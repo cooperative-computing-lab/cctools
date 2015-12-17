@@ -267,7 +267,7 @@ void parse_limits_string(struct rmsummary *limits, char *str)
 
 	rmsummary_merge_override(limits, s);
 
-	free(s);
+	rmsummary_delete(s);
 }
 
 void parse_limits_file(struct rmsummary *limits, char *path)
@@ -277,7 +277,7 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 
 	rmsummary_merge_override(limits, s);
 
-	free(s);
+	rmsummary_delete(s);
 }
 
 
@@ -618,15 +618,15 @@ void rmonitor_summary_header()
 	    fprintf(log_series, " %20s", "cpu_time");
 	    fprintf(log_series, " %25s", "max_concurrent_processes");
 	    fprintf(log_series, " %25s", "virtual_memory");
-	    fprintf(log_series, " %25s", "resident_memory");
+	    fprintf(log_series, " %25s", "memory");
 	    fprintf(log_series, " %25s", "swap_memory");
 	    fprintf(log_series, " %25s", "bytes_read");
 	    fprintf(log_series, " %25s", "bytes_written");
 
-	    if(resources_flags->workdir_footprint)
+	    if(resources_flags->disk)
 	    {
-		    fprintf(log_series, " %25s", "workdir_num_files");
-		    fprintf(log_series, " %25s", "workdir_footprint");
+		    fprintf(log_series, " %25s", "total_files");
+		    fprintf(log_series, " %25s", "disk");
 	    }
 
 	    fprintf(log_series, "\n");
@@ -649,12 +649,12 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	 * fallback. */
 	if(m->resident > 0) {
 		tr->virtual_memory    = (int64_t) m->virtual;
-		tr->resident_memory   = (int64_t) m->resident;
+		tr->memory   = (int64_t) m->resident;
 		tr->swap_memory       = (int64_t) m->swap;
 	}
 	else {
 		tr->virtual_memory    = (int64_t) p->mem.virtual;
-		tr->resident_memory   = (int64_t) p->mem.resident;
+		tr->memory   = (int64_t) p->mem.resident;
 		tr->swap_memory       = (int64_t) p->mem.swap;
 	}
 
@@ -662,8 +662,8 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
 	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
-	tr->workdir_num_files = (int64_t) d->files;
-	tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+	tr->total_files = (int64_t) d->files;
+	tr->disk = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
 	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 }
@@ -689,15 +689,15 @@ void rmonitor_log_row(struct rmsummary *tr)
 		fprintf(log_series, " %18" PRId64, tr->cpu_time);
 		fprintf(log_series, " %20" PRId64, tr->max_concurrent_processes);
 		fprintf(log_series, " %20" PRId64, tr->virtual_memory);
-		fprintf(log_series, " %20" PRId64, tr->resident_memory);
+		fprintf(log_series, " %20" PRId64, tr->memory);
 		fprintf(log_series, " %20" PRId64, tr->swap_memory);
 		fprintf(log_series, " %20" PRId64, tr->bytes_read);
 		fprintf(log_series, " %20" PRId64, tr->bytes_written);
 
-		if(resources_flags->workdir_footprint)
+		if(resources_flags->disk)
 		{
-			fprintf(log_series, " %20" PRId64, tr->workdir_num_files);
-			fprintf(log_series, " %20" PRId64, tr->workdir_footprint);
+			fprintf(log_series, " %20" PRId64, tr->total_files);
+			fprintf(log_series, " %20" PRId64, tr->disk);
 		}
 
 		fprintf(log_series, "\n");
@@ -706,7 +706,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
 
-	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->resident_memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->workdir_num_files, tr->workdir_footprint);
+	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->total_files, tr->disk);
 
 }
 
@@ -1193,14 +1193,14 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
 	over_limit_check(tr, cpu_time,  1.0/ONE_SECOND, "lf");
 	over_limit_check(tr, max_concurrent_processes,   1, PRId64);
-	over_limit_check(tr, total_processes,   1, PRId64);
+	over_limit_check(tr, total_processes, 1, PRId64);
 	over_limit_check(tr, virtual_memory,  1, PRId64);
-	over_limit_check(tr, resident_memory, 1, PRId64);
+	over_limit_check(tr, memory,          1, PRId64);
 	over_limit_check(tr, swap_memory,     1, PRId64);
 	over_limit_check(tr, bytes_read,      1, PRId64);
 	over_limit_check(tr, bytes_written,   1, PRId64);
-	over_limit_check(tr, workdir_num_files, 1, PRId64);
-	over_limit_check(tr, workdir_footprint, 1, PRId64);
+	over_limit_check(tr, total_files,     1, PRId64);
+	over_limit_check(tr, disk, 1, PRId64);
 
 	if(tr->limits_exceeded)
 		return 0;
@@ -1532,7 +1532,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		rmonitor_poll_all_processes_once(processes, p_acc);
 		rmonitor_poll_maps_once(processes, m_acc);
 
-		if(resources_flags->workdir_footprint)
+		if(resources_flags->disk)
 			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(ONE_SECOND*hash_table_size(wdirs))));
 
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
@@ -1560,7 +1560,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		round++;
 	}
 
-    free(resources_now);
+    rmsummary_delete(resources_now);
     free(p_acc);
     free(m_acc);
     free(d_acc);
@@ -1595,8 +1595,8 @@ int main(int argc, char **argv) {
     signal(SIGTERM, rmonitor_final_cleanup);
 
     summary          = calloc(1, sizeof(struct rmsummary));
-    resources_limits = make_rmsummary(-1);
-    resources_flags  = make_rmsummary(0);
+    resources_limits = rmsummary_create(-1);
+    resources_flags  = rmsummary_create(0);
 
     rmsummary_read_env_vars(resources_limits);
 
@@ -1650,7 +1650,7 @@ int main(int argc, char **argv) {
 
 
 	/* By default, measure working directory. */
-	resources_flags->workdir_footprint = 1;
+	resources_flags->disk = 1;
 
 	/* Used in LONG_OPT_MEASURE_DIR */
 	char measure_dir_name[PATH_MAX];
@@ -1706,7 +1706,7 @@ int main(int argc, char **argv) {
 				use_inotify = 1;
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
-				resources_flags->workdir_footprint = 0;
+				resources_flags->disk = 0;
 				break;
 			case LONG_OPT_FOLLOW_CHDIR:
 				follow_chdir = 1;

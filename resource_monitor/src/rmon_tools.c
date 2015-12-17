@@ -4,12 +4,12 @@ struct field fields[NUM_FIELDS + 1] = {
 	[WALL_TIME] = {"t", "wall time",      "s",      1, offsetof(struct rmDsummary, wall_time)},
 	[CPU_TIME]  = {"c", "cpu time",        "s",     1, offsetof(struct rmDsummary, cpu_time)},
 	[VIRTUAL  ] = {"v", "virtual memory",  "MB",    1, offsetof(struct rmDsummary, virtual_memory)},
-	[RESIDENT ] = {"m", "resident memory", "MB",    1, offsetof(struct rmDsummary, resident_memory)},
+	[RESIDENT ] = {"m", "resident memory", "MB",    1, offsetof(struct rmDsummary, memory)},
 	[SWAP     ] = {"s", "swap memory",     "MB",    1, offsetof(struct rmDsummary, swap_memory)},
 	[B_READ   ] = {"r", "read bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_read)},
 	[B_WRITTEN] = {"w", "written bytes",   "MB",    1, offsetof(struct rmDsummary, bytes_written)},
-	[FILES    ] = {"n", "num files",       "files", 1, offsetof(struct rmDsummary, workdir_num_files)},
-	[FOOTPRINT] = {"z", "footprint",       "MB",    1, offsetof(struct rmDsummary, workdir_footprint)},
+	[FILES    ] = {"n", "num files",       "files", 1, offsetof(struct rmDsummary, total_files)},
+	[FOOTPRINT] = {"z", "footprint",       "MB",    1, offsetof(struct rmDsummary, disk)},
 	[CORES    ] = {"C", "cores",           "cores", 0, offsetof(struct rmDsummary, cores)},
 	[MAX_PROCESSES]   = {"p", "max processes",   "procs", 0, offsetof(struct rmDsummary, max_concurrent_processes)},
 	[TOTAL_PROCESSES] = {"P", "total processes", "procs", 0, offsetof(struct rmDsummary, total_processes)},
@@ -268,14 +268,14 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 	s->max_concurrent_processes = so->max_concurrent_processes;
 
 	s->virtual_memory = so->virtual_memory;
-	s->resident_memory = so->resident_memory;
+	s->memory = so->memory;
 	s->swap_memory = so->swap_memory;
 
 	s->bytes_read    = bytes_to_Mbytes(so->bytes_read);
 	s->bytes_written = bytes_to_Mbytes(so->bytes_written);
 
-	s->workdir_num_files = so->workdir_num_files;
-	s->workdir_footprint = so->workdir_footprint;
+	s->total_files = so->total_files;
+	s->disk = so->disk;
 
 	s->task_id = so->task_id;
 	if(s->task_id < 0)

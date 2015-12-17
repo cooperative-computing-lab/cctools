@@ -82,7 +82,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
 {
 	FILE *file;
 	int njobs;
@@ -150,19 +150,16 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	if(options)
 		fprintf(file, "%s\n", options);
 
-	const char *resource = NULL;
+	if(resources) {
+		if(resources->cores > -1)
+			fprintf(file, "request_cpus = %" PRId64 "\n", resources->cores);
 
-	resource = hash_table_lookup(q->options, "cores");
-	if(resource)
-		fprintf(file, "request_cpus = %s\n", resource);
+		if(resources->memory > -1)
+			fprintf(file, "request_memory = %" PRId64 "\n", resources->memory);
 
-	resource = hash_table_lookup(q->options, "memory");
-	if(resource)
-		fprintf(file, "request_memory = %s\n", resource);
-
-	resource = hash_table_lookup(q->options, "disk");
-	if(resource)
-		fprintf(file, "request_disk = (%s*1024)\n", resource);
+		if(resources->disk > -1)
+			fprintf(file, "request_disk = (%" PRId64 "*1024)\n", resources->disk);
+	}
 
 	fprintf(file, "queue\n");
 	fclose(file);
