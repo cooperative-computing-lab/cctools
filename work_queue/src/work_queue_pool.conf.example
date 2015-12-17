@@ -1,7 +1,12 @@
-distribution: lyu2-proj.*=200
-max_workers: 200
-mode: on-demand
-default_capacity: 20
-max_change_per_min: 60
-billing_cycle: 1200
-worker_terminate_boundary: 1200
+{
+    "master-name": "my_masters.*",
+    "max-workers": 400,
+    "min-workers": 1,
+    "cores":     8,
+    "disk":      500,
+    "timeout": 300,
+    "tasks-per-worker": 8.0,
+    "worker-extra-options": "-dall"
+}
+
+
