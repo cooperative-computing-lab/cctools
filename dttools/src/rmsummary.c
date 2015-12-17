@@ -25,7 +25,7 @@
 #include "int_sizes.h"
 #include "jx.h"
 #include "jx_parse.h"
-#include "jx_print.h"
+#include "jx_pretty_print.h"
 #include "list.h"
 #include "macros.h"
 #include "rmsummary.h"
@@ -371,7 +371,7 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fiel
 		}
 	}
 
-	jx_print_stream(jsum, stream);
+	jx_pretty_print_stream(jsum, stream);
 	jx_delete(jsum);
 }
 

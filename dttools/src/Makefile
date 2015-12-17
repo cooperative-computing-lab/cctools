@@ -58,6 +58,7 @@ SOURCES = \
 	jx_database.c \
 	jx_parse.c \
 	jx_print.c \
+	jx_pretty_print.c \
 	jx_table.c \
 	jx_export.c \
 	link.c \
