@@ -34,4 +34,6 @@ See the file COPYING for details.
 #define TERABYTE TERA
 #define PETABYTE PETA
 
+#define USECOND 1000000
+
 #endif
