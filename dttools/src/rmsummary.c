@@ -258,9 +258,6 @@ struct jx *rmsummary_to_json(struct rmsummary *s) {
 	if(s->exit_status)
 		jx_insert_integer(output, "exit_status", s->exit_status);
 
-	if(s->exit_type)
-		jx_insert_string(output, "exit_type", s->exit_type);
-
 	if(s->command)
 		jx_insert_string(output, "command",   s->command);
 
