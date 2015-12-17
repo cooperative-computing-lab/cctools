@@ -25,10 +25,10 @@ struct makeflow_monitor * makeflow_monitor_create()
 	m->enable_time_series = 0;
 	m->enable_list_files  = 0;
 
-	m->limits_name	= NULL;
-	m->interval		= 1;  // in seconds
-	m->log_prefix	= NULL;
-	m->exe			= NULL;
+	m->limits       = NULL;
+	m->interval     = 1;  // in seconds
+	m->log_prefix   = NULL;
+	m->exe          = NULL;
 	m->exe_remote	= NULL;
 
 	return m;
@@ -104,7 +104,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 
 	char * result = resource_monitor_write_command(executable,
 			m->log_prefix,
-			m->limits_name,
+			m->limits,
 			extra_options,
 			m->enable_debug,
 			m->enable_time_series,

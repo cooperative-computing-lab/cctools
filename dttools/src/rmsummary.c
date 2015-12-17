@@ -21,14 +21,15 @@
 #include <ctype.h>
 
 #include "buffer.h"
+#include "debug.h"
 #include "int_sizes.h"
+#include "jx_print.h"
+#include "list.h"
+#include "macros.h"
+#include "rmsummary.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-#include "debug.h"
-#include "list.h"
-#include "rmsummary.h"
 
-#define ONE_MEGABYTE 1048576 /* this many bytes */
 #define MAX_LINE 1024
 
 #define rmsummary_assign_as_int_field(s, key, value, field)	\
@@ -57,7 +58,6 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_time_field  (s, key, value, end);
 	rmsummary_assign_as_string_field(s, key, value, exit_type);
 	rmsummary_assign_as_int_field   (s, key, value, signal);
-	rmsummary_assign_as_string_field(s, key, value, limits_exceeded);
 	rmsummary_assign_as_int_field   (s, key, value, exit_status);
 	rmsummary_assign_as_int_field   (s, key, value, last_error);
 	rmsummary_assign_as_time_field  (s, key, value, wall_time);
@@ -65,12 +65,12 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 	rmsummary_assign_as_int_field   (s, key, value, total_processes);
 	rmsummary_assign_as_time_field  (s, key, value, cpu_time);
 	rmsummary_assign_as_int_field   (s, key, value, virtual_memory);
-	rmsummary_assign_as_int_field   (s, key, value, resident_memory);
+	rmsummary_assign_as_int_field   (s, key, value, memory);
 	rmsummary_assign_as_int_field   (s, key, value, swap_memory);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_read);
 	rmsummary_assign_as_int_field   (s, key, value, bytes_written);
-	rmsummary_assign_as_int_field   (s, key, value, workdir_num_files);
-	rmsummary_assign_as_int_field   (s, key, value, workdir_footprint);
+	rmsummary_assign_as_int_field   (s, key, value, total_files);
+	rmsummary_assign_as_int_field   (s, key, value, disk);
 	rmsummary_assign_as_int_field   (s, key, value, cores);
 	rmsummary_assign_as_int_field   (s, key, value, gpus);
 
@@ -78,7 +78,7 @@ int rmsummary_assign_field(struct rmsummary *s, char *key, char *value)
 }
 
 /** Reads a single summary from stream. Summaries are not parsed, here
-	we simply read between markers (--) **/
+	we simply read between markers (---) **/
 char *rmsummary_read_single_chunk(FILE *stream)
 {
 	struct buffer b;
@@ -105,7 +105,7 @@ char *rmsummary_read_single_chunk(FILE *stream)
 	ungetc(c, stream);
 	while(fgets(line, MAX_LINE, stream))
 	{
-		if(string_prefix_is(line, "--")) {
+		if(string_prefix_is(line, "---")) {
 			/* we got to the end of document */
 			break;
 		}
@@ -134,7 +134,7 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 
 	const char delim[] = { separator, '\n', '\0'};
 
-	struct rmsummary *s = make_rmsummary(-1);
+	struct rmsummary *s = rmsummary_create(-1);
 
 	/* if source have no last_error, we do not want the -1 from above */
 	s->last_error = 0;
@@ -166,7 +166,7 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 }
 
 /* Parse the file, assuming there is a single summary in it. */
-struct rmsummary *rmsummary_parse_file_single(char *filename)
+struct rmsummary *rmsummary_parse_file_single(const char *filename)
 {
 	FILE *stream;
 	stream = fopen(filename, "r");
@@ -186,100 +186,146 @@ struct rmsummary *rmsummary_parse_file_single(char *filename)
 	return s;
 }
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits, char *preamble, char *epilogue)
-{
-	if(preamble)
-		fprintf(stream, "%s", preamble);
+struct jx *rmsummary_to_json(struct rmsummary *s) {
+	struct jx *output = jx_object(NULL);
+	struct jx *array;
 
-	if(s->command)
-		fprintf(stream, "%s %s\n",  "command:", s->command);
+	if(s->disk > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->disk));
+		jx_array_append(array, jx_string("MB"));
+		jx_insert(output, jx_string("cpu_time"), array);
+	}
 
-	if(s->category)
-		fprintf(stream, "%-15s%s\n",  "category:", s->category);
+	if(s->total_files > -1)
+		jx_insert_integer(output, "total_files",   s->total_files);
 
-	if(s->exit_type)
-		fprintf(stream, "%-20s%20s\n",  "exit_type:", s->exit_type);
+	if(s->bytes_written > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->bytes_written));
+		jx_array_append(array, jx_string("B"));
+		jx_insert(output, jx_string("bytes_written"), array);
+	}
 
-	fprintf(stream, "%-20s%20" PRId64 "\n",  "exit_status:", s->exit_status);
+	if(s->bytes_read > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->bytes_read));
+		jx_array_append(array, jx_string("B"));
+		jx_insert(output, jx_string("bytes_read"), array);
+	}
 
-	if(s->last_error)
-		fprintf(stream, "%-20s%20" PRId64 " %s\n",  "last_error:", s->last_error, strerror(s->last_error));
+	if(s->swap_memory > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->swap_memory));
+		jx_array_append(array, jx_string("MB"));
+		jx_insert(output, jx_string("swap_memory"), array);
+	}
+
+	if(s->memory > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->memory));
+		jx_array_append(array, jx_string("MB"));
+		jx_insert(output, jx_string("memory"), array);
+	}
+
+	if(s->virtual_memory > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->virtual_memory));
+		jx_array_append(array, jx_string("MB"));
+		jx_insert(output, jx_string("virtual_memory"), array);
+	}
+
+	if(s->total_processes > -1)
+		jx_insert_integer(output, "total_processes",   s->total_processes);
+
+	if(s->max_concurrent_processes > -1)
+		jx_insert_integer(output, "max_concurrent_processes",   s->max_concurrent_processes);
+
+	if(s->cores > -1)
+		jx_insert_integer(output, "cores",   s->cores);
+
+	if(s->cpu_time > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->cpu_time/1e6));
+		jx_array_append(array, jx_string("s"));
+		jx_insert(output, jx_string("cpu_time"), array);
+	}
+
+	if(s->wall_time > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->wall_time/1e6));
+		jx_array_append(array, jx_string("s"));
+		jx_insert(output, jx_string("wall_time"), array);
+	}
+
+	if(s->end > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->end/1e6));
+		jx_array_append(array, jx_string("s"));
+		jx_insert(output, jx_string("end"), array);
+	}
+
+	if(s->start > -1) {
+		array = jx_array(NULL);
+		jx_array_append(array, jx_double(s->start/1e6));
+		jx_array_append(array, jx_string("s"));
+		jx_insert(output, jx_string("start"), array);
+	}
 
 	if(s->exit_type)
 	{
 		if( strcmp(s->exit_type, "signal") == 0 )
-			fprintf(stream, "%-20s%20" PRId64 "\n",  "signal:", s->signal);
+			jx_insert_integer(output, "signal", s->signal);
 		else if( strcmp(s->exit_type, "limits") == 0 )
-			fprintf(stream, "%-20s%s\n",  "limits_exceeded:", s->limits_exceeded);
+			if(s->limits_exceeded) {
+				struct jx *lim = rmsummary_to_json(s->limits_exceeded);
+				jx_insert(output, jx_string("limits_exceeded"), lim);
+			}
+		jx_insert_string(output, "exit_type", "limits");
 	}
 
-	rmsummary_print_only_resources(stream, s, "");
+	if(s->last_error)
+		jx_insert_integer(output, "last_error", s->last_error);
 
-	if(limits) {
-		rmsummary_print_only_resources(stream, limits, "limits_");
-	}
+	if(s->exit_status)
+		jx_insert_integer(output, "exit_status", s->exit_status);
 
-	if(epilogue)
-		fprintf(stream, "%s", epilogue);
+	if(s->exit_type)
+		jx_insert_string(output, "exit_type", s->exit_type);
 
-	fprintf(stream, "--\n\n");
+	if(s->command)
+		jx_insert_string(output, "command",   s->command);
+
+	if(s->category)
+		jx_insert_string(output, "category",  s->category);
+
+
+	return output;
 }
 
-void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix)
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fields)
 {
-	if(!prefix){
-		prefix = "";
+	struct jx *jsum = rmsummary_to_json(s);
+
+	if(verbatim_fields) {
+		if(!jx_istype(verbatim_fields, JX_OBJECT)) {
+			fatal("Vebatim fields is not a json object.");
+		}
+		struct jx_pair *head = verbatim_fields->u.pairs;
+
+		while(head) {
+			jx_insert(jsum, head->key, head->value);
+			head = head->next;
+		}
 	}
 
-	if(s->start > -1)
-		fprintf(stream, "%-20s%20lf s\n", "start:", s->start / 1000000e0);
-
-	if(s->end > -1)
-		fprintf(stream, "%-20s%20lf s\n", "end:",  s->end / 1000000e0);
-
-	if(s->wall_time > -1)
-		fprintf(stream, "%s%-20s%20lf s\n", prefix, "wall_time:", s->wall_time >= 0 ? s->wall_time / 1000000e0 : -1);
-
-	if(s->cpu_time > -1)
-		fprintf(stream, "%s%-20s%20lf s\n", prefix, "cpu_time:", s->cpu_time   >= 0 ? s->cpu_time  / 1000000e0 : -1);
-
-	if(s->cores > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 "\n", prefix,  "cores:", s->cores);
-
-	//Disable printing gpus for now, as we cannot measure them.
-	//if(s->gpus > -1)
-	//	fprintf(stream, "%s%-20s%20" PRId64 "\n",  prefix, "gpus:", s->gpus);
-
-	if(s->max_concurrent_processes > -1)
-		fprintf(stream, "%s%-20s%15" PRId64 " procs\n",  prefix, "max_concurrent_processes:", s->max_concurrent_processes);
-
-	if(s->total_processes > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " procs\n",  prefix, "total_processes:", s->total_processes);
-
-	if(s->virtual_memory > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "virtual_memory:", s->virtual_memory);
-
-	if(s->resident_memory > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "resident_memory:", s->resident_memory);
-
-	if(s->swap_memory > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " MB\n",  prefix, "swap_memory:", s->swap_memory);
-
-	if(s->bytes_read > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " B\n",  prefix, "bytes_read:", s->bytes_read);
-
-	if(s->bytes_written > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " B\n",  prefix, "bytes_written:", s->bytes_written);
-
-	if(s->workdir_num_files > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " files+dirs\n",  prefix, "workdir_num_files:", s->workdir_num_files);
-
-	if(s->workdir_footprint > -1)
-		fprintf(stream, "%s%-20s%20" PRId64 " MB\n", prefix, "workdir_footprint:", s->workdir_footprint);
+	jx_print_stream(jsum, stream);
+	jx_delete(jsum);
 }
+
 /* Parse the file assuming there are multiple summaries in it. Summary
    boundaries are lines starting with # */
-struct list *rmsummary_parse_file_multiple(char *filename)
+struct list *rmsummary_parse_file_multiple(const char *filename)
 {
 	FILE *stream;
 	stream = fopen(filename, "r");
@@ -317,20 +363,9 @@ struct rmsummary *rmsummary_parse_next(FILE *stream)
 	return s;
 }
 
-struct rmsummary *rmsummary_parse_limits_exceeded(char *limits_exceeded)
-{
-	struct rmsummary *limits = NULL;
-
-	if(limits_exceeded)
-		limits = rmsummary_parse_from_str(limits_exceeded, ',');
-
-	return limits;
-}
-
-
 /* Create summary filling all numeric fields with default_value, and
 all string fields with NULL. Usual values are 0, or -1. */
-struct rmsummary *make_rmsummary(signed char default_value)
+struct rmsummary *rmsummary_create(signed char default_value)
 {
 	struct rmsummary *s = malloc(sizeof(struct rmsummary));
 	memset(s, default_value, sizeof(struct rmsummary));
@@ -340,18 +375,39 @@ struct rmsummary *make_rmsummary(signed char default_value)
 	s->exit_type = NULL;
 	s->limits_exceeded = NULL;
 
+	s->last_error  = 0;
+	s->exit_status = 0;
+
 	return s;
+}
+
+void rmsummary_delete(struct rmsummary *s)
+{
+	if(!s)
+		return;
+
+	if(s->command)
+		free(s->command);
+
+	if(s->category)
+		free(s->category);
+
+	if(s->exit_type)
+		free(s->exit_type);
+
+	if(s->limits_exceeded)
+		free(s->limits_exceeded);
 }
 
 void rmsummary_read_env_vars(struct rmsummary *s)
 {
 	char *value;
 	if((value = getenv( RESOURCES_CORES  )))
-		s->cores           = atoi(value);
+		s->cores  = atoi(value);
 	if((value = getenv( RESOURCES_MEMORY )))
-		s->resident_memory = atoi(value);
+		s->memory = atoi(value);
 	if((value = getenv( RESOURCES_DISK )))
-		s->workdir_footprint = atoi(value);
+		s->disk   = atoi(value);
 }
 
 #define rmsummary_apply_op(dest, src, fn, field) (dest)->field = fn((dest)->field, (src)->field)
@@ -368,12 +424,12 @@ void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op f
 	rmsummary_apply_op(dest, src, fn, total_processes);
 	rmsummary_apply_op(dest, src, fn, cpu_time);
 	rmsummary_apply_op(dest, src, fn, virtual_memory);
-	rmsummary_apply_op(dest, src, fn, resident_memory);
+	rmsummary_apply_op(dest, src, fn, memory);
 	rmsummary_apply_op(dest, src, fn, swap_memory);
 	rmsummary_apply_op(dest, src, fn, bytes_read);
 	rmsummary_apply_op(dest, src, fn, bytes_written);
-	rmsummary_apply_op(dest, src, fn, workdir_num_files);
-	rmsummary_apply_op(dest, src, fn, workdir_footprint);
+	rmsummary_apply_op(dest, src, fn, total_files);
+	rmsummary_apply_op(dest, src, fn, disk);
 
 	rmsummary_apply_op(dest, src, fn, cores);
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
@@ -402,6 +458,21 @@ void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src)
 	rmsummary_bin_op(dest, src, max_field);
 }
 
+/* Select the min of the fields, ignoring negative numbers */
+static int64_t min_field(int64_t d, int64_t s)
+{
+	if(d < 0 || s < 0) {
+		return MAX(-1, MAX(s, d)); /* return at least -1. */
+	} else {
+		return MIN(s, d);
+	}
+}
+
+void rmsummary_merge_min(struct rmsummary *dest, struct rmsummary *src)
+{
+	rmsummary_bin_op(dest, src, min_field);
+}
+
 void rmsummary_debug_report(struct rmsummary *s)
 {
 	if(s->cores != -1)
@@ -420,18 +491,18 @@ void rmsummary_debug_report(struct rmsummary *s)
 		debug(D_DEBUG, "max resource %-18s  s: %lf\n", "cpu_time",  ((double) s->cpu_time  / 1000000));
 	if(s->virtual_memory != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "virtual_memory", s->virtual_memory);
-	if(s->resident_memory != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "resident_memory", s->resident_memory);
+	if(s->memory != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "memory", s->memory);
 	if(s->swap_memory != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "swap_memory", s->swap_memory);
 	if(s->bytes_read != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_read", s->bytes_read);
 	if(s->bytes_written != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_written", s->bytes_written);
-	if(s->workdir_num_files != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "workdir_num_files", s->workdir_num_files);
-	if(s->workdir_footprint != -1)
-		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "workdir_footprint", s->workdir_footprint);
+	if(s->total_files != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
+	if(s->disk != -1)
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "disk", s->disk);
 }
 
 /* vim: set noexpandtab tabstop=4: */
