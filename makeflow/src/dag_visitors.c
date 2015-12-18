@@ -157,25 +157,29 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
 {
 
 	//separate nodes per category
-	struct itable *nodes_of_category = itable_create(2*hash_table_size(d->task_categories));
+	struct hash_table *nodes_of_category = hash_table_create(2*hash_table_size(d->task_categories), 0);
 
 	struct category *c;
 	struct list *ns;
 	struct dag_node *n = d->nodes;
+	char *name;
 
 	while(n) {
-		ns = itable_lookup(nodes_of_category, (uintptr_t) c);
+		name = n->category->name;
+		ns = hash_table_lookup(nodes_of_category, name);
 		if(!ns) {
 			ns = list_create(0);
-			itable_insert(nodes_of_category, (uintptr_t) c, (void *) ns);
+			hash_table_insert(nodes_of_category, name, (void *) ns);
 		}
 		list_push_tail(ns, n);
 		n = n->next;
 	}
 
-	itable_firstkey(nodes_of_category);
-	while(itable_nextkey(nodes_of_category, (uintptr_t *) &c, (void **) &ns))
+	hash_table_firstkey(nodes_of_category);
+	while(hash_table_nextkey(nodes_of_category, &name, (void **) &ns)) {
+		c = category_lookup_or_create(d->task_categories, name);
 		dag_to_file_category(c, ns, dag_stream, rename);
+	}
 
 	return 0;
 }
