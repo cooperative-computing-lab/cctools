@@ -786,29 +786,31 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 	uint64_t start;
 	err = rmonitor_get_start_time(pid, &start);
 	if(err != 0)
-		return err;
+		return NULL;
 
 	rmonitor_info_to_rmsummary(tr, &p, d, NULL, start);
 	tr->command = rmonitor_get_command_line(pid);
 
 	if(d) {
+		path_disk_size_info_delete_state(d->state);
 		free(d);
 	}
 
-	return 0;
+	return tr;
 }
 
 int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid) {
 
-	struct rmsummary now;
-	int err = rmonitor_measure_process(&now, pid);
+	struct rmsummary *now = rmonitor_measure_process(pid);
 
-	if(err != 0)
-		return err;
+	if(!now)
+		return 0;
 
-	rmsummary_merge_max(tr, &now);
+	rmsummary_merge_max(tr, now);
 
-	return 0;
+	rmsummary_delete(now);
+
+	return 1;
 }
 
 /* vim: set noexpandtab tabstop=4: */

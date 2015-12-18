@@ -84,6 +84,8 @@ void category_delete(struct hash_table *categories, const char *name) {
 	itable_delete(c->disk_histogram);
 	itable_delete(c->wall_time_histogram);
 
+	rmsummary_delete(c->first);
+
 	free(c);
 }
 

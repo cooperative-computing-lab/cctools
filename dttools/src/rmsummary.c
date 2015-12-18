@@ -37,16 +37,22 @@
 
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
+		if(s->category)
+			free(s->category);
 		s->category = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "command") == 0) {
+		if(s->command)
+			free(s->command);
 		s->command = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "exit_type") == 0) {
+		if(s->exit_type)
+			free(s->exit_type);
 		s->exit_type = xxstrdup(value);
 		return 1;
 	}
@@ -401,7 +407,7 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fiel
 		struct jx_pair *head = verbatim_fields->u.pairs;
 
 		while(head) {
-			jx_insert(jsum, head->key, head->value);
+			jx_insert(jsum, jx_copy(head->key), jx_copy(head->value));
 			head = head->next;
 		}
 	}
@@ -444,6 +450,8 @@ void rmsummary_delete(struct rmsummary *s)
 
 	if(s->limits_exceeded)
 		free(s->limits_exceeded);
+
+	free(s);
 }
 
 void rmsummary_read_env_vars(struct rmsummary *s)

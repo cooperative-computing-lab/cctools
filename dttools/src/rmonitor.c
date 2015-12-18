@@ -166,7 +166,8 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 
 	buffer_printf(&cmd_builder, " --sh []");
 
-	char *result = xxstrdup(buffer_tostring(&cmd_builder));
+	char *result;
+	buffer_dupl(&cmd_builder, &result, 0);
 	buffer_free(&cmd_builder);
 
 	return result;

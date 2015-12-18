@@ -645,9 +645,9 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 		return;
 
 	// If host and port are not set, pick defaults.
-	if(!q->catalog_host)	q->catalog_host = strdup(CATALOG_HOST);
-	if(!q->catalog_port)	q->catalog_port = CATALOG_PORT;
-	if(!q->update_port)	q->update_port = datagram_create(DATAGRAM_PORT_ANY);
+	if(!q->catalog_host) q->catalog_host = strdup(CATALOG_HOST);
+	if(!q->catalog_port) q->catalog_port = CATALOG_PORT;
+	if(!q->update_port)  q->update_port = datagram_create(DATAGRAM_PORT_ANY);
 
 	if(!domain_name_cache_lookup(q->catalog_host, address)) {
 		debug(D_WQ,"could not resolve address of catalog server %s!",q->catalog_host);
@@ -1185,10 +1185,13 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	char *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
+	if(t->rs)
+		free(t->rs);
+
 	t->rs = rmsummary_parse_file_single(summary);
 
 	if(t->rs) {
-		t->rs->category = xxstrdup(t->category);
+		rmsummary_assign_char_field(t->rs, "category", t->category);
 	}
 
 	free(summary);
@@ -2498,6 +2501,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	t->time_send_input_finish = timestamp_get(); //record end time in case we return prematurely below.
 
 	if (result != SUCCESS) {
+		free(command_line);
 		return result;
 	}
 
@@ -4114,8 +4118,6 @@ struct work_queue *work_queue_create(int port)
 	q->measured_local_resources = rmsummary_create(-1);
 	q->worker_top_resources     = rmsummary_create(-1);
 
-	q->categories = hash_table_create(0, 0);
-
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
 
@@ -4209,8 +4211,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
   }
 
   q->monitor_summary_filename = string_format("%s/wq-%d.summaries", q->monitor_output_dirname, getpid());
-
-  q->monitor_file = fopen(q->monitor_summary_filename, "a");
+  q->monitor_file             = fopen(q->monitor_summary_filename, "a");
 
   if(!q->monitor_file)
   {
@@ -4218,7 +4219,9 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	return 0;
   }
 
-  rmonitor_measure_process(q->measured_local_resources, getpid());
+  if(q->measured_local_resources)
+	  free(q->measured_local_resources);
+  q->measured_local_resources = rmonitor_measure_process(getpid());
 
   q->monitor_mode = MON_SINGLE_FILE;
 
@@ -4382,7 +4385,13 @@ void work_queue_delete(struct work_queue *q)
 		if(q->name) {
 			update_catalog(q, NULL, 1);
 		}
+
+		/* we call this function here before any of the structures are freed. */
+		work_queue_disable_monitoring(q);
+
 		if(q->catalog_host) free(q->catalog_host);
+		if(q->update_port)  free(q->update_port);
+
 		hash_table_delete(q->worker_table);
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
@@ -4408,13 +4417,18 @@ void work_queue_delete(struct work_queue *q)
 		free(q->stats);
 		free(q->stats_disconnected_workers);
 
+		if(q->name)
+			free(q->name);
+
+		if(q->master_preferred_connection)
+			free(q->master_preferred_connection);
+
 		free(q->poll_table);
 		link_close(q->master_link);
 		if(q->logfile) {
 			fclose(q->logfile);
 		}
 
-		work_queue_disable_monitoring(q);
 		if(q->measured_local_resources)
 			rmsummary_delete(q->measured_local_resources);
 		if(q->worker_top_resources)
@@ -4461,22 +4475,32 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 
 	FILE *final = fdopen(final_fd, "w");
 
-	rmsummary_print(final, q->measured_local_resources, NULL);
-	fprintf(final, "user:        %s\n", getlogin());
-	fprintf(final, "type:        work_queue\n");
+	struct jx *extra = jx_object(
+			jx_pair(jx_string("type"), jx_string("work_queue"),
+				jx_pair(jx_string("user"), jx_string(getlogin()),
+					NULL)));
 
-	if(q->name)
-		fprintf(final, "master_name: %s\n", q->name);
+	if(q->name) {
+		jx_insert_string(extra, "master_name", q->name);
+	}
 
-	fprintf(final, "exit_type:   normal\n");
+	if(!q->measured_local_resources->exit_type)
+		q->measured_local_resources->exit_type = xxstrdup("normal");
+
+	rmsummary_print(final, q->measured_local_resources, extra);
 
 	copy_fd_to_stream(summs_fd, final);
 
+	jx_delete(extra);
 	fclose(final);
 	close(summs_fd);
 
 	if(rename(template, q->monitor_summary_filename) < 0)
 		warn(D_DEBUG, "Could not move monitor report to final destination file.");
+
+	free(q->monitor_exe);
+	free(q->monitor_output_dirname);
+	free(q->monitor_summary_filename);
 }
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
@@ -4515,7 +4539,10 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	}
 
 	int extra_files = (q->monitor_mode == MON_FULL);
-	char *wrap_cmd  = string_wrap_command(t->command_line, resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0));
+	char *monitor_cmd = resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0);
+
+	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
+	free(monitor_cmd);
 
 	if(extra_files) {
 		char *debug    = NULL;
