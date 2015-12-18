@@ -61,25 +61,24 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 	}
 
 	if(strcmp(key, "start") == 0) {
-		s->start = value * USECOND;
+		s->start = value;
 		return 1;
 	}
 
 	if(strcmp(key, "end") == 0) {
-		s->end = value * USECOND;
+		s->end = value;
 		return 1;
 	}
 
 	if(strcmp(key, "wall_time") == 0) {
-		s->wall_time = value * USECOND;
+		s->wall_time = value;
 		return 1;
 	}
 
 	if(strcmp(key, "cpu_time") == 0) {
-		s->cpu_time = value * USECOND;
+		s->cpu_time = value;
 		return 1;
 	}
-
 
 	if(strcmp(key, "signal") == 0) {
 		s->signal = value;
@@ -160,47 +159,35 @@ struct jx *rmsummary_to_json(struct rmsummary *s) {
 	struct jx *array;
 
 	if(s->disk > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->disk));
-		jx_array_append(array, jx_string("MB"));
-		jx_insert(output, jx_string("cpu_time"), array);
+		array = jx_arrayv(jx_integer(s->disk), jx_string("MB"), NULL);
+		jx_insert(output, jx_string("disk"), array);
 	}
 
 	if(s->total_files > -1)
 		jx_insert_integer(output, "total_files",   s->total_files);
 
 	if(s->bytes_written > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->bytes_written));
-		jx_array_append(array, jx_string("B"));
+		array = jx_arrayv(jx_integer(s->bytes_written), jx_string("MB"), NULL);
 		jx_insert(output, jx_string("bytes_written"), array);
 	}
 
 	if(s->bytes_read > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->bytes_read));
-		jx_array_append(array, jx_string("B"));
+		array = jx_arrayv(jx_integer(s->bytes_read), jx_string("MB"), NULL);
 		jx_insert(output, jx_string("bytes_read"), array);
 	}
 
 	if(s->swap_memory > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->swap_memory));
-		jx_array_append(array, jx_string("MB"));
+		array = jx_arrayv(jx_integer(s->swap_memory), jx_string("MB"), NULL);
 		jx_insert(output, jx_string("swap_memory"), array);
 	}
 
 	if(s->memory > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->memory));
-		jx_array_append(array, jx_string("MB"));
+		array = jx_arrayv(jx_integer(s->memory), jx_string("MB"), NULL);
 		jx_insert(output, jx_string("memory"), array);
 	}
 
 	if(s->virtual_memory > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->virtual_memory));
-		jx_array_append(array, jx_string("MB"));
+		array = jx_arrayv(jx_integer(s->virtual_memory), jx_string("MB"), NULL);
 		jx_insert(output, jx_string("virtual_memory"), array);
 	}
 
@@ -214,30 +201,22 @@ struct jx *rmsummary_to_json(struct rmsummary *s) {
 		jx_insert_integer(output, "cores",   s->cores);
 
 	if(s->cpu_time > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->cpu_time/1e6));
-		jx_array_append(array, jx_string("s"));
+		array = jx_arrayv(jx_integer(s->cpu_time), jx_string("us"), NULL);
 		jx_insert(output, jx_string("cpu_time"), array);
 	}
 
 	if(s->wall_time > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->wall_time/1e6));
-		jx_array_append(array, jx_string("s"));
+		array = jx_arrayv(jx_integer(s->wall_time), jx_string("us"), NULL);
 		jx_insert(output, jx_string("wall_time"), array);
 	}
 
 	if(s->end > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->end/1e6));
-		jx_array_append(array, jx_string("s"));
+		array = jx_arrayv(jx_integer(s->end), jx_string("us"), NULL);
 		jx_insert(output, jx_string("end"), array);
 	}
 
 	if(s->start > -1) {
-		array = jx_array(NULL);
-		jx_array_append(array, jx_double(s->start/1e6));
-		jx_array_append(array, jx_string("s"));
+		array = jx_arrayv(jx_integer(s->start), jx_string("us"), NULL);
 		jx_insert(output, jx_string("start"), array);
 	}
 
