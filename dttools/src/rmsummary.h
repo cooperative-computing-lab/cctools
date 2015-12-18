@@ -82,9 +82,6 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename);
 /**  Reads all summaries from filename **/
 struct list *rmsummary_parse_file_multiple(const char *filename);
 
-/** Reads a single summary file from buffer, with separator between fields (usually ',' or '\n'). **/
-struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separator);
-
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
@@ -92,7 +89,6 @@ struct rmsummary *rmsummary_create(signed char default_value);
 void rmsummary_delete(struct rmsummary *s);
 
 void rmsummary_read_env_vars(struct rmsummary *s);
-
 
 void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src);
