@@ -17,6 +17,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stddef.h>
+#include <math.h>
 
 #include <ctype.h>
 
@@ -268,6 +269,55 @@ struct jx *rmsummary_to_json(struct rmsummary *s) {
 	return output;
 }
 
+static int json_number_of_array(struct jx *array, char *field, int64_t *number) {
+
+	struct jx_item *first = array->u.items;
+
+	if(!first)
+		return 0;
+
+	double result;
+
+	if(jx_istype(first->value, JX_DOUBLE)) {
+		result = first->value->u.double_value;
+	} else if(jx_istype(first->value, JX_INTEGER)) {
+		result = (double) first->value->u.integer_value;
+	} else {
+		return 0;
+	}
+
+	struct jx_item *second = first->next;
+
+	if(!second)
+		return 0;
+
+	if(!jx_istype(second->value, JX_STRING))
+		return 0;
+
+	char *unit = second->value->u.string_value;
+
+	/* all values in MB, or useconds. Incomplete list! */
+
+	if(strcmp(unit, "us") == 0) {
+		result *= 1;
+	} else if(strcmp(unit, "s") == 0) {
+		result *= USECOND;
+	} else if(strcmp(unit, "MB") == 0) {
+		result *= 1;
+	} else if(strcmp(unit, "B") == 0) {
+		result *= MEGABYTE;
+	}
+
+	/* round for worst case. */
+	if(strcmp(field, "start") == 0) {
+		*number = (int64_t) floor(result);
+	} else {
+		*number = (int64_t) ceil(result);
+	}
+
+	return 1;
+}
+
 struct rmsummary *json_to_rmsummary(struct jx *j) {
 	if(!j || !jx_istype(j, JX_OBJECT))
 		return NULL;
@@ -286,6 +336,12 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 			rmsummary_assign_char_field(s, key, value->u.string_value);
 		} else if(jx_istype(value, JX_INTEGER)) {
 			rmsummary_assign_int_field(s, key, value->u.integer_value);
+		} else if(jx_istype(value, JX_ARRAY)) {
+			int64_t number;
+			int status = json_number_of_array(value, key, &number);
+			if(status) {
+				rmsummary_assign_int_field(s, key, number);
+			}
 		}
 
 		head = head->next;
