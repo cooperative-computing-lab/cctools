@@ -22,7 +22,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "path.h"
 
-int disk_alloc_create(char *loc, int64_t size) {
+int disk_alloc_create(char *loc, char *fs, int64_t size) {
 
 	if(size <= 0) {
 		debug(D_NOTICE, "Mountpoint pathname argument nonexistant.\n");
@@ -37,7 +37,6 @@ int disk_alloc_create(char *loc, int64_t size) {
 	char *losetup_args = NULL;
 	char *mk_args = NULL;
 	char *mount_args = NULL;
-	char *fs = "ext3";
 
 	//Set Loopback Device Location
 	device_loc = string_format("%s/alloc.img", loc);

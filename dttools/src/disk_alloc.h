@@ -18,7 +18,7 @@ See the file COPYING for details.
  * system's capacity (in KB).
  * @return: Return 0 on success, else -1.
  */
-int disk_alloc_create(char *loc, int64_t size);
+int disk_alloc_create(char *loc, char *fs, int64_t size);
 
 /* The disk_alloc_delete functions deletes
  * a file system at the user defined location.
