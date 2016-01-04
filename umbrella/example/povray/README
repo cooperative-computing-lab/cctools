@@ -64,3 +64,12 @@ umbrella \
 --ec2_instance_type m3.medium \
 --log umbrella.log \
 run
+
+#povray_S_local.umbrella: all the dependencies are from local dir. To run this cmd successfully, you need to ensure the specified data exists on your local machine.
+umbrella \
+--spec povray_S_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_local/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
