@@ -40,6 +40,8 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
 	int taskid = p->task->taskid;
+	//placeholder filesystem until permanent solution
+	char *fs = "ext2";
 
 	p->sandbox = string_format("t.%d", taskid);
 
@@ -48,7 +50,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 		if(p->disk > 0) {
 			int64_t size = (p->disk) * 1024;
 
-			if(disk_alloc_create(p->sandbox, size) == 0) {
+			if(disk_alloc_create(p->sandbox, fs, size) == 0) {
 				p->loop_mount = 1;
 				debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
 				return p;
