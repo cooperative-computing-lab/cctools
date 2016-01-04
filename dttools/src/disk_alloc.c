@@ -37,6 +37,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	char *losetup_args = NULL;
 	char *mk_args = NULL;
 	char *mount_args = NULL;
+	char *fs = "ext3";
 
 	//Set Loopback Device Location
 	device_loc = string_format("%s/alloc.img", loc);
@@ -104,7 +105,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	}
 
 	//Mount Loop Device
-	result = mount(mount_args, loc, "ext4", 0, "");
+	result = mount(mount_args, loc, fs, 0, "");
 	if(result != 0) {
 		char *rm_dir_args;
 		debug(D_NOTICE, "Failed to mount loop device: %s.\n", strerror(errno));
