@@ -137,12 +137,10 @@ struct work_queue_task {
 
 	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
-	struct rmsummary *rs;                                 /**< When monitoring is enabled, it points to the measured resources used by the task. */
-
-	struct rmsummary *rn;                                 /**< Number of cores, disk, memory, time, etc. the task requires. */
+	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *resources_needed;                    /**< Number of cores, disk, memory, time, etc. the task requires. */
 
 	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
-
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
@@ -836,14 +834,8 @@ starting to dispatch tasks.
 @param worker The number of workers to wait before tasks are dispatched.*/
 void work_queue_activate_worker_waiting(struct work_queue *q, int resources);
 
-void work_queue_specify_max_worker_memory(struct work_queue *q, int64_t memory);
-void work_queue_specify_max_worker_disk(struct work_queue *q,   int64_t disk);
-void work_queue_specify_max_worker_cores(struct work_queue *q,  int64_t cores);
-
 void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct rmsummary *rm);
-
 void work_queue_initialize_categories(struct work_queue *q, const char *summaries_file);
-
 void work_queue_auto_label_category(struct work_queue *q,  const char *category, int enable);
 
 #endif

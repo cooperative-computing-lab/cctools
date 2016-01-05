@@ -126,20 +126,20 @@ static void specify_integer_env_var( struct work_queue_process *p, const char *n
 }
 
 static void specify_resources_vars(struct work_queue_process *p) {
-	if(p->task->rn->cores > 0) {
-		specify_integer_env_var(p, "CORES", p->task->rn->cores);
+	if(p->task->resources_needed->cores > 0) {
+		specify_integer_env_var(p, "CORES", p->task->resources_needed->cores);
 	}
 
-	if(p->task->rn->memory > 0) {
-		specify_integer_env_var(p, "MEMORY", p->task->rn->memory);
+	if(p->task->resources_needed->memory > 0) {
+		specify_integer_env_var(p, "MEMORY", p->task->resources_needed->memory);
 	}
 
-	if(p->task->rn->disk > 0) {
-		specify_integer_env_var(p, "DISK", p->task->rn->disk);
+	if(p->task->resources_needed->disk > 0) {
+		specify_integer_env_var(p, "DISK", p->task->resources_needed->disk);
 	}
 
-	if(p->task->rn->gpus > 0) {
-		specify_integer_env_var(p, "GPUS", p->task->rn->gpus);
+	if(p->task->resources_needed->gpus > 0) {
+		specify_integer_env_var(p, "GPUS", p->task->resources_needed->gpus);
 	}
 }
 
@@ -312,7 +312,7 @@ void  work_queue_process_compute_disk_needed( struct work_queue_process *p ) {
 	struct work_queue_file *f;
 	struct stat s;
 
-	p->disk = t->rn->disk;
+	p->disk = t->resources_needed->disk;
 
 	/* task did not specify its disk usage. */
 	if(p->disk < 0)

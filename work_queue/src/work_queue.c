@@ -699,7 +699,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		}
 		t->output = 0;
 		if(t->unlabeled) {
-			t->rn->cores = t->rn->memory = t->rn->disk = t->rn->gpus = -1;
+			t->resources_needed->cores = t->resources_needed->memory = t->resources_needed->disk = t->resources_needed->gpus = -1;
 		}
 
 		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
@@ -1185,13 +1185,13 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	char *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
-	if(t->rs)
-		free(t->rs);
+	if(t->resources_measured)
+		free(t->resources_measured);
 
-	t->rs = rmsummary_parse_file_single(summary);
+	t->resources_measured = rmsummary_parse_file_single(summary);
 
-	if(t->rs) {
-		rmsummary_assign_char_field(t->rs, "category", t->category);
+	if(t->resources_measured) {
+		rmsummary_assign_char_field(t->resources_measured, "category", t->category);
 	}
 
 	free(summary);
@@ -1211,10 +1211,10 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 	fcntl(monitor_fd, F_SETLKW, &lock);
 
-	if(!t->rs)
+	if(!t->resources_measured)
 	{
 		/* mark all resources with -1, to signal that no information is available. */
-		t->rs = rmsummary_create(-1);
+		t->resources_measured = rmsummary_create(-1);
 		fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
 	}
 
@@ -1347,7 +1347,7 @@ static void expire_waiting_tasks(struct work_queue *q)
 
 		t = list_pop_head(q->ready_list);
 
-		if(t->rn->end > 0 && (uint64_t) t->rn->end <= current_time)
+		if(t->resources_needed->end > 0 && (uint64_t) t->resources_needed->end <= current_time)
 		{
 			expire_waiting_task(q, t);
 		}
@@ -2513,15 +2513,15 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(command_line), command_line);
 	free(command_line);
 
-	send_worker_msg(q,w, "cores %"PRId64"\n",        t->rn->cores);
-	send_worker_msg(q,w, "memory %"PRId64"\n",       t->rn->memory);
-	send_worker_msg(q,w, "disk %"PRId64"\n",         t->rn->disk);
-	send_worker_msg(q,w, "gpus %"PRId64"\n",         t->rn->gpus);
+	send_worker_msg(q,w, "cores %"PRId64"\n",        t->resources_needed->cores);
+	send_worker_msg(q,w, "memory %"PRId64"\n",       t->resources_needed->memory);
+	send_worker_msg(q,w, "disk %"PRId64"\n",         t->resources_needed->disk);
+	send_worker_msg(q,w, "gpus %"PRId64"\n",         t->resources_needed->gpus);
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(!q->monitor_mode) {
-		send_worker_msg(q,w, "end_time %"PRIu64"\n",     t->rn->end);
-		send_worker_msg(q,w, "wall_time %"PRIu64"\n",    t->rn->wall_time);
+		send_worker_msg(q,w, "end_time %"PRIu64"\n",     t->resources_needed->end);
+		send_worker_msg(q,w, "wall_time %"PRIu64"\n",    t->resources_needed->wall_time);
 	}
 
 	/* Note that even when environment variables after resources, values for
@@ -2659,10 +2659,10 @@ static int check_foreman_against_task(struct work_queue *q, struct work_queue_wo
 	else
 	{
 		// Assume the task will take "whatever it can get" for unlabeled resources
-		cores_used = MAX(t->rn->cores, 0);
-		mem_used   = MAX(t->rn->memory, 0);
-		disk_used  = MAX(t->rn->disk, 0);
-		gpus_used  = MAX(t->rn->gpus, 0);
+		cores_used = MAX(t->resources_needed->cores, 0);
+		mem_used   = MAX(t->resources_needed->memory, 0);
+		disk_used  = MAX(t->resources_needed->disk, 0);
+		gpus_used  = MAX(t->resources_needed->gpus, 0);
 	}
 
 	if(w->resources->cores.inuse + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
@@ -2699,10 +2699,10 @@ static int check_worker_against_task(struct work_queue *q, struct work_queue_wor
 	else
 	{
 		// Assume the task will take "whatever it can get" for unlabeled resources
-		cores_used = MAX(t->rn->cores, 0);
-		mem_used = MAX(t->rn->memory, 0);
-		disk_used = MAX(t->rn->disk, 0);
-		gpus_used = MAX(t->rn->gpus, 0);
+		cores_used = MAX(t->resources_needed->cores, 0);
+		mem_used = MAX(t->resources_needed->memory, 0);
+		disk_used = MAX(t->resources_needed->disk, 0);
+		gpus_used = MAX(t->resources_needed->gpus, 0);
 
 		if(w->resources->unlabeled.inuse > 0) {
 			ok = 0;
@@ -2975,10 +2975,10 @@ static void count_worker_resources(struct work_queue_worker *w)
 		}
 		else
 		{
-			cores_used = MAX(t->rn->cores, 0);
-			mem_used  = MAX(t->rn->memory, 0);
-			disk_used = MAX(t->rn->disk, 0);
-			gpus_used = MAX(t->rn->gpus, 0);
+			cores_used = MAX(t->resources_needed->cores, 0);
+			mem_used  = MAX(t->resources_needed->memory, 0);
+			disk_used = MAX(t->resources_needed->disk, 0);
+			gpus_used = MAX(t->resources_needed->gpus, 0);
 			unlabeled_used = 0;
 		}
 
@@ -3330,10 +3330,10 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->total_cmd_execution_time = 0;
 	t->priority = 0;
 
-	t->rs = NULL;
+	t->resources_measured = NULL;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
-	t->rn        = rmsummary_create(-1);
+	t->resources_needed = rmsummary_create(-1);
 	t->unlabeled = 1;
 
 	t->category = xxstrdup("default");
@@ -3362,14 +3362,14 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   new->output_files = work_queue_task_file_list_clone(task->output_files);
   new->env_list     = work_queue_task_env_list_clone(task->env_list);
 
-  if(task->rn) {
-	  new->rn = malloc(sizeof(struct rmsummary));
-	  memcpy(new->rn, task->rn, sizeof(sizeof(struct rmsummary)));
+  if(task->resources_needed) {
+	  new->resources_needed = malloc(sizeof(struct rmsummary));
+	  memcpy(new->resources_needed, task->resources_needed, sizeof(sizeof(struct rmsummary)));
   }
 
-  if(task->rs) {
-	  new->rs = malloc(sizeof(struct rmsummary));
-	  memcpy(new->rs, task->rs, sizeof(sizeof(struct rmsummary)));
+  if(task->resources_measured) {
+	  new->resources_measured = malloc(sizeof(struct rmsummary));
+	  memcpy(new->resources_measured, task->resources_measured, sizeof(sizeof(struct rmsummary)));
   }
 
   if(task->output) {
@@ -3415,7 +3415,7 @@ void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max
 
 static void set_task_unlabel_flag( struct work_queue_task *t )
 {
-	if(t->rn->cores < 0 && t->rn->memory < 0 && t->rn->disk < 0 && t->rn->gpus < 0)
+	if(t->resources_needed->cores < 0 && t->resources_needed->memory < 0 && t->resources_needed->disk < 0 && t->resources_needed->gpus < 0)
 	{
 		t->unlabeled = 1;
 	}
@@ -3425,11 +3425,11 @@ void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
 	if(memory < 0)
 	{
-		t->rn->memory = -1;
+		t->resources_needed->memory = -1;
 	}
 	else
 	{
-		t->rn->memory = memory;
+		t->resources_needed->memory = memory;
 		t->unlabeled = 0;
 	}
 
@@ -3440,11 +3440,11 @@ void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 {
 	if(disk < 0)
 	{
-		t->rn->disk = -1;
+		t->resources_needed->disk = -1;
 	}
 	else
 	{
-		t->rn->disk = disk;
+		t->resources_needed->disk = disk;
 		t->unlabeled = 0;
 	}
 
@@ -3455,11 +3455,11 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 {
 	if(cores < 0)
 	{
-		t->rn->cores = -1;
+		t->resources_needed->cores = -1;
 	}
 	else
 	{
-		t->rn->cores = cores;
+		t->resources_needed->cores = cores;
 		t->unlabeled = 0;
 	}
 
@@ -3470,11 +3470,11 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 {
 	if(gpus < 0)
 	{
-		t->rn->gpus = -1;
+		t->resources_needed->gpus = -1;
 	}
 	else
 	{
-		t->rn->gpus = gpus;
+		t->resources_needed->gpus = gpus;
 		t->unlabeled = 0;
 	}
 
@@ -3485,15 +3485,15 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t us
 {
 	if(useconds < 1)
 	{
-		t->rn->end = -1;
+		t->resources_needed->end = -1;
 	}
 	else
 	{
-		t->rn->end = useconds;
+		t->resources_needed->end = useconds;
 
 		/* If end time is specified, assume at least one core is specified.
 		 * Otherwise, a single worker will get all the tasks. */
-		if(t->rn->cores < 0) {
+		if(t->resources_needed->cores < 0) {
 			work_queue_task_specify_cores(t, 1);
 		}
 	}
@@ -3503,15 +3503,15 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_
 {
 	if(useconds < 1)
 	{
-		t->rn->wall_time = -1;
+		t->resources_needed->wall_time = -1;
 	}
 	else
 	{
-		t->rn->wall_time = useconds;
+		t->resources_needed->wall_time = useconds;
 
 		/* If wall time is specified, assume at least one core is specified.
 		 * Otherwise, a single worker will get all the tasks. */
-		if(t->rn->cores < 0) {
+		if(t->resources_needed->cores < 0) {
 			work_queue_task_specify_cores(t, 1);
 		}
 	}
@@ -4026,10 +4026,10 @@ void work_queue_task_delete(struct work_queue_task *t)
 			free(t->hostname);
 		if(t->host)
 			free(t->host);
-		if(t->rn)
-			rmsummary_delete(t->rn);
-		if(t->rs)
-			rmsummary_delete(t->rs);
+		if(t->resources_needed)
+			rmsummary_delete(t->resources_needed);
+		if(t->resources_measured)
+			rmsummary_delete(t->resources_measured);
 		free(t);
 	}
 }
@@ -4535,7 +4535,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	limits.disk   = limits.disk   < -1 ? w->resources->disk.total   : MIN(w->resources->disk.total, limits.disk);
 
 	if(!t->unlabeled) {
-		rmsummary_merge_min(&limits, t->rn);
+		rmsummary_merge_min(&limits, t->resources_needed);
 	}
 
 	int extra_files = (q->monitor_mode == MON_FULL);
@@ -5505,7 +5505,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		c->total_good_execute_time  += t->cmd_execution_time;
 		c->total_good_transfer_time += t->total_transfer_time;
 
-		category_accumulate_summary(q->categories, t->category, t->rs);
+		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 
 		if(c->total_tasks_complete % FIRST_ALLOCATION_EVERY_NTASKS == 0) {
 			category_update_first_allocation(q->categories, t->category, q->worker_top_resources);
@@ -5517,42 +5517,12 @@ void work_queue_initialize_categories(struct work_queue *q, const char *summarie
 	categories_initialize(q->categories, q->worker_top_resources, summaries_file);
 }
 
-void work_queue_specify_max_worker_memory(struct work_queue *q, int64_t memory) {
-	if(memory < 0) {
-		q->worker_top_resources->memory = -1;
-	}
-	else {
-		q->worker_top_resources->memory = memory;
-		q->auto_label_tasks_mode = 1;
-	}
-}
-
-void work_queue_specify_max_worker_disk(struct work_queue *q, int64_t disk) {
-	if(disk < 0) {
-		q->worker_top_resources->disk = -1;
-	}
-	else {
-		q->worker_top_resources->disk = disk;
-		q->auto_label_tasks_mode = 1;
-	}
-}
-
-void work_queue_specify_max_worker_cores(struct work_queue *q, int64_t cores) {
-	if(cores < 0) {
-		q->worker_top_resources->cores = -1;
-	}
-	else {
-		q->worker_top_resources->cores = cores;
-		q->auto_label_tasks_mode = 1;
-	}
-}
-
 void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct rmsummary *rm) {
 	if(rm) {
 		memcpy(q->worker_top_resources, rm, sizeof(struct rmsummary));
 		q->auto_label_tasks_mode = 1;
 	} else {
-		bzero(q->worker_top_resources, sizeof(struct rmsummary));
+		memset(q->worker_top_resources, -1, sizeof(struct rmsummary));
 		q->auto_label_tasks_mode = 0;
 	}
 }
@@ -5576,10 +5546,10 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		/* We check whether the task already has the maximum resources. If it
 		 * does, we mark it as done. */
-		if(     (top->cores     < 0 || top->cores     <= t->rn->cores)  &&
-				(top->memory    < 0 || top->memory    <= t->rn->memory) &&
-				(top->disk      < 0 || top->disk      <= t->rn->disk)   &&
-				(top->wall_time < 0 || top->wall_time <= t->rn->wall_time) ) {
+		if(     (top->cores     < 0 || top->cores     <= t->resources_needed->cores)  &&
+				(top->memory    < 0 || top->memory    <= t->resources_needed->memory) &&
+				(top->disk      < 0 || top->disk      <= t->resources_needed->disk)   &&
+				(top->wall_time < 0 || top->wall_time <= t->resources_needed->wall_time) ) {
 			return 0;
 		} else {
 			memcpy(&label, top, sizeof(struct rmsummary));
@@ -5595,7 +5565,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	}
 
 	/* update label only when there is a change. */
-	if(memcmp(&label, t->rn, sizeof(struct rmsummary))) {
+	if(memcmp(&label, t->resources_needed, sizeof(struct rmsummary))) {
 		work_queue_task_specify_cores(t,        label.cores);
 		work_queue_task_specify_memory(t,       label.memory);
 		work_queue_task_specify_disk(t,         label.disk);
