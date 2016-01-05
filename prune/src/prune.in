@@ -6,12 +6,10 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-from prune.script import Script
-
+import prune
 import sys
 
-cctools_version = 'CCTOOLS_VERSION'
-cctools_releasedate = 'CCTOOLS_RELEASE_DATE'
+prune.main.cctools_version = 'CCTOOLS_VERSION'
+prune.main.cctools_releasedate = 'CCTOOLS_RELEASE_DATE'
 
-if __name__ == '__main__':
-	pass
+prune.main.start_prune()
