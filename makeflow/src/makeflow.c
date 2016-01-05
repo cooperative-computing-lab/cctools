@@ -1533,7 +1533,7 @@ exit(1);
 		struct dag_node *n;
 		for(n = d->nodes; n; n = n->next) {
 			if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)) {
-				fprintf("Node %d didn't have enough resources to run with allocated resources", n->linenum);
+				fprintf(stderr, "Node %d didn't have enough resources to run with allocated resources", n->linenum);
 			}
 	}
 	if(tooBig)
