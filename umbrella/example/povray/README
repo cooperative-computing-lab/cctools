@@ -73,3 +73,23 @@ umbrella \
 --sandbox_mode parrot \
 --log umbrella.log \
 run
+
+#povray_S_osf.umbrella: all the dependencies are from OSF. To run this cmd successfully, you need to ensure you have the access permission to the OSF data.
+#The interaction between Umbrella and OSF uses the requests package which is not included in Python by default. Please install requests first.
+umbrella \
+--spec povray_S_osf.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_osf/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+--osf_user <osf_username> \
+--osf_pass <osf_password> \
+run
+
+#The interaction between Umbrella and OSF uses the requests package which is not included in Python by default. Please install requests first.
+#upload the dependencies to OSF.
+umbrella \
+--spec povray_S_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--log umbrella.log \
+upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>
