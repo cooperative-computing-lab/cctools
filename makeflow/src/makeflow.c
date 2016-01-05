@@ -1155,7 +1155,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_SKIP_FILE_CHECK,
-		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_MEM,
 		LONG_OPT_DISK,
 		LONG_OPT_CORES
@@ -1579,19 +1578,21 @@ int main(int argc, char *argv[])
 	}
 
 	// check to ensure that all jobs can be ran with resources given
-	if(clean_mode == MAKEFLOW_CLEAN_ALL)
+	if(clean_mode != MAKEFLOW_CLEAN_ALL)
 	{
-		int tooBig;
-		struct dag_node *n;
+			int tooBig;
+			struct dag_node *n;
 		for(n = d->nodes; n; n = n->next) {
 			if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)) {
 				fprintf(stderr, "Node %d didn't have enough resources to run with allocated resources", n->linenum);
+				tooBig = 1;
 			}
-	}
-	if(tooBig)
-	{
-		fprintf(stderr, "Critical error, not enough resources to run all jobs");
-		exit(EXIT_FAILURE);
+		}
+		if(tooBig)
+		{
+			fprintf(stderr, "Critical error, not enough resources to run all jobs");
+			exit(EXIT_FAILURE);
+		}
 	}
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
@@ -1749,3 +1750,4 @@ int main(int argc, char *argv[])
 	return 0;
 
 }
+
