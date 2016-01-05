@@ -1192,6 +1192,7 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 
 	if(t->resources_measured) {
 		rmsummary_assign_char_field(t->resources_measured, "category", t->category);
+		t->return_status = t->resources_measured->exit_status;
 	}
 
 	free(summary);
