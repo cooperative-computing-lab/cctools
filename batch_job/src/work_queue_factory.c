@@ -65,6 +65,8 @@ static char *amazon_ami = NULL;
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
+static int pool_timeout=0;
+static int pool_timeout_start=0;
 struct batch_queue *queue = 0;
 
 static void handle_abort( int sig )
@@ -482,7 +484,25 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
+		
 
+		// check to see if pool_timeout is triggered
+		time_t curr_time = time(0);
+		if(list_size(masters_list))
+		{
+			pool_timeout_start = 0;
+		} else {
+			if(pool_timeout_start) {
+				if(curr_time - pool_timeout_start > pool_timeout) {
+					fprintf(stderr, "There have been no masters for longer then the pool timeout, exiting");
+					abort_flag=1;
+				}
+			} else {
+				pool_timeout_start = curr_time;
+			}
+		}
+ 
+	
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
 
@@ -587,7 +607,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_AUTOSIZE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_POOL_TIMEOUT, LONG_OPT_AUTOSIZE };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -613,6 +633,7 @@ static const struct option long_options[] = {
 	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
+	{"pool_timeout", required_argument, 0, LONG_OPT_POOL_TIMEOUT},
 	{0,0,0,0}
 };
 
@@ -684,6 +705,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AUTOSIZE:
 				autosize = 1;
+				break;
+			case LONG_OPT_POOL_TIMEOUT:
+				pool_timeout = atoi(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
