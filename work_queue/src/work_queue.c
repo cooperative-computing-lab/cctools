@@ -185,14 +185,13 @@ struct work_queue {
 
 	int monitor_mode;
 	FILE *monitor_file;
-	int auto_label_tasks_mode;
 
 	char *monitor_output_dirname;
 	char *monitor_summary_filename;
 
 	char *monitor_exe;
 	struct rmsummary *measured_local_resources;
-	struct rmsummary *worker_top_resources;
+	struct rmsummary *default_category_max_resources;
 
 	char *password;
 	double bandwidth;
@@ -4116,8 +4115,8 @@ struct work_queue *work_queue_create(int port)
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
-	q->measured_local_resources = rmsummary_create(-1);
-	q->worker_top_resources     = rmsummary_create(-1);
+	q->measured_local_resources       = rmsummary_create(-1);
+	q->default_category_max_resources = NULL;
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
@@ -4148,8 +4147,6 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode = MON_DISABLED;
 
-	/* Create categories after worker_top_resources, as these values are needed
-	 * for category initialization. */
 	q->categories = hash_table_create(0, 0);
 
 	// The value -1 indicates that fast abort is inactive by default
@@ -4432,8 +4429,8 @@ void work_queue_delete(struct work_queue *q)
 
 		if(q->measured_local_resources)
 			rmsummary_delete(q->measured_local_resources);
-		if(q->worker_top_resources)
-			rmsummary_delete(q->worker_top_resources);
+		if(q->default_category_max_resources)
+			rmsummary_delete(q->default_category_max_resources);
 
 		free(q);
 	}
@@ -4527,20 +4524,26 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_TASK_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 	free(summary);
 
-	struct rmsummary limits;
+	struct rmsummary *limits = rmsummary_create(-1);
+	limits->cores  = w->resources->cores.total;
+	limits->memory = w->resources->memory.total;
+	limits->disk   = w->resources->disk.total;
 
-	/* use the minimum of worker, or top value. We take care of the -1 that means 'unspecified'. */
-	memcpy(&limits, q->worker_top_resources, sizeof(struct rmsummary));
-	limits.cores  = limits.cores  < -1 ? w->resources->cores.total  : MIN(w->resources->cores.total, limits.cores);
-	limits.memory = limits.memory < -1 ? w->resources->memory.total : MIN(w->resources->memory.total, limits.memory);
-	limits.disk   = limits.disk   < -1 ? w->resources->disk.total   : MIN(w->resources->disk.total, limits.disk);
+	struct category *c    = category_lookup_or_create(q->categories, t->category);
+	struct rmsummary *top = c->max_allocation ? c->max_allocation : q->default_category_max_resources;
+
+	if(top) {
+		rmsummary_merge_min(limits, top);
+	}
 
 	if(!t->unlabeled) {
-		rmsummary_merge_min(&limits, t->resources_needed);
+		rmsummary_merge_min(limits, t->resources_needed);
 	}
 
 	int extra_files = (q->monitor_mode == MON_FULL);
-	char *monitor_cmd = resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, &limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0);
+	char *monitor_cmd = resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0);
+
+	rmsummary_delete(limits);
 
 	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
 	free(monitor_cmd);
@@ -4593,9 +4596,12 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
 
+	struct category *c;
+
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
-			if(q->auto_label_tasks_mode && (t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION)) {
+			c = category_lookup_or_create(q->categories, t->category);
+			if((t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) && !c->disable_auto_labeling && (q->default_category_max_resources || c->max_allocation)) {
 				/* when a task is resubmitted given resource exhaustion, we
 				 * push it at the head of the list, so it gets to run as soon
 				 * as possible. This avoids the issue in which all 'big' tasks
@@ -5498,7 +5504,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 
 	const char *name = t->category ? t->category : "default";
 
-	struct category *c = hash_table_lookup(q->categories, name);
+	struct category *c = category_lookup_or_create(q->categories, name);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
@@ -5508,40 +5514,65 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 
 		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 
-		if(c->total_tasks_complete % FIRST_ALLOCATION_EVERY_NTASKS == 0) {
-			category_update_first_allocation(q->categories, t->category, q->worker_top_resources);
+		if(c->total_tasks_complete % FIRST_ALLOCATION_EVERY_NTASKS == 0 && !c->disable_auto_labeling) {
+			struct rmsummary *top = c->max_allocation ? c->max_allocation : q->default_category_max_resources;
+			if(top) {
+				category_update_first_allocation(q->categories, t->category, top);
+			}
 		}
 	}
 }
 
 void work_queue_initialize_categories(struct work_queue *q, const char *summaries_file) {
-	categories_initialize(q->categories, q->worker_top_resources, summaries_file);
+	if(!q->default_category_max_resources)
+		q->default_category_max_resources = rmsummary_create(-1);
+
+	categories_initialize(q->categories, q->default_category_max_resources, summaries_file);
 }
 
-void work_queue_specify_max_worker_resources(struct work_queue *q,  const struct rmsummary *rm) {
+void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm) {
+	if(q->default_category_max_resources)
+		rmsummary_delete(q->default_category_max_resources);
+
 	if(rm) {
-		memcpy(q->worker_top_resources, rm, sizeof(struct rmsummary));
-		q->auto_label_tasks_mode = 1;
+		q->default_category_max_resources = rmsummary_create(-1);
+		rmsummary_merge_max(q->default_category_max_resources, rm);
 	} else {
-		memset(q->worker_top_resources, -1, sizeof(struct rmsummary));
-		q->auto_label_tasks_mode = 0;
+		q->default_category_max_resources = NULL;
+	}
+}
+
+void work_queue_specify_max_category_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = category_lookup_or_create(q->categories, category);
+
+	if(c->max_allocation) {
+		rmsummary_delete(c->max_allocation);
+	}
+
+	if(rm) {
+		c->max_allocation = rmsummary_create(-1);
+		rmsummary_merge_max(c->max_allocation, rm);
+		c->disable_auto_labeling = 0;
+	} else {
+		c->max_allocation = NULL;
+		c->disable_auto_labeling = 1;
 	}
 }
 
 /* returns: 1 relabel was possible, 0 already at max or no new label available. */
 int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 
-	/* We are not relabeling, thus we return whether the task already failed because of resource exhaustion. */
-	if(!q->auto_label_tasks_mode)
-		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
-
 	struct category *c = category_lookup_or_create(q->categories, t->category);
+
+	/* We are not relabeling, thus we return whether the task already failed because of resource exhaustion. */
+	if(!q->default_category_max_resources && !c->max_allocation)
+		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 	/* If the category should not label its tasks, as above. */
 	if(c->disable_auto_labeling)
 		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
-	struct rmsummary *top   = q->worker_top_resources;
+	struct rmsummary *top   = c->max_allocation ? c->max_allocation : q->default_category_max_resources;
 	struct rmsummary label;
 
 	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
@@ -5557,8 +5588,8 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 			debug(D_WQ, "Setting task %d to use maximum resources.", t->taskid);
 		}
 	} else if(t->total_submissions == 0) {
-		/* Task has not run even once. Note we ignore any manual labeling. */
-		memcpy(&label, c->first, sizeof(struct rmsummary));
+		/* Task has not run even once. Note we ignore any initial manual labeling. */
+		memcpy(&label, c->first_allocation, sizeof(struct rmsummary));
 	} else {
 		/* Task was already labeled, and is being resubmitted for a reason
 		 * different than resource exhaustion. We simply return. */

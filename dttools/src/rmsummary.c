@@ -468,7 +468,7 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 #define rmsummary_apply_op(dest, src, fn, field) (dest)->field = fn((dest)->field, (src)->field)
 
 typedef int64_t (*rm_bin_op)(int64_t, int64_t);
-void rmsummary_bin_op(struct rmsummary *dest, struct rmsummary *src, rm_bin_op fn)
+void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bin_op fn)
 {
 	rmsummary_apply_op(dest, src, fn, start);
 	rmsummary_apply_op(dest, src, fn, end);
@@ -496,7 +496,7 @@ static int64_t override_field(int64_t d, int64_t s)
 	return (s > -1) ? s : d;
 }
 
-void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src)
+void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src)
 {
 	rmsummary_bin_op(dest, src, override_field);
 }
@@ -508,7 +508,7 @@ static int64_t max_field(int64_t d, int64_t s)
 	return (d > s) ? d : s;
 }
 
-void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src)
+void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 {
 	rmsummary_bin_op(dest, src, max_field);
 }
@@ -517,18 +517,18 @@ void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src)
 static int64_t min_field(int64_t d, int64_t s)
 {
 	if(d < 0 || s < 0) {
-		return MAX(-1, MAX(s, d)); /* return at least -1. */
+		return MAX(-1, MAX(s, d)); /* return at least -1. treat -1 as undefined.*/
 	} else {
 		return MIN(s, d);
 	}
 }
 
-void rmsummary_merge_min(struct rmsummary *dest, struct rmsummary *src)
+void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
 {
 	rmsummary_bin_op(dest, src, min_field);
 }
 
-void rmsummary_debug_report(struct rmsummary *s)
+void rmsummary_debug_report(const struct rmsummary *s)
 {
 	if(s->cores != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "cores", s->cores);

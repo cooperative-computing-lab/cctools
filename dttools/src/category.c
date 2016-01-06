@@ -46,7 +46,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	/* autolabeling enabled by default if work_queue_specify_max_worker_resources is used. */
 	c->disable_auto_labeling = 0;
 
-	c->first    = rmsummary_create(-1);
+	c->first_allocation    = rmsummary_create(-1);
+    c->max_allocation      = NULL;
 
 	c->cores_histogram     = itable_create(0);
 	c->memory_histogram    = itable_create(0);
@@ -84,7 +85,8 @@ void category_delete(struct hash_table *categories, const char *name) {
 	itable_delete(c->disk_histogram);
 	itable_delete(c->wall_time_histogram);
 
-	rmsummary_delete(c->first);
+	rmsummary_delete(c->max_allocation);
+	rmsummary_delete(c->first_allocation);
 
 	free(c);
 }
@@ -103,7 +105,7 @@ int cmp_int(const void *a, const void *b) {
 	return (*((int64_t *) a) - *((int64_t *) b));
 }
 
-int64_t *category_sort_histogram(struct itable *histogram) {
+int64_t *category_sort_histogram(struct itable *histogram, uint64_t top_resource) {
 	if(itable_size(histogram) < 1) {
 		return NULL;
 	}
@@ -116,7 +118,13 @@ int64_t *category_sort_histogram(struct itable *histogram) {
 	itable_firstkey(histogram);
 	while(itable_nextkey(histogram, &key, (void **) &count)) {
 		/* histograms keys are shifted to the right, as 0 cannot be a valid key. */
-		buckets[i] = key - 1;
+        key--;
+
+        /* shave bucket rounding. */
+        if(key > top_resource)
+            key = top_resource;
+
+		buckets[i] = key;
 		i++;
 	}
 
@@ -133,7 +141,7 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 
 	uint64_t n = itable_size(histogram);
 
-	int64_t *buckets = category_sort_histogram(histogram);
+	int64_t *buckets = category_sort_histogram(histogram, top_resource);
 	uintptr_t *accum = malloc(n*sizeof(uintptr_t));
 
 	/* histograms keys are shifted to the right, thus the bucket - 1. */
@@ -144,13 +152,13 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 		accum[i] = accum[i - 1] + (uintptr_t) itable_lookup(histogram, buckets[i] + 1);
 	}
 
-	uint64_t a_1 = top_resource;
-	uint64_t a_m = top_resource;
+	int64_t a_1 = top_resource;
+	int64_t a_m = top_resource;
 	int64_t Ea_1 = INT64_MAX;
 
 	for(i = 0; i < n; i++) {
-		uint64_t a  = buckets[i];
-		uint64_t Pa = accum[n-1] - accum[i];
+		int64_t a  = buckets[i];
+		int64_t Pa = accum[n-1] - accum[i];
 		int64_t  Ea = a*accum[n-1] + a_m*Pa;
 
 		if(Ea < Ea_1) {
@@ -186,11 +194,11 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 	int64_t wall_time = category_first_allocation(c->wall_time_histogram, top->wall_time);
 
 	/* Update values, and print debug message only if something changed. */
-	if(cores != c->first->cores ||  memory != c->first->memory || disk != c->first->disk || wall_time != c->first->wall_time) {
-		c->first->cores     = cores;
-		c->first->memory    = memory;
-		c->first->disk      = disk;
-		c->first->wall_time = wall_time;
+	if(cores != c->first_allocation->cores ||  memory != c->first_allocation->memory || disk != c->first_allocation->disk || wall_time != c->first_allocation->wall_time) {
+		c->first_allocation->cores     = cores;
+		c->first_allocation->memory    = memory;
+		c->first_allocation->disk      = disk;
+		c->first_allocation->wall_time = wall_time;
 
 		/* From here on we only print debugging info. */
 		buffer_rewind(b, 0);
@@ -243,9 +251,9 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	hash_table_firstkey(categories);
 	while(hash_table_nextkey(categories, &name, (void **) &c)) {
 		category_clear_histograms(c);
-		if(c->first) {
-			rmsummary_delete(c->first);
-			c->first = rmsummary_create(-1);
+		if(c->first_allocation) {
+			rmsummary_delete(c->first_allocation);
+			c->first_allocation = rmsummary_create(-1);
 		}
 	}
 

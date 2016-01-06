@@ -16,7 +16,8 @@ struct category {
 
 	int disable_auto_labeling;
 
-	struct rmsummary *first;
+	struct rmsummary *first_allocation;
+	struct rmsummary *max_allocation;
 
 	/* All keys are assumed positive. Thus, we shift them to the right so that
 	 * we can have a "0" key. 0->1, 1->2, etc. */

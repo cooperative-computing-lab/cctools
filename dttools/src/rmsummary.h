@@ -90,9 +90,9 @@ void rmsummary_delete(struct rmsummary *s);
 
 void rmsummary_read_env_vars(struct rmsummary *s);
 
-void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src);
-void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src);
-void rmsummary_merge_min(struct rmsummary *dest, struct rmsummary *src);
-void rmsummary_debug_report(struct rmsummary *s);
+void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_debug_report(const struct rmsummary *s);
 
 #endif
