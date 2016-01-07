@@ -481,10 +481,10 @@ static int start_process( struct work_queue_process *p )
 
 	struct work_queue_task *t = p->task;
 
-	cores_allocated += t->cores;
-	memory_allocated += t->memory;
-	disk_allocated += t->disk;
-	gpus_allocated += t->gpus;
+	cores_allocated += t->resources_needed->cores;
+	memory_allocated += t->resources_needed->memory;
+	disk_allocated += t->resources_needed->disk;
+	gpus_allocated += t->resources_needed->gpus;
 
 	return 1;
 }
@@ -573,7 +573,7 @@ static void expire_procs_running() {
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
-		if(p->task->maximum_end_time > 0 && current_time > p->task->maximum_end_time)
+		if(p->task->resources_needed->end > 0 && current_time > (uint64_t) p->task->resources_needed->end)
 		{
 			p->task_status |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
@@ -611,10 +611,10 @@ static int handle_tasks(struct link *master)
 
 			p->execution_end = timestamp_get();
 
-			cores_allocated  -= p->task->cores;
-			memory_allocated -= p->task->memory;
-			disk_allocated   -= p->task->disk;
-			gpus_allocated   -= p->task->gpus;
+			cores_allocated  -= p->task->resources_needed->cores;
+			memory_allocated -= p->task->resources_needed->memory;
+			disk_allocated   -= p->task->resources_needed->disk;
+			gpus_allocated   -= p->task->resources_needed->gpus;
 
 			itable_remove(procs_running, p->pid);
 			itable_firstkey(procs_running);
@@ -793,16 +793,16 @@ static void normalize_resources( struct work_queue_process *p )
 {
 	struct work_queue_task *t = p->task;
 
-	if(t->cores < 0 && t->memory < 0 && t->disk < 0 && t->gpus < 0) {
-		t->cores = local_resources->cores.total;
-		t->memory = local_resources->memory.total;
-		t->disk = local_resources->disk.total;
-		t->gpus = local_resources->gpus.total;
+	if(t->resources_needed->cores < 0 && t->resources_needed->memory < 0 && t->resources_needed->disk < 0 && t->resources_needed->gpus < 0) {
+		t->resources_needed->cores = local_resources->cores.total;
+		t->resources_needed->memory = local_resources->memory.total;
+		t->resources_needed->disk = local_resources->disk.total;
+		t->resources_needed->gpus = local_resources->gpus.total;
 	} else {
-		t->cores = MAX(t->cores, 0);
-		t->memory = MAX(t->memory, 0);
-		t->disk = MAX(t->disk, 0);
-		t->gpus = MAX(t->gpus, 0);
+		t->resources_needed->cores = MAX(t->resources_needed->cores, 0);
+		t->resources_needed->memory = MAX(t->resources_needed->memory, 0);
+		t->resources_needed->disk = MAX(t->resources_needed->disk, 0);
+		t->resources_needed->gpus = MAX(t->resources_needed->gpus, 0);
 	}
 }
 
@@ -1150,10 +1150,10 @@ static int do_kill(int taskid)
 	} else {
 		if(itable_remove(procs_running, p->pid)) {
 			work_queue_process_kill(p);
-			cores_allocated -= p->task->cores;
-			memory_allocated -= p->task->memory;
-			disk_allocated -= p->task->disk;
-			gpus_allocated -= p->task->gpus;
+			cores_allocated -= p->task->resources_needed->cores;
+			memory_allocated -= p->task->resources_needed->memory;
+			disk_allocated -= p->task->resources_needed->disk;
+			gpus_allocated -= p->task->resources_needed->gpus;
 		}
 	}
 
@@ -1225,8 +1225,8 @@ static int enforce_process_limits(struct work_queue_process *p) {
 		return 1;
 
 	work_queue_process_measure_disk(p, max_time_on_measurement);
-	if(p->sandbox_size > p->task->disk) {
-		debug(D_WQ,"Task %d went over its disk size limit: %" PRId64 " MB > %" PRIu64 " MB\n", p->task->taskid, p->sandbox_size, p->task->disk);
+	if(p->sandbox_size > p->task->resources_needed->disk) {
+		debug(D_WQ,"Task %d went over its disk size limit: %" PRId64 " MB > %" PRIu64 " MB\n", p->task->taskid, p->sandbox_size, p->task->resources_needed->disk);
 		return 0;
 	}
 
@@ -1269,12 +1269,12 @@ static void enforce_processes_max_running_time() {
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**) &p)) {
-		/* If the task did not specify maximum_running_time, return right away. */
-		if(p->task->maximum_running_time < 1)
+		/* If the task did not specify wall_time, return right away. */
+		if(p->task->resources_needed->wall_time < 1)
 			continue;
 
-		if(now - p->execution_start > p->task->maximum_running_time) {
-			debug(D_WQ,"Task %d went over its running time limit: %" PRId64 " us > %" PRIu64 " us\n", p->task->taskid, now - p->execution_start, p->task->maximum_running_time);
+		if(now < p->execution_start + p->task->resources_needed->wall_time) {
+			debug(D_WQ,"Task %d went over its running time limit: %" PRId64 " us > %" PRIu64 " us\n", p->task->taskid, now - p->execution_start, p->task->resources_needed->wall_time);
 			p->task_status |= WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}
@@ -1397,10 +1397,10 @@ Return true if this task can run with the resources currently available.
 static int check_for_resources(struct work_queue_task *t)
 {
 	return
-		(cores_allocated  + t->cores  <= local_resources->cores.total) &&
-		(memory_allocated + t->memory <= local_resources->memory.total) &&
-		(disk_allocated   + t->disk   <= local_resources->disk.total) &&
-		(gpus_allocated   + t->gpus   <= local_resources->gpus.total);
+		(cores_allocated  + t->resources_needed->cores  <= local_resources->cores.total) &&
+		(memory_allocated + t->resources_needed->memory <= local_resources->memory.total) &&
+		(disk_allocated   + t->resources_needed->disk   <= local_resources->disk.total) &&
+		(gpus_allocated   + t->resources_needed->gpus   <= local_resources->gpus.total);
 }
 
 /*

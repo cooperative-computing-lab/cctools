@@ -92,7 +92,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	return 1;
 }
 
-static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;

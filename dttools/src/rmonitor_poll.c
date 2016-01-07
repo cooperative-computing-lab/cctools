@@ -24,8 +24,6 @@ See the file COPYING for details.
  * Helper functions
 ***/
 
-#define div_round_up(a, b) (((a) + (b) - 1) / (b))
-
 #define ANON_MAPS_NAME "[anon]"
 
 uint64_t usecs_since_epoch()
@@ -341,11 +339,11 @@ int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 	fclose(fmem);
 
 	/* in MB */
-	mem->virtual  = div_round_up(mem->virtual,  1024);
-	mem->resident = div_round_up(mem->resident, 1024);
-	mem->text     = div_round_up(mem->text,     1024);
-	mem->data     = div_round_up(mem->data,     1024);
-	mem->shared   = div_round_up(mem->shared,   1024);
+	mem->virtual  = DIV_INT_ROUND_UP(mem->virtual,  1024);
+	mem->resident = DIV_INT_ROUND_UP(mem->resident, 1024);
+	mem->text     = DIV_INT_ROUND_UP(mem->text,     1024);
+	mem->data     = DIV_INT_ROUND_UP(mem->data,     1024);
+	mem->shared   = DIV_INT_ROUND_UP(mem->shared,   1024);
 
 	return status;
 }
@@ -526,7 +524,7 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 			/* a series of upper bounds: */
 			/* by adding referenced, we assumed a worst case of non-sharing
 			 * memory, but referenced cannot be larger than the virtual size: */
-			info->virtual  = div_round_up(info->map_end - info->map_start, 1024); /* bytes to kB. */
+			info->virtual  = DIV_INT_ROUND_UP(info->map_end - info->map_start, 1024); /* bytes to kB. */
 			info->referenced = MIN(info->referenced, info->virtual);
 
 			/* similarly, resident cannot be larger than referenced. */
@@ -560,10 +558,10 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 	hash_table_delete(maps_per_file);
 
 	/* all the values computed are in kB, we convert to MB. */
-	mem->virtual      = div_round_up(mem->virtual,  1024);
-	mem->shared       = div_round_up(mem->shared,   1024);
-	mem->private      = div_round_up(mem->private,  1024);
-	mem->resident     = div_round_up(mem->resident, 1024);
+	mem->virtual      = DIV_INT_ROUND_UP(mem->virtual,  1024);
+	mem->shared       = DIV_INT_ROUND_UP(mem->shared,   1024);
+	mem->private      = DIV_INT_ROUND_UP(mem->private,  1024);
+	mem->resident     = DIV_INT_ROUND_UP(mem->resident, 1024);
 
 	return 0;
 }
@@ -737,19 +735,19 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->max_concurrent_processes = -1;
 	tr->total_processes          = -1;
 
-	tr->virtual_memory    = (int64_t) p->mem.virtual;
-	tr->resident_memory   = (int64_t) p->mem.resident;
-	tr->swap_memory       = (int64_t) p->mem.swap;
+	tr->virtual_memory = (int64_t) p->mem.virtual;
+	tr->memory         = (int64_t) p->mem.resident;
+	tr->swap_memory    = (int64_t) p->mem.swap;
 
 	tr->bytes_read        = (int64_t)  p->io.chars_read;
 	tr->bytes_written     = (int64_t)  p->io.chars_written;
 
-	tr->workdir_num_files = -1;
-	tr->workdir_footprint = -1;
+	tr->total_files = -1;
+	tr->disk        = -1;
 
 	if(d) {
-		tr->workdir_num_files = (int64_t) (d->files);
-		tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+		tr->total_files = (int64_t) (d->files);
+		tr->disk        = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 	}
 
 	tr->fs_nodes = -1;
@@ -758,26 +756,27 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	}
 }
 
-int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
+struct rmsummary *rmonitor_measure_process(pid_t pid) {
 	int err;
 
-	memset(tr, 0, sizeof(struct rmsummary));
+	struct rmsummary *tr = rmsummary_create(-1);
 
 	struct rmonitor_process_info p;
 	p.pid = pid;
 
 	err = rmonitor_poll_process_once(&p);
 	if(err != 0)
-		return err;
+		return NULL;
 
 	char cwd_link[PATH_MAX];
 	char cwd_org[PATH_MAX];
 
 	struct rmonitor_wdir_info *d = NULL;
 	snprintf(cwd_link, PATH_MAX, "/proc/%d/cwd", pid);
-	err = readlink(cwd_link, cwd_org, PATH_MAX);
+	ssize_t n = readlink(cwd_link, cwd_org, PATH_MAX - 1);
 
-	if(!err)  {
+	if(n != -1)  {
+		cwd_org[n] = '\0';
 		d = malloc(sizeof(struct rmonitor_wdir_info));
 		d->path  = cwd_org;
 		d->state = NULL;
@@ -788,29 +787,31 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 	uint64_t start;
 	err = rmonitor_get_start_time(pid, &start);
 	if(err != 0)
-		return err;
+		return NULL;
 
 	rmonitor_info_to_rmsummary(tr, &p, d, NULL, start);
 	tr->command = rmonitor_get_command_line(pid);
 
 	if(d) {
+		path_disk_size_info_delete_state(d->state);
 		free(d);
 	}
 
-	return 0;
+	return tr;
 }
 
 int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid) {
 
-	struct rmsummary now;
-	int err = rmonitor_measure_process(&now, pid);
+	struct rmsummary *now = rmonitor_measure_process(pid);
 
-	if(err != 0)
-		return err;
+	if(!now)
+		return 0;
 
-	rmsummary_merge_max(tr, &now);
+	rmsummary_merge_max(tr, now);
 
-	return 0;
+	rmsummary_delete(now);
+
+	return 1;
 }
 
 /* vim: set noexpandtab tabstop=4: */

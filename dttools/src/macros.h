@@ -20,6 +20,8 @@ See the file COPYING for details.
 #define ABS(x) ( ((x)>=0) ? (x) : (-(x)) )
 #endif
 
+#define DIV_INT_ROUND_UP(a, b) (((a) + (b) - 1) / (b))
+
 #define KILO 1024
 #define MEGA (KILO*KILO)
 #define GIGA (KILO*MEGA)
@@ -31,5 +33,7 @@ See the file COPYING for details.
 #define GIGABYTE GIGA
 #define TERABYTE TERA
 #define PETABYTE PETA
+
+#define USECOND 1000000
 
 #endif

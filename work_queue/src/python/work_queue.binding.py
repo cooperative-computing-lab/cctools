@@ -99,7 +99,7 @@ class Task(_object):
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
-    def specify_category(self, tag):
+    def specify_category(self, name):
         return work_queue_task_specify_category(self._task, name)
 
     ##
@@ -269,6 +269,18 @@ class Task(_object):
     @property
     def tag(self):
         return self._task.tag
+
+    ##
+    # Get the category name for the task.
+    #
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.category
+    # @endcode
+    @property
+    def category(self):
+        return self._task.category
 
     ##
     # Get the shell command executed by the task.
@@ -598,6 +610,17 @@ class Task(_object):
 
         return self._task.resources_measured
 
+
+    ##
+    # Get the resources the task requested to run. For valid fields see @resources_measured.
+    #
+    @property
+    def resources_needed(self):
+        if not self._task.resources_needed:
+            return None
+
+        return self._task.resources_needed
+
 ##
 # Python Work Queue object
 #
@@ -857,6 +880,68 @@ class WorkQueue(_object):
 
     def specify_password_file(self, file):
         return work_queue_specify_password_file(self._work_queue, file)
+
+    ##
+    # Specify the maximum resources a task may use. Enables resource autolabeling for all categories.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores is found on any worker:
+    # >>> q.specify_max_resources({'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
+    # >>> q.specify_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_max_resources(self, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_max_resources(self._work_queue, rm)
+
+    ##
+    # Specify the maximum resources a task in a category may use. Enables
+    # resource autolabeling for that category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores may be used by a task in the category:
+    # >>> q.specify_max_category_resources("my_category", {'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
+    # >>> q.specify_max_category_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_max_category_resources(self, category, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_max_category_resources(self._work_queue, category, rm)
+
+    ##
+    # Enable/disable autolabeling for the category.
+    #
+    # @param self     Reference to the current work queue object.
+    # @param category Name of the category.
+    # @param enable   0: disable, 1: enable resource autolabeling.
+
+    def auto_label_category(self, category, enable):
+        return work_queue_auto_label_category(self._work_queue, category, enable)
+
+    ##
+    # Initialize first value of categories
+    #
+    # @param self     Reference to the current work queue object.
+    # @param filename JSON file with resource summaries.
+    # @param enable   0: disable, 1: enable resource autolabeling.
+
+    def initialize_categories(filename):
+        return work_queue_initialize_categories(self._work_queue, filename)
 
     ##
     # Cancel task identified by its taskid and remove from the given queue.
