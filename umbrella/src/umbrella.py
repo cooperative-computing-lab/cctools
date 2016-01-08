@@ -68,8 +68,17 @@ import multiprocessing
 import resource
 import tempfile
 import urllib
-import requests
-import requests.packages.urllib3
+
+import imp
+
+found_requests = None
+try:
+	imp.find_module('requests')
+	found_requests = True
+	import requests
+	import requests.packages.urllib3
+except ImportError:
+	found_requests = False
 
 if sys.version_info >= (3,):
 	import urllib.request as urllib2
@@ -357,10 +366,11 @@ def meta_search(meta_json, name, id=None):
 		logging.debug("meta_json does not include %s", name)
 		sys.exit("meta_json does not include %s\n" % name)
 
-def attr_check(item, attr, check_len = 0):
+def attr_check(name, item, attr, check_len = 0):
 	"""Check and obtain the attr of an item.
 
 	Args:
+		name: the name of the dependency.
 		item: an item from the metadata database
 		attr: an attribute
 		check_len: if set to 1, also check whether the length of the attr is > 0; if set to 0, ignore the length checking.
@@ -378,7 +388,12 @@ def attr_check(item, attr, check_len = 0):
 				logging.debug("The %s attr of the item is empty.", attr)
 				sys.exit("The %s attr of the item (%s) is empty." % (item, attr))
 			else:
-				return item[attr][0]
+				#when multiple options are available, currently the first one will be picked.
+				#we can add filter here to control the choice.
+				if attr == 'source':
+					return source_filter(item[attr], ['osf'], name)
+				else:
+					return item[attr][0]
 		else:
 			return item[attr]
 	else:
@@ -386,6 +401,37 @@ def attr_check(item, attr, check_len = 0):
 		logging.debug("This item doesn not have %s attr!", attr)
 		sys.exit("the item (%s) does not have %s attr!" % (item, attr))
 
+def source_filter(sources, filters, name):
+	"""Filter the download urls of a dependency.
+	The reason why this filtering process is necessary is: some urls are not
+	accessible by the current umbrella runtime. For example, if some urls points to
+	OSF, but the execution node has no requests python package installed. In this
+	case, all the download urls pointing to OSF are ignored.
+
+	Args:
+		sources: a list of download urls
+		filters: a list of protocols which are not supported by the current umbrella runtime.
+		name: the name of the dependency.
+
+	Returns:
+		If all the download urls are not available, exit directly.
+		Otherwise, return the first available url.
+	"""
+	l = []
+	for s in sources:
+		filtered = 0
+		for item in filters:
+			if s[:len(item)] == item:
+				filtered = 1
+				break
+		if not filtered:
+			l.append(s)
+
+	if len(l) == 0:
+		logging.critical("All the urls for retrieving %s are not available!", name)
+		sys.exit("All the urls for retrieving %s are not available!" % name)
+	else:
+		return l[0]
 
 def cctools_download(sandbox_dir, hardware_platform, linux_distro, action):
 	"""Download cctools
@@ -529,12 +575,12 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 		dest: the path of the downloaded data dependency in the umbrella local cache.
 	"""
 	item = meta_search(meta_json, name, id)
-	source = attr_check(item, "source", 1)
+	source = attr_check(name, item, "source", 1)
 	if source[:4] == 'git+':
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 	elif source[:4] == 'osf+':
-		checksum = attr_check(item, "checksum")
-		format = attr_check(item, "format")
+		checksum = attr_check(name, item, "checksum")
+		format = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		if format == "tgz":
 			osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
@@ -542,8 +588,8 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 			osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
 		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
 	else:
-		checksum = attr_check(item, "checksum")
-		format = attr_check(item, "format")
+		checksum = attr_check(name, item, "checksum")
+		format = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		dependency_download(name, source, checksum, "md5sum", dest, format, action)
 	return dest
@@ -583,7 +629,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 	mount_value = ''
 
 	item = meta_search(meta_json, name, id)
-	source = attr_check(item, "source", 1)
+	source = attr_check(name, item, "source", 1)
 	logging.debug("%s is chosen to deliver %s", source, name)
 
 	if source[:4] == "git+":
@@ -592,8 +638,8 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 		cleanup(tempfile_list, tempdir_list)
 		sys.exit("this is git source, can not support")
 	elif source[:4] == "osf+":
-		checksum = attr_check(item, "checksum")
-		format = attr_check(item, "format")
+		checksum = attr_check(name, item, "checksum")
+		format = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		if format == "tgz":
 			osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
@@ -604,8 +650,8 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 	elif source[:5] == "cvmfs":
 		pass
 	else:
-		checksum = attr_check(item, "checksum")
-		format = attr_check(item, "format")
+		checksum = attr_check(name, item, "checksum")
+		format = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		dependency_download(name, source, checksum, "md5sum", dest, format, action)
 		mount_value = dest
@@ -622,7 +668,7 @@ def env_parameter_init(hardware_spec, kernel_spec, os_spec):
 	Returns:
 		a tuple including the requirements for hardware, kernel and os.
 	"""
-	hardware_platform = attr_check(hardware_spec, "arch").lower()
+	hardware_platform = attr_check("hardware", hardware_spec, "arch").lower()
 
 	cpu_cores = 1
 	if hardware_spec.has_key("cores"):
@@ -636,12 +682,12 @@ def env_parameter_init(hardware_spec, kernel_spec, os_spec):
 	if hardware_spec.has_key("disk"):
 		disk_size = hardware_spec["disk"].lower()
 
-	kernel_name = attr_check(kernel_spec, "name").lower()
-	kernel_version = attr_check(kernel_spec, "version").lower()
+	kernel_name = attr_check("kernel", kernel_spec, "name").lower()
+	kernel_version = attr_check("kernel", kernel_spec, "version").lower()
 	kernel_version = re.sub('\s+', '', kernel_version).strip()
 
-	distro_name = attr_check(os_spec, "name").lower()
-	distro_version = attr_check(os_spec, "version").lower()
+	distro_name = attr_check("os", os_spec, "name").lower()
+	distro_version = attr_check("os", os_spec, "version").lower()
 
 	os_id = ''
 	if os_spec.has_key("id"):
@@ -904,7 +950,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 
 		if mount_env and not mountpoint:
 			result = meta_search(meta_json, item, id)
-			env_para_dict[mount_env] =attr_check(result, "source", 1)
+			env_para_dict[mount_env] =attr_check(item, result, "source", 1)
 		else:
 			if mount_env and mountpoint:
 				env_para_dict[mount_env] = mountpoint
@@ -961,7 +1007,7 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
 
 		if mount_env and not mountpoint:
 			result = meta_search(meta_json, item, id)
-			env_para_dict[mount_env] = attr_check(result, "source", 1)
+			env_para_dict[mount_env] = attr_check(item, result, "source", 1)
 		else:
 			mount_value = data_dependency_process(item, id, meta_json, sandbox_dir, action, osf_auth)
 			logging.debug("Add mountpoint (%s:%s) into mount_dict", mountpoint, mount_value)
@@ -2248,7 +2294,7 @@ def cal_new_os_id(sec, old_os_id, pac_list):
 		md5_value: the md5 value of the string constructed from binding old_os_id and information from the package_manager section.
 		install_cmd: the package install cmd, such as: yum -y install python
 	"""
-	pm_name = attr_check(sec, "name")
+	pm_name = attr_check("os", sec, "name")
 	cmd = pm_name + " " + pac_manager[pm_name][0] + " " + ' '.join(pac_list)
 	install_cmd = []
 	install_cmd.append(cmd)
@@ -2736,13 +2782,13 @@ def abstract_metadata(spec_json, meta_path):
 		If the umbrella spec is not complete, exit directly.
 		Otherwise, return None.
 	"""
-	hardware_sec = attr_check(spec_json, "hardware")
-	hardware_arch = attr_check(hardware_sec, "arch")
+	hardware_sec = attr_check("hardware", spec_json, "hardware")
+	hardware_arch = attr_check("hardware", hardware_sec, "arch")
 
 	metadata = {}
-	os_sec = attr_check(spec_json, "os")
-	os_name = attr_check(os_sec, "name")
-	os_version = attr_check(os_sec, "version")
+	os_sec = attr_check("os", spec_json, "os")
+	os_name = attr_check("os", os_sec, "name")
+	os_version = attr_check("os", os_sec, "version")
 	os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
 	os_item = os_item.lower()
 	add2db(os_item, os_sec, metadata)
@@ -2851,12 +2897,12 @@ def separatize_spec(spec_json, meta_json, target_type):
 		metadata = {}
 
 
-	hardware_sec = attr_check(spec_json, "hardware")
-	hardware_arch = attr_check(hardware_sec, "arch")
+	hardware_sec = attr_check("hardware", spec_json, "hardware")
+	hardware_arch = attr_check("hardware", hardware_sec, "arch")
 
-	os_sec = attr_check(spec_json, "os")
-	os_name = attr_check(os_sec, "name")
-	os_version = attr_check(os_sec, "version")
+	os_sec = attr_check("os", spec_json, "os")
+	os_name = attr_check("os", os_sec, "name")
+	os_version = attr_check("os", os_sec, "version")
 	os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
 	os_item = os_item.lower()
 	ident = None
@@ -2982,7 +3028,7 @@ def validate_meta(meta_json):
 		for ident in meta_json[name]:
 			logging.debug("check for %s with the id of %s ...", name, ident)
 			print "check for %s with the id of %s ..." % (name, ident)
-			attr_check(meta_json[name][ident], "source", 1)
+			attr_check(name, meta_json[name][ident], "source", 1)
 
 	logging.debug("Finish validating the metadata db ....\n")
 	print "Finish validating the metadata db successfully!"
@@ -3305,7 +3351,8 @@ def main():
 	disable_warnings function is used here to disable the SNIMissingWarning and InsecurePlatformWarning from /afs/crc.nd.edu/user/h/hmeng/.local/lib/python2.6/site-packages/requests-2.9.1-py2.6.egg/requests/packages/urllib3/util/ssl_.py.
 	"Requests 2.6 introduced this warning for users of Python prior to Python 2.7.9 with only stock SSL modules available."
 	"""
-	requests.packages.urllib3.disable_warnings()
+	if found_requests:
+		requests.packages.urllib3.disable_warnings()
 
 	logging.basicConfig(filename=logfilename, level=logging.DEBUG,
         format='%(asctime)s.%(msecs)d %(levelname)s %(module)s - %(funcName)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
@@ -3700,6 +3747,10 @@ def main():
 			logging.critical("The syntax for umbrella upload is: umbrella ... upload <target> ... \n")
 			sys.exit("The syntax for umbrella upload is: umbrella ... upload <target> ... \n")
 		if args[1] == "osf":
+
+			if not found_requests:
+				logging.critical("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
+				sys.exit("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 			if len(args) != 8:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>\n")
