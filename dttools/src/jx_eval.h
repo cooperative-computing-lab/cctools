@@ -9,16 +9,13 @@ See the file COPYING for details.
 
 #include "jx.h"
 
-/** Evaluation function.  To use @ref jx_evaluate, the caller must
-define a function of type @ref jx_eval_func_t which accepts a symbol
-name and returns a JX value.
-*/
-typedef struct jx * (*jx_eval_func_t) ( const char *ident );
-
 /** Evaluate an expression.  Traverses the expression recursively, and
-for each value of type @ref JX_SYMBOL, invokes the evaluator function
-to replace it with a constant value.  @param j The expression to evaluate.  @param evaluator The evaluating function.  @return A newly created result expression, which must be deleted with @ref jx_delete.
+for each value of type @ref JX_SYMBOL, looks for a property with a
+matching name in the context object.
+@param j The expression to evaluate.
+@param context An object in which values will be found.
+@return A newly created result expression, which must be deleted with @ref jx_delete.
 */
-struct jx * jx_evaluate( struct jx *j, jx_eval_func_t evaluator );
+struct jx * jx_evaluate( struct jx *j, struct jx *context );
 
 #endif
