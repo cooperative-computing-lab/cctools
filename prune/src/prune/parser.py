@@ -2,7 +2,7 @@ import json, uuid, io, sys
 
 
 class Parser:
-	def __init__( self, base_dir='./', file_threshold=sys.maxint, one_file=True ):
+	def __init__( self, base_dir='./', file_threshold=sys.maxint, one_file=True, debug=False ):
   		self.base_dir = base_dir
 		self.obj_buffer = ''
 		self.stream = None
@@ -11,25 +11,36 @@ class Parser:
 		self.stream_remain = 0
 		self.my_buffer = ''
 		self.use_file = False
+		self.nospace = 0
 		self.file_threshold = file_threshold
 		self.one_file = one_file
 		self.objects = []
 		self.results = []
+		self.debug = debug
 
 	def parse(self, new_buffer):
 		self.my_buffer += new_buffer
 		while len(self.my_buffer) > 0:
 			if self.stream and self.stream_remain > 0:
 				if self.stream_remain >= len(self.my_buffer):
-					#print 'binary:',self.my_buffer,
+					if self.debug:
+						if self.stream_size<256 or len(self.my_buffer)<10:
+							print 'binary:',self.my_buffer,
+						else:
+							print 'binary:',self.my_buffer[0:10],'...',
 					self.stream.write( self.my_buffer )
 					self.stream_remain -= len(self.my_buffer)
 					self.my_buffer = ''
 				else:
-					#print 'binary:',self.my_buffer[0:self.stream_size],'____'
+					if self.debug:
+						if self.stream_size<256 or self.stream_remain<10:
+							print 'binary:',self.my_buffer,
+						else:
+							print 'binary:',self.my_buffer[0:10],'...',
 					self.stream.write( self.my_buffer[0:self.stream_remain] )
 					self.my_buffer = self.my_buffer[self.stream_remain+1:]
 					self.stream_remain = 0
+
 
 				if self.stream_remain <= 0:
 					if self.use_file:
@@ -45,14 +56,22 @@ class Parser:
 
 
 			else:
-				ar = self.my_buffer.split( '\n', 1 )
-				if len(ar)>1:
-					line, self.my_buffer = ar
-					#print 'line:',line
+				pos = self.my_buffer.find( '\n', self.nospace )
+				if pos < 0:
+					tlen = len(self.my_buffer)
+					self.nospace = tlen
+					break
+				else:
+					line = self.my_buffer[0:pos]
+					self.my_buffer = self.my_buffer[pos+1:]
+					self.nospace = 0
+					if self.debug:
+						print 'line:',line
 					if len(line) == 0:
 						self.results.append( self.objects )
 						self.objects = []
-						#print 'was blank line.'
+						if self.debug:
+							print 'end message.'
 
 					elif line[0] == '{':
 						self.obj_buffer = '{'

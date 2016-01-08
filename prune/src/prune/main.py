@@ -186,6 +186,7 @@ def start_prune():
 		print 'Starting up master at %s:%i...' % (hostname, port)
 		master = Master( cfg )
 		master.executer = exec_master.Master( master )
+		master.start()
 		try:
 			while True:
 				time.sleep(3)
@@ -247,17 +248,16 @@ class Master:
 	def __init__( self, new_cfg ):
 		self.cfg = new_cfg
 		self.master = self
-		self.start()
+		#self.start()
 
 
 	def start( self ):
+
 		if not self.ready:
 			
 			self.ready = False
 			self.messageQ = Queue()
 
-			if 'socket' in self.cfg:
-				self.server = msg_server.Listen( self.cfg['socket']['hostname'], self.cfg['socket']['port'], self )
 
 			self.stores = {}
 			for drive_name in self.cfg['drives']:
@@ -279,6 +279,9 @@ class Master:
 
 
 			self.ready = True
+
+			if 'socket' in self.cfg:
+				self.server = msg_server.Listen( self.cfg['socket']['hostname'], self.cfg['socket']['port'], self )
 
 
 	def stop( self ):

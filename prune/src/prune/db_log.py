@@ -54,6 +54,7 @@ class Database:
 		if not self.ready:
 			self.position = 0
 			parser = Parser()
+			start = time.time()
 			self.open_file = self.drive.open_stream( self.drive.database_file() )
 			self.open_file.seek(0)
 			for line in self.open_file:
@@ -61,9 +62,12 @@ class Database:
 				if results:
 					for objects in results:
 						i = 0
-						while i<len(objects):
+						while i<len(objects) and len(objects)>0:
 							obj = objects[i]
-							body = objects[i+1]
+							if (i+1)<len(objects):
+								body = objects[i+1]
+							else:
+								body = None
 
 							if obj['type'] == 'envi':
 								en = Envi( obj, body=body )
@@ -74,12 +78,13 @@ class Database:
 							elif obj['type'] == 'file':
 								fl = File( obj, body=body )
 								self.index_obj( fl )
-							elif obj['exec'] == 'exec':
+							elif obj['type'] == 'exec':
 								ex = Exec( obj, body=body )
 								self.index_obj( ex )
 
 							i += 2
-
+			diff = time.time() - start
+			print "DB loaded in:",diff
 			self.ready = True
 
 
@@ -152,7 +157,7 @@ class Database:
 		stored = False
 
 		node = self.fetch( obj.key )
-		if not node:
+		if not node or ( isinstance(obj, File) and (obj.tree_key!=node.obj.tree_key) ):
 
 			if isinstance(obj, File) and (obj.path or obj.tree_key):
 				obj_str = obj.str_w_file( self.file_folder + obj.key )
@@ -164,6 +169,7 @@ class Database:
 				self.open_file.write( "\n" )
 				self.open_file.flush()
 			stored = True
+
 
 		self.index_obj( obj )
 
@@ -201,7 +207,18 @@ class Database:
 			return self.drive.symlink( src, target )
 		node = self.fetch( src )
 		if node.obj.path:
-			self.drive.symlink( src, target )
+			self.drive.symlink( node.obj.key, target )
+		else:
+			f = open( target, 'wb' )
+			f.write(node.obj.body)
+			f.close()
+
+	def copy_file( self, src, target ):
+		if src == self.nil:
+			return self.drive.symlink( src, target )
+		node = self.fetch( src )
+		if node.obj.path:
+			self.drive.copy( node.obj.key, target )
 		else:
 			f = open( target, 'wb' )
 			f.write(node.obj.body)

@@ -142,6 +142,9 @@ class Folder:
 	def symlink( self, src, target ):
 		os.symlink( self.folder + self.file_folder() + src, target )
 
+	def copy( self, src, target ):
+		shutil.copy( self.folder + self.file_folder() + src, target )
+
 	def touch( self, src ):
 		open( self.folder + self.file_folder() + self.nil, 'a' ).close()
 

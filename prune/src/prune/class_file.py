@@ -1,4 +1,4 @@
-import json, time, os
+import json, time, os, shutil
 from . import store_local
 
 class File(object):
@@ -21,11 +21,14 @@ class File(object):
 			self.body = None
 			self.path = kwargs['path']
 			self.size = int(kwargs['size'])
-		elif 'body' in kwargs:
+		elif 'body' in kwargs and kwargs['body']:
 			self.body = kwargs['body']
 			self.path = None
 			self.size = len(self.body)
 		else:
+			self.body = None
+			self.path = None
+			self.size = 0
 			print 'NO PATH OR BODY TO THIS FILE:', kwargs
 
 
@@ -59,7 +62,7 @@ class File(object):
 		obj['path'] = filename
 		if self.path:
 			obj['size'] = self.size
-			os.rename( self.path, store_local.primary.folder + filename )
+			shutil.move( self.path, store_local.primary.folder + filename )
 			self.path = filename
 			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': '))
 		else:
