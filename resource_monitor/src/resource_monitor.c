@@ -151,7 +151,7 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
+#define DEFAULT_INTERVAL       5*USECOND       /* in useconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
@@ -1016,7 +1016,7 @@ void ping_processes(void)
 struct rmsummary *rmonitor_rusage_tree(void)
 {
     struct rusage usg;
-    struct rmsummary *tr_usg = calloc(1, sizeof(struct rmsummary));
+    struct rmsummary *tr_usg = rmsummary_create(-1);
 
     debug(D_RMON, "calling getrusage.\n");
 
@@ -1025,6 +1025,10 @@ struct rmsummary *rmonitor_rusage_tree(void)
         debug(D_RMON, "getrusage failed: %s\n", strerror(errno));
         return NULL;
     }
+
+	tr_usg->cpu_time  = 0;
+	tr_usg->cpu_time += usg.ru_utime.tv_sec*USECOND + usg.ru_utime.tv_usec;
+	tr_usg->cpu_time += usg.ru_stime.tv_sec*USECOND + usg.ru_stime.tv_usec;
 
 	if(usg.ru_majflt > 0) {
 		/* Here we add the maximum recorded + the io from memory maps */
