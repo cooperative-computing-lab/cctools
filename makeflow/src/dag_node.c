@@ -41,7 +41,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
-	n->resources = make_rmsummary(-1);
+	n->resources = rmsummary_create(-1);
 
 	return n;
 }
@@ -233,11 +233,11 @@ void dag_node_fill_resources(struct dag_node *n)
 
 	val_str = dag_variable_lookup_string(RESOURCES_DISK, &s);
 	if(val_str)
-		rs->workdir_footprint = atoll(val_str);
+		rs->disk = atoll(val_str);
 
 	val_str = dag_variable_lookup_string(RESOURCES_MEMORY, &s);
 	if(val_str)
-		rs->resident_memory = atoll(val_str);
+		rs->memory = atoll(val_str);
 
 	val_str = dag_variable_lookup_string(RESOURCES_GPUS, &s);
 	if(val_str)
@@ -248,10 +248,10 @@ void dag_node_print_debug_resources(struct dag_node *n)
 {
 	if( n->resources->cores > -1 )
 		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources->cores);
-	if( n->resources->resident_memory > -1 )
-		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources->resident_memory);
-	if( n->resources->workdir_footprint > -1 )
-		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources->workdir_footprint);
+	if( n->resources->memory > -1 )
+		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources->memory);
+	if( n->resources->disk > -1 )
+		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources->disk);
 	if( n->resources->gpus > -1 )
 		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n", n->resources->gpus);
 }
@@ -264,11 +264,11 @@ char *dag_node_resources_wrap_as_wq_options(struct dag_node *n, const char *defa
 
 	char *options = NULL;
 
-	options = string_format("%s resources: cores: %" PRId64 ", resident_memory: %" PRId64 ", workdir_footprint: %" PRId64,
+	options = string_format("%s resources: cores: %" PRId64 ", memory: %" PRId64 ", disk: %" PRId64,
 			default_options           ? default_options      : "",
 			s->cores             > -1 ? s->cores             : -1,
-			s->resident_memory   > -1 ? s->resident_memory   : -1,
-			s->workdir_footprint > -1 ? s->workdir_footprint : -1);
+			s->memory   > -1 ? s->memory   : -1,
+			s->disk > -1 ? s->disk : -1);
 
 	return options;
 }
@@ -304,12 +304,12 @@ char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n)
 	add_monitor_field_int(options, s, total_processes);
 	add_monitor_field_double(options, s, cpu_time);
 	add_monitor_field_int(options, s, virtual_memory);
-	add_monitor_field_int(options, s, resident_memory);
+	add_monitor_field_int(options, s, memory);
 	add_monitor_field_int(options, s, swap_memory);
 	add_monitor_field_int(options, s, bytes_read);
 	add_monitor_field_int(options, s, bytes_written);
-	add_monitor_field_int(options, s, workdir_num_files);
-	add_monitor_field_int(options, s, workdir_footprint);
+	add_monitor_field_int(options, s, total_files);
+	add_monitor_field_int(options, s, disk);
 
 	return options;
 }
@@ -345,8 +345,8 @@ char *dag_node_resources_wrap_as_condor_options(struct dag_node *n, const char *
 	char *opt;
 
 	options = dag_node_resources_add_condor_option(options, "Cores>=", s->cores);
-	options = dag_node_resources_add_condor_option(options, "Memory>=", s->resident_memory);
-	options = dag_node_resources_add_condor_option(options, "Disk>=", s->workdir_footprint);
+	options = dag_node_resources_add_condor_option(options, "Memory>=", s->memory);
+	options = dag_node_resources_add_condor_option(options, "Disk>=", s->disk);
 
 	if(!options)
 	{

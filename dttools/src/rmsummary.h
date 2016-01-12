@@ -40,12 +40,12 @@ struct rmsummary
 	int64_t  max_concurrent_processes;
 	int64_t  cpu_time;
 	int64_t  virtual_memory;
-	int64_t  resident_memory;
+	int64_t  memory;
 	int64_t  swap_memory;
 	int64_t  bytes_read;
 	int64_t  bytes_written;
-	int64_t  workdir_num_files;
-	int64_t  workdir_footprint;
+	int64_t  total_files;
+	int64_t  disk;
 
 	int64_t  cores;
 	int64_t  gpus;
@@ -81,7 +81,9 @@ struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separa
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
-struct rmsummary *make_rmsummary(signed char default_value);
+struct rmsummary *rmsummary_create(signed char default_value);
+void rmsummary_delete(struct rmsummary *s);
+
 void rmsummary_read_env_vars(struct rmsummary *s);
 
 

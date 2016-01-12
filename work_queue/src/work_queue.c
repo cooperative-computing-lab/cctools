@@ -3970,7 +3970,7 @@ void work_queue_task_delete(struct work_queue_task *t)
 		if(t->host)
 			free(t->host);
 		if(t->resources_measured)
-			free(t->resources_measured);
+			rmsummary_delete(t->resources_measured);
 		free(t);
 	}
 }
@@ -4356,6 +4356,10 @@ void work_queue_delete(struct work_queue *q)
 		if(q->logfile) {
 			fclose(q->logfile);
 		}
+
+		if(q->measured_local_resources)
+			rmsummary_delete(q->measured_local_resources);
+
 		free(q);
 	}
 }
