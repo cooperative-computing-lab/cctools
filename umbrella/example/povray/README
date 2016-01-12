@@ -101,3 +101,19 @@ umbrella \
 --sandbox_mode parrot \
 --log umbrella.log \
 run
+
+#The interaction between Umbrella and the Amazon S3 uses the boto3 package which is not included in Python by default. Please install boto3 first.
+#upload the dependencies to S3.
+umbrella \
+--spec povray_S_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--log umbrella.log \
+upload s3 testhmeng public-read newspec.umbrella
+
+umbrella \
+--spec povray_S_s3.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_s3/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
