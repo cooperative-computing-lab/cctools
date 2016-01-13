@@ -24,8 +24,6 @@ See the file COPYING for details.
  * Helper functions
 ***/
 
-#define div_round_up(a, b) (((a) + (b) - 1) / (b))
-
 #define ANON_MAPS_NAME "[anon]"
 
 uint64_t usecs_since_epoch()
@@ -341,11 +339,11 @@ int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 	fclose(fmem);
 
 	/* in MB */
-	mem->virtual  = div_round_up(mem->virtual,  1024);
-	mem->resident = div_round_up(mem->resident, 1024);
-	mem->text     = div_round_up(mem->text,     1024);
-	mem->data     = div_round_up(mem->data,     1024);
-	mem->shared   = div_round_up(mem->shared,   1024);
+	mem->virtual  = DIV_INT_ROUND_UP(mem->virtual,  1024);
+	mem->resident = DIV_INT_ROUND_UP(mem->resident, 1024);
+	mem->text     = DIV_INT_ROUND_UP(mem->text,     1024);
+	mem->data     = DIV_INT_ROUND_UP(mem->data,     1024);
+	mem->shared   = DIV_INT_ROUND_UP(mem->shared,   1024);
 
 	return status;
 }
@@ -526,7 +524,7 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 			/* a series of upper bounds: */
 			/* by adding referenced, we assumed a worst case of non-sharing
 			 * memory, but referenced cannot be larger than the virtual size: */
-			info->virtual  = div_round_up(info->map_end - info->map_start, 1024); /* bytes to kB. */
+			info->virtual  = DIV_INT_ROUND_UP(info->map_end - info->map_start, 1024); /* bytes to kB. */
 			info->referenced = MIN(info->referenced, info->virtual);
 
 			/* similarly, resident cannot be larger than referenced. */
@@ -560,10 +558,10 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 	hash_table_delete(maps_per_file);
 
 	/* all the values computed are in kB, we convert to MB. */
-	mem->virtual      = div_round_up(mem->virtual,  1024);
-	mem->shared       = div_round_up(mem->shared,   1024);
-	mem->private      = div_round_up(mem->private,  1024);
-	mem->resident     = div_round_up(mem->resident, 1024);
+	mem->virtual      = DIV_INT_ROUND_UP(mem->virtual,  1024);
+	mem->shared       = DIV_INT_ROUND_UP(mem->shared,   1024);
+	mem->private      = DIV_INT_ROUND_UP(mem->private,  1024);
+	mem->resident     = DIV_INT_ROUND_UP(mem->resident, 1024);
 
 	return 0;
 }
