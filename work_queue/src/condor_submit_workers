@@ -35,15 +35,29 @@ parse_arguments()
 
 			--autosize)
 			arguments="$arguments --cores \$\$(TotalSlotCpus) --memory \$\$(TotalSlotMemory) --disk \$\$(TotalSlotDisk)"
-			cores="TotalSlotCpus"
-			memory="TotalSlotMemory"
-			disk="TotalSlotDisk"
+
+			if [ -z "$cores" ]; then
+				cores="TotalSlotCpus"
+			else
+				cores="ifThenElse($cores > TotalSlotCpus, $cores, TotalSlotCpus)"
+			fi
+
+			if [ -z "$memory" ]; then
+				memory="TotalSlotMemory"
+			else
+				memory="ifThenElse($memory > TotalSlotMemory, $memory, TotalSlotMemory)"
+			fi
+
+			if [ -z "$disk" ]; then
+				disk="TotalSlotDisk"
+			else
+				disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
+			fi
 			;;
 
 			*)
 			break
 			;;
-
 		esac
 		shift
 	done
