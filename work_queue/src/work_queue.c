@@ -2490,11 +2490,28 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	return SUCCESS;
 }
 
+static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
+
+	struct rmsummary *limits = rmsummary_create(-1);
+	const struct rmsummary *label = task_dynamic_label(q, t);
+
+	rmsummary_merge_max(limits, label);
+
+	if(t->resource_request == WORK_QUEUE_ALLOCATION_AUTO_ZERO) {
+		limits->cores  = MIN(MAX(label->cores, 0),  w->resources->cores.total);
+		limits->memory = MIN(MAX(label->memory, 0), w->resources->memory.total);
+		limits->disk   = MIN(MAX(label->disk, 0),   w->resources->disk.total);
+		limits->gpus   = MIN(MAX(label->gpus, 0),   w->resources->gpus.total);
+	}
+
+	return limits;
+}
+
 static work_queue_result_code_t start_one_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
 	/* wrap command at the last minute, so that we have the updated information
 	 * about resources. */
-	struct rmsummary *limits = t->resources_requested;
+	struct rmsummary *limits = task_worker_box_size(q, w, t);
 
 	char *command_line;
 	if(q->monitor_mode) {
@@ -2531,6 +2548,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 		send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
 	}
 
+	rmsummary_delete(limits);
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -5573,7 +5591,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
 
-	//relabel task here
+	relabel_task(q, t);
 	struct category *c = category_lookup_or_create(q->categories, t->category);
 
 	switch(t->resource_request) {
