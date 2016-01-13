@@ -882,6 +882,61 @@ class WorkQueue(_object):
         return work_queue_specify_password_file(self._work_queue, file)
 
     ##
+    # Enables resource autolabeling for tasks without an explicit category ("default" category).
+    # rm specifies the maximum resources a task in the default category may use.
+    # If rm is None, disable autolabeling for the default category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores is found on any worker:
+    # >>> q.specify_max_resources({'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
+    # >>> q.specify_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_max_resources(self, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_max_resources(self._work_queue, rm)
+
+    ##
+    # Enables resource autolabeling for tasks in the given category.
+    # rm specifies the maximum resources a task in the category may use.
+    # If rm is None, disable autolabeling for that category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores may be used by a task in the category:
+    # >>> q.specify_max_category_resources("my_category", {'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
+    # >>> q.specify_max_category_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_max_category_resources(self, category, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_max_category_resources(self._work_queue, category, rm)
+
+    ##
+    # Initialize first value of categories
+    #
+    # @param self     Reference to the current work queue object.
+    # @param rm       Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # @param filename JSON file with resource summaries.
+
+    def initialize_categories(filename, rm):
+        return work_queue_initialize_categories(self._work_queue, rm, filename)
+
+    ##
     # Cancel task identified by its taskid and remove from the given queue.
     #
     # @param self   Reference to the current work queue object.
