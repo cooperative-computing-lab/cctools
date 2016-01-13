@@ -486,22 +486,24 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
 		
 
-		// check to see if factory timeout is triggered
-		time_t curr_time = time(0);
-		if(list_size(masters_list))
+		// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
+		if(!factory_timeout)
 		{
-			factory_timeout_start = 0;
-		} else {
-			if(factory_timeout_start) {
-				if(curr_time - factory_timeout_start > factory_timeout) {
-					fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting");
-					abort_flag=1;
-				}
+			time_t curr_time = time(0);
+			if(list_size(masters_list))
+			{
+				factory_timeout_start = 0;
 			} else {
-				factory_timeout_start = curr_time;
+				if(factory_timeout_start) {
+					if(curr_time - factory_timeout_start > factory_timeout) {
+						fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting");
+						abort_flag=1;
+					}
+				} else {
+					factory_timeout_start = curr_time;
+				}
 			}
-		}
- 
+	 	}
 	
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
