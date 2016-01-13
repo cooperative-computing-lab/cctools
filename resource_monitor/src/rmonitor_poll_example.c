@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "rmonitor_poll.h"
+#include "rmsummary.h"
 
 int main(int argc, char **argv) {
 	sleep(2);
@@ -21,6 +22,9 @@ int main(int argc, char **argv) {
 
 	fprintf(stdout, "total cores used: %" PRId64 "\n",
 			resources->cores);
+
+	fprintf(stdout, "\n\njson output:\n");
+	rmsummary_print(stdout, resources, 0);
 
 	rmsummary_delete(resources);
 
