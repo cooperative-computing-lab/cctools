@@ -50,6 +50,7 @@ OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can
 OPTION_TRIPLET(-T,batch-type, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
 OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
 OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
+OPTION_ITEM(`--autosize')Automatically size a worker to an available slot (Condor only).
 OPTION_ITEM(-c --capacity) Use worker capacity reported by masters.
 OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to master.
 OPTION_TRIPLET(-t,timeout,time)Abort after this amount of idle time.

@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "path.h"
 #include "buffer.h"
+#include "rmsummary.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -47,6 +48,7 @@ static int catalog_port = 0;
 static int workers_min = 5;
 static int workers_max = 100;
 static double tasks_per_worker = -1;
+static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
 static char *project_regex = 0;
@@ -128,30 +130,25 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 	return needed_workers;
 }
 
-static void set_worker_resources( struct batch_queue *queue )
+static void set_worker_resources_options( struct batch_queue *queue )
 {
-
 	buffer_t b;
 	buffer_init(&b);
 
-	if(num_cores_option > -1) {
-		batch_queue_set_int_option(queue, "cores",  num_cores_option);
-		buffer_printf(&b, " --cores=%d", num_cores_option);
-	}
+	if(batch_queue_supports_feature(queue, "autosize") && autosize) {
+		buffer_printf(&b, " --cores=$$(TotalSlotCpus) --memory=$$(TotalSlotMemory) --disk=$$(TotalSlotDisk)");
+	} else {
+		if(resources->cores > -1) {
+			buffer_printf(&b, " --cores=%" PRId64, resources->cores);
+		}
 
-	if(num_memory_option > -1) {
-		batch_queue_set_int_option(queue, "memory", num_memory_option);
-		buffer_printf(&b, " --memory=%d", num_memory_option);
-	}
+		if(resources->memory > -1) {
+			buffer_printf(&b, " --memory=%" PRId64, resources->memory);
+		}
 
-	if(num_disk_option > -1) {
-		batch_queue_set_int_option(queue, "disk",   num_disk_option);
-		buffer_printf(&b, " --disk=%d", num_disk_option);
-	}
-
-	if(num_gpus_option > -1) {
-		batch_queue_set_int_option(queue, "gpus",   num_gpus_option);
-		buffer_printf(&b, " --gpus=%d", num_gpus_option);
+		if(resources->disk > -1) {
+			buffer_printf(&b, " --disk=%" PRId64, resources->disk);
+		}
 	}
 
 	resource_args = xxstrdup(buffer_tostring(&b));
@@ -479,6 +476,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 			debug(D_NOTICE, "Error re-reading '%s'. Using previous values.", config_file);
 		} else {
 			set_worker_resources_options( queue );
+			batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 		}
 
 		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
@@ -578,6 +576,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
+	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
@@ -588,7 +587,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_AUTOSIZE };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -613,6 +612,7 @@ static const struct option long_options[] = {
 	{"help", no_argument, 0, 'h'},
 	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{0,0,0,0}
 };
 
@@ -681,6 +681,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_GPUS:
 				resources->gpus = atoi(optarg);
+				break;
+			case LONG_OPT_AUTOSIZE:
+				autosize = 1;
 				break;
 			case 'P':
 				password_file = optarg;
@@ -787,6 +790,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 	set_worker_resources_options( queue );
 
 	if (amazon_credentials != NULL) {
