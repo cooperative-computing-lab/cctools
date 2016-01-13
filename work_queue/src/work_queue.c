@@ -105,6 +105,7 @@ typedef enum {
 typedef enum {
 	MON_DISABLED = 0,
 	MON_SINGLE_FILE,
+	MON_SINGLE_FILE_NO_KEEP,
 	MON_FULL
 } work_queue_monitoring_mode;
 
@@ -1197,7 +1198,11 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 	struct flock lock;
 	char        *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
-	t->resources_measured = rmsummary_parse_file_single(summary);
+	if(q->monitor_mode == MON_SINGLE_FILE_NO_KEEP) {
+		unlink(summary);
+		return;
+	}
+
 	int monitor_fd = fileno(q->monitor_file);
 
 	lock.l_type   = F_WRLCK;
@@ -4196,12 +4201,12 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	return 0;
   }
 
-  if(!monitor_output_directory) {
-	  debug(D_NOTICE, "Missing monitor output directory. Disabling monitor mode.\n");
-	  return 0;
+  if(monitor_output_directory) {
+	  q->monitor_output_dirname = xxstrdup(monitor_output_directory);
+  } else {
+	  q->monitor_output_dirname = xxstrdup("./");
   }
 
-  q->monitor_output_dirname = xxstrdup(monitor_output_directory);
 
   if(!create_dir(q->monitor_output_dirname, 0777)) {
 	  debug(D_NOTICE, "Could not create monitor output directory - %s (%s)", q->monitor_output_dirname, strerror(errno));
@@ -4214,17 +4219,20 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	  free(q->measured_local_resources);
   q->measured_local_resources = rmonitor_measure_process(getpid());
 
-  q->monitor_file = fopen(q->monitor_summary_filename, "a");
+  if(monitor_output_directory) {
+	  q->monitor_summary_filename = string_format("%s/wq-%d.summaries", q->monitor_output_dirname, getpid());
+	  q->monitor_file             = fopen(q->monitor_summary_filename, "a");
 
-  if(!q->monitor_file)
-  {
-	debug(D_NOTICE, "Could not open monitor log file. Disabling monitor mode.\n");
-	return 0;
+	  if(!q->monitor_file)
+	  {
+		  fatal("Could not open monitor log file for writing: '%s'\n", q->monitor_summary_filename);
+		  return 0;
+	  }
+
+	  q->monitor_mode = MON_SINGLE_FILE;
+  } else {
+	  q->monitor_mode = MON_SINGLE_FILE_NO_KEEP;
   }
-
-  q->measured_local_resources = rmonitor_measure_process(getpid());
-
-  q->monitor_mode = MON_SINGLE_FILE;
 
   return 1;
 }
@@ -4456,43 +4464,60 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 	if(!q->monitor_mode)
 		return;
 
-	fclose(q->monitor_file);
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
+	if(!q->measured_local_resources->exit_type)
+		q->measured_local_resources->exit_type = xxstrdup("normal");
 
-	char template[] = "rmonitor-summaries-XXXXXX";
-	int final_fd = mkstemp(template);
-	int summs_fd = open(q->monitor_summary_filename, O_RDONLY);
-
-	if( final_fd < 0 || summs_fd < 0 ) {
-		warn(D_DEBUG, "Could not consolidate resource summaries.");
+	if(q->monitor_mode == MON_SINGLE_FILE_NO_KEEP) {
 		return;
+	} else {
+		fclose(q->monitor_file);
+
+		char template[] = "rmonitor-summaries-XXXXXX";
+		int final_fd = mkstemp(template);
+		int summs_fd = open(q->monitor_summary_filename, O_RDONLY);
+
+		if( final_fd < 0 || summs_fd < 0 ) {
+			warn(D_DEBUG, "Could not consolidate resource summaries.");
+			return;
+		}
+
+		/* set permissions according to user's mask. getumask is not available yet,
+		   and the only way to get the value of the current mask is to change
+		   it... */
+		mode_t old_mask = umask(0);
+		umask(old_mask);
+		fchmod(final_fd, 0777 & ~old_mask  );
+
+		FILE *final = fdopen(final_fd, "w");
+
+		struct jx *extra = jx_object(
+				jx_pair(jx_string("type"), jx_string("work_queue"),
+					jx_pair(jx_string("user"), jx_string(getlogin()),
+						NULL)));
+
+		if(q->name) {
+			jx_insert_string(extra, "master_name", q->name);
+		}
+
+		rmsummary_print(final, q->measured_local_resources, extra);
+
+		copy_fd_to_stream(summs_fd, final);
+
+		jx_delete(extra);
+		fclose(final);
+		close(summs_fd);
+
+		if(rename(template, q->monitor_summary_filename) < 0)
+			warn(D_DEBUG, "Could not move monitor report to final destination file.");
 	}
 
-	/* set permissions according to user's mask. getumask is not available yet,
-	   and the only way to get the value of the current mask is to change
-	   it... */
-	mode_t old_mask = umask(0);
-	umask(old_mask);
-	fchmod(final_fd, 0777 & ~old_mask  );
-
-	FILE *final = fdopen(final_fd, "w");
-
-	fprintf(final, "user:        %s\n", getlogin());
-	fprintf(final, "type:        work_queue\n");
-
-	if(q->name)
-		fprintf(final, "master_name: %s\n", q->name);
-
-	fprintf(final, "exit_type:   normal\n");
-	rmsummary_print(final, q->measured_local_resources, NULL);
-
-	copy_fd_to_stream(summs_fd, final);
-
-	fclose(final);
-	close(summs_fd);
-
-	if(rename(template, q->monitor_summary_filename) < 0)
-		warn(D_DEBUG, "Could not move monitor report to final destination file.");
+	if(q->monitor_exe)
+		free(q->monitor_exe);
+	if(q->monitor_output_dirname)
+		free(q->monitor_output_dirname);
+	if(q->monitor_summary_filename)
+		free(q->monitor_summary_filename);
 }
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits)
