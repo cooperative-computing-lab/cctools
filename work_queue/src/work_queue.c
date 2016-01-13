@@ -35,6 +35,7 @@ The following major problems must be fixed:
 #include "buffer.h"
 #include "rmonitor.h"
 #include "rmonitor_poll.h"
+#include "category.h"
 #include "copy_stream.h"
 #include "random.h"
 #include "process.h"
@@ -221,13 +222,6 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 };
 
-struct work_queue_task_category {
-	char *name;
-	double fast_abort;
-	timestamp_t average_task_time;
-	struct work_queue_stats *stats;
-};
-
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 
 struct blacklist_host_info {
@@ -269,8 +263,7 @@ static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
-static struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name);
-void category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
+void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -698,9 +691,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			t->output = NULL;
 		}
 		t->output = 0;
-		if(t->unlabeled) {
-			t->cores = t->memory = t->disk = t->gpus = -1;
-		}
 
 		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
 			t->result = WORK_QUEUE_RESULT_MAX_RETRIES;
@@ -1263,12 +1253,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	delete_uncacheable_files(q,w,t);
 
-	// At this point, a task is completed.
-	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
-
-	w->finished_tasks--;
-	t->time_task_finish = timestamp_get();
-
 	/* if q is monitoring, append the task summary to the single
 	 * queue summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode) {
@@ -1277,9 +1261,13 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		/* Further, if we got debug and series files, gzip them. */
 		if(q->monitor_mode == MON_FULL)
 			resource_monitor_compress_logs(q, t);
-
 	}
 
+	// At this point, a task is completed.
+	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
+
+	w->finished_tasks--;
+	t->time_task_finish = timestamp_get();
 
 	// Record statistics information for capacity estimation
 	add_task_report(q,t);
@@ -2979,7 +2967,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	change_task_state(q, t, new_state);
 
 	if(new_state == WORK_QUEUE_TASK_RETRIEVED) {
-		category_accumulate_task(q, t);
+		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 	}
 
 	count_worker_resources(w);
@@ -3085,7 +3073,7 @@ static void ask_for_workers_updates(struct work_queue *q) {
 
 static void abort_slow_workers(struct work_queue *q)
 {
-	struct work_queue_task_category *c;
+	struct category *c;
 	char *category_name;
 
 	struct work_queue_worker *w;
@@ -3097,12 +3085,12 @@ static void abort_slow_workers(struct work_queue *q)
 
 	hash_table_firstkey(q->categories);
 	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
-		if(c->stats->total_tasks_complete < 10) {
+		if(c->total_tasks_complete < 10) {
 			c->average_task_time = 0;
 			continue;
 		}
 
-		c->average_task_time = (c->stats->total_good_execute_time + c->stats->total_good_transfer_time) / c->stats->total_tasks_complete;
+		c->average_task_time = (c->total_good_execute_time + c->total_good_transfer_time) / c->total_tasks_complete;
 
 		if(c->fast_abort > 0)
 			fast_abort_flag = 1;
@@ -3111,14 +3099,14 @@ static void abort_slow_workers(struct work_queue *q)
 	if(!fast_abort_flag)
 		return;
 
-	struct work_queue_task_category *c_def = category_lookup_or_create(q, "default");
+	struct category *c_def = category_lookup_or_create(q->categories, "default");
 
 	timestamp_t current = timestamp_get();
 
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
 
-		c = category_lookup_or_create(q, t->category);
+		c = category_lookup_or_create(q->categories, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
 			continue;
@@ -4100,6 +4088,13 @@ struct work_queue *work_queue_create(int port)
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
 
 	q->monitor_mode = MON_DISABLED;
+
+	q->categories = hash_table_create(0, 0);
+
+	// The value -1 indicates that fast abort is inactive by default
+	// fast abort depends on categories, thus set after them.
+	work_queue_activate_fast_abort(q, -1);
+
 	q->password = 0;
 
 	q->asynchrony_multiplier = 1.0;
@@ -4199,7 +4194,7 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
 
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
-	struct work_queue_task_category *c = category_lookup_or_create(q, category);
+	struct category *c = category_lookup_or_create(q->categories, category);
 
 	if(multiplier >= 1) {
 		debug(D_WQ, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
@@ -4334,14 +4329,10 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_delete(q->worker_blacklist);
 		itable_delete(q->worker_task_map);
 
-		struct work_queue_task_category *c;
+		struct category *c;
 		hash_table_firstkey(q->categories);
 		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-			if(c->name)
-				free(c->name);
-			if(c->stats)
-				free(c->stats);
-			free(c);
+			category_delete(q->categories, key);
 		}
 		hash_table_delete(q->categories);
 
@@ -5377,40 +5368,6 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	{
 		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
 		return 0;
-	}
-}
-
-struct work_queue_task_category *category_lookup_or_create(struct work_queue *q, const char *name) {
-	struct work_queue_task_category *c;
-
-	if(!name)
-		name = "default";
-
-	c = hash_table_lookup(q->categories, name);
-	if(c) return c;
-
-	c = calloc(1, sizeof(struct work_queue_task_category));
-
-	c->name       = xxstrdup(name);
-	c->stats      = calloc(1, sizeof(struct work_queue_stats));
-	c->fast_abort = -1;
-
-	hash_table_insert(q->categories, name, c);
-
-	return c;
-}
-
-void category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
-
-	const char *name = t->category ? t->category : "default";
-
-	struct work_queue_task_category *c = hash_table_lookup(q->categories, name);
-
-	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
-	{
-		c->stats->total_tasks_complete++;
-		c->stats->total_good_execute_time  += t->cmd_execution_time;
-		c->stats->total_good_transfer_time += t->total_transfer_time;
 	}
 }
 
