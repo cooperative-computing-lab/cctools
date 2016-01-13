@@ -3460,6 +3460,17 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_
 	}
 }
 
+void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *rm) {
+	if(!rm)
+		return;
+
+	work_queue_task_specify_cores(t,        rm->cores);
+	work_queue_task_specify_memory(t,       rm->memory);
+	work_queue_task_specify_disk(t,         rm->disk);
+	work_queue_task_specify_running_time(t, rm->wall_time);
+	work_queue_task_specify_end_time(t,     rm->end);
+}
+
 void work_queue_task_specify_tag(struct work_queue_task *t, const char *tag)
 {
 	if(t->tag)

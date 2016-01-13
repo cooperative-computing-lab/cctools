@@ -62,34 +62,7 @@ static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
 	}
 }
 
-static struct rmsummary *parse_batch_options_resources(const char *options_text)
-{
-	if(!options_text)
-		return NULL;
-
-	char *resources = strstr(options_text, "resources:");
-
-	if(!resources)
-		return NULL;
-
-	resources = strchr(resources, ':') + 1;
-
-	return rmsummary_parse_from_str(resources, ',');
-}
-
-static void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *resources)
-{
-		if(resources->cores > -1)
-			work_queue_task_specify_cores(t, resources->cores);
-
-		if(resources->memory > -1)
-			work_queue_task_specify_memory(t, resources->memory);
-
-		if(resources->disk > -1)
-			work_queue_task_specify_disk(t, resources->disk);
-}
-
-static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources)
 {
 	struct work_queue_task *t;
 
@@ -106,11 +79,9 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
 
-	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
 	if(resources)
 	{
 		work_queue_task_specify_resources(t, resources);
-		free(resources);
 	}
 
 	work_queue_submit(q->data, t);

@@ -61,10 +61,7 @@ static char *amazon_credentials = NULL;
 static char *amazon_ami = NULL;
 
 /* -1 means 'not specified' */
-static int num_cores_option  = -1;
-static int num_disk_option   = -1;
-static int num_memory_option = -1;
-static int num_gpus_option   = -1;
+static struct rmsummary *resources = NULL;
 
 struct batch_queue *queue = 0;
 
@@ -187,7 +184,7 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
-	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
+	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0,resources);
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
@@ -367,10 +364,11 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, JX_INTEGER, integer_value)
-	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, JX_INTEGER, integer_value)
-	assign_new_value(new_num_memory_option, num_memory_option, memory, int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_disk_option,  resources->disk, disk,      int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_memory_option, resources->memory, memory, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_autosize_option, autosize, autosize, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
 
@@ -406,10 +404,11 @@ int read_config_file(const char *config_file) {
 	workers_min    = new_workers_min;
 	worker_timeout = new_worker_timeout;
 	tasks_per_worker = new_tasks_per_worker;
+	autosize       = new_autosize_option;
 
-	num_cores_option = new_num_cores_option;
-	num_memory_option = new_num_memory_option;
-	num_disk_option = new_num_disk_option;
+	resources->cores  = new_num_cores_option;
+	resources->memory = new_num_memory_option;
+	resources->disk   = new_num_disk_option;
 
 	if(new_project_regex != project_regex) {
 		if(project_regex) free(project_regex); project_regex = xxstrdup(new_project_regex);
@@ -439,16 +438,16 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "max-workers: %d\n", workers_max);
 	fprintf(stdout, "min-workers: %d\n", workers_min);
 
-	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (num_cores_option > 0 ? num_cores_option : 1));
+	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
-	fprintf(stdout, "cores: %d\n", num_cores_option > 0 ? num_cores_option : 1);
+	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
 
-	if(num_memory_option > -1) {
-		fprintf(stdout, "memory: %d MB\n", num_memory_option);
+	if(resources->memory > -1) {
+		fprintf(stdout, "memory: %" PRId64 " MB\n", resources->memory);
 	}
 
-	if(num_disk_option > -1) {
-		fprintf(stdout, "disk: %d MB\n", num_disk_option);
+	if(resources->disk > -1) {
+		fprintf(stdout, "disk: %" PRId64 " MB\n", resources->disk);
 	}
 
 	if(extra_worker_args) {
@@ -479,7 +478,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		if(config_file && !read_config_file(config_file)) {
 			debug(D_NOTICE, "Error re-reading '%s'. Using previous values.", config_file);
 		} else {
-			set_worker_resources( queue );
+			set_worker_resources_options( queue );
 		}
 
 		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
@@ -627,6 +626,8 @@ int main(int argc, char *argv[])
 
 	debug_config(argv[0]);
 
+	resources = rmsummary_create(-1);
+
 	int c;
 
 	while((c = getopt_long(argc, argv, "C:F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
@@ -664,7 +665,7 @@ int main(int argc, char *argv[])
 				extra_worker_args = xxstrdup(optarg);
 				break;
 			case LONG_OPT_CORES:
-				num_cores_option = atoi(optarg);
+				resources->cores = atoi(optarg);
 				break;
 			case LONG_OPT_AMAZON_CREDENTIALS:
 				amazon_credentials = xxstrdup(optarg);
@@ -673,13 +674,13 @@ int main(int argc, char *argv[])
 				amazon_ami = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MEMORY:
-				num_memory_option = atoi(optarg);
+				resources->memory = atoi(optarg);
 				break;
 			case LONG_OPT_DISK:
-				num_disk_option = atoi(optarg);
+				resources->disk = atoi(optarg);
 				break;
 			case LONG_OPT_GPUS:
-				num_gpus_option = atoi(optarg);
+				resources->gpus = atoi(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
@@ -786,7 +787,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	set_worker_resources( queue );
+	set_worker_resources_options( queue );
 
 	if (amazon_credentials != NULL) {
 		batch_queue_set_option(queue, "amazon-credentials", amazon_credentials);
