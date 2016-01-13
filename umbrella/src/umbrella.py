@@ -68,7 +68,6 @@ import multiprocessing
 import resource
 import tempfile
 import urllib
-
 import imp
 
 found_requests = None
@@ -79,6 +78,26 @@ try:
 	import requests.packages.urllib3
 except ImportError:
 	found_requests = False
+
+
+found_boto3 = None
+try:
+	imp.find_module('boto3')
+	found_boto3 = True
+	import boto3
+except ImportError:
+	found_boto3 = False
+
+
+found_botocore = None
+try:
+	imp.find_module('botocore')
+	found_botocore = True
+	import botocore
+except ImportError:
+	found_botocore = False
+
+s3_url = 'https://s3.amazonaws.com'
 
 if sys.version_info >= (3,):
 	import urllib.request as urllib2
@@ -587,6 +606,15 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 		else:
 			osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
 		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
+	elif source[:3] == "s3+":
+		checksum = attr_check(name, item, "checksum")
+		format = attr_check(name, item, "format")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
+		if format == "tgz":
+			s3_download(source[3:], dest + ".tar.gz")
+		else:
+			s3_download(source[3:], dest)
+		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
 	else:
 		checksum = attr_check(name, item, "checksum")
 		format = attr_check(name, item, "format")
@@ -645,6 +673,16 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 			osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
 		else:
 			osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
+		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
+		mount_value = dest
+	elif source[:3] == "s3+":
+		checksum = attr_check(name, item, "checksum")
+		format = attr_check(name, item, "format")
+		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
+		if format == "tgz":
+			s3_download(source[3:], dest + ".tar.gz")
+		else:
+			s3_download(source[3:], dest)
 		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
 		mount_value = dest
 	elif source[:5] == "cvmfs":
@@ -3207,7 +3245,127 @@ def osf_download(username, password, osf_url, dest):
 	    for chunk in r2.iter_content(chunk_size):
 			fd.write(chunk)
 
-def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth):
+def s3_create(bucket_name, acl):
+	"""Create a s3 bucket
+
+	Args:
+		bucket_name: the bucket name
+		acl: the access control, which can be: private, public-read
+
+	Returns:
+		bucket: an S3.Bucket instance
+	"""
+	#create the connection with s3
+	s3 = boto3.resource('s3')
+
+	#list all the bucket names
+	buckets = set()
+	try:
+		for bucket in s3.buckets.all():
+			buckets.add(bucket.name)
+	except botocore.exceptions.ClientError as e:
+		sys.exit(e.message)
+	except:
+		sys.exit("Fails to list all the current buckets!")
+
+	#check whether the bucket name already exists
+	if bucket_name in buckets:
+		sys.exit("The bucket name (%s) already exists!" % bucket_name)
+
+	#create a new bucket
+	try:
+		s3.create_bucket(Bucket=bucket_name)
+	except:
+		sys.exit("Fails to create the new bucket (%s)!" % bucket_name)
+
+	#obtain the created bucket
+	bucket = s3.Bucket(bucket_name)
+
+	#set access control
+	#ACL totally can be one of these options: 'private'|'public-read'|'public-read-write'|'authenticated-read'
+	#for now, when an user uses Umbrella to upload to s3, the acl can only be private, public-read.
+	try:
+		bucket.Acl().put(ACL=acl)
+	except botocore.exceptions.ClientError as e:
+		sys.exit(e.message)
+	except:
+		sys.exit("Fails to list all the current buckets!")
+
+	return bucket
+
+def s3_upload(bucket, source, acl):
+	"""Upload a local file to s3
+
+	Args:
+		bucket: an S3.Bucket instance
+		source: the local file path
+		acl: the access control, which can be: private, public-read
+
+	Returns:
+		link: the link of a s3 object
+	"""
+	print "Upload %s to S3 ..." % source
+	logging.debug("Upload %s to S3 ...", source)
+
+	key = os.path.basename(source)
+	data = open(source, 'rb')
+
+	try:
+		#acl on the bucket does not automatically apply to all the objects in it. Acl must be set on each object.
+		bucket.put_object(ACL=acl, Key=key, Body=data) #https://s3.amazonaws.com/testhmeng/s3
+	except botocore.exceptions.ClientError as e:
+		sys.exit(e.message)
+	except:
+		sys.exit("Fails to upload the file (%s) to S3!" % source)
+
+	return "%s/%s/%s" % (s3_url, bucket.name, key)
+
+def s3_download(link, dest):
+	"""Download a s3 file to dest
+
+	Args:
+		link: the link of a s3 object. e.g., https://s3.amazonaws.com/testhmeng/s3
+		dest: a local file path
+
+	Returns:
+		None
+	"""
+	if not found_boto3 or not found_botocore:
+		logging.critical("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
+		sys.exit("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
+
+	print "Download %s from S3 to %s" % (link, dest)
+	logging.debug("Download %s from S3 to %s", link, dest)
+	s3 = boto3.resource('s3')
+
+	if (len(s3_url)+1) >= len(link):
+		sys.exit("The s3 object link (%s) is invalid! The correct format shoulde be <%s>/<bucket_name>/<key>!" % (link, s3_url))
+
+	m = link[(len(s3_url)+1):] #m format: <bucket_name>/<key>
+
+	i = m.find('/')
+	if i == -1:
+		sys.exit("The s3 object link (%s) is invalid! The correct format shoulde be <%s>/<bucket_name>/<key>!" % (link, s3_url))
+
+	bucket_name = m[:i]
+
+	if (i+1) >= len(m):
+		sys.exit("The s3 object link (%s) is invalid! The correct format shoulde be <%s>/<bucket_name>/<key>!" % (link, s3_url))
+
+	key = m[(i+1):]
+
+	if not os.path.exists(os.path.dirname(dest)):
+		os.makedirs(os.path.dirname(dest))
+
+	#the download url can be automatically combined through bucket name and key
+	try:
+		s3.Object(bucket_name, key).download_file(dest)
+	except botocore.exceptions.ClientError as e:
+		sys.exit(e.message)
+	except:
+		sys.exit("Fails to download the object (%s) from the bucket(%s)! Please ensure you have the right permission to download these s3 objects!" % (key, bucket_name))
+
+def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s3_bucket=None):
 	"""Upload each dependency in an umbrella spec to the target (OSF or s3), and add the new target download url into the umbrella spec.
 
 	Args:
@@ -3216,6 +3374,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth):
 		target_info: the info necessary to communicate with the remote target (i.e., OSF, s3)
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		osf_auth: the osf authentication info including osf_username and osf_password.
+		s3_bucket: an S3.Bucket instance
 
 	Returns:
 		None
@@ -3242,6 +3401,9 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth):
 		if target_info[0] == "osf":
 			osf_url = osf_upload(target_info[1], target_info[2], target_info[3], os_image_dir + ".tar.gz")
 			spec_json["os"]["source"].append("osf+" + osf_url)
+		elif target_info[0] == "s3":
+			s3_url = s3_upload(s3_bucket, os_image_dir + ".tar.gz", target_info[1])
+			spec_json["os"]["source"].append("s3+" + s3_url)
 
 	for sec_name in ["data"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
@@ -3252,9 +3414,13 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth):
 					source_url = mount_dict[sec[item]["mountpoint"]] + ".tar.gz"
 				else:
 					source_url = mount_dict[sec[item]["mountpoint"]]
+
 				if target_info[0] == "osf":
 					osf_url = osf_upload(target_info[1], target_info[2], target_info[3], source_url)
 					sec[item]["source"].append("osf+" + osf_url)
+				elif target_info[0] == "s3":
+					s3_url = s3_upload(s3_bucket, source_url, target_info[1])
+					sec[item]["source"].append("s3+" + s3_url)
 
 	for sec_name in ["software", "package_manager"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
@@ -3274,6 +3440,9 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth):
 				if target_info[0] == "osf":
 					osf_url = osf_upload(target_info[1], target_info[2], target_info[3], source_url)
 					sec[item]["source"].append("osf+" + osf_url)
+				elif target_info[0] == "s3":
+					s3_url = s3_upload(s3_bucket, source_url, target_info[1])
+					sec[item]["source"].append("s3+" + s3_url)
 
 def main():
 	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
@@ -3741,20 +3910,25 @@ def main():
 		json2file(new_spec_path, new_json)
 
 	if behavior in ["upload"]:
-		target = ["osf"]
-		if len(args) < 2 or args[1] not in ["osf"]:
+		target = ["osf", "s3"]
+		if len(args) < 2 or args[1] not in target:
 			cleanup(tempfile_list, tempdir_list)
-			logging.critical("The syntax for umbrella upload is: umbrella ... upload <target> ... \n")
-			sys.exit("The syntax for umbrella upload is: umbrella ... upload <target> ... \n")
+			logging.critical("The syntax for umbrella upload is: umbrella ... upload <target> ... (target can be: %s)\n", " or ".join(target))
+			sys.exit("The syntax for umbrella upload is: umbrella ... upload <target> ... (target can be: %s)\n" % " or ".join(target))
 		if args[1] == "osf":
 
 			if not found_requests:
 				logging.critical("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 				sys.exit("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
+
 			if len(args) != 8:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>\n")
 				sys.exit("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>\n")
+
+			acl = ["private", "public"]
+			if args[6] not in acl:
+				sys.exit("The access control for s3 bucket and object can only be: %s" % " or ".join(acl))
 
 			target_specpath = os.path.abspath(args[7])
 			path_exists(target_specpath)
@@ -3768,6 +3942,32 @@ def main():
 			spec_upload(spec_json, meta_json, osf_info, sandbox_dir, osf_auth)
 			json2file(target_specpath, spec_json)
 			osf_upload(args[2], args[3], osf_proj_id, target_specpath)
+
+		elif args[1] == "s3":
+			if not found_boto3 or not found_botocore:
+				logging.critical("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
+				sys.exit("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
+
+			if len(args) != 5:
+				cleanup(tempfile_list, tempdir_list)
+				logging.critical("The syntax for umbrella upload s3 is: umbrella ... upload s3 <bucket_name> <access_control> <target_specpath>\n")
+				sys.exit("The syntax for umbrella upload s3 is: umbrella ... upload s3 <bucket_name> <access_control> <target_specpath>\n")
+
+			acl = ["private", "public-read"]
+			if args[3] not in acl:
+				sys.exit("The access control for s3 bucket and object can only be: %s" % " or ".join(acl))
+
+			target_specpath = os.path.abspath(args[4])
+			path_exists(target_specpath)
+			dir_create(target_specpath)
+
+			s3_info = []
+			s3_info.append("s3")
+			s3_info.append(args[3])
+			bucket = s3_create(args[2], args[3])
+			spec_upload(spec_json, meta_json, s3_info, sandbox_dir, s3_bucket=bucket)
+			json2file(target_specpath, spec_json)
+			s3_upload(bucket, target_specpath, args[3])
 
 	cleanup(tempfile_list, tempdir_list)
 	end = datetime.datetime.now()
