@@ -8,20 +8,21 @@
 int main(int argc, char **argv) {
 	sleep(2);
 
-	struct rmsummary resources;
-	rmonitor_measure_process(&resources, getpid());
+	struct rmsummary *resources = rmonitor_measure_process(getpid());
 
 	fprintf(stdout, "command: %s, ",
-			resources.command);
+			resources->command);
 
 	fprintf(stdout, "wall time used (s): %3.0lf, ",
-			resources.wall_time/1000000.0);
+			resources->wall_time/1000000.0);
 
 	fprintf(stdout, "total memory used (MB): %" PRId64 ", ",
-			resources.memory + resources.swap_memory);
+			resources->memory + resources->swap_memory);
 
 	fprintf(stdout, "total cores used: %" PRId64 "\n",
-			resources.cores);
+			resources->cores);
+
+	rmsummary_delete(resources);
 
 	return 0;
 }
