@@ -4165,8 +4165,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	return 0;
   }
 
-  q->measured_local_resources = malloc(sizeof(struct rmsummary));
-  rmonitor_measure_process(q->measured_local_resources, getpid());
+  q->measured_local_resources = rmonitor_measure_process(getpid());
 
   q->monitor_mode = MON_SINGLE_FILE;
 

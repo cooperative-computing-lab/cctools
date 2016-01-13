@@ -429,8 +429,10 @@ int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 		status |= rmonitor_get_int_attribute(fmem, "Swap:",          &swap, 0);
 
 		/* error reading a field, we simply skip the record. */
-		if(status)
+		if(status) {
+			free(info);
 			continue;
+		}
 
 		info->resident   = rss;
 		info->referenced = ref;
@@ -516,6 +518,7 @@ int rmonitor_poll_maps_once(struct itable *processes, struct rmonitor_mem_info *
 					list_pop_head(infos);
 					if(next->map_name)
 						free(next->map_name);
+					free(next);
 				} else {
 					break;
 				}
@@ -735,9 +738,9 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->max_concurrent_processes = -1;
 	tr->total_processes          = -1;
 
-	tr->virtual_memory    = (int64_t) p->mem.virtual;
-	tr->memory   = (int64_t) p->mem.resident;
-	tr->swap_memory       = (int64_t) p->mem.swap;
+	tr->virtual_memory = (int64_t) p->mem.virtual;
+	tr->memory         = (int64_t) p->mem.resident;
+	tr->swap_memory    = (int64_t) p->mem.swap;
 
 	tr->bytes_read        = (int64_t)  p->io.chars_read;
 	tr->bytes_written     = (int64_t)  p->io.chars_written;
@@ -747,7 +750,7 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 
 	if(d) {
 		tr->total_files = (int64_t) (d->files);
-		tr->disk = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+		tr->disk        = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 	}
 
 	tr->fs_nodes = -1;
@@ -756,17 +759,17 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	}
 }
 
-int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
+struct rmsummary *rmonitor_measure_process(pid_t pid) {
 	int err;
 
-	memset(tr, 0, sizeof(struct rmsummary));
+	struct rmsummary *tr = rmsummary_create(-1);
 
 	struct rmonitor_process_info p;
 	p.pid = pid;
 
 	err = rmonitor_poll_process_once(&p);
 	if(err != 0)
-		return err;
+		return NULL;
 
 	char cwd_link[PATH_MAX];
 	char cwd_org[PATH_MAX];
@@ -787,29 +790,31 @@ int rmonitor_measure_process(struct rmsummary *tr, pid_t pid) {
 	uint64_t start;
 	err = rmonitor_get_start_time(pid, &start);
 	if(err != 0)
-		return err;
+		return NULL;
 
 	rmonitor_info_to_rmsummary(tr, &p, d, NULL, start);
 	tr->command = rmonitor_get_command_line(pid);
 
 	if(d) {
+		path_disk_size_info_delete_state(d->state);
 		free(d);
 	}
 
-	return 0;
+	return tr;
 }
 
 int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid) {
 
-	struct rmsummary now;
-	int err = rmonitor_measure_process(&now, pid);
+	struct rmsummary *now = rmonitor_measure_process(pid);
 
-	if(err != 0)
-		return err;
+	if(!now)
+		return 0;
 
-	rmsummary_merge_max(tr, &now);
+	rmsummary_merge_max(tr, now);
 
-	return 0;
+	rmsummary_delete(now);
+
+	return 1;
 }
 
 /* vim: set noexpandtab tabstop=4: */
