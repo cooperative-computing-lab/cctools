@@ -187,19 +187,6 @@ void dag_count_states(struct dag *d)
 	}
 }
 
-struct dag_task_category *dag_task_category_lookup_or_create(struct dag *d, const char *label)
-{
-	struct dag_task_category *category;
-
-	category = hash_table_lookup(d->task_categories, label);
-	if(!category) {
-		category = dag_task_category_create(label);
-		hash_table_insert(d->task_categories, label, category);
-	}
-
-	return category;
-}
-
 /**
  * If the return value is x, a positive integer, that means at least x tasks
  * can be run in parallel during a certain point of the execution of the

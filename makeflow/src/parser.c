@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include "cctools.h"
 #include "catalog_query.h"
+#include "category.h"
 #include "create_dir.h"
 #include "copy_stream.h"
 #include "datagram.h"
@@ -171,7 +172,7 @@ static int dag_parse(struct dag *d, FILE *stream)
 
 	bk->d        = d;
 	bk->stream   = stream;
-	bk->category = dag_task_category_lookup_or_create(d, "default");
+	bk->category = category_lookup_or_create(d->task_categories, "default");
 
 	struct dag_variable_lookup_set s = { d, NULL, NULL, NULL };
 	bk->environment = &s;
@@ -222,18 +223,14 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 		special = 1;
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
-		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
+		struct category *category = category_lookup_or_create(d->task_categories, value);
 
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
 		 * the global task_category. Else, update the
 		 * global task category. */
 		if(n) {
-			/* Remove node from previous category...*/
-			list_pop_tail(n->category->nodes);
 			n->category = category;
-			/* and add it to the new one */
-			list_push_tail(n->category->nodes, n);
 			debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
 		else
@@ -448,7 +445,6 @@ static int dag_parse_node(struct lexer *bk)
 	}
 
 	n->category = bk->category;
-	list_push_tail(n->category->nodes, n);
 
 	dag_parse_node_filelist(bk, n);
 
@@ -479,7 +475,7 @@ static int dag_parse_node(struct lexer *bk)
 	bk->d->nodes = n;
 	itable_insert(bk->d->node_table, n->nodeid, n);
 
-	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
+	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->name, n->nodeid);
 	dag_node_fill_resources(n);
 	dag_node_print_debug_resources(n);
 
