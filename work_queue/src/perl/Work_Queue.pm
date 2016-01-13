@@ -685,7 +685,7 @@ Number of workers.
 
 =head3 C<tune>
 
-Tune advanced parameters for work queue.
+Tune advanced parameters for work queue.  Return 0 on succes, -1 on failure.
 
 =over 12
 
