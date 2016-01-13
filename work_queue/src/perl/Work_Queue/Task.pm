@@ -368,6 +368,12 @@ sub resources_measured {
 	my ($self) = @_;
 	return $self->{_task}->{resources_measured};
 }
+
+sub resources_requested {
+	my ($self) = @_;
+	return $self->{_task}->{resources_requested};
+}
+
 1;
 
 __END__
@@ -958,7 +964,7 @@ Must be called only after the task completes execution.
 
 		resident_memory:           maximum resident size across all processes
 
-		$t->resources_measured{resident_memory};
+		$t->resources_measured{memory};
 
 		swap_memory:               maximum swap usage across all processes
 
@@ -974,10 +980,17 @@ Must be called only after the task completes execution.
 
 		workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
 
-		$t->resources_measured{workdir_footprint};
+		$t->resources_measured{disk};
 
 		workdir_footprint:         size in MB of all working directories in the tree
 
-		$t->resources_measured{workdir_num_files};
+		$t->resources_measured{total_files};
+
+=head3 C<resources_requested>
+
+	Get the resources requested by the task. See @resources_measured for possible fields.
+
+	Must be called only after the task completes execution.
+
 
 =cut

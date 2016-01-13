@@ -99,7 +99,7 @@ class Task(_object):
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
-    def specify_category(self, tag):
+    def specify_category(self, name):
         return work_queue_task_specify_category(self._task, name)
 
     ##
@@ -269,6 +269,18 @@ class Task(_object):
     @property
     def tag(self):
         return self._task.tag
+
+    ##
+    # Get the category name for the task.
+    #
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.category
+    # @endcode
+    @property
+    def category(self):
+        return self._task.category
 
     ##
     # Get the shell command executed by the task.
@@ -598,6 +610,17 @@ class Task(_object):
 
         return self._task.resources_measured
 
+
+    ##
+    # Get the resources the task requested to run. For valid fields see @resources_measured.
+    #
+    @property
+    def resources_requested(self):
+        if not self._task.resources_requested:
+            return None
+
+        return self._task.resources_requested
+
 ##
 # Python Work Queue object
 #
@@ -748,7 +771,7 @@ class WorkQueue(_object):
     # @param name       Name of the category.
     # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref fast_abort)
     def activate_fast_abort_category(self, name, multiplier):
-        return work_queue_activate_fast_abort_category(self._work_queue, multiplier)
+        return work_queue_activate_fast_abort_category(self._work_queue, name, multiplier)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.

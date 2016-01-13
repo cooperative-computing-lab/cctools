@@ -133,20 +133,15 @@ struct work_queue_task {
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
 
-	timestamp_t maximum_end_time;                               /**< Maximum time (microseconds from epoch) this is valid. If less than 1, then task is always valid (default).*/
-	int64_t memory;                                        /**< Memory required by the task. (MB) */
-	int64_t disk;                                          /**< Disk space required by the task. (MB) */
-	int cores;                                             /**< Number of cores required by the task. */
-	int gpus;                                              /**< Number of gpus required by the task. */
-	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
-
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
 	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
-	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	int unlabeled;                                         /**< 1 if any resource has been explicitely requested, 0 otherwise. */
 
-	timestamp_t maximum_running_time;                      /**< Maximum time (microseconds) this task may run in a worker. If less than 1, no limit is enforced (default).*/
+	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
+
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
@@ -345,7 +340,7 @@ This is useful, for example, when the task uses certificates that expire.
 @param seconds Number of seconds since the Epoch.
 */
 
-void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t useconds );
+void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds );
 
 /** Specify the maximum time (in microseconds) the task is allowed to run in a
  * worker. This time is accounted since the the moment the task starts to run
@@ -354,7 +349,7 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t us
 @param seconds Maximum number of seconds the task may run in a worker.
 */
 
-void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_t useconds );
+void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t useconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience

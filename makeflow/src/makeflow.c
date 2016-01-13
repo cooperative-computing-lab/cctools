@@ -659,7 +659,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		if(monitor && info->exit_code == 147)
+		if(monitor && info->exit_code == RM_OVERFLOW)
 		{
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
 			char *nodeid = string_format("%d",n->nodeid);
