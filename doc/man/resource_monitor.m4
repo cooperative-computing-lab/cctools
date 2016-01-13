@@ -38,36 +38,36 @@ is, if a process issues a read call from standard input, and standard
 input has not been redirected, then the tree process is
 terminated. This is likely to change in future versions of the tool.
 
-BOLD(resource_monitor) generates up to three log files: a summary
-file with the maximum values of resource used, a time-series that
-shows the resources used at given time intervals, and a list of
-files that were opened during execution.
+BOLD(resource_monitor) generates up to three log files: a summary file encoded
+as json with the maximum values of resource used, a time-series that shows the
+resources used at given time intervals, and a list of files that were opened
+during execution.
 
-The summary file has the following format:
+The summary file has the following fields:
 
 LONGCODE_BEGIN
 command:                   [the command line given as an argument]
-start:                     [seconds at the start of execution, since the epoch, float]
-end:                       [seconds at the end of execution, since the epoch,   float]
-exit_type:                 [one of normal, signal or limit,                    string]
+start:                     [microseconds at the start of execution, since the epoch, int]
+end:                       [microseconds at the end of execution, since the epoch,   int]
+exit_type:                 [one of normal, signal or limit,                       string]
 signal:                    [number of the signal that terminated the process.
-                            Only present if exit_type is signal                   int]
-cores:                     [number of cores. Computed as cpu_time/wall_time     float]
+                            Only present if exit_type is signal                      int]
+cores:                     [number of cores. Computed as cpu_time/wall_time        float]
 limits_exceeded:           [resources over the limit. Only present if
-                            exit_type is limit,                                string]
-exit_status:               [final status of the parent process,                   int]
-max_concurrent_processes:  [the maximum number of processes running concurrently, int]
-total_processes:           [count of all of the processes created,                int]
-wall_time:                 [seconds spent during execution, end - start,        float]
-cpu_time:                  [user + system time of the execution, in seconds,    float]
-virtual_memory:            [maximum virtual memory across all processes, in MB,   int]
-resident_memory:           [maximum resident size across all processes, in MB,    int]
-swap_memory:               [maximum swap usage across all processes, in MB,       int]
-bytes_read:                [number of bytes read from disk,                       int]
-bytes_written:             [number of bytes written to disk,                      int]
-workdir_num_files:         [total maximum number of files and directories of
-                            all the working directories in the tree,              int]
-workdir_footprint:         [size in MB of all working directories in the tree,    int]
+                            exit_type is limit,                                   string]
+exit_status:               [final status of the parent process,                      int]
+max_concurrent_processes:  [the maximum number of processes running concurrently,    int]
+total_processes:           [count of all of the processes created,                   int]
+wall_time:                 [microseconds spent during execution, end - start,        int]
+cpu_time:                  [user + system time of the execution, in microseconds,    int]
+virtual_memory:            [maximum virtual memory across all processes, in MB,      int]
+resident_memory:           [maximum resident size across all processes, in MB,       int]
+swap_memory:               [maximum swap usage across all processes, in MB,          int]
+bytes_read:                [amount of data read from disk, in MB,                    int]
+bytes_written:             [amount of data written to disk, in MB,                   int]
+total_files:               [total maximum number of files and directories of
+                            all the working directories in the tree,                 int]
+disk:                      [size in MB of all working directories in the tree,       int]
 LONGCODE_END
 
 The time-series log has a row per time sample. For each row, the columns have the following meaning:
@@ -83,7 +83,7 @@ bytes_read                [accumulated number of bytes read,                    
 bytes_written             [accumulated number of bytes written,                    int]
 files                     [current number of files and directories, across all
                            working directories in the tree,                        int]
-footprint                 [current size of working directories in the tree, in MB  int]
+disk                      [current size of working directories in the tree, in MB  int]
 LONGCODE_END
 
 SECTION(OPTIONS)

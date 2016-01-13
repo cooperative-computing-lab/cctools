@@ -88,6 +88,14 @@ typedef enum {
 	WORK_QUEUE_URL                    /**< File-spec refers to an URL **/
 } work_queue_file_t;
 
+typedef enum {
+	WORK_QUEUE_ALLOCATION_UNLABELED = 0, /**< No resources are explicitely requested. */
+	WORK_QUEUE_ALLOCATION_USER,          /**< Using values from task->resources_requested. */
+	WORK_QUEUE_ALLOCATION_AUTO_ZERO,     /**< Pre-step for autolabeling, when the first allocation has not been computed. */
+	WORK_QUEUE_ALLOCATION_AUTO_FIRST,    /**< Using first step value of the two-step policy. */
+	WORK_QUEUE_ALLOCATION_AUTO_MAX       /**< Using max of category. (2nd step of two-step policy) */
+} work_queue_allocation_t;
+
 extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
 												 workers upon creating queue . Change prior to
 												 calling work_queue_create, after queue is created
@@ -137,11 +145,10 @@ struct work_queue_task {
 
 	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
-	int unlabeled;                                         /**< 1 if any resource has been explicitely requested, 0 otherwise. */
-
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 
+	work_queue_allocation_t resource_request;              /**< See @ref work_queue_allocation_t */
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
@@ -739,6 +746,31 @@ void work_queue_master_preferred_connection(struct work_queue *q, const char *pr
 @return 0 on succes, -1 on failure.
 */
 int work_queue_tune(struct work_queue *q, const char *name, double value);
+
+/** Enables resource autolabeling for tasks without an explicit category ("default" category).
+rm specifies the maximum resources a task in the default category may use.  If
+rm is NULL, disable autolabeling for the default category.
+@param q  Reference to the current work queue object.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm);
+
+/** Enables resource autolabeling for tasks in the given category.
+rm specifies the maximum resources a task in the category may use.
+If rm is None, disable autolabeling for that category.
+@param q         Reference to the current work queue object.
+@param category  Name of the category.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_max_category_resources(struct work_queue *q, const char *category, const struct rmsummary *rm);
+
+/** Initialize first value of categories
+@param q     Reference to the current work queue object.
+@param rm Structure indicating maximum overall values. See @rmsummary for possible fields.
+@param filename JSON file with resource summaries.
+*/
+void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file);
+
 
 //@}
 
