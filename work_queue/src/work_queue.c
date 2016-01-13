@@ -86,6 +86,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_TASK_REMOTE_NAME "wq-cctools-monitoring-task"
 
+#define FIRST_ALLOCATION_EVERY_NTASKS 20
+
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 // Result codes for signaling the completion of operations in WQ
@@ -5550,9 +5552,14 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		c->total_good_transfer_time += t->total_transfer_time;
 
 		category_accumulate_summary(q->categories, t->category, t->resources_measured);
+
+		if(c->total_tasks_complete % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
+			if(c->max_allocation) {
+				category_update_first_allocation(q->categories, t->category, c->max_allocation);
+			}
+		}
 	}
 }
-
 
 void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file) {
 	categories_initialize(q->categories, max, summaries_file);
