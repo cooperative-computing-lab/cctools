@@ -747,6 +747,31 @@ void work_queue_master_preferred_connection(struct work_queue *q, const char *pr
 */
 int work_queue_tune(struct work_queue *q, const char *name, double value);
 
+/** Enables resource autolabeling for tasks without an explicit category ("default" category).
+rm specifies the maximum resources a task in the default category may use.  If
+rm is NULL, disable autolabeling for the default category.
+@param q  Reference to the current work queue object.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm);
+
+/** Enables resource autolabeling for tasks in the given category.
+rm specifies the maximum resources a task in the category may use.
+If rm is None, disable autolabeling for that category.
+@param q         Reference to the current work queue object.
+@param category  Name of the category.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_max_category_resources(struct work_queue *q, const char *category, const struct rmsummary *rm);
+
+/** Initialize first value of categories
+@param q     Reference to the current work queue object.
+@param rm Structure indicating maximum overall values. See @rmsummary for possible fields.
+@param filename JSON file with resource summaries.
+*/
+void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file);
+
+
 //@}
 
 /** @name Functions - Deprecated */

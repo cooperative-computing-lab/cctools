@@ -5554,6 +5554,33 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 }
 
 
+void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file) {
+	categories_initialize(q->categories, max, summaries_file);
+}
+
+void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm) {
+	work_queue_specify_max_category_resources(q,  "default", rm);
+}
+
+void work_queue_specify_max_category_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = category_lookup_or_create(q->categories, category);
+
+	if(c->max_allocation) {
+		rmsummary_delete(c->max_allocation);
+	}
+
+	if(rm) {
+		c->max_allocation = rmsummary_create(-1);
+		rmsummary_merge_max(c->max_allocation, rm);
+
+		if(!q->monitor_mode) {
+			work_queue_enable_monitoring(q, NULL);
+		}
+	} else {
+		c->max_allocation = NULL;
+	}
+}
+
 /* returns: 1 relabel was possible, 0 already at max or no new label available. */
 int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 	/* If user specified resources manually, respect the label. */
