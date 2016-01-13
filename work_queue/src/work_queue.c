@@ -5044,7 +5044,19 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+
+			if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+				int status = relabel_task(q, t);
+				if(status) {
+					debug(D_WQ, "Task %d resubmitted using max resources.\n", t->taskid);
+					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+				} else {
+					debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+					change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+				}
+			} else {
+				cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
+			}
 		}
 
 		//We have the resources we have been waiting for; start task transfers
@@ -5521,6 +5533,42 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 
 		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 	}
+}
+
+
+/* returns: 1 relabel was possible, 0 already at max or no new label available. */
+int relabel_task(struct work_queue *q, struct work_queue_task *t) {
+	/* If user specified resources manually, respect the label. */
+	if(t->resource_request == WORK_QUEUE_ALLOCATION_USER)
+		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+
+	struct category *c = category_lookup_or_create(q->categories, t->category);
+
+	/* We return whether the task already failed because of resource
+	 * exhaustion. */
+	if(!c->max_allocation) {
+		t->resource_request = WORK_QUEUE_ALLOCATION_UNLABELED;
+		return ~(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+	}
+
+	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		/* We check whether the task already has the maximum resources. If it
+		 * does, we mark it as done. */
+		if(t->resource_request == WORK_QUEUE_ALLOCATION_AUTO_MAX) {
+			return 0;
+		} else {
+			debug(D_WQ, "Setting task %d to use maximum resources.", t->taskid);
+			t->resource_request = WORK_QUEUE_ALLOCATION_AUTO_MAX;
+		}
+	} else if(c->first_allocation) {
+		/* Use first allocation when it is available. */
+		t->resource_request = WORK_QUEUE_ALLOCATION_AUTO_FIRST;
+	} else {
+		/* Use default when no enough information is available. */
+		t->resource_request = WORK_QUEUE_ALLOCATION_AUTO_ZERO;
+	}
+
+	return 1;
 }
 
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
