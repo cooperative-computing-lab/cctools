@@ -52,6 +52,7 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -2413,7 +2414,7 @@ pfs_size_t pfs_table::mmap_create_object( pfs_file *file, pfs_size_t channel_off
 	return channel_offset;
 }
 
-pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t map_length, int prot, int flags )
+pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, size_t map_length, int prot, int flags )
 {
 	pfs_file *file;
 	pfs_size_t channel_offset;
@@ -2458,7 +2459,7 @@ pfs_size_t pfs_table::mmap_create( int fd, pfs_size_t file_offset, pfs_size_t ma
 	}
 }
 
-int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
+int pfs_table::mmap_update( uintptr_t logical_addr, size_t channel_offset )
 {
 	if(mmap_list && !mmap_list->logical_addr) {
 		mmap_list->logical_addr = logical_addr;
@@ -2471,17 +2472,17 @@ int pfs_table::mmap_update( pfs_size_t logical_addr, pfs_size_t channel_offset )
 	return -1;
 }
 
-int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
+int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 {
-	pfs_mmap *m, **p;
+	long pgsize = sysconf(_SC_PAGESIZE);
+	uintptr_t s = logical_addr & ~(pgsize-1); /* first page; 0 out lower bits */
+	uintptr_t e = (logical_addr+length+pgsize-1) & ~(pgsize-1); /* first page NOT IN MAPPING; 0 out lower bits */
 
-	p = &mmap_list;
+	debug(D_DEBUG, "munmap(%016"PRIxPTR", %"PRIxPTR") --> unmap [%016"PRIxPTR", %016"PRIxPTR")", logical_addr, length, s, e);
 
-	for(m=mmap_list;m;p=&m->next,m=m->next) {
-		if( logical_addr >= m->logical_addr && ( logical_addr < (m->logical_addr+m->map_length ) ) ) {
-
-			// Remove the map from the list.
-			*p = m->next;
+	for(pfs_mmap *m = mmap_list, **p = &mmap_list; m; p=&m->next, m=m->next) {
+		if( s >= m->logical_addr && ( s < (m->logical_addr+m->map_length ) ) ) {
+			*p = m->next; // Remove the map from the list.
 
 			// Write back the portion of the file that is mapped in.
 			if(m->flags&MAP_SHARED && m->prot&PROT_WRITE && m->file) {
@@ -2489,21 +2490,26 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 			}
 
 			/* If we are deleting a mapping that has no logical address, then mmap failed. Don't attempt to split the mapping. */
-			if (!(logical_addr == 0 && length == 0)) {
+			if (!(s == 0 && length == 0)) {
 				// If there is a fragment left over before the unmap, add it as a new map
 				// This will increase the reference count of both the file and the memory object.
 
-				if(logical_addr>m->logical_addr) {
-					mmap_create_object(m->file, m->channel_offset, logical_addr-m->logical_addr, m->file_offset, m->prot, m->flags);
-					mmap_update(m->logical_addr,0);
+				if(s>m->logical_addr) {
+					pfs_mmap *newmap = new pfs_mmap(m);
+					newmap->map_length = s-m->logical_addr;
+					newmap->next = *p;
+					*p = newmap;
 				}
 
 				// If there is a fragment left over after the unmap, add it as a new map
 				// This will increase the reference count of both the file and the memory object.
 
-				if((logical_addr+length) < (m->logical_addr+m->map_length)) {
-					mmap_create_object(m->file, m->channel_offset, m->map_length-length-(logical_addr-m->logical_addr), m->file_offset+m->map_length-(m->logical_addr-logical_addr), m->prot, m->flags);
-					mmap_update(logical_addr+length,0);
+				if(e < (m->logical_addr+m->map_length)) {
+					pfs_mmap *newmap = new pfs_mmap(m);
+					newmap->logical_addr = m->logical_addr+m->map_length-e;
+					newmap->map_length = m->file_offset+(e-s);
+					newmap->next = *p;
+					*p = newmap;
 				}
 			}
 

@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <sys/mman.h>
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,15 +23,15 @@ public:
 	struct pfs_stat finfo;
 	char fpath[PFS_PATH_MAX];
 	pfs_file   *file;
-	pfs_size_t logical_addr;
+	uintptr_t logical_addr;
 	pfs_size_t channel_offset;
-	pfs_size_t map_length;
+	size_t map_length;
 	pfs_size_t file_offset;
 	int	   prot;
 	int	   flags;
 	pfs_mmap   *next;
 
-	pfs_mmap( pfs_file *_file, pfs_size_t _logical_addr, pfs_size_t _channel_offset, pfs_size_t _map_length, pfs_size_t _file_offset, int _prot, int _flags )
+	pfs_mmap( pfs_file *_file, uintptr_t _logical_addr, pfs_size_t _channel_offset, size_t _map_length, pfs_size_t _file_offset, int _prot, int _flags )
 	{
 		if (_file->fstat(&finfo) == -1) {
 			finfo.st_dev = 0;

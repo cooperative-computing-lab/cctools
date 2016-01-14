@@ -14,6 +14,8 @@ prepare()
 #include <sys/stat.h>
 
 #include <errno.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +40,36 @@ int main (int argc, char *argv[])
 			abort();
 		}
 	}
+
+	/* before split */
+	{
+		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
+		int fd = mkstemp(f);
+		if (fd >= 0) {
+			unlink(f);
+			ftruncate(fd, 0x2000);
+			uint8_t *addr = mmap(NULL, 0x2000, PROT_READ, MAP_SHARED, fd, 0);
+			close(fd);
+			if (addr != MAP_FAILED) {
+				munmap(addr+0x1000, 0x118);
+			}
+		}
+	}
+
+	/* after split */
+	{
+		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
+		int fd = mkstemp(f);
+		if (fd >= 0) {
+			unlink(f);
+			ftruncate(fd, 0x2000);
+			uint8_t *addr = mmap(NULL, 0x2000, PROT_READ, MAP_SHARED, fd, 0);
+			close(fd);
+			if (addr != MAP_FAILED) {
+				munmap(addr, 0x118);
+			}
+		}
+	}
 	return 0;
 }
 EOF
@@ -46,7 +78,7 @@ EOF
 
 run()
 {
-	../src/parrot_run -- ./"$exe"
+	../src/parrot_run -d all -- ./"$exe"
 	return $?
 }
 
