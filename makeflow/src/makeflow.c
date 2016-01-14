@@ -105,6 +105,7 @@ static int remote_jobs_max = 100;
 static char *project = NULL;
 static int port = 0;
 static int output_len_check = 0;
+static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
@@ -727,7 +728,7 @@ static int makeflow_check(struct dag *d)
 				continue;
 			}
 
-			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
+			if(skip_file_check || batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
 				continue;
 			}
 
@@ -922,6 +923,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
+	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 
 	printf("\n*Monitor Options:\n\n");
@@ -1021,7 +1023,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
-		LONG_OPT_AMAZON_AMI
+		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_SKIP_FILE_CHECK
 	};
 
 	static const struct option long_options_run[] = {
@@ -1066,6 +1069,7 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
+		{"skip-file-check", no_argument, 0, LONG_OPT_SKIP_FILE_CHECK},
 		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
@@ -1322,6 +1326,9 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER;
 				container_image = xxstrdup(optarg);
 				break;
+			case LONG_OPT_SKIP_FILE_CHECK:
+				skip_file_check = 1;
+				break;
 			case LONG_OPT_DOCKER_TAR:
 				image_tar = xxstrdup(optarg);
 				break;
@@ -1510,7 +1517,7 @@ int main(int argc, char *argv[])
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode );
+	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check );
 
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
