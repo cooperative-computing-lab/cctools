@@ -412,14 +412,17 @@ static int path_is_exec(const char *path) {
 	return found;
 }
 
-
 char *path_which(const char *exec) {
 
 	if(!exec)
 		return NULL;
 
-	if(strchr(exec, '/') && path_is_exec(exec))
-		return xxstrdup(exec);
+	/* if path has a /, do not check PATH */
+	if(strchr(exec, '/') != NULL) {
+		if(path_is_exec(exec))
+			return xxstrdup(exec);
+		return NULL;
+	}
 
 	const char *path_org = getenv("PATH");
 	if(!path_org)
@@ -458,7 +461,5 @@ char *path_which(const char *exec) {
 		return NULL;
 	}
 }
-
-
 
 /* vim: set noexpandtab tabstop=4: */
