@@ -487,7 +487,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		
 
 		// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
-		if(!factory_timeout)
+		if(factory_timeout)
 		{
 			time_t curr_time = time(0);
 			if(list_size(masters_list))
@@ -496,7 +496,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 			} else {
 				if(factory_timeout_start) {
 					if(curr_time - factory_timeout_start > factory_timeout) {
-						fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting");
+						fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting\n");
+						exit(EXIT_SUCCESS);
 						abort_flag=1;
 					}
 				} else {
