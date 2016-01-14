@@ -635,7 +635,7 @@ static const struct option long_options[] = {
 	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
-	{"factory_timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
 	{0,0,0,0}
 };
 
