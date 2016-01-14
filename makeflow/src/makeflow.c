@@ -923,7 +923,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
-	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
+	printf(" %-30s Do not check whether inputs exist. (Useful for very large workflows on shared filesystems.)\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 
 	printf("\n*Monitor Options:\n\n");

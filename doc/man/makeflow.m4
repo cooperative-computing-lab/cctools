@@ -78,6 +78,7 @@ OPTION_TRIPLET(-P, priority, integer)Priority. Higher the value, higher the prio
 OPTION_TRIPLET(-W, wq-schedule, mode)WorkQueue scheduling algorithm. (time|files|fcfs)
 OPTION_TRIPLET(-s, password, pwfile)Password file for authenticating workers.
 OPTION_ITEM(`--disable-cache')Disable file caching (currently only Work Queue, default is false)
+OPTION_ITEM(`--skip-file-check')Do not check whether inputs exist. (Useful for very large workflows on shared filesystems.)
 OPTION_PAIR(--work-queue-preferred-connection,connection)Indicate preferred connection. Chose one of by_ip or by_hostname. (default is by_ip)
 OPTIONS_END
 
