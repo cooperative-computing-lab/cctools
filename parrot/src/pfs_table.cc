@@ -2494,16 +2494,21 @@ int pfs_table::mmap_delete( pfs_size_t logical_addr, pfs_size_t length )
 				// This will increase the reference count of both the file and the memory object.
 
 				if(logical_addr>m->logical_addr) {
-					mmap_create_object(m->file, m->channel_offset, logical_addr-m->logical_addr, m->file_offset, m->prot, m->flags);
-					mmap_update(m->logical_addr,0);
+					pfs_mmap *newmap = new pfs_mmap(m);
+					newmap->map_length = logical_addr-m->logical_addr;
+					newmap->next = *p;
+					*p = newmap;
 				}
 
 				// If there is a fragment left over after the unmap, add it as a new map
 				// This will increase the reference count of both the file and the memory object.
 
 				if((logical_addr+length) < (m->logical_addr+m->map_length)) {
-					mmap_create_object(m->file, m->channel_offset, m->map_length-length-(logical_addr-m->logical_addr), m->file_offset+m->map_length-(m->logical_addr-logical_addr), m->prot, m->flags);
-					mmap_update(logical_addr+length,0);
+					pfs_mmap *newmap = new pfs_mmap(m);
+					newmap->logical_addr = m->map_length-length-(logical_addr-m->logical_addr);
+					newmap->map_length = m->file_offset+m->map_length-(m->logical_addr-logical_addr);
+					newmap->next = *p;
+					*p = newmap;
 				}
 			}
 
