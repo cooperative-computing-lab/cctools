@@ -168,7 +168,7 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 /** The clean_mode variable was added so that we could better print out error messages
  * apply in the situation. Currently only used to silence node rerun checking.
  */
-void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode)
+void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode, int skip_file_check)
 {
 	char *line, *name, file[MAX_BUFFER_SIZE];
 	int nodeid, state, jobid, file_state;
@@ -275,7 +275,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	dag_count_states(d);
 
 	// Check for log consistency
-	if(!first_run) {
+	if(!first_run && !skip_file_check) {
 		hash_table_firstkey(d->files);
 		while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 			if(dag_file_should_exist(f) && !dag_file_is_source(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){

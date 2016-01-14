@@ -27,5 +27,5 @@ capitol.270.jpg: capitol.jpg
 capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
-capitol.jpg:
-	$CURL -o capitol.jpg $URL
+#capitol.jpg:
+#	$CURL -o capitol.jpg $URL
