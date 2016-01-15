@@ -29,6 +29,7 @@ extern "C" {
 #include "hash_table.h"
 #include "macros.h"
 #include "md5.h"
+#include "memfdexe.h"
 #include "path.h"
 #include "pattern.h"
 #include "random.h"
@@ -634,26 +635,22 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 					}
 				}
 			} else if (pattern_match(pname.rest, "^/proc/(%d+)/maps$", &pid) >= 0) {
-				char tmpfd[PATH_MAX];
-				buffer_t B[1];
-				buffer_init(B);
+				extern char pfs_temp_per_instance_dir[PATH_MAX];
+				static const char name[] = "parrot-maps";
 
-				mmap_proc(atoi(pid), B);
-
-				snprintf(tmpfd, sizeof(tmpfd), "/dev/shm/parrot-tmp-fd.XXXXXX");
-				int fd = mkstemp(tmpfd);
+				int fd = memfdexe(name, pfs_temp_per_instance_dir);
 				if (fd >= 0) {
+					buffer_t B[1];
+					buffer_init(B);
+					mmap_proc(atoi(pid), B);
 					full_write(fd, buffer_tostring(B), buffer_pos(B));
+					::lseek(fd, 0, SEEK_SET);
+					buffer_free(B);
+					file = pfs_file_bootstrap(fd, name);
 				} else {
-					strcpy(tmpfd, "/dev/null");
+					errno = ENOENT;
+					file = 0;
 				}
-
-				resolve_name(0, tmpfd, &pname, open_mode);
-				file = pname.service->open(&pname, O_RDONLY, 0);
-				assert(file);
-				close(fd);
-				unlink(tmpfd);
-				buffer_free(B);
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 			}
