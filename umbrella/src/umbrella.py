@@ -68,6 +68,7 @@ import multiprocessing
 import resource
 import tempfile
 import urllib
+import gzip
 import imp
 
 found_requests = None
@@ -3444,6 +3445,92 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 					s3_url = s3_upload(s3_bucket, source_url, target_info[1])
 					sec[item]["source"].append("s3+" + s3_url)
 
+def dep_build(d, name):
+	"""Build the metadata info of a dependency.
+
+	Args:
+		d: a dependency object
+		name: the name of the dependency
+
+	Returns:
+		None
+	"""
+	#check the validity of the 'format' attr
+	formats = ['plain', 'tgz']
+	form = attr_check(name, d, "format")
+	if not form in formats:
+		sys.exit("The format attr can only be: %s!\n", ' or '.join(formats))
+
+	#check the validity of the 'source' attr
+	source = attr_check(name, d, "source", 1)
+
+	if source == '':
+		sys.exit("The source of %s is empty!" % name)
+
+	if source[0] != '/':
+		sys.exit("The source of %s should be a local path!" % name)
+
+	#set the file size
+	size = os.stat(source).st_size
+	d["size"] = str(size)
+
+	#set the uncompressed size of tgz file
+	if form == "tgz":
+		full_size = get_tgz_size(source)
+		d["uncompressed_size"] = str(full_size)
+
+	#set the 'checksum' and 'id' attrs
+	checksum = md5_cal(source)
+	d["id"] = checksum
+	d["checksum"] = checksum
+
+def get_tgz_size(path):
+	"""Get the uncompressed size of a tgz file
+
+	Args:
+		path: a tgz file path
+
+	Returns:
+		size: the uncompressed size of a tgz file
+	"""
+	size = 0
+	f = gzip.open(path, 'rb')
+	try:
+		while True:
+			c = f.read(1024*1024)
+			if not c:
+				break
+			else:
+				size += len(c)
+	finally:
+		f.close()
+
+	return size
+
+def spec_build(spec_json):
+	"""Build the metadata information of an umbrella spec
+
+	Args:
+		spec_json: the json object including the specification.
+
+	Returns:
+		None
+	"""
+	if spec_json.has_key("os") and spec_json["os"]:
+		dep_build(spec_json["os"], "os")
+
+	for sec_name in ["data", "software", "package_manager"]:
+		if spec_json.has_key(sec_name) and spec_json[sec_name]:
+			sec = spec_json[sec_name]
+			if sec_name == "package_manager":
+				if sec.has_key("config") and sec["config"]:
+					sec = sec["config"]
+				else:
+					logging.debug("%s does not have config attribute!", sec_name)
+					break
+			for item in sec:
+				dep_build(sec[item], item)
+
 def main():
 	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
 						version="%prog CCTOOLS_VERSION")
@@ -3544,12 +3631,43 @@ def main():
 
 	behavior = args[0]
 	logging.debug("Check the validity of the behavior: %s", behavior)
-	behavior_list = ["run", "expand", "filter", "split", "validate", "upload"]
+	behavior_list = ["run", "expand", "filter", "split", "validate", "upload", "build"]
 	if behavior not in behavior_list:
 		logging.critical("%s is not supported by umbrella!", behavior)
 		print behavior + " is not supported by umbrella!\n"
 		parser.print_help()
 		sys.exit(1)
+
+	if behavior in ["build"]:
+		if len(args) != 3:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("The syntax for umbrella build is: umbrella ... build <source.umbrella> <dest.umbrella>\n")
+			sys.exit("The syntax for umbrella build is: umbrella ... build <source.umbrella> <dest.umbrella>\n")
+
+		args[1] = os.path.abspath(args[1])
+		if (not os.path.exists(args[1])) or (not os.path.isfile(args[1])):
+			logging.critical("<source.umbrella> (%s) should be an existing file!\n", args[1])
+			sys.exit("<source.umbrella> (%s) should be an existing file!\n" % args[1])
+
+		if os.path.exists(args[2]):
+			logging.critical("<dest.umbrella> (%s) should be a non-existing file!\n", args[2])
+			sys.exit("<dest.umbrella> (%s) should be a non-existing file!\n" % args[2])
+
+		args[2] = os.path.abspath(args[2])
+		if not os.path.exists(os.path.dirname(args[2])):
+			print os.path.dirname(args[2])
+			try:
+				os.makedirs(os.path.dirname(args[2]))
+			except:
+				logging.critical("Fails to create the directory for the <dest.umbrella> (%s)!", args[2])
+				sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % args[2])
+
+		with open(args[1]) as f:
+			spec_json = json.load(f)
+			spec_build(spec_json)
+			json2file(args[2], spec_json)
+		sys.exit(0)
+
 
 	if behavior in ["run", "upload"]:
 		#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.

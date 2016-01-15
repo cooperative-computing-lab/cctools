@@ -117,3 +117,5 @@ umbrella \
 --sandbox_mode parrot \
 --log umbrella.log \
 run
+
+umbrella build povray_base_local.umbrella full.umbrella
