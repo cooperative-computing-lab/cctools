@@ -369,6 +369,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_autosize_option, autosize, autosize, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_factory_timeout_option, factory_timeout, factory-timeout, int, JX_INTEGER, integer_value)
+
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
 
 	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
@@ -395,6 +397,11 @@ int read_config_file(const char *config_file) {
 		error_found = 1;
 	}
 
+	if(new_factory_timeout_option < 0) {
+		debug(D_NOTICE, "%s: factory timeout (%d) is less than zero.\n", config_file, new_factory_timeout_option);
+		error_found = 1;
+	}
+
 	if(error_found) {
 		goto end;
 	}
@@ -403,7 +410,8 @@ int read_config_file(const char *config_file) {
 	workers_min    = new_workers_min;
 	worker_timeout = new_worker_timeout;
 	tasks_per_worker = new_tasks_per_worker;
-	autosize       = new_autosize_option;
+	autosize         = new_autosize_option;
+	factory_timeout  = new_factory_timeout_option;
 
 	resources->cores  = new_num_cores_option;
 	resources->memory = new_num_memory_option;
@@ -440,6 +448,10 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
+
+	if(factory_timeout > 0) {
+		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
+	}
 
 	if(resources->memory > -1) {
 		fprintf(stdout, "memory: %" PRId64 " MB\n", resources->memory);
