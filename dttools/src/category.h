@@ -24,12 +24,11 @@ struct category {
 	struct itable *disk_histogram;
 	struct itable *wall_time_histogram;
 
-	/* stats for work queue */
-	timestamp_t average_task_time;
-	uint64_t total_tasks_complete;
-	uint64_t total_good_execute_time;
-	uint64_t total_good_transfer_time;
+	uint64_t total_tasks;
 
+	/* stats for wq */
+	uint64_t average_task_time;
+	struct work_queue_stats *wq_stats;
 };
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);

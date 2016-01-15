@@ -39,9 +39,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->name       = xxstrdup(name);
 	c->fast_abort = -1;
 
-	c->total_tasks_complete     = 0;
-	c->total_good_execute_time  = 0;
-	c->total_good_transfer_time = 0;
+	c->total_tasks = 0;
 
 	c->first_allocation    = NULL;
 	c->max_allocation      = NULL;

@@ -272,6 +272,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t);
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t);
 
 void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t);
+struct category *work_queue_category_lookup_or_create(struct hash_table *categories, const char *name);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -3177,12 +3178,18 @@ static void abort_slow_workers(struct work_queue *q)
 
 	hash_table_firstkey(q->categories);
 	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
-		if(c->total_tasks_complete < 10) {
+		if(c->total_tasks < 10) {
 			c->average_task_time = 0;
 			continue;
 		}
 
-		c->average_task_time = (c->total_good_execute_time + c->total_good_transfer_time) / c->total_tasks_complete;
+		struct work_queue_stats *stats = c->wq_stats;
+		if(!stats) {
+			/* no stats have been computed yet */
+			continue;
+		}
+
+		c->average_task_time = (stats->total_good_execute_time + stats->total_good_transfer_time) / c->total_tasks;
 
 		if(c->fast_abort > 0)
 			fast_abort_flag = 1;
@@ -5536,30 +5543,53 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 }
 
 void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
-	/* buffer used only for debug output. */
-	static buffer_t *b = NULL;
-	if(!b) {
-		b = malloc(sizeof(buffer_t));
-		buffer_init(b);
-	}
-
-	const char *name = t->category ? t->category : "default";
+	const char *name              = t->category ? t->category : "default";
+	work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 
 	struct category *c = category_lookup_or_create(q->categories, name);
 
-	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
-	{
-		c->total_tasks_complete++;
-		c->total_good_execute_time  += t->cmd_execution_time;
-		c->total_good_transfer_time += t->total_transfer_time;
+	struct work_queue_stats *s = c->wq_stats;
 
-		category_accumulate_summary(q->categories, t->category, t->resources_measured);
+	s->total_bytes_sent     += t->total_bytes_sent;
+	s->total_bytes_received += t->total_bytes_received;
+	s->total_execute_time   += t->cmd_execution_time;
 
-		if(c->total_tasks_complete % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
-			if(c->max_allocation) {
-				category_update_first_allocation(q->categories, t->category, c->max_allocation);
+	s->total_send_time      += (t->time_send_input_finish     - t->time_send_input_start);
+	s->total_receive_time   += (t->time_receive_output_finish - t->time_receive_output_start);
+
+	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
+
+	switch(state) {
+		case WORK_QUEUE_TASK_DONE:
+			if(t->result == WORK_QUEUE_RESULT_SUCCESS)
+			{
+				c->total_tasks++;
+
+				s->total_tasks_complete      = c->total_tasks;
+				s->total_good_execute_time  += t->cmd_execution_time;
+				s->total_good_transfer_time += t->total_transfer_time;
+				s->total_good_execute_time  += t->cmd_execution_time;
+
+				category_accumulate_summary(q->categories, t->category, t->resources_measured);
+
+				if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
+					if(c->max_allocation) {
+						category_update_first_allocation(q->categories, t->category, c->max_allocation);
+					}
+				}
+			} else {
+				s->total_tasks_failed++;
 			}
-		}
+			break;
+		case WORK_QUEUE_TASK_READY:
+			s->total_tasks_dispatched++;
+			break;
+		case WORK_QUEUE_TASK_CANCELED:
+			s->total_tasks_cancelled++;
+			break;
+		default:
+			/* nothing */
+			break;
 	}
 }
 
@@ -5650,6 +5680,16 @@ const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_que
 			}
 			break;
 	}
+}
+
+struct category *work_queue_category_lookup_or_create(struct hash_table *categories, const char *name) {
+	struct category *c = category_lookup_or_create(categories, name);
+
+	if(!c->wq_stats) {
+		c->wq_stats = calloc(1, sizeof(struct work_queue_stats));
+	}
+
+	return c;
 }
 
 /* vim: set noexpandtab tabstop=4: */
