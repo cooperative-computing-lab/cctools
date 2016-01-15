@@ -65,6 +65,8 @@ static char *amazon_ami = NULL;
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
+static int64_t factory_timeout = 0;
+
 struct batch_queue *queue = 0;
 
 static void handle_abort( int sig )
@@ -367,6 +369,8 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_autosize_option, autosize, autosize, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_factory_timeout_option, factory_timeout, factory-timeout, int, JX_INTEGER, integer_value)
+
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
 
 	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
@@ -393,6 +397,11 @@ int read_config_file(const char *config_file) {
 		error_found = 1;
 	}
 
+	if(new_factory_timeout_option < 0) {
+		debug(D_NOTICE, "%s: factory timeout (%d) is less than zero.\n", config_file, new_factory_timeout_option);
+		error_found = 1;
+	}
+
 	if(error_found) {
 		goto end;
 	}
@@ -401,7 +410,8 @@ int read_config_file(const char *config_file) {
 	workers_min    = new_workers_min;
 	worker_timeout = new_worker_timeout;
 	tasks_per_worker = new_tasks_per_worker;
-	autosize       = new_autosize_option;
+	autosize         = new_autosize_option;
+	factory_timeout  = new_factory_timeout_option;
 
 	resources->cores  = new_num_cores_option;
 	resources->memory = new_num_memory_option;
@@ -439,6 +449,10 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
 
+	if(factory_timeout > 0) {
+		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
+	}
+
 	if(resources->memory > -1) {
 		fprintf(stdout, "memory: %" PRId64 " MB\n", resources->memory);
 	}
@@ -470,6 +484,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 	struct list *masters_list = NULL;
 	struct list *foremen_list = NULL;
 
+	int64_t factory_timeout_start = time(0);
+
 	while(!abort_flag) {
 
 		if(config_file && !read_config_file(config_file)) {
@@ -483,6 +499,21 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
 
+		if(list_size(masters_list) > 0)
+		{
+			factory_timeout_start = time(0);
+		} else {
+			// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
+			if(factory_timeout > 0)
+			{
+				if(time(0) - factory_timeout_start > factory_timeout) {
+					fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting\n");
+					abort_flag=1;
+					break;
+				}
+			}
+		}
+	
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
 
@@ -587,7 +618,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_AUTOSIZE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -613,6 +644,7 @@ static const struct option long_options[] = {
 	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
+	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
 	{0,0,0,0}
 };
 
@@ -684,6 +716,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AUTOSIZE:
 				autosize = 1;
+				break;
+			case LONG_OPT_FACTORY_TIMEOUT:
+				factory_timeout = MAX(0, atoi(optarg));
 				break;
 			case 'P':
 				password_file = optarg;
