@@ -22,7 +22,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "path.h"
 
-int disk_alloc_create(char *loc, int64_t size) {
+int disk_alloc_create(char *loc, char *fs, int64_t size) {
 
 	if(size <= 0) {
 		debug(D_NOTICE, "Mountpoint pathname argument nonexistant.\n");
@@ -104,7 +104,7 @@ int disk_alloc_create(char *loc, int64_t size) {
 	}
 
 	//Mount Loop Device
-	result = mount(mount_args, loc, "ext4", 0, "");
+	result = mount(mount_args, loc, fs, 0, "");
 	if(result != 0) {
 		char *rm_dir_args;
 		debug(D_NOTICE, "Failed to mount loop device: %s.\n", strerror(errno));

@@ -18,12 +18,13 @@ int main(int argc, char *argv[]) {
 
 	char *func = argv[1];
 	char *loc = argv[2];
+	char *fs = argv[3];
 	int result;
 
 	if(strstr(func, "create") != NULL) {
 
 		int64_t size = (string_metric_parse(argv[3]) / 1024);
-		result = disk_alloc_create(loc, size);
+		result = disk_alloc_create(loc, fs, size);
 
 		if(result != 0) {
 
