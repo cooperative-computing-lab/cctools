@@ -2491,11 +2491,12 @@ int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 				// If there is a fragment left over before the unmap, add it as a new map
 				// This will increase the reference count of both the file and the memory object.
 
-				if(s>m->logical_addr) {
+				if(m->logical_addr < s) {
 					pfs_mmap *newmap = new pfs_mmap(m);
-					newmap->map_length = s-m->logical_addr;
+					newmap->map_length = s - m->logical_addr;
 					newmap->next = *p;
 					*p = newmap;
+					debug(D_DEBUG, "split off memory fragment [%016"PRIxPTR", %016"PRIxPTR") size = %zu", newmap->logical_addr, newmap->logical_addr+newmap->map_length, newmap->map_length);
 				}
 
 				// If there is a fragment left over after the unmap, add it as a new map
@@ -2503,10 +2504,12 @@ int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 
 				if(e < (m->logical_addr+m->map_length)) {
 					pfs_mmap *newmap = new pfs_mmap(m);
-					newmap->logical_addr = m->logical_addr+m->map_length-e;
-					newmap->map_length = m->file_offset+(e-s);
+					newmap->logical_addr = e;
+					newmap->map_length -= e - m->logical_addr;
+					newmap->file_offset += e - m->logical_addr;
 					newmap->next = *p;
 					*p = newmap;
+					debug(D_DEBUG, "split off memory fragment [%016"PRIxPTR", %016"PRIxPTR") size = %zu", newmap->logical_addr, newmap->logical_addr+newmap->map_length, newmap->map_length);
 				}
 			}
 
