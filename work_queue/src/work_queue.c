@@ -5482,6 +5482,18 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	}
 }
 
+void work_queue_get_stats_category(struct work_queue *q, const char *category, struct work_queue_stats *s)
+{
+	struct category *c = work_queue_category_lookup_or_create(q->categories, category);
+	struct work_queue_stats *cs = c->wq_stats;
+	memcpy(s, cs, sizeof(*s));
+
+	//info about tasks
+	s->tasks_waiting = task_state_count(q, category, WORK_QUEUE_TASK_READY);
+	s->tasks_running = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	s->tasks_complete = task_state_count(q, category, WORK_QUEUE_TASK_RETRIEVED);
+}
+
 /*
 This function is a little roundabout, because work_queue_resources_add
 updates the min and max of each value as it goes.  So, we set total

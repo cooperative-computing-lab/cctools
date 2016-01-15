@@ -561,6 +561,13 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 */
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
 
+/** Get the task statistics for the given category.
+@param q A work queue object.
+@param c A category name.
+@param s A pointer to a buffer that will be filed with statistics.
+*/
+void work_queue_get_stats_category(struct work_queue *q, const char *c, struct work_queue_stats *s);
+
 
 /** Get the current state of the task.
 @param q A work queue object.
