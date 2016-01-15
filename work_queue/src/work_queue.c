@@ -256,7 +256,7 @@ static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task
 /* pointer to first task found with state. NULL if no such task */
 static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state);
 /* number of tasks with state */
-static int task_state_count( struct work_queue *q, work_queue_task_state_t state);
+static int task_state_count( struct work_queue *q, const char *category, work_queue_task_state_t state);
 
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
@@ -1346,7 +1346,7 @@ static void expire_waiting_tasks(struct work_queue *q)
 	int count;
 
 	timestamp_t current_time = timestamp_get();
-	count = task_state_count(q, WORK_QUEUE_TASK_READY);
+	count = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 
 	while(count > 0)
 	{
@@ -4716,7 +4716,7 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 	return NULL;
 }
 
-static int task_state_count(struct work_queue *q, work_queue_task_state_t state) {
+static int task_state_count(struct work_queue *q, const char *category, work_queue_task_state_t state) {
 	struct work_queue_task *t;
 	uint64_t taskid;
 
@@ -4725,7 +4725,9 @@ static int task_state_count(struct work_queue *q, work_queue_task_state_t state)
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
 		if( task_state_is(q, taskid, state) ) {
-			count++;
+			if(!category || strcmp(category, t->category) == 0) {
+				count++;
+			}
 		}
 	}
 
@@ -5120,7 +5122,7 @@ int work_queue_hungry(struct work_queue *q)
 	//j = # of queued tasks.
 	//i-j = # of tasks to queue to re-reach the status quo.
 	i = (1.1 * hash_table_size(q->worker_table));
-	j = task_state_count(q, WORK_QUEUE_TASK_READY);
+	j = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 	return MAX(i - j, 0);
 }
 
@@ -5364,9 +5366,9 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_workers_fast_aborted = qs->total_workers_fast_aborted;
 
 	//info about tasks
-	s->tasks_waiting = task_state_count(q, WORK_QUEUE_TASK_READY);
-	s->tasks_running = task_state_count(q, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_complete = task_state_count(q, WORK_QUEUE_TASK_RETRIEVED);
+	s->tasks_waiting = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
+	s->tasks_running = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	s->tasks_complete = task_state_count(q, NULL, WORK_QUEUE_TASK_RETRIEVED);
 
 	s->total_tasks_dispatched = qs->total_tasks_dispatched;
 	s->total_tasks_complete = qs->total_tasks_complete;
