@@ -500,6 +500,7 @@ static void makeflow_alloc_local(struct dag_node *n)
 
 		if(loc_info.local_disk != -1)
 			loc_info.local_disk -= n->resources->disk;
+
 }
 /*
  * Reallocates the resources to the local machine after a local job
@@ -514,6 +515,7 @@ static void makeflow_dealloc_local(struct dag_node *n)
 
 		if(loc_info.local_disk != -1)
 			loc_info.local_disk += n->resources->disk;
+
 }
 
 /*
@@ -596,8 +598,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(output_files);
 	jx_delete(envlist);
 }
-
-
 static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
@@ -1052,6 +1052,9 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+	loc_info.local_mem =  -1;
+	loc_info.local_disk = -1;
+	loc_info.local_cores= load_average_get_cpus();
 
 	loc_info.local_mem = -1;
 	loc_info.local_disk = -1;
@@ -1251,7 +1254,6 @@ int main(int argc, char *argv[])
 						makeflow_gc_count = 1 << 14;	/* Inode threshold of 2^14. */
 				} else {
 					fprintf(stderr, "makeflow: invalid garbage collection method: %s\n", optarg);
-					
 					exit(1);
 				}
 				break;
