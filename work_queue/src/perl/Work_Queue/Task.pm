@@ -15,8 +15,6 @@ use work_queue;
 
 use Carp qw(croak);
 
-our $VERSION = 4.3.0;
-
 sub Work_Queue::Task::new {
 	my ($class, $command) = @_;
 	my $_task = work_queue_task_create($command);

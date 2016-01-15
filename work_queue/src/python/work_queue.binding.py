@@ -700,7 +700,7 @@ class WorkQueue(_object):
     # @code
     # >>> print q.stats
     # @endcode
-    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # The fields in @ref stats can also be individually accessed through this call. For example:
     # @code
     # >>> print q.stats.workers_busy
     # @endcode
@@ -714,16 +714,35 @@ class WorkQueue(_object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print q.stats
+    # >>> print q.stats_hierarchy
     # @endcode
-    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # The fields in @ref stats_hierarchy can also be individually accessed through this call. For example:
     # @code
-    # >>> print q.stats.workers_busy
+    # >>> print q.stats_hierarchy.workers_busy
     # @endcode
     @property
     def stats_hierarchy(self):
         work_queue_get_stats_hierarchy(self._work_queue, self._stats_hierarchy)
         return self._stats_hierarchy
+
+    ##
+    # Get the task statistics for the given category.
+    #
+    # @param self 	Reference to the current work queue object.
+    # @param category   A category name.
+    # For example:
+    # @code
+    # s = q.stats_category("my_category")
+    # >>> print s
+    # @endcode
+    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # @code
+    # >>> print s.tasks_waiting
+    # @endcode
+    def stats_category(self, category):
+        stats = work_queue_stats()
+        work_queue_get_stats_category(self._work_queue, category, stats)
+        return stats
 
     ##
     # Get current task state. See @ref work_queue_task_state_t for possible values.

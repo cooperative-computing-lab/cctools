@@ -15,8 +15,6 @@ use Carp qw(croak);
 use work_queue;
 use Work_Queue::Task;
 
-our $VERSION = 4.3.0;
-
 local $SIG{INT} = sub {
 	croak "Got terminate signal!\n";
 };
@@ -90,6 +88,14 @@ sub stats_hierarchy {
 	work_queue_get_stats_hierarchy($self->{_work_queue}, $self->{_stats_hierarchy});
 	return $self->{_stats_hierarchy};
 }
+
+sub stats_category {
+	my ($self, $category) = @_;
+	my $stats = work_queue::work_queue_stats->new();
+	work_queue_get_stats_category($self->{_work_queue}, $category, $stats);
+	return $stats;
+}
+
 
 sub task_state {
 	my ($self, $taskid) = @_;
@@ -361,6 +367,14 @@ Get the master's queue statistics.
 Get the queue statistics, including master and foremen.
 
 		 print $q->stats_hierarchy->{workers_busy};
+
+=head3 C<stats_category>
+
+Get the tasks statistics from the particular category.
+
+		 $s = $q->stats_category("my_category")
+		 print $s->{tasks_waiting}
+
 
 =head3 C<enable_monitoring($dir_name)>
 
