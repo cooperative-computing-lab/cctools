@@ -65,8 +65,8 @@ static char *amazon_ami = NULL;
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
-static int factory_timeout=0;
-static int factory_timeout_start=0;
+static int64_t factory_timeout = 0;
+
 struct batch_queue *queue = 0;
 
 static void handle_abort( int sig )
@@ -472,6 +472,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 	struct list *masters_list = NULL;
 	struct list *foremen_list = NULL;
 
+	int64_t factory_timeout_start = time(0);
+
 	while(!abort_flag) {
 
 		if(config_file && !read_config_file(config_file)) {
@@ -484,27 +486,21 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
-		
 
-		// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
-		if(factory_timeout)
+		if(list_size(masters_list) > 0)
 		{
-			time_t curr_time = time(0);
-			if(list_size(masters_list))
+			factory_timeout_start = time(0);
+		} else {
+			// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
+			if(factory_timeout > 0)
 			{
-				factory_timeout_start = 0;
-			} else {
-				if(factory_timeout_start) {
-					if(curr_time - factory_timeout_start > factory_timeout) {
-						fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting\n");
-						exit(EXIT_SUCCESS);
-						abort_flag=1;
-					}
-				} else {
-					factory_timeout_start = curr_time;
+				if(time(0) - factory_timeout_start > factory_timeout) {
+					fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting\n");
+					abort_flag=1;
+					break;
 				}
 			}
-	 	}
+		}
 	
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
@@ -710,7 +706,7 @@ int main(int argc, char *argv[])
 				autosize = 1;
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
-				factory_timeout = atoi(optarg);
+				factory_timeout = MAX(0, atoi(optarg));
 				break;
 			case 'P':
 				password_file = optarg;
