@@ -2035,8 +2035,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		 */
 
 		case SYSCALL64_munmap:
-			if(entering) {
-				pfs_mmap_delete(args[0],args[1]);
+			if(!entering) {
+				INT64_T actual;
+				tracer_result_get(p->tracer,&actual); /* check if kernel did the unmap... kernel does some error checking for us */
+				if (actual == 0) {
+					pfs_mmap_delete(args[0],args[1]);
+				}
 			}
 			break;
 
