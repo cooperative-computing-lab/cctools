@@ -476,9 +476,9 @@ static int makeflow_can_alloc_local(struct dag_node *n)
 	int disk_ok = 0;
 	int cores_ok = 0;
 
-	mem_ok = (loc_info.local_mem == -1 || n->resources->resident_memory <= loc_info.local_mem);
+	mem_ok = (loc_info.local_mem == -1 || n->resources->memory <= loc_info.local_mem);
 
-	disk_ok = (loc_info.local_disk == -1 || n->resources->workdir_footprint <= loc_info.local_disk);
+	disk_ok = (loc_info.local_disk == -1 || n->resources->disk <= loc_info.local_disk);
 
 	cores_ok = (n->resources->cores <= loc_info.local_cores ||( n->resources->cores < 1 && loc_info.local_cores >= 1 ));
 	return (cores_ok && disk_ok && mem_ok);
@@ -496,10 +496,10 @@ static void makeflow_alloc_local(struct dag_node *n)
 
 
 		if(loc_info.local_mem != -1)
-			loc_info.local_mem -= n->resources->resident_memory;
+			loc_info.local_mem -= n->resources->memory;
 
 		if(loc_info.local_disk != -1)
-			loc_info.local_disk -= n->resources->workdir_footprint;
+			loc_info.local_disk -= n->resources->disk;
 }
 /*
  * Reallocates the resources to the local machine after a local job
@@ -510,10 +510,10 @@ static void makeflow_dealloc_local(struct dag_node *n)
 		loc_info.local_cores += n->resources->cores;
 
 		if(loc_info.local_mem != -1)
-			loc_info.local_mem += n->resources->resident_memory;
+			loc_info.local_mem += n->resources->memory;
 
 		if(loc_info.local_disk != -1)
-			loc_info.local_disk += n->resources->workdir_footprint;
+			loc_info.local_disk += n->resources->disk;
 }
 
 /*
@@ -597,53 +597,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	jx_delete(envlist);
 }
 
-static int makeflow_is_local_node(struct dag_node *n)
-{
-	return (batch_queue_type == BATCH_TYPE_LOCAL || (n->local_job && local_queue));
-}
-static int makeflow_can_alloc_local(struct dag_node *n)
-{
-		if(n->resources)
-		{
-				return (n->resources->cores >= loc_info.local_cores
-				&& n->resources->resident_memory >= loc_info.local_mem // check and see if it can be ran
-				&& n->resources->swap_memory >= loc_info.local_disk);
-		}
-		else if(loc_info.local_cores > 0) // if resources isn't initialized
-		{
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
-}
-static void makeflow_alloc_local(struct dag_node *n)
-{
-	if(!n->resources || (n->resources->local_mem == -1 && n->resources->local_disk == -1))
-	{
-		loc_info.local_cores--;
-	}
-	else
-	{
-		loc_info.local_cores -= n->resources->cores;
-		loc_info.local_mem -= n->resources->resident_memory;
-		loc_info.local_disk -= n->resources->swap_memory;
-	}
-}
-static void makeflow_dealloc_local(struct dag_node *n)
-{
-	if(!n->resources || (n->resources->local_mem == -1 && n->resources->local_disk == -1))
-	{
-		loc_info.local_cores++;
-	}
-	else
-	{
-		loc_info.local_cores += n->resources->cores;
-		loc_info.local_mem += n->resources->resident_memory;
-		loc_info.local_disk += n->resources->swap_memory;
-	}
-}
 
 static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 {
@@ -1100,7 +1053,6 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 
-	loc_info = malloc(sizeof(local_info));
 	loc_info.local_mem = -1;
 	loc_info.local_disk = -1;
 	loc_info.local_cores= load_average_get_cpus();
