@@ -271,7 +271,7 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 int relabel_task(struct work_queue *q, struct work_queue_task *t);
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t);
 
-void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t);
+void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 struct category *work_queue_category_lookup_or_create(struct hash_table *categories, const char *name);
 
 /** Clone a @ref work_queue_file
@@ -3059,10 +3059,6 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	itable_remove(q->worker_task_map, t->taskid);
 	change_task_state(q, t, new_state);
 
-	if(new_state == WORK_QUEUE_TASK_RETRIEVED) {
-		work_queue_accumulate_task(q, t);
-	}
-
 	count_worker_resources(q, w);
 
 	log_worker_stats(q);
@@ -3198,7 +3194,7 @@ static void abort_slow_workers(struct work_queue *q)
 	if(!fast_abort_flag)
 		return;
 
-	struct category *c_def = category_lookup_or_create(q->categories, "default");
+	struct category *c_def = work_queue_category_lookup_or_create(q->categories, "default");
 
 	timestamp_t current = timestamp_get();
 
@@ -4656,11 +4652,15 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			} else {
 				list_push_priority(q->ready_list,t,t->priority);
 			}
+			if(old_state == WORK_QUEUE_TASK_UNKNOWN) {
+				work_queue_category_accumulate_task(q, t);
+			}
 			break;
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
 			itable_remove(q->tasks, t->taskid);
+			work_queue_category_accumulate_task(q, t);
 			break;
 		default:
 			/* do nothing */
@@ -5542,11 +5542,11 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	}
 }
 
-void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
+void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 	const char *name              = t->category ? t->category : "default";
 	work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 
-	struct category *c = category_lookup_or_create(q->categories, name);
+	struct category *c = work_queue_category_lookup_or_create(q->categories, name);
 
 	struct work_queue_stats *s = c->wq_stats;
 
@@ -5602,7 +5602,7 @@ void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsumm
 }
 
 void work_queue_specify_max_category_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
-	struct category *c = category_lookup_or_create(q->categories, category);
+	struct category *c = work_queue_category_lookup_or_create(q->categories, category);
 
 	if(c->max_allocation) {
 		rmsummary_delete(c->max_allocation);
@@ -5658,7 +5658,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
 
 	relabel_task(q, t);
-	struct category *c = category_lookup_or_create(q->categories, t->category);
+	struct category *c = work_queue_category_lookup_or_create(q->categories, t->category);
 
 	switch(t->resource_request) {
 		/* return the old cases when we are not autolabeling. */
