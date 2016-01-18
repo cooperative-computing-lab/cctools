@@ -346,7 +346,7 @@ public:
 			result = 0;
 		}
 		if (result)
-			debug(D_LOCAL, "= %d [%s]",(int)fd,__func__);
+			debug(D_LOCAL, "= %d [%s]",fd,__func__);
 		else
 			debug(D_LOCAL, "= %d %s [%s]",errno,strerror(errno),__func__);
 		return result;
