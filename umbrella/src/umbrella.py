@@ -338,20 +338,20 @@ def dependency_download(name, url, checksum, checksum_tool, dest, format_remote_
 		tfile = tarfile.open(dest, "r:gz")
 		tfile.extractall(dest_dir)
 
-def extract_tar(src, dest, format):
+def extract_tar(src, dest, form):
 	"""Extract a tgz file from src to dest
 
 	Args:
 		src: the location of a tgz file
 		dest: the location where the uncompressed data will be put
-		format: the format the tarball. Such as: tar, tgz
+		form: the format the tarball. Such as: tar, tgz
 
 	Returns:
 		None
 	"""
-	if format == "tar":
+	if form == "tar":
 		tfile = tarfile.open(src, "r")
-	elif format == "tgz":
+	elif form == "tgz":
 		tfile = tarfile.open(src, "r:gz")
 	tfile.extractall(dest)
 
@@ -407,13 +407,13 @@ def attr_check(name, item, attr, check_len = 0):
 				cleanup(tempfile_list, tempdir_list)
 				logging.debug("The %s attr of the item is empty.", attr)
 				sys.exit("The %s attr of the item (%s) is empty." % (item, attr))
+
+			#when multiple options are available, currently the first one will be picked.
+			#we can add filter here to control the choice.
+			if attr == 'source':
+				return source_filter(item[attr], ['osf', 's3'], name)
 			else:
-				#when multiple options are available, currently the first one will be picked.
-				#we can add filter here to control the choice.
-				if attr == 'source':
-					return source_filter(item[attr], ['osf'], name)
-				else:
-					return item[attr][0]
+				return item[attr][0]
 		else:
 			return item[attr]
 	else:
@@ -448,8 +448,7 @@ def source_filter(sources, filters, name):
 			l.append(s)
 
 	if len(l) == 0:
-		logging.critical("All the urls for retrieving %s are not available!", name)
-		sys.exit("All the urls for retrieving %s are not available!" % name)
+		return sources[0]
 	else:
 		return l[0]
 
@@ -600,27 +599,40 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 	elif source[:4] == 'osf+':
 		checksum = attr_check(name, item, "checksum")
-		format = attr_check(name, item, "format")
+		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		if format == "tgz":
-			osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
-		else:
-			osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
-		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
+		try:
+			logging.debug("Trying to download %s as a normal url ,,,", source)
+			dependency_download(name, source[4:], checksum, "md5sum", dest, form, action)
+		except:
+			logging.debug("Fails to download %s as a normal url ,,,", source)
+			if len(osf_auth) < 2:
+				logging.debug("Please use --osf_user and --osf_pass to specify your osf authentication info!")
+				sys.exit("Please use --osf_user and --osf_pass to specify your osf authentication info!")
+			if form == "tgz":
+				osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
+			else:
+				osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
+			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 	elif source[:3] == "s3+":
 		checksum = attr_check(name, item, "checksum")
-		format = attr_check(name, item, "format")
+		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		if format == "tgz":
-			s3_download(source[3:], dest + ".tar.gz")
-		else:
-			s3_download(source[3:], dest)
-		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
+		try:
+			logging.debug("Trying to download %s as a normal url ,,,", source)
+			dependency_download(name, source[3:], checksum, "md5sum", dest, form, action)
+		except:
+			logging.debug("Fails to download %s as a normal url ,,,", source)
+			if form == "tgz":
+				s3_download(source[3:], dest + ".tar.gz")
+			else:
+				s3_download(source[3:], dest)
+			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 	else:
 		checksum = attr_check(name, item, "checksum")
-		format = attr_check(name, item, "format")
+		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		dependency_download(name, source, checksum, "md5sum", dest, format, action)
+		dependency_download(name, source, checksum, "md5sum", dest, form, action)
 	return dest
 
 def check_cvmfs_repo(repo_name):
@@ -668,31 +680,46 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 		sys.exit("this is git source, can not support")
 	elif source[:4] == "osf+":
 		checksum = attr_check(name, item, "checksum")
-		format = attr_check(name, item, "format")
+		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		if format == "tgz":
-			osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
-		else:
-			osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
-		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
+
+		#first download it as a normal url
+		try:
+			logging.debug("Trying to download %s as a normal url ,,,", source)
+			dependency_download(name, source[4:], checksum, "md5sum", dest, form, action)
+		except:
+			logging.debug("Fails to download %s as a normal url ,,,", source)
+			if len(osf_auth) < 2:
+				logging.debug("Please use --osf_user and --osf_pass to specify your osf authentication info!")
+				sys.exit("Please use --osf_user and --osf_pass to specify your osf authentication info!")
+			if form == "tgz":
+				osf_download(osf_auth[0], osf_auth[1], source[4:], dest + ".tar.gz")
+			else:
+				osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
+			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 		mount_value = dest
 	elif source[:3] == "s3+":
 		checksum = attr_check(name, item, "checksum")
-		format = attr_check(name, item, "format")
+		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		if format == "tgz":
-			s3_download(source[3:], dest + ".tar.gz")
-		else:
-			s3_download(source[3:], dest)
-		dependency_download(name, dest, checksum, "md5sum", dest, format, action)
+		try:
+			logging.debug("Trying to download %s as a normal url ,,,", source)
+			dependency_download(name, source[3:], checksum, "md5sum", dest, form, action)
+		except:
+			logging.debug("Fails to download %s as a normal url ,,,", source)
+			if form == "tgz":
+				s3_download(source[3:], dest + ".tar.gz")
+			else:
+				s3_download(source[3:], dest)
+			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 		mount_value = dest
 	elif source[:5] == "cvmfs":
 		pass
 	else:
 		checksum = attr_check(name, item, "checksum")
-		format = attr_check(name, item, "format")
+		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
-		dependency_download(name, source, checksum, "md5sum", dest, format, action)
+		dependency_download(name, source, checksum, "md5sum", dest, form, action)
 		mount_value = dest
 	return mount_value
 
@@ -3215,6 +3242,10 @@ def osf_download(username, password, osf_url, dest):
 		If the osf_url is downloaded successfully, return None;
 		Otherwise, directly exit.
 	"""
+	if not found_requests:
+		logging.critical("\nDownloading private stuff from OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
+		sys.exit("\nDownloading private stuff from OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
+
 	print "Download %s from OSF to %s" % (osf_url, dest)
 	logging.debug("Download %s from OSF to %s", osf_url, dest)
 	word = 'resources'

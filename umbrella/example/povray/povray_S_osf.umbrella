@@ -1,5 +1,6 @@
 {
     "comment": "A ray-tracing application which creates video frames. The dependencies are all from OSF.", 
+    "_comment": "osf project name: abc8",
     "kernel": {
         "version": ">=2.6.18", 
         "name": "linux"

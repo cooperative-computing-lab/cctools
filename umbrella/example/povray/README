@@ -111,6 +111,14 @@ umbrella \
 upload s3 testhmeng public-read newspec.umbrella
 
 umbrella \
+--spec povray_S_osf.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_osf/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
+
+umbrella \
 --spec povray_S_s3.umbrella \
 --localdir /tmp/umbrella_test/ \
 --output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_S_s3/output.png" \
