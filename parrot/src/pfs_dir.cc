@@ -28,6 +28,9 @@ extern "C" {
 pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 {
 	iterations = 0;
+	if(strcmp(n->path, "/") == 0) {
+		append("chirp");
+	}
 }
 
 int pfs_dir::fstat( struct pfs_stat *buf )

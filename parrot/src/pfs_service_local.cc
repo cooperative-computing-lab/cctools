@@ -367,9 +367,6 @@ public:
 				if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
 				result->append(d);
 			}
-			if(!strcmp(name->rest,"/")) {
-				result->append("chirp");
-			}
 			closedir(dir);
 		} else {
 			result = 0;
