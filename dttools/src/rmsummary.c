@@ -160,7 +160,7 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 }
 
 
-struct jx *rmsummary_to_json(struct rmsummary *s) {
+struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 	struct jx *output = jx_object(NULL);
 	struct jx *array;
 
@@ -226,30 +226,31 @@ struct jx *rmsummary_to_json(struct rmsummary *s) {
 		jx_insert(output, jx_string("start"), array);
 	}
 
-	if(s->exit_type)
-	{
-		if( strcmp(s->exit_type, "signal") == 0 ) {
-			jx_insert_integer(output, "signal", s->signal);
-		} else if( strcmp(s->exit_type, "limits") == 0 ) {
-			if(s->limits_exceeded) {
-				struct jx *lim = rmsummary_to_json(s->limits_exceeded);
-				jx_insert(output, jx_string("limits_exceeded"), lim);
+	if(!only_resources) {
+		if(s->exit_type)
+		{
+			if( strcmp(s->exit_type, "signal") == 0 ) {
+				jx_insert_integer(output, "signal", s->signal);
+			} else if( strcmp(s->exit_type, "limits") == 0 ) {
+				if(s->limits_exceeded) {
+					struct jx *lim = rmsummary_to_json(s->limits_exceeded, 1);
+					jx_insert(output, jx_string("limits_exceeded"), lim);
+				}
+				jx_insert_string(output, "exit_type", "limits");
 			}
-			jx_insert_string(output, "exit_type", "limits");
 		}
+
+		if(s->last_error)
+			jx_insert_integer(output, "last_error", s->last_error);
+
+		jx_insert_integer(output, "exit_status", s->exit_status);
+
+		if(s->command)
+			jx_insert_string(output, "command",   s->command);
+
+		if(s->category)
+			jx_insert_string(output, "category",  s->category);
 	}
-
-	if(s->last_error)
-		jx_insert_integer(output, "last_error", s->last_error);
-
-	jx_insert_integer(output, "exit_status", s->exit_status);
-
-	if(s->command)
-		jx_insert_string(output, "command",   s->command);
-
-	if(s->category)
-		jx_insert_string(output, "category",  s->category);
-
 
 	return output;
 }
@@ -398,7 +399,7 @@ struct rmsummary *rmsummary_parse_next(FILE *stream)
 
 void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fields)
 {
-	struct jx *jsum = rmsummary_to_json(s);
+	struct jx *jsum = rmsummary_to_json(s, 0);
 
 	if(verbatim_fields) {
 		if(!jx_istype(verbatim_fields, JX_OBJECT)) {
