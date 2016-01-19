@@ -3108,6 +3108,10 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
+
+		// Check whether a first-allocation is available for the task.
+		relabel_task(q, t);
+
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
@@ -5678,9 +5682,7 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
 
-	relabel_task(q, t);
 	struct category *c = work_queue_category_lookup_or_create(q->categories, t->category);
-
 	switch(t->resource_request) {
 		/* return the old cases when we are not autolabeling. */
 		case WORK_QUEUE_ALLOCATION_AUTO_ZERO:
