@@ -4254,12 +4254,11 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	return 0;
 
   q->monitor_mode = MON_DISABLED;
-
   q->monitor_exe = resource_monitor_locate(NULL);
+
   if(!q->monitor_exe)
   {
-	debug(D_NOTICE, "Could not find the resource monitor executable. Disabling monitor mode.\n");
-	return 0;
+	fatal("Could not find the resource monitor executable.\n");
   }
 
   if(monitor_output_directory) {
@@ -4529,9 +4528,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 	if(!q->measured_local_resources->exit_type)
 		q->measured_local_resources->exit_type = xxstrdup("normal");
 
-	if(q->monitor_mode == MON_SINGLE_FILE_NO_KEEP) {
-		return;
-	} else {
+	if(q->monitor_mode && !q->monitor_mode == MON_SINGLE_FILE_NO_KEEP) {
 		fclose(q->monitor_file);
 
 		char template[] = "rmonitor-summaries-XXXXXX";
@@ -4581,17 +4578,30 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 		free(q->monitor_summary_filename);
 }
 
-char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits)
-{
-	static char *monitor_remote_name = NULL;
-	if(!monitor_remote_name) {
-		monitor_remote_name = string_format("./cctools-resource-monitor-%d", getpid());
+void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *t) {
+	char *template = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME, q->monitor_output_dirname, getpid(), t->taskid);
+	work_queue_task_specify_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+
+	char *summary  = string_format("%s.summary", template);
+	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+	free(summary);
+
+	if(q->monitor_mode == MON_FULL) {
+		char *debug  = string_format("%s.debug",   template);
+		char *series = string_format("%s.series",  template);
+
+		work_queue_task_specify_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug",   WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+		work_queue_task_specify_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
+
+		free(debug);
+		free(series);
 	}
 
-	char *template = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME, q->monitor_output_dirname, getpid(), t->taskid);
+	free(template);
+}
 
-	char *summary       = string_format("%s.summary", template);
-
+char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits)
+{
 	char *extra_options;
 	if(t->category) {
 		extra_options = string_format("-V 'taskid: %d' -V 'category: %s'", t->taskid, t->category);
@@ -4599,33 +4609,13 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		extra_options = string_format("-V 'taskid: %d'", t->taskid);
 	}
 
-
-	work_queue_task_specify_file(t, q->monitor_exe, monitor_remote_name, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
-	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_TASK_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-	free(summary);
-
 	int extra_files = (q->monitor_mode == MON_FULL);
-	char *monitor_cmd = resource_monitor_write_command(monitor_remote_name, RESOURCE_MONITOR_TASK_REMOTE_NAME, limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0);
 
+	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0);
 	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
-	free(monitor_cmd);
-
-	if(extra_files) {
-		char *debug    = NULL;
-		char *series   = NULL;
-
-		debug  = string_format("%s.debug",   template);
-		series = string_format("%s.series",  template);
-
-		work_queue_task_specify_file(t, debug, RESOURCE_MONITOR_TASK_REMOTE_NAME ".debug",   WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-		work_queue_task_specify_file(t, series, RESOURCE_MONITOR_TASK_REMOTE_NAME ".series", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
-
-		free(debug);
-		free(series);
-	}
 
 	free(extra_options);
-	free(template);
+	free(monitor_cmd);
 
 	return wrap_cmd;
 }
@@ -5675,7 +5665,13 @@ int relabel_task(struct work_queue *q, struct work_queue_task *t) {
 			debug(D_WQ, "Setting task %d to use maximum resources.", t->taskid);
 			t->resource_request = WORK_QUEUE_ALLOCATION_AUTO_MAX;
 		}
-	} else if(c->first_allocation) {
+	}
+
+	/* Never downgrade max allocation */
+	if(t->resource_request == WORK_QUEUE_ALLOCATION_AUTO_MAX)
+		return 1;
+
+	if(c->first_allocation) {
 		/* Use first allocation when it is available. */
 		t->resource_request = WORK_QUEUE_ALLOCATION_AUTO_FIRST;
 	} else {
