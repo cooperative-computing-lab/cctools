@@ -1221,40 +1221,45 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 
 void resource_monitor_append_report(struct work_queue *q, struct work_queue_task *t)
 {
+	if(q->monitor_mode == MON_DISABLED)
+		return;
+
 	struct flock lock;
 	char        *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
-	if(q->monitor_mode == MON_SINGLE_FILE_NO_KEEP) {
+	if(q->monitor_mode != MON_SINGLE_FILE_NO_KEEP) {
+		int monitor_fd = fileno(q->monitor_file);
+
+		lock.l_type   = F_WRLCK;
+		lock.l_start  = 0;
+		lock.l_whence = SEEK_SET;
+		lock.l_len    = 0;
+
+		fcntl(monitor_fd, F_SETLKW, &lock);
+
+		if(!t->resources_measured)
+		{
+			/* mark all resources with -1, to signal that no information is available. */
+			t->resources_measured = rmsummary_create(-1);
+			fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
+		}
+
+		FILE *fs = fopen(summary, "r");
+		if(fs) {
+			copy_stream_to_stream(fs, q->monitor_file);
+			fclose(fs);
+		}
+
+		fprintf(q->monitor_file, "\n");
+
+		lock.l_type   = F_ULOCK;
+		fcntl(monitor_fd, F_SETLK, &lock);
+	}
+
+	/* Remove individual summary file if only keeping single file. */
+	if(q->monitor_mode != MON_FULL) {
 		unlink(summary);
-		return;
 	}
-
-	int monitor_fd = fileno(q->monitor_file);
-
-	lock.l_type   = F_WRLCK;
-	lock.l_start  = 0;
-	lock.l_whence = SEEK_SET;
-	lock.l_len    = 0;
-
-	fcntl(monitor_fd, F_SETLKW, &lock);
-
-	if(!t->resources_measured)
-	{
-		/* mark all resources with -1, to signal that no information is available. */
-		t->resources_measured = rmsummary_create(-1);
-		fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
-	}
-
-	FILE *fs = fopen(summary, "r");
-	if(fs) {
-		copy_stream_to_stream(fs, q->monitor_file);
-		fclose(fs);
-	}
-
-	fprintf(q->monitor_file, "\n");
-
-	lock.l_type   = F_ULOCK;
-	fcntl(monitor_fd, F_SETLK, &lock);
 
 	free(summary);
 }
@@ -4269,10 +4274,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 
 
   if(!create_dir(q->monitor_output_dirname, 0777)) {
-	  debug(D_NOTICE, "Could not create monitor output directory - %s (%s)", q->monitor_output_dirname, strerror(errno));
-	  debug(D_NOTICE, "Disabling monitor mode.\n");
-
-	  return 0;
+	  fatal("Could not create monitor output directory - %s (%s)", q->monitor_output_dirname, strerror(errno));
   }
 
   if(q->measured_local_resources)
@@ -4286,7 +4288,6 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	  if(!q->monitor_file)
 	  {
 		  fatal("Could not open monitor log file for writing: '%s'\n", q->monitor_summary_filename);
-		  return 0;
 	  }
 
 	  q->monitor_mode = MON_SINGLE_FILE;
