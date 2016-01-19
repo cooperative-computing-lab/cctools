@@ -84,7 +84,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define WORKER_HASHKEY_MAX 32
 
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
-#define RESOURCE_MONITOR_TASK_REMOTE_NAME "wq-cctools-monitoring-task"
+#define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 
 #define FIRST_ALLOCATION_EVERY_NTASKS 20
 
@@ -672,6 +672,36 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	last_update_time = time(0);
 }
 
+static void clean_task_state(struct work_queue_task *t) {
+
+		t->total_bytes_transferred = 0;
+		t->total_bytes_received = 0;
+		t->total_bytes_sent = 0;
+		t->total_transfer_time = 0;
+		t->cmd_execution_time = 0;
+
+		if (t->time_execute_cmd_start >= t->time_committed) {
+			t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
+		}
+
+		if(t->output) {
+			free(t->output);
+			t->output = NULL;
+		}
+
+		if(t->hostname) {
+			free(t->hostname);
+			t->hostname = NULL;
+		}
+		if(t->host) {
+			free(t->host);
+			t->host = NULL;
+		}
+
+		/* If result is never updated, then it is mark as a failure. */
+		t->result = WORK_QUEUE_RESULT_UNKNOWN;
+}
+
 static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	char *key, *value;
@@ -689,18 +719,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-		t->total_bytes_transferred = 0;
-		t->total_transfer_time = 0;
-		t->cmd_execution_time = 0;
-		if (t->time_execute_cmd_start >= t->time_committed) {
-			t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
-		}
-		if(t->output) {
-			free(t->output);
-			t->output = NULL;
-		}
-		t->output = 0;
-
+		clean_task_state(t);
 		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
 			t->result = WORK_QUEUE_RESULT_MAX_RETRIES;
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
@@ -2533,8 +2552,6 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	}
 
 	t->time_execute_cmd_start = timestamp_get();
-	t->hostname = xxstrdup(w->hostname);
-	t->host = xxstrdup(w->addrport);
 
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
 	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(command_line), command_line);
@@ -3034,6 +3051,9 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 {
 	t->time_committed = timestamp_get();
 
+	t->hostname = xxstrdup(w->hostname);
+	t->host = xxstrdup(w->addrport);
+
 	change_task_state(q, t, WORK_QUEUE_TASK_RUNNING);
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
@@ -3083,7 +3103,6 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
 
