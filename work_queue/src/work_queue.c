@@ -4624,8 +4624,29 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 {
-	change_task_state(q, t, WORK_QUEUE_TASK_READY);
+	int by_priority = 1;
+
+	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		struct category *c = category_lookup_or_create(q->categories, t->category);
+		if(c->max_allocation) {
+			/* when a task is resubmitted given resource exhaustion, we
+			 * push it at the head of the list, so it gets to run as soon
+			 * as possible. This avoids the issue in which all 'big' tasks
+			 * fail because the first allocation is too small. */
+			by_priority = 0;
+		}
+	}
+
+	if(by_priority) {
+		list_push_priority(q->ready_list,t,t->priority);
+	} else {
+		list_push_head(q->ready_list,t);
+	}
+
+	/* If the task has been used before, clear out accumulated state. */
+	clean_task_state(t);
 }
+
 
 work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid) {
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
@@ -4648,22 +4669,12 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
 
-	struct category *c;
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
-			c = category_lookup_or_create(q->categories, t->category);
-			if((t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) && c->max_allocation) {
-				/* when a task is resubmitted given resource exhaustion, we
-				 * push it at the head of the list, so it gets to run as soon
-				 * as possible. This avoids the issue in which all 'big' tasks
-				 * fail because the first allocation is too small. */
-				list_push_head(q->ready_list,t);
-			} else {
-				list_push_priority(q->ready_list,t,t->priority);
-			}
-			if(old_state == WORK_QUEUE_TASK_UNKNOWN) {
+			if(t->total_submissions > 1 && old_state == WORK_QUEUE_TASK_UNKNOWN) {
 				work_queue_category_accumulate_task(q, t);
 			}
+			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
@@ -4752,33 +4763,15 @@ static int task_state_count(struct work_queue *q, const char *category, work_que
 
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 {
-	/* If the task has been used before, clear out accumlated state. */
-	if(t->output) {
-		free(t->output);
-		t->output = 0;
-	}
-	if(t->hostname) {
-		free(t->hostname);
-		t->hostname = 0;
-	}
-	if(t->host) {
-		free(t->host);
-		t->host = 0;
-	}
-	t->total_bytes_received = 0;
-	t->total_bytes_sent = 0;
-	t->total_transfer_time = 0;
-	t->cmd_execution_time = 0;
-
-	/* If result is never updated, then it is mark as a failure. */
-	t->result = WORK_QUEUE_RESULT_UNKNOWN;
-
 	itable_insert(q->tasks, t->taskid, t);
 
-	push_task_to_ready_list(q,t);
+	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 
 	t->time_task_submit = timestamp_get();
 	q->stats->total_tasks_dispatched++;
+
+	if(q->monitor_mode != MON_DISABLED)
+		work_queue_monitor_add_files(q, t);
 
 	return (t->taskid);
 }
