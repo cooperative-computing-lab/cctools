@@ -2525,10 +2525,10 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 	rmsummary_merge_max(limits, label);
 
 	if(t->resource_request == WORK_QUEUE_ALLOCATION_AUTO_ZERO) {
-		limits->cores  = MIN(MAX(label->cores, 0),  w->resources->cores.total);
-		limits->memory = MIN(MAX(label->memory, 0), w->resources->memory.total);
-		limits->disk   = MIN(MAX(label->disk, 0),   w->resources->disk.total);
-		limits->gpus   = MIN(MAX(label->gpus, 0),   w->resources->gpus.total);
+		limits->cores  = MIN(label->cores,  w->resources->cores.total);
+		limits->memory = MIN(label->memory, w->resources->memory.total);
+		limits->disk   = MIN(label->disk,   w->resources->disk.total);
+		limits->gpus   = MIN(label->gpus,   w->resources->gpus.total);
 	}
 
 	return limits;
