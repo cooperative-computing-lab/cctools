@@ -1,4 +1,5 @@
 #include "rmon_tools.h"
+#include "macros.h"
 
 struct field fields[NUM_FIELDS + 1] = {
 	[WALL_TIME] = {"t", "wall time",      "s",      1, offsetof(struct rmDsummary, wall_time)},
@@ -415,6 +416,54 @@ struct rmDsummary_set *make_new_set(char *category)
 	ss->summaries = list_create();
 
 	return ss;
+}
+
+void rmDsummary_print(FILE *output, struct rmDsummary *so) {
+	struct rmsummary *s = rmsummary_create(-1);
+
+	s->command    = xxstrdup(so->command);
+
+	if(so->category)
+	{
+		s->category   = xxstrdup(so->category);
+	}
+	else if(so->command)
+	{
+		s->category   = xxstrdup(so->command);
+	}
+	else
+	{
+		s->category   = xxstrdup(DEFAULT_CATEGORY);
+		s->command    = xxstrdup(DEFAULT_CATEGORY);
+	}
+
+	if(so->task_id) {
+		s->task_id = xxstrdup(so->task_id);
+	}
+
+	s->start     = secs_to_usecs(so->start);
+	s->end       = secs_to_usecs(so->end);
+	s->wall_time = secs_to_usecs(so->wall_time);
+	s->cpu_time  = secs_to_usecs(so->cpu_time);
+
+	s->cores = so->cores;
+	s->total_processes = so->total_processes;
+	s->max_concurrent_processes = so->max_concurrent_processes;
+
+	s->virtual_memory = so->virtual_memory;
+	s->memory = so->memory;
+	s->swap_memory = so->swap_memory;
+
+	s->bytes_read    = so->bytes_read;
+	s->bytes_written = so->bytes_written;
+
+	s->total_files = so->total_files;
+	s->disk = so->disk;
+
+	rmsummary_print(output, s, 0);
+	rmsummary_delete(s);
+
+	return;
 }
 
 /* vim: set noexpandtab tabstop=4: */

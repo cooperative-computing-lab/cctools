@@ -764,17 +764,26 @@ void write_limits_of_category(struct rmDsummary_set *s, double p_cut)
 
 char *copy_outlier(struct rmDsummary *s)
 {
-	char *base = NULL;
-	char *outlier;
+	static int count = 0;
+	count++;
 
-	if(s->file)
-	{
-		base = sanitize_path_name(s->file);
+	char *base = string_format("outlier-%d.summary", count);
+	char *outlier = string_format("%s/%s/%s", output_directory, OUTLIER_DIR, base);
 
-		outlier = string_format("%s/%s/%s", output_directory, OUTLIER_DIR, base);
-		copy_file_to_file(s->file, outlier);
-		free(outlier);
+	char dir[PATH_MAX];
+	path_dirname(outlier, dir);
+	create_dir(dir, S_IRWXU);
+
+	FILE *output = fopen(outlier, "w");
+	if(output) {
+		rmDsummary_print(output, s);
+		fclose(output);
+	} else {
+		debug(D_NOTICE, "Could not create outlier summary: %s\n", outlier);
+		outlier = NULL;
 	}
+
+	free(outlier);
 
 	return base;
 }

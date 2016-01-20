@@ -128,4 +128,6 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname);
 
 struct rmDsummary_set *make_new_set(char *category);
 
+void rmDsummary_print(FILE *output, struct rmDsummary *so);
+
 #endif
