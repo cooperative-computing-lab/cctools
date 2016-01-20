@@ -36,3 +36,42 @@ umbrella \
 --log umbrella.log \
 --cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
 run
+
+#The interaction between Umbrella and OSF uses the requests package which is not included in Python by default. Please install requests first.
+#upload the dependencies to OSF.
+umbrella \
+--spec cms_complex_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--log umbrella.log \
+--osf_user <osf_username> \
+--osf_pass <osf_password> \
+--osf_userid <osf_userid> \
+upload osf <osf_project_name> <public_or_private> <target_specpath>
+
+#run the appliction using an umbrella spec with all the deps from osf
+umbrella \
+--spec cms_complex_S_osf.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_complex_S_osf_output" \
+--sandbox_mode parrot \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
+
+#The interaction between Umbrella and the Amazon S3 uses the boto3 package which is not included in Python by default. Please install boto3 first.
+#upload the dependencies to S3.
+umbrella \
+--spec cms_complex_S.umbrella \
+--localdir /tmp/umbrella_test/ \
+--log umbrella.log \
+upload s3 cvmfs_cms_app public-read s3.umbrella
+
+#run the appliction using an umbrella spec with all the deps from s3
+umbrella \
+--spec cms_complex_S_s3.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_complex_S_s3_output" \
+--sandbox_mode parrot \
+--log umbrella.log \
+--cvmfs_http_proxy http://cache01.hep.wisc.edu:3128 \
+run
