@@ -293,8 +293,9 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 	s->memory = so->memory;
 	s->swap_memory = so->swap_memory;
 
-	s->bytes_read    = bytes_to_Mbytes(so->bytes_read);
-	s->bytes_written = bytes_to_Mbytes(so->bytes_written);
+	/* Convert MB to bytes. */
+	s->bytes_read    = DIV_INT_ROUND_UP(so->bytes_read, MEGABYTE);
+	s->bytes_written = DIV_INT_ROUND_UP(so->bytes_written, MEGABYTE);
 
 	s->bytes_received = bytes_to_Mbytes(so->bytes_received);
 	s->bytes_sent     = bytes_to_Mbytes(so->bytes_sent);
