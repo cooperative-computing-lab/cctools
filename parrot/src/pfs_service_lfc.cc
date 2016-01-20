@@ -165,7 +165,7 @@ public:
 			debug(D_LFC,"replica: %s",replicas[n]);
 			n++;
 		}
-		return random_int()%n;
+		return random_uint()%n;
 	}
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
