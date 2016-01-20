@@ -703,6 +703,29 @@ System                  2                   2
 
 				<p>After this command, db1 only includes the metadata information of the dependencies involved in cms_opendata.umbrella.</p>
 
+		<h3 id="behavior.upload.s3">Upload the Dependencies in an Umbrella Spec into the Amazon S3<a class="sectionlink" href="#behavior.upload.s3" title="Link to this section.">&#x21d7;</a></h3>
+				<p><b>Upload the Dependencies in an Umbrella Spec into the Amazon S3:</b></p>
+				<code>umbrella \
+	--spec cms_complex_S.umbrella \
+	--localdir /tmp/umbrella_test/ \
+	--log umbrella.log \
+	upload s3 test_bucket public s3.umbrella</code>
+
+				<p><b>test_bucket</b> is the Amazon S3 bucket name which will be created to hold the dependencies. <b>public</b> specifies the access permission of the created bucket and the new objects in it is public (Anyone with the s3 link can download the resource). <b>s3.umbrella</b> is the new umbrella spec which has all the dependencies from the Amazon S3. </p>
+
+				<p>After this command, a new file called <b>s3.umbrella</b> will be created and all the dependencies in it are from the Amazon S3.</p>
+
+		<h3 id="behavior.upload.osf">Upload the Dependencies in an Umbrella Spec into OSF<a class="sectionlink" href="#behavior.upload.osf" title="Link to this section.">&#x21d7;</a></h3>
+				<p><b>Upload the Dependencies in an Umbrella Spec into OSF:</b></p>
+				<code>umbrella \
+	--spec cms_complex_S.umbrella \
+	--localdir /tmp/umbrella_test/ \
+	--log umbrella.log \
+	upload osf proj_cms public osf.umbrella</code>
+
+				<p><b>proj_cms</b> is the OSF project name which will be created to hold the dependencies. <b>public</b> specifies the access permission of the created project and the new objects in it is public (Anyone with the osf link can download the resource). <b>osf.umbrella</b> is the new umbrella spec which has all the dependencies from OSF. </p>
+
+				<p>After this command, a new file called <b>osf.umbrella</b> will be created and all the dependencies in it are from OSF.</p>
 
 	<h2 id="running">Different Execution Engines of Umbrella<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 
