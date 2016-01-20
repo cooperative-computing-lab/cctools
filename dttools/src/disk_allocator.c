@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
-			exit(EXIT_SUCCESS);	
+			exit(EXIT_SUCCESS);
 			break;
 		default:
 			show_help(argv[0]);
