@@ -28,6 +28,7 @@ extern "C" {
 pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 {
 	iterations = 0;
+	/* FIXME This should include all services, not just Chirp. See issue #1107. */
 	if(strcmp(n->path, "/") == 0) {
 		append("chirp");
 	}
