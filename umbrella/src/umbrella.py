@@ -258,10 +258,10 @@ def md5_cal(filename, block_size=2**20):
 					break
 				md5.update(data)
 			return md5.hexdigest()
-	except:
+	except Exception as e:
 		cleanup(tempfile_list, tempdir_list)
-		logging.critical("Computing the checksum of %s fails.", filename)
-		sys.exit("md5_cal(" + filename + ") failed.\n")
+		logging.critical("Computing the checksum of %s fails: %s.", filename, e)
+		sys.exit("md5_cal(" + filename + ") failed.\n" + e)
 
 def url_download(url, dest):
 	""" Download url into dest
@@ -3297,8 +3297,8 @@ def s3_create(bucket_name, acl):
 			buckets.add(bucket.name)
 	except botocore.exceptions.ClientError as e:
 		sys.exit(e.message)
-	except:
-		sys.exit("Fails to list all the current buckets!")
+	except Exception as e:
+		sys.exit("Fails to list all the current buckets: %s!" % e)
 
 	#check whether the bucket name already exists
 	if bucket_name in buckets:
@@ -3307,8 +3307,8 @@ def s3_create(bucket_name, acl):
 	#create a new bucket
 	try:
 		s3.create_bucket(Bucket=bucket_name)
-	except:
-		sys.exit("Fails to create the new bucket (%s)!" % bucket_name)
+	except Exception as e:
+		sys.exit("Fails to create the new bucket (%s): %s!" % (bucket_name, e))
 
 	#obtain the created bucket
 	bucket = s3.Bucket(bucket_name)
@@ -3320,8 +3320,8 @@ def s3_create(bucket_name, acl):
 		bucket.Acl().put(ACL=acl)
 	except botocore.exceptions.ClientError as e:
 		sys.exit(e.message)
-	except:
-		sys.exit("Fails to list all the current buckets!")
+	except Exception as e:
+		sys.exit("Fails to list all the current buckets: %s!" % e)
 
 	return bucket
 
@@ -3347,8 +3347,8 @@ def s3_upload(bucket, source, acl):
 		bucket.put_object(ACL=acl, Key=key, Body=data) #https://s3.amazonaws.com/testhmeng/s3
 	except botocore.exceptions.ClientError as e:
 		sys.exit(e.message)
-	except:
-		sys.exit("Fails to upload the file (%s) to S3!" % source)
+	except Exception as e:
+		sys.exit("Fails to upload the file (%s) to S3: %s!" % (source, e))
 
 	return "%s/%s/%s" % (s3_url, bucket.name, key)
 
@@ -3394,11 +3394,15 @@ def s3_download(link, dest):
 		s3.Object(bucket_name, key).download_file(dest)
 	except botocore.exceptions.ClientError as e:
 		sys.exit(e.message)
-	except:
-		sys.exit("Fails to download the object (%s) from the bucket(%s)! Please ensure you have the right permission to download these s3 objects!" % (key, bucket_name))
+	except Exception as e:
+		sys.exit("Fails to download the object (%s) from the bucket(%s):! Please ensure you have the right permission to download these s3 objects: %s!" % (key, bucket_name, e))
 
 def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s3_bucket=None):
 	"""Upload each dependency in an umbrella spec to the target (OSF or s3), and add the new target download url into the umbrella spec.
+
+	The source of the dependencies can be anywhere supported by umbrella: http
+	https git local s3 osf. Umbrella always first downloads each dependency into
+	its local cache, then upload the dep from its local cache to the target.
 
 	Args:
 		spec_json: the json object including the specification.
@@ -3464,7 +3468,12 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 					logging.debug("%s does not have config attribute!", sec_name)
 					break
 			software_install(mount_dict, env_para_dict, sec, meta_json, sandbox_dir, 0, osf_auth)
+
 			for item in sec:
+				#ignore upload resouces from cvmfs
+				if (not sec[item].has_key("mountpoint")) or (not mount_dict.has_key(sec[item]["mountpoint"])) or mount_dict[sec[item]["mountpoint"]] == "":
+					continue
+
 				if sec[item]["format"] == "tgz":
 					source_url = mount_dict[sec[item]["mountpoint"]] + ".tar.gz"
 				else:
@@ -3689,9 +3698,9 @@ def main():
 			print os.path.dirname(args[2])
 			try:
 				os.makedirs(os.path.dirname(args[2]))
-			except:
-				logging.critical("Fails to create the directory for the <dest.umbrella> (%s)!", args[2])
-				sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % args[2])
+			except Exception as e:
+				logging.critical("Fails to create the directory for the <dest.umbrella> (%s): %s!", args[2], e)
+				sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % (args[2], e))
 
 		with open(args[1]) as f:
 			spec_json = json.load(f)
