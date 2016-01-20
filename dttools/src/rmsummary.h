@@ -26,6 +26,7 @@ struct rmsummary
 {
 	char    *category;
 	char    *command;
+	char    *task_id;
 
 	int64_t  start;
 	int64_t  end;
@@ -55,7 +56,6 @@ struct rmsummary
 
 	int64_t  cores;
 	int64_t  gpus;
-	int64_t  task_id;
 
 	struct rmsummary *limits_exceeded;
 

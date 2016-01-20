@@ -57,15 +57,18 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 		return 1;
 	}
 
+	if(strcmp(key, "task_id") == 0) {
+		if(s->task_id)
+			free(s->task_id);
+		s->task_id = xxstrdup(value);
+		return 1;
+	}
+
+
 	return 0;
 }
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value) {
-	if(strcmp(key, "task_id") == 0) {
-		s->task_id = value;
-		return 1;
-	}
-
 	if(strcmp(key, "start") == 0) {
 		s->start = value;
 		return 1;
@@ -278,6 +281,9 @@ struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 		if(s->command)
 			jx_insert_string(output, "command",   s->command);
 
+		if(s->task_id)
+			jx_insert_string(output, "task_id",  s->task_id);
+
 		if(s->category)
 			jx_insert_string(output, "category",  s->category);
 	}
@@ -472,6 +478,7 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->command   = NULL;
 	s->category  = NULL;
 	s->exit_type = NULL;
+	s->task_id   = NULL;
 	s->limits_exceeded = NULL;
 
 	s->last_error  = 0;
@@ -494,8 +501,11 @@ void rmsummary_delete(struct rmsummary *s)
 	if(s->exit_type)
 		free(s->exit_type);
 
+	if(s->task_id)
+		free(s->task_id);
+
 	if(s->limits_exceeded)
-		free(s->limits_exceeded);
+		rmsummary_delete(s->limits_exceeded);
 
 	free(s);
 }

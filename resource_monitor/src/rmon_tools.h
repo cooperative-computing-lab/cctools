@@ -44,10 +44,10 @@ struct rmDsummary
 {
 	char    *command;
 	char    *category;
+	char    *task_id;
 
 	char    *file;
 
-	int64_t  task_id;
 
 	double start;
 	double end;
@@ -104,7 +104,7 @@ double Mbytes_to_Gbytes(double Mbytes);
 
 char *sanitize_path_name(char *name);
 
-int get_rule_number(char *filename);
+char *get_rule_number(char *filename);
 
 char *make_field_names_str(char *separator);
 

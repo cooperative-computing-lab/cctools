@@ -131,13 +131,13 @@ char *make_field_names_str(char *separator)
 	return str;
 }
 
-int get_rule_number(char *filename)
+char *get_rule_number(char *filename)
 {
 	char  name[MAX_LINE];
 	const char *base =  path_basename(filename);
 
 	sscanf(base, RULE_PREFIX "%6c" RULE_SUFFIX, name);
-	return atoi(name);
+	return xxstrdup(name);
 }
 
 void parse_fields_options(char *field_str)
@@ -250,14 +250,17 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 		return NULL;
 
 	struct rmDsummary *s  = malloc(sizeof(struct rmDsummary));
-
-	s->command    = so->command;
+	bzero(s, sizeof(*s));
 
 	s->file       = xxstrdup(filename);
 
+	if(so->command) {
+		s->command    = xxstrdup(so->command);
+	}
+
 	if(so->category)
 	{
-		s->category   = so->category;
+		s->category   = xxstrdup(so->category);
 	}
 	else if(so->command)
 	{
@@ -268,6 +271,14 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 		s->category   = xxstrdup(DEFAULT_CATEGORY);
 		s->command    = xxstrdup(DEFAULT_CATEGORY);
 	}
+
+	if(so->task_id)
+	{
+		s->task_id = xxstrdup(so->task_id);
+	} else {
+		s->task_id = get_rule_number(filename);
+	}
+
 
 	s->start     = usecs_to_secs(so->start);
 	s->end       = usecs_to_secs(so->end);
@@ -292,12 +303,6 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 	s->total_files = so->total_files;
 	s->disk = so->disk;
 
-	s->task_id = so->task_id;
-	if(s->task_id < 0)
-	{
-		s->task_id = get_rule_number(filename);
-	}
-
 	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
@@ -307,7 +312,7 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 		}
 	}
 
-	free(so); //we do not free so->command on purpouse.
+	rmsummary_delete(so);
 
 	return s;
 }

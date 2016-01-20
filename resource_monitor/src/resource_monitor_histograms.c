@@ -795,7 +795,7 @@ void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *pr
 	}
 
 	fprintf(stream, "<td class=\"data\">\n");
-	fprintf(stream, "<a href=%s%s/%s>(%" PRId64 ")</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
+	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
 	fprintf(stream, "<br><br>\n");
 	fprintf(stream, "%6.0lf\n", value_of_field(s, f));
 	fprintf(stream, "</td>\n");

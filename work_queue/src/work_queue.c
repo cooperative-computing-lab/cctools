@@ -4610,9 +4610,9 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 {
 	char *extra_options;
 	if(t->category) {
-		extra_options = string_format("-V 'taskid: %d' -V 'category: %s'", t->taskid, t->category);
+		extra_options = string_format("-V 'task_id: %d' -V 'category: %s'", t->taskid, t->category);
 	} else {
-		extra_options = string_format("-V 'taskid: %d'", t->taskid);
+		extra_options = string_format("-V 'task_id: %d'", t->taskid);
 	}
 
 	int extra_files = (q->monitor_mode == MON_FULL);
