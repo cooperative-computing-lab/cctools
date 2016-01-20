@@ -169,9 +169,12 @@ struct work_queue_stats {
 	int total_workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
 	int total_workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref work_queue_activate_fast_abort) */
 
+	/* Stats for the current state of tasks: */
 	int tasks_waiting;              /**< Number of tasks waiting to be run. */
 	int tasks_running;              /**< Number of tasks currently running. */
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
+
+	/* Cummulative stats for tasks: */
 	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
 	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
 	int total_tasks_failed;         /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
@@ -557,6 +560,13 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 @param s A pointer to a buffer that will be filed with statistics.
 */
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
+
+/** Get the task statistics for the given category.
+@param q A work queue object.
+@param c A category name.
+@param s A pointer to a buffer that will be filed with statistics.
+*/
+void work_queue_get_stats_category(struct work_queue *q, const char *c, struct work_queue_stats *s);
 
 
 /** Get the current state of the task.
