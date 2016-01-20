@@ -1268,7 +1268,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 
 									CATCH(confugaR_register(C, fid, size->u.integer, sid));
 									if (streql(file_tag->u.string.ptr, CONFUGA_OUTPUT_TAG)) {
-										jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path);
+										jdebug(D_DEBUG, id, tag, "setting output fid = " CONFUGA_FID_PRIFMT " size = %" PRICONFUGA_OFF_T " task_path = `%s'", CONFUGA_FID_PRIARGS(fid), size, task_path->u.string.ptr);
 										sqlcatch(sqlite3_reset(stmt));
 										sqlcatch(sqlite3_bind_int64(stmt, 1, id));
 										sqlcatch(sqlite3_bind_text(stmt, 2, task_path->u.string.ptr, -1, SQLITE_STATIC));
