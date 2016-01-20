@@ -602,7 +602,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 					/* idea here is to not include a SPECIAL fd in this directory */
 					if (pointers[i] == NATIVE || PARROT_POINTER(pointers[i])) {
 						struct dirent dirent;
-						dirent.d_ino = random_int();
+						dirent.d_ino = random_uint();
 						dirent.d_off = 0;
 						dirent.d_reclen = sizeof(dirent);
 						snprintf(dirent.d_name, sizeof(dirent.d_name), "%d", i);

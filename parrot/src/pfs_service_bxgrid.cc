@@ -329,7 +329,8 @@ const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int n
 				strncpy(replicaid, replica_list->replicas[i], BXGRID_ID_MAX);
 				debug(D_BXGRID, "selecting closest replica %s", replicaid);
 			} else {
-				strncpy(replicaid, replica_list->replicas[random_int() % replica_list->nreplicas], BXGRID_ID_MAX);
+				// Careful, use UNSIGNED integer for array index!
+				strncpy(replicaid, replica_list->replicas[random_uint() % replica_list->nreplicas], BXGRID_ID_MAX);
 				debug(D_BXGRID, "selecting random replica %s", replicaid);
 			}
 		} else {
@@ -344,7 +345,7 @@ const char *bxgrid_lookup_replicaid( MYSQL *mysql_cxn, const char *fileid, int n
 
 		if (nreplicas == 0 || nid >= nreplicas) return NULL;
 		if (nid < 0) {
-			int i, ri = random_int() % nreplicas;
+			int i, ri = random_uint() % nreplicas;
 			BXGRID_FETCH_AND_CHECK(rep_row, rep_res, NULL);
 			for (i = 0; i < nreplicas; i++) {
 				if (ri == i)
