@@ -17,24 +17,17 @@ See the file COPYING for details.
 
 static void show_help(const char *cmd) {
 
-	fprintf(stdout, "Use: %s [options]\n", cmd);
+	fprintf(stdout, "Use: %s [options] <create|delete> <target directory> <size (i.e. 100MB)> <filesystem>\n", cmd);
 	fprintf(stdout, "Where options are:\n");
 	fprintf(stdout, " %-30s This message\n", "-h,--help=<flag>");
 	fprintf(stdout, " %-30s Version\n", "-v,--version");
-	fprintf(stdout, " %-30s Loop device allocation\n", "create <target directory> <size (i.e. 100MB)> <filesystem>");
-	fprintf(stdout, " %-30s Loop device deallocation\n", "delete <target directory>");
 	fprintf(stdout, "\n");
 	return;
 }
 
 int main(int argc, char *argv[]) {
 
-	char *func = argv[1];
-	char *loc = argv[2];
-	char *fs = argv[4];
-	int result;
-	signed char c;
-
+	int c;
 	static const struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
@@ -58,6 +51,25 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	if(strstr(argv[1], "create") != NULL && argc < 5) {
+		fprintf(stdout, "Too few arguments given for loop device creation. Needs: create <target directory> <size (i.e. 100MB)> <filesystem>\n");
+		return 1;
+	}
+	else if(strstr(argv[1], "delete") != NULL && argc < 3) {
+		fprintf(stdout, "Too few arguments given for loop device deletion. Needs: delete <target directory>\n");
+		return 1;
+	}
+	else if(argc > 5) {
+		printf("%d\n", argc);
+		fprintf(stdout, "Too many arguments given.\n");
+		return 1;
+	}
+
+	char *func = argv[1];
+	char *loc = argv[2];
+	char *fs = argv[4];
+	int result;
+
 	if(strstr(func, "create") != NULL) {
 
 		int64_t size = (string_metric_parse(argv[3]) / 1024);
@@ -66,7 +78,7 @@ int main(int argc, char *argv[]) {
 		if(result != 0) {
 
 			printf("Could not create allocation.\n");
-			return -1;
+			return 1;
 		}
 
 		printf("Allocation complete.\n");
@@ -80,7 +92,7 @@ int main(int argc, char *argv[]) {
 		if(result != 0) {
 
 			printf("Could not delete allocation.\n");
-			return -1;
+			return 1;
 		}
 
 		printf("Deallocation complete.\n");
@@ -90,7 +102,6 @@ int main(int argc, char *argv[]) {
 	else {
 
 		printf("Invalid parameters defined.\n");
-		return -1;
+		return 1;
 	}
 }
-
