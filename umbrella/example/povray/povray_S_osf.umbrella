@@ -1,6 +1,5 @@
 {
     "comment": "A ray-tracing application which creates video frames. The dependencies are all from OSF.", 
-    "_comment": "osf project name: abc8",
     "kernel": {
         "version": ">=2.6.18", 
         "name": "linux"
@@ -10,7 +9,7 @@
             "format": "plain", 
             "checksum": "c65266cd2b672854b821ed93028a877a", 
             "source": [
-                "osf+https://files.osf.io/v1/resources/vkda4/providers/osfstorage/568c11b38c5e4a4e1803ac2f"
+                "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febca9ad5a100b15598b7"
             ], 
             "action": "none", 
             "mountpoint": "/tmp/4_cubes.pov", 
@@ -21,7 +20,7 @@
             "format": "plain", 
             "checksum": "2f8afdd09fc3a6177c6f1977bb3bdae7", 
             "source": [
-                "osf+https://files.osf.io/v1/resources/vkda4/providers/osfstorage/568c11b68c5e4a4e1d03abc6"
+                "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febce9ad5a100b7559c3a"
             ], 
             "action": "none", 
             "mountpoint": "/tmp/WRC_RubiksCube.inc", 
@@ -50,7 +49,7 @@
         "format": "tgz", 
         "checksum": "669ab5ef94af84d273f8f92a86b7907a", 
         "source": [
-            "osf+https://files.osf.io/v1/resources/vkda4/providers/osfstorage/568c11b08c5e4a4e1803ac2c"
+            "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febc6594d90006fae3975"
         ], 
         "version": "6.5", 
         "size": "633848940", 
@@ -62,7 +61,7 @@
             "format": "tgz", 
             "checksum": "b02ba86dd3081a703b4b01dc463e0499", 
             "source": [
-                "osf+https://files.osf.io/v1/resources/vkda4/providers/osfstorage/568c11b98c5e4a4e2003acec"
+                "osf+https://files.osf.io/v1/resources/c5jyn/providers/osfstorage/569febd3594d900074ae38fa"
             ], 
             "mountpoint": "/software/povray-3.6.1-redhat6-x86_64", 
             "size": "1471452", 

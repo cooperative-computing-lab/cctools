@@ -3634,6 +3634,9 @@ def main():
 	parser.add_option("--osf_pass",
 					action="store",
 					help="the OSF password",)
+	parser.add_option("--osf_userid",
+					action="store",
+					help="the OSF user id",)
 
 	(options, args) = parser.parse_args()
 	logfilename = options.log
@@ -3727,6 +3730,14 @@ def main():
 		tempdir_list.append(sandbox_dir)
 
 	osf_auth = []
+	#osf_auth info
+	osf_user = options.osf_user
+	osf_pass = options.osf_pass
+	if osf_user or osf_pass:
+		osf_auth.append(osf_user)
+		osf_auth.append(osf_pass)
+
+
 	if behavior in ["run"]:
 		sandbox_mode = options.sandbox_mode
 		logging.debug("Check the sandbox_mode option: %s", sandbox_mode)
@@ -3758,13 +3769,6 @@ def main():
 
 		#get the cvmfs HTTP_PROXY
 		cvmfs_http_proxy = options.cvmfs_http_proxy
-
-		#osf_auth info
-		osf_user = options.osf_user
-		osf_pass = options.osf_pass
-		if osf_user or osf_pass:
-			osf_auth.append(osf_user)
-			osf_auth.append(osf_pass)
 
 	if behavior in ["run", "expand", "filter", "split", "validate", "upload"]:
 		spec_path = options.spec
@@ -4079,27 +4083,27 @@ def main():
 				logging.critical("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 				sys.exit("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 
-			if len(args) != 8:
+			if len(args) != 5:
 				cleanup(tempfile_list, tempdir_list)
-				logging.critical("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>\n")
-				sys.exit("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>\n")
+				logging.critical("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_project_name> <public_or_private> <target_specpath>\n")
+				sys.exit("The syntax for umbrella upload osf is: umbrella ... upload osf <osf_project_name> <public_or_private> <target_specpath>\n")
 
 			acl = ["private", "public"]
-			if args[6] not in acl:
+			if args[3] not in acl:
 				sys.exit("The access control for s3 bucket and object can only be: %s" % " or ".join(acl))
 
-			target_specpath = os.path.abspath(args[7])
+			target_specpath = os.path.abspath(args[4])
 			path_exists(target_specpath)
 			dir_create(target_specpath)
 
 			osf_info = []
 			osf_info.append("osf")
-			osf_info += args[2:4]
-			osf_proj_id = osf_create(args[2], args[3], args[4], args[5], args[6] == "public")
+			osf_info += [options.osf_user, options.osf_pass]
+			osf_proj_id = osf_create(options.osf_user, options.osf_pass, options.osf_userid, args[2], args[3] == "public")
 			osf_info.append(osf_proj_id)
 			spec_upload(spec_json, meta_json, osf_info, sandbox_dir, osf_auth)
 			json2file(target_specpath, spec_json)
-			osf_upload(args[2], args[3], osf_proj_id, target_specpath)
+			osf_upload(options.osf_user, options.osf_pass, osf_proj_id, target_specpath)
 
 		elif args[1] == "s3":
 			if not found_boto3 or not found_botocore:

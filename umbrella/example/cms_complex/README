@@ -43,7 +43,10 @@ umbrella \
 --spec cms_complex_S.umbrella \
 --localdir /tmp/umbrella_test/ \
 --log umbrella.log \
-upload osf <osf_username> <osf_password> <osf_userid> <osf_project_name> <public_or_private> <target_specpath>
+--osf_user <osf_username> \
+--osf_pass <osf_password> \
+--osf_userid <osf_userid> \
+upload osf <osf_project_name> <public_or_private> <target_specpath>
 
 #run the appliction using an umbrella spec with all the deps from osf
 umbrella \
