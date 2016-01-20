@@ -28,9 +28,30 @@ extern "C" {
 pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 {
 	iterations = 0;
-	/* FIXME This should include all services, not just Chirp. See issue #1107. */
 	if(strcmp(n->path, "/") == 0) {
 		append("chirp");
+		append("multi");
+		append("anonftp");
+		append("ftp");
+		append("http");
+		append("grow");
+#ifdef HAS_GLOBUS_GSS
+		append("gsiftp");
+		append("gridftp");
+#endif
+#ifdef HAS_IRODS
+		append("irods");
+#endif
+		append("hdfs");
+#ifdef HAS_BXGRID
+		append("bxgrid");
+#endif
+#ifdef HAS_XROOTD
+		append("xrootd");
+#endif
+#ifdef HAS_CVMFS
+		append("cvmfs");
+#endif
 	}
 }
 
