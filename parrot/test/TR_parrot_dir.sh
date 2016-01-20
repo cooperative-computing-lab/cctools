@@ -7,7 +7,8 @@ exe="dir.test"
 prepare()
 {
 	gcc -I../src/ -g -o "$exe" -x c - -x none -lm <<EOF
-#define __USE_GNU
+/* Required for O_DIRECTORY on old glibcs */
+#define _GNU_SOURCE
 
 #include <fcntl.h>
 #include <sys/stat.h>
