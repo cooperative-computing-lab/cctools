@@ -108,6 +108,7 @@ HEADERS_PUBLIC = \
 	auth_kerberos.h \
 	auth_ticket.h \
 	auth_unix.h \
+	jx.h \
 	buffer.h \
 	debug.h \
 	int_sizes.h \
