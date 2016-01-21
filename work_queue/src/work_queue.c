@@ -2568,7 +2568,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	send_worker_msg(q,w, "gpus %"PRId64"\n",   limits->gpus);
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
-	if(!q->monitor_mode) {
+	if(q->monitor_mode == MON_DISABLED) {
 		send_worker_msg(q,w, "end_time %"PRIu64"\n",  limits->end);
 		send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
 	}
@@ -4526,14 +4526,14 @@ void update_resource_report(struct work_queue *q) {
 }
 
 void work_queue_disable_monitoring(struct work_queue *q) {
-	if(!q->monitor_mode)
+	if(q->monitor_mode == MON_DISABLED)
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
 	if(!q->measured_local_resources->exit_type)
 		q->measured_local_resources->exit_type = xxstrdup("normal");
 
-	if(q->monitor_mode && !q->monitor_mode == MON_SINGLE_FILE_NO_KEEP) {
+	if(q->monitor_mode && q->monitor_mode != MON_SINGLE_FILE_NO_KEEP) {
 		fclose(q->monitor_file);
 
 		char template[] = "rmonitor-summaries-XXXXXX";
@@ -5631,7 +5631,7 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 		c->max_allocation = rmsummary_create(-1);
 		rmsummary_merge_max(c->max_allocation, rm);
 
-		if(!q->monitor_mode) {
+		if(q->monitor_mode == MON_DISABLED) {
 			work_queue_enable_monitoring(q, NULL);
 		}
 	} else {
