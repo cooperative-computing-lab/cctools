@@ -230,6 +230,14 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_master_preferred_connection(q->data, value);
 		else
 			work_queue_master_preferred_connection(q->data, "by_ip");
+	} else if(strcmp(what, "category-limits") == 0) {
+		struct rmsummary *s = rmsummary_parse_string(value);
+		if(s) {
+			work_queue_specify_max_category_resources(q->data, s->category, s);
+			rmsummary_delete(s);
+		} else {
+			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);
+		}
 	}
 }
 
