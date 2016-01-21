@@ -64,6 +64,11 @@ int pfs_service::is_local()
 	return 0;
 }
 
+int pfs_service::can_open_dirs()
+{
+	return 0;
+}
+
 pfs_file * pfs_service::open( pfs_name *name, int flags, mode_t mode )
 {
 	errno = ENOENT;
