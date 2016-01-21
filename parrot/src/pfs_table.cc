@@ -594,7 +594,8 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	// system directories (or the filesystem root) are marked RO.
 	if(resolve_name(1,lname,&pname,open_mode)) {
 		char *pid = NULL;
-		if(flags&O_DIRECTORY) {
+		char *fd = NULL;
+		if(pname.service->is_local()) {
 			if (pattern_match(pname.rest, "^/proc/(%d+)/fd$", &pid) >= 0) {
 				int i;
 				pfs_dir *dir = new pfs_dir(&pname);
@@ -611,12 +612,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 					}
 				}
 				file = dir;
-			} else {
-				file = pname.service->getdir(&pname);
-			}
-		} else if(pname.service->is_local()) {
-			char *fd = NULL;
-			if (pattern_match(pname.rest, "^/proc/(%d+)/fd/(%d+)$", &pid, &fd) >= 0) {
+			} else if (pattern_match(pname.rest, "^/proc/(%d+)/fd/(%d+)$", &pid, &fd) >= 0) {
 				int ifd = atoi(fd);
 				if (!VALID_FD(ifd)) {
 					errno = ENOENT;
