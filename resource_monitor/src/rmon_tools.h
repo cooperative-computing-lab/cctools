@@ -83,6 +83,7 @@ struct rmDsummary_set
 struct field {
 	char  *abbrev;
 	char  *name;
+	char  *caption;
 	char  *units;
 	int    active;
 	size_t offset;
@@ -119,12 +120,12 @@ double divide(double a, double b);
 
 void parse_fields_options(char *field_str);
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename);
-struct rmDsummary *parse_summary_file(char *filename);
+struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories);
+struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categories);
 char *parse_executable_name(char *command);
 
-void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename);
-void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname);
+void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories);
+void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct hash_table *categories);
 
 struct rmDsummary_set *make_new_set(char *category);
 

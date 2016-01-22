@@ -1,23 +1,24 @@
 #include "rmon_tools.h"
 #include "macros.h"
+#include "category.h"
 
 struct field fields[NUM_FIELDS + 1] = {
-	[WALL_TIME] = {"t", "wall time",      "s",      1, offsetof(struct rmDsummary, wall_time)},
-	[CPU_TIME]  = {"c", "cpu time",        "s",     1, offsetof(struct rmDsummary, cpu_time)},
-	[VIRTUAL  ] = {"v", "virtual memory",  "MB",    1, offsetof(struct rmDsummary, virtual_memory)},
-	[RESIDENT ] = {"m", "resident memory", "MB",    1, offsetof(struct rmDsummary, memory)},
-	[SWAP     ] = {"s", "swap memory",     "MB",    1, offsetof(struct rmDsummary, swap_memory)},
-	[B_READ   ] = {"r", "read bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_read)},
-	[B_WRITTEN] = {"w", "written bytes",   "MB",    1, offsetof(struct rmDsummary, bytes_written)},
-	[B_RX   ]   = {"R", "received bytes",  "MB",    1, offsetof(struct rmDsummary, bytes_received)},
-	[B_TX]      = {"W", "sent bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_sent)},
-	[BANDWIDTH] = {"B", "bandwidth",       "bits/s",1, offsetof(struct rmDsummary, bandwidth)},
-	[FILES    ] = {"n", "num files",       "files", 1, offsetof(struct rmDsummary, total_files)},
-	[DISK]      = {"z", "disk",            "MB",    1, offsetof(struct rmDsummary, disk)},
-	[CORES    ] = {"C", "cores",           "cores", 0, offsetof(struct rmDsummary, cores)},
-	[MAX_PROCESSES]   = {"p", "max processes",   "procs", 0, offsetof(struct rmDsummary, max_concurrent_processes)},
-	[TOTAL_PROCESSES] = {"P", "total processes", "procs", 0, offsetof(struct rmDsummary, total_processes)},
-	[NUM_FIELDS] = {NULL, NULL, NULL, 0, 0}
+	[WALL_TIME] = {"t", "wall_time",      "wall time",       "s",     1, offsetof(struct rmDsummary, wall_time)},
+	[CPU_TIME]  = {"c", "cpu_time",       "cpu time",        "s",     1, offsetof(struct rmDsummary, cpu_time)},
+	[VIRTUAL  ] = {"v", "virtual memory", "virtual memory",  "MB",    1, offsetof(struct rmDsummary, virtual_memory)},
+	[RESIDENT ] = {"m", "memory",         "resident memory", "MB",    1, offsetof(struct rmDsummary, memory)},
+	[SWAP     ] = {"s", "swap_memory",    "swap memory",     "MB",    1, offsetof(struct rmDsummary, swap_memory)},
+	[B_READ   ] = {"r", "bytes_read",     "read bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_read)},
+	[B_WRITTEN] = {"w", "bytes_written",  "written bytes",   "MB",    1, offsetof(struct rmDsummary, bytes_written)},
+	[B_RX   ]   = {"R", "bytes_received", "received bytes",  "MB",    1, offsetof(struct rmDsummary, bytes_received)},
+	[B_TX]      = {"W", "bytes_sent",     "bytes_sent",      "MB",    1, offsetof(struct rmDsummary, bytes_sent)},
+	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "bits/s",1, offsetof(struct rmDsummary, bandwidth)},
+	[FILES    ] = {"n", "total_files",    "num files",       "files", 1, offsetof(struct rmDsummary, total_files)},
+	[DISK]      = {"z", "disk",           "disk",            "MB",    1, offsetof(struct rmDsummary, disk)},
+	[CORES    ] = {"C", "cores",          "cores",           "cores", 0, offsetof(struct rmDsummary, cores)},
+	[MAX_PROCESSES]   = {"p", "max_concurrent_processes", "max processes",   "procs", 0, offsetof(struct rmDsummary, max_concurrent_processes)},
+	[TOTAL_PROCESSES] = {"P", "total_processes", "total processes", "procs", 0, offsetof(struct rmDsummary, total_processes)},
+	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, 0, 0}
 };
 
 double usecs_to_secs(double usecs)
@@ -216,21 +217,21 @@ void parse_fields_options(char *field_str)
 	}
 }
 
-struct rmDsummary *parse_summary_file(char *filename)
+struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categories)
 {
 	FILE *stream;
 	stream = fopen(filename, "r");
 	if(!stream)
 		fatal("Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
 
-	struct rmDsummary *s = parse_summary(stream, filename);
+	struct rmDsummary *s = parse_summary(stream, filename, categories);
 
 	fclose(stream);
 
 	return s;
 }
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename)
+struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories)
 {
 	static FILE *last_stream = NULL;
 	static int   summ_id     = 1;
@@ -246,9 +247,14 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 	}
 
 	struct rmsummary  *so = rmsummary_parse_next(stream);
-
 	if(!so)
 		return NULL;
+
+	if(categories && so->category) {
+		category_accumulate_summary(categories, so->category, so);
+	}
+
+	category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
 
 	struct rmDsummary *s  = malloc(sizeof(struct rmDsummary));
 	bzero(s, sizeof(*s));
@@ -319,7 +325,7 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 	return s;
 }
 
-void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename)
+void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories)
 {
 	FILE *flist;
 
@@ -350,7 +356,7 @@ void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename)
 		if(!stream)
 			fatal("Cannot open resources summary file: %s : %s\n", file_summ, strerror(errno));
 
-		while((s = parse_summary(stream, file_summ)))
+		while((s = parse_summary(stream, file_summ, categories)))
 			list_push_tail(dest->summaries, s);
 
 		fclose(stream);
@@ -358,7 +364,7 @@ void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename)
 }
 
 
-void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname)
+void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct hash_table *categories)
 {
 
 	FTS *hierarchy;
@@ -379,7 +385,7 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname)
 			if(!stream)
 				fatal("Cannot open resources summary file: %s : %s\n", entry->fts_accpath, strerror(errno));
 
-			while((s = parse_summary(stream, entry->fts_path)))
+			while((s = parse_summary(stream, entry->fts_path, categories)))
 				list_push_tail(dest->summaries, s);
 
 			fclose(stream);

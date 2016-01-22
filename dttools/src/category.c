@@ -16,14 +16,14 @@ See the file COPYING for details.
 #include "rmsummary.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "jx_print.h"
 
 #include "category.h"
 
-static uint64_t cores_bucket_size     = 1;          /* unit-less */
-static uint64_t memory_bucket_size    = 25;         /* MB */
-static uint64_t disk_bucket_size      = 25;         /* MB */
-static uint64_t wall_time_bucket_size = 30000000;   /* useconds */
-
+static uint64_t memory_bucket_size  = 100;       /* MB */
+static uint64_t disk_bucket_size    = 100;       /* MB */
+static uint64_t time_bucket_size    = 30000000;  /* 30 s */
+static uint64_t bytes_bucket_size   = MEGABYTE;  /* 1 M */
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
 	struct category *c;
@@ -44,10 +44,17 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->first_allocation    = NULL;
 	c->max_allocation      = NULL;
 
-	c->cores_histogram     = itable_create(0);
-	c->memory_histogram    = itable_create(0);
-	c->disk_histogram      = itable_create(0);
-	c->wall_time_histogram = itable_create(0);
+	c->cores_histogram           = itable_create(0);
+	c->wall_time_histogram       = itable_create(0);
+	c->cpu_time_histogram        = itable_create(0);
+	c->memory_histogram          = itable_create(0);
+	c->swap_memory_histogram     = itable_create(0);
+	c->virtual_memory_histogram  = itable_create(0);
+	c->bytes_read_histogram      = itable_create(0);
+	c->bytes_written_histogram   = itable_create(0);
+	c->total_files_histogram     = itable_create(0);
+	c->disk_histogram            = itable_create(0);
+	c->max_concurrent_processes_histogram = itable_create(0);
 
 	hash_table_insert(categories, name, c);
 
@@ -59,9 +66,16 @@ static void category_clear_histograms(struct category *c) {
 		return;
 
 	itable_clear(c->cores_histogram);
-	itable_clear(c->memory_histogram);
-	itable_clear(c->disk_histogram);
 	itable_clear(c->wall_time_histogram);
+	itable_clear(c->cpu_time_histogram);
+	itable_clear(c->max_concurrent_processes_histogram);
+	itable_clear(c->memory_histogram);
+	itable_clear(c->swap_memory_histogram);
+	itable_clear(c->virtual_memory_histogram);
+	itable_clear(c->bytes_read_histogram);
+	itable_clear(c->bytes_written_histogram);
+	itable_clear(c->total_files_histogram);
+	itable_clear(c->disk_histogram);
 }
 
 void category_delete(struct hash_table *categories, const char *name) {
@@ -90,10 +104,11 @@ void category_delete(struct hash_table *categories, const char *name) {
 }
 
 /* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */
-#define category_inc_histogram_count(c, field, value, bucket_size)\
+#define category_inc_histogram_count(c, field, summary, bucket_size)\
 {\
+	int64_t value = (summary)->field;\
 	if(value >= 0) { \
-		uintptr_t bucket = DIV_INT_ROUND_UP(value, bucket_size)*bucket_size;\
+		uintptr_t bucket = DIV_INT_ROUND_UP(value + 1, bucket_size)*bucket_size; /* + 1 so border values go to the next bucket. */ \
 		uintptr_t count = (uintptr_t) itable_lookup(c->field##_histogram, bucket + 1) + 1;\
 		itable_insert(c->field##_histogram, bucket + 1, (void *) count);\
 	}\
@@ -162,7 +177,7 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 		}
 	}
 
-	if(a_1 > ceil(top_resource / 2.0)) {
+	if(a_1 > top_resource) {
 		a_1 = top_resource;
 	}
 
@@ -190,41 +205,27 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 		c->first_allocation = rmsummary_create(-1);
 	}
 
-	//int64_t cores     = category_first_allocation(c->cores_histogram,     top->cores);
-	int64_t cores     = c->max_allocation->cores;
-	int64_t memory    = category_first_allocation(c->memory_histogram,    top->memory);
-	int64_t disk      = category_first_allocation(c->disk_histogram,      top->disk);
-	int64_t wall_time = category_first_allocation(c->wall_time_histogram, top->wall_time);
+	c->first_allocation->cores          = c->max_allocation->cores;
+	c->first_allocation->cpu_time       = category_first_allocation(c->cpu_time_histogram,       top->cpu_time);
+	c->first_allocation->wall_time      = category_first_allocation(c->wall_time_histogram,      top->wall_time);
+	c->first_allocation->virtual_memory = category_first_allocation(c->virtual_memory_histogram, top->virtual_memory);
+	c->first_allocation->memory         = category_first_allocation(c->memory_histogram,         top->memory);
+	c->first_allocation->swap_memory    = category_first_allocation(c->swap_memory_histogram,    top->swap_memory);
+	c->first_allocation->bytes_read     = category_first_allocation(c->bytes_read_histogram,     top->bytes_read);
+	c->first_allocation->bytes_written  = category_first_allocation(c->bytes_written_histogram,  top->bytes_written);
+	c->first_allocation->total_files    = category_first_allocation(c->total_files_histogram,    top->total_files);
+	c->first_allocation->disk           = category_first_allocation(c->disk_histogram,           top->disk);
+	c->first_allocation->max_concurrent_processes = category_first_allocation(c->max_concurrent_processes_histogram, top->max_concurrent_processes);
 
+	/* From here on we only print debugging info. */
+	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
 
-	/* Update values, and print debug message only if something changed. */
-	if(cores != c->first_allocation->cores ||  memory != c->first_allocation->memory || disk != c->first_allocation->disk || wall_time != c->first_allocation->wall_time) {
-		c->first_allocation->cores     = cores;
-		c->first_allocation->memory    = memory;
-		c->first_allocation->disk      = disk;
-		c->first_allocation->wall_time = wall_time;
-
-		/* From here on we only print debugging info. */
-		buffer_rewind(b, 0);
-		buffer_printf(b, "Updating first allocation '%s':", category);
-
-		if(cores > -1) {
-			buffer_printf(b, " cores: %" PRId64, cores);
-		}
-
-		if(memory > -1) {
-			buffer_printf(b, " memory: %" PRId64 " MB", memory);
-		}
-
-		if(disk > -1) {
-			buffer_printf(b, " disk: %" PRId64 " MB", disk);
-		}
-
-		if(wall_time > -1) {
-			buffer_printf(b, " wall_time: %" PRId64 " us", wall_time);
-		}
-
-		debug(D_DEBUG, "%s\n", buffer_tostring(b));
+	if(jsum) {
+		char *str = jx_print_string(jsum);
+		debug(D_DEBUG, "Updating first allocation '%s':", category);
+		debug(D_DEBUG, "%s", str);
+		jx_delete(jsum);
+		free(str);
 	}
 }
 
@@ -234,12 +235,20 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 
 	struct category *c = category_lookup_or_create(categories, name);
 
-	if(c->max_allocation && rs) {
-		category_inc_histogram_count(c, cores,     rs->cores,     cores_bucket_size);
-		category_inc_histogram_count(c, memory,    rs->memory,    memory_bucket_size);
-		category_inc_histogram_count(c, disk,      rs->disk,      disk_bucket_size);
-		category_inc_histogram_count(c, wall_time, rs->wall_time, wall_time_bucket_size);
+	if(rs) {
+		category_inc_histogram_count(c, cores,          rs, 1);
+		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
+		category_inc_histogram_count(c, wall_time,      rs, time_bucket_size);
+		category_inc_histogram_count(c, virtual_memory, rs, memory_bucket_size);
+		category_inc_histogram_count(c, memory,         rs, memory_bucket_size);
+		category_inc_histogram_count(c, swap_memory,    rs, memory_bucket_size);
+		category_inc_histogram_count(c, bytes_read,     rs, bytes_bucket_size);
+		category_inc_histogram_count(c, bytes_written,  rs, bytes_bucket_size);
+		category_inc_histogram_count(c, total_files,    rs, 1);
+		category_inc_histogram_count(c, disk,           rs, disk_bucket_size);
+		category_inc_histogram_count(c, max_concurrent_processes, rs, 1);
 	}
+
 }
 
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file) {

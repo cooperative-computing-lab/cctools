@@ -68,6 +68,102 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 	return 0;
 }
 
+int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
+	if(strcmp(key, "start") == 0) {
+		return s->start;
+	}
+
+	if(strcmp(key, "end") == 0) {
+		return s->end;
+	}
+
+	if(strcmp(key, "wall_time") == 0) {
+		return s->wall_time;
+	}
+
+	if(strcmp(key, "cpu_time") == 0) {
+		return s->cpu_time;
+	}
+
+	if(strcmp(key, "signal") == 0) {
+		return s->signal;
+	}
+
+	if(strcmp(key, "exit_status") == 0) {
+		return s->exit_status;
+	}
+
+	if(strcmp(key, "last_error") == 0) {
+		return s->last_error;
+	}
+
+	if(strcmp(key, "max_concurrent_processes") == 0) {
+		return s->max_concurrent_processes;
+	}
+
+	if(strcmp(key, "total_processes") == 0) {
+		return s->total_processes;
+	}
+
+	if(strcmp(key, "virtual_memory") == 0) {
+		return s->virtual_memory;
+	}
+
+	if(strcmp(key, "memory") == 0) {
+		return s->memory;
+	}
+
+	if(strcmp(key, "swap_memory") == 0) {
+		return s->swap_memory;
+	}
+
+	if(strcmp(key, "bytes_read") == 0) {
+		return s->bytes_read;
+	}
+
+	if(strcmp(key, "bytes_written") == 0) {
+		return s->bytes_written;
+	}
+
+	if(strcmp(key, "total_files") == 0) {
+		return s->total_files;
+	}
+
+	if(strcmp(key, "disk") == 0) {
+		return s->disk;
+	}
+
+	if(strcmp(key, "cores") == 0) {
+		return s->cores;
+	}
+
+	if(strcmp(key, "gpus") == 0) {
+		return s->gpus;
+	}
+
+	return 0;
+}
+
+const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
+	if(strcmp(key, "category") == 0) {
+		return s->category;
+	}
+
+	if(strcmp(key, "command") == 0) {
+		return s->command;
+	}
+
+	if(strcmp(key, "exit_type") == 0) {
+		return s->exit_type;
+	}
+
+	if(strcmp(key, "task_id") == 0) {
+		return s->task_id;
+	}
+
+	return NULL;
+}
+
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value) {
 	if(strcmp(key, "start") == 0) {
 		s->start = value;
@@ -176,6 +272,7 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 
 	return 0;
 }
+
 
 
 struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {

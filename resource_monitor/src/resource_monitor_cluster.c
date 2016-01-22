@@ -742,12 +742,12 @@ int main(int argc, char **argv)
 
 	if(input_directory)
 	{
-		parse_summary_recursive(set, input_directory);
+		parse_summary_recursive(set, input_directory, NULL);
 	}
 
 	if(input_list)
 	{
-		parse_summary_from_filelist(set, input_list);
+		parse_summary_from_filelist(set, input_list, NULL);
 	}
 
 	max_values = find_max_summary(set->summaries);
