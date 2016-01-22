@@ -1,5 +1,7 @@
 #!/usr/bin/env cctools_python
 # CCTOOLS_PYTHON_VERSION 2.7 2.6
+
+# All the vanilla python package dependencies of Umbrella can be satisfied by Python 2.6.
 """
 Umbrella is a tool for specifying and materializing comprehensive execution environments, from the hardware all the way up to software and data.  A user simply invokes Umbrella with the desired task, and Umbrella determines the minimum mechanism necessary to run the task, whether it be direct execution, a system container, a local virtual machine, or submission to a cloud or grid environment.  We present the overall design of Umbrella and demonstrate its use to precisely execute a high energy physics application and a ray-tracing application across many platforms using a combination of Parrot, Chroot, Docker, VMware, Condor, and Amazon EC2.
 
@@ -1851,6 +1853,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			print "Start executing the user's task: %s" % cmd
 			rc, stdout, stderr = func_call(cmd)
 
+			print "\n********** STDOUT of the command **********"
+			print stdout
+
+			print "\n********** STDERR of the command **********"
+			print stderr
+
 			#docker export container_name > tarball
 			if len(new_os_image_dir) > 0:
 				if not os.path.exists(new_os_image_dir):
@@ -1912,6 +1920,13 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+
+			print "\n********** STDOUT of the command **********"
+			print stdout
+
+			print "\n********** STDERR of the command **********"
+			print stderr
+
 		else:
 			env_dict = os.environ
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
@@ -1931,6 +1946,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+
+			print "\n********** STDOUT of the command **********"
+			print stdout
+
+			print "\n********** STDERR of the command **********"
+			print stderr
 
 #		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
 #		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
@@ -3571,8 +3592,104 @@ def spec_build(spec_json):
 			for item in sec:
 				dep_build(sec[item], item)
 
+
+help_info = {
+"build": '''Build up the metadata info of dependencies inside an umbrella spec, and write the built-up version into a new file.
+
+A good use case of build is when you have some dependencies from the local filesystem. In this case, umbrella will calculate the metadata info
+about these dependencies.
+The source spec should specify the following info of each local dependency: source, action, mountpoint, format.
+When the local dependency is a .tar.gz file, the following metadata info will be put into the target spec: id, checksum, size, uncompressed size.
+When the local dependency is a plain file, the following metadata info will be put into the target spec: id, checksum, size.
+When the local dependencies is a dir D, a corresponding D.tar.gz file will be created under the same directory with D, then the following metadata info will be put into the target spec: id, checksum, size, uncompressed size.
+
+For more info about how to compose an umbrella spec, please check the following link:
+	http://ccl.cse.nd.edu/software/manuals/umbrella.html#create_spec
+
+usage: umbrella [options] build source target
+
+	source		the path of an existing umbrella spec file from your local filesystem whose metadata info is needed to be built up
+	target		an non-existing file path on your local filesystem where the built-up version of the umbrella spec will be wrotten into
+''',
+"expand": '''Expand an umbrella spec file into a self-contained umbrella spec
+
+The source umbrella spec should be specified through the --spec option; the metadata db should be specified through the --meta option.
+For each dependency in the source umbrella spec, the following info will be extracted from the metadata db: source, size, format, checksum.
+Finally, the expanded umbrella sepc will be wrotten into a new file.
+
+usage: umbrella [options] expand target
+
+	target		an non-existing file path on your local filesystem where the expanded version of the umbrella spec will be wrotten into
+''',
+"filter": '''Filter the metadata info for an umbrella spec file from a huge metadata db
+
+The source umbrella spec should be specified through the --spec option; the metadata db should be specified through the --meta option.
+The source umbrella spec should NOT be self-contained.
+For each dependency specified in the source umbrella spec, its metadata info will be extracted from the huge metadata db, and written into the target path.
+
+usage: umbrella [options] filter target
+
+	target		an non-existing file path on your local filesystem where the metadata info of all the dependencies in the umbrella spec will be wrotten into
+''',
+"run": '''Run your application through umbrella
+
+usage: umbrella [options] run [command]
+
+	command		command to run, the command can also be set inside the umbrella spec. By default: /bin/sh
+''',
+"split": '''Split a self-contained umbrella spec file into an umbrella spec and a metadata db
+
+The source umbrella spec should be specified through the --spec option; The --meta option will be ignored.
+The source umbrella spec should be self-contained.
+
+usage: umbrella [options] split newspec newdb
+
+	newspec		an non-existing file path on your local filesystem where the new umbrella spec will be wrotten into
+	newdb		an non-existing file path on your local filesystem where the metadata info corresponding to newspec will be wrotten into
+''',
+"upload": '''Upload the dependencies in an umbrella spec into remote archives (OSF, Amazon S3)
+
+Umbrella will upload all the dependencies to the target archive, and add the new resource location into the source section of each dependency.
+Finally, the new umbrella spec will be written into a new file.
+When the source of a dependency has already include one url from the target archive, the dependency will be ignored.
+
+Currently, the supported target includes: OSF, the Amazon S3.
+Uploading to OSF requires the following umbrella options: --osf_user, --osf_pass, --osf_userid
+
+usage of upload osf: umbrella [options] upload osf proj acl target
+
+	proj		the osf project name
+	acl		the access permission of the uploaded data. Options: public, private
+	target		an non-existing file path on your local filesystem where the new umbrella spec will be wrotten into
+
+usage of upload s3: umbrella [options] upload s3 bucket acl target
+
+	bucket		the s3 bucket name
+	acl		the access permission of the uploaded data. Options: public-read, private
+	target		an non-existing file path on your local filesystem where the new umbrella spec will be wrotten into
+''',
+"validate": '''Validate an umbrella spec file
+
+The source umbrella spec should be specified through the --spec option; the metadata db should be specified through the --meta option.
+
+usage: umbrella [options] validate
+'''
+}
+
 def main():
-	parser = OptionParser(usage="usage: %prog [options] run \"command\"",
+	parser = OptionParser(description="Umbrella is a portable environment creator for reproducible computing on clusters, clouds, and grids.",
+usage="""usage: %prog [options] run|expand|filter|split|validate|upload|build ...
+
+Currently, umbrella supports the following behaviors:
+	build\t\tbuild up the metadata info of dependencies inside an umbrella spec
+	expand\t\texpand an umbrella spec file into a self-contained umbrella spec
+	filter\t\tfilter the metadata info for an umbrella spec file from a huge metadata db
+	run\t\trun your application through umbrella
+	split\t\tsplit a self-contained umbrella spec file into an umbrella spec and a metadata db
+	upload\t\tupload the dependencies in an umbrella spec into remote archives (OSF, Amazon S3)
+	validate\tvalidate an umbrella spec file
+
+To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 						version="%prog CCTOOLS_VERSION")
 	parser.add_option("--spec",
 					action="store",
@@ -3582,28 +3699,23 @@ def main():
 					help="The source of meta information, which can be a local file path (e.g., file:///tmp/meta.json) or url (e.g., http://...).\nIf this option is not provided, the specification will be treated a self-contained specification.",)
 	parser.add_option("-l", "--localdir",
 					action="store",
-					default="./umbrella_test",
-					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir. (By default: ./umbrella_test)",)
+					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir.",)
 	parser.add_option("-o", "--output",
 					action="store",
-					help="The mappings of outputs in the format of container_path=local_path (i.e., /container/f1=/tmp/output/f1). Multiple mappings should be separated by comma. container_path should be consistent with the semantics of the application, local path must be non-existing.",)
+					help="The mappings of outputs in the format of <container_path>=<local_path>. Multiple mappings should be separated by comma.\ncontainer_path is a path inside the sandbox and should be exposed in the output section of an umbrella spec.\nlocal_path should be a non-existing path on your local filessytem where you want the output from container_path to be put into.",)
 	parser.add_option("-s", "--sandbox_mode",
 					action="store",
-					default="parrot",
 					choices=['parrot', 'destructive', 'docker', 'ec2',],
-					help="sandbox mode, which can be parrot, destructive, docker, ec2.)",)
+					help="sandbox mode, which can be parrot, destructive, docker, ec2.",)
 	parser.add_option("-i", "--inputs",
 					action="store",
-					default='',
-					help="The path of input files in the format of access_path=actual_path. i.e, -i '/home/hmeng/file1=/tmp/file2'. access_path must be consistent with the semantics of the provided command, actual_path can be relative or absolute. (By default: '')",)
+					help="The path of input files in the format of <container_path>=<local_path>. Multiple mappings should be separated by comma. Please refer to the --output option for the settings of local_path and container_path.",)
 	parser.add_option("-e", "--env",
 					action="store",
-					default='',
-					help="The environment variable. I.e., -e 'PWD=/tmp'. (By default: '')")
+					help="The environment variables in the format of <variable_name>=<variable_value>. Multiple settings should be separated by comma. I.e., -e 'PWD=/tmp'.")
 	parser.add_option("--log",
 					action="store",
-					default="./umbrella.log",
-					help="The path of umbrella log file. (By default: ./umbrella.log)",)
+					help="The path of umbrella log file.",)
 	parser.add_option("--cvmfs_http_proxy",
 					action="store",
 					help="HTTP_PROXY to access cvmfs (Used by Parrot)",)
@@ -3630,13 +3742,13 @@ def main():
 					help="the type of an Amazon EC2 instance. (only for ec2)",)
 	parser.add_option("--osf_user",
 					action="store",
-					help="the OSF username",)
+					help="the OSF username (required in two cases: uploading to osf; downloading private osf resources.)",)
 	parser.add_option("--osf_pass",
 					action="store",
-					help="the OSF password",)
+					help="the OSF password (required in two cases: uploading to osf; downloading private osf resources.)",)
 	parser.add_option("--osf_userid",
 					action="store",
-					help="the OSF user id",)
+					help="the OSF user id (required in two cases: uploading to osf; downloading private osf resources.)",)
 
 	(options, args) = parser.parse_args()
 	logfilename = options.log
@@ -3680,6 +3792,10 @@ def main():
 		print behavior + " is not supported by umbrella!\n"
 		parser.print_help()
 		sys.exit(1)
+
+	if len(args) > 1 and args[1] in ['help']:
+		print help_info[behavior]
+		sys.exit(0)
 
 	if behavior in ["build"]:
 		if len(args) != 3:
