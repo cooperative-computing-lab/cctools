@@ -187,7 +187,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 			silent = 0;
 
 		/* We have a record of the file, but it is no longer created or used so delete */
-		if(dag_file_is_source(f) && dag_file_is_sink(f))
+		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
 			makeflow_clean_file(d, queue, f, silent);
 		if(dag_file_is_source(f))
 			continue;
