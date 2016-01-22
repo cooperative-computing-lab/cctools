@@ -1,20 +1,27 @@
 #
 # This is a sample Makeflow script that retrieves an image from the web,
 # creates four variations of it, and then combines them into an animation.
-# A Makeflow script is a subset of the Makefile language, see the manual
-# for more information.
-#
 
-MAKEFLOW_INPUTS=
-MAKEFLOW_OUTPUTS="capitol.montage.gif"
-
+# A Makeflow script is a subset of the Makefile language (see the manual
+# for more information). For example, for convenience we can define the
+# textual substitutions:
 CURL=/usr/bin/curl
 CONVERT=/usr/bin/convert
 URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
+# We specify the set of inputs and outputs. This is not required, but strongly
+# recommended.
+MAKEFLOW_INPUTS=$CURL $CONVERT
+MAKEFLOW_OUTPUTS=capitol.montage.gif
+
+# Similar rules can be arbitrarily labeled to form sets, called categories. In
+# this example we define three categories: preprocess, analysis, and merge.
+# Rules belong to the category of the most recent CATEGORY statement.
+CATEGORY=merge
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
+CATEGORY=analysis
 capitol.90.jpg: capitol.jpg
 	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
 
@@ -27,5 +34,6 @@ capitol.270.jpg: capitol.jpg
 capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
+CATEGORY=preprocess
 capitol.jpg:
 	$CURL -o capitol.jpg $URL
