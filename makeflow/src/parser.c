@@ -168,6 +168,43 @@ void dag_close_over_environment(struct dag *d)
 
 }
 
+void dag_close_over_categories(struct dag *d) {
+	/* per category, we assign the values found for resources. */
+
+	struct category *c;
+	char *name;
+
+	hash_table_firstkey(d->categories);
+	while(hash_table_nextkey(d->categories, &name, (void **) &c)) {
+		struct rmsummary *rs = rmsummary_create(-1);
+
+		struct dag_variable_lookup_set s = {d, c, NULL, NULL };
+		struct dag_variable_value *val;
+
+		val = dag_variable_lookup(RESOURCES_CORES, &s);
+		if(val) {
+			rs->cores = atoll(val->value);
+		}
+
+		val = dag_variable_lookup(RESOURCES_DISK, &s);
+		if(val) {
+			rs->disk = atoll(val->value);
+		}
+
+		val = dag_variable_lookup(RESOURCES_MEMORY, &s);
+		if(val) {
+			rs->memory = atoll(val->value);
+		}
+
+		val = dag_variable_lookup(RESOURCES_GPUS, &s);
+		if(val) {
+			rs->gpus = atoll(val->value);
+		}
+
+		c->max_allocation = rs;
+	}
+}
+
 static int dag_parse(struct dag *d, FILE *stream)
 {
 	struct lexer *bk = lexer_create(STREAM, stream, 1, 1);
@@ -209,6 +246,8 @@ static int dag_parse(struct dag *d, FILE *stream)
 	}
 
 	dag_close_over_environment(d);
+	dag_close_over_categories(d);
+
 	dag_compile_ancestors(d);
 	lexer_delete(bk);
 

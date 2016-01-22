@@ -183,6 +183,9 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 
 	struct category *c = category_lookup_or_create(categories, category);
 
+	if(!c->max_allocation)
+		return;
+
 	if(!c->first_allocation) {
 		c->first_allocation = rmsummary_create(-1);
 	}
