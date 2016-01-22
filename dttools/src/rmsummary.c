@@ -136,6 +136,16 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	if(strcmp(key, "bytes_received") == 0) {
+		s->bytes_received = value;
+		return 1;
+	}
+
+	if(strcmp(key, "bytes_sent") == 0) {
+		s->bytes_sent = value;
+		return 1;
+	}
+
 	if(strcmp(key, "total_files") == 0) {
 		s->total_files = value;
 		return 1;
@@ -172,13 +182,23 @@ struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 	if(s->total_files > -1)
 		jx_insert_integer(output, "total_files",   s->total_files);
 
+	if(s->bytes_sent > -1) {
+		array = jx_arrayv(jx_integer(s->bytes_sent), jx_string("B"), NULL);
+		jx_insert(output, jx_string("bytes_sent"), array);
+	}
+
+	if(s->bytes_received > -1) {
+		array = jx_arrayv(jx_integer(s->bytes_received), jx_string("B"), NULL);
+		jx_insert(output, jx_string("bytes_received"), array);
+	}
+
 	if(s->bytes_written > -1) {
-		array = jx_arrayv(jx_integer(s->bytes_written), jx_string("MB"), NULL);
+		array = jx_arrayv(jx_integer(s->bytes_written), jx_string("B"), NULL);
 		jx_insert(output, jx_string("bytes_written"), array);
 	}
 
 	if(s->bytes_read > -1) {
-		array = jx_arrayv(jx_integer(s->bytes_read), jx_string("MB"), NULL);
+		array = jx_arrayv(jx_integer(s->bytes_read), jx_string("B"), NULL);
 		jx_insert(output, jx_string("bytes_read"), array);
 	}
 
@@ -484,6 +504,8 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, swap_memory);
 	rmsummary_apply_op(dest, src, fn, bytes_read);
 	rmsummary_apply_op(dest, src, fn, bytes_written);
+	rmsummary_apply_op(dest, src, fn, bytes_sent);
+	rmsummary_apply_op(dest, src, fn, bytes_received);
 	rmsummary_apply_op(dest, src, fn, total_files);
 	rmsummary_apply_op(dest, src, fn, disk);
 
@@ -555,6 +577,10 @@ void rmsummary_debug_report(const struct rmsummary *s)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_read", s->bytes_read);
 	if(s->bytes_written != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_written", s->bytes_written);
+	if(s->bytes_received != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_received", s->bytes_received);
+	if(s->bytes_sent != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_sent", s->bytes_sent);
 	if(s->total_files != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
 	if(s->disk != -1)

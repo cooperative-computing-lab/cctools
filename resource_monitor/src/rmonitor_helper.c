@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <sys/socket.h>
 #include <limits.h>
 
 #ifdef __linux__
@@ -315,6 +316,121 @@ ssize_t write(int fd, const void *buf, size_t count)
 	ssize_t real_count;
 	PUSH_ERRNO
 		real_count = original_write(fd, buf, count);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t recv(int fd, void *buf, size_t count, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = RX;
+	msg.origin = getpid();
+
+	__typeof__(recv) *original_recv = dlsym(RTLD_NEXT, "recv");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_recv(fd, buf, count, flags);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t recvfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *src, socklen_t *addrlen)
+{
+	struct rmonitor_msg msg;
+	msg.type   = RX;
+	msg.origin = getpid();
+
+	__typeof__(recvfrom) *original_recvfrom = dlsym(RTLD_NEXT, "recvfrom");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_recvfrom(fd, buf, count, flags, src, addrlen);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t send(int fd, const void *buf, size_t count, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = TX;
+	msg.origin = getpid();
+
+	__typeof__(send) *original_send = dlsym(RTLD_NEXT, "send");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_send(fd, buf, count, flags);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t sendfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *src, socklen_t *addrlen)
+{
+	struct rmonitor_msg msg;
+	msg.type   = TX;
+	msg.origin = getpid();
+
+	__typeof__(sendfrom) *original_sendfrom = dlsym(RTLD_NEXT, "sendfrom");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_sendfrom(fd, buf, count, flags, src, addrlen);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t sendmsg(int fd, const struct msghdr *mg, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = TX;
+	msg.origin = getpid();
+
+	__typeof__(sendmsg) *original_sendmsg = dlsym(RTLD_NEXT, "sendmsg");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_sendmsg(fd, mg, flags);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+
+ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = RX;
+	msg.origin = getpid();
+
+	__typeof__(recvmsg) *original_recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_recvmsg(fd, mg, flags);
 	POP_ERRNO(msg)
 
 	msg.data.n = real_count;

@@ -46,6 +46,9 @@ struct rmsummary
 	int64_t  bytes_read;
 	int64_t  bytes_written;
 
+	int64_t  bytes_sent;
+	int64_t  bytes_received;
+
 	int64_t  total_files;
 	int64_t  disk;
 

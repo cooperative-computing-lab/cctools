@@ -40,10 +40,12 @@ See the file COPYING for details.
  * vmem:          current total memory size (virtual).
  * rss:           current total resident size.
  * swap:          current total swap usage.
- * bytes_read:    read chars count using *read system calls
- * bytes_written: writen char count using *write system calls.
- * files+dir      total file + directory count of all working directories.
- * footprint      total byte count of all working directories.
+ * bytes_read:    read chars count using *read system calls from disk.
+ * bytes_written: writen char count using *write system calls to disk.
+ * bytes_received:total bytes received (recv family)
+ * bytes_sent:    total bytes sent     (send family)
+ * total_files    total file + directory count of all working directories.
+ * disk           total byte count of all working directories.
  *
  * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
@@ -198,6 +200,9 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
 struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
+
+int64_t total_bytes_rx;  /* total bytes received */
+int64_t total_bytes_tx;  /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
 
@@ -667,9 +672,9 @@ void rmonitor_summary_header()
 	    fprintf(log_series, "# Units:\n");
 	    fprintf(log_series, "# wall_clock and cpu_time in microseconds\n");
 	    fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
-	    fprintf(log_series, "# footprint in megabytes.\n");
-	    fprintf(log_series, "# cpu_time, bytes_read, and bytes_written show cummulative values.\n");
-	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and footprint show values at the sample point.\n");
+	    fprintf(log_series, "# disk in megabytes.\n");
+	    fprintf(log_series, "# cpu_time, bytes_read, bytes_written, bytes_sent, and bytes_received show cummulative values.\n");
+	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
 
 	    fprintf(log_series, "#");
 	    fprintf(log_series,  "%-20s", "wall_clock");
@@ -680,6 +685,8 @@ void rmonitor_summary_header()
 	    fprintf(log_series, " %25s", "swap_memory");
 	    fprintf(log_series, " %25s", "bytes_read");
 	    fprintf(log_series, " %25s", "bytes_written");
+	    fprintf(log_series, " %25s", "bytes_received");
+	    fprintf(log_series, " %25s", "bytes_sent");
 
 	    if(resources_flags->disk)
 	    {
@@ -720,6 +727,9 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
 	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
+	tr->bytes_received = total_bytes_rx;
+	tr->bytes_sent     = total_bytes_tx;
+
 	tr->total_files = (int64_t) d->files;
 	tr->disk = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
@@ -751,6 +761,8 @@ void rmonitor_log_row(struct rmsummary *tr)
 		fprintf(log_series, " %20" PRId64, tr->swap_memory);
 		fprintf(log_series, " %20" PRId64, tr->bytes_read);
 		fprintf(log_series, " %20" PRId64, tr->bytes_written);
+		fprintf(log_series, " %20" PRId64, tr->bytes_received);
+		fprintf(log_series, " %20" PRId64, tr->bytes_sent);
 
 		if(resources_flags->disk)
 		{
@@ -764,7 +776,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
 
-	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->total_files, tr->disk);
+	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->bytes_received, tr->bytes_sent, tr->total_files, tr->disk);
 
 }
 
@@ -1232,6 +1244,8 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, swap_memory);
 	over_limit_check(tr, bytes_read);
 	over_limit_check(tr, bytes_written);
+	over_limit_check(tr, bytes_received);
+	over_limit_check(tr, bytes_sent);
 	over_limit_check(tr, total_files);
 	over_limit_check(tr, disk);
 
@@ -1334,8 +1348,16 @@ void rmonitor_dispatch_msg(void)
 					break;
 			}
 			break;
+		case RX:
+			if(msg.data.n > 0)
+				total_bytes_rx += msg.data.n;
+			break;
+		case TX:
+			if(msg.data.n > 0)
+				total_bytes_tx += msg.data.n;
+			break;
         case READ:
-            break;
+			break;
         case WRITE:
 			switch(msg.error) {
 				case ENOSPC:
@@ -1636,6 +1658,9 @@ int main(int argc, char **argv) {
     summary          = calloc(1, sizeof(struct rmsummary));
     resources_limits = rmsummary_create(-1);
     resources_flags  = rmsummary_create(0);
+
+	total_bytes_rx = 0;
+	total_bytes_tx = 0;
 
     rmsummary_read_env_vars(resources_limits);
 
