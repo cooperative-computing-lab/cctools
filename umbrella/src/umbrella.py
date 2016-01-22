@@ -1851,6 +1851,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			print "Start executing the user's task: %s" % cmd
 			rc, stdout, stderr = func_call(cmd)
 
+			print "\n********** STDOUT of the command **********"
+			print stdout
+
+			print "\n********** STDERR of the command **********"
+			print stderr
+
 			#docker export container_name > tarball
 			if len(new_os_image_dir) > 0:
 				if not os.path.exists(new_os_image_dir):
@@ -1912,6 +1918,13 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+
+			print "\n********** STDOUT of the command **********"
+			print stdout
+
+			print "\n********** STDERR of the command **********"
+			print stderr
+
 		else:
 			env_dict = os.environ
 			env_dict['PARROT_MOUNT_FILE'] = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
@@ -1931,6 +1944,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+
+			print "\n********** STDOUT of the command **********"
+			print stdout
+
+			print "\n********** STDERR of the command **********"
+			print stderr
 
 #		logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
 #		if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
