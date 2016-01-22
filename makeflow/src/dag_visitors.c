@@ -779,9 +779,9 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 			if(with_details) {
 				printf("subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
 				printf("\tstyle=unfilled;\n\tcolor=red\n");
-				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources->cores);
-				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->memory);
-				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->disk);
+				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->cores);
+				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->memory);
+				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->disk);
 				printf("\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
 
 				//Source Files

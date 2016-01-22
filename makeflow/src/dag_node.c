@@ -41,7 +41,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
-	n->resources = rmsummary_create(-1);
+	n->resources_needed = rmsummary_create(-1);
 
 	n->resource_request = CATEGORY_ALLOCATION_UNLABELED;
 
@@ -224,38 +224,60 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 
 void dag_node_fill_resources(struct dag_node *n)
 {
-	struct rmsummary *rs    = n->resources;
-	struct dag_variable_lookup_set s = { n->d, n->category, n, NULL };
+	struct rmsummary *rs    = n->resources_needed;
+	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
+	struct dag_variable_lookup_set s_all  = { n->d, n->category, n, NULL };
 
-	char    *val_str;
+	struct dag_variable_value *val;
 
-	val_str = dag_variable_lookup_string(RESOURCES_CORES, &s);
-	if(val_str)
-		rs->cores = atoll(val_str);
+	/* first pass, only node variables. We only check if this node was individually labeled. */
+	val = dag_variable_lookup(RESOURCES_CORES, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
 
-	val_str = dag_variable_lookup_string(RESOURCES_DISK, &s);
-	if(val_str)
-		rs->disk = atoll(val_str);
+	val = dag_variable_lookup(RESOURCES_DISK, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
 
-	val_str = dag_variable_lookup_string(RESOURCES_MEMORY, &s);
-	if(val_str)
-		rs->memory = atoll(val_str);
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
 
-	val_str = dag_variable_lookup_string(RESOURCES_GPUS, &s);
-	if(val_str)
-		rs->gpus = atoll(val_str);
+	val = dag_variable_lookup(RESOURCES_GPUS, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
+
+
+	/* second pass: fill fall-back values if at least one resource was individually labeled. */
+	/* if not, resources will come from the category when submitting. */
+	val = dag_variable_lookup(RESOURCES_CORES, &s_all);
+	if(val)
+		rs->cores = atoll(val->value);
+
+	val = dag_variable_lookup(RESOURCES_DISK, &s_all);
+	if(val)
+		rs->disk = atoll(val->value);
+
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s_all);
+	if(val)
+		rs->memory = atoll(val->value);
+
+	val = dag_variable_lookup(RESOURCES_GPUS, &s_all);
+	if(val)
+		rs->gpus = atoll(val->value);
+
 }
 
 void dag_node_print_debug_resources(struct dag_node *n)
 {
-	if( n->resources->cores > -1 )
-		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources->cores);
-	if( n->resources->memory > -1 )
-		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources->memory);
-	if( n->resources->disk > -1 )
-		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources->disk);
-	if( n->resources->gpus > -1 )
-		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n", n->resources->gpus);
+	if( n->resources_needed->cores > -1 )
+		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources_needed->cores);
+	if( n->resources_needed->memory > -1 )
+		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources_needed->memory);
+	if( n->resources_needed->disk > -1 )
+		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources_needed->disk);
+	if( n->resources_needed->gpus > -1 )
+		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n",       n->resources_needed->gpus);
 }
 
 /*

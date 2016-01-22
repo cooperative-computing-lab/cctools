@@ -58,7 +58,7 @@ struct dag_node {
 	struct hash_table *variables;       /* This node settings for variables with @ syntax */
 
 	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
-	struct rmsummary *resources;             /* resources required by this rule */
+	struct rmsummary *resources_needed;      /* resources required by this rule */
 
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
 	* functions. Probably we should move them only to those functions, using

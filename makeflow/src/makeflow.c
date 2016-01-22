@@ -501,7 +501,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources);
+	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources_needed);
 
 	/* Restore old batch job options. */
 	if(previous_batch_options) {
