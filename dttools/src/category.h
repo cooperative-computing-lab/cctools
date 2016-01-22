@@ -38,6 +38,10 @@ struct category {
 	/* stats for wq */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;
+
+	/* variables for makeflow */
+	/* Mappings between variable names defined in the makeflow file and their values. */
+	struct hash_table *mf_variables;
 };
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);

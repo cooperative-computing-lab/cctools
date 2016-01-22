@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "dag_variable.h"
+#include "dag_resources.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
 #include "debug.h"
@@ -168,20 +169,10 @@ struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_vari
 {
 	struct dag_variable_value *v;
 
-	int nodeid;
-	if(s->node)
-	{
-		nodeid = s->node->nodeid;
-	}
-	else if(s->dag)
-	{
-		nodeid = s->dag->nodeid_counter;
-	}
-
 	if(s) {
 		/* Try node variables table */
 		if(s->node) {
-			v = dag_variable_get_value(name, s->node->variables, nodeid);
+			v = dag_variable_get_value(name, s->node->variables, s->node->nodeid);
 			if(v) {
 				s->table = s->node->variables; //why this line?
 				return v;
@@ -190,9 +181,9 @@ struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_vari
 
 		/* Try dag variables table */
 		if(s->dag) {
-			v = dag_variable_get_value(name, s->dag->variables, nodeid);
+			v = dag_variable_get_value(name, s->dag->default_category->mf_variables, s->dag->nodeid_counter);
 			if(v) {
-				s->table = s->dag->variables;
+				s->table = s->dag->default_category->mf_variables;
 				return v;
 			}
 		}

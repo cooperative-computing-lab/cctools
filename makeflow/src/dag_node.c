@@ -43,6 +43,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->resources = rmsummary_create(-1);
 
+	n->resource_request = CATEGORY_ALLOCATION_UNLABELED;
+
 	return n;
 }
 

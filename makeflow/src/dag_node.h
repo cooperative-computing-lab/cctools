@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define DAG_NODE_H
 
 #include "batch_job.h"
+#include "category.h"
 #include "set.h"
 #include "hash_table.h"
 #include "itable.h"
@@ -55,7 +56,9 @@ struct dag_node {
 	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
 										   file labeled which tasks have comparable resource usage. */
 	struct hash_table *variables;       /* This node settings for variables with @ syntax */
-	struct rmsummary *resources;        /* resources required by this rule */
+
+	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
+	struct rmsummary *resources;             /* resources required by this rule */
 
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
 	* functions. Probably we should move them only to those functions, using
