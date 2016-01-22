@@ -5598,7 +5598,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 				if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
 					if(c->max_allocation) {
-						category_update_first_allocation(q->categories, t->category, c->max_allocation);
+						category_update_first_allocation(q->categories, t->category);
 					}
 				}
 			} else {

@@ -42,6 +42,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->ancestor_depth = -1;
 
 	n->resources_needed = rmsummary_create(-1);
+	n->resources_measured = NULL;
 
 	n->resource_request = CATEGORY_ALLOCATION_UNLABELED;
 

@@ -59,6 +59,7 @@ struct dag_node {
 
 	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
 	struct rmsummary *resources_needed;      /* resources required by this rule */
+	struct rmsummary *resources_measured;    /* resources measured on completion. */
 
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
 	* functions. Probably we should move them only to those functions, using

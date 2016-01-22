@@ -172,8 +172,7 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 	return a_1;
 }
 
-void category_update_first_allocation(struct hash_table *categories, const char *category, struct rmsummary *top) {
-
+void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */
 	static buffer_t *b = NULL;
 	if(!b) {
@@ -182,8 +181,9 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 	}
 
 	struct category *c = category_lookup_or_create(categories, category);
+	struct rmsummary *top = c->max_allocation;
 
-	if(!c->max_allocation)
+	if(!top)
 		return;
 
 	if(!c->first_allocation) {
@@ -272,7 +272,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 
 	hash_table_firstkey(categories);
 	while(hash_table_nextkey(categories, &name, (void **) &c)) {
-		category_update_first_allocation(categories, name, top);
+		category_update_first_allocation(categories, name);
 		category_clear_histograms(c);
 	}
 }

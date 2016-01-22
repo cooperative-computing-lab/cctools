@@ -48,7 +48,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 void category_delete(struct hash_table *categories, const char *name);
 int64_t category_first_allocation(struct itable *histogram, int64_t top_resource);
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
-void category_update_first_allocation(struct hash_table *categories, const char *category, struct rmsummary *top);
+void category_update_first_allocation(struct hash_table *categories, const char *category);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow);
 
