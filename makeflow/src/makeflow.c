@@ -477,6 +477,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	dag_node_update_resources(n, /* overflow */ 0);
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
 	command = makeflow_wrap_monitor(command, n, monitor);
@@ -501,7 +502,12 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources_needed);
+	if(n->resource_request == CATEGORY_ALLOCATION_UNLABELED || n->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
+		/* if task does not have a proper resources label, do not submit with one. */
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,NULL);
+	} else {
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources_needed);
+	}
 
 	/* Restore old batch job options. */
 	if(previous_batch_options) {
@@ -669,17 +675,23 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			char *summary_name = string_format("%s.summary", log_name_prefix);
 			struct rmsummary *s = rmsummary_parse_file_single(summary_name);
 
-			if(s && s->limits_exceeded)
+			if(s)
 			{
 				rmsummary_print(stderr, s, NULL);
 				rmsummary_delete(s);
 				fprintf(stderr, "\n");
 			}
 
+			int new_resources = dag_node_update_resources(n, 1);
+			if(new_resources) {
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+			} else {
+				makeflow_failed_flag = 1;
+			}
+
 			free(log_name_prefix);
 			free(summary_name);
-
-			makeflow_failed_flag = 1;
 		}
 		else if(makeflow_retry_flag || info->exit_code == 101) {
 			n->failure_count++;

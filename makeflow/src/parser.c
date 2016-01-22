@@ -478,7 +478,7 @@ static int dag_parse_node(struct lexer *bk)
 	itable_insert(bk->d->node_table, n->nodeid, n);
 
 	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->name, n->nodeid);
-	dag_node_fill_resources(n);
+	dag_node_init_resources(n);
 	dag_node_print_debug_resources(n);
 
 	return 1;

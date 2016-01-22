@@ -222,7 +222,7 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 	target->created_by = n;
 }
 
-void dag_node_fill_resources(struct dag_node *n)
+void dag_node_init_resources(struct dag_node *n)
 {
 	struct rmsummary *rs    = n->resources_needed;
 	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
@@ -248,24 +248,73 @@ void dag_node_fill_resources(struct dag_node *n)
 		n->resource_request = CATEGORY_ALLOCATION_USER;
 
 
+	int category_flag = 0;
 	/* second pass: fill fall-back values if at least one resource was individually labeled. */
 	/* if not, resources will come from the category when submitting. */
 	val = dag_variable_lookup(RESOURCES_CORES, &s_all);
-	if(val)
+	if(val) {
+		category_flag = 1;
 		rs->cores = atoll(val->value);
+	}
 
 	val = dag_variable_lookup(RESOURCES_DISK, &s_all);
-	if(val)
+	if(val) {
+		category_flag = 1;
 		rs->disk = atoll(val->value);
+	}
 
 	val = dag_variable_lookup(RESOURCES_MEMORY, &s_all);
-	if(val)
+	if(val) {
+		category_flag = 1;
 		rs->memory = atoll(val->value);
+	}
 
 	val = dag_variable_lookup(RESOURCES_GPUS, &s_all);
-	if(val)
+	if(val) {
+		category_flag = 1;
 		rs->gpus = atoll(val->value);
+	}
 
+	if(n->resource_request != CATEGORY_ALLOCATION_USER && category_flag) {
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_ZERO;
+	}
+}
+
+int dag_node_update_resources(struct dag_node *n, int overflow)
+{
+	if(overflow && (n->resource_request == CATEGORY_ALLOCATION_USER || n->resource_request == CATEGORY_ALLOCATION_AUTO_MAX || n->resource_request == CATEGORY_ALLOCATION_UNLABELED)) {
+		return 0;
+	}
+
+	struct rmsummary *rs = n->resources_needed;
+	struct rmsummary *rc = n->category->max_allocation;
+	struct rmsummary *rd = n->d->default_category->max_allocation;
+
+	if(overflow) {
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_MAX;
+		rs->cores  = rc->cores  > -1 ? rc->cores  : rd->cores;
+		rs->memory = rc->memory > -1 ? rc->memory : rd->memory;
+		rs->disk   = rc->disk   > -1 ? rc->disk   : rd->disk;
+		rs->gpus   = rc->gpus   > -1 ? rc->gpus   : rd->gpus;
+
+		return 1;
+	}
+
+	if(n->category->first_allocation) {
+		rc = n->category->first_allocation;
+
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_FIRST;
+		rs->cores  = rc->cores  > -1 ? rc->cores  : rd->cores;
+		rs->memory = rc->memory > -1 ? rc->memory : rd->memory;
+		rs->disk   = rc->disk   > -1 ? rc->disk   : rd->disk;
+		rs->gpus   = rc->gpus   > -1 ? rc->gpus   : rd->gpus;
+
+		return 1;
+	}
+
+	/* else, no change possible, we keep the CATEGORY_ALLOCATION_AUTO_ZERO as is. */
+
+	return 1;
 }
 
 void dag_node_print_debug_resources(struct dag_node *n)

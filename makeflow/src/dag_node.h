@@ -88,7 +88,8 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
 char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n);
 
-void dag_node_fill_resources(struct dag_node *n);
+void dag_node_init_resources(struct dag_node *n);
+int dag_node_update_resources(struct dag_node *n, int overflow);
 void dag_node_print_debug_resources(struct dag_node *n);
 
 const char *dag_node_state_name(dag_node_state_t state);
