@@ -21,6 +21,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#include <stdio.h>
+
 extern void debug_stderr_write (INT64_T flags, const char *str);
 extern void debug_stdout_write (INT64_T flags, const char *str);
 
@@ -44,6 +46,9 @@ static void (*debug_write) (INT64_T flags, const char *str) = debug_stderr_write
 static pid_t (*debug_getpid) (void) = getpid;
 static char debug_program_name[PATH_MAX];
 static INT64_T debug_flags = D_NOTICE|D_ERROR|D_FATAL;
+
+static char *terminal_path = "/dev/tty";
+static FILE *terminal_f    = NULL;
 
 struct flag_info {
 	const char *name;
@@ -198,6 +203,9 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 
 	debug_write(flags, buffer_tostring(&B));
 
+	if(terminal_f)
+		fprintf(terminal_f, "%s", buffer_tostring(&B));
+
 	buffer_free(&B);
 }
 
@@ -301,6 +309,17 @@ void debug_config_file (const char *path)
 void debug_config (const char *name)
 {
 	strncpy(debug_program_name, path_basename(name), sizeof(debug_program_name)-1);
+
+	if(!isatty(STDERR_FILENO)) {
+		if(terminal_f)
+			fclose(terminal_f);
+
+		terminal_f = fopen(terminal_path, "a");
+		if(!terminal_f) {
+			/* print to wherever stderr is pointing that we could not open the terminal. */
+			fprintf(stderr, "could not open '%s' for immediate error reporting.", terminal_path);
+		}
+	}
 }
 
 void debug_config_file_size (off_t size)
