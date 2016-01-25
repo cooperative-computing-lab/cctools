@@ -21,7 +21,7 @@ endif
 
 all: $(TARGETS)
 
-$(OBJECTS_PARROT_RUN): tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c
+$(OBJECTS): tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c
 
 tracer.table.h tracer.table.c tracer.table64.h tracer.table64.c: tracer.table.pl syscall_parrot.tbl
 
