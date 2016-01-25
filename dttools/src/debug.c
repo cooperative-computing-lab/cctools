@@ -208,7 +208,7 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 			if(!terminal_f) {
 				if((terminal_f = fopen(terminal_path, "a")) == NULL) {
 					/* print to wherever stderr is pointing that we could not open the terminal. */
-					fprintf(stderr, "could not open '%s' for immediate error reporting.", terminal_path);
+					fprintf(stderr, "Could not open '%s' for immediate error reporting.\n", terminal_path);
 				}
 			}
 		}
