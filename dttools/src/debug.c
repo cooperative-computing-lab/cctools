@@ -203,8 +203,19 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 
 	debug_write(flags, buffer_tostring(&B));
 
-	if(terminal_f)
-		fprintf(terminal_f, "%s", buffer_tostring(&B));
+	if(flags & (D_ERROR | D_NOTICE | D_FATAL)) {
+		if(debug_write != debug_stderr_write || !isatty(STDERR_FILENO)) {
+			if(!terminal_f) {
+				if((terminal_f = fopen(terminal_path, "a")) == NULL) {
+					/* print to wherever stderr is pointing that we could not open the terminal. */
+					fprintf(stderr, "could not open '%s' for immediate error reporting.", terminal_path);
+				}
+			}
+		}
+
+		if(terminal_f)
+			fprintf(terminal_f, "%s", buffer_tostring(&B));
+	}
 
 	buffer_free(&B);
 }
@@ -320,17 +331,6 @@ void debug_config_file (const char *path)
 void debug_config (const char *name)
 {
 	strncpy(debug_program_name, path_basename(name), sizeof(debug_program_name)-1);
-
-	if(!isatty(STDERR_FILENO)) {
-		if(terminal_f)
-			fclose(terminal_f);
-
-		terminal_f = fopen(terminal_path, "a");
-		if(!terminal_f) {
-			/* print to wherever stderr is pointing that we could not open the terminal. */
-			fprintf(stderr, "could not open '%s' for immediate error reporting.", terminal_path);
-		}
-	}
 }
 
 void debug_config_file_size (off_t size)
