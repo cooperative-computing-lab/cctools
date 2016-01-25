@@ -146,6 +146,11 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	if(strcmp(key, "bandwidth") == 0) {
+		s->bandwidth = value;
+		return 1;
+	}
+
 	if(strcmp(key, "total_files") == 0) {
 		s->total_files = value;
 		return 1;
@@ -181,6 +186,11 @@ struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 
 	if(s->total_files > -1)
 		jx_insert_integer(output, "total_files",   s->total_files);
+
+	if(s->bandwidth > -1) {
+		array = jx_arrayv(jx_integer(s->bandwidth), jx_string("bits/s"), NULL);
+		jx_insert(output, jx_string("bandwidth"), array);
+	}
 
 	if(s->bytes_sent > -1) {
 		array = jx_arrayv(jx_integer(s->bytes_sent), jx_string("B"), NULL);
@@ -506,6 +516,7 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, bytes_written);
 	rmsummary_apply_op(dest, src, fn, bytes_sent);
 	rmsummary_apply_op(dest, src, fn, bytes_received);
+	rmsummary_apply_op(dest, src, fn, bandwidth);
 	rmsummary_apply_op(dest, src, fn, total_files);
 	rmsummary_apply_op(dest, src, fn, disk);
 
@@ -581,6 +592,8 @@ void rmsummary_debug_report(const struct rmsummary *s)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_received", s->bytes_received);
 	if(s->bytes_sent != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_sent", s->bytes_sent);
+	if(s->bandwidth != -1)
+		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bandwidth", s->bandwidth);
 	if(s->total_files != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
 	if(s->disk != -1)

@@ -10,6 +10,7 @@ struct field fields[NUM_FIELDS + 1] = {
 	[B_WRITTEN] = {"w", "written bytes",   "MB",    1, offsetof(struct rmDsummary, bytes_written)},
 	[B_RX   ]   = {"R", "received bytes",  "MB",    1, offsetof(struct rmDsummary, bytes_received)},
 	[B_TX]      = {"W", "sent bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_sent)},
+	[BANDWIDTH] = {"B", "bandwidth",       "bits/s",1, offsetof(struct rmDsummary, bandwidth)},
 	[FILES    ] = {"n", "num files",       "files", 1, offsetof(struct rmDsummary, total_files)},
 	[DISK]      = {"z", "disk",            "MB",    1, offsetof(struct rmDsummary, disk)},
 	[CORES    ] = {"C", "cores",           "cores", 0, offsetof(struct rmDsummary, cores)},
@@ -286,6 +287,7 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 
 	s->bytes_received = bytes_to_Mbytes(so->bytes_received);
 	s->bytes_sent     = bytes_to_Mbytes(so->bytes_sent);
+	s->bandwidth      = bytes_to_Mbytes(so->bandwidth);
 
 	s->total_files = so->total_files;
 	s->disk = so->disk;

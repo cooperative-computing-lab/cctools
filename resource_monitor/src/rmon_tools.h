@@ -38,7 +38,7 @@
 
 #define MAX_LINE 1024
 
-enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, FILES, DISK, CORES, NUM_FIELDS};
+enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES, NUM_FIELDS};
 
 struct rmDsummary
 {
@@ -64,6 +64,7 @@ struct rmDsummary
 	double  bytes_written;
 	double  bytes_received;
 	double  bytes_sent;
+	double  bandwidth;
 	double  total_files;
 	double  disk;
 	double  cores;
