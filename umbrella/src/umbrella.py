@@ -167,6 +167,7 @@ ec2_json = {
 	}
 }
 
+upload_count = 0
 
 def subprocess_error(cmd, rc, stdout, stderr):
 	"""Print the command, return code, stdout, and stderr; and then directly exit.
@@ -609,6 +610,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 		except:
 			logging.debug("Fails to download %s as a normal url ,,,", source)
 			if len(osf_auth) < 2:
+				cleanup(tempfile_list, tempdir_list)
 				logging.debug("Please use --osf_user and --osf_pass to specify your osf authentication info!")
 				sys.exit("Please use --osf_user and --osf_pass to specify your osf authentication info!")
 			if form == "tgz":
@@ -692,6 +694,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 		except:
 			logging.debug("Fails to download %s as a normal url ,,,", source)
 			if len(osf_auth) < 2:
+				cleanup(tempfile_list, tempdir_list)
 				logging.debug("Please use --osf_user and --osf_pass to specify your osf authentication info!")
 				sys.exit("Please use --osf_user and --osf_pass to specify your osf authentication info!")
 			if form == "tgz":
@@ -983,7 +986,7 @@ def chrootize_user_cmd(user_cmd, cwd_setting):
 	user_cmd[0] = 'chroot / /bin/sh -c "cd %s; %s"' %(cwd_setting, user_cmd[0])
 	return user_cmd
 
-def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbox_dir, pac_install_destructive, osf_auth):
+def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbox_dir, pac_install_destructive, osf_auth, name=None):
 	""" Installation each software dependency specified in the software section of the specification.
 
 	Args:
@@ -994,6 +997,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		pac_install_destructive: whether this is to install packages through package manager in destructive mode
 		osf_auth: the osf authentication info including osf_username and osf_password.
+		name: if name is specified, then only the specified item will be installed. All the other items in the software section will be ignored.
 
 	Returns:
 		None.
@@ -1002,6 +1006,8 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 	print "Installing software dependencies ..."
 
 	for item in software_spec:
+		if name and name != item:
+			continue
 		# always first check whether the attribute is set or not inside the umbrella specificiation file.
 		id = ''
 		if software_spec[item].has_key('id'):
@@ -1031,6 +1037,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 					if not os.path.exists(parent_dir):
 						os.makedirs(parent_dir)
 					elif not os.path.isdir(parent_dir):
+						cleanup(tempfile_list, tempdir_list)
 						logging.critical("%s is not a directory!\n", parent_dir)
 						sys.exit("%s is not a directory!\n" % parent_dir)
 
@@ -1043,7 +1050,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 					mount_dict[mountpoint] = mount_value
 
 
-def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth):
+def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, name=None):
 	"""Process data section of the specification.
 	At the beginning of the function, mount_dict only includes items for software and os dependencies. After this function is done, all the items for data dependencies will be added into mount_dict.
 
@@ -1054,12 +1061,15 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		osf_auth: the osf authentication info including osf_username and osf_password.
+		name: if name is specified, then only the specified item will be installed. All the other items in the software section will be ignored.
 
 	Returns:
 		None
 	"""
 	print "Installing data dependencies ..."
 	for item in data_spec:
+		if name and name != item:
+			continue
 		id = ''
 		if data_spec[item].has_key('id'):
 			id = data_spec[item]['id']
@@ -1784,6 +1794,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			if not os.path.exists(parent_dir):
 				os.makedirs(parent_dir)
 			elif not os.path.isdir(parent_dir):
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("%s is not a directory!\n", parent_dir)
 				sys.exit("%s is not a directory!\n" % parent_dir)
 
@@ -3075,8 +3086,6 @@ def path_exists(filepath):
 		logging.debug("The file (%s) already exists, please specify a new path!", filepath)
 		sys.exit("The file (%s) already exists, please specify a new path!" % filepath)
 
-
-
 def dir_create(filepath):
 	"""Create the directory for it if necessary. If the file already exists, exit directly.
 
@@ -3197,6 +3206,7 @@ def osf_create(username, password, user_id, proj_name, is_public):
 	while url:
 		r=requests.get(url)
 		if r.status_code != 200:
+			cleanup(tempfile_list, tempdir_list)
 			sys.exit("Fails to check the projects contributed by the user (%d): %s!" % (r.status_code, r.reason))
 		for data in r.json()['data']:
 			nodes.add(data['attributes']['title'])
@@ -3204,6 +3214,7 @@ def osf_create(username, password, user_id, proj_name, is_public):
 		url=r.json()['links']['next']
 
 	if proj_name in nodes:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The project name (%s) already exists!" % proj_name)
 
 	#create the new project
@@ -3220,6 +3231,7 @@ def osf_create(username, password, user_id, proj_name, is_public):
 	r=requests.post(url, auth=auth, data=payload)
 
 	if r.status_code != 201:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to create the new project (%d): %s!" % (r.status_code, r.reason))
 
 	proj_id = r.json()['data']['id']
@@ -3246,6 +3258,7 @@ def osf_upload(username, password, proj_id, source):
 	r=requests.put(url, params=payload, auth = auth, data=f)
 
 	if r.status_code != 201 and r.status_code != 200:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to upload the file %s to OSF(%d): %s!" % (source, r.status_code, r.reason))
 
 	return r.json()['data']['links']['download']
@@ -3264,6 +3277,7 @@ def osf_download(username, password, osf_url, dest):
 		Otherwise, directly exit.
 	"""
 	if not found_requests:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("\nDownloading private stuff from OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 		sys.exit("\nDownloading private stuff from OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 
@@ -3277,11 +3291,13 @@ def osf_download(username, password, osf_url, dest):
 	r2 = None
 	if r.status_code == 401:
 		if username == None or password == None:
+			cleanup(tempfile_list, tempdir_list)
 			sys.exit("The OSF resource (%s) is private (%d): %s! To use the OSF resource, you need to provide a legal OSF username and password." % (url, r.status_code, r.reason))
 
 		auth = (username, password)
 		r1=requests.get(url, auth=auth)
 		if r1.status_code != 200:
+			cleanup(tempfile_list, tempdir_list)
 			sys.exit("The OSF resource (%s) is private (%d): %s! The username or password is incorrect!" % (url, r1.status_code, r1.reason))
 		else:
 			r2=requests.get(osf_url, auth=auth, stream=True)
@@ -3289,6 +3305,7 @@ def osf_download(username, password, osf_url, dest):
 		r2=requests.get(osf_url, stream=True)
 
 	if r2.status_code != 200:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to download the osf resource: %s (%d): %s!" % (r2.status_code, r2.reason))
 
 	chunk_size=10240
@@ -3317,18 +3334,22 @@ def s3_create(bucket_name, acl):
 		for bucket in s3.buckets.all():
 			buckets.add(bucket.name)
 	except botocore.exceptions.ClientError as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit(e.message)
 	except Exception as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to list all the current buckets: %s!" % e)
 
 	#check whether the bucket name already exists
 	if bucket_name in buckets:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The bucket name (%s) already exists!" % bucket_name)
 
 	#create a new bucket
 	try:
 		s3.create_bucket(Bucket=bucket_name)
 	except Exception as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to create the new bucket (%s): %s!" % (bucket_name, e))
 
 	#obtain the created bucket
@@ -3340,8 +3361,10 @@ def s3_create(bucket_name, acl):
 	try:
 		bucket.Acl().put(ACL=acl)
 	except botocore.exceptions.ClientError as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit(e.message)
 	except Exception as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to list all the current buckets: %s!" % e)
 
 	return bucket
@@ -3367,8 +3390,10 @@ def s3_upload(bucket, source, acl):
 		#acl on the bucket does not automatically apply to all the objects in it. Acl must be set on each object.
 		bucket.put_object(ACL=acl, Key=key, Body=data) #https://s3.amazonaws.com/testhmeng/s3
 	except botocore.exceptions.ClientError as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit(e.message)
 	except Exception as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to upload the file (%s) to S3: %s!" % (source, e))
 
 	return "%s/%s/%s" % (s3_url, bucket.name, key)
@@ -3384,6 +3409,7 @@ def s3_download(link, dest):
 		None
 	"""
 	if not found_boto3 or not found_botocore:
+		cleanup(tempfile_list, tempdir_list)
 		logging.critical("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
 		sys.exit("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
 
@@ -3392,17 +3418,20 @@ def s3_download(link, dest):
 	s3 = boto3.resource('s3')
 
 	if (len(s3_url)+1) >= len(link):
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The s3 object link (%s) is invalid! The correct format shoulde be <%s>/<bucket_name>/<key>!" % (link, s3_url))
 
 	m = link[(len(s3_url)+1):] #m format: <bucket_name>/<key>
 
 	i = m.find('/')
 	if i == -1:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The s3 object link (%s) is invalid! The correct format shoulde be <%s>/<bucket_name>/<key>!" % (link, s3_url))
 
 	bucket_name = m[:i]
 
 	if (i+1) >= len(m):
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The s3 object link (%s) is invalid! The correct format shoulde be <%s>/<bucket_name>/<key>!" % (link, s3_url))
 
 	key = m[(i+1):]
@@ -3414,9 +3443,31 @@ def s3_download(link, dest):
 	try:
 		s3.Object(bucket_name, key).download_file(dest)
 	except botocore.exceptions.ClientError as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit(e.message)
 	except Exception as e:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("Fails to download the object (%s) from the bucket(%s):! Please ensure you have the right permission to download these s3 objects: %s!" % (key, bucket_name, e))
+
+def has_source(sources, target):
+	"""Check whether the sources includes a url from the specific target.
+
+	Args:
+		sources: a list of url
+		target: the specific resource url. For example, s3, osf.
+
+	Returns:
+		If a url from the specific target exists, return True.
+		Otherwise, return False.
+	"""
+	if not sources or len(sources) == 0:
+		return False
+
+	n = len(target)
+	for source in sources:
+		if len(source) > n and source[:n] == target:
+			return True
+	return False
 
 def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s3_bucket=None):
 	"""Upload each dependency in an umbrella spec to the target (OSF or s3), and add the new target download url into the umbrella spec.
@@ -3438,6 +3489,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 	"""
 	mount_dict = {}
 	env_para_dict = {}
+	global upload_count
 
 	print "Upload the dependencies from the umbrella spec to %s ..." % target_info[0]
 	logging.debug("Upload the dependencies from the umbrella spec to %s ...", target_info[0])
@@ -3452,21 +3504,54 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 		logging.debug("A separate OS (%s) is needed!", os_image_dir)
 		mountpoint = '/'
 		action = 'unpack'
-		r3 = dependency_process(item, os_id, action, meta_json, sandbox_dir, osf_auth)
-		logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
-		mount_dict[mountpoint] = r3
-		if target_info[0] == "osf":
-			osf_url = osf_upload(target_info[1], target_info[2], target_info[3], os_image_dir + ".tar.gz")
-			spec_json["os"]["source"].append("osf+" + osf_url)
-		elif target_info[0] == "s3":
-			s3_url = s3_upload(s3_bucket, os_image_dir + ".tar.gz", target_info[1])
-			spec_json["os"]["source"].append("s3+" + s3_url)
+
+		if spec_json["os"].has_key("source") or attr_check(item, meta_search(meta_json, item, os_id), "source", 1):
+			if spec_json["os"].has_key("source"):
+				sources = spec_json["os"]["source"]
+			else:
+				sources = meta_search(meta_json, item, os_id)["source"]
+
+			if has_source(sources, target_info[0]):
+				logging.debug("The os section already has a url from %s!", target_info[0])
+				print "The os section already has a url from %s!" % target_info[0]
+			else:
+				upload_count += 1
+				r3 = dependency_process(item, os_id, action, meta_json, sandbox_dir, osf_auth)
+				logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
+				mount_dict[mountpoint] = r3
+				if target_info[0] == "osf":
+					osf_url = osf_upload(target_info[1], target_info[2], target_info[3], os_image_dir + ".tar.gz")
+					spec_json["os"]["source"].append("osf+" + osf_url)
+				elif target_info[0] == "s3":
+					s3_url = s3_upload(s3_bucket, os_image_dir + ".tar.gz", target_info[1])
+					spec_json["os"]["source"].append("s3+" + s3_url)
+		else:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("the os section does not has source attr!")
+			sys.exit("the os section does not has source attr!")
 
 	for sec_name in ["data"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
 			sec = spec_json[sec_name]
-			data_install(sec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth)
 			for item in sec:
+				if sec[item].has_key("source") or attr_check(item, meta_search(meta_json, item, id), "source", 1):
+					if sec[item].has_key("source"):
+						sources = sec[item]["source"]
+					else:
+						sources = meta_search(meta_json, item, id)["source"]
+
+					if has_source(sources, target_info[0]):
+						logging.debug("%s already has a url from %s!", item, target_info[0])
+						print "%s already has a url from %s!" % (item, target_info[0])
+						continue
+				else:
+					cleanup(tempfile_list, tempdir_list)
+					logging.critical("%s does not has the source attr!", item)
+					sys.exit("%s does not has the source attr!" % item)
+
+				upload_count += 1
+				data_install(sec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, item)
+
 				if sec[item]["format"] == "tgz":
 					source_url = mount_dict[sec[item]["mountpoint"]] + ".tar.gz"
 				else:
@@ -3488,9 +3573,25 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 				else:
 					logging.debug("%s does not have config attribute!", sec_name)
 					break
-			software_install(mount_dict, env_para_dict, sec, meta_json, sandbox_dir, 0, osf_auth)
 
 			for item in sec:
+				if sec[item].has_key("source") or attr_check(item, meta_search(meta_json, item, id), "source", 1):
+					if sec[item].has_key("source"):
+						sources = sec[item]["source"]
+					else:
+						sources = meta_search(meta_json, item, id)["source"]
+
+					if has_source(sources, target_info[0]):
+						logging.debug("%s already has a url from %s!", item, target_info[0])
+						print "%s already has a url from %s!" % (item, target_info[0])
+						continue
+				else:
+					cleanup(tempfile_list, tempdir_list)
+					logging.critical("%s does not has the source attr!", item)
+					sys.exit("%s does not has the source attr!" % item)
+
+				upload_count += 1
+				software_install(mount_dict, env_para_dict, sec, meta_json, sandbox_dir, 0, osf_auth, item)
 				#ignore upload resouces from cvmfs
 				if (not sec[item].has_key("mountpoint")) or (not mount_dict.has_key(sec[item]["mountpoint"])) or mount_dict[sec[item]["mountpoint"]] == "":
 					continue
@@ -3520,15 +3621,18 @@ def dep_build(d, name):
 	formats = ['plain', 'tgz']
 	form = attr_check(name, d, "format")
 	if not form in formats:
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The format attr can only be: %s!\n", ' or '.join(formats))
 
 	#check the validity of the 'source' attr
 	source = attr_check(name, d, "source", 1)
 
 	if source == '':
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The source of %s is empty!" % name)
 
 	if source[0] != '/':
+		cleanup(tempfile_list, tempdir_list)
 		sys.exit("The source of %s should be a local path!" % name)
 
 	#set the file size
@@ -3715,7 +3819,8 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="The environment variables in the format of <variable_name>=<variable_value>. Multiple settings should be separated by comma. I.e., -e 'PWD=/tmp'.")
 	parser.add_option("--log",
 					action="store",
-					help="The path of umbrella log file.",)
+					default="./umbrella.log",
+					help="The path of umbrella log file. (By default: ./umbrella.log)",)
 	parser.add_option("--cvmfs_http_proxy",
 					action="store",
 					help="HTTP_PROXY to access cvmfs (Used by Parrot)",)
@@ -3757,6 +3862,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
 	global tempfile_list
 	global tempdir_list
+	global upload_count
 
 	"""
 	disable_warnings function is used here to disable the SNIMissingWarning and InsecurePlatformWarning from /afs/crc.nd.edu/user/h/hmeng/.local/lib/python2.6/site-packages/requests-2.9.1-py2.6.egg/requests/packages/urllib3/util/ssl_.py.
@@ -3805,10 +3911,12 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
 		args[1] = os.path.abspath(args[1])
 		if (not os.path.exists(args[1])) or (not os.path.isfile(args[1])):
+			cleanup(tempfile_list, tempdir_list)
 			logging.critical("<source.umbrella> (%s) should be an existing file!\n", args[1])
 			sys.exit("<source.umbrella> (%s) should be an existing file!\n" % args[1])
 
 		if os.path.exists(args[2]):
+			cleanup(tempfile_list, tempdir_list)
 			logging.critical("<dest.umbrella> (%s) should be a non-existing file!\n", args[2])
 			sys.exit("<dest.umbrella> (%s) should be a non-existing file!\n" % args[2])
 
@@ -3818,6 +3926,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			try:
 				os.makedirs(os.path.dirname(args[2]))
 			except Exception as e:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("Fails to create the directory for the <dest.umbrella> (%s): %s!", args[2], e)
 				sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % (args[2], e))
 
@@ -3859,6 +3968,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		logging.debug("Check the sandbox_mode option: %s", sandbox_mode)
 		if sandbox_mode in ["destructive"]:
 			if getpass.getuser() != 'root':
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("You must be root to use the %s sandbox mode.", sandbox_mode)
 				print 'You must be root to use the %s sandbox mode.\n' % (sandbox_mode)
 				parser.print_help()
@@ -3894,6 +4004,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			spec_path_basename = os.path.basename(spec_path)
 			logging.debug("Start to read the specification file: %s", spec_path)
 			if not os.path.isfile(spec_path):
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
 				print "The specification json file does not exist! Please refer the -c option.\n"
 				parser.print_help()
@@ -3975,6 +4086,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					access_path = item[:index]
 					actual_path = item[(index+1):]
 					if access_path[0] != '/':
+						cleanup(tempfile_list, tempdir_list)
 						logging.critical("the path of an output should be absolute!")
 						sys.exit("the path of an output should be absolute!")
 					actual_path = os.path.abspath(actual_path)
@@ -3996,9 +4108,11 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					elif key in dirs:
 						output_d_dict[key] = output_dict[key]
 					else:
+						cleanup(tempfile_list, tempdir_list)
 						logging.critical("the output file (%s) is not specified in the spec file!", key)
 						sys.exit("the output file (%s) is not specified in the spec file!" % key)
 			else:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("the specification does not have a output section!")
 				sys.exit("the specification does not have a output section!")
 
@@ -4011,6 +4125,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				if not os.path.exists(d):
 					os.makedirs(d)
 				elif not os.path.isdir(d):
+					cleanup(tempfile_list, tempdir_list)
 					logging.critical("the parent path of the output file (%s) is not a directory!", f)
 					sys.exit("the parent path of the output file (%s) is not a directory!" % f)
 				else:
@@ -4196,6 +4311,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		if args[1] == "osf":
 
 			if not found_requests:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 				sys.exit("\nUploading umbrella spec dependencies to OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 
@@ -4206,6 +4322,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
 			acl = ["private", "public"]
 			if args[3] not in acl:
+				cleanup(tempfile_list, tempdir_list)
 				sys.exit("The access control for s3 bucket and object can only be: %s" % " or ".join(acl))
 
 			target_specpath = os.path.abspath(args[4])
@@ -4218,11 +4335,16 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			osf_proj_id = osf_create(options.osf_user, options.osf_pass, options.osf_userid, args[2], args[3] == "public")
 			osf_info.append(osf_proj_id)
 			spec_upload(spec_json, meta_json, osf_info, sandbox_dir, osf_auth)
-			json2file(target_specpath, spec_json)
-			osf_upload(options.osf_user, options.osf_pass, osf_proj_id, target_specpath)
+			if upload_count > 0:
+				json2file(target_specpath, spec_json)
+				osf_upload(options.osf_user, options.osf_pass, osf_proj_id, target_specpath)
+			else:
+				logging.debug("All the dependencies has been already inside OSF!")
+				print "All the dependencies has been already inside OSF!"
 
 		elif args[1] == "s3":
 			if not found_boto3 or not found_botocore:
+				cleanup(tempfile_list, tempdir_list)
 				logging.critical("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
 				sys.exit("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
 
@@ -4233,6 +4355,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
 			acl = ["private", "public-read"]
 			if args[3] not in acl:
+				cleanup(tempfile_list, tempdir_list)
 				sys.exit("The access control for s3 bucket and object can only be: %s" % " or ".join(acl))
 
 			target_specpath = os.path.abspath(args[4])
@@ -4244,8 +4367,12 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			s3_info.append(args[3])
 			bucket = s3_create(args[2], args[3])
 			spec_upload(spec_json, meta_json, s3_info, sandbox_dir, s3_bucket=bucket)
-			json2file(target_specpath, spec_json)
-			s3_upload(bucket, target_specpath, args[3])
+			if upload_count > 0:
+				json2file(target_specpath, spec_json)
+				s3_upload(bucket, target_specpath, args[3])
+			else:
+				logging.debug("All the dependencies has been already inside S3!")
+				print "All the dependencies has been already inside S3!"
 
 	cleanup(tempfile_list, tempdir_list)
 	end = datetime.datetime.now()
