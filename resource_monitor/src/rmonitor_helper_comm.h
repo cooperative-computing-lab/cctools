@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include <inttypes.h>
+#include "timestamp.h"
 
 #ifndef RMONITOR_HELPER_COMM_H
 #define RMONITOR_HELPER_COMM_H
@@ -28,8 +29,10 @@ enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN_INPUT, OPEN_OU
 struct rmonitor_msg
 {
 	enum rmonitor_msg_type type;
-	pid_t                 origin;
-	int                   error;
+	pid_t                  origin;
+	int                    error;
+	timestamp_t            start;
+	timestamp_t            end;
 	union {
 		pid_t    p;
 		uint64_t n;

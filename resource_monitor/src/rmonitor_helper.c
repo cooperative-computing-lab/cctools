@@ -34,6 +34,7 @@
 #include <sched.h>
 #endif
 
+#include "timestamp.h"
 #include "itable.h"
 
 #include "debug.h"
@@ -52,8 +53,12 @@
 #define RTLD_NEXT 0
 #endif
 
+
 #define PUSH_ERRNO { int last_errno = errno; errno = 0;
 #define POP_ERRNO(msg) msg.error = errno; if(!errno){ errno = last_errno; } }
+
+#define START(msg) { if(msg.type == RX || msg.type == TX) msg.start = timestamp_get(); PUSH_ERRNO
+#define END(msg)   POP_ERRNO(msg) if(msg.type == RX || msg.type == TX) msg.end = timestamp_get(); }
 
 static struct itable *family_of_fd = NULL;
 
@@ -188,9 +193,9 @@ FILE *fopen(const char *path, const char *mode)
 
 	debug(D_RMON, "fopen %s mode %s from %d.\n", path, mode, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		file = original_fopen(path, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -227,9 +232,9 @@ int open(const char *path, int flags, ...)
 
 	debug(D_RMON, "open %s from %d.\n", path, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		fd = original_open(path, flags, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -260,9 +265,9 @@ FILE *fopen64(const char *path, const char *mode)
 
 	debug(D_RMON, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		file = original_fopen64(path, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -299,9 +304,9 @@ int open64(const char *path, int flags, ...)
 
 	debug(D_RMON, "open64 %s from %d.\n", path, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		fd = original_open64(path, flags, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -359,9 +364,9 @@ ssize_t write(int fd, const void *buf, size_t count)
 	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_write(fd, buf, count);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -383,9 +388,9 @@ ssize_t read(int fd, void *buf, size_t count)
 	__typeof__(read) *original_read = dlsym(RTLD_NEXT, "read");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_read(fd, buf, count);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -402,9 +407,9 @@ ssize_t recv(int fd, void *buf, size_t count, int flags)
 	__typeof__(recv) *original_recv = dlsym(RTLD_NEXT, "recv");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_recv(fd, buf, count, flags);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -421,9 +426,9 @@ ssize_t recvfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *sr
 	__typeof__(recvfrom) *original_recvfrom = dlsym(RTLD_NEXT, "recvfrom");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_recvfrom(fd, buf, count, flags, src, addrlen);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -441,9 +446,9 @@ ssize_t send(int fd, const void *buf, size_t count, int flags)
 	__typeof__(send) *original_send = dlsym(RTLD_NEXT, "send");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_send(fd, buf, count, flags);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -460,9 +465,9 @@ ssize_t sendfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *sr
 	__typeof__(sendfrom) *original_sendfrom = dlsym(RTLD_NEXT, "sendfrom");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_sendfrom(fd, buf, count, flags, src, addrlen);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -479,9 +484,9 @@ ssize_t sendmsg(int fd, const struct msghdr *mg, int flags)
 	__typeof__(sendmsg) *original_sendmsg = dlsym(RTLD_NEXT, "sendmsg");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_sendmsg(fd, mg, flags);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -499,9 +504,9 @@ ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
 	__typeof__(recvmsg) *original_recvmsg = dlsym(RTLD_NEXT, "recvmsg");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_recvmsg(fd, mg, flags);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);

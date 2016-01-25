@@ -201,8 +201,9 @@ struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
 
-int64_t total_bytes_rx;  /* total bytes received */
-int64_t total_bytes_tx;  /* total bytes sent */
+struct list *tx_rx_sizes; /* list of network byte counts with a timestamp, to compute bandwidth. */
+int64_t total_bytes_rx;   /* total bytes received */
+int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
 
@@ -659,6 +660,55 @@ void rmonitor_handle_inotify(void)
 #endif
 }
 
+void append_network_bw(struct rmonitor_msg *msg) {
+
+	/* Avoid division by zero, negative bws */
+	if(msg->end <= msg->start || msg->data.n < 1)
+		return;
+
+	struct rmonitor_bw_info *new_tail = malloc(sizeof(struct rmonitor_bw_info));
+
+	new_tail->bit_count = 8*msg->data.n;
+	new_tail->start     = msg->start;
+	new_tail->end       = msg->end;
+
+	/* we drop entries older than 60s */
+	struct rmonitor_bw_info *head;
+	while((head = list_peek_head(tx_rx_sizes))) {
+		if( head->end + 60*USECOND < new_tail->start) {
+			list_pop_head(tx_rx_sizes);
+			free(head);
+		} else {
+			break;
+		}
+	}
+
+	list_push_tail(tx_rx_sizes, new_tail);
+}
+
+int64_t average_bandwidth(int use_min_len) {
+	if(list_size(tx_rx_sizes) == 0)
+		return 0;
+
+	int64_t sum = 0;
+	struct rmonitor_bw_info *head, *tail;
+
+	list_first_item(tx_rx_sizes);
+	while((head = list_next_item(tx_rx_sizes))) {
+		sum += head->bit_count;
+	}
+
+	head = list_peek_head(tx_rx_sizes);
+	tail = list_peek_tail(tx_rx_sizes);
+
+	int64_t len_real = DIV_INT_ROUND_UP(tail->end - head->start, USECOND);
+
+	/* divide at least by 10s, to smooth noise. */
+	int n = use_min_len ? MAX(10, len_real) : len_real;
+
+	return DIV_INT_ROUND_UP(sum, n);
+}
+
 
 /***
  * Logging functions. The process tree is summarized in struct
@@ -673,6 +723,7 @@ void rmonitor_summary_header()
 	    fprintf(log_series, "# wall_clock and cpu_time in microseconds\n");
 	    fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
 	    fprintf(log_series, "# disk in megabytes.\n");
+	    fprintf(log_series, "# bandwidth in bits/s.\n");
 	    fprintf(log_series, "# cpu_time, bytes_read, bytes_written, bytes_sent, and bytes_received show cummulative values.\n");
 	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
 
@@ -687,6 +738,7 @@ void rmonitor_summary_header()
 	    fprintf(log_series, " %25s", "bytes_written");
 	    fprintf(log_series, " %25s", "bytes_received");
 	    fprintf(log_series, " %25s", "bytes_sent");
+	    fprintf(log_series, " %25s", "bandwidth");
 
 	    if(resources_flags->disk)
 	    {
@@ -730,6 +782,8 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->bytes_received = total_bytes_rx;
 	tr->bytes_sent     = total_bytes_tx;
 
+	tr->bandwidth = average_bandwidth(1);
+
 	tr->total_files = (int64_t) d->files;
 	tr->disk = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
@@ -763,6 +817,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 		fprintf(log_series, " %20" PRId64, tr->bytes_written);
 		fprintf(log_series, " %20" PRId64, tr->bytes_received);
 		fprintf(log_series, " %20" PRId64, tr->bytes_sent);
+		fprintf(log_series, " %20" PRId64, tr->bandwidth);
 
 		if(resources_flags->disk)
 		{
@@ -903,6 +958,10 @@ int rmonitor_final_summary()
 
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
+
+	summary->bandwidth = MAX(average_bandwidth(0), summary->bandwidth);
+	summary->bytes_received = total_bytes_rx;
+	summary->bytes_sent     = total_bytes_tx;
 
 	if(summary->limits_exceeded) {
 		summary->exit_status = 128 + SIGTERM;
@@ -1349,12 +1408,16 @@ void rmonitor_dispatch_msg(void)
 			}
 			break;
 		case RX:
-			if(msg.data.n > 0)
+			if(msg.data.n > 0) {
 				total_bytes_rx += msg.data.n;
+				append_network_bw(&msg);
+			}
 			break;
 		case TX:
-			if(msg.data.n > 0)
+			if(msg.data.n > 0) {
 				total_bytes_tx += msg.data.n;
+				append_network_bw(&msg);
+			}
 			break;
         case READ:
 			break;
@@ -1661,6 +1724,7 @@ int main(int argc, char **argv) {
 
 	total_bytes_rx = 0;
 	total_bytes_tx = 0;
+	tx_rx_sizes    = list_create(0);
 
     rmsummary_read_env_vars(resources_limits);
 
