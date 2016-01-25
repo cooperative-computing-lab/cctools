@@ -598,6 +598,9 @@ class Task(_object):
     # swap_memory:               maximum swap usage across all processes
     # bytes_read:                number of bytes read from disk
     # bytes_written:             number of bytes written to disk
+    # bytes_received:            number of bytes read from the network
+    # bytes_send:                number of bytes written to the network
+    # bandwidth:                 maximum network bits/s (average over one minute)
     # workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
     # workdir_footprint:         size in MB of all working directories in the tree
     # @code

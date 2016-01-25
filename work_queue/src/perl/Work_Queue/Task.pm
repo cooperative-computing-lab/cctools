@@ -976,6 +976,18 @@ Must be called only after the task completes execution.
 
 		$t->resources_measured{bytes_written};
 
+		bytes_received:            number of bytes read from the network
+
+		$t->resources_measured{bytes_received};
+
+		bytes_sent:                number of bytes written to the network
+
+		$t->resources_measured{bytes_sent};
+
+		bandwidth:                 maximum network bits/s (average over one minute)
+
+		$t->resources_measured{bandwidth};
+
 		workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
 
 		$t->resources_measured{disk};
