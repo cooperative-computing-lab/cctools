@@ -108,6 +108,7 @@ modify the linker namespace we are using.
 
 #define debug                  cctools_debug
 #define fatal                  cctools_fatal
+#define notice                 cctools_notice
 #define warn                   cctools_warn
 #define debug_config           cctools_debug_config
 #define debug_config_file      cctools_debug_config_file
@@ -156,6 +157,14 @@ Displays a printf-style message, and then forcibly exits the program.
 */
 
 void fatal(const char *fmt, ...);
+
+
+/** Emit a notice message.
+Logs a warning message, regardless of if given flags are active.
+@param flags Any of the standard debugging flags OR-ed together.
+@param fmt A printf-style formatting string, followed by the necessary arguments.
+  */
+void notice(INT64_T flags, const char *fmt, ...);
 
 /** Initialize the debugging system.
 Must be called before any other calls take place.

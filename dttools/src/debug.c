@@ -21,6 +21,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#include <stdio.h>
+
 extern void debug_stderr_write (INT64_T flags, const char *str);
 extern void debug_stdout_write (INT64_T flags, const char *str);
 
@@ -44,6 +46,9 @@ static void (*debug_write) (INT64_T flags, const char *str) = debug_stderr_write
 static pid_t (*debug_getpid) (void) = getpid;
 static char debug_program_name[PATH_MAX];
 static INT64_T debug_flags = D_NOTICE|D_ERROR|D_FATAL;
+
+static char *terminal_path = "/dev/tty";
+static FILE *terminal_f    = NULL;
 
 struct flag_info {
 	const char *name;
@@ -198,6 +203,20 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 
 	debug_write(flags, buffer_tostring(&B));
 
+	if(flags & (D_ERROR | D_NOTICE | D_FATAL)) {
+		if(debug_write != debug_stderr_write || !isatty(STDERR_FILENO)) {
+			if(!terminal_f) {
+				if((terminal_f = fopen(terminal_path, "a")) == NULL) {
+					/* print to wherever stderr is pointing that we could not open the terminal. */
+					fprintf(stderr, "Could not open '%s' for immediate error reporting.\n", terminal_path);
+				}
+			}
+		}
+
+		if(terminal_f)
+			fprintf(terminal_f, "%s", buffer_tostring(&B));
+	}
+
 	buffer_free(&B);
 }
 
@@ -229,6 +248,17 @@ void warn(INT64_T flags, const char *fmt, ...)
 	int save_errno = errno;
 	va_start(args, fmt);
 	do_debug(flags|D_ERROR, fmt, args);
+	va_end(args);
+	errno = save_errno;
+}
+
+void notice(INT64_T flags, const char *fmt, ...)
+{
+	va_list args;
+
+	int save_errno = errno;
+	va_start(args, fmt);
+	do_debug(flags|D_NOTICE, fmt, args);
 	va_end(args);
 	errno = save_errno;
 }
