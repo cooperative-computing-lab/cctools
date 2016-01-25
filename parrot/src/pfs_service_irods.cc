@@ -92,28 +92,30 @@ public:
 
 		struct irods_file *ifile;
 
-		ifile = irods_reli_open(name->hostport,name->rest,flags,mode);
+		if(!(flags&O_DIRECTORY)) {
+			ifile = irods_reli_open(name->hostport,name->rest,flags,mode);
+		}
 		if(ifile) {
 			return new pfs_file_irods(name,ifile);
+		} if((errno == EISDIR) || (flags&O_DIRECTORY)) {
+			pfs_dir *dir = new pfs_dir(name);
+			int result;
+
+			result = irods_reli_getdir(name->hostport,name->rest,add_one_dir,dir);
+
+			if(result<0) {
+				delete dir;
+				return 0;
+			} else {
+				return dir;
+			}
 		} else {
 			return 0;
 		}
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {
-
-		pfs_dir *dir = new pfs_dir(name);
-		int result;
-
-		result = irods_reli_getdir(name->hostport,name->rest,add_one_dir,dir);
-
-		if(result<0) {
-			delete dir;
-			return 0;
-		} else {
-			return dir;
-		}
-
+		return (pfs_dir *)open(name, O_DIRECTORY, 000);
 	}
 
 	virtual int statfs( pfs_name *name, struct pfs_statfs *info ) {
@@ -224,6 +226,10 @@ public:
 	}
 
 	virtual int is_seekable() {
+		return 1;
+	}
+
+	virtual int can_open_dirs() {
 		return 1;
 	}
 
