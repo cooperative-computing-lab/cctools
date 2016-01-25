@@ -34,6 +34,8 @@
 #include <sched.h>
 #endif
 
+#include "itable.h"
+
 #include "debug.h"
 //#define debug fprintf
 //#define D_RMON stderr
@@ -52,6 +54,8 @@
 
 #define PUSH_ERRNO { int last_errno = errno; errno = 0;
 #define POP_ERRNO(msg) msg.error = errno; if(!errno){ errno = last_errno; } }
+
+static struct itable *family_of_fd = NULL;
 
 pid_t fork()
 {
@@ -143,6 +147,20 @@ int fchdir(int fd)
 
 		send_monitor_msg(&msg);
 	}
+
+	return status;
+}
+
+int close(int fd)
+{
+	__typeof__(close) *original_close = dlsym(RTLD_NEXT, "close");
+
+	debug(D_RMON, "close %d from %d.\n", fd, getpid());
+
+	if(family_of_fd)
+		itable_remove(family_of_fd, fd);
+
+	int status = original_close(fd);
 
 	return status;
 }
@@ -305,17 +323,68 @@ int open64(const char *path, int flags, ...)
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
 
+int socket(int domain, int type, int protocol)
+{
+	int fd;
+
+	if(!family_of_fd)
+		family_of_fd = itable_create(8);
+
+	__typeof__(socket) *original_socket = dlsym(RTLD_NEXT, "socket");
+	fd = original_socket(domain, type, protocol);
+
+	if(fd > -1 && (domain != AF_LOCAL || domain != AF_NETLINK)) {
+		itable_insert(family_of_fd, fd, (void **) 1);
+	} else {
+		itable_remove(family_of_fd, fd);
+	}
+
+	debug(D_RMON, "open socket %d from %d.\n", domain, getpid());
+
+	return fd;
+}
+
 ssize_t write(int fd, const void *buf, size_t count)
 {
 	struct rmonitor_msg msg;
-	msg.type   = WRITE;
 	msg.origin = getpid();
+
+	if(family_of_fd && itable_lookup(family_of_fd, fd)) {
+		msg.type   = TX;
+	} else {
+		msg.type   = WRITE;
+	}
+
 
 	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
 
 	ssize_t real_count;
 	PUSH_ERRNO
 		real_count = original_write(fd, buf, count);
+	POP_ERRNO(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t read(int fd, void *buf, size_t count)
+{
+	struct rmonitor_msg msg;
+	msg.origin = getpid();
+
+	if(family_of_fd && itable_lookup(family_of_fd, fd)) {
+		msg.type   = RX;
+	} else {
+		msg.type   = READ;
+	}
+
+	__typeof__(read) *original_read = dlsym(RTLD_NEXT, "read");
+
+	ssize_t real_count;
+	PUSH_ERRNO
+		real_count = original_read(fd, buf, count);
 	POP_ERRNO(msg)
 
 	msg.data.n = real_count;
@@ -365,6 +434,7 @@ ssize_t recvfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *sr
 ssize_t send(int fd, const void *buf, size_t count, int flags)
 {
 	struct rmonitor_msg msg;
+
 	msg.type   = TX;
 	msg.origin = getpid();
 
