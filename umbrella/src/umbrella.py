@@ -3867,7 +3867,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		#transfer options.env into a dictionary, env_para_dict
 		env_para = options.env
 		env_para_dict = {}
-		if env_para == '':
+		if (not env_para) or env_para == '':
 			logging.debug("The env option is null")
 			env_para_list = ''
 			env_para_dict = {}
@@ -3931,17 +3931,17 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
 		#get the absolute path of each input file
 		input_files = options.inputs
-		input_files = re.sub( '\s+', '', input_files).strip() #remove all the whitespaces within the inputs option
 
 		input_list = []
 		input_dict = {}
 
-		if input_files == '':
+		if (not input_files) or input_files == '':
 			input_list_origin = ''
 			input_list = []
 			input_dict = {}
 			logging.debug("the inputs options is null")
 		else:
+			input_files = re.sub( '\s+', '', input_files).strip() #remove all the whitespaces within the inputs option
 			logging.debug("The inputs option: %s", input_files)
 			input_list_origin = input_files.split(',')
 			for item in input_list_origin:
