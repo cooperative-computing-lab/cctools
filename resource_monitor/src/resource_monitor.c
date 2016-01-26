@@ -672,14 +672,17 @@ void append_network_bw(struct rmonitor_msg *msg) {
 	new_tail->start     = msg->start;
 	new_tail->end       = msg->end;
 
-	/* we drop entries older than 60s */
-	struct rmonitor_bw_info *head;
-	while((head = list_peek_head(tx_rx_sizes))) {
-		if( head->end + 60*USECOND < new_tail->start) {
-			list_pop_head(tx_rx_sizes);
-			free(head);
-		} else {
-			break;
+	/* we drop entries older than 60s, unless there are less than 4, so
+	 * we can smooth some noise. */
+	if(list_size(tx_rx_sizes) > 3) {
+		struct rmonitor_bw_info *head;
+		while((head = list_peek_head(tx_rx_sizes))) {
+			if( head->end + 60*USECOND < new_tail->start) {
+				list_pop_head(tx_rx_sizes);
+				free(head);
+			} else {
+				break;
+			}
 		}
 	}
 
@@ -693,14 +696,18 @@ int64_t average_bandwidth(int use_min_len) {
 	int64_t sum = 0;
 	struct rmonitor_bw_info *head, *tail;
 
+
+	/* if last bit count occured more than a minute ago, report bw as 0 */
+	tail = list_peek_tail(tx_rx_sizes);
+	if(tail->end + 60*USECOND < timestamp_get())
+		return 0;
+
 	list_first_item(tx_rx_sizes);
 	while((head = list_next_item(tx_rx_sizes))) {
 		sum += head->bit_count;
 	}
 
 	head = list_peek_head(tx_rx_sizes);
-	tail = list_peek_tail(tx_rx_sizes);
-
 	int64_t len_real = DIV_INT_ROUND_UP(tail->end - head->start, USECOND);
 
 	/* divide at least by 10s, to smooth noise. */
