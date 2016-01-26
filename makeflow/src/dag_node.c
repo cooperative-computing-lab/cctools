@@ -19,6 +19,16 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <unistd.h>
 
+int dag_node_comp(void *item, const void *arg)
+{
+	struct dag_node *d = ((struct dag_node *) item);
+	struct dag_node *e = ((struct dag_node *) arg);
+
+	if(d->nodeid == e->nodeid)
+		return 1;
+	return 0;
+}
+
 struct dag_node *dag_node_create(struct dag *d, int linenum)
 {
 	struct dag_node *n;
@@ -40,6 +50,13 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->descendants = set_create(0);
 	n->ancestors = set_create(0);
 
+	n->source_size = -1;
+	n->target_size = -1;
+
+	n->res_nodes = list_create();
+	n->wgt_nodes = list_create();
+	n->run_nodes = list_create();
+
 	n->ancestor_depth = -1;
 
 	// resources explicitely requested for only this node in the dag file.
@@ -60,6 +77,17 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->archive_id = NULL;
 
 	return n;
+}
+
+struct dag_node_size *dag_node_size_create(struct dag_node *n, uint64_t size)
+{
+	struct dag_node_size *s;
+
+	s = malloc(sizeof(struct dag_node_size));
+	s->n = n;
+	s->size = size;
+
+	return s;
 }
 
 const char *dag_node_state_name(dag_node_state_t state)
@@ -250,6 +278,277 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, const ch
 
 	/* register this node as the creator of the file */
 	target->created_by = n;
+}
+
+void dag_node_prepare_node_size(struct dag_node *n)
+{
+	struct dag_file *f;
+	struct dag_node *s;
+	n->source_size = 0;
+	n->target_size = 0;
+	list_first_item(n->source_files);
+	while((f = list_next_item(n->source_files))){
+		if(dag_file_should_exist(f))
+			n->source_size += f->file_size;
+		else
+			n->source_size += f->est_size;
+	}
+	list_first_item(n->target_files);
+	while((f = list_next_item(n->target_files))){
+		if(dag_file_should_exist(f))
+			n->target_size += f->file_size;
+		else
+			n->target_size += f->est_size;
+	}
+
+	set_first_element(n->descendants);
+	while((s = set_next_element(n->descendants))){
+		dag_node_prepare_node_size(s);
+	}
+}
+
+uint64_t dag_node_determine_parent_weight(struct dag_node *n)
+{
+	struct dag_node *d;
+	uint64_t weight = n->target_size;
+	set_first_element(n->ancestors);
+	while((d = set_next_element(n->ancestors))){
+		weight += d->target_size;
+	}
+
+	return weight;
+}
+
+uint64_t dag_node_determine_child_weight(struct dag_node *n)
+{
+	struct dag_node *d;
+	struct dag_file *f;
+	uint64_t weight = n->target_size;
+	set_first_element(n->descendants);
+	while((d = set_next_element(n->descendants))){
+		weight += d->target_size;
+		while((f = list_next_item(n->source_files))){
+			if(f->created_by->nodeid == n->nodeid)
+				continue;
+			weight += dag_file_size(f);
+		}
+	}
+
+	return weight;
+}
+
+uint64_t dag_node_determine_descendant_weight(struct dag_node *n)
+{
+	struct dag_node *d, *e;
+	struct dag_node_size *s, *t;
+	struct set *tmp = set_create(0);
+
+	set_first_element(n->descendants);
+	while((d = set_next_element(n->descendants))){
+		set_push(tmp, d);
+		list_first_item(d->res_nodes);
+		list_first_item(d->wgt_nodes);
+	}
+
+	list_delete(n->res_nodes);
+	list_delete(n->wgt_nodes);
+	list_delete(n->run_nodes);
+
+	set_first_element(n->descendants);
+	if(set_size(n->descendants) > 1){
+		n->res_nodes = list_create();
+		n->wgt_nodes = list_create();
+		n->run_nodes = list_create();
+		set_first_element(n->descendants);
+
+		int comp = 1;
+		while(comp){
+			d = set_next_element(n->descendants);
+			s = list_next_item(d->res_nodes);
+			while((d = set_next_element(n->descendants))){
+				t = list_next_item(d->res_nodes);
+				if((t && !s) || (s && !t) || (t->n->nodeid != s->n->nodeid))
+					comp = 0;
+			}
+
+			set_first_element(n->descendants);
+			if(comp)
+				list_push_tail(n->res_nodes, s);
+		}
+
+		comp = 1;
+		while(comp){
+			d = set_next_element(n->descendants);
+			s = list_next_item(d->wgt_nodes);
+			while((d = set_next_element(n->descendants))){
+				t = list_next_item(d->wgt_nodes);
+				if((t && !s) || (s && !t) || (t->n->nodeid != s->n->nodeid))
+					comp = 0;
+			}
+
+			set_first_element(n->descendants);
+			if(comp)
+				list_push_tail(n->wgt_nodes, s);
+		}
+
+		uint64_t node_wgt, max_wgt, tmp_wgt, res_size;
+		max_wgt = 0;
+		set_first_element(tmp);
+		while((d = set_next_element(tmp))){
+			struct list *tmp_run = list_create();
+			node_wgt = d->parent_wgt;
+			if(d->parent_wgt <= d->child_wgt)
+				node_wgt = d->child_wgt;
+			list_push_head(tmp_run, d);
+
+			while((t = list_peek_current(d->wgt_nodes))){
+				if(t->size > node_wgt)
+					node_wgt = t->size;
+				list_next_item(d->wgt_nodes);
+			}
+			tmp_wgt = node_wgt;
+			set_first_element(n->descendants);
+			while((e = set_next_element(n->descendants))){
+				t = list_peek_current(e->res_nodes);
+				if(!t)
+					res_size = e->target_size;
+				else
+					res_size = t->size;
+				if(e->nodeid != d->nodeid){
+					node_wgt += res_size;
+					list_push_head(tmp_run, e);
+				}
+			}
+
+			if(max_wgt < tmp_wgt || (max_wgt == tmp_wgt && node_wgt < n->descendant_wgt)){
+				max_wgt = tmp_wgt;
+				n->descendant_wgt = node_wgt;
+				list_delete(n->run_nodes);
+				n->run_nodes = list_duplicate(tmp_run);
+			}
+			list_delete(tmp_run);
+		}
+		return max_wgt;
+	} else if(set_size(n->descendants) == 1){
+		d = set_next_element(n->descendants);
+		n->run_nodes = list_create();
+		list_push_tail(n->run_nodes, d);
+
+		n->res_nodes = list_duplicate(d->res_nodes);
+		n->wgt_nodes = list_duplicate(d->wgt_nodes);
+	} else {
+		n->res_nodes = list_create();
+		n->wgt_nodes = list_create();
+		n->run_nodes = list_create();
+	}
+	return 0;
+}
+
+void dag_node_determine_footprint(struct dag_node *n)
+{
+	struct dag_node *d;
+	struct dag_node_size *s;
+
+	n->parent_wgt = dag_node_determine_parent_weight(n);
+
+	n->child_wgt = dag_node_determine_child_weight(n);
+
+	set_first_element(n->descendants);
+	while((d = set_next_element(n->descendants))){
+		dag_node_determine_footprint(d);
+	}
+
+	n->descendant_wgt = dag_node_determine_descendant_weight(n);
+
+	list_push_tail(n->res_nodes, dag_node_size_create(n, n->target_size));
+
+	if((n->parent_wgt >= n->child_wgt) && (n->parent_wgt >= n->descendant_wgt)){
+		list_push_tail(n->wgt_nodes, dag_node_size_create(n, n->parent_wgt));
+	} else if((n->child_wgt >= n->parent_wgt) && (n->child_wgt >= n->descendant_wgt)){
+		list_push_tail(n->wgt_nodes, dag_node_size_create(n, n->child_wgt));
+	} else {
+		list_push_tail(n->wgt_nodes, dag_node_size_create(n, n->descendant_wgt));
+	}
+
+/*		USED FOR CHECKING EXPECTED SIZES
+*/
+	printf("Parent weight for %d : %" PRIu64"\n", n->nodeid, n->parent_wgt);
+	printf("Child weight for %d : %" PRIu64"\n", n->nodeid, n->child_wgt);
+	printf("Desc weight for %d : %" PRIu64"\n", n->nodeid, n->descendant_wgt);
+
+	list_first_item(n->run_nodes);
+	while((d = list_next_item(n->run_nodes)))
+		printf("%d\t", d->nodeid);
+	printf("\n");
+
+	list_first_item(n->wgt_nodes);
+	while((s = list_next_item(n->wgt_nodes))){
+		printf("(%d, %"PRIu64") ", s->n->nodeid, s->size);
+	}
+	printf("\n");
+
+	list_first_item(n->res_nodes);
+	while((s = list_next_item(n->res_nodes))){
+		printf("(%d, %"PRIu64") ", s->n->nodeid, s->size);
+	}
+	printf("\n");fflush(stdout);
+}
+
+void dag_node_init_resources(struct dag_node *n)
+{
+	struct rmsummary *rs    = n->resources_requested;
+	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
+	struct dag_variable_lookup_set s_all  = { n->d, n->category, n, NULL };
+
+	struct dag_variable_value *val;
+
+	/* first pass, only node variables. We only check if this node was individually labeled. */
+	val = dag_variable_lookup(RESOURCES_CORES, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
+
+	val = dag_variable_lookup(RESOURCES_DISK, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
+
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
+
+	val = dag_variable_lookup(RESOURCES_GPUS, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
+
+	int category_flag = 0;
+	/* second pass: fill fall-back values if at least one resource was individually labeled. */
+	/* if not, resources will come from the category when submitting. */
+	val = dag_variable_lookup(RESOURCES_CORES, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->cores = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_DISK, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->disk = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->memory = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_GPUS, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->gpus = atoll(val->value);
+	}
+
+	if(n->resource_request != CATEGORY_ALLOCATION_USER && category_flag) {
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_ZERO;
+	}
 }
 
 void dag_node_print_debug_resources(struct dag_node *n)

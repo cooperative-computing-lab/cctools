@@ -95,6 +95,7 @@ int dag_file_should_exist( const struct dag_file *f );
 @return One if in transit state, zero if not.
 */
 int dag_file_in_trans( const struct dag_file *f );
+uint64_t dag_file_size( const struct dag_file *f );
 
 /** Report the size of file. If no actual size exists, estimated size will be used.
 @param f dag_file.

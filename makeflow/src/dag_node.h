@@ -15,11 +15,11 @@ See the file COPYING for details.
 
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
-	DAG_NODE_STATE_RUNNING = 1,
-	DAG_NODE_STATE_COMPLETE = 2,
-	DAG_NODE_STATE_FAILED = 3,
-	DAG_NODE_STATE_ABORTED = 4,
-	DAG_NODE_STATE_MAX = 5
+	DAG_NODE_STATE_RUNNING,
+	DAG_NODE_STATE_COMPLETE,
+	DAG_NODE_STATE_FAILED,
+	DAG_NODE_STATE_ABORTED,
+	DAG_NODE_STATE_MAX
 } dag_node_state_t;
 
 /* struct dag_node implements a linked list of nodes. A dag_node
@@ -52,6 +52,17 @@ struct dag_node {
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
 	struct list   *source_files;        /* list of dag_files of the node's requirements */
 	struct list   *target_files;        /* list of dag_files of the node's productions */
+
+	uint64_t source_size;			/* size of dag_files of the node's requirements */
+	uint64_t target_size;			/* size of dag_files of the node's productions */
+
+	uint64_t parent_wgt;			/* size of dag_files of my output's and my parents' */
+	uint64_t child_wgt;			/* size of dag_files of my output's and my child's */
+	uint64_t descendant_wgt;		/* size of dag_files at the widest child with minimal siblings */
+
+	struct list *res_nodes;		/* list of dag_node/wgt that describe residual wgt at each point */
+	struct list *wgt_nodes;		/* list of dag_node/wgt that show the commitment sizes */
+	struct list *run_nodes;		/* list of child and the order to maintain committed size */
 
 	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
 										   file labeled which tasks have comparable resource usage. */
@@ -86,13 +97,24 @@ struct dag_node {
 	struct dag_node *next;              /* The next node in the list of nodes */
 };
 
+struct dag_node_size {
+	struct dag_node *n;
+	uint64_t size;
+};
+
 struct dag_node *dag_node_create(struct dag *d, int linenum);
+struct dag_node_size *dag_node_size_create(struct dag_node *n, uint64_t size);
+
+int dag_node_comp(void *item, const void *arg);
 
 void dag_node_add_source_file(struct dag_node *n, const char *filename, const char *remotename);
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename );
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
+
+void dag_node_prepare_node_size(struct dag_node *n);
+void dag_node_determine_footprint(struct dag_node *n);
 
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
 char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n);

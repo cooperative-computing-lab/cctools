@@ -380,6 +380,21 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 }
 
+static void makeflow_prepare_node_sizes(struct dag *d)
+{
+	struct dag_node *n = dag_node_create(d, -1);
+	struct dag_node *p;
+
+	for(p = d->nodes; p; p = p->next) {
+		if(set_size(p->ancestors) == 0) {
+			set_push(n->descendants, p);
+		}
+	}
+
+	dag_node_prepare_node_size(n);
+	dag_node_determine_footprint(n);
+}
+
 /*
 Update nested jobs with appropriate number of local jobs
 (total local jobs max / maximum number of concurrent nests).
@@ -2075,6 +2090,9 @@ int main(int argc, char *argv[])
 	}
 
 	makeflow_parse_input_outputs(d);
+
+	makeflow_prepare_node_sizes(d);
+
 	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
