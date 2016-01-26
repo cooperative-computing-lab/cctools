@@ -940,7 +940,6 @@ int main(int argc, char *argv[])
 	random_init();
 	debug_config(argv[0]);
 
-	cctools_version_debug((long) D_MAKEFLOW_RUN, argv[0]);
 	const char *dagfile;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
@@ -1340,6 +1339,8 @@ int main(int argc, char *argv[])
 				break;
 		}
 	}
+
+	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
 	if(!did_explicit_auth)
 		auth_register_all();
