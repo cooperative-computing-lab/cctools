@@ -279,20 +279,20 @@ HDFS is known to return bogus errnos from unlink,
 so check for directories beforehand, and set the errno
 properly afterwards if needed.
 */
-static INT64_T do_unlink(const char *path)
+static INT64_T do_unlink(const char *path, int recursive )
 {
 	struct chirp_stat info;
 
 	if(do_stat(path, &info) < 0)
 		return -1;
 
-	if(S_ISDIR(info.cst_mode)) {
+	if(!recursive && S_ISDIR(info.cst_mode)) {
 		errno = EISDIR;
 		return -1;
 	}
 
 	debug(D_HDFS, "unlink %s", path);
-	if(hdfs_services->unlink(fs, path, 0) == -1) {
+	if(hdfs_services->unlink(fs, path, recursive) == -1) {
 		errno = EACCES;
 		return -1;
 	}
@@ -348,13 +348,13 @@ static INT64_T chirp_fs_hdfs_open(const char *path, INT64_T flags, INT64_T mode)
 			debug(D_HDFS, "opening file %s (flags: %"PRIo64") for writing; mode: %"PRIo64"", path, flags, mode);
 			if(flags & O_TRUNC) {
 				if(file_exists) {
-					do_unlink(path);
+					do_unlink(path,0);
 					file_exists = 0;
 					flags ^= O_TRUNC;
 				}
 			} else if(file_exists && info.cst_size == 0) {
 				/* file is empty, just delete it as if O_TRUNC (useful for FUSE with some UNIX utils, like mv) */
-				do_unlink(path);
+				do_unlink(path,0);
 				file_exists = 0;
 			} else {
 				if(file_exists) {
@@ -502,21 +502,22 @@ static INT64_T chirp_fs_hdfs_fsync(int fd)
 static INT64_T chirp_fs_hdfs_unlink(const char *path)
 {
 	RESOLVE(path)
-	return do_unlink(path);
+	debug(D_HDFS,"unlink %s",path);
+	return do_unlink(path,0);
 }
 
 static INT64_T chirp_fs_hdfs_rmall(const char *path)
 {
 	RESOLVE(path)
-	debug(D_HDFS, "rmall %s", path);
-	return hdfs_services->unlink(fs, path, 1);
+	debug(D_HDFS,"rmall %s",path);
+	return do_unlink(path,1);
 }
 
 static INT64_T chirp_fs_hdfs_rename(const char *path, const char *newpath)
 {
 	RESOLVE(path)
 	RESOLVE(newpath)
-	do_unlink(newpath);
+	do_unlink(newpath,0);
 	debug(D_HDFS, "rename %s %s", path, newpath);
 	return hdfs_services->rename(fs, path, newpath);
 }
@@ -563,7 +564,7 @@ static INT64_T chirp_fs_hdfs_rmdir(const char *path)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "rmdir %s", path);
-	return hdfs_services->unlink(fs, path, 1);
+	return do_unlink(path,1);
 }
 
 static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat *buf)
