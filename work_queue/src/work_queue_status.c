@@ -236,7 +236,8 @@ int get_masters(time_t stoptime)
 		if(i == catalog_size)
 			resize_catalog( catalog_size * 2 );
 
-		if(strcmp(nvpair_lookup_string(nv, "type"), "wq_master") == 0) {
+		const char *master_type = nvpair_lookup_string(nv, "type");
+		if(master_type && strcmp(nvpair_lookup_string(nv, "type"), "wq_master") == 0) {
 			global_catalog[i] = nv; // make the global catalog point to this memory that nv references
 			i++;                    // only increment i when a master nvpair is found
 		} else{
