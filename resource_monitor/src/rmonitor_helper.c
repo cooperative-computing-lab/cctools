@@ -160,8 +160,6 @@ int close(int fd)
 {
 	__typeof__(close) *original_close = dlsym(RTLD_NEXT, "close");
 
-	debug(D_RMON, "close %d from %d.\n", fd, getpid());
-
 	if(family_of_fd)
 		itable_remove(family_of_fd, fd);
 
@@ -343,8 +341,6 @@ int socket(int domain, int type, int protocol)
 	} else {
 		itable_remove(family_of_fd, fd);
 	}
-
-	debug(D_RMON, "open socket %d from %d.\n", domain, getpid());
 
 	return fd;
 }

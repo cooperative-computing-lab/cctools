@@ -13,7 +13,7 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120000000 -- some-command-line-and-options
+ * resource_monitor -i 120 -- some-command-line-and-options
  *
  * to monitor some-command-line at two minutes intervals (120
  * seconds).
@@ -154,7 +154,7 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define DEFAULT_INTERVAL       5*USECOND       /* in useconds */
+#define DEFAULT_INTERVAL       5               /* in seconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
@@ -1353,14 +1353,16 @@ void write_helper_lib(void)
 	atexit(cleanup_library);
 }
 
-void rmonitor_dispatch_msg(void)
+/* return 1 if urgent message (wait, branch), 0 otherwise) */
+int rmonitor_dispatch_msg(void)
 {
 	struct rmonitor_msg msg;
 	struct rmonitor_process_info *p;
 
 	recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
+	//Next line commented: Useful for detailed debugging, but too spammy for regular operations.
+	//debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 
@@ -1614,7 +1616,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
     fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
@@ -1637,7 +1639,7 @@ static void show_help(const char *cmd)
 }
 
 
-int rmonitor_resources(long int interval /*in microseconds */)
+int rmonitor_resources(long int interval /*in seconds */)
 {
     uint64_t round;
 
@@ -1656,6 +1658,8 @@ int rmonitor_resources(long int interval /*in microseconds */)
 	round = 1;
 	while(itable_size(processes) > 0)
 	{
+		debug(D_RMON, "Round %" PRId64, round);
+
 		resources_now->last_error = 0;
 
 		ping_processes();
@@ -1664,7 +1668,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		rmonitor_poll_maps_once(processes, m_acc);
 
 		if(resources_flags->disk)
-			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(ONE_SECOND*hash_table_size(wdirs))));
+			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(MAX(1, hash_table_size(wdirs)))));
 
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
@@ -1811,7 +1815,7 @@ int main(int argc, char **argv) {
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1) {
-					debug(D_FATAL, "interval cannot be set to less than one microsecond.");
+					debug(D_FATAL, "interval cannot be set to less than one second.");
 					exit(RM_MONITOR_ERROR);
 				}
 				break;
