@@ -1387,19 +1387,23 @@ int rmonitor_dispatch_msg(void)
     switch(msg.type)
     {
         case BRANCH:
+			msg.error = 0;
             rmonitor_track_process(msg.origin);
             if(summary->max_concurrent_processes < itable_size(processes))
                 summary->max_concurrent_processes = itable_size(processes);
             break;
         case END_WAIT:
+			msg.error = 0;
             p->waiting = 1;
 			if(msg.origin == first_process_pid)
 				first_process_exit_status = msg.data.n;
             break;
         case END:
+			msg.error = 0;
             rmonitor_untrack_process(msg.origin);
             break;
         case CHDIR:
+			msg.error = 0;
 			if(follow_chdir)
 				p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
@@ -1421,18 +1425,21 @@ int rmonitor_dispatch_msg(void)
 			}
 			break;
 		case RX:
+			msg.error = 0;
 			if(msg.data.n > 0) {
 				total_bytes_rx += msg.data.n;
 				append_network_bw(&msg);
 			}
 			break;
 		case TX:
+			msg.error = 0;
 			if(msg.data.n > 0) {
 				total_bytes_tx += msg.data.n;
 				append_network_bw(&msg);
 			}
 			break;
         case READ:
+			msg.error = 0;
 			break;
         case WRITE:
 			switch(msg.error) {
