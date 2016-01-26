@@ -404,13 +404,18 @@ static void link_to_hash_key(struct link *link, char *key)
 __attribute__ (( format(printf,3,4) ))
 static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, const char *fmt, ... )
 {
-	char debug_msg[2*WORK_QUEUE_LINE_MAX];
 	va_list va;
-	va_list debug_va;
-
-	va_start(va,fmt);
-
 	time_t stoptime;
+	buffer_t B[1];
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
+	buffer_max(B, WORK_QUEUE_LINE_MAX);
+
+	va_start(va, fmt);
+	buffer_putvfstring(B, fmt, va);
+	va_end(va);
+
+	debug(D_WQ, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
 
 	//If foreman, then we wait until foreman gives the master some attention.
 	if(w->foreman)
@@ -418,13 +423,9 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	else
 		stoptime = time(0) + q->short_timeout;
 
-	sprintf(debug_msg, "tx to %s (%s): ", w->hostname, w->addrport);
-	strcat(debug_msg, fmt);
-	va_copy(debug_va, va);
-	vdebug(D_WQ, debug_msg, debug_va);
+	int result = link_putlstring(w->link, buffer_tostring(B), buffer_pos(B), stoptime);
 
-	int result = link_putvfstring(w->link, fmt, stoptime, va);
-	va_end(va);
+	buffer_free(B);
 
 	return result;
 }
