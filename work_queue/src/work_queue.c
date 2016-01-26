@@ -2584,8 +2584,6 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 		send_worker_msg(q, w,"env %zu\n%s\n", strlen(var), var);
 	}
 
-	char remote_name_encoded[PATH_MAX];
-
 	if(t->input_files) {
 		struct work_queue_file *tf;
 		list_first_item(t->input_files);
@@ -2593,6 +2591,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 			if(tf->type == WORK_QUEUE_DIRECTORY) {
 				send_worker_msg(q,w, "dir %s\n", tf->remote_name);
 			} else {
+				char remote_name_encoded[PATH_MAX];
 				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
 				send_worker_msg(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 			}
@@ -2603,6 +2602,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 		struct work_queue_file *tf;
 		list_first_item(t->output_files);
 		while((tf = list_next_item(t->output_files))) {
+			char remote_name_encoded[PATH_MAX];
 			url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
 			send_worker_msg(q,w, "outfile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 		}
