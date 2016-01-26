@@ -510,12 +510,6 @@ ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
 	return real_count;
 }
 
-void wakeup_pselect_from_exit(int signum)
-{
-	if(signum == SIGCONT)
-		signal(SIGCONT, SIG_DFL);
-}
-
 void exit_wrapper_preamble(int status)
 {
 	static int did_exit_wrapper = 0;
@@ -525,16 +519,11 @@ void exit_wrapper_preamble(int status)
 
 	did_exit_wrapper = 1;
 
-	sigset_t set_cont, set_prev;
-	void (*prev_handler)(int signum);
-	struct timespec timeout = {.tv_sec = 2, .tv_nsec = 0};
+	sigset_t all_signals;
+	sigfillset(&all_signals);
+	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0};
 
 	debug(D_RMON, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
-
-	prev_handler = signal(SIGCONT, wakeup_pselect_from_exit);
-	sigemptyset(&set_cont);
-	sigaddset(&set_cont, SIGCONT);
-	sigprocmask(SIG_BLOCK, &set_cont, &set_prev); //Adds SIGCONT to blocked signals.
 
 	struct rmonitor_msg msg;
 	msg.type   = END_WAIT;
@@ -544,11 +533,11 @@ void exit_wrapper_preamble(int status)
 
 	send_monitor_msg(&msg);
 
-	/* Wait at most timeout for monitor to send SIGCONT */
-	debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
-	pselect(0, NULL, NULL, NULL, &timeout, &set_prev);
-	signal(SIGCONT, prev_handler);
-	sigprocmask(SIG_SETMASK, &set_prev, NULL);
+	if(sigprocmask(SIG_SETMASK, &all_signals, NULL) != -1) {
+		/* Wait at most timeout for monitor to send SIGCONT */
+		debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
+		sigtimedwait(&all_signals, NULL, &timeout);
+	}
 
 	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }

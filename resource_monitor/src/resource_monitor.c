@@ -1099,9 +1099,10 @@ void cleanup_zombies(void)
       cleanup_zombie(p);
 }
 
-void release_waiting_process(pid_t pid)
+void release_waiting_process(uint64_t pid)
 {
-	kill(pid, SIGCONT);
+	debug(D_RMON, "sendig SIGCONT to %" PRIu64 ".", pid);
+	kill((pid_t) pid, SIGCONT);
 }
 
 void release_waiting_processes(void)
@@ -1238,11 +1239,14 @@ void rmonitor_final_cleanup(int signum)
         kill(pid, signum);
     }
 
-    ping_processes();
-    cleanup_zombies();
-
-    if(itable_size(processes) > 0)
-        sleep(5);
+	/* wait for processes to cleanup. We wait 5 seconds, but no more than 0.2 seconds at a time. */
+	int count = 25;
+	do{
+		usleep(200000);
+		ping_processes();
+		cleanup_zombies();
+		count--;
+	} while(itable_size(processes) > 0 && count > 0);
 
     if(!first_process_already_waited)
 	    rmonitor_check_child(signum);
@@ -1374,10 +1378,10 @@ int rmonitor_dispatch_msg(void)
 		if( msg.type == END_WAIT )
         {
 			release_waiting_process(msg.origin);
-			return;
+			return 1;
         }
 		else if(msg.type != BRANCH)
-			return;
+			return 1;
 	}
 
     switch(msg.type)
@@ -1451,46 +1455,51 @@ int rmonitor_dispatch_msg(void)
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
+	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 int wait_for_messages(int interval)
 {
-    struct timeval timeout;
+	struct timeval timeout;
+	timeout.tv_sec   = interval;
+	timeout.tv_usec  = 0;
 
-    debug(D_RMON, "sleeping for: %lf seconds\n", ((double) interval / ONE_SECOND));
+	debug(D_RMON, "sleeping for: %d seconds\n", interval);
 
-    //If grandchildren processes cannot talk to us, simply wait.
-    //Else, wait, and check socket for messages.
-    if (rmonitor_queue_fd < 0)
-    {
+	//If grandchildren processes cannot talk to us, simply wait.
+	//Else, wait, and check socket for messages.
+	if (rmonitor_queue_fd < 0)
+	{
 		/* wait for interval. */
-		timeout.tv_sec  = 0;
-		timeout.tv_usec = interval;
-
 		select(1, NULL, NULL, NULL, &timeout);
-    }
-    else
-    {
+	}
+	else
+	{
 
-	/* Figure out the number of file descriptors to pass to select */
-        int nfds = rmonitor_queue_fd + 1;
+		/* Figure out the number of file descriptors to pass to select */
+		int nfds = rmonitor_queue_fd + 1;
 		fd_set rset;
 
-        int count = 0;
+		int count = 0;
 		do
 		{
-			timeout.tv_sec   = 0;
-			timeout.tv_usec  = interval;
-			interval = 0;                     //Next loop we do not wait at all
-
 			FD_ZERO(&rset);
 			if (rmonitor_queue_fd > 0)   FD_SET(rmonitor_queue_fd,   &rset);
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
-			if(count > 0)
-				if (FD_ISSET(rmonitor_queue_fd, &rset)) rmonitor_dispatch_msg();
-
+			if(count > 0) {
+				if (FD_ISSET(rmonitor_queue_fd, &rset)) {
+					int urgent = rmonitor_dispatch_msg();
+					if(urgent) {
+						timeout.tv_sec  = 0;
+					}
+				}
+			}
 		} while(count > 0);
 	}
 
