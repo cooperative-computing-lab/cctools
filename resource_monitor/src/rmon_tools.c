@@ -8,8 +8,11 @@ struct field fields[NUM_FIELDS + 1] = {
 	[SWAP     ] = {"s", "swap memory",     "MB",    1, offsetof(struct rmDsummary, swap_memory)},
 	[B_READ   ] = {"r", "read bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_read)},
 	[B_WRITTEN] = {"w", "written bytes",   "MB",    1, offsetof(struct rmDsummary, bytes_written)},
+	[B_RX   ]   = {"R", "received bytes",  "MB",    1, offsetof(struct rmDsummary, bytes_received)},
+	[B_TX]      = {"W", "sent bytes",      "MB",    1, offsetof(struct rmDsummary, bytes_sent)},
+	[BANDWIDTH] = {"B", "bandwidth",       "bits/s",1, offsetof(struct rmDsummary, bandwidth)},
 	[FILES    ] = {"n", "num files",       "files", 1, offsetof(struct rmDsummary, total_files)},
-	[FOOTPRINT] = {"z", "footprint",       "MB",    1, offsetof(struct rmDsummary, disk)},
+	[DISK]      = {"z", "disk",            "MB",    1, offsetof(struct rmDsummary, disk)},
 	[CORES    ] = {"C", "cores",           "cores", 0, offsetof(struct rmDsummary, cores)},
 	[MAX_PROCESSES]   = {"p", "max processes",   "procs", 0, offsetof(struct rmDsummary, max_concurrent_processes)},
 	[TOTAL_PROCESSES] = {"P", "total processes", "procs", 0, offsetof(struct rmDsummary, total_processes)},
@@ -184,12 +187,20 @@ void parse_fields_options(char *field_str)
 				fields[B_WRITTEN].active = 1;
 				debug(D_DEBUG, "adding clustering field: bytes written\n");
 				break;
+			case 'R':
+				fields[B_RX].active = 1;
+				debug(D_DEBUG, "adding clustering field: bytes received\n");
+				break;
+			case 'W':
+				fields[B_TX].active = 1;
+				debug(D_DEBUG, "adding clustering field: bytes sent\n");
+				break;
 			case 'n':
 				fields[FILES].active = 1;
 				debug(D_DEBUG, "adding clustering field: number of files\n");
 				break;
 			case 'z':
-				fields[FOOTPRINT].active = 1;
+				fields[DISK].active = 1;
 				debug(D_DEBUG, "adding clustering field: footprint\n");
 				break;
 			case 'C':
@@ -273,6 +284,10 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename)
 
 	s->bytes_read    = bytes_to_Mbytes(so->bytes_read);
 	s->bytes_written = bytes_to_Mbytes(so->bytes_written);
+
+	s->bytes_received = bytes_to_Mbytes(so->bytes_received);
+	s->bytes_sent     = bytes_to_Mbytes(so->bytes_sent);
+	s->bandwidth      = bytes_to_Mbytes(so->bandwidth);
 
 	s->total_files = so->total_files;
 	s->disk = so->disk;

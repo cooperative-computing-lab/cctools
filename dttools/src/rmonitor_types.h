@@ -75,6 +75,13 @@ struct rmonitor_io_info
 	uint64_t delta_bytes_faulted;
 };
 
+struct rmonitor_bw_info
+{
+	uint64_t start;
+	uint64_t end;
+	uint64_t bit_count;
+};
+
 struct rmonitor_file_info
 {
 	uint64_t n_references;

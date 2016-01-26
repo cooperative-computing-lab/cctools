@@ -61,6 +61,12 @@ const char *str_msgtype(enum rmonitor_msg_type n)
 		case WRITE:
 			return "write";
 			break;
+		case RX:
+			return "received";
+			break;
+		case TX:
+			return "sent";
+			break;
 		default:
 			return "unknown";
 			break;
