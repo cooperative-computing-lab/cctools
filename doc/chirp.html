@@ -871,7 +871,8 @@ limitations, discussed below). Perhaps best of all, client jobs will no longer
 have any Hadoop or Java (version) dependencies.</p>
 
 <p>To run a Chirp server as a frontend to your HDFS filesystem,
-you will need to first set several environment variables which
+you will need to install the <tt>libhdfs-devel</tt> package
+and then set several environment variables which
 describe your Hadoop installation.  JAVA_HOME and HADOOP_HOME
 LIBHDFS_PATH should be set to indicate the location of the libhdfs library.
 Common values for the Cloudera Hadoop installation would be this:
