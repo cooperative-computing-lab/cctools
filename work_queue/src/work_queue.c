@@ -2581,7 +2581,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	char *var;
 	list_first_item(t->env_list);
 	while((var=list_next_item(t->env_list))) {
-		send_worker_msg(q, w,"env %d\n%s\n", (int) strlen(var), var);
+		send_worker_msg(q, w,"env %zu\n%s\n", strlen(var), var);
 	}
 
 	char remote_name_encoded[PATH_MAX];
