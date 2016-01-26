@@ -937,9 +937,6 @@ static void show_help_run(const char *cmd)
 int main(int argc, char *argv[])
 {
 	int c;
-	random_init();
-	debug_config(argv[0]);
-
 	const char *dagfile;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
@@ -973,6 +970,9 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+
+	random_init();
+	debug_config(argv[0]);
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
