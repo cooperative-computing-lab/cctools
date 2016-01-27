@@ -448,7 +448,6 @@ uint64_t dag_node_determine_descendant_weight(struct dag_node *n)
 void dag_node_determine_footprint(struct dag_node *n)
 {
 	struct dag_node *d;
-	struct dag_node_size *s;
 
 	n->parent_wgt = dag_node_determine_parent_weight(n);
 
