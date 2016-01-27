@@ -1,6 +1,7 @@
 #include "rmon_tools.h"
 #include "create_dir.h"
 #include "category.h"
+#include "macros.h"
 
 #include "copy_stream.h"
 
@@ -153,7 +154,7 @@ double set_bin_size_by_iqr(struct histogram *h)
 	if(v_75 > v_25)
 		return h->bin_size = 2*(v_75 - v_25)*pow((double) h->total_count, (-1.0/3.0));
 	else
-		return h->bin_size = 1;
+		return h->bin_size = 1.0;
 }
 
 uint64_t get_bucket_count(struct histogram *h, uint64_t bucket)
@@ -426,7 +427,6 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "unset border\n");
 	fprintf(f, "set style line 1 lc 16\n");
 	fprintf(f, "set style fill solid noborder 0.45\n");
-	fprintf(f, "set boxwidth 1.0*%lf absolute\n", h->bin_size);
 	fprintf(f, "set tmargin 2\n");
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
@@ -450,11 +450,13 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 
 	if( all->nbuckets == 1 )
 	{
+		fprintf(f, "set boxwidth 1.0*%lf absolute\n", (all->max_value - all->min_value + 1)/50.0);
 		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - 1, all->max_value + 2);
 	}
 	else
 	{
 		double gap = (all->max_value - all->min_value)/5.0;
+		fprintf(f, "set boxwidth 1.0*%lf absolute\n", MAX(0.1, h->bin_size));
 		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - gap, all->max_value + gap);
 	}
 
@@ -500,7 +502,6 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "unset border\n");
 	fprintf(f, "set style line 1 lc 16\n");
 	fprintf(f, "set style fill solid noborder 0.45\n");
-	fprintf(f, "set boxwidth 1.0*%lf absolute\n", h->bin_size);
 	fprintf(f, "set tmargin 2\n");
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
@@ -520,11 +521,13 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 
 	if( all->nbuckets == 1 )
 	{
+		fprintf(f, "set boxwidth 1.0*%lf absolute\n", (all->max_value - all->min_value + 1)/50.0);
 		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - 1, all->max_value + 2);
 	}
 	else
 	{
 		double gap = (all->max_value - all->min_value)/5.0;
+		fprintf(f, "set boxwidth 1.0*%lf absolute\n", h->bin_size);
 		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - gap, all->max_value + gap);
 	}
 
@@ -842,7 +845,7 @@ void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *pr
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
 	fprintf(stream, "<br><br>\n");
-	fprintf(stream, "%6.0lf\n", value_of_field(s, f));
+	fprintf(stream, "%d\n", (int) value_of_field(s, f));
 	fprintf(stream, "</td>\n");
 }
 
