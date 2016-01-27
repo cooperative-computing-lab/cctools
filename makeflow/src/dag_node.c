@@ -52,6 +52,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->source_size = -1;
 	n->target_size = -1;
+	n->updated = 0;
 
 	n->res_nodes = list_create();
 	n->wgt_nodes = list_create();
@@ -455,7 +456,8 @@ void dag_node_determine_footprint(struct dag_node *n)
 
 	set_first_element(n->descendants);
 	while((d = set_next_element(n->descendants))){
-		dag_node_determine_footprint(d);
+		if(!d->updated)
+			dag_node_determine_footprint(d);
 	}
 
 	n->descendant_wgt = dag_node_determine_descendant_weight(n);
@@ -469,29 +471,18 @@ void dag_node_determine_footprint(struct dag_node *n)
 	} else {
 		list_push_tail(n->wgt_nodes, dag_node_size_create(n, n->descendant_wgt));
 	}
+	n->updated = 1;
+}
 
-/*		USED FOR CHECKING EXPECTED SIZES
-*/
-	printf("Parent weight for %d : %" PRIu64"\n", n->nodeid, n->parent_wgt);
-	printf("Child weight for %d : %" PRIu64"\n", n->nodeid, n->child_wgt);
-	printf("Desc weight for %d : %" PRIu64"\n", n->nodeid, n->descendant_wgt);
-
-	list_first_item(n->run_nodes);
-	while((d = list_next_item(n->run_nodes)))
-		printf("%d\t", d->nodeid);
-	printf("\n");
-
-	list_first_item(n->wgt_nodes);
-	while((s = list_next_item(n->wgt_nodes))){
-		printf("(%d, %"PRIu64") ", s->n->nodeid, s->size);
+void dag_node_reset_updated(struct dag_node *n)
+{
+	struct dag_node *d;
+	set_first_element(n->descendants);
+	while((d = set_next_element(n->descendants))){
+		if(d->updated)
+			dag_node_reset_updated(d);
 	}
-	printf("\n");
-
-	list_first_item(n->res_nodes);
-	while((s = list_next_item(n->res_nodes))){
-		printf("(%d, %"PRIu64") ", s->n->nodeid, s->size);
-	}
-	printf("\n");fflush(stdout);
+	n->updated = 0;
 }
 
 void dag_node_init_resources(struct dag_node *n)

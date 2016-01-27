@@ -1228,6 +1228,7 @@ static void show_help_run(const char *cmd)
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
+	printf("    --storage-limit             Set storage limit within which Makeflow executes\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
@@ -1329,6 +1330,7 @@ int main(int argc, char *argv[])
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
+	uint64_t storage_limit = 0;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1373,6 +1375,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
+		LONG_OPT_STORAGE_LIMIT,
 		LONG_OPT_PASSWORD,
 		LONG_OPT_TICKETS,
 		LONG_OPT_VERBOSE_PARSING,
@@ -1450,6 +1453,7 @@ int main(int argc, char *argv[])
 		{"retry-count", required_argument, 0, 'r'},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
+		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
@@ -1736,6 +1740,9 @@ int main(int argc, char *argv[])
 				assert(shared_fs_list);
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
 				list_push_head(shared_fs_list, xxstrdup(optarg));
+				break;
+			case LONG_OPT_STORAGE_LIMIT:
+				storage_limit = string_metric_parse(optarg);
 				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
@@ -2091,7 +2098,8 @@ int main(int argc, char *argv[])
 
 	makeflow_parse_input_outputs(d);
 
-	makeflow_prepare_node_sizes(d);
+	if(storage_limit > 0)
+		makeflow_prepare_node_sizes(d);
 
 	makeflow_prepare_nested_jobs(d);
 

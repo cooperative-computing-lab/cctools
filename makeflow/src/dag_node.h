@@ -95,6 +95,8 @@ struct dag_node {
 	char *archive_id;
 
 	struct dag_node *next;              /* The next node in the list of nodes */
+
+	int updated;						/* Int indicating this node has updated its size */
 };
 
 struct dag_node_size {
@@ -115,6 +117,7 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 
 void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
+void dag_node_reset_updated(struct dag_node *n);
 
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
 char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n);
