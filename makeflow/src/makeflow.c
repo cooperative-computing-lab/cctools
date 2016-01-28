@@ -1228,7 +1228,7 @@ static void show_help_run(const char *cmd)
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
-	printf("    --storage-limit             Set storage limit within which Makeflow executes\n");
+	printf("    --storage-limit             Set storage limit for Makeflow (default is off)\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
@@ -1278,6 +1278,7 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs. (def: resource-rule-%%)\n");
+
 }
 
 int main(int argc, char *argv[])

@@ -26,6 +26,8 @@ typedef enum {
 	DAG_FILE_STATE_UP         /* UNUSED STATE, included for when files can be uploaded */
 } dag_file_state_t;
 
+
+
 typedef enum {
 	DAG_FILE_TYPE_INPUT,       /* File has no rule that creates it or is specified as input.
                                   No input files are cleaned in garbage collection */
