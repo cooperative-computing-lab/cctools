@@ -1455,7 +1455,6 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
 	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
-	batch_queue_set_option(remote_queue, "fast-abort",string_format("%f", wq_option_fast_abort_multiplier));
 	batch_queue_set_option(remote_queue, "priority", priority);
 	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
@@ -1465,6 +1464,10 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
+
+	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
+	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
+	free(fa_multiplier);
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 

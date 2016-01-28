@@ -99,6 +99,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 			set_insert(d->inputs, f);
 			debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
 		}
+		free(input_list);
 		free(argv);
 	} else {
 		debug(D_NOTICE, "MAKEFLOW_INPUTS is not specified");
@@ -120,6 +121,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 			set_remove(d->outputs, f);
 			debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
 		}
+		free(output_list);
 		free(argv);
 	} else {
 		debug(D_NOTICE, "MAKEFLOW_OUTPUTS is not specified");
