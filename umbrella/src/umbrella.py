@@ -130,43 +130,6 @@ pac_manager = {
 "yum": ("-y install", "info")
 }
 
-"""
-ec2 metadata
-the instance types provided by ec2 are undergoing changes as time goes by.
-"""
-ec2_json = {
-	"redhat-6.5-x86_64": {
-		"ami-2cf8901c": {
-			"ami": "ami-2cf8901c",
-			"root_device_type": "ebs",
-			"virtualization_type": "paravirtual",
-			"user": "ec2-user"
-		},
-		"ami-0b5f073b": {
-			"ami": "ami-0b5f073b",
-			"root_device_type": "ebs",
-			"virtualization_type": "paravirtual",
-			"user": "ec2-user"
-		}
-	},
-	"centos-6.6-x86_64": {
-		"ami-0b06483b": {
-			"ami": "ami-0b06483b",
-			"root_device_type": "ebs",
-			"virtualization_type": "paravirtual",
-			"user": "root"
-		}
-	},
-	"redhat-5.10-x86_64": {
-		"ami-d76a29e7": {
-			"ami": "ami-d76a29e7",
-			"root_device_type": "ebs",
-			"virtualization_type": "hvm",
-			"user": "root"
-		}
-	}
-}
-
 upload_count = 0
 
 def subprocess_error(cmd, rc, stdout, stderr):
@@ -680,8 +643,6 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 	if source[:4] == "git+":
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 		mount_value = dest
-		cleanup(tempfile_list, tempdir_list)
-		sys.exit("this is git source, can not support")
 	elif source[:4] == "osf+":
 		checksum = attr_check(name, item, "checksum")
 		form = attr_check(name, item, "format")
@@ -2156,7 +2117,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 		meta_path: the path of the json file including all the metadata information.
 		ssh_key: the name the private key file to use when connecting to an instance.
 		ec2_key_pair: the path of the key-pair to use when launching an instance.
-		ec2_security_group: the security group within which the EC2 instance should be run.
+		ec2_security_group: the security group id within which the EC2 instance should be run.
 		ec2_instance_type: the type of an Amazone ec2 instance
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		output_f_dict: the mappings of output files (key is the file path used by the application; value is the file path the user specifies.)
@@ -2181,65 +2142,44 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 		cleanup(tempfile_list, tempdir_list)
 		sys.exit("this spec has no hardware section!\n")
 
-	#According to the given specification file, the AMI and the instance type can be identified. os and arch can be used to decide the AMI; cores, memory and disk can be used to decide the instance type.
-	#decide the AMI according to (distro_name, distro_version, hardware_platform)
-	print "Deciding the AMI according to the umbrella specification ..."
+	# the instance types provided by the Amazon EC2 keep changing. So, the instance type will be provided by the user.
+	# The AMI will be provided by the author of the Umbrella spec.
+	print "Obtaining the AMI info from the umbrella specification ..."
 	name = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
-	if ec2_json.has_key(name):
-		if os_id[:4] != "ec2:":
-			for item in ec2_json[name]:
-				logging.debug("The AMI information is: ")
-				logging.debug(ec2_json[name][item])
-				ami = ec2_json[name][item]['ami']
-				user_name = ec2_json[name][item]['user']
-				break
-		else:
-			if ec2_json[name].has_key(os_id):
-				logging.debug("The AMI information is: ")
-				logging.debug(ec2_json[name][os_id])
-				ami = ec2_json[name][os_id]['ami']
-				user_name = ec2_json[name][os_id]['user']
-			else:
-				cleanup(tempfile_list, tempdir_list)
-				logging.critical("%s with the id <%s> is not in the ec2 json file (%s).", name, os_id, ec2_path)
-				sys.exit("%s with the id <%s> is not in the ec2 json file (%s)." % (name, os_id, ec2_path))
-	else:
-		cleanup(tempfile_list, tempdir_list)
-		logging.critical("%s is not in the ec2 json file (%s).", name, ec2_path)
-		sys.exit("%s is not in the ec2 json file (%s).\n" % (name, ec2_path))
+
+	if not spec_json["os"].has_key("ec2"):
+		logging.debug("To use ec2 execution engine, the os section should have a ec2 subsection providing the AMI, region and user info!")
+		sys.exit("To use ec2 execution engine, the os section should have a ec2 subsection providing the AMI, region and user info!")
+
+	ec2 = spec_json["os"]["ec2"]
+
+	ami = attr_check('', ec2, "ami")
+	user_name = attr_check('', ec2, "user")
+	region = attr_check('', ec2, "region")
+
+	#here we should judge the os type, yum is used by Fedora, CentOS, and REHL.
+	if distro_name not in ["fedora", "centos", "redhat"]:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("Currently the supported Linux distributions are redhat, centos and fedora.\n")
+			sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
 
 	#start the instance and obtain the instance id
 	print "Starting an Amazon EC2 instance ..."
-	instance_id = get_instance_id(ami, ec2_instance_type, ec2_key_pair, ec2_security_group)
-	logging.debug("Start the instance and obtain the instance id: %s", instance_id)
+	instance = launch_ec2_instance(ami, region, ec2_instance_type, ec2_key_pair, ec2_security_group)
+	logging.debug("Start the instance and obtain the instance id: %s", instance)
 
-	#get the public DNS of the instance_id
-	print "Obtaining the public DNS of the Amazon EC2 instance ..."
-	public_dns = get_public_dns(instance_id)
-	logging.debug("Get the public DNS of the instance_id: %s", public_dns)
-
-	'''
-
-	#instance_id = "<instance_id>"
-	#public_dns = "<public_dns>"
-
-	instance_id = "i-e61ad13c"
-	public_dns = "ec2-52-26-177-97.us-west-2.compute.amazonaws.com"
-	'''
+	#get the public DNS of the instance
+	public_ip = instance.public_ip_address
+	logging.debug("Get the public IP of the instance: %s", public_ip)
 
 	#install wget on the instance
 	print "Installing wget on the EC2 instance ..."
 	logging.debug("Install wget on the instance")
-	#here we should judge the os type, yum is used by Fedora, CentOS, and REHL.
-	if distro_name not in ["fedora", "centos", "redhat"]:
-			cleanup(tempfile_list, tempdir_list)
-			sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
-
 	#ssh exit code 255: the remote node is down or unavailable
 	rc = 300
 	while rc != 0:
 		#without `-t` option of ssh, if the username is not root, `ssh + sudo` will get the following error: sudo: sorry, you must have a tty to run sudo.
-		cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_dns)
+		cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_ip)
 		rc, stdout, stderr = func_call(cmd)
 		if rc != 0:
 			logging.debug("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s" % (cmd, rc, stdout, stderr))
@@ -2252,10 +2192,10 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 	python_url = "http://ccl.cse.nd.edu/research/data/hep-case-study/python-2.6.9-%s-%s.tar.gz" % (linux_distro, hardware_platform)
 	scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
 	python_url_filename = os.path.basename(path)
-	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo wget %s && sudo tar zxvf %s\'' % (ssh_key, user_name, public_dns, python_url, python_url_filename)
+	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo wget %s && sudo tar zxvf %s\'' % (ssh_key, user_name, public_ip, python_url, python_url_filename)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#scp umbrella, meta.json and input files to the instance
@@ -2267,17 +2207,24 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 
 	#here meta_path may start with http so need a special treatement
 	umbrella_fullpath = which_exec("umbrella")
+	if umbrella_fullpath == None:
+		cleanup(tempfile_list, tempdir_list)
+		terminate_instance(instance)
+		logging.critical("Failed to find the executable umbrella. Please modify your $PATH.")
+		sys.exit("Failed to find the executable umbrella. Please modify your $PATH.\n")
+
+	logging.debug("The full path of umbrella is: %s" % umbrella_fullpath)
 
 	if meta_option:
 		meta_option = " --meta ~%s/%s " % (user_name, os.path.basename(meta_path))
-		cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, meta_path, input_file_string, user_name, public_dns)
+		cmd = 'scp -i %s %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, meta_path, input_file_string, user_name, public_ip)
 	else:
 		meta_option = ""
-		cmd = 'scp -i %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, input_file_string, user_name, public_dns)
+		cmd = 'scp -i %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, input_file_string, user_name, public_ip)
 
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	#change the --inputs option to put all the inputs directory in the home dir of the instance
@@ -2300,6 +2247,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 	cmd = 'which cctools_python'
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 	cctools_python_path = stdout[:-1]
 
@@ -2316,45 +2264,54 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 	if output_option:
 		ec2_output_option = " -o '%s'" % output_option
 
-	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "sudo %s/bin/python ~%s/umbrella %s -s destructive --spec ~%s/%s %s --log ~%s/ec2_umbrella.log -l ec2_umbrella %s %s %s run \'%s\'"' % (ssh_key, user_name, public_dns, python_name, user_name, cvmfs_http_proxy_option, user_name, os.path.basename(spec_path), meta_option, user_name, ec2_output_option, new_input_options, env_option, user_cmd[0])
+	if not env_option:
+		env_option = ''
+
+	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "sudo %s/bin/python ~%s/umbrella %s -s destructive --spec ~%s/%s %s --log ~%s/ec2_umbrella.log -l ec2_umbrella %s %s %s run \'%s\'"' % (ssh_key, user_name, public_ip, python_name, user_name, cvmfs_http_proxy_option, user_name, os.path.basename(spec_path), meta_option, user_name, ec2_output_option, new_input_options, env_option, user_cmd[0])
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
+
+	print "\n********** STDOUT of the command **********"
+	print stdout
+
+	print "\n********** STDERR of the command **********"
+	print stderr
 
 	#postprocessing
 	print "Transferring the output of the user's task from the EC2 instance back to the local machine ..."
 	logging.debug("Create a tarball for the output dir on the instance.")
 
 	output = '%s %s' % (' '.join(output_f_dict.values()), ' '.join(output_d_dict.values()))
-	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo tar cvzf ~%s/output.tar.gz %s && sudo chown %s:%s ~%s/output.tar.gz ~%s/ec2_umbrella.log\'' % (ssh_key, user_name, public_dns, user_name, output, user_name, user_name, user_name, user_name)
+	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo tar cvzf ~%s/output.tar.gz %s && sudo chown %s:%s ~%s/output.tar.gz ~%s/ec2_umbrella.log\'' % (ssh_key, user_name, public_ip, user_name, output, user_name, user_name, user_name, user_name)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the output.tar.gz to the local machine.")
-	cmd = 'scp -i %s %s@%s:output.tar.gz %s/' % (ssh_key, user_name, public_dns, sandbox_dir)
+	cmd = 'scp -i %s %s@%s:output.tar.gz %s/' % (ssh_key, user_name, public_ip, sandbox_dir)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the remote umbrella log file to the local machine.")
-	cmd = 'scp -i %s %s@%s:ec2_umbrella.log %s' % (ssh_key, user_name, public_dns, ec2log_path)
+	cmd = 'scp -i %s %s@%s:ec2_umbrella.log %s' % (ssh_key, user_name, public_ip, ec2log_path)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	cmd = 'tar zxvf %s/output.tar.gz -C /' % (sandbox_dir)
 	rc, stdout, stderr = func_call(cmd)
 	if rc != 0:
-		terminate_instance(instance_id)
+		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	print "Terminating the EC2 instance ..."
-	terminate_instance(instance_id)
+	terminate_instance(instance)
 
 def obtain_package(spec_json):
 	"""Check whether this spec includes a package_manager section, which in turn includes a list attr.
@@ -2628,83 +2585,65 @@ def dependency_check(item):
 		print "Find the executable `%s` through $PATH." % item
 		return 0
 
-def get_instance_id(image_id, instance_type, ec2_key_pair, ec2_security_group):
+def launch_ec2_instance(image_id, region, instance_type, ec2_key_pair, ec2_security_group):
 	""" Start one VM instance through Amazon EC2 command line interface and return the instance id.
 
 	Args:
 		image_id: the Amazon Image Identifier.
+		region: the AWS region where the AMI specified by image_id belongs to. The instance will be launched within the same region.
 		instance_type: the Amazon EC2 instance type used for the task.
 		ec2_key_pair: the path of the key-pair to use when launching an instance.
-		ec2_security_group: the security group within which the EC2 instance should be run.
+		ec2_security_group: the security group id within which the EC2 instance should be run.
 
 	Returns:
-		If no error happens, returns the id of the started instance.
+		If no error happens, returns an EC2.Instance object.
 		Otherwise, directly exit.
 	"""
-	sg_option = ''
-	if ec2_security_group:
-		sg_option = ' -g ' + ec2_security_group
-	cmd = 'ec2-run-instances %s -t %s -k %s %s --associate-public-ip-address true' % (image_id, instance_type, ec2_key_pair, sg_option)
-	logging.debug("Starting an instance: %s", cmd)
-	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-	(stdout, stderr) = p.communicate()
-	rc = p.returncode
-	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, stdout, stderr)
-	if rc != 0:
-		subprocess_error(cmd, rc, stdout, stderr)
-	str = "\nINSTANCE"
-	index = stdout.find(str)
-	if index == -1:
-		cleanup(tempfile_list, tempdir_list)
-		sys.exit("Fail to get the instance id!")
-	else:
-		instance_id = stdout[(index+9):(index+20)]
-		return instance_id
+	# check the current user can access the region
+	client = boto3.client('ec2')
+	regions = (client.describe_regions())["Regions"]
+	region_avail = False
+	for i in regions:
+		if region == i["RegionName"]:
+			region_avail = True
+			break
 
-def terminate_instance(instance_id):
+	if not region_avail:
+		logging.critical("The AMI locates at the %s region, which is not available to your AWS account!", region)
+		sys.exit("The AMI locates at the %s region, which is not available to your AWS account!" % region)
+
+	session = boto3.session.Session(region_name=region)
+	ec2 = session.resource("ec2")
+
+	if ec2_security_group and ec2_security_group != '':
+		instances = ec2.create_instances(ImageId=image_id, MinCount=1, MaxCount=1, KeyName=ec2_key_pair, SecurityGroupIds=[ec2_security_group], InstanceType=instance_type)
+	else:
+		instances = ec2.create_instances(ImageId=image_id, MinCount=1, MaxCount=1, KeyName=ec2_key_pair, InstanceType=instance_type)
+
+	if len(instances) <= 0:
+		logging.critical("No instance was launched!")
+		sys.exit("No instance was launched!")
+
+	instance = instances[0]
+	instance.wait_until_running()
+
+	# Calls EC2.Client.describe_instances() to update the attributes of the Instance resource
+	instance.load()
+
+	return instance
+
+def terminate_instance(instance):
 	"""Terminate an instance.
 
 	Args:
-		instance_id: the id of the VM instance.
+		instance_id: an ec2.Instance object
 
 	Returns:
 		None.
 	"""
-	logging.debug("Terminate the ec2 instance: %s", instance_id)
-	cmd = 'ec2-terminate-instances %s' % instance_id
-	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-
-def get_public_dns(instance_id):
-	"""Get the public dns of one VM instance from Amazon EC2.
-	`ec2-run-instances` can not directly return the public dns of the instance, so this function is needed to check the result of `ec2-describe-instances` to obtain the public dns of the instance.
-
-	Args:
-		instance_id: the id of the VM instance.
-
-	Returns:
-		If no error happens, returns the public dns of the instance.
-		Otherwise, directly exit.
-	"""
-	public_dns = ''
-	while public_dns == None or public_dns == '' or public_dns == 'l':
-		cmd = 'ec2-describe-instances ' + instance_id
-		p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
-		(stdout, stderr) = p.communicate()
-		rc = p.returncode
-		logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, stdout, stderr)
-		if rc != 0:
-			subprocess_error(cmd, rc, stdout, stderr)
-
-		str = "\nPRIVATEIPADDRESS"
-		index = stdout.find(str)
-		if index >= 0:
-			index1 = stdout.find("ec2", index + 1)
-			if index1 == -1:
-				time.sleep(5)
-				continue
-			public_dns = stdout[index1:-1]
-			break
-	return public_dns
+	logging.debug("Terminate the ec2 instance:")
+	instance.terminate()
+	instance.wait_until_terminated()
 
 def add2spec(item, source_dict, target_dict):
 	"""Abstract the metadata information (source format checksum size) from source_dict (metadata database) and add these information into target_dict (umbrella spec).
@@ -3835,7 +3774,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="The path of the ec2 umbrella log file. Required for ec2 execution engines.",)
 	parser.add_option("-g", "--ec2_group",
 					action="store",
-					help="the security group within which an Amazon EC2 instance should be run. (only for ec2)",)
+					help="the security group id within which an Amazon EC2 instance should be run. (only for ec2)",)
 	parser.add_option("-k", "--ec2_key",
 					action="store",
 					help="the name of the key pair to use when launching an Amazon EC2 instance. (only for ec2)",)
@@ -4242,6 +4181,13 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.critical("The ssh key file (%s) does not exists!", ssh_key)
 				sys.exit("The ssh key file (%s) does not exists!\n" % ssh_key)
 
+			if not found_boto3 or not found_botocore:
+				cleanup(tempfile_list, tempdir_list)
+				logging.critical("\nUsing the Amazon EC2 resources requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
+				sys.exit("\nUsing the Amazon EC2 resources requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
+
+			# Here the security group id, instead of the security group name, is used to allow an instance to be launched into a nondefault VPC.
+			# the security group name can only be used to launch an instance into EC2-Classic or default VPC.
 			ec2_security_group = options.ec2_group
 			ec2_key_pair = options.ec2_key
 			ec2_instance_type = options.ec2_instance_type

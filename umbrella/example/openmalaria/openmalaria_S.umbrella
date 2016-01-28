@@ -12,6 +12,11 @@
 		"version": ">=2.6.18"
 	},
 	"os": {
+		"ec2": {
+			"ami": "ami-0b06483b",
+			"region": "us-west-2",
+			"user": "root"
+		},
 		"id": "902703f016e0f930a870eaf9cb31640b",
 		"name": "CentOS",
 		"version": "6.6",
