@@ -15,6 +15,11 @@
         "name": "yum"
     }, 
     "os": {
+        "ec2": {
+            "ami": "ami-0b06483b",
+            "region": "us-west-2",
+            "user": "root"
+        },
         "name": "CentOS", 
         "version": "6.6", 
         "id": "902703f016e0f930a870eaf9cb31640b"

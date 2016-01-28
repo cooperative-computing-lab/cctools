@@ -130,43 +130,6 @@ pac_manager = {
 "yum": ("-y install", "info")
 }
 
-"""
-ec2 metadata
-the instance types provided by ec2 are undergoing changes as time goes by.
-"""
-ec2_json = {
-	"redhat-6.5-x86_64": {
-		"ami-2cf8901c": {
-			"ami": "ami-2cf8901c",
-			"root_device_type": "ebs",
-			"virtualization_type": "paravirtual",
-			"user": "ec2-user"
-		},
-		"ami-0b5f073b": {
-			"ami": "ami-0b5f073b",
-			"root_device_type": "ebs",
-			"virtualization_type": "paravirtual",
-			"user": "ec2-user"
-		}
-	},
-	"centos-6.6-x86_64": {
-		"ami-0b06483b": {
-			"ami": "ami-0b06483b",
-			"root_device_type": "ebs",
-			"virtualization_type": "paravirtual",
-			"user": "root"
-		}
-	},
-	"redhat-5.10-x86_64": {
-		"ami-d76a29e7": {
-			"ami": "ami-d76a29e7",
-			"root_device_type": "ebs",
-			"virtualization_type": "hvm",
-			"user": "root"
-		}
-	}
-}
-
 upload_count = 0
 
 def subprocess_error(cmd, rc, stdout, stderr):
@@ -2179,32 +2142,20 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 		cleanup(tempfile_list, tempdir_list)
 		sys.exit("this spec has no hardware section!\n")
 
-	#According to the given specification file, the AMI and the instance type can be identified. os and arch can be used to decide the AMI; cores, memory and disk can be used to decide the instance type.
-	#decide the AMI according to (distro_name, distro_version, hardware_platform)
-	print "Deciding the AMI according to the umbrella specification ..."
+	# the instance types provided by the Amazon EC2 keep changing. So, the instance type will be provided by the user.
+	# The AMI will be provided by the author of the Umbrella spec.
+	print "Obtaining the AMI info from the umbrella specification ..."
 	name = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
-	if ec2_json.has_key(name):
-		if os_id[:4] != "ec2:":
-			for item in ec2_json[name]:
-				logging.debug("The AMI information is: ")
-				logging.debug(ec2_json[name][item])
-				ami = ec2_json[name][item]['ami']
-				user_name = ec2_json[name][item]['user']
-				break
-		else:
-			if ec2_json[name].has_key(os_id):
-				logging.debug("The AMI information is: ")
-				logging.debug(ec2_json[name][os_id])
-				ami = ec2_json[name][os_id]['ami']
-				user_name = ec2_json[name][os_id]['user']
-			else:
-				cleanup(tempfile_list, tempdir_list)
-				logging.critical("%s with the id <%s> is not in the ec2 json file (%s).", name, os_id, ec2_path)
-				sys.exit("%s with the id <%s> is not in the ec2 json file (%s)." % (name, os_id, ec2_path))
-	else:
-		cleanup(tempfile_list, tempdir_list)
-		logging.critical("%s is not in the ec2 json file (%s).", name, ec2_path)
-		sys.exit("%s is not in the ec2 json file (%s).\n" % (name, ec2_path))
+
+	if not spec_json["os"].has_key("ec2"):
+		logging.debug("To use ec2 execution engine, the os section should have a ec2 subsection providing the AMI, region and user info!")
+		sys.exit("To use ec2 execution engine, the os section should have a ec2 subsection providing the AMI, region and user info!")
+
+	ec2 = spec_json["os"]["ec2"]
+
+	ami = attr_check('', ec2, "ami")
+	user_name = attr_check('', ec2, "user")
+	region = attr_check('', ec2, "region")
 
 	#here we should judge the os type, yum is used by Fedora, CentOS, and REHL.
 	if distro_name not in ["fedora", "centos", "redhat"]:
@@ -2214,7 +2165,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 
 	#start the instance and obtain the instance id
 	print "Starting an Amazon EC2 instance ..."
-	instance = launch_ec2_instance(ami, ec2_instance_type, ec2_key_pair, ec2_security_group)
+	instance = launch_ec2_instance(ami, region, ec2_instance_type, ec2_key_pair, ec2_security_group)
 	logging.debug("Start the instance and obtain the instance id: %s", instance)
 
 	#get the public DNS of the instance
@@ -2634,11 +2585,12 @@ def dependency_check(item):
 		print "Find the executable `%s` through $PATH." % item
 		return 0
 
-def launch_ec2_instance(image_id, instance_type, ec2_key_pair, ec2_security_group):
+def launch_ec2_instance(image_id, region, instance_type, ec2_key_pair, ec2_security_group):
 	""" Start one VM instance through Amazon EC2 command line interface and return the instance id.
 
 	Args:
 		image_id: the Amazon Image Identifier.
+		region: the AWS region where the AMI specified by image_id belongs to. The instance will be launched within the same region.
 		instance_type: the Amazon EC2 instance type used for the task.
 		ec2_key_pair: the path of the key-pair to use when launching an instance.
 		ec2_security_group: the security group id within which the EC2 instance should be run.
@@ -2647,7 +2599,21 @@ def launch_ec2_instance(image_id, instance_type, ec2_key_pair, ec2_security_grou
 		If no error happens, returns an EC2.Instance object.
 		Otherwise, directly exit.
 	"""
-	ec2 = boto3.resource('ec2')
+	# check the current user can access the region
+	client = boto3.client('ec2')
+	regions = (client.describe_regions())["Regions"]
+	region_avail = False
+	for i in regions:
+		if region == i["RegionName"]:
+			region_avail = True
+			break
+
+	if not region_avail:
+		logging.critical("The AMI locates at the %s region, which is not available to your AWS account!", region)
+		sys.exit("The AMI locates at the %s region, which is not available to your AWS account!" % region)
+
+	session = boto3.session.Session(region_name=region)
+	ec2 = session.resource("ec2")
 
 	if ec2_security_group and ec2_security_group != '':
 		instances = ec2.create_instances(ImageId=image_id, MinCount=1, MaxCount=1, KeyName=ec2_key_pair, SecurityGroupIds=[ec2_security_group], InstanceType=instance_type)

@@ -11,6 +11,11 @@
 		"version": ">=2.6.32"
 	},
 	"os": {
+		"ec2": {
+			"ami": "ami-2cf8901c",
+			"region": "us-west-2",
+			"user": "ec2-user"
+		},
 		"id": "669ab5ef94af84d273f8f92a86b7907a",
 		"name": "Redhat",
 		"version": "6.5"
