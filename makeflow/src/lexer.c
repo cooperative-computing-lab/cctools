@@ -671,6 +671,10 @@ struct token *lexer_concat_expandable(struct lexer *lx, struct list *tokens)
 	}
 
 	t = lexer_pack_token(lx, TOKEN_LITERAL);
+
+	/* free lexeme allocated, as the buffer did the accumulation */
+	free(t->lexeme);
+
 	t->lexeme = xxstrdup(buffer_tostring(&b));
 	buffer_free(&b);
 
@@ -956,10 +960,10 @@ int lexer_read_command(struct lexer *lx)
 
 	if(list_size(tokens) < 2) {
 		/* If the only token in the list is a NEWLINE, then this is an empty line. */
-		while((t = list_pop_head(tokens)))
-			lexer_free_token(t);
-
+		t = list_pop_head(tokens);
+		lexer_free_token(t);
 		list_delete(tokens);
+
 		return 1;
 	}
 
@@ -1263,11 +1267,11 @@ struct lexer *lexer_create_substitution(struct lexer *lx, struct token *t)
 void lexer_delete(struct lexer *lx)
 {
 
-	list_free(lx->column_numbers);
+	list_delete(lx->column_numbers);
 
 	free(lx->lexeme);
 
-	list_free(lx->token_queue);
+	list_delete(lx->token_queue);
 
 	free(lx->buffer);
 
@@ -1301,9 +1305,11 @@ struct token *lexer_next_token(struct lexer *lx)
 
 	if(head)
 	{
-		if(lx->depth == 0)
-			debug(D_MAKEFLOW_LEXER, "%s", lexer_print_token(head));
-
+		if(lx->depth == 0) {
+			char *str = lexer_print_token(head);
+			debug(D_MAKEFLOW_LEXER, "%s", str);
+			free(str);
+		}
 		list_pop_head(lx->token_queue);
 	}
 

@@ -90,9 +90,10 @@ static int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 		lexer_free_token(t);
 	}
 
-	if(!t)
-	{
+	if(!t) {
 		lexer_report_error(bk, "Command does not end with newline.\n");
+	} else {
+		lexer_free_token(t);
 	}
 
 	n->command = xxstrdup(buffer_tostring(&b));
@@ -208,7 +209,7 @@ static int dag_parse(struct dag *d, FILE *stream)
 
 	dag_close_over_environment(d);
 	dag_compile_ancestors(d);
-	free(bk);
+	lexer_delete(bk);
 
 	return 1;
 }
