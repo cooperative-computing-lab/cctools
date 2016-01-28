@@ -56,6 +56,11 @@ struct dag_node {
 	uint64_t source_size;			/* size of dag_files of the node's requirements */
 	uint64_t target_size;			/* size of dag_files of the node's productions */
 
+	uint64_t residual_size;			/* Size of current residual, changes depending on
+										context of requesting node. */
+	uint64_t footprint_size;		/* Size of current largest footprint, changes depending
+										on context of requesting node. */
+
 	uint64_t footprint;				/* Size of the largest defined footprint */
 	uint64_t parent_footprint;		/* size of dag_files of my output's and my parents' */
 	uint64_t child_footprint;		/* size of dag_files of my output's and my child's */
