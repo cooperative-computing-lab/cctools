@@ -82,8 +82,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 int dag_node_comp(void *item, const void *arg)
 {
-	struct dag_node *node1 = ((struct dag_node *) item);
-	struct dag_node *node2 = ((struct dag_node *) arg);
+	struct dag_node *node1 = (struct dag_node *)item;
+	struct dag_node *node2 = (struct dag_node *)arg;
 
 	if(node1 == node2)
 		return 1;
@@ -92,10 +92,14 @@ int dag_node_comp(void *item, const void *arg)
 
 int dag_node_comp_residual(const void *item, const void *arg)
 {
-	struct dag_node *node1 = ((struct dag_node *) item);
-	struct dag_node *node2 = ((struct dag_node *) arg);
-
-	return (node1->residual_size - node2->residual_size);
+	struct dag_node *node1 = (struct dag_node *)item;
+	struct dag_node *node2 = (struct dag_node *)arg;
+	printf("%d\t:\t%d\n", node1->nodeid, node2->nodeid);
+	if(node1->residual_size > node2->residual_size)
+		return 1;
+	else if(node1->residual_size < node2->residual_size)
+		return -1;
+	return 0;
 }
 
 const char *dag_node_state_name(dag_node_state_t state)
@@ -313,7 +317,7 @@ void dag_node_prepare_node_size(struct dag_node *n)
 		dag_node_prepare_node_size(s);
 
 	/* Mark this node as having been updated for size */
-	s->size_updated = 1;
+	n->size_updated = 1;
 }
 
 /* The parent footprint of a node is defined as its target size and
@@ -433,7 +437,7 @@ uint64_t dag_node_determine_descendant_footprint(struct dag_node *n)
 			/* Since the current node in the residual nodes is the first uncommon
 				node between branches is is the last node that we will need to
 				store while other nodes are computed. */
-			node2 = list_peek_current(node2->residual_nodes);
+			node2 = list_peek_current(node1->residual_nodes);
 			if(node2)
 				node1->residual_size = node2->target_size;
 		}
@@ -498,7 +502,10 @@ uint64_t dag_node_determine_descendant_footprint(struct dag_node *n)
 			if(max_branch < node1->footprint_size || (max_branch == node1->footprint_size && node_footprint < n->descendant_footprint)){
 				max_branch = node1->footprint_size;
 				n->descendant_footprint = node_footprint;
-				list_sort(tmp_run_order, (int (*)(const void *, const void *)) dag_node_comp_residual);
+
+				printf("%d\n", ((struct dag_node *)list_peek_head(tmp_run_order))->nodeid);
+				list_sort(tmp_run_order, dag_node_comp_residual);
+				printf("%d\n", ((struct dag_node *)list_peek_head(tmp_run_order))->nodeid);
 				/* Add to run order, as we push tail this will be last. */
 				list_push_tail(tmp_run_order, node1);
 

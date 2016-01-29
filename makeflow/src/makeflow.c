@@ -344,6 +344,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	list_first_item(outputs);
 	while((f1 = list_next_item(outputs)))
 		makeflow_clean_file(d, remote_queue, f1, 0);
+	list_delete(outputs);
 	makeflow_clean_node(d, remote_queue, n, 0);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
