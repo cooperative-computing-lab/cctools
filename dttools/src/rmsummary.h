@@ -107,4 +107,7 @@ void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_debug_report(const struct rmsummary *s);
 
+double rmsummary_to_external_unit(const char *field, int64_t n);
+int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit);
+
 #endif

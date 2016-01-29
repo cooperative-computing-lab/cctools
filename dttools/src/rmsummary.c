@@ -32,8 +32,131 @@
 #include "rmsummary.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "hash_table.h"
 
 #define MAX_LINE 1024
+
+static int units_initialized = 0;
+static struct hash_table *conversion_fields = NULL;
+static struct hash_table *multiplier_of     = NULL;
+
+struct conversion_field {
+	char *name;
+	char *internal_unit;
+	char *external_unit;
+	int  float_flag;
+};
+
+void add_conversion_field(const char *name, const char *internal, const char *external, int float_flag) {
+	struct conversion_field *c = malloc(sizeof(struct conversion_field));
+
+	c->name          = xxstrdup(name);
+	c->internal_unit = xxstrdup(internal);
+	c->external_unit = xxstrdup(external);
+	c->float_flag    = float_flag;
+
+	hash_table_insert(conversion_fields, name, (void *) c);
+}
+
+void initialize_units() {
+	units_initialized = 1;
+
+	conversion_fields = hash_table_create(32, 0);
+	multiplier_of     = hash_table_create(32, 0);
+
+	add_conversion_field("wall_time",                "us",     "s",       1);
+	add_conversion_field("cpu_time",                 "us",     "s",       1);
+	add_conversion_field("start",                    "us",     "us",      0);
+	add_conversion_field("end",                      "us",     "us",      0);
+	add_conversion_field("memory",                   "MB",     "MB",      0);
+	add_conversion_field("virtual_memory",           "MB",     "MB",      0);
+	add_conversion_field("swap_memory",              "MB",     "MB",      0);
+	add_conversion_field("disk",                     "MB",     "MB",      0);
+	add_conversion_field("bytes_read",               "B",      "MB",      1);
+	add_conversion_field("bytes_written",            "B",      "MB",      1);
+	add_conversion_field("bytes_received",           "B",      "MB",      1);
+	add_conversion_field("bytes_sent",               "B",      "MB",      1);
+	add_conversion_field("bandwidth",                "bits/s", "Mbits/s", 1);
+	add_conversion_field("cores",                    "cores",  "cores",   0);
+	add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
+	add_conversion_field("total_processes",          "procs",  "procs",   0);
+	add_conversion_field("total_files",              "files",  "files",   0);
+
+	/* to internal units */
+	hash_table_insert(multiplier_of, "us",    (void **) 1);
+	hash_table_insert(multiplier_of, "B",     (void **) 1);
+	hash_table_insert(multiplier_of, "bits/s",(void **) 1);
+	hash_table_insert(multiplier_of, "cores", (void **) 1);
+	hash_table_insert(multiplier_of, "procs", (void **) 1);
+	hash_table_insert(multiplier_of, "files", (void **) 1);
+
+	/* size units */
+	hash_table_insert(multiplier_of, "kB", (void **) KILOBYTE);
+	hash_table_insert(multiplier_of, "MB", (void **) MEGABYTE);
+	hash_table_insert(multiplier_of, "GB", (void **) GIGABYTE);
+
+	/* time units */
+	hash_table_insert(multiplier_of, "s",  (void **) USECOND);
+	hash_table_insert(multiplier_of, "ms", (void **) 1000);
+
+	/* rate units */
+	hash_table_insert(multiplier_of, "Gbits/s",  (void **) 1000000000);
+	hash_table_insert(multiplier_of, "Mbits/s",  (void **) 1000000);
+}
+
+int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit) {
+
+	if(!units_initialized)
+		initialize_units();
+
+	uintptr_t multiplier = (uintptr_t) hash_table_lookup(multiplier_of, unit);
+
+	if(!multiplier) {
+		warn(D_DEBUG, "Unknown units: '%s'", unit);
+		return 0;
+	}
+
+	input_number *= multiplier;
+
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
+	if(!cf) {
+		warn(D_DEBUG, "Unknown field: '%s'", field);
+		return 0;
+	}
+
+	const char *to_unit = cf->internal_unit;
+	if(to_unit && strcmp("MB", to_unit) == 0) {
+		input_number /= MEGABYTE;
+	}
+
+	*output_number = (int64_t) input_number;
+
+	return 1;
+}
+
+double rmsummary_to_external_unit(const char *field, int64_t n) {
+
+	if(!units_initialized)
+		initialize_units();
+
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
+
+	const char *to_unit   = cf->external_unit;
+	const char *from_unit = cf->internal_unit;
+
+	if(from_unit && to_unit && (strcmp(from_unit, to_unit) == 0)) {
+		return (double) n;
+	}
+
+	uintptr_t divider = (uintptr_t) hash_table_lookup(multiplier_of, to_unit);
+
+	if(!divider)
+		fatal("Unknown units: '%s'", to_unit);
+
+	double nd = ((double) n) / divider;
+
+	return nd;
+}
 
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
@@ -274,87 +397,40 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 }
 
 
+#define field_to_json(o, s, f)\
+	if((s)->f > -1) {\
+		struct conversion_field *cf = hash_table_lookup(conversion_fields, #f);\
+		if(cf) {\
+			struct jx *array = jx_arrayv(\
+					cf->float_flag ? jx_double(rmsummary_to_external_unit(#f, (s)->f)) : jx_integer(rmsummary_to_external_unit(#f, (s)->f))\
+					, jx_string(cf->external_unit), NULL);\
+			jx_insert(o, jx_string(#f), array);\
+		}\
+	}
 
 struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
+	if(!units_initialized)
+		initialize_units();
+
 	struct jx *output = jx_object(NULL);
-	struct jx *array;
 
-	if(s->disk > -1) {
-		array = jx_arrayv(jx_integer(s->disk), jx_string("MB"), NULL);
-		jx_insert(output, jx_string("disk"), array);
-	}
-
-	if(s->total_files > -1)
-		jx_insert_integer(output, "total_files",   s->total_files);
-
-	if(s->bandwidth > -1) {
-		array = jx_arrayv(jx_integer(s->bandwidth), jx_string("bits/s"), NULL);
-		jx_insert(output, jx_string("bandwidth"), array);
-	}
-
-	if(s->bytes_sent > -1) {
-		array = jx_arrayv(jx_integer(s->bytes_sent), jx_string("B"), NULL);
-		jx_insert(output, jx_string("bytes_sent"), array);
-	}
-
-	if(s->bytes_received > -1) {
-		array = jx_arrayv(jx_integer(s->bytes_received), jx_string("B"), NULL);
-		jx_insert(output, jx_string("bytes_received"), array);
-	}
-
-	if(s->bytes_written > -1) {
-		array = jx_arrayv(jx_integer(s->bytes_written), jx_string("B"), NULL);
-		jx_insert(output, jx_string("bytes_written"), array);
-	}
-
-	if(s->bytes_read > -1) {
-		array = jx_arrayv(jx_integer(s->bytes_read), jx_string("B"), NULL);
-		jx_insert(output, jx_string("bytes_read"), array);
-	}
-
-	if(s->swap_memory > -1) {
-		array = jx_arrayv(jx_integer(s->swap_memory), jx_string("MB"), NULL);
-		jx_insert(output, jx_string("swap_memory"), array);
-	}
-
-	if(s->memory > -1) {
-		array = jx_arrayv(jx_integer(s->memory), jx_string("MB"), NULL);
-		jx_insert(output, jx_string("memory"), array);
-	}
-
-	if(s->virtual_memory > -1) {
-		array = jx_arrayv(jx_integer(s->virtual_memory), jx_string("MB"), NULL);
-		jx_insert(output, jx_string("virtual_memory"), array);
-	}
-
-	if(s->total_processes > -1)
-		jx_insert_integer(output, "total_processes",   s->total_processes);
-
-	if(s->max_concurrent_processes > -1)
-		jx_insert_integer(output, "max_concurrent_processes",   s->max_concurrent_processes);
-
-	if(s->cores > -1)
-		jx_insert_integer(output, "cores",   s->cores);
-
-	if(s->cpu_time > -1) {
-		array = jx_arrayv(jx_integer(s->cpu_time), jx_string("us"), NULL);
-		jx_insert(output, jx_string("cpu_time"), array);
-	}
-
-	if(s->wall_time > -1) {
-		array = jx_arrayv(jx_integer(s->wall_time), jx_string("us"), NULL);
-		jx_insert(output, jx_string("wall_time"), array);
-	}
-
-	if(s->end > -1) {
-		array = jx_arrayv(jx_integer(s->end), jx_string("us"), NULL);
-		jx_insert(output, jx_string("end"), array);
-	}
-
-	if(s->start > -1) {
-		array = jx_arrayv(jx_integer(s->start), jx_string("us"), NULL);
-		jx_insert(output, jx_string("start"), array);
-	}
+	field_to_json(output, s, disk);
+	field_to_json(output, s, total_files);
+	field_to_json(output, s, bandwidth);
+	field_to_json(output, s, bytes_sent);
+	field_to_json(output, s, bytes_received);
+	field_to_json(output, s, bytes_written);
+	field_to_json(output, s, bytes_read);
+	field_to_json(output, s, swap_memory);
+	field_to_json(output, s, virtual_memory);
+	field_to_json(output, s, memory);
+	field_to_json(output, s, total_processes);
+	field_to_json(output, s, max_concurrent_processes);
+	field_to_json(output, s, cores);
+	field_to_json(output, s, cpu_time);
+	field_to_json(output, s, wall_time);
+	field_to_json(output, s, end);
+	field_to_json(output, s, start);
 
 	if(!only_resources) {
 		if(s->exit_type)
@@ -415,26 +491,7 @@ static int json_number_of_array(struct jx *array, char *field, int64_t *number) 
 
 	char *unit = second->value->u.string_value;
 
-	/* all values in MB, or useconds. Incomplete list! */
-
-	if(strcmp(unit, "us") == 0) {
-		result *= 1;
-	} else if(strcmp(unit, "s") == 0) {
-		result *= USECOND;
-	} else if(strcmp(unit, "MB") == 0) {
-		result *= 1;
-	} else if(strcmp(unit, "B") == 0) {
-		result *= MEGABYTE;
-	}
-
-	/* round for worst case. */
-	if(strcmp(field, "start") == 0) {
-		*number = (int64_t) floor(result);
-	} else {
-		*number = (int64_t) ceil(result);
-	}
-
-	return 1;
+	return rmsummary_to_internal_unit(field, result, number, unit);
 }
 
 struct rmsummary *json_to_rmsummary(struct jx *j) {
@@ -707,15 +764,15 @@ void rmsummary_debug_report(const struct rmsummary *s)
 	if(s->swap_memory != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "swap_memory", s->swap_memory);
 	if(s->bytes_read != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_read", s->bytes_read);
+		debug(D_DEBUG, "max resource %-18s B: %" PRId64 "\n", "bytes_read", s->bytes_read);
 	if(s->bytes_written != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_written", s->bytes_written);
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_written", s->bytes_written);
 	if(s->bytes_received != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_received", s->bytes_received);
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_received", s->bytes_received);
 	if(s->bytes_sent != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bytes_sent", s->bytes_sent);
+		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_sent", s->bytes_sent);
 	if(s->bandwidth != -1)
-		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "bandwidth", s->bandwidth);
+		debug(D_DEBUG, "max resource %-18s b/s: %" PRId64 "\n", "bandwidth", s->bandwidth);
 	if(s->total_files != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
 	if(s->disk != -1)
