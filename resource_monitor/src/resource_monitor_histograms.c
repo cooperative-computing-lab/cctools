@@ -731,7 +731,7 @@ void find_max_of_category(struct rmDsummary_set *s, struct hash_table *categorie
 		rmsummary_assign_int_field(c->max_allocation, f->name, (int64_t) value_of_p(h, .99));
 	}
 
-	category_update_first_allocation(categories, s->category, c->max_allocation);
+	category_update_first_allocation(categories, s->category);
 
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{

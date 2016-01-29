@@ -32,11 +32,15 @@ struct category {
 	struct itable *wall_time_histogram;
 	struct itable *cpu_time_histogram;
 	struct itable *max_concurrent_processes_histogram;
+	struct itable *total_processes_histogram;
 	struct itable *memory_histogram;
 	struct itable *swap_memory_histogram;
 	struct itable *virtual_memory_histogram;
 	struct itable *bytes_read_histogram;
 	struct itable *bytes_written_histogram;
+	struct itable *bytes_received_histogram;
+	struct itable *bytes_sent_histogram;
+	struct itable *bandwidth_histogram;
 	struct itable *total_files_histogram;
 	struct itable *disk_histogram;
 
