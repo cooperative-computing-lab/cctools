@@ -85,6 +85,7 @@ struct field {
 	char  *name;
 	char  *caption;
 	char  *units;
+	int    cummulative;
 	int    active;
 	size_t offset;
 };
@@ -95,13 +96,6 @@ extern struct field fields[];
 
 #define assign_to_field(s, f, v)\
 	*((double *) ((char *) s + (f)->offset)) = (double) v
-
-double usecs_to_secs(double usecs);
-double secs_to_usecs(double secs);
-double bytes_to_Mbytes(double bytes);
-double Mbytes_to_bytes(double Mbytes);
-double bytes_to_Gbytes(double bytes);
-double Mbytes_to_Gbytes(double Mbytes);
 
 char *sanitize_path_name(char *name);
 

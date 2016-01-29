@@ -1,3 +1,5 @@
+#include <float.h>
+
 #include "rmon_tools.h"
 #include "create_dir.h"
 #include "category.h"
@@ -9,6 +11,8 @@
 
 #define OUTLIER_DIR "outliers"
 #define OUTLIER_N    5
+
+#define MAX_P        1.00
 
 #define value_at_index(h, idx) (value_of_field((h)->summaries_sorted[(idx)], (h)->resource))
 
@@ -45,8 +49,6 @@ struct histogram {
 	uint64_t count_at_min_value;
 	uint64_t count_at_max_value;
 
-	int64_t first_value;
-
 	uint64_t  max_count;             //i.e., how many times the mode occurs.
 	uint64_t  min_count;
 	double    value_at_max_count;    //i.e., mode
@@ -58,6 +60,9 @@ struct histogram {
 
 	double kurtosis;
 	double skewdness;
+
+	uint64_t first_allocation_histogram;
+	uint64_t first_allocation_bruteforce;
 
 	struct itable *buckets;
 	uint64_t  nbuckets;
@@ -633,7 +638,7 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 	itable_insert(source->histograms, (uint64_t) ((uintptr_t) f), (void *) h);
 
-	debug(D_DEBUG, "%s-%s:\n buckets: %" PRIu64 " bin_size: %lf max_count: %" PRIu64 " mode: %lf\n", h->source->category, h->resource->caption, h->nbuckets, h->bin_size, h->max_count, h->value_at_max_count);
+	debug(D_RMON, "%s-%s:\n buckets: %" PRIu64 " bin_size: %lf max_count: %" PRIu64 " mode: %lf\n", h->source->category, h->resource->caption, h->nbuckets, h->bin_size, h->max_count, h->value_at_max_count);
 
 	return h;
 }
@@ -653,11 +658,11 @@ void write_histogram_stats_header(FILE *stream)
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	char *resource_no_spaces = sanitize_path_name(h->resource->name);
-	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %" PRId64 " %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
+	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %" PRId64 " %" PRId64 " %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
 			resource_no_spaces,
 			h->total_count,
 			h->mean, h->std_dev, h->skewdness, h->kurtosis,
-			h->max_value, h->min_value, h->first_value,
+			h->max_value, h->min_value, h->first_allocation_histogram, h->first_allocation_bruteforce,
 			value_of_p(h, 0.25),
 			value_of_p(h, 0.50),
 			value_of_p(h, 0.75),
@@ -714,7 +719,7 @@ void plots_of_category(struct rmDsummary_set *s)
 	}
 }
 
-void find_max_of_category(struct rmDsummary_set *s, struct hash_table *categories) {
+void find_first_allocation_of_category_histogram(struct rmDsummary_set *s, struct hash_table *categories) {
 	struct field *f;
 	struct histogram *h;
 
@@ -728,7 +733,10 @@ void find_max_of_category(struct rmDsummary_set *s, struct hash_table *categorie
 			continue;
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-		rmsummary_assign_int_field(c->max_allocation, f->name, (int64_t) value_of_p(h, .99));
+
+		int64_t value;
+		rmsummary_to_internal_unit(f->name, value_of_p(h, MAX_P), &value, f->units);
+		rmsummary_assign_int_field(c->max_allocation, f->name, value);
 	}
 
 	category_update_first_allocation(categories, s->category);
@@ -740,14 +748,82 @@ void find_max_of_category(struct rmDsummary_set *s, struct hash_table *categorie
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
-		int64_t first = -1;
+		h->first_allocation_histogram = -1;
 		if(c->first_allocation) {
-			first = rmsummary_get_int_field(c->first_allocation, f->name);
+			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
+			h->first_allocation_histogram = rmsummary_to_external_unit(f->name, first);
 		}
-
-		h->first_value = first;
 	}
 }
+
+void find_first_allocation_of_field_bruteforce(struct rmDsummary_set *s, struct field *f) {
+	struct histogram *h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+
+	double min_waste     = DBL_MAX;
+	int64_t min_candidate = value_of_p(h, MAX_P);
+	int64_t max_candidate = value_of_p(h, MAX_P);
+
+	uint64_t prev = 0;
+	for(int i = 0; i < h->total_count; i++) {
+		uint64_t candidate = value_of_field(h->summaries_sorted[i], f);
+		double candidate_waste   = 0;
+
+		if( i > 0 ) {
+			if(candidate - prev < 1)
+				continue;
+		}
+
+		for(int j = 0; j < h->total_count; j+=100) {
+			double current   = value_of_field(h->summaries_sorted[j], f);
+
+			double wall_time;
+			if(f->cummulative) {
+				wall_time = 1;
+			} else {
+				wall_time = h->summaries_sorted[j]->wall_time;
+			}
+
+			if(max_candidate < current)
+				continue;
+
+			double current_waste;
+			if(current > candidate) {
+				current_waste = (max_candidate - current + candidate)*wall_time;
+			} else {
+				current_waste = (candidate - current)*wall_time;
+			}
+
+			candidate_waste += current_waste;
+
+			if(candidate_waste > min_waste)
+				break;
+		}
+
+		if(candidate_waste < min_waste) {
+			min_candidate = candidate;
+			min_waste     = candidate_waste;
+		}
+
+		prev = candidate;
+	}
+
+	debug(D_RMON, "first allocation '%s' brute force: %" PRId64, f->caption, min_candidate);
+
+	h->first_allocation_bruteforce = min_candidate;
+}
+
+void find_first_allocation_of_category_bruteforce(struct rmDsummary_set *s) {
+	struct field *f;
+
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(!f->active)
+			continue;
+
+		find_first_allocation_of_field_bruteforce(s, f);
+	}
+}
+
 
 void write_stats_of_category(struct rmDsummary_set *s)
 {
@@ -878,11 +954,10 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >p_50</td>");
 	fprintf(stream, "<td class=\"datahdr\" >min</td>");
 	fprintf(stream, "<td class=\"datahdr\" >1st alloc.</td>");
+	fprintf(stream, "<td class=\"datahdr\" >1st alloc. b.f.</td>");
 	fprintf(stream, "<td class=\"datahdr\" >mode</td>");
 	fprintf(stream, "<td class=\"datahdr\" >&mu;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >&sigma;</td>");
-	fprintf(stream, "<td class=\"datahdr\" >z_99</td>");
-	fprintf(stream, "<td class=\"datahdr\" >z_95</td>");
 }
 
 void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int include_thumbnail)
@@ -915,7 +990,11 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	write_outlier(stream, s, f, prefix);
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->first_value);
+	fprintf(stream, "%" PRId64 "\n", h->first_allocation_histogram);
+	fprintf(stream, "</td>\n");
+
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
+	fprintf(stream, "%" PRId64 "\n", h->first_allocation_bruteforce);
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
@@ -929,15 +1008,6 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%6.0lf\n", h->std_dev);
 	fprintf(stream, "</td>\n");
-
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->z_99);
-	fprintf(stream, "</td>\n");
-
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->z_95);
-	fprintf(stream, "</td>\n");
-
 }
 
 void write_individual_histogram_webpage(struct histogram *h)
@@ -1204,7 +1274,8 @@ int main(int argc, char **argv)
 		while((s = list_next_item(all_sets)))
 		{
 			histograms_of_category(s);
-			find_max_of_category(s, categories);
+			find_first_allocation_of_category_histogram(s, categories);
+			find_first_allocation_of_category_bruteforce(s);
 			write_stats_of_category(s);
 			write_limits_of_category(s, 0.95);
 
