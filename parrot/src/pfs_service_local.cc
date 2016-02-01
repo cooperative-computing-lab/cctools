@@ -706,10 +706,6 @@ public:
 		return loc;
 	}
 
-virtual int can_open_dirs() {
-	return 1;
-}
-
 	virtual int is_seekable() {
 		return 1;
 	}

@@ -650,12 +650,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 			}
-		} else if(!pname.service->can_open_dirs() && (flags&O_DIRECTORY)) {
-			// This is a hack to maintain compatibility with the interpretation
-			// of O_DIRECTORY used in some of the services. If getdents fails
-			// on certain remote services or similar strangeness,
-			// this is a good place to start looking.
-			file = pname.service->getdir(&pname);
+			free(fd);
 		} else if(pname.service->is_seekable()) {
 			if(force_cache) {
 				file = pfs_cache_open(&pname,flags,mode);
@@ -669,7 +664,6 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				file = pfs_cache_open(&pname,flags,mode);
 			}
 		}
-		free(fd);
 		free(pid);
 	} else {
 		file = 0;

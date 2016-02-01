@@ -26,7 +26,6 @@ public:
 	virtual int tilde_is_special();
 	virtual int is_seekable();
 	virtual int is_local();
-	virtual int can_open_dirs();
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode );
 	virtual pfs_dir * getdir( pfs_name *name );
