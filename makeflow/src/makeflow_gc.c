@@ -102,7 +102,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 		free(input_list);
 		free(argv);
 	} else {
-		debug(D_NOTICE, "MAKEFLOW_INPUTS is not specified");
+		debug(D_MAKEFLOW_RUN, "MAKEFLOW_INPUTS is not specified");
 	}
 	/* add all source files */
 	hash_table_firstkey(d->files);
@@ -124,7 +124,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 		free(output_list);
 		free(argv);
 	} else {
-		debug(D_NOTICE, "MAKEFLOW_OUTPUTS is not specified");
+		debug(D_MAKEFLOW_RUN, "MAKEFLOW_OUTPUTS is not specified");
 		/* add all sink if OUTPUTS not specified */
 		hash_table_firstkey(d->files);
 		while((hash_table_nextkey(d->files, &filename, (void **) &f)))
@@ -143,21 +143,15 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 		return 1;
 
 	if(batch_fs_unlink(queue, f->filename) == 0) {
-		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
 
-		if(!silent)
-			debug(D_NOTICE, "Makeflow: Deleted path %s\n", f->filename);
 	} else if(errno != ENOENT) {
 		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 
-		if(!silent) {
-			debug(D_NOTICE, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
-			return 1;
-		} else {
 			debug(D_MAKEFLOW_RUN, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
-		}
+			return 1;
 	}
 	return 0;
 }
