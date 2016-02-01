@@ -75,6 +75,11 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+struct {
+    int local_mem;
+    int local_cores;
+    int local_disk;
+} loc_info;
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -101,6 +106,7 @@ static struct batch_queue *remote_queue = 0;
 
 static int local_jobs_max = 1;
 static int remote_jobs_max = 100;
+
 
 static char *project = NULL;
 static int port = 0;
@@ -452,6 +458,65 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 
 	return 0;
 }
+/*
+ * Returns 1 if a node is being ran locally, 0 if it isn't being ran locally
+ */
+static int makeflow_is_local_node(struct dag_node *n)
+{
+	return (batch_queue_type == BATCH_QUEUE_TYPE_LOCAL || (n->local_job && local_queue));
+}
+/*
+ * Checks that the local machine has the available resources to allocate
+ * another job to run. Will return 1 if resources are available, 0 otherwise
+ *
+ */
+static int makeflow_can_alloc_local(struct dag_node *n)
+{
+	int mem_ok = 0;
+	int disk_ok = 0;
+	int cores_ok = 0;
+
+	mem_ok = (loc_info.local_mem == -1 || n->resources->memory <= loc_info.local_mem);
+
+	disk_ok = (loc_info.local_disk == -1 || n->resources->disk <= loc_info.local_disk);
+
+	cores_ok = (n->resources->cores <= loc_info.local_cores ||( n->resources->cores < 1 && loc_info.local_cores >= 1 ));
+	return (cores_ok && disk_ok && mem_ok);
+
+}
+ /*
+ *
+ * Takes the allocates the local machine resources
+ * of the job given as a parameter.
+ */
+static void makeflow_alloc_local(struct dag_node *n)
+{
+
+		loc_info.local_cores -= n->resources->cores;
+
+
+		if(loc_info.local_mem != -1)
+			loc_info.local_mem -= n->resources->memory;
+
+		if(loc_info.local_disk != -1)
+			loc_info.local_disk -= n->resources->disk;
+
+}
+/*
+ * Reallocates the resources to the local machine after a local job
+ * stops running.
+ */
+static void makeflow_dealloc_local(struct dag_node *n)
+{
+		loc_info.local_cores += n->resources->cores;
+
+		if(loc_info.local_mem != -1)
+			loc_info.local_mem += n->resources->memory;
+
+		if(loc_info.local_disk != -1)
+			loc_info.local_disk += n->resources->disk;
+
+}
 
 /*
 Submit a node to the appropriate batch system, after materializing
@@ -467,6 +532,11 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = local_queue;
 	} else {
 		queue = remote_queue;
+	}
+
+	if(makeflow_is_local_node(n))
+	{
+		makeflow_alloc_local(n);
 	}
 
 	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor);
@@ -528,7 +598,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(output_files);
 	jx_delete(envlist);
 }
-
 static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 {
 	struct dag_file *f;
@@ -536,6 +605,9 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
 
+	if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)){
+					return 0;
+	}
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
 			return 0;
@@ -628,8 +700,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
-	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
+	if(makeflow_is_local_node(n))
+		makeflow_dealloc_local(n);
+
+	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 	if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
@@ -894,6 +969,9 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Show this help screen.\n", "-h,--help");
 	printf(" %-30s Max number of local jobs to run at once.	(default is # of cores)\n", "-j,--max-local=<#>");
 	printf(" %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
+	printf(" %-30s Max amount of local disk allowed to be used.", "--max-local-disk");
+	printf(" %-30s Max amount of local ram allowed to be used.", "--max-local-ram");
+	printf(" %-30s Max number of local core allowed to be used.", "--max-local-cores");
 	printf("															(default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
 	printf(" %-30s Use this file for the makeflow log.		 (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	printf(" %-30s Use this file for the batch system log.	 (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
@@ -970,6 +1048,13 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+	loc_info.local_mem =  -1;
+	loc_info.local_disk = -1;
+	loc_info.local_cores= load_average_get_cpus();
+
+	loc_info.local_mem = -1;
+	loc_info.local_disk = -1;
+	loc_info.local_cores= load_average_get_cpus();
 
 	random_init();
 	debug_config(argv[0]);
@@ -1023,7 +1108,10 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_SKIP_FILE_CHECK
+		LONG_OPT_SKIP_FILE_CHECK,
+		LONG_OPT_MEM,
+		LONG_OPT_DISK,
+		LONG_OPT_CORES
 	};
 
 	static const struct option long_options_run[] = {
@@ -1048,6 +1136,9 @@ int main(int argc, char *argv[])
 		{"help", no_argument, 0, 'h'},
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
+		{"max-local-disk", required_argument, 0, LONG_OPT_DISK},
+		{"max-local-ram", required_argument, 0, LONG_OPT_MEM},
+		{"max-local-cores", required_argument, 0, LONG_OPT_CORES},
 		{"max-remote", required_argument, 0, 'J'},
 		{"monitor", required_argument, 0, LONG_OPT_MONITOR},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
@@ -1337,6 +1428,15 @@ int main(int argc, char *argv[])
 			case 'X':
 				change_dir = optarg;
 				break;
+			case LONG_OPT_DISK:
+				loc_info.local_disk = string_metric_parse(optarg);
+				break;
+			case LONG_OPT_MEM:
+				loc_info.local_mem = string_metric_parse(optarg);
+				break;
+			case LONG_OPT_CORES:
+				loc_info.local_cores = atoi(optarg);
+				break;
 		}
 	}
 
@@ -1400,7 +1500,6 @@ int main(int argc, char *argv[])
 	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
 		explicit_remote_jobs_max = explicit_local_jobs_max;
 	}
-
 	if(explicit_local_jobs_max) {
 		local_jobs_max = explicit_local_jobs_max;
 	} else {
@@ -1433,6 +1532,23 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	// check to ensure that all jobs can be ran with resources given
+	if(clean_mode != MAKEFLOW_CLEAN_ALL)
+	{
+			int tooBig=0;
+			struct dag_node *n;
+		for(n = d->nodes; n; n = n->next) {
+			if(makeflow_is_local_node(n) && !makeflow_can_alloc_local(n)) {
+				fprintf(stderr, "Node %d didn't have enough resources to run with allocated resources", n->linenum);
+				tooBig = 1;
+			}
+		}
+		if(tooBig)
+		{
+			fprintf(stderr, "Critical error, not enough resources to run all jobs");
+			exit(EXIT_FAILURE);
+		}
+	}
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
@@ -1590,6 +1706,5 @@ int main(int argc, char *argv[])
 	}
 
 	return 0;
-}
 
-/* vim: set noexpandtab tabstop=4: */
+}
