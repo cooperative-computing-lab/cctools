@@ -83,6 +83,9 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 /**  Reads a single summary file from filename **/
 struct rmsummary *rmsummary_parse_file_single(const char *filename);
 
+/**  Reads a single summary file from string **/
+struct rmsummary *rmsummary_parse_string(const char *str);
+
 /**  Reads all summaries from filename **/
 struct list *rmsummary_parse_file_multiple(const char *filename);
 

@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 
 #include "dag.h"
+#include "dag_resources.h"
 #include "dag_variable.h"
 #include "dag_visitors.h"
 #include "rmsummary.h"
@@ -71,7 +72,7 @@ int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *pref
 	set_first_element(vars);
 	for(name = set_next_element(vars); name; name = set_next_element(vars))
 	{
-		v = hash_table_lookup(d->variables, name);
+		v = hash_table_lookup(d->default_category->mf_variables, name);
 		if(v)
 		{
 			fprintf(dag_stream, "%s%s=", prefix, name);
@@ -145,8 +146,8 @@ int dag_to_file_category(struct category *c, struct list *nodes, FILE * dag_stre
 	list_first_item(nodes);
 	while((n = list_next_item(nodes)))
 	{
-		dag_to_file_vars(n->d->special_vars, n->d->variables, n->nodeid, dag_stream, "");
-		dag_to_file_vars(n->d->export_vars,  n->d->variables, n->nodeid, dag_stream, "");
+		dag_to_file_vars(n->d->special_vars, n->d->default_category->mf_variables, n->nodeid, dag_stream, "");
+		dag_to_file_vars(n->d->export_vars,  n->d->default_category->mf_variables, n->nodeid, dag_stream, "");
 		dag_to_file_node(n, dag_stream, rename);
 	}
 
@@ -157,7 +158,7 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
 {
 
 	//separate nodes per category
-	struct hash_table *nodes_of_category = hash_table_create(2*hash_table_size(d->task_categories), 0);
+	struct hash_table *nodes_of_category = hash_table_create(2*hash_table_size(d->categories), 0);
 
 	struct category *c;
 	struct list *ns;
@@ -177,7 +178,7 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
 
 	hash_table_firstkey(nodes_of_category);
 	while(hash_table_nextkey(nodes_of_category, &name, (void **) &ns)) {
-		c = category_lookup_or_create(d->task_categories, name);
+		c = makeflow_category_lookup_or_create(d, name);
 		dag_to_file_category(c, ns, dag_stream, rename);
 	}
 
@@ -199,8 +200,8 @@ int dag_to_file(const struct dag *d, const char *dag_file, char *(*rename) (stru
 		return 1;
 
 	// For the collect list, use the their final value (the value at node with id nodeid_counter).
-	dag_to_file_var("GC_COLLECT_LIST", d->variables, d->nodeid_counter, dag_stream, "");
-	dag_to_file_var("GC_PRESERVE_LIST", d->variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var("GC_COLLECT_LIST", d->default_category->mf_variables, d->nodeid_counter, dag_stream, "");
+	dag_to_file_var("GC_PRESERVE_LIST", d->default_category->mf_variables, d->nodeid_counter, dag_stream, "");
 
 	dag_to_file_exports(d, dag_stream, "");
 
@@ -778,9 +779,9 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 			if(with_details) {
 				printf("subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
 				printf("\tstyle=unfilled;\n\tcolor=red\n");
-				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources->cores);
-				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->memory);
-				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources->disk);
+				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->cores);
+				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->memory);
+				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->disk);
 				printf("\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
 
 				//Source Files

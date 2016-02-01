@@ -477,6 +477,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	dag_node_update_resources(n, /* overflow */ 0);
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
 	command = makeflow_wrap_monitor(command, n, monitor);
@@ -501,7 +502,12 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources);
+	if(n->resource_request == CATEGORY_ALLOCATION_UNLABELED || n->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
+		/* if task does not have a proper resources label, do not submit with one. */
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,NULL);
+	} else {
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources_needed);
+	}
 
 	/* Restore old batch job options. */
 	if(previous_batch_options) {
@@ -628,6 +634,20 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
+	if(monitor) {
+		char *nodeid = string_format("%d",n->nodeid);
+		char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
+		char *summary_name = string_format("%s.summary", log_name_prefix);
+
+		if(n->resources_measured)
+			rmsummary_delete(n->resources_measured);
+		n->resources_measured = rmsummary_parse_file_single(summary_name);
+
+		free(nodeid);
+		free(log_name_prefix);
+		free(summary_name);
+	}
+
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
 	if(info->exited_normally && info->exit_code == 0) {
@@ -663,23 +683,19 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		if(monitor && info->exit_code == RM_OVERFLOW)
 		{
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
-			char *nodeid = string_format("%d",n->nodeid);
-			char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
-			free(nodeid);
-			char *summary_name = string_format("%s.summary", log_name_prefix);
-			struct rmsummary *s = rmsummary_parse_file_single(summary_name);
-
-			if(s && s->limits_exceeded)
+			if(n->resources_measured)
 			{
-				rmsummary_print(stderr, s, NULL);
-				rmsummary_delete(s);
+				rmsummary_print(stderr, n->resources_measured, NULL);
 				fprintf(stderr, "\n");
 			}
 
-			free(log_name_prefix);
-			free(summary_name);
-
-			makeflow_failed_flag = 1;
+			int new_resources = dag_node_update_resources(n, 1);
+			if(new_resources) {
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+			} else {
+				makeflow_failed_flag = 1;
+			}
 		}
 		else if(makeflow_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
@@ -698,13 +714,19 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	} else {
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files))){
+		while((f = list_next_item(n->source_files))) {
 			f->ref_count+= -1;
 			if(f->ref_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+
+		if(monitor) {
+			category_accumulate_summary(d->categories, n->category->name, n->resources_measured);
+			if(d->node_states[DAG_NODE_STATE_COMPLETE] % 20 == 0)
+				category_update_first_allocation(d->categories, n->category->name);
+		}
 	}
 }
 

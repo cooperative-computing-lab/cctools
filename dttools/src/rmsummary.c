@@ -384,6 +384,21 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename)
 	return s;
 }
 
+struct rmsummary *rmsummary_parse_string(const char *str) {
+	if(!str)
+		return NULL;
+
+	struct jx *j = jx_parse_string(str);
+
+	if(!j)
+		return NULL;
+
+	struct rmsummary *s = json_to_rmsummary(j);
+
+	jx_delete(j);
+	return s;
+}
+
 
 /* Parse the file assuming there are multiple summaries in it. Summary
    boundaries are lines starting with # */

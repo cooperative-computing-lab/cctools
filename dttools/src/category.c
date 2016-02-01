@@ -172,8 +172,7 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 	return a_1;
 }
 
-void category_update_first_allocation(struct hash_table *categories, const char *category, struct rmsummary *top) {
-
+void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */
 	static buffer_t *b = NULL;
 	if(!b) {
@@ -182,6 +181,10 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 	}
 
 	struct category *c = category_lookup_or_create(categories, category);
+	struct rmsummary *top = c->max_allocation;
+
+	if(!top)
+		return;
 
 	if(!c->first_allocation) {
 		c->first_allocation = rmsummary_create(-1);
@@ -269,7 +272,39 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 
 	hash_table_firstkey(categories);
 	while(hash_table_nextkey(categories, &name, (void **) &c)) {
-		category_update_first_allocation(categories, name, top);
+		category_update_first_allocation(categories, name);
 		category_clear_histograms(c);
+	}
+}
+
+/* returns the next allocation state. */
+category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow) {
+
+	if(resource_overflow && (current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX)) {
+		return CATEGORY_ALLOCATION_ERROR;
+	}
+
+	/* If user specified resources manually, respect the label. */
+	if(current_label == CATEGORY_ALLOCATION_USER) {
+			return CATEGORY_ALLOCATION_USER;
+	}
+
+	struct category *c = category_lookup_or_create(categories, category);
+	/* If category is not labeling, and user is not labeling, return unlabeled. */
+	if(!c->max_allocation) {
+		return CATEGORY_ALLOCATION_UNLABELED;
+	}
+
+	/* Never downgrade max allocation */
+	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
+		return CATEGORY_ALLOCATION_AUTO_MAX;
+	}
+
+	if(c->first_allocation) {
+		/* Use first allocation when it is available. */
+		return CATEGORY_ALLOCATION_AUTO_FIRST;
+	} else {
+		/* Use default when no enough information is available. */
+		return CATEGORY_ALLOCATION_AUTO_ZERO;
 	}
 }

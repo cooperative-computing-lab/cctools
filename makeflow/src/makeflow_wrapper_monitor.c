@@ -99,7 +99,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 
 	char * result = resource_monitor_write_command(executable,
 			m->log_prefix,
-			n->resources,
+			n->resources_needed,
 			extra_options,
 			m->enable_debug,
 			m->enable_time_series,

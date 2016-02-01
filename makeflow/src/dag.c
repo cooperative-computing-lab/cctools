@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "rmsummary.h"
 
 #include "dag.h"
+#include "dag_resources.h"
 
 struct dag_variable *dag_variable_create(const char *name, const char *initial_value);
 
@@ -37,13 +38,14 @@ struct dag *dag_create()
 	d->files = hash_table_create(0, 0);
 	d->inputs = set_create(0);
 	d->outputs = set_create(0);
-	d->variables = hash_table_create(0, 0);
 	d->nodeid_counter = 0;
 	d->export_vars  = set_create(0);
 	d->special_vars = set_create(0);
-	d->task_categories = hash_table_create(0, 0);
 	d->completed_files = 0;
 	d->deleted_files = 0;
+
+	d->categories   = hash_table_create(0, 0);
+	d->default_category = makeflow_category_lookup_or_create(d, "default");
 
 	/* Add GC_*_LIST to variables table to ensure it is in
 	 * global DAG scope. /

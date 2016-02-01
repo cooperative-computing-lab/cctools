@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 #include "timestamp.h"
+#include "category.h"
 #include "rmsummary.h"
 
 #define WORK_QUEUE_DEFAULT_PORT 9123               /**< Default Work Queue port number. */
@@ -88,14 +89,6 @@ typedef enum {
 	WORK_QUEUE_URL                    /**< File-spec refers to an URL **/
 } work_queue_file_t;
 
-typedef enum {
-	WORK_QUEUE_ALLOCATION_UNLABELED = 0, /**< No resources are explicitely requested. */
-	WORK_QUEUE_ALLOCATION_USER,          /**< Using values from task->resources_requested. */
-	WORK_QUEUE_ALLOCATION_AUTO_ZERO,     /**< Pre-step for autolabeling, when the first allocation has not been computed. */
-	WORK_QUEUE_ALLOCATION_AUTO_FIRST,    /**< Using first step value of the two-step policy. */
-	WORK_QUEUE_ALLOCATION_AUTO_MAX       /**< Using max of category. (2nd step of two-step policy) */
-} work_queue_allocation_t;
-
 extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
 												 workers upon creating queue . Change prior to
 												 calling work_queue_create, after queue is created
@@ -148,7 +141,7 @@ struct work_queue_task {
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 
-	work_queue_allocation_t resource_request;              /**< See @ref work_queue_allocation_t */
+	category_allocation_t resource_request;                /**< See @ref category_allocation_t */
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
