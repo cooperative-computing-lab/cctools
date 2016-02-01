@@ -653,6 +653,9 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				}
 			} else {
 				file = pname.service->open(&pname,flags,mode);
+				if(!file && (errno == EISDIR)) {
+					file = pname.service->getdir(&pname);
+				}
 			}
 			free(fd);
 		} else if(pname.service->is_seekable()) {
@@ -660,10 +663,16 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				file = pfs_cache_open(&pname,flags,mode);
 			} else {
 				file = pname.service->open(&pname,flags,mode);
+				if(!file && (errno == EISDIR)) {
+					file = pname.service->getdir(&pname);
+				}
 			}
 		} else {
 			if(force_stream) {
 				file = pname.service->open(&pname,flags,mode);
+				if(!file && (errno == EISDIR)) {
+					file = pname.service->getdir(&pname);
+				}
 			} else {
 				file = pfs_cache_open(&pname,flags,mode);
 			}
