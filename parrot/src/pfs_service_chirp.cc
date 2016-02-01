@@ -201,34 +201,9 @@ public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
 		struct chirp_file *file;
 		chirp_dircache_invalidate();
-		if(!(flags&O_DIRECTORY)) {
-			file = chirp_global_open(name->hostport,name->rest,flags,mode,time(0)+pfs_master_timeout);
-		}
+		file = chirp_global_open(name->hostport,name->rest,flags,mode,time(0)+pfs_master_timeout);
 		if(file) {
 			return new pfs_file_chirp(name,file);
-		} else if((errno == EISDIR) || (flags&O_DIRECTORY)) {
-			int result=-1;
-			pfs_dir *dir = new pfs_dir(name);
-
-			if(pfs_enable_small_file_optimizations) {
-				chirp_dircache_begin(name->path);
-				result = chirp_global_getlongdir(name->hostport,name->rest,chirp_dircache_insert,dir,time(0)+pfs_master_timeout);
-			} else {
-				result = -1;
-				errno = EINVAL;
-			}
-
-			if(result<0 && (errno==EINVAL||errno==ENOSYS)) {
-				chirp_dircache_invalidate();
-				result = chirp_global_getdir(name->hostport,name->rest,add_to_dir,dir,time(0)+pfs_master_timeout);
-			}
-
-			if(result>=0) {
-				return dir;
-			} else {
-				delete dir;
-				return 0;
-			}
 		} else {
 			return 0;
 		}
@@ -314,7 +289,28 @@ public:
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {
-		return (pfs_dir *)open(name, O_DIRECTORY, 000);
+		int result=-1;
+		pfs_dir *dir = new pfs_dir(name);
+
+		if(pfs_enable_small_file_optimizations) {
+			chirp_dircache_begin(name->path);
+			result = chirp_global_getlongdir(name->hostport,name->rest,chirp_dircache_insert,dir,time(0)+pfs_master_timeout);
+		} else {
+			result = -1;
+			errno = EINVAL;
+		}
+
+		if(result<0 && (errno==EINVAL||errno==ENOSYS)) {
+			chirp_dircache_invalidate();
+			result = chirp_global_getdir(name->hostport,name->rest,add_to_dir,dir,time(0)+pfs_master_timeout);
+		}
+
+		if(result>=0) {
+			return dir;
+		} else {
+			delete dir;
+			return 0;
+		}
 	}
 
 	virtual int statfs( pfs_name *name, struct pfs_statfs *buf ) {
@@ -620,9 +616,6 @@ public:
 		return 1;
 	}
 
-	virtual int can_open_dirs() {
-		return 1;
-	}
 };
 
 static pfs_service_chirp pfs_service_chirp_instance;
