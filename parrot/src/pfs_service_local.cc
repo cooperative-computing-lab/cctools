@@ -341,7 +341,14 @@ public:
 		debug(D_LOCAL,"open %s %d %d",name->rest,flags,(flags&O_CREAT) ? mode : 0);
 		int fd = ::open64(name->rest,flags|O_NOCTTY,mode);
 		if(fd>=0) {
-			result = new pfs_file_local(name,fd,0);
+			struct stat info;
+			if (::fstat(fd, &info) == 0 && S_ISDIR(info.st_mode)) {
+				result = 0;
+				errno = EISDIR;
+				::close(fd);
+			} else {
+				result = new pfs_file_local(name,fd,0);
+			}
 		} else {
 			result = 0;
 		}
