@@ -19,9 +19,10 @@ the software, see here:
 If you are impatient, the following commands will build
 and install the software in your home directory:
 
-   ./configure --prefix $HOME/cctools
+   ./configure --prefix ${HOME}/cctools
+   make clean
    make install
-   export PATH=$HOME/cctools/bin
+   export PATH=${PATH}:${HOME}/cctools/bin
    chirp_status
 
 ------------------------------------------------------------
