@@ -677,6 +677,9 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		} else if(pname.service->is_seekable()) {
 			if(force_cache) {
 				file = pfs_cache_open(&pname,flags,mode);
+				if(!file && (errno == EISDIR)) {
+					file = open_directory(&pname, flags);
+				}
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
@@ -691,6 +694,9 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				}
 			} else {
 				file = pfs_cache_open(&pname,flags,mode);
+				if(!file && (errno == EISDIR)) {
+					file = open_directory(&pname, flags);
+				}
 			}
 		}
 		free(pid);
