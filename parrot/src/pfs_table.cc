@@ -593,6 +593,10 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 	// on the parent directory. However, this seems to cause problems if
 	// system directories (or the filesystem root) are marked RO.
 	if(resolve_name(1,lname,&pname,open_mode)) {
+		if((flags&O_CREAT) && (flags&O_DIRECTORY)) {
+			// Linux ignores O_DIRECTORY in this combination
+			flags &= ~O_DIRECTORY;
+		}
 		char *pid = NULL;
 		if(flags&O_DIRECTORY) {
 			if (pattern_match(pname.rest, "^/proc/(%d+)/fd$", &pid) >= 0) {
@@ -612,7 +616,12 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				}
 				file = dir;
 			} else {
-				file = pname.service->getdir(&pname);
+				if((flags&O_RDWR)||(flags&O_WRONLY)) {
+					errno = EISDIR;
+					file = 0;
+				} else {
+					file = pname.service->getdir(&pname);
+				}
 			}
 		} else if(pname.service->is_local()) {
 			char *fd = NULL;
@@ -654,7 +663,12 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
-					file = pname.service->getdir(&pname);
+					if((flags&O_RDWR)||(flags&O_WRONLY)) {
+						errno = EISDIR;
+						file = 0;
+					} else {
+						file = pname.service->getdir(&pname);
+					}
 				}
 			}
 			free(fd);
@@ -664,14 +678,24 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
-					file = pname.service->getdir(&pname);
+					if((flags&O_RDWR)||(flags&O_WRONLY)) {
+						errno = EISDIR;
+						file = 0;
+					} else {
+						file = pname.service->getdir(&pname);
+					}
 				}
 			}
 		} else {
 			if(force_stream) {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
-					file = pname.service->getdir(&pname);
+					if((flags&O_RDWR)||(flags&O_WRONLY)) {
+						errno = EISDIR;
+						file = 0;
+					} else {
+						file = pname.service->getdir(&pname);
+					}
 				}
 			} else {
 				file = pfs_cache_open(&pname,flags,mode);
