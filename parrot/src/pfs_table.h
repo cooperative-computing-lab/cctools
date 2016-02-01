@@ -18,6 +18,7 @@ extern "C" {
 #include "pfs_types.h"
 
 class pfs_file;
+class pfs_dir;
 class pfs_pointer;
 class pfs_service;
 
@@ -134,6 +135,7 @@ public:
 	static void mmap_proc(pid_t pid, buffer_t *B);
 
 	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
+	pfs_dir * open_directory(pfs_name *pname, int flags);
 
 	int find_empty( int lowest );
 	int complete_at_path( int dirfd, const char *short_path, char *long_path );

@@ -555,6 +555,18 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 	}
 }
 
+pfs_dir * pfs_table::open_directory(pfs_name *pname, int flags)
+{
+	pfs_dir *file;
+	if((flags&O_RDWR)||(flags&O_WRONLY)) {
+		errno = EISDIR;
+		file = 0;
+	} else {
+		file = pname->service->getdir(pname);
+	}
+	return file;
+}
+
 pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, int force_cache )
 {
 	pfs_name pname;
@@ -616,12 +628,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 				}
 				file = dir;
 			} else {
-				if((flags&O_RDWR)||(flags&O_WRONLY)) {
-					errno = EISDIR;
-					file = 0;
-				} else {
-					file = pname.service->getdir(&pname);
-				}
+				file = open_directory(&pname, flags);
 			}
 		} else if(pname.service->is_local()) {
 			char *fd = NULL;
@@ -663,12 +670,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
-					if((flags&O_RDWR)||(flags&O_WRONLY)) {
-						errno = EISDIR;
-						file = 0;
-					} else {
-						file = pname.service->getdir(&pname);
-					}
+					file = open_directory(&pname, flags);
 				}
 			}
 			free(fd);
@@ -678,24 +680,14 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			} else {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
-					if((flags&O_RDWR)||(flags&O_WRONLY)) {
-						errno = EISDIR;
-						file = 0;
-					} else {
-						file = pname.service->getdir(&pname);
-					}
+					file = open_directory(&pname, flags);
 				}
 			}
 		} else {
 			if(force_stream) {
 				file = pname.service->open(&pname,flags,mode);
 				if(!file && (errno == EISDIR)) {
-					if((flags&O_RDWR)||(flags&O_WRONLY)) {
-						errno = EISDIR;
-						file = 0;
-					} else {
-						file = pname.service->getdir(&pname);
-					}
+					file = open_directory(&pname, flags);
 				}
 			} else {
 				file = pfs_cache_open(&pname,flags,mode);
