@@ -1153,10 +1153,6 @@ class pfs_service_cvmfs:public pfs_service {
 		return 1;
 	}
 
-	virtual int can_open_dirs() {
-		return 1;
-	}
-
 	virtual pfs_file *open(pfs_name * name, int flags, mode_t mode) {
 		struct cvmfs_dirent d;
 
