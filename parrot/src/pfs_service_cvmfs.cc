@@ -1165,63 +1165,13 @@ class pfs_service_cvmfs:public pfs_service {
 			return 0;
 		}
 
-		if((!S_ISDIR(d.mode)) && (flags&O_DIRECTORY)) {
-			errno = ENOTDIR;
+		/* cvmfs_open does not work with directories (it gives a 'fail to fetch' error). */
+		if(S_ISDIR(d.mode)) {
+			errno = EISDIR;
 			return 0;
 		}
 
 		debug(D_CVMFS,"open(%s)",name->rest);
-
-		if(S_ISDIR(d.mode)) {
-			struct cvmfs_dirent d;
-
-			/*
-			If the root of the CVFMS filesystem is requested,
-			we must generate it internally, containing the
-			list of the known filesystems.
-			*/
-
-			if(!name->host[0]) {
-				pfs_dir *dir = new pfs_dir(name);
-				dir->append(".");
-				dir->append("..");
-				CvmfsFilesystemList::const_iterator i    = cvmfs_filesystem_list.begin();
-				CvmfsFilesystemList::const_iterator iend = cvmfs_filesystem_list.end();
-				for(; i != iend; ++i) {
-					cvmfs_filesystem *f = *i;
-					/* If the host begins with dot, then it is a wildcard entry. */
-					/* Otherwise, it is a normal entry. */
-					const char *host = f->host.c_str();
-					if(host && host[0]!='.') {
-						dir->append(host);
-					}
-				}
-				return dir;
-			}
-
-			/*
-			Otherwise, go to CVMFS for the directory liting.
-			*/
-
-			pfs_dir *dir = new pfs_dir(name);
-
-			char **buf = NULL;
-			size_t buflen = 0;
-
-			int rc = compat_cvmfs_listdir(name->rest, &buf, &buflen);
-
-			if(rc<0) return 0;
-
-			int i;
-			for(i = 0; buf[i]; i++) {
-				dir->append(buf[i]);
-				free(buf[i]);
-			}
-			free(buf);
-
-			return dir;
-		}
-
 		int fd = compat_cvmfs_open(name->rest);
 
 		if(fd<0) return 0;
@@ -1230,8 +1180,67 @@ class pfs_service_cvmfs:public pfs_service {
 	}
 
 	pfs_dir *getdir(pfs_name * name) {
+		struct cvmfs_dirent d;
+
+		/*
+		If the root of the CVFMS filesystem is requested,
+		we must generate it internally, containing the
+		list of the known filesystems.
+		*/
+
+		if(!name->host[0]) {
+			pfs_dir *dir = new pfs_dir(name);
+			dir->append(".");
+			dir->append("..");
+			CvmfsFilesystemList::const_iterator i    = cvmfs_filesystem_list.begin();
+			CvmfsFilesystemList::const_iterator iend = cvmfs_filesystem_list.end();
+			for(; i != iend; ++i) {
+				cvmfs_filesystem *f = *i;
+				/* If the host begins with dot, then it is a wildcard entry. */
+				/* Otherwise, it is a normal entry. */
+				const char *host = f->host.c_str();
+				if(host && host[0]!='.') {
+					dir->append(host);
+				}
+			}
+			return dir;
+		}
+
+		/*
+		Otherwise, go to CVMFS for the directory liting.
+		*/
+
+		if(!d.lookup(name, 1, 1)) {
+			if( errno == EAGAIN ) {
+				class pfs_service *local = pfs_service_lookup_default();
+				return local->getdir(name);
+			}
+			return 0;
+		}
+
+		if(!S_ISDIR(d.mode)) {
+			errno = ENOTDIR;
+			return 0;
+		}
+
+		pfs_dir *dir = new pfs_dir(name);
+
+		char **buf = NULL;
+		size_t buflen = 0;
+
 		debug(D_CVMFS, "getdir(%s)", name->rest);
-		return (pfs_dir *)open(name, O_DIRECTORY, 000);
+		int rc = compat_cvmfs_listdir(name->rest, &buf, &buflen);
+
+		if(rc<0) return 0;
+
+		int i;
+		for(i = 0; buf[i]; i++) {
+			dir->append(buf[i]);
+			free(buf[i]);
+		}
+		free(buf);
+
+		return dir;
 	}
 
 	virtual int anystat(pfs_name * name, struct pfs_stat *info, int follow_leaf_links, int expand_internal_symlinks ) {
