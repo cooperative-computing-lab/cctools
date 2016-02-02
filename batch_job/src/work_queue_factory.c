@@ -61,6 +61,7 @@ static const char *password_file = 0;
 static char *config_file = 0;
 static char *amazon_credentials = NULL;
 static char *amazon_ami = NULL;
+static char *condor_requirements = NULL;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -608,6 +609,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
+	printf(" %-30s Set up workers on specific nodes (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
@@ -618,7 +620,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -645,6 +647,7 @@ static const struct option long_options[] = {
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{0,0,0,0}
 };
 
@@ -719,6 +722,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
 				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_CONDOR_REQUIREMENTS:
+				condor_requirements = xxstrdup(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
@@ -834,6 +840,16 @@ int main(int argc, char *argv[])
 	if (amazon_ami != NULL) {
 		batch_queue_set_option(queue, "amazon-ami", amazon_ami);
 	}
+
+	if (condor_requirements != NULL) {
+
+		if (batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
+			debug(D_NOTICE, "condor_requirements couldn't be specified without condor");
+		}
+
+		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
+	}
+
 	mainloop( queue, project_regex, foremen_regex );
 
 	batch_queue_delete(queue);
