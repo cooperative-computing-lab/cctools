@@ -61,6 +61,7 @@ static const char *password_file = 0;
 static char *config_file = 0;
 static char *amazon_credentials = NULL;
 static char *amazon_ami = NULL;
+static char *condor_requirements = NULL;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -377,6 +378,8 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
 
+	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
+
 	if(!new_project_regex || strlen(new_project_regex) == 0) {
 		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
 		error_found = 1;
@@ -435,6 +438,13 @@ int read_config_file(const char *config_file) {
 		extra_worker_args = xxstrdup(new_extra_worker_args);
 	}
 
+	if(new_condor_requirements != condor_requirements) {
+		if(condor_requirements) {
+			free(condor_requirements);
+		}
+		condor_requirements = xxstrdup(new_condor_requirements);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -448,6 +458,8 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
+
+	fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
 
 	if(factory_timeout > 0) {
 		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
@@ -608,6 +620,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
+	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
@@ -618,7 +631,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -645,6 +658,7 @@ static const struct option long_options[] = {
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{0,0,0,0}
 };
 
@@ -719,6 +733,15 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
 				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_CONDOR_REQUIREMENTS:
+				if(condor_requirements) {
+					char *tmp = condor_requirements;
+					condor_requirements = string_format("(%s && (%s))", tmp, optarg);
+					free(tmp);
+				} else {
+					condor_requirements = string_format("(%s)", optarg);
+				}
 				break;
 			case 'P':
 				password_file = optarg;
@@ -834,6 +857,13 @@ int main(int argc, char *argv[])
 	if (amazon_ami != NULL) {
 		batch_queue_set_option(queue, "amazon-ami", amazon_ami);
 	}
+
+	if(condor_requirements != NULL && batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
+		debug(D_NOTICE, "condor_requirements will be ignored as workers will not be running in condor.");
+	} else {
+		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
+	}
+
 	mainloop( queue, project_regex, foremen_regex );
 
 	batch_queue_delete(queue);

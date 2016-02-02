@@ -108,10 +108,12 @@ HEADERS_PUBLIC = \
 	auth_kerberos.h \
 	auth_ticket.h \
 	auth_unix.h \
-	jx.h \
 	buffer.h \
+	category.h \
 	debug.h \
+	hash_table.h \
 	int_sizes.h \
+	jx.h \
 	link.h \
 	md5.h \
 	rmonitor_poll.h \
