@@ -56,8 +56,9 @@ OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to ma
 OPTION_TRIPLET(-t,timeout,time)Abort after this amount of idle time.
 OPTION_TRIPLET(-C,config-file,file)Use the configuration file <file>.
 OPTION_TRIPLET(-E,extra-options,options)Extra options that should be added to the worker.
-OPTION_PAIR(--condor-requirements, str")Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).
+OPTION_PAIR(--condor-requirements, str)Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).
 OPTION_TRIPLET(-S,scratch,file)Scratch directory. (default is /tmp/${USER}-workers)
+OPTION_PAIR(--factory-timeout, n)Exit after no master has been seen in <n> seconds.
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_PAIR(--factory-timeout, #)Set factory timeout to <#> seconds. (off by default) This will cause work queue to exit when their are no masters present after the given number of seconds.
