@@ -1,10 +1,10 @@
 #include <float.h>
+#include <omp.h>
 
 #include "rmon_tools.h"
 #include "create_dir.h"
 #include "category.h"
 #include "macros.h"
-
 #include "copy_stream.h"
 
 #define MAX_LINE 1024
@@ -773,7 +773,7 @@ void find_first_allocation_of_field_bruteforce(struct rmDsummary_set *s, struct 
 				continue;
 		}
 
-		for(int j = 0; j < h->total_count; j+=100) {
+		for(int j = 0; j < h->total_count; j+=1) {
 			double current   = value_of_field(h->summaries_sorted[j], f);
 
 			double wall_time;
@@ -813,10 +813,15 @@ void find_first_allocation_of_field_bruteforce(struct rmDsummary_set *s, struct 
 }
 
 void find_first_allocation_of_category_bruteforce(struct rmDsummary_set *s) {
-	struct field *f;
 
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	int i = WALL_TIME;
+	int n = NUM_FIELDS;
+
+#pragma omp parallel for schedule(dynamic,1) private(i)
+	for(i = WALL_TIME; i < n; i++)
 	{
+		struct field *f = (fields + i);
+
 		if(!f->active)
 			continue;
 
