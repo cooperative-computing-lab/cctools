@@ -131,19 +131,16 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	const char *c_req = batch_queue_get_option(q, "condor-requirements");
 	char *bexp = blacklisted_expression(q);
 
-	if(c_req) {
-		if(bexp) {
-			fprintf(file, "requirements = %s && %s\n", c_req, bexp);
-			free(bexp);
-		} else {
-			fprintf(file, "requirements = %s\n", c_req);
-		}
-	} else {
-		if(bexp) {
-			fprintf(file, "requirements = %s\n", bexp);
-			free(bexp);
-		}
+	if(c_req && bexp) {
+		fprintf(file, "requirements = %s && %s\n", c_req, bexp);
+	} else if(c_req) {
+		fprintf(file, "requirements = %s\n", c_req);
+	} else if(bexp) {
+		fprintf(file, "requirements = %s\n", bexp);
 	}
+
+	if(bexp)
+		free(bexp);
 
 	/*
 	Getting environment variables formatted for a condor submit
