@@ -343,25 +343,9 @@ public:
 		if(fd>=0) {
 			struct stat info;
 			if (::fstat(fd, &info) == 0 && S_ISDIR(info.st_mode)) {
-				if(!pfs_acl_check_dir(name,IBOX_ACL_LIST)) {
-					::close(fd);
-					return 0;
-				}
-
-				DIR *dir = ::fdopendir(fd);
-				if(dir) {
-					struct dirent *d;
-					pfs_dir *D = new pfs_dir(name);
-					while((d=::readdir(dir))) {
-						if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
-						D->append(d);
-					}
-					::closedir(dir); /* closes fd */
-					result = D;
-				} else {
-					::close(fd);
-					result = 0;
-				}
+				result = 0;
+				errno = EISDIR;
+				::close(fd);
 			} else {
 				result = new pfs_file_local(name,fd,0);
 			}
@@ -376,8 +360,29 @@ public:
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {
+		struct dirent *d;
+		DIR *dir;
+		pfs_dir *result = 0;
+
+		if(!pfs_acl_check_dir(name,IBOX_ACL_LIST)) return 0;
+
 		debug(D_LOCAL,"getdir %s",name->rest);
-		return (pfs_dir *)open(name, O_DIRECTORY, 000);
+		dir = ::opendir(name->rest);
+		if(dir) {
+			result = new pfs_dir(name);
+			while((d=::readdir(dir))) {
+				if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
+				result->append(d);
+			}
+			closedir(dir);
+		} else {
+			result = 0;
+		}
+		if (result)
+			debug(D_LOCAL, "= 0 [%s]",__func__);
+		else
+			debug(D_LOCAL, "= %d %s [%s]",errno,strerror(errno),__func__);
+		return result;
 	}
 
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
