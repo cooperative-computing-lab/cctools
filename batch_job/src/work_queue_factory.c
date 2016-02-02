@@ -620,7 +620,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
-	printf(" %-30s Set up workers on specific nodes (Condor only).\n", "--condor-requirements");
+	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
@@ -735,7 +735,13 @@ int main(int argc, char *argv[])
 				factory_timeout = MAX(0, atoi(optarg));
 				break;
 			case LONG_OPT_CONDOR_REQUIREMENTS:
-				condor_requirements = xxstrdup(optarg);
+				if(condor_requirements) {
+					char *tmp = condor_requirements;
+					condor_requirements = string_format("(%s && (%s))", tmp, optarg);
+					free(tmp);
+				} else {
+					condor_requirements = string_format("(%s)", optarg);
+				}
 				break;
 			case 'P':
 				password_file = optarg;
@@ -852,12 +858,9 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "amazon-ami", amazon_ami);
 	}
 
-	if (condor_requirements != NULL) {
-
-		if (batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
-			debug(D_NOTICE, "condor_requirements couldn't be specified without condor");
-		}
-
+	if(condor_requirements != NULL && batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
+		debug(D_NOTICE, "condor_requirements will be ignored as workers will not be running in condor.");
+	} else {
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
