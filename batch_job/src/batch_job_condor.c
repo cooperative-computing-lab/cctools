@@ -35,8 +35,9 @@ static int setup_condor_wrapper(const char *wrapperfile)
 	return 0;
 }
 
-static char *blacklisted_expression(struct batch_queue *q) {
-	const char *blacklisted     = hash_table_lookup(q->options, "workers-blacklisted");
+static char *blacklisted_expression(struct batch_queue *q)
+{
+	const char *blacklisted = hash_table_lookup(q->options, "workers-blacklisted");
 	static char *last_blacklist = NULL;
 
 	if(!blacklisted)
@@ -82,7 +83,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
+static batch_job_id_t batch_job_condor_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources)
 {
 	FILE *file;
 	int njobs;
@@ -97,10 +98,10 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	if(!string_istrue(hash_table_lookup(q->options, "skip-afs-check"))) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
-			debug(D_NOTICE|D_BATCH, "The working directory is '%s':", cwd);
-			debug(D_NOTICE|D_BATCH, "This won't work because Condor is not able to write to files in AFS.");
-			debug(D_NOTICE|D_BATCH, "Instead, run makeflow from a local disk like /tmp.");
-			debug(D_NOTICE|D_BATCH, "Or, use the Work Queue with -T wq and condor_submit_workers.");
+			debug(D_NOTICE | D_BATCH, "The working directory is '%s':", cwd);
+			debug(D_NOTICE | D_BATCH, "This won't work because Condor is not able to write to files in AFS.");
+			debug(D_NOTICE | D_BATCH, "Instead, run makeflow from a local disk like /tmp.");
+			debug(D_NOTICE | D_BATCH, "Or, use the Work Queue with -T wq and condor_submit_workers.");
 			free(cwd);
 			exit(EXIT_FAILURE);
 		}
@@ -115,7 +116,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	fprintf(file, "universe = vanilla\n");
 	fprintf(file, "executable = condor.sh\n");
-	fprintf(file, "arguments = %s\n",cmd);
+	fprintf(file, "arguments = %s\n", cmd);
 	if(extra_input_files)
 		fprintf(file, "transfer_input_files = %s\n", extra_input_files);
 	// Note that we do not use transfer_output_files, because that causes the job
@@ -128,18 +129,29 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
 
+	const char *c_req = batch_queue_get_option(q, "condor-requirements");
 	char *bexp = blacklisted_expression(q);
-	if(bexp) {
-		fprintf(file, "requirements = %s\n", bexp);
-		free(bexp);
+
+	if(c_req) {
+		if(bexp) {
+			fprintf(file, "requirements = %s && %s\n", c_req, bexp);
+			free(bexp);
+		} else {
+			fprintf(file, "requirements = %s\n", c_req);
+		}
+	} else {
+		if(bexp) {
+			fprintf(file, "requirements = %s\n", bexp);
+			free(bexp);
+		}
 	}
 
 	/*
-	Getting environment variables formatted for a condor submit
-	file is very hairy, due to some strange quoting rules.
-	To avoid problems, we simply export vars to the environment,
-	and then tell condor getenv=true, which pulls in the environment.
-	*/
+	   Getting environment variables formatted for a condor submit
+	   file is very hairy, due to some strange quoting rules.
+	   To avoid problems, we simply export vars to the environment,
+	   and then tell condor getenv=true, which pulls in the environment.
+	 */
 
 	fprintf(file, "getenv = true\n");
 
@@ -150,22 +162,21 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	if(options)
 		fprintf(file, "%s\n", options);
 
-	int64_t cores  = -1;
+	int64_t cores = -1;
 	int64_t memory = -1;
-	int64_t disk   = -1;
+	int64_t disk = -1;
 
 	if(resources) {
-		cores  = resources->cores;
+		cores = resources->cores;
 		memory = resources->memory;
-		disk   = resources->disk;
+		disk = resources->disk;
 	}
 
 	if(batch_queue_get_option(q, "autosize")) {
 		fprintf(file, "request_cpus   = ifThenElse(%" PRId64 " > TotalSlotCpus, %" PRId64 ", TotalSlotCpus)\n", cores, cores);
 		fprintf(file, "request_memory = ifThenElse(%" PRId64 " > TotalSlotMemory, %" PRId64 ", TotalSlotMemory)\n", memory, memory);
 		fprintf(file, "request_disk   = ifThenElse((%" PRId64 "*1024) > TotalSlotDisk, (%" PRId64 "*1024), TotalSlotDisk)\n", disk, disk);
-	}
-	else {
+	} else {
 		if(cores > -1)
 			fprintf(file, "request_cpus = %" PRId64 "\n", cores);
 
@@ -202,7 +213,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	return -1;
 }
 
-static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_job_id_t batch_job_condor_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
 	static FILE *logfile = 0;
 
@@ -308,7 +319,7 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 	return -1;
 }
 
-static int batch_job_condor_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_condor_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
 	char *command = string_format("condor_rm %" PRIbjid, jobid);
 
@@ -320,14 +331,13 @@ static int batch_job_condor_remove (struct batch_queue *q, batch_job_id_t jobid)
 		return 0;
 	} else {
 		char buffer[1024];
-		while (fread(buffer, sizeof(char), sizeof(buffer)/sizeof(char), file) > 0)
-		  ;
+		while(fread(buffer, sizeof(char), sizeof(buffer) / sizeof(char), file) > 0);
 		pclose(file);
 		return 1;
 	}
 }
 
-static int batch_queue_condor_create (struct batch_queue *q)
+static int batch_queue_condor_create(struct batch_queue *q)
 {
 	strncpy(q->logfile, "condor.logfile", sizeof(q->logfile));
 	batch_queue_set_feature(q, "batch_log_name", "%s.condorlog");
@@ -357,19 +367,19 @@ const struct batch_queue_module batch_queue_condor = {
 	batch_queue_condor_option_update,
 
 	{
-		batch_job_condor_submit,
-		batch_job_condor_wait,
-		batch_job_condor_remove,
-	},
+	 batch_job_condor_submit,
+	 batch_job_condor_wait,
+	 batch_job_condor_remove,
+	 },
 
 	{
-		batch_fs_condor_chdir,
-		batch_fs_condor_getcwd,
-		batch_fs_condor_mkdir,
-		batch_fs_condor_putfile,
-		batch_fs_condor_stat,
-		batch_fs_condor_unlink,
-	},
+	 batch_fs_condor_chdir,
+	 batch_fs_condor_getcwd,
+	 batch_fs_condor_mkdir,
+	 batch_fs_condor_putfile,
+	 batch_fs_condor_stat,
+	 batch_fs_condor_unlink,
+	 },
 };
 
 /* vim: set noexpandtab tabstop=4: */
