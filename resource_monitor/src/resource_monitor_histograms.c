@@ -440,11 +440,17 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 			h->min_value, value_of_p(h, 0.25));
 	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
 			value_of_p(h, 0.75), h->max_value);
-	fprintf(f, "set label \"\" at %lf,graph -0.01 tc ls 1 center front point pt 5\n",
-			value_of_p(h, 0.5));
 
-	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 center front point pt 27 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
+	/* square for mean */
+	fprintf(f, "set label \"\" at %lf,graph -0.00 tc ls 1 center front point pt 4\n",
+			h->mean);
 
+	/* up triangle for mode */
+	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.05 tc ls 1 center front point pt 8 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
+
+	/* down triangle for first allocation */
+	fprintf(f, "set label \"\" at %" PRIu64",graph -0.025 tc ls 1 center front point pt 10\n",
+			h->first_allocation_histogram);
 
 	if(h == all)
 	{
@@ -467,22 +473,23 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 
 	char *table_name = path_of_table(h, 1);
 
-	if(h->max_count > 100*h->min_count && 0)
+	if(all->max_count > 10000*all->min_count)
 	{
-		fprintf(f, "set yrange [0:(log10(%lf))]\n", 1.0*h->max_count);
-		fprintf(f, "set label \"%" PRIu64 "\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
+		fprintf(f, "set yrange [0:(log10(%lf))]\n", 1.0*all->max_count);
+		fprintf(f, "set label \"log(%" PRIu64 ")\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
 				h->max_count, h->value_at_max_count, (double) h->max_count);
 
 		fprintf(f, "plot \"%s\" using 1:(log10($2)) w boxes\n", table_name);
 	}
 	else
 	{
-		fprintf(f, "set yrange [0:%lf]\n", 1.0*h->max_count);
+		fprintf(f, "set yrange [0:%lf]\n", 1.0*all->max_count);
 		fprintf(f, "set label \"%" PRIu64 "\" at %lf,%lf tc ls 1 left front nopoint offset 0,character 0.5\n",
 				h->max_count, h->value_at_max_count, (double) h->max_count);
 
 		fprintf(f, "plot \"%s\" using 1:2 w boxes\n", table_name);
 	}
+
 	free(table_name);
 
 	fprintf(f, "\n");
@@ -515,10 +522,17 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 			h->min_value, value_of_p(h, 0.25));
 	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
 			value_of_p(h, 0.75), h->max_value);
-	fprintf(f, "set label \"\" at %lf,graph -0.01 tc ls 1 center front point pt 5\n",
-			value_of_p(h, 0.5));
 
-	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 center front point pt 27 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
+	/* square for mean */
+	fprintf(f, "set label \"\" at %lf,graph -0.00 tc ls 1 center front point pt 4\n",
+			h->mean);
+
+	/* up triangle for mode */
+	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.05 tc ls 1 center front point pt 8 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
+
+	/* down triangle for first allocation */
+	fprintf(f, "set label \"\" at %" PRIu64",graph -0.025 tc ls 1 center front point pt 10\n",
+			h->first_allocation_histogram);
 
 	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n", all->min_value, all->min_value);
 
@@ -537,10 +551,10 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	}
 
 	char *table_name = path_of_table(h, 1);
-	if(h->max_count > 100*h->min_count && 0)
+	if(h->max_count > 10000*h->min_count)
 	{
 		fprintf(f, "set yrange [0:(log10(%lf))]\n", 1.0*h->max_count);
-		fprintf(f, "set label \"%" PRIu64 "\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
+		fprintf(f, "set label \"log(%" PRIu64 ")\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
 				h->max_count, h->value_at_max_count, (double) h->max_count);
 		fprintf(f, "plot \"%s\" using 1:(log10($2)) w boxes\n", table_name);
 	}
@@ -645,11 +659,11 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 void write_histogram_stats_header(FILE *stream)
 {
-	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
+	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
 			"resource",
 			"n",
 			"mean", "std_dev", "skewd", "kurtos",
-			"max", "min",
+			"max", "min", "first_alloc",
 			"p_25", "p_50", "p_75", "p_95", "p_99",
 			"z_95", "z_99"
 		   );
@@ -658,11 +672,11 @@ void write_histogram_stats_header(FILE *stream)
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	char *resource_no_spaces = sanitize_path_name(h->resource->name);
-	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %" PRId64 " %" PRId64 " %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
+	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %" PRId64 " %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
 			resource_no_spaces,
 			h->total_count,
 			h->mean, h->std_dev, h->skewdness, h->kurtosis,
-			h->max_value, h->min_value, h->first_allocation_histogram, h->first_allocation_bruteforce,
+			h->max_value, h->min_value, h->first_allocation_histogram,
 			value_of_p(h, 0.25),
 			value_of_p(h, 0.50),
 			value_of_p(h, 0.75),
@@ -953,16 +967,13 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	}
 	fprintf(stream, "</td>");
 
-	fprintf(stream, "<td class=\"datahdr\" >max</td>");
-	fprintf(stream, "<td class=\"datahdr\" >p_99</td>");
-	fprintf(stream, "<td class=\"datahdr\" >p_95</td>");
-	fprintf(stream, "<td class=\"datahdr\" >p_50</td>");
-	fprintf(stream, "<td class=\"datahdr\" >min</td>");
-	fprintf(stream, "<td class=\"datahdr\" >1st alloc.</td>");
-	fprintf(stream, "<td class=\"datahdr\" >1st alloc. b.f.</td>");
-	fprintf(stream, "<td class=\"datahdr\" >mode</td>");
-	fprintf(stream, "<td class=\"datahdr\" >&mu;</td>");
-	fprintf(stream, "<td class=\"datahdr\" >&sigma;</td>");
+	fprintf(stream, "<td class=\"datahdr\" >mode <br> &#9653;</td>");
+	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc.<br> &#9663; </td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f.</td>");
+	fprintf(stream, "<td class=\"datahdr\" >&sigma;/&mu;</td>");
+	fprintf(stream, "<td class=\"datahdr\" >p<sub>99</sub></td>");
+	fprintf(stream, "<td class=\"datahdr\" >p<sub>95</sub></td>");
 }
 
 void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int include_thumbnail)
@@ -978,21 +989,13 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	}
 	fprintf(stream, "</td>");
 
-	struct rmDsummary *s;
-	s = h->summaries_sorted[h->total_count - 1];
-	write_outlier(stream, s, f, prefix);
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
+	fprintf(stream, "%6.0lf\n", h->value_at_max_count);
+	fprintf(stream, "</td>\n");
 
-	s = h->summaries_sorted[index_of_p(h, 0.99)];
-	write_outlier(stream, s, f, prefix);
-
-	s = h->summaries_sorted[index_of_p(h, 0.95)];
-	write_outlier(stream, s, f, prefix);
-
-	s = h->summaries_sorted[index_of_p(h, 0.50)];
-	write_outlier(stream, s, f, prefix);
-
-	s = h->summaries_sorted[0];
-	write_outlier(stream, s, f, prefix);
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
+	fprintf(stream, "%6.0lf\n", h->mean);
+	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%" PRId64 "\n", h->first_allocation_histogram);
@@ -1003,16 +1006,17 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->value_at_max_count);
+	fprintf(stream, "%6.2lf\n", h->mean > 0 ? h->std_dev/h->mean : -1);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->mean);
-	fprintf(stream, "</td>\n");
+	struct rmDsummary *s;
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->std_dev);
-	fprintf(stream, "</td>\n");
+	s = h->summaries_sorted[index_of_p(h, 0.99)];
+	write_outlier(stream, s, f, prefix);
+
+	s = h->summaries_sorted[index_of_p(h, 0.95)];
+	write_outlier(stream, s, f, prefix);
+
 }
 
 void write_individual_histogram_webpage(struct histogram *h)
@@ -1103,7 +1107,7 @@ void write_front_page(char *workflow_name)
 	list_first_item(all_sets);
 	while((s = list_next_item(all_sets)))
 	{
-		fprintf(fo, "<td class=\"datahdr\" colspan=\"11\">%s</td>", s->category);
+		fprintf(fo, "<td class=\"datahdr\" colspan=\"8\">%s: %d</td>", s->category, list_size(s->summaries));
 	}
 	fprintf(fo, "</tr>\n");
 
