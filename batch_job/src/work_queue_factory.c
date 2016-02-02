@@ -378,6 +378,8 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
 
+	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
+
 	if(!new_project_regex || strlen(new_project_regex) == 0) {
 		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
 		error_found = 1;
@@ -436,6 +438,13 @@ int read_config_file(const char *config_file) {
 		extra_worker_args = xxstrdup(new_extra_worker_args);
 	}
 
+	if(new_condor_requirements != condor_requirements) {
+		if(condor_requirements) {
+			free(condor_requirements);
+		}
+		condor_requirements = xxstrdup(new_condor_requirements);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -449,6 +458,8 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
+
+	fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
 
 	if(factory_timeout > 0) {
 		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
