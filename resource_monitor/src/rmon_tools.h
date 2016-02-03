@@ -44,10 +44,10 @@ struct rmDsummary
 {
 	char    *command;
 	char    *category;
+	char    *task_id;
 
 	char    *file;
 
-	int64_t  task_id;
 
 	double start;
 	double end;
@@ -83,7 +83,9 @@ struct rmDsummary_set
 struct field {
 	char  *abbrev;
 	char  *name;
+	char  *caption;
 	char  *units;
+	int    cummulative;
 	int    active;
 	size_t offset;
 };
@@ -95,16 +97,9 @@ extern struct field fields[];
 #define assign_to_field(s, f, v)\
 	*((double *) ((char *) s + (f)->offset)) = (double) v
 
-double usecs_to_secs(double usecs);
-double secs_to_usecs(double secs);
-double bytes_to_Mbytes(double bytes);
-double Mbytes_to_bytes(double Mbytes);
-double bytes_to_Gbytes(double bytes);
-double Mbytes_to_Gbytes(double Mbytes);
-
 char *sanitize_path_name(char *name);
 
-int get_rule_number(char *filename);
+char *get_rule_number(char *filename);
 
 char *make_field_names_str(char *separator);
 
@@ -119,13 +114,15 @@ double divide(double a, double b);
 
 void parse_fields_options(char *field_str);
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename);
-struct rmDsummary *parse_summary_file(char *filename);
+struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories);
+struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categories);
 char *parse_executable_name(char *command);
 
-void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename);
-void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname);
+void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories);
+void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct hash_table *categories);
 
 struct rmDsummary_set *make_new_set(char *category);
+
+void rmDsummary_print(FILE *output, struct rmDsummary *so);
 
 #endif

@@ -29,9 +29,20 @@ struct category {
 	/* All keys are assumed positive. Thus, we shift them to the right so that
 	 * we can have a "0" key. 0->1, 1->2, etc. */
 	struct itable *cores_histogram;
-	struct itable *memory_histogram;
-	struct itable *disk_histogram;
 	struct itable *wall_time_histogram;
+	struct itable *cpu_time_histogram;
+	struct itable *max_concurrent_processes_histogram;
+	struct itable *total_processes_histogram;
+	struct itable *memory_histogram;
+	struct itable *swap_memory_histogram;
+	struct itable *virtual_memory_histogram;
+	struct itable *bytes_read_histogram;
+	struct itable *bytes_written_histogram;
+	struct itable *bytes_received_histogram;
+	struct itable *bytes_sent_histogram;
+	struct itable *bandwidth_histogram;
+	struct itable *total_files_histogram;
+	struct itable *disk_histogram;
 
 	uint64_t total_tasks;
 

@@ -26,6 +26,7 @@ struct rmsummary
 {
 	char    *category;
 	char    *command;
+	char    *task_id;
 
 	int64_t  start;
 	int64_t  end;
@@ -55,7 +56,6 @@ struct rmsummary
 
 	int64_t  cores;
 	int64_t  gpus;
-	int64_t  task_id;
 
 	struct rmsummary *limits_exceeded;
 
@@ -80,6 +80,9 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fiel
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
+int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);
+const char *rmsummary_get_char_field(struct rmsummary *s, const char *key);
+
 /**  Reads a single summary file from filename **/
 struct rmsummary *rmsummary_parse_file_single(const char *filename);
 
@@ -92,6 +95,8 @@ struct list *rmsummary_parse_file_multiple(const char *filename);
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
+struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources);
+
 struct rmsummary *rmsummary_create(signed char default_value);
 void rmsummary_delete(struct rmsummary *s);
 
@@ -101,5 +106,8 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_debug_report(const struct rmsummary *s);
+
+double rmsummary_to_external_unit(const char *field, int64_t n);
+int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit);
 
 #endif

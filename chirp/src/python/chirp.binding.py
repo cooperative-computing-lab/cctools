@@ -345,7 +345,7 @@ class Client:
     #                        'type':      'OUTPUT' }
     #    }
     #    job_id = client.job_create(job_description);
-    # @encode
+    # @endcode
     def job_create(self, job_description):
         job_json = json.dumps(job_description)
         job_id   = chirp_wrap_job_create(self.hostport, job_json, self.__stoptime())
@@ -641,3 +641,6 @@ class ChirpJobError(Exception):
         self.value  = value
     def __str__(self):
         return "%s(%s) %s" % (self.action, self.status, self.value)
+
+
+# @endcode
