@@ -53,7 +53,11 @@ WITH
 			GROUP BY StorageNode.id
 	)
 SELECT StorageNode.id, PRINTF('%d', TransferredBytes.sent), PRINTF('%d', ReceivedBytes.received), PRINTF('%d', ProcessedBytes.processed)
-	FROM Confuga.StorageNode LEFT OUTER JOIN (TransferredBytes NATURAL JOIN ReceivedBytes NATURAL JOIN ProcessedBytes) AS Foo ON StorageNode.id = Foo.id
+	FROM
+		Confuga.StorageNode
+		LEFT OUTER JOIN TransferredBytes ON StorageNode.id = TransferredBytes.id
+		LEFT OUTER JOIN ReceivedBytes ON StorageNode.id = ReceivedBytes.id
+		LEFT OUTER JOIN ProcessedBytes ON StorageNode.id = ProcessedBytes.id
 	ORDER BY StorageNode.id;
 EOF
 cat "$data"
