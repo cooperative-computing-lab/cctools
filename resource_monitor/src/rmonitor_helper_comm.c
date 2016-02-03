@@ -132,51 +132,7 @@ int find_localhost_addr(int port, struct addrinfo **addr)
 	return status;
 }
 
-
-int send_monitor_msg(struct rmonitor_msg *msg)
-{
-	int port;
-	int fd;
-	char *socket_info;
-	struct addrinfo *addr;
-
-	socket_info = getenv(RESOURCE_MONITOR_INFO_ENV_VAR);
-	if(!socket_info)
-	{
-		debug(D_RMON,"couldn't find socket info.\n");
-		return -1;
-	}
-
-	sscanf(socket_info, "%d", &port);
-	debug(D_RMON, "found socket info at %d.\n", port);
-
-	int status = find_localhost_addr(port, &addr);
-
-	if(status != 0) {
-		debug(D_RMON,"couldn't read socket information.");
-		return -1;
-	}
-
-	fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-	if(fd < 0)
-	{
-		debug(D_RMON,"couldn't open socket for writing.");
-		freeaddrinfo(addr);
-		return -1;
-	}
-
-	int count;
-	debug(D_RMON, "sending message from %d to port %d: %s(%d)\n", getpid(), port, str_msgtype(msg->type), msg->error);
-	count = sendto(fd, msg, sizeof(struct rmonitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
-	debug(D_RMON, "message sent from %d to port %d. %d bytes.\n", getpid(), port, count);
-
-	freeaddrinfo(addr);
-	close(fd);
-
-	return count;
-}
-
-int rmonitor_open_socket(int *fd, int *port)
+int rmonitor_server_open_socket(int *fd, int *port)
 {
 	struct addrinfo *addr;
 
@@ -222,6 +178,42 @@ int rmonitor_open_socket(int *fd, int *port)
 	return 0;
 }
 
+int rmonitor_client_open_socket(int *fd, struct addrinfo **addr) {
+	int port;
+	char *socket_info;
+	struct addrinfo *res;
+
+	socket_info = getenv(RESOURCE_MONITOR_INFO_ENV_VAR);
+	if(!socket_info)
+	{
+		debug(D_RMON,"couldn't find socket info.\n");
+		return -1;
+	}
+
+	sscanf(socket_info, "%d", &port);
+	debug(D_RMON, "found socket info at %d.\n", port);
+
+	int status = find_localhost_addr(port, &res);
+
+	if(status != 0) {
+		debug(D_RMON,"couldn't read socket information.");
+		return -1;
+	}
+
+
+	*fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if(*fd < 0)
+	{
+		debug(D_RMON,"couldn't open socket for writing.");
+		freeaddrinfo(res);
+		return -1;
+	}
+
+	*addr = res;
+
+	return 0;
+}
+
  /* We use datagrams to send information to the monitor from the
   * great grandchildren processes */
 int rmonitor_helper_init(char *lib_default_path, int *fd)
@@ -235,7 +227,7 @@ int rmonitor_helper_init(char *lib_default_path, int *fd)
 
 	if(access(helper_absolute,R_OK|X_OK)==0) {
 		debug(D_RMON, "found helper in %s\n", helper_absolute);
-		rmonitor_open_socket(fd, &port);
+		rmonitor_server_open_socket(fd, &port);
 	}
 	else {
 		debug(D_RMON,"couldn't find helper library %s but continuing anyway.", helper_path);
@@ -262,6 +254,25 @@ int rmonitor_helper_init(char *lib_default_path, int *fd)
 	free(helper_path);
 	return port;
 }
+
+int send_monitor_msg(struct rmonitor_msg *msg)
+{
+	static int fd = -1;
+	static struct addrinfo *addr = NULL;
+
+	if(fd < 0) {
+		int status = rmonitor_client_open_socket(&fd, &addr);
+		if(status < 0) {
+			return status;
+		}
+	}
+
+	int count;
+	count = sendto(fd, msg, sizeof(struct rmonitor_msg), 0, addr->ai_addr, addr->ai_addrlen);
+
+	return count;
+}
+
 
 
 /* vim: set noexpandtab tabstop=4: */
