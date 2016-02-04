@@ -11,17 +11,26 @@ URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
 # We specify the set of inputs and outputs. This is not required, but strongly
 # recommended.
-MAKEFLOW_INPUTS=$CURL $CONVERT
+MAKEFLOW_INPUTS=$CURL
 MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 # Similar rules can be arbitrarily labeled to form sets, called categories. In
 # this example we define three categories: preprocess, analysis, and merge.
 # Rules belong to the category of the most recent CATEGORY statement.
 CATEGORY=merge
+
+# Resources needed for a single task in category may be included (optional).
+# MEMORY and DISK in MB.
+CORES=1
+MEMORY=50
+DISK=100
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
 CATEGORY=analysis
+CORES=1
+MEMORY=10
+DISK=20
 capitol.90.jpg: capitol.jpg
 	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
 
@@ -34,6 +43,11 @@ capitol.270.jpg: capitol.jpg
 capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
+# If a rule is preceded by LOCAL, it executes at the local site.
 CATEGORY=preprocess
-capitol.jpg:
-	$CURL -o capitol.jpg $URL
+CORES=1
+MEMORY=10
+DISK=20
+capitol.jpg: $CURL
+	LOCAL $CURL -o capitol.jpg $URL
+
