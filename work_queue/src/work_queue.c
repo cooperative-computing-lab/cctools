@@ -1745,6 +1745,47 @@ static char *blacklisted_to_string( struct work_queue  *q ) {
 	return result;
 }
 
+/* category_to_jx creates a jx expression with category statistics that can be
+sent to the catalog.
+*/
+
+static struct jx * category_to_jx(struct work_queue *q, const char *category) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+
+	struct work_queue_stats s;
+	work_queue_get_stats_category(q, category, &s);
+
+	struct jx *j = jx_object(0);
+	if(!j) return 0;
+
+	jx_insert_integer(j, "tasks_waiting", s.tasks_waiting);
+	jx_insert_integer(j, "tasks_running", s.tasks_running + s.tasks_complete);
+	jx_insert_integer(j, "total_tasks_dispatched", s.total_tasks_dispatched);
+	jx_insert_integer(j, "total_tasks_complete", s.total_tasks_complete);
+	jx_insert_integer(j, "total_tasks_failed", s.total_tasks_failed);
+	jx_insert_integer(j, "total_tasks_cancelled", s.total_tasks_cancelled);
+
+	if(c->max_allocation) {
+		if(c->max_allocation->cores > -1)
+			jx_insert_integer(j, "max_cores", c->max_allocation->cores);
+		if(c->max_allocation->memory > -1)
+			jx_insert_integer(j, "max_memory", c->max_allocation->memory);
+		if(c->max_allocation->disk > -1)
+			jx_insert_integer(j, "max_disk", c->max_allocation->disk);
+	}
+
+	if(c->first_allocation) {
+		if(c->first_allocation->cores > -1)
+			jx_insert_integer(j, "first_cores", c->first_allocation->cores);
+		if(c->first_allocation->memory > -1)
+			jx_insert_integer(j, "first_memory", c->first_allocation->memory);
+		if(c->first_allocation->disk > -1)
+			jx_insert_integer(j, "first_disk", c->first_allocation->disk);
+	}
+
+	return j;
+}
+
 /*
 queue_to_jx examines the overall queue status and creates
 an jx expression which can be sent to the catalog or directly to the
@@ -1840,6 +1881,19 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 		r.disk.total = local_resources.disk.total;
 		r.disk.inuse = local_resources.disk.inuse;
 		work_queue_resources_add_to_jx(&r,j);
+	}
+
+	//add the stats per category
+	struct jx *categories = jx_object(0);
+	if(categories) {
+		struct category *c;
+		char *category_name;
+		hash_table_firstkey(q->categories);
+		while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+			jx_insert(categories, jx_string(category_name), category_to_jx(q, category_name));
+		}
+
+		jx_insert(j, jx_string("categories"), categories);
 	}
 
 	return j;
