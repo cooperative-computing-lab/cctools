@@ -49,6 +49,7 @@ static INT64_T debug_flags = D_NOTICE|D_ERROR|D_FATAL;
 
 static char *terminal_path = "/dev/tty";
 static FILE *terminal_f    = NULL;
+static int   did_terminal_notice = 0;
 
 struct flag_info {
 	const char *name;
@@ -203,12 +204,13 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 
 	debug_write(flags, buffer_tostring(&B));
 
-	if(flags & (D_ERROR | D_NOTICE | D_FATAL)) {
+	if(!did_terminal_notice && (flags & (D_ERROR | D_NOTICE | D_FATAL))) {
 		if(debug_write != debug_stderr_write || !isatty(STDERR_FILENO)) {
 			if(!terminal_f) {
 				if((terminal_f = fopen(terminal_path, "a")) == NULL) {
 					/* print to wherever stderr is pointing that we could not open the terminal. */
 					fprintf(stderr, "Could not open '%s' for immediate error reporting.\n", terminal_path);
+					did_terminal_notice = 1;
 				}
 			}
 		}
