@@ -3404,6 +3404,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
+	t->resources_measured  = rmsummary_create(-1);
 
 	t->category = xxstrdup("default");
 
@@ -5645,6 +5646,7 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 }
 
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
+	static struct rmsummary *user_label = NULL;
 
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 	switch(t->resource_request) {
@@ -5657,7 +5659,20 @@ const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_que
 			return c->first_allocation;
 			break;
 		case CATEGORY_ALLOCATION_USER:
-			return t->resources_requested;
+			if(!c->max_allocation) {
+				return t->resources_requested;
+			} else {
+				if(user_label) {
+					rmsummary_delete(user_label);
+				}
+				user_label = rmsummary_create(-1);
+
+				rmsummary_merge_min(user_label, c->max_allocation);
+				rmsummary_merge_override(user_label, t->resources_requested);
+
+				return user_label;
+			}
+			break;
 		case CATEGORY_ALLOCATION_UNLABELED:
 		default:
 			if(c->max_allocation) {
