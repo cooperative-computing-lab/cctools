@@ -29,29 +29,13 @@ pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 {
 	iterations = 0;
 	if(strcmp(n->path, "/") == 0) {
-		append("chirp");
-		append("multi");
-		append("anonftp");
-		append("ftp");
-		append("http");
-		append("grow");
-#ifdef HAS_GLOBUS_GSS
-		append("gsiftp");
-		append("gridftp");
-#endif
-#ifdef HAS_IRODS
-		append("irods");
-#endif
-		append("hdfs");
-#ifdef HAS_BXGRID
-		append("bxgrid");
-#endif
-#ifdef HAS_XROOTD
-		append("xrootd");
-#endif
-#ifdef HAS_CVMFS
-		append("cvmfs");
-#endif
+		extern struct hash_table *available_services;
+		char *key;
+		void *value;
+		hash_table_firstkey(available_services);
+		while(hash_table_nextkey(available_services, &key, &value)) {
+			append(key);
+		}
 	}
 }
 
