@@ -1205,7 +1205,7 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	char *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
 
 	if(t->resources_measured)
-		free(t->resources_measured);
+		rmsummary_delete(t->resources_measured);
 
 	t->resources_measured = rmsummary_parse_file_single(summary);
 
