@@ -130,3 +130,12 @@ umbrella \
 run
 
 umbrella build povray_base_local.umbrella full.umbrella
+
+umbrella \
+--spec povray_base_local.umbrella \
+--localdir /tmp/umbrella_test/ \
+--output /tmp/umbrella_test/parrot_povray_base_local \
+--output "/tmp/frame000.png=/tmp/umbrella_test/parrot_povray_base_local/output.png" \
+--sandbox_mode parrot \
+--log umbrella.log \
+run
