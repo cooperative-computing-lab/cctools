@@ -2646,7 +2646,7 @@ def terminate_instance(instance):
 	instance.wait_until_terminated()
 
 def add2spec(item, source_dict, target_dict):
-	"""Abstract the metadata information (source format checksum size) from source_dict (metadata database) and add these information into target_dict (umbrella spec).
+	"""Abstract the metadata information (source format checksum size uncompressed_size) from source_dict (metadata database) and add these information into target_dict (umbrella spec).
 	For any piece of metadata information, if it already exists in target_dict, do nothing; otherwise, add it into the umbrella spec.
 
 	Args:
@@ -2697,7 +2697,7 @@ def add2spec(item, source_dict, target_dict):
 		target_dict["uncompressed_size"] = source_dict["uncompressed_size"]
 
 def add2db(item, source_dict, target_dict):
-	"""Add the metadata information (source format checksum size) about item from source_dict (umbrella specification) to target_dict (metadata database).
+	"""Add the metadata information (source format checksum size uncompressed_size) about item from source_dict (umbrella specification) to target_dict (metadata database).
 	The item can be identified through two mechanisms: checksum attribute or one source location, which is used when checksum is not applicable for this item.
 	If the item has been in the metadata database, do nothing; otherwise, add it, together with its metadata, into the metadata database.
 
@@ -3554,15 +3554,9 @@ def dep_build(d, name):
 		name: the name of the dependency
 
 	Returns:
-		None
+		If the dependency comes from a local path, return 1 denoting this dependency has been built up.
+		Otherwise, return 0 denoting nothing is built up.
 	"""
-	#check the validity of the 'format' attr
-	formats = ['plain', 'tgz']
-	form = attr_check(name, d, "format")
-	if not form in formats:
-		cleanup(tempfile_list, tempdir_list)
-		sys.exit("The format attr can only be: %s!\n", ' or '.join(formats))
-
 	#check the validity of the 'source' attr
 	source = attr_check(name, d, "source", 1)
 
@@ -3571,8 +3565,15 @@ def dep_build(d, name):
 		sys.exit("The source of %s is empty!" % name)
 
 	if source[0] != '/':
+		logging.debug("The source of %s is not a local path (%s)!" % (name, source))
+		return 0
+
+	#check the validity of the 'format' attr
+	formats = ['plain', 'tgz']
+	form = attr_check(name, d, "format")
+	if not form in formats:
 		cleanup(tempfile_list, tempdir_list)
-		sys.exit("The source of %s should be a local path!" % name)
+		sys.exit("The format attr can only be: %s!\n", ' or '.join(formats))
 
 	#set the file size
 	size = os.stat(source).st_size
@@ -3587,6 +3588,8 @@ def dep_build(d, name):
 	checksum = md5_cal(source)
 	d["id"] = checksum
 	d["checksum"] = checksum
+
+	return 1
 
 def get_tgz_size(path):
 	"""Get the uncompressed size of a tgz file
@@ -3618,10 +3621,11 @@ def spec_build(spec_json):
 		spec_json: the json object including the specification.
 
 	Returns:
-		None
+		count: the count of dependencies whose metadata have been built.
 	"""
+	count = 0
 	if spec_json.has_key("os") and spec_json["os"]:
-		dep_build(spec_json["os"], "os")
+		count += dep_build(spec_json["os"], "os")
 
 	for sec_name in ["data", "software", "package_manager"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
@@ -3633,28 +3637,34 @@ def spec_build(spec_json):
 					logging.debug("%s does not have config attribute!", sec_name)
 					break
 			for item in sec:
-				dep_build(sec[item], item)
+				count += dep_build(sec[item], item)
+	return count
 
 
 help_info = {
 "build": '''Build up the metadata info of dependencies inside an umbrella spec, and write the built-up version into a new file.
 
-A good use case of build is when you have some dependencies from the local filesystem. In this case, umbrella will calculate the metadata info
-about these dependencies.
+A good use case of build is when you have some dependencies from the local filesystem. In this case, umbrella will calculate the metadata info about these dependencies.
 The source spec should specify the following info of each local dependency: source, action, mountpoint, format.
+The format of local dependencies can be plain (a file which will be used directly) or tgz file (a *.tar.gz file which will be uncompressed inside the sandbox).
 When the local dependency is a .tar.gz file, the following metadata info will be put into the target spec: id, checksum, size, uncompressed size.
 When the local dependency is a plain file, the following metadata info will be put into the target spec: id, checksum, size.
-When the local dependencies is a dir D, a corresponding D.tar.gz file will be created under the same directory with D, then the following metadata info will be put into the target spec: id, checksum, size, uncompressed size.
+
+Umbrella build can not be used together with the --meta option!
 
 For more info about how to compose an umbrella spec, please check the following link:
 	http://ccl.cse.nd.edu/software/manuals/umbrella.html#create_spec
 
-usage: umbrella [options] build source target
+usage: umbrella [options] build target
 
-	source		the path of an existing umbrella spec file from your local filesystem whose metadata info is needed to be built up
+	required options: --spec
+
 	target		an non-existing file path on your local filesystem where the built-up version of the umbrella spec will be wrotten into
 ''',
 "expand": '''Expand an umbrella spec file into a self-contained umbrella spec
+
+Add the dependency metadata information (source format checksum size uncompressed_size) from the metadata database into the umbrella specfication.
+If the metadata information has been in the the umbrella specification, do nothing.
 
 The source umbrella spec should be specified through the --spec option; the metadata db should be specified through the --meta option.
 For each dependency in the source umbrella spec, the following info will be extracted from the metadata db: source, size, format, checksum.
@@ -3662,9 +3672,13 @@ Finally, the expanded umbrella sepc will be wrotten into a new file.
 
 usage: umbrella [options] expand target
 
+	required options: --spec, --meta
+
 	target		an non-existing file path on your local filesystem where the expanded version of the umbrella spec will be wrotten into
 ''',
-"filter": '''Filter the metadata info for an umbrella spec file from a huge metadata db
+"filter": '''Filter the metadata info for an umbrella spec file from a huge metadata db into a separate metadata database.
+
+Filter the dependency metadata information (source format checksum size uncompressed_size) into a separate metadata database.
 
 The source umbrella spec should be specified through the --spec option; the metadata db should be specified through the --meta option.
 The source umbrella spec should NOT be self-contained.
@@ -3672,20 +3686,34 @@ For each dependency specified in the source umbrella spec, its metadata info wil
 
 usage: umbrella [options] filter target
 
+	required options: --spec, --meta
+
 	target		an non-existing file path on your local filesystem where the metadata info of all the dependencies in the umbrella spec will be wrotten into
 ''',
 "run": '''Run your application through umbrella
 
+Note for ec2 sandbox mode: the EC2 AMIs, security groups, key pairs are all regional resources ( http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/resources.html ).
+Therefore, please check the region setting of the desired AMI in the umbrella spec file, and provide security group, key pairs, ssh keys in the same region.
+The security group used should allow incoming ssh traffic.
+
 usage: umbrella [options] run [command]
+
+	required options: --spec, --meta (if the --spec option is not self-contained), --localdir, --sandbox_mode, --output (if output is needed)
+	additional reqired options for ec2 sandbox_mode: --ec2_sshkey, --ec2_key, --ec2_instance_type, --ec2_log, --ec2_group (if a non-default security group is needed).
 
 	command		command to run, the command can also be set inside the umbrella spec. By default: /bin/sh
 ''',
 "split": '''Split a self-contained umbrella spec file into an umbrella spec and a metadata db
 
+The dependency metadata information (source format checksum size uncompressed_size) will be put into a separate metadata database.
+The remaining information will be put into a new umbrella spec.
+
 The source umbrella spec should be specified through the --spec option; The --meta option will be ignored.
 The source umbrella spec should be self-contained.
 
 usage: umbrella [options] split newspec newdb
+
+	required options: --spec
 
 	newspec		an non-existing file path on your local filesystem where the new umbrella spec will be wrotten into
 	newdb		an non-existing file path on your local filesystem where the metadata info corresponding to newspec will be wrotten into
@@ -3697,9 +3725,10 @@ Finally, the new umbrella spec will be written into a new file.
 When the source of a dependency has already include one url from the target archive, the dependency will be ignored.
 
 Currently, the supported target includes: OSF, the Amazon S3.
-Uploading to OSF requires the following umbrella options: --osf_user, --osf_pass, --osf_userid
 
 usage of upload osf: umbrella [options] upload osf proj acl target
+
+	required options: --spec, --meta (if the --spec option is not self-contained), --localdir, --osf_user, --osf_pass, --osf_userid
 
 	proj		the osf project name
 	acl		the access permission of the uploaded data. Options: public, private
@@ -3707,15 +3736,24 @@ usage of upload osf: umbrella [options] upload osf proj acl target
 
 usage of upload s3: umbrella [options] upload s3 bucket acl target
 
+	required options: --spec, --meta (if the --spec option is not self-contained), --localdir
+
 	bucket		the s3 bucket name
 	acl		the access permission of the uploaded data. Options: public-read, private
 	target		an non-existing file path on your local filesystem where the new umbrella spec will be wrotten into
 ''',
 "validate": '''Validate an umbrella spec file
 
+This validation process does the following checkings:
+	whether all the required attributes in the hardware, kernel, and os sections are set;
+	whether each dependency has a source attr;
+	whether each dependency at least has one of the following two attributes (mountpoint, mount_env).
+
 The source umbrella spec should be specified through the --spec option; the metadata db should be specified through the --meta option.
 
 usage: umbrella [options] validate
+
+	required options: --spec, --meta (if the --spec option is not self-contained)
 '''
 }
 
@@ -3739,7 +3777,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="The specification json file.",)
 	parser.add_option("--meta",
 					action="store",
-					help="The source of meta information, which can be a local file path (e.g., file:///tmp/meta.json) or url (e.g., http://...).\nIf this option is not provided, the specification will be treated a self-contained specification.",)
+					help="The source of meta information, which can be a local file relative or absolute path (e.g., /tmp/meta.json) or url (e.g., http://...).\nIf this option is not provided, the specification will be treated a self-contained specification.",)
 	parser.add_option("-l", "--localdir",
 					action="store",
 					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir.",)
@@ -3774,7 +3812,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="The path of the ec2 umbrella log file. Required for ec2 execution engines.",)
 	parser.add_option("-g", "--ec2_group",
 					action="store",
-					help="the security group id within which an Amazon EC2 instance should be run. (only for ec2)",)
+					help="the security group id within which an Amazon EC2 instance should be run, the security group should should support incoming ssh traffic. (only for ec2)",)
 	parser.add_option("-k", "--ec2_key",
 					action="store",
 					help="the name of the key pair to use when launching an Amazon EC2 instance. (only for ec2)",)
@@ -3842,40 +3880,6 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		print help_info[behavior]
 		sys.exit(0)
 
-	if behavior in ["build"]:
-		if len(args) != 3:
-			cleanup(tempfile_list, tempdir_list)
-			logging.critical("The syntax for umbrella build is: umbrella ... build <source.umbrella> <dest.umbrella>\n")
-			sys.exit("The syntax for umbrella build is: umbrella ... build <source.umbrella> <dest.umbrella>\n")
-
-		args[1] = os.path.abspath(args[1])
-		if (not os.path.exists(args[1])) or (not os.path.isfile(args[1])):
-			cleanup(tempfile_list, tempdir_list)
-			logging.critical("<source.umbrella> (%s) should be an existing file!\n", args[1])
-			sys.exit("<source.umbrella> (%s) should be an existing file!\n" % args[1])
-
-		if os.path.exists(args[2]):
-			cleanup(tempfile_list, tempdir_list)
-			logging.critical("<dest.umbrella> (%s) should be a non-existing file!\n", args[2])
-			sys.exit("<dest.umbrella> (%s) should be a non-existing file!\n" % args[2])
-
-		args[2] = os.path.abspath(args[2])
-		if not os.path.exists(os.path.dirname(args[2])):
-			print os.path.dirname(args[2])
-			try:
-				os.makedirs(os.path.dirname(args[2]))
-			except Exception as e:
-				cleanup(tempfile_list, tempdir_list)
-				logging.critical("Fails to create the directory for the <dest.umbrella> (%s): %s!", args[2], e)
-				sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % (args[2], e))
-
-		with open(args[1]) as f:
-			spec_json = json.load(f)
-			spec_build(spec_json)
-			json2file(args[2], spec_json)
-		sys.exit(0)
-
-
 	if behavior in ["run", "upload"]:
 		#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.
 		#to allow the reuse the local cache, the localdir can be a dir which already exists.
@@ -3935,42 +3939,82 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		#get the cvmfs HTTP_PROXY
 		cvmfs_http_proxy = options.cvmfs_http_proxy
 
-	if behavior in ["run", "expand", "filter", "split", "validate", "upload"]:
+	if behavior in ["run", "expand", "filter", "split", "validate", "upload", "build"]:
 		spec_path = options.spec
-		if behavior == "validate" and spec_path == None:
-			spec_json = None
-		else:
-			spec_path_basename = os.path.basename(spec_path)
-			logging.debug("Start to read the specification file: %s", spec_path)
-			if not os.path.isfile(spec_path):
+		if spec_path == None:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("The --spec option is missing!")
+			sys.exit("The --spec option is missing!")
+
+		spec_path_basename = os.path.basename(spec_path)
+		logging.debug("Start to read the specification file: %s", spec_path)
+		if not os.path.isfile(spec_path):
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
+			print "The specification json file does not exist! Please refer the -c option.\n"
+			parser.print_help()
+			sys.exit(1)
+
+		with open(spec_path) as f: #python 2.4 does not support this syntax: with open () as
+			spec_json = json.load(f)
+			if behavior in ["run"]:
+				user_cmd = args[1:]
+				if len(user_cmd) == 0:
+					if spec_json.has_key("cmd") and len(spec_json["cmd"]) > 0:
+						user_cmd.append(spec_json["cmd"])
+					else:
+						user_cmd.append("/bin/sh") #set the user_cmd to be default: /bin/sh
+
+				logging.debug("The user's command is: %s", user_cmd)
+
+				#if the spec file has environ seciton, merge the variables defined in it into env_para_dict
+				if spec_json.has_key("environ") and spec_json["environ"]:
+					logging.debug("The specification file has environ section, update env_para_dict ....")
+					spec_env = spec_json["environ"]
+					for key in spec_env:
+						env_para_dict[key] = spec_env[key]
+					logging.debug("env_para_dict:")
+					logging.debug(env_para_dict)
+
+	meta_json = None
+	meta_path = options.meta
+
+	if behavior in ["build"]:
+		if meta_path:
+			logging.critical("umbrella build can not be used together with the --meta option!")
+			sys.exit("umbrella build can not be used together with the --meta option!")
+
+		if len(args) != 2:
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("The syntax for umbrella build is: umbrella ... build <dest.umbrella>\n")
+			sys.exit("The syntax for umbrella build is: umbrella ... build <dest.umbrella>\n")
+
+		if os.path.exists(args[1]):
+			cleanup(tempfile_list, tempdir_list)
+			logging.critical("<dest.umbrella> (%s) should be a non-existing file!\n", args[1])
+			sys.exit("<dest.umbrella> (%s) should be a non-existing file!\n" % args[1])
+
+		args[1] = os.path.abspath(args[1])
+		if not os.path.exists(os.path.dirname(args[1])):
+			print os.path.dirname(args[1])
+			try:
+				os.makedirs(os.path.dirname(args[1]))
+			except Exception as e:
 				cleanup(tempfile_list, tempdir_list)
-				logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
-				print "The specification json file does not exist! Please refer the -c option.\n"
-				parser.print_help()
-				sys.exit(1)
+				logging.critical("Fails to create the directory for the <dest.umbrella> (%s): %s!", args[1], e)
+				sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % (args[1], e))
 
-			with open(spec_path) as f: #python 2.4 does not support this syntax: with open () as
-				spec_json = json.load(f)
-				if behavior in ["run"]:
-					user_cmd = args[1:]
-					if len(user_cmd) == 0:
-						if spec_json.has_key("cmd") and len(spec_json["cmd"]) > 0:
-							user_cmd.append(spec_json["cmd"])
-						else:
-							user_cmd.append("/bin/sh") #set the user_cmd to be default: /bin/sh
-
-					logging.debug("The user's command is: %s", user_cmd)
-
-					#if the spec file has environ seciton, merge the variables defined in it into env_para_dict
-					if spec_json.has_key("environ") and spec_json["environ"]:
-						logging.debug("The specification file has environ section, update env_para_dict ....")
-						spec_env = spec_json["environ"]
-						for key in spec_env:
-							env_para_dict[key] = spec_env[key]
-						logging.debug("env_para_dict:")
-						logging.debug(env_para_dict)
+		if spec_build(spec_json) == 0:
+			print "There is no local dependencies whose metadata info needs to built!"
+		else:
+			json2file(args[1], spec_json)
+		sys.exit(0)
 
 	if behavior in ["run"]:
+		if not meta_path:
+			print "Trying to build the metadata info for local dependencies ..."
+			spec_build(spec_json)
+
 		if 'PWD' in env_para_dict:
 			cwd_setting = env_para_dict['PWD']
 			logging.debug("PWD environment variable is set explicitly: %s", cwd_setting)
@@ -4089,17 +4133,15 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			else:
 				pass
 
-	meta_json = None
 	if behavior in ["run", "expand", "filter", "validate"]:
 		"""
 		meta_path is optional. If set, it provides the metadata information for the dependencies.
 		If not set, the umbrella specification is treated as a self-contained specification.
-		meta_path can be in either file:///filepath format or a http/https url like http:/ccl.cse.nd.edu/.... Otherwise, it is treated as a local path.
+		meta_path can be in either a local filepath (relative or absolute) or a http/https url like http:/ccl.cse.nd.edu/.... Otherwise, it is treated as a local path.
 		"""
-		meta_path = options.meta
 		if meta_path:
-			if meta_path[:7] == "file://":
-				meta_path = meta_path[7:]
+			if meta_path[:1] == "/":
+				meta_path = os.path.abspath(meta_path)
 				logging.debug("Check the metatdata database file: %s", meta_path)
 				if not os.path.exists(meta_path):
 					cleanup(tempfile_list, tempdir_list)
