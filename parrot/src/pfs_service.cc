@@ -348,55 +348,17 @@ int pfs_service::md5( pfs_name *source, unsigned char *digest )
 
 pfs_service * pfs_service_lookup( const char *name )
 {
-	if(!strcmp(name,"chirp")) {
-		extern pfs_service *pfs_service_chirp;
-		return pfs_service_chirp;
-	} else if(!strcmp(name,"multi")) {
-		extern pfs_service *pfs_service_multi;
-		return pfs_service_multi;
-	} else if(!strcmp(name,"anonftp")) {
-		extern pfs_service *pfs_service_anonftp;
-		return pfs_service_anonftp;
-	} else if(!strcmp(name,"ftp")) {
-		extern pfs_service *pfs_service_ftp;
-		return pfs_service_ftp;
-	} else if(!strcmp(name,"http")) {
-		extern pfs_service *pfs_service_http;
-		return pfs_service_http;
-	} else if(!strcmp(name,"grow")) {
-		extern pfs_service *pfs_service_grow;
-		return pfs_service_grow;
-#ifdef HAS_GLOBUS_GSS
-	} else if(!strcmp(name,"gsiftp") || !strcmp(name,"gridftp") ) {
-		extern pfs_service *pfs_service_gsiftp;
-		return pfs_service_gsiftp;
-#endif
-#ifdef HAS_IRODS
-	} else if(!strcmp(name,"irods")) {
-		extern pfs_service *pfs_service_irods;
-		return pfs_service_irods;
-#endif
-	} else if(!strcmp(name,"hdfs")) {
-		extern pfs_service *pfs_service_hdfs;
-		return pfs_service_hdfs;
-#ifdef HAS_BXGRID
-	} else if(!strcmp(name,"bxgrid")) {
-		extern pfs_service *pfs_service_bxgrid;
-		return pfs_service_bxgrid;
-#endif
-#ifdef HAS_XROOTD
-	} else if(!strcmp(name,"xrootd")) {
-		extern pfs_service *pfs_service_xrootd;
-		return pfs_service_xrootd;
-#endif
-#ifdef HAS_CVMFS
-	} else if(!strcmp(name,"cvmfs")) {
-		extern pfs_service *pfs_service_cvmfs;
-		return pfs_service_cvmfs;
-#endif
-	} else {
-		return 0;
+	extern struct hash_table *available_services;
+	char *key;
+	void *value;
+	hash_table_firstkey(available_services);
+	while(hash_table_nextkey(available_services, &key, &value)) {
+		if(!strcmp(name, key)) {
+			return (pfs_service *) value;
+		}
 	}
+
+	return 0;
 }
 
 pfs_service * pfs_service_lookup_default()

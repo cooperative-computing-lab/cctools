@@ -76,6 +76,7 @@ int wait_barrier = 0;
 int pfs_master_timeout = 300;
 struct file_cache *pfs_file_cache = 0;
 struct password_cache *pfs_password_cache = 0;
+struct hash_table *available_services;
 int pfs_force_stream = 0;
 int pfs_force_cache = 0;
 int pfs_force_sync = 0;
@@ -280,13 +281,12 @@ static void show_help( const char *cmd )
 	printf( "\n\n");
 	printf( "Enabled filesystems are:");
 
-	const char *driver_list[] = {"http","grow","ftp","anonftp","gsiftp","nest","chirp","gfal","rfio","dcap","glite","lfc","irods","hdfs","bxgrid","s3","rootd","xrootd","cvmfs",0};
-
-	int i;
-
-	for(i=0;driver_list[i];i++) {
-		if(pfs_service_lookup(driver_list[i])) {
-			printf(" %s",driver_list[i]);
+	{
+		char *key;
+		void *value;
+		hash_table_firstkey(available_services);
+		while(hash_table_nextkey(available_services, &key, &value)) {
+			printf(" %s", key);
 		}
 	}
 
@@ -627,6 +627,43 @@ int main( int argc, char *argv[] )
 
 	pfs_uid = getuid();
 	pfs_gid = getgid();
+
+	available_services = hash_table_create(0, 0);
+	extern pfs_service *pfs_service_chirp;
+	hash_table_insert(available_services, "chirp", pfs_service_chirp);
+	extern pfs_service *pfs_service_multi;
+	hash_table_insert(available_services, "multi", pfs_service_multi);
+	extern pfs_service *pfs_service_anonftp;
+	hash_table_insert(available_services, "anonftp", pfs_service_anonftp);
+	extern pfs_service *pfs_service_ftp;
+	hash_table_insert(available_services, "ftp", pfs_service_ftp);
+	extern pfs_service *pfs_service_http;
+	hash_table_insert(available_services, "http", pfs_service_http);
+	extern pfs_service *pfs_service_grow;
+	hash_table_insert(available_services, "grow", pfs_service_grow);
+	extern pfs_service *pfs_service_hdfs;
+	hash_table_insert(available_services, "hdfs", pfs_service_hdfs);
+#ifdef HAS_GLOBUS_GSS
+	extern pfs_service *pfs_service_gsiftp;
+	hash_table_insert(available_services, "gsiftp", pfs_service_gsiftp);
+	hash_table_insert(available_services, "gridftp", pfs_service_gsiftp);
+#endif
+#ifdef HAS_IRODS
+	extern pfs_service *pfs_service_irods;
+	hash_table_insert(available_services, "irods", pfs_service_irods);
+#endif
+#ifdef HAS_BXGRID
+	extern pfs_service *pfs_service_bxgrid;
+	hash_table_insert(available_services, "bxgrid", pfs_service_bxgrid);
+#endif
+#ifdef HAS_XROOTD
+	extern pfs_service *pfs_service_xrootd;
+	hash_table_insert(available_services, "xrootd", pfs_service_xrootd);
+#endif
+#ifdef HAS_CVMFS
+	extern pfs_service *pfs_service_cvmfs;
+	hash_table_insert(available_services, "cvmfs", pfs_service_cvmfs);
+#endif
 
 	{
 		const char *s;
