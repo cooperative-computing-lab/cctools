@@ -3571,8 +3571,8 @@ def dep_build(d, name):
 		sys.exit("The source of %s is empty!" % name)
 
 	if source[0] != '/':
-		cleanup(tempfile_list, tempdir_list)
-		sys.exit("The source of %s should be a local path!" % name)
+		logging.debug("The source of %s is not a local path (%s)!" % (name, source))
+		return
 
 	#set the file size
 	size = os.stat(source).st_size
