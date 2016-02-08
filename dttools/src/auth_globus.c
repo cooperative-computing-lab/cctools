@@ -88,16 +88,16 @@ static int auth_globus_assert(struct link *link, time_t stoptime)
 			} else {
 				globus_gss_assist_display_status_str(&reason, "", major, minor, token);
 				debug(D_AUTH, "globus: credentials rejected: %s", reason ? reason : "unknown reason");
-				THROW_QUIET(EPERM);
+				THROW_QUIET(EACCES);
 			}
 		} else {
 			debug(D_AUTH, "globus: server couldn't load credentials");
-			THROW_QUIET(EPERM);
+			THROW_QUIET(EACCES);
 		}
 	} else {
 		debug(D_AUTH, "globus: couldn't load my credentials; did you grid-proxy-init?");
 		auth_barrier(link, "no\n", stoptime);
-		THROW_QUIET(EPERM);
+		THROW_QUIET(EACCES);
 	}
 
 	rc = 0;
