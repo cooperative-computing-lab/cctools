@@ -4323,7 +4323,8 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 
   if(!q->monitor_exe)
   {
-	fatal("Could not find the resource monitor executable.\n");
+	warn(D_WQ, "Could not find the resource monitor executable. Disabling monitoring.\n");
+	return 0;
   }
 
   if(monitor_output_directory) {
