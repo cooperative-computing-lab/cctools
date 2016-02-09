@@ -86,6 +86,8 @@ struct hash_table *unique_strings;
 int split_categories  = 0;
 struct hash_table *categories;
 
+int brute_force = 0;
+
 char *unique_string(char *str)
 {
 	char *tmp = hash_table_lookup(unique_strings, str);
@@ -976,7 +978,11 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >mode <br> &#9653;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc.<br> &#9663; </td>");
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f.</td>");
+
+	if(brute_force) {
+		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f.</td>");
+	}
+
 	fprintf(stream, "<td class=\"datahdr\" >&sigma;/&mu;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >p<sub>99</sub></td>");
 	fprintf(stream, "<td class=\"datahdr\" >p<sub>95</sub></td>");
@@ -1007,9 +1013,11 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "%" PRId64 "\n", h->first_allocation_histogram);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->first_allocation_bruteforce);
-	fprintf(stream, "</td>\n");
+	if(brute_force) {
+		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
+		fprintf(stream, "%" PRId64 "\n", h->first_allocation_bruteforce);
+		fprintf(stream, "</td>\n");
+	}
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%6.2lf\n", h->mean > 0 ? h->std_dev/h->mean : -1);
@@ -1180,6 +1188,7 @@ static void show_usage(const char *cmd)
 	fprintf(stdout, "%-20s Read summaries recursively from <dir> (filename of form '%s[0-9]+%s').\n", "-D <dir>", RULE_PREFIX, RULE_SUFFIX);
 	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
 	fprintf(stdout, "%-20s Split on task categories.\n", "-s");
+	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations.\n", "-b");
 	fprintf(stdout, "%-20s Select these fields for the histograms.     (Default is: tcvmsrwhz).\n\n", "-f <fields>");
 	fprintf(stdout, "<fields> is a string in which each character should be one of the following:\n");
 	fprintf(stdout, "%s", make_field_names_str("\n"));
@@ -1197,7 +1206,7 @@ int main(int argc, char **argv)
 	debug_config(argv[0]);
 
 	signed char c;
-	while( (c = getopt(argc, argv, "D:d:f:hL:o:s")) > -1 )
+	while( (c = getopt(argc, argv, "bD:d:f:hL:o:s")) > -1 )
 	{
 		switch(c)
 		{
@@ -1218,6 +1227,9 @@ int main(int argc, char **argv)
 				break;
 			case 's':
 				split_categories = 1;
+				break;
+			case 'b':
+				brute_force = 1;
 				break;
 			case 'h':
 				show_usage(argv[0]);
@@ -1290,7 +1302,11 @@ int main(int argc, char **argv)
 		{
 			histograms_of_category(s);
 			find_first_allocation_of_category_histogram(s, categories);
-			find_first_allocation_of_category_bruteforce(s);
+
+			if(brute_force) {
+				find_first_allocation_of_category_bruteforce(s);
+			}
+
 			write_stats_of_category(s);
 			write_limits_of_category(s, 0.95);
 

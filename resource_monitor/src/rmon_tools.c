@@ -41,7 +41,7 @@ double Mbytes_to_Gbytes(double bytes)
 struct field fields[NUM_FIELDS + 1] = {
 	[WALL_TIME] = {"t", "wall_time",      "wall time",       "s",        1, 1, offsetof(struct rmDsummary, wall_time)},
 	[CPU_TIME]  = {"c", "cpu_time",       "cpu time",        "s",        1, 1, offsetof(struct rmDsummary, cpu_time)},
-	[VIRTUAL  ] = {"v", "virtual memory", "virtual memory",  "MB",       0, 1, offsetof(struct rmDsummary, virtual_memory)},
+	[VIRTUAL  ] = {"v", "virtual_memory", "virtual memory",  "MB",       0, 1, offsetof(struct rmDsummary, virtual_memory)},
 	[RESIDENT ] = {"m", "memory",         "resident memory", "MB",       0, 1, offsetof(struct rmDsummary, memory)},
 	[SWAP     ] = {"s", "swap_memory",    "swap memory",     "MB",       0, 1, offsetof(struct rmDsummary, swap_memory)},
 	[B_READ   ] = {"r", "bytes_read",     "read bytes",      "MB",       0, 1, offsetof(struct rmDsummary, bytes_read)},
