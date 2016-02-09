@@ -92,12 +92,15 @@ int dag_node_comp(void *item, const void *arg)
 
 int dag_node_comp_residual(const void *item, const void *arg)
 {
-	struct dag_node *node1 = (struct dag_node *)item;
-	struct dag_node *node2 = (struct dag_node *)arg;
-	printf("%d\t:\t%d\n", node1->nodeid, node2->nodeid);
-	if(node1->residual_size > node2->residual_size)
+	struct dag_node **node1 = (void *)item;
+	struct dag_node **node2 = (void *)arg;
+
+	uint64_t size1 = (*node1)->residual_size;
+	uint64_t size2 = (*node2)->residual_size;
+
+	if(size1 > size2)
 		return 1;
-	else if(node1->residual_size < node2->residual_size)
+	else if(size1 < size2)
 		return -1;
 	return 0;
 }
@@ -345,7 +348,7 @@ uint64_t dag_node_determine_child_footprint(struct dag_node *n)
 	struct dag_node *s;
 	struct dag_file *f;
 
-	uint64_t footprint = n->target_size;
+	uint64_t footprint = 0;
 	set_first_element(n->descendants);
 	while((s = set_next_element(n->descendants))){
 		footprint += s->source_size;
@@ -353,7 +356,7 @@ uint64_t dag_node_determine_child_footprint(struct dag_node *n)
 	}
 
 	while((f = list_next_item(n->target_files))){
-		if(f->reference_count > 0)
+		if(list_size(f->needed_by))
 			continue;
 		footprint += dag_file_size(f);
 	}
@@ -503,9 +506,7 @@ uint64_t dag_node_determine_descendant_footprint(struct dag_node *n)
 				max_branch = node1->footprint_size;
 				n->descendant_footprint = node_footprint;
 
-				printf("%d\n", ((struct dag_node *)list_peek_head(tmp_run_order))->nodeid);
 				list_sort(tmp_run_order, dag_node_comp_residual);
-				printf("%d\n", ((struct dag_node *)list_peek_head(tmp_run_order))->nodeid);
 				/* Add to run order, as we push tail this will be last. */
 				list_push_tail(tmp_run_order, node1);
 
@@ -583,6 +584,11 @@ void dag_node_determine_footprint(struct dag_node *n)
 		these decisions. */
 	list_push_tail(n->residual_nodes, n);
 	list_push_tail(n->footprint_nodes, n);
+
+	printf("\n%d\n", n->nodeid);
+	printf("Parent\t: %"PRIu64"\n", n->parent_footprint);
+	printf("Child\t: %"PRIu64"\n", n->child_footprint);
+	printf("Desc\t: %"PRIu64"\n\n", n->descendant_footprint);
 
 	/* Mark node as having been updated. */
 	n->footprint_updated = 1;
