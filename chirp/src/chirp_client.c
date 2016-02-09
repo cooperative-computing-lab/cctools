@@ -56,6 +56,17 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+/* Prevent openssl from opening $HOME/.rnd */
+#define OPENSSL_RANDFILE \
+	"if [ -r /dev/urandom ]; then\n" \
+	"   export RANDFILE=/dev/urandom\n" \
+	"elif [ -r /dev/random ]; then\n" \
+	"   export RANDFILE=/dev/random\n" \
+	"else\n" \
+	"   unset RANDFILE\n" \
+	"   export HOME=/\n" \
+	"fi\n"
+
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
@@ -528,6 +539,7 @@ static int ticket_translate(const char *name, char *ticket_subject)
 {
 	static const char command[] =
 		"set -e\n"
+		OPENSSL_RANDFILE
 		"sed '/^\\s*#/d' < \"$CHIRP_TICKET_NAME\" | openssl rsa -pubout\n"
 		;
 
@@ -591,6 +603,7 @@ INT64_T chirp_client_ticket_register(struct chirp_client * c, const char *name, 
 {
 	static const char command[] =
 		"set -e\n"
+		OPENSSL_RANDFILE
 		"if [ -r \"$CHIRP_TICKET_NAME\" ]; then\n"
 		"	sed '/^\\s*#/d' < \"$CHIRP_TICKET_NAME\" | openssl rsa -pubout\n"
 		"	exit 0\n"
@@ -686,6 +699,7 @@ INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH
 {
 	static const char command[] =
 		"set -e\n"
+		OPENSSL_RANDFILE
 		"umask 0177\n" /* files only readable/writable by owner */
 		"T=`mktemp /tmp/ticket.XXXXXX`\n"
 		"P=`mktemp /tmp/ticket.pub.XXXXXX`\n"
