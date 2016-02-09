@@ -79,6 +79,13 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
 
+	if(envlist) {
+		const char *category = jx_lookup_string(envlist, "CATEGORY");
+		if(category) {
+			work_queue_task_specify_category(t, category);
+		}
+	}
+
 	if(resources)
 	{
 		work_queue_task_specify_resources(t, resources);
