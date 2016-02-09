@@ -1101,6 +1101,8 @@ void write_front_page(char *workflow_name)
 	char *filename = string_format("%s/index.html", output_directory);
 	fo = fopen(filename, "w");
 
+	int columns = brute_force ? 8 : 7;
+
 	if(!fo)
 		fatal("Could not open file %s for writing: %s\n", strerror(errno));
 
@@ -1121,7 +1123,7 @@ void write_front_page(char *workflow_name)
 	list_first_item(all_sets);
 	while((s = list_next_item(all_sets)))
 	{
-		fprintf(fo, "<td class=\"datahdr\" colspan=\"8\">%s: %d</td>", s->category, list_size(s->summaries));
+		fprintf(fo, "<td class=\"datahdr\" colspan=\"%d\">%s: %d</td>", columns, s->category, list_size(s->summaries));
 	}
 	fprintf(fo, "</tr>\n");
 
