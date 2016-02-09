@@ -1,8 +1,8 @@
 import json, time, os, shutil
-from . import store_local
+import glob
 
 class File(object):
-	__slots__ = ( 'key', 'tree_key', 'when', 'path', 'size', 'body' )
+	__slots__ = ( 'key', 'tree_key', 'when', 'path', 'size', 'body', 'workflow_id' )
 	def __init__( self, obj={}, **kwargs ):
 		kwargs.update( obj )
 		self.key = kwargs['key']
@@ -31,17 +31,21 @@ class File(object):
 			self.size = 0
 			print 'NO PATH OR BODY TO THIS FILE:', kwargs
 
+		if 'workflow_id' in kwargs:
+			self.workflow_id = kwargs['workflow_id']
+		else:
+			self.workflow_id = None
 
-	def __str__( self ):
-		obj = {'type':'file', 'key':self.key}
+	def full_str( self ):
+		obj = {'type':'file', 'key':self.key, 'workflow_id':self.workflow_id}
 		if self.tree_key:
 			obj['tree_key'] = self.tree_key
 		if self.when:
 			obj['when'] = self.when
 		if self.path:
 			obj['stream_length'] = self.size
-			if store_local.primary:
-				f = open( store_local.primary.folder + self.path, 'rb' )
+			if glob.store_local and glob.store_local.primary and self.path[0] != '/':
+				f = open( glob.store_local.primary.folder + self.path, 'rb' )
 			else:
 				f = open( self.path, 'rb' )
 			data = ''
@@ -49,12 +53,41 @@ class File(object):
 			while buf:
 				data += buf
 				buf = f.read(1024)
+
+			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': ')) + "\n" + data + "\n"
+		else:
+			obj['stream_length'] = len(self.body)
+			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': ')) + "\n" + self.body + "\n"
+	def __str__( self ):
+		obj = {'type':'file', 'key':self.key, 'workflow_id':self.workflow_id}
+		if self.tree_key:
+			obj['tree_key'] = self.tree_key
+		if self.when:
+			obj['when'] = self.when
+		if self.path:
+			obj['stream_length'] = self.size
+			if glob.store_local and glob.store_local.primary and self.path[0] != '/':
+				f = open( glob.store_local.primary.folder + self.path, 'rb' )
+			else:
+				f = open( self.path, 'rb' )
+			buf = f.read(25)
+			data = buf + ' ... '
+			last_buf = ''
+			while buf:
+				last_buf = buf
+				buf = f.read(1024)
+			if len(last_buf)>28:
+				data += last_buf[-25:]
+			else:
+				data += last_buf
+
 			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': ')) + "\n" + data
 		else:
 			obj['stream_length'] = len(self.body)
 			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': ')) + "\n" + self.body
+
 	def str_w_file( self, filename ):
-		obj = {'type':'file', 'key':self.key}
+		obj = {'type':'file', 'key':self.key, 'workflow_id':self.workflow_id}
 		if self.tree_key:
 			obj['tree_key'] = self.tree_key
 		if self.when:
@@ -62,12 +95,18 @@ class File(object):
 		obj['path'] = filename
 		if self.path:
 			obj['size'] = self.size
-			shutil.move( self.path, store_local.primary.folder + filename )
+			if glob.store_local and glob.store_local.primary:
+				shutil.move( self.path, glob.store_local.primary.folder + filename )
+			else:
+				shutil.move( self.path, filename )
 			self.path = filename
 			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': '))
 		else:
 			obj['size'] = len( self.body )
-			f = open( store_local.primary.folder + filename, 'wb' )
+			if glob.store_local and filename[0] != '/':
+				f = open( glob.store_local.primary.folder + filename, 'wb' )
+			else:
+				f = open( filename, 'wb' )
 			f.write( self.body )
 			f.close()
 			return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': '))
@@ -80,3 +119,6 @@ class File(object):
 		return self.body == other.body
 	def __ne__(self, other):
 		return not self.__eq__(other)
+
+	def __len__( self ):
+		return len(str(self))

@@ -1,7 +1,7 @@
 import json, time
 
 class Exec(object):
-	__slots__ = ( 'key', 'cpu_time', 'duration', 'when', 'body' )
+	__slots__ = ( 'key', 'cpu_time', 'duration', 'when', 'body', 'workflow_id' )
 	def __init__( self, obj={}, **kwargs ):
 		kwargs.update( obj )
 		self.key = kwargs['key']
@@ -26,9 +26,15 @@ class Exec(object):
 		else:
 			self.body = {}
 
+		if 'workflow_id' in kwargs:
+			self.workflow_id = kwargs['workflow_id']
+		else:
+			self.workflow_id = None
 
+	def full_str( self ):
+		return str( self ) + "\n"
 	def __str__( self ):
-		obj = {'type':'exec', 'key':self.key}
+		obj = {'type':'exec', 'key':self.key, 'workflow_id':self.workflow_id}
 		obj['cpu_time'] = self.cpu_time
 		obj['duration'] = self.duration
 		if self.when:
@@ -44,3 +50,6 @@ class Exec(object):
 		return self.body == other.body
 	def __ne__(self, other):
 		return not self.__eq__(other)
+	def __len__( self ):
+		return len(str(self))
+

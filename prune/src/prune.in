@@ -1,15 +1,15 @@
 #!/usr/bin/env cctools_python
 # CCTOOLS_PYTHON_VERSION 2.7 2.6
-#
 
 # Copyright (c) 2010- The University of Notre Dame.
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import prune
-import sys
 
-prune.main.cctools_version = 'CCTOOLS_VERSION'
-prune.main.cctools_releasedate = 'CCTOOLS_RELEASE_DATE'
+from prune import main
 
-prune.main.start_prune()
+
+main.cctools_version = 'CCTOOLS_VERSION'
+main.cctools_releasedate = 'CCTOOLS_RELEASE_DATE'
+
+main.start_prune()

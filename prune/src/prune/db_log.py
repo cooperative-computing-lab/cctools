@@ -16,12 +16,14 @@ from parser import Parser
 
 
 from json import JSONEncoder
+from uuid import UUID
 JSONEncoder_olddefault = JSONEncoder.default
-def JSONEncoder_newdefault( self, o ):
-	if isinstance( o, Entry ):
-		return o.__dict__
-	return JSONEncoder_olddefault( self, o )
+def JSONEncoder_newdefault(self, o):
+	if isinstance(o, UUID): return str(o)
+	return JSONEncoder_olddefault(self, o)
 JSONEncoder.default = JSONEncoder_newdefault
+
+import glob
 
 
 class Entry:
@@ -55,9 +57,14 @@ class Database:
 			self.position = 0
 			parser = Parser()
 			start = time.time()
+			offset = 0
+			size = 0
 			self.open_file = self.drive.open_stream( self.drive.database_file() )
+			self.open_index_file = self.drive.open_stream( self.drive.index_file() )
 			self.open_file.seek(0)
+			self.open_index_file.seek(0)
 			for line in self.open_file:
+				size += len(line)
 				results = parser.parse( line )
 				if results:
 					for objects in results:
@@ -69,7 +76,10 @@ class Database:
 							else:
 								body = None
 
-							if obj['type'] == 'envi':
+							if not 'type' in obj:
+								print 'No type in Logged object:',obj,body
+
+							elif obj['type'] == 'envi':
 								en = Envi( obj, body=body )
 								self.index_obj( en )
 							elif obj['type'] == 'call':
@@ -79,6 +89,7 @@ class Database:
 								fl = File( obj, body=body )
 								self.index_obj( fl )
 							elif obj['type'] == 'exec':
+								#if len(body['results'])>0:
 								ex = Exec( obj, body=body )
 								self.index_obj( ex )
 
@@ -86,6 +97,8 @@ class Database:
 			diff = time.time() - start
 			print "DB loaded in:",diff
 			self.ready = True
+			
+			glob.set_ready_handle( 'db', self )
 
 
 	def stop( self ):
@@ -157,7 +170,7 @@ class Database:
 		stored = False
 
 		node = self.fetch( obj.key )
-		if not node or ( isinstance(obj, File) and (obj.tree_key!=node.obj.tree_key) ):
+		if not node or ( isinstance(obj, File) and (obj.tree_key!=node.obj.tree_key) ) or isinstance(obj, Exec):
 
 			if isinstance(obj, File) and (obj.path or obj.tree_key):
 				obj_str = obj.str_w_file( self.file_folder + obj.key )
@@ -169,6 +182,7 @@ class Database:
 				self.open_file.write( "\n" )
 				self.open_file.flush()
 			stored = True
+
 
 
 		self.index_obj( obj )
@@ -206,6 +220,9 @@ class Database:
 		if src == self.nil:
 			return self.drive.symlink( src, target )
 		node = self.fetch( src )
+		while not node:
+			time.sleep(0.01)
+			node = self.fetch( src )
 		if node.obj.path:
 			self.drive.symlink( node.obj.key, target )
 		else:

@@ -2,12 +2,11 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-""" Prune package """
+import os, sys, time, traceback, logging
 
-#from . import main
 
-#from . import core
-##from . import lib
-#from . import wrapper
+def start( *args ):
+	pass
 
-# vim: set sts=4 sw=4 ts=8 expandtab ft=python:
+def stop( *args ):
+	pass

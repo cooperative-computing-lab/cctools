@@ -7,6 +7,9 @@ import shutil
 import uuid as uuidlib
 import json as jsonlib
 
+import glob
+from utils import *
+
 primary = None
 
 class Folder:
@@ -16,6 +19,8 @@ class Folder:
 			self.folder = new_folder
 		else:
 			self.folder = new_folder+'/'
+		global state
+		glob.store = self
 		self.start()
 
 
@@ -53,14 +58,24 @@ class Folder:
 
 	def database_file( self, volatile=False ):
 		return self.file_ready( 'db', volatile )
+	def index_file( self, volatile=False ):
+		return self.file_ready( 'index', volatile )
 	def database_folder( self, volatile=False ):
 		return self.folder_ready( 'db/', volatile )
 	def config_file( self, volatile=False ):
 		return self.file_ready( 'config', volatile )
 	def file_folder( self, volatile=False ):
 		return self.folder_ready( 'files/', volatile )
-	def sandbox_folder( self, volatile=False ):
+	def sandbox_folder( self, volatile=True ):
 		return self.folder_ready( 'sandboxes/', volatile )
+
+	def file_folder_path( self, volatile=False ):
+		return self.folder_ready( self.folder + 'files/', volatile )
+	def tmp_file_path( self, name=None, volatile=True ):
+		if name:
+			return self.folder_ready( self.folder + 'tmp/' + name, volatile )
+		else:
+			return self.folder_ready( self.folder + 'tmp/' + uuid(), volatile )
 
 	def new_sandbox( self, volatile=True ):
 		uuid = uuidlib.uuid4()

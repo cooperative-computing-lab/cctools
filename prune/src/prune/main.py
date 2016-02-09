@@ -3,19 +3,19 @@
 # See the file COPYING for details.
 
 from Queue import Queue
-import os, sys, traceback
-import uuid as uuidlib
+import os, sys, time, traceback
 import json as jsonlib
-import yaml, time
 import readline
 import subprocess, hashlib
 
-from . import store_local
-from . import msg_server
-from . import msg_client
+import store_local
+import server
 #from . import cmdline_ui
-from . import db_log
-from . import exec_master
+import db_log
+import exec_master
+
+import glob
+from utils import *
 
 
 def start_prune():
@@ -24,13 +24,13 @@ def start_prune():
 	HOME = os.path.expanduser("~")
 	CWD = os.getcwd()
 
-	start_master = False
-	start_client = True
+	start_master = True
 	start_worker = False
 	workdir = None
 	hostname = None
 	port = None
 	cores = None
+	exec_filename = None
 
 
 	argi = 1
@@ -46,14 +46,8 @@ def start_prune():
 				start_master = True
 				start_client = False
 				start_worker = False
-			elif mode == 'worker':
-				start_master = False
-				start_client = False
-				start_worker = True
-			else: # default
-				start_master = False
-				start_client = True
-				start_worker = False
+			else:
+				print '%s mode not yet implemented.' % mode
 
 
 		# -h <hostname>: hostname for the master (default: localhost)
@@ -72,6 +66,10 @@ def start_prune():
 		elif arg in ['-c','--cores']:
 			argi += 1
 			cores = int(sys.argv[argi])
+
+
+		else:
+			exec_filename = arg
 
 
 		# working directory for config, log, files, etc
@@ -104,7 +102,7 @@ def start_prune():
 		--reset      Truncate the database and delete all data.
 
 		-w,--workdir <pathname>      Specify a working directory. (worker default ./.prune;  master default ~/.prune)
-		-m,--mode <master|client|worker>      Running mode. (default: client)
+		-m,--mode <master|worker>      Running mode. (default: master)
 		-c,--cores <num_cores>      Number of master (or worker) cores. (default: 8)
 		-h,--hostname <ip|domain>      Hostname for master. (default: localhost)
 		-p,--port <port_number>      Port number for master. (default: 8073)
@@ -137,11 +135,11 @@ def start_prune():
 
 	cfg = None
 	if os.path.isfile( workdir + 'config' ):
-		with open( workdir + 'config', 'r' ) as ymlfile:
-			cfg = yaml.load( ymlfile )
+		with open( workdir + 'config', 'r' ) as jsonfile:
+			cfg = jsonlib.load( jsonfile )
 	if not cfg:
 		cfg = { 'socket': { 'hostname':'127.0.0.1', 'port': 8073 },
-				'repo': { 'id':uuidlib.uuid4() },
+				'repo': { 'id':uuid() },
 				'cores': 8,
 
 				'db': { 'drive':'primary', 'type':'log' },
@@ -162,8 +160,8 @@ def start_prune():
 		if cores:
 			cfg['cores'] = cores
 		with open( workdir + 'config', 'w' ) as f:
-			dump = yaml.dump( cfg )
-			f.write( dump )
+			jsonlib.dump( cfg, f, sort_keys=True, indent=2, separators=(',', ': ') )
+
 	else:
 		if hostname:
 			cfg['socket']['hostname'] = hostname
@@ -178,29 +176,17 @@ def start_prune():
 		#Ask the user if these setting should be saved in the working directory
 
 
-	socket2server = None
 	master = None
 	if start_master:
-		#socket2server = msg_client.Connect( hostname, port )
-		#if not socket2server.ready:
 		print 'Starting up master at %s:%i...' % (hostname, port)
 		master = Master( cfg )
-		master.executer = exec_master.Master( master )
+		exec_master.Master( )
 		master.start()
 		try:
 			while True:
-				time.sleep(3)
+				time.sleep(1)
 		except KeyboardInterrupt:
 			print "Exiting Prune"
-
-	elif start_client:
-		print 'Connecting to master at %s:%i.' % ( hostname, port )
-		try:
-			socket2server = msg_client.Connect( hostname, port )
-		except KeyboardInterrupt:
-			print "Exiting Prune"
-				
-	#cmdline = cmdline_ui.CmdLine( master )
 
 
 	'''
@@ -258,13 +244,13 @@ class Master:
 			self.ready = False
 			self.messageQ = Queue()
 
-
 			self.stores = {}
 			for drive_name in self.cfg['drives']:
 				drive_info = self.cfg['drives'][drive_name]
 				self.stores[drive_name] = store_local.Folder( drive_info['location'] )
 				if not store_local.primary:
 					store_local.primary = self.stores[drive_name]
+				glob.store_local = store_local
 
 			if 'db' in self.cfg:
 				db_info = self.cfg['db']
@@ -281,33 +267,19 @@ class Master:
 			self.ready = True
 
 			if 'socket' in self.cfg:
-				self.server = msg_server.Listen( self.cfg['socket']['hostname'], self.cfg['socket']['port'], self )
+				self.server = server.Listen( self.cfg['socket']['hostname'], self.cfg['socket']['port'] )
 
 
 	def stop( self ):
 		if self.ready:
 			self.server.stop()
 			while not self.master.messageQ.empty():
-				print '.'
-				time.sleep(1)
+				time.sleep(0.1)
 
 
 	def restart( self ):
 		if self.ready:
 			self.stop()
 		self.start()
-
-
-
-	def hashfile( self, fname, blocksize=65536 ):
-		key = hashlib.sha1()
-		afile = open( fname, 'rb' )
-		buf = afile.read( blocksize )
-		length = len( buf )
-		while len( buf ) > 0:
-			key.update( buf )
-			buf = afile.read( blocksize )
-			length += len( buf )
-		return key.hexdigest(), length
 
 

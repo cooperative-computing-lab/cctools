@@ -1,6 +1,6 @@
 import json
 class Mesg(object):
-	__slots__ = ('action', 'key', 'plan')
+	__slots__ = ('action', 'key', 'flow')
 	def __init__(self, obj={}, **kwargs):
 		kwargs.update( obj )
 		self.action = kwargs['action']
@@ -8,18 +8,18 @@ class Mesg(object):
 			self.key = kwargs['key']
 		else:
 			self.key = None
-		if 'plan' in kwargs:
-			self.plan = kwargs['plan']
+		if 'flow' in kwargs:
+			self.flow = kwargs['flow']
 		else:
-			self.plan = None
+			self.flow = None
 
   
 	def __str__(self):
 		obj = {'action':self.action}
 		if self.key:
 			obj['key'] = self.key
-		if self.plan:
-			obj['plan'] = self.plan
+		if self.flow:
+			obj['flow'] = self.flow
 		return json.dumps( obj, sort_keys=True, indent=2, separators=(',', ': ') )
 	def __add__(self, other):
 		return str(self) + other

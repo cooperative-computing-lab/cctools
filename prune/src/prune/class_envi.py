@@ -1,7 +1,7 @@
 import json, time
 
 class Envi(object):
-	__slots__ = ( 'key', 'when', 'body' )
+	__slots__ = ( 'key', 'when', 'body', 'workflow_id' )
 	def __init__( self, obj={}, **kwargs ):
 		kwargs.update( obj )
 		self.key = kwargs['key']
@@ -16,9 +16,15 @@ class Envi(object):
 		else:
 			self.body = ''
 
+		if 'workflow_id' in kwargs:
+			self.workflow_id = kwargs['workflow_id']
+		else:
+			self.workflow_id = None
 
+	def full_str( self ):
+		return str( self ) + "\n"
 	def __str__( self ):
-		obj = {'type':'envi', 'key':self.key}
+		obj = {'type':'envi', 'key':self.key, 'workflow_id':self.workflow_id}
 		if self.when:
 			obj['when'] = self.when
 
@@ -32,3 +38,5 @@ class Envi(object):
 		return self.body == other.body
 	def __ne__(self, other):
 		return not self.__eq__(other)
+	def __len__( self ):
+		return len(str(self))

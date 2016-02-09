@@ -1,0 +1,107 @@
+#!/usr/bin/env cctools_python
+# CCTOOLS_PYTHON_VERSION 2.7 2.6
+
+# Copyright (c) 2010- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+
+
+import glob
+from utils import *
+from class_item import Item
+
+import db_sqlite
+import db_net
+
+import worker_local
+#import worker_wq
+#import exec_wq
+
+
+glob.cctools_version = 'CCTOOLS_VERSION'
+glob.cctools_releasedate = 'CCTOOLS_RELEASE_DATE'
+
+
+HOME = os.path.expanduser("~")+'/'
+CWD = os.getcwd()+'/'
+
+worker_type = 'local'
+concurrency = 8
+hostname = None
+port = None
+
+argi = 1
+while argi<len(sys.argv):
+	arg = sys.argv[argi]
+	
+
+	# --type: specify what kind of workers to use (default: local)
+	if arg in ['-t','--type']:
+		argi += 1
+		worker_type = sys.argv[argi]
+
+	# -c <concurrency>: number of concurrent workers (default: 8)
+	elif arg in ['-c','--cores']:
+		argi += 1
+		cores = int(sys.argv[argi])
+
+	# -h <hostname>: hostname for the master (default: None (connect to local database))
+	elif arg in ['-h','--host']:
+		argi += 1
+		hostname = sys.argv[argi]
+
+
+	# -p <port>: port for the master (default: None (connect to local database))
+	elif arg in ['-p','--port']:
+		argi += 1
+		port = int(sys.argv[argi])
+
+	elif arg in ['-v','--version']:
+		#cctools_version = '5.0.0 [prune:887c027d-DIRTY]'
+		#cctools_releasedate = '2015-05-26 11:56:15 -0400'
+		print "prune_core version %s (released %s)"%( cctools_version, cctools_releasedate )
+		sys.exit(0)
+
+	elif arg in ['-d','--debug']:
+		argi += 1
+		debug_level = sys.argv[argi]
+
+	elif arg in ['-h','--help']:
+		message = '''Use: prune [options]
+prune options:
+	-h,--help      Show command line options
+	-v,--version      Display the version of cctools that is installed.
+	-d,--debug <subsystem>      Enable debugging on worker for this subsystem. (try -d all to start)
+
+	-t,--type <local|wq>      Type of workers. (default: local)
+	-c,--concurrency <num_workers>      Number of master (or worker) cores. (default: 8)
+	-h,--hostname <ip|domain>      Hostname for master. (default: localhost)
+	-p,--port <port_number>      Port number for master. (default: 8073)
+		'''
+		print message
+		sys.exit(0)
+
+	argi += 1
+
+
+if worker_type == 'local':
+	if not hostname and not port:
+		glob.ready = True
+		glob.db = db_sqlite.Database()
+		worker = worker_local.Master()
+		worker.run()
+	else:
+		'Network server not yet implemented'
+
+elif worker_type == 'wq':
+	if not hostname and not port:
+		glob.ready = True
+		glob.db = db_sqlite.Database()
+		#worker = exec_wq.Master()
+		#worker.run()
+	else:
+		'Network server not yet implemented'
+
+else:
+	print '%s mode not yet implemented.' % mode
+

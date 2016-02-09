@@ -1,5 +1,7 @@
-import json, uuid, io, sys
+import json, uuid, io, sys, time
 
+import glob
+from utils import uuid
 
 class Parser:
 	def __init__( self, base_dir='./', file_threshold=sys.maxint, one_file=True, debug=False ):
@@ -27,16 +29,16 @@ class Parser:
 						if self.stream_size<256 or len(self.my_buffer)<10:
 							print 'binary:',self.my_buffer,
 						else:
-							print 'binary:',self.my_buffer[0:10],'...',
+							print 'binary:',self.my_buffer[0:10],'.-.',self.my_buffer[-10:],'!!\n',
 					self.stream.write( self.my_buffer )
 					self.stream_remain -= len(self.my_buffer)
 					self.my_buffer = ''
 				else:
 					if self.debug:
-						if self.stream_size<256 or self.stream_remain<10:
+						if self.stream_size<127 or self.stream_remain<10:
 							print 'binary:',self.my_buffer,
 						else:
-							print 'binary:',self.my_buffer[0:10],'...',
+							print 'binary:',self.my_buffer[0:10],'._.',self.my_buffer[-10:],'!!!\n',
 					self.stream.write( self.my_buffer[0:self.stream_remain] )
 					self.my_buffer = self.my_buffer[self.stream_remain+1:]
 					self.stream_remain = 0
@@ -89,7 +91,11 @@ class Parser:
 							del obj['stream_length']
 							if (obj['type'] == 'file' and self.stream_size > self.file_threshold) or ('tree_key' in obj and not self.one_file):
 								self.use_file = True
-								self.stream_fname = 'tmp_' + str(uuid.uuid4())
+								if glob.store:
+									self.stream_fname = glob.store.tmp_file_path( ) + uuid()
+								else:
+									self.stream_fname = 'tmp_' + uuid()
+
 								self.stream = open( self.stream_fname, 'w+' )
 							else:
 								self.use_file = False
@@ -99,6 +105,7 @@ class Parser:
 
 					else:
 						self.obj_buffer += line
+			time.sleep(0.001)
 
 		final_results = self.results
 		self.results = []
