@@ -13,7 +13,7 @@ URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
 # We specify the set of inputs and outputs. This is not required, but strongly
 # recommended.
-MAKEFLOW_INPUTS=$CURL $CONVERT
+MAKEFLOW_INPUTS=
 MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 # Similar rules can be arbitrarily labeled to form sets, called categories. In
