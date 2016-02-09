@@ -13,7 +13,7 @@ URL=http://ccl.cse.nd.edu/images/capitol.jpg
 # recommended. MAKEFLOW_INPUTS files should exist in the local filesystem, but
 # they are not copied to a remote execution site unless they appear as a rule
 # prerequisite.
-MAKEFLOW_INPUTS=$CURL $CONVERT
+MAKEFLOW_INPUTS=
 MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
