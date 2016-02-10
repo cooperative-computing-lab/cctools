@@ -223,7 +223,7 @@ def md5_cal(filename, block_size=2**20):
 				if not data:
 					break
 				md5.update(data)
-			return md5.hexdigest()
+			return md5.hexdigest().lower()
 	except Exception as e:
 		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Computing the checksum of %s fails: %s.", filename, e)
@@ -564,7 +564,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 	if source[:4] == 'git+':
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 	elif source[:4] == 'osf+':
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		try:
@@ -582,7 +582,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 				osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
 			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 	elif source[:3] == "s3+":
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		try:
@@ -596,7 +596,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 				s3_download(source[3:], dest)
 			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 	else:
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		dependency_download(name, source, checksum, "md5sum", dest, form, action)
@@ -644,7 +644,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 		mount_value = dest
 	elif source[:4] == "osf+":
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 
@@ -665,7 +665,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 		mount_value = dest
 	elif source[:3] == "s3+":
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		try:
@@ -682,7 +682,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 	elif source[:5] == "cvmfs":
 		pass
 	else:
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		dependency_download(name, source, checksum, "md5sum", dest, form, action)
@@ -2678,12 +2678,12 @@ def add2spec(item, source_dict, target_dict):
 	#item must exist inside target_dict.
 	ident = None
 	if source_dict.has_key("checksum"):
-		checksum = source_dict["checksum"]
+		checksum = source_dict["checksum"].lower()
 		ident = checksum
 		if not target_dict.has_key("id"):
 			target_dict["id"] = ident
 		if not target_dict.has_key(checksum):
-			target_dict["checksum"] = source_dict["checksum"]
+			target_dict["checksum"] = source_dict["checksum"].lower()
 
 	if source_dict.has_key("source"):
 		if len(source_dict["source"]) == 0:
@@ -2732,13 +2732,13 @@ def add2db(item, source_dict, target_dict):
 
 	ident = None
 	if source_dict.has_key("checksum"):
-		checksum = source_dict["checksum"]
+		checksum = source_dict["checksum"].lower()
 		if target_dict[item].has_key(checksum):
 			logging.debug("%s has been inside the metadata database!", item)
 			return
 		ident = checksum
 		target_dict[item][ident] = {}
-		target_dict[item][ident]["checksum"] = source_dict["checksum"]
+		target_dict[item][ident]["checksum"] = source_dict["checksum"].lower()
 
 	if source_dict.has_key("source"):
 		if len(source_dict["source"]) == 0:
