@@ -353,6 +353,9 @@ void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, st
 		FILE *stream;
 
 		int n = strlen(file_summ);
+		if(n < 1)
+			continue;
+
 		if(file_summ[n - 1] == '\n')
 		{
 			file_summ[n - 1] = '\0';
