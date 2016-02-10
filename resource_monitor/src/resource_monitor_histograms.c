@@ -339,6 +339,15 @@ char *path_of_table(struct histogram *h, int only_base_name)
 	return path;
 }
 
+char *path_of_variables_script(struct histogram *h, int only_base_name)
+{
+	char *common = path_common(h, only_base_name);
+	char *path   = string_format("%s_vars.gnuplot", common);
+	free(common);
+
+	return path;
+}
+
 char *path_of_thumbnail_script(struct histogram *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
@@ -423,10 +432,44 @@ void write_histogram_table(struct histogram *h)
 	fclose(f);
 }
 
+void write_variables_gnuplot(struct histogram *h, struct histogram *all)
+{
+	char *fname = path_of_variables_script(h, 0);
+	FILE *f     = open_file(fname);
+	free(fname);
+
+	fprintf(f, "%s = %lf\n",        "current_minimum",    h->min_value);
+	fprintf(f, "%s = %lf\n",        "current_maximum",    h->max_value);
+	fprintf(f, "%s = %lf\n",        "current_mode",       h->value_at_max_count);
+	fprintf(f, "%s = %" PRId64"\n", "current_mode_count", h->max_count);
+	fprintf(f, "%s = %lf\n",        "current_mean",       h->mean);
+	fprintf(f, "%s = %lf\n",        "current_percentile75", value_of_p(h, 0.75));
+	fprintf(f, "%s = %lf\n",        "current_percentile25", value_of_p(h, 0.25));
+	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation", h->first_allocation_histogram);
+	fprintf(f, "%s = %lf\n",        "current_bin_size",   h->bin_size);
+
+	if(all) {
+		fprintf(f, "%s = %lf\n",        "all_minimum",    all->min_value);
+		fprintf(f, "%s = %lf\n",        "all_maximum",    all->max_value);
+		fprintf(f, "%s = %lf\n",        "all_mode",       all->value_at_max_count);
+		fprintf(f, "%s = %" PRId64"\n", "all_mode_count", all->max_count);
+		fprintf(f, "%s = %lf\n",        "all_mean",       all->mean);
+		fprintf(f, "%s = %lf\n",        "all_percentile75", value_of_p(all, 0.75));
+		fprintf(f, "%s = %lf\n",        "all_percentile25", value_of_p(all, 0.25));
+		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation", all->first_allocation_histogram);
+	}
+
+	fclose(f);
+}
+
 void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 {
 	char *fname = path_of_thumbnail_script(h, 0);
 	FILE *f     = open_file(fname);
+	free(fname);
+
+	fname = path_of_variables_script(h, 1);
+	fprintf(f, "load \"%s\"\n", fname);
 	free(fname);
 
 	fprintf(f, "set terminal pngcairo truecolor rounded size %d,%d enhanced font \"times,10\"\n",
@@ -444,56 +487,49 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
 
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
-			h->min_value, value_of_p(h, 0.25));
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
-			value_of_p(h, 0.75), h->max_value);
+	fprintf(f, "set arrow from current_minimum,graph -0.01 to current_percentile25,graph -0.01 nohead lc 16\n");
+	fprintf(f, "set arrow from current_percentile75,graph -0.01 to current_maximum,graph -0.01 nohead lc 16\n");
 
 	/* square for mean */
-	fprintf(f, "set label \"\" at %lf,graph -0.00 tc ls 1 center front point pt 4\n",
-			h->mean);
+	fprintf(f, "set label \"\" at current_mean,graph 0.00 tc ls 1 center front point pt 4\n");
 
 	/* up triangle for mode */
-	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.05 tc ls 1 center front point pt 8 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
+	fprintf(f, "set label sprintf(\"%%.0f\", current_mode) at current_mode,graph -0.05 tc ls 1 center front point pt 8 offset 0,character -0.90\n");
 
 	/* down triangle for first allocation */
-	fprintf(f, "set label \"\" at %" PRIu64",graph -0.025 tc ls 1 center front point pt 10\n",
-			h->first_allocation_histogram);
+	fprintf(f, "set label \"\" at current_first_allocation,graph -0.025 tc ls 1 center front point pt 10\n");
 
 	if(h == all)
 	{
-		fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n", all->min_value, all->min_value);
-
-		fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 left front nopoint offset character 1.0,character -0.25\n", all->max_value, all->max_value);
+		fprintf(f, "set label sprintf(\"%%.0f\", all_minimum) at all_minimum,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n");
+		fprintf(f, "set label sprintf(\"%%.0f\", all_maximum) at all_maximum,graph -0.01 tc ls 1 left front nopoint offset character 1.0,character -0.25\n");
 	}
 
 	if( all->nbuckets == 1 )
 	{
-		fprintf(f, "set boxwidth 1.0*%lf absolute\n", (all->max_value - all->min_value + 1)/50.0);
-		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - 1, all->max_value + 2);
+		fprintf(f, "set boxwidth 1.0*(all_maximum - all_minimum + 1)/50 absolute\n");
+		fprintf(f, "set xrange [all_minimum - 1 : all_maximum + 2]\n");
 	}
 	else
 	{
-		double gap = (all->max_value - all->min_value)/5.0;
-		fprintf(f, "set boxwidth 1.0*%lf absolute\n", MAX(0.1, h->bin_size));
-		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - gap, all->max_value + gap);
+		fprintf(f, "gap = (all_maximum - all_minimum)/5.0\n");
+		fprintf(f, "set boxwidth (0.1 > current_bin_size ? 0.1 : current_bin_size) absolute\n");
+		fprintf(f, "set xrange [all_minimum - gap : all_maximum + gap]\n");
 	}
 
 	char *table_name = path_of_table(h, 1);
 
 	if(all->max_count > 10000*all->min_count)
 	{
-		fprintf(f, "set yrange [0:(log10(%lf))]\n", 1.0*all->max_count);
-		fprintf(f, "set label \"log(%" PRIu64 ")\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
-				h->max_count, h->value_at_max_count, (double) h->max_count);
+		fprintf(f, "set yrange [0:(log10(all_mode_count))]\n");
+		fprintf(f, "set label sprintf(\"log(%%d)\",current_mode_count) at current_mode,(log10(current_mode_count)) tc ls 1 left front nopoint offset 0,character 0.5\n");
 
 		fprintf(f, "plot \"%s\" using 1:(log10($2)) w boxes\n", table_name);
 	}
 	else
 	{
-		fprintf(f, "set yrange [0:%lf]\n", 1.0*all->max_count);
-		fprintf(f, "set label \"%" PRIu64 "\" at %lf,%lf tc ls 1 left front nopoint offset 0,character 0.5\n",
-				h->max_count, h->value_at_max_count, (double) h->max_count);
+		fprintf(f, "set yrange [0:all_mode_count]\n");
+		fprintf(f, "set label sprintf(\"%%d\", current_mode_count) at current_mode,current_mode_count tc ls 1 left front nopoint offset 0,character 0.5\n");
 
 		fprintf(f, "plot \"%s\" using 1:2 w boxes\n", table_name);
 	}
@@ -511,6 +547,10 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	FILE *f     = open_file(fname);
 	free(fname);
 
+	fname = path_of_variables_script(h, 1);
+	fprintf(f, "load \"%s\"\n", fname);
+	free(fname);
+
 	fprintf(f, "set terminal pngcairo truecolor rounded size %d,%d enhanced font \"times,12\"\n",
 			width, height);
 
@@ -526,53 +566,49 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
 
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
-			h->min_value, value_of_p(h, 0.25));
-	fprintf(f, "set arrow from %lf,graph -0.01 to %lf,graph -0.01 nohead lc 16\n",
-			value_of_p(h, 0.75), h->max_value);
+	fprintf(f, "set arrow from current_minimum,graph -0.01 to current_percentile25,graph -0.01 nohead lc 16\n");
+	fprintf(f, "set arrow from current_percentile75,graph -0.01 to current_maximum,graph -0.01 nohead lc 16\n");
 
 	/* square for mean */
-	fprintf(f, "set label \"\" at %lf,graph -0.00 tc ls 1 center front point pt 4\n",
-			h->mean);
+	fprintf(f, "set label \"\" at current_mean,graph -0.00 tc ls 1 center front point pt 4\n");
 
 	/* up triangle for mode */
-	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.05 tc ls 1 center front point pt 8 offset 0,character -0.90\n", h->value_at_max_count, h->value_at_max_count);
+	fprintf(f, "set label sprintf(\"%%.0f\", current_mode) at current_mode,graph -0.05 tc ls 1 center front point pt 8 offset 0,character -0.90\n");
 
 	/* down triangle for first allocation */
-	fprintf(f, "set label \"\" at %" PRIu64",graph -0.025 tc ls 1 center front point pt 10\n",
-			h->first_allocation_histogram);
+	fprintf(f, "set label \"\" at current_first_allocation,graph -0.025 tc ls 1 center front point pt 10\n");
 
-	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n", all->min_value, all->min_value);
-
-	fprintf(f, "set label \"%.0lf\" at %lf,graph -0.01 tc ls 1 left front nopoint offset character 1.0,character -0.25\n", all->max_value, all->max_value);
+	fprintf(f, "set label sprintf(\"%%.0f\", all_minimum) at all_minimum,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n");
+	fprintf(f, "set label sprintf(\"%%.0f\", all_maximum) at all_maximum,graph -0.01 tc ls 1 left  front nopoint offset character  1.0,character -0.25\n");
 
 	if( all->nbuckets == 1 )
 	{
-		fprintf(f, "set boxwidth 1.0*%lf absolute\n", (all->max_value - all->min_value + 1)/50.0);
-		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - 1, all->max_value + 2);
+		fprintf(f, "set boxwidth (all_maximum - all_minimum + 1)/50 absolute\n");
+		fprintf(f, "set xrange [all_minimum - 1 : all_maximum + 2]\n");
 	}
 	else
 	{
-		double gap = (all->max_value - all->min_value)/5.0;
-		fprintf(f, "set boxwidth 1.0*%lf absolute\n", h->bin_size);
-		fprintf(f, "set xrange [%lf:%lf]\n", all->min_value - gap, all->max_value + gap);
+		fprintf(f, "gap = (all_maximum - all_minimum)/5.0\n");
+		fprintf(f, "set boxwidth (0.1 > current_bin_size ? 0.1 : current_bin_size) absolute\n");
+		fprintf(f, "set xrange [all_minimum - gap : all_maximum + gap]\n");
 	}
 
 	char *table_name = path_of_table(h, 1);
 	if(h->max_count > 10000*h->min_count)
 	{
-		fprintf(f, "set yrange [0:(log10(%lf))]\n", 1.0*h->max_count);
-		fprintf(f, "set label \"log(%" PRIu64 ")\" at %lf,(log10(%lf)) tc ls 1 left front nopoint offset 0,character 0.5\n",
-				h->max_count, h->value_at_max_count, (double) h->max_count);
+		fprintf(f, "set yrange [0:(log10(all_mode_count))]\n");
+		fprintf(f, "set label sprintf(\"log(%%d)\",current_mode_count) at current_mode,(log10(current_mode_count)) tc ls 1 left front nopoint offset 0,character 0.5\n");
+
 		fprintf(f, "plot \"%s\" using 1:(log10($2)) w boxes\n", table_name);
 	}
 	else
 	{
-		fprintf(f, "set yrange [0:%lf]\n", 1.0*h->max_count);
-		fprintf(f, "set label \"%" PRIu64 "\" at %lf,%lf tc ls 1 left front nopoint offset 0,character 0.5\n",
-				h->max_count, h->value_at_max_count, (double) h->max_count);
+		fprintf(f, "set yrange [0:all_mode_count]\n");
+		fprintf(f, "set label sprintf(\"%%d\", current_mode_count) at current_mode,current_mode_count tc ls 1 left front nopoint offset 0,character 0.5\n");
+
 		fprintf(f, "plot \"%s\" using 1:2 w boxes\n", table_name);
 	}
+
 	free(table_name);
 
 	fprintf(f, "\n");
@@ -728,6 +764,7 @@ void plots_of_category(struct rmDsummary_set *s)
 			all = h;
 
 		write_histogram_table(h);
+		write_variables_gnuplot(h, all);
 		write_thumbnail_gnuplot(h, all);
 		write_image_gnuplot(h, all);
 
