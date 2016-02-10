@@ -223,7 +223,7 @@ def md5_cal(filename, block_size=2**20):
 				if not data:
 					break
 				md5.update(data)
-			return md5.hexdigest()
+			return md5.hexdigest().lower()
 	except Exception as e:
 		cleanup(tempfile_list, tempdir_list)
 		logging.critical("Computing the checksum of %s fails: %s.", filename, e)
@@ -564,7 +564,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 	if source[:4] == 'git+':
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 	elif source[:4] == 'osf+':
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		try:
@@ -582,7 +582,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 				osf_download(osf_auth[0], osf_auth[1], source[4:], dest)
 			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 	elif source[:3] == "s3+":
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		try:
@@ -596,7 +596,7 @@ def data_dependency_process(name, id, meta_json, sandbox_dir, action, osf_auth):
 				s3_download(source[3:], dest)
 			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 	else:
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		dependency_download(name, source, checksum, "md5sum", dest, form, action)
@@ -644,7 +644,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 		dest = git_dependency_parser(item, source[4:], sandbox_dir)
 		mount_value = dest
 	elif source[:4] == "osf+":
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 
@@ -665,7 +665,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 			dependency_download(name, dest, checksum, "md5sum", dest, form, action)
 		mount_value = dest
 	elif source[:3] == "s3+":
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		try:
@@ -682,7 +682,7 @@ def dependency_process(name, id, action, meta_json, sandbox_dir, osf_auth):
 	elif source[:5] == "cvmfs":
 		pass
 	else:
-		checksum = attr_check(name, item, "checksum")
+		checksum = attr_check(name, item, "checksum").lower()
 		form = attr_check(name, item, "format")
 		dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/" + name
 		dependency_download(name, source, checksum, "md5sum", dest, form, action)
@@ -1719,11 +1719,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		new_os_image_dir: the path of the newly created OS image with all the packages installed by package manager.
 
 	Returns:
-		If no error happens, returns None.
-		Otherwise, directly exit.
+		return_code: the return code of executing the user command
+		If critical errors happen, directly exit.
 	"""
 	#sandbox_dir will be the home directory of the sandbox
 	print 'Executing the application ....'
+	return_code = 0
 	if not os.path.exists(sandbox_dir):
 		os.makedirs(sandbox_dir)
 	logging.debug("chdir(%s)", sandbox_dir)
@@ -1770,6 +1771,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		rc, stdout, stderr = func_call_withenv(cmd, env_dict)
 		if rc != 0:
 			subprocess_error(cmd, rc, stdout, stderr)
+		return_code = rc
 
 		logging.debug("Moving the outputs to the expected locations ...")
 		print "Moving the outputs to the expected locations ..."
@@ -1799,6 +1801,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				logging.debug("Create a parrot mountfile for the siteconf meta (%s)", item)
 				env_para_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
+			# if the new os image has been ready, do not build the image again.
+			if len(new_os_image_dir) > 0:
+				os_tar = new_os_image_dir + ".tar"
+				if os.path.exists(os_tar):
+					return 0
+
 			logging.debug("Add a volume item (%s:%s) for the sandbox_dir", sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/output:/home/hmeng/umbrella_test/output
 			volume_output = " -v %s:%s " % (sandbox_dir, sandbox_dir)
@@ -1823,7 +1831,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			#to allow the exit code of user_cmd to be transferred back, seperate the user_cmd and the chown command.
 			cmd = 'docker run --name %s %s %s -e "PATH=%s" %s %s:%s /bin/sh -c "cd %s; %s"' % (container_name, volume_output, volume_parameters, path_env, other_envs, docker_image_name, os_image_id, cwd_setting, user_cmd[0])
 			print "Start executing the user's task: %s" % cmd
-			rc, stdout, stderr = func_call(cmd)
+			return_code, stdout, stderr = func_call(cmd)
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -1891,7 +1899,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			print "Start executing the user's task: %s" % user_cmd[0]
-			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -1917,7 +1925,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			print "Start executing the user's task: %s" % user_cmd[0]
-			rc, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -1931,6 +1939,8 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 	else:
 		pass
+
+	return return_code
 
 def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_dir, output_dir, input_list_origin, user_cmd, cwd_setting, condorlog_path, cvmfs_http_proxy):
 	"""Process the specification when condor execution engine is chosen
@@ -2519,18 +2529,22 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 			new_os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), new_os_id, item)
 
 			logging.debug("Installing the package into the image (%s), and create a new image: %s ...", os_image_dir, new_os_image_dir)
+			print "Installing the package into the image (%s), and create a new image: %s ..." % (os_image_dir, new_os_image_dir)
 			if os.path.exists(new_os_image_dir) and os.path.isdir(new_os_image_dir):
 				logging.debug("the new os image already exists!")
+				print "the new os image already exists!"
 				#use the intermidate os image which has all the dependencies from package manager ready as the os image
 				os_image_dir = new_os_image_dir
 				os_id = new_os_id
 				pass
 			else:
 				logging.debug("the new os image does not exist!")
+				print "the new os image does not exist!"
 				new_env_para_dict = {}
 
 				#install dependency specified in the spec_json["package_manager"]["config"] section
 				logging.debug('Install dependency specified in the spec_json["package_manager"]["config"] section.')
+				print 'Install dependency specified in the spec_json["package_manager"]["config"] section.'
 				if sandbox_mode == "destructive":
 					software_install(mount_dict, new_env_para_dict, new_sw_sec, meta_json, sandbox_dir, 1, osf_auth)
 
@@ -2543,8 +2557,12 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 					#install dependencies through package managers
 					logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
-					workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir)
+					print "Create an intermediate OS image with all the dependencies from package managers ready!"
+					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir) != 0:
+						logging.critical("Fails to construct the intermediate OS image!")
+						sys.exit("Fails to construct the intermediate OS image!")
 					logging.debug("Finishing creating the intermediate OS image!")
+					print "Finishing creating the intermediate OS image!"
 
 					#use the intermidate os image which has all the dependencies from package manager ready as the os image
 					os_image_dir = new_os_image_dir
@@ -2660,12 +2678,12 @@ def add2spec(item, source_dict, target_dict):
 	#item must exist inside target_dict.
 	ident = None
 	if source_dict.has_key("checksum"):
-		checksum = source_dict["checksum"]
+		checksum = source_dict["checksum"].lower()
 		ident = checksum
 		if not target_dict.has_key("id"):
 			target_dict["id"] = ident
 		if not target_dict.has_key(checksum):
-			target_dict["checksum"] = source_dict["checksum"]
+			target_dict["checksum"] = source_dict["checksum"].lower()
 
 	if source_dict.has_key("source"):
 		if len(source_dict["source"]) == 0:
@@ -2714,13 +2732,13 @@ def add2db(item, source_dict, target_dict):
 
 	ident = None
 	if source_dict.has_key("checksum"):
-		checksum = source_dict["checksum"]
+		checksum = source_dict["checksum"].lower()
 		if target_dict[item].has_key(checksum):
 			logging.debug("%s has been inside the metadata database!", item)
 			return
 		ident = checksum
 		target_dict[item][ident] = {}
-		target_dict[item][ident]["checksum"] = source_dict["checksum"]
+		target_dict[item][ident]["checksum"] = source_dict["checksum"].lower()
 
 	if source_dict.has_key("source"):
 		if len(source_dict["source"]) == 0:

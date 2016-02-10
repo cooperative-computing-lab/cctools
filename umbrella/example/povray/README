@@ -25,7 +25,16 @@ run
 umbrella \
 --spec povray.umbrella \
 --meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
+filter db2
+
+umbrella \
+--spec povray.umbrella \
+--meta http://ccl.cse.nd.edu/software/umbrella/database/packages.json \
 expand povray_S.umbrella
+
+umbrella \
+--spec povray_S.umbrella \
+split f1 db1
 
 umbrella \
 --spec povray_S.umbrella \
@@ -129,7 +138,7 @@ umbrella \
 --log umbrella.log \
 run
 
-umbrella build povray_base_local.umbrella full.umbrella
+umbrella --spec povray_base_local.umbrella build full.umbrella
 
 umbrella \
 --spec povray_base_local.umbrella \
