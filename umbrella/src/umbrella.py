@@ -1799,6 +1799,12 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				logging.debug("Create a parrot mountfile for the siteconf meta (%s)", item)
 				env_para_dict['PARROT_MOUNT_FILE'] = construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint)
 
+			# if the new os image has been ready, do not build the image again.
+			if len(new_os_image_dir) > 0:
+				os_tar = new_os_image_dir + ".tar"
+				if os.path.exists(os_tar):
+					return
+
 			logging.debug("Add a volume item (%s:%s) for the sandbox_dir", sandbox_dir, sandbox_dir)
 			#-v /home/hmeng/umbrella_test/output:/home/hmeng/umbrella_test/output
 			volume_output = " -v %s:%s " % (sandbox_dir, sandbox_dir)
