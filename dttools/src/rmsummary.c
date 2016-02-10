@@ -248,6 +248,18 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->bytes_written;
 	}
 
+	if(strcmp(key, "bytes_received") == 0) {
+		return s->bytes_received;
+	}
+
+	if(strcmp(key, "bytes_sent") == 0) {
+		return s->bytes_sent;
+	}
+
+	if(strcmp(key, "bandwidth") == 0) {
+		return s->bandwidth;
+	}
+
 	if(strcmp(key, "total_files") == 0) {
 		return s->total_files;
 	}
