@@ -50,10 +50,10 @@ def hashstring( str ):
 	timer.stop('utils','hashstring')
 	return key
 
-'''
+
 def d( debug_type, *args, **kwargs ):
-	if debug_type in glob.debug_types:
-		print '_____'+debug_type+'_____'
+	#if debug_type in glob.debug_types:
+	#	print '_____'+debug_type+'_____'
 		for arg in args:
 			print arg,
 		for key in kwargs:
@@ -67,8 +67,8 @@ def d( debug_type, *args, **kwargs ):
 						buf = afile.read( 2048 )
 			else:
 				print '-----'+key + ': ' + kwargs[key]
-		print '-----'+debug_type+'-----'
-'''
+	#	print '-----'+debug_type+'-----'
+
 
 def which( name, flags=os.X_OK ):
 	result = []
