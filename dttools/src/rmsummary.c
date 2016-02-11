@@ -408,6 +408,16 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 	return 0;
 }
 
+int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *value) {
+
+	if(strcmp(key, "limits_exceeded") == 0) {
+		s->limits_exceeded = json_to_rmsummary(value);
+		return 1;
+	}
+
+	return 0;
+}
+
 
 #define field_to_json(o, s, f)\
 	if((s)->f > -1) {\
@@ -530,6 +540,8 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 			if(status) {
 				rmsummary_assign_int_field(s, key, number);
 			}
+		} else if(jx_istype(value, JX_OBJECT)) {
+			rmsummary_assign_summary_field(s, key, value);
 		}
 
 		head = head->next;
