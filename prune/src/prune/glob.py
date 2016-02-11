@@ -13,7 +13,8 @@ shutting_down = False
 HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 
-base_dir = HOME+'/.prune/'
+#base_dir = HOME+'/.prune/'
+base_dir = '/data/pivie/prune_space5/'
 
 data_file_directory = base_dir+'data/files/'
 data_db_pathname = base_dir+'data/_prune.db'
@@ -34,7 +35,7 @@ tmp_file_directory = base_dir+'tmp/'
 
 repository_id = uuid()
 workflow_id = None
-step = None
+workflow_step = None
 
 
 log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

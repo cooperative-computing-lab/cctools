@@ -6,14 +6,15 @@
 # See the file COPYING for details.
 
 
-import glob
-from utils import *
-from class_item import Item
+from prune import glob
+from prune.utils import *
+from prune.class_item import Item
 
-import db_sqlite
-import db_net
+from prune import db_sqlite
+from prune import db_net
 
-import worker_local
+from prune import worker_local
+
 #import worker_wq
 #import exec_wq
 

@@ -6,14 +6,13 @@ import os, sys
 import hashlib
 import uuid as uuidlib
 
-import glob
 import timer
 
 def uuid( ):
 	return str( uuidlib.uuid4() )
 
 def hashfile_copy( fname, newfname, blocksize=65536 ):
-	timer.start('utils','hashfile_copy')
+	timer.start('utils.hashfile_copy')
 	key = hashlib.sha1()
 	afile = open( fname, 'rb' )
 	nfile = open( newfname, 'wb' )
@@ -25,11 +24,11 @@ def hashfile_copy( fname, newfname, blocksize=65536 ):
 		buf = afile.read( blocksize )
 		length += len( buf )
 	key = key.hexdigest()
-	timer.stop('utils','hashfile_copy')
+	timer.stop('utils.hashfile_copy')
 	return key, length
 
 def hashfile( fname, blocksize=65536 ):
-	timer.start('utils','hashfile')
+	timer.start('utils.hashfile')
 	key = hashlib.sha1()
 	afile = open( fname, 'rb' )
 	buf = afile.read( blocksize )
@@ -39,15 +38,15 @@ def hashfile( fname, blocksize=65536 ):
 		buf = afile.read( blocksize )
 		length += len( buf )
 	key = key.hexdigest()
-	timer.stop('utils','hashfile')
+	timer.stop('utils.hashfile')
 	return key, length
 
 def hashstring( str ):
-	timer.start('utils','hashstring')
+	timer.start('utils.hashstring')
 	key = hashlib.sha1()
 	key.update( str )
 	key = key.hexdigest()
-	timer.stop('utils','hashstring')
+	timer.stop('utils.hashstring')
 	return key
 
 

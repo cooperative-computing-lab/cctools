@@ -22,16 +22,16 @@ class Connect:
 
 
 
-	def env_add( self, **kwargs ):
+	def envi_add( self, **kwargs ):
+		timer.start('client.envi_add')
 		if 'engine' in kwargs:
 			if kwargs['engine'] == 'wrapper':
-				#{'engine':kwargs['engine'], 'open':kwargs['open'], 'close':kwargs['close'], 'args':kwargs['args'], 'params':kwargs['params']}
-				obj_str = jsonlib.dumps(kwargs, sort_keys=True)
+				obj = {'engine':kwargs['engine'], 'open':kwargs['open'], 'close':kwargs['close'], 'args':kwargs['args'], 'params':kwargs['params']}
 				it = Item( type='envi', body=obj_str )
 				glob.db.insert(it)
 				return it.cbid
 
-			'''
+				'''
 			elif kwargs['engine'] == 'targz':
 				if glob.store:
 					filename = glob.tmp_file_path()
@@ -89,92 +89,82 @@ class Connect:
 				self.out_msgs.put_nowait( {'mesg':mesg, 'body':en} )
 
 				return env_key
-			'''
+				'''
+
+			else:
+				timer.stop('client.envi_add')
+				return self.nil
 		else:
+			timer.stop('client.envi_add')
 			return self.nil
 
 	def file_add( self, filename ):
+		timer.start('client.file_add')
+
+		#start = time.time()
 		it = Item( type='file', path=filename, new_path=glob.tmp_file_directory+uuid() )
+		#elapsed = time.time()-start
 		glob.db.insert(it)
+
+		timer.stop('client.file_add')
+
 		return it.cbid
-		'''
-		key, length = hashfile( filename )
-		mesg = Mesg( action='have', key=key )
-		self.out_msgs.put_nowait( {'mesg':mesg} )
-		
-		transfer_now = False
-		if transfer_now:
-			data = ''
-			f = open( filename, 'rb' )
-			buf = f.read(1024)
-			while buf:
-				data += buf
-				buf = f.read(1024)
 
-			fl = File( key=key, body=data, workflow_id=self.workflow_id )
-			self.files[key] = fl  # save the data in case the server asks for it
-
-		else:
-			fl = File( key=key, path=filename, size=length, workflow_id=self.workflow_id )
-			self.files[key] = fl
-		return key
-		'''
 
 	def data_add( self, data ):
+		timer.start('client.data_add')
+
 		it = Item( type='file', body=data )
 		glob.db.insert(it)
+
+		timer.stop('client.data_add')
 		return it.cbid
-		'''
-		#data = jsonlib.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
-		key = self.hashstring( data )
-		mesg = Mesg( action='save' )
-		fl = File( key=key, body=data, workflow_id=self.workflow_id )
-		# Send the server this file
-		self.out_msgs.put_nowait( {'mesg':mesg, 'body':fl} )
-		return key
-		'''
+
 
 
 	def file_dump( self, key, filename ):
+		timer.start('client.file_dump')
 		glob.db.dump( key, filename)
-		'''
-		mesg = Mesg( action='send', key=key )
-		# Ask the server to send this data
-		self.out_msgs.put_nowait( {'mesg':mesg} )
-		# save the filename for when the data comes
-		self.dump_files[key] = filename
-		return key
-		'''
+		timer.start('client.file_dump')
 
 	def call_add( self, returns, env, cmd, args=[], params=[], types=[], env_vars={}, precise=True):
+		timer.start('client.call_add')
 		obj = {'returns':returns, 'env':env, 'cmd':cmd, 'args':args, 'params':params, 'types':types, 'env_vars':env_vars, 'precise':precise}
 		it = Item( type='call', body=obj )
 		if glob.db.insert( it ):
 			glob.db.task_add( it )
 		results = []
 		for i in range( 0, len(returns) ):
-			results.append(it.cbid+str(i))
+			results.append(it.cbid+':'+str(i))
+		timer.stop('client.call_add')
 		return results
 
-		'''
-		obj = {'returns':returns, 'env':env, 'cmd':cmd, 'args':args, 'params':params, 'types':types, 'env_vars':env_vars, 'precise':precise}
-		if len(types)==0:
-			for param in params:
-				obj['types'].append('path')   # alternative to 'path' is 'data'
 
-		key = hashstring( str(obj) )
+	def step_add( self, name ):
+		self.wait()
+		self.report()
+		glob.workflow_step = name
 
-		mesg = Mesg( action='save' )
-		cl = Call( key=key, body=obj, workflow_id=self.workflow_id )
-		# Send the server this call specification
-		self.out_msgs.put_nowait( {'mesg':mesg, 'body':cl} )
-		
-		results = []
-		for i in range( 0, len(returns) ):
-			results.append(key+str(i))
-		return results
-		#env, paper, dist, case
-		'''
+	def report( self ):
+		timer.report()
+		timer.reset()
+
+
+	def wait( self ):
+		while glob.db.task_remain( glob.workflow_id ):
+			time.sleep(3)
+
+
+
+
+
+
+
+
+
+
+
+
 
 	def flow_dump( self, key, filename, depth=1 ):
 		flow = {'key':key,'depth':depth}
@@ -242,7 +232,7 @@ class Connect:
 
 
 
-
+	'''
 	def wait( self ):
 		print '.'
 		self.waiting = True
@@ -263,7 +253,7 @@ class Connect:
 		except KeyboardInterrupt:
 			sys.exit(0)
 			#raise KeyboardInterrupt
-
+	'''
 
 
 	def _receive( self, sock, objects ):

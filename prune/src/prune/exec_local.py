@@ -16,15 +16,15 @@ from class_call import Call
 from class_exec import Exec
 from class_envi import Envi
 
-
+concurrency = 16
 
 class Master:
 	debug = True
 
 
 	def hungry( self ):
-		if len(self.workers) < glob.exec_local_concurrency:
-			return glob.exec_local_concurrency - len(self.workers)
+		if len(self.workers) < concurrency:
+			return concurrency - len(self.workers)
 		return 0
 
 
@@ -40,17 +40,23 @@ class Master:
 
 
 	def __init__( self, parent ):
+		self.workers = []
 		self.parent = parent
 		self.shutting_down = False
-		self.start()	
+
+		self.thread = Thread( target=self.loop, args=([  ]) )
+		self.thread.daemon = True
+		self.thread.start()
+
+		#self.run()	
 		
 
-	def run( self ):
+	def loop( self ):
 
-		print 'Allocating %i local workers.' % glob.exec_local_concurrency
+		print 'Allocating %i local workers.' % concurrency
 		self.workers = []
 
-		while not glob.shutting_down:
+		while True:
 
 			#glob.starts['exec_local_loop'] = time.time()
 			for k, worker in enumerate( self.workers ):

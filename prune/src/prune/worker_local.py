@@ -4,9 +4,12 @@
 
 
 import os, sys, time, traceback
+import subprocess
 
 import glob
-
+import timer
+from class_item import Item
+from utils import *
 
 db = None
 
@@ -15,27 +18,37 @@ class Master:
 
 
 	def start_workers( self ):
+		timer.start('work.start.workers')
 		started_worker_cnt = 0
 		slots = glob.exec_local_concurrency - len(self.workers)
-		cbids = db.task_get( slots )
-		for cbid in cbids:
-			obj = db.find( cbid )
-			call = Item( obj )
-			print call
-			time.sleep(5)
-			#worker = Worker( call )
-			#worker.start()
-			#self.workers.append( worker )
-			started_worker_cnt += 1
+		batch = db.task_claim( slots )
+		sys.stdout.write('.')
+		sys.stdout.flush()
+		if batch:
+			calls = db.task_get( batch )
+
+			for call in calls:
+				worker = Worker( call )
+				worker.start()
+				self.workers.append( worker )
+				started_worker_cnt += 1
+		elif len(self.workers)==0 and db.task_remain( glob.workflow_id )==0 and self.total_tasks>0:
+			timer.report()
+			sys.exit(0)
+
+		self.total_tasks += started_worker_cnt
+		timer.stop('work.start.workers')
 		return started_worker_cnt
 
+
 	def finish_workers( self ):
+		timer.start('work.finish.workers')
 		finished_worker_cnt = 0
 		#glob.starts['exec_local_loop'] = time.time()
 		for k, worker in enumerate( self.workers ):
 			if worker.process.poll() is not None:
 				(stdout, stderr) = worker.process.communicate()
-				print "Local execution complete (%s): %s (return code %d)" % (worker.call.key, worker.call.body['cmd'], worker.process.returncode)
+				print "Local execution complete (%s): %s (return code %d)" % (worker.call.cbid, worker.call.body['cmd'], worker.process.returncode)
 				finished_worker_cnt += 1
 				
 				if worker.process.returncode != 0:
@@ -50,18 +63,19 @@ class Master:
 					if len(stderr)>0:
 						print 'stderr:', stderr
 
-				self.parent.end_call( worker.call )
 				worker.finish()
 				del self.workers[k]
+				db.task_del( worker.call.cbid )
+				
 		#glob.sums['exec_local_loop'] += time.time() - glob.starts['exec_local_loop']
 		
 		#cnt4 += 1
 		#if (cnt4%1000) == 0:
 		#	print glob.sums
 		
+		timer.stop('work.finish.workers')
 		return finished_worker_cnt
-		
-		pass
+
 
 
 
@@ -72,6 +86,7 @@ class Master:
 			time.sleep(1)
 
 		db = glob.db
+		self.total_tasks = 0
 
 
 	def run( self ):
@@ -80,6 +95,7 @@ class Master:
 		self.workers = []
 
 		while not glob.shutting_down:
+			timer.start('work')
 
 			finished_worker_cnt = self.finish_workers()
 
@@ -87,6 +103,8 @@ class Master:
 
 			if finished_worker_cnt == 0 and started_worker_cnt == 0:
 				time.sleep(1)
+
+			timer.stop('work')
 
 		
 		
@@ -99,23 +117,26 @@ class Worker:
 		self.process = None
 
 	def start( self ):
-		self.db = glob.get_ready_handle( 'db' )
-
+		timer.start('work.stage_in')
+		
 		self.start = time.time()
-		self.sandbox = glob.store.new_sandbox()
+		self.sandbox = glob.sandbox_directory+uuid()+'/'
+		os.makedirs( self.sandbox, 0755 );
 
 		call_body = self.call.body
-		key = self.call.key
 
 		#self.debug_print( 'Executing the call below in the sandbox:',sandbox )
 		#self.debug_print( jsonlib.dumps(self.call, sort_keys=True, indent=4, separators=(',', ': ')) )
 
-
+		self.log_pathname = 'PRUNE_CALL_LOG'
+		self.open_cmd = "echo \"prune_call_start `date '+%%s.%%N'`\" > %s" % (self.log_pathname)
+		self.close_cmd = "echo \"prune_call_end `date '+%%s.%%N'`\" >> %s" % (self.log_pathname)
 		self.args = []
+		self.params = []
+		
 		for arg in call_body['args']:
 			self.args.append( arg )
 
-		self.params = []
 		for param in call_body['params']:
 			self.params.append( param )
 
@@ -124,55 +145,53 @@ class Worker:
 		#all_params = call_body['params']
 		env_names = []
 
-
+		
+		
 		env_key = call_body['env']
-		env_body = targz_env_body = None
 		if env_key != self.nil:
-			node = self.db.fetch( env_key )
-			env_body = node.obj.body
-			if env_body['engine'] == 'targz':
-				targz_env_body = env_body
-			elif env_body['engine'] == 'umbrella' and 'targz_env' in env_body:
-				node = self.db.fetch( env_body['targz_env'] )
-				targz_env_body = node.obj.body
+			env = glob.db.find( env_key )
+			if env.body['engine'] == 'wrapper':
+				for i,arg in enumerate(env.body['args']):
+					self.args.append( arg )
+					self.params.append( env.body['params'][i] )
+				self.open_cmd = self.open_cmd + '; ' + env.body['open']
+				self.close_cmd = env.body['close'] + '; ' + self.close_cmd
 
+		self.open_cmd = self.open_cmd + '; ' + "echo \"prune_cmd_start `date '+%%s.%%N'`\" >> %s" % (self.log_pathname)
+		self.close_cmd = "echo \"prune_cmd_end `date '+%%s.%%N'`\" >> %s; " % (self.log_pathname) + self.close_cmd
 
 		my_env = os.environ
-		#for evar, key in call_body['env_vars'].iteritems():
-		#	body = self.db.fetch_body( key )
-		#	my_env[evar] = body
-		#	exec_file.write( "%s=%s;\nexport %s;\n" % (evar, body, evar) )
-
-
-		targz_lines = []
-		if targz_env_body:
-			env_names.append('targz')
-
-			for arg in targz_env_body['args']:
-				self.args += [arg]
-			for param in targz_env_body['params']:
-				self.params += [param]
-				targz_lines.append( 'tar -zxf %s' % param )
 
 
 
-		if not env_body or env_body['engine'] == 'targz':
+		
+		#targz_lines.append( 'tar -zxf %s' % param )
+
+
+
+		if env_key == self.nil or env.body['engine'] == 'wrapper':
 			for i, arg in enumerate( self.args ):
 				param = self.params[i]
-				self.db.put_file( arg, self.sandbox + param )
+				it = glob.db.find_one( arg )
+				if it.path:
+					if it.type == 'temp':
+						os.symlink( glob.cache_file_directory+it.path, self.sandbox + param )
+					else:
+						os.symlink( glob.data_file_directory+it.path, self.sandbox + param )
+				else:
+					with open( self.sandbox + param, 'w' ) as f:
+						it.stream_content( f )
 
-
-			exec_lines = []
-			for line in targz_lines:
-				exec_lines.append( line )
-			exec_lines.append( 'chmod 755 *' )
-			exec_lines.append( call_body['cmd'] )
-
-			exec_file = open( self.sandbox + 'PRUNE_EXEC', 'w+' )
-			exec_file.write( "#!/bin/sh\n\n" )
-			for line in exec_lines:
-				exec_file.write( line+"\n" )
-			exec_file.close()
+			with open( self.sandbox + 'PRUNE_EXEC', 'w+' ) as exec_file:
+				exec_file.write( "#!/bin/sh\n\n" )
+				exec_file.write( self.open_cmd+"\n\n" )
+				exec_file.write( call_body['cmd']+"\n\n" )
+				exec_file.write( self.close_cmd+"\n\n" )
+				exec_file.write( "echo \"prune_stage_out_start `date '+%%s.%%N'`\" >> %s\n" % (self.log_pathname) )
+				for ret in call_body['returns']:
+					exec_file.write( "echo \"sha1sum %s `sha1sum %s | awk '{print $1}'`\" >> %s\n" % (ret, ret, self.log_pathname) )
+					exec_file.write( "echo \"filesize %s `ls -l %s | awk '{print $5}'`\" >> %s\n" % (ret, ret, self.log_pathname) )
+				exec_file.write( "echo \"prune_stage_out_end `date '+%%s.%%N'`\" >> %s\n" % (self.log_pathname) )
 
 
 			os.chmod( self.sandbox + 'PRUNE_EXEC', 0755);
@@ -207,7 +226,7 @@ class Worker:
 				print arg, param, filename
 
 				if not os.path.isfile( filename ):
-					self.db.copy_file( arg, filename )
+					glob.db.copy_file( arg, filename )
 
 				arg_str += ', %s=%s' % (virtual_folder+param,filename)
 
@@ -234,7 +253,7 @@ class Worker:
 			#shutil.copy( , self.sandbox + 'spec.umbrella' )
 			for a, arg in enumerate(self.args):
 				param = self.params[a]
-				self.db.copy_file( arg, self.sandbox + param )
+				glob.db.copy_file( arg, self.sandbox + param )
 
 			uexec_file = open( self.sandbox + 'UMBRELLA_EXEC', 'w+' )
 			uexec_file.write( "#!/bin/sh\n\n" )
@@ -242,6 +261,9 @@ class Worker:
 			uexec_file.close()
 
 			os.chmod( self.sandbox + 'UMBRELLA_EXEC', 0755);
+
+			timer.stop('work.stage_in')
+
 			self.process = subprocess.Popen( "./UMBRELLA_EXEC", cwd=self.sandbox, env=my_env,
 				stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True )
 
@@ -259,31 +281,39 @@ class Worker:
 		full_content = True
 		results = []
 		sizes = []
+
+		timer.start('work.stage_out')
+
+		with open(self.sandbox + 'PRUNE_CALL_LOG') as f:
+			for line in f:
+				if line.startswith('sha1sum'):
+					(a, fname, cbid) = line.split(' ')
+					results.append( cbid )
+				elif line.startswith('filesize'):
+					(a, fname, size) = line.split(' ')
+					sizes.append( int(size) )
+				elif line.startswith('prune_call_start'):
+					(a, estart) = line.split(' ')
+				elif line.startswith('prune_call_end'):
+					(a, efinish) = line.split(' ')
+				elif line.startswith('prune_cmd_start'):
+					(a, cstart) = line.split(' ')
+				elif line.startswith('prune_cmd_end'):
+					(a, cfinish) = line.split(' ')
+
+
 		for i, src in enumerate( call_body['returns'] ):
 
 			if os.path.isfile( self.sandbox + src ):
-				#combining the following lines would be more efficient at some point (if possible)
-
-				#glob.starts['exec_local_hash'] = time.time()
-				key, size = hashfile( self.sandbox + src )
-				#glob.sums['exec_local_hash'] += time.time() - glob.starts['exec_local_hash']
-				if size>0:
-					results.append( key )
-					sizes.append( size )
-					node = self.db.fetch( key )
-					#if not node: # commented out to allow for multiple source files
-					filename = glob.store.tmp_file_path( key )
-					#glob.starts['exec_local_move'] = time.time()
-					shutil.move( self.sandbox + src, filename )
-					fl = File( key=key, tree_key=self.call.key+str(i), path=filename, size=size )
-					#glob.sums['exec_local_move'] += time.time() - glob.starts['exec_local_move']
-					self.db.store( fl )
-				else:
-					full_content = False
+				it = Item( type='temp', cbid=results[i], dbid=self.call.cbid+':'+str(i), path=self.sandbox+src, size=sizes[i] )
+				glob.db.insert( it )
 
 			else:
 				d( 'exec', 'sandbox return file not found: '+src )
 				full_content = False
+
+		timer.stop('work.stage_out')
+
 		if full_content:
 			d( 'exec', 'sandbox kept at: '+self.sandbox )
 			'''
@@ -294,9 +324,19 @@ class Worker:
 					os.rmdir(os.path.join(root, name))
 			'''
 			#shutil.rmtree( worker.sandbox )
-			duration = time.time() - self.start
-			ex = Exec( key=self.call.key+'_', duration=duration, body={'results':results, 'sizes':sizes} )
-			self.db.store( ex )
+			timer.start('work.report')
+
+			wall_time = float(cfinish)-float(cstart)
+			env_time = (float(efinish)-float(estart)) - wall_time
+			meta = {'wall_time':wall_time,'env_time':env_time}
+			it = Item( type='work', cbid=self.call.cbid+'()', meta=meta, body={'results':results, 'sizes':sizes} )
+			glob.db.insert( it )
+
+			timer.add( env_time, 'work.environment_use' )
+			timer.add( wall_time, 'work.wall_time' )
+
+			timer.stop('work.report')
+
 		else:
 			d( 'exec', 'sandbox kept: '+self.sandbox )
 

@@ -14,11 +14,11 @@ class Item(object):
 		self.cbid = kwargs['cbid'] if 'cbid' in kwargs else None
 		self.dbid = kwargs['dbid'] if 'dbid' in kwargs else None
 		self.wfid = kwargs['wfid'] if 'wfid' in kwargs else glob.workflow_id
-		self.step = kwargs['step'] if 'step' in kwargs else glob.step
+		self.step = kwargs['step'] if 'step' in kwargs else glob.workflow_step
 		self.when = kwargs['when'] if 'when' in kwargs else time.time()
 
 		if 'meta' in kwargs:
-			if isinstance(obj, SortedDict):
+			if isinstance( kwargs['meta'], basestring ):
 				self.meta = json.loads( kwargs['meta'] )
 			else:
 				self.meta = kwargs['meta']
@@ -28,9 +28,9 @@ class Item(object):
 		self.body = None
 		self.repo = None
 		self.path = None
-		if 'body' in kwargs:
+		if 'body' in kwargs and kwargs['body'] != None:
 			if isinstance( kwargs['body'], basestring ):
-				self.body = kwargs['body']
+				self.body = json.loads( kwargs['body'] )
 				tmp_str = kwargs['body']
 			else:
 				self.body = kwargs['body']
@@ -39,13 +39,13 @@ class Item(object):
 			if not self.cbid:
 				self.cbid = hashstring(tmp_str)
 
-		elif 'repo' in kwargs:
+		elif 'repo' in kwargs and kwargs['repo'] != None:
 			self.repo = kwargs['repo']
 			if not self.cbid:
 				log.error("No cbid for an object in a remote repository. There is no way to obtain it.")
 			self.size = 0
 
-		elif 'path' in kwargs:
+		elif 'path' in kwargs and kwargs['path'] != None:
 			self.path = kwargs['path']
 			if not self.cbid:
 				if 'new_path' in kwargs:
@@ -53,9 +53,12 @@ class Item(object):
 					self.path = kwargs['new_path']
 				else:
 					self.cbid, self.size = hashfile(self.path)
+			elif 'size' in kwargs:
+				self.size = int(kwargs['size'])
 			else:
 				statinfo = os.stat(self.path)
 				self.size = statinfo.st_size
+
 
 
 	def __str__( self ):
@@ -63,7 +66,12 @@ class Item(object):
 		if self.dbid: obj['dbid'] = self.dbid
 		if self.wfid: obj['wfid'] = self.wfid
 		if self.step: obj['step'] = self.step
-		if self.meta: obj['meta'] = self.meta
+		if self.meta:
+			if isinstance( self.meta, basestring ):
+				obj['meta'] = self.meta
+			else:
+				obj['meta'] = json.dumps(self.meta, sort_keys=True)
+
 		if self.size: obj['size'] = self.size
 		if self.body:
 			if isinstance( self.body, basestring ):
@@ -74,7 +82,7 @@ class Item(object):
 			obj['repo'] = self.repo
 		elif self.path:
 			obj['path'] = self.path
-		return json.dumps(obj, indent=2, separators=(',', ': ')) + "\n"
+		return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': ')) + "\n"
 
 	def stream( self, active_stream ):
 		obj = dict(type=self.type, cbid=self.cbid, when=self.when)
@@ -93,7 +101,7 @@ class Item(object):
 			active_stream.write( json.dumps(obj, sort_keys=True) + "\n" )
 			summary = self.stream_content( active_stream )
 
-		return json.dumps(obj, indent=2, separators=(',', ': ')) + "\n" + summary + "\n"
+		return json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': ')) + "\n" + summary + "\n"
 
 
 	def export( self ):
@@ -154,7 +162,7 @@ class Item(object):
 			vals.append( self.step )
 		if self.meta:
 			keys.append( 'meta' )
-			vals.append( self.meta )
+			vals.append( json.dumps(self.meta, sort_keys=True) )
 		if self.size:
 			keys.append( 'size' )
 			vals.append( self.size )
