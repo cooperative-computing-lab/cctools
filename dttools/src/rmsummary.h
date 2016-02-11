@@ -96,6 +96,7 @@ struct list *rmsummary_parse_file_multiple(const char *filename);
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
 struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources);
+struct rmsummary *json_to_rmsummary(struct jx *j);
 
 struct rmsummary *rmsummary_create(signed char default_value);
 void rmsummary_delete(struct rmsummary *s);
