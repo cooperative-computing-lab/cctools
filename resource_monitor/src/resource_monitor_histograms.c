@@ -362,7 +362,7 @@ void write_variables_gnuplot(struct field_stats *h, struct field_stats *all)
 	fprintf(f, "%s = %lf\n", "current_first_allocation_min_waste", rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
 
 	fprintf(f, "%s = %lf\n", "current_bin_size",   rmsummary_to_external_unit(h->field, histogram_bucket_size(h->histogram)));
-
+	
 	if(all) {
 
 		fprintf(f, "%s = %lf\n", "all_minimum",    floor(rmsummary_to_external_unit(h->field, histogram_min_value(all->histogram))));
