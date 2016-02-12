@@ -438,10 +438,12 @@ void write_variables_gnuplot(struct histogram *h, struct histogram *all)
 	FILE *f     = open_file(fname);
 	free(fname);
 
+	fprintf(f, "%s = %" PRId64"\n", "current_buckets",    h->nbuckets);
 	fprintf(f, "%s = %lf\n",        "current_minimum",    h->min_value);
 	fprintf(f, "%s = %lf\n",        "current_maximum",    h->max_value);
 	fprintf(f, "%s = %lf\n",        "current_mode",       h->value_at_max_count);
 	fprintf(f, "%s = %" PRId64"\n", "current_mode_count", h->max_count);
+	fprintf(f, "%s = %" PRId64"\n", "current_min_count",  h->min_count);
 	fprintf(f, "%s = %lf\n",        "current_mean",       h->mean);
 	fprintf(f, "%s = %lf\n",        "current_percentile75", value_of_p(h, 0.75));
 	fprintf(f, "%s = %lf\n",        "current_percentile25", value_of_p(h, 0.25));
