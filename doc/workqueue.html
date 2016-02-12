@@ -73,8 +73,8 @@ Let's begin by running a simple but complete example of a Work Queue
 application. After trying it out, we will then show how to write a Work Queue
 application from scratch.
 <p>
-We assume that you have downloaded and installed the cctools package in the
-directory CCTOOLS. Next, download the example file for the language of your
+We assume that you have downloaded and installed the cctools package
+in your home directory under <tt>$HOME/cctools</tt>. Next, download the example file for the language of your
 choice:
 <ul>
 <li>C: <a href=work_queue_example.c>work_queue_example.c</a></li>
@@ -84,15 +84,15 @@ choice:
 
 If you are using the C example, compile it like this:
 <div class ="code_area"><pre class="code_snip">
-gcc work_queue_example.c -o work_queue_example -I${CCTOOLS}/include/cctools -L${CCTOOLS}/lib -lwork_queue -ldttools -lm
+gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm
 </pre></div>
 If you are using the Python example, set PYTHONPATH to include the Python modules in cctools:
 <div class ="code_area"><pre class="code_snip">
-export PYTHONPATH=${PYTHONPATH}:${CCTOOLS}/lib/python2.6/site-packages
+export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python2.6/site-packages
 </pre></div>
 If you are using the Perl example, set PERL5LIB to include the Perl modules in cctools:
 <div class ="code_area"><pre class="code_snip">
-export PERL5LIB=${PERL5LIB}:${CCTOOLS}/lib/perl5/site_perl
+export PERL5LIB=${PERL5LIB}:${HOME}/cctools/lib/perl5/site_perl
 </pre></div>
 
 <h2 id="running">Running Work Queue Application<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
