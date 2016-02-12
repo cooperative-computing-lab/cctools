@@ -76,7 +76,7 @@ void initialize_units() {
 	add_conversion_field("bytes_written",            "B",      "MB",      1);
 	add_conversion_field("bytes_received",           "B",      "MB",      1);
 	add_conversion_field("bytes_sent",               "B",      "MB",      1);
-	add_conversion_field("bandwidth",                "bits/s", "Mbits/s", 1);
+	add_conversion_field("bandwidth",                "bps",    "Mbps",    1);
 	add_conversion_field("cores",                    "cores",  "cores",   0);
 	add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
 	add_conversion_field("total_processes",          "procs",  "procs",   0);
@@ -85,7 +85,7 @@ void initialize_units() {
 	/* to internal units */
 	hash_table_insert(multiplier_of, "us",    (void **) 1);
 	hash_table_insert(multiplier_of, "B",     (void **) 1);
-	hash_table_insert(multiplier_of, "bits/s",(void **) 1);
+	hash_table_insert(multiplier_of, "bps",   (void **) 1);
 	hash_table_insert(multiplier_of, "cores", (void **) 1);
 	hash_table_insert(multiplier_of, "procs", (void **) 1);
 	hash_table_insert(multiplier_of, "files", (void **) 1);
@@ -100,8 +100,8 @@ void initialize_units() {
 	hash_table_insert(multiplier_of, "ms", (void **) 1000);
 
 	/* rate units */
-	hash_table_insert(multiplier_of, "Gbits/s",  (void **) 1000000000);
-	hash_table_insert(multiplier_of, "Mbits/s",  (void **) 1000000);
+	hash_table_insert(multiplier_of, "Gbps",  (void **) 1000000000);
+	hash_table_insert(multiplier_of, "Mbps",  (void **) 1000000);
 }
 
 int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit) {
@@ -796,7 +796,7 @@ void rmsummary_debug_report(const struct rmsummary *s)
 	if(s->bytes_sent != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "bytes_sent", s->bytes_sent);
 	if(s->bandwidth != -1)
-		debug(D_DEBUG, "max resource %-18s b/s: %" PRId64 "\n", "bandwidth", s->bandwidth);
+		debug(D_DEBUG, "max resource %-18s bps: %" PRId64 "\n", "bandwidth", s->bandwidth);
 	if(s->total_files != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
 	if(s->disk != -1)

@@ -48,7 +48,7 @@ struct field fields[NUM_FIELDS + 1] = {
 	[B_WRITTEN] = {"w", "bytes_written",  "written bytes",   "MB",       0, 1, offsetof(struct rmDsummary, bytes_written)},
 	[B_RX   ]   = {"R", "bytes_received", "received bytes",  "MB",       0, 1, offsetof(struct rmDsummary, bytes_received)},
 	[B_TX]      = {"W", "bytes_sent",     "bytes_sent",      "MB",       0, 1, offsetof(struct rmDsummary, bytes_sent)},
-	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "Mbits/s",  0, 1, offsetof(struct rmDsummary, bandwidth)},
+	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "Mbps",     0, 1, offsetof(struct rmDsummary, bandwidth)},
 	[FILES    ] = {"n", "total_files",    "num files",       "files",    0, 1, offsetof(struct rmDsummary, total_files)},
 	[DISK]      = {"z", "disk",           "disk",            "MB",       0, 1, offsetof(struct rmDsummary, disk)},
 	[CORES    ] = {"C", "cores",          "cores",           "cores",    0, 0, offsetof(struct rmDsummary, cores)},
@@ -480,7 +480,7 @@ void rmDsummary_print(FILE *output, struct rmDsummary *so) {
 
 	to_internal(so, s, bytes_received, "MB");
 	to_internal(so, s, bytes_sent,     "MB");
-	to_internal(so, s, bandwidth,      "Mbits/s");
+	to_internal(so, s, bandwidth,      "Mbps");
 
 	to_internal(so, s, total_files, "files");
 	to_internal(so, s, disk, "MB");
