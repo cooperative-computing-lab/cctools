@@ -575,7 +575,7 @@ static void expire_procs_running() {
 	while(itable_nextkey(procs_running, (uint64_t*)&pid, (void**)&p)) {
 		if(p->task->resources_requested->end > 0 && current_time > (uint64_t) p->task->resources_requested->end)
 		{
-			p->task_status |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+			p->task_status = WORK_QUEUE_RESULT_TASK_TIMEOUT;
 			kill(pid, SIGKILL);
 		}
 	}
@@ -1246,7 +1246,7 @@ static int enforce_processes_limits() {
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
 			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
-			p->task_status |= WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
+			p->task_status = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
 
 			/* we delete the sandbox, to free the exhausted resource. */
 			delete_dir(p->sandbox);
@@ -1275,7 +1275,7 @@ static void enforce_processes_max_running_time() {
 
 		if(now < p->execution_start + p->task->resources_requested->wall_time) {
 			debug(D_WQ,"Task %d went over its running time limit: %" PRId64 " us > %" PRIu64 " us\n", p->task->taskid, now - p->execution_start, p->task->resources_requested->wall_time);
-			p->task_status |= WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
+			p->task_status = WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME;
 			kill(pid, SIGKILL);
 		}
 	}

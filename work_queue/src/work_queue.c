@@ -261,6 +261,8 @@ static int task_state_count( struct work_queue *q, const char *category, work_qu
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
 
+static int update_task_result(struct work_queue_task *t, work_queue_result_t new_result);
+
 static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
@@ -722,10 +724,10 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
 		clean_task_state(t);
 		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
-			t->result = WORK_QUEUE_RESULT_MAX_RETRIES;
+			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
 		} else {
-			t->result = WORK_QUEUE_RESULT_UNKNOWN;
+			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 		}
 
@@ -980,7 +982,7 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 			// but we continue and consider the transfer a 'success' so that other
 			// outputs are transferred and the task is given back to the caller.
 			debug(D_WQ, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
-			t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
+			update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);
 		} else if(!strcmp(line,"end")) {
 			// We have to return on receiving an end message.
 			if (result == SUCCESS) {
@@ -999,7 +1001,9 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 	// failure which causes this function to return failure and the task
 	// to be returned to the queue to be attempted elsewhere.
 	debug(D_WQ, "%s (%s) failed to return output %s to %s", w->addrport, w->hostname, remote_name, local_name);
-	if(result == APP_FAILURE) t->result |= WORK_QUEUE_RESULT_OUTPUT_MISSING;
+	if(result == APP_FAILURE) {
+		update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);;
+	}
 	return result;
 }
 
@@ -1358,7 +1362,7 @@ Expire tasks in the ready list.
 */
 static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
 {
-	t->result |= WORK_QUEUE_RESULT_TASK_TIMEOUT;
+	update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 
 	//add the task to complete list so it is given back to the application.
 	change_task_state(q, t, WORK_QUEUE_TASK_RETRIEVED);
@@ -1602,7 +1606,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	} else {
 		retrieved_output_length = MAX_TASK_STDOUT_STORAGE;
 		fprintf(stderr, "warning: stdout of task %"PRId64" requires %2.2lf GB of storage. This exceeds maximum supported size of %d GB. Only %d GB will be retreived.\n", taskid, ((double) output_length)/MAX_TASK_STDOUT_STORAGE, MAX_TASK_STDOUT_STORAGE/GIGABYTE, MAX_TASK_STDOUT_STORAGE/GIGABYTE);
-		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
+		update_task_result(t, WORK_QUEUE_RESULT_STDOUT_MISSING);
 	}
 
 	t->output = malloc(retrieved_output_length+1);
@@ -1612,7 +1616,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		stoptime = time(0) + get_transfer_wait_time(q, w, t, output_length);
 		link_soak(w->link, output_length, stoptime);
 		retrieved_output_length = 0;
-		t->result |= WORK_QUEUE_RESULT_STDOUT_MISSING;
+		update_task_result(t, WORK_QUEUE_RESULT_STDOUT_MISSING);
 	}
 
 	if(retrieved_output_length > 0) {
@@ -1663,10 +1667,10 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	// Convert resource_monitor status into work queue status if needed.
 	if(q->monitor_mode && t->return_status == RM_OVERFLOW) {
-		t->result |= WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
+		update_task_result(t, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 	}
 
-	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		/* if resource exhaustion, mark the task for possible resubmission. */
 		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
 	} else {
@@ -1716,6 +1720,33 @@ static work_queue_result_code_t get_available_results(struct work_queue *q, stru
 	}
 
 	return result;
+}
+
+static int update_task_result(struct work_queue_task *t, work_queue_result_t new_result) {
+
+	if(new_result & ~(0x7)) {
+		/* Upper bits are set, so this is not related to old-style result for
+		 * inputs, outputs, or stdout, so we simply make an update. */
+		t->result = new_result;
+	} else if(t->result & ~(0x7)) {
+
+		/* Ignore new result, since we only update for input, output, or
+		 * stdout missing when no other result exists. This is because
+		 * missing inputs/outputs are anyway expected with other kind of
+		 * errors. */
+
+	} else if(new_result == WORK_QUEUE_RESULT_INPUT_MISSING) {
+		/* input missing always appears by itself, so yet again we simply make an update. */
+		t->result = new_result;
+	} else if(new_result == WORK_QUEUE_RESULT_OUTPUT_MISSING) {
+		/* output missing clobbers stdout missing. */
+		t->result = new_result;
+	} else {
+		/* we only get here for stdout missing. */
+		t->result = new_result;
+	}
+
+	return t->result;
 }
 
 static char *blacklisted_to_string( struct work_queue  *q ) {
@@ -2526,7 +2557,9 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 			f->type == WORK_QUEUE_BUFFER ? "literal data" : f->payload,
 			total_bytes);
 
-		if(result == APP_FAILURE) t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
+		if(result == APP_FAILURE) {
+			update_task_result(t, WORK_QUEUE_RESULT_INPUT_MISSING);
+		}
 	}
 
 	return result;
@@ -2545,13 +2578,13 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 			if(f->type == WORK_QUEUE_FILE || f->type == WORK_QUEUE_FILE_PIECE) {
 				char * expanded_payload = expand_envnames(w, f->payload);
 				if(!expanded_payload) {
-					t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
+					update_task_result(t, WORK_QUEUE_RESULT_INPUT_MISSING);
 					return APP_FAILURE;
 				}
 				if(stat(expanded_payload, &s) != 0) {
 					debug(D_WQ,"Could not stat %s: %s\n", expanded_payload, strerror(errno));
 					free(expanded_payload);
-					t->result |= WORK_QUEUE_RESULT_INPUT_MISSING;
+					update_task_result(t, WORK_QUEUE_RESULT_INPUT_MISSING);
 					return APP_FAILURE;
 				}
 				free(expanded_payload);
@@ -4693,7 +4726,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 {
 	int by_priority = 1;
 
-	if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		struct category *c = category_lookup_or_create(q->categories, t->category);
 		if(c->max_allocation) {
 			/* when a task is resubmitted given resource exhaustion, we
@@ -5146,7 +5179,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
 
-			if(t->result & WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
 				if(next == CATEGORY_ALLOCATION_ERROR) {
 					debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
