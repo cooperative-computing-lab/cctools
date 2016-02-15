@@ -40,13 +40,15 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->descendants = set_create(0);
 	n->ancestors = set_create(0);
 
-	n->source_size = -1;
-	n->target_size = -1;
+	n->source_size = 0;
+	n->target_size = 0;
+	n->residual    = 0;
 
 	n->residual_size = 0;
 	n->footprint_size = 0;
 
-	n->footprint = 0;
+	n->footprint_max = 0;
+	n->footprint_min = 0;
 	n->parent_footprint = 0;
 	n->child_footprint = 0;
 	n->descendant_footprint = 0;
@@ -474,8 +476,8 @@ uint64_t dag_node_determine_descendant_footprint(struct dag_node *n)
 				want to continue through the list after the point of the
 				intersect above. */
 			while((node2 = list_peek_current(node1->footprint_nodes))){
-				if(node2->footprint > node_footprint)
-					node1->footprint_size = node2->footprint;
+				if(node2->footprint_min > node_footprint)
+					node1->footprint_size = node2->footprint_min;
 				list_next_item(node1->footprint_nodes);
 			}
 		}
@@ -524,10 +526,12 @@ uint64_t dag_node_determine_descendant_footprint(struct dag_node *n)
 
 		n->residual_nodes = list_duplicate(node1->residual_nodes);
 		n->footprint_nodes = list_duplicate(node1->footprint_nodes);
+		n->residual_size = node1->residual_size;
 	} else {
 		/* Case 3. Create empty lists reflecting lack of children. */
 		n->residual_nodes = list_create();
 		n->footprint_nodes = list_create();
+		n->residual_size = n->target_size;
 		n->run_order = list_create();
 	}
 
@@ -560,7 +564,7 @@ uint64_t dag_node_max_footprints( uint64_t a, uint64_t b, uint64_t c)
  * stores the largest as the key footprint of the node. */
 void dag_node_determine_footprint(struct dag_node *n)
 {
-	struct dag_node *d;
+	struct dag_node *c;
 
 	n->parent_footprint = dag_node_determine_parent_footprint(n);
 
@@ -568,30 +572,65 @@ void dag_node_determine_footprint(struct dag_node *n)
 
 	/* Have un-updated children calculate their current footprint. */
 	set_first_element(n->descendants);
-	while((d = set_next_element(n->descendants))){
-		if(!d->footprint_updated)
-			dag_node_determine_footprint(d);
+	while((c = set_next_element(n->descendants))){
+		if(!c->footprint_updated)
+			dag_node_determine_footprint(c);
+		n->footprint_max = c->footprint_max;
 	}
 
 	n->descendant_footprint = dag_node_determine_descendant_footprint(n);
 
 	/* Finds the max of all three different weights. */
-	n->footprint = dag_node_max_footprints(n->parent_footprint,
+	n->footprint_min = dag_node_max_footprints(n->parent_footprint,
 										   n->child_footprint,
 										   n->descendant_footprint);
+
+	if(n->footprint_max == 0)
+		n->footprint_max = n->footprint_min;
 
 	/* Adding the current nodes list so parents can quickly access
 		these decisions. */
 	list_push_tail(n->residual_nodes, n);
 	list_push_tail(n->footprint_nodes, n);
 
-	printf("\n%d\n", n->nodeid);
-	printf("Parent\t: %"PRIu64"\n", n->parent_footprint);
-	printf("Child\t: %"PRIu64"\n", n->child_footprint);
-	printf("Desc\t: %"PRIu64"\n\n", n->descendant_footprint);
-
 	/* Mark node as having been updated. */
 	n->footprint_updated = 1;
+}
+
+void dag_node_print_footprint_node(struct dag_node *n)
+{
+	printf("\n%d\t:", n->nodeid);
+	printf("%"PRIu64"\t:", n->footprint_max);
+	printf("%"PRIu64"\t:", n->footprint_min);
+	printf("%"PRIu64"", n->residual_size);
+
+	struct dag_node *c;
+
+	set_first_element(n->descendants);
+	while((c = set_next_element(n->descendants))){
+		if(!c->footprint_updated)
+			dag_node_print_footprint_node(c);
+	}
+
+	n->footprint_updated = 1;
+}
+
+void dag_node_print_footprint(struct dag_node *n)
+{
+	dag_node_reset_updated(n);
+	printf("\nNode\t:");
+	printf("Footprint-Max\t: ");
+	printf("Footprint-Min\t: ");
+	printf("Residual");
+
+	struct dag_node *c;
+
+	set_first_element(n->descendants);
+	while((c = set_next_element(n->descendants))){
+		if(!c->footprint_updated)
+			dag_node_print_footprint_node(c);
+	}
+	printf("\n");
 }
 
 /* After a node has been completed mark that it and its

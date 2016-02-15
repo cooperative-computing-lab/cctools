@@ -381,7 +381,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 }
 
-static void makeflow_prepare_node_sizes(struct dag *d)
+static void makeflow_prepare_node_sizes(struct dag *d, int storage_print)
 {
 	struct dag_node *n = dag_node_create(d, -1);
 	struct dag_node *p;
@@ -394,6 +394,10 @@ static void makeflow_prepare_node_sizes(struct dag *d)
 
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
+	if(storage_print){
+		dag_node_print_footprint(n);
+		exit(0);
+	}
 }
 
 /*
@@ -1333,6 +1337,7 @@ int main(int argc, char *argv[])
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
 	uint64_t storage_limit = 0;
+	int storage_print = 0;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1378,6 +1383,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
 		LONG_OPT_STORAGE_LIMIT,
+		LONG_OPT_STORAGE_PRINT,
 		LONG_OPT_PASSWORD,
 		LONG_OPT_TICKETS,
 		LONG_OPT_VERBOSE_PARSING,
@@ -1456,6 +1462,7 @@ int main(int argc, char *argv[])
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
 		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
+		{"storage-print", no_argument, 0, LONG_OPT_STORAGE_PRINT},
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
@@ -1745,6 +1752,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_STORAGE_LIMIT:
 				storage_limit = string_metric_parse(optarg);
+				break;
+			case LONG_OPT_STORAGE_PRINT:
+				storage_print = 1;
 				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
@@ -2100,8 +2110,9 @@ int main(int argc, char *argv[])
 
 	makeflow_parse_input_outputs(d);
 
-	if(storage_limit > 0)
-		makeflow_prepare_node_sizes(d);
+	if(storage_limit > 0 || storage_print){
+		makeflow_prepare_node_sizes(d, storage_print);
+	}
 
 	makeflow_prepare_nested_jobs(d);
 

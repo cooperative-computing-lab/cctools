@@ -55,13 +55,15 @@ struct dag_node {
 
 	uint64_t source_size;			/* size of dag_files of the node's requirements */
 	uint64_t target_size;			/* size of dag_files of the node's productions */
+	uint64_t residual;				/* size of dag_files of the node's residual size */
 
 	uint64_t residual_size;			/* Size of current residual, changes depending on
 										context of requesting node. */
 	uint64_t footprint_size;		/* Size of current largest footprint, changes depending
 										on context of requesting node. */
 
-	uint64_t footprint;				/* Size of the largest defined footprint */
+	uint64_t footprint_max;			/* Size of the largest defined footprint */
+	uint64_t footprint_min;			/* Size of the minimum defined footprint */
 	uint64_t parent_footprint;		/* size of dag_files of my output's and my parents' */
 	uint64_t child_footprint;		/* size of dag_files of my output's and my child's */
 	uint64_t descendant_footprint;	/* size of dag_files at the widest child with minimal siblings */
@@ -118,6 +120,7 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 
 void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
+void dag_node_print_footprint(struct dag_node *n);
 void dag_node_reset_updated(struct dag_node *n);
 
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
