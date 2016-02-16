@@ -197,7 +197,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 				ticket = server_callback(ticket_digest);
 				if(ticket) {
 					char challenge[CHALLENGE_LENGTH];
-					char sig[CHALLENGE_LENGTH*4]; /* 4x should be more than enough... */
+					char sig[CHALLENGE_LENGTH*64]; /* 64x (4096) should be more than enough... */
 					size_t siglen;
 
 					random_array(challenge, sizeof(challenge));
