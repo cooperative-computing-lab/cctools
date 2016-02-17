@@ -484,7 +484,7 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "unset key\n");
 	fprintf(f, "unset border\n");
 	fprintf(f, "set style line 1 lc 16\n");
-	fprintf(f, "set style fill solid noborder 0.45\n");
+	fprintf(f, "set style fill solid noborder\n");
 	fprintf(f, "set tmargin 2\n");
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
@@ -563,7 +563,7 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "unset key\n");
 	fprintf(f, "unset border\n");
 	fprintf(f, "set style line 1 lc 16\n");
-	fprintf(f, "set style fill solid noborder 0.45\n");
+	fprintf(f, "set style fill solid noborder\n");
 	fprintf(f, "set tmargin 2\n");
 	fprintf(f, "set bmargin 2\n");
 	fprintf(f, "unset tics\n");
