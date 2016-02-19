@@ -71,6 +71,10 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 	q->output_table = itable_create(0);
 	q->data = NULL;
 
+	batch_queue_set_feature(q, "local_job_queue", "yes");
+	batch_queue_set_feature(q, "batch_log_name", "%s.batchlog");
+	batch_queue_set_feature(q, "gc_size", "yes");
+
 	q->module = NULL;
 	for (i = 0; batch_queue_modules[i]->type != BATCH_QUEUE_TYPE_UNKNOWN; i++)
 		if (batch_queue_modules[i]->type == type)
@@ -84,10 +88,6 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 		batch_queue_delete(q);
 		return NULL;
 	}
-
-	batch_queue_set_feature(q, "local_job_queue", "yes");
-	batch_queue_set_feature(q, "batch_log_name", "%s.batchlog");
-	batch_queue_set_feature(q, "gc_size", "yes");
 
 	debug(D_BATCH, "created queue %p (%s)", q, q->module->typestr);
 
@@ -166,7 +166,6 @@ void batch_queue_set_feature (struct batch_queue *q, const char *what, const cha
 	} else {
 		debug(D_BATCH, "cleared feature `%s'", what);
 	}
-	q->module->option_update(q, what, value);
 }
 
 void batch_queue_set_int_option(struct batch_queue *q, const char *what, int value) {
@@ -200,9 +199,9 @@ const char *batch_queue_type_string()
 }
 
 
-batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources)
 {
-	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, envlist);
+	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, envlist, resources);
 }
 
 batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)

@@ -24,6 +24,12 @@ void    random_init (void);
  */
 #define random_int()   ((int) random_int64())
 
+/** Get a random unsigned int.
+ *
+ * @return a random unsigned int.
+ */
+#define random_uint()   ((unsigned) random_int64())
+
 /** Get a random int32_t.
  *
  * @return a random int32_t.

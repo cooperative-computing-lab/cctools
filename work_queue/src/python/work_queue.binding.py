@@ -99,7 +99,7 @@ class Task(_object):
     #
     # @param self       Reference to the current task object.
     # @param name       The name of the category
-    def specify_category(self, tag):
+    def specify_category(self, name):
         return work_queue_task_specify_category(self._task, name)
 
     ##
@@ -269,6 +269,18 @@ class Task(_object):
     @property
     def tag(self):
         return self._task.tag
+
+    ##
+    # Get the category name for the task.
+    #
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.category
+    # @endcode
+    @property
+    def category(self):
+        return self._task.category
 
     ##
     # Get the shell command executed by the task.
@@ -586,6 +598,9 @@ class Task(_object):
     # swap_memory:               maximum swap usage across all processes
     # bytes_read:                number of bytes read from disk
     # bytes_written:             number of bytes written to disk
+    # bytes_received:            number of bytes read from the network
+    # bytes_send:                number of bytes written to the network
+    # bandwidth:                 maximum network bits/s (average over one minute)
     # workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
     # workdir_footprint:         size in MB of all working directories in the tree
     # @code
@@ -597,6 +612,17 @@ class Task(_object):
             return None
 
         return self._task.resources_measured
+
+
+    ##
+    # Get the resources the task requested to run. For valid fields see @resources_measured.
+    #
+    @property
+    def resources_requested(self):
+        if not self._task.resources_requested:
+            return None
+
+        return self._task.resources_requested
 
 ##
 # Python Work Queue object
@@ -677,7 +703,7 @@ class WorkQueue(_object):
     # @code
     # >>> print q.stats
     # @endcode
-    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # The fields in @ref stats can also be individually accessed through this call. For example:
     # @code
     # >>> print q.stats.workers_busy
     # @endcode
@@ -691,16 +717,35 @@ class WorkQueue(_object):
     # @a Note: This is defined using property decorator. So it must be called without parentheses
     # (). For example:
     # @code
-    # >>> print q.stats
+    # >>> print q.stats_hierarchy
     # @endcode
-    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # The fields in @ref stats_hierarchy can also be individually accessed through this call. For example:
     # @code
-    # >>> print q.stats.workers_busy
+    # >>> print q.stats_hierarchy.workers_busy
     # @endcode
     @property
     def stats_hierarchy(self):
         work_queue_get_stats_hierarchy(self._work_queue, self._stats_hierarchy)
         return self._stats_hierarchy
+
+    ##
+    # Get the task statistics for the given category.
+    #
+    # @param self 	Reference to the current work queue object.
+    # @param category   A category name.
+    # For example:
+    # @code
+    # s = q.stats_category("my_category")
+    # >>> print s
+    # @endcode
+    # The fields in @ref work_queue_stats can also be individually accessed through this call. For example:
+    # @code
+    # >>> print s.tasks_waiting
+    # @endcode
+    def stats_category(self, category):
+        stats = work_queue_stats()
+        work_queue_get_stats_category(self._work_queue, category, stats)
+        return stats
 
     ##
     # Get current task state. See @ref work_queue_task_state_t for possible values.
@@ -748,7 +793,7 @@ class WorkQueue(_object):
     # @param name       Name of the category.
     # @param multiplier The multiplier of the average task time at which point to abort; if zero, deacticate for the category, negative (the default), use the one for the "default" category (see @ref fast_abort)
     def activate_fast_abort_category(self, name, multiplier):
-        return work_queue_activate_fast_abort_category(self._work_queue, multiplier)
+        return work_queue_activate_fast_abort_category(self._work_queue, name, multiplier)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
@@ -857,6 +902,61 @@ class WorkQueue(_object):
 
     def specify_password_file(self, file):
         return work_queue_specify_password_file(self._work_queue, file)
+
+    ##
+    # Enables resource autolabeling for tasks without an explicit category ("default" category).
+    # rm specifies the maximum resources a task in the default category may use.
+    # If rm is None, disable autolabeling for the default category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores is found on any worker:
+    # >>> q.specify_max_resources({'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
+    # >>> q.specify_max_resources({'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_max_resources(self, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_max_resources(self._work_queue, rm)
+
+    ##
+    # Enables resource autolabeling for tasks in the given category.
+    # rm specifies the maximum resources a task in the category may use.
+    # If rm is None, disable autolabeling for that category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores may be used by a task in the category:
+    # >>> q.specify_max_category_resources("my_category", {'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
+    # >>> q.specify_max_category_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_max_category_resources(self, category, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_max_category_resources(self._work_queue, category, rm)
+
+    ##
+    # Initialize first value of categories
+    #
+    # @param self     Reference to the current work queue object.
+    # @param rm       Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # @param filename JSON file with resource summaries.
+
+    def initialize_categories(filename, rm):
+        return work_queue_initialize_categories(self._work_queue, rm, filename)
 
     ##
     # Cancel task identified by its taskid and remove from the given queue.

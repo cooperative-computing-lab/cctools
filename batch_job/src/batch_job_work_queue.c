@@ -62,34 +62,7 @@ static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
 	}
 }
 
-static struct rmsummary *parse_batch_options_resources(const char *options_text)
-{
-	if(!options_text)
-		return NULL;
-
-	char *resources = strstr(options_text, "resources:");
-
-	if(!resources)
-		return NULL;
-
-	resources = strchr(resources, ':') + 1;
-
-	return rmsummary_parse_from_str(resources, ',');
-}
-
-static void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *resources)
-{
-		if(resources->cores > -1)
-			work_queue_task_specify_cores(t, resources->cores);
-
-		if(resources->resident_memory > -1)
-			work_queue_task_specify_memory(t, resources->resident_memory);
-
-		if(resources->workdir_footprint > -1)
-			work_queue_task_specify_disk(t, resources->workdir_footprint);
-}
-
-static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources)
 {
 	struct work_queue_task *t;
 
@@ -106,11 +79,16 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
 
-	struct rmsummary *resources = parse_batch_options_resources(hash_table_lookup(q->options, "batch-options"));
+	if(envlist) {
+		const char *category = jx_lookup_string(envlist, "CATEGORY");
+		if(category) {
+			work_queue_task_specify_category(t, category);
+		}
+	}
+
 	if(resources)
 	{
 		work_queue_task_specify_resources(t, resources);
-		free(resources);
 	}
 
 	work_queue_submit(q->data, t);
@@ -259,6 +237,14 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_master_preferred_connection(q->data, value);
 		else
 			work_queue_master_preferred_connection(q->data, "by_ip");
+	} else if(strcmp(what, "category-limits") == 0) {
+		struct rmsummary *s = rmsummary_parse_string(value);
+		if(s) {
+			work_queue_specify_max_category_resources(q->data, s->category, s);
+			rmsummary_delete(s);
+		} else {
+			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);
+		}
 	}
 }
 

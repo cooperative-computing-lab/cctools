@@ -14,9 +14,20 @@ prepare()
 #include <sys/stat.h>
 
 #include <errno.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+void dumpmaps (void)
+{
+	char buf[4096];
+	int fd = open("/proc/self/maps", O_RDONLY);
+	read(fd, buf, sizeof(buf));
+	write(STDOUT_FILENO, buf, strlen(buf));
+	close(fd);
+}
 
 int main (int argc, char *argv[])
 {
@@ -38,6 +49,57 @@ int main (int argc, char *argv[])
 			abort();
 		}
 	}
+
+	/* before split */
+	{
+		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
+		int fd = mkstemp(f);
+		if (fd >= 0) {
+			unlink(f);
+			ftruncate(fd, 0x2000);
+			uint8_t *addr = mmap(NULL, 0x2000, PROT_READ, MAP_SHARED, fd, 0);
+			close(fd);
+			dumpmaps();
+			if (addr != MAP_FAILED) {
+				munmap(addr+0x1000, 0x118);
+			}
+		}
+		dumpmaps();
+	}
+
+	/* after split */
+	{
+		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
+		int fd = mkstemp(f);
+		if (fd >= 0) {
+			unlink(f);
+			ftruncate(fd, 0x2000);
+			uint8_t *addr = mmap(NULL, 0x2000, PROT_READ, MAP_SHARED, fd, 0);
+			close(fd);
+			dumpmaps();
+			if (addr != MAP_FAILED) {
+				munmap(addr, 0x118);
+			}
+		}
+		dumpmaps();
+	}
+
+	/* whole */
+	{
+		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
+		int fd = mkstemp(f);
+		if (fd >= 0) {
+			unlink(f);
+			ftruncate(fd, 0x2000);
+			uint8_t *addr = mmap(NULL, 0x2000, PROT_READ, MAP_SHARED, fd, 0);
+			close(fd);
+			dumpmaps();
+			if (addr != MAP_FAILED) {
+				munmap(addr, 0x1118);
+			}
+		}
+		dumpmaps();
+	}
 	return 0;
 }
 EOF
@@ -46,7 +108,7 @@ EOF
 
 run()
 {
-	../src/parrot_run -- ./"$exe"
+	../src/parrot_run -d all -- ./"$exe"
 	return $?
 }
 

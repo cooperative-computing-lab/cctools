@@ -76,6 +76,7 @@ int wait_barrier = 0;
 int pfs_master_timeout = 300;
 struct file_cache *pfs_file_cache = 0;
 struct password_cache *pfs_password_cache = 0;
+struct hash_table *available_services;
 int pfs_force_stream = 0;
 int pfs_force_cache = 0;
 int pfs_force_sync = 0;
@@ -186,7 +187,7 @@ static void pfs_helper_init( void )
 
 	snprintf(helper_path, sizeof(helper_path),"%s/lib/libparrot_helper.so",INSTALL_PATH);
 
-	char * s = getenv("PARROT_HELPER");
+	char *s = getenv("PARROT_HELPER");
 	if(s) {
 		debug(D_DEBUG,"PARROT_HELPER=%s",s);
 		snprintf(helper_path,sizeof(helper_path),"%s",s);
@@ -280,13 +281,12 @@ static void show_help( const char *cmd )
 	printf( "\n\n");
 	printf( "Enabled filesystems are:");
 
-	const char *driver_list[] = {"http","grow","ftp","anonftp","gsiftp","nest","chirp","gfal","rfio","dcap","glite","lfc","irods","hdfs","bxgrid","s3","rootd","xrootd","cvmfs",0};
-
-	int i;
-
-	for(i=0;driver_list[i];i++) {
-		if(pfs_service_lookup(driver_list[i])) {
-			printf(" %s",driver_list[i]);
+	{
+		char *key;
+		void *value;
+		hash_table_firstkey(available_services);
+		while(hash_table_nextkey(available_services, &key, &value)) {
+			printf(" %s", key);
 		}
 	}
 
@@ -557,13 +557,14 @@ int main( int argc, char *argv[] )
 {
 	int c;
 	int chose_auth = 0;
-	const char *s;
 	char *tickets = NULL;
 	char *http_proxy = NULL;
 	pid_t pid;
 	struct pfs_process *p;
 	char envlist[PATH_MAX] = "";
 	int valgrind = 0;
+	int envdebug = 0;
+	int envauth = 0;
 
 	if(getenv("PARROT_ENABLED")) {
 		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
@@ -620,14 +621,153 @@ int main( int argc, char *argv[] )
 	install_handler(SIGTTIN,SIG_IGN);
 	install_handler(SIGTTOU,SIG_IGN);
 
-	if(isatty(0)) {
-		pfs_master_timeout = 300;
-	} else {
+	if(!isatty(0)) {
 		pfs_master_timeout = 3600;
 	}
 
 	pfs_uid = getuid();
 	pfs_gid = getgid();
+
+	available_services = hash_table_create(0, 0);
+	extern pfs_service *pfs_service_chirp;
+	hash_table_insert(available_services, "chirp", pfs_service_chirp);
+	extern pfs_service *pfs_service_multi;
+	hash_table_insert(available_services, "multi", pfs_service_multi);
+	extern pfs_service *pfs_service_anonftp;
+	hash_table_insert(available_services, "anonftp", pfs_service_anonftp);
+	extern pfs_service *pfs_service_ftp;
+	hash_table_insert(available_services, "ftp", pfs_service_ftp);
+	extern pfs_service *pfs_service_http;
+	hash_table_insert(available_services, "http", pfs_service_http);
+	extern pfs_service *pfs_service_grow;
+	hash_table_insert(available_services, "grow", pfs_service_grow);
+	extern pfs_service *pfs_service_hdfs;
+	hash_table_insert(available_services, "hdfs", pfs_service_hdfs);
+#ifdef HAS_GLOBUS_GSS
+	extern pfs_service *pfs_service_gsiftp;
+	hash_table_insert(available_services, "gsiftp", pfs_service_gsiftp);
+	hash_table_insert(available_services, "gridftp", pfs_service_gsiftp);
+#endif
+#ifdef HAS_IRODS
+	extern pfs_service *pfs_service_irods;
+	hash_table_insert(available_services, "irods", pfs_service_irods);
+#endif
+#ifdef HAS_BXGRID
+	extern pfs_service *pfs_service_bxgrid;
+	hash_table_insert(available_services, "bxgrid", pfs_service_bxgrid);
+#endif
+#ifdef HAS_XROOTD
+	extern pfs_service *pfs_service_xrootd;
+	hash_table_insert(available_services, "xrootd", pfs_service_xrootd);
+#endif
+#ifdef HAS_CVMFS
+	extern pfs_service *pfs_service_cvmfs;
+	hash_table_insert(available_services, "cvmfs", pfs_service_cvmfs);
+#endif
+
+	{
+		const char *s;
+
+		s = getenv("PARROT_BLOCK_SIZE");
+		if(s) pfs_service_set_block_size(string_metric_parse(s));
+
+		s = getenv("PARROT_MOUNT_FILE");
+		if(s) pfs_resolve_file_config(s);
+
+		s = getenv("PARROT_MOUNT_STRING");
+		if(s) pfs_resolve_manual_config(s);
+
+		s = getenv("PARROT_FORCE_STREAM");
+		if(s) pfs_force_stream = 1;
+
+		s = getenv("PARROT_FORCE_CACHE");
+		if(s) pfs_force_cache = 1;
+
+		s = getenv("PARROT_FOLLOW_SYMLINKS");
+		if(s) pfs_follow_symlinks = atoi(s);
+
+		s = getenv("PARROT_SESSION_CACHE");
+		if(s) pfs_session_cache = 1;
+
+		s = getenv("PARROT_HOST_NAME");
+		if(s) pfs_false_uname = xxstrdup(pfs_false_uname);
+
+		s = getenv("PARROT_UID");
+		if(s) pfs_uid = atoi(s);
+
+		s = getenv("PARROT_GID");
+		if(s) pfs_gid = atoi(s);
+
+		s = getenv("PARROT_TIMEOUT");
+		if(s) pfs_master_timeout = string_time_parse(s);
+
+		s = getenv("PARROT_FORCE_SYNC");
+		if(s) pfs_force_sync = 1;
+
+		s = getenv("PARROT_LDSO_PATH");
+		if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
+
+		s = getenv("PARROT_DEBUG_FLAGS");
+		if(s) {
+			char *x = xxstrdup(s);
+			int nargs;
+			char **args;
+			if(string_split(x,&nargs,&args)) {
+				for(int i=0;i<nargs;i++) {
+					debug_flags_set(args[i]);
+				}
+			}
+			free(x);
+			envdebug = 1;
+		}
+
+		s = getenv("PARROT_CHIRP_AUTH");
+		if(s) {
+			char *x = xxstrdup(s);
+			int nargs;
+			char **args;
+			if(string_split(x,&nargs,&args)) {
+				for(int i=0;i<nargs;i++) {
+					if (!auth_register_byname(optarg))
+						fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
+					chose_auth = 1;
+				}
+			}
+			free(x);
+			envauth = 1;
+		}
+
+		s = getenv("PARROT_USER_PASS");
+		if(s) {
+			char *x = xxstrdup(s);
+			int nargs;
+			char **args;
+			if(string_split(x,&nargs,&args)) {
+				pfs_password_cache = password_cache_init(args[0], args[1]);
+			}
+		}
+
+		s = getenv("TMPDIR");
+		if(s) {
+			snprintf(sys_temp_dir, sizeof(sys_temp_dir), "%s", s);
+		}
+
+		s = getenv("PARROT_TEMP_DIR");
+		if(s) {
+			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s", s);
+		} else {
+			assert(sys_temp_dir[0]);
+			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
+		}
+
+		s = getenv("PARROT_CVMFS_ALIEN_CACHE");
+		if(s) {
+			snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s", s);
+		} else {
+			assert(pfs_temp_dir[0]);
+			snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s/cvmfs", pfs_temp_dir);
+		}
+	}
 
 	static const struct option long_options[] = {
 		{"auto-decompress", no_argument, 0, 'Z'},
@@ -686,6 +826,10 @@ int main( int argc, char *argv[] )
 	while((c=getopt_long(argc,argv,"+ha:b:B:c:Cd:DFfG:e:Hi:I:kKl:m:n:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'a':
+			if(envauth) {
+				auth_clear();
+				envauth = 0;
+			}
 			if(!auth_register_byname(optarg)) {
 				fprintf(stderr,"unknown auth type: %s\n",optarg);
 				return 1;
@@ -706,6 +850,10 @@ int main( int argc, char *argv[] )
 			ftp_lite_data_channel_authentication = 1;
 			break;
 		case 'd':
+			if(envdebug) {
+				debug_flags_clear();
+				envdebug = 0;
+			}
 			if(!debug_flags_set(optarg)) show_help(argv[0]);
 			break;
 		case 'D':
@@ -916,110 +1064,12 @@ int main( int argc, char *argv[] )
 		setenv("HTTP_PROXY", http_proxy, 1);
 	http_proxy = (char *)realloc(http_proxy, 0);
 
-	s = getenv("PARROT_BLOCK_SIZE");
-	if(s) pfs_service_set_block_size(string_metric_parse(s));
-
-	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(s);
-
-	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(s);
-
-	s = getenv("PARROT_FORCE_STREAM");
-	if(s) pfs_force_stream = 1;
-
-	s = getenv("PARROT_FORCE_CACHE");
-	if(s) pfs_force_cache = 1;
-
-	s = getenv("PARROT_FOLLOW_SYMLINKS");
-	if(s) pfs_follow_symlinks = atoi(s);
-
-	s = getenv("PARROT_SESSION_CACHE");
-	if(s) pfs_session_cache = 1;
-
-	s = getenv("PARROT_HOST_NAME");
-	if(s && !pfs_false_uname) pfs_false_uname = xxstrdup(pfs_false_uname);
-
-	s = getenv("PARROT_UID");
-	if(s) pfs_uid = atoi(s);
-
-	s = getenv("PARROT_GID");
-	if(s) pfs_gid = atoi(s);
-
-	s = getenv("PARROT_TIMEOUT");
-	if(s) pfs_master_timeout = string_time_parse(s);
-
-	s = getenv("PARROT_FORCE_SYNC");
-	if(s) pfs_force_sync = 1;
-
-	s = getenv("PARROT_LDSO_PATH");
-	if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
-
-	s = getenv("PARROT_DEBUG_FLAGS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				debug_flags_set(args[i]);
-			}
-		}
-		free(x);
-	}
-
-	s = getenv("PARROT_CHIRP_AUTH");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				if (!auth_register_byname(optarg))
-					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
-				chose_auth = 1;
-			}
-		}
-		free(x);
-	}
-
-	s = getenv("PARROT_USER_PASS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			pfs_password_cache = password_cache_init(args[0], args[1]);
-		}
-	}
-
-	if (getenv("TMPDIR"))
-		snprintf(sys_temp_dir, sizeof(sys_temp_dir), "%s", getenv("TMPDIR"));
-
-	if (!pfs_temp_dir[0]) {
-		char *t = getenv("PARROT_TEMP_DIR");
-		if(t && t[0]) {
-			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s", t);
-		} else {
-			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
-		}
-	}
 	if (!create_dir(pfs_temp_dir, S_IRWXU))
 		fatal("could not create directory '%s': %s", pfs_temp_dir, strerror(errno));
 
 	snprintf(pfs_temp_per_instance_dir, sizeof(pfs_temp_per_instance_dir), "%s/parrot-instance.XXXXXX", pfs_temp_dir);
 	if (mkdtemp(pfs_temp_per_instance_dir) == NULL)
 		fatal("could not create directory '%s': %s", pfs_temp_per_instance_dir, strerror(errno));
-
-	pfs_cvmfs_alien_cache_dir[0]                = '\0';
-	pfs_cvmfs_alien_cache_dir[PATH_MAX - 1] = '\0';
-	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
-	if(s && strlen(s) > 0)
-		snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s", s);
-
-	//if alien cache dir has not been set, use default based on final value of pfs_temp_dir.
-	if(strlen(pfs_cvmfs_alien_cache_dir) < 1)
-		snprintf(pfs_cvmfs_alien_cache_dir,sizeof(pfs_cvmfs_alien_cache_dir),"%s/cvmfs", pfs_temp_dir);
 
 	pfs_file_cache = file_cache_init(pfs_temp_dir);
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));

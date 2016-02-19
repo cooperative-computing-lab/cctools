@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
 #include "jx.h"
+#include "jx_print.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -105,6 +106,7 @@ static int remote_jobs_max = 100;
 static char *project = NULL;
 static int port = 0;
 static int output_len_check = 0;
+static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
@@ -353,6 +355,34 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 	}
 }
 
+void makeflow_set_categories(struct dag *d) {
+	if(batch_queue_type != BATCH_QUEUE_TYPE_WORK_QUEUE)
+		return;
+
+	char *name;
+	struct category *c;
+
+	hash_table_firstkey(d->categories);
+	while(hash_table_nextkey(d->categories, &name, (void **) &c)) {
+		if(!c->max_allocation)
+			continue;
+
+		if(c->max_allocation->category) {
+			free(c->max_allocation->category);
+		}
+
+		c->max_allocation->category = xxstrdup(name);
+
+		struct jx *j = rmsummary_to_json(c->max_allocation, 0);
+		char *limits = jx_print_string(j);
+		batch_queue_set_option(remote_queue, "category-limits", limits);
+		jx_delete(j);
+		free(limits);
+	}
+}
+
+
+
 /*
 Given a file, return the string that identifies it appropriately
 for the given batch system, combining the local and remote name
@@ -419,7 +449,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct jx *envlist )
+static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct jx *envlist, struct rmsummary *resources)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -429,7 +459,7 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	printf("submitting job: %s\n", command);
 
 	while(1) {
-		jobid = batch_job_submit(queue, command, input_files, output_files, envlist );
+		jobid = batch_job_submit(queue, command, input_files, output_files, envlist, resources);
 		if(jobid >= 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
 			return jobid;
@@ -476,6 +506,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+	dag_node_update_resources(n, /* overflow */ 0);
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
 	command = makeflow_wrap_monitor(command, n, monitor);
@@ -484,17 +515,13 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
-	char *batch_options_env	= dag_variable_lookup_string("BATCH_OPTIONS", &s);
-	char *batch_submit_options = dag_node_resources_wrap_options(n, batch_options_env, batch_queue_get_type(queue));
-	char *old_batch_submit_options = NULL;
-	free(batch_options_env);
+	char *batch_options          = dag_variable_lookup_string("BATCH_OPTIONS", &s);
+	const char *previous_batch_options = batch_queue_get_option(queue, "batch-options");
 
-	if(batch_submit_options) {
-		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_submit_options);
-		if(batch_queue_get_option(queue, "batch-options"))
-			old_batch_submit_options = xxstrdup(batch_queue_get_option(queue, "batch-options"));
-		batch_queue_set_option(queue, "batch-options", batch_submit_options);
-		free(batch_submit_options);
+	if(batch_options) {
+		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_options);
+		batch_queue_set_option(queue, "batch-options", batch_options);
+		free(batch_options);
 	}
 
 	/* Generate the environment vars specific to this node. */
@@ -504,12 +531,16 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist);
+	if(n->resource_request == CATEGORY_ALLOCATION_UNLABELED || n->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
+		/* if task does not have a proper resources label, do not submit with one. */
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,NULL);
+	} else {
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources_needed);
+	}
 
 	/* Restore old batch job options. */
-	if(old_batch_submit_options) {
-		batch_queue_set_option(queue, "batch-options", old_batch_submit_options);
-		free(old_batch_submit_options);
+	if(previous_batch_options) {
+		batch_queue_set_option(queue, "batch-options", previous_batch_options);
 	}
 
 	/* Update all of the necessary data structures. */
@@ -632,6 +663,20 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
+	if(monitor) {
+		char *nodeid = string_format("%d",n->nodeid);
+		char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
+		char *summary_name = string_format("%s.summary", log_name_prefix);
+
+		if(n->resources_measured)
+			rmsummary_delete(n->resources_measured);
+		n->resources_measured = rmsummary_parse_file_single(summary_name);
+
+		free(nodeid);
+		free(log_name_prefix);
+		free(summary_name);
+	}
+
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
 	if(info->exited_normally && info->exit_code == 0) {
@@ -664,26 +709,22 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		if(monitor && info->exit_code == 147)
+		if(monitor && info->exit_code == RM_OVERFLOW)
 		{
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
-			char *nodeid = string_format("%d",n->nodeid);
-			char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
-			free(nodeid);
-			char *summary_name = string_format("%s.summary", log_name_prefix);
-			struct rmsummary *s = rmsummary_parse_limits_exceeded(summary_name);
-
-			if(s)
+			if(n->resources_measured)
 			{
-				rmsummary_print(stderr, s, NULL, NULL, NULL);
-				free(s);
+				rmsummary_print(stderr, n->resources_measured, NULL);
 				fprintf(stderr, "\n");
 			}
 
-			free(log_name_prefix);
-			free(summary_name);
-
-			makeflow_failed_flag = 1;
+			int new_resources = dag_node_update_resources(n, 1);
+			if(new_resources) {
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+			} else {
+				makeflow_failed_flag = 1;
+			}
 		}
 		else if(makeflow_retry_flag || info->exit_code == 101) {
 			n->failure_count++;
@@ -702,13 +743,19 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	} else {
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files))){
+		while((f = list_next_item(n->source_files))) {
 			f->ref_count+= -1;
 			if(f->ref_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+
+		if(monitor) {
+			category_accumulate_summary(d->categories, n->category->name, n->resources_measured);
+			if(d->node_states[DAG_NODE_STATE_COMPLETE] % 20 == 0)
+				category_update_first_allocation(d->categories, n->category->name);
+		}
 	}
 }
 
@@ -732,7 +779,7 @@ static int makeflow_check(struct dag *d)
 				continue;
 			}
 
-			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
+			if(skip_file_check || batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
 				continue;
 			}
 
@@ -927,11 +974,11 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
+	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
-	printf(" %-30s Use <file> as value-pairs for resource limits.\n", "   --monitor-limits=<file>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
 	printf(" %-30s Enable monitor time series.				 (default is disabled)\n", "   --monitor-with-time-series");
 	printf(" %-30s Enable monitoring of openened files.		(default is disabled)\n", "   --monitor-with-opened-files");
@@ -941,10 +988,6 @@ static void show_help_run(const char *cmd)
 int main(int argc, char *argv[])
 {
 	int c;
-	random_init();
-	debug_config(argv[0]);
-
-	cctools_version_debug((long) D_MAKEFLOW_RUN, argv[0]);
 	const char *dagfile;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
@@ -979,6 +1022,9 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 
+	random_init();
+	debug_config(argv[0]);
+
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
 		batch_queue_type = batch_queue_type_from_string(s);
@@ -1011,7 +1057,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_GC_SIZE,
 		LONG_OPT_MONITOR,
 		LONG_OPT_MONITOR_INTERVAL,
-		LONG_OPT_MONITOR_LIMITS,
 		LONG_OPT_MONITOR_LOG_NAME,
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
@@ -1028,7 +1073,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
-		LONG_OPT_AMAZON_AMI
+		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_SKIP_FILE_CHECK
 	};
 
 	static const struct option long_options_run[] = {
@@ -1056,7 +1102,6 @@ int main(int argc, char *argv[])
 		{"max-remote", required_argument, 0, 'J'},
 		{"monitor", required_argument, 0, LONG_OPT_MONITOR},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
-		{"monitor-limits", required_argument,   0, LONG_OPT_MONITOR_LIMITS},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
 		{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
 		{"monitor-with-time-series",  no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
@@ -1074,6 +1119,7 @@ int main(int argc, char *argv[])
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
+		{"skip-file-check", no_argument, 0, LONG_OPT_SKIP_FILE_CHECK},
 		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
 		{"wq-fast-abort", required_argument, 0, 'F'},
@@ -1201,12 +1247,6 @@ int main(int argc, char *argv[])
 				if (!monitor) monitor = makeflow_monitor_create();
 				if(log_dir) free(log_dir);
 				log_dir = xxstrdup(optarg);
-				break;
-			case LONG_OPT_MONITOR_LIMITS:
-				if (!monitor) monitor = makeflow_monitor_create();
-				if(monitor->limits_name)
-					free(monitor->limits_name);
-				monitor->limits_name = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MONITOR_INTERVAL:
 				if (!monitor) monitor = makeflow_monitor_create();
@@ -1336,6 +1376,9 @@ int main(int argc, char *argv[])
 				container_mode = CONTAINER_MODE_DOCKER;
 				container_image = xxstrdup(optarg);
 				break;
+			case LONG_OPT_SKIP_FILE_CHECK:
+				skip_file_check = 1;
+				break;
 			case LONG_OPT_DOCKER_TAR:
 				image_tar = xxstrdup(optarg);
 				break;
@@ -1347,6 +1390,8 @@ int main(int argc, char *argv[])
 				break;
 		}
 	}
+
+	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
 	if(!did_explicit_auth)
 		auth_register_all();
@@ -1461,7 +1506,6 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
 	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
-	batch_queue_set_option(remote_queue, "fast-abort",string_format("%f", wq_option_fast_abort_multiplier));
 	batch_queue_set_option(remote_queue, "priority", priority);
 	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
@@ -1471,6 +1515,10 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
+
+	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
+	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
+	free(fa_multiplier);
 
 	/* Do not create a local queue for systems where local and remote are the same. */
 
@@ -1508,6 +1556,8 @@ int main(int argc, char *argv[])
 
 	makeflow_prepare_nested_jobs(d);
 
+	makeflow_set_categories(d);
+
 	if (change_dir)
 		chdir(change_dir);
 
@@ -1524,7 +1574,7 @@ int main(int argc, char *argv[])
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode );
+	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check );
 
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);

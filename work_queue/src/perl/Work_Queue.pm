@@ -15,8 +15,6 @@ use Carp qw(croak);
 use work_queue;
 use Work_Queue::Task;
 
-our $VERSION = 4.3.0;
-
 local $SIG{INT} = sub {
 	croak "Got terminate signal!\n";
 };
@@ -90,6 +88,14 @@ sub stats_hierarchy {
 	work_queue_get_stats_hierarchy($self->{_work_queue}, $self->{_stats_hierarchy});
 	return $self->{_stats_hierarchy};
 }
+
+sub stats_category {
+	my ($self, $category) = @_;
+	my $stats = work_queue::work_queue_stats->new();
+	work_queue_get_stats_category($self->{_work_queue}, $category, $stats);
+	return $stats;
+}
+
 
 sub task_state {
 	my ($self, $taskid) = @_;
@@ -232,6 +238,21 @@ sub tune {
 	return work_queue_tune($self->{_work_queue}, $name, $value);
 }
 
+sub specify_max_resources {
+	my ($self, $rm) = @_;
+	return work_queue_specify_max_resources($self->{_work_queue}, $rm);
+}
+
+sub specify_max_category_resources {
+	my ($self, $category, $rm) = @_;
+	return work_queue_specify_max_category_resources($self->{_work_queue}, $category, $rm);
+}
+
+sub initialize_categories {
+	my ($self, $rm, $filename) = @_;
+	return work_queue_initialize_categories($self->{_work_queue}, $rm, $filename);
+}
+
 sub submit {
 	my ($self, $task) = @_;
 	my $taskid = work_queue_submit($self->{_work_queue}, $task->{_task});
@@ -346,6 +367,14 @@ Get the master's queue statistics.
 Get the queue statistics, including master and foremen.
 
 		 print $q->stats_hierarchy->{workers_busy};
+
+=head3 C<stats_category>
+
+Get the tasks statistics from the particular category.
+
+		 $s = $q->stats_category("my_category")
+		 print $s->{tasks_waiting}
+
 
 =head3 C<enable_monitoring($dir_name)>
 
@@ -685,7 +714,7 @@ Number of workers.
 
 =head3 C<tune>
 
-Tune advanced parameters for work queue.
+Tune advanced parameters for work queue.  Return 0 on succes, -1 on failure.
 
 =over 12
 
@@ -721,13 +750,74 @@ Set the minimum number of seconds to wait before sending new keepalive checks to
 
 Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
 
-=back
-
 =item value The value to set the parameter to.
 
 =back
 
-Return 0 on succes, -1 on failure.
+=head3 C<specify_max_resources>
+
+Enables resource autolabeling for tasks without an explicit category ("default"
+category).  rm specifies the maximum resources a task in the default category
+may use.  If rm is C<undefined>, disable autolabeling for the default category.
+
+=over 12
+
+=item rm
+
+Hash reference indicating maximum values. See @resources_measured for possible fields.
+
+=back
+
+A maximum of 4 cores is found on any worker:
+
+		q->specify_max_resources({'cores' => 4});
+
+A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
+
+		q->specify_max_resources({'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+
+
+=head3 C<specify_max_category_resources>
+
+Enables resource autolabeling for tasks in the given category.
+rm specifies the maximum resources a task in the category may use.
+If rm is C<undefined>, disable autolabeling for that category.
+
+=over 12
+
+=item category
+
+Name of the category
+
+=item rm
+
+Hash reference indicating maximum values. See @resources_measured for possible fields.
+
+A maximum of 4 cores is found on any worker:
+
+		q->specify_max_category_resources('my_category', {'cores' => 4});
+
+A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
+
+		q->specify_max_category_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+
+
+=head3 C<initialize_categories>
+
+Initialize first value of categories
+
+=over 12
+
+=item rm
+
+Hash reference indicating maximum values. See @resources_measured for possible fields.
+
+=item filename
+
+JSON file with resource summaries.
+
+=back
+
 
 =head3 C<submit>
 

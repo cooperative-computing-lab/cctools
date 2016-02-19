@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include <sys/types.h>
 #include "timestamp.h"
+#include "category.h"
 #include "rmsummary.h"
 
 #define WORK_QUEUE_DEFAULT_PORT 9123               /**< Default Work Queue port number. */
@@ -133,20 +134,14 @@ struct work_queue_task {
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
 
-	timestamp_t maximum_end_time;                               /**< Maximum time (microseconds from epoch) this is valid. If less than 1, then task is always valid (default).*/
-	int64_t memory;                                        /**< Memory required by the task. (MB) */
-	int64_t disk;                                          /**< Disk space required by the task. (MB) */
-	int cores;                                             /**< Number of cores required by the task. */
-	int gpus;                                              /**< Number of gpus required by the task. */
-	int unlabeled;                                         /**< 1 if the task did not specify any required resource. 0 otherwise. */
-
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
 	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 
-	timestamp_t maximum_running_time;                      /**< Maximum time (microseconds) this task may run in a worker. If less than 1, no limit is enforced (default).*/
+	category_allocation_t resource_request;                /**< See @ref category_allocation_t */
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
@@ -167,9 +162,12 @@ struct work_queue_stats {
 	int total_workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
 	int total_workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref work_queue_activate_fast_abort) */
 
+	/* Stats for the current state of tasks: */
 	int tasks_waiting;              /**< Number of tasks waiting to be run. */
 	int tasks_running;              /**< Number of tasks currently running. */
 	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
+
+	/* Cummulative stats for tasks: */
 	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
 	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
 	int total_tasks_failed;         /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
@@ -345,7 +343,7 @@ This is useful, for example, when the task uses certificates that expire.
 @param seconds Number of seconds since the Epoch.
 */
 
-void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t useconds );
+void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds );
 
 /** Specify the maximum time (in microseconds) the task is allowed to run in a
  * worker. This time is accounted since the the moment the task starts to run
@@ -354,7 +352,7 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, timestamp_t us
 @param seconds Maximum number of seconds the task may run in a worker.
 */
 
-void work_queue_task_specify_running_time( struct work_queue_task *t, timestamp_t useconds );
+void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t useconds );
 
 /** Attach a user defined string tag to the task.
 This field is not interpreted by the work queue, but is provided for the user's convenience
@@ -556,6 +554,13 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s);
 */
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s);
 
+/** Get the task statistics for the given category.
+@param q A work queue object.
+@param c A category name.
+@param s A pointer to a buffer that will be filed with statistics.
+*/
+void work_queue_get_stats_category(struct work_queue *q, const char *c, struct work_queue_stats *s);
+
 
 /** Get the current state of the task.
 @param q A work queue object.
@@ -744,6 +749,31 @@ void work_queue_master_preferred_connection(struct work_queue *q, const char *pr
 @return 0 on succes, -1 on failure.
 */
 int work_queue_tune(struct work_queue *q, const char *name, double value);
+
+/** Enables resource autolabeling for tasks without an explicit category ("default" category).
+rm specifies the maximum resources a task in the default category may use.  If
+rm is NULL, disable autolabeling for the default category.
+@param q  Reference to the current work queue object.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm);
+
+/** Enables resource autolabeling for tasks in the given category.
+rm specifies the maximum resources a task in the category may use.
+If rm is None, disable autolabeling for that category.
+@param q         Reference to the current work queue object.
+@param category  Name of the category.
+@param rm Structure indicating maximum values. See @rmsummary for possible fields.
+*/
+void work_queue_specify_max_category_resources(struct work_queue *q, const char *category, const struct rmsummary *rm);
+
+/** Initialize first value of categories
+@param q     Reference to the current work queue object.
+@param rm Structure indicating maximum overall values. See @rmsummary for possible fields.
+@param filename JSON file with resource summaries.
+*/
+void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *max, const char *summaries_file);
+
 
 //@}
 

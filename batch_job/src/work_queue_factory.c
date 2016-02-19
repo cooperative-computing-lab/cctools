@@ -24,6 +24,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "path.h"
 #include "buffer.h"
+#include "rmsummary.h"
 
 #include "jx.h"
 #include "jx_parse.h"
@@ -47,6 +48,7 @@ static int catalog_port = 0;
 static int workers_min = 5;
 static int workers_max = 100;
 static double tasks_per_worker = -1;
+static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
 static char *project_regex = 0;
@@ -59,12 +61,12 @@ static const char *password_file = 0;
 static char *config_file = 0;
 static char *amazon_credentials = NULL;
 static char *amazon_ami = NULL;
+static char *condor_requirements = NULL;
 
 /* -1 means 'not specified' */
-static int num_cores_option  = -1;
-static int num_disk_option   = -1;
-static int num_memory_option = -1;
-static int num_gpus_option   = -1;
+static struct rmsummary *resources = NULL;
+
+static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
 
@@ -131,30 +133,25 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 	return needed_workers;
 }
 
-static void set_worker_resources( struct batch_queue *queue )
+static void set_worker_resources_options( struct batch_queue *queue )
 {
-
 	buffer_t b;
 	buffer_init(&b);
 
-	if(num_cores_option > -1) {
-		batch_queue_set_int_option(queue, "cores",  num_cores_option);
-		buffer_printf(&b, " --cores=%d", num_cores_option);
-	}
+	if(batch_queue_supports_feature(queue, "autosize") && autosize) {
+		buffer_printf(&b, " --cores=$$(TotalSlotCpus) --memory=$$(TotalSlotMemory) --disk=$$(TotalSlotDisk)");
+	} else {
+		if(resources->cores > -1) {
+			buffer_printf(&b, " --cores=%" PRId64, resources->cores);
+		}
 
-	if(num_memory_option > -1) {
-		batch_queue_set_int_option(queue, "memory", num_memory_option);
-		buffer_printf(&b, " --memory=%d", num_memory_option);
-	}
+		if(resources->memory > -1) {
+			buffer_printf(&b, " --memory=%" PRId64, resources->memory);
+		}
 
-	if(num_disk_option > -1) {
-		batch_queue_set_int_option(queue, "disk",   num_disk_option);
-		buffer_printf(&b, " --disk=%d", num_disk_option);
-	}
-
-	if(num_gpus_option > -1) {
-		batch_queue_set_int_option(queue, "gpus",   num_gpus_option);
-		buffer_printf(&b, " --gpus=%d", num_gpus_option);
+		if(resources->disk > -1) {
+			buffer_printf(&b, " --disk=%" PRId64, resources->disk);
+		}
 	}
 
 	resource_args = xxstrdup(buffer_tostring(&b));
@@ -187,7 +184,7 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
-	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0);
+	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0,resources);
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
@@ -367,16 +364,21 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_num_cores_option, num_cores_option, cores,    int, JX_INTEGER, integer_value)
-	assign_new_value(new_num_disk_option, num_disk_option, disk,       int, JX_INTEGER, integer_value)
-	assign_new_value(new_num_memory_option, num_memory_option, memory, int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_disk_option,  resources->disk, disk,      int, JX_INTEGER, integer_value)
+	assign_new_value(new_num_memory_option, resources->memory, memory, int, JX_INTEGER, integer_value)
 
+	assign_new_value(new_autosize_option, autosize, autosize, int, JX_INTEGER, integer_value)
+
+	assign_new_value(new_factory_timeout_option, factory_timeout, factory-timeout, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
 
 	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_extra_worker_args, extra_worker_args, worker-extra-options, const char *, JX_STRING, string_value)
+
+	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
 	if(!new_project_regex || strlen(new_project_regex) == 0) {
 		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
@@ -398,6 +400,11 @@ int read_config_file(const char *config_file) {
 		error_found = 1;
 	}
 
+	if(new_factory_timeout_option < 0) {
+		debug(D_NOTICE, "%s: factory timeout (%d) is less than zero.\n", config_file, new_factory_timeout_option);
+		error_found = 1;
+	}
+
 	if(error_found) {
 		goto end;
 	}
@@ -406,10 +413,12 @@ int read_config_file(const char *config_file) {
 	workers_min    = new_workers_min;
 	worker_timeout = new_worker_timeout;
 	tasks_per_worker = new_tasks_per_worker;
+	autosize         = new_autosize_option;
+	factory_timeout  = new_factory_timeout_option;
 
-	num_cores_option = new_num_cores_option;
-	num_memory_option = new_num_memory_option;
-	num_disk_option = new_num_disk_option;
+	resources->cores  = new_num_cores_option;
+	resources->memory = new_num_memory_option;
+	resources->disk   = new_num_disk_option;
 
 	if(new_project_regex != project_regex) {
 		if(project_regex) free(project_regex); project_regex = xxstrdup(new_project_regex);
@@ -429,6 +438,13 @@ int read_config_file(const char *config_file) {
 		extra_worker_args = xxstrdup(new_extra_worker_args);
 	}
 
+	if(new_condor_requirements != condor_requirements) {
+		if(condor_requirements) {
+			free(condor_requirements);
+		}
+		condor_requirements = xxstrdup(new_condor_requirements);
+	}
+
 	last_time_modified = new_time_modified;
 	fprintf(stdout, "Configuration file '%s' has been loaded.", config_file);
 
@@ -439,16 +455,22 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "max-workers: %d\n", workers_max);
 	fprintf(stdout, "min-workers: %d\n", workers_min);
 
-	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (num_cores_option > 0 ? num_cores_option : 1));
+	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
-	fprintf(stdout, "cores: %d\n", num_cores_option > 0 ? num_cores_option : 1);
+	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
 
-	if(num_memory_option > -1) {
-		fprintf(stdout, "memory: %d MB\n", num_memory_option);
+	fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
+
+	if(factory_timeout > 0) {
+		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
 	}
 
-	if(num_disk_option > -1) {
-		fprintf(stdout, "disk: %d MB\n", num_disk_option);
+	if(resources->memory > -1) {
+		fprintf(stdout, "memory: %" PRId64 " MB\n", resources->memory);
+	}
+
+	if(resources->disk > -1) {
+		fprintf(stdout, "disk: %" PRId64 " MB\n", resources->disk);
 	}
 
 	if(extra_worker_args) {
@@ -474,18 +496,36 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 	struct list *masters_list = NULL;
 	struct list *foremen_list = NULL;
 
+	int64_t factory_timeout_start = time(0);
+
 	while(!abort_flag) {
 
 		if(config_file && !read_config_file(config_file)) {
 			debug(D_NOTICE, "Error re-reading '%s'. Using previous values.", config_file);
 		} else {
-			set_worker_resources( queue );
+			set_worker_resources_options( queue );
+			batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 		}
 
 		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
 
+		if(list_size(masters_list) > 0)
+		{
+			factory_timeout_start = time(0);
+		} else {
+			// check to see if factory timeout is triggered, factory timeout will be 0 if flag isn't set
+			if(factory_timeout > 0)
+			{
+				if(time(0) - factory_timeout_start > factory_timeout) {
+					fprintf(stderr, "There have been no masters for longer then the factory timeout, exiting\n");
+					abort_flag=1;
+					break;
+				}
+			}
+		}
+	
 		debug(D_WQ,"evaluating master list...");
 		int workers_needed = count_workers_needed(masters_list, 0);
 
@@ -580,6 +620,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
+	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
+	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
+	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
@@ -589,7 +632,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS };
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -614,6 +657,9 @@ static const struct option long_options[] = {
 	{"help", no_argument, 0, 'h'},
 	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
+	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{0,0,0,0}
 };
 
@@ -626,6 +672,8 @@ int main(int argc, char *argv[])
 	catalog_port = CATALOG_PORT;
 
 	debug_config(argv[0]);
+
+	resources = rmsummary_create(-1);
 
 	int c;
 
@@ -664,7 +712,7 @@ int main(int argc, char *argv[])
 				extra_worker_args = xxstrdup(optarg);
 				break;
 			case LONG_OPT_CORES:
-				num_cores_option = atoi(optarg);
+				resources->cores = atoi(optarg);
 				break;
 			case LONG_OPT_AMAZON_CREDENTIALS:
 				amazon_credentials = xxstrdup(optarg);
@@ -673,13 +721,28 @@ int main(int argc, char *argv[])
 				amazon_ami = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MEMORY:
-				num_memory_option = atoi(optarg);
+				resources->memory = atoi(optarg);
 				break;
 			case LONG_OPT_DISK:
-				num_disk_option = atoi(optarg);
+				resources->disk = atoi(optarg);
 				break;
 			case LONG_OPT_GPUS:
-				num_gpus_option = atoi(optarg);
+				resources->gpus = atoi(optarg);
+				break;
+			case LONG_OPT_AUTOSIZE:
+				autosize = 1;
+				break;
+			case LONG_OPT_FACTORY_TIMEOUT:
+				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_CONDOR_REQUIREMENTS:
+				if(condor_requirements) {
+					char *tmp = condor_requirements;
+					condor_requirements = string_format("(%s && (%s))", tmp, optarg);
+					free(tmp);
+				} else {
+					condor_requirements = string_format("(%s)", optarg);
+				}
 				break;
 			case 'P':
 				password_file = optarg;
@@ -786,7 +849,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	set_worker_resources( queue );
+	batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
+	set_worker_resources_options( queue );
 
 	if (amazon_credentials != NULL) {
 		batch_queue_set_option(queue, "amazon-credentials", amazon_credentials);
@@ -794,6 +858,13 @@ int main(int argc, char *argv[])
 	if (amazon_ami != NULL) {
 		batch_queue_set_option(queue, "amazon-ami", amazon_ami);
 	}
+
+	if(condor_requirements != NULL && batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
+		debug(D_NOTICE, "condor_requirements will be ignored as workers will not be running in condor.");
+	} else {
+		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
+	}
+
 	mainloop( queue, project_regex, foremen_regex );
 
 	batch_queue_delete(queue);

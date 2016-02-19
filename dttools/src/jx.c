@@ -284,11 +284,15 @@ int jx_istype( struct jx *j, jx_type_t type )
 
 int jx_pair_equals( struct jx_pair *j, struct jx_pair *k )
 {
+	if(!j && !k) return 1;
+	if(!j || !k) return 0;
 	return jx_equals(j->key,k->key) && jx_equals(j->value,k->value) && jx_pair_equals(j->next,k->next);
 }
 
 int jx_item_equals( struct jx_item *j, struct jx_item *k )
 {
+	if(!j && !k) return 1;
+	if(!j || !k) return 0;
 	return jx_equals(j->value,k->value) && jx_item_equals(j->next,k->next);
 }
 

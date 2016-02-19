@@ -28,6 +28,15 @@ extern "C" {
 pfs_dir::pfs_dir( pfs_name *n ) : pfs_file(n)
 {
 	iterations = 0;
+	if(strcmp(n->path, "/") == 0) {
+		extern struct hash_table *available_services;
+		char *key;
+		void *value;
+		hash_table_firstkey(available_services);
+		while(hash_table_nextkey(available_services, &key, &value)) {
+			append(key);
+		}
+	}
 }
 
 int pfs_dir::fstat( struct pfs_stat *buf )

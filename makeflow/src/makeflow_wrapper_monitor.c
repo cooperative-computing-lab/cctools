@@ -25,10 +25,9 @@ struct makeflow_monitor * makeflow_monitor_create()
 	m->enable_time_series = 0;
 	m->enable_list_files  = 0;
 
-	m->limits_name	= NULL;
-	m->interval		= 1;  // in seconds
-	m->log_prefix	= NULL;
-	m->exe			= NULL;
+	m->interval     = 1;  // in seconds
+	m->log_prefix   = NULL;
+	m->exe          = NULL;
 	m->exe_remote	= NULL;
 
 	return m;
@@ -96,15 +95,11 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 	} else {
 		executable = string_format("%s", m->exe);
 	}
-	char *limits_str = dag_node_resources_wrap_as_rmonitor_options(n);
-	char *extra_options = string_format("%s -V '%-15s%s'",
-			limits_str ? limits_str : "",
-			"category:",
-			n->category->label);
+	char *extra_options = string_format("-V '%s%s'", "category:", n->category->name);
 
 	char * result = resource_monitor_write_command(executable,
 			m->log_prefix,
-			m->limits_name,
+			n->resources_needed,
 			extra_options,
 			m->enable_debug,
 			m->enable_time_series,
@@ -114,7 +109,6 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct dag_
 	result = string_replace_percents(result, nodeid);
 
 	free(executable);
-	free(limits_str);
 	free(extra_options);
 	free(nodeid);
 

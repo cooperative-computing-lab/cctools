@@ -10,12 +10,12 @@ See the file COPYING for details.
 #include "dag_node.h"
 #include "dag_file.h"
 #include "dag_variable.h"
-#include "dag_task_category.h"
 
 #include "itable.h"
 #include "set.h"
 #include "timestamp.h"
 #include "batch_job.h"
+#include "category.h"
 
 #include <stdio.h>
 
@@ -27,8 +27,8 @@ struct dag {
 	struct hash_table *files;           /* Maps every filename to a struct dag_file. */
 	struct set *inputs;                 /* Set of every struct dag_file specified as input. */
 	struct set *outputs;                /* Set of every struct dag_file specified as output. */
-	struct hash_table *variables;       /* Mappings between variable names defined in the makeflow file and their values. */
-	struct hash_table *task_categories; /* Mapping from labels to category structures. */
+	struct hash_table *categories;      /* Mapping from labels to category structures. */
+	struct category *default_category;  /* Default for all rules and variables without an explicit category. */
 	struct set *export_vars;            /* List of variables with prefix export. (these are setenv'ed eventually). */
 	struct set *special_vars;           /* List of special variables, such as category, cores, memory, etc. */
 

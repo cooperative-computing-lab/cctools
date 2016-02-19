@@ -99,9 +99,10 @@ void makeflow_parse_input_outputs( struct dag *d )
 			set_insert(d->inputs, f);
 			debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
 		}
+		free(input_list);
 		free(argv);
 	} else {
-		debug(D_NOTICE, "MAKEFLOW_INPUTS is not specified");
+		debug(D_MAKEFLOW_RUN, "MAKEFLOW_INPUTS is not specified");
 	}
 	/* add all source files */
 	hash_table_firstkey(d->files);
@@ -120,9 +121,10 @@ void makeflow_parse_input_outputs( struct dag *d )
 			set_remove(d->outputs, f);
 			debug(D_MAKEFLOW_RUN, "Added %s to output list", f->filename);
 		}
+		free(output_list);
 		free(argv);
 	} else {
-		debug(D_NOTICE, "MAKEFLOW_OUTPUTS is not specified");
+		debug(D_MAKEFLOW_RUN, "MAKEFLOW_OUTPUTS is not specified");
 		/* add all sink if OUTPUTS not specified */
 		hash_table_firstkey(d->files);
 		while((hash_table_nextkey(d->files, &filename, (void **) &f)))
@@ -141,21 +143,15 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 		return 1;
 
 	if(batch_fs_unlink(queue, f->filename) == 0) {
-		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
 
-		if(!silent)
-			debug(D_NOTICE, "Makeflow: Deleted path %s\n", f->filename);
 	} else if(errno != ENOENT) {
 		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 
-		if(!silent) {
-			debug(D_NOTICE, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
-			return 1;
-		} else {
 			debug(D_MAKEFLOW_RUN, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
-		}
+			return 1;
 	}
 	return 0;
 }
@@ -187,7 +183,7 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 			silent = 0;
 
 		/* We have a record of the file, but it is no longer created or used so delete */
-		if(dag_file_is_source(f) && dag_file_is_sink(f))
+		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
 			makeflow_clean_file(d, queue, f, silent);
 		if(dag_file_is_source(f))
 			continue;

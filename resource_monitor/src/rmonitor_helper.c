@@ -27,11 +27,15 @@
 #include <sys/stat.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <sys/socket.h>
 #include <limits.h>
 
 #ifdef __linux__
 #include <sched.h>
 #endif
+
+#include "timestamp.h"
+#include "itable.h"
 
 #include "debug.h"
 //#define debug fprintf
@@ -49,8 +53,14 @@
 #define RTLD_NEXT 0
 #endif
 
+
 #define PUSH_ERRNO { int last_errno = errno; errno = 0;
 #define POP_ERRNO(msg) msg.error = errno; if(!errno){ errno = last_errno; } }
+
+#define START(msg) { if(msg.type == RX || msg.type == TX) msg.start = timestamp_get(); PUSH_ERRNO
+#define END(msg)   POP_ERRNO(msg) if(msg.type == RX || msg.type == TX) msg.end = timestamp_get(); }
+
+static struct itable *family_of_fd = NULL;
 
 pid_t fork()
 {
@@ -146,6 +156,18 @@ int fchdir(int fd)
 	return status;
 }
 
+int close(int fd)
+{
+	__typeof__(close) *original_close = dlsym(RTLD_NEXT, "close");
+
+	if(family_of_fd)
+		itable_remove(family_of_fd, fd);
+
+	int status = original_close(fd);
+
+	return status;
+}
+
 static int open_for_writing(int fd) {
 	int flags, access_mode;
 
@@ -169,9 +191,9 @@ FILE *fopen(const char *path, const char *mode)
 
 	debug(D_RMON, "fopen %s mode %s from %d.\n", path, mode, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		file = original_fopen(path, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -208,9 +230,9 @@ int open(const char *path, int flags, ...)
 
 	debug(D_RMON, "open %s from %d.\n", path, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		fd = original_open(path, flags, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -241,9 +263,9 @@ FILE *fopen64(const char *path, const char *mode)
 
 	debug(D_RMON, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		file = original_fopen64(path, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -280,9 +302,9 @@ int open64(const char *path, int flags, ...)
 
 	debug(D_RMON, "open64 %s from %d.\n", path, getpid());
 
-	PUSH_ERRNO
+	START(msg)
 		fd = original_open64(path, flags, mode);
-	POP_ERRNO(msg)
+	END(msg)
 
 	/* With ENOENT we do not send a message, simply to reduce spam. */
 	if(msg.error == ENOENT)
@@ -304,18 +326,43 @@ int open64(const char *path, int flags, ...)
 }
 #endif /* defined linux && __USE_LARGEFILE64 */
 
+int socket(int domain, int type, int protocol)
+{
+	int fd;
+
+	if(!family_of_fd)
+		family_of_fd = itable_create(8);
+
+	__typeof__(socket) *original_socket = dlsym(RTLD_NEXT, "socket");
+	fd = original_socket(domain, type, protocol);
+
+	if(fd > -1 && (domain != AF_LOCAL || domain != AF_NETLINK)) {
+		itable_insert(family_of_fd, fd, (void **) 1);
+	} else {
+		itable_remove(family_of_fd, fd);
+	}
+
+	return fd;
+}
+
 ssize_t write(int fd, const void *buf, size_t count)
 {
 	struct rmonitor_msg msg;
-	msg.type   = WRITE;
 	msg.origin = getpid();
+
+	if(family_of_fd && itable_lookup(family_of_fd, fd)) {
+		msg.type   = TX;
+	} else {
+		msg.type   = WRITE;
+	}
+
 
 	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
 
 	ssize_t real_count;
-	PUSH_ERRNO
+	START(msg)
 		real_count = original_write(fd, buf, count);
-	POP_ERRNO(msg)
+	END(msg)
 
 	msg.data.n = real_count;
 	send_monitor_msg(&msg);
@@ -323,10 +370,144 @@ ssize_t write(int fd, const void *buf, size_t count)
 	return real_count;
 }
 
-void wakeup_pselect_from_exit(int signum)
+ssize_t read(int fd, void *buf, size_t count)
 {
-	if(signum == SIGCONT)
-		signal(SIGCONT, SIG_DFL);
+	struct rmonitor_msg msg;
+	msg.origin = getpid();
+
+	if(family_of_fd && itable_lookup(family_of_fd, fd)) {
+		msg.type   = RX;
+	} else {
+		msg.type   = READ;
+	}
+
+	__typeof__(read) *original_read = dlsym(RTLD_NEXT, "read");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_read(fd, buf, count);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t recv(int fd, void *buf, size_t count, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = RX;
+	msg.origin = getpid();
+
+	__typeof__(recv) *original_recv = dlsym(RTLD_NEXT, "recv");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_recv(fd, buf, count, flags);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t recvfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *src, socklen_t *addrlen)
+{
+	struct rmonitor_msg msg;
+	msg.type   = RX;
+	msg.origin = getpid();
+
+	__typeof__(recvfrom) *original_recvfrom = dlsym(RTLD_NEXT, "recvfrom");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_recvfrom(fd, buf, count, flags, src, addrlen);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t send(int fd, const void *buf, size_t count, int flags)
+{
+	struct rmonitor_msg msg;
+
+	msg.type   = TX;
+	msg.origin = getpid();
+
+	__typeof__(send) *original_send = dlsym(RTLD_NEXT, "send");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_send(fd, buf, count, flags);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t sendfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *src, socklen_t *addrlen)
+{
+	struct rmonitor_msg msg;
+	msg.type   = TX;
+	msg.origin = getpid();
+
+	__typeof__(sendfrom) *original_sendfrom = dlsym(RTLD_NEXT, "sendfrom");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_sendfrom(fd, buf, count, flags, src, addrlen);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+ssize_t sendmsg(int fd, const struct msghdr *mg, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = TX;
+	msg.origin = getpid();
+
+	__typeof__(sendmsg) *original_sendmsg = dlsym(RTLD_NEXT, "sendmsg");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_sendmsg(fd, mg, flags);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
+}
+
+
+ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
+{
+	struct rmonitor_msg msg;
+	msg.type   = RX;
+	msg.origin = getpid();
+
+	__typeof__(recvmsg) *original_recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+
+	ssize_t real_count;
+	START(msg)
+		real_count = original_recvmsg(fd, mg, flags);
+	END(msg)
+
+	msg.data.n = real_count;
+	send_monitor_msg(&msg);
+
+	return real_count;
 }
 
 void exit_wrapper_preamble(int status)
@@ -338,16 +519,11 @@ void exit_wrapper_preamble(int status)
 
 	did_exit_wrapper = 1;
 
-	sigset_t set_cont, set_prev;
-	void (*prev_handler)(int signum);
-	struct timespec timeout = {.tv_sec = 2, .tv_nsec = 0};
+	sigset_t all_signals;
+	sigfillset(&all_signals);
+	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0};
 
 	debug(D_RMON, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
-
-	prev_handler = signal(SIGCONT, wakeup_pselect_from_exit);
-	sigemptyset(&set_cont);
-	sigaddset(&set_cont, SIGCONT);
-	sigprocmask(SIG_BLOCK, &set_cont, &set_prev); //Adds SIGCONT to blocked signals.
 
 	struct rmonitor_msg msg;
 	msg.type   = END_WAIT;
@@ -357,11 +533,11 @@ void exit_wrapper_preamble(int status)
 
 	send_monitor_msg(&msg);
 
-	/* Wait at most timeout for monitor to send SIGCONT */
-	debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
-	pselect(0, NULL, NULL, NULL, &timeout, &set_prev);
-	signal(SIGCONT, prev_handler);
-	sigprocmask(SIG_SETMASK, &set_prev, NULL);
+	if(sigprocmask(SIG_SETMASK, &all_signals, NULL) != -1) {
+		/* Wait at most timeout for monitor to send SIGCONT */
+		debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
+		sigtimedwait(&all_signals, NULL, &timeout);
+	}
 
 	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }

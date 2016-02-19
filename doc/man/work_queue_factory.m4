@@ -50,14 +50,19 @@ OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can
 OPTION_TRIPLET(-T,batch-type, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
 OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
 OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
+OPTION_ITEM(`--autosize')Automatically size a worker to an available slot (Condor only).
 OPTION_ITEM(-c --capacity) Use worker capacity reported by masters.
 OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to master.
 OPTION_TRIPLET(-t,timeout,time)Abort after this amount of idle time.
 OPTION_TRIPLET(-C,config-file,file)Use the configuration file <file>.
 OPTION_TRIPLET(-E,extra-options,options)Extra options that should be added to the worker.
+OPTION_PAIR(--condor-requirements, str)Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).
 OPTION_TRIPLET(-S,scratch,file)Scratch directory. (default is /tmp/${USER}-workers)
+OPTION_PAIR(--factory-timeout, n)Exit after no master has been seen in <n> seconds.
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+OPTION_PAIR(--factory-timeout, #)Set factory timeout to <#> seconds. (off by default) This will cause work queue to exit when their are no masters present after the given number of seconds.
+
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
 
@@ -79,19 +84,28 @@ LONGCODE_BEGIN
 work_queue_factory -T sge -M barney -W 100
 LONGCODE_END
 
-To start workers according to the master's capacity, such that the
-workers exit after 5 minutes (300s) of idleness:
+To start workers such that the workers exit after 5 minutes (300s) of idleness:
 
 LONGCODE_BEGIN
-work_queue_factory -T condor -M barney -c -t 300
+work_queue_factory -T condor -M barney -t 300
 LONGCODE_END
 
 If you want to start workers that match any project that begins
 with barney, use a regular expression:
 
 LONGCODE_BEGIN
-work_queue_factory -T condor -M barney.\* -c -t 300
+work_queue_factory -T condor -M barney.\* -t 300
 LONGCODE_END
+
+If running on condor, you may manually specify condor requirements:
+
+LONGCODE_BEGIN
+work_queue_factory -T condor -M barney --condor_requirements 'MachineGroup == "disc"' --condor_requirements 'has_matlab == true'
+LONGCODE_END
+
+Repeated uses of CODE(condor-requirements) are and-ed together. The previous example will produce a statement equivalent to:
+
+CODE(requirements = ((MachineGroup == "disc") && (has_matlab == true)))
 
 Use the configuration file BOLD(my_conf):
 
@@ -118,6 +132,7 @@ max-workers
 task-per-worker
 timeout
 worker-extra-options
+condor-requirements
 cores
 memory
 disk

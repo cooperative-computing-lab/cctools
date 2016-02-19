@@ -5,6 +5,11 @@
         "name": "linux"
     }, 
     "os": {
+        "ec2": {
+            "ami": "ami-2cf8901c",
+            "region": "us-west-2",
+            "user": "ec2-user"
+        },
         "name": "Redhat", 
         "format": "tgz", 
         "checksum": "669ab5ef94af84d273f8f92a86b7907a", 

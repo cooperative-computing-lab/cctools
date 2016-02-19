@@ -40,6 +40,8 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
 	int taskid = p->task->taskid;
+	//placeholder filesystem until permanent solution
+	char *fs = "ext2";
 
 	p->sandbox = string_format("t.%d", taskid);
 
@@ -48,7 +50,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 		if(p->disk > 0) {
 			int64_t size = (p->disk) * 1024;
 
-			if(disk_alloc_create(p->sandbox, size) == 0) {
+			if(disk_alloc_create(p->sandbox, fs, size) == 0) {
 				p->loop_mount = 1;
 				debug(D_WQ, "disk_alloc: %"PRId64"MB\n", size);
 				return p;
@@ -126,20 +128,20 @@ static void specify_integer_env_var( struct work_queue_process *p, const char *n
 }
 
 static void specify_resources_vars(struct work_queue_process *p) {
-	if(p->task->cores > 0) {
-		specify_integer_env_var(p, "CORES", p->task->cores);
+	if(p->task->resources_requested->cores > 0) {
+		specify_integer_env_var(p, "CORES", p->task->resources_requested->cores);
 	}
 
-	if(p->task->memory > 0) {
-		specify_integer_env_var(p, "MEMORY", p->task->memory);
+	if(p->task->resources_requested->memory > 0) {
+		specify_integer_env_var(p, "MEMORY", p->task->resources_requested->memory);
 	}
 
-	if(p->task->disk > 0) {
-		specify_integer_env_var(p, "DISK", p->task->disk);
+	if(p->task->resources_requested->disk > 0) {
+		specify_integer_env_var(p, "DISK", p->task->resources_requested->disk);
 	}
 
-	if(p->task->gpus > 0) {
-		specify_integer_env_var(p, "GPUS", p->task->gpus);
+	if(p->task->resources_requested->gpus > 0) {
+		specify_integer_env_var(p, "GPUS", p->task->resources_requested->gpus);
 	}
 }
 
@@ -312,7 +314,7 @@ void  work_queue_process_compute_disk_needed( struct work_queue_process *p ) {
 	struct work_queue_file *f;
 	struct stat s;
 
-	p->disk = t->disk;
+	p->disk = t->resources_requested->disk;
 
 	/* task did not specify its disk usage. */
 	if(p->disk < 0)

@@ -41,7 +41,10 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
-	n->resources = make_rmsummary(-1);
+	n->resources_needed = rmsummary_create(-1);
+	n->resources_measured = NULL;
+
+	n->resource_request = CATEGORY_ALLOCATION_UNLABELED;
 
 	return n;
 }
@@ -220,210 +223,111 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 	target->created_by = n;
 }
 
-void dag_node_fill_resources(struct dag_node *n)
+void dag_node_init_resources(struct dag_node *n)
 {
-	struct rmsummary *rs    = n->resources;
-	struct dag_variable_lookup_set s = { n->d, n->category, n, NULL };
+	struct rmsummary *rs    = n->resources_needed;
+	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
+	struct dag_variable_lookup_set s_all  = { n->d, n->category, n, NULL };
 
-	char    *val_str;
+	struct dag_variable_value *val;
 
-	val_str = dag_variable_lookup_string(RESOURCES_CORES, &s);
-	if(val_str)
-		rs->cores = atoll(val_str);
+	/* first pass, only node variables. We only check if this node was individually labeled. */
+	val = dag_variable_lookup(RESOURCES_CORES, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
 
-	val_str = dag_variable_lookup_string(RESOURCES_DISK, &s);
-	if(val_str)
-		rs->workdir_footprint = atoll(val_str);
+	val = dag_variable_lookup(RESOURCES_DISK, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
 
-	val_str = dag_variable_lookup_string(RESOURCES_MEMORY, &s);
-	if(val_str)
-		rs->resident_memory = atoll(val_str);
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
 
-	val_str = dag_variable_lookup_string(RESOURCES_GPUS, &s);
-	if(val_str)
-		rs->gpus = atoll(val_str);
+	val = dag_variable_lookup(RESOURCES_GPUS, &s_node);
+	if(val)
+		n->resource_request = CATEGORY_ALLOCATION_USER;
+
+
+	int category_flag = 0;
+	/* second pass: fill fall-back values if at least one resource was individually labeled. */
+	/* if not, resources will come from the category when submitting. */
+	val = dag_variable_lookup(RESOURCES_CORES, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->cores = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_DISK, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->disk = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->memory = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_GPUS, &s_all);
+	if(val) {
+		category_flag = 1;
+		rs->gpus = atoll(val->value);
+	}
+
+	if(n->resource_request != CATEGORY_ALLOCATION_USER && category_flag) {
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_ZERO;
+	}
+}
+
+int dag_node_update_resources(struct dag_node *n, int overflow)
+{
+	if(overflow && (n->resource_request == CATEGORY_ALLOCATION_USER || n->resource_request == CATEGORY_ALLOCATION_AUTO_MAX || n->resource_request == CATEGORY_ALLOCATION_UNLABELED)) {
+		return 0;
+	}
+
+	struct rmsummary *rs = n->resources_needed;
+	struct rmsummary *rc = n->category->max_allocation;
+	struct rmsummary *rd = n->d->default_category->max_allocation;
+
+	if(overflow) {
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_MAX;
+		rs->cores  = rc->cores  > -1 ? rc->cores  : rd->cores;
+		rs->memory = rc->memory > -1 ? rc->memory : rd->memory;
+		rs->disk   = rc->disk   > -1 ? rc->disk   : rd->disk;
+		rs->gpus   = rc->gpus   > -1 ? rc->gpus   : rd->gpus;
+
+		return 1;
+	}
+
+	if(n->category->first_allocation) {
+		rc = n->category->first_allocation;
+
+		n->resource_request = CATEGORY_ALLOCATION_AUTO_FIRST;
+		rs->cores  = rc->cores  > -1 ? rc->cores  : rd->cores;
+		rs->memory = rc->memory > -1 ? rc->memory : rd->memory;
+		rs->disk   = rc->disk   > -1 ? rc->disk   : rd->disk;
+		rs->gpus   = rc->gpus   > -1 ? rc->gpus   : rd->gpus;
+
+		return 1;
+	}
+
+	/* else, no change possible, we keep the CATEGORY_ALLOCATION_AUTO_ZERO as is. */
+
+	return 1;
 }
 
 void dag_node_print_debug_resources(struct dag_node *n)
 {
-	if( n->resources->cores > -1 )
-		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources->cores);
-	if( n->resources->resident_memory > -1 )
-		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources->resident_memory);
-	if( n->resources->workdir_footprint > -1 )
-		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources->workdir_footprint);
-	if( n->resources->gpus > -1 )
-		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n", n->resources->gpus);
-}
-
-char *dag_node_resources_wrap_as_wq_options(struct dag_node *n, const char *default_options)
-{
-	struct rmsummary *s;
-
-	s = n->resources;
-
-	char *options = NULL;
-
-	options = string_format("%s resources: cores: %" PRId64 ", resident_memory: %" PRId64 ", workdir_footprint: %" PRId64,
-			default_options           ? default_options      : "",
-			s->cores             > -1 ? s->cores             : -1,
-			s->resident_memory   > -1 ? s->resident_memory   : -1,
-			s->workdir_footprint > -1 ? s->workdir_footprint : -1);
-
-	return options;
-}
-
-#define add_monitor_field_int(options, s, field) \
-	if(s->field > -1) \
-	{ \
-		char *opt = string_format("%s -L'%s: %" PRId64 "' ", options ? options : "", #field, s->field);\
-		if(options)\
-			free(options);\
-		options = opt;\
-	}
-
-#define add_monitor_field_double(options, s, field) \
-	if(s->field > -1) \
-	{ \
-		char *opt = string_format("%s -L'%s: %lf' ", options ? options : "", #field, s->field/1000000.0);\
-		if(options)\
-			free(options);\
-		options = opt;\
-	}
-
-char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n)
-{
-	struct rmsummary *s;
-
-	s = n->resources;
-
-	char *options = NULL;
-
-	add_monitor_field_double(options, s, wall_time);
-	add_monitor_field_int(options, s, max_concurrent_processes);
-	add_monitor_field_int(options, s, total_processes);
-	add_monitor_field_double(options, s, cpu_time);
-	add_monitor_field_int(options, s, virtual_memory);
-	add_monitor_field_int(options, s, resident_memory);
-	add_monitor_field_int(options, s, swap_memory);
-	add_monitor_field_int(options, s, bytes_read);
-	add_monitor_field_int(options, s, bytes_written);
-	add_monitor_field_int(options, s, workdir_num_files);
-	add_monitor_field_int(options, s, workdir_footprint);
-
-	return options;
-}
-
-/* works as realloc for the first argument */
-char *dag_node_resources_add_condor_option(char *options, const char *expression, int64_t value)
-{
-	if(value < 0)
-		return options;
-
-	char *opt = NULL;
-	if(options)
-	{
-		opt = string_format("%s && (%s%" PRId64 ")", options, expression, value);
-		free(options);
-		options = opt;
-	}
-	else
-	{
-		options = string_format("(%s%" PRId64 ")", expression, value);
-	}
-
-	return options;
-}
-
-char *dag_node_resources_wrap_as_condor_options(struct dag_node *n, const char *default_options)
-{
-	struct rmsummary *s;
-
-	s = n->resources;
-
-	char *options = NULL;
-	char *opt;
-
-	options = dag_node_resources_add_condor_option(options, "Cores>=", s->cores);
-	options = dag_node_resources_add_condor_option(options, "Memory>=", s->resident_memory);
-	options = dag_node_resources_add_condor_option(options, "Disk>=", s->workdir_footprint);
-
-	if(!options)
-	{
-		if(default_options)
-			return xxstrdup(default_options);
-		return
-			NULL;
-	}
-
-	if(!default_options)
-	{
-		opt = string_format("Requirements = %s\n", options);
-		free(options);
-		return opt;
-	}
-
-	/* else default_options && options */
-	char *scratch = xxstrdup(default_options);
-	char *req_pos = strstr(scratch, "Requirements");
-	if(!req_pos)
-		req_pos = strstr(scratch, "requirements");
-
-	if(!req_pos)
-	{
-		opt = string_format("Requirements = %s\n%s", options, scratch);
-		free(options);
-		free(scratch);
-		return opt;
-	}
-
-	/* else, requirements have been specified also at default_options*/
-	char *equal_sign = strchr(req_pos, '=');
-	if(!equal_sign)
-	{
-	/* Possibly malformed, not much we can do. */
-		free(options);
-		free(scratch);
-		return xxstrdup(default_options);
-	}
-
-	char *newline = strchr(scratch, '\n');
-	if(!newline)
-		newline = (scratch + strlen(default_options) - 1); /* end of string */
-
-	*req_pos    = '\0';
-	*equal_sign = '\0';
-	*newline    = '\0';
-
-	/* Now we have these different strings:
-	   scratch: from beginning of default_options to the 'R' in Requirements
-	   equal_sign: from the '=' after Requirements to a new line or end of default_options
-	   newline: from the end of original requirements to end of default_options
-	*/
-
-	opt = string_format("%s\nRequirements = (%s) && (%s)\n%s", scratch, (equal_sign + 1), options, (newline + 1));
-	free(scratch);
-	free(options);
-
-	return opt;
-}
-
-char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type)
-{
-	switch(batch_type)
-	{
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
-			return dag_node_resources_wrap_as_wq_options(n, default_options);
-			break;
-		case BATCH_QUEUE_TYPE_CONDOR:
-			return dag_node_resources_wrap_as_condor_options(n, default_options);
-			break;
-		default:
-			if(default_options)
-				return xxstrdup(default_options);
-			else
-				return NULL;
-	}
+	if( n->resources_needed->cores > -1 )
+		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources_needed->cores);
+	if( n->resources_needed->memory > -1 )
+		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources_needed->memory);
+	if( n->resources_needed->disk > -1 )
+		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources_needed->disk);
+	if( n->resources_needed->gpus > -1 )
+		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n",       n->resources_needed->gpus);
 }
 
 /*

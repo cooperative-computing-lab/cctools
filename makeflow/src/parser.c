@@ -19,6 +19,7 @@ See the file COPYING for details.
 
 #include "cctools.h"
 #include "catalog_query.h"
+#include "category.h"
 #include "create_dir.h"
 #include "copy_stream.h"
 #include "datagram.h"
@@ -42,6 +43,7 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "dag_visitors.h"
+#include "dag_resources.h"
 #include "lexer.h"
 #include "buffer.h"
 
@@ -89,9 +91,10 @@ static int dag_parse_node_regular_command(struct lexer *bk, struct dag_node *n)
 		lexer_free_token(t);
 	}
 
-	if(!t)
-	{
+	if(!t) {
 		lexer_report_error(bk, "Command does not end with newline.\n");
+	} else {
+		lexer_free_token(t);
 	}
 
 	n->command = xxstrdup(buffer_tostring(&b));
@@ -138,13 +141,13 @@ void dag_close_over_environment(struct dag *d)
 	set_first_element(d->special_vars);
 	while((name = set_next_element(d->special_vars)))
 	{
-		v = dag_variable_get_value(name, d->variables, d->nodeid_counter);
+		v = dag_variable_get_value(name, d->default_category->mf_variables, d->nodeid_counter);
 		if(!v)
 		{
 			char *value_env = getenv(name);
 			if(value_env)
 			{
-				dag_variable_add_value(name, d->variables, 0, value_env);
+				dag_variable_add_value(name, d->default_category->mf_variables, 0, value_env);
 			}
 		}
 	}
@@ -152,17 +155,54 @@ void dag_close_over_environment(struct dag *d)
 	set_first_element(d->export_vars);
 	while((name = set_next_element(d->export_vars)))
 	{
-		v = dag_variable_get_value(name, d->variables, d->nodeid_counter);
+		v = dag_variable_get_value(name, d->default_category->mf_variables, d->nodeid_counter);
 		if(!v)
 		{
 			char *value_env = getenv(name);
 			if(value_env)
 			{
-				dag_variable_add_value(name, d->variables, 0, value_env);
+				dag_variable_add_value(name, d->default_category->mf_variables, 0, value_env);
 			}
 		}
 	}
 
+}
+
+void dag_close_over_categories(struct dag *d) {
+	/* per category, we assign the values found for resources. */
+
+	struct category *c;
+	char *name;
+
+	hash_table_firstkey(d->categories);
+	while(hash_table_nextkey(d->categories, &name, (void **) &c)) {
+		struct rmsummary *rs = rmsummary_create(-1);
+
+		struct dag_variable_lookup_set s = {d, c, NULL, NULL };
+		struct dag_variable_value *val;
+
+		val = dag_variable_lookup(RESOURCES_CORES, &s);
+		if(val) {
+			rs->cores = atoll(val->value);
+		}
+
+		val = dag_variable_lookup(RESOURCES_DISK, &s);
+		if(val) {
+			rs->disk = atoll(val->value);
+		}
+
+		val = dag_variable_lookup(RESOURCES_MEMORY, &s);
+		if(val) {
+			rs->memory = atoll(val->value);
+		}
+
+		val = dag_variable_lookup(RESOURCES_GPUS, &s);
+		if(val) {
+			rs->gpus = atoll(val->value);
+		}
+
+		c->max_allocation = rs;
+	}
 }
 
 static int dag_parse(struct dag *d, FILE *stream)
@@ -171,7 +211,7 @@ static int dag_parse(struct dag *d, FILE *stream)
 
 	bk->d        = d;
 	bk->stream   = stream;
-	bk->category = dag_task_category_lookup_or_create(d, "default");
+	bk->category = d->default_category;
 
 	struct dag_variable_lookup_set s = { d, NULL, NULL, NULL };
 	bk->environment = &s;
@@ -206,8 +246,10 @@ static int dag_parse(struct dag *d, FILE *stream)
 	}
 
 	dag_close_over_environment(d);
+	dag_close_over_categories(d);
+
 	dag_compile_ancestors(d);
-	free(bk);
+	lexer_delete(bk);
 
 	return 1;
 }
@@ -222,18 +264,14 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 		special = 1;
 		/* If we have never seen this label, then create
 		 * a new category, otherwise retrieve the category. */
-		struct dag_task_category *category = dag_task_category_lookup_or_create(d, value);
+		struct category *category = makeflow_category_lookup_or_create(d, value);
 
 		/* If we are parsing inside a node, make category
 		 * the category of the node, but do not update
 		 * the global task_category. Else, update the
 		 * global task category. */
 		if(n) {
-			/* Remove node from previous category...*/
-			list_pop_tail(n->category->nodes);
 			n->category = category;
-			/* and add it to the new one */
-			list_push_tail(n->category->nodes, n);
 			debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
 		else
@@ -281,7 +319,7 @@ void dag_parse_append_variable(struct lexer *bk, int nodeid, struct dag_node *n,
 		}
 		else
 		{
-			dag_variable_add_value(name, bk->d->variables, nodeid, value);
+			dag_variable_add_value(name, bk->d->default_category->mf_variables, nodeid, value);
 		}
 	}
 }
@@ -334,7 +372,7 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	}
 	else
 	{
-		current_table = bk->d->variables;
+		current_table = bk->d->default_category->mf_variables;
 		nodeid        = bk->d->nodeid_counter;
 	}
 
@@ -448,7 +486,6 @@ static int dag_parse_node(struct lexer *bk)
 	}
 
 	n->category = bk->category;
-	list_push_tail(n->category->nodes, n);
 
 	dag_parse_node_filelist(bk, n);
 
@@ -479,8 +516,8 @@ static int dag_parse_node(struct lexer *bk)
 	bk->d->nodes = n;
 	itable_insert(bk->d->node_table, n->nodeid, n);
 
-	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->label, n->nodeid);
-	dag_node_fill_resources(n);
+	debug(D_MAKEFLOW_PARSER, "Setting resource category '%s' for rule %d.\n", n->category->name, n->nodeid);
+	dag_node_init_resources(n);
 	dag_node_print_debug_resources(n);
 
 	return 1;

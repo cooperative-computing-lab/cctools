@@ -13,7 +13,7 @@ See the file COPYING for details.
  *
  * Use as:
  *
- * resource_monitor -i 120000000 -- some-command-line-and-options
+ * resource_monitor -i 120 -- some-command-line-and-options
  *
  * to monitor some-command-line at two minutes intervals (120
  * seconds).
@@ -40,10 +40,12 @@ See the file COPYING for details.
  * vmem:          current total memory size (virtual).
  * rss:           current total resident size.
  * swap:          current total swap usage.
- * bytes_read:    read chars count using *read system calls
- * bytes_written: writen char count using *write system calls.
- * files+dir      total file + directory count of all working directories.
- * footprint      total byte count of all working directories.
+ * bytes_read:    read chars count using *read system calls from disk.
+ * bytes_written: writen char count using *write system calls to disk.
+ * bytes_received:total bytes received (recv family)
+ * bytes_sent:    total bytes sent     (send family)
+ * total_files    total file + directory count of all working directories.
+ * disk           total byte count of all working directories.
  *
  * The log file is written to the home directory of the monitor
  * process. A flag will be added later to indicate a prefered
@@ -132,6 +134,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "hash_table.h"
 #include "itable.h"
+#include "jx.h"
 #include "list.h"
 #include "macros.h"
 #include "path.h"
@@ -151,7 +154,7 @@ See the file COPYING for details.
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_piggyback.h"
 
-#define DEFAULT_INTERVAL       ONE_SECOND        /* in useconds */
+#define DEFAULT_INTERVAL       5               /* in seconds */
 
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
@@ -159,7 +162,7 @@ FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
 FILE  *log_inotify  = NULL;      /* List of opened files is written to this file. */
 
-struct list *verbatim_summary_lines; /* lines added to the summary without change */
+struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
 
 int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which (great)
@@ -197,6 +200,10 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
 struct rmsummary *summary;
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
+
+struct list *tx_rx_sizes; /* list of network byte counts with a timestamp, to compute bandwidth. */
+int64_t total_bytes_rx;   /* total bytes received */
+int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
 
@@ -260,14 +267,47 @@ FILE *open_log_file(const char *log_path)
     return log_file;
 }
 
-void parse_limits_string(struct rmsummary *limits, char *str)
+void parse_limit_string(struct rmsummary *limits, char *str)
 {
-	struct rmsummary *s;
-	s = rmsummary_parse_from_str(str, ',');
+	char *pair  = xxstrdup(str);
+	char *delim = strchr(pair, ':');
 
-	rmsummary_merge_override(limits, s);
+	if(!delim) {
+		fatal("Missing ':' in '%s'\n", str);
+	}
 
-	free(s);
+	*delim = '\0';
+
+	char *field = string_trim_spaces(pair);
+	char *value = string_trim_spaces(delim + 1);
+
+	int status;
+
+	if(
+			strcmp(field, "start")     == 0 ||
+			strcmp(field, "end")       == 0 ||
+			strcmp(field, "wall_time") == 0 ||
+			strcmp(field, "cpu_time")  == 0
+	  ) {
+		double d;
+		status = string_is_float(value, &d);
+		if(status) {
+			rmsummary_assign_int_field(limits, field, d*1000000);
+		}
+
+	} else {
+		long long i;
+		status = string_is_integer(value, &i);
+		if(status) {
+			status = rmsummary_assign_int_field(limits, field, i);
+		}
+	}
+
+	if(!status) {
+		fatal("Invalid limit field '%s' or value '%s'\n", field, value);
+	}
+
+	free(pair);
 }
 
 void parse_limits_file(struct rmsummary *limits, char *path)
@@ -277,7 +317,29 @@ void parse_limits_file(struct rmsummary *limits, char *path)
 
 	rmsummary_merge_override(limits, s);
 
-	free(s);
+	rmsummary_delete(s);
+}
+
+void add_verbatim_field(const char *str) {
+	char *pair  = xxstrdup(str);
+	char *delim = strchr(pair, ':');
+
+	if(!delim) {
+		fatal("Missing ':' in '%s'\n", str);
+	}
+
+	*delim = '\0';
+
+	char *field = string_trim_spaces(pair);
+	char *value = string_trim_spaces(delim + 1);
+
+	if(!verbatim_summary_fields)
+		verbatim_summary_fields = jx_object(NULL);
+
+	jx_insert_string(verbatim_summary_fields, field, value);
+	debug(D_RMON, "%s", pair);
+
+	free(pair);
 }
 
 
@@ -291,6 +353,7 @@ int rmonitor_determine_exec_type(const char *executable) {
 	int fd = open(absolute_exec, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_RMON, "Could not open '%s' for reading.", absolute_exec);
+		free(absolute_exec);
 		return 1;
 	}
 
@@ -326,9 +389,10 @@ int rmonitor_determine_exec_type(const char *executable) {
 	}
 
 	char *type_field = string_format("executable_type: %s", exec_type);
+	add_verbatim_field(type_field);
 
-	debug(D_RMON, "%s", type_field);
-	list_push_tail(verbatim_summary_lines, type_field);
+	free(type_field);
+	free(absolute_exec);
 
 	return 0;
 }
@@ -477,7 +541,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
     return inventory;
 }
 
-void rmonitor_add_file_watch(char *filename, int is_output)
+void rmonitor_add_file_watch(const char *filename, int is_output)
 {
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
@@ -596,6 +660,62 @@ void rmonitor_handle_inotify(void)
 #endif
 }
 
+void append_network_bw(struct rmonitor_msg *msg) {
+
+	/* Avoid division by zero, negative bws */
+	if(msg->end <= msg->start || msg->data.n < 1)
+		return;
+
+	struct rmonitor_bw_info *new_tail = malloc(sizeof(struct rmonitor_bw_info));
+
+	new_tail->bit_count = 8*msg->data.n;
+	new_tail->start     = msg->start;
+	new_tail->end       = msg->end;
+
+	/* we drop entries older than 60s, unless there are less than 4, so
+	 * we can smooth some noise. */
+	if(list_size(tx_rx_sizes) > 3) {
+		struct rmonitor_bw_info *head;
+		while((head = list_peek_head(tx_rx_sizes))) {
+			if( head->end + 60*USECOND < new_tail->start) {
+				list_pop_head(tx_rx_sizes);
+				free(head);
+			} else {
+				break;
+			}
+		}
+	}
+
+	list_push_tail(tx_rx_sizes, new_tail);
+}
+
+int64_t average_bandwidth(int use_min_len) {
+	if(list_size(tx_rx_sizes) == 0)
+		return 0;
+
+	int64_t sum = 0;
+	struct rmonitor_bw_info *head, *tail;
+
+
+	/* if last bit count occured more than a minute ago, report bw as 0 */
+	tail = list_peek_tail(tx_rx_sizes);
+	if(tail->end + 60*USECOND < timestamp_get())
+		return 0;
+
+	list_first_item(tx_rx_sizes);
+	while((head = list_next_item(tx_rx_sizes))) {
+		sum += head->bit_count;
+	}
+
+	head = list_peek_head(tx_rx_sizes);
+	int64_t len_real = DIV_INT_ROUND_UP(tail->end - head->start, USECOND);
+
+	/* divide at least by 10s, to smooth noise. */
+	int n = use_min_len ? MAX(10, len_real) : len_real;
+
+	return DIV_INT_ROUND_UP(sum, n);
+}
+
 
 /***
  * Logging functions. The process tree is summarized in struct
@@ -609,24 +729,28 @@ void rmonitor_summary_header()
 	    fprintf(log_series, "# Units:\n");
 	    fprintf(log_series, "# wall_clock and cpu_time in microseconds\n");
 	    fprintf(log_series, "# virtual, resident and swap memory in megabytes.\n");
-	    fprintf(log_series, "# footprint in megabytes.\n");
-	    fprintf(log_series, "# cpu_time, bytes_read, and bytes_written show cummulative values.\n");
-	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and footprint show values at the sample point.\n");
+	    fprintf(log_series, "# disk in megabytes.\n");
+	    fprintf(log_series, "# bandwidth in bits/s.\n");
+	    fprintf(log_series, "# cpu_time, bytes_read, bytes_written, bytes_sent, and bytes_received show cummulative values.\n");
+	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
 
 	    fprintf(log_series, "#");
 	    fprintf(log_series,  "%-20s", "wall_clock");
 	    fprintf(log_series, " %20s", "cpu_time");
 	    fprintf(log_series, " %25s", "max_concurrent_processes");
 	    fprintf(log_series, " %25s", "virtual_memory");
-	    fprintf(log_series, " %25s", "resident_memory");
+	    fprintf(log_series, " %25s", "memory");
 	    fprintf(log_series, " %25s", "swap_memory");
 	    fprintf(log_series, " %25s", "bytes_read");
 	    fprintf(log_series, " %25s", "bytes_written");
+	    fprintf(log_series, " %25s", "bytes_received");
+	    fprintf(log_series, " %25s", "bytes_sent");
+	    fprintf(log_series, " %25s", "bandwidth");
 
-	    if(resources_flags->workdir_footprint)
+	    if(resources_flags->disk)
 	    {
-		    fprintf(log_series, " %25s", "workdir_num_files");
-		    fprintf(log_series, " %25s", "workdir_footprint");
+		    fprintf(log_series, " %25s", "total_files");
+		    fprintf(log_series, " %25s", "disk");
 	    }
 
 	    fprintf(log_series, "\n");
@@ -649,12 +773,12 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	 * fallback. */
 	if(m->resident > 0) {
 		tr->virtual_memory    = (int64_t) m->virtual;
-		tr->resident_memory   = (int64_t) m->resident;
+		tr->memory   = (int64_t) m->resident;
 		tr->swap_memory       = (int64_t) m->swap;
 	}
 	else {
 		tr->virtual_memory    = (int64_t) p->mem.virtual;
-		tr->resident_memory   = (int64_t) p->mem.resident;
+		tr->memory   = (int64_t) p->mem.resident;
 		tr->swap_memory       = (int64_t) p->mem.swap;
 	}
 
@@ -662,8 +786,13 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->bytes_read       += (int64_t)  p->io.delta_bytes_faulted;
 	tr->bytes_written     = (int64_t) (p->io.delta_chars_written + tr->bytes_written);
 
-	tr->workdir_num_files = (int64_t) d->files;
-	tr->workdir_footprint = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
+	tr->bytes_received = total_bytes_rx;
+	tr->bytes_sent     = total_bytes_tx;
+
+	tr->bandwidth = average_bandwidth(1);
+
+	tr->total_files = (int64_t) d->files;
+	tr->disk = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
 	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 }
@@ -689,15 +818,18 @@ void rmonitor_log_row(struct rmsummary *tr)
 		fprintf(log_series, " %18" PRId64, tr->cpu_time);
 		fprintf(log_series, " %20" PRId64, tr->max_concurrent_processes);
 		fprintf(log_series, " %20" PRId64, tr->virtual_memory);
-		fprintf(log_series, " %20" PRId64, tr->resident_memory);
+		fprintf(log_series, " %20" PRId64, tr->memory);
 		fprintf(log_series, " %20" PRId64, tr->swap_memory);
 		fprintf(log_series, " %20" PRId64, tr->bytes_read);
 		fprintf(log_series, " %20" PRId64, tr->bytes_written);
+		fprintf(log_series, " %20" PRId64, tr->bytes_received);
+		fprintf(log_series, " %20" PRId64, tr->bytes_sent);
+		fprintf(log_series, " %20" PRId64, tr->bandwidth);
 
-		if(resources_flags->workdir_footprint)
+		if(resources_flags->disk)
 		{
-			fprintf(log_series, " %20" PRId64, tr->workdir_num_files);
-			fprintf(log_series, " %20" PRId64, tr->workdir_footprint);
+			fprintf(log_series, " %20" PRId64, tr->total_files);
+			fprintf(log_series, " %20" PRId64, tr->disk);
 		}
 
 		fprintf(log_series, "\n");
@@ -706,7 +838,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
 
-	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->resident_memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->workdir_num_files, tr->workdir_footprint);
+	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->bytes_received, tr->bytes_sent, tr->total_files, tr->disk);
 
 }
 
@@ -791,25 +923,9 @@ void rmonitor_add_files_to_summary(char *field, int outputs) {
 
 		buffer_putfstring(&b,  "\n%16s", "]");
 
-		list_push_tail(verbatim_summary_lines, xxstrdup(buffer_tostring(&b)));
+		add_verbatim_field(buffer_tostring(&b));
 
 		buffer_free(&b);
-}
-
-char *rmonitor_consolidate_verbatim_lines() {
-	char *verbatim_line;
-
-	buffer_t b;
-	buffer_init(&b);
-
-	list_first_item(verbatim_summary_lines);
-	while((verbatim_line = list_next_item(verbatim_summary_lines)))
-		buffer_putfstring(&b,  "%s\n", verbatim_line);
-
-	char *result = xxstrdup(buffer_tostring(&b));
-
-	buffer_free(&b);
-	return result;
 }
 
 int rmonitor_file_io_summaries()
@@ -850,6 +966,10 @@ int rmonitor_final_summary()
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
 
+	summary->bandwidth = MAX(average_bandwidth(0), summary->bandwidth);
+	summary->bytes_received = total_bytes_rx;
+	summary->bytes_sent     = total_bytes_tx;
+
 	if(summary->limits_exceeded) {
 		summary->exit_status = 128 + SIGTERM;
 	}
@@ -858,7 +978,7 @@ int rmonitor_final_summary()
 	}
 
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
-	list_push_tail(verbatim_summary_lines, monitor_self_info);
+	add_verbatim_field(monitor_self_info);
 
 	if(log_inotify)
 	{
@@ -888,14 +1008,10 @@ int rmonitor_final_summary()
 		rmonitor_file_io_summaries();
 	}
 
-	char *epilogue = rmonitor_consolidate_verbatim_lines();
-	rmsummary_print(log_summary, summary, resources_limits, NULL, epilogue);
+	rmsummary_print(log_summary, summary, verbatim_summary_fields);
 
 	if(monitor_self_info)
 		free(monitor_self_info);
-	if(epilogue)
-		free(epilogue);
-
 
 	int status;
 
@@ -983,9 +1099,10 @@ void cleanup_zombies(void)
       cleanup_zombie(p);
 }
 
-void release_waiting_process(pid_t pid)
+void release_waiting_process(uint64_t pid)
 {
-	kill(pid, SIGCONT);
+	debug(D_RMON, "sendig SIGCONT to %" PRIu64 ".", pid);
+	kill((pid_t) pid, SIGCONT);
 }
 
 void release_waiting_processes(void)
@@ -1016,7 +1133,7 @@ void ping_processes(void)
 struct rmsummary *rmonitor_rusage_tree(void)
 {
     struct rusage usg;
-    struct rmsummary *tr_usg = calloc(1, sizeof(struct rmsummary));
+    struct rmsummary *tr_usg = rmsummary_create(-1);
 
     debug(D_RMON, "calling getrusage.\n");
 
@@ -1025,6 +1142,10 @@ struct rmsummary *rmonitor_rusage_tree(void)
         debug(D_RMON, "getrusage failed: %s\n", strerror(errno));
         return NULL;
     }
+
+	tr_usg->cpu_time  = 0;
+	tr_usg->cpu_time += usg.ru_utime.tv_sec*USECOND + usg.ru_utime.tv_usec;
+	tr_usg->cpu_time += usg.ru_stime.tv_sec*USECOND + usg.ru_stime.tv_usec;
 
 	if(usg.ru_majflt > 0) {
 		/* Here we add the maximum recorded + the io from memory maps */
@@ -1118,11 +1239,14 @@ void rmonitor_final_cleanup(int signum)
         kill(pid, signum);
     }
 
-    ping_processes();
-    cleanup_zombies();
-
-    if(itable_size(processes) > 0)
-        sleep(5);
+	/* wait for processes to cleanup. We wait 5 seconds, but no more than 0.2 seconds at a time. */
+	int count = 25;
+	do{
+		usleep(200000);
+		ping_processes();
+		cleanup_zombies();
+		count--;
+	} while(itable_size(processes) > 0 && count > 0);
 
     if(!first_process_already_waited)
 	    rmonitor_check_child(signum);
@@ -1159,21 +1283,12 @@ void rmonitor_final_cleanup(int signum)
     exit(status);
 }
 
-// The following keeps getting uglier and uglier! Rethink how to do it!
-//
-#define over_limit_check(tr, fld, mult, fmt)				\
+#define over_limit_check(tr, fld)\
 	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
-	{								\
-		debug(D_RMON, "Limit " #fld " broken.\n");		\
-		char *tmp;						\
-		if((tr)->limits_exceeded)                               \
-		{							\
-			tmp = string_format("%s, " #fld ": %" fmt, (tr)->limits_exceeded, mult * resources_limits->fld); \
-			free((tr)->limits_exceeded);			\
-			(tr)->limits_exceeded = tmp;			\
-		}							\
-		else							\
-			(tr)->limits_exceeded = string_format(#fld ": %" fmt, mult * resources_limits->fld); \
+	{\
+		debug(D_RMON, "Limit " #fld " broken.\n");\
+		if(!(tr)->limits_exceeded) { (tr)->limits_exceeded = rmsummary_create(-1); }\
+		(tr)->limits_exceeded->fld = resources_limits->fld;\
 	}
 
 /* return 0 means above limit, 1 means limist ok */
@@ -1188,19 +1303,21 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	if(!resources_limits)
 		return 1;
 
-	over_limit_check(tr, start, 1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, end,   1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, wall_time, 1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, cpu_time,  1.0/ONE_SECOND, "lf");
-	over_limit_check(tr, max_concurrent_processes,   1, PRId64);
-	over_limit_check(tr, total_processes,   1, PRId64);
-	over_limit_check(tr, virtual_memory,  1, PRId64);
-	over_limit_check(tr, resident_memory, 1, PRId64);
-	over_limit_check(tr, swap_memory,     1, PRId64);
-	over_limit_check(tr, bytes_read,      1, PRId64);
-	over_limit_check(tr, bytes_written,   1, PRId64);
-	over_limit_check(tr, workdir_num_files, 1, PRId64);
-	over_limit_check(tr, workdir_footprint, 1, PRId64);
+	over_limit_check(tr, start);
+	over_limit_check(tr, end);
+	over_limit_check(tr, wall_time);
+	over_limit_check(tr, cpu_time);
+	over_limit_check(tr, max_concurrent_processes);
+	over_limit_check(tr, total_processes);
+	over_limit_check(tr, virtual_memory);
+	over_limit_check(tr, memory);
+	over_limit_check(tr, swap_memory);
+	over_limit_check(tr, bytes_read);
+	over_limit_check(tr, bytes_written);
+	over_limit_check(tr, bytes_received);
+	over_limit_check(tr, bytes_sent);
+	over_limit_check(tr, total_files);
+	over_limit_check(tr, disk);
 
 	if(tr->limits_exceeded)
 		return 0;
@@ -1240,14 +1357,16 @@ void write_helper_lib(void)
 	atexit(cleanup_library);
 }
 
-void rmonitor_dispatch_msg(void)
+/* return 1 if urgent message (wait, branch), 0 otherwise) */
+int rmonitor_dispatch_msg(void)
 {
 	struct rmonitor_msg msg;
 	struct rmonitor_process_info *p;
 
 	recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
+	//Next line commented: Useful for detailed debugging, but too spammy for regular operations.
+	//debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
 
 	p = itable_lookup(processes, (uint64_t) msg.origin);
 
@@ -1259,28 +1378,32 @@ void rmonitor_dispatch_msg(void)
 		if( msg.type == END_WAIT )
         {
 			release_waiting_process(msg.origin);
-			return;
+			return 1;
         }
 		else if(msg.type != BRANCH)
-			return;
+			return 1;
 	}
 
     switch(msg.type)
     {
         case BRANCH:
+			msg.error = 0;
             rmonitor_track_process(msg.origin);
             if(summary->max_concurrent_processes < itable_size(processes))
                 summary->max_concurrent_processes = itable_size(processes);
             break;
         case END_WAIT:
+			msg.error = 0;
             p->waiting = 1;
 			if(msg.origin == first_process_pid)
 				first_process_exit_status = msg.data.n;
             break;
         case END:
+			msg.error = 0;
             rmonitor_untrack_process(msg.origin);
             break;
         case CHDIR:
+			msg.error = 0;
 			if(follow_chdir)
 				p->wd = lookup_or_create_wd(p->wd, msg.data.s);
             break;
@@ -1301,8 +1424,23 @@ void rmonitor_dispatch_msg(void)
 					break;
 			}
 			break;
+		case RX:
+			msg.error = 0;
+			if(msg.data.n > 0) {
+				total_bytes_rx += msg.data.n;
+				append_network_bw(&msg);
+			}
+			break;
+		case TX:
+			msg.error = 0;
+			if(msg.data.n > 0) {
+				total_bytes_tx += msg.data.n;
+				append_network_bw(&msg);
+			}
+			break;
         case READ:
-            break;
+			msg.error = 0;
+			break;
         case WRITE:
 			switch(msg.error) {
 				case ENOSPC:
@@ -1324,46 +1462,51 @@ void rmonitor_dispatch_msg(void)
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
+	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END) {
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 int wait_for_messages(int interval)
 {
-    struct timeval timeout;
+	struct timeval timeout;
+	timeout.tv_sec   = interval;
+	timeout.tv_usec  = 0;
 
-    debug(D_RMON, "sleeping for: %lf seconds\n", ((double) interval / ONE_SECOND));
+	debug(D_RMON, "sleeping for: %d seconds\n", interval);
 
-    //If grandchildren processes cannot talk to us, simply wait.
-    //Else, wait, and check socket for messages.
-    if (rmonitor_queue_fd < 0)
-    {
+	//If grandchildren processes cannot talk to us, simply wait.
+	//Else, wait, and check socket for messages.
+	if (rmonitor_queue_fd < 0)
+	{
 		/* wait for interval. */
-		timeout.tv_sec  = 0;
-		timeout.tv_usec = interval;
-
 		select(1, NULL, NULL, NULL, &timeout);
-    }
-    else
-    {
+	}
+	else
+	{
 
-	/* Figure out the number of file descriptors to pass to select */
-        int nfds = rmonitor_queue_fd + 1;
+		/* Figure out the number of file descriptors to pass to select */
+		int nfds = rmonitor_queue_fd + 1;
 		fd_set rset;
 
-        int count = 0;
+		int count = 0;
 		do
 		{
-			timeout.tv_sec   = 0;
-			timeout.tv_usec  = interval;
-			interval = 0;                     //Next loop we do not wait at all
-
 			FD_ZERO(&rset);
 			if (rmonitor_queue_fd > 0)   FD_SET(rmonitor_queue_fd,   &rset);
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
-			if(count > 0)
-				if (FD_ISSET(rmonitor_queue_fd, &rset)) rmonitor_dispatch_msg();
-
+			if(count > 0) {
+				if (FD_ISSET(rmonitor_queue_fd, &rset)) {
+					int urgent = rmonitor_dispatch_msg();
+					if(urgent) {
+						timeout.tv_sec  = 0;
+					}
+				}
+			}
 		} while(count > 0);
 	}
 
@@ -1452,6 +1595,12 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 				exit(RM_MONITOR_ERROR);
 			}
         }
+
+		char *executable_path = path_which(executable);
+		if(executable_path) {
+			rmonitor_add_file_watch(executable_path, /* is output? */ 0);
+			free(executable_path);
+		}
     }
     else if(pid < 0) {
 		debug(D_FATAL, "fork failed: %s\n", strerror(errno));
@@ -1483,7 +1632,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Interval between observations, in microseconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
     fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
@@ -1506,7 +1655,7 @@ static void show_help(const char *cmd)
 }
 
 
-int rmonitor_resources(long int interval /*in microseconds */)
+int rmonitor_resources(long int interval /*in seconds */)
 {
     uint64_t round;
 
@@ -1525,6 +1674,8 @@ int rmonitor_resources(long int interval /*in microseconds */)
 	round = 1;
 	while(itable_size(processes) > 0)
 	{
+		debug(D_RMON, "Round %" PRId64, round);
+
 		resources_now->last_error = 0;
 
 		ping_processes();
@@ -1532,8 +1683,8 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		rmonitor_poll_all_processes_once(processes, p_acc);
 		rmonitor_poll_maps_once(processes, m_acc);
 
-		if(resources_flags->workdir_footprint)
-			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(ONE_SECOND*hash_table_size(wdirs))));
+		if(resources_flags->disk)
+			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(MAX(1, hash_table_size(wdirs)))));
 
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
@@ -1560,7 +1711,7 @@ int rmonitor_resources(long int interval /*in microseconds */)
 		round++;
 	}
 
-    free(resources_now);
+    rmsummary_delete(resources_now);
     free(p_acc);
     free(m_acc);
     free(d_acc);
@@ -1595,8 +1746,12 @@ int main(int argc, char **argv) {
     signal(SIGTERM, rmonitor_final_cleanup);
 
     summary          = calloc(1, sizeof(struct rmsummary));
-    resources_limits = make_rmsummary(-1);
-    resources_flags  = make_rmsummary(0);
+    resources_limits = rmsummary_create(-1);
+    resources_flags  = rmsummary_create(0);
+
+	total_bytes_rx = 0;
+	total_bytes_tx = 0;
+	tx_rx_sizes    = list_create(0);
 
     rmsummary_read_env_vars(resources_limits);
 
@@ -1607,8 +1762,6 @@ int main(int argc, char **argv) {
 
     wdirs_rc   = itable_create(0);
     filesys_rc = itable_create(0);
-
-	verbatim_summary_lines = list_create(0);
 
 	char *cwd = getcwd(NULL, 0);
 
@@ -1650,7 +1803,7 @@ int main(int argc, char **argv) {
 
 
 	/* By default, measure working directory. */
-	resources_flags->workdir_footprint = 1;
+	resources_flags->disk = 1;
 
 	/* Used in LONG_OPT_MEASURE_DIR */
 	char measure_dir_name[PATH_MAX];
@@ -1678,7 +1831,7 @@ int main(int argc, char **argv) {
 			case 'i':
 				interval = strtoll(optarg, NULL, 10);
 				if(interval < 1) {
-					debug(D_FATAL, "interval cannot be set to less than one microsecond.");
+					debug(D_FATAL, "interval cannot be set to less than one second.");
 					exit(RM_MONITOR_ERROR);
 				}
 				break;
@@ -1686,10 +1839,10 @@ int main(int argc, char **argv) {
 				parse_limits_file(resources_limits, optarg);
 				break;
 			case 'L':
-				parse_limits_string(resources_limits, optarg);
+				parse_limit_string(resources_limits, optarg);
 				break;
 			case 'V':
-				list_push_tail(verbatim_summary_lines, optarg);
+				add_verbatim_field(optarg);
 				break;
 			case 'f':
 				child_in_foreground = 1;
@@ -1706,7 +1859,7 @@ int main(int argc, char **argv) {
 				use_inotify = 1;
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
-				resources_flags->workdir_footprint = 0;
+				resources_flags->disk = 0;
 				break;
 			case LONG_OPT_FOLLOW_CHDIR:
 				follow_chdir = 1;

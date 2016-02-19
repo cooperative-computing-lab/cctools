@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2015- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -225,9 +231,6 @@ struct rmDsummary *cluster_find_centroid(struct cluster *c)
 {
 	struct rmDsummary *s = calloc(1, sizeof(struct rmDsummary));
 	struct rmDsummary *r = calloc(1, sizeof(struct rmDsummary));
-
-	s->task_id = -1;
-	r->task_id = -1;
 
 	summary_bin_op(r, c->left->centroid_raw, c->right->centroid_raw, plus);
 	summary_unit_op(s, r, (double) c->count, divide);
@@ -639,7 +642,7 @@ void report_clusters_rules(FILE *freport, struct list *clusters)
 		struct rmDsummary *s;
 		list_first_item(summaries);
 		while( (s = list_next_item(summaries)) )
-			fprintf(freport, "%" PRId64 " ", s->task_id);
+			fprintf(freport, "%s ", s->task_id);
 		list_delete(summaries);
 		fprintf(freport, "\n\n");
 
@@ -745,12 +748,12 @@ int main(int argc, char **argv)
 
 	if(input_directory)
 	{
-		parse_summary_recursive(set, input_directory);
+		parse_summary_recursive(set, input_directory, NULL);
 	}
 
 	if(input_list)
 	{
-		parse_summary_from_filelist(set, input_list);
+		parse_summary_from_filelist(set, input_list, NULL);
 	}
 
 	max_values = find_max_summary(set->summaries);

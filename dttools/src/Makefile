@@ -14,6 +14,7 @@ SOURCES = \
 	bitmap.c \
 	buffer.c \
 	catalog_query.c \
+	category.c \
 	cctools.c \
 	change_process_title.c \
 	chunk.c \
@@ -57,6 +58,7 @@ SOURCES = \
 	jx_database.c \
 	jx_parse.c \
 	jx_print.c \
+	jx_pretty_print.c \
 	jx_table.c \
 	jx_export.c \
 	link.c \
@@ -107,8 +109,11 @@ HEADERS_PUBLIC = \
 	auth_ticket.h \
 	auth_unix.h \
 	buffer.h \
+	category.h \
 	debug.h \
+	hash_table.h \
 	int_sizes.h \
+	jx.h \
 	link.h \
 	md5.h \
 	rmonitor_poll.h \

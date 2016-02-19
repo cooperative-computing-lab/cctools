@@ -10,6 +10,7 @@ COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "jx.h"
 #include "int_sizes.h"
 
 /* Environment variables names */
@@ -25,13 +26,13 @@ struct rmsummary
 {
 	char    *category;
 	char    *command;
+	char    *task_id;
 
 	int64_t  start;
 	int64_t  end;
 
 	char    *exit_type;
 	int64_t  signal;
-	char    *limits_exceeded;
 	int64_t  exit_status;
 	int64_t  last_error;
 
@@ -40,16 +41,23 @@ struct rmsummary
 	int64_t  max_concurrent_processes;
 	int64_t  cpu_time;
 	int64_t  virtual_memory;
-	int64_t  resident_memory;
+	int64_t  memory;                     /* a.k.a. resident memory */
 	int64_t  swap_memory;
+
 	int64_t  bytes_read;
 	int64_t  bytes_written;
-	int64_t  workdir_num_files;
-	int64_t  workdir_footprint;
+
+	int64_t  bytes_sent;
+	int64_t  bytes_received;
+	int64_t  bandwidth;
+
+	int64_t  total_files;
+	int64_t  disk;
 
 	int64_t  cores;
 	int64_t  gpus;
-	int64_t  task_id;
+
+	struct rmsummary *limits_exceeded;
 
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
@@ -67,26 +75,40 @@ struct rmsummary_field
 	}       value;
 };
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct rmsummary *limits, char *preamble, char *epilogue);
-void rmsummary_print_only_resources(FILE *stream, struct rmsummary *s, const char *prefix);
+void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fields);
 
+int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
+int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
+
+int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);
+const char *rmsummary_get_char_field(struct rmsummary *s, const char *key);
 
 /**  Reads a single summary file from filename **/
-struct rmsummary *rmsummary_parse_file_single(char *filename);
-struct rmsummary *rmsummary_parse_limits_exceeded(char *filename);
+struct rmsummary *rmsummary_parse_file_single(const char *filename);
 
-/** Reads a single summary file from buffer, with separator between fields (usually ',' or '\n'). **/
-struct rmsummary *rmsummary_parse_from_str(const char *buffer, const char separator);
+/**  Reads a single summary file from string **/
+struct rmsummary *rmsummary_parse_string(const char *str);
+
+/**  Reads all summaries from filename **/
+struct list *rmsummary_parse_file_multiple(const char *filename);
 
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
-struct rmsummary *make_rmsummary(signed char default_value);
+struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources);
+struct rmsummary *json_to_rmsummary(struct jx *j);
+
+struct rmsummary *rmsummary_create(signed char default_value);
+void rmsummary_delete(struct rmsummary *s);
+
 void rmsummary_read_env_vars(struct rmsummary *s);
 
+void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_debug_report(const struct rmsummary *s);
 
-void rmsummary_merge_override(struct rmsummary *dest, struct rmsummary *src);
-void rmsummary_merge_max(struct rmsummary *dest, struct rmsummary *src);
-void rmsummary_debug_report(struct rmsummary *s);
+double rmsummary_to_external_unit(const char *field, int64_t n);
+int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit);
 
 #endif

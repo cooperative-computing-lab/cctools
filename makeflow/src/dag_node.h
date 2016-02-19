@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define DAG_NODE_H
 
 #include "batch_job.h"
+#include "category.h"
 #include "set.h"
 #include "hash_table.h"
 #include "itable.h"
@@ -52,10 +53,13 @@ struct dag_node {
 	struct list   *source_files;        /* list of dag_files of the node's requirements */
 	struct list   *target_files;        /* list of dag_files of the node's productions */
 
-	struct dag_task_category *category; /* The set of task this node belongs too. Ideally, the makeflow
+	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
 										   file labeled which tasks have comparable resource usage. */
 	struct hash_table *variables;       /* This node settings for variables with @ syntax */
-	struct rmsummary *resources;        /* resources required by this rule */
+
+	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
+	struct rmsummary *resources_needed;      /* resources required by this rule */
+	struct rmsummary *resources_measured;    /* resources measured on completion. */
 
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
 	* functions. Probably we should move them only to those functions, using
@@ -85,7 +89,8 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
 char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n);
 
-void dag_node_fill_resources(struct dag_node *n);
+void dag_node_init_resources(struct dag_node *n);
+int dag_node_update_resources(struct dag_node *n, int overflow);
 void dag_node_print_debug_resources(struct dag_node *n);
 
 const char *dag_node_state_name(dag_node_state_t state);

@@ -115,9 +115,9 @@ int		pfs_get_local_name( const char *rpath, char *lpath, char *firstline, size_t
 
 int		pfs_search( const char *path, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
-pfs_size_t	pfs_mmap_create( int fd, pfs_size_t file_offset, pfs_size_t length, int prot, int flags );
-int		pfs_mmap_update( pfs_size_t logical_address, pfs_size_t channel_address );
-int		pfs_mmap_delete( pfs_size_t logical_address, pfs_size_t length );
+int	pfs_mmap_delete( uintptr_t logical_address, size_t length );
+int	pfs_mmap_update( uintptr_t logical_address, pfs_size_t channel_address );
+pfs_size_t pfs_mmap_create( int fd, pfs_size_t file_offset, size_t length, int prot, int flags );
 
 #ifdef __cplusplus
 }

@@ -6,5 +6,6 @@
 	"disk":      500,
 	"timeout": 300,
 	"tasks-per-worker": 8.0,
-	"worker-extra-options": "-dall"
+	"worker-extra-options": "-dall",
+	"condor-requirements": "(MachineGroup == \"disc\")"
 }

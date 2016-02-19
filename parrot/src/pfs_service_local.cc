@@ -341,12 +341,19 @@ public:
 		debug(D_LOCAL,"open %s %d %d",name->rest,flags,(flags&O_CREAT) ? mode : 0);
 		int fd = ::open64(name->rest,flags|O_NOCTTY,mode);
 		if(fd>=0) {
-			result = new pfs_file_local(name,fd,0);
+			struct stat info;
+			if (::fstat(fd, &info) == 0 && S_ISDIR(info.st_mode)) {
+				result = 0;
+				errno = EISDIR;
+				::close(fd);
+			} else {
+				result = new pfs_file_local(name,fd,0);
+			}
 		} else {
 			result = 0;
 		}
 		if (result)
-			debug(D_LOCAL, "= %d [%s]",(int)fd,__func__);
+			debug(D_LOCAL, "= %d [%s]",fd,__func__);
 		else
 			debug(D_LOCAL, "= %d %s [%s]",errno,strerror(errno),__func__);
 		return result;
@@ -366,9 +373,6 @@ public:
 			while((d=::readdir(dir))) {
 				if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
 				result->append(d);
-			}
-			if(!strcmp(name->rest,"/")) {
-				result->append("chirp");
 			}
 			closedir(dir);
 		} else {

@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
 	int i, j, result, fail_flag = 0;
 	char *arg_loc = argv[1];
 	char *arg_size = argv[2];
+	char *fs = argv[3];
 	int64_t size = string_metric_parse(arg_size) / 1024;
 	char *test_loc = (char *) malloc(sizeof(char) * 200);
 
@@ -54,7 +55,7 @@ int main(int argc, char **argv) {
 
 			sprintf(test_loc, "%s%d/", arg_loc, i);
 
-			result = disk_alloc_create(test_loc, size);
+			result = disk_alloc_create(test_loc, fs, size);
 
 			if(result < 0) {
 
