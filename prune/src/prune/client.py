@@ -27,7 +27,7 @@ class Connect:
 		if 'engine' in kwargs:
 			if kwargs['engine'] == 'wrapper':
 				obj = {'engine':kwargs['engine'], 'open':kwargs['open'], 'close':kwargs['close'], 'args':kwargs['args'], 'params':kwargs['params']}
-				it = Item( type='envi', body=obj_str )
+				it = Item( type='envi', body=obj )
 				glob.db.insert(it)
 				return it.cbid
 
@@ -93,9 +93,11 @@ class Connect:
 
 			else:
 				timer.stop('client.envi_add')
+				self.op_cnt += 1
 				return self.nil
 		else:
 			timer.stop('client.envi_add')
+			self.op_cnt += 1
 			return self.nil
 
 	def file_add( self, filename ):
@@ -108,6 +110,7 @@ class Connect:
 
 		timer.stop('client.file_add')
 
+		self.op_cnt += 1
 		return it.cbid
 
 
@@ -118,34 +121,75 @@ class Connect:
 		glob.db.insert(it)
 
 		timer.stop('client.data_add')
+		self.op_cnt += 1
 		return it.cbid
 
 
 
 	def file_dump( self, key, filename ):
 		timer.start('client.file_dump')
-		glob.db.dump( key, filename)
+
+		glob.db.dump( key, filename )
+		
 		timer.start('client.file_dump')
+
 
 	def call_add( self, returns, env, cmd, args=[], params=[], types=[], env_vars={}, precise=True):
 		timer.start('client.call_add')
 		obj = {'returns':returns, 'env':env, 'cmd':cmd, 'args':args, 'params':params, 'types':types, 'env_vars':env_vars, 'precise':precise}
 		it = Item( type='call', body=obj )
-		if glob.db.insert( it ):
-			glob.db.task_add( it )
+		glob.db.insert( it )
+		glob.db.task_add( it )
 		results = []
 		for i in range( 0, len(returns) ):
 			results.append(it.cbid+':'+str(i))
 		timer.stop('client.call_add')
+		self.op_cnt += 1
+		#if (self.op_cnt%100)==0:
+		#	time.sleep(0.1)
 		return results
 
 
 	def step_add( self, name ):
 		self.wait()
 		self.report()
+			
+
+		print name
 		glob.workflow_step = name
+		print '=================='
+		print '------------------'
+		print '=================='
+		print '------------------'
+		print '=================='
+		print '------------------'
+		print '=================='
+		
+
 
 	def report( self ):
+		print '------------------'
+		print '------------------'
+		print '------------------'
+		timer.report()
+		print '------------------'
+		print '------------------'
+		print '------------------'
+		timer.reset()
+
+		if glob.workflow_step and glob.workflow_step != 'Stage 0':
+			cmd = 'prune_worker'
+			#if glob.workflow_step=='Stage 5':
+			#raw_input("Press enter to execute %s"%glob.workflow_step)
+
+			#print 'Executing', glob.workflow_step
+			#p = subprocess.Popen( cmd , stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=True)
+			#(stdout, stderr) = p.communicate()
+			#print 'stdout:',stdout
+			#print 'stderr:',stderr
+
+
+		#val = raw_input("Press enter to continue...")
 		timer.report()
 		timer.reset()
 
@@ -405,8 +449,11 @@ class Connect:
 		if not os.path.exists(glob.tmp_file_directory):
 			os.makedirs(glob.tmp_file_directory)
 
+		self.op_cnt = 0
+		
 		glob.ready = True
 		glob.db = Database()
+
 
 	def __init_old__( self, hostname, port):
 		self.hostname = hostname

@@ -53,12 +53,19 @@ class Item(object):
 					self.path = kwargs['new_path']
 				else:
 					self.cbid, self.size = hashfile(self.path)
-			elif 'size' in kwargs:
+			elif 'size' in kwargs and kwargs['size'] != None:
 				self.size = int(kwargs['size'])
-			else:
+			elif os.path.isfile(self.path):
 				statinfo = os.stat(self.path)
 				self.size = statinfo.st_size
-
+			elif os.path.isfile(glob.data_file_directory+self.path):
+				statinfo = os.stat(glob.data_file_directory+self.path)
+				self.size = statinfo.st_size
+			elif os.path.isfile(glob.cache_file_directory+self.path):
+				statinfo = os.stat(glob.cache_file_directory+self.path)
+				self.size = statinfo.st_size
+			else:
+				print "Can't find the file!!!"
 
 
 	def __str__( self ):
@@ -68,16 +75,20 @@ class Item(object):
 		if self.step: obj['step'] = self.step
 		if self.meta:
 			if isinstance( self.meta, basestring ):
-				obj['meta'] = self.meta
+				#obj['meta'] = self.meta
+				obj['meta'] = json.loads(self.meta)
 			else:
-				obj['meta'] = json.dumps(self.meta, sort_keys=True)
+				#obj['meta'] = json.dumps(self.meta, sort_keys=True)
+				obj['meta'] = self.meta
 
 		if self.size: obj['size'] = self.size
 		if self.body:
 			if isinstance( self.body, basestring ):
-				obj['body'] = self.body[0:20]+' ... '+self.body[-20:]
+				#obj['body'] = self.body[0:20]+' ... '+self.body[-20:]
+				obj['body'] = json.loads(self.body)
 			else:
-				obj['body'] = json.dumps(self.body, sort_keys=True)
+				#obj['body'] = json.dumps(self.body, sort_keys=True)
+				obj['body'] = self.body
 		elif self.repo:
 			obj['repo'] = self.repo
 		elif self.path:
@@ -137,7 +148,12 @@ class Item(object):
 			print "Stream from repository not implemented..."
 			return None
 		elif self.path:
-			with open( glob.base_dir + self.path, 'r' ) as f:
+			if self.type=='temp':
+				pathname = glob.cache_file_directory + self.path
+			else:
+				pathname = glob.data_file_directory + self.path
+
+			with open( pathname, 'r' ) as f:
 				buf = f.read(1024*1024)
 				lastbuf = ''
 				summary = buf[0:20] + ' ... ' if len(buf)>20 else buf

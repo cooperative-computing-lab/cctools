@@ -14,7 +14,7 @@ HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 
 #base_dir = HOME+'/.prune/'
-base_dir = '/data/pivie/prune_space5/'
+base_dir = '/data/pivie/prune_space7/'
 
 data_file_directory = base_dir+'data/files/'
 data_db_pathname = base_dir+'data/_prune.db'
@@ -51,7 +51,14 @@ worker_log_pathname = base_dir+'logs/worker.log'
 exec_local_concurrency = 16
 
 
+timer_log = base_dir+'logs/timing.log'
 
+
+wq_port = 0
+#wq_name = 'prune_'+uuid()
+wq_name = 'prune_census'
+wq_log_pathname = base_dir+'logs/wq.log'
+wq_stage = None
 
 cctools_version = 'CCTOOLS_VERSION'
 cctools_releasedate = 'CCTOOLS_RELEASE_DATE'

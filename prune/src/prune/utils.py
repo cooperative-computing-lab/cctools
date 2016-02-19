@@ -52,7 +52,7 @@ def hashstring( str ):
 
 def d( debug_type, *args, **kwargs ):
 	#if debug_type in glob.debug_types:
-	#	print '_____'+debug_type+'_____'
+		#print '_____'+debug_type+'_____'
 		for arg in args:
 			print arg,
 		for key in kwargs:

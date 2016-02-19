@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS items (
 		db_init_todos = """
 CREATE TABLE IF NOT EXISTS todos (
 	id INTEGER NOT NULL, cbid TEXT, wfid UUID, step TEXT, priority INTEGER DEFAULT 0,
-	next_arg TEXT, assigned TEXT,
+	next_arg TEXT, assigned TEXT, failures INTEGER DEFAULT 0,
 	PRIMARY KEY (id)
 );
 
@@ -110,9 +110,10 @@ CREATE TABLE IF NOT EXISTS todos (
 				d[col[0]] = row[idx]
 			return d
 
-		conn =  sqlite3.connect( db_pathname, detect_types=sqlite3.PARSE_DECLTYPES )
+		conn =  sqlite3.connect( db_pathname, timeout=30, detect_types=sqlite3.PARSE_DECLTYPES )
 		conn.row_factory = dict_factory
 		conn.text_factory = str
+		#conn.execute("PRAGMA busy_timeout = 30000")
 		return conn, log
 
 
@@ -121,11 +122,10 @@ CREATE TABLE IF NOT EXISTS todos (
 	def insert( self, item ):
 		timer.start('db.insert')
 
-
 		action_taken = 'exists'
 		if item.type == 'temp':
 			# This is an intermediate file, use the cache
-			if not self.exists_temp( item ):
+			if not self.exists_temp_dbid( item.dbid ):
 				conn, file_dir, log = (self.cconn, glob.cache_file_directory, clog)
 				action_taken = 'saved'
 
@@ -138,15 +138,22 @@ CREATE TABLE IF NOT EXISTS todos (
 		if action_taken == 'saved':
 			if item.path:
 				new_pathname = file_dir + item.cbid
-				shutil.move( item.path, new_pathname )
+				if not os.path.isfile( new_pathname ):
+					shutil.move( item.path, new_pathname )
 				item.path = item.cbid
 			ins, vals = item.sqlite3_insert()
-			#print item
 			#print ins
 			#print vals
-			curs = conn.cursor()
-			curs.execute( ins, vals )
-			conn.commit()			
+			while True:
+				try:
+					curs = conn.cursor()
+					curs.execute( ins, vals )
+					conn.commit()			
+				except sqlite3.OperationalError:
+					print 'Database (todos) is locked on insert_exec'
+					time.sleep(1)
+					continue
+				break
 
 			self.task_prep( item )
 
@@ -155,6 +162,7 @@ CREATE TABLE IF NOT EXISTS todos (
 				log.info('%s (%s) %s' % (item.cbid, item.dbid, action_taken))
 			else:
 				log.info('%s %s' % (item.cbid, action_taken))
+
 
 		timer.stop('db.insert')
 		
@@ -200,36 +208,67 @@ CREATE TABLE IF NOT EXISTS todos (
 		timer.stop('db.find_one')
 		return res
 
+	def exists_temp_dbid( self, dbid ):
+		timer.start('db.exists_temp')
+
+		while True:
+			try:
+				curs = self.cconn.cursor()
+				curs.execute('SELECT "when" FROM items WHERE dbid=?', (dbid,) )
+				when = curs.fetchone()
+
+				timer.stop('db.exists_temp')
+				return when
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_add'
+				time.sleep(1)
+				continue
+			break
+
 	def exists_temp( self, item ):
 		timer.start('db.exists_temp')
 
-		curs = self.cconn.cursor()
-		curs.execute('SELECT "when" FROM items WHERE cbid=? OR dbid=?', (item.cbid, item.dbid,) )
-		when = curs.fetchone()
+		while True:
+			try:
+				curs = self.cconn.cursor()
+				curs.execute('SELECT "when" FROM items WHERE cbid=? OR dbid=?', (item.cbid, item.dbid,) )
+				when = curs.fetchone()
 
-		timer.stop('db.exists_temp')
-		return when
+				timer.stop('db.exists_temp')
+				return when
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_add'
+				time.sleep(1)
+				continue
+			break
+
 
 	def exists_data( self, item ):
 		timer.start('db.exists_data')
 
-		curs = self.dconn.cursor()
-		curs.execute('SELECT "when" FROM items WHERE cbid=?', (item.cbid,) )
-		when = curs.fetchone()
+		while True:
+			try:
+				curs = self.dconn.cursor()
+				curs.execute('SELECT "when" FROM items WHERE cbid=?', (item.cbid,) )
+				when = curs.fetchone()
 
-		timer.stop('db.exists_data')
-		return when
+				timer.stop('db.exists_data')
+				return when
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_add'
+				time.sleep(1)
+				continue
+			break
 
 
 
 	def dump( self, key, pathname ):
 		timer.start('db.dump')
 		
-		obj = self.find_one( key )
-		if not obj:
+		item = self.find_one( key )
+		if not item:
 			print 'Need to wait for: %s' % key
 		else:
-			item = Item( obj )
 			with open( pathname, 'w' ) as f:
 				item.stream_content( f )
 
@@ -242,55 +281,127 @@ CREATE TABLE IF NOT EXISTS todos (
 	def task_add( self, call ):
 		timer.start('db.task.add')
 
-		# Check if is_ready
+		while True:
+			try:
+				conn, log = (self.tconn, self.tlog)
+				with conn:			
+					curs = conn.cursor()
+
+					# Check whether the output files already exist
+					outputs_exist = True
+					for i in range( 0, len(call.body['returns']) ):
+						dbid = call.cbid+':'+str(i)
+						if not glob.db.exists_temp_dbid( dbid ):
+							outputs_exist = False
+							break
+
+					if not outputs_exist:
+						# Check whether the task is already queued up
+						curs.execute('SELECT cbid FROM todos WHERE cbid=?', (call.cbid,) )
+						res = curs.fetchone()
+						if not res:
+							# Find the first needed argument that is not already available
+							next_arg = None
+							if 'args' in call.body and len(call.body['args'])>0:
+								for arg in call.body['args']:
+									if not glob.db.find( arg ):
+										next_arg = arg
+										break
+							ins = 'INSERT INTO todos (cbid, step, priority, next_arg) VALUES (?,?,0,?);'
+							curs.execute( ins, (call.cbid, call.step, next_arg) )
+							conn.commit()
+
+							log.info('%s added' % (call.cbid))
 
 
-		conn, log = (self.tconn, self.tlog)
-		with conn:			
-			curs = conn.cursor()
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_add'
+				time.sleep(1)
+				continue
+			break
 
-			next_arg = None
-			if 'args' in call.body and len(call.body['args'])>0:
-				for arg in call.body['args']:
-					if not glob.db.find( arg ):
-						next_arg = arg
-						break
-			ins = 'INSERT INTO todos (cbid, step, priority, next_arg) VALUES (?,?,0,?);'
-			curs.execute( ins, (call.cbid, call.step, next_arg) )
-			conn.commit()
+					
+		timer.stop('db.task.add')
 
-			log.info('%s added' % (call.cbid))
-			
-			timer.stop('db.task.add')
+	def task_update( self, call ):
+		timer.start('db.task.update')
+
+		while True:
+			try:
+		
+				conn, log = (self.tconn, self.tlog)
+				with conn:			
+					curs = conn.cursor()
+
+					# Check whether the output files already exist
+					outputs_exist = True
+					for i in range( 0, len(call.body['returns']) ):
+						dbid = call.cbid+':'+str(i)
+						if not glob.db.exists_temp_dbid( dbid ):
+							outputs_exist = False
+							break
+
+					if not outputs_exist:
+						# Find the first needed argument that is not already available
+						next_arg = None
+						if 'args' in call.body and len(call.body['args'])>0:
+							for arg in call.body['args']:
+								if not glob.db.find( arg ):
+									next_arg = arg
+									break
+						upd = 'UPDATE todos SET next_arg=? WHERE cbid=?;'
+						curs.execute( upd, (next_arg, call.cbid) )
+						conn.commit()
+
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_update'
+				time.sleep(1)
+				continue
+			break
+					
+		timer.stop('db.task.update')
 
 
 
 	def task_claim( self, count=1 ):
 		batch = uuid()
 		timer.start('db.task.claim')
+		while True:
+			try:
+				conn, log = (self.tconn, self.tlog)
+				with conn:		
+					curs = conn.cursor()
+					if glob.wq_stage:
+						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL AND step = ? LIMIT ?', (glob.wq_stage,count) )
+					else:
+						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL ORDER BY id LIMIT ?', (count,) )
 
-		conn, log = (self.tconn, self.tlog)
-		with conn:		
-			curs = conn.cursor()
-			curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL ORDER BY step LIMIT ?', (count,) )
-			res = curs.fetchall()
-			
-			cbids = []
-			for r in res:
-				cbids.append(r['cbid'])
+					res = curs.fetchall()
+					
+					cbids = []
+					for r in res:
+						cbids.append(r['cbid'])
 
-			if len(cbids)>0:
-				upd_str = 'UPDATE todos SET assigned = ? WHERE next_arg IS NULL AND assigned IS NULL AND cbid IN (%s);' % ', '.join('?' for c in cbids)
-				#print upd_str
-				#print [batch]+cbids
-				conn.execute( upd_str, [batch]+cbids )
+					if len(cbids)>0:
+						upd_str = 'UPDATE todos SET assigned = ? WHERE next_arg IS NULL AND assigned IS NULL AND cbid IN (%s);' % ', '.join('?' for c in cbids)
+						#print upd_str
+						#print [batch]+cbids
+						curs.execute( upd_str, [batch]+cbids )
+						conn.commit()
 
-				#log.info('%i tasks assigned' % ( len(res) ))
-				timer.stop('db.task.claim')
-				return batch
+						#log.info('%i tasks assigned' % ( len(res) ))
+						timer.stop('db.task.claim')
+						return batch
 
-			
-		timer.stop('db.task.claim')
+			except sqlite3.OperationalError:
+				print traceback.format_exc()
+				print 'Database (todos) is locked on task_claim'
+				time.sleep(0.95)
+				continue
+			break
+
+				
+		#timer.stop('db.task.claim')
 		return None
 
 
@@ -299,16 +410,25 @@ CREATE TABLE IF NOT EXISTS todos (
 		calls = []
 		timer.start('db.task.get')
 
-		conn, log = (self.tconn, self.tlog)
-		with conn:
-			curs = conn.cursor()
-			curs.execute('SELECT cbid FROM todos WHERE assigned=?', (batch,) )
-			res = curs.fetchall()
-			
-			for r in res:
-				call = self.find_one( r['cbid'] )
-				if call:
-					calls.append( call )
+		while True:
+			try:
+
+				conn, log = (self.tconn, self.tlog)
+				with conn:
+					curs = conn.cursor()
+					curs.execute('SELECT cbid FROM todos WHERE assigned=?', (batch,) )
+					res = curs.fetchall()
+					
+					for r in res:
+						call = self.find_one( r['cbid'] )
+						if call:
+							calls.append( call )
+
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_get'
+				time.sleep(1)
+				continue
+			break
 
 		timer.stop('db.task.get')
 		return calls
@@ -318,20 +438,31 @@ CREATE TABLE IF NOT EXISTS todos (
 		calls = []
 		timer.start('db.task.prep')
 
-		conn, log = (self.tconn, self.tlog)
-		with conn:
+		while True:
+			try:
+				conn, log = (self.tconn, self.tlog)
+				with conn:
 
-			curs = conn.cursor()
-			curs.execute('SELECT cbid FROM todos WHERE next_arg IN (?,?)', (item.cbid, item.dbid,) )
-			res = curs.fetchall()
-			
-			for r in res:
-				call = self.find_one( r['cbid'] )
-				if call:
-					self.task_add(call)
+					# Check if task is already queued
+					curs = conn.cursor()
+					curs.execute('SELECT cbid FROM todos WHERE next_arg IN (?,?)', (item.cbid, item.dbid,) )
+					res = curs.fetchall()
+					
+					for r in res:
+						call = self.find_one( r['cbid'] )
+						if call:
+							# Update next_arg for task
+							self.task_update( call )
+
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_prep'
+				time.sleep(1)
+				continue
+			break
 
 		timer.stop('db.task.prep')
 		return calls
+
 
 	def task_remain( self, wfid ):
 		calls = []
@@ -340,28 +471,40 @@ CREATE TABLE IF NOT EXISTS todos (
 		conn, log = (self.tconn, self.tlog)
 		with conn:
 
-			curs = conn.cursor()
-			curs.execute('SELECT id FROM todos WHERE wfid = ?', (glob.workflow_id,) )
-			res = curs.fetchall()
-			
-			timer.stop('db.task.remain')
-			return len(res)
+			try:
+				curs = conn.cursor()
+				curs.execute('SELECT id FROM todos WHERE wfid = ?', (glob.workflow_id,) )
+				res = curs.fetchall()
+				
+				timer.stop('db.task.remain')
+				return len(res)
+			except sqlite3.OperationalError:
+				return 1
 
 
 
 	def task_del( self, cbid ):
 		timer.start('db.task.del')
 
-		conn, log = (self.tconn, self.tlog)
+		while True:
+			try:
 
-		with conn:			
-			curs = self.tconn.cursor()
+				conn, log = (self.tconn, self.tlog)
 
-			del_str = 'DELETE FROM todos WHERE cbid = ?;'
-			curs.execute( del_str, (cbid,) )
-			conn.commit()
+				with conn:			
+					curs = self.tconn.cursor()
 
-			log.info('%s deleted' % (cbid))
+					del_str = 'DELETE FROM todos WHERE cbid = ?;'
+					curs.execute( del_str, (cbid,) )
+					conn.commit()
+
+					log.info('%s deleted' % (cbid))
+
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_del'
+				time.sleep(1)
+				continue
+			break
 
 		timer.stop('db.task.del')
 
