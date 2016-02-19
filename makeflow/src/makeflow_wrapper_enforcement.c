@@ -31,10 +31,17 @@
 void makeflow_log_file_expectation( struct dag *d, struct list *file_list );
 void makeflow_log_file_existence( struct dag *d, struct list *file_list );
 
+void makeflow_make_tempdir(const char* path) {
+	struct stat buf;
+	if (mkdir(path, S_IRWXU)) {
+		if ((errno != EEXIST) || stat(path, &buf) || !S_ISDIR(buf.st_mode) ) {
+			fatal("could not create temp directory: %s", strerror(errno));
+		}
+	}
+}
 
 void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_path) {
 	struct stat stat_buf;
-	int local_parrot = open(local_parrot_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
 	int host_parrot = open(parrot_path, O_RDONLY);
 	if (host_parrot == -1) {
 		fatal("could not open parrot at `%s': %s", parrot_path, strerror(errno));
@@ -43,9 +50,9 @@ void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_pat
 	if (!(stat_buf.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH))) {
 		fatal("%s is not executable", parrot_path);
 	}
+	int local_parrot = open(local_parrot_path, O_WRONLY|O_CREAT, S_IRWXU);
 	if (local_parrot == -1) {
-		if (errno != EEXIST) fatal("could not create local copy of parrot: %s", strerror(errno));
-		/* parrot_run is already in the current directory, so we'll just use that */
+		fatal("could not create local copy of parrot: %s", strerror(errno));
 	} else {
 		fchmod(local_parrot, 0755);
 		if (copy_fd_to_fd(host_parrot, local_parrot) != stat_buf.st_size) {
@@ -84,9 +91,9 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	makeflow_log_file_expectation(n->d, enforcer_paths);
 
 	/* Create local directories to bind to /tmp, /var/tmp, and /dev/shm */
-	if (mkdir(tmp_path, S_IRWXU) || mkdir(vartmp_path, S_IRWXU) || mkdir(shm_path, S_IRWXU)) {
-		fatal("could not create temp directory: %s", strerror(errno));
-	}
+	makeflow_make_tempdir(tmp_path);
+	makeflow_make_tempdir(vartmp_path);
+	makeflow_make_tempdir(shm_path);
 
 	makeflow_log_file_existence(n->d, enforcer_paths);
 	list_delete(enforcer_paths);
@@ -96,7 +103,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	makeflow_log_file_expectation(n->d, enforcer_paths);
 
 	/* make an invalid mountfile to send */
-	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR);
+	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
 	if (mountlist_fd == -1) {
 		fatal("could not create `%s': %s", mountlist_path, strerror(errno));
 	}
@@ -111,7 +118,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	makeflow_log_file_expectation(n->d, enforcer_paths);
 
 	/* and generate a wrapper script with the current nodeid */
-	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT|O_EXCL, S_IRWXU);
+	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT, S_IRWXU);
 	if (enforcer_fd == -1 || (enforcer = fdopen(enforcer_fd, "w")) == NULL) {
 		fatal("could not create `%s': %s", enforcer_path, strerror(errno));
 	}
