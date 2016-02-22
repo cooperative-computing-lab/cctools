@@ -909,13 +909,13 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 	char * square = strstr(wrapper_command,"[]");
 	char * new_command;
 
-	if(square) {
-		new_command = string_escape_shell(command);
-	} else {
+	if(braces) {
 		new_command = strdup(command);
+	} else {
+		new_command = string_escape_shell(command);
 	}
 
-	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
+	char * result = malloc(strlen(new_command)+strlen(wrapper_command)+16);
 
 	if(braces) {
 		strcpy(result,wrapper_command);
@@ -929,7 +929,7 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 		strcat(result,square+2);
 	} else {
 		strcpy(result,wrapper_command);
-		strcat(result," ");
+		strcat(result," /bin/sh -c ");
 		strcat(result,new_command);
 	}
 
