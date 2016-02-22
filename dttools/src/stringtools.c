@@ -23,30 +23,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-char *escape_shell_string(const char *str)
-{
-	if(str == NULL)
-		str = "";
-	char *escaped_string = malloc(strlen(str) * 3 + 1);
-	if(escaped_string == NULL)
-		return NULL;
-	const char *old = str;
-	char *current = escaped_string;
-	strcpy(current, "'");
-	current += 1;
-	for(; *old; old++) {
-		if(*old == '\'') {
-			strcpy(current, "'\\''");
-			current += 3;
-		} else {
-			*current = *old;
-			current += 1;
-		}
-	}
-	strcpy(current, "'");
-	return escaped_string;
-}
-
 /*
  * Based on opengroup.org's definition of the Shell Command Language (also gnu's)
  * In section 2.2.3 on Double-Quoted Strings, it indicates you only need to
