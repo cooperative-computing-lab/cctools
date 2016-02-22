@@ -361,6 +361,28 @@ CREATE TABLE IF NOT EXISTS todos (
 					
 		timer.stop('db.task.update')
 
+	def task_fail( self, call ):
+		timer.start('db.task.fail')
+
+		while True:
+			try:
+		
+				conn, log = (self.tconn, self.tlog)
+				with conn:			
+					curs = conn.cursor()
+
+					upd = 'UPDATE todos SET assigned=? WHERE cbid=?;'
+					curs.execute( upd, ('failed', call.cbid) )
+					conn.commit()
+
+			except sqlite3.OperationalError:
+				print 'Database (todos) is locked on task_update'
+				time.sleep(1)
+				continue
+			break
+					
+		timer.stop('db.task.fail')
+
 
 
 	def task_claim( self, count=1 ):
@@ -478,6 +500,23 @@ CREATE TABLE IF NOT EXISTS todos (
 				
 				timer.stop('db.task.remain')
 				return len(res)
+			except sqlite3.OperationalError:
+				return 1
+
+	def task_cnt( self ):
+		calls = []
+		timer.start('db.task.count')
+
+		conn, log = (self.tconn, self.tlog)
+		with conn:
+
+			try:
+				curs = conn.cursor()
+				curs.execute('SELECT count(id) as cnt FROM todos WHERE 1')
+				res = curs.fetchone()
+				
+				timer.stop('db.task.count')
+				return int(res['cnt'])
 			except sqlite3.OperationalError:
 				return 1
 

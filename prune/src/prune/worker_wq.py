@@ -43,7 +43,7 @@ class Master:
 
 		slots = self.wq.hungry()
 		if slots==100:
-			slots = 25
+			slots = 20
 		#if slots>0 and slots<25:
 		#	slots = 25
 		batch = db.task_claim( slots )
@@ -55,15 +55,36 @@ class Master:
 			for call in calls:
 				self.execute( call )
 				started_worker_cnt += 1
-		elif len(self.workers)==0 and db.task_remain( glob.workflow_id )==0 and self.total_tasks>0:
+		elif len(self.workers)==0 and db.task_cnt()==0:
 			timer.report()
 			sys.exit(0)
-
+		'''
 		if first_try:
 			if started_worker_cnt==0:
-				print 'Nothing to execute.'
-				sys.exit(0)
+				cnt = db.task_cnt()
+				if cnt>0:
+					print 'Nothing to execute right now.'
+					while cnt>0:
+						batch = db.task_claim( slots )
+						sys.stdout.write('.')
+						sys.stdout.flush()
+						if batch:
+							calls = db.task_get( batch )
+							if len(calls)==0:
+								pass # (missed them)
+							else:
+								for call in calls:
+									self.execute( call )
+									started_worker_cnt += 1
+									cnt = 0
+						else:
+							time.sleep(0.5)
+							cnt = db.task_cnt()
+				else:
+					print 'Nothing to execute.'
+					sys.exit(0)
 			first_try = False
+		'''
 		self.total_tasks += started_worker_cnt
 		timer.stop('work.start.workers')
 		return started_worker_cnt
@@ -76,8 +97,8 @@ class Master:
 		t = self.wq.wait(10)
 		if t:
 			worker = self.workers[t.id]
-			print "WQ execution (%s) complete: %s (return code %d)" % (worker.call.cbid, worker.call.body['cmd'], t.return_status)
-			
+			print "WQ execution (%s) completed in %s: %s (return code %d)" % (worker.call.cbid, worker.sandbox, worker.call.body['cmd'], t.return_status)
+
 			if t.return_status != 0:
 				self.fails.append( worker.call )
 				if worker.debug( t ):
@@ -343,67 +364,70 @@ class Worker:
 		meta_results = [] # place for debugging information (for example)
 		tmp_results = []
 		tmp_sizes = []
+		try:
 
-		with open(self.sandbox + 'work_log.prune') as f:
-			for line in f:
-				#print line
-				if line.startswith('sha1sum'):
-					(a, fname, cbid) = line.split(' ')
-					tmp_results.append( cbid.strip() )
-				elif line.startswith('filesize'):
-					(a, fname, size) = line.split(' ')
-					tmp_sizes.append( int(size.strip()) )
-				elif line.startswith('prune_call_start'):
-					(a, estart) = line.split(' ')
-				elif line.startswith('prune_call_end'):
-					(a, efinish) = line.split(' ')
-				elif line.startswith('prune_cmd_start'):
-					(a, cstart) = line.split(' ')
-				elif line.startswith('prune_cmd_end'):
-					(a, cfinish) = line.split(' ')
-				elif line.startswith('prune_stage_out_start'):
-					(a, sostart) = line.split(' ')
-				elif line.startswith('prune_stage_out_end'):
-					(a, sofinish) = line.split(' ')
+			with open(self.sandbox + 'work_log.prune') as f:
+				for line in f:
+					#print line
+					if line.startswith('sha1sum'):
+						(a, fname, cbid) = line.split(' ')
+						tmp_results.append( cbid.strip() )
+					elif line.startswith('filesize'):
+						(a, fname, size) = line.split(' ')
+						tmp_sizes.append( int(size.strip()) )
+					elif line.startswith('prune_call_start'):
+						(a, estart) = line.split(' ')
+					elif line.startswith('prune_call_end'):
+						(a, efinish) = line.split(' ')
+					elif line.startswith('prune_cmd_start'):
+						(a, cstart) = line.split(' ')
+					elif line.startswith('prune_cmd_end'):
+						(a, cfinish) = line.split(' ')
+					elif line.startswith('prune_stage_out_start'):
+						(a, sostart) = line.split(' ')
+					elif line.startswith('prune_stage_out_end'):
+						(a, sofinish) = line.split(' ')
 
-		for i, rtrn in enumerate( call_body['returns'] ):
-			result = self.results[i]
+			for i, rtrn in enumerate( call_body['returns'] ):
+				result = self.results[i]
 
-			if os.path.isfile( result ):
-				it = Item( type='temp', cbid=tmp_results[i], dbid=self.call.cbid+':'+str(i), path=result, size=tmp_sizes[i] )
+				if os.path.isfile( result ):
+					it = Item( type='temp', cbid=tmp_results[i], dbid=self.call.cbid+':'+str(i), path=result, size=tmp_sizes[i] )
+					glob.db.insert( it )
+
+				else:
+					d( 'exec', 'sandbox return file not found: '+src )
+					full_content = False
+
+			if full_content:
+				d( 'exec', 'sandbox kept at: '+self.sandbox )
+				'''
+				for root, dirs, files in os.walk(self.sandbox, topdown=False):
+					for name in files:
+						os.remove(os.path.join(root, name))
+					for name in dirs:
+						os.rmdir(os.path.join(root, name))
+				'''
+				#shutil.rmtree( worker.sandbox )
+				timer.start('work.report')
+
+				wall_time = float(cfinish)-float(cstart)
+				env_time = (float(efinish)-float(estart)) - wall_time
+				meta = {'wall_time':wall_time,'env_time':env_time}
+				it = Item( type='work', cbid=self.call.cbid+'()', meta=meta, body={'results':tmp_results, 'sizes':tmp_sizes} )
 				glob.db.insert( it )
 
+				timer.add( env_time, 'work.environment_use' )
+				timer.add( wall_time, 'work.wall_time' )
+				timer.add( (float(sofinish)-float(sostart)), 'work.stage_out.hash' )
+
+				timer.stop('work.report')
+
 			else:
-				d( 'exec', 'sandbox return file not found: '+src )
-				full_content = False
-
-		if full_content:
-			d( 'exec', 'sandbox kept at: '+self.sandbox )
-			'''
-			for root, dirs, files in os.walk(self.sandbox, topdown=False):
-				for name in files:
-					os.remove(os.path.join(root, name))
-				for name in dirs:
-					os.rmdir(os.path.join(root, name))
-			'''
-			#shutil.rmtree( worker.sandbox )
-			timer.start('work.report')
-
-			wall_time = float(cfinish)-float(cstart)
-			env_time = (float(efinish)-float(estart)) - wall_time
-			meta = {'wall_time':wall_time,'env_time':env_time}
-			it = Item( type='work', cbid=self.call.cbid+'()', meta=meta, body={'results':tmp_results, 'sizes':tmp_sizes} )
-			glob.db.insert( it )
-
-			timer.add( env_time, 'work.environment_use' )
-			timer.add( wall_time, 'work.wall_time' )
-			timer.add( (float(sofinish)-float(sostart)), 'work.stage_out.hash' )
-
-			timer.stop('work.report')
-
-		else:
-			d( 'exec', 'sandbox kept: '+self.sandbox )
-
+				d( 'exec', 'sandbox kept: '+self.sandbox )
+		except:
+			print traceback.format_exc()
+			glob.db.task_fail( self.call )
 
 
 

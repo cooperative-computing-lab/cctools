@@ -14,7 +14,7 @@ HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 
 #base_dir = HOME+'/.prune/'
-base_dir = '/data/pivie/prune_space7/'
+base_dir = '/data/pivie/prune_space6/'
 
 data_file_directory = base_dir+'data/files/'
 data_db_pathname = base_dir+'data/_prune.db'
