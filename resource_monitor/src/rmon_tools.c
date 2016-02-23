@@ -154,7 +154,7 @@ void parse_fields_options(char *field_str)
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 		f->active = 0;
 
-	char *c =  field_str;
+	char *c = field_str;
 	while( *c != '\0' )
 	{
 		switch(*c)
@@ -216,7 +216,7 @@ void parse_fields_options(char *field_str)
 				debug(D_DEBUG, "adding clustering field: cores\n");
 				break;
 			default:
-				fatal("'%c' is not a field option\n", c);
+				fatal("'%c' is not a field option\n", *c);
 				break;
 		}
 		c++;

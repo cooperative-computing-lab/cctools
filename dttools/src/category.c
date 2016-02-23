@@ -67,6 +67,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_concurrent_processes_histogram = itable_create(0);
 	c->total_processes_histogram = itable_create(0);
 
+	c->time_peak_independece = 0;
+
 	hash_table_insert(categories, name, c);
 
 	return c;
@@ -199,7 +201,7 @@ int64_t *category_sort_histogram(struct itable *histogram, uint64_t top_resource
 	return keys;
 }
 
-int64_t category_first_allocation(struct itable *histogram, int64_t top_resource) {
+int64_t category_first_allocation(struct itable *histogram, int assume_independence, int64_t top_resource) {
 	/* Automatically labeling for memory is not activated. */
 	if(top_resource < 0) {
 		return -1;
@@ -241,7 +243,14 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 
 	for(i = 0; i < n; i++) {
 		int64_t a  = keys[i];
-		double  Ea = a*tau_mean + a_m*times_accum[i];
+		double  Ea;
+
+		if(assume_independence) {
+			double Pa = counts_accum[n-1] - counts_accum[i];
+			Ea = a*counts_accum[n-1] + a_m*Pa;
+		} else {
+			Ea = a*tau_mean + a_m*times_accum[i];
+		}
 
 		if(Ea < Ea_1) {
 			Ea_1 = Ea;
@@ -260,8 +269,8 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 	return a_1;
 }
 
-#define update_first_allocation_field(c, top, field)\
-	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, top->field)
+#define update_first_allocation_field(c, top, independence, field)\
+	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, top->field)
 
 void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */
@@ -283,20 +292,20 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 
 	c->first_allocation->cores          = c->max_allocation->cores;
 
-	update_first_allocation_field(c, top, cpu_time);
-	update_first_allocation_field(c, top, wall_time);
-	update_first_allocation_field(c, top, virtual_memory);
-	update_first_allocation_field(c, top, memory);
-	update_first_allocation_field(c, top, swap_memory);
-	update_first_allocation_field(c, top, bytes_read);
-	update_first_allocation_field(c, top, bytes_written);
-	update_first_allocation_field(c, top, bytes_received);
-	update_first_allocation_field(c, top, bytes_sent);
-	update_first_allocation_field(c, top, bandwidth);
-	update_first_allocation_field(c, top, total_files);
-	update_first_allocation_field(c, top, disk);
-	update_first_allocation_field(c, top, max_concurrent_processes);
-	update_first_allocation_field(c, top, total_processes);
+	update_first_allocation_field(c, top, 1, cpu_time);
+	update_first_allocation_field(c, top, 1, wall_time);
+	update_first_allocation_field(c, top, c->time_peak_independece, virtual_memory);
+	update_first_allocation_field(c, top, c->time_peak_independece, memory);
+	update_first_allocation_field(c, top, c->time_peak_independece, swap_memory);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_read);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_written);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_received);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_sent);
+	update_first_allocation_field(c, top, c->time_peak_independece, bandwidth);
+	update_first_allocation_field(c, top, c->time_peak_independece, total_files);
+	update_first_allocation_field(c, top, c->time_peak_independece, disk);
+	update_first_allocation_field(c, top, c->time_peak_independece, max_concurrent_processes);
+	update_first_allocation_field(c, top, c->time_peak_independece, total_processes);
 
 	/* From here on we only print debugging info. */
 	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
