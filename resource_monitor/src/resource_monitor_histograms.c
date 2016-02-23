@@ -67,7 +67,8 @@ struct histogram {
 	double kurtosis;
 	double skewdness;
 
-	uint64_t first_allocation_histogram;
+	uint64_t first_allocation_time_dependence;
+	uint64_t first_allocation_time_independence;
 	uint64_t first_allocation_bruteforce;
 
 	struct itable *buckets;
@@ -447,7 +448,8 @@ void write_variables_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "%s = %lf\n",        "current_mean",       h->mean);
 	fprintf(f, "%s = %lf\n",        "current_percentile75", value_of_p(h, 0.75));
 	fprintf(f, "%s = %lf\n",        "current_percentile25", value_of_p(h, 0.25));
-	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation", h->first_allocation_histogram);
+	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation", h->first_allocation_time_dependence);
+	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation_time_independence", h->first_allocation_time_independence);
 	fprintf(f, "%s = %lf\n",        "current_bin_size",   h->bin_size);
 
 	if(all) {
@@ -458,7 +460,8 @@ void write_variables_gnuplot(struct histogram *h, struct histogram *all)
 		fprintf(f, "%s = %lf\n",        "all_mean",       all->mean);
 		fprintf(f, "%s = %lf\n",        "all_percentile75", value_of_p(all, 0.75));
 		fprintf(f, "%s = %lf\n",        "all_percentile25", value_of_p(all, 0.25));
-		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation", all->first_allocation_histogram);
+		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation", all->first_allocation_time_dependence);
+		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation_time_independence", h->first_allocation_time_independence);
 	}
 
 	fclose(f);
@@ -722,7 +725,7 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 			resource_no_spaces,
 			h->total_count,
 			h->mean, h->std_dev, h->skewdness, h->kurtosis,
-			h->max_value, h->min_value, h->first_allocation_histogram,
+			h->max_value, h->min_value, h->first_allocation_time_dependence,
 			value_of_p(h, 0.25),
 			value_of_p(h, 0.50),
 			value_of_p(h, 0.75),
@@ -809,10 +812,27 @@ void find_first_allocation_of_category_histogram(struct rmDsummary_set *s, struc
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
-		h->first_allocation_histogram = -1;
+		h->first_allocation_time_dependence = -1;
 		if(c->first_allocation) {
 			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
-			h->first_allocation_histogram = rmsummary_to_external_unit(f->name, first);
+			h->first_allocation_time_dependence = rmsummary_to_external_unit(f->name, first);
+		}
+	}
+
+	c->time_peak_independece = 1;
+	category_update_first_allocation(categories, s->category);
+
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(!f->active)
+			continue;
+
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+
+		h->first_allocation_time_independence = -1;
+		if(c->first_allocation) {
+			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
+			h->first_allocation_time_independence = rmsummary_to_external_unit(f->name, first);
 		}
 	}
 }
@@ -1017,6 +1037,7 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >mode <br> &#9653;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc.<br> &#9663; </td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. ind.<br> &#9663; </td>");
 
 	if(brute_force) {
 		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f.</td>");
@@ -1049,7 +1070,11 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->first_allocation_histogram);
+	fprintf(stream, "%" PRId64 "\n", h->first_allocation_time_dependence);
+	fprintf(stream, "</td>\n");
+
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
+	fprintf(stream, "%" PRId64 "\n", h->first_allocation_time_independence);
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
