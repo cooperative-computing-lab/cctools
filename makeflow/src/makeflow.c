@@ -381,7 +381,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 }
 
-static void makeflow_prepare_node_sizes(struct dag *d, int storage_print)
+static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 {
 	struct dag_node *n = dag_node_create(d, -1);
 	struct dag_node *p;
@@ -395,7 +395,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, int storage_print)
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
 	if(storage_print){
-		dag_node_print_footprint(n);
+		dag_node_print_footprint(n, storage_print);
 		exit(0);
 	}
 }
@@ -1234,6 +1234,7 @@ static void show_help_run(const char *cmd)
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
 	printf("    --storage-limit             Set storage limit for Makeflow (default is off)\n");
+	printf("    --storage-print=<file>      Print storage limit calculated by Makeflow\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
@@ -1283,7 +1284,6 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs. (def: resource-rule-%%)\n");
-
 }
 
 int main(int argc, char *argv[])
@@ -1337,7 +1337,7 @@ int main(int argc, char *argv[])
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
 	uint64_t storage_limit = 0;
-	int storage_print = 0;
+	char *storage_print = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1462,7 +1462,7 @@ int main(int argc, char *argv[])
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
 		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
-		{"storage-print", no_argument, 0, LONG_OPT_STORAGE_PRINT},
+		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
@@ -1754,7 +1754,8 @@ int main(int argc, char *argv[])
 				storage_limit = string_metric_parse(optarg);
 				break;
 			case LONG_OPT_STORAGE_PRINT:
-				storage_print = 1;
+				if(storage_print) free(storage_print);
+				storage_print = xxstrdup(optarg);
 				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();

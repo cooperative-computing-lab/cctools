@@ -50,26 +50,36 @@ struct dag_node {
 
 	struct itable *remote_names;    /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
-	struct list   *source_files;    /* list of dag_files of the node's requirements */
-	struct list   *target_files;    /* list of dag_files of the node's productions */
 
+	struct list *source_files;		/* list of dag_files of the node's requirements */
 	uint64_t source_size;			/* size of dag_files of the node's requirements */
-	uint64_t target_size;			/* size of dag_files of the node's productions */
-	uint64_t residual;				/* size of dag_files of the node's residual size */
 
+	struct list *target_files;		/* list of dag_files of the node's productions */
+	uint64_t target_size;			/* size of dag_files of the node's productions */
+
+	struct list *residual_nodes;	/* list of dag_nodes that describe residual sybc */
+	struct set *residual_files;		/* set of dag_files of the node's residual */
 	uint64_t residual_size;			/* Size of current residual, changes depending on
 										context of requesting node. */
-	uint64_t footprint_size;		/* Size of current largest footprint, changes depending
-										on context of requesting node. */
 
-	uint64_t footprint_max;			/* Size of the largest defined footprint */
-	uint64_t footprint_min;			/* Size of the minimum defined footprint */
+	struct set *parent_files;		/* size of dag_files of my output's and my parents' */
 	uint64_t parent_footprint;		/* size of dag_files of my output's and my parents' */
-	uint64_t child_footprint;		/* size of dag_files of my output's and my child's */
-	uint64_t descendant_footprint;	/* size of dag_files at the widest child with minimal siblings */
 
-	struct list *residual_nodes;	/* list of dag_node/wgt that describe residual wgt at each point */
-	struct list *footprint_nodes;	/* list of dag_node/wgt that show the commitment sizes */
+	struct set *child_files;		/* size of dag_files of my output's and my child's */
+	uint64_t child_footprint;		/* size of dag_files of my output's and my child's */
+
+	struct set *desc_min_files;		/* Set of nodes that define the min footprint */
+	uint64_t desc_min_footprint;	/* Size of the minimum defined footprint */
+
+	struct set *desc_max_files;		/* Set of nodes that define the max footprint */
+	uint64_t desc_max_footprint;	/* Size of the largest defined footprint */
+
+	struct set *footprint_min_files;/* Set of nodes that define the min footprint */
+	uint64_t footprint_min_size;	/* Size of the minimum defined footprint */
+
+	struct set *footprint_max_files;/* Set of nodes that define the max footprint */
+	uint64_t footprint_max_size;	/* Size of the largest defined footprint */
+
 	struct list *run_order;			/* list of child and the order to maintain committed size */
 
 	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
@@ -120,7 +130,7 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 
 void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
-void dag_node_print_footprint(struct dag_node *n);
+void dag_node_print_footprint(struct dag_node *n, char *output);
 void dag_node_reset_updated(struct dag_node *n);
 
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
