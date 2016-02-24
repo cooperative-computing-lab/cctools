@@ -648,33 +648,36 @@ void dag_node_print_file_set(struct set *s, FILE *out, char *t)
 	fprintf(out, "\\}%s", t);
 }
 
-void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *r, char *t)
+void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *retrn, char *node_retrn, char *delim)
 {
-	fprintf(out, "%d%s", n->nodeid, t);
+	fprintf(out, "%d%s", n->nodeid, delim);
 
 	int numeric = 1;
 	int symbolic = 1;
 
 	if(numeric){
-		fprintf(out, "%"PRIu64"%s", n->residual_size, t);
-		fprintf(out, "%"PRIu64"%s", n->parent_footprint, t);
-		fprintf(out, "%"PRIu64"%s", n->child_footprint, t);
-		fprintf(out, "%"PRIu64"%s", n->desc_min_footprint, t);
-		fprintf(out, "%"PRIu64"%s", n->desc_max_footprint, t);
-		fprintf(out, "%"PRIu64"%s", n->footprint_min_size, t);
-		fprintf(out, "%"PRIu64"%s", n->footprint_max_size, r);
-		if(symbolic)
-			fprintf(out, "%s", t);
+		fprintf(out, "%"PRIu64"%s", n->residual_size, delim);
+		fprintf(out, "%"PRIu64"%s", n->parent_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->child_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->desc_min_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->desc_max_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->footprint_min_size, delim);
+		if(symbolic) {
+			fprintf(out, "%"PRIu64"%s", n->footprint_max_size, node_retrn);
+			fprintf(out, "%s", delim);
+		} else {
+			fprintf(out, "%"PRIu64"%s", n->footprint_max_size, retrn);
+		}
 	}
 
 	if(symbolic){
-		dag_node_print_file_set(n->residual_files, out, t);
-		dag_node_print_file_set(n->parent_files, out, t);
-		dag_node_print_file_set(n->child_files, out, t);
-		dag_node_print_file_set(n->desc_min_files, out, t);
-		dag_node_print_file_set(n->desc_max_files, out, t);
-		dag_node_print_file_set(n->footprint_min_files, out, t);
-		dag_node_print_file_set(n->footprint_max_files, out, r);
+		dag_node_print_file_set(n->residual_files, out, delim);
+		dag_node_print_file_set(n->parent_files, out, delim);
+		dag_node_print_file_set(n->child_files, out, delim);
+		dag_node_print_file_set(n->desc_min_files, out, delim);
+		dag_node_print_file_set(n->desc_max_files, out, delim);
+		dag_node_print_file_set(n->footprint_min_files, out, delim);
+		dag_node_print_file_set(n->footprint_max_files, out, retrn);
 	}
 
 	struct dag_node *c;
@@ -682,7 +685,7 @@ void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *r, char 
 	set_first_element(n->descendants);
 	while((c = set_next_element(n->descendants))){
 		if(!c->footprint_updated)
-			dag_node_print_footprint_node(c, out, r, t);
+			dag_node_print_footprint_node(c, out, retrn, node_retrn, delim);
 	}
 
 	n->footprint_updated = 1;
@@ -694,35 +697,37 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 
 	int tex = 1;
 
-	char *r = "\n";
-	char *t = "\t";
+	char *retrn = "\n";
+	char *node_retrn = "\n";
+	char *delim = "\t";
 
 	if(tex){
-		r = "\\\\ \\hline \n\t";
-		t = " & ";
+		retrn = "\\\\ \\hline \n\t";
+		node_retrn = "\\\\ \\hline \n\t";
+		delim = " & ";
 	}
 
 	FILE * out;
 	out = fopen(output, "w");
 
 	if(tex)
-		fprintf(out, "\\begin{table*}\n\t\\begin{tabular}{cccccccc}%s",r);
+		fprintf(out, "\\begin{table*}\n\t\\begin{tabular}{cccccccc}%s",retrn);
 
-	fprintf(out, "Node%s",t);
-	fprintf(out, "Residual%s",t);
-	fprintf(out, "Parent%s",t);
-	fprintf(out, "Child%s",t);
-	fprintf(out, "Desc-Min%s",t);
-	fprintf(out, "Desc-Max%s",t);
-	fprintf(out, "Foot-Min%s",t);
-	fprintf(out, "Foot-Max%s",r);
+	fprintf(out, "Node%s",delim);
+	fprintf(out, "Residual%s",delim);
+	fprintf(out, "Parent%s",delim);
+	fprintf(out, "Child%s",delim);
+	fprintf(out, "Desc-Min%s",delim);
+	fprintf(out, "Desc-Max%s",delim);
+	fprintf(out, "Foot-Min%s",delim);
+	fprintf(out, "Foot-Max%s",retrn);
 
 	struct dag_node *c;
 
 	set_first_element(n->descendants);
 	while((c = set_next_element(n->descendants))){
 		if(!c->footprint_updated)
-			dag_node_print_footprint_node(c, out, r, t);
+			dag_node_print_footprint_node(c, out, retrn, node_retrn, delim);
 	}
 
 	if(tex)
