@@ -729,12 +729,8 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 	}
   
 	for(n = d->nodes; n; n = n->next) {
-		if(task_id){
-			label = string_format("%d",n->nodeid);
-		} else {
-			name = xxstrdup(n->command);
-			label = strtok(name, " \t\n");
-		}
+		name = xxstrdup(n->command);
+		label = strtok(name, " \t\n");
 		t = hash_table_lookup(h, label);
 		if(!t) {
 			t = malloc(sizeof(*t));
