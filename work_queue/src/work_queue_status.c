@@ -313,7 +313,7 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 
 			find_child_relations(spaces + 1,
 					jx_lookup_string(global_catalog[i], "name"),
-					atoi(jx_lookup_string(global_catalog[i], "port")),
+					jx_lookup_integer(global_catalog[i], "port"),
 					headers,
 					stoptime);
 		}
