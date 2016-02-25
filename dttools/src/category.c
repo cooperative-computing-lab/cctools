@@ -19,7 +19,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx_print.h"
 
-#include "category.h"
+#include "category_internal.h"
 
 struct peak_count_time {
 	int64_t count;
@@ -409,5 +409,19 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	} else {
 		/* Use default when no enough information is available. */
 		return CATEGORY_ALLOCATION_AUTO_ZERO;
+	}
+}
+
+void category_tune_bucket_size(const char *resource, uint64_t size) {
+	if(strcmp(resource, "memory") == 0) {
+		memory_bucket_size = size;
+	} else if(strcmp(resource, "disk") == 0) {
+		disk_bucket_size = size;
+	} else if(strcmp(resource, "time") == 0) {
+		time_bucket_size = size;
+	} else if(strcmp(resource, "io") == 0) {
+		bytes_bucket_size = size;
+	} else if(strcmp(resource, "bandwidth") == 0) {
+		bandwidth_bucket_size = size;
 	}
 }
