@@ -69,11 +69,11 @@ struct histogram {
 
 	uint64_t first_allocation_time_dependence;
 	uint64_t first_allocation_time_independence;
-	uint64_t first_allocation_bruteforce;
+	uint64_t first_allocation_brute_force;
 
 	double waste_time_dependence;
 	double waste_time_independence;
-	double waste_bruteforce;
+	double waste_brute_force;
 
 	double waste_max;
 
@@ -714,12 +714,12 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 void write_histogram_stats_header(FILE *stream)
 {
-	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
+	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
 			"resource",
 			"count",
 			"mean", "std_dev",
-			"max", "min", "first_alloc_w_time", "first_alloc_wo_time",
-			"waste_max", "waste_w_time", "waste_wo_time",
+			"max", "min", "first_alloc_w_time", "first_alloc_wo_time", "first_alloc_bf",
+			"waste_max", "waste_w_time", "waste_wo_time", "waste_brute_force",
 			"p_25", "p_50", "p_75", "p_95", "p_99"
 		   );
 }
@@ -727,16 +727,18 @@ void write_histogram_stats_header(FILE *stream)
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	char *resource_no_spaces = sanitize_path_name(h->resource->name);
-	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %" PRId64 " %" PRId64 " %g %g %g %.3lf %.3lf %.3lf %.3lf %.3lf\n",
+	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %" PRId64 " %" PRId64 " %" PRId64 " %g %g %g %g %.3lf %.3lf %.3lf %.3lf %.3lf\n",
 			resource_no_spaces,
 			h->total_count,
 			h->mean, h->std_dev,
 			h->max_value, h->min_value,
 			h->first_allocation_time_dependence,
 			h->first_allocation_time_independence,
+			h->first_allocation_brute_force,
 			h->waste_max,
 			h->waste_time_dependence,
 			h->waste_time_independence,
+			h->waste_brute_force,
 			value_of_p(h, 0.25),
 			value_of_p(h, 0.50),
 			value_of_p(h, 0.75),
@@ -794,16 +796,15 @@ void plots_of_category(struct rmDsummary_set *s)
 
 double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 	double waste   = 0;
-	double wall_time;
 	double wall_time_accum = 0;
-	double current;
-
 	double max_candidate = h->max_value;
 
 	int i;
+#pragma omp parallel for private(i) reduction(+: wall_time_accum, waste)
 	for(i = 0; i < h->total_count; i+=1) {
-		current   = value_of_field(h->summaries_sorted[i], f);
+		double current   = value_of_field(h->summaries_sorted[i], f);
 
+		double wall_time;
 		if(f->cummulative) {
 			wall_time = 1;
 		} else {
@@ -904,6 +905,59 @@ void set_first_allocation_time_independence(struct rmDsummary_set *s, struct has
 	}
 }
 
+void set_first_allocation_brute_force_field(struct histogram *h, struct field *f) {
+	double   min_waste     = DBL_MAX;
+	uint64_t min_candidate = h->max_value;
+
+	uint64_t prev = 0;
+	for(int i = 0; i < h->total_count; i++) {
+		uint64_t candidate = value_of_field(h->summaries_sorted[i], f);
+
+		if( i > 0 ) {
+			if(candidate - prev < 1)
+				continue;
+		}
+
+		double candidate_waste = total_waste(h, f, candidate);
+
+		if(candidate_waste < min_waste) {
+			min_candidate = candidate;
+			min_waste     = candidate_waste;
+		}
+
+		prev = candidate;
+	}
+
+	debug(D_RMON, "first allocation '%s' brute force: %" PRId64, f->caption, min_candidate);
+
+	h->first_allocation_brute_force = min_candidate;
+	h->waste_brute_force            = total_waste(h, f, min_candidate);
+}
+
+void set_first_allocation_brute_force(struct rmDsummary_set *s, struct hash_table *categories) {
+	struct field *f;
+	struct histogram *h;
+
+	int i;
+	for(i = WALL_TIME; i < NUM_FIELDS; i++)
+	{
+		f = (fields + i);
+
+		if(!f->active)
+			continue;
+
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+
+		if(brute_force) {
+			set_first_allocation_brute_force_field(h, f);
+		} else {
+			h->first_allocation_brute_force = -1;
+			h->waste_brute_force            = -1;
+		}
+	}
+}
+
+
 void set_max_waste(struct rmDsummary_set *s, struct hash_table *categories) {
 	struct field *f;
 	struct histogram *h;
@@ -927,6 +981,7 @@ void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_tab
 	set_category_maximum(s, categories);
 	set_first_allocation_time_dependence(s, categories);
 	set_first_allocation_time_independence(s, categories);
+	set_first_allocation_brute_force(s, categories);
 
 	set_max_waste(s, categories);
 }
@@ -1098,8 +1153,8 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"data\"> (w: %3.2lf) <br><br>\n", h->waste_bruteforce);
-		fprintf(stream, "%" PRId64 "\n", h->first_allocation_bruteforce);
+		fprintf(stream, "<td class=\"data\"> (w: %3.2lf) <br><br>\n", h->waste_brute_force);
+		fprintf(stream, "%" PRId64 "\n", h->first_allocation_brute_force);
 		fprintf(stream, "</td>\n");
 	}
 
