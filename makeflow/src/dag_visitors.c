@@ -720,6 +720,7 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		printf( "edge [%s]\n", edge_attr);
 	}
 
+
 	h = hash_table_create(0, 0);
 
 	if(task_attr){
