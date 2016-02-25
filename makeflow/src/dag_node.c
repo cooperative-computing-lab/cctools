@@ -637,7 +637,7 @@ void dag_node_print_file_set(struct set *s, FILE *out, char *t)
 	set_first_element(s);
 	struct dag_file *f = set_next_element(s);
 	if(!f){
-		fprintf(out, "0%s", t);
+		fprintf(out, "{}%s", t);
 		return;
 	}
 
