@@ -712,31 +712,35 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 void write_histogram_stats_header(FILE *stream)
 {
-	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
+	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
 			"resource",
 			"n",
-			"mean", "std_dev", "skewd", "kurtos",
-			"max", "min", "first_alloc",
-			"p_25", "p_50", "p_75", "p_95", "p_99",
-			"z_95", "z_99"
+			"mean", "std_dev",
+			"max", "min", "first_alloc_dep", "first_alloc_indep", "first_alloc_bf",
+			"waste_dep", "waste_indep", "waste_bf",
+			"p_25", "p_50", "p_75", "p_95", "p_99"
 		   );
 }
 
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	char *resource_no_spaces = sanitize_path_name(h->resource->name);
-	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %" PRId64 " %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
+	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %" PRId64 " %" PRId64 " %" PRId64 " %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
 			resource_no_spaces,
 			h->total_count,
-			h->mean, h->std_dev, h->skewdness, h->kurtosis,
-			h->max_value, h->min_value, h->first_allocation_time_dependence,
+			h->mean, h->std_dev,
+			h->max_value, h->min_value,
+			h->first_allocation_time_dependence,
+			h->first_allocation_time_independence,
+			h->first_allocation_bruteforce,
+			h->waste_time_dependence,
+			h->waste_time_independence,
+			h->waste_bruteforce,
 			value_of_p(h, 0.25),
 			value_of_p(h, 0.50),
 			value_of_p(h, 0.75),
 			value_of_p(h, 0.95),
-			value_of_p(h, 0.99),
-			h->z_95,
-			h->z_99);
+			value_of_p(h, 0.99));
 
 	free(resource_no_spaces);
 }
