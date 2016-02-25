@@ -288,6 +288,7 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 		special = 1;
 		dag_parse_process_category(bk, n, nodeid, value);
 	}
+
 	/* else if some other special variable .... */
 	/* ... */
 
