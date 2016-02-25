@@ -1275,6 +1275,7 @@ static void show_usage(const char *cmd)
 	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
 	fprintf(stdout, "%-20s Split on task categories.\n", "-s");
 	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations.\n", "-b");
+	fprintf(stdout, "%-20s Do not plot histograms.\n", "-n");
 	fprintf(stdout, "%-20s Select these fields for the histograms.     (Default is: tcvmsrwhz).\n\n", "-f <fields>");
 	fprintf(stdout, "<fields> is a string in which each character should be one of the following:\n");
 	fprintf(stdout, "%s", make_field_names_str("\n"));
@@ -1292,7 +1293,7 @@ int main(int argc, char **argv)
 	debug_config(argv[0]);
 
 	signed char c;
-	while( (c = getopt(argc, argv, "bD:d:f:hL:o:s")) > -1 )
+	while( (c = getopt(argc, argv, "bD:d:f:hL:no:s")) > -1 )
 	{
 		switch(c)
 		{
@@ -1316,6 +1317,9 @@ int main(int argc, char **argv)
 				break;
 			case 'b':
 				brute_force = 1;
+				break;
+			case 'n':
+				webpage_mode = 0;
 				break;
 			case 'h':
 				show_usage(argv[0]);
