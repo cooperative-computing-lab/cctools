@@ -1274,7 +1274,8 @@ static void show_usage(const char *cmd)
 	fprintf(stdout, "%-20s Read summaries recursively from <dir> (filename of form '%s[0-9]+%s').\n", "-D <dir>", RULE_PREFIX, RULE_SUFFIX);
 	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
 	fprintf(stdout, "%-20s Split on task categories.\n", "-s");
-	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations.\n", "-b");
+	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations. (slow)\n", "-b");
+	fprintf(stdout, "%-20s Use smallest bucket sizes to compute proposed resource allocations. (slow)\n", "-m");
 	fprintf(stdout, "%-20s Do not plot histograms.\n", "-n");
 	fprintf(stdout, "%-20s Select these fields for the histograms.     (Default is: tcvmsrwhz).\n\n", "-f <fields>");
 	fprintf(stdout, "<fields> is a string in which each character should be one of the following:\n");
@@ -1293,7 +1294,7 @@ int main(int argc, char **argv)
 	debug_config(argv[0]);
 
 	signed char c;
-	while( (c = getopt(argc, argv, "bD:d:f:hL:no:s")) > -1 )
+	while( (c = getopt(argc, argv, "bD:d:f:hL:mno:s")) > -1 )
 	{
 		switch(c)
 		{
@@ -1317,6 +1318,13 @@ int main(int argc, char **argv)
 				break;
 			case 'b':
 				brute_force = 1;
+				break;
+				break;
+			case 'm':
+				/* brute force, small bucket size */
+				category_tune_bucket_size("time",   USECOND);
+				category_tune_bucket_size("memory", 1);
+				category_tune_bucket_size("disk",   1);
 				break;
 			case 'n':
 				webpage_mode = 0;
