@@ -711,7 +711,7 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 	out = fopen(output, "w");
 
 	if(tex)
-		fprintf(out, "\\begin{table*}\n\t\\begin{tabular}{cccccccc}%s",retrn);
+		fprintf(out, "begin{tabular}{cccccccc}%s",retrn);
 
 	fprintf(out, "Node%s",delim);
 	fprintf(out, "Residual%s",delim);
@@ -731,7 +731,7 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 	}
 
 	if(tex)
-		fprintf(out, "\\end{tabular}\n\\end{table*}\n");
+		fprintf(out, "\\end{tabular}\n");
 
 	fclose(out);
 }
