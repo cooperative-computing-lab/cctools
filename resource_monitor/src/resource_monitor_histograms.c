@@ -38,6 +38,8 @@ int webpage_mode   = 1;
 
 char *output_directory = NULL;
 
+uint64_t input_overhead;
+
 struct histogram {
 	struct field *resource;
 	char *units;
@@ -1085,6 +1087,8 @@ void write_overheads_of_category(struct rmDsummary_set *s)
 	free(f_ovhs_raw);
 	free(filename);
 
+	fprintf(f_ovhs, "task_count,");
+	fprintf(f_ovhs, "input,");
 	fprintf(f_ovhs, "time_dependence,");
 	fprintf(f_ovhs, "time_independence,");
 
@@ -1094,6 +1098,8 @@ void write_overheads_of_category(struct rmDsummary_set *s)
 		fprintf(f_ovhs, "\n");
 	}
 
+	fprintf(f_ovhs, "%d,",  list_size(s->summaries));
+	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", input_overhead));
 	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_dependence));
 	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_independence));
 
@@ -1501,6 +1507,8 @@ int main(int argc, char **argv)
 	/* read and parse all input summaries */
 	all_summaries = make_new_set(ALL_SUMMARIES_CATEGORY);
 
+	input_overhead = timestamp_get();
+
 	if(input_directory)
 	{
 		parse_summary_recursive(all_summaries, input_directory, categories);
@@ -1510,6 +1518,8 @@ int main(int argc, char **argv)
 	{
 		parse_summary_from_filelist(all_summaries, input_list, categories);
 	}
+
+	input_overhead = timestamp_get() - input_overhead;
 
 	list_push_head(all_sets, all_summaries);
 
