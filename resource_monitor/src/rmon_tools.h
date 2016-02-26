@@ -84,6 +84,10 @@ struct rmDsummary_set
 
 	//per resource, address by field
 	struct itable *histograms;
+
+	uint64_t overhead_time_dependence;
+	uint64_t overhead_time_independence;
+	uint64_t overhead_brute_force;
 };
 
 struct field {

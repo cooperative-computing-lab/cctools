@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "category_internal.h"
 #include "macros.h"
 #include "copy_stream.h"
+#include "timestamp.h"
 
 #define MAX_LINE 1024
 
@@ -76,10 +77,6 @@ struct histogram {
 	double waste_time_independence;
 	double waste_brute_force;
 	double waste_95;
-
-	uint64_t overhead_time_dependence;
-	uint64_t overhead_time_independence;
-	uint64_t overhead_brute_force;
 
 	double waste_max;
 
@@ -1006,10 +1003,21 @@ void set_max_waste(struct rmDsummary_set *s, struct hash_table *categories) {
 
 void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_table *categories) {
 
+
 	set_category_maximum(s, categories);
+
+	s->overhead_time_dependence = timestamp_get();
 	set_first_allocation_time_dependence(s, categories);
+	s->overhead_time_dependence = timestamp_get() - s->overhead_time_dependence;
+
+	s->overhead_time_independence = timestamp_get();
 	set_first_allocation_time_independence(s, categories);
+	s->overhead_time_independence = timestamp_get() - s->overhead_time_independence;
+
+	s->overhead_brute_force = timestamp_get();
 	set_first_allocation_brute_force(s, categories);
+	s->overhead_brute_force = timestamp_get() - s->overhead_brute_force;
+
 	set_first_allocation_95(s, categories);
 
 	set_max_waste(s, categories);
@@ -1065,6 +1073,37 @@ void write_limits_of_category(struct rmDsummary_set *s)
 	}
 
 	fclose(f_limits);
+}
+
+void write_overheads_of_category(struct rmDsummary_set *s)
+{
+	char *f_ovhs_raw   = sanitize_path_name(s->category);
+	char *filename      = string_format("%s/%s.overheads", output_directory, f_ovhs_raw);
+
+	FILE *f_ovhs  = open_file(filename);
+
+	free(f_ovhs_raw);
+	free(filename);
+
+	fprintf(f_ovhs, "time_dependence,");
+	fprintf(f_ovhs, "time_independence,");
+
+	if(brute_force) {
+		fprintf(f_ovhs, "brute_force\n");
+	} else {
+		fprintf(f_ovhs, "\n");
+	}
+
+	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_dependence));
+	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_independence));
+
+	if(brute_force) {
+		fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_brute_force));
+	} else {
+		fprintf(f_ovhs, "\n");
+	}
+
+	fclose(f_ovhs);
 }
 
 char *copy_outlier(struct rmDsummary *s)
@@ -1492,6 +1531,7 @@ int main(int argc, char **argv)
 
 			write_stats_of_category(s);
 			write_limits_of_category(s);
+			write_overheads_of_category(s);
 
 			if(webpage_mode)
 			{
