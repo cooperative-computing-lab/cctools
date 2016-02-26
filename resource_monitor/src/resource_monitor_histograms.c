@@ -720,40 +720,40 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 void write_histogram_stats_header(FILE *stream)
 {
-	fprintf(stream, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s %s\n",
-			"resource",
-			"count",
-			"mean", "std_dev",
-			"max", "min", "first_alloc_w_time", "first_alloc_wo_time", "first_alloc_bf",
-			"waste_max", "waste_w_time", "waste_wo_time", "waste_brute_force",
-			"p_25", "p_50", "p_75", "p_95", "p_99"
-		   );
+	fprintf(stream, "resource,");
+	fprintf(stream, "count,mean,std_dev,");
+	fprintf(stream, "min,");
+	fprintf(stream, "max,waste_max,");
+	fprintf(stream, "first_alloc_w_time,waste_w_time,");
+	fprintf(stream, "first_alloc_wo_time,waste_wo_time,");
+	fprintf(stream, "first_alloc_95,waste_95,");
+
+	if(brute_force) {
+		fprintf(stream, "first_alloc_bf,waste_brute_force,");
+	}
+
+	fprintf(stream, "p_25,p_50,p_75,p_99");
 }
 
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
-	char *resource_no_spaces = sanitize_path_name(h->resource->name);
-	fprintf(stream, "%s %d %.3lf %.3lf %.3lf %.3lf %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %g %g %g %g %g %.3lf %.3lf %.3lf %.3lf %.3lf\n",
-			resource_no_spaces,
-			h->total_count,
-			h->mean, h->std_dev,
-			h->max_value, h->min_value,
-			h->first_allocation_time_dependence,
-			h->first_allocation_time_independence,
-			h->first_allocation_95,
-			h->first_allocation_brute_force,
-			h->waste_max,
-			h->waste_time_dependence,
-			h->waste_time_independence,
-			h->waste_95,
-			h->waste_brute_force,
+	fprintf(stream, "%s,", sanitize_path_name(h->resource->name));
+	fprintf(stream, "%d,%.0lf,%.3lf,", h->total_count, ceil(h->mean), h->std_dev);
+	fprintf(stream, "%.0lf,", floor(h->min_value));
+	fprintf(stream, "%.0lf,%.0lf,", ceil(h->max_value), ceil(h->waste_max));
+	fprintf(stream, "%" PRId64 ",%.0lf,", h->first_allocation_time_dependence, ceil(h->waste_time_dependence));
+	fprintf(stream, "%" PRId64 ",%.0lf,", h->first_allocation_time_independence, ceil(h->waste_time_independence));
+	fprintf(stream, "%" PRId64 ",%.0lf,", h->first_allocation_95, ceil(h->waste_95));
+
+	if(brute_force) {
+		fprintf(stream, "%" PRId64 ",%.0lf,", h->first_allocation_brute_force, ceil(h->waste_brute_force));
+	}
+
+	fprintf(stream, "%.3lf,%.3lf,%.3lf,%.3lf\n",
 			value_of_p(h, 0.25),
 			value_of_p(h, 0.50),
 			value_of_p(h, 0.75),
-			value_of_p(h, 0.95),
 			value_of_p(h, 0.99));
-
-	free(resource_no_spaces);
 }
 
 void histograms_of_category(struct rmDsummary_set *ss)
