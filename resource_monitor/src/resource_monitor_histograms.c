@@ -874,6 +874,7 @@ void set_first_allocation_time_dependence(struct rmDsummary_set *s, struct hash_
 		if(!f->active)
 			continue;
 
+
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
 		h->first_allocation_time_dependence = -1;
@@ -1040,7 +1041,7 @@ void write_stats_of_category(struct rmDsummary_set *s)
 	fclose(f_stats);
 }
 
-void write_limits_of_category(struct rmDsummary_set *s, double p_cut)
+void write_limits_of_category(struct rmDsummary_set *s)
 {
 
 	char *f_stats_raw   = sanitize_path_name(s->category);
@@ -1060,7 +1061,7 @@ void write_limits_of_category(struct rmDsummary_set *s, double p_cut)
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
-		fprintf(f_limits, "%s: %" PRIu64 "\n", f->name, (int64_t) ceil(value_of_p(h, p_cut)));
+		fprintf(f_limits, "%s: %" PRIu64 "\n", f->name, h->first_allocation_time_dependence);
 	}
 
 	fclose(f_limits);
@@ -1490,7 +1491,7 @@ int main(int argc, char **argv)
 			set_first_allocations_of_category(s, categories);
 
 			write_stats_of_category(s);
-			write_limits_of_category(s, 0.95);
+			write_limits_of_category(s);
 
 			if(webpage_mode)
 			{
