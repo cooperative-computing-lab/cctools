@@ -1141,8 +1141,8 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >mode <br> &#9653;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc.<br> &#9663; </td>");
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. ind.<br> &#9663; </td>");
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. 0.95<br> &#9663; </td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. ind.</td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. 0.95</td>");
 
 	if(brute_force) {
 		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f.</td>");
@@ -1174,20 +1174,20 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "%6.0lf\n", h->mean);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %lf) <br><br>\n", h->waste_time_dependence);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->waste_time_dependence));
 	fprintf(stream, "%" PRId64 "\n", h->first_allocation_time_dependence);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %3.2lf ) <br><br>\n", h->waste_time_independence);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->waste_time_independence));
 	fprintf(stream, "%" PRId64 "\n", h->first_allocation_time_independence);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %3.2lf ) <br><br>\n", h->waste_95);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->waste_95));
 	fprintf(stream, "%" PRId64 "\n", h->first_allocation_95);
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"data\"> (w: %3.2lf) <br><br>\n", h->waste_brute_force);
+		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->waste_brute_force));
 		fprintf(stream, "%" PRId64 "\n", h->first_allocation_brute_force);
 		fprintf(stream, "</td>\n");
 	}
