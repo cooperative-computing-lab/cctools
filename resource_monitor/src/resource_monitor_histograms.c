@@ -731,7 +731,7 @@ void write_histogram_stats_header(FILE *stream)
 		fprintf(stream, "first_alloc_bf,waste_brute_force,");
 	}
 
-	fprintf(stream, "p_25,p_50,p_75,p_99");
+	fprintf(stream, "p_25,p_50,p_75,p_99\n");
 }
 
 void write_histogram_stats(FILE *stream, struct histogram *h)
