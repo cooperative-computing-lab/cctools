@@ -88,6 +88,7 @@ struct rmDsummary_set
 	uint64_t overhead_time_dependence;
 	uint64_t overhead_time_independence;
 	uint64_t overhead_brute_force;
+	uint64_t overhead_best_throughput;
 };
 
 struct field {
