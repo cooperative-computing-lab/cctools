@@ -81,7 +81,8 @@ class Item(object):
 				#obj['meta'] = json.dumps(self.meta, sort_keys=True)
 				obj['meta'] = self.meta
 
-		if self.size: obj['size'] = self.size
+		if self.size:
+			obj['size'] = self.size
 		if self.body:
 			if isinstance( self.body, basestring ):
 				#obj['body'] = self.body[0:20]+' ... '+self.body[-20:]
@@ -97,6 +98,7 @@ class Item(object):
 
 	def stream( self, active_stream ):
 		obj = dict(type=self.type, cbid=self.cbid, when=self.when)
+		summary = ''
 		if self.dbid: obj['dbid'] = self.dbid
 		if self.wfid: obj['wfid'] = self.wfid
 		if self.step: obj['step'] = self.step

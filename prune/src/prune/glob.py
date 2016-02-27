@@ -13,8 +13,8 @@ shutting_down = False
 HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 
-#base_dir = HOME+'/.prune/'
-base_dir = '/data/pivie/prune_space6/'
+base_dir = HOME+'/.prune/'
+#base_dir = '/data/pivie/prune_space.export/'
 
 data_file_directory = base_dir+'data/files/'
 data_db_pathname = base_dir+'data/_prune.db'
@@ -48,7 +48,7 @@ port = 8073
 
 # Worker settings
 worker_log_pathname = base_dir+'logs/worker.log'
-exec_local_concurrency = 16
+exec_local_concurrency = 13
 
 
 timer_log = base_dir+'logs/timing.log'
@@ -56,7 +56,8 @@ timer_log = base_dir+'logs/timing.log'
 
 wq_port = 0
 #wq_name = 'prune_'+uuid()
-wq_name = 'prune_census'
+wq_name = 'prune'
+wq_debug_log_pathname = base_dir+'logs/wq_debug.log'
 wq_log_pathname = base_dir+'logs/wq.log'
 wq_stage = None
 

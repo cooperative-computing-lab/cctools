@@ -6,6 +6,7 @@ import os, sys, time, traceback
 import json as jsonlib
 import subprocess, shutil
 import Queue
+from collections import deque
 
 import glob
 from utils import *
@@ -134,8 +135,8 @@ class Connect:
 		timer.start('client.file_dump')
 
 
-	def call_add( self, returns, env, cmd, args=[], params=[], types=[], env_vars={}, precise=True):
-		timer.start('client.call_add')
+	def task_add( self, returns, env, cmd, args=[], params=[], types=[], env_vars={}, precise=True):
+		timer.start('client.task_add')
 		obj = {'returns':returns, 'env':env, 'cmd':cmd, 'args':args, 'params':params, 'types':types, 'env_vars':env_vars, 'precise':precise}
 		it = Item( type='call', body=obj )
 		glob.db.insert( it )
@@ -143,7 +144,7 @@ class Connect:
 		results = []
 		for i in range( 0, len(returns) ):
 			results.append(it.cbid+':'+str(i))
-		timer.stop('client.call_add')
+		timer.stop('client.task_add')
 		self.op_cnt += 1
 		#if (self.op_cnt%100)==0:
 		#	time.sleep(0.1)
@@ -203,20 +204,200 @@ class Connect:
 
 
 
+	def export( self, prid, pathname, **kwargs ):
+		timer.start('client.export')
 
 
+		visited = {}
+		if isinstance( prid, str ):
+			prid_list = [prid]
+		else:
+			prid_list = prid
+		next_prid_list = []
+		depth = 0
+		if 'lineage' in kwargs:
+			lineage = int(kwargs['lineage'])
+		else:
+			lineage = 0
+		if 'progeny' in kwargs:
+			progeny = int(kwargs['progeny'])
+		else:
+			progeny = 0
+
+		if 'all_files' in kwargs and kwargs['all_files']:
+			all_files = True
+		else:
+			all_files = False
+
+		if lineage==0 and progeny==0 and (isinstance( prid, str ) or len(prid)==1):
+			single_file = True
+		else:
+			single_file = False
 
 
+		file_cnt = 0
+		task_cnt = 0
+		temp_cnt = 0
+		more_cnt = 0
+		size = 0
+		with open( pathname, 'w' ) as f:
+			while prid_list:
+				print 'depth',depth
+				for prid in prid_list:
+					if prid not in visited:
+						visited[prid] = True
+						item = glob.db.find_one( prid )
+						if not item:
+							if ':' in prid:
+								task_id,file_id = prid.split(':')	
+								item = glob.db.find_one( task_id )
+						if not item:
+							print prid,item
+						elif item.type=='temp':
+							#print 'temp:',item.cbid
+							task_id,file_id = item.dbid.split(':')
+							#print '----->',task_id
+							if single_file:
+								print 'temp:', item.cbid, item.size
+								item.stream_content( f )
+							elif depth<lineage:
+								if all_files:
+									#size += item.size
+									item.stream( f )
+								item2 = glob.db.find_one( task_id )
+								if item2.cbid not in visited:
+									print 'task:', item2.cbid, item2.body['cmd']
+									visited[item2.cbid] = True
+									item2.stream( f )
+									for arg in item2.body['args']:
+										#print '----->',arg
+										next_prid_list.append(arg)
+									task_cnt += 1
+							else:
+								print 'temp:', item.cbid, item.size
+								#size += item.size
+								item.stream( f )
+							temp_cnt += 1
+						elif item.type=='file':
+							#print 'file:',item
+							if single_file:
+								print 'file:', item.cbid, item.size
+								item.stream_content( f )
+							else:
+								print 'file:', item.cbid, item.size
+								#size += item.size
+								item.stream( f )
+							file_cnt += 1
+						elif item.type=='call':
+							#print 'call',item
+							if single_file:
+								print 'task:', item.cbid, item.body['cmd']
+								item.stream_content( f )
+							else:
+								print 'task:', item.cbid, item.body['cmd']
+								item.stream( f )
+								for arg in item.body['args']:
+									#print '----->',arg
+									next_prid_list.append(arg)
+
+								if 'env' in item.body and item.body['env']!=self.nil:
+									for arg in item.body['args']:
+										item2 = glob.db.find_one( arg )
+										if item2.cbid not in visited:
+											visited[item2.cbid] = True
+											print item2.type+':', item2.cbid, item2.size
+											item2.stream( f )
+
+							task_cnt += 1
+						else:
+							print item.type+':', item.cbid, item.size
+							print item
+							item.stream( f )
+							if 'args' in item.body:
+								for arg in item.body['args']:
+									#print '----->',arg
+									item2 = glob.db.find_one( arg )
+									if item2.cbid not in visited:
+										visited[item2.cbid] = True
+										print item2.type+':', item2.cbid
+										item2.stream( f )
+
+							more_cnt += 1
+
+				prid_list = next_prid_list
+				next_prid_list = []
+				depth += 1
+						
+
+				
+		
+		diff = timer.stop('client.export')
+		statinfo = os.stat(pathname)
+		total_size = statinfo.st_size + size
+		print 'Export description: pathname=%s prid(s)=%s' % ( pathname, prid ), kwargs
+		print 'Export results: duration=%f size=%i file_cnt=%i task_cnt=%i temp_cnt=%i more_cnt=%i' % (diff, total_size, file_cnt, task_cnt, temp_cnt, more_cnt)
+		'''
+		timer.start('client.export_zip')
+
+		zipped = pathname+'.gz'
+		cmd = 'gzip < %s > %s' % (pathname,zipped)
+		p = subprocess.Popen( cmd , stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=True)
+		(stdout, stderr) = p.communicate()
+		#if stdout:
+		#	print 'stdout:',stdout
+		if stderr:
+			print 'stderr:',stderr
+
+		diff = timer.stop('client.export_zip')
+		statinfo = os.stat(zipped)
+		print 'Export zipped: duration=%f size=%i' % (diff, statinfo.st_size)
+		'''
+
+	def load( self, pathname ):
+		timer.start('client.import')
+
+		with open(pathname, 'r') as f:
+			line = f.readline()
+			cnt = 0
+			while line:
+				if (cnt%1000)==0:
+					sys.stdout.write(str(cnt))					
+				sys.stdout.write('.')
+				sys.stdout.flush()
+				obj = jsonlib.loads( line )
+				if 'size' in obj and 'body' not in obj:
+					pathname = glob.tmp_file_directory+uuid()
+					with open(pathname,'w') as tf:
+						remaining = obj['size']
+						while remaining>(1024*1024):
+							sys.stdout.write(',')
+							sys.stdout.flush()
+							tf.write( f.read(1024*1024) )
+							remaining -= (1024*1024)
+						tf.write( f.read(remaining) )
+					item = Item( obj, path=pathname )
+				else:
+					item = Item( obj )
+				glob.db.insert( item )
+				if item.type=='call':
+					glob.db.task_add( item )
+
+				cnt += 1
+				line = f.readline()
 
 
+		diff = timer.stop('client.import')
+		print 'Imported in:',diff
 
+
+	'''
 	def flow_dump( self, key, filename, depth=1 ):
 		flow = {'key':key,'depth':depth}
 		mesg = Mesg( action='send', key=key, flow=flow )
 		self.out_msgs.put_nowait( {'mesg':mesg} )
 		self.dump_flows[key] = filename
 		return key
-
+	'''
 
 	def flow_add( self, filename ):
 		parser = Parser()
@@ -450,6 +631,8 @@ class Connect:
 			os.makedirs(glob.tmp_file_directory)
 
 		self.op_cnt = 0
+
+		print glob.base_dir
 		
 		glob.ready = True
 		glob.db = Database()

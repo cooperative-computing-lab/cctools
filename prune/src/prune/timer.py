@@ -20,12 +20,14 @@ def start( *args ):
 def stop( *args ):
 	global starts,summs
 	for arg in args:
+		diff = time.time()-starts[arg]
 		if arg in summs:
-			summs[arg] += time.time()-starts[arg]
+			summs[arg] += diff
 			cnts[arg] += 1
 		else:
-			summs[arg] = time.time()-starts[arg]
+			summs[arg] = diff
 			cnts[arg] = 1
+	return diff
 
 def add( *args ):
 	global starts,summs

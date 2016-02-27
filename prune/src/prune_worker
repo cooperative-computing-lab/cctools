@@ -20,8 +20,8 @@ from prune import worker_wq
 #import exec_wq
 
 
-glob.cctools_version = 'CCTOOLS_VERSION'
-glob.cctools_releasedate = 'CCTOOLS_RELEASE_DATE'
+glob.cctools_version = '6.0.0 [prune:e7102b7e-DIRTY]'
+glob.cctools_releasedate = ''
 
 
 HOME = os.path.expanduser("~")+'/'

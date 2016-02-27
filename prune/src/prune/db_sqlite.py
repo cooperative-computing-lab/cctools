@@ -197,11 +197,11 @@ CREATE TABLE IF NOT EXISTS todos (
 		timer.start('db.find_one')
 
 		curs = self.dconn.cursor()
-		curs.execute("SELECT * FROM items WHERE cbid=?", (key,) )
+		curs.execute("SELECT * FROM items WHERE cbid=? ORDER BY id DESC LIMIT 1", (key,) )
 		res = curs.fetchone()
 		if not res:
 			curs = self.cconn.cursor()
-			curs.execute('SELECT * FROM items WHERE cbid=? OR dbid=?', (key, key,) )
+			curs.execute('SELECT * FROM items WHERE cbid=? OR dbid=? ORDER BY id DESC LIMIT 1', (key, key,) )
 			res = curs.fetchone()
 		if res:
 			res = Item( res )
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS todos (
 				timer.stop('db.exists_temp')
 				return when
 			except sqlite3.OperationalError:
-				print 'Database (todos) is locked on task_add'
+				print 'Database (todos) is locked on exists_temp_dbid'
 				time.sleep(1)
 				continue
 			break
@@ -237,7 +237,7 @@ CREATE TABLE IF NOT EXISTS todos (
 				timer.stop('db.exists_temp')
 				return when
 			except sqlite3.OperationalError:
-				print 'Database (todos) is locked on task_add'
+				print 'Database (todos) is locked on exists_temp'
 				time.sleep(1)
 				continue
 			break
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS todos (
 				timer.stop('db.exists_data')
 				return when
 			except sqlite3.OperationalError:
-				print 'Database (todos) is locked on task_add'
+				print 'Database (todos) is locked on exists_data'
 				time.sleep(1)
 				continue
 			break
@@ -273,6 +273,7 @@ CREATE TABLE IF NOT EXISTS todos (
 				item.stream_content( f )
 
 		timer.stop('db.dump')
+
 
 
 
@@ -396,7 +397,7 @@ CREATE TABLE IF NOT EXISTS todos (
 					if glob.wq_stage:
 						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL AND step = ? LIMIT ?', (glob.wq_stage,count) )
 					else:
-						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL ORDER BY id LIMIT ?', (count,) )
+						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL ORDER BY id DESC LIMIT ?', (count,) )
 
 					res = curs.fetchall()
 					

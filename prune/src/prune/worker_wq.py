@@ -143,8 +143,9 @@ class Master:
 		self.wq.specify_name(glob.wq_name)
 
 		cctools_debug_flags_set("all")
-		cctools_debug_config_file( glob.wq_log_pathname+'_'+uuid() )
-
+		temp_uuid = uuid()
+		cctools_debug_config_file( glob.wq_debug_log_pathname+'_'+temp_uuid )
+		self.wq.specify_log( glob.wq_log_pathname+'_'+temp_uuid )
 		self.wq.wait(1)	
 
 
