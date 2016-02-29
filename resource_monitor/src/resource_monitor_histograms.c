@@ -42,7 +42,6 @@ uint64_t input_overhead;
 
 struct histogram {
 	struct field *resource;
-	char *units;
 
 	struct rmDsummary_set *source;
 	struct rmDsummary **summaries_sorted;
@@ -727,12 +726,10 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 
 void write_histogram_stats_header(FILE *stream)
 {
-	fprintf(stream, "resource,");
+	fprintf(stream, "resource,units,");
 	fprintf(stream, "count,mean,std_dev,");
 	fprintf(stream, "min,");
 	fprintf(stream, "max,waste,throughput,");
-	fprintf(stream, "first_alloc_w_time,waste,throughput,");
-	fprintf(stream, "first_alloc_wo_time,waste,throughput,");
 	fprintf(stream, "first_alloc_95,waste,throughput,");
 
 	if(brute_force) {
@@ -740,12 +737,15 @@ void write_histogram_stats_header(FILE *stream)
 		fprintf(stream, "first_alloc_th,waste,throughput,");
 	}
 
+	fprintf(stream, "first_alloc_wo_time,waste,throughput,");
+	fprintf(stream, "first_alloc_w_time,waste,throughput,");
+
 	fprintf(stream, "p_25,p_50,p_75,p_99\n");
 }
 
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
-	fprintf(stream, "%s,", sanitize_path_name(h->resource->name));
+	fprintf(stream, "%s,%s,", sanitize_path_name(h->resource->name),h->resource->units);
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
 	fprintf(stream, "%.0lf,", floor(h->min_value));
 	fprintf(stream, "%.0lf,%.0lf,%6.2lf,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max/h->throughput_max);
@@ -1223,27 +1223,27 @@ void write_overheads_of_category(struct rmDsummary_set *s)
 
 	fprintf(f_ovhs, "task_count,");
 	fprintf(f_ovhs, "input,");
-	fprintf(f_ovhs, "time_dependence,");
-	fprintf(f_ovhs, "time_independence,");
 
 	if(brute_force) {
 		fprintf(f_ovhs, "brute_force,");
-		fprintf(f_ovhs, "best_throughput\n");
-	} else {
-		fprintf(f_ovhs, "\n");
+		fprintf(f_ovhs, "best_throughput,");
 	}
+
+	fprintf(f_ovhs, "time_independence,");
+	fprintf(f_ovhs, "time_dependence\n");
+
 
 	fprintf(f_ovhs, "%d,",  list_size(s->summaries));
 	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", input_overhead));
-	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_dependence));
-	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_independence));
 
 	if(brute_force) {
 		fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_brute_force));
-		fprintf(f_ovhs, "%lf\n", rmsummary_to_external_unit("wall_time", s->overhead_best_throughput));
-	} else {
-		fprintf(f_ovhs, "\n");
+		fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_best_throughput));
 	}
+
+	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_time_independence));
+	fprintf(f_ovhs, "%lf\n", rmsummary_to_external_unit("wall_time", s->overhead_time_dependence));
+
 
 	fclose(f_ovhs);
 }
@@ -1597,9 +1597,9 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				/* brute force, small bucket size */
-				category_tune_bucket_size("time",   USECOND);
-				category_tune_bucket_size("memory", 1);
-				category_tune_bucket_size("disk",   1);
+				category_tune_bucket_size("time",   5*USECOND);
+				category_tune_bucket_size("memory", 10);
+				category_tune_bucket_size("disk",   10);
 				break;
 			case 'n':
 				webpage_mode = 0;
