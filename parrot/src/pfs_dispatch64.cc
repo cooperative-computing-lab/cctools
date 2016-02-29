@@ -52,6 +52,7 @@ extern "C" {
 #include <sys/un.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -108,6 +109,12 @@ extern "C" {
 #endif
 #ifndef UFFD_CLOEXEC
 #	define UFFD_CLOEXEC 02000000
+#endif
+#ifndef BTRFS_IOCTL_MAGIC
+#	define BTRFS_IOCTL_MAGIC 0x94
+#endif
+#ifndef BTRFS_IOC_CLONE
+#	define BTRFS_IOC_CLONE _IOW (BTRFS_IOCTL_MAGIC, 9, int)
 #endif
 
 extern struct pfs_process *pfs_current;
@@ -1707,12 +1714,22 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
-		/* ioctl is only for I/O streams which are never Parrot files. */
+		/* ioctl is only for I/O streams which are never Parrot files.
+		 * The exception is BTRFS_IOC_CLONE, which we use to trigger an
+		 * in-Parrot file copy.
+		 */
 
 		case SYSCALL64_ioctl:
 			if (entering) {
 				if (p->table->isparrot(args[0])) {
-					divert_to_dummy(p,-ENOTTY);
+					if (args[1] == BTRFS_IOC_CLONE) {
+						debug(D_DEBUG, "starting BTRFS_IOC_CLONE operation %" PRId64 "->%" PRId64, args[2], args[0]);
+						p->syscall_result = pfs_fcopyfile(args[2],args[0]);
+						if(p->syscall_result<0) p->syscall_result = -errno;
+						divert_to_dummy(p,p->syscall_result);
+					} else {
+						divert_to_dummy(p,-ENOTTY);
+					}
 				} else if (!p->table->isnative(args[0])) {
 					divert_to_dummy(p,-EBADF);
 				}

@@ -106,6 +106,7 @@ int		pfs_getacl( const char *path, char *buf, int size );
 int		pfs_setacl( const char *path, const char *subject, const char *rights );
 int		pfs_locate( const char *path, char* buf, int size );
 int		pfs_copyfile( const char *source, const char *target );
+int		pfs_fcopyfile( int srcfd, int dstfd );
 int		pfs_md5( const char *path, unsigned char *digest );
 int		pfs_timeout( const char *str );
 
