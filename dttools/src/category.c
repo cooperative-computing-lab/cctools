@@ -28,7 +28,7 @@ struct peak_count_time {
 
 static uint64_t memory_bucket_size    = 25;        /* MB */
 static uint64_t disk_bucket_size      = 25;        /* MB */
-static uint64_t time_bucket_size      = 30000000;   /*  1 s */
+static uint64_t time_bucket_size      = 30000000;  /*  1 s */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
@@ -219,22 +219,22 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 
 	p = itable_lookup(histogram, keys[0]);
 	counts_accum[0] = p->count;
-	double tau_mean = p->times;
 
 	int64_t i;
 	for(i = 1; i < n; i++) {
 		p = itable_lookup(histogram, keys[i]);
 		counts_accum[i] = counts_accum[i - 1] + p->count;
-		tau_mean += p->times;
 	}
-	tau_mean /= counts_accum[n-1];
 
 	p = itable_lookup(histogram, keys[n-1]);
-	times_accum[n-1]  = p->times;
+	times_accum[n-1]  = p->times/counts_accum[n-1];
+
 	for(i = n-2; i >= 0; i--) {
 		p = itable_lookup(histogram, keys[i]);
-		times_accum[i] = times_accum[i + 1] + ((double) p->times)/counts_accum[n-1];
+		times_accum[i] = times_accum[i + 1] + p->times/counts_accum[n-1];
 	}
+
+	double tau_mean = times_accum[0];
 
 	int64_t a_1 = top_resource;
 	int64_t a_m = top_resource;
@@ -245,9 +245,11 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 		int64_t a  = keys[i];
 		double  Ea;
 
+		double Pa = 1 - ((double) counts_accum[i])/counts_accum[n-1];
+
 		if(assume_independence) {
-			double Pa = counts_accum[n-1] - counts_accum[i];
-			Ea = a*counts_accum[n-1] + a_m*Pa;
+			Ea = a + a_m*Pa;
+		   Ea *= tau_mean;
 		} else {
 			Ea = a*tau_mean + a_m*times_accum[i];
 		}

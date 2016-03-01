@@ -21,7 +21,7 @@ resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
 resource_monitor: rmonitor_helper_comm.o
 
 resource_monitor_histograms.o resource_monitor_cluster.o rmon_tools.o: %.o: %.c
-	$(CCTOOLS_CC) -fopenmp -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
+	$(CCTOOLS_CC) -fopenmp -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 resource_monitor_histograms resource_monitor_cluster: %: rmon_tools.o %.o
 	$(CCTOOLS_LD) -fopenmp -O3 -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
