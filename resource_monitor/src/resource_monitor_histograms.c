@@ -748,16 +748,20 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 	fprintf(stream, "%s,%s,", sanitize_path_name(h->resource->name),h->resource->units);
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
 	fprintf(stream, "%.0lf,", floor(h->min_value));
-	fprintf(stream, "%.0lf,%.0lf,%6.2lf,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max/h->throughput_max);
-	fprintf(stream, "%" PRId64 ",%.0lf,%6.2lf,", h->first_allocation_95, ceil(h->waste_95), h->throughput_95/h->throughput_max);
+
+	if(h->throughput_max < 1E-6)
+		h->throughput_max = 1;
+
+	fprintf(stream, "%.0lf,%.0lf,%.2lf,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max/h->throughput_max);
+	fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_95, ceil(h->waste_95), h->throughput_95/h->throughput_max);
 
 	if(brute_force) {
-		fprintf(stream, "%" PRId64 ",%.0lf,%6.2lf,", h->first_allocation_brute_force,    ceil(h->waste_brute_force), h->throughput_brute_force/h->throughput_max);
-		fprintf(stream, "%" PRId64 ",%.0lf,%6.2lf,", h->first_allocation_best_throughput, ceil(h->waste_best_throughput), h->throughput_best_throughput/h->throughput_max);
+		fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_brute_force,    ceil(h->waste_brute_force), h->throughput_brute_force/h->throughput_max);
+		fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_best_throughput, ceil(h->waste_best_throughput), h->throughput_best_throughput/h->throughput_max);
 	}
 
-	fprintf(stream, "%" PRId64 ",%.0lf,%6.2lf,", h->first_allocation_time_dependence, ceil(h->waste_time_dependence), h->throughput_time_dependence/h->throughput_max);
-	fprintf(stream, "%" PRId64 ",%.0lf,%6.2lf,", h->first_allocation_time_independence, ceil(h->waste_time_independence), h->throughput_time_independence/h->throughput_max);
+	fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_time_dependence, ceil(h->waste_time_dependence), h->throughput_time_dependence/h->throughput_max);
+	fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_time_independence, ceil(h->waste_time_independence), h->throughput_time_independence/h->throughput_max);
 
 	fprintf(stream, "%.2lf,%.2lf,%.2lf,%.2lf\n",
 			value_of_p(h, 0.25),
@@ -849,7 +853,14 @@ double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 	double tasks_accum     = 0;
 	double wall_time_accum = 0;
-	double max_allocation  = h->max_value;
+
+	if(first_alloc == 0)
+		return 0;
+
+	struct histogram *all = itable_lookup(all_summaries->histograms, (uint64_t) ((uintptr_t) f));
+	if(!all)
+		all = h;
+	double max_allocation  = all->max_value;
 
 	double current_task = max_allocation/first_alloc;
 
@@ -879,7 +890,9 @@ double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 		}
 	}
 
-	tasks_accum /= wall_time_accum;
+	if(wall_time_accum > 0) {
+		tasks_accum /= wall_time_accum;
+	}
 
 	return tasks_accum;
 }
@@ -1247,6 +1260,7 @@ void write_overheads_of_category(struct rmDsummary_set *s)
 
 	fclose(f_ovhs);
 }
+
 
 char *copy_outlier(struct rmDsummary *s)
 {
