@@ -331,6 +331,23 @@ using the <tt>stat</tt> system call.</p>
 <p>You can also directly set your command as the arguments of <tt>parrot_package_run</tt>. In this case, <tt>parrot_package_run</tt> will exit automatically after the command is finished, and you do not need to use <tt>exit</tt> to exit. However, your command must belong to the original command set executed inside <tt>parrot_run</tt> and preserved by <tt>parrot_package_create</tt>.</p>
 <code>% parrot_package_run --package-path /tmp/package ls -al</code>
 
+<h2 id="reflink">Reflink Copy<a class="sectionlink" href="#reflink" title="Link to this section.">&#x21d7;</a></h2>
+<p>
+Parrot can take advantage of the reflink feature (added in coreutils 7.5) when using <tt>cp</tt>.
+To use this feature, invoke <tt>cp</tt> as
+<code>% cp --reflink foo bar</code>
+This works by intercepting <tt>BTRFS_IOC_CLONE</tt> to trigger an in-Parrot copy with no further
+interaction with <tt>cp</tt>, avoiding the overhead of moving data into the client's buffer and
+then immediately back to Parrot. When run in Parrot, <tt>cp --reflink</tt> is not restricted to
+files on the same BTRFS volume, and can be used for efficiently copying any regular file.
+</p>
+
+<p>
+As of coreutils 8.24, <tt>mv</tt> will automatically attempt a reflink copy when moving files
+across mount points. Parrot's reflink feature allows e.g. <tt>mv</tt>ing a file into a tmpfs
+like <tt>/tmp</tt> with minimal overhead.
+</p>
+
 <h2 id="parrot_cp">More Efficient Copies with <tt>parrot_cp</tt><a class="sectionlink" href="#parrot_cp" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>

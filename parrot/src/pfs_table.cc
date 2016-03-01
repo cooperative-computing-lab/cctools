@@ -2149,6 +2149,9 @@ int pfs_table::locate( const char *n, char *buf, int length )
 pfs_ssize_t pfs_table::copyfile( const char *source, const char *target )
 {
 	pfs_name psource, ptarget;
+	pfs_file *sourcefile;
+	pfs_file *targetfile;
+	pfs_stat info;
 	pfs_ssize_t result;
 
 	if(!pfs_enable_small_file_optimizations) {
@@ -2171,47 +2174,60 @@ pfs_ssize_t pfs_table::copyfile( const char *source, const char *target )
 
 	if(result<0) {
 		if(errno==ENOSYS || psource.service==ptarget.service) {
-			result = copyfile_slow(source,target);
+			sourcefile = open_object(source,O_RDONLY,0,0);
+			if(!sourcefile) return -1;
+
+			result = sourcefile->fstat(&info);
+			if(result<0) {
+				sourcefile->close();
+				delete sourcefile;
+				return -1;
+			}
+
+			if(S_ISDIR(info.st_mode)) {
+				sourcefile->close();
+				delete sourcefile;
+				errno = EISDIR;
+				return -1;
+			}
+
+			targetfile = open_object(target,O_WRONLY|O_CREAT|O_TRUNC,0777,0);
+			if(!targetfile) {
+				sourcefile->close();
+				delete sourcefile;
+				return -1;
+			}
+
+			result = copyfile_slow(sourcefile,targetfile);
+
+			sourcefile->close();
+			delete sourcefile;
+
+			targetfile->close();
+			delete targetfile;
 		}
 	}
 
 	return result;
 }
 
-pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
+pfs_ssize_t pfs_table::fcopyfile(int sourcefd, int targetfd) {
+	CHECK_FD(sourcefd);
+	CHECK_FD(targetfd);
+
+	if (copyfile_slow(pointers[sourcefd]->file, pointers[targetfd]->file) > -1) {
+		return 0;
+	} else {
+		errno = ENOTTY;
+		return -1;
+	}
+}
+
+pfs_ssize_t pfs_table::copyfile_slow( pfs_file *sourcefile, pfs_file *targetfile )
 {
-	pfs_file *sourcefile;
-	pfs_file *targetfile;
-	pfs_stat info;
 	pfs_ssize_t total, ractual, wactual;
 	void *buffer;
 	int buffer_size;
-
-	int result;
-
-	sourcefile = open_object(source,O_RDONLY,0,0);
-	if(!sourcefile) return -1;
-
-	result = sourcefile->fstat(&info);
-	if(result<0) {
-		sourcefile->close();
-		delete sourcefile;
-		return -1;
-	}
-
-	if(S_ISDIR(info.st_mode)) {
-		sourcefile->close();
-		delete sourcefile;
-		errno = EISDIR;
-		return -1;
-	}
-
-	targetfile = open_object(target,O_WRONLY|O_CREAT|O_TRUNC,0777,0);
-	if(!targetfile) {
-		sourcefile->close();
-		delete sourcefile;
-		return -1;
-	}
 
 	buffer_size = MAX(sourcefile->get_block_size(),targetfile->get_block_size());
 	buffer = malloc(buffer_size);
@@ -2229,12 +2245,6 @@ pfs_ssize_t pfs_table::copyfile_slow( const char *source, const char *target )
 	}
 
 	free(buffer);
-
-	sourcefile->close();
-	delete sourcefile;
-
-	targetfile->close();
-	delete targetfile;
 
 	if(ractual==0) {
 		return total;
