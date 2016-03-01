@@ -439,6 +439,20 @@ If neither specifier is given, Makeflow appends <tt>/bin/sh -c []</tt> to the wr
 <code>makeflow --wrapper '/usr/bin/time -p /bin/sh -c []' example.makeflow</code>
 <p>This way, if a single rule specifies multiple commands, the wrapper will time <em>all</em> of them.</p>
 
+<p>The square brackets and the default
+behavior of running commands in a shell were added because Makeflow allows a rule to run multiple commands. The curly braces simply perform text substitution, so for example</p>
+<code>makeflow --wrapper 'env -i {}' example.makeflow</code>
+does not work correctly if multiple commands are specified.
+<code>target_1: source_1
+	command_1; command_2; command_3</code>
+will be executed as
+<code>env -i command_1; command_2; command_3</code>
+<p>Notice that only <tt>command_1</tt>'s environment will be cleared; subsequent commands are not affected.
+Thus this wrapper should be given as</p>
+<code>makeflow --wrapper 'env -i /bin/sh -c []' example.makeflow</code>
+or more succinctly as
+<code>makeflow --wrapper 'env -i' example.makeflow</code>
+
 <p>Suppose you want to apply <tt>strace</tt> to every rule, to obtain system call traces.  Since every rule would have to have its own output file for the trace, you could indicate output files like this:</p>
 
 <code>makeflow --wrapper 'strace -o trace.%%' --wrapper-output 'trace.%%' example.makeflow</code>
