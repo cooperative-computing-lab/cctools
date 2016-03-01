@@ -1608,9 +1608,9 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				/* brute force, small bucket size */
-				category_tune_bucket_size("time",   2*USECOND);
-				category_tune_bucket_size("memory", 5);
-				category_tune_bucket_size("disk",   5);
+				category_tune_bucket_size("time",   USECOND);
+				category_tune_bucket_size("memory", 1);
+				category_tune_bucket_size("disk",   1);
 				break;
 			case 'n':
 				webpage_mode = 0;
