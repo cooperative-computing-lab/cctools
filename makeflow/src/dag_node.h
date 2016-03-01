@@ -80,6 +80,8 @@ struct dag_node {
 	struct set *footprint_max_files;/* Set of nodes that define the max footprint */
 	uint64_t footprint_max_size;	/* Size of the largest defined footprint */
 
+	uint64_t footprint_size;		/* Size decided upon by the user as the footprint between min and max */
+
 	struct list *run_order;			/* list of child and the order to maintain committed size */
 
 	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow

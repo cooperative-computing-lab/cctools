@@ -519,7 +519,7 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 		set_first_element(tmp_descendants);
 		/* Loop over each child adding it max to the footprint. */
 		while((node1 = set_next_element(tmp_descendants))){
-			set_insert_set(n->desc_max_files, node1->footprint_min_files);
+			set_insert_set(n->desc_max_files, node1->footprint_max_files);
 		}
 		n->desc_max_footprint = dag_node_set_size(n->desc_max_files);
 	} else if(set_size(n->descendants) == 1){
@@ -556,18 +556,16 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
  * be clearly expressed. */
 void dag_node_min_footprint( struct dag_node *n)
 {
+	set_delete(n->footprint_min_files);
 	if(n->parent_footprint >= n->child_footprint
 		&& n->parent_footprint >= n->desc_min_footprint){
 		n->footprint_min_size = n->parent_footprint;
-		set_delete(n->footprint_min_files);
 		n->footprint_min_files = set_duplicate(n->parent_files);
 	} else if(n->child_footprint >= n->desc_min_footprint){
 		n->footprint_min_size = n->child_footprint;
-		set_delete(n->footprint_min_files);
 		n->footprint_min_files = set_duplicate(n->child_files);
 	} else {
 		n->footprint_min_size = n->desc_min_footprint;
-		set_delete(n->footprint_min_files);
 		n->footprint_min_files = set_duplicate(n->desc_min_files);
 	}
 }
@@ -577,18 +575,16 @@ void dag_node_min_footprint( struct dag_node *n)
  * be clearly expressed. */
 void dag_node_max_footprint( struct dag_node *n)
 {
+	set_delete(n->footprint_max_files);
 	if(n->parent_footprint >= n->child_footprint
 		&& n->parent_footprint >= n->desc_max_footprint){
 		n->footprint_max_size = n->parent_footprint;
-		set_delete(n->footprint_min_files);
 		n->footprint_max_files = set_duplicate(n->parent_files);
 	} else if(n->child_footprint >= n->desc_max_footprint){
 		n->footprint_max_size = n->child_footprint;
-		set_delete(n->footprint_min_files);
 		n->footprint_max_files = set_duplicate(n->child_files);
 	} else {
 		n->footprint_max_size = n->desc_max_footprint;
-		set_delete(n->footprint_min_files);
 		n->footprint_max_files = set_duplicate(n->desc_max_files);
 	}
 }
@@ -627,6 +623,16 @@ void dag_node_determine_footprint(struct dag_node *n)
 	n->footprint_updated = 1;
 }
 
+/* qsort C-string comparison function */
+int cstring_cmp(const void *a, const void *b)
+{
+    const char **ia = (const char **)a;
+    const char **ib = (const char **)b;
+    return strcmp(*ia, *ib);
+	/* strcmp functions works exactly as expected from
+ *	comparison function */
+}
+
 void dag_node_print_file_set(struct set *s, FILE *out, char *t)
 {
 	if(!s){
@@ -635,17 +641,25 @@ void dag_node_print_file_set(struct set *s, FILE *out, char *t)
 	}
 
 	set_first_element(s);
-	struct dag_file *f = set_next_element(s);
-	if(!f){
+	struct dag_file *f;
+	if(set_size(s) == 0){
 		fprintf(out, "\\{\\}%s", t);
-		return;
-	}
+	} else {
+		fprintf(out, "\\{");
+		const char *files[set_size(s)];
+		int index = 0;
+		while((f = set_next_element(s))){
+			files[index] = f->filename;
+			index++;
+		}
 
-	fprintf(out, "\\{%s", f->filename);
-	while((f = set_next_element(s))){
-		fprintf(out, ",%s", f->filename);
+		qsort(files, index, sizeof(char *), cstring_cmp);
+		for(int i = 0; i < index; i++){
+			fprintf(out, "%s", files[i]);
+		}
+
+		fprintf(out, "\\}%s", t);
 	}
-	fprintf(out, "\\}%s", t);
 }
 
 void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *retrn, char *node_retrn, char *delim)
@@ -703,7 +717,7 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 
 	if(tex){
 		retrn = "\\\\ \\hline \n\t";
-		node_retrn = "\\\\ \\hline \n\t";
+		node_retrn = "\\\\ \n\t";
 		delim = " & ";
 	}
 
@@ -711,7 +725,7 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 	out = fopen(output, "w");
 
 	if(tex)
-		fprintf(out, "\\begin{tabular}{cccccccc}%s",retrn);
+		fprintf(out, "\\begin{tabular}{|cccccccc|}%s",retrn);
 
 	fprintf(out, "Node%s",delim);
 	fprintf(out, "Residual%s",delim);
