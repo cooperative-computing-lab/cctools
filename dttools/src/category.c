@@ -23,12 +23,12 @@ See the file COPYING for details.
 
 struct peak_count_time {
 	int64_t count;
-	int64_t times;
+	double  times;
 };
 
 static uint64_t memory_bucket_size    = 25;        /* MB */
 static uint64_t disk_bucket_size      = 25;        /* MB */
-static uint64_t time_bucket_size      = 30000000;  /* 30 s */
+static uint64_t time_bucket_size      = 30000000;   /*  1 s */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
@@ -157,12 +157,11 @@ void category_delete(struct hash_table *categories, const char *name) {
 	int64_t value    = (summary)->field;\
 	int64_t walltime = (summary)->wall_time;\
 	if(value >= 0 && walltime >= 0) { \
-		uintptr_t bucket = DIV_INT_ROUND_UP(value + 1, bucket_size)*bucket_size; /* + 1 so border values go to the next bucket. */ \
-		/* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */\
-		struct peak_count_time *p = itable_lookup(c->field##_histogram, bucket + 1);\
-		if(!p) { p = malloc(sizeof(*p)); p->count = 0; p->times = 0; itable_insert(c->field##_histogram, bucket + 1, p);}\
+		uintptr_t bucket = (value/bucket_size)*bucket_size;\
+		struct peak_count_time *p = itable_lookup(c->field##_histogram, bucket);\
+		if(!p) { p = malloc(sizeof(*p)); p->count = 0; p->times = 0; itable_insert(c->field##_histogram, bucket, p);}\
 		p->count++;\
-		p->times += ceil( 1.0*walltime/time_bucket_size );\
+		p->times += ((double) walltime)/time_bucket_size;\
 	}\
 }
 
@@ -192,7 +191,7 @@ int64_t *category_sort_histogram(struct itable *histogram, uint64_t top_resource
 	itable_firstkey(histogram);
 	while(itable_nextkey(histogram, &key, (void **) &p)) {
 		/* histograms keys are shifted to the right, as 0 cannot be a valid key. */
-		keys[i] = key - 1;
+		keys[i] = key;
 		i++;
 	}
 
@@ -216,25 +215,26 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
 	double  *times_accum  = malloc(n*sizeof(intptr_t));
 
-	/* histograms keys are shifted to the right, thus the bucket + 1. */
 	struct peak_count_time *p;
 
-	p = itable_lookup(histogram, keys[0] + 1);
+	p = itable_lookup(histogram, keys[0]);
 	counts_accum[0] = p->count;
+	double tau_mean = p->times;
+
 	int64_t i;
 	for(i = 1; i < n; i++) {
-		p = itable_lookup(histogram, keys[i] + 1);
+		p = itable_lookup(histogram, keys[i]);
 		counts_accum[i] = counts_accum[i - 1] + p->count;
+		tau_mean += p->times;
 	}
+	tau_mean /= counts_accum[n-1];
 
-	p = itable_lookup(histogram, keys[n-1] + 1);
+	p = itable_lookup(histogram, keys[n-1]);
 	times_accum[n-1]  = p->times;
 	for(i = n-2; i >= 0; i--) {
-		p = itable_lookup(histogram, keys[i] + 1);
-		times_accum[i] = times_accum[i + 1] + (time_bucket_size*((1.0*p->times)/counts_accum[n-1]));
+		p = itable_lookup(histogram, keys[i]);
+		times_accum[i] = times_accum[i + 1] + ((double) p->times)/counts_accum[n-1];
 	}
-
-	double tau_mean = times_accum[0];
 
 	int64_t a_1 = top_resource;
 	int64_t a_m = top_resource;

@@ -749,19 +749,16 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
 	fprintf(stream, "%.0lf,", floor(h->min_value));
 
-	if(h->throughput_max < 1E-6)
-		h->throughput_max = 1;
-
-	fprintf(stream, "%.0lf,%.0lf,%.2lf,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max/h->throughput_max);
-	fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_95, ceil(h->waste_95), h->throughput_95/h->throughput_max);
+	fprintf(stream, "%.0lf,%.0lf,%lf,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max);
+	fprintf(stream, "%" PRId64 ",%.0lf,%lf,", h->first_allocation_95, ceil(h->waste_95), h->throughput_95);
 
 	if(brute_force) {
-		fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_brute_force,    ceil(h->waste_brute_force), h->throughput_brute_force/h->throughput_max);
-		fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_best_throughput, ceil(h->waste_best_throughput), h->throughput_best_throughput/h->throughput_max);
+		fprintf(stream, "%" PRId64 ",%.0lf,%lf,", h->first_allocation_brute_force,    ceil(h->waste_brute_force), h->throughput_brute_force);
+		fprintf(stream, "%" PRId64 ",%.0lf,%lf,", h->first_allocation_best_throughput, ceil(h->waste_best_throughput), h->throughput_best_throughput);
 	}
 
-	fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_time_dependence, ceil(h->waste_time_dependence), h->throughput_time_dependence/h->throughput_max);
-	fprintf(stream, "%" PRId64 ",%.0lf,%.2lf,", h->first_allocation_time_independence, ceil(h->waste_time_independence), h->throughput_time_independence/h->throughput_max);
+	fprintf(stream, "%" PRId64 ",%.0lf,%lf,", h->first_allocation_time_independence, ceil(h->waste_time_independence), h->throughput_time_independence);
+	fprintf(stream, "%" PRId64 ",%.0lf,%lf,", h->first_allocation_time_dependence, ceil(h->waste_time_dependence), h->throughput_time_dependence);
 
 	fprintf(stream, "%.2lf,%.2lf,%.2lf,%.2lf\n",
 			value_of_p(h, 0.25),
@@ -858,11 +855,11 @@ double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 		return 0;
 
 	struct histogram *all = itable_lookup(all_summaries->histograms, (uint64_t) ((uintptr_t) f));
-	if(!all)
+	if(!all) {
 		all = h;
+	}
 	double max_allocation  = all->max_value;
-
-	double current_task = max_allocation/first_alloc;
+	double current_task    = max_allocation/first_alloc;
 
 	int i;
 #pragma omp parallel for private(i) reduction(+: wall_time_accum, tasks_accum)
@@ -1611,9 +1608,9 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				/* brute force, small bucket size */
-				category_tune_bucket_size("time",   5*USECOND);
-				category_tune_bucket_size("memory", 10);
-				category_tune_bucket_size("disk",   10);
+				category_tune_bucket_size("time",   USECOND);
+				category_tune_bucket_size("memory", 5);
+				category_tune_bucket_size("disk",   5);
 				break;
 			case 'n':
 				webpage_mode = 0;
