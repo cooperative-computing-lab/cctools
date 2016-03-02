@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "category.h"
 
+void category_first_allocation_accum_times(struct itable *histogram, int64_t *keys, int64_t *counts_accum, double *times_mean, double *times_accum);
 void category_tune_bucket_size(const char *resource, uint64_t size);
 
 #endif

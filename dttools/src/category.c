@@ -157,7 +157,7 @@ void category_delete(struct hash_table *categories, const char *name) {
 	int64_t value    = (summary)->field;\
 	int64_t walltime = (summary)->wall_time;\
 	if(value >= 0 && walltime >= 0) { \
-		uintptr_t bucket = (value/bucket_size)*bucket_size;\
+		uintptr_t bucket = DIV_INT_ROUND_UP(value, bucket_size)*bucket_size;\
 		struct peak_count_time *p = itable_lookup(c->field##_histogram, bucket);\
 		if(!p) { p = malloc(sizeof(*p)); p->count = 0; p->times = 0; itable_insert(c->field##_histogram, bucket, p);}\
 		p->count++;\
@@ -178,12 +178,10 @@ int cmp_int(const void *a, const void *b) {
 	return 0;
 }
 
-int64_t *category_sort_histogram(struct itable *histogram, uint64_t top_resource) {
+int64_t *category_sort_histogram(struct itable *histogram, int64_t *keys) {
 	if(itable_size(histogram) < 1) {
 		return NULL;
 	}
-
-	int64_t *keys = malloc(itable_size(histogram)*sizeof(int64_t));
 
 	size_t i = 0;
 	uint64_t  key;
@@ -200,6 +198,35 @@ int64_t *category_sort_histogram(struct itable *histogram, uint64_t top_resource
 	return keys;
 }
 
+void category_first_allocation_accum_times(struct itable *histogram, int64_t *keys, int64_t *counts_accum, double *times_mean, double *times_accum) {
+
+	int64_t n = itable_size(histogram);
+
+	category_sort_histogram(histogram, keys);
+
+	struct peak_count_time *p;
+	p = itable_lookup(histogram, keys[0]);
+	counts_accum[0] = p->count;
+	times_mean[0]   = (((double) time_bucket_size)/USECOND)*(p->times/p->count);
+
+	int64_t i;
+	for(i = 1; i < n; i++) {
+		p = itable_lookup(histogram, keys[i]);
+		counts_accum[i] = counts_accum[i - 1] + p->count;
+		times_mean[i]   = (((double) time_bucket_size)/USECOND)*(p->times/p->count);
+	}
+
+	p = itable_lookup(histogram, keys[n-1]);
+	times_accum[n-1]  = 0;
+
+	for(i = n-2; i >= 0; i--) {
+		p = itable_lookup(histogram, keys[i+1]);
+		times_accum[i] = times_accum[i + 1] + times_mean[i+1] * ((double) p->count)/counts_accum[n-1];
+	}
+
+	return;
+}
+
 int64_t category_first_allocation(struct itable *histogram, int assume_independence, int64_t top_resource) {
 	/* Automatically labeling for memory is not activated. */
 	if(top_resource < 0) {
@@ -211,28 +238,12 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 	if(n < 1)
 		return -1;
 
-	int64_t *keys         = category_sort_histogram(histogram, top_resource);
+	int64_t *keys         = malloc(n*sizeof(intptr_t));
 	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
+	double  *times_mean   = malloc(n*sizeof(intptr_t));
 	double  *times_accum  = malloc(n*sizeof(intptr_t));
 
-	struct peak_count_time *p;
-
-	p = itable_lookup(histogram, keys[0]);
-	counts_accum[0] = p->count;
-
-	int64_t i;
-	for(i = 1; i < n; i++) {
-		p = itable_lookup(histogram, keys[i]);
-		counts_accum[i] = counts_accum[i - 1] + p->count;
-	}
-
-	p = itable_lookup(histogram, keys[n-1]);
-	times_accum[n-1]  = p->times/counts_accum[n-1];
-
-	for(i = n-2; i >= 0; i--) {
-		p = itable_lookup(histogram, keys[i]);
-		times_accum[i] = times_accum[i + 1] + p->times/counts_accum[n-1];
-	}
+	category_first_allocation_accum_times(histogram, keys, counts_accum, times_mean, times_accum);
 
 	double tau_mean = times_accum[0];
 
@@ -241,6 +252,7 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 
 	double Ea_1 = DBL_MAX;
 
+	int i;
 	for(i = 0; i < n; i++) {
 		int64_t a  = keys[i];
 		double  Ea;
@@ -249,7 +261,7 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 
 		if(assume_independence) {
 			Ea = a + a_m*Pa;
-		   Ea *= tau_mean;
+			Ea *= tau_mean;
 		} else {
 			Ea = a*tau_mean + a_m*times_accum[i];
 		}
@@ -265,6 +277,7 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 	}
 
 	free(counts_accum);
+	free(times_mean);
 	free(times_accum);
 	free(keys);
 
