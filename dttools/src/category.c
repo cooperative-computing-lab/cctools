@@ -198,7 +198,7 @@ int64_t *category_sort_histogram(struct itable *histogram, int64_t *keys) {
 	return keys;
 }
 
-void category_first_allocation_accum_times(struct itable *histogram, int64_t *keys, int64_t *counts_accum, double *times_mean, double *times_accum) {
+void category_first_allocation_accum_times(struct itable *histogram, double *tau_mean, int64_t *keys, int64_t *counts_accum, double *times_mean, double *times_accum) {
 
 	int64_t n = itable_size(histogram);
 
@@ -224,6 +224,9 @@ void category_first_allocation_accum_times(struct itable *histogram, int64_t *ke
 		times_accum[i] = times_accum[i + 1] + times_mean[i+1] * ((double) p->count)/counts_accum[n-1];
 	}
 
+	p = itable_lookup(histogram, keys[0]);
+	*tau_mean = times_accum[0] + times_mean[0] * ((double) p->count)/counts_accum[n-1];
+
 	return;
 }
 
@@ -243,9 +246,9 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 	double  *times_mean   = malloc(n*sizeof(intptr_t));
 	double  *times_accum  = malloc(n*sizeof(intptr_t));
 
-	category_first_allocation_accum_times(histogram, keys, counts_accum, times_mean, times_accum);
+	double tau_mean;
 
-	double tau_mean = times_accum[0];
+	category_first_allocation_accum_times(histogram, &tau_mean, keys, counts_accum, times_mean, times_accum);
 
 	int64_t a_1 = top_resource;
 	int64_t a_m = top_resource;
