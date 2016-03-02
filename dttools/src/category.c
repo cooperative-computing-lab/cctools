@@ -26,9 +26,9 @@ struct peak_count_time {
 	double  times;
 };
 
-static uint64_t memory_bucket_size    = 25;        /* MB */
-static uint64_t disk_bucket_size      = 25;        /* MB */
-static uint64_t time_bucket_size      = 30000000;  /*  1 s */
+static uint64_t memory_bucket_size    = 50;        /* MB */
+static uint64_t disk_bucket_size      = 50;        /* MB */
+static uint64_t time_bucket_size      = 60000000;  /* 1 minute */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
