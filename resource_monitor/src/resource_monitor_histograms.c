@@ -1221,53 +1221,67 @@ void write_limits_of_category(struct rmDsummary_set *s)
 	fclose(f_limits);
 }
 
-/*
-void write_scatters_of_category(struct category *c) {
+void write_scatters_of_category_aux(struct itable *hc, char *cat_name, char *field_name) {
 
-	char *name_raw   = sanitize_path_name(h->source->category);
-	char *filename   = string_format("%s/%s_scatter_%s_time.data", output_directory, name_raw, f->name);
+	int n = itable_size(hc);
+	if(n < 1)
+		return;
 
+	int64_t *keys         = malloc(n*sizeof(intptr_t));
+	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
+	double  *times_mean   = malloc(n*sizeof(intptr_t));
+	double  *times_accum  = malloc(n*sizeof(intptr_t));
+	double tau_mean;
 
+	category_first_allocation_accum_times(hc, &tau_mean, keys, counts_accum, times_mean, times_accum);
+
+	char *name_raw   = sanitize_path_name(cat_name);
+	char *filename   = string_format("%s/%s/scatter_%s_time.data", output_directory, name_raw, field_name);
 	FILE *f_rt = open_file(filename);
 
+	fprintf(f_rt, "mean_time = %lf\n", tau_mean);
+	fprintf(f_rt, "# resource mean_time >mean_time\n");
+	fprintf(f_rt, "$DATA << EOD\n");
 
+	int i;
+	for(i = 0; i < n; i++) {
+		double Pa = 1 - ((double) counts_accum[i])/counts_accum[n-1];
+		double mean_rest = Pa > 0 ? times_accum[i]/Pa : 0;
+
+		fprintf(f_rt, "%" PRId64 " %lf %lf\n", keys[i], times_mean[i], mean_rest);
+	}
+
+	fprintf(f_rt, "EOD\n");
 	fclose(f_rt);
+
+	free(keys);
+	free(counts_accum);
+	free(times_mean);
+	free(times_accum);
 }
 
-#define write_scatters_of_category(name) write_scatters_of_category_aux()
+#define write_scatters_of_field(c, field) write_scatters_of_category_aux((c)->field##_histogram, c->name, #field)
 
 void write_scatters_of_category(struct rmDsummary_set *s)
 {
 	struct category *c = category_lookup_or_create(categories, s->category);
 
-	c->cores_histogram          = itable_create(0);
-	c->wall_time_histogram      = itable_create(0);
-	c->cpu_time_histogram       = itable_create(0);
-	c->memory_histogram         = itable_create(0);
-	c->swap_memory_histogram    = itable_create(0);
-	c->virtual_memory_histogram = itable_create(0);
-	c->bytes_read_histogram     = itable_create(0);
-	c->bytes_written_histogram  = itable_create(0);
-	c->bytes_received_histogram = itable_create(0);
-	c->bytes_sent_histogram     = itable_create(0);
-	c->bandwidth_histogram      = itable_create(0);
-	c->total_files_histogram    = itable_create(0);
-	c->disk_histogram           = itable_create(0);
-	c->max_concurrent_processes_histogram = itable_create(0);
-	c->total_processes_histogram = itable_create(0);
-
-	struct field *f;
-	struct histogram *h;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		if(!f->active)
-			continue;
-
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-		write_scatters_of_field(h, f);
-	}
+	write_scatters_of_field(c, cores);
+	write_scatters_of_field(c, wall_time);
+	write_scatters_of_field(c, cpu_time);
+	write_scatters_of_field(c, memory);
+	write_scatters_of_field(c, swap_memory);
+	write_scatters_of_field(c, virtual_memory);
+	write_scatters_of_field(c, bytes_read);
+	write_scatters_of_field(c, bytes_written);
+	write_scatters_of_field(c, bytes_received);
+	write_scatters_of_field(c, bytes_sent);
+	write_scatters_of_field(c, bandwidth);
+	write_scatters_of_field(c, total_files);
+	write_scatters_of_field(c, disk);
+	write_scatters_of_field(c, max_concurrent_processes);
+	write_scatters_of_field(c, total_processes);
 }
-*/
 
 void write_overheads_of_category(struct rmDsummary_set *s)
 {
@@ -1743,6 +1757,7 @@ int main(int argc, char **argv)
 			write_stats_of_category(s);
 			write_limits_of_category(s);
 			write_overheads_of_category(s);
+			write_scatters_of_category(s);
 
 			if(webpage_mode)
 			{
