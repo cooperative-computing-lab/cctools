@@ -1171,12 +1171,12 @@ void set_throughputs_of_category(struct rmDsummary_set *s, struct hash_table *ca
 
 void write_stats_of_category(struct rmDsummary_set *s)
 {
-	char *f_stats_raw   = sanitize_path_name(s->category);
-	char *filename      = string_format("%s/%s.stats", output_directory, f_stats_raw);
+	char *name_raw   = sanitize_path_name(s->category);
+	char *filename      = string_format("%s/%s.stats", output_directory, name_raw);
 
 	FILE *f_stats  = open_file(filename);
 
-	free(f_stats_raw);
+	free(name_raw);
 	free(filename);
 
 	write_histogram_stats_header(f_stats);
@@ -1198,13 +1198,13 @@ void write_stats_of_category(struct rmDsummary_set *s)
 void write_limits_of_category(struct rmDsummary_set *s)
 {
 
-	char *f_stats_raw   = sanitize_path_name(s->category);
-	char *filename      = string_format("%s/%s.limits", output_directory, f_stats_raw);
+	char *name_raw   = sanitize_path_name(s->category);
+	char *filename      = string_format("%s/%s.limits", output_directory, name_raw);
 
 	FILE *f_limits      = open_file(filename);
 
 	free(filename);
-	free(f_stats_raw);
+	free(name_raw);
 
 	struct field *f;
 	struct histogram *h;
@@ -1223,12 +1223,12 @@ void write_limits_of_category(struct rmDsummary_set *s)
 
 void write_overheads_of_category(struct rmDsummary_set *s)
 {
-	char *f_ovhs_raw   = sanitize_path_name(s->category);
-	char *filename      = string_format("%s/%s.overheads", output_directory, f_ovhs_raw);
+	char *name_raw   = sanitize_path_name(s->category);
+	char *filename   = string_format("%s/%s.overheads", output_directory, name_raw);
 
 	FILE *f_ovhs  = open_file(filename);
 
-	free(f_ovhs_raw);
+	free(name_raw);
 	free(filename);
 
 	fprintf(f_ovhs, "task_count,");
@@ -1608,7 +1608,7 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				/* brute force, small bucket size */
-				category_tune_bucket_size("time",   USECOND);
+				category_tune_bucket_size("time",   10*USECOND);
 				category_tune_bucket_size("memory", 1);
 				category_tune_bucket_size("disk",   1);
 				break;
