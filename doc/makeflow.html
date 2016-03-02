@@ -431,12 +431,14 @@ Makeflow allows a global wrapper command to be applied to every rule in the work
 Square brackets (<tt>[]</tt>) are the same as curly braces, except that the command is quoted and escaped before substitution.
 If neither specifier is given, Makeflow appends <tt>/bin/sh -c []</tt> to the wrapper command.</p>
 
-<p>For example, suppose that you wish to apply <tt>/usr/bin/time</tt> to every rule in the workflow.  Instead of modifying the workflow, run it like this:</p>
+<p>For example, suppose that you wish to shell builtin command <tt>time</tt> to
+every rule in the workflow.  Instead of modifying the workflow, run it like
+this:</p>
 
-<code>makeflow --wrapper '/usr/bin/time -p' example.makeflow</code>
+<code>makeflow --wrapper 'time -p' example.makeflow</code>
 
 <p>Since the preceding wrapper did not specify where to substitute the command, it is equivalent to</p>
-<code>makeflow --wrapper '/usr/bin/time -p /bin/sh -c []' example.makeflow</code>
+<code>makeflow --wrapper 'time -p /bin/sh -c []' example.makeflow</code>
 <p>This way, if a single rule specifies multiple commands, the wrapper will time <em>all</em> of them.</p>
 
 <p>The square brackets and the default
