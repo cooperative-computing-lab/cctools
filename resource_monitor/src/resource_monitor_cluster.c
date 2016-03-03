@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <math.h>
+#include <float.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -210,7 +211,7 @@ struct cluster *cluster_nearest_neighbor(struct itable *active_clusters, struct 
 	uint64_t        ptr;
 	struct cluster *nearest = NULL;
 	struct cluster *other;
-	double         dmin, dtest;
+	double         dmin = DBL_MAX, dtest;
 
 	itable_firstkey(active_clusters);
 	while( itable_nextkey( active_clusters, &ptr, (void *) &other ) )
