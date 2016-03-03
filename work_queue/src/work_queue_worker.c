@@ -1335,12 +1335,14 @@ static int handle_master(struct link *master) {
 		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
 			if(path_within_dir(filename, workspace)) {
 				r = do_put(master, filename, length, mode);
+				reset_idle_timer();
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r= 0;
+				r = 0;
 			}
-				} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
-						r = do_url(master, filename, length, mode);
+		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
+			r = do_url(master, filename, length, mode);
+			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename) == 1) {
 			if(path_within_dir(filename, workspace)) {
 				r = do_unlink(filename);
@@ -1354,6 +1356,7 @@ static int handle_master(struct link *master) {
 			r = do_thirdget(mode, filename, path);
 		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
 			r = do_thirdput(master, mode, filename, path);
+			reset_idle_timer();
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
 			if(taskid >= 0) {
 				r = do_kill(taskid);
@@ -1381,7 +1384,6 @@ static int handle_master(struct link *master) {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
 			r = 0;
 		}
-
 	} else {
 		debug(D_WQ, "Failed to read from master.\n");
 		r = 0;
