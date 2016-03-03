@@ -258,11 +258,12 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table
 	if(!so)
 		return NULL;
 
-	if(categories && so->category) {
-		category_accumulate_summary(categories, so->category, so);
+	if(categories) {
+		category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
+		if(so->category) {
+			category_accumulate_summary(categories, so->category, so);
+		}
 	}
-
-	category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
 
 	struct rmDsummary *s  = malloc(sizeof(struct rmDsummary));
 	bzero(s, sizeof(*s));
