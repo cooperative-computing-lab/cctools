@@ -19,6 +19,7 @@ Eventually, this module will supersede "local" as the default.
 #include "stringtools.h"
 #include "sandbox.h"
 #include "itable.h"
+#include "jx.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -28,7 +29,7 @@ Eventually, this module will supersede "local" as the default.
 
 static struct itable * sandbox_table = 0;
 
-static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct nvpair *envlist )
+static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
 
@@ -80,7 +81,7 @@ static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const cha
 
 		/* Set up the environment specific to the child. */
 		if(envlist) {
-			nvpair_export(envlist);
+			jx_export(envlist);
 		}
 
 		/** A note from "man system 3" as of Jan 2012:
