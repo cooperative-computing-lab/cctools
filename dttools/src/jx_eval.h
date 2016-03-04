@@ -16,6 +16,6 @@ matching name in the context object.
 @param context An object in which values will be found.
 @return A newly created result expression, which must be deleted with @ref jx_delete.
 */
-struct jx * jx_evaluate( struct jx *j, struct jx *context );
+struct jx * jx_eval( struct jx *j, struct jx *context );
 
 #endif
