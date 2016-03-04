@@ -26,6 +26,17 @@ typedef enum {
 	JX_TOKEN_COLON,
 	JX_TOKEN_TRUE,
 	JX_TOKEN_FALSE,
+	JX_TOKEN_EQ,
+	JX_TOKEN_NE,
+	JX_TOKEN_LT,
+	JX_TOKEN_LE,
+	JX_TOKEN_GT,
+	JX_TOKEN_GE,
+	JX_TOKEN_ADD,
+	JX_TOKEN_SUB,
+	JX_TOKEN_MUL,
+	JX_TOKEN_DIV,
+	JX_TOKEN_MOD,
 	JX_TOKEN_NULL,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_EOF,
@@ -216,6 +227,34 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_COMMA;
 	} else if(c==':') {
 		return JX_TOKEN_COLON;
+	} else if(c=='+') {
+		return JX_TOKEN_ADD;
+	} else if(c=='-') {
+		return JX_TOKEN_SUB;
+	} else if(c=='*') {
+		return JX_TOKEN_MUL;
+	} else if(c=='/') {
+		return JX_TOKEN_DIV;
+	} else if(c=='%') {
+		return JX_TOKEN_MOD;
+	} else if(c=='!') {
+		char d = jx_getchar(s);
+		if(d=='=') return JX_TOKEN_NE;
+		return JX_TOKEN_ERROR;
+	} else if(c=='=') {
+		char d = jx_getchar(s);
+		if(d=='=') return JX_TOKEN_EQ;
+		return JX_TOKEN_ERROR;
+	} else if(c=='<') {
+		char d = jx_getchar(s);
+		if(d=='=') return JX_TOKEN_LE;
+		jx_ungetchar(s,d);
+		return JX_TOKEN_LT;
+	} else if(c=='>') {
+		char d = jx_getchar(s);
+		if(d=='=') return JX_TOKEN_GE;
+		jx_ungetchar(s,d);
+		return JX_TOKEN_GT;
 	} else if(c=='\"') {
 		int i;
 		for(i=0;i<MAX_TOKEN_SIZE;i++) {
@@ -232,12 +271,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		jx_parse_error(s,"string constant too long");
 		return JX_TOKEN_ERROR;
 
-	} else if(strchr("+-0123456789.",c)) {
+	} else if(strchr("0123456789.",c)) {
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			c = jx_getchar(s);
-			if(strchr("0123456789.-+eE",c)) {
+			if(strchr("0123456789.",c)) {
 				s->token[i] = c;
 			} else {
 				s->token[i] = 0;
@@ -375,7 +414,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	return p;
 }
 
-struct jx * jx_parse( struct jx_parser *s )
+struct jx * jx_parse_atomic( struct jx_parser *s )
 {
 	jx_token_t t = jx_scan(s);
 
@@ -405,11 +444,7 @@ struct jx * jx_parse( struct jx_parser *s )
 		} else {
 			return jx_symbol(s->token);
 		}
-	case JX_TOKEN_RBRACE:
-	case JX_TOKEN_RBRACKET:
-	case JX_TOKEN_COMMA:
-	case JX_TOKEN_COLON:
-	case JX_TOKEN_ERROR:
+	default:
 		jx_parse_error(s,"unexpected token");
 		return 0;
 	}
@@ -421,6 +456,76 @@ struct jx * jx_parse( struct jx_parser *s )
 
 	jx_parse_error(s,"parse error");
 	return 0;
+}
+
+static int jx_operator_precedence( jx_token_t t )
+{
+	switch(t) {
+		case JX_TOKEN_EQ:	return 3;
+		case JX_TOKEN_NE:	return 3;
+		case JX_TOKEN_LE:	return 3;
+		case JX_TOKEN_LT:	return 3;
+		case JX_TOKEN_GE:	return 3;
+		case JX_TOKEN_GT:	return 3;
+		case JX_TOKEN_MUL:	return 2;
+		case JX_TOKEN_DIV:	return 2;
+		case JX_TOKEN_MOD:	return 2;
+		case JX_TOKEN_ADD:	return 1;
+		case JX_TOKEN_SUB:	return 1;
+		default:		return 0;
+	}
+}
+
+static jx_operator_t jx_token_to_operator( jx_token_t t )
+{
+	switch(t) {
+		case JX_TOKEN_EQ:	return JX_OP_EQ;
+		case JX_TOKEN_NE:	return JX_OP_NE;
+		case JX_TOKEN_LE:	return JX_OP_LE;
+		case JX_TOKEN_LT:	return JX_OP_LT;
+		case JX_TOKEN_GE:	return JX_OP_GE;
+		case JX_TOKEN_GT:	return JX_OP_GT;
+		case JX_TOKEN_ADD:	return JX_OP_ADD;
+		case JX_TOKEN_SUB:	return JX_OP_SUB;
+		case JX_TOKEN_MUL:	return JX_OP_MUL;
+		case JX_TOKEN_DIV:	return JX_OP_DIV;
+		case JX_TOKEN_MOD:	return JX_OP_MOD;
+		default:		return 100;
+	}
+}
+
+struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
+{
+	struct jx *a;
+
+	if(precedence<=0) {
+		a = jx_parse_atomic(s);
+	} else {
+		a = jx_parse_prec(s,precedence-1);
+	}
+
+	if(!a) return 0;
+
+	jx_token_t t = jx_scan(s);
+	jx_operator_t op = jx_token_to_operator(t);
+
+	if(op!=100 && jx_operator_precedence(op)==precedence ) {
+		struct jx *b = jx_parse_prec(s,precedence);
+		if(b) {
+			return jx_operator(op,a,b);
+		} else {
+			jx_delete(a);
+			return 0;
+		}
+	} else {
+		jx_unscan(s,t);
+		return a;
+	}
+}
+
+struct jx * jx_parse( struct jx_parser *s )
+{
+	return jx_parse_prec(s,2);
 }
 
 static struct jx * jx_parse_finish( struct jx_parser *p )

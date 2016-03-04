@@ -208,6 +208,8 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 
 static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context )
 {
+	if(!pair) return 0;
+
 	return jx_pair(
 		jx_eval(pair->key,context),
 		jx_eval(pair->value,context),
@@ -217,6 +219,8 @@ static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context )
 
 static struct jx_item * jx_eval_item( struct jx_item *item, struct jx *context )
 {
+	if(!item) return 0;
+
 	return jx_item(
 		jx_eval(item->value,context),
 		jx_eval_item(item->next,context)

@@ -15,6 +15,7 @@ and failure is returned.
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_print.h"
+#include "jx_eval.h"
 
 #include <stdio.h>
 
@@ -27,9 +28,18 @@ int main( int argc, char *argv[] )
 	struct jx *j = jx_parse(p);
 
 	if(!jx_parser_errors(p)) {
+		printf("expression: ");
 		jx_print_stream(j,stdout);
 		printf("\n");
+
+		struct jx *k = jx_eval(j,jx_null());
+		printf("evaluated: ");
+		jx_print_stream(k,stdout);
+		printf("\n");
+
 		jx_delete(j);
+		jx_delete(k);
+
 		jx_parser_delete(p);
 		return 0;
 	} else {
