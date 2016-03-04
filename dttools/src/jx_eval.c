@@ -30,39 +30,26 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 	int a = left->u.boolean_value;
 	int b = right->u.boolean_value;
 
-	int r;
-
 	switch(op) {
 		case JX_OP_EQ:
-			r = a==b;
-			break;
+			return jx_boolean(a==b);
 		case JX_OP_NE:
-			r = a!=b;
-			break;
+			return jx_boolean(a!=b);
 		case JX_OP_LT:
-			r = a<b;
-			break;
+			return jx_boolean(a<b);
 		case JX_OP_LE:
-			r = a<=b;
-			break;
+			return jx_boolean(a<=b);
 		case JX_OP_GT:
-			r = a>b;
-			break;
+			return jx_boolean(a>b);
 		case JX_OP_GE:
-			r = a>=b;
-			break;
+			return jx_boolean(a>=b);
 		case JX_OP_ADD:
-			r = a|b;
-			break;
+			return jx_boolean(a|b);
 		case JX_OP_MUL:
-			r = a&b;
-			break;
-		default:
-			r = 0;
-			break;
+			return jx_boolean(a&b);
 	}
 
-	return jx_boolean(r);
+	return jx_boolean(0);
 }
 
 static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx *right )
