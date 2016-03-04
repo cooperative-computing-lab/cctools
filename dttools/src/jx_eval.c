@@ -38,6 +38,8 @@ struct jx * jx_evaluate( struct jx *j, struct jx *context )
 			return jx_array(jx_item_evaluate(j->u.items,context));
 		case JX_OBJECT:
 			return jx_object(jx_pair_evaluate(j->u.pairs,context));
+		case JX_OPERATOR:
+			return jx_null();
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;

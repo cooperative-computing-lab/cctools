@@ -50,6 +50,7 @@ typedef enum {
 	JX_SYMBOL,	/**< variable identifier */
 	JX_ARRAY,	/**< array containing values */
 	JX_OBJECT,	/**< object containing key-value pairs */
+	JX_OPERATOR,	/**< operator on multiple values. */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
@@ -69,6 +70,26 @@ struct jx_pair {
 	struct jx_pair *next;   /**< pointer to next pair */
 };
 
+typedef enum {
+	JX_OP_EQ,
+	JX_OP_NE,
+	JX_OP_LE,
+	JX_OP_LT,
+	JX_OP_GE,
+	JX_OP_GT,
+	JX_OP_ADD,
+	JX_OP_SUB,
+	JX_OP_MUL,
+	JX_OP_DIV,
+	JX_OP_MOD,
+} jx_operator_t;
+
+struct jx_operator {
+	jx_operator_t type;
+	struct jx *left;
+	struct jx *right;
+};
+
 /** JX value representing any expression type. */
 
 struct jx {
@@ -81,6 +102,7 @@ struct jx {
 		char * symbol_name;   /**< value of @ref JX_SYMBOL */
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
+		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
 	} u;
 };
 
@@ -114,6 +136,9 @@ struct jx * jx_arrayv( struct jx *value, ... );
 
 /** Create a JX object.  @param pairs A linked list of @ref jx_pair key-value pairs.  @return a JX object. */
 struct jx * jx_object( struct jx_pair *pairs );
+
+/** Create a JX binary expression, @param oper The kind of operator.  @param left The left side of the expression.  @param right The right side of the expression. */
+struct jx * jx_operator( jx_operator_t oper, struct jx *left, struct jx *right );
 
 /** Create a JX key-value pair.  @param key The key. @param value The value. @param next The next item in the linked list. @return A key-value pair.*/
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next );

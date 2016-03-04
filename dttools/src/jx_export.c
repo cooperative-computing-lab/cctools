@@ -105,6 +105,10 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		}
 		fprintf(stream,"</array>\n");
 		break;
+	case JX_OPERATOR:
+		fprintf(stream,"<expr>\n");
+		jx_print_stream(j,stream);
+		fprintf(stream,"</expr>\n");
 	}
 }
 

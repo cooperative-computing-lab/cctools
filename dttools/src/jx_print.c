@@ -32,6 +32,24 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 	}
 }
 
+static const char * jx_operator_string( jx_operator_t type )
+{
+	switch(type) {
+		case JX_OP_EQ: return "==";
+		case JX_OP_NE: return "!=";
+		case JX_OP_LT: return "<";
+		case JX_OP_LE: return "<=";
+		case JX_OP_GT: return ">";
+		case JX_OP_GE: return ">=";
+		case JX_OP_ADD: return "+";
+		case JX_OP_SUB: return "-";
+		case JX_OP_MUL: return "*";
+		case JX_OP_DIV: return "/";
+		case JX_OP_MOD: return "%";
+	}
+	return "???";
+}
+
 void jx_escape_string( const char *s, buffer_t *b )
 {
 	if(!s) return;
@@ -109,6 +127,10 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			jx_pair_print(j->u.pairs,b);
 			buffer_putstring(b,"}");
 			break;
+		case JX_OPERATOR:
+			jx_print_buffer(j->u.oper.left,b);
+			buffer_putstring(b,jx_operator_string(j->u.oper.type));
+			jx_print_buffer(j->u.oper.right,b);
 	}
 }
 
