@@ -9,14 +9,30 @@ See the file COPYING for details.
 
 #include <string.h>
 
-struct jx * jx_eval_boolean( struct jx_operator *o, struct jx *left, struct jx *right )
+static struct jx * jx_eval_null( jx_operator_t op )
+{
+	switch(op) {
+		case JX_OP_EQ:
+			return jx_boolean(1);
+		case JX_OP_NE: 
+		case JX_OP_LT:
+		case JX_OP_LE:
+		case JX_OP_GT:
+		case JX_OP_GE:
+			return jx_boolean(0);
+		default:
+			return jx_null();
+	}
+}
+
+static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx *right )
 {
 	int a = left->u.boolean_value;
 	int b = right->u.boolean_value;
 
 	int r;
 
-	switch(o->type) {
+	switch(op) {
 		case JX_OP_EQ:
 			r = a==b;
 			break;
@@ -49,39 +65,30 @@ struct jx * jx_eval_boolean( struct jx_operator *o, struct jx *left, struct jx *
 	return jx_boolean(r);
 }
 
-struct jx * jx_eval_integer( struct jx_operator *o, struct jx *left, struct jx *right )
+static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx *right )
 {
 	int a = left->u.integer_value;
 	int b = right->u.integer_value;
 
-	switch(o->type) {
+	switch(op) {
 		case JX_OP_EQ:
 			return jx_boolean(a==b);
-			break;
 		case JX_OP_NE:
 			return jx_boolean(a!=b);
-			break;
 		case JX_OP_LT:
 			return jx_boolean(a<b);
-			break;
 		case JX_OP_LE:
 			return jx_boolean(a<=b);
-			break;
 		case JX_OP_GT:
 			return jx_boolean(a>b);
-			break;
 		case JX_OP_GE:
 			return jx_boolean(a>=b);
-			break;
 		case JX_OP_ADD:
 			return jx_integer(a+b);
-			break;
 		case JX_OP_SUB:
 			return jx_integer(a-b);
-			break;
 		case JX_OP_MUL:
 			return jx_integer(a*b);
-			break;
 		case JX_OP_DIV:
 			if(b==0) return jx_null();
 			return jx_integer(a/b);
@@ -93,12 +100,12 @@ struct jx * jx_eval_integer( struct jx_operator *o, struct jx *left, struct jx *
 	return jx_null();
 }
 
-struct jx * jx_eval_double( struct jx_operator *o, struct jx *left, struct jx *right )
+static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx *right )
 {
 	double a = left->u.double_value;
 	double b = right->u.double_value;
 
-	switch(o->type) {
+	switch(op) {
 		case JX_OP_EQ:
 			return jx_boolean(a==b);
 			break;
@@ -137,12 +144,12 @@ struct jx * jx_eval_double( struct jx_operator *o, struct jx *left, struct jx *r
 	return jx_null();
 }
 
-struct jx * jx_eval_string( struct jx_operator *o, struct jx *left, struct jx *right )
+static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx *right )
 {
 	const char *a = left->u.string_value;
 	const char *b = right->u.string_value;
 
-	switch(o->type) {
+	switch(op) {
 		case JX_OP_EQ:
 			return jx_boolean(0==strcmp(a,b));
 		case JX_OP_NE:
@@ -165,26 +172,48 @@ struct jx * jx_eval_string( struct jx_operator *o, struct jx *left, struct jx *r
 	return jx_null();
 }
 
+/*
+Type conversion rules:
+Generally, operators are not meant to be applied to unequal types.
+NULL is the result of an operator on two incompatible expressions.
+Exception: When x and y are incompatible types, x==y returns FALSE and x!=y returns TRUE.
+Exception: integers are promoted to doubles as needed.
+*/
+
 static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
 	struct jx *left = jx_eval(o->left,context);
 	struct jx *right = jx_eval(o->right,context);
 
-	/* need to do type conversions here */
-
 	if(left->type!=right->type) {
-		fatal("jx type conversions not yet implemented");
+		if( left->type==JX_INTEGER && right->type==JX_DOUBLE) {
+			struct jx *n = jx_double(left->u.integer_value);
+			jx_delete(left);
+			left = n;
+		} else if( left->type==JX_DOUBLE && right->type==JX_INTEGER) {
+			struct jx *n = jx_double(right->u.integer_value);
+			jx_delete(right);
+			right = n;
+		} else if(o->type==JX_OP_EQ) {
+			return jx_boolean(0);
+		} else if(o->type==JX_OP_NE) {
+			return jx_boolean(1);
+		} else {
+			return jx_null();
+		}
 	}
 
 	switch(left->type) {
+		case JX_NULL:
+			return jx_eval_null(o->type);
 		case JX_BOOLEAN:
-			return jx_eval_boolean(o,left,right);
+			return jx_eval_boolean(o->type,left,right);
 		case JX_INTEGER:
-			return jx_eval_integer(o,left,right);
+			return jx_eval_integer(o->type,left,right);
 		case JX_DOUBLE:
-			return jx_eval_double(o,left,right);
+			return jx_eval_double(o->type,left,right);
 		case JX_STRING:
-			return jx_eval_string(o,left,right);
+			return jx_eval_string(o->type,left,right);
 		default:
 			return jx_null();
 	}
