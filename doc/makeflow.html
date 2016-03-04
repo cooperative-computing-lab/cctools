@@ -12,9 +12,9 @@
 <div id="manual">
 <h1>Makeflow User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: December 2014</b></p>
+<p style="text-align: right;"><b>Last edited: March 2016</b></p>
 
-<p>Makeflow is Copyright (C) 2009 The University of Notre Dame.<br>
+<p>Makeflow is Copyright (C) 2009- The University of Notre Dame.<br>
 This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
@@ -402,6 +402,20 @@ runs remotely, but the remote system expects <tt>a.in</tt> to be named
 did not need to rename the file <tt>b.out</tt>. Without remote file renaming,
 we would have to create either a symbolic link, or a copy of the files with the
 expected correct names.</p>
+
+<h3 id="details.renaming">Nested Makeflows<a class="sectionlink" href="#details.nested" title="Link to this section.">&#x21d7;</a></h3>
+
+One Makeflow can be nested inside of another by writing a rule
+with the following syntax:
+
+<code>output-files: input-files
+    MAKEFLOW makeflow-file [working-dir]
+</code>
+
+The input and output files are specified as usual, describing the files
+consumed and created by the child makeflow as a whole.  Then, the <tt>MAKEFLOW</tt>keyword</tt> introduces the child makeflow specification, and an
+optional working directory into which the makeflow will be executed.
+If not given, the current working directory is assumed.
 
 <h2 id="details.displaying">Displaying a Makeflow<a class="sectionlink" href="#details.displaying" title="Link to this section.">&#x21d7;</a></h2>
 
