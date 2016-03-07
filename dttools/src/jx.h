@@ -84,7 +84,8 @@ typedef enum {
 	JX_OP_MOD,
 	JX_OP_AND,
 	JX_OP_OR,
-	JX_OP_NOT
+	JX_OP_NOT,
+	JX_OP_INVALID
 } jx_operator_t;
 
 struct jx_operator {

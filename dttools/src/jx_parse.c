@@ -507,7 +507,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_AND:	return JX_OP_AND;
 		case JX_TOKEN_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
-		default:		return 100;
+		default:		return JX_OP_INVALID;
 	}
 }
 
@@ -549,7 +549,7 @@ struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
 	jx_token_t t = jx_scan(s);
 	jx_operator_t op = jx_token_to_operator(t);
 
-	if(op!=100 && jx_operator_precedence(op)==precedence ) {
+	if(op!=JX_OP_INVALID && jx_operator_precedence(op)==precedence ) {
 		struct jx *b = jx_parse_prec(s,precedence);
 		if(b) {
 			return jx_operator(op,a,b);
