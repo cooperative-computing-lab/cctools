@@ -47,6 +47,12 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 			return jx_boolean(a|b);
 		case JX_OP_MUL:
 			return jx_boolean(a&b);
+		case JX_OP_AND:
+			return jx_boolean(a&&b);
+		case JX_OP_OR:
+			return jx_boolean(a||b);
+		case JX_OP_NOT:
+			return jx_boolean(!b);
 		default:
 			return jx_boolean(0);
 	}

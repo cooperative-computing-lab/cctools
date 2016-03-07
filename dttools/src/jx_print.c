@@ -46,6 +46,9 @@ static const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_MUL: return "*";
 		case JX_OP_DIV: return "/";
 		case JX_OP_MOD: return "%";
+		case JX_OP_AND:	return "&&";
+		case JX_OP_OR:	return "||";
+		case JX_OP_NOT:	return "!";
 	}
 	return "???";
 }

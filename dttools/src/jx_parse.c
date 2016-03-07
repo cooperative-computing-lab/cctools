@@ -37,6 +37,9 @@ typedef enum {
 	JX_TOKEN_MUL,
 	JX_TOKEN_DIV,
 	JX_TOKEN_MOD,
+	JX_TOKEN_AND,
+	JX_TOKEN_OR,
+	JX_TOKEN_NOT,
 	JX_TOKEN_NULL,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_EOF,
@@ -237,10 +240,19 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_DIV;
 	} else if(c=='%') {
 		return JX_TOKEN_MOD;
+	} else if(c=='&') {
+		char d = jx_getchar(s);
+		if(d=='&') return JX_TOKEN_AND;
+		return JX_TOKEN_ERROR;
+	} else if(c=='|') {
+		char d = jx_getchar(s);
+		if(d=='|') return JX_TOKEN_AND;
+		return JX_TOKEN_ERROR;
 	} else if(c=='!') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
-		return JX_TOKEN_ERROR;
+		jx_ungetchar(s,d);
+		return JX_TOKEN_NOT;
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
@@ -461,12 +473,14 @@ struct jx * jx_parse_atomic( struct jx_parser *s )
 static int jx_operator_precedence( jx_token_t t )
 {
 	switch(t) {
-		case JX_TOKEN_EQ:	return 3;
-		case JX_TOKEN_NE:	return 3;
-		case JX_TOKEN_LE:	return 3;
-		case JX_TOKEN_LT:	return 3;
-		case JX_TOKEN_GE:	return 3;
-		case JX_TOKEN_GT:	return 3;
+		case JX_TOKEN_EQ:	return 5;
+		case JX_TOKEN_NE:	return 5;
+		case JX_TOKEN_LE:	return 5;
+		case JX_TOKEN_LT:	return 5;
+		case JX_TOKEN_GE:	return 5;
+		case JX_TOKEN_GT:	return 5;
+		case JX_TOKEN_OR:	return 4;
+		case JX_TOKEN_AND:	return 3;
 		case JX_TOKEN_MUL:	return 2;
 		case JX_TOKEN_DIV:	return 2;
 		case JX_TOKEN_MOD:	return 2;
@@ -490,16 +504,42 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_MUL:	return JX_OP_MUL;
 		case JX_TOKEN_DIV:	return JX_OP_DIV;
 		case JX_TOKEN_MOD:	return JX_OP_MOD;
+		case JX_TOKEN_AND:	return JX_OP_AND;
+		case JX_TOKEN_OR:	return JX_OP_OR;
+		case JX_TOKEN_NOT:	return JX_OP_NOT;
 		default:		return 100;
 	}
 }
+
+struct jx * jx_parse_unary( struct jx_parser *s )
+{
+	struct jx *j;
+	
+	jx_token_t t = jx_scan(s);
+	switch(t) {
+		case JX_TOKEN_SUB:
+		case JX_TOKEN_ADD:
+		case JX_TOKEN_NOT:
+			j = jx_parse_atomic(s);
+			if(j) {
+				return jx_operator(jx_token_to_operator(t),0,j);
+			} else {
+				return 0;
+			}
+			break;
+		default:
+			jx_unscan(s,t);
+			return jx_parse_atomic(s);
+	}
+}
+
 
 struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
 {
 	struct jx *a;
 
 	if(precedence<=0) {
-		a = jx_parse_atomic(s);
+		a = jx_parse_unary(s);
 	} else {
 		a = jx_parse_prec(s,precedence-1);
 	}
