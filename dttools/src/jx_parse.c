@@ -494,7 +494,7 @@ struct jx * jx_parse_atomic( struct jx_parser *s )
 
 #define JX_PRECEDENCE_MAX 5
 
-static int jx_operator_precedence( jx_operator_t t )
+int jx_operator_precedence( jx_operator_t t )
 {
 	switch(t) {
 		case JX_OP_AND:	return 5;

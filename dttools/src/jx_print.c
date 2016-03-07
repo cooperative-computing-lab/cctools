@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "jx_print.h"
+#include "jx_parse.h"
 
 #include <ctype.h>
 
@@ -97,6 +98,23 @@ void jx_escape_string( const char *s, buffer_t *b )
 	buffer_putstring(b,"\"");
 }
 
+void jx_print_subexpr( struct jx *j, jx_operator_t parent, buffer_t *b )
+{
+	if(!j) return;
+
+	int do_parens = 0;
+
+	if(j->type==JX_OPERATOR && jx_operator_precedence(parent) < jx_operator_precedence(j->u.oper.type)) {
+		do_parens = 1;
+	} else {
+		do_parens = 0;
+	}
+
+	if(do_parens) buffer_putstring(b,"(");
+	jx_print_buffer(j,b);
+	if(do_parens) buffer_putstring(b,")");
+}
+
 void jx_print_buffer( struct jx *j, buffer_t *b )
 {
 	if(!j) return;
@@ -131,9 +149,10 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b,"}");
 			break;
 		case JX_OPERATOR:
-			jx_print_buffer(j->u.oper.left,b);
+			jx_print_subexpr(j->u.oper.left,j->u.oper.type,b);
 			buffer_putstring(b,jx_operator_string(j->u.oper.type));
-			jx_print_buffer(j->u.oper.right,b);
+			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
+			break;
 	}
 }
 
