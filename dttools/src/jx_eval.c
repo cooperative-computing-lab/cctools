@@ -139,8 +139,8 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 
 static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx *right )
 {
-	const char *a = left->u.string_value;
-	const char *b = right->u.string_value;
+	const char *a = left ? left->u.string_value : "";
+	const char *b = right ? right->u.string_value : "";
 
 	switch(op) {
 		case JX_OP_EQ:
@@ -188,28 +188,47 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_delete(right);
 			right = n;
 		} else if(o->type==JX_OP_EQ) {
+			jx_delete(left);
+			jx_delete(right);
 			return jx_boolean(0);
 		} else if(o->type==JX_OP_NE) {
+			jx_delete(left);
+			jx_delete(right);
 			return jx_boolean(1);
 		} else {
+			jx_delete(left);
+			jx_delete(right);
 			return jx_null();
 		}
 	}
 
+	struct jx *result;
+
 	switch(right->type) {
 		case JX_NULL:
-			return jx_eval_null(o->type);
+			result = jx_eval_null(o->type);
+			break;
 		case JX_BOOLEAN:
-			return jx_eval_boolean(o->type,left,right);
+			result = jx_eval_boolean(o->type,left,right);
+			break;
 		case JX_INTEGER:
-			return jx_eval_integer(o->type,left,right);
+			result = jx_eval_integer(o->type,left,right);
+			break;
 		case JX_DOUBLE:
-			return jx_eval_double(o->type,left,right);
+			result = jx_eval_double(o->type,left,right);
+			break;
 		case JX_STRING:
-			return jx_eval_string(o->type,left,right);
+			result = jx_eval_string(o->type,left,right);
+			break;
 		default:
-			return jx_null();
+			result = jx_null();
+			break;
 	}
+
+	jx_delete(left);
+	jx_delete(right);
+
+	return result;
 }
 
 static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context )
