@@ -49,8 +49,8 @@ static const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_AND:	return "&&";
 		case JX_OP_OR:	return "||";
 		case JX_OP_NOT:	return "!";
+		default:        return "???";
 	}
-	return "???";
 }
 
 void jx_escape_string( const char *s, buffer_t *b )
