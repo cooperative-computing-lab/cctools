@@ -69,6 +69,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
+	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
+
 	hash_table_insert(categories, name, c);
 
 	return c;
@@ -230,8 +232,8 @@ void category_first_allocation_accum_times(struct itable *histogram, double *tau
 	return;
 }
 
-int64_t category_first_allocation(struct itable *histogram, int assume_independence, int64_t top_resource) {
-	/* Automatically labeling for memory is not activated. */
+int64_t category_first_allocation_min_waste(struct itable *histogram, int assume_independence, int64_t top_resource) {
+	/* Automatically labeling for resource is not activated. */
 	if(top_resource < 0) {
 		return -1;
 	}
@@ -287,8 +289,80 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 	return a_1;
 }
 
+int64_t category_first_allocation_max_throughput(struct itable *histogram, int64_t top_resource) {
+	/* Automatically labeling for resource is not activated. */
+	if(top_resource < 0) {
+		return -1;
+	}
+
+	int64_t n = itable_size(histogram);
+
+	if(n < 1)
+		return -1;
+
+	int64_t *keys         = malloc(n*sizeof(intptr_t));
+	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
+	double  *times_mean   = malloc(n*sizeof(intptr_t));
+	double  *times_accum  = malloc(n*sizeof(intptr_t));
+
+	double tau_mean;
+
+	category_first_allocation_accum_times(histogram, &tau_mean, keys, counts_accum, times_mean, times_accum);
+
+	int64_t a_1 = top_resource;
+	int64_t a_m = top_resource;
+
+	double Ta_1 = 0;
+
+	int i;
+	for(i = 0; i < n; i++) {
+		int64_t a  = keys[i];
+
+		if(a < 1) {
+			continue;
+		}
+
+		double Pbef = ((double) counts_accum[i])/counts_accum[n-1];
+		double Paft = 1 - Pbef;
+
+		double numerator   = (Pbef*a_m)/a + Paft;
+		double denominator = tau_mean + times_accum[i];
+
+		double  Ta = numerator/denominator;
+
+
+		if(Ta > Ta_1) {
+			Ta_1 = Ta;
+			a_1 = a;
+		}
+	}
+
+	if(a_1 > top_resource) {
+		a_1 = top_resource;
+	}
+
+	free(counts_accum);
+	free(times_mean);
+	free(times_accum);
+	free(keys);
+
+	return a_1;
+}
+
+int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_allocation_t mode,  int64_t top_resource) {
+	switch(mode) {
+		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
+			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
+			break;
+		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+		default:
+			return category_first_allocation_max_throughput(histogram, top_resource);
+			break;
+	}
+}
+
 #define update_first_allocation_field(c, top, independence, field)\
-	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, top->field)
+	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field)
 
 void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */

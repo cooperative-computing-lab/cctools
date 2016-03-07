@@ -19,6 +19,11 @@ typedef enum {
 	CATEGORY_ALLOCATION_ERROR          /**< No valid resources could be found. (E.g., after 2nd step fails) */
 } category_allocation_t;
 
+typedef enum {
+	CATEGORY_ALLOCATION_MODE_MIN_WASTE = 0,
+	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+} category_mode_t;
+
 struct category {
 	char *name;
 	double fast_abort;
@@ -43,6 +48,8 @@ struct category {
 	struct itable *bandwidth_histogram;
 	struct itable *total_files_histogram;
 	struct itable *disk_histogram;
+
+	category_mode_t allocation_mode;
 
 	uint64_t total_tasks;
 
