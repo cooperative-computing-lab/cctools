@@ -47,9 +47,9 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 			return jx_boolean(a|b);
 		case JX_OP_MUL:
 			return jx_boolean(a&b);
+		default:
+			return jx_boolean(0);
 	}
-
-	return jx_boolean(0);
 }
 
 static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx *right )
@@ -82,9 +82,9 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 		case JX_OP_MOD:
 			if(b==0) return jx_null();
 			return jx_integer(a%b);
+		default:
+			return jx_null();
 	}
-
-	return jx_null();
 }
 
 static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx *right )
@@ -126,9 +126,9 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 		case JX_OP_MOD:
 			if(b==0) return jx_null();
 			return jx_double((int)a%(int)b);
+		default:
+			return jx_null();
 	}
-
-	return jx_null();
 }
 
 static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx *right )
@@ -153,10 +153,8 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 			return jx_format("%s%s",a,b);
 		default:
 			return jx_null();
-			break;
-	}
 
-	return jx_null();
+	}
 }
 
 /*
