@@ -668,8 +668,9 @@ void write_images(struct histogram *h)
 
 	if(pid == 0) {
 		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category));
-		chdir(path);
-		execlp(gnuplot_path, "gnuplot", path_of_image_script(h, 1), NULL);
+		if(chdir(path) == 0) {
+			execlp(gnuplot_path, "gnuplot", path_of_image_script(h, 1), NULL);
+		}
 		fatal("Could not exec when creating image: %s\n", path_of_image(h, 0));
 	}
 

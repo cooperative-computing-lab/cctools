@@ -349,7 +349,7 @@ int64_t category_first_allocation_max_throughput(struct itable *histogram, int64
 	return a_1;
 }
 
-int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_allocation_t mode,  int64_t top_resource) {
+int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_mode_t mode,  int64_t top_resource) {
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
 			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
