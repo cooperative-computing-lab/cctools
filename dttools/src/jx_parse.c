@@ -492,23 +492,25 @@ struct jx * jx_parse_atomic( struct jx_parser *s )
 	return 0;
 }
 
-static int jx_operator_precedence( jx_token_t t )
+#define JX_PRECEDENCE_MAX 5
+
+static int jx_operator_precedence( jx_operator_t t )
 {
 	switch(t) {
-		case JX_TOKEN_EQ:	return 5;
-		case JX_TOKEN_NE:	return 5;
-		case JX_TOKEN_LE:	return 5;
-		case JX_TOKEN_LT:	return 5;
-		case JX_TOKEN_GE:	return 5;
-		case JX_TOKEN_GT:	return 5;
-		case JX_TOKEN_OR:	return 4;
-		case JX_TOKEN_AND:	return 3;
-		case JX_TOKEN_MUL:	return 2;
-		case JX_TOKEN_DIV:	return 2;
-		case JX_TOKEN_MOD:	return 2;
-		case JX_TOKEN_ADD:	return 1;
-		case JX_TOKEN_SUB:	return 1;
-		default:		return 0;
+		case JX_OP_AND:	return 5;
+		case JX_OP_OR:	return 4;
+		case JX_OP_EQ:	return 3;
+		case JX_OP_NE:	return 3;
+		case JX_OP_LE:	return 3;
+		case JX_OP_LT:	return 3;
+		case JX_OP_GE:	return 3;
+		case JX_OP_GT:	return 3;
+		case JX_OP_ADD: return 2;
+		case JX_OP_SUB:	return 2;
+		case JX_OP_MUL:	return 1;
+		case JX_OP_DIV:	return 1;
+		case JX_OP_MOD:	return 1;
+		default:	return 0;
 	}
 }
 
@@ -587,7 +589,7 @@ struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
 
 struct jx * jx_parse( struct jx_parser *s )
 {
-	return jx_parse_prec(s,2);
+	return jx_parse_prec(s,JX_PRECEDENCE_MAX);
 }
 
 static struct jx * jx_parse_finish( struct jx_parser *p )
