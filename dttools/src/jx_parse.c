@@ -41,6 +41,8 @@ typedef enum {
 	JX_TOKEN_OR,
 	JX_TOKEN_NOT,
 	JX_TOKEN_NULL,
+	JX_TOKEN_LPAREN,
+	JX_TOKEN_RPAREN,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
@@ -283,6 +285,10 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		jx_parse_error(s,"string constant too long");
 		return JX_TOKEN_ERROR;
 
+	} else if(c=='(') {
+		return JX_TOKEN_LPAREN;
+	} else if(c==')') {
+		return JX_TOKEN_RPAREN;
 	} else if(strchr("0123456789.",c)) {
 		s->token[0] = c;
 		int i;
@@ -432,6 +438,7 @@ struct jx * jx_parse_atomic( struct jx_parser *s )
 
 	switch(t) {
 	case JX_TOKEN_EOF:
+	case JX_TOKEN_RPAREN:
 		return 0;
 	case JX_TOKEN_LBRACE:
 		return jx_object(jx_parse_pair_list(s));
@@ -455,6 +462,21 @@ struct jx * jx_parse_atomic( struct jx_parser *s )
 			return 0;
 		} else {
 			return jx_symbol(s->token);
+		}
+		break;
+	case JX_TOKEN_LPAREN:
+		{
+		struct jx *j = jx_parse(s);
+		if(!j) return 0;
+
+		t = jx_scan(s);
+		if(t!=JX_TOKEN_RPAREN) {
+			jx_parse_error(s,"missing closing parenthesis");
+			jx_delete(j);
+			return 0;
+		}
+
+		return j;
 		}
 	default:
 		jx_parse_error(s,"unexpected token");
