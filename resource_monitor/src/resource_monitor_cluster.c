@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <math.h>
+#include <float.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -29,7 +30,7 @@ See the file COPYING for details.
 #include "rmon_tools.h"
 
 
-#define DEFAULT_MAX_CLUSTERS 4
+#define DEFAULT_MAX_CLUSTERS 8
 
 static char *report_filename = "clusters.txt";
 struct rmDsummary *max_values;
@@ -210,7 +211,7 @@ struct cluster *cluster_nearest_neighbor(struct itable *active_clusters, struct 
 	uint64_t        ptr;
 	struct cluster *nearest = NULL;
 	struct cluster *other;
-	double         dmin, dtest;
+	double         dmin = DBL_MAX, dtest;
 
 	itable_firstkey(active_clusters);
 	while( itable_nextkey( active_clusters, &ptr, (void *) &other ) )
@@ -438,8 +439,9 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters, doubl
 			list_push_head(stack, closest);
 		}
 
-		debug(D_DEBUG, "stack: %d  active: %d  closest: %lf subtop: %lf\n",
-				list_size(stack), itable_size(active_clusters), dclosest, dsubtop);
+		if((list_size(stack) + itable_size(active_clusters)) % 50 == 0) {
+			debug(D_DEBUG, "stack: %d  active: %d  closest: %lf subtop: %lf\n", list_size(stack), itable_size(active_clusters), dclosest, dsubtop);
+		}
 
 		/* If there are no more active_clusters, but there is not
 		 * a single cluster in the stack, we try again,
@@ -742,7 +744,6 @@ int main(int argc, char **argv)
 	freport = fopen(report_filename, "w");
 	if(!freport)
 		fatal("%s: %s\n", report_filename, strerror(errno));
-
 
 	struct rmDsummary_set *set = make_new_set("all");
 
