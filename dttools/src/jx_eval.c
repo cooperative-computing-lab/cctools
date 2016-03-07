@@ -258,7 +258,11 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	
 	switch(j->type) {
 		case JX_SYMBOL:
-			return jx_lookup(context,j->u.symbol_name);
+			if(context) {
+				struct jx *result = jx_lookup(context,j->u.symbol_name);
+				if(result) return jx_copy(result);
+			}
+			return jx_null();
 		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
