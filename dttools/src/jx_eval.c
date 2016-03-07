@@ -27,8 +27,8 @@ static struct jx * jx_eval_null( jx_operator_t op )
 
 static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx *right )
 {
-	int a = left->u.boolean_value;
-	int b = right->u.boolean_value;
+	int a = left ? left->u.boolean_value : 0;
+	int b = right ? right->u.boolean_value : 0;
 
 	switch(op) {
 		case JX_OP_EQ:
@@ -60,8 +60,8 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 
 static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx *right )
 {
-	int a = left->u.integer_value;
-	int b = right->u.integer_value;
+	int a = left ? left->u.integer_value : 0;
+	int b = right ? right->u.integer_value : 0;
 
 	switch(op) {
 		case JX_OP_EQ:
@@ -95,8 +95,8 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 
 static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx *right )
 {
-	double a = left->u.double_value;
-	double b = right->u.double_value;
+	double a = left ? left->u.double_value : 0;
+	double b = right ? right->u.double_value : 0;
 
 	switch(op) {
 		case JX_OP_EQ:
@@ -173,10 +173,12 @@ Exception: integers are promoted to doubles as needed.
 
 static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
+	if(!o) return 0;
+	
 	struct jx *left = jx_eval(o->left,context);
 	struct jx *right = jx_eval(o->right,context);
 
-	if(left->type!=right->type) {
+	if((left && right) && (left->type!=right->type) ) {
 		if( left->type==JX_INTEGER && right->type==JX_DOUBLE) {
 			struct jx *n = jx_double(left->u.integer_value);
 			jx_delete(left);
@@ -194,7 +196,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		}
 	}
 
-	switch(left->type) {
+	switch(right->type) {
 		case JX_NULL:
 			return jx_eval_null(o->type);
 		case JX_BOOLEAN:
@@ -233,6 +235,8 @@ static struct jx_item * jx_eval_item( struct jx_item *item, struct jx *context )
 
 struct jx * jx_eval( struct jx *j, struct jx *context )
 {
+	if(!j) return 0;
+	
 	switch(j->type) {
 		case JX_SYMBOL:
 			return jx_lookup(context,j->u.symbol_name);
