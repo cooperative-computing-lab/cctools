@@ -1,0 +1,121 @@
+{
+"outfile":"results",
+"infile":"mydata",
+"a": true,
+"b": false,
+"f": 0.5,
+"g": 3.141592654,
+"x": 10,
+"y": 20,
+}
+
+10
+3847.576
+.5
+10.
+987
+12347812309487
+
+"hello"
+"goodbye\n"
+"\"quotes\""
+"tab\ttab\ttab\rreturn\nnewline\n"
+"\\\\\\\\"
+
+true
+false
+null
+true && true
+true && false
+false && true
+false && false
+true || true
+true || false
+false || true
+false || false
+!true
+!false
+
+10 == 20
+10 != 20
+10 < 20
+10 <= 20
+10 > 20
+10 >= 20
+
+10.5 == 20.5
+10.5 != 20.5
+10.5 < 20.5
+10.5 <= 20.5
+10.5 > 20.5
+10.5 >= 20.5
+
+"hello" == "goodbye"
+"hello" != "goodbye"
+"hello" <= "goodbye"
+"hello" < "goodbye"
+"hello" > "goodbye"
+"hello" >= "goodbye"
+
+"hello" == "hello"
+"hello" != "hello"
+"hello" <= "hello"
+"hello" < "hello"
+"hello" > "hello"
+"hello" >= "hello"
+
+a==b
+a!=b
+a<b
+a>b
+a<=b
+a>=b
+
+f==g
+f!=g
+f<g
+f>g
+f<=g
+f>=g
+
+x==y
+x!=y
+x<y
+x>y
+x<=y
+x>=y
+
+a+b
+a-b
+a*b
+a/b
+a%b
+
+f+g
+f-g
+f*g
+f/g
+f%g
+
+x+y
+x-y
+x*y
+x/y
+x%y
+
+(x+y)*(f+g)
+(10 + (20 * 30))
+(10*(20+30))
+(a==b) || ((f>g) && x<y)
+
+[10,-90.5,true,false,null,[-1,-2,-3]]
+
+{
+"command":"grep English "+infile+" > "+outfile,
+"inputs":["/usr/bin/grep",infile],
+"outputs":[outfile],
+"environment":{"PATH":"/usr/bin"},
+"cores":1,
+"memory":16,
+"disk":1
+}
