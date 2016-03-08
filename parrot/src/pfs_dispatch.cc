@@ -1631,7 +1631,16 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_userfaultfd:
 			if (entering) {
 				debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
-				wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
+
+				/* XXX Normally a wait_barrier would be required here as a new
+				 * fd may be added to the fd table. However, because accept may
+				 * block, the barrier will potentially cause deadlock. In my
+				 * tests (TR_parrot_thread_fd.sh), the barrier is not required
+				 * as apparently the file descriptors are not added to the file
+				 * descriptor table until (after?) the syscall exit event is
+				 * received.
+				 */
+
 			} else {
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);

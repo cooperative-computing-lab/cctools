@@ -28,14 +28,25 @@ void *setcloexec (void *arg)
 	return NULL;
 }
 
-void test (void)
+void *addpipe (void *arg)
+{
+	int fds[2];
+	pipe(fds);
+	sched_yield();
+	close(fds[0]);
+	close(fds[1]);
+	return NULL;
+}
+
+
+void test (void *(*f)(void *))
 {
 	int fd = open("/dev/null", O_RDONLY);
 	pthread_t id;
 	pthread_attr_t attr[1];
 	pthread_attr_init(attr);
 	pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED);
-	pthread_create(&id, attr, setcloexec, &fd);
+	pthread_create(&id, attr, f, &fd);
 	sched_yield();
 	pid_t pid = fork();
 	if (pid == 0) {
@@ -50,7 +61,10 @@ int main (int argc, char *argv[])
 {
 	int i;
 	for (i = 0; i < 1000; i++) {
-		test();
+		test(setcloexec);
+	}
+	for (i = 0; i < 1000; i++) {
+		test(addpipe);
 	}
 	return 0;
 }
