@@ -71,9 +71,6 @@ extern "C" {
 #ifndef F_DUPFD_CLOEXEC
 #	define F_DUPFD_CLOEXEC 1030
 #endif
-#ifndef F_DUP2FD
-#	define F_DUP2FD F_DUPFD
-#endif
 #ifndef IN_CLOEXEC
 #	define IN_CLOEXEC 02000000
 #endif
@@ -192,7 +189,6 @@ static void divert_to_parrotfd( struct pfs_process *p, INT64_T fd, char *path, c
 
 	p->syscall_args_changed = 1;
 	p->syscall_parrotfd = fd;
-	wait_barrier = 1; /* this handles two processes racing to create the same file, also see comment for pfs_table::setparrot. */
 }
 
 static void handle_parrotfd( struct pfs_process *p )
@@ -1574,6 +1570,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				} else {
 					divert_to_parrotfd(p,p->syscall_result,path,POINTER(args[0]),flags);
 				}
+				wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
 			} else if (p->syscall_parrotfd >= 0) {
 				handle_parrotfd(p);
 			} else if (p->syscall_args_changed) {
@@ -1603,7 +1600,9 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			/* fallthrough */
 		case SYSCALL32_dup:
-			if (!entering && !p->syscall_dummy) {
+			if (entering) {
+				wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
+			} else if (!p->syscall_dummy) {
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);
 				if (actual >= 0 && actual != args[0]) {
@@ -1632,6 +1631,16 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_userfaultfd:
 			if (entering) {
 				debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
+
+				/* XXX Normally a wait_barrier would be required here as a new
+				 * fd may be added to the fd table. However, because accept may
+				 * block, the barrier will potentially cause deadlock. In my
+				 * tests (TR_parrot_thread_fd.sh), the barrier is not required
+				 * as apparently the file descriptors are not added to the file
+				 * descriptor table until (after?) the syscall exit event is
+				 * received.
+				 */
+
 			} else {
 				INT64_T actual;
 				tracer_result_get(p->tracer, &actual);
@@ -1764,25 +1773,22 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		}
 
 		case SYSCALL32_close:
-			if (p->table->isspecial(args[1])) {
-				if (entering) {
+			if (entering) {
+				if (p->table->isspecial(args[1])) {
 					debug(D_DEBUG, "ignoring attempt to close special fd %d", (int)args[1]);
 					divert_to_dummy(p, -EIO); /* best errno we can give */
-				}
-			} else if (p->table->isnative(args[0])) {
-				if (entering) {
+				} else if (p->table->isnative(args[0])) {
 					debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 					pfs_close(args[0]);
-				}
-				/* fall through so it closes the Parrot fd */
-			} else {
-				if (entering) {
+					/* fall through so it closes the Parrot fd */
+				} else {
 					p->syscall_result = pfs_close(args[0]);
 					if(p->syscall_result<0)
 						divert_to_dummy(p, -errno);
 					else
 						p->syscall_dummy = 1; /* Fake a dummy "return" (so p->syscall_result is returned) but allow the kernel to close the Parrot fd. */
 				}
+				wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
 			}
 			break;
 
@@ -2230,38 +2236,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_fcntl:
 		case SYSCALL32_fcntl64:
-			/* special case for fcntl dup */
-			if (args[1] == F_DUPFD || args[1] == F_DUP2FD || args[1] == F_DUPFD_CLOEXEC) {
-				if (entering) {
-					if (!p->table->isvalid(args[2])) {
-						divert_to_dummy(p, -EBADF);
-					}
-				} else if (!p->syscall_dummy) {
-					INT64_T actual;
-					tracer_result_get(p->tracer, &actual);
-					if (actual >= 0 && actual != args[0]) {
-						if (args[1] == F_DUPFD_CLOEXEC) {
-							p->table->dup2(args[0], actual, FD_CLOEXEC);
-						} else {
-							p->table->dup2(args[0], actual, 0);
-						}
-					}
-				}
-			} else if (p->table->isnative(args[0])) {
-				if (entering) {
-					debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
-				} else {
-					/* Handle the application marking FD_CLOEXEC. */
-					INT64_T actual;
-					tracer_result_get(p->tracer, &actual);
-					if (actual >= 0) {
-						if (args[1] == F_SETFD) {
-							debug(D_DEBUG, "updating native fd %d flags to %d", (int)args[0], (int)args[2]);
-							p->table->setnative(args[0], args[2]);
-						}
-					}
-				}
-			} else if (entering) {
+			if (entering) {
 				pid_t pid;
 				int fd = args[0];
 				int cmd = args[1];
@@ -2270,81 +2245,135 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				switch(cmd) {
 					case F_GETFD:
 					case F_SETFD:
-						p->syscall_result = pfs_fcntl(fd,cmd,uaddr);
-						if(p->syscall_result<0)
-							divert_to_dummy(p,-errno);
-						/* allow the kernel to also set fd flags (e.g. FD_CLOEXEC) */
+						if (p->table->isnative(args[0])) {
+							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
+						} else {
+							p->syscall_result = pfs_fcntl(fd,cmd,uaddr);
+							if(p->syscall_result<0)
+								divert_to_dummy(p,-errno);
+							/* else allow the kernel to also set fd flags (e.g. FD_CLOEXEC) */
+						}
+						wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
 						break;
 
 					case F_GETFL:
 					case F_SETFL:
-						p->syscall_result = pfs_fcntl(fd,cmd,uaddr);
-						if(p->syscall_result<0) p->syscall_result=-errno;
-						divert_to_dummy(p,p->syscall_result);
+						if (p->table->isnative(args[0])) {
+							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
+						} else {
+							p->syscall_result = pfs_fcntl(fd,cmd,uaddr);
+							if(p->syscall_result<0) p->syscall_result=-errno;
+							divert_to_dummy(p,p->syscall_result);
 
-						if(cmd==F_SETFL) {
-							int flags = (int)args[2];
-							if(flags&O_ASYNC) {
-								debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",(int)pfs_current->pid,fd);
-								p->flags |= PFS_PROCESS_FLAGS_ASYNC;
+							if(cmd==F_SETFL) {
+								int flags = (int)args[2];
+								if(flags&O_ASYNC) {
+									debug(D_PROCESS,"pid %d requests O_ASYNC on fd %d",(int)pfs_current->pid,fd);
+									p->flags |= PFS_PROCESS_FLAGS_ASYNC;
+								}
 							}
 						}
 						break;
 
 					case PFS_GETLK:
 					case PFS_SETLK:
-					case PFS_SETLKW: {
-						struct flock fl;
-						struct pfs_kernel_flock kfl;
-
-						TRACER_MEM_OP(tracer_copy_in(p->tracer,&kfl,uaddr,sizeof(kfl),TRACER_O_ATOMIC));
-						COPY_FLOCK(kfl,fl);
-						p->syscall_result = pfs_fcntl(fd,cmd,&fl);
-						if(p->syscall_result<0) {
-							p->syscall_result=-errno;
+					case PFS_SETLKW:
+						if (p->table->isnative(args[0])) {
+							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 						} else {
-							COPY_FLOCK(fl,kfl);
-							TRACER_MEM_OP(tracer_copy_out(p->tracer,&kfl,uaddr,sizeof(kfl),TRACER_O_ATOMIC));
+							struct flock fl;
+							struct pfs_kernel_flock kfl;
+
+							TRACER_MEM_OP(tracer_copy_in(p->tracer,&kfl,uaddr,sizeof(kfl),TRACER_O_ATOMIC));
+							COPY_FLOCK(kfl,fl);
+							p->syscall_result = pfs_fcntl(fd,cmd,&fl);
+							if(p->syscall_result<0) {
+								p->syscall_result=-errno;
+							} else {
+								TRACER_MEM_OP(tracer_copy_out(p->tracer,&fl,uaddr,sizeof(fl),TRACER_O_ATOMIC));
+							}
+							divert_to_dummy(p,p->syscall_result);
 						}
-						divert_to_dummy(p,p->syscall_result);
 						break;
-					}
 
 					case PFS_GETLK64:
 					case PFS_SETLK64:
-					case PFS_SETLKW64: {
-						struct flock64 fl64;
-						struct pfs_kernel_flock64 kfl64;
-
-						TRACER_MEM_OP(tracer_copy_in(p->tracer,&kfl64,uaddr,sizeof(kfl64),TRACER_O_ATOMIC));
-						COPY_FLOCK(kfl64,fl64);
-						p->syscall_result = pfs_fcntl(fd,cmd,&fl64);
-						if(p->syscall_result<0) {
-							p->syscall_result=-errno;
+					case PFS_SETLKW64:
+						if (p->table->isnative(args[0])) {
+							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
 						} else {
-							COPY_FLOCK(fl64,kfl64);
-							TRACER_MEM_OP(tracer_copy_out(p->tracer,&kfl64,uaddr,sizeof(kfl64),TRACER_O_ATOMIC));
+							struct flock64 fl64;
+							struct pfs_kernel_flock64 kfl64;
+
+							TRACER_MEM_OP(tracer_copy_in(p->tracer,&kfl64,uaddr,sizeof(kfl64),TRACER_O_ATOMIC));
+							COPY_FLOCK(kfl64,fl64);
+							p->syscall_result = pfs_fcntl(fd,cmd,&fl64);
+							if(p->syscall_result<0) {
+								p->syscall_result=-errno;
+							} else {
+								COPY_FLOCK(fl64,kfl64);
+								TRACER_MEM_OP(tracer_copy_out(p->tracer,&kfl64,uaddr,sizeof(kfl64),TRACER_O_ATOMIC));
+							}
+							divert_to_dummy(p,p->syscall_result);
 						}
-						divert_to_dummy(p,p->syscall_result);
 						break;
-					}
 
 					/* Pretend that the caller is the signal recipient */
 					case F_GETOWN:
-						divert_to_dummy(p,p->pid);
+						if (p->table->isnative(args[0])) {
+							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
+						} else {
+							divert_to_dummy(p,p->pid);
+						}
 						break;
 
 					/* But we always get the signal. */
 					case F_SETOWN:
-						debug(D_PROCESS,"pid %d requests F_SETOWN on fd %d",pfs_current->pid,fd);
-						p->flags |= PFS_PROCESS_FLAGS_ASYNC;
-						pid = getpid();
-						pfs_fcntl(fd,F_SETOWN,POINTER(pid));
-						divert_to_dummy(p,0);
+						if (p->table->isnative(args[0])) {
+							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
+						} else {
+							debug(D_PROCESS,"pid %d requests F_SETOWN on fd %d",pfs_current->pid,fd);
+							p->flags |= PFS_PROCESS_FLAGS_ASYNC;
+							pid = getpid();
+							pfs_fcntl(fd,F_SETOWN,POINTER(pid));
+							divert_to_dummy(p,0);
+						}
+						break;
+
+					case F_DUPFD:
+					case F_DUPFD_CLOEXEC:
+						if (!p->table->isvalid(args[2])) {
+							divert_to_dummy(p, -EBADF);
+						}
+						/* otherwise let the kernel do it */
+						wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
 						break;
 
 					default:
 						divert_to_dummy(p,-ENOSYS);
+						break;
+				}
+			} else if (!p->syscall_dummy) {
+				int fd = args[0];
+				int cmd = args[1];
+				INT64_T actual;
+				tracer_result_get(p->tracer, &actual);
+				switch (cmd) {
+					case F_DUPFD:
+					case F_DUPFD_CLOEXEC:
+						if (actual >= 0 && actual != fd) {
+							if (cmd == F_DUPFD_CLOEXEC) {
+								p->table->dup2(fd, actual, FD_CLOEXEC);
+							} else {
+								p->table->dup2(fd, actual, 0);
+							}
+						}
+						break;
+					case F_SETFD:
+						if (p->table->isnative(fd)) {
+							debug(D_DEBUG, "updating native fd %d flags to %d", fd, (int)args[2]);
+							p->table->setnative(fd, args[2]);
+						}
 						break;
 				}
 			}
@@ -2798,6 +2827,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				} else {
 					divert_to_parrotfd(p,p->syscall_result,path,POINTER(args[1]),args[2]);
 				}
+				wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
 			} else if (p->syscall_parrotfd >= 0) {
 				handle_parrotfd(p);
 			} else if (p->syscall_args_changed) {
