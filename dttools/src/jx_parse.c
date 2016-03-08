@@ -568,14 +568,14 @@ struct jx * jx_parse_unary( struct jx_parser *s )
 }
 
 
-struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
+struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 {
 	struct jx *a;
 
 	if(precedence<=0) {
 		a = jx_parse_unary(s);
 	} else {
-		a = jx_parse_prec(s,precedence-1);
+		a = jx_parse_binary(s,precedence-1);
 	}
 
 	if(!a) return 0;
@@ -584,7 +584,7 @@ struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
 	jx_operator_t op = jx_token_to_operator(t);
 
 	if(op!=JX_OP_INVALID && !jx_operator_is_unary(op) && jx_operator_precedence(op)==precedence ) {
-		struct jx *b = jx_parse_prec(s,precedence);
+		struct jx *b = jx_parse_binary(s,precedence);
 		if(b) {
 			return jx_operator(op,a,b);
 		} else {
@@ -599,7 +599,7 @@ struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
 
 struct jx * jx_parse( struct jx_parser *s )
 {
-	return jx_parse_prec(s,JX_PRECEDENCE_MAX);
+	return jx_parse_binary(s,JX_PRECEDENCE_MAX);
 }
 
 static struct jx * jx_parse_finish( struct jx_parser *p )
