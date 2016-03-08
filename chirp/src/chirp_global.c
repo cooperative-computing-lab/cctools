@@ -124,27 +124,22 @@ static int server_table_load(time_t stoptime)
 
 	debug(D_CHIRP, "querying catalog at %s:%d", CATALOG_HOST, CATALOG_PORT);
 
-	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, stoptime);
+	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, "type==\"chirp\"", stoptime);
 	if(!q)
 		return 0;
 
 	while((j = catalog_query_read(q, stoptime))) {
 		char name[CHIRP_PATH_MAX];
-		const char *type, *hname;
+		const char *hname;
 		int port;
 
-		type = jx_lookup_string(j, "type");
-		if(type && !strcmp(type, "chirp")) {
-			hname = jx_lookup_string(j, "name");
-			if(hname) {
-				port = jx_lookup_integer(j, "port");
-				if(!port)
-					port = CHIRP_PORT;
-				sprintf(name, "%s:%d", hname, port);
-				hash_table_insert(server_table, name, j);
-			} else {
-				jx_delete(j);
-			}
+		hname = jx_lookup_string(j, "name");
+		if(hname) {
+			port = jx_lookup_integer(j, "port");
+			if(!port)
+				port = CHIRP_PORT;
+			sprintf(name, "%s:%d", hname, port);
+			hash_table_insert(server_table, name, j);
 		} else {
 			jx_delete(j);
 		}

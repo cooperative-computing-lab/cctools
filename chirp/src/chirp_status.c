@@ -196,7 +196,11 @@ int main(int argc, char *argv[])
 
 	stoptime = time(0) + timeout;
 
-	q = catalog_query_create(catalog_host, 0, stoptime);
+	const char *query_expr = "type==\"chirp\" || type==\"catalog\"";
+
+	if(show_all_types) query_expr = 0;
+
+	q = catalog_query_create(catalog_host, 0, query_expr, stoptime);
 	if(!q) {
 		fprintf(stderr, "couldn't query catalog: %s\n", strerror(errno));
 		return 1;
@@ -217,19 +221,6 @@ int main(int argc, char *argv[])
 	qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
 
 	for(i = 0; i < count; i++) {
-		const char *etype = jx_lookup_string(table[i], "type");
-		if(!show_all_types) {
-			if(etype) {
-				if(!strcmp(etype, "chirp") || !strcmp(etype, "catalog")) {
-					/* ok, keep going */
-				} else {
-					continue;
-				}
-			} else {
-				continue;
-			}
-		}
-
 		const char *lastheardfrom = jx_lookup_string(table[i], "lastheardfrom");
 		if (lastheardfrom && (time_t)strtoul(lastheardfrom, NULL, 10) < server_lastheardfrom)
 			continue;

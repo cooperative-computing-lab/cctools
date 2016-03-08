@@ -227,7 +227,7 @@ int get_masters(time_t stoptime)
 		catalog_port = CATALOG_PORT;
 	}
 
-	cq = catalog_query_create(catalog_host, catalog_port, stoptime );
+	cq = catalog_query_create(catalog_host, catalog_port, "type==\"wq_master\"", stoptime );
 	if(!cq)
 		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 
@@ -235,13 +235,9 @@ int get_masters(time_t stoptime)
 		if(i == catalog_size)
 			resize_catalog( catalog_size * 2 );
 
-		const char *type = jx_lookup_string(j,"type");
-		if(type && !strcmp(type,"wq_master")) {
-			global_catalog[i] = j; // make the global catalog point to this memory that j references
-			i++;                    // only increment i when a master jx is found
-		} else{
-			jx_delete(j);
-		}
+		// make the global catalog point to this memory that j references
+		global_catalog[i] = j;
+		i++;
 	}
 
 	global_catalog[i] = NULL;
