@@ -359,6 +359,8 @@ struct jx_item * jx_item_copy( struct jx_item *i )
 
 struct jx  *jx_copy( struct jx *j )
 {
+	if(!j) return 0;
+
 	switch(j->type) {
 		case JX_NULL:
 			return jx_null();
@@ -377,7 +379,7 @@ struct jx  *jx_copy( struct jx *j )
 		case JX_OBJECT:
 			return jx_object(jx_pair_copy(j->u.pairs));
 		case JX_OPERATOR:
-			return jx_operator(j->u.oper.type,j->u.oper.left,j->u.oper.right);
+			return jx_operator(j->u.oper.type,jx_copy(j->u.oper.left),jx_copy(j->u.oper.right));
 	}
 
 	/* not reachable, but some compilers complain. */
