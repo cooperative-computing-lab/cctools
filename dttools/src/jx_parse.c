@@ -535,6 +535,16 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 	}
 }
 
+int jx_operator_is_unary( jx_operator_t op )
+{
+	switch(op) {
+		case JX_OP_NOT:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 struct jx * jx_parse_unary( struct jx_parser *s )
 {
 	struct jx *j;
@@ -573,7 +583,7 @@ struct jx * jx_parse_prec( struct jx_parser *s, int precedence )
 	jx_token_t t = jx_scan(s);
 	jx_operator_t op = jx_token_to_operator(t);
 
-	if(op!=JX_OP_INVALID && jx_operator_precedence(op)==precedence ) {
+	if(op!=JX_OP_INVALID && !jx_operator_is_unary(op) && jx_operator_precedence(op)==precedence ) {
 		struct jx *b = jx_parse_prec(s,precedence);
 		if(b) {
 			return jx_operator(op,a,b);
