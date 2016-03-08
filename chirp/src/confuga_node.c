@@ -84,7 +84,7 @@ CONFUGA_IAPI int confugaS_catalog_sync (confuga *C)
 
 	debug(D_DEBUG|D_CONFUGA, "syncing with catalog");
 
-	Q = catalog_query_create(C->catalog_host, C->catalog_port, stoptime);
+	Q = catalog_query_create(C->catalog_host, C->catalog_port, 0, stoptime);
 	CATCH(Q == NULL ? errno : 0);
 
 	/* FIXME sqlcatch is silent about EAGAIN, what should we do? */
