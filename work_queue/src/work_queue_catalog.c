@@ -53,7 +53,7 @@ struct list * work_queue_catalog_query( const char *catalog_host, int catalog_po
 {
 	time_t stoptime = time(0) + 60;
 
-	struct catalog_query *q = catalog_query_create(catalog_host, catalog_port, stoptime);
+	struct catalog_query *q = catalog_query_create(catalog_host, catalog_port, "type==\"wq_master\"", stoptime);
 	if(!q) {
 		debug(D_NOTICE,"unable to contact catalog server at %s:%d\n", catalog_host, catalog_port);
 		return 0;
@@ -65,20 +65,13 @@ struct list * work_queue_catalog_query( const char *catalog_host, int catalog_po
 	struct jx *j;
 	while((j = catalog_query_read(q, stoptime))) {
 
-		// if it is a WQ master...
-		const char *type = jx_lookup_string(j,"type");
-		if(type && !strcmp(type,"wq_master")) {
-
-			// and the project name matches...
+			// if the project name matches...
 			const char *project = jx_lookup_string(j,"project");
 			if(project && whole_string_match_regex(project,project_regex)) {
-
 				// put the item in the list.
 				list_push_head(masters_list,j);
 				continue;
 			}
-		}
-
 		// we reach here unless j is push into masters_list
 		jx_delete(j);
 	}
