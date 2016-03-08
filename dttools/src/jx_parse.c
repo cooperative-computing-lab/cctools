@@ -248,7 +248,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_ERROR;
 	} else if(c=='|') {
 		char d = jx_getchar(s);
-		if(d=='|') return JX_TOKEN_AND;
+		if(d=='|') return JX_TOKEN_OR;
 		return JX_TOKEN_ERROR;
 	} else if(c=='!') {
 		char d = jx_getchar(s);
