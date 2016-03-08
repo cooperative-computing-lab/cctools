@@ -54,6 +54,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Long output.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Totals output.\n", "-T,--totals");
 	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
+	fprintf(stdout, " %-30s Filter results by this expression.\n", "   --where=<expr>");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
@@ -92,6 +93,7 @@ int main(int argc, char *argv[])
 	enum {
 		LONGOPT_SERVER_LASTHEARDFROM = INT_MAX-0,
 		LONGOPT_SERVER_PROJECT       = INT_MAX-1,
+		LONGOPT_WHERE = INT_MAX-2,
 	};
 
 	static const struct option long_options[] = {
@@ -109,6 +111,7 @@ int main(int argc, char *argv[])
 		{"totals", no_argument, 0, 'T'},
 		{"verbose", no_argument, 0, 'l'},
 		{"version", no_argument, 0, 'v'},
+		{"where", required_argument, 0, LONGOPT_WHERE },
 		{0, 0, 0, 0}
 	};
 
@@ -123,6 +126,7 @@ int main(int argc, char *argv[])
 	INT64_T sum_total = 0, sum_avail = 0;
 	const char *filter_name = 0;
 	const char *filter_value = 0;
+	const char *where_expr = "true";
 	int show_all_types = 0;
 
 	const char *server_project = NULL;
@@ -172,6 +176,9 @@ int main(int argc, char *argv[])
 		case LONGOPT_SERVER_PROJECT:
 			server_project = xxstrdup(optarg);
 			break;
+		case LONGOPT_WHERE:
+			where_expr = optarg;
+			break;
 		case 'h':
 		default:
 			show_help(argv[0]);
@@ -196,9 +203,10 @@ int main(int argc, char *argv[])
 
 	stoptime = time(0) + timeout;
 
-	const char *query_expr = "type==\"chirp\" || type==\"catalog\"";
+	const char *type_expr = "type==\"chirp\" || type==\"catalog\"";
+	if(show_all_types) type_expr = "true";
 
-	if(show_all_types) query_expr = 0;
+	const char *query_expr = string_format("%s && %s",type_expr,where_expr);
 
 	q = catalog_query_create(catalog_host, 0, query_expr, stoptime);
 	if(!q) {
