@@ -432,7 +432,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	return p;
 }
 
-struct jx * jx_parse_atomic( struct jx_parser *s )
+static struct jx * jx_parse_atomic( struct jx_parser *s )
 {
 	jx_token_t t = jx_scan(s);
 
@@ -535,7 +535,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 	}
 }
 
-int jx_operator_is_unary( jx_operator_t op )
+static int jx_operator_is_unary( jx_operator_t op )
 {
 	switch(op) {
 		case JX_OP_NOT:
@@ -545,7 +545,7 @@ int jx_operator_is_unary( jx_operator_t op )
 	}
 }
 
-struct jx * jx_parse_unary( struct jx_parser *s )
+static struct jx * jx_parse_unary( struct jx_parser *s )
 {
 	struct jx *j;
 	
@@ -568,7 +568,7 @@ struct jx * jx_parse_unary( struct jx_parser *s )
 }
 
 
-struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
+static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 {
 	struct jx *a;
 
