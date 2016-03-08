@@ -23,7 +23,11 @@ export CCTOOLS_TEST_LOG
 echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 
 # we need cctools_python in the path.
-export PATH="$(pwd)/dttools/src:$PATH"
+PATH="$(pwd)/dttools/src:$PATH"
+# we need resource_monitor in the path.
+PATH="$(pwd)/resource_monitor/src:$PATH"
+export PATH
+
 export PYTHONPATH="$(pwd)/chirp/src/python:$(pwd)/work_queue/src/python:$PYTHONPATH"
 export PERL5LIB="$(pwd)/chirp/src/perl:$(pwd)/work_queue/src/perl:$PERL5LIB"
 
