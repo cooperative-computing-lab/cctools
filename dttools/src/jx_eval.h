@@ -9,12 +9,13 @@ See the file COPYING for details.
 
 #include "jx.h"
 
-/** Evaluate an expression.  Traverses the expression recursively, and
-for each value of type @ref JX_SYMBOL, looks for a property with a
-matching name in the context object.
+/** Evaluate an expression.
+Traverses the expression, evaluates all operators and evalutes
+unbound symbols by looking for matches in the context object.
 @param j The expression to evaluate.
 @param context An object in which values will be found.
 @return A newly created result expression, which must be deleted with @ref jx_delete.
+If the expression is invalid in some way, an object of type @ref JX_NULL is returned.
 */
 struct jx * jx_eval( struct jx *j, struct jx *context );
 
