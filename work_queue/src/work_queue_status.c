@@ -240,7 +240,13 @@ int get_masters( time_t stoptime )
 
 	const char *query_expr = string_format("type==\"wq_master\" && %s",where_expr);
 
-	cq = catalog_query_create(catalog_host, catalog_port, query_expr, stoptime );
+	struct jx *jexpr = jx_parse_string(query_expr);
+	if(!jexpr) {
+		fprintf(stderr,"invalid expression: %s\n",query_expr);
+		exit(1);
+	}
+
+	cq = catalog_query_create(catalog_host, catalog_port, jexpr, stoptime );
 	if(!cq)
 		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 

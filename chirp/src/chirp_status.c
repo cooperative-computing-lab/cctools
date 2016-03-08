@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "jx_table.h"
 #include "jx_print.h"
+#include "jx_parse.h"
 #include "cctools.h"
 #include "debug.h"
 #include "getopt_aux.h"
@@ -203,12 +204,21 @@ int main(int argc, char *argv[])
 
 	stoptime = time(0) + timeout;
 
-	const char *type_expr = "type==\"chirp\" || type==\"catalog\"";
-	if(show_all_types) type_expr = "true";
+	const char *query_expr;
 
-	const char *query_expr = string_format("%s && %s",type_expr,where_expr);
+	if(show_all_types) {
+		query_expr = where_expr;
+	} else {
+		query_expr = string_format("%s && (type==\"chirp\" || type==\"catalog\")",where_expr);
+	}
 
-	q = catalog_query_create(catalog_host, 0, query_expr, stoptime);
+	struct jx *jexpr = jx_parse_string(query_expr);
+	if(!jexpr) {
+		fprintf(stderr,"invalid expression: %s\n",query_expr);
+		return 1;
+	}
+
+	q = catalog_query_create(catalog_host, 0, jexpr, stoptime);
 	if(!q) {
 		fprintf(stderr, "couldn't query catalog: %s\n", strerror(errno));
 		return 1;

@@ -41,6 +41,7 @@ the space used (in MB.)
 #include "sleeptools.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
+#include "jx_parse.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -124,7 +125,10 @@ static int server_table_load(time_t stoptime)
 
 	debug(D_CHIRP, "querying catalog at %s:%d", CATALOG_HOST, CATALOG_PORT);
 
-	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, "type==\"chirp\"", stoptime);
+	struct jx *jexpr = jx_parse_string("type==\"chirp\"");
+	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, jexpr, stoptime);
+	jx_delete(jexpr);
+
 	if(!q)
 		return 0;
 

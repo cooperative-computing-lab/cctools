@@ -20,7 +20,7 @@ struct catalog_query {
 	struct jx_item *current;
 };
 
-struct catalog_query *catalog_query_create(const char *host, int port, const char *filter_expr, time_t stoptime)
+struct catalog_query *catalog_query_create(const char *host, int port, struct jx *filter_expr, time_t stoptime)
 {
 	if(!host)
 		host = CATALOG_HOST;
@@ -51,9 +51,7 @@ struct catalog_query *catalog_query_create(const char *host, int port, const cha
 	struct catalog_query *q = xxmalloc(sizeof(*q));
 	q->data = j;
 	q->current = j->u.items;
-	if(filter_expr) {
-		q->filter_expr = jx_parse_string(filter_expr);
-	}
+	q->filter_expr = filter_expr;
 	return q;
 }
 
