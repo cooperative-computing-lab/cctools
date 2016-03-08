@@ -19,11 +19,16 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx_print.h"
 
-#include "category.h"
+#include "category_internal.h"
 
-static uint64_t memory_bucket_size    = 100;       /* MB */
-static uint64_t disk_bucket_size      = 100;       /* MB */
-static uint64_t time_bucket_size      = 60000000;  /* 60 s */
+struct peak_count_time {
+	int64_t count;
+	double  times;
+};
+
+static uint64_t memory_bucket_size    = 50;        /* MB */
+static uint64_t disk_bucket_size      = 50;        /* MB */
+static uint64_t time_bucket_size      = 60000000;  /* 1 minute */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
@@ -62,45 +67,53 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_concurrent_processes_histogram = itable_create(0);
 	c->total_processes_histogram = itable_create(0);
 
+	c->time_peak_independece = 0;
+
+	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
+
 	hash_table_insert(categories, name, c);
 
 	return c;
+}
+
+static void category_clear_histogram(struct itable *h) {
+	struct peak_count_time *p;
+	uint64_t key;
+
+	itable_firstkey(h);
+	while(itable_nextkey(h, &key, (void **) &p)) {
+		free(p);
+	}
+
+	itable_clear(h);
 }
 
 static void category_clear_histograms(struct category *c) {
 	if(!c)
 		return;
 
-	itable_clear(c->cores_histogram);
-	itable_clear(c->wall_time_histogram);
-	itable_clear(c->cpu_time_histogram);
-	itable_clear(c->max_concurrent_processes_histogram);
-	itable_clear(c->total_processes_histogram);
-	itable_clear(c->memory_histogram);
-	itable_clear(c->swap_memory_histogram);
-	itable_clear(c->virtual_memory_histogram);
-	itable_clear(c->bytes_read_histogram);
-	itable_clear(c->bytes_written_histogram);
-	itable_clear(c->bytes_received_histogram);
-	itable_clear(c->bytes_sent_histogram);
-	itable_clear(c->bandwidth_histogram);
-	itable_clear(c->total_files_histogram);
-	itable_clear(c->disk_histogram);
+	category_clear_histogram(c->cores_histogram);
+	category_clear_histogram(c->wall_time_histogram);
+	category_clear_histogram(c->cpu_time_histogram);
+	category_clear_histogram(c->max_concurrent_processes_histogram);
+	category_clear_histogram(c->total_processes_histogram);
+	category_clear_histogram(c->memory_histogram);
+	category_clear_histogram(c->swap_memory_histogram);
+	category_clear_histogram(c->virtual_memory_histogram);
+	category_clear_histogram(c->bytes_read_histogram);
+	category_clear_histogram(c->bytes_written_histogram);
+	category_clear_histogram(c->bytes_received_histogram);
+	category_clear_histogram(c->bytes_sent_histogram);
+	category_clear_histogram(c->bandwidth_histogram);
+	category_clear_histogram(c->total_files_histogram);
+	category_clear_histogram(c->disk_histogram);
 }
 
-void category_delete(struct hash_table *categories, const char *name) {
-	struct category *c = hash_table_lookup(categories, name);
-
+static void category_delete_histograms(struct category *c) {
 	if(!c)
 		return;
 
-	hash_table_remove(categories, name);
-
-	if(c->name)
-		free(c->name);
-
-	if(c->wq_stats)
-		free(c->wq_stats);
+	category_clear_histograms(c);
 
 	itable_delete(c->cores_histogram);
 	itable_delete(c->wall_time_histogram);
@@ -117,6 +130,23 @@ void category_delete(struct hash_table *categories, const char *name) {
 	itable_delete(c->bandwidth_histogram);
 	itable_delete(c->total_files_histogram);
 	itable_delete(c->disk_histogram);
+}
+
+void category_delete(struct hash_table *categories, const char *name) {
+	struct category *c = hash_table_lookup(categories, name);
+
+	if(!c)
+		return;
+
+	hash_table_remove(categories, name);
+
+	if(c->name)
+		free(c->name);
+
+	if(c->wq_stats)
+		free(c->wq_stats);
+
+	category_delete_histograms(c);
 
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
@@ -126,12 +156,14 @@ void category_delete(struct hash_table *categories, const char *name) {
 
 #define category_inc_histogram_count(c, field, summary, bucket_size)\
 {\
-	int64_t value = (summary)->field;\
-	if(value >= 0) { \
-		uintptr_t bucket = DIV_INT_ROUND_UP(value + 1, bucket_size)*bucket_size; /* + 1 so border values go to the next bucket. */ \
-		/* histograms keys are shifted to the right, as 0 cannot be a valid key (thus the bucket + 1). */\
-		uintptr_t count = (uintptr_t) itable_lookup(c->field##_histogram, bucket + 1) + 1;\
-		itable_insert(c->field##_histogram, bucket + 1, (void *) count);\
+	int64_t value    = (summary)->field;\
+	int64_t walltime = (summary)->wall_time;\
+	if(value >= 0 && walltime >= 0) { \
+		uintptr_t bucket = DIV_INT_ROUND_UP(value, bucket_size)*bucket_size;\
+		struct peak_count_time *p = itable_lookup(c->field##_histogram, bucket);\
+		if(!p) { p = malloc(sizeof(*p)); p->count = 0; p->times = 0; itable_insert(c->field##_histogram, bucket, p);}\
+		p->count++;\
+		p->times += ((double) walltime)/time_bucket_size;\
 	}\
 }
 
@@ -148,58 +180,96 @@ int cmp_int(const void *a, const void *b) {
 	return 0;
 }
 
-int64_t *category_sort_histogram(struct itable *histogram, uint64_t top_resource) {
+int64_t *category_sort_histogram(struct itable *histogram, int64_t *keys) {
 	if(itable_size(histogram) < 1) {
 		return NULL;
 	}
 
-	int64_t *buckets = malloc(itable_size(histogram)*sizeof(int64_t));
-
 	size_t i = 0;
 	uint64_t  key;
-	uintptr_t count;
+	struct peak_count_time *p;
 	itable_firstkey(histogram);
-	while(itable_nextkey(histogram, &key, (void **) &count)) {
+	while(itable_nextkey(histogram, &key, (void **) &p)) {
 		/* histograms keys are shifted to the right, as 0 cannot be a valid key. */
-		buckets[i] = key - 1;
+		keys[i] = key;
 		i++;
 	}
 
-	qsort(buckets, itable_size(histogram), sizeof(int64_t), cmp_int);
+	qsort(keys, itable_size(histogram), sizeof(int64_t), cmp_int);
 
-	return buckets;
+	return keys;
 }
 
-int64_t category_first_allocation(struct itable *histogram, int64_t top_resource) {
-	/* Automatically labeling for memory is not activated. */
+void category_first_allocation_accum_times(struct itable *histogram, double *tau_mean, int64_t *keys, int64_t *counts_accum, double *times_mean, double *times_accum) {
+
+	int64_t n = itable_size(histogram);
+
+	category_sort_histogram(histogram, keys);
+
+	struct peak_count_time *p;
+	p = itable_lookup(histogram, keys[0]);
+	counts_accum[0] = p->count;
+	times_mean[0]   = (((double) time_bucket_size)/USECOND)*(p->times/p->count);
+
+	int64_t i;
+	for(i = 1; i < n; i++) {
+		p = itable_lookup(histogram, keys[i]);
+		counts_accum[i] = counts_accum[i - 1] + p->count;
+		times_mean[i]   = (((double) time_bucket_size)/USECOND)*(p->times/p->count);
+	}
+
+	p = itable_lookup(histogram, keys[n-1]);
+	times_accum[n-1]  = 0;
+
+	for(i = n-2; i >= 0; i--) {
+		p = itable_lookup(histogram, keys[i+1]);
+		times_accum[i] = times_accum[i + 1] + times_mean[i+1] * ((double) p->count)/counts_accum[n-1];
+	}
+
+	p = itable_lookup(histogram, keys[0]);
+	*tau_mean = times_accum[0] + times_mean[0] * ((double) p->count)/counts_accum[n-1];
+
+	return;
+}
+
+int64_t category_first_allocation_min_waste(struct itable *histogram, int assume_independence, int64_t top_resource) {
+	/* Automatically labeling for resource is not activated. */
 	if(top_resource < 0) {
 		return -1;
 	}
 
-	uint64_t n = itable_size(histogram);
+	int64_t n = itable_size(histogram);
 
 	if(n < 1)
 		return -1;
 
-	int64_t *buckets = category_sort_histogram(histogram, top_resource);
-	intptr_t *accum = malloc(n*sizeof(intptr_t));
+	int64_t *keys         = malloc(n*sizeof(intptr_t));
+	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
+	double  *times_mean   = malloc(n*sizeof(intptr_t));
+	double  *times_accum  = malloc(n*sizeof(intptr_t));
 
-	/* histograms keys are shifted to the right, thus the bucket + 1. */
-	accum[0] = (intptr_t) itable_lookup(histogram, buckets[0] + 1);
+	double tau_mean;
 
-	uint64_t i;
-	for(i = 1; i < n; i++) {
-		accum[i] = accum[i - 1] + (intptr_t) itable_lookup(histogram, buckets[i] + 1);
-	}
+	category_first_allocation_accum_times(histogram, &tau_mean, keys, counts_accum, times_mean, times_accum);
 
 	int64_t a_1 = top_resource;
 	int64_t a_m = top_resource;
+
 	double Ea_1 = DBL_MAX;
 
+	int i;
 	for(i = 0; i < n; i++) {
-		int64_t a  = buckets[i];
-		double  Pa = accum[n-1] - accum[i];
-		double  Ea = a*accum[n-1] + a_m*Pa;
+		int64_t a  = keys[i];
+		double  Ea;
+
+		double Pa = 1 - ((double) counts_accum[i])/counts_accum[n-1];
+
+		if(assume_independence) {
+			Ea = a + a_m*Pa;
+			Ea *= tau_mean;
+		} else {
+			Ea = a*tau_mean + a_m*times_accum[i];
+		}
 
 		if(Ea < Ea_1) {
 			Ea_1 = Ea;
@@ -211,14 +281,88 @@ int64_t category_first_allocation(struct itable *histogram, int64_t top_resource
 		a_1 = top_resource;
 	}
 
-	free(accum);
-	free(buckets); /* of popcorn! */
+	free(counts_accum);
+	free(times_mean);
+	free(times_accum);
+	free(keys);
 
 	return a_1;
 }
 
-#define update_first_allocation_field(c, top, field)\
-	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, top->field)
+int64_t category_first_allocation_max_throughput(struct itable *histogram, int64_t top_resource) {
+	/* Automatically labeling for resource is not activated. */
+	if(top_resource < 0) {
+		return -1;
+	}
+
+	int64_t n = itable_size(histogram);
+
+	if(n < 1)
+		return -1;
+
+	int64_t *keys         = malloc(n*sizeof(intptr_t));
+	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
+	double  *times_mean   = malloc(n*sizeof(intptr_t));
+	double  *times_accum  = malloc(n*sizeof(intptr_t));
+
+	double tau_mean;
+
+	category_first_allocation_accum_times(histogram, &tau_mean, keys, counts_accum, times_mean, times_accum);
+
+	int64_t a_1 = top_resource;
+	int64_t a_m = top_resource;
+
+	double Ta_1 = 0;
+
+	int i;
+	for(i = 0; i < n; i++) {
+		int64_t a  = keys[i];
+
+		if(a < 1) {
+			continue;
+		}
+
+		double Pbef = ((double) counts_accum[i])/counts_accum[n-1];
+		double Paft = 1 - Pbef;
+
+		double numerator   = (Pbef*a_m)/a + Paft;
+		double denominator = tau_mean + times_accum[i];
+
+		double  Ta = numerator/denominator;
+
+
+		if(Ta > Ta_1) {
+			Ta_1 = Ta;
+			a_1 = a;
+		}
+	}
+
+	if(a_1 > top_resource) {
+		a_1 = top_resource;
+	}
+
+	free(counts_accum);
+	free(times_mean);
+	free(times_accum);
+	free(keys);
+
+	return a_1;
+}
+
+int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_mode_t mode,  int64_t top_resource) {
+	switch(mode) {
+		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
+			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
+			break;
+		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+		default:
+			return category_first_allocation_max_throughput(histogram, top_resource);
+			break;
+	}
+}
+
+#define update_first_allocation_field(c, top, independence, field)\
+	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field)
 
 void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */
@@ -240,20 +384,20 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 
 	c->first_allocation->cores          = c->max_allocation->cores;
 
-	update_first_allocation_field(c, top, cpu_time);
-	update_first_allocation_field(c, top, wall_time);
-	update_first_allocation_field(c, top, virtual_memory);
-	update_first_allocation_field(c, top, memory);
-	update_first_allocation_field(c, top, swap_memory);
-	update_first_allocation_field(c, top, bytes_read);
-	update_first_allocation_field(c, top, bytes_written);
-	update_first_allocation_field(c, top, bytes_received);
-	update_first_allocation_field(c, top, bytes_sent);
-	update_first_allocation_field(c, top, bandwidth);
-	update_first_allocation_field(c, top, total_files);
-	update_first_allocation_field(c, top, disk);
-	update_first_allocation_field(c, top, max_concurrent_processes);
-	update_first_allocation_field(c, top, total_processes);
+	update_first_allocation_field(c, top, 1, cpu_time);
+	update_first_allocation_field(c, top, 1, wall_time);
+	update_first_allocation_field(c, top, c->time_peak_independece, virtual_memory);
+	update_first_allocation_field(c, top, c->time_peak_independece, memory);
+	update_first_allocation_field(c, top, c->time_peak_independece, swap_memory);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_read);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_written);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_received);
+	update_first_allocation_field(c, top, c->time_peak_independece, bytes_sent);
+	update_first_allocation_field(c, top, c->time_peak_independece, bandwidth);
+	update_first_allocation_field(c, top, c->time_peak_independece, total_files);
+	update_first_allocation_field(c, top, c->time_peak_independece, disk);
+	update_first_allocation_field(c, top, c->time_peak_independece, max_concurrent_processes);
+	update_first_allocation_field(c, top, c->time_peak_independece, total_processes);
 
 	/* From here on we only print debugging info. */
 	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
@@ -357,5 +501,19 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	} else {
 		/* Use default when no enough information is available. */
 		return CATEGORY_ALLOCATION_AUTO_ZERO;
+	}
+}
+
+void category_tune_bucket_size(const char *resource, uint64_t size) {
+	if(strcmp(resource, "memory") == 0) {
+		memory_bucket_size = size;
+	} else if(strcmp(resource, "disk") == 0) {
+		disk_bucket_size = size;
+	} else if(strcmp(resource, "time") == 0) {
+		time_bucket_size = size;
+	} else if(strcmp(resource, "io") == 0) {
+		bytes_bucket_size = size;
+	} else if(strcmp(resource, "bandwidth") == 0) {
+		bandwidth_bucket_size = size;
 	}
 }

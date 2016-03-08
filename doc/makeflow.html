@@ -12,9 +12,9 @@
 <div id="manual">
 <h1>Makeflow User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: December 2014</b></p>
+<p style="text-align: right;"><b>Last edited: March 2016</b></p>
 
-<p>Makeflow is Copyright (C) 2009 The University of Notre Dame.<br>
+<p>Makeflow is Copyright (C) 2009- The University of Notre Dame.<br>
 This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.</p>
 
@@ -403,6 +403,20 @@ did not need to rename the file <tt>b.out</tt>. Without remote file renaming,
 we would have to create either a symbolic link, or a copy of the files with the
 expected correct names.</p>
 
+<h3 id="details.renaming">Nested Makeflows<a class="sectionlink" href="#details.nested" title="Link to this section.">&#x21d7;</a></h3>
+
+One Makeflow can be nested inside of another by writing a rule
+with the following syntax:
+
+<code>output-files: input-files
+    MAKEFLOW makeflow-file [working-dir]
+</code>
+
+The input and output files are specified as usual, describing the files
+consumed and created by the child makeflow as a whole.  Then, the <tt>MAKEFLOW</tt>keyword</tt> introduces the child makeflow specification, and an
+optional working directory into which the makeflow will be executed.
+If not given, the current working directory is assumed.
+
 <h2 id="details.displaying">Displaying a Makeflow<a class="sectionlink" href="#details.displaying" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>There are several ways to visualize both the structure of a Makeflow
@@ -427,11 +441,33 @@ Or use a similar command to generate a <a href="http://www.cytoscape.org">Cytosc
 <p>
 Makeflow allows a global wrapper command to be applied to every rule in the workflow.  This is particularly useful for applying troubleshooting tools, or for setting up a global environment without rewriting the entire workflow.  The <tt>--wrapper</tt> option will prefix a command in front of every rule, while the <tt>--wrapper-input</tt> and <tt>--wrapper-output</tt> options will specify input and output files related to the wrapper.</p>
 
-<p>A few special characters are supported by wrappers.  If the wrapper command or wrapper files contain two percents (<tt>%%</tt>), then the number of the current rule will be substituted there.  If the command contains curly braces (<tt>{}</tt>) the original command will be substituted at that point, instead of at the end of the command.</p>
+<p>A few special characters are supported by wrappers.  If the wrapper command or wrapper files contain two percents (<tt>%%</tt>), then the number of the current rule will be substituted there.  If the command contains curly braces (<tt>{}</tt>) the original command will be substituted at that point.
+Square brackets (<tt>[]</tt>) are the same as curly braces, except that the command is quoted and escaped before substitution.
+If neither specifier is given, Makeflow appends <tt>/bin/sh -c []</tt> to the wrapper command.</p>
 
-<p>For example, suppose that you wish to apply <tt>/usr/bin/time</tt> to every rule in the workflow.  Instead of modifying the workflow, run it like this:</p>
+<p>For example, suppose that you wish to shell builtin command <tt>time</tt> to
+every rule in the workflow.  Instead of modifying the workflow, run it like
+this:</p>
 
-<code>makeflow --wrapper '/usr/bin/time -p' example.makeflow</code>
+<code>makeflow --wrapper 'time -p' example.makeflow</code>
+
+<p>Since the preceding wrapper did not specify where to substitute the command, it is equivalent to</p>
+<code>makeflow --wrapper 'time -p /bin/sh -c []' example.makeflow</code>
+<p>This way, if a single rule specifies multiple commands, the wrapper will time <em>all</em> of them.</p>
+
+<p>The square brackets and the default
+behavior of running commands in a shell were added because Makeflow allows a rule to run multiple commands. The curly braces simply perform text substitution, so for example</p>
+<code>makeflow --wrapper 'env -i {}' example.makeflow</code>
+does not work correctly if multiple commands are specified.
+<code>target_1: source_1
+	command_1; command_2; command_3</code>
+will be executed as
+<code>env -i command_1; command_2; command_3</code>
+<p>Notice that only <tt>command_1</tt>'s environment will be cleared; subsequent commands are not affected.
+Thus this wrapper should be given as</p>
+<code>makeflow --wrapper 'env -i /bin/sh -c []' example.makeflow</code>
+or more succinctly as
+<code>makeflow --wrapper 'env -i' example.makeflow</code>
 
 <p>Suppose you want to apply <tt>strace</tt> to every rule, to obtain system call traces.  Since every rule would have to have its own output file for the trace, you could indicate output files like this:</p>
 

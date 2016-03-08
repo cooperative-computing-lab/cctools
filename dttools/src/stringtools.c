@@ -23,30 +23,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-char *escape_shell_string(const char *str)
-{
-	if(str == NULL)
-		str = "";
-	char *escaped_string = malloc(strlen(str) * 3 + 1);
-	if(escaped_string == NULL)
-		return NULL;
-	const char *old = str;
-	char *current = escaped_string;
-	strcpy(current, "'");
-	current += 1;
-	for(; *old; old++) {
-		if(*old == '\'') {
-			strcpy(current, "'\\''");
-			current += 3;
-		} else {
-			*current = *old;
-			current += 1;
-		}
-	}
-	strcpy(current, "'");
-	return escaped_string;
-}
-
 /*
  * Based on opengroup.org's definition of the Shell Command Language (also gnu's)
  * In section 2.2.3 on Double-Quoted Strings, it indicates you only need to
@@ -909,13 +885,13 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 	char * square = strstr(wrapper_command,"[]");
 	char * new_command;
 
-	if(square) {
-		new_command = string_escape_shell(command);
-	} else {
+	if(braces) {
 		new_command = strdup(command);
+	} else {
+		new_command = string_escape_shell(command);
 	}
 
-	char * result = malloc(strlen(command)+strlen(wrapper_command)+2);
+	char * result = malloc(strlen(new_command)+strlen(wrapper_command)+16);
 
 	if(braces) {
 		strcpy(result,wrapper_command);
@@ -929,7 +905,7 @@ char * string_wrap_command( const char *command, const char *wrapper_command )
 		strcat(result,square+2);
 	} else {
 		strcpy(result,wrapper_command);
-		strcat(result," ");
+		strcat(result," /bin/sh -c ");
 		strcat(result,new_command);
 	}
 

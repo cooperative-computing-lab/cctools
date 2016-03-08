@@ -19,6 +19,11 @@ typedef enum {
 	CATEGORY_ALLOCATION_ERROR          /**< No valid resources could be found. (E.g., after 2nd step fails) */
 } category_allocation_t;
 
+typedef enum {
+	CATEGORY_ALLOCATION_MODE_MIN_WASTE = 0,
+	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+} category_mode_t;
+
 struct category {
 	char *name;
 	double fast_abort;
@@ -44,7 +49,12 @@ struct category {
 	struct itable *total_files_histogram;
 	struct itable *disk_histogram;
 
+	category_mode_t allocation_mode;
+
 	uint64_t total_tasks;
+
+	/* assume that peak usage is independent of wall time */
+	int time_peak_independece;
 
 	/* stats for wq */
 	uint64_t average_task_time;
@@ -57,7 +67,6 @@ struct category {
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
-int64_t category_first_allocation(struct itable *histogram, int64_t top_resource);
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
 void category_update_first_allocation(struct hash_table *categories, const char *category);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);

@@ -12,7 +12,7 @@ TARGETS = $(LIBRARIES) $(PROGRAMS)
 all: $(TARGETS)
 
 librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o $(EXTERNAL_DEPENDENCIES)
-	$(CCTOOLS_CC) -shared -ldl -fPIC $^ -o $@
+	$(CCTOOLS_CC) -shared -fPIC $^ -o $@ -ldl
 
 rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
 	./piggybacker rmonitor_piggyback.h CCTOOLS_USE_RMONITOR_HELPER_LIB librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
@@ -21,7 +21,7 @@ resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
 resource_monitor: rmonitor_helper_comm.o
 
 resource_monitor_histograms.o resource_monitor_cluster.o rmon_tools.o: %.o: %.c
-	$(CCTOOLS_CC) -fopenmp -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
+	$(CCTOOLS_CC) -fopenmp -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 resource_monitor_histograms resource_monitor_cluster: %: rmon_tools.o %.o
 	$(CCTOOLS_LD) -fopenmp -O3 -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)

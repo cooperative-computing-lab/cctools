@@ -15,8 +15,6 @@ See the file COPYING for details.
 
 typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
 
-char *escape_shell_string (const char *str);
-
 /** Takes a command string and escapes special characters in the Shell Command
   language. Mallocs space for new string and does not modify original string.
   Characters dollar-sign $, backtick `, backslash \, and double-quote " are

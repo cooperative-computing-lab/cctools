@@ -154,7 +154,7 @@ void parse_fields_options(char *field_str)
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 		f->active = 0;
 
-	char *c =  field_str;
+	char *c = field_str;
 	while( *c != '\0' )
 	{
 		switch(*c)
@@ -216,7 +216,7 @@ void parse_fields_options(char *field_str)
 				debug(D_DEBUG, "adding clustering field: cores\n");
 				break;
 			default:
-				fatal("'%c' is not a field option\n", c);
+				fatal("'%c' is not a field option\n", *c);
 				break;
 		}
 		c++;
@@ -258,11 +258,12 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table
 	if(!so)
 		return NULL;
 
-	if(categories && so->category) {
-		category_accumulate_summary(categories, so->category, so);
+	if(categories) {
+		category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
+		if(so->category) {
+			category_accumulate_summary(categories, so->category, so);
+		}
 	}
-
-	category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
 
 	struct rmDsummary *s  = malloc(sizeof(struct rmDsummary));
 	bzero(s, sizeof(*s));

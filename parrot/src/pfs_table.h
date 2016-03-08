@@ -119,7 +119,8 @@ public:
 	int	setacl( const char *path, const char *subject, const char *rights );
 	int	locate( const char *path, char *buf, int size );
 	pfs_ssize_t copyfile( const char *source, const char *target );
-	pfs_ssize_t copyfile_slow( const char *source, const char *target );
+	pfs_ssize_t fcopyfile(int sourcefd, int targetfd);
+	pfs_ssize_t copyfile_slow( pfs_file *sourcefile, pfs_file *targetfile );
 	int	md5( const char *path, unsigned char *digest );
 	int	md5_slow( const char *path, unsigned char *digest );
 	int 	search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);

@@ -500,6 +500,14 @@ int pfs_copyfile( const char *source, const char *target )
 	END
 }
 
+int pfs_fcopyfile( int srcfd, int dstfd )
+{
+	BEGIN
+	debug(D_LIBCALL,"fcopyfile %d %d",srcfd,dstfd);
+	result = pfs_current->table->fcopyfile(srcfd,dstfd);
+	END
+}
+
 int pfs_md5( const char *path, unsigned char *digest )
 {
 	BEGIN

@@ -564,7 +564,23 @@ static INT64_T chirp_fs_hdfs_rmdir(const char *path)
 {
 	RESOLVE(path)
 	debug(D_HDFS, "rmdir %s", path);
-	return do_unlink(path,1);
+
+	struct chirp_stat info;
+
+	if(do_stat(path, &info) < 0)
+		return -1;
+
+	if(!S_ISDIR(info.cst_mode)) {
+		errno = ENOTDIR;
+		return -1;
+	}
+
+	if(hdfs_services->unlink(fs, path, 0)<0) {
+		errno = EACCES;
+		return -1;
+	}
+
+	return 0;
 }
 
 static INT64_T chirp_fs_hdfs_lstat(const char *path, struct chirp_stat *buf)
