@@ -37,6 +37,9 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->descendants = set_create(0);
 	n->ancestors = set_create(0);
 
+	n->direct_children = set_create(0);
+	n->accounted = set_create(0);
+
 	n->source_files = list_create(0);
 	n->source_size = 0;
 
@@ -47,17 +50,17 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->residual_files = set_create(0);
 	n->residual_size = 0;
 
-	n->parent_files = set_create(0);
-	n->parent_footprint = 0;
+	n->run_files = set_create(0);
+	n->run_footprint = 0;
 
-	n->child_files = set_create(0);
-	n->child_footprint = 0;
+	n->delete_files = set_create(0);
+	n->delete_footprint = 0;
 
-	n->desc_min_files = set_create(0);
-	n->desc_min_footprint = 0;
+	n->prog_min_files = set_create(0);
+	n->prog_min_footprint = 0;
 
-	n->desc_max_files = set_create(0);
-	n->desc_max_footprint = 0;
+	n->prog_max_files = set_create(0);
+	n->prog_max_footprint = 0;
 
 	n->footprint_min_files = set_create(0);
 	n->footprint_min_size = 0;
@@ -65,6 +68,13 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->footprint_max_files = set_create(0);
 	n->footprint_max_size = 0;
 
+	n->res = 0;
+	n->res_files = set_create(0);
+	n->wgt = 0;
+	n->wgt_files = set_create(0);
+	n->diff = 0;
+
+	n->children_updated = 0;
 	n->size_updated = 0;
 	n->footprint_updated = 0;
 
@@ -102,18 +112,56 @@ int dag_node_comp(void *item, const void *arg)
 	return 0;
 }
 
-int dag_node_comp_residual(const void *item, const void *arg)
+int dag_node_comp_footprint(const void *item, const void *arg)
 {
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	uint64_t size1 = (*node1)->residual_size;
-	uint64_t size2 = (*node2)->residual_size;
+	uint64_t size1 = (*node1)->wgt;
+	uint64_t size2 = (*node2)->wgt;
 
 	if(size1 > size2)
 		return 1;
 	else if(size1 < size2)
 		return -1;
+	return 0;
+}
+int dag_node_comp_residual(const void *item, const void *arg)
+{
+	struct dag_node **node1 = (void *)item;
+	struct dag_node **node2 = (void *)arg;
+
+	uint64_t size1 = (*node1)->res;
+	uint64_t size2 = (*node2)->res;
+
+	if(size1 > size2)
+		return 1;
+	else if(size1 < size2)
+		return -1;
+	return 0;
+}
+
+int dag_node_comp_diff(const void *item, const void *arg)
+{
+	struct dag_node **node1 = (void *)item;
+	struct dag_node **node2 = (void *)arg;
+
+	uint64_t size1 = (*node1)->diff;
+	uint64_t size2 = (*node2)->diff;
+
+	if(size1 > size2)
+		return -1;
+	else if(size1 < size2)
+		return 1;
+
+	size1 = (*node1)->res;
+	size2 = (*node2)->res;
+
+	if(size1 > size2)
+		return -1;
+	else if(size1 < size2)
+		return 1;
+
 	return 0;
 }
 
@@ -287,6 +335,33 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 	source->reference_count++;
 }
 
+/* Function that calculates the three different footprint values and
+ * stores the largest as the key footprint of the node. */
+void dag_node_determine_children(struct dag_node *n)
+{
+	struct dag_node *c;
+
+	/* Have un-updated children calculate their current footprint. */
+	set_first_element(n->descendants);
+	while((c = set_next_element(n->descendants))){
+		if(!c->children_updated){
+			dag_node_determine_children(c);
+			set_insert_set(n->accounted, c->accounted);
+		}
+	}
+
+	set_first_element(n->descendants);
+	while((c = set_next_element(n->descendants))){
+		if(!set_lookup(n->accounted, c)){
+			set_insert(n->direct_children, c);
+			set_insert(n->accounted, c);
+		}
+	}
+
+	n->children_updated = 1;
+}
+
+
 /* Adds the local name as a target of the node, and register the
  * node as the producer of the file. If remotename is not NULL,
  * it is added to the namespace of the node. */
@@ -327,8 +402,8 @@ void dag_node_prepare_node_size(struct dag_node *n)
 		n->target_size += dag_file_size(f);
 
 	/* Recursively updated children if they have not yet been updated */
-	set_first_element(n->descendants);
-	while((s = set_next_element(n->descendants)) && !s->size_updated)
+	set_first_element(n->direct_children);
+	while((s = set_next_element(n->direct_children)) && !s->size_updated)
 		dag_node_prepare_node_size(s);
 
 	/* Mark this node as having been updated for size */
@@ -346,43 +421,16 @@ uint64_t dag_node_set_size(struct set *s)
 	return size;
 }
 
-/* The parent footprint of a node is defined as its target size and
+/* The run footprint of a node is defined as its target size and
  * the size of it inputs. It is the cost needed to run this node. */
-void dag_node_determine_parent_footprint(struct dag_node *n)
+void dag_node_determine_run_footprint(struct dag_node *n)
 {
-	set_delete(n->parent_files);
-	n->parent_files = set_create(0);
-	set_insert_list(n->parent_files, n->source_files);
-	set_insert_list(n->parent_files, n->target_files);
+	set_delete(n->run_files);
+	n->run_files = set_create(0);
+	set_insert_list(n->run_files, n->source_files);
+	set_insert_list(n->run_files, n->target_files);
 
-	n->parent_footprint = dag_node_set_size(n->parent_files);
-}
-
-/* The child footprint of a node is defined as the sum of all the
- * nodes child's target and source size. This sum includes the
- * outputs of this node. We also add outputs of the node that are
- * not used but may be final outputs. */
-void dag_node_determine_child_footprint(struct dag_node *n)
-{
-	struct dag_node *s;
-	struct dag_file *f;
-
-	set_delete(n->child_files);
-	n->child_files = set_create(0);
-	set_first_element(n->descendants);
-	while((s = set_next_element(n->descendants))){
-		set_insert_list(n->child_files, s->source_files);
-		set_insert_list(n->child_files, s->target_files);
-	}
-
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))){
-		if(list_size(f->needed_by))
-			continue;
-		set_insert(n->child_files, f);
-	}
-
-	n->child_footprint = dag_node_set_size(n->child_files);
+	n->run_footprint = dag_node_set_size(n->run_files);
 }
 
 /* The descendant footprint of a node is defined as a balance between
@@ -394,8 +442,8 @@ void dag_node_determine_child_footprint(struct dag_node *n)
  * computed. */
 void dag_node_determine_descendant_footprint(struct dag_node *n)
 {
-	struct dag_node *node1, *node2;
-	struct set *tmp_descendants = set_duplicate(n->descendants);
+	struct dag_node *node1, *node2, *res_node;
+	struct list *tmp_direct_children = list_create();
 	struct set *footprint = set_create(0);
 	uint64_t max_branch = 0;
 	uint64_t footprint_size = 0;
@@ -404,10 +452,16 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 		iterate through while holding out current. This is needed
 		as we compare footprint and the residual nodes.
 		We also set the residual and footprint list to first. */
+	set_first_element(n->direct_children);
+	while((node1 = set_next_element(n->direct_children))){
+		list_push_tail(tmp_direct_children, node1);
+	}
+
 	set_first_element(n->descendants);
 	while((node1 = set_next_element(n->descendants))){
 		list_first_item(node1->residual_nodes);
 	}
+
 
 	/* Clear existing list to prevent complicated modifications. */
 	list_delete(n->residual_nodes);
@@ -421,7 +475,7 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 		3. No children indication we are the start of a branch and need
 			create empty lists for this case.
 	*/
-	set_first_element(n->descendants);
+	set_first_element(n->direct_children);
 	if(set_size(n->descendants) > 1){
 		/* Case 1. We need to find common sublists and determine the
 			weight. */
@@ -434,59 +488,99 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 			intersect forms the basis for the parents residual nodes as
 			all sub-branches will culminate in the listed nodes. */
 		int comp = 1;
+		int index = 0;
 		while(comp){
+			index++;
 			node1 = set_next_element(n->descendants); // Get first child
-			node1 = list_next_item(node1->residual_nodes); // Grab next node in its list
+			node1 = list_peek_current(node1->residual_nodes); // Grab next node in its list
 			while((node2 = set_next_element(n->descendants))){ // Loop over remaining children
-				node2 = list_next_item(node2->residual_nodes);
+				node2 = list_peek_current(node2->residual_nodes);
 				/* We mark when the nodes are no longer comparable, but do
 					not break as we need all of the lists to be in the first
 					non-shared location for future use. */
-				if((node1 && !node2) || (!node1 && node2) || (node1 != node2))
+				if(!node1 || !node2 || (node1 != node2))
 					comp = 0;
 			}
 
 			set_first_element(n->descendants);
 			/* Only add the node if it occurred in all of the branch lists. */
-			if(comp)
+			if(comp){
 				list_push_tail(n->residual_nodes, node1);
+				res_node = node1;
+				while((node1 = set_next_element(n->descendants))){
+					list_next_item(node1->residual_nodes);
+				}
+				set_first_element(n->descendants);
+			}
 		}
 
-		while((node1 = set_next_element(n->descendants))){
+		set_first_element(n->direct_children);
+		while((node1 = set_next_element(n->direct_children))){
 			node2 = list_peek_current(node1->residual_nodes);
-			if(node2)
-				set_insert_set(n->residual_files, node2->residual_files);
-			else
-				set_insert_set(n->residual_files, node1->residual_files);
+			set_insert_set(n->residual_files, node2->residual_files);
+			set_insert_set(node1->res_files, node2->residual_files);
+			node1->res = node2->residual_size;
+			set_insert_set(node1->wgt_files, node2->footprint_min_files);
+			node1->wgt = node2->footprint_min_size;
+			list_next_item(node1->residual_nodes);
+			while((node2 = list_peek_current(node1->residual_nodes))){
+				if(node2->footprint_min_size >= node1->wgt){
+					set_delete(node1->wgt_files);
+					node1->wgt_files = set_duplicate(node2->footprint_min_files);
+					node1->wgt = node2->footprint_min_size;
+				}
+				list_next_item(node1->residual_nodes);
+			}
+		}
+
+		set_first_element(n->direct_children);
+		while((node1 = set_next_element(n->direct_children))){
+			n->diff = node1->wgt - node1->res;
 		}
 
 		n->residual_size = dag_node_set_size(n->residual_files);
-		if(n->target_size > n->residual_size){
-			n->residual_size = n->target_size;
-			set_delete(n->residual_files);
-			n->residual_files = set_create(0);
-			set_insert_list(n->residual_files, n->target_files);
+
+		/* Clear any previously defined max though it should not exist. */
+		set_delete(n->prog_max_files);
+		n->prog_max_files = set_create(0);
+
+		set_insert_list(footprint, n->target_files);
+
+		list_sort(tmp_direct_children, dag_node_comp_diff);
+		list_first_item(tmp_direct_children);
+		/* Loop over each child giving it the chance to be the largest footprint. */
+		while((node1 = list_next_item(tmp_direct_children))){
+			footprint_size = dag_node_set_size(footprint);
+			if((footprint_size + node1->wgt) > n->delete_footprint){
+				set_delete(n->delete_files);
+				n->delete_files = set_duplicate(footprint);
+				set_insert_set(n->delete_files, node1->wgt_files);
+				n->delete_footprint = dag_node_set_size(n->delete_files);
+
+			}
+			// This is where we would remove an input file is it wasn't needed for other branches
+			set_insert_set(footprint, node1->res_files);
 		}
 
-		set_first_element(n->descendants);
-
-		set_first_element(tmp_descendants);
+		list_sort(tmp_direct_children, dag_node_comp_residual);
+		list_first_item(tmp_direct_children);
 		/* Loop over each child giving it the chance to be the largest footprint. */
-		while((node1 = set_next_element(tmp_descendants))){
+		while((node1 = list_next_item(tmp_direct_children))){
 			/* Create tmp list for remember run order if this is best. */
 			struct list *tmp_run_order = list_create();
 
 			set_delete(footprint);
-			footprint = set_duplicate(node1->footprint_min_files);
+
+			set_insert_set(n->prog_max_files, node1->wgt_files);
+			footprint = set_duplicate(node1->wgt_files);
 
 			/* Find what the total space is needed to hold all residuals and
 				the largest footprint branch concurrently. */
-			set_first_element(n->descendants);
-			while((node2 = set_next_element(n->descendants))){
+			set_first_element(n->direct_children);
+			while((node2 = set_next_element(n->direct_children))){
 				if(node1 == node2) // Ignore if the node is the current footprint node
 					continue;
-
-				set_insert_set(footprint, node2->residual_files);
+				set_insert_set(footprint, node2->res_files);
 				list_push_head(tmp_run_order, node2);
 			}
 
@@ -494,13 +588,13 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 				footprint we will store it. */
 			footprint_size = dag_node_set_size(footprint);
 
-			if(max_branch < node1->footprint_min_size || (max_branch == node1->footprint_min_size && footprint_size < n->desc_min_footprint)){
+			if(max_branch < node1->wgt || (max_branch == node1->wgt && footprint_size < n->prog_min_footprint)){
 
-				max_branch = node1->footprint_min_size;
+				max_branch = node1->wgt;
 
-				set_delete(n->desc_min_files);
-				n->desc_min_files = set_duplicate(footprint);
-				n->desc_min_footprint = footprint_size;
+				set_delete(n->prog_min_files);
+				n->prog_min_files = set_duplicate(footprint);
+				n->prog_min_footprint = footprint_size;
 
 				list_sort(tmp_run_order, dag_node_comp_residual);
 				/* Add to run order, as we push tail this will be last. */
@@ -512,30 +606,14 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 			list_delete(tmp_run_order);
 		}
 
-		/* Clear any previously defined max though it should not exist. */
-		set_delete(n->desc_max_files);
-		n->desc_max_files = set_create(0);
-
-		set_first_element(tmp_descendants);
 		/* Loop over each child adding it max to the footprint. */
-		while((node1 = set_next_element(tmp_descendants))){
-			set_insert_set(n->desc_max_files, node1->footprint_max_files);
-		}
-		n->desc_max_footprint = dag_node_set_size(n->desc_max_files);
-	} else if(set_size(n->descendants) == 1){
+		n->prog_max_footprint = dag_node_set_size(n->prog_max_files);
+	} else if(set_size(n->direct_children) == 1){
 		/* Case 2. Extend the lists maintained at the child with
 			the exception of run order which is just the child. */
-		node1 = set_next_element(n->descendants);
+		node1 = set_next_element(n->direct_children);
 		n->run_order = list_create();
 		list_push_tail(n->run_order, node1);
-
-		set_delete(n->desc_min_files);
-		n->desc_min_files = set_duplicate(node1->footprint_min_files);
-		n->desc_min_footprint = node1->footprint_min_size;
-
-		set_delete(n->desc_max_files);
-		n->desc_max_files = set_duplicate(node1->footprint_max_files);
-		n->desc_max_footprint = node1->footprint_max_size;
 
 		n->residual_nodes = list_duplicate(node1->residual_nodes);
 		set_insert_list(n->residual_files, n->target_files);
@@ -548,7 +626,11 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 		n->run_order = list_create();
 	}
 
-	set_delete(tmp_descendants);
+	/* Adding the current nodes list so parents can quickly access
+		these decisions. */
+	list_push_tail(n->residual_nodes, n);
+
+	list_delete(tmp_direct_children);
 }
 
 /* Function that allows the purpose to be succintly stated. We only
@@ -557,16 +639,16 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 void dag_node_min_footprint( struct dag_node *n)
 {
 	set_delete(n->footprint_min_files);
-	if(n->parent_footprint >= n->child_footprint
-		&& n->parent_footprint >= n->desc_min_footprint){
-		n->footprint_min_size = n->parent_footprint;
-		n->footprint_min_files = set_duplicate(n->parent_files);
-	} else if(n->child_footprint >= n->desc_min_footprint){
-		n->footprint_min_size = n->child_footprint;
-		n->footprint_min_files = set_duplicate(n->child_files);
+	if(n->run_footprint >= n->delete_footprint
+		&& n->run_footprint >= n->prog_min_footprint){
+		n->footprint_min_size = n->run_footprint;
+		n->footprint_min_files = set_duplicate(n->run_files);
+	} else if(n->delete_footprint >= n->prog_min_footprint){
+		n->footprint_min_size = n->delete_footprint;
+		n->footprint_min_files = set_duplicate(n->delete_files);
 	} else {
-		n->footprint_min_size = n->desc_min_footprint;
-		n->footprint_min_files = set_duplicate(n->desc_min_files);
+		n->footprint_min_size = n->prog_min_footprint;
+		n->footprint_min_files = set_duplicate(n->prog_min_files);
 	}
 }
 
@@ -576,16 +658,16 @@ void dag_node_min_footprint( struct dag_node *n)
 void dag_node_max_footprint( struct dag_node *n)
 {
 	set_delete(n->footprint_max_files);
-	if(n->parent_footprint >= n->child_footprint
-		&& n->parent_footprint >= n->desc_max_footprint){
-		n->footprint_max_size = n->parent_footprint;
-		n->footprint_max_files = set_duplicate(n->parent_files);
-	} else if(n->child_footprint >= n->desc_max_footprint){
-		n->footprint_max_size = n->child_footprint;
-		n->footprint_max_files = set_duplicate(n->child_files);
+	if(n->run_footprint >= n->delete_footprint
+		&& n->run_footprint >= n->prog_max_footprint){
+		n->footprint_max_size = n->run_footprint;
+		n->footprint_max_files = set_duplicate(n->run_files);
+	} else if(n->delete_footprint >= n->prog_max_footprint){
+		n->footprint_max_size = n->delete_footprint;
+		n->footprint_max_files = set_duplicate(n->delete_files);
 	} else {
-		n->footprint_max_size = n->desc_max_footprint;
-		n->footprint_max_files = set_duplicate(n->desc_max_files);
+		n->footprint_max_size = n->prog_max_footprint;
+		n->footprint_max_files = set_duplicate(n->prog_max_files);
 	}
 }
 
@@ -596,13 +678,11 @@ void dag_node_determine_footprint(struct dag_node *n)
 {
 	struct dag_node *c;
 
-	dag_node_determine_parent_footprint(n);
-
-	dag_node_determine_child_footprint(n);
+	dag_node_determine_run_footprint(n);
 
 	/* Have un-updated children calculate their current footprint. */
-	set_first_element(n->descendants);
-	while((c = set_next_element(n->descendants))){
+	set_first_element(n->direct_children);
+	while((c = set_next_element(n->direct_children))){
 		if(!c->footprint_updated)
 			dag_node_determine_footprint(c);
 	}
@@ -614,10 +694,6 @@ void dag_node_determine_footprint(struct dag_node *n)
 
 	/* Finds the max of all three different weights. */
 	dag_node_max_footprint(n);
-
-	/* Adding the current nodes list so parents can quickly access
-		these decisions. */
-	list_push_tail(n->residual_nodes, n);
 
 	/* Mark node as having been updated. */
 	n->footprint_updated = 1;
@@ -633,10 +709,52 @@ int cstring_cmp(const void *a, const void *b)
  *	comparison function */
 }
 
+void dag_node_print_node_set(struct set *s, FILE *out, char *t)
+{
+	if(!s){
+		fprintf(out, "\\{\\}%s", t);
+		return;
+	}
+
+	set_first_element(s);
+	struct dag_node *n;
+	if(set_size(s) == 0){
+		fprintf(out, "\\{\\}%s", t);
+	} else {
+		n = set_next_element(s);
+		fprintf(out, "\\{%d", n->nodeid);
+		while((n = set_next_element(s))){
+			fprintf(out, ",%d", n->nodeid);
+		}
+		fprintf(out, "\\}%s", t);
+	}
+}
+
+void dag_node_print_node_list(struct list *s, FILE *out, char *t)
+{
+	if(!s){
+		fprintf(out, "\\{\\}%s", t);
+		return;
+	}
+
+	list_first_item(s);
+	struct dag_node *n;
+	if(list_size(s) == 0){
+		fprintf(out, "\\{\\}%s", t);
+	} else {
+		n = list_next_item(s);
+		fprintf(out, "\\{%d", n->nodeid);
+		while((n = list_next_item(s))){
+			fprintf(out, ",%d", n->nodeid);
+		}
+		fprintf(out, "\\}%s", t);
+	}
+}
+
 void dag_node_print_file_set(struct set *s, FILE *out, char *t)
 {
 	if(!s){
-		fprintf(out, "0%s", t);
+		fprintf(out, "\\{\\}%s", t);
 		return;
 	}
 
@@ -670,44 +788,36 @@ void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *retrn, c
 	int symbolic = 1;
 
 	if(numeric){
-		fprintf(out, "%"PRIu64"%s", n->residual_size, delim);
-		fprintf(out, "%"PRIu64"%s", n->parent_footprint, delim);
-		fprintf(out, "%"PRIu64"%s", n->child_footprint, delim);
-		fprintf(out, "%"PRIu64"%s", n->desc_min_footprint, delim);
-		fprintf(out, "%"PRIu64"%s", n->desc_max_footprint, delim);
 		fprintf(out, "%"PRIu64"%s", n->footprint_min_size, delim);
+		fprintf(out, "%"PRIu64"%s", n->footprint_max_size, delim);
+		fprintf(out, "%"PRIu64"%s", n->residual_size, delim);
+		fprintf(out, "%"PRIu64"%s", n->run_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->delete_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->prog_min_footprint, delim);
+		fprintf(out, "%"PRIu64"%s", n->prog_max_footprint, node_retrn);
 		if(symbolic) {
-			fprintf(out, "%"PRIu64"%s", n->footprint_max_size, node_retrn);
-			fprintf(out, "%s", delim);
+			dag_node_print_node_list(n->residual_nodes, out, delim);
 		} else {
-			fprintf(out, "%"PRIu64"%s", n->footprint_max_size, retrn);
+			dag_node_print_node_list(n->residual_nodes, out, delim);
+			fprintf(out,"%s%s%s%s%s%s%s",
+				delim,delim,delim,delim,delim,delim,retrn);
 		}
 	}
 
 	if(symbolic){
-		dag_node_print_file_set(n->residual_files, out, delim);
-		dag_node_print_file_set(n->parent_files, out, delim);
-		dag_node_print_file_set(n->child_files, out, delim);
-		dag_node_print_file_set(n->desc_min_files, out, delim);
-		dag_node_print_file_set(n->desc_max_files, out, delim);
 		dag_node_print_file_set(n->footprint_min_files, out, delim);
-		dag_node_print_file_set(n->footprint_max_files, out, retrn);
+		dag_node_print_file_set(n->footprint_max_files, out, delim);
+		dag_node_print_file_set(n->residual_files, out, delim);
+		dag_node_print_file_set(n->run_files, out, delim);
+		dag_node_print_file_set(n->delete_files, out, delim);
+		dag_node_print_file_set(n->prog_min_files, out, delim);
+		dag_node_print_file_set(n->prog_max_files, out, retrn);
 	}
-
-	struct dag_node *c;
-
-	set_first_element(n->descendants);
-	while((c = set_next_element(n->descendants))){
-		if(!c->footprint_updated)
-			dag_node_print_footprint_node(c, out, retrn, node_retrn, delim);
-	}
-
-	n->footprint_updated = 1;
 }
 
-void dag_node_print_footprint(struct dag_node *n, char *output)
+void dag_node_print_footprint(struct dag *d, char *output)
 {
-	dag_node_reset_updated(n);
+	struct dag_node *n;
 
 	int tex = 1;
 
@@ -725,23 +835,21 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 	out = fopen(output, "w");
 
 	if(tex)
-		fprintf(out, "\\begin{tabular}{|cccccccc|}%s",retrn);
+		fprintf(out, "\\begin{tabular}{|cccccccc|}\n\t\\hline\n");
 
 	fprintf(out, "Node%s",delim);
+	fprintf(out, "Foot-Min%s",delim);
+	fprintf(out, "Foot-Max%s",delim);
 	fprintf(out, "Residual%s",delim);
 	fprintf(out, "Parent%s",delim);
 	fprintf(out, "Child%s",delim);
 	fprintf(out, "Desc-Min%s",delim);
-	fprintf(out, "Desc-Max%s",delim);
-	fprintf(out, "Foot-Min%s",delim);
-	fprintf(out, "Foot-Max%s",retrn);
+	fprintf(out, "Desc-Max%s",node_retrn);
+	fprintf(out, "Res Nodes%s%s%s%s%s%s%s%s",
+				delim,delim,delim,delim,delim,delim,delim,retrn);
 
-	struct dag_node *c;
-
-	set_first_element(n->descendants);
-	while((c = set_next_element(n->descendants))){
-		if(!c->footprint_updated)
-			dag_node_print_footprint_node(c, out, retrn, node_retrn, delim);
+	for(n = d->nodes; n; n = n->next) {
+		dag_node_print_footprint_node(n, out, retrn, node_retrn, delim);
 	}
 
 	if(tex)
@@ -755,8 +863,8 @@ void dag_node_print_footprint(struct dag_node *n, char *output)
 void dag_node_reset_updated(struct dag_node *n)
 {
 	struct dag_node *d;
-	set_first_element(n->descendants);
-	while((d = set_next_element(n->descendants))){
+	set_first_element(n->direct_children);
+	while((d = set_next_element(n->direct_children))){
 		if(d->footprint_updated)
 			dag_node_reset_updated(d);
 	}

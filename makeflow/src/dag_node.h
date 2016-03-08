@@ -41,7 +41,10 @@ struct dag_node {
 	int local_job;					/* Flag: does this node run locally? */
 
 	struct set *descendants;		/* The nodes of which this node is an immediate ancestor */
+	struct set *direct_children;			/* The nodes of which this node is an immediate ancestor
+										and no descendant of mine is also its parent */
 	struct set *ancestors;			/* The nodes of which this node is an immediate descendant */
+	struct set *accounted;			/* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;				/* The depth of the ancestor tree for this node */
 
 	int nested_job;					/* Flag: Is this a recursive call to makeflow? */
@@ -62,17 +65,17 @@ struct dag_node {
 	uint64_t residual_size;			/* Size of current residual, changes depending on
 										context of requesting node. */
 
-	struct set *parent_files;		/* size of dag_files of my output's and my parents' */
-	uint64_t parent_footprint;		/* size of dag_files of my output's and my parents' */
+	struct set *run_files;			/* size of dag_files of my output's and my parents' */
+	uint64_t run_footprint;			/* size of dag_files of my output's and my parents' */
 
-	struct set *child_files;		/* size of dag_files of my output's and my child's */
-	uint64_t child_footprint;		/* size of dag_files of my output's and my child's */
+	struct set *delete_files;		/* size of dag_files of my output's and my child's */
+	uint64_t delete_footprint;		/* size of dag_files of my output's and my child's */
 
-	struct set *desc_min_files;		/* Set of nodes that define the min footprint */
-	uint64_t desc_min_footprint;	/* Size of the minimum defined footprint */
+	struct set *prog_min_files;		/* Set of nodes that define the min footprint */
+	uint64_t prog_min_footprint;	/* Size of the minimum defined footprint */
 
-	struct set *desc_max_files;		/* Set of nodes that define the max footprint */
-	uint64_t desc_max_footprint;	/* Size of the largest defined footprint */
+	struct set *prog_max_files;		/* Set of nodes that define the max footprint */
+	uint64_t prog_max_footprint;	/* Size of the largest defined footprint */
 
 	struct set *footprint_min_files;/* Set of nodes that define the min footprint */
 	uint64_t footprint_min_size;	/* Size of the minimum defined footprint */
@@ -81,6 +84,12 @@ struct dag_node {
 	uint64_t footprint_max_size;	/* Size of the largest defined footprint */
 
 	uint64_t footprint_size;		/* Size decided upon by the user as the footprint between min and max */
+
+	uint64_t res;
+	struct set *res_files;
+	uint64_t wgt;
+	struct set *wgt_files;
+	uint64_t diff;
 
 	struct list *run_order;			/* list of child and the order to maintain committed size */
 
@@ -115,6 +124,7 @@ struct dag_node {
 
 	struct dag_node *next;          /* The next node in the list of nodes */
 
+	int children_updated;				/* Int indicating this node has updated its size */
 	int size_updated;				/* Int indicating this node has updated its size */
 	int footprint_updated;			/* Int indicating this node has updated its size */
 };
@@ -130,9 +140,10 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, const ch
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename );
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 
+void dag_node_determine_children(struct dag_node *n);
 void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
-void dag_node_print_footprint(struct dag_node *n, char *output);
+void dag_node_print_footprint(struct dag *d, char *output);
 void dag_node_reset_updated(struct dag_node *n);
 
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);

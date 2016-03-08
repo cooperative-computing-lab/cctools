@@ -34,11 +34,13 @@ See the file COPYING for details.
 #include "sha1.h"
 
 #include "dag.h"
+#include "dag_node.h"
 #include "dag_visitors.h"
 #include "parser.h"
 #include "parser_jx.h"
 
 #include "makeflow_summary.h"
+#include "makeflow_alloc.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
@@ -163,6 +165,8 @@ static int use_mountfile = 0;
 static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
+
+static struct makeflow_alloc *storage_allocation = 0;
 
 /*
 Determines if this is a local job that will consume
@@ -343,7 +347,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	struct list *outputs = makeflow_generate_output_files(n);
 	list_first_item(outputs);
 	while((f1 = list_next_item(outputs)))
-		makeflow_clean_file(d, remote_queue, f1, 0);
+		makeflow_clean_file(d, remote_queue, f1, 0, storage_allocation);
 	list_delete(outputs);
 	makeflow_clean_node(d, remote_queue, n, 0);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
@@ -392,10 +396,11 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 		}
 	}
 
+	dag_node_determine_children(n);
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
 	if(storage_print){
-		dag_node_print_footprint(n, storage_print);
+		dag_node_print_footprint(d, storage_print);
 		exit(0);
 	}
 }
@@ -588,6 +593,9 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		queue = remote_queue;
 	}
 
+	makeflow_alloc_commit_space(storage_allocation, n);
+	makeflow_log_alloc_event(d, storage_allocation);
+
 	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
@@ -697,6 +705,10 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
+	if(! makeflow_alloc_check_node_size(storage_allocation, n) ){
+		return 0;
+	}
+
 	return 1;
 }
 
@@ -737,7 +749,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 Check the the indicated file was created and log, error, or retry as appropriate.
 */
 
-int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
+int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, struct dag_file *f)
 {
 	struct stat buf;
 	int file_created = 0;
@@ -756,6 +768,8 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
 			f->actual_size = buf.st_size;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
+			d->total_file_size += buf.st_size;
+			makeflow_log_alloc_event(d, storage_allocation);
 			file_created = 1;
 			break;
 		}
@@ -824,7 +838,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	else if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
-			if(!makeflow_node_check_file_was_created(n, f))
+			if(!makeflow_node_check_file_was_created(d, n, f))
 			{
 				job_failed = 1;
 			}
@@ -851,10 +865,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		while((f = list_next_item(outputs))) {
 			if(f->state == DAG_FILE_STATE_EXPECT) {
 				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 1);
+						f, prep_failed, 1, storage_allocation);
 			} else {
 				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 0);
+						f, prep_failed, 0, storage_allocation);
 			}
 		}
 
@@ -1133,7 +1147,7 @@ static void makeflow_run( struct dag *d )
 		 * amount of tasks have passed. */
 		makeflow_gc_barrier--;
 		if(makeflow_gc_method != MAKEFLOW_GC_NONE && makeflow_gc_barrier == 0) {
-			makeflow_gc(d, remote_queue, makeflow_gc_method, makeflow_gc_size, makeflow_gc_count);
+			makeflow_gc(d, remote_queue, makeflow_gc_method, makeflow_gc_size, makeflow_gc_count, storage_allocation);
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
@@ -1148,7 +1162,7 @@ static void makeflow_run( struct dag *d )
 		makeflow_abort_all(d);
 	} else {
 		if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
-			makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0);
+			makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0, storage_allocation);
 		}
 	}
 }
@@ -1898,6 +1912,13 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
+	if(!storage_allocation){
+		storage_allocation = makeflow_alloc_create(-1, NULL, 0, 0);
+	} else {
+		makeflow_gc_method = MAKEFLOW_GC_ALL;
+	}
+
+
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
 			fprintf(stderr, "makeflow: Makeflow running in catalog mode. Please use '-N' option to specify the name of this project.\n");
@@ -2111,9 +2132,7 @@ int main(int argc, char *argv[])
 
 	makeflow_parse_input_outputs(d);
 
-	if(storage_limit > 0 || storage_print){
-		makeflow_prepare_node_sizes(d, storage_print);
-	}
+	makeflow_prepare_node_sizes(d, storage_print);
 
 	makeflow_prepare_nested_jobs(d);
 
@@ -2218,7 +2237,7 @@ int main(int argc, char *argv[])
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
-		if(makeflow_clean(d, remote_queue, clean_mode)) {
+		if(makeflow_clean(d, remote_queue, clean_mode, storage_allocation)) {
 			fprintf(stderr, "Failed to clean up makeflow!\n");
 			exit(EXIT_FAILURE);
 		}
@@ -2270,6 +2289,8 @@ int main(int argc, char *argv[])
 
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
+
+	makeflow_log_alloc_event(d, storage_allocation);
 
 	if(local_queue)
 		batch_queue_delete(local_queue);

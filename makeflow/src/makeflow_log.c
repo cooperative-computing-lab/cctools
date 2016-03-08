@@ -210,6 +210,14 @@ void makeflow_log_file_list_state_change( struct dag *d, struct list *file_list,
 	}
 }
 
+void makeflow_log_alloc_event( struct dag *d, struct makeflow_alloc *a )
+{
+	debug(D_MAKEFLOW_RUN, "ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->commit, a->storage->free, d->total_file_size);
+
+	fprintf(d->logfile, "# ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->commit, a->storage->free, d->total_file_size);
+	makeflow_log_sync(d,0);
+}
+
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
 	fprintf(d->logfile, "# GC %" PRIu64 " %d %" PRIu64 " %d\n", timestamp_get(), collected, elapsed, total_collected);
@@ -382,7 +390,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 				continue;
 			if(dag_file_should_exist(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
 				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
-				makeflow_clean_file(d, queue, f, 0);
+				makeflow_clean_file(d, queue, f, 0, NULL);
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
 			}
 		}
