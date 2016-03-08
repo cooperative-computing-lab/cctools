@@ -245,10 +245,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if(c=='&') {
 		char d = jx_getchar(s);
 		if(d=='&') return JX_TOKEN_AND;
+		jx_parse_error(s,"invalid character: &");
 		return JX_TOKEN_ERROR;
 	} else if(c=='|') {
 		char d = jx_getchar(s);
 		if(d=='|') return JX_TOKEN_OR;
+		jx_parse_error(s,"invalid character: |");
 		return JX_TOKEN_ERROR;
 	} else if(c=='!') {
 		char d = jx_getchar(s);
@@ -258,6 +260,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
+		jx_parse_error(s,"invalid character: =");
 		return JX_TOKEN_ERROR;
 	} else if(c=='<') {
 		char d = jx_getchar(s);
@@ -274,6 +277,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		for(i=0;i<MAX_TOKEN_SIZE;i++) {
 			int n = jx_scan_string_char(s);
 			if(n==EOF) {
+				jx_parse_error(s,"missing end quote");
 				return JX_TOKEN_ERROR;
 			} else if(n==0) {
 				s->token[i] = n;
@@ -340,6 +344,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else {
 		s->token[0] = c;
 		s->token[1] = 0;
+		jx_parse_error(s,"invalid character");
 		return JX_TOKEN_ERROR;
 	}
 }
