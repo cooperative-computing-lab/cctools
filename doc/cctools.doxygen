@@ -30,6 +30,7 @@ data structures, and so forth.  The most commonly used are:
 - @ref jx.h
 - @ref jx_print.h
 - @ref jx_parse.h
+- @ref jx_eval.h
 
 Or, you can browse all documented modules in the package:
 
