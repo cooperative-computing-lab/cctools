@@ -553,7 +553,7 @@ static int jx_operator_is_unary( jx_operator_t op )
 static struct jx * jx_parse_unary( struct jx_parser *s )
 {
 	struct jx *j;
-	
+
 	jx_token_t t = jx_scan(s);
 	switch(t) {
 		case JX_TOKEN_SUB:

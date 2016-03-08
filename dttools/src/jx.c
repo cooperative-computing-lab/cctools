@@ -432,4 +432,3 @@ void jx_export( struct jx *j )
 		}
 	}
 }
-

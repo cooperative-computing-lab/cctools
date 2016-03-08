@@ -32,7 +32,7 @@ int main( int argc, char *argv[] )
 		fprintf(stderr,"invalid context expression: %s\n",jx_parser_error_string(p));
 		return 1;
 	}
-	
+
 	printf("Now enter expressions:\n");
 
 	while(1) {

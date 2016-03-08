@@ -14,7 +14,7 @@ static struct jx * jx_eval_null( jx_operator_t op )
 	switch(op) {
 		case JX_OP_EQ:
 			return jx_boolean(1);
-		case JX_OP_NE: 
+		case JX_OP_NE:
 		case JX_OP_LT:
 		case JX_OP_LE:
 		case JX_OP_GT:
@@ -174,7 +174,7 @@ Exception: integers are promoted to doubles as needed.
 static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
 	if(!o) return 0;
-	
+
 	struct jx *left = jx_eval(o->left,context);
 	struct jx *right = jx_eval(o->right,context);
 
@@ -255,7 +255,7 @@ static struct jx_item * jx_eval_item( struct jx_item *item, struct jx *context )
 struct jx * jx_eval( struct jx *j, struct jx *context )
 {
 	if(!j) return 0;
-	
+
 	switch(j->type) {
 		case JX_SYMBOL:
 			if(context) {
