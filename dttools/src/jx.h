@@ -128,14 +128,14 @@ struct jx * jx_string( const char *string_value );
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
 
-/** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_evaluate. @param symbol_name A C string. @return A JX expression.
+/** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );
 
-/** Create a JX array with inline items.  @param item One or more items of the array must be given, terminated with a null value.  @return A JX array. */
+/** Create a JX array with inline items.  @param value One or more items of the array must be given, terminated with a null value.  @return A JX array. */
 struct jx * jx_arrayv( struct jx *value, ... );
 
 /** Create a JX object.  @param pairs A linked list of @ref jx_pair key-value pairs.  @return a JX object. */
