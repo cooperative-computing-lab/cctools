@@ -80,6 +80,7 @@ EOF
 
 run()
 {
+	set -e
 	../src/parrot_run -d process -d syscall -- "$(pwd)/$exe"
 	../src/parrot_run -d process -d syscall --work-dir=/tmp -- "$(pwd)/$exe"
 	../src/parrot_run -d process -d syscall --work-dir=/http -- "$(pwd)/$exe" && return 1
@@ -88,7 +89,7 @@ run()
 
 clean()
 {
-	rm -f "$exe"
+	rm -f "$exe" foo
 	return 0
 }
 
