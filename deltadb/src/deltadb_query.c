@@ -58,6 +58,8 @@ struct deltadb * deltadb_create( const char *logdir )
 
 int deltadb_boolean_expr( struct jx *expr, struct jx *data )
 {
+	if(!expr) return 1;
+
 	struct jx *j = jx_eval(expr,data);
 	int result = j && j->type==JX_BOOLEAN && j->u.boolean_value;
 	jx_delete(j);
@@ -157,13 +159,18 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 		/* Update each reduction with its value. */
 		for(n=db->reduce_exprs->head;n;n=n->next) {
 			struct deltadb_reduction *r = n->data;
-			struct jx *value = jx_lookup(jobject,r->attr);
+			struct jx *value = jx_eval(r->expr,jobject);
 			if(value) {
 				if(value->type==JX_INTEGER) {
 					deltadb_reduction_update(n->data,(double)value->u.integer_value);
-				} else {
+				} else if(value->type==JX_DOUBLE) {
 					deltadb_reduction_update(n->data,value->u.double_value);
+				} else {
+					// treat non-numerics as 1, to facilitate operations like COUNT
+					deltadb_reduction_update(n->data,1);
 				}
+
+				jx_delete(value);
 			}
 		}
 	}
@@ -502,7 +509,14 @@ int main( int argc, char *argv[] )
 			break;
 		case 'o':
 			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
-				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_attr);
+
+				struct jx *reduce_expr = jx_parse_string(reduce_attr);
+				if(!reduce_expr) {
+					fprintf(stderr,"deltadb_query: invalid expression: %s\n",reduce_attr);
+					return 1;
+				}
+
+				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr);
 				if(!r) {
 					printf("deltadb_query: invalid reduction: %s\n",reduce_name);
 					return 1;
@@ -578,7 +592,7 @@ int main( int argc, char *argv[] )
 	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
 		struct deltadb_reduction *r = db->reduce_exprs->head->data;
 		const char *name = jx_print_string(db->output_exprs->head->data);
-		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",r->attr,name);
+		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",jx_print_string(r->expr),name);
 		return 1;
 	}
 

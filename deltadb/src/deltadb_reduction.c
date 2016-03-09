@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
-struct deltadb_reduction *deltadb_reduction_create( const char *name, const char *attr )
+struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr )
 {
 	struct deltadb_reduction *r;
 	deltadb_reduction_t type;
@@ -28,7 +28,7 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, const char
 	r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
 	r->type = type;
-	r->attr = strdup(attr);
+	r->expr = expr;
 
 	return r;
 };
@@ -36,7 +36,7 @@ struct deltadb_reduction *deltadb_reduction_create( const char *name, const char
 void deltadb_reduction_delete( struct deltadb_reduction *r )
 {
 	if(!r) return;
-	free((char*)r->attr);
+	jx_delete(r->expr);
 	free(r);
 }
 
