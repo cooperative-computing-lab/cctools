@@ -558,7 +558,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(start_time==0) {
-		fprintf(stderr,"deltadb_query: invalid start time\n");
+		fprintf(stderr,"deltadb_query: invalid --from time (must be \"YY-MM-DD\" or \"YY-MM-DD HH:MM:SS\")\n");
 		return 1;
 	}
 
