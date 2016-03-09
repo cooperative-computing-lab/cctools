@@ -60,8 +60,8 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 
 static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx *right )
 {
-	int a = left ? left->u.integer_value : 0;
-	int b = right ? right->u.integer_value : 0;
+	jx_int_t a = left ? left->u.integer_value : 0;
+	jx_int_t b = right ? right->u.integer_value : 0;
 
 	switch(op) {
 		case JX_OP_EQ:
@@ -131,7 +131,7 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 			return jx_double(a/b);
 		case JX_OP_MOD:
 			if(b==0) return jx_null();
-			return jx_double((int)a%(int)b);
+			return jx_double((jx_int_t)a%(jx_int_t)b);
 		default:
 			return jx_null();
 	}
