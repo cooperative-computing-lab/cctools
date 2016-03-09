@@ -37,25 +37,32 @@ SECTION(EXAMPLES)
 To show 1 week worth of history starting on 15 April 2013:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2013/04/15 --to 2015/04/22
+% deltadb_query --db /data/catalog.history --from 2013-04-15 --to 2015-04-22
 LONGCODE_END
 
 To show all history after 1 March 2013:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2013/03/1
+% deltadb_query --db /data/catalog.history --from 2013-03-01
 LONGCODE_END
 
 To show the names of fred's servers where load5 exceeds 2.0:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2013/03/1 --filter 'owner=fred' --where 'load5>2.0' --output name --output load5
+% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred"' --where 'load5>2.0' --output name --output load5
 LONGCODE_END
 
 To show the average load of all servers owned by fred at one hour intervals:
 
 LONGCODE_BEGIN
-% deltadb_query --db /data/catalog.history --from 2013/03/1 --filter 'owner=fred' --output 'AVERAGE(load5)' --every 1h
+% deltadb_query --db /data/catalog.history --from 2013-03-01 --filter 'owner=="fred"' --output 'AVERAGE(load5)' --every 1h
+LONGCODE_END
+
+The raw event output of a query can be saved to a file, and then queried using the --file option, which can accelerate operations on reduced data.  For example:
+
+LONGCODE_BEGIN
+% deltadb_query --db /data/catalog.history --from 2014-01-01 --to 2015-01-01 --filter 'type=="wq_master"' > wq.data
+% deltadb_query --file wq.data --from 2014-01-01 --output 'COUNT(name)' --output 'MAX(tasks_running)'
 LONGCODE_END
 
 SECTION(COPYRIGHT)
