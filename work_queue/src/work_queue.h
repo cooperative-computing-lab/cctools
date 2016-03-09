@@ -56,17 +56,17 @@ typedef enum {
 
 
 typedef enum {
-	WORK_QUEUE_RESULT_SUCCESS        = 0,       /**< The task ran successfully **/
-	WORK_QUEUE_RESULT_INPUT_MISSING  = 1,       /**< The task cannot be run due to a missing input file **/
-	WORK_QUEUE_RESULT_OUTPUT_MISSING = 2,       /**< The task ran but failed to generate a specified output file **/
-	WORK_QUEUE_RESULT_STDOUT_MISSING = 4,       /**< The task ran but its stdout has been truncated **/
-	WORK_QUEUE_RESULT_SIGNAL         = 8,       /**< The task was terminated with a signal **/
-	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 16, /**< The task used more resources than requested **/
-	WORK_QUEUE_RESULT_TASK_TIMEOUT   = 32,      /**< The task ran after the specified (absolute since epoch) end time. **/
-	WORK_QUEUE_RESULT_UNKNOWN        = 64,      /**< The result could not be classified. **/
-	WORK_QUEUE_RESULT_FORSAKEN       = 128,     /**< The task failed, but it was neither a task or worker error **/
-	WORK_QUEUE_RESULT_MAX_RETRIES    = 256,     /**< The task could not be completed successfully in the given number of retries. **/
-	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME = 512   /**< The task ran for more than the specified time (relative since running in a worker). **/
+	WORK_QUEUE_RESULT_SUCCESS             = 0,      /**< The task ran successfully **/
+	WORK_QUEUE_RESULT_INPUT_MISSING       = 1,      /**< The task cannot be run due to a missing input file **/
+	WORK_QUEUE_RESULT_OUTPUT_MISSING      = 2,      /**< The task ran but failed to generate a specified output file **/
+	WORK_QUEUE_RESULT_STDOUT_MISSING      = 4,      /**< The task ran but its stdout has been truncated **/
+	WORK_QUEUE_RESULT_SIGNAL              = 1 << 3, /**< The task was terminated with a signal **/
+	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 2 << 3, /**< The task used more resources than requested **/
+	WORK_QUEUE_RESULT_TASK_TIMEOUT        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
+	WORK_QUEUE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
+	WORK_QUEUE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was neither a task or worker error **/
+	WORK_QUEUE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
+	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 } work_queue_result_t;
 
 typedef enum {
