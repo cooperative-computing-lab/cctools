@@ -38,6 +38,7 @@ See the file COPYING for details.
 #include "random.h"
 #include "url_encode.h"
 #include "md5.h"
+#include "disk_alloc.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -881,6 +882,15 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 
 	struct work_queue_process *p = work_queue_process_create(task, disk_alloc);
 
+	if(disk_alloc) {
+		char *environment_path = getenv("CCTOOLS_LIB_IO_HELPER");
+		char *preload_path = string_format("LD_PRELOAD=%s", environment_path);
+		int preload_result = putenv(preload_path);
+		if(preload_result != 0) {
+			debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed");
+		}
+	}
+
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
 
@@ -1248,8 +1258,13 @@ static int enforce_processes_limits() {
 			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
 			p->task_status = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
 
-			/* we delete the sandbox, to free the exhausted resource. */
-			delete_dir(p->sandbox);
+			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
+			if(p->loop_mount == 1) {
+				disk_alloc_delete(p->sandbox);
+			}
+			else {
+				delete_dir(p->sandbox);
+			}
 			return 0;
 		}
 	}
@@ -1922,7 +1937,7 @@ static const struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
-	{"disk-allocation",     no_argument,        0, LONG_OPT_DISK_ALLOCATION},
+	{"disk-allocation",     required_argument,  0,  LONG_OPT_DISK_ALLOCATION},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
 	{"foreman-port-file",   required_argument,  0,  'Z'},
@@ -2166,8 +2181,13 @@ int main(int argc, char *argv[])
 			tar_fn = xxstrdup(optarg);
 			break;
 		case LONG_OPT_DISK_ALLOCATION:
+		{
+			char resolved_path[PATH_MAX];
+			char *abs_path_preloader = realpath(optarg, resolved_path);
+			setenv("CCTOOLS_LIB_IO_HELPER", abs_path_preloader, 1);
 			disk_allocation = 1;
 			break;
+		}
 		default:
 			show_help(argv[0]);
 			return 1;

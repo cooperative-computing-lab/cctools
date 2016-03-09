@@ -1,0 +1,69 @@
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE // Aaaaaah!!
+#endif
+
+#if !defined(RTLD_NEXT)
+#define RTLD_NEXT 0
+#endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <string.h>
+#include <signal.h>
+#include <inttypes.h>
+#include <stdarg.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+ssize_t write(int fd, const void *buf, size_t count) {
+
+	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
+
+	int real_count;
+	int prev_errno = errno;
+	errno = 0;
+	real_count = original_write(fd, buf, count);
+
+	if(real_count < 0 && errno == ENOSPC) {
+		original_write(2, "WRITE ERROR: device capacity reached.\n", 39);
+		return -1;
+	}
+
+	if(!errno) {
+	   errno = prev_errno;
+	}
+
+	return real_count;
+}
+
+int open(const char *path, int flags, ...)
+{
+
+	__typeof__(open) *original_open = dlsym(RTLD_NEXT, "open");
+
+	va_list ap;
+	int fd;
+	int mode;
+	int prev_errno = errno;
+
+	va_start(ap, flags);
+	mode = va_arg(ap, int);
+	va_end(ap);
+
+	fd = original_open(path, flags, mode);
+
+	//struct statvfs free_inodes;
+	//statvfs(path, &free_inodes);
+	if(fd == -1 && errno == ENOSPC) {
+		fprintf(stderr, "OPEN ERROR: inode capacity reached.\n");
+		return -1;
+	}
+
+	if(!errno) {
+		errno = prev_errno;
+	}
+
+	return fd;
+}

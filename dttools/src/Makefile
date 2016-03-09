@@ -61,6 +61,7 @@ SOURCES = \
 	jx_pretty_print.c \
 	jx_table.c \
 	jx_export.c \
+	lib_io_helper.c \
 	link.c \
 	link_auth.c \
 	list.c \
@@ -120,7 +121,7 @@ HEADERS_PUBLIC = \
 	rmsummary.h \
 	timestamp.h
 
-LIBRARIES = libdttools.a
+LIBRARIES = libdttools.a lib_io_helper.so
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = catalog_update catalog_server watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
@@ -138,6 +139,9 @@ auth_globus.o: auth_globus.c
 
 auth_test: auth_test.o libdttools.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+
+lib_io_helper.so: lib_io_helper.o
+	$(CCTOOLS_CC) -shared -ldl -fPIC $^ -o $@
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS) auth_test.o
