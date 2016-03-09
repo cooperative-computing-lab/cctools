@@ -518,7 +518,7 @@ int main( int argc, char *argv[] )
 
 				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr);
 				if(!r) {
-					printf("deltadb_query: invalid reduction: %s\n",reduce_name);
+					fprintf(stderr,"deltadb_query: invalid reduction: %s\n",reduce_name);
 					return 1;
 				}
 				list_push_tail(reduce_exprs,r);
