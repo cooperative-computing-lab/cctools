@@ -511,7 +511,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
 
-		if(list_size(masters_list) > 0)
+		if(masters_list && list_size(masters_list) > 0)
 		{
 			factory_timeout_start = time(0);
 		} else {
