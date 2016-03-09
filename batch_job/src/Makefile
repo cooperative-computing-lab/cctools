@@ -10,6 +10,7 @@ EXTERNAL_LIBRARIES = ../../work_queue/src/libwork_queue.a ../../chirp/src/libchi
 SOURCES = \
 	batch_job.c \
 	batch_job_amazon.c \
+	batch_job_dryrun.c \
 	batch_job_chirp.c \
 	batch_job_cluster.c \
 	batch_job_condor.c \

@@ -1500,6 +1500,19 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
+		int logfd;
+		if ((logfd = creat(batchlogfilename, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) < 0) {
+			fatal("unable to open log file %s\n", batchlogfilename);
+		} else {
+			dprintf(logfd, "#!/bin/sh\n");
+			dprintf(logfd, "set -x\n");
+			dprintf(logfd, "set -e\n");
+			dprintf(logfd, "\n# %s version %s (released %s)\n\n", argv[0], CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
+			close(logfd);
+		}
+	}
+
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "skip-afs-check", skip_afs_check ? "yes" : "no");
