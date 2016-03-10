@@ -70,6 +70,9 @@ See the file COPYING for details.
 /* The maximum chunk of memory the server will allocate to handle I/O */
 #define MAX_BUFFER_SIZE (16*1024*1024)
 
+/* Valid characters in an IPV6 address */
+#define IPV6_CHARS "0123456789abcdefABCDEF:"
+
 static int global_serial = 0;
 
 struct chirp_client {
@@ -349,7 +352,12 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 	int save_errno;
 	int port;
 
-	if(sscanf(hostport, "%[^:]:%d", host, &port) == 2) {
+	if(sscanf(hostport, "[%[" IPV6_CHARS "]]:%d", host, &port) == 2) {
+		/* IPV6 address with port */
+	} else if(sscanf(hostport, "[%[" IPV6_CHARS "]]", host) == 1) {
+		/* IPV6 address without port */
+		port = CHIRP_PORT;
+	} else if(sscanf(hostport, "%[^:]:%d", host, &port) == 2) {
 		/* use the split host and port */
 	} else {
 		strcpy(host, hostport);
