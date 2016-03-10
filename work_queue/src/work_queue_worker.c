@@ -2188,7 +2188,6 @@ int main(int argc, char *argv[])
 			else {
 				preload_result = 1;
 			}
-			fprintf(stderr, "\npreload_result: %d\nLD_PRELOAD: %s\n\n", preload_result, getenv("LD_PRELOAD"));
 			if(preload_result != 0) {
 				timestamp_t preload_fail_time = timestamp_get();
 				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
