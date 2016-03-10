@@ -882,15 +882,6 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 
 	struct work_queue_process *p = work_queue_process_create(task, disk_alloc);
 
-	if(disk_alloc) {
-		char *environment_path = getenv("CCTOOLS_LIB_IO_HELPER");
-		char *preload_path = string_format("LD_PRELOAD=%s", environment_path);
-		int preload_result = putenv(preload_path);
-		if(preload_result != 0) {
-			debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed");
-		}
-	}
-
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
 
@@ -2184,7 +2175,24 @@ int main(int argc, char *argv[])
 		{
 			char resolved_path[PATH_MAX];
 			char *abs_path_preloader = realpath(optarg, resolved_path);
-			setenv("CCTOOLS_LIB_IO_HELPER", abs_path_preloader, 1);
+			int preload_result;
+			char *curr_ld_preload = getenv("LD_PRELOAD");
+			if(curr_ld_preload != NULL && abs_path_preloader != NULL) {
+				char *new_ld_preload = string_format("%s:%s", curr_ld_preload, abs_path_preloader);
+				preload_result = setenv("LD_PRELOAD", new_ld_preload, 1);
+				free(new_ld_preload);
+			}
+			else if(abs_path_preloader != NULL) {
+				preload_result = setenv("LD_PRELOAD", abs_path_preloader, 1);
+			}
+			else {
+				preload_result = 1;
+			}
+			fprintf(stderr, "\npreload_result: %d\nLD_PRELOAD: %s\n\n", preload_result, getenv("LD_PRELOAD"));
+			if(preload_result != 0) {
+				timestamp_t preload_fail_time = timestamp_get();
+				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
+			}
 			disk_allocation = 1;
 			break;
 		}

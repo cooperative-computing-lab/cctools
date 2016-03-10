@@ -27,8 +27,8 @@ ssize_t write(int fd, const void *buf, size_t count) {
 	real_count = original_write(fd, buf, count);
 
 	if(real_count < 0 && errno == ENOSPC) {
-		original_write(2, "WRITE ERROR: device capacity reached.\n", 39);
-		return -1;
+		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+		return real_count;
 	}
 
 	if(!errno) {
@@ -54,11 +54,9 @@ int open(const char *path, int flags, ...)
 
 	fd = original_open(path, flags, mode);
 
-	//struct statvfs free_inodes;
-	//statvfs(path, &free_inodes);
 	if(fd == -1 && errno == ENOSPC) {
 		fprintf(stderr, "OPEN ERROR: inode capacity reached.\n");
-		return -1;
+		return fd;
 	}
 
 	if(!errno) {

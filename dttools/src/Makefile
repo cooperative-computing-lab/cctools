@@ -141,7 +141,7 @@ auth_test: auth_test.o libdttools.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 lib_io_helper.so: lib_io_helper.o
-	$(CCTOOLS_CC) -shared -ldl -fPIC $^ -o $@
+	$(CCTOOLS_CC) -shared -fPIC $^ -o $@ -ldl
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS) auth_test.o
