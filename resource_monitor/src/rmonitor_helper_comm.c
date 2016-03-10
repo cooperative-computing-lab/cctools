@@ -238,12 +238,21 @@ int rmonitor_helper_init(char *lib_default_path, int *fd)
 	{
 		rmonitor_port = string_format("%d", port);
 
-		debug(D_RMON,"setting LD_PRELOAD to %s\n", helper_absolute);
-		setenv("LD_PRELOAD", helper_absolute, 1);
+		char *prev_ldpreload = getenv("LD_PRELOAD");
+		char *ld_preload     = string_format("%s%s%s",
+				helper_absolute,
+				prev_ldpreload ? ":" : "",
+				prev_ldpreload ? prev_ldpreload : "");
+
+		debug(D_RMON,"setting LD_PRELOAD to %s\n", ld_preload);
+
+
+		setenv("LD_PRELOAD", ld_preload, 1);
 
 		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, rmonitor_port);
 		setenv(RESOURCE_MONITOR_INFO_ENV_VAR, rmonitor_port, 1);
 
+		free(ld_preload);
 		free(rmonitor_port);
 	}
 	else
