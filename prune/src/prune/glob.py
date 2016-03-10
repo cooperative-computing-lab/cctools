@@ -14,7 +14,7 @@ HOME = os.path.expanduser("~")
 CWD = os.getcwd()
 
 base_dir = HOME+'/.prune/'
-#base_dir = '/data/pivie/prune_space.export/'
+base_dir = '/data/pivie/prune_space.big/'
 
 data_file_directory = base_dir+'data/files/'
 data_db_pathname = base_dir+'data/_prune.db'
@@ -24,8 +24,12 @@ cache_file_directory = base_dir+'cache/files/'
 cache_db_pathname = base_dir+'cache/_prune.db'
 cache_log_pathname = base_dir+'logs/cache.log'
 
-cache_quota = 1024*1024 # only considers the cache
-total_quota = 1024*1024 # considers data and cache
+trash_file_directory = base_dir+'trash/files/'
+trash_db_pathname = base_dir+'trash/_prune.db'
+trash_log_pathname = base_dir+'logs/trash.log'
+
+#total_quota = 30000000000000 # considers data and cache
+total_quota = 1000000000000 # considers data and cache
 
 work_db_pathname = base_dir+'_work.db'
 work_log_pathname = base_dir+'logs/work.log'
@@ -48,7 +52,7 @@ port = 8073
 
 # Worker settings
 worker_log_pathname = base_dir+'logs/worker.log'
-exec_local_concurrency = 13
+exec_local_concurrency = 16
 
 
 timer_log = base_dir+'logs/timing.log'

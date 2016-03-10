@@ -201,7 +201,12 @@ class Connect:
 
 
 
+	def keep_quota( self, quota_bytes ):
+		return glob.db.keep_quota( quota_bytes )
 
+
+	def restore_trash( self ):
+		return glob.db.restore_trash()
 
 
 	def export( self, prid, pathname, **kwargs ):
@@ -224,10 +229,13 @@ class Connect:
 		else:
 			progeny = 0
 
-		if 'all_files' in kwargs and kwargs['all_files']:
-			all_files = True
+		if 'files' in kwargs and kwargs['files']:
+			if isinstance(kwargs['files'], str):
+				filescope = [ kwargs['files'] ]
+			else:
+				filescope = kwargs['files']
 		else:
-			all_files = False
+			filescope = ['min']
 
 		if lineage==0 and progeny==0 and (isinstance( prid, str ) or len(prid)==1):
 			single_file = True
@@ -260,10 +268,19 @@ class Connect:
 							if single_file:
 								print 'temp:', item.cbid, item.size
 								item.stream_content( f )
+								temp_cnt += 1
+
 							elif depth<lineage:
-								if all_files:
+								if depth==0 and 'results' in filescope:
+									print 'result:',item.cbid
 									#size += item.size
 									item.stream( f )
+									temp_cnt += 1
+								elif 'all' in filescope:
+									print 'all:',item.cbid
+									#size += item.size
+									item.stream( f )
+									temp_cnt += 1
 								item2 = glob.db.find_one( task_id )
 								if item2.cbid not in visited:
 									print 'task:', item2.cbid, item2.body['cmd']
@@ -274,10 +291,11 @@ class Connect:
 										next_prid_list.append(arg)
 									task_cnt += 1
 							else:
-								print 'temp:', item.cbid, item.size
-								#size += item.size
-								item.stream( f )
-							temp_cnt += 1
+								if 'min' in filescope or 'all' in filescope:
+									print 'temp:', item.cbid, item.size
+									#size += item.size
+									item.stream( f )
+									temp_cnt += 1
 						elif item.type=='file':
 							#print 'file:',item
 							if single_file:
@@ -390,6 +408,16 @@ class Connect:
 		print 'Imported in:',diff
 
 
+
+	def work_stats( self, keys ):
+		key = uuid()
+		flow = {'key':key, 'keys':keys, 'files':False}
+		mesg = Mesg( action='send', key=key, flow=flow )
+		self.out_msgs.put_nowait( {'mesg':mesg} )
+		self.dump_stats[key] = filename
+		return key
+
+
 	'''
 	def flow_dump( self, key, filename, depth=1 ):
 		flow = {'key':key,'depth':depth}
@@ -447,13 +475,6 @@ class Connect:
 		return None
 
 
-	def stats_dump( self, keys, filename ):
-		key = uuid()
-		flow = {'key':key, 'keys':keys, 'files':False}
-		mesg = Mesg( action='send', key=key, flow=flow )
-		self.out_msgs.put_nowait( {'mesg':mesg} )
-		self.dump_stats[key] = filename
-		return key
 
 
 

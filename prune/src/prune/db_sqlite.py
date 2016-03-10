@@ -41,6 +41,9 @@ class Database:
 		self.cconn, clog = self.sqlite3_connect( 
 			glob.cache_db_pathname, glob.cache_log_pathname, 'cache_db_logger', glob.cache_file_directory )
 
+		self.trconn, clog = self.sqlite3_connect( 
+			glob.trash_db_pathname, glob.trash_log_pathname, 'trash_db_logger', glob.trash_file_directory )
+
 		self.tconn, self.tlog = self.sqlite3_connect( glob.work_db_pathname, glob.work_log_pathname )
 
 
@@ -72,6 +75,12 @@ CREATE TABLE IF NOT EXISTS todos (
 		curs.execute( 'CREATE INDEX IF NOT EXISTS itcbids ON items(cbid);' )
 		curs.execute( 'CREATE INDEX IF NOT EXISTS itdbids ON items(dbid);' )
 		self.cconn.commit()
+		
+		curs = self.trconn.cursor()
+		curs.execute( db_init_str )
+		curs.execute( 'CREATE INDEX IF NOT EXISTS itcbids ON items(cbid);' )
+		curs.execute( 'CREATE INDEX IF NOT EXISTS itdbids ON items(dbid);' )
+		self.trconn.commit()
 		
 		curs = self.tconn.cursor()
 		curs.execute( db_init_todos )
@@ -165,6 +174,9 @@ CREATE TABLE IF NOT EXISTS todos (
 
 
 		timer.stop('db.insert')
+
+		#if glob.total_quota:
+		#	self.keep_quota()
 		
 		if action_taken == 'saved':
 			return True
@@ -242,7 +254,6 @@ CREATE TABLE IF NOT EXISTS todos (
 				continue
 			break
 
-
 	def exists_data( self, item ):
 		timer.start('db.exists_data')
 
@@ -260,6 +271,135 @@ CREATE TABLE IF NOT EXISTS todos (
 				continue
 			break
 
+
+	def keep_quota( self, quota_bytes ):
+		timer.start('db.keep_quota')
+
+		consumption = self.quota_status()
+		print '%i %i %i'%(time.time(), consumption, quota_bytes)
+		
+		if consumption <= quota_bytes:
+			pass
+			#print 'Under Quota by:', (quota_bytes-consumption)
+		else:
+			over_consumption = consumption-quota_bytes
+			#print 'Over Quota by:', over_consumption
+			file_cnt = 0
+			while over_consumption>0:
+				try:
+					
+					curs = self.cconn.cursor()
+					trcurs = self.trconn.cursor()
+					curs.execute('SELECT * FROM items ORDER BY id LIMIT 25;')
+					res = curs.fetchall()
+					timer.stop('db.keep_quota')
+
+					cbids = []
+					for r in res:
+						it = Item(r)
+						if it.dbid != '685aa1bae538a9f5dba28a55858467f82f5142a8:0':
+							#shutil.copy( glob.cache_file_directory+it.path, glob.trash_file_directory+it.path )
+							ins, dat = it.sqlite3_insert()
+							trcurs.execute( ins, dat )
+							cbids.append( it.cbid )
+							over_consumption -= it.size
+							if over_consumption <= 0:
+								break
+					self.trconn.commit()
+					print '# %i files put in the trash'%(len(cbids))
+					#timer.start('db.keep_quota')
+
+					for cbid in cbids:
+						pass
+						#print ' -'+cbid
+						curs.execute( "DELETE FROM items WHERE cbid=?;", (cbid,) )
+					self.cconn.commit()
+
+
+				except sqlite3.OperationalError:
+					print 'Database (cache) is locked on keep_quota'
+					time.sleep(1)
+					continue
+				file_cnt += len(cbids)
+			return file_cnt
+
+	def restore_trash( self ):
+		timer.start('db.restore_trash')
+
+		while True:
+			try:
+				
+				trcurs = self.trconn.cursor()
+				
+				trcurs.execute('SELECT * FROM items ORDER BY id LIMIT 5;')
+				res = trcurs.fetchall()
+
+				cbids = []
+				curs = self.cconn.cursor()
+				for r in res:
+					it = Item(r)
+					#shutil.copy( glob.cache_file_directory+it.path, glob.trash_file_directory+it.path )
+					ins, dat = it.sqlite3_insert()
+					curs.execute( ins, dat )
+					cbids.append( it.cbid )
+				self.cconn.commit()
+				#print '------'
+				#timer.start('db.keep_quota')
+
+				for cbid in cbids:
+					#print ' -'+cbid
+					trcurs.execute( "DELETE FROM items WHERE cbid=?;", (cbid,) )
+				self.trconn.commit()
+
+				timer.stop('db.restore_trash')
+				if len(cbids)==0:
+					break
+
+			except sqlite3.OperationalError:
+				print 'Database error on restore_trash'
+				time.sleep(1)
+				continue
+			#break
+		timer.stop('db.restore_trash')
+
+
+	def quota_status( self ):
+		timer.start('db.quota_status')
+
+		while True:
+			consumption = 0
+			try:
+				curs = self.cconn.cursor()
+				curs.execute('SELECT SUM(size) AS cache FROM items;')
+				res = curs.fetchone()
+				#print 'cache:', res['cache']
+				consumption += res['cache']
+
+				curs = self.dconn.cursor()
+				curs.execute('SELECT SUM(size) AS data FROM items;')
+				res = curs.fetchone()
+				#print 'data:', res['data']
+				consumption += res['data']
+
+			except sqlite3.OperationalError:
+				print 'Database (cache|data) is locked on quota_status'
+				time.sleep(1)
+				continue
+			break
+
+		statinfo = os.stat(glob.cache_db_pathname)
+		size = statinfo.st_size
+		#print 'cache_db:', size
+		consumption += size
+
+		statinfo = os.stat(glob.data_db_pathname)
+		size = statinfo.st_size
+		#print 'data_db:', size
+		consumption += size
+
+
+		timer.stop('db.quota_status')
+		return consumption
 
 
 	def dump( self, key, pathname ):
@@ -397,7 +537,7 @@ CREATE TABLE IF NOT EXISTS todos (
 					if glob.wq_stage:
 						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL AND step = ? LIMIT ?', (glob.wq_stage,count) )
 					else:
-						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL ORDER BY id DESC LIMIT ?', (count,) )
+						curs.execute('SELECT cbid FROM todos WHERE next_arg IS NULL AND assigned IS NULL ORDER BY id LIMIT ?', (count,) )
 
 					res = curs.fetchall()
 					

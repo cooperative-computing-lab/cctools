@@ -5,7 +5,7 @@ import timer
 from utils import *
 
 class Item(object):
-	__slots__ = ( 'type', 'cbid', 'dbid', 'wfid', 'step', 'when', 'meta', 'body', 'repo', 'path', 'size' )
+	__slots__ = ( 'type', 'cbid', 'dbid', 'wfid', 'step', 'when', 'meta', 'body', 'repo', 'path', 'size', 'id' )
 	def __init__( self, obj={}, **kwargs ):
 		# Three situations: Network streamed data (obj), Database data (obj), Newly created data (kwargs)
 		kwargs.update( obj )
@@ -16,6 +16,7 @@ class Item(object):
 		self.wfid = kwargs['wfid'] if 'wfid' in kwargs else glob.workflow_id
 		self.step = kwargs['step'] if 'step' in kwargs else glob.workflow_step
 		self.when = kwargs['when'] if 'when' in kwargs else time.time()
+		self.id = kwargs['id'] if 'id' in kwargs else None
 
 		if 'meta' in kwargs:
 			if isinstance( kwargs['meta'], basestring ):
@@ -28,6 +29,7 @@ class Item(object):
 		self.body = None
 		self.repo = None
 		self.path = None
+		self.size = 0
 		if 'body' in kwargs and kwargs['body'] != None:
 			if isinstance( kwargs['body'], basestring ):
 				self.body = json.loads( kwargs['body'] )
@@ -43,7 +45,6 @@ class Item(object):
 			self.repo = kwargs['repo']
 			if not self.cbid:
 				log.error("No cbid for an object in a remote repository. There is no way to obtain it.")
-			self.size = 0
 
 		elif 'path' in kwargs and kwargs['path'] != None:
 			self.path = kwargs['path']
@@ -169,6 +170,9 @@ class Item(object):
 	def sqlite3_insert( self ):
 		keys = ['type','cbid','"when"']
 		vals = [self.type, self.cbid, self.when]
+		if self.id:
+			keys.append( 'id' )
+			vals.append( self.id )
 		if self.dbid:
 			keys.append( 'dbid' )
 			vals.append( self.dbid )
@@ -193,9 +197,12 @@ class Item(object):
 		elif self.path:
 			keys.append( 'path' )
 			vals.append( self.path )
+		
+
 		qs = ['?'] * len(keys)
-		ins = 'INSERT INTO items (%s) VALUES (%s);' % (','.join(keys),','.join(qs))
+		ins = 'INSERT INTO items (%s) VALUES (%s);' % (','.join(keys), ','.join(qs))
 		return ins, tuple(vals)
+
 
 	#def __add__( self, other ):
 	#	return str(self) + other
