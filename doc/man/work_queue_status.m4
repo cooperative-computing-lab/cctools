@@ -25,6 +25,7 @@ LIST_END
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_PAIR(--where,expr) Show only Work Queue masters matching this expression.
 OPTION_ITEM(`-Q, --statistics')Show summary information about queues. (default)
 OPTION_ITEM(`-M, --project-name=<name>')Filter results of -Q for masters matching <name>.
 OPTION_ITEM(`-W, --workers')Show details of all workers connected to the master.
