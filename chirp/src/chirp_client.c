@@ -348,13 +348,9 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 	char host[DOMAIN_NAME_MAX];
 	int save_errno;
 	int port;
-	char *separator;
 
-	if((separator = strrchr(hostport, ':')) != NULL) {
+	if(sscanf(hostport, "%[^:]:%d", host, &port) == 2) {
 		/* use the split host and port */
-		strncpy(host, hostport, separator - hostport);
-		host[separator - hostport] = '\0';
-		port = atoi(separator + 1);
 	} else {
 		strcpy(host, hostport);
 		port = CHIRP_PORT;
