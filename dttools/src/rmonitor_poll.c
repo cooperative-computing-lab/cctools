@@ -19,6 +19,8 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 #include "rmonitor_poll_internal.h"
+#include "host_memory_info.h"
+#include "load_average.h"
 
 /***
  * Helper functions
@@ -815,6 +817,18 @@ int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid) {
 	rmsummary_delete(now);
 
 	return 1;
+}
+
+struct rmsummary *rmonitor_measure_host() {
+	uint64_t free_mem, total_mem;
+	struct rmsummary *tr = rmsummary_create(-1);
+
+	host_memory_info_get(&free_mem, &total_mem);
+	tr->memory = total_mem / MEGABYTE;
+	tr->cores = load_average_get_cpus();
+	rmsummary_read_env_vars(tr);
+
+	return tr;
 }
 
 /* vim: set noexpandtab tabstop=4: */
