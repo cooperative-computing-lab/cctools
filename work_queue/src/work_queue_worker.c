@@ -2177,18 +2177,18 @@ int main(int argc, char *argv[])
 			char *abs_path_preloader = realpath(optarg, resolved_path);
 			int preload_result;
 			char *curr_ld_preload = getenv("LD_PRELOAD");
-			if(curr_ld_preload != NULL && abs_path_preloader != NULL) {
+			if(curr_ld_preload && abs_path_preloader) {
 				char *new_ld_preload = string_format("%s:%s", curr_ld_preload, abs_path_preloader);
 				preload_result = setenv("LD_PRELOAD", new_ld_preload, 1);
 				free(new_ld_preload);
 			}
-			else if(abs_path_preloader != NULL) {
+			else if(abs_path_preloader) {
 				preload_result = setenv("LD_PRELOAD", abs_path_preloader, 1);
 			}
 			else {
 				preload_result = 1;
 			}
-			if(preload_result != 0) {
+			if(!preload_result) {
 				timestamp_t preload_fail_time = timestamp_get();
 				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
 			}
