@@ -14,9 +14,16 @@ See the file COPYING for details.
 This module implements resource allocations.
 */
 
+typedef enum {
+	MAKEFLOW_ALLOC_COMMIT,		/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_USED,		/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_FREE			/* Clean nothing, default. */
+} makeflow_alloc_release;
+
 struct makeflow_alloc_unit {
 	uint64_t total;
 	uint64_t commit;
+	uint64_t used;
 	uint64_t free;
 };
 
@@ -32,7 +39,8 @@ struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc 
 
 void makeflow_alloc_print( struct makeflow_alloc *a, struct dag_node *n);
 
-int makeflow_alloc_check_node_size( struct makeflow_alloc *a, struct dag_node *n);
+int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n);
 int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n);
-int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, uint64_t size, int free);
+int makeflow_alloc_use_space( struct makeflow_alloc *a, struct dag_node *n);
+int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, uint64_t size, makeflow_alloc_release release);
 #endif

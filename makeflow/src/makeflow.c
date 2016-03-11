@@ -593,8 +593,11 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		queue = remote_queue;
 	}
 
-	makeflow_alloc_commit_space(storage_allocation, n);
-	makeflow_log_alloc_event(d, storage_allocation);
+	if(makeflow_alloc_commit_space(storage_allocation, n)){
+		makeflow_log_alloc_event(d, storage_allocation);
+	} else {
+		printf("Unable to commit enough space for execution");
+	}
 
 	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
 
@@ -705,7 +708,11 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	if(! makeflow_alloc_check_node_size(storage_allocation, n) ){
+	if(! makeflow_alloc_check_space(storage_allocation, n) ){
+		return 0;
+	}
+
+	if(! dag_node_dependencies_active(n) ){
 		return 0;
 	}
 
@@ -767,9 +774,8 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
 			f->actual_size = buf.st_size;
+			d->total_file_size += f->actual_size;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
-			d->total_file_size += buf.st_size;
-			makeflow_log_alloc_event(d, storage_allocation);
 			file_created = 1;
 			break;
 		}
@@ -938,8 +944,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			f->reference_count+= -1;
-			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
+			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
+				if(storage_allocation->locked)
+					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
+			}
 		}
 
 		/* store node into archiving directory  */
@@ -958,6 +967,12 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			list_delete(input_list);
 		}
 
+		if(makeflow_alloc_use_space(storage_allocation, n) &&
+			makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_COMMIT)) {
+			makeflow_log_alloc_event(d, storage_allocation);
+		} else {
+			printf("Unable to commit enough space for execution");
+		}
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 	list_delete(outputs);
@@ -1083,30 +1098,45 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
-        timestamp_t last_time = timestamp_get();
-        timestamp_t start = timestamp_get();
-        int first_report = 1;
+    timestamp_t last_time = timestamp_get();
+    timestamp_t start = timestamp_get();
+    int first_report = 1;
+	// Relevant to GC and allocations
+	int cleaned_completed_jobs = 0;
 
-        //reporting to catalog
-        if(catalog_reporting_on){
-            makeflow_catalog_summary(d, project, batch_queue_type, start);
-        }
+    //reporting to catalog
+    if(catalog_reporting_on){
+        makeflow_catalog_summary(d, project, batch_queue_type, start);
+    }
 
 	while(!makeflow_abort_flag) {
 		did_find_archived_job = 0;
 		makeflow_dispatch_ready_jobs(d);
 		/*
+			We continue the loop under 4 conditions:
+			1. We have local jobs running
+			2. We have remote jobs running
+			3. We have archival jobs to be found (See Note)
+			4. We have cleaned completed jobs to ensure allocated jobs can run
+
+		Note:
  		Due to the fact that archived jobs are never "run", no local or remote jobs are added
  		to the remote or local job table if all ready jobs were found within the archive.
  		Thus makeflow_dispatch_ready_jobs must run at least once more if an archived job was found.
  		*/
-		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 && did_find_archived_job == 0 )
+		if(dag_local_jobs_running(d)==0 && 
+			dag_remote_jobs_running(d)==0 && 
+			did_find_archived_job == 0 && 
+			cleaned_completed_jobs == 0 )
 			break;
+
+		cleaned_completed_jobs = 0;
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
+				cleaned_completed_jobs = 1;
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
@@ -1127,6 +1157,7 @@ static void makeflow_run( struct dag *d )
 
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
+				cleaned_completed_jobs = 1;
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
@@ -1912,10 +1943,11 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	if(!storage_allocation){
-		storage_allocation = makeflow_alloc_create(-1, NULL, 0, 0);
-	} else {
+	if(storage_limit){
+		storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1);
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
+	} else {
+		storage_allocation = makeflow_alloc_create(-1, NULL, 0, 0);
 	}
 
 

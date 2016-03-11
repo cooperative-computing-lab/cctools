@@ -92,6 +92,7 @@ struct dag_node {
 	uint64_t diff;
 
 	struct list *run_order;			/* list of child and the order to maintain committed size */
+	struct set *dependencies;		/* Set of nodes that need to be active prior to execution for footprint */
 
 	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
 										   file labeled which tasks have comparable resource usage. */
@@ -137,6 +138,9 @@ int dag_node_comp(void *item, const void *arg);
 void dag_node_add_source_file(struct dag_node *n, const char *filename, const char *remotename);
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
+uint64_t dag_node_file_list_size(struct list *s);
+uint64_t dag_node_file_set_size(struct set *s);
+
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename );
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 
@@ -145,6 +149,8 @@ void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
 void dag_node_print_footprint(struct dag *d, char *output);
 void dag_node_reset_updated(struct dag_node *n);
+
+int dag_node_dependencies_active(struct dag_node *n);
 
 char *dag_node_resources_wrap_options(struct dag_node *n, const char *default_options, batch_queue_type_t batch_type);
 char *dag_node_resources_wrap_as_rmonitor_options(struct dag_node *n);

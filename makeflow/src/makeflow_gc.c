@@ -151,9 +151,10 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 		return 1;
 
 	if(batch_fs_unlink(queue, f->filename) == 0) {
-		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
-		makeflow_alloc_release_space(alloc, f->created_by, f->actual_size, 1);
+		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
+		makeflow_alloc_release_space(alloc, f->created_by, f->actual_size, MAKEFLOW_ALLOC_USED);
 		d->total_file_size -= f->actual_size;
+		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 		makeflow_log_alloc_event(d, alloc);
 
 	} else if(errno != ENOENT) {

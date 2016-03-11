@@ -212,9 +212,9 @@ void makeflow_log_file_list_state_change( struct dag *d, struct list *file_list,
 
 void makeflow_log_alloc_event( struct dag *d, struct makeflow_alloc *a )
 {
-	debug(D_MAKEFLOW_RUN, "ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->commit, a->storage->free, d->total_file_size);
+	debug(D_MAKEFLOW_RUN, "ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->used, a->storage->commit, a->storage->free, d->total_file_size);
 
-	fprintf(d->logfile, "# ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->commit, a->storage->free, d->total_file_size);
+	fprintf(d->logfile, "# ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->used, a->storage->commit, a->storage->free, d->total_file_size);
 	makeflow_log_sync(d,0);
 }
 
