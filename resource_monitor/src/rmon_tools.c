@@ -161,59 +161,59 @@ void parse_fields_options(char *field_str)
 		{
 			case 't':
 				fields[WALL_TIME].active = 1;
-				debug(D_DEBUG, "adding clustering field: wall time\n");
+				debug(D_RMON, "adding field: wall time\n");
 				break;
 			case 'p':
 				fields[MAX_PROCESSES].active = 1;
-				debug(D_DEBUG, "adding clustering field: concurrent processes\n");
+				debug(D_RMON, "adding field: concurrent processes\n");
 				break;
 			case 'P':
 				fields[TOTAL_PROCESSES].active = 1;
-				debug(D_DEBUG, "adding clustering field: total processes\n");
+				debug(D_RMON, "adding field: total processes\n");
 				break;
 			case 'c':
 				fields[CPU_TIME].active = 1;
-				debug(D_DEBUG, "adding clustering field: cpu time\n");
+				debug(D_RMON, "adding field: cpu time\n");
 				break;
 			case 'v':
 				fields[VIRTUAL].active = 1;
-				debug(D_DEBUG, "adding clustering field: virtual memory\n");
+				debug(D_RMON, "adding field: virtual memory\n");
 				break;
 			case 'm':
 				fields[RESIDENT].active = 1;
-				debug(D_DEBUG, "adding clustering field: resident memory\n");
+				debug(D_RMON, "adding field: resident memory\n");
 				break;
 			case 's':
 				fields[SWAP].active = 1;
-				debug(D_DEBUG, "adding clustering field: swap memory\n");
+				debug(D_RMON, "adding field: swap memory\n");
 				break;
 			case 'r':
 				fields[B_READ].active = 1;
-				debug(D_DEBUG, "adding clustering field: bytes read\n");
+				debug(D_RMON, "adding field: bytes read\n");
 				break;
 			case 'w':
 				fields[B_WRITTEN].active = 1;
-				debug(D_DEBUG, "adding clustering field: bytes written\n");
+				debug(D_RMON, "adding field: bytes written\n");
 				break;
 			case 'R':
 				fields[B_RX].active = 1;
-				debug(D_DEBUG, "adding clustering field: bytes received\n");
+				debug(D_RMON, "adding field: bytes received\n");
 				break;
 			case 'W':
 				fields[B_TX].active = 1;
-				debug(D_DEBUG, "adding clustering field: bytes sent\n");
+				debug(D_RMON, "adding field: bytes sent\n");
 				break;
 			case 'n':
 				fields[FILES].active = 1;
-				debug(D_DEBUG, "adding clustering field: number of files\n");
+				debug(D_RMON, "adding field: number of files\n");
 				break;
 			case 'z':
 				fields[DISK].active = 1;
-				debug(D_DEBUG, "adding clustering field: footprint\n");
+				debug(D_RMON, "adding field: footprint\n");
 				break;
 			case 'C':
 				fields[CORES].active = 1;
-				debug(D_DEBUG, "adding clustering field: cores\n");
+				debug(D_RMON, "adding field: cores\n");
 				break;
 			default:
 				fatal("'%c' is not a field option\n", *c);

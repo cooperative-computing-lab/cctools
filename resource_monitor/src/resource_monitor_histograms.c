@@ -110,46 +110,31 @@ struct hash_table *categories;
 
 int brute_force = 0;
 
-char *unique_string(char *str)
-{
-	char *tmp = hash_table_lookup(unique_strings, str);
-
-	if(tmp)
-		return tmp;
-	else
-	{
-		tmp = xxstrdup(str);
-		hash_table_insert(unique_strings, str, tmp);
-	}
-
-	return tmp;
-}
-
 void split_summaries_on_category(struct rmDsummary_set *source)
 {
-	struct itable *splits = itable_create(0);
+	debug(D_RMON, "Splitting categories.");
+
+	struct hash_table *splits = hash_table_create(0, 0);
 
 	struct rmDsummary *s;
 	struct rmDsummary_set *bucket;
-	char *label;
 
 	list_first_item(source->summaries);
 	while((s = list_next_item(source->summaries)))
 	{
-		label = unique_string(s->category);
-		bucket = itable_lookup(splits, (uint64_t) ((uintptr_t) label));
+		bucket = hash_table_lookup(splits, s->category);
 
 		if(!bucket)
 		{
-			bucket = make_new_set(label);
-			itable_insert(splits, (uint64_t) ((uintptr_t) label), bucket);
+			bucket = make_new_set(s->category);
+			hash_table_insert(splits, s->category, bucket);
 			list_push_tail(all_sets, bucket);
 		}
 
 		list_push_tail(bucket->summaries, s);
 	}
 
-	itable_delete(splits);
+	hash_table_delete(splits);
 }
 
 static struct field *sort_field;
@@ -784,6 +769,8 @@ void histograms_of_category(struct rmDsummary_set *ss)
 		if(!f->active)
 			continue;
 
+		debug(D_RMON, "Computing histogram of %s.%s", ss->category, f->name);
+
 		histogram_of_field(ss, f, output_directory);
 	}
 
@@ -882,7 +869,7 @@ double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 
 		wall_time_accum += wall_time;
 
-		if(current >= first_alloc) {
+		if(current > first_alloc) {
 			tasks_accum     += 1;
 			wall_time_accum += wall_time;
 		} else {
@@ -1220,6 +1207,8 @@ void write_stats_of_category(struct rmDsummary_set *s)
 	free(name_raw);
 	free(filename);
 
+	debug(D_RMON, "Writing stats for %s", s->category);
+
 	write_histogram_stats_header(f_stats);
 
 	struct histogram *h;
@@ -1246,6 +1235,8 @@ void write_limits_of_category(struct rmDsummary_set *s)
 
 	free(filename);
 	free(name_raw);
+
+	debug(D_RMON, "Writing limits for %s", s->category);
 
 	struct field *f;
 	struct histogram *h;
@@ -1301,27 +1292,30 @@ void write_scatters_of_category_aux(struct itable *hc, char *cat_name, char *fie
 	free(times_accum);
 }
 
-#define write_scatters_of_field(c, field) write_scatters_of_category_aux((c)->field##_histogram, c->name, #field)
+#define write_scatters_of_field(c, id, field) if(fields[id].active) { write_scatters_of_category_aux((c)->field##_histogram, c->name, #field); }
 
 void write_scatters_of_category(struct rmDsummary_set *s)
 {
+
 	struct category *c = category_lookup_or_create(categories, s->category);
 
-	write_scatters_of_field(c, cores);
-	write_scatters_of_field(c, wall_time);
-	write_scatters_of_field(c, cpu_time);
-	write_scatters_of_field(c, memory);
-	write_scatters_of_field(c, swap_memory);
-	write_scatters_of_field(c, virtual_memory);
-	write_scatters_of_field(c, bytes_read);
-	write_scatters_of_field(c, bytes_written);
-	write_scatters_of_field(c, bytes_received);
-	write_scatters_of_field(c, bytes_sent);
-	write_scatters_of_field(c, bandwidth);
-	write_scatters_of_field(c, total_files);
-	write_scatters_of_field(c, disk);
-	write_scatters_of_field(c, max_concurrent_processes);
-	write_scatters_of_field(c, total_processes);
+	debug(D_RMON, "Writing scatters for %s", s->category);
+
+	write_scatters_of_field(c, WALL_TIME,       wall_time)
+	write_scatters_of_field(c, CPU_TIME,        cpu_time)
+	write_scatters_of_field(c, MAX_PROCESSES,   max_concurrent_processes)
+	write_scatters_of_field(c, TOTAL_PROCESSES, total_processes)
+	write_scatters_of_field(c, VIRTUAL,         virtual_memory)
+	write_scatters_of_field(c, RESIDENT,        memory)
+	write_scatters_of_field(c, SWAP,            swap_memory)
+	write_scatters_of_field(c, B_READ,          bytes_read)
+	write_scatters_of_field(c, B_WRITTEN,       bytes_written)
+	write_scatters_of_field(c, B_RX,            bytes_received)
+	write_scatters_of_field(c, B_TX,            bytes_sent)
+	write_scatters_of_field(c, BANDWIDTH,       bandwidth)
+	write_scatters_of_field(c, FILES,           total_files)
+	write_scatters_of_field(c, DISK,            disk)
+	write_scatters_of_field(c, CORES,           cores)
 }
 
 void write_overheads_of_category(struct rmDsummary_set *s)
@@ -1330,6 +1324,8 @@ void write_overheads_of_category(struct rmDsummary_set *s)
 	char *filename   = string_format("%s/%s.overheads", output_directory, name_raw);
 
 	FILE *f_ovhs  = open_file(filename);
+
+	debug(D_RMON, "Writing overheads for %s", s->category);
 
 	free(name_raw);
 	free(filename);
@@ -1642,6 +1638,8 @@ void write_front_page(char *workflow_name)
 
 void write_webpage(char *workflow_name)
 {
+	debug(D_RMON, "Writing html pages.");
+
 	write_front_page(workflow_name);
 
 	struct rmDsummary_set *s;
@@ -1715,7 +1713,6 @@ int main(int argc, char **argv)
 			case 'b':
 				brute_force = 1;
 				break;
-				break;
 			case 'm':
 				/* brute force, small bucket size */
 				category_tune_bucket_size("time",   10*USECOND);
@@ -1770,6 +1767,8 @@ int main(int argc, char **argv)
 	all_summaries = make_new_set(ALL_SUMMARIES_CATEGORY);
 
 	input_overhead = timestamp_get();
+
+	debug(D_RMON, "Reading summaries.");
 
 	if(input_directory)
 	{
