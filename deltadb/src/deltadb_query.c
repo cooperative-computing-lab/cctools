@@ -532,6 +532,10 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		case 'w':
+			if(where_expr) {
+				fprintf(stderr,"Only one --where expression is allowed.  Try joining the expressions with the && (and) operator.");
+				return 1;
+			}
 			where_expr = jx_parse_string(optarg);
 			if(!where_expr) {
 				fprintf(stderr,"invalid expression: %s\n",optarg);
@@ -539,6 +543,10 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		case 'f':
+			if(filter_expr) {
+				fprintf(stderr,"Only one --filter expression is allowed.  Try joining the expressions with the && (and) operator.");
+				return 1;
+			}
 			filter_expr = jx_parse_string(optarg);
 			if(!filter_expr) {
 				fprintf(stderr,"invalid expression: %s\n",optarg);
