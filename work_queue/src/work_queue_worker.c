@@ -2173,7 +2173,6 @@ int main(int argc, char *argv[])
 			break;
 		case LONG_OPT_DISK_ALLOCATION:
 		{
-			char resolved_path[PATH_MAX];
 			char *abs_path_preloader = string_format("%s/lib/libforce_halt_enospc.so", INSTALL_PATH);
 			int preload_result;
 			char *curr_ld_preload = getenv("LD_PRELOAD");
