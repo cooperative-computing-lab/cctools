@@ -61,7 +61,6 @@ SOURCES = \
 	jx_pretty_print.c \
 	jx_table.c \
 	jx_export.c \
-	libforce_halt_enospc.c \
 	link.c \
 	link_auth.c \
 	list.c \
