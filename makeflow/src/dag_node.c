@@ -772,9 +772,9 @@ void dag_node_determine_footprint(struct dag_node *n)
 /* qsort C-string comparison function */
 int cstring_cmp(const void *a, const void *b)
 {
-    const char **ia = (const char **)a;
-    const char **ib = (const char **)b;
-    return strcmp(*ia, *ib);
+	const char **ia = (const char **)a;
+	const char **ib = (const char **)b;
+	return strcmp(*ia, *ib);
 	/* strcmp functions works exactly as expected from
  *	comparison function */
 }

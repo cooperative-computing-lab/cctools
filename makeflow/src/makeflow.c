@@ -709,8 +709,8 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	if(storage_allocation->locked && !(
-			makeflow_alloc_check_space(storage_allocation, n) &&
+	if(storage_allocation->locked &&
+		!( makeflow_alloc_check_space(storage_allocation, n) &&
 			dag_node_dependencies_active(n))){
 		return 0;
 	}
