@@ -453,7 +453,7 @@ void dag_node_determine_run_footprint(struct dag_node *n)
  * computed. */
 void dag_node_determine_descendant_footprint(struct dag_node *n)
 {
-	struct dag_node *node1, *node2, *res_node;
+	struct dag_node *node1, *node2; //, *res_node;
 	struct list *tmp_direct_children = list_create();
 	struct set *footprint = set_create(0);
 	uint64_t max_branch = 0;
@@ -517,7 +517,7 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 			/* Only add the node if it occurred in all of the branch lists. */
 			if(comp){
 				list_push_tail(n->residual_nodes, node1);
-				res_node = node1;
+				//res_node = node1;
 				while((node1 = set_next_element(n->descendants))){
 					list_next_item(node1->residual_nodes);
 				}

@@ -388,6 +388,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 {
 	struct dag_node *n = dag_node_create(d, -1);
+	n->state = DAG_NODE_STATE_COMPLETE;
 	struct dag_node *p;
 
 	for(p = d->nodes; p; p = p->next) {
@@ -708,11 +709,9 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	if(! makeflow_alloc_check_space(storage_allocation, n) ){
-		return 0;
-	}
-
-	if(! dag_node_dependencies_active(n) ){
+	if(storage_allocation->locked && !(
+			makeflow_alloc_check_space(storage_allocation, n) &&
+			dag_node_dependencies_active(n))){
 		return 0;
 	}
 
