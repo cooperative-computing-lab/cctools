@@ -539,7 +539,7 @@ int main( int argc, char *argv[] )
 			where_expr = jx_parse_string(optarg);
 			if(!where_expr) {
 				fprintf(stderr,"invalid expression: %s\n",optarg);
-				break;
+				return 1;
 			}
 			break;
 		case 'f':
@@ -550,7 +550,7 @@ int main( int argc, char *argv[] )
 			filter_expr = jx_parse_string(optarg);
 			if(!filter_expr) {
 				fprintf(stderr,"invalid expression: %s\n",optarg);
-				break;
+				return 1;
 			}
 			break;
 		case 'F':
