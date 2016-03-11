@@ -1928,7 +1928,7 @@ static const struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
-	{"disk-allocation",     required_argument,  0,  LONG_OPT_DISK_ALLOCATION},
+	{"disk-allocation",     no_argument,  		0,  LONG_OPT_DISK_ALLOCATION},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
 	{"foreman-port-file",   required_argument,  0,  'Z'},
@@ -2174,7 +2174,7 @@ int main(int argc, char *argv[])
 		case LONG_OPT_DISK_ALLOCATION:
 		{
 			char resolved_path[PATH_MAX];
-			char *abs_path_preloader = realpath(optarg, resolved_path);
+			char *abs_path_preloader = string_format("%s/lib/libforce_halt_enospc.so", INSTALL_PATH);
 			int preload_result;
 			char *curr_ld_preload = getenv("LD_PRELOAD");
 			if(curr_ld_preload && abs_path_preloader) {
@@ -2188,6 +2188,7 @@ int main(int argc, char *argv[])
 			else {
 				preload_result = 1;
 			}
+			free(abs_path_preloader);
 			if(preload_result) {
 				timestamp_t preload_fail_time = timestamp_get();
 				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
