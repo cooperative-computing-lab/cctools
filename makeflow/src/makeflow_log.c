@@ -212,9 +212,7 @@ void makeflow_log_file_list_state_change( struct dag *d, struct list *file_list,
 
 void makeflow_log_alloc_event( struct dag *d, struct makeflow_alloc *a )
 {
-	debug(D_MAKEFLOW_RUN, "ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->used, a->storage->commit, a->storage->free, d->total_file_size);
-
-	fprintf(d->logfile, "# ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", a->storage->total, a->storage->used, a->storage->commit, a->storage->free, d->total_file_size);
+	fprintf(d->logfile, "# ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", timestamp_get(), a->storage->total, a->storage->used, a->storage->commit, a->storage->free, d->total_file_size);
 	makeflow_log_sync(d,0);
 }
 
@@ -251,7 +249,6 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 			linenum++;
 
 			if(sscanf(line, "# FILE %" SCNu64 " %s %d %" SCNu64 "", &previous_completion_time, file, &file_state, &size) == 4) {
-
 				f = dag_file_lookup_or_create(d, file);
 				f->state = file_state;
 				if(file_state == DAG_FILE_STATE_EXISTS){
