@@ -138,7 +138,7 @@ if [ -d "$SFX_DIR/lib" ]; then
         fi
     fi
 fi
-%s
+%s "$@"
 '''
 
 # Create SFX
