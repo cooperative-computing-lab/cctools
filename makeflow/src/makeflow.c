@@ -597,7 +597,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	if(makeflow_alloc_commit_space(storage_allocation, n)){
 		makeflow_log_alloc_event(d, storage_allocation);
 	} else {
-		printf("Unable to commit enough space for execution");
+		printf("Unable to commit enough space for execution\n");
 	}
 
 	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
@@ -939,6 +939,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	} else {
 		makeflow_clean_rm_fail_dir(d, n, remote_queue);
 
+		if(makeflow_alloc_use_space(storage_allocation, n)){
+			makeflow_log_alloc_event(d, storage_allocation);
+		}
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
@@ -966,11 +969,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			list_delete(input_list);
 		}
 
-		if(makeflow_alloc_use_space(storage_allocation, n) &&
-			makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_COMMIT)) {
+		if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_COMMIT)) {
 			makeflow_log_alloc_event(d, storage_allocation);
 		} else {
-			printf("Unable to commit enough space for execution");
+			printf("Unable to release space\n");
 		}
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
@@ -1796,6 +1798,7 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_STORAGE_LIMIT:
 				storage_limit = string_metric_parse(optarg);
+				printf("Storage Limit %"PRIu64"\n", storage_limit);
 				break;
 			case LONG_OPT_STORAGE_PRINT:
 				if(storage_print) free(storage_print);
