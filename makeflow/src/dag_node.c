@@ -346,8 +346,8 @@ void dag_node_determine_children(struct dag_node *n)
 	while((c = set_next_element(n->descendants))){
 		if(!c->children_updated){
 			dag_node_determine_children(c);
-			set_insert_set(n->accounted, c->accounted);
 		}
+		set_insert_set(n->accounted, c->accounted);
 	}
 
 	set_first_element(n->descendants);
@@ -518,6 +518,7 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 			if(comp){
 				list_push_tail(n->residual_nodes, node1);
 				//res_node = node1;
+				/* Advance all descendants forward one residual. */
 				while((node1 = set_next_element(n->descendants))){
 					list_next_item(node1->residual_nodes);
 				}
