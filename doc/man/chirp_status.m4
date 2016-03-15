@@ -18,10 +18,8 @@ When using CODE(chirp_status) with long form option (-l), it lists additional in
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_PAIR(--where,expr) Show only servers matching this expression.
 OPTION_TRIPLET(-c,catalog,host)Query the catalog on this host.
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
-OPTION_TRIPLET(-O,debug-rotate-max,bytes)Rotate file once it reaches this size.
 OPTION_TRIPLET(-A,server-space,size)Only show servers with this space available. (example: -A 100MB).
 OPTION_PAIR(--server-project,name)Only servers with this project name.
 OPTION_TRIPLET(-t,timeout,time)Timeout.
@@ -29,6 +27,9 @@ OPTION_ITEM(`-s, --brief')Short output.
 OPTION_ITEM(`-l, --verbose')Long output.
 OPTION_ITEM(`-T, --totals')Totals output.
 OPTION_ITEM(`-v, --version')Show program version.
+OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+OPTION_TRIPLET(-O,debug-rotate-max,bytes)Rotate file once it reaches this size.
 OPTION_ITEM(`-h, --help')Show help text.
 OPTIONS_END
 
@@ -52,19 +53,19 @@ LONGCODE_END
 To show status of a particular Chirp server:
 
 LONGCODE_BEGIN
-% chirp_status server1.somewhere.edu
+% chirp_status --where 'name=="server1.somewhere.edu"'
 LONGCODE_END
 
-To show all details of a single server:
+To show status of Chirp servers which belong to a particular owner:
 
 LONGCODE_BEGIN
-% chirp_status -l server1.somewhere.edu
+% chirp_status --where 'owner=="fred"'
 LONGCODE_END
 
-To show status of Chirp servers which belong to a particular owner using BOLD(chirp_status):
+To show all details in JSON format:
 
 LONGCODE_BEGIN
-% chirp_status owner ownername
+% chirp_status --long
 LONGCODE_END
 
 To show aggregate status of all Chirp servers using  BOLD(chirp_status):

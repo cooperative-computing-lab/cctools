@@ -7,6 +7,8 @@ See the file COPYING for details.
 #ifndef DELTADB_REDUCTION_H
 #define DELTADB_REDUCTION_H
 
+#include "jx.h"
+
 typedef enum {
 	COUNT,
 	SUM,
@@ -20,7 +22,7 @@ typedef enum {
 
 struct deltadb_reduction {
 	deltadb_reduction_t type;
-	const char *attr;
+	struct jx *expr;
 	double count;
 	double sum;
 	double first;
@@ -29,7 +31,7 @@ struct deltadb_reduction {
 	double max;
 };
 
-struct deltadb_reduction *deltadb_reduction_create( const char *name, const char *attr );
+struct deltadb_reduction *deltadb_reduction_create( const char *name, struct jx *expr );
 void deltadb_reduction_delete( struct deltadb_reduction *r );
 void deltadb_reduction_reset( struct deltadb_reduction *r );
 void deltadb_reduction_update( struct deltadb_reduction *r, double value );

@@ -9,16 +9,18 @@ See the file COPYING for details.
 #include "http_query.h"
 #include "jx.h"
 #include "jx_parse.h"
+#include "jx_eval.h"
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "debug.h"
 
 struct catalog_query {
 	struct jx *data;
-	struct jx_item *next_item;
+	struct jx *filter_expr;
+	struct jx_item *current;
 };
 
-struct catalog_query *catalog_query_create(const char *host, int port, time_t stoptime)
+struct catalog_query *catalog_query_create(const char *host, int port, struct jx *filter_expr, time_t stoptime)
 {
 	if(!host)
 		host = CATALOG_HOST;
@@ -48,22 +50,45 @@ struct catalog_query *catalog_query_create(const char *host, int port, time_t st
 
 	struct catalog_query *q = xxmalloc(sizeof(*q));
 	q->data = j;
-	q->next_item = j->u.items;
+	q->current = j->u.items;
+	q->filter_expr = filter_expr;
 	return q;
 }
 
 struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime)
 {
-	if(!q || !q->next_item) return 0;
+	while(q && q->current) {
 
-	struct jx *result = jx_copy(q->next_item->value);
-	q->next_item = q->next_item->next;
+		int keepit = 1;
 
-	return result;
+		if(q->filter_expr) {
+			struct jx * b;
+			b = jx_eval(q->filter_expr,q->current->value);
+			if(b && b->type && b->u.boolean_value) {
+				keepit = 1;
+			} else {
+				keepit = 0;
+			}
+			jx_delete(b);
+		} else {
+			keepit = 1;
+		}
+
+		if(keepit) {
+			struct jx *result = jx_copy(q->current->value);
+			q->current = q->current->next;
+			return result;
+		}
+
+		q->current = q->current->next;
+	}
+
+	return 0;
 }
 
 void catalog_query_delete(struct catalog_query *q)
 {
+	jx_delete(q->filter_expr);
 	jx_delete(q->data);
 	free(q);
 }

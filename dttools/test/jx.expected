@@ -1,0 +1,263 @@
+Enter context expression (or {} for an empty context):
+Now enter expressions:
+expression: 10
+value:      10
+
+expression: 3847.58
+value:      3847.58
+
+expression: 0.5
+value:      0.5
+
+expression: 10
+value:      10
+
+expression: 987
+value:      987
+
+expression: 12347812309487
+value:      12347812309487
+
+expression: "hello"
+value:      "hello"
+
+expression: "goodbye\n"
+value:      "goodbye\n"
+
+expression: "\"quotes\""
+value:      "\"quotes\""
+
+expression: "tab\ttab\ttab\rreturn\nnewline\n"
+value:      "tab\ttab\ttab\rreturn\nnewline\n"
+
+expression: "\\\\\\\\"
+value:      "\\\\\\\\"
+
+expression: true
+value:      true
+
+expression: false
+value:      false
+
+expression: null
+value:      null
+
+expression: true&&true
+value:      true
+
+expression: true&&false
+value:      false
+
+expression: false&&true
+value:      false
+
+expression: false&&false
+value:      false
+
+expression: true||true
+value:      true
+
+expression: true||false
+value:      true
+
+expression: false||true
+value:      true
+
+expression: false||false
+value:      false
+
+expression: !true
+value:      false
+
+expression: !false
+value:      true
+
+expression: 10==20
+value:      false
+
+expression: 10!=20
+value:      true
+
+expression: 10<20
+value:      true
+
+expression: 10<=20
+value:      true
+
+expression: 10>20
+value:      false
+
+expression: 10>=20
+value:      false
+
+expression: 10.5==20.5
+value:      false
+
+expression: 10.5!=20.5
+value:      true
+
+expression: 10.5<20.5
+value:      true
+
+expression: 10.5<=20.5
+value:      true
+
+expression: 10.5>20.5
+value:      false
+
+expression: 10.5>=20.5
+value:      false
+
+expression: "hello"=="goodbye"
+value:      false
+
+expression: "hello"!="goodbye"
+value:      true
+
+expression: "hello"<="goodbye"
+value:      false
+
+expression: "hello"<"goodbye"
+value:      false
+
+expression: "hello">"goodbye"
+value:      true
+
+expression: "hello">="goodbye"
+value:      true
+
+expression: "hello"=="hello"
+value:      true
+
+expression: "hello"!="hello"
+value:      false
+
+expression: "hello"<="hello"
+value:      true
+
+expression: "hello"<"hello"
+value:      false
+
+expression: "hello">"hello"
+value:      false
+
+expression: "hello">="hello"
+value:      true
+
+expression: a==b
+value:      false
+
+expression: a!=b
+value:      true
+
+expression: a<b
+value:      false
+
+expression: a>b
+value:      true
+
+expression: a<=b
+value:      false
+
+expression: a>=b
+value:      true
+
+expression: f==g
+value:      false
+
+expression: f!=g
+value:      true
+
+expression: f<g
+value:      true
+
+expression: f>g
+value:      false
+
+expression: f<=g
+value:      true
+
+expression: f>=g
+value:      false
+
+expression: x==y
+value:      false
+
+expression: x!=y
+value:      true
+
+expression: x<y
+value:      true
+
+expression: x>y
+value:      false
+
+expression: x<=y
+value:      true
+
+expression: x>=y
+value:      false
+
+expression: a+b
+value:      true
+
+expression: a-b
+value:      false
+
+expression: a*b
+value:      false
+
+expression: a/b
+value:      false
+
+expression: a%b
+value:      false
+
+expression: f+g
+value:      3.64159
+
+expression: f-g
+value:      -2.64159
+
+expression: f*g
+value:      1.5708
+
+expression: f/g
+value:      0.159155
+
+expression: f%g
+value:      0
+
+expression: x+y
+value:      30
+
+expression: x-y
+value:      -10
+
+expression: x*y
+value:      200
+
+expression: x/y
+value:      0
+
+expression: x%y
+value:      10
+
+expression: (x+y)*(f+g)
+value:      109.248
+
+expression: 10+20*30
+value:      610
+
+expression: 10*(20+30)
+value:      500
+
+expression: a==b||(f>g&&x<y)
+value:      false
+
+expression: [10,-90.5,true,false,null,[-1,-2,-3]]
+value:      [10,-90.5,true,false,null,[-1,-2,-3]]
+
+expression: {"command":"grep English "+infile+" > "+outfile,"inputs":["/usr/bin/grep",infile],"outputs":[outfile],"environment":{"PATH":"/usr/bin"},"cores":1,"memory":16,"disk":1}
+value:      {"command":"grep English mydata > results","inputs":["/usr/bin/grep","mydata"],"outputs":["results"],"environment":{"PATH":"/usr/bin"},"cores":1,"memory":16,"disk":1}
+

@@ -60,4 +60,8 @@ const char *jx_parser_error_string( struct jx_parser *p );
 /** Delete a parser.  @param p The parser to delete. */
 void jx_parser_delete( struct jx_parser *p );
 
+/* Private function used by jx_print to put parens in the right place. */
+int jx_operator_precedence( jx_operator_t op );
+
+
 #endif

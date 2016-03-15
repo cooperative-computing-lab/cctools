@@ -15,7 +15,7 @@ See the file COPYING for details.
 
 /** @file nvpair.h
 
-<b>This module is deprecated, please use @ref jx.h for new code.</b>
+This module is deprecated, please use @ref jx.h for new code.
 
 An nvpair object is a collection of name-value pairs that might
 describe a complex object such as a host or a job.  An nvpair object

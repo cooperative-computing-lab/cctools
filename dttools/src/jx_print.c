@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "jx_print.h"
+#include "jx_parse.h"
 
 #include <ctype.h>
 
@@ -29,6 +30,27 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 	if(item->next) {
 		buffer_putstring(b,",");
 		jx_item_print(item->next,b);
+	}
+}
+
+static const char * jx_operator_string( jx_operator_t type )
+{
+	switch(type) {
+		case JX_OP_EQ: return "==";
+		case JX_OP_NE: return "!=";
+		case JX_OP_LT: return "<";
+		case JX_OP_LE: return "<=";
+		case JX_OP_GT: return ">";
+		case JX_OP_GE: return ">=";
+		case JX_OP_ADD: return "+";
+		case JX_OP_SUB: return "-";
+		case JX_OP_MUL: return "*";
+		case JX_OP_DIV: return "/";
+		case JX_OP_MOD: return "%";
+		case JX_OP_AND:	return "&&";
+		case JX_OP_OR:	return "||";
+		case JX_OP_NOT:	return "!";
+		default:        return "???";
 	}
 }
 
@@ -76,6 +98,23 @@ void jx_escape_string( const char *s, buffer_t *b )
 	buffer_putstring(b,"\"");
 }
 
+void jx_print_subexpr( struct jx *j, jx_operator_t parent, buffer_t *b )
+{
+	if(!j) return;
+
+	int do_parens = 0;
+
+	if(j->type==JX_OPERATOR && jx_operator_precedence(parent) < jx_operator_precedence(j->u.oper.type)) {
+		do_parens = 1;
+	} else {
+		do_parens = 0;
+	}
+
+	if(do_parens) buffer_putstring(b,"(");
+	jx_print_buffer(j,b);
+	if(do_parens) buffer_putstring(b,")");
+}
+
 void jx_print_buffer( struct jx *j, buffer_t *b )
 {
 	if(!j) return;
@@ -108,6 +147,11 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b,"{");
 			jx_pair_print(j->u.pairs,b);
 			buffer_putstring(b,"}");
+			break;
+		case JX_OPERATOR:
+			jx_print_subexpr(j->u.oper.left,j->u.oper.type,b);
+			buffer_putstring(b,jx_operator_string(j->u.oper.type));
+			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
 			break;
 	}
 }

@@ -45,6 +45,7 @@ static char *catalog_host = NULL;
 static int catalog_port = 0;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
+static const char *where_expr = "true";
 
 static struct jx_table queue_headers[] = {
 {"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 18},
@@ -96,9 +97,14 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
+	fprintf(stdout, " %-30s Filter results by this expression.\n","   --where=<expr>\n");
 	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", work_queue_status_timeout);
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
+
+enum {
+	LONG_OPT_WHERE=1000
+};
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port, const char **project_name)
 {
@@ -113,6 +119,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"debug", required_argument, 0, 'd'},
 		{"timeout", required_argument, 0, 't'},
 		{"help", no_argument, 0, 'h'},
+		{"where", required_argument, 0, LONG_OPT_WHERE},
 		{0,0,0,0}};
 
 	signed int c;
@@ -172,6 +179,9 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
+		case LONG_OPT_WHERE:
+			where_expr = optarg;
+			break;
 		default:
 			show_help(argv[0]);
 			exit(EXIT_FAILURE);
@@ -217,17 +227,26 @@ void resize_catalog(size_t new_size)
 	catalog_size = new_size;
 }
 
-int get_masters(time_t stoptime)
+int get_masters( time_t stoptime )
 {
 	struct catalog_query *cq;
 	struct jx *j;
 	int i = 0; //jx pointer array iterator
+
 	if(!catalog_host) {
 		catalog_host = strdup(CATALOG_HOST);
 		catalog_port = CATALOG_PORT;
 	}
 
-	cq = catalog_query_create(catalog_host, catalog_port, stoptime );
+	const char *query_expr = string_format("type==\"wq_master\" && %s",where_expr);
+
+	struct jx *jexpr = jx_parse_string(query_expr);
+	if(!jexpr) {
+		fprintf(stderr,"invalid expression: %s\n",query_expr);
+		exit(1);
+	}
+
+	cq = catalog_query_create(catalog_host, catalog_port, jexpr, stoptime );
 	if(!cq)
 		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
 
@@ -235,13 +254,9 @@ int get_masters(time_t stoptime)
 		if(i == catalog_size)
 			resize_catalog( catalog_size * 2 );
 
-		const char *type = jx_lookup_string(j,"type");
-		if(type && !strcmp(type,"wq_master")) {
-			global_catalog[i] = j; // make the global catalog point to this memory that j references
-			i++;                    // only increment i when a master jx is found
-		} else{
-			jx_delete(j);
-		}
+		// make the global catalog point to this memory that j references
+		global_catalog[i] = j;
+		i++;
 	}
 
 	global_catalog[i] = NULL;

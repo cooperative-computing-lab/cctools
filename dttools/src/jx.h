@@ -50,6 +50,7 @@ typedef enum {
 	JX_SYMBOL,	/**< variable identifier */
 	JX_ARRAY,	/**< array containing values */
 	JX_OBJECT,	/**< object containing key-value pairs */
+	JX_OPERATOR,	/**< operator on multiple values. */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
@@ -69,6 +70,30 @@ struct jx_pair {
 	struct jx_pair *next;   /**< pointer to next pair */
 };
 
+typedef enum {
+	JX_OP_EQ,
+	JX_OP_NE,
+	JX_OP_LE,
+	JX_OP_LT,
+	JX_OP_GE,
+	JX_OP_GT,
+	JX_OP_ADD,
+	JX_OP_SUB,
+	JX_OP_MUL,
+	JX_OP_DIV,
+	JX_OP_MOD,
+	JX_OP_AND,
+	JX_OP_OR,
+	JX_OP_NOT,
+	JX_OP_INVALID
+} jx_operator_t;
+
+struct jx_operator {
+	jx_operator_t type;
+	struct jx *left;
+	struct jx *right;
+};
+
 /** JX value representing any expression type. */
 
 struct jx {
@@ -81,6 +106,7 @@ struct jx {
 		char * symbol_name;   /**< value of @ref JX_SYMBOL */
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
+		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
 	} u;
 };
 
@@ -102,18 +128,21 @@ struct jx * jx_string( const char *string_value );
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
 
-/** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_evaluate. @param symbol_name A C string. @return A JX expression.
+/** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );
 
-/** Create a JX array with inline items.  @param item One or more items of the array must be given, terminated with a null value.  @return A JX array. */
+/** Create a JX array with inline items.  @param value One or more items of the array must be given, terminated with a null value.  @return A JX array. */
 struct jx * jx_arrayv( struct jx *value, ... );
 
 /** Create a JX object.  @param pairs A linked list of @ref jx_pair key-value pairs.  @return a JX object. */
 struct jx * jx_object( struct jx_pair *pairs );
+
+/** Create a JX binary expression, @param oper The kind of operator.  @param left The left side of the expression.  @param right The right side of the expression. */
+struct jx * jx_operator( jx_operator_t oper, struct jx *left, struct jx *right );
 
 /** Create a JX key-value pair.  @param key The key. @param value The value. @param next The next item in the linked list. @return A key-value pair.*/
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next );
@@ -179,17 +208,5 @@ int jx_is_constant( struct jx *j );
 
 /** Export a jx object as a set of environment variables.  @param j A JX_OBJECT. */
 void jx_export( struct jx *j );
-
-/** Evaluation function.  To use @ref jx_evaluate, the caller must
-define a function of type @ref jx_eval_func_t which accepts a symbol
-name and returns a JX value.
-*/
-typedef struct jx * (*jx_eval_func_t) ( const char *ident );
-
-/** Evaluate an expression.  Traverses the expression recursively, and
-for each value of type @ref JX_SYMBOL, invokes the evaluator function
-to replace it with a constant value.  @param j The expression to evaluate.  @param evaluator The evaluating function.  @return A newly created result expression, which must be deleted with @ref jx_delete.
-*/
-struct jx * jx_evaluate( struct jx *j, jx_eval_func_t evaluator );
 
 #endif

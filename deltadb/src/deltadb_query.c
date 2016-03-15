@@ -5,9 +5,9 @@ See the file COPYING for details.
 */
 
 #include "deltadb_stream.h"
-#include "deltadb_expr.h"
 #include "deltadb_reduction.h"
 
+#include "jx_eval.h"
 #include "jx_database.h"
 #include "jx_print.h"
 #include "jx_parse.h"
@@ -36,8 +36,8 @@ struct deltadb {
 	const char *logdir;
 	FILE *logfile;
 	int epoch_mode;
-	struct deltadb_expr *filter_exprs;
-	struct deltadb_expr *where_exprs;
+	struct jx *filter_expr;
+	struct jx *where_expr;
 	struct list * output_exprs;
 	struct list * reduce_exprs;
 	time_t display_every;
@@ -54,6 +54,16 @@ struct deltadb * deltadb_create( const char *logdir )
 	db->logdir = logdir;
 	db->logfile = 0;
 	return db;
+}
+
+int deltadb_boolean_expr( struct jx *expr, struct jx *data )
+{
+	if(!expr) return 1;
+
+	struct jx *j = jx_eval(expr,data);
+	int result = j && j->type==JX_BOOLEAN && j->u.boolean_value;
+	jx_delete(j);
+	return result;
 }
 
 /*
@@ -73,7 +83,7 @@ static int compat_checkpoint_read( struct deltadb *db, const char *filename )
 				nvpair_delete(hash_table_remove(db->table,key));
 				struct jx *j = nvpair_to_jx(nv);
 				/* skip objects that don't match the filter */
-				if(deltadb_expr_matches(db->filter_exprs,j)) {
+				if(deltadb_boolean_expr(db->filter_expr,j)) {
 					hash_table_insert(db->table,key,j);
 				} else {
 					jx_delete(j);
@@ -115,7 +125,7 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 	struct jx_pair *p;
 	for(p=jcheckpoint->u.pairs;p;p=p->next) {
 		if(p->key->type!=JX_STRING) continue;
-		if(!deltadb_expr_matches(db->filter_exprs,p->value)) continue;
+		if(!deltadb_boolean_expr(db->filter_expr,p->value)) continue;
 		hash_table_insert(db->table,p->key->u.string_value,p->value);
 		p->value = 0;
 	}
@@ -144,18 +154,23 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 	while(hash_table_nextkey(db->table,&key,(void**)&jobject)) {
 
 		/* Skip if the where expression doesn't match */
-		if(!deltadb_expr_matches(db->where_exprs,jobject)) continue;
+		if(!deltadb_boolean_expr(db->where_expr,jobject)) continue;
 
 		/* Update each reduction with its value. */
 		for(n=db->reduce_exprs->head;n;n=n->next) {
 			struct deltadb_reduction *r = n->data;
-			struct jx *value = jx_lookup(jobject,r->attr);
+			struct jx *value = jx_eval(r->expr,jobject);
 			if(value) {
 				if(value->type==JX_INTEGER) {
 					deltadb_reduction_update(n->data,(double)value->u.integer_value);
-				} else {
+				} else if(value->type==JX_DOUBLE) {
 					deltadb_reduction_update(n->data,value->u.double_value);
+				} else {
+					// treat non-numerics as 1, to facilitate operations like COUNT
+					deltadb_reduction_update(n->data,1);
 				}
+
+				jx_delete(value);
 			}
 		}
 	}
@@ -190,7 +205,7 @@ static void display_output_exprs( struct deltadb *db, time_t current )
 
 		/* Skip if the where expression doesn't match */
 
-		if(!deltadb_expr_matches(db->where_exprs,jobject)) continue;
+		if(!deltadb_boolean_expr(db->where_expr,jobject)) continue;
 
 		/* Emit the current time */
 
@@ -205,17 +220,11 @@ static void display_output_exprs( struct deltadb *db, time_t current )
 		/* For each output expression, compute the value and print. */
 
 		struct list_node *n;
-		char *str;
 		for(n=db->output_exprs->head;n;n=n->next) {
-
-			struct jx *jvalue = jx_lookup(jobject,n->data);
-			if(jvalue) {
-				str = jx_print_string(jvalue);
-			} else {
-				str = strdup("null");
-			}
-			printf("%s\t",str);
-			free(str);
+			struct jx *jvalue = jx_eval(n->data,jobject);
+			jx_print_stream(jvalue,stdout);
+			printf("\t");
+			jx_delete(jvalue);
 		}
 
 		printf("\n");
@@ -224,7 +233,7 @@ static void display_output_exprs( struct deltadb *db, time_t current )
 
 int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
 {
-	if(!deltadb_expr_matches(db->filter_exprs,jobject)) return 1;
+	if(!deltadb_boolean_expr(db->filter_expr,jobject)) return 1;
 	hash_table_insert(db->table,key,jobject);
 
 	if(display_mode==MODE_STREAM) {
@@ -474,9 +483,8 @@ int main( int argc, char *argv[] )
 {
 	const char *dbdir=0;
 	const char *dbfile=0;
-	struct deltadb_expr *e;
-	struct deltadb_expr *where_exprs = 0;
-	struct deltadb_expr *filter_exprs = 0;
+	struct jx *where_expr = 0;
+	struct jx *filter_expr = 0;
 	struct list *output_exprs = list_create();
 	struct list *reduce_exprs = list_create();
 	time_t start_time = 0;
@@ -501,31 +509,49 @@ int main( int argc, char *argv[] )
 			break;
 		case 'o':
 			if(2==sscanf(optarg,"%[^(](%[^)])",reduce_name,reduce_attr)) {
-				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_attr);
+
+				struct jx *reduce_expr = jx_parse_string(reduce_attr);
+				if(!reduce_expr) {
+					fprintf(stderr,"deltadb_query: invalid expression: %s\n",reduce_attr);
+					return 1;
+				}
+
+				struct deltadb_reduction *r = deltadb_reduction_create(reduce_name,reduce_expr);
 				if(!r) {
-					printf("deltadb_query: invalid reduction: %s\n",reduce_name);
+					fprintf(stderr,"deltadb_query: invalid reduction: %s\n",reduce_name);
 					return 1;
 				}
 				list_push_tail(reduce_exprs,r);
 			} else {
-				list_push_tail(output_exprs,strdup(optarg));
+				struct jx *j = jx_parse_string(optarg);
+				if(!j) {
+					fprintf(stderr,"invalid expression: %s\n",optarg);
+					return 1;
+				}
+				list_push_tail(output_exprs,j);
 			}
 			break;
 		case 'w':
-			e = deltadb_expr_create(optarg,where_exprs);
-			if(!e) {
-				fprintf(stderr,"invalid expression: %s\n",optarg);
-				break;
+			if(where_expr) {
+				fprintf(stderr,"Only one --where expression is allowed.  Try joining the expressions with the && (and) operator.");
+				return 1;
 			}
-			where_exprs = e;
+			where_expr = jx_parse_string(optarg);
+			if(!where_expr) {
+				fprintf(stderr,"invalid expression: %s\n",optarg);
+				return 1;
+			}
 			break;
 		case 'f':
-			e = deltadb_expr_create(optarg,filter_exprs);
-			if(!e) {
-				fprintf(stderr,"invalid expression: %s\n",optarg);
-				break;
+			if(filter_expr) {
+				fprintf(stderr,"Only one --filter expression is allowed.  Try joining the expressions with the && (and) operator.");
+				return 1;
 			}
-			filter_exprs = e;
+			filter_expr = jx_parse_string(optarg);
+			if(!filter_expr) {
+				fprintf(stderr,"invalid expression: %s\n",optarg);
+				return 1;
+			}
 			break;
 		case 'F':
 			start_time = parse_time(optarg,current);
@@ -554,7 +580,7 @@ int main( int argc, char *argv[] )
 	}
 
 	if(start_time==0) {
-		fprintf(stderr,"deltadb_query: invalid start time\n");
+		fprintf(stderr,"deltadb_query: invalid --from time (must be \"YY-MM-DD\" or \"YY-MM-DD HH:MM:SS\")\n");
 		return 1;
 	}
 
@@ -564,8 +590,8 @@ int main( int argc, char *argv[] )
 
 	struct deltadb *db = deltadb_create(dbdir);
 
-	db->where_exprs = where_exprs;
-	db->filter_exprs = filter_exprs;
+	db->where_expr = where_expr;
+	db->filter_expr = filter_expr;
 	db->epoch_mode = epoch_mode;
 	db->output_exprs = output_exprs;
 	db->reduce_exprs = reduce_exprs;
@@ -573,9 +599,8 @@ int main( int argc, char *argv[] )
 
 	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
 		struct deltadb_reduction *r = db->reduce_exprs->head->data;
-		const char *name = db->output_exprs->head->data;
-		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",r->attr,name
-);
+		const char *name = jx_print_string(db->output_exprs->head->data);
+		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",jx_print_string(r->expr),name);
 		return 1;
 	}
 

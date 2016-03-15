@@ -41,6 +41,7 @@ the space used (in MB.)
 #include "sleeptools.h"
 #include "hash_table.h"
 #include "xxmalloc.h"
+#include "jx_parse.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -124,27 +125,25 @@ static int server_table_load(time_t stoptime)
 
 	debug(D_CHIRP, "querying catalog at %s:%d", CATALOG_HOST, CATALOG_PORT);
 
-	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, stoptime);
+	struct jx *jexpr = jx_parse_string("type==\"chirp\"");
+	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, jexpr, stoptime);
+	jx_delete(jexpr);
+
 	if(!q)
 		return 0;
 
 	while((j = catalog_query_read(q, stoptime))) {
 		char name[CHIRP_PATH_MAX];
-		const char *type, *hname;
+		const char *hname;
 		int port;
 
-		type = jx_lookup_string(j, "type");
-		if(type && !strcmp(type, "chirp")) {
-			hname = jx_lookup_string(j, "name");
-			if(hname) {
-				port = jx_lookup_integer(j, "port");
-				if(!port)
-					port = CHIRP_PORT;
-				sprintf(name, "%s:%d", hname, port);
-				hash_table_insert(server_table, name, j);
-			} else {
-				jx_delete(j);
-			}
+		hname = jx_lookup_string(j, "name");
+		if(hname) {
+			port = jx_lookup_integer(j, "port");
+			if(!port)
+				port = CHIRP_PORT;
+			sprintf(name, "%s:%d", hname, port);
+			hash_table_insert(server_table, name, j);
 		} else {
 			jx_delete(j);
 		}

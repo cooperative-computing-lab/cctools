@@ -112,6 +112,15 @@ struct jx * jx_array( struct jx_item *items )
 	return j;
 }
 
+struct jx * jx_operator( jx_operator_t type, struct jx *left, struct jx *right )
+{
+	struct jx * j = jx_create(JX_OPERATOR);
+	j->u.oper.type = type;
+	j->u.oper.left = left;
+	j->u.oper.right = right;
+	return j;
+}
+
 struct jx * jx_arrayv( struct jx *value, ... )
 {
 	va_list args;
@@ -273,6 +282,10 @@ void jx_delete( struct jx *j )
 		case JX_OBJECT:
 			jx_pair_delete(j->u.pairs);
 			break;
+		case JX_OPERATOR:
+			jx_delete(j->u.oper.left);
+			jx_delete(j->u.oper.right);
+			break;
 	}
 	free(j);
 }
@@ -319,6 +332,10 @@ int jx_equals( struct jx *j, struct jx *k )
 			return jx_item_equals(j->u.items,k->u.items);
 		case JX_OBJECT:
 			return jx_pair_equals(j->u.pairs,k->u.pairs);
+		case JX_OPERATOR:
+			return j->u.oper.type == j->u.oper.type
+				&& jx_equals(j->u.oper.left,k->u.oper.right)
+				&& jx_equals(j->u.oper.right,j->u.oper.right);
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -346,6 +363,8 @@ struct jx_item * jx_item_copy( struct jx_item *i )
 
 struct jx  *jx_copy( struct jx *j )
 {
+	if(!j) return 0;
+
 	switch(j->type) {
 		case JX_NULL:
 			return jx_null();
@@ -363,6 +382,8 @@ struct jx  *jx_copy( struct jx *j )
 			return jx_array(jx_item_copy(j->u.items));
 		case JX_OBJECT:
 			return jx_object(jx_pair_copy(j->u.pairs));
+		case JX_OPERATOR:
+			return jx_operator(j->u.oper.type,jx_copy(j->u.oper.left),jx_copy(j->u.oper.right));
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -396,6 +417,8 @@ int jx_is_constant( struct jx *j )
 			return jx_item_is_constant(j->u.items);
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->u.pairs);
+		case JX_OPERATOR:
+			return 0;
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -412,41 +435,4 @@ void jx_export( struct jx *j )
 			setenv(p->key->u.string_value,p->value->u.string_value,1);
 		}
 	}
-}
-
-struct jx_pair * jx_pair_evaluate( struct jx_pair *pair, jx_eval_func_t func )
-{
-	return jx_pair(
-		jx_evaluate(pair->key,func),
-		jx_evaluate(pair->value,func),
-		jx_pair_evaluate(pair->next,func)
-	);
-}
-
-struct jx_item * jx_item_evaluate( struct jx_item *item, jx_eval_func_t func )
-{
-	return jx_item(
-		jx_evaluate(item->value,func),
-		jx_item_evaluate(item->next,func)
-	);
-}
-
-struct jx * jx_evaluate( struct jx *j, jx_eval_func_t func )
-{
-	switch(j->type) {
-		case JX_SYMBOL:
-			return func(j->u.symbol_name);
-		case JX_DOUBLE:
-		case JX_BOOLEAN:
-		case JX_INTEGER:
-		case JX_STRING:
-		case JX_NULL:
-			return jx_copy(j);
-		case JX_ARRAY:
-			return jx_array(jx_item_evaluate(j->u.items,func));
-		case JX_OBJECT:
-			return jx_object(jx_pair_evaluate(j->u.pairs,func));
-	}
-	/* not reachable, but some compilers complain. */
-	return 0;
 }
