@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <inttypes.h>
+#include <errno.h>
 
 #include <ctype.h>
 #include <limits.h>
@@ -25,6 +26,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "set.h"
 #include "stringtools.h"
+#include "copy_stream.h"
 
 #include "dag.h"
 #include "dag_resources.h"
@@ -649,6 +651,10 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 
 	fprintf(cytograph, "</graph>\n");
 	fclose(cytograph);
+
+	if(copy_file_to_file(INSTALL_PATH "/share/cctools/makeflow-cytoscape-style.xml", "style.xml") < 0) {
+		fprintf(stderr, "Unable to create ./style.xml: %s\n", strerror(errno));
+	}
 
 	hash_table_firstkey(h);
 	while(hash_table_nextkey(h, &label, (void **) &t)) {
