@@ -31,6 +31,8 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	chmod 755 $(SCRIPTS)
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/cctools/
+	cp style.xml $(CCTOOLS_INSTALL_DIR)/share/cctools/makeflow-cytoscape-style.xml
 
 test: all
 
