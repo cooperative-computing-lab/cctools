@@ -19,6 +19,7 @@ struct makeflow_alloc_unit * makeflow_alloc_unit_create(uint64_t size)
 	struct makeflow_alloc_unit *u = malloc(sizeof(*u));
 	u->total	= size;
 	u->used		= 0;
+	u->greedy	= 0;
 	u->commit	= 0;
 	u->free		= size;
 
@@ -178,27 +179,29 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 	if(alloc1->nodeid == n->nodeid){
 		if(alloc1->storage->free < n->target_size)
 			return 0;
-		alloc1->storage->commit += n->target_size;
-		alloc1->storage->free   -= n->target_size;
+	} else {
+		while((node1 = list_peek_current(n->residual_nodes))){
+			alloc2 = makeflow_alloc_create(node1->nodeid, alloc1, 0, 0);
+			if(!(makeflow_alloc_grow_alloc(alloc2, node1->footprint_min_size)
+				|| (n == node1 && set_size(n->descendants) < 2 &&
+					makeflow_alloc_grow_alloc(alloc2, node1->self_res)))){
+				return 0;
+			}
+			list_push_tail(alloc1->residuals, alloc2);
+			alloc1 = alloc2;
 
-		return 1;
-	}
-
-	while((node1 = list_peek_current(n->residual_nodes))){
-		alloc2 = makeflow_alloc_create(node1->nodeid, alloc1, 0, 0);
-		if(!(makeflow_alloc_grow_alloc(alloc2, node1->footprint_min_size)
-			|| (n == node1 && set_size(n->descendants) < 2 &&
-				makeflow_alloc_grow_alloc(alloc2, node1->self_res)))){
-			return 0;
+			list_next_item(n->residual_nodes);
 		}
-		list_push_tail(alloc1->residuals, alloc2);
-		alloc1 = alloc2;
-
-		list_next_item(n->residual_nodes);
 	}
 
-	alloc1->storage->commit += n->target_size;
+	alloc1->storage->greedy += n->target_size;
 	alloc1->storage->free   -= n->target_size;
+	alloc1 = alloc1->parent;
+	while(alloc1){
+		alloc1->storage->greedy += n->target_size;
+		alloc1->storage->commit -= n->target_size;
+		alloc1 = alloc1->parent;
+	}
 
 	return 1;
 }
@@ -206,18 +209,35 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 int makeflow_alloc_use_space( struct makeflow_alloc *a, struct dag_node *n)
 {
 	uint64_t inc = dag_node_file_list_size(n->target_files);
+	uint64_t needed;
 	a = makeflow_alloc_traverse_to_node(a, n);
 
-	if(inc > a->storage->commit){
-		uint64_t needed = inc - a->storage->commit;
-		if(!makeflow_alloc_grow_alloc(a, needed))
-			return 0;
-		a->storage->commit += needed;
+	if(inc > a->storage->greedy){
+		needed = inc - a->storage->greedy;
+
+		if(needed > a->storage->commit){
+			uint64_t grow = needed - a->storage->commit;
+			if(!makeflow_alloc_grow_alloc(a, grow))
+				return 0;
+			a->storage->commit += grow;
+
+		}
+		a->storage->greedy += needed;
+		struct makeflow_alloc *a2 = a->parent;
+		while(a2){
+			a2->storage->greedy += needed;
+			a2->storage->commit -= needed;
+			a2 = a2->parent;
+		}
+	}
+
+	if(inc < a->storage->greedy){
+		needed = a->storage->greedy - inc;
 	}
 
 	while(a){
 		a->storage->used   += inc;
-		a->storage->commit -= inc;
+		a->storage->greedy -= (inc + needed);
 		a = a->parent;
 	}
 
@@ -253,6 +273,8 @@ int makeflow_alloc_shrink_alloc( struct makeflow_alloc *a, uint64_t dec, makeflo
 			a->parent->storage->commit -= dec;
 			a->parent->storage->free   += dec;
 		}
+
+
 	}
 	return 1;
 }

@@ -22,8 +22,9 @@ typedef enum {
 
 struct makeflow_alloc_unit {
 	uint64_t total;
-	uint64_t commit;
 	uint64_t used;
+	uint64_t greedy;
+	uint64_t commit;
 	uint64_t free;
 };
 
