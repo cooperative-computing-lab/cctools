@@ -258,6 +258,12 @@ value:      false
 expression: [10,-90.5,true,false,null,[-1,-2,-3]]
 value:      [10,-90.5,true,false,null,[-1,-2,-3]]
 
+expression: list[2]
+value:      300
+
+expression: object["house"]
+value:      "home"
+
 expression: {"command":"grep English "+infile+" > "+outfile,"inputs":["/usr/bin/grep",infile],"outputs":[outfile],"environment":{"PATH":"/usr/bin"},"cores":1,"memory":16,"disk":1}
 value:      {"command":"grep English mydata > results","inputs":["/usr/bin/grep","mydata"],"outputs":["results"],"environment":{"PATH":"/usr/bin"},"cores":1,"memory":16,"disk":1}
 

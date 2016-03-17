@@ -24,6 +24,7 @@ typedef enum {
 	JX_TOKEN_RBRACE,
 	JX_TOKEN_COMMA,
 	JX_TOKEN_COLON,
+	JX_TOKEN_SEMI,
 	JX_TOKEN_TRUE,
 	JX_TOKEN_FALSE,
 	JX_TOKEN_EQ,
@@ -232,6 +233,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_COMMA;
 	} else if(c==':') {
 		return JX_TOKEN_COLON;
+	} else if(c==';') {
+		return JX_TOKEN_SEMI;
 	} else if(c=='+') {
 		return JX_TOKEN_ADD;
 	} else if(c=='-') {
@@ -515,6 +518,7 @@ int jx_operator_precedence( jx_operator_t t )
 		case JX_OP_MUL:	return 1;
 		case JX_OP_DIV:	return 1;
 		case JX_OP_MOD:	return 1;
+		case JX_OP_LOOKUP: return 0;
 		default:	return 0;
 	}
 }
@@ -536,6 +540,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_AND:	return JX_OP_AND;
 		case JX_TOKEN_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
+		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		default:		return JX_OP_INVALID;
 	}
 }
@@ -550,6 +555,35 @@ static int jx_operator_is_unary( jx_operator_t op )
 	}
 }
 
+static struct jx * jx_parse_postfix( struct jx_parser *s )
+{
+	struct jx *a = jx_parse_atomic(s);
+	if(!a) return 0;
+
+	jx_token_t t = jx_scan(s);
+	if(t==JX_TOKEN_LBRACKET) {
+		struct jx *b = jx_parse(s);
+		if(!b) {
+			jx_delete(a);
+			// parse error already set
+			return 0;
+		}
+
+		t = jx_scan(s);
+		if(t!=JX_TOKEN_RBRACKET) {
+			jx_parse_error(s,"missing closing bracket");
+			jx_delete(a);
+			jx_delete(b);
+			return 0;
+		} else {
+			return jx_operator(JX_OP_LOOKUP,a,b);
+		}
+	} else {
+		jx_unscan(s,t);
+		return a;
+	}
+}
+
 static struct jx * jx_parse_unary( struct jx_parser *s )
 {
 	struct jx *j;
@@ -559,7 +593,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
 		case JX_TOKEN_NOT:
-			j = jx_parse_atomic(s);
+			j = jx_parse_postfix(s);
 			if(j) {
 				return jx_operator(jx_token_to_operator(t),0,j);
 			} else {
@@ -568,10 +602,9 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			break;
 		default:
 			jx_unscan(s,t);
-			return jx_parse_atomic(s);
+			return jx_parse_postfix(s);
 	}
 }
-
 
 static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 {
@@ -604,7 +637,13 @@ static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 
 struct jx * jx_parse( struct jx_parser *s )
 {
-	return jx_parse_binary(s,JX_PRECEDENCE_MAX);
+	struct jx *j = jx_parse_binary(s,JX_PRECEDENCE_MAX);
+	if(!j) return 0;
+
+	jx_token_t t = jx_scan(s);
+	if(t!=JX_TOKEN_SEMI) jx_unscan(s,t);
+
+	return j;
 }
 
 static struct jx * jx_parse_finish( struct jx_parser *p )
