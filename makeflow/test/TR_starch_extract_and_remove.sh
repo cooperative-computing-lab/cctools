@@ -13,7 +13,7 @@ prepare()
 
 run()
 {
-	../src/starch -v -x tar -x rm -c 'for f in $@; do if ! tar xvf $f; then exit 1; fi ; done; rm $@' $sfxfile
+	../src/starch -v -x tar -x rm -c 'tar_test() { for f in $@; do if ! tar xvf $f; then exit 1; fi ; done; rm $@; }; tar_test' $sfxfile
 	exec ./$sfxfile $tarfile
 }
 

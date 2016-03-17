@@ -15,7 +15,7 @@ EOF
 
 run()
 {
-	../src/starch -C $cfgfile $sfxfile
+	../src/starch -c date -C $cfgfile $sfxfile
 	exec ./$sfxfile
 }
 
