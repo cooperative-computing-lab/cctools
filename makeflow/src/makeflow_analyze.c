@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "random.h"
 #include "path.h"
+#include "jx_pretty_print.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -49,6 +50,7 @@ See the file COPYING for details.
 enum { SHOW_INPUT_FILES = 2,
 	   SHOW_OUTPUT_FILES,
 	   SHOW_MAKEFLOW_ANALYSIS,
+	   SHOW_JSON,
 	   SHOW_DAG_FILE
 };
 
@@ -190,6 +192,10 @@ void dag_show_output_files(struct dag *d)
 	}
 }
 
+void dag_show_json(struct dag *d) {
+	jx_pretty_print_stream(dag_to_json(d), stdout);
+}
+
 static void show_help_analyze(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] <dagfile>\n", cmd);
@@ -199,6 +205,7 @@ static void show_help_analyze(const char *cmd)
 	fprintf(stdout, " %-30s Show input files.\n", "-I,--show-input");
 	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
+	fprintf(stdout, " %-30s Translate workflow JSON representation.\n", "-J,--json");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
 }
 
@@ -222,10 +229,11 @@ int main(int argc, char *argv[])
 		{"show-input", no_argument, 0, 'I'},
 		{"syntax-check", no_argument, 0, 'k'},
 		{"show-output", no_argument, 0, 'O'},
+		{"json", no_argument, 0, 'J'},
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
-	const char *option_string_analyze = "b:hiIkOd:v";
+	const char *option_string_analyze = "b:hiIkOJd:v";
 
 	while((c = getopt_long(argc, argv, option_string_analyze, long_options_analyze, NULL)) >= 0) {
 		switch (c) {
@@ -246,6 +254,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'O':
 				display_mode = SHOW_OUTPUT_FILES;
+				break;
+			case 'J':
+				display_mode = SHOW_JSON;
 				break;
 			case 'd':
 				debug_flags_set(optarg);
@@ -310,6 +321,10 @@ int main(int argc, char *argv[])
 
 			case SHOW_MAKEFLOW_ANALYSIS:
 				dag_show_analysis(d);
+				break;
+
+			case SHOW_JSON:
+				dag_show_json(d);
 				break;
 
 			default:

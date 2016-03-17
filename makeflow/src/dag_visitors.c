@@ -1133,4 +1133,148 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option)
 
 }
 
+struct jx *variables_to_json(struct hash_table *h) {
+	char *key;
+	struct dag_variable *value;
+	struct jx *result = jx_object(NULL);
+
+	hash_table_firstkey(h);
+	while(hash_table_nextkey(h, &key, (void **) &value)) {
+		jx_insert(result, jx_string(key), jx_string(value->values[value->count - 1]->value));
+	}
+
+	return result;
+}
+
+struct jx *category_allocation_to_json(category_allocation_t c) {
+	switch(c) {
+		case CATEGORY_ALLOCATION_UNLABELED:
+			return jx_string("unlabeled");
+			break;
+		case CATEGORY_ALLOCATION_USER:
+			return jx_string("user");
+			break;
+		case CATEGORY_ALLOCATION_AUTO_ZERO:
+			return jx_string("auto_zero");
+			break;
+		case CATEGORY_ALLOCATION_AUTO_FIRST:
+			return jx_string("auto_first");
+			break;
+		case CATEGORY_ALLOCATION_AUTO_MAX:
+			return jx_string("auto_max");
+			break;
+		case CATEGORY_ALLOCATION_ERROR:
+			return jx_string("error");
+			break;
+	}
+	return jx_null();
+}
+
+struct jx *resources_to_json(struct rmsummary *r) {
+	struct jx *result = jx_object(NULL);
+	if(r->cores > 0) {
+		jx_insert(result, jx_string("cores"), jx_integer(r->cores));
+	}
+	if(r->disk > 0) {
+		jx_insert(result, jx_string("disk"), jx_integer(r->disk));
+	}
+	if(r->memory > 0) {
+		jx_insert(result, jx_string("memory"), jx_integer(r->memory));
+	}
+	if(r->gpus > 0) {
+		jx_insert(result, jx_string("gpus"), jx_integer(r->gpus));
+	}
+	return result;
+}
+
+struct jx *category_to_json(struct category *c) {
+	struct jx *result = resources_to_json(c->max_allocation);
+	jx_insert_unless_empty(result, jx_string("variables"), variables_to_json(c->mf_variables));
+	return result;
+}
+
+struct jx *env_to_json(struct dag *d) {
+	char *name;
+	struct jx *result = jx_object(NULL);
+
+	set_first_element(d->export_vars);
+	while((name = set_next_element(d->export_vars))) {
+		jx_insert(result, jx_string(name), jx_null());
+	}
+
+	return result;
+}
+
+struct jx *files_to_json(struct list *files) {
+	struct jx *result = jx_array(NULL);
+	struct dag_file *f;
+	list_first_item(files);
+	while((f = list_next_item(files))) {
+		jx_array_insert(result, jx_string(f->filename));
+	}
+	return result;
+}
+
+struct jx *remote_names_to_json(struct itable *r) {
+	struct dag_file *f;
+	char *remote;
+	struct jx *result = jx_object(NULL);
+	itable_firstkey(r);
+	while(itable_nextkey(r, (uintptr_t *) &f, (void *) &remote)) {
+		jx_insert(result, jx_string(f->filename), jx_string(remote));
+	}
+	return result;
+}
+
+struct jx *dag_nodes_to_json(struct dag_node *node) {
+	struct jx *result = jx_array(NULL);
+	struct dag_node *n = node;
+	struct jx *rule;
+	struct jx *submakeflow;
+
+	while(n) {
+		rule = jx_object(NULL);
+		jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
+		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
+		jx_insert_unless_empty(rule, jx_string("variables"), variables_to_json(n->variables));
+		jx_insert_unless_empty(rule, jx_string("resources_needed"), resources_to_json(n->resources_needed));
+		jx_insert(rule, jx_string("source_files"), files_to_json(n->source_files));
+		jx_insert(rule, jx_string("target_files"), files_to_json(n->target_files));
+		jx_insert_unless_empty(rule, jx_string("remote_names"), remote_names_to_json(n->remote_names));
+		jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
+
+		if(n->nested_job) {
+			submakeflow = jx_object(NULL);
+			jx_insert(submakeflow, jx_string("path"), jx_string(n->makeflow_dag));
+			jx_insert(submakeflow, jx_string("cwd"), jx_string(n->makeflow_cwd));
+			jx_insert(rule, jx_string("makeflow"), submakeflow);
+		} else {
+			jx_insert(rule, jx_string("command"), jx_string(n->command));
+		}
+
+		jx_array_insert(result, rule);
+		n = n->next;
+	}
+
+	return result;
+}
+
+struct jx *dag_to_json(struct dag *d) {
+	char *key;
+	void *value;
+	struct jx *result = jx_object(NULL);
+	struct jx *categories = jx_object(NULL);
+	jx_insert(result, jx_string("filename"), jx_string(d->filename));
+	jx_insert_unless_empty(result, jx_string("environment"), env_to_json(d));
+	jx_insert(result, jx_string("rules"), dag_nodes_to_json(d->nodes));
+	hash_table_firstkey(d->categories);
+	while(hash_table_nextkey(d->categories, &key,& value)) {
+		jx_insert(categories, jx_string(key), category_to_json((struct category *) value));
+	}
+	jx_insert(result, jx_string("categories"), categories);
+	jx_insert(result, jx_string("default_category"), jx_string(d->default_category->name));
+
+	return result;
+}
+
 /* vim: set noexpandtab tabstop=4: */

@@ -216,6 +216,26 @@ int jx_insert( struct jx *j, struct jx *key, struct jx *value )
 	return 1;
 }
 
+int jx_insert_unless_empty( struct jx *object, struct jx *key, struct jx *value ) {
+	switch(value->type) {
+		case JX_OBJECT:
+		case JX_ARRAY:
+			/* C99 says union members have the same start address, so
+			 * just pick one, they're both pointers. */
+			if(value->u.pairs == NULL) {
+				jx_delete(key);
+				jx_delete(value);
+				return -1;
+			} else {
+				return jx_insert(object, key, value);
+			}
+			break;
+		default:
+			return jx_insert(object, key, value);
+			break;
+	}
+}
+
 void jx_insert_integer( struct jx *j, const char *key, jx_int_t value )
 {
 	jx_insert(j,jx_string(key),jx_integer(value));
