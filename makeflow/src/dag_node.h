@@ -60,6 +60,8 @@ struct dag_node {
 	struct list *target_files;		/* list of dag_files of the node's productions */
 	uint64_t target_size;			/* size of dag_files of the node's productions */
 
+	struct set *terminal_files;		/* set of dag_files that exist until the end of the Makeflow */
+
 	struct list *residual_nodes;	/* list of dag_nodes that describe residual sybc */
 	struct set *residual_files;		/* set of dag_files of the node's residual */
 	uint64_t residual_size;			/* Size of current residual, changes depending on
@@ -85,6 +87,7 @@ struct dag_node {
 
 	uint64_t footprint_size;		/* Size decided upon by the user as the footprint between min and max */
 
+	uint64_t self_res;
 	uint64_t res;
 	struct set *res_files;
 	uint64_t wgt;
@@ -125,9 +128,10 @@ struct dag_node {
 
 	struct dag_node *next;          /* The next node in the list of nodes */
 
-	int children_updated;				/* Int indicating this node has updated its size */
+	int children_updated;			/* Int indicating this node has updated its direct_children */
 	int size_updated;				/* Int indicating this node has updated its size */
-	int footprint_updated;			/* Int indicating this node has updated its size */
+	int footprint_updated;			/* Int indicating this node has updated its footprint */
+	int terminal_updated;			/* Int indicating this node has updated its terminal_files */
 };
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);
@@ -145,6 +149,7 @@ const char *dag_node_get_remote_name(struct dag_node *n, const char *filename );
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 
 void dag_node_determine_children(struct dag_node *n);
+void dag_node_prepare_node_terminal_files(struct dag_node *n);
 void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
 void dag_node_print_footprint(struct dag *d, char *output);

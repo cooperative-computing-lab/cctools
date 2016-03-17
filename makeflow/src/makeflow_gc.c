@@ -115,6 +115,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
 		if(dag_file_is_source(f)) {
 			set_insert(d->inputs, f);
+			f->type = DAG_FILE_TYPE_INPUT;
 			debug(D_MAKEFLOW_RUN, "Added %s to input list", f->filename);
 		}
 

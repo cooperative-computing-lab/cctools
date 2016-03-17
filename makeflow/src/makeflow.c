@@ -398,6 +398,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 	}
 
 	dag_node_determine_children(n);
+	dag_node_prepare_node_terminal_files(n);
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
 	if(storage_print){
@@ -709,10 +710,16 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	if(storage_allocation->locked &&
-		!( makeflow_alloc_check_space(storage_allocation, n) &&
-			dag_node_dependencies_active(n))){
-		return 0;
+	if(storage_allocation->locked){
+		if(!( makeflow_alloc_check_space(storage_allocation, n))){
+			printf("Not enough space.\n");
+			return 0;
+		}
+
+		if (!(dag_node_dependencies_active(n))){
+			printf("Dependencies not active.\n");
+			return 0;
+		}
 	}
 
 	return 1;

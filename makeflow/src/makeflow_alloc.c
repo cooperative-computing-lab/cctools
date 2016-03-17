@@ -25,6 +25,12 @@ struct makeflow_alloc_unit * makeflow_alloc_unit_create(uint64_t size)
 	return u;
 }
 
+void makeflow_alloc_unit_delete( struct makeflow_alloc_unit *u)
+{
+	free(u);
+	return;
+}
+
 struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc *parent, uint64_t size, int locked)
 {
 	struct makeflow_alloc *a = malloc(sizeof(*a));
@@ -35,6 +41,17 @@ struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc 
 	a->locked = locked;
 
 	return a;
+}
+
+void makeflow_alloc_delete(struct makeflow_alloc *a)
+{
+	makeflow_alloc_unit_delete(a->storage);
+	if(a->parent){
+		list_remove(a->parent->residuals, a);
+	}
+	list_delete(a->residuals);
+	free(a);
+	return;
 }
 
 struct makeflow_alloc * makeflow_alloc_traverse_to_node(struct makeflow_alloc *a, struct dag_node *n)
@@ -105,9 +122,13 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	while((node1 = list_peek_current(n->residual_nodes))){
 		alloc2 = makeflow_alloc_create(node1->nodeid, alloc1, 0, 0);
-		if(!makeflow_alloc_try_grow_alloc(alloc2, node1->footprint_min_size))
+		if(!(makeflow_alloc_try_grow_alloc(alloc2, node1->footprint_min_size)
+			|| (n == node1 && set_size(n->descendants) < 2 &&
+				makeflow_alloc_try_grow_alloc(alloc2, node1->self_res)))){
 			return 0;
+		}
 
+		makeflow_alloc_delete(alloc2);
 		list_next_item(n->residual_nodes);
 	}
 
@@ -165,8 +186,11 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	while((node1 = list_peek_current(n->residual_nodes))){
 		alloc2 = makeflow_alloc_create(node1->nodeid, alloc1, 0, 0);
-		if(!makeflow_alloc_grow_alloc(alloc2, node1->footprint_min_size))
+		if(!(makeflow_alloc_grow_alloc(alloc2, node1->footprint_min_size)
+			|| (n == node1 && set_size(n->descendants) < 2 &&
+				makeflow_alloc_grow_alloc(alloc2, node1->self_res)))){
 			return 0;
+		}
 		list_push_tail(alloc1->residuals, alloc2);
 		alloc1 = alloc2;
 
@@ -208,6 +232,11 @@ int makeflow_alloc_shrink_alloc( struct makeflow_alloc *a, uint64_t dec, makeflo
 	if(release == MAKEFLOW_ALLOC_USED){
 		a->storage->used  -= dec;
 		a->storage->total -= dec;
+		if(a->parent){
+			a = a->parent;
+			a->storage->used -= dec;
+			a->storage->free += dec;
+		}
 		while(a->parent){
 			a = a->parent;
 			a->storage->used   -= dec;
@@ -242,7 +271,7 @@ int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, 
 	makeflow_alloc_shrink_alloc(alloc1, size, release);
 
 	if(alloc1->storage->total == 0){
-		// Delete allocations that are empty
+		makeflow_alloc_delete(alloc1);
 	}
 
 	return 1;
