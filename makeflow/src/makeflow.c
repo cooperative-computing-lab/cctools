@@ -782,15 +782,13 @@ static int makeflow_check(struct dag *d)
 			if(skip_file_check || batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
 				continue;
 			}
-
-			if(!error) {
-				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-			}
-			error = 1;
+			fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
+			error++;
 		}
 	}
 
 	if(error) {
+		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", error);
 		return 0;
 	} else {
 		return 1;
