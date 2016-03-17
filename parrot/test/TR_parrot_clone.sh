@@ -48,7 +48,7 @@ EOF
 run()
 {
 	../src/parrot_run -d all -- ./"$exe" && return 1
-	return $?
+	return 0
 }
 
 clean()
