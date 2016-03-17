@@ -712,12 +712,10 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 
 	if(storage_allocation->locked){
 		if(!( makeflow_alloc_check_space(storage_allocation, n))){
-			printf("Not enough space.\n");
 			return 0;
 		}
 
 		if (!(dag_node_dependencies_active(n))){
-			printf("Dependencies not active.\n");
 			return 0;
 		}
 	}
