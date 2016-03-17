@@ -421,6 +421,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 			 *     attached  using  PTRACE_SEIZE), or PTRACE_EVENT_STOP if
 			 *     PTRACE_SEIZE was used.
 			 */
+			debug(D_DEBUG, "%d received PTRACE_EVENT_STOP, continuing...", (int)pid);
 			if (tracer_continue(p->tracer, 0) == -1)
 				return;
 		} else if((linux_available(3,4,0) && ((status>>16) == PTRACE_EVENT_STOP)) || (!linux_available(3,4,0) && SIG_ISSTOP(signum) && ptrace(PTRACE_GETSIGINFO, pid, 0, &info) == -1 && errno == EINVAL)) {
