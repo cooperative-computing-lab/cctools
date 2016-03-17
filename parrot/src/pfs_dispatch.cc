@@ -104,6 +104,9 @@ extern "C" {
 #ifndef BTRFS_IOC_CLONE
 #	define BTRFS_IOC_CLONE _IOW (BTRFS_IOCTL_MAGIC, 9, int)
 #endif
+#ifndef CLONE_UNTRACED
+#	define CLONE_UNTRACED 0x00800000
+#endif
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
@@ -1342,6 +1345,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				 * the child.
 				 */
 				wait_barrier = 1;
+				int flags = args[0];
+				debug(D_DEBUG, "flags = 0x%X", flags);
+				if (flags & CLONE_UNTRACED) {
+					fatal("cannot run application which does not allow tracing (CLONE_UNTRACED)");
+				}
 			}
 			break;
 
