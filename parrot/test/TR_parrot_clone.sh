@@ -36,7 +36,7 @@ int main (int argc, char *argv[])
 	int status;
 	int flags = SIGCHLD|CLONE_VM|CLONE_SIGHAND|CLONE_PARENT|CLONE_THREAD|CLONE_FILES|CLONE_FS;
 	char *stk = malloc(1<<20);
-	pid_t pid = clone(fn, stk+(1<<20), flags, NULL); /* should cause Parrot to quit */
+	pid_t pid = clone(fn, stk+(1<<20), flags|CLONE_UNTRACED, NULL); /* should cause Parrot to quit */
 	fprintf(stderr, "cloned %d\\n", (int)pid);
 	sleep(2);
 	return 0;
