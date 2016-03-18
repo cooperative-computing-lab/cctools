@@ -56,7 +56,7 @@ OPTION_ITEM(`-R, --retry')Automatically retry failed batch jobs up to 100 times.
 OPTION_TRIPLET(-r, retry-count, n)Automatically retry failed batch jobs up to n times.
 OPTION_PAIR(--wait-for-files-upto, #)Wait for output files to be created upto this many seconds (e.g., to deal with NFS semantics).
 OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
-OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, condor, sge, pbs, torque, slurm, moab, cluster, wq, amazon. (default is local)
+OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, dryrun, condor, sge, pbs, torque, slurm, moab, cluster, wq, amazon. (default is local)
 OPTIONS_END
 
 SUBSECTION(Debugging Options)
@@ -117,6 +117,16 @@ OPTION_PAIR(--wrapper,script) Wrap all commands with this BOLD(script). Each rul
 OPTION_PAIR(--wrapper-input,file) Wrapper command requires this input file. This option may be specified more than once, defining an array of inputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
 OPTION_PAIR(--wrapper-output,file) Wrapper command requires this output file. This option may be specified more than once, defining an array of outputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
 OPTIONS_END
+
+SECTION(DRYRUN MODE)
+
+When the batch system is set to BOLD(-T) PARAM(dryrun), Makeflow runs as usual
+but does not actually execute jobs or modify the system. This is useful to
+check that wrappers and substitutions are applied as expected. In addition,
+Makeflow will write an equivalent shell script to the batch system log
+specified by BOLD(-L) PARAM(logfile). This script will run the commands in
+serial that Makeflow would have run. This shell script format may be useful
+for archival purposes, since it does not depend on Makeflow.
 
 SECTION(ENVIRONMENT VARIABLES)
 
