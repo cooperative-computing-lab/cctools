@@ -389,7 +389,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	struct rmsummary *tr = rmonitor_measure_host();
+	struct rmsummary *tr = rmonitor_measure_host(NULL);
 	if(num_cores==0) num_cores = tr->cores;
 	debug(D_DEBUG,"num_cores: %d\n",num_cores);
 

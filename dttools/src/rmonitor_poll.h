@@ -11,6 +11,6 @@ See the file COPYING for details.
 
 struct rmsummary *rmonitor_measure_process(pid_t pid);
 int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid);
-struct rmsummary *rmonitor_measure_host();
+struct rmsummary *rmonitor_measure_host(char *);
 
 #endif

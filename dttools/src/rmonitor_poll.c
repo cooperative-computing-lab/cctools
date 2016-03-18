@@ -20,6 +20,7 @@ See the file COPYING for details.
 
 #include "rmonitor_poll_internal.h"
 #include "host_memory_info.h"
+#include "path_disk_size_info.h"
 #include "load_average.h"
 
 /***
@@ -819,10 +820,18 @@ int rmonitor_measure_process_update_to_peak(struct rmsummary *tr, pid_t pid) {
 	return 1;
 }
 
-struct rmsummary *rmonitor_measure_host() {
-	uint64_t free_mem, total_mem;
+struct rmsummary *rmonitor_measure_host(char *path) {
+	uint64_t free_mem;
+	uint64_t total_mem;
+	int64_t total_disk;
+	int64_t file_count;
 	struct rmsummary *tr = rmsummary_create(-1);
 
+	if(path) {
+		path_disk_size_info_get(path, &total_disk, &file_count);
+		tr->disk = total_disk;
+		tr->total_files = file_count;
+	}
 	host_memory_info_get(&free_mem, &total_mem);
 	tr->memory = total_mem / MEGABYTE;
 	tr->cores = load_average_get_cpus();
