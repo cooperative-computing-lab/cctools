@@ -974,7 +974,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			list_delete(input_list);
 		}
 
-		if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_COMMIT)) {
+		if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
 			makeflow_log_alloc_event(d, storage_allocation);
 		} else {
 			printf("Unable to release space\n");
@@ -1387,6 +1387,7 @@ int main(int argc, char *argv[])
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
+	int storage_type = MAKEFLOW_ALLOC_TYPE_MIN;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
 
@@ -1433,6 +1434,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
+		LONG_OPT_STORAGE_TYPE,
 		LONG_OPT_STORAGE_LIMIT,
 		LONG_OPT_STORAGE_PRINT,
 		LONG_OPT_PASSWORD,
@@ -1512,6 +1514,7 @@ int main(int argc, char *argv[])
 		{"retry-count", required_argument, 0, 'r'},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
+		{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
 		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
 		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
 		{"submission-timeout", required_argument, 0, 'S'},
@@ -1801,9 +1804,11 @@ int main(int argc, char *argv[])
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
 				list_push_head(shared_fs_list, xxstrdup(optarg));
 				break;
+			case LONG_OPT_STORAGE_TYPE:
+				storage_type = atoi(optarg);
+				break;
 			case LONG_OPT_STORAGE_LIMIT:
 				storage_limit = string_metric_parse(optarg);
-				printf("Storage Limit %"PRIu64"\n", storage_limit);
 				break;
 			case LONG_OPT_STORAGE_PRINT:
 				if(storage_print) free(storage_print);
@@ -1951,10 +1956,10 @@ int main(int argc, char *argv[])
 	}
 
 	if(storage_limit){
-		storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1);
+		storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1, storage_type);
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
 	} else {
-		storage_allocation = makeflow_alloc_create(-1, NULL, 0, 0);
+		storage_allocation = makeflow_alloc_create(-1, NULL, 0, 0, storage_type);
 	}
 
 

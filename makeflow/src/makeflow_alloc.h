@@ -15,10 +15,16 @@ This module implements resource allocations.
 */
 
 typedef enum {
-	MAKEFLOW_ALLOC_COMMIT,		/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_USED,		/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_FREE			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_RELEASE_COMMIT,		/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_RELEASE_USED			/* Clean nothing, default. */
 } makeflow_alloc_release;
+
+typedef enum {
+	MAKEFLOW_ALLOC_TYPE_MIN,			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_MAX,			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_OFF,			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_SIZE			/* Clean nothing, default. */
+} makeflow_alloc_type;
 
 struct makeflow_alloc_unit {
 	uint64_t total;
@@ -34,9 +40,11 @@ struct makeflow_alloc {
 	struct makeflow_alloc *parent;
 	struct list *residuals;
 	int locked;
+	int ordered;
+	makeflow_alloc_type enabled;
 };
 
-struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc *parent, uint64_t size, int locked);
+struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc *parent, uint64_t size, int locked, makeflow_alloc_type type);
 
 void makeflow_alloc_print( struct makeflow_alloc *a, struct dag_node *n);
 
