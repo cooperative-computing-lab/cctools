@@ -31,6 +31,22 @@ static void jx_pretty_print_pair( struct jx_pair *pair, buffer_t *b, int level)
 	}
 }
 
+static void jx_pretty_print_item( struct jx_item *item, buffer_t *b, int level)
+{
+	if(!item) return;
+
+	buffer_printf(b,"%*s", level*SPACES, "");
+
+	jx_pretty_print_buffer(item->value, b, level );
+
+	if(item->next) {
+		buffer_putstring(b,",\n");
+		jx_pretty_print_item(item->next, b, level);
+	} else {
+		buffer_putstring(b,"\n");
+	}
+}
+
 static void jx_pretty_print_buffer( struct jx *j, buffer_t *b, int level )
 {
 	if(!j) return;
@@ -39,6 +55,10 @@ static void jx_pretty_print_buffer( struct jx *j, buffer_t *b, int level )
 		buffer_printf(b,"\n%*s{\n", level*SPACES, "");
 		jx_pretty_print_pair(j->u.pairs, b, level+1);
 		buffer_printf(b,"%*s}", level*SPACES, "");
+	} else if(j->type==JX_ARRAY) {
+		buffer_printf(b,"\n%*s[\n", level*SPACES, "");
+		jx_pretty_print_item(j->u.items, b, level+1);
+		buffer_printf(b,"%*s]", level*SPACES, "");
 	} else {
 		jx_print_buffer(j, b);
 	}
