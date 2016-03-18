@@ -1238,8 +1238,8 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
 		jx_insert_unless_empty(rule, jx_string("variables"), variables_to_json(n->variables));
 		jx_insert_unless_empty(rule, jx_string("resources_needed"), resources_to_json(n->resources_needed));
-		jx_insert(rule, jx_string("source_files"), files_to_json(n->source_files));
-		jx_insert(rule, jx_string("target_files"), files_to_json(n->target_files));
+		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files));
+		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files));
 		jx_insert_unless_empty(rule, jx_string("remote_names"), remote_names_to_json(n->remote_names));
 		jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
 
@@ -1264,7 +1264,6 @@ struct jx *dag_to_json(struct dag *d) {
 	void *value;
 	struct jx *result = jx_object(NULL);
 	struct jx *categories = jx_object(NULL);
-	jx_insert(result, jx_string("filename"), jx_string(d->filename));
 	jx_insert_unless_empty(result, jx_string("environment"), env_to_json(d));
 	jx_insert(result, jx_string("rules"), dag_nodes_to_json(d->nodes));
 	hash_table_firstkey(d->categories);
