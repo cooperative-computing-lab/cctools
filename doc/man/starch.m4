@@ -44,7 +44,7 @@ Once a CODE(SFX) is generated, you can use it as a normal executable.
 
 SECTION(CONFIGURATION FILE)
 The command line options may be stored in a configuration file and passed to
-starch using the CODE(-C) option.  The format of the configuration file is as
+starch using the CODE(starch -C) option.  The format of the configuration file is as
 follows:
 LONGCODE_BEGIN
 [starch]
@@ -86,13 +86,14 @@ SECTION(EXAMPLES)
 
 Package the date program:
 LONGCODE_BEGIN
-    $ starch -x date date.sfx
+    $ starch -c date -x date date.sfx
 LONGCODE_END
 
 Package the date program using a configuration file:
 LONGCODE_BEGIN
     $ cat data.cfg
     [starch]
+    executables = date
     command = date
     $ starch -C date.cfg date.sfx
 LONGCODE_END
@@ -119,7 +120,7 @@ LONGCODE_END
 
 Advanced example involving a complex shell command:
 LONGCODE_BEGIN
-    $ starch -v -x tar -x rm extract_and_remove.sfx 'for f in $@; do if ! tar xvf $f; then exit 1; fi; done; rm $@'
+    $ starch -v -x tar -x rm  -c 'tar_test() { for f in $@; do if ! tar xvf $f; then exit 1; fi; done; rm $@'; }; tar_test' extract_and_remove.sfx
     $ ./extract_and_remove.sfx *.tar.gz
 LONGCODE_END
 
