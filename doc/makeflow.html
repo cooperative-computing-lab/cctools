@@ -81,7 +81,7 @@ machine.</p>
 CONVERT=/usr/bin/convert
 URL=http://ccl.cse.nd.edu/images/capitol.jpg
 
-capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg $CONVERT
         LOCAL $CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
 capitol.90.jpg: capitol.jpg $CONVERT
