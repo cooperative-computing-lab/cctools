@@ -173,7 +173,7 @@ static void get_linux_version(const char *cmd)
 	debug(D_DEBUG,"kernel is %s %s",name.sysname,name.release);
 
 	/* warning for latest untested version of Linux */
-	if(linux_available(3,15,3))
+	if(linux_available(4,5,0))
 		debug(D_NOTICE,"parrot_run %s has not been tested on %s %s yet, this may not work",CCTOOLS_VERSION,name.sysname,name.release);
 	else if (!linux_available(2,5,60))
 		fatal("this version of Parrot requires at least kernel version 2.5.60");
