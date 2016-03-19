@@ -93,8 +93,6 @@ export_env() {
 }
 export_env
 
-unset PARROT_ENABLED
-
 ldso_file="$(echo "$(pwd)/$(ldd ${cmd_parrot_run} | grep ld-linux | cut -d' ' -f1)" | sed -e 's/[ \t]//g')"
 
 #initialize the repeat process

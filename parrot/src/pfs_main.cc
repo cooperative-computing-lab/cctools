@@ -15,6 +15,10 @@ See the file COPYING for details.
 #include "pfs_table.h"
 #include "ptrace.h"
 
+extern "C" {
+#include "parrot_client.h"
+}
+
 #ifndef PTRACE_EVENT_STOP
 #  define PTRACE_EVENT_STOP 128
 #endif
@@ -567,9 +571,13 @@ int main( int argc, char *argv[] )
 	int envdebug = 0;
 	int envauth = 0;
 
-	if(getenv("PARROT_ENABLED")) {
-		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
-		exit(EXIT_FAILURE);
+	{
+		char buf[4096];
+		if (parrot_version(buf, sizeof(buf)) >= 0) {
+			fprintf(stderr, "sorry, parrot_run cannot be run inside of itself.\n");
+			fprintf(stderr, "version already running is %s.\n",buf);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	random_init();
@@ -1149,7 +1157,6 @@ int main( int argc, char *argv[] )
 		if (!WIFCONTINUED(status))
 			fatal("child did not continue as expected!");
 	} else if(pid==0) {
-		setenv("PARROT_ENABLED", "TRUE", 1);
 		if (pfs_use_helper)
 			pfs_helper_init();
 		pfs_paranoia_payload();
