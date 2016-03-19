@@ -1,6 +1,7 @@
 #! /bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 export PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES="yes"
 export HTTP_PROXY=http://eddie.crc.nd.edu:3128
@@ -15,9 +16,9 @@ prepare()
 
 run()
 {
-	if ../src/parrot_run --check-driver cvmfs
+	if parrot --check-driver cvmfs
 	then
-		../src/parrot_run -t${tmp_dir} -dcvmfs stat /cvmfs/atlas.cern.ch/repo
+		parrot -t${tmp_dir} -- stat /cvmfs/atlas.cern.ch/repo
 		return $?
 	else
 		return 0

@@ -1,13 +1,13 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 . ../../chirp/test/chirp-common.sh
 
 c="./hostport.$PPID"
-parrot_debug=parrot.debug
 
-parrot() {
-	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" --timeout=5 --work-dir="/chirp/$hostport/" "$@"
+myp() {
+	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/$hostport/" "$@"
 }
 
 prepare()
@@ -25,7 +25,7 @@ run()
 	set +e
 
 	N=10
-	parrot /bin/sh <<EOF1
+	myp /bin/sh <<EOF1
 set -ex
 cat > a.py <<EOF2
 #!/chirp/$hostport/python
@@ -38,7 +38,7 @@ cp "$(which python)" "$(which sh)" .
 chmod 700 a.py python sh
 EOF1
 	while [ "$N" -gt 0 ]; do
-		parrot -- /bin/sh <<EOF1 &
+		myp -- /bin/sh <<EOF1 &
 ./a.py
 EOF1
 		N=$(expr $N - 1)
@@ -58,7 +58,7 @@ EOF1
 clean()
 {
 	chirp_clean
-	rm -f "$c" "$parrot_debug"
+	rm -f "$c"
 }
 
 set -e

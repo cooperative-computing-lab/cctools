@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe="socket.test"
 
@@ -81,9 +82,9 @@ EOF
 run()
 {
 	set -e
-	../src/parrot_run -d process -d syscall -- "$(pwd)/$exe"
-	../src/parrot_run -d process -d syscall --work-dir=/tmp -- "$(pwd)/$exe"
-	../src/parrot_run -d process -d syscall --work-dir=/http -- "$(pwd)/$exe" && return 1
+	parrot -- "$(pwd)/$exe"
+	parrot --work-dir=/tmp -- "$(pwd)/$exe"
+	parrot --work-dir=/http -- "$(pwd)/$exe" && return 1
 	return 0
 }
 

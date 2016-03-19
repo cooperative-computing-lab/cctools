@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 parrot_debug=parrot.debug
 
@@ -8,7 +9,7 @@ expected=expected.txt
 output=output.txt
 
 search() {
-  ../src/parrot_run --debug=all --debug-file="$parrot_debug" --debug-rotate-max=0 --timeout=5 ../src/parrot_search "$@"
+  parrot --timeout=5 ../src/parrot_search "$@"
 }
 
 prepare()

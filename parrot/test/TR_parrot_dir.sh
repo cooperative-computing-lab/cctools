@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe="dir.test"
 
@@ -93,7 +94,7 @@ run()
 {
 	set -e
 	./"$exe"
-	../src/parrot_run -d syscall -- ./"$exe"
+	parrot -- ./"$exe"
 	return $?
 }
 

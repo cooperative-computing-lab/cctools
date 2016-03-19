@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe="mmap.test"
 
@@ -108,7 +109,7 @@ EOF
 
 run()
 {
-	../src/parrot_run -d all -- ./"$exe"
+	parrot -- ./"$exe"
 	return $?
 }
 

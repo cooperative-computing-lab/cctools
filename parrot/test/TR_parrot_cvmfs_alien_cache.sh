@@ -1,6 +1,7 @@
 #! /bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 export PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES="yes"
 export HTTP_PROXY=http://eddie.crc.nd.edu:3128
@@ -18,12 +19,12 @@ prepare()
 
 run()
 {
-	if ../src/parrot_run --check-driver cvmfs
+	if parrot --check-driver cvmfs
 	then
-		../src/parrot_run -t${tmp_dir_master} -dcvmfs sh -c "head $test_file > /dev/null; sleep 10" &
+		parrot -t${tmp_dir_master} -- sh -c "head $test_file > /dev/null; sleep 10" &
 		pid_master=$!
 
-		../src/parrot_run -t${tmp_dir_hitcher} -dcvmfs --cvmfs-alien-cache=${tmp_dir_master}/cvmfs sh -c "stat $test_file"
+		parrot -t${tmp_dir_hitcher} --cvmfs-alien-cache=${tmp_dir_master}/cvmfs -- sh -c "stat $test_file"
 		status=$?
 
 		kill $pid_master
