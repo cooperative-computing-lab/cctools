@@ -251,4 +251,14 @@ int parrot_unmount ( const char *path )
 #endif
 }
 
+ssize_t parrot_version ( char *buf, size_t len )
+{
+#ifdef CCTOOLS_CPU_I386
+	return syscall(SYSCALL32_parrot_version,buf,len);
+#else
+	return syscall(SYSCALL64_parrot_version,buf,len);
+#endif
+}
+
+
 /* vim: set noexpandtab tabstop=4: */

@@ -3363,6 +3363,22 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			}
 			break;
 
+		case SYSCALL32_parrot_version:
+			if (entering) {
+				void *uaddr = POINTER(args[0]);
+				size_t len = args[1];
+
+				if (uaddr) {
+					char buffer[4096];
+					p->syscall_result = MIN((size_t)snprintf(buffer, sizeof(buffer), "%s", CCTOOLS_VERSION),len);
+					TRACER_MEM_OP(tracer_copy_out(p->tracer,buffer,uaddr,p->syscall_result,TRACER_O_ATOMIC));
+					divert_to_dummy(p,p->syscall_result);
+				} else {
+					divert_to_dummy(p,0);
+				}
+			}
+			break;
+
 		/* These things are not currently permitted.
 		 */
 
