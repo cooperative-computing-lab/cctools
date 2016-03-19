@@ -7,6 +7,8 @@ See the file COPYING for details.
 #ifndef PFS_SEARCH_H
 #define PFS_SEARCH_H
 
+#include <sys/stat.h>
+
 #include <stdlib.h>
 
 struct searchent {

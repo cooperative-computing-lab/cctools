@@ -8,7 +8,6 @@ See the file COPYING for details.
 
 #include "tracer.table.h"
 #include "tracer.table64.h"
-#include "int_sizes.h"
 
 #include <unistd.h>
 
@@ -72,7 +71,7 @@ int parrot_cp( const char *source, const char *dest )
 #endif
 }
 
-int parrot_mkalloc( const char *path, INT64_T size, mode_t mode )
+int parrot_mkalloc( const char *path, int64_t size, mode_t mode )
 {
 #ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_mkalloc,path,&size,mode);
@@ -81,7 +80,7 @@ int parrot_mkalloc( const char *path, INT64_T size, mode_t mode )
 #endif
 }
 
-int parrot_lsalloc( const char *path, char *alloc_path, INT64_T *total, INT64_T *inuse )
+int parrot_lsalloc( const char *path, char *alloc_path, int64_t *total, int64_t *inuse )
 {
 #ifdef CCTOOLS_CPU_I386
 	return syscall(SYSCALL32_parrot_lsalloc,path,alloc_path,total,inuse);
