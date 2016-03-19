@@ -23,9 +23,9 @@ prepare()
 
 void dumpmaps (void)
 {
-	char buf[4096];
+	char buf[65536] = "";
 	int fd = open("/proc/self/maps", O_RDONLY);
-	read(fd, buf, sizeof(buf));
+	read(fd, buf, sizeof(buf)-1);
 	write(STDOUT_FILENO, buf, strlen(buf));
 	close(fd);
 }
@@ -33,6 +33,8 @@ void dumpmaps (void)
 int main (int argc, char *argv[])
 {
 	int i;
+	void *mappings[65536] = {NULL};
+
 	/* Test that we can allocate mmap lots of files without hitting _SC_OPEN_MAX fd limit. */
 	for (i = 0; i < (int)sysconf(_SC_OPEN_MAX)+1; i++) {
 		int fd = open("/dev/zero", O_RDWR, S_IRUSR|S_IWUSR);
@@ -40,8 +42,8 @@ int main (int argc, char *argv[])
 			fprintf(stderr, "= -1 [%s] open(...)\n", strerror(errno));
 			abort();
 		}
-		char *file = mmap(NULL, 4096, PROT_READ,MAP_FILE|MAP_PRIVATE,fd,0);
-		if (file == NULL) {
+		mappings[i] = mmap(NULL, 4096, PROT_READ,MAP_FILE|MAP_PRIVATE, fd, 0);
+		if (mappings[i] == NULL) {
 			fprintf(stderr, "NULL [%s] = mmap(...)\n", strerror(errno));
 			abort();
 		}
@@ -50,8 +52,11 @@ int main (int argc, char *argv[])
 			abort();
 		}
 	}
+	for (i = 0; mappings[i]; i++)
+		mappings[i] = (munmap(mappings[i], 4096), NULL);
 
 	/* before split */
+	fprintf(stderr, "---\\n");
 	{
 		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
 		int fd = mkstemp(f);
@@ -69,6 +74,7 @@ int main (int argc, char *argv[])
 	}
 
 	/* after split */
+	fprintf(stderr, "---\\n");
 	{
 		char f[PATH_MAX] = "/tmp/foo.XXXXXX";
 		int fd = mkstemp(f);
