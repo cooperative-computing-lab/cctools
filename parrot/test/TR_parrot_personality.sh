@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 name=`basename "$0" .sh`
 exe="$name.test"
@@ -34,7 +35,7 @@ EOF
 
 run()
 {
-	../src/parrot_run ./"$exe"
+	parrot ./"$exe"
 	return $?
 }
 

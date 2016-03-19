@@ -3,6 +3,7 @@
 set -e
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 . ../../chirp/test/chirp-common.sh
 CHIRP_SERVER=../../chirp/src/chirp_server
 
@@ -12,7 +13,7 @@ expected=expected.txt
 output=output.txt
 
 psearch() {
-	../src/parrot_run --no-chirp-catalog --debug=all --debug-file="$parrot_debug" --timeout=5 ../src/parrot_search "$@"
+	parrot --no-chirp-catalog --timeout=5 ../src/parrot_search "$@"
 }
 
 prepare()

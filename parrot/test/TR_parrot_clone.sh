@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe="${0}.test"
 
@@ -47,7 +48,7 @@ EOF
 
 run()
 {
-	../src/parrot_run -d all -- ./"$exe" && return 1
+	parrot -- ./"$exe" && return 1
 	return 0
 }
 

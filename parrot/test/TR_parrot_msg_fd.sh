@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe="socket.test"
 
@@ -113,7 +114,7 @@ EOF
 
 run()
 {
-	../src/parrot_run -d syscall -- ./"$exe"
+	parrot -- ./"$exe"
 	return $?
 }
 

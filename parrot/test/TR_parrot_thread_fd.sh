@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe="$0.test"
 
@@ -38,7 +39,6 @@ void *addpipe (void *arg)
 	return NULL;
 }
 
-
 void test (void *(*f)(void *))
 {
 	int fd = open("/dev/null", O_RDONLY);
@@ -74,7 +74,7 @@ EOF
 
 run()
 {
-	../src/parrot_run -- ./"$exe"
+	parrot -- ./"$exe"
 	return $?
 }
 

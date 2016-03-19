@@ -1,6 +1,7 @@
 #!/bin/sh
 
 . ../../dttools/test/test_runner_common.sh
+. ./parrot-test.sh
 
 exe=$PWD/parrot_fake_setuid.$PPID
 
@@ -80,7 +81,7 @@ EOF
 
 run()
 {
-	../src/parrot_run --fake-setuid -U 0 -G 0 -- "$exe"
+	parrot --fake-setuid -U 0 -G 0 -- "$exe"
 	return $?
 }
 
