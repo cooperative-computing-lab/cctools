@@ -121,11 +121,12 @@ HEADERS_PUBLIC = \
 	rmsummary.h \
 	timestamp.h
 
-LIBRARIES = libdttools.a libforce_halt_enospc.so
+LIBRARIES = libdttools.a
+PRELOAD_LIBRARIES = libforce_halt_enospc.so
 OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = catalog_update catalog_server watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
-TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
+TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
 TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun
 
 all: $(TARGETS)
@@ -150,7 +151,7 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(SCRIPTS) $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	cp $(LIBRARIES) $(PRELOAD_LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(HEADERS_PUBLIC) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 
