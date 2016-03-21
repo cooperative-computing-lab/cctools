@@ -42,7 +42,7 @@ static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char
 				if(p->key->type==JX_STRING && p->value->type==JX_STRING) {
 					env_assignment = string_format("%s=%s", p->key->u.string_value,p->value->u.string_value);
 					escaped_env_assignment = string_escape_shell(env_assignment);
-					fprintf(log, escaped_env_assignment);
+					fprintf(log, "%s", escaped_env_assignment);
 					fprintf(log, " ");
 					free(env_assignment);
 					free(escaped_env_assignment);
