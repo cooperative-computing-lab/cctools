@@ -53,6 +53,8 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 			return jx_boolean(a||b);
 		case JX_OP_NOT:
 			return jx_boolean(!b);
+		case JX_OP_LOOKUP:
+			return jx_null();
 		default:
 			return jx_boolean(0);
 	}
@@ -164,11 +166,49 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 }
 
 /*
+Handle a lookup operator, which has two valid cases:
+1 - left is an object, right is a string, return the named item in the object.
+2 - left is an array, right is an integer, return the nth item in the array.
+*/
+
+static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
+{
+	if(left->type==JX_OBJECT && right->type==JX_STRING) {
+		struct jx *r = jx_lookup(left,right->u.string_value);
+		if(r) {
+			return jx_copy(r);
+		} else {
+			return jx_null();
+		}
+	} else if(left->type==JX_ARRAY && right->type==JX_INTEGER) {
+		struct jx_item *item = left->u.items;
+		int count = right->u.integer_value;
+
+		if(count<0) return jx_null();
+
+		while(count>0) {
+			if(!item) return jx_null();
+			item = item->next;
+			count--;
+		}
+
+		if(item) {
+			return jx_copy(item->value);
+		} else {
+			return jx_null();
+		}
+	} else {
+		return jx_null();
+	}
+}
+
+/*
 Type conversion rules:
 Generally, operators are not meant to be applied to unequal types.
 NULL is the result of an operator on two incompatible expressions.
 Exception: When x and y are incompatible types, x==y returns FALSE and x!=y returns TRUE.
 Exception: integers are promoted to doubles as needed.
+Exception: The lookup operation can be "object[string]" or "array[integer]"
 */
 
 static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
@@ -195,6 +235,11 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_delete(left);
 			jx_delete(right);
 			return jx_boolean(1);
+		} else if(o->type==JX_OP_LOOKUP) {
+			struct jx *r = jx_eval_lookup(left,right);
+			jx_delete(left);
+			jx_delete(right);
+			return r;
 		} else {
 			jx_delete(left);
 			jx_delete(right);
