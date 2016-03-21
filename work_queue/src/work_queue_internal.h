@@ -50,3 +50,4 @@ void work_queue_broadcast_message(struct work_queue *q, const char *msg);
 
 /* shortcut to set cores, memory, disk, etc. from a single function. */
 void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *rm);
+

@@ -106,9 +106,9 @@ typedef enum {
 
 typedef enum {
 	MON_DISABLED = 0,
-	MON_SINGLE_FILE,
-	MON_SINGLE_FILE_NO_KEEP,
-	MON_FULL
+	MON_SINGLE_FILE,      /* accumulate all summary files to a single file. */
+	MON_NO_KEEP,          /* fill task->resources_measured, but delete summary file. */
+	MON_FULL              /* accumulate to a single file, and generate series and monitorin debug output. */
 } work_queue_monitoring_mode;
 
 // Threshold for available disk space (MB) beyond which files are not received from worker.
@@ -1205,8 +1205,18 @@ static void delete_uncacheable_files( struct work_queue *q, struct work_queue_wo
 	delete_worker_files(q, w, t->output_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
 }
 
+char *monitor_file_name(struct work_queue *q, struct work_queue_task *t, const char *ext) {
+	if(t->monitor_output_file && strcmp(".summary", ext) == 0) {
+		return xxstrdup(t->monitor_output_file);
+	} else {
+		return string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME "%s",
+				q->monitor_output_dirname, getpid(), t->taskid, ext ? ext : "");
+	}
+}
+
 void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
-	char *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
+
+	char *summary = monitor_file_name(q, t, ".summary");
 
 	if(t->resources_measured)
 		rmsummary_delete(t->resources_measured);
@@ -1229,12 +1239,12 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 	if(q->monitor_mode == MON_DISABLED)
 		return;
 
-	struct flock lock;
-	char        *summary = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".summary", q->monitor_output_dirname, getpid(), t->taskid);
+	char *summary = monitor_file_name(q, t, ".summary");
 
-	if(q->monitor_mode != MON_SINGLE_FILE_NO_KEEP) {
+	if(q->monitor_mode != MON_NO_KEEP) {
 		int monitor_fd = fileno(q->monitor_file);
 
+		struct flock lock;
 		lock.l_type   = F_WRLCK;
 		lock.l_start  = 0;
 		lock.l_whence = SEEK_SET;
@@ -1261,8 +1271,8 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 		fcntl(monitor_fd, F_SETLK, &lock);
 	}
 
-	/* Remove individual summary file if only keeping single file. */
-	if(q->monitor_mode != MON_FULL) {
+	/* Remove individual summary file unless it is named specifically. */
+	if(!t->monitor_output_file) {
 		unlink(summary);
 	}
 
@@ -1270,8 +1280,8 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 }
 
 void resource_monitor_compress_logs(struct work_queue *q, struct work_queue_task *t) {
-	char *series    = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".series", q->monitor_output_dirname, getpid(), t->taskid);
-	char *debug_log = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME ".debug", q->monitor_output_dirname, getpid(), t->taskid);
+	char *series    = monitor_file_name(q, t, ".series");
+	char *debug_log = monitor_file_name(q, t, ".debug");
 
 	char *command = string_format("gzip -9 -q %s %s", series, debug_log);
 
@@ -3494,6 +3504,8 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->resource_request   = CATEGORY_ALLOCATION_UNLABELED;
 	t->resources_measured = NULL;
 
+	t->monitor_output_file = NULL;
+
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured  = rmsummary_create(-1);
@@ -3532,6 +3544,10 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   if(task->resources_measured) {
 	  new->resources_measured = malloc(sizeof(struct rmsummary));
 	  memcpy(new->resources_measured, task->resources_measured, sizeof(sizeof(struct rmsummary)));
+  }
+
+  if(task->monitor_output_file) {
+	new->monitor_output_file = xxstrdup(task->monitor_output_file);
   }
 
   if(task->output) {
@@ -4105,6 +4121,19 @@ void work_queue_task_specify_priority( struct work_queue_task *t, double priorit
 	t->priority = priority;
 }
 
+void work_queue_task_specify_monitor_output(struct work_queue_task *t, const char *monitor_output_file) {
+
+	if(!monitor_output_file) {
+		fatal("Error: no monitor_output_file was specified.");
+	}
+
+	if(t->monitor_output_file) {
+		free(t->monitor_output_file);
+	}
+
+	t->monitor_output_file = xxstrdup(monitor_output_file);
+}
+
 void work_queue_file_delete(struct work_queue_file *tf) {
 	if(tf->payload)
 		free(tf->payload);
@@ -4202,6 +4231,9 @@ void work_queue_task_delete(struct work_queue_task *t)
 			rmsummary_delete(t->resources_requested);
 		if(t->resources_measured)
 			rmsummary_delete(t->resources_measured);
+		if(t->monitor_output_file)
+			free(t->monitor_output_file);
+
 		free(t);
 	}
 }
@@ -4353,48 +4385,48 @@ struct work_queue *work_queue_create(int port)
 
 int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory)
 {
-  if(!q)
-	return 0;
+	if(!q)
+		return 0;
 
-  q->monitor_mode = MON_DISABLED;
-  q->monitor_exe = resource_monitor_locate(NULL);
+	q->monitor_mode = MON_DISABLED;
+	q->monitor_exe = resource_monitor_locate(NULL);
 
-  if(!q->monitor_exe)
-  {
-	warn(D_WQ, "Could not find the resource monitor executable. Disabling monitoring.\n");
-	return 0;
-  }
+	if(!q->monitor_exe)
+	{
+		warn(D_WQ, "Could not find the resource monitor executable. Disabling monitoring.\n");
+		return 0;
+	}
 
-  if(monitor_output_directory) {
-	  q->monitor_output_dirname = xxstrdup(monitor_output_directory);
-  } else {
-	  q->monitor_output_dirname = xxstrdup("./");
-  }
+	if(monitor_output_directory) {
+		q->monitor_output_dirname = xxstrdup(monitor_output_directory);
+	} else {
+		q->monitor_output_dirname = xxstrdup("./");
+	}
 
+	if(!create_dir(q->monitor_output_dirname, 0777)) {
+		fatal("Could not create monitor output directory - %s (%s)", q->monitor_output_dirname, strerror(errno));
+	}
 
-  if(!create_dir(q->monitor_output_dirname, 0777)) {
-	  fatal("Could not create monitor output directory - %s (%s)", q->monitor_output_dirname, strerror(errno));
-  }
+	if(q->measured_local_resources)
+		free(q->measured_local_resources);
 
-  if(q->measured_local_resources)
-	  free(q->measured_local_resources);
-  q->measured_local_resources = rmonitor_measure_process(getpid());
+	q->measured_local_resources = rmonitor_measure_process(getpid());
 
-  if(monitor_output_directory) {
-	  q->monitor_summary_filename = string_format("%s/wq-%d.summaries", q->monitor_output_dirname, getpid());
-	  q->monitor_file             = fopen(q->monitor_summary_filename, "a");
+	if(monitor_output_directory) {
+		q->monitor_summary_filename = string_format("%s/wq-%d.summaries", q->monitor_output_dirname, getpid());
+		q->monitor_file             = fopen(q->monitor_summary_filename, "a");
 
-	  if(!q->monitor_file)
-	  {
-		  fatal("Could not open monitor log file for writing: '%s'\n", q->monitor_summary_filename);
-	  }
+		if(!q->monitor_file)
+		{
+			fatal("Could not open monitor log file for writing: '%s'\n", q->monitor_summary_filename);
+		}
 
-	  q->monitor_mode = MON_SINGLE_FILE;
-  } else {
-	  q->monitor_mode = MON_SINGLE_FILE_NO_KEEP;
-  }
+		q->monitor_mode = MON_SINGLE_FILE;
+	} else {
+		q->monitor_mode = MON_NO_KEEP;
+	}
 
-  return 1;
+	return 1;
 }
 
 int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory) {
@@ -4628,7 +4660,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 	if(!q->measured_local_resources->exit_type)
 		q->measured_local_resources->exit_type = xxstrdup("normal");
 
-	if(q->monitor_mode && q->monitor_mode != MON_SINGLE_FILE_NO_KEEP) {
+	if(q->monitor_mode && q->monitor_mode != MON_NO_KEEP) {
 		fclose(q->monitor_file);
 
 		char template[] = "rmonitor-summaries-XXXXXX";
@@ -4679,16 +4711,15 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 }
 
 void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *t) {
-	char *template = string_format("%s/" RESOURCE_MONITOR_TASK_LOCAL_NAME, q->monitor_output_dirname, getpid(), t->taskid);
 	work_queue_task_specify_file(t, q->monitor_exe, RESOURCE_MONITOR_REMOTE_NAME, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 
-	char *summary  = string_format("%s.summary", template);
+	char *summary  = monitor_file_name(q, t, ".summary");
 	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 	free(summary);
 
 	if(q->monitor_mode == MON_FULL) {
-		char *debug  = string_format("%s.debug",   template);
-		char *series = string_format("%s.series",  template);
+		char *debug  = monitor_file_name(q, t, ".debug");
+		char *series = monitor_file_name(q, t, ".series");
 
 		work_queue_task_specify_file(t, debug, RESOURCE_MONITOR_REMOTE_NAME ".debug",   WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 		work_queue_task_specify_file(t, series, RESOURCE_MONITOR_REMOTE_NAME ".series", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
@@ -4697,7 +4728,6 @@ void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *
 		free(series);
 	}
 
-	free(template);
 }
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits)

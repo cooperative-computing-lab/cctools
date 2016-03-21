@@ -145,6 +145,8 @@ struct work_queue_task {
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
+	char *monitor_output_file;                             /**< Custom output name for the monitoring summary. If NULL, save to directory from @ref work_queue_enable_monitoring */
+
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
 
@@ -393,6 +395,13 @@ To change the scheduling algorithm for all tasks, use @ref work_queue_specify_al
 */
 void work_queue_task_specify_algorithm(struct work_queue_task *t, work_queue_schedule_t algorithm);
 
+/** Specify a custom name for the monitoring summary. If @ref work_queue_enable_monitoring is also enabled, the summary is also written to that directory.
+@param t A task object.
+@param monitor_output Resource summary file.
+*/
+
+void work_queue_task_specify_monitor_output(struct work_queue_task *t, const char *monitor_output);
+
 /** Delete a task.
 This may be called on tasks after they are returned from @ref work_queue_wait.
 @param t The task to delete.
@@ -426,17 +435,21 @@ struct work_queue *work_queue_create(int port);
 /** Enables resource monitoring on the give work queue.
 It generates a resource summary per task, which is written to the given
 directory. It also creates all_summaries-PID.log, that consolidates all
-summaries into a single.
+summaries into a single. If monitor_output_dirname is NULL, work_queue_task is
+updated with the resources measured, and no summary file is kept unless
+explicitely given by work_queue_task's monitor_output_file.
 @param q A work queue object.
-@param monitor_output_dirname The name of the output directory.
+@param monitor_output_dirname The name of the output directory. If NULL, no
+summary file is kept, but resources_measured from work_queue_task is updated.
 @return 1 on success, 0 if monitoring was not enabled.
 */
-int work_queue_enable_monitoring(struct work_queue *q, char *monitor_summary_file);
-
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dirname);
 
 /** Enables resource monitoring on the give work queue.
-As @ref work_queue_enable_monitoring, but it generates a time series and a monitor debug file (WARNING: for long running tasks these files may reach gigabyte sizes.)
-@param q A work queue object.
+As @ref work_queue_enable_monitoring, but it generates a time series and a
+monitor debug file (WARNING: for long running tasks these files may reach
+gigabyte sizes. This function is mostly used for debugging.) @param q A work
+queue object.
 @param monitor_output_dirname The name of the output directory.
 @return 1 on success, 0 if monitoring was not enabled.
 */
