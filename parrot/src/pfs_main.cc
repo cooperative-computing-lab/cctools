@@ -451,7 +451,6 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 					if(p->nsyscalls == 0) { /* stop before we begin running the process */
 						debug(D_DEBUG, "suppressing bootstrap SIGSTOP for %d",pid);
 						signum = 0; /* suppress delivery */
-						kill(p->pid,SIGCONT);
 					}
 					break;
 				case SIGTSTP:
