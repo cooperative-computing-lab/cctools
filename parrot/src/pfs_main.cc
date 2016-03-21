@@ -1170,6 +1170,7 @@ int main( int argc, char *argv[] )
 		if (!WIFCONTINUED(status))
 			fatal("child did not continue as expected!");
 	} else if(pid==0) {
+		setenv("PARROT_ENABLED", "TRUE", 1);
 		if (pfs_use_helper)
 			pfs_helper_init();
 		pfs_paranoia_payload();
