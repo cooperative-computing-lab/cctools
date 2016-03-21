@@ -1504,6 +1504,7 @@ int wait_for_messages(int interval)
 					int urgent = rmonitor_dispatch_msg();
 					if(urgent) {
 						timeout.tv_sec  = 0;
+						timeout.tv_usec = 0;
 					}
 				}
 			}
