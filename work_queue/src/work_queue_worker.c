@@ -38,6 +38,7 @@ See the file COPYING for details.
 #include "random.h"
 #include "url_encode.h"
 #include "md5.h"
+#include "disk_alloc.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -1248,8 +1249,13 @@ static int enforce_processes_limits() {
 			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
 			p->task_status = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
 
-			/* we delete the sandbox, to free the exhausted resource. */
-			delete_dir(p->sandbox);
+			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
+			if(p->loop_mount == 1) {
+				disk_alloc_delete(p->sandbox);
+			}
+			else {
+				delete_dir(p->sandbox);
+			}
 			return 0;
 		}
 	}
@@ -1922,7 +1928,7 @@ static const struct option long_options[] = {
 	{"debug",               required_argument,  0,  'd'},
 	{"debug-file",          required_argument,  0,  'o'},
 	{"debug-rotate-max",    required_argument,  0,  LONG_OPT_DEBUG_FILESIZE},
-	{"disk-allocation",     no_argument,        0, LONG_OPT_DISK_ALLOCATION},
+	{"disk-allocation",     no_argument,  		0,  LONG_OPT_DISK_ALLOCATION},
 	{"foreman",             no_argument,        0,  LONG_OPT_FOREMAN},
 	{"foreman-port",        required_argument,  0,  LONG_OPT_FOREMAN_PORT},
 	{"foreman-port-file",   required_argument,  0,  'Z'},
@@ -2166,8 +2172,29 @@ int main(int argc, char *argv[])
 			tar_fn = xxstrdup(optarg);
 			break;
 		case LONG_OPT_DISK_ALLOCATION:
+		{
+			char *abs_path_preloader = string_format("%s/lib/libforce_halt_enospc.so", INSTALL_PATH);
+			int preload_result;
+			char *curr_ld_preload = getenv("LD_PRELOAD");
+			if(curr_ld_preload && abs_path_preloader) {
+				char *new_ld_preload = string_format("%s:%s", curr_ld_preload, abs_path_preloader);
+				preload_result = setenv("LD_PRELOAD", new_ld_preload, 1);
+				free(new_ld_preload);
+			}
+			else if(abs_path_preloader) {
+				preload_result = setenv("LD_PRELOAD", abs_path_preloader, 1);
+			}
+			else {
+				preload_result = 1;
+			}
+			free(abs_path_preloader);
+			if(preload_result) {
+				timestamp_t preload_fail_time = timestamp_get();
+				debug(D_WQ|D_NOTICE, "i/o dynamic library linking via LD_PRELOAD for loop device failed at: %"PRId64"", preload_fail_time);
+			}
 			disk_allocation = 1;
 			break;
+		}
 		default:
 			show_help(argv[0]);
 			return 1;
