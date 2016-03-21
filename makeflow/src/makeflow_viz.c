@@ -39,6 +39,7 @@ See the file COPYING for details.
 #include "getopt_aux.h"
 #include "random.h"
 #include "path.h"
+#include "jx_pretty_print.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -49,6 +50,7 @@ enum {
 	   SHOW_DAG_DOT,
 	   SHOW_DAG_PPM,
 	   SHOW_DAG_CYTO,
+	   SHOW_DAG_JSON,
 	   SHOW_DAG_DAX
 };
 
@@ -76,6 +78,7 @@ static void show_help_viz(const char *cmd)
 	fprintf(stdout, " %-35s ppm      PPM file format for rapid iconic display\n","");
 	fprintf(stdout, " %-35s cyto     Cytoscape format for browsing and customization.\n","");
 	fprintf(stdout, " %-35s dax      DAX format for use by the Pegasus workflow manager.\n","");
+	fprintf(stdout, " %-35s json     JSON representation of the DAG.\n","");
 	fprintf(stdout, "\n");
 	fprintf(stdout, " %-30s Condense similar boxes.\n", "--dot-merge-similar");
 	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
@@ -135,6 +138,8 @@ int main(int argc, char *argv[])
 					display_mode = SHOW_DAG_CYTO;
 				} else if (strcasecmp(optarg, "dax") ==0 ) {
 					display_mode = SHOW_DAG_DAX;
+				} else if(strcasecmp(optarg, "json") == 0) {
+					display_mode = SHOW_DAG_JSON;
 				} else {
 					fatal("Unknown display option: %s\n", optarg);
 				}
@@ -221,6 +226,9 @@ int main(int argc, char *argv[])
 				break;
 			case SHOW_DAG_DAX:
 				dag_to_dax(d, path_basename(dagfile) );
+				break;
+			case SHOW_DAG_JSON:
+				jx_pretty_print_stream(dag_to_json(d), stdout);
 				break;
 			default:
 				fatal("Unknown display option.");

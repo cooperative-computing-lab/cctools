@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define DAG_VISITORS_H
 
 #include "dag.h"
+#include "jx.h"
 
 /* The dag_to_file function write a struct dag in memory to a
  * file, using the remotename names generated from
@@ -34,5 +35,9 @@ void dag_to_ppm(struct dag *d, int ppm_mode, char *ppm_option);
  * file, giving a graphical presentation of the makeflow for use in Cytoscape
  */
 void dag_to_cyto(struct dag *d, int condense_display, int change_size);
+
+/* Generate a JSON representation of the given DAG.
+ */
+struct jx *dag_to_json(struct dag *d);
 
 #endif
