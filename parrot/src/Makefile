@@ -49,7 +49,7 @@ tracer.table.c: syscall_32.tbl
 tracer.table.h: syscall_32.tbl
 	cat $< syscall_parrot.tbl | perl tracer.table.pl header 32 > $@
 
-parrot_run: $(OBJECTS_PARROT_RUN)
+parrot_run: $(OBJECTS_PARROT_RUN) libparrot_client.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_MYSQL_LDFLAGS) $(CCTOOLS_XROOTD_LDFLAGS) $(CCTOOLS_CVMFS_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 irods_reli.o: irods_reli.cc irods_reli.h

@@ -15,6 +15,10 @@ See the file COPYING for details.
 #include "pfs_table.h"
 #include "ptrace.h"
 
+extern "C" {
+#include "parrot_client.h"
+}
+
 #ifndef PTRACE_EVENT_STOP
 #  define PTRACE_EVENT_STOP 128
 #endif
@@ -147,7 +151,8 @@ enum {
 	LONG_OPT_SYSCALL_DISABLE_DEBUG,
 	LONG_OPT_VALGRIND,
 	LONG_OPT_FAKE_SETUID,
-	LONG_OPT_DYNAMIC_MOUNTS
+	LONG_OPT_DYNAMIC_MOUNTS,
+	LONG_OPT_IS_RUNNING,
 };
 
 static void get_linux_version(const char *cmd)
@@ -221,6 +226,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
 	printf( " %-30s     (default 10M, 0 disables)\n","");
 	printf( " %-30s Display version number.\n", "-v,--version");
+	printf( " %-30s Test if Parrot is already running.\n", "   --is-running");
 	printf( " %-30s Show most commonly used options.\n", "-h,--help");
 	printf("\n");
 	printf("Virtualization options:\n");
@@ -567,11 +573,6 @@ int main( int argc, char *argv[] )
 	int envdebug = 0;
 	int envauth = 0;
 
-	if(getenv("PARROT_ENABLED")) {
-		fprintf(stderr,"sorry, parrot_run cannot be run inside of itself.\n");
-		exit(EXIT_FAILURE);
-	}
-
 	random_init();
 
 	debug_config(argv[0]);
@@ -818,6 +819,7 @@ int main( int argc, char *argv[] )
 		{"username", required_argument, 0, 'u'},
 		{"valgrind", no_argument, 0, LONG_OPT_VALGRIND},
 		{"version", no_argument, 0, 'v'},
+		{"is-running", no_argument, 0, LONG_OPT_IS_RUNNING},
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
 		{"work-dir", required_argument, 0, 'w'},
@@ -1016,6 +1018,16 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_DYNAMIC_MOUNTS:
 			pfs_allow_dynamic_mounts = 1;
 			break;
+		case LONG_OPT_IS_RUNNING: {
+			char buf[4096];
+			if (parrot_version(buf, sizeof(buf)) >= 0) {
+				printf("%s\n", buf);
+				exit(EXIT_SUCCESS);
+			} else {
+				exit(EXIT_FAILURE);
+			}
+			break;
+		}
 		default:
 			show_help(argv[0]);
 			break;
@@ -1023,6 +1035,15 @@ int main( int argc, char *argv[] )
 	}
 
 	if(optind>=argc) show_help(argv[0]);
+
+	{
+		char buf[4096];
+		if (parrot_version(buf, sizeof(buf)) >= 0) {
+			fprintf(stderr, "sorry, parrot_run cannot be run inside of itself.\n");
+			fprintf(stderr, "version already running is %s.\n",buf);
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 

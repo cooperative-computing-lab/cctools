@@ -57,6 +57,7 @@ OPTION_TRIPLET(-u, username, name)Use this extended username.
 OPTION_ITEM(`    --fake-setuid')Track changes from setuid and setgid.
 OPTION_ITEM(`    --valgrind')Enable valgrind support for Parrot.
 OPTION_ITEM(`-v, --version')Display version number.
+OPTION_ITEM(`    --is-running')Test is Parrot is already running.
 OPTION_TRIPLET(-w, work-dir, dir)Initial working directory.
 OPTION_ITEM(`-W, --syscall-table')Display table of system calls trapped.
 OPTION_ITEM(`-Y, --sync-write')Force synchronous disk writes.
