@@ -1215,12 +1215,19 @@ struct jx *files_to_json(struct list *files) {
 	return result;
 }
 
+/*
+Note the odd cast here: the pointer to the file structure
+is being used as an integer entry in the itable.
+Strange, but matches the use in dag_node.c
+*/
+
 struct jx *remote_names_to_json(struct itable *r) {
-	struct dag_file *f;
+	uint64_t id;
 	char *remote;
 	struct jx *result = jx_object(NULL);
 	itable_firstkey(r);
-	while(itable_nextkey(r, (uintptr_t *) &f, (void *) &remote)) {
+	while(itable_nextkey(r, &id, (void **)&remote)) {
+		struct dag_file *f = (struct dag_file *)id;
 		jx_insert(result, jx_string(f->filename), jx_string(remote));
 	}
 	return result;
