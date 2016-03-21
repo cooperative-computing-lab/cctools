@@ -371,6 +371,7 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 			return;
 		cpid = message;
 		debug(D_PROCESS, "pid %d cloned %d",pid,cpid);
+		assert(p->nsyscalls > 0);
 
 		if(status>>8 == (SIGTRAP | (PTRACE_EVENT_FORK<<8)) || status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 			clone_files = 0;
