@@ -11,7 +11,7 @@ prepare()
 
 run()
 {
-	../src/starch -x date $sfxfile
+	../src/starch -c date -x date $sfxfile
 	exec ./$sfxfile
 }
 
