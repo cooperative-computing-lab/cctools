@@ -355,34 +355,6 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 	}
 }
 
-void makeflow_set_categories(struct dag *d) {
-	if(batch_queue_type != BATCH_QUEUE_TYPE_WORK_QUEUE)
-		return;
-
-	char *name;
-	struct category *c;
-
-	hash_table_firstkey(d->categories);
-	while(hash_table_nextkey(d->categories, &name, (void **) &c)) {
-		if(!c->max_allocation)
-			continue;
-
-		if(c->max_allocation->category) {
-			free(c->max_allocation->category);
-		}
-
-		c->max_allocation->category = xxstrdup(name);
-
-		struct jx *j = rmsummary_to_json(c->max_allocation, 0);
-		char *limits = jx_print_string(j);
-		batch_queue_set_option(remote_queue, "category-limits", limits);
-		jx_delete(j);
-		free(limits);
-	}
-}
-
-
-
 /*
 Given a file, return the string that identifies it appropriately
 for the given batch system, combining the local and remote name
@@ -1561,10 +1533,7 @@ int main(int argc, char *argv[])
 	}
 
 	makeflow_parse_input_outputs(d);
-
 	makeflow_prepare_nested_jobs(d);
-
-	makeflow_set_categories(d);
 
 	if (change_dir)
 		chdir(change_dir);

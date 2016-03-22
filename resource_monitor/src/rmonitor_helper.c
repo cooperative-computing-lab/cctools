@@ -510,6 +510,12 @@ ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
 	return real_count;
 }
 
+/* dummy handler. In RH5, SIGCONT is ignored by sigprocmask/sigtimedwait,
+ * unless handler is different than SIG_IGN. */
+void exit_signal_handler(int signum) {
+	return;
+}
+
 void exit_wrapper_preamble(int status)
 {
 	static int did_exit_wrapper = 0;
@@ -533,6 +539,8 @@ void exit_wrapper_preamble(int status)
 	msg.origin = getpid();
 	msg.data.n = status;
 
+	sighandler_t old_handler = signal(SIGCONT, exit_signal_handler);
+
 	int blocking_signals = 0;
 	if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
 		blocking_signals = 1;
@@ -543,8 +551,12 @@ void exit_wrapper_preamble(int status)
 	if(blocking_signals) {
 		debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
 		sigtimedwait(&all_signals, NULL, &timeout);
+		signal(SIGCONT, old_handler);
 		sigprocmask(SIG_SETMASK, &old_signals, NULL);
+	} else {
+		signal(SIGCONT, old_handler);
 	}
+
 
 	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }
