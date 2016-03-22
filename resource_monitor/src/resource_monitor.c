@@ -1101,7 +1101,7 @@ void cleanup_zombies(void)
 
 void release_waiting_process(uint64_t pid)
 {
-	debug(D_RMON, "sendig SIGCONT to %" PRIu64 ".", pid);
+	debug(D_RMON, "sending SIGCONT to %" PRIu64 ".", pid);
 	kill((pid_t) pid, SIGCONT);
 }
 
