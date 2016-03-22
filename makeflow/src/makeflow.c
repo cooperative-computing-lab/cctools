@@ -1499,16 +1499,13 @@ int main(int argc, char *argv[])
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
-		int logfd;
-		if ((logfd = creat(batchlogfilename, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) < 0) {
-			fatal("unable to open log file %s\n", batchlogfilename);
-		} else {
-			dprintf(logfd, "#!/bin/sh\n");
-			dprintf(logfd, "set -x\n");
-			dprintf(logfd, "set -e\n");
-			dprintf(logfd, "\n# %s version %s (released %s)\n\n", argv[0], CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
-			close(logfd);
-		}
+		FILE *file = fopen(batchlogfilename,"w");
+		if(!file) fatal("unable to open log file %s: %s\n", batchlogfilename, strerror(errno));
+		fprintf(file, "#!/bin/sh\n");
+		fprintf(file, "set -x\n");
+		fprintf(file, "set -e\n");
+		fprintf(file, "\n# %s version %s (released %s)\n\n", argv[0], CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
+		fclose(file);
 	}
 
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
