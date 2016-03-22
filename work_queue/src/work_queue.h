@@ -145,7 +145,7 @@ struct work_queue_task {
 
 	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
 
-	char *monitor_output_file;                             /**< Custom output name for the monitoring summary. If NULL, save to directory from @ref work_queue_enable_monitoring */
+	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref work_queue_enable_monitoring */
 
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
@@ -439,11 +439,12 @@ summaries into a single. If monitor_output_dirname is NULL, work_queue_task is
 updated with the resources measured, and no summary file is kept unless
 explicitely given by work_queue_task's monitor_output_file.
 @param q A work queue object.
-@param monitor_output_dirname The name of the output directory. If NULL, no
-summary file is kept, but resources_measured from work_queue_task is updated.
-@return 1 on success, 0 if monitoring was not enabled.
+@param monitor_output_dirname The name of the output directory. If NULL,
+summaries are kept only when monitor_output_directory is specify per task, but
+resources_measured from work_queue_task is updated.  @return 1 on success, 0 if
+monitoring was not enabled.
 */
-int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dirname);
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory);
 
 /** Enables resource monitoring on the give work queue.
 As @ref work_queue_enable_monitoring, but it generates a time series and a

@@ -260,9 +260,9 @@ class Task(_object):
         return work_queue_task_specify_enviroment_variable(self._task,name,value)
 
     ##
-    # Set a name for the resource summary output from the monitor.
-    def specify_monitor_output( self, filename ):
-        return work_queue_task_specify_monitor_output(self._task,filename)
+    # Set a name for the resource summary output directory from the monitor.
+    def specify_monitor_output( self, directory ):
+        return work_queue_task_specify_monitor_output(self._task,directory)
 
     ##
     # Get the user-defined logical name for the task.

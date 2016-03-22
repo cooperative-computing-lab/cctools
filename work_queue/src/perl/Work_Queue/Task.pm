@@ -229,8 +229,8 @@ sub specify_environment_variable {
 }
 
 sub specify_monitor_output {
-	my ($self, $filename) = @_;
-	return work_queue_task_specify_monitor_output($self->{_task}, $filename);
+	my ($self, $directory) = @_;
+	return work_queue_task_specify_monitor_output($self->{_task}, $directory);
 }
 
 sub tag {
@@ -782,13 +782,13 @@ Value of the environment variable. Variable is unset if value is not given.
 
 =head3 C<specify_monitor_output>
 
-Set a name for the resource summary output from the monitor.
+Set the directory name for the resource output from the monitor.
 
 =over 12
 
-=item filename
+=item directory
 
-Name of the resource summary.
+Name of the directory.
 
 =back
 
