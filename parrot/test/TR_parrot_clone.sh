@@ -7,12 +7,13 @@ exe="${0}.test"
 
 prepare()
 {
-	gcc -I../src/ -g -o "$exe" -x c - -x none -lm <<EOF
+	gcc -I../src/ -g -o "$exe" -x c - -x none -lpthread -lm <<EOF
 #define _GNU_SOURCE
+
+#include <pthread.h>
 
 #include <fcntl.h>
 #include <sched.h>
-#include <syscall.h>
 #include <unistd.h>
 
 #include <sys/wait.h>
@@ -25,21 +26,39 @@ prepare()
 #include <stdlib.h>
 #include <string.h>
 
-int fn (void *arg)
+void *fn (void *arg)
 {
 	(void)arg;
-	sleep(1);
-	return 0;
+	sched_yield();
+	fork();
+	return NULL;
+}
+
+void testparallel (void)
+{
+	int i;
+	for (i = 0; i < 1000; i++) {
+		pthread_t id;
+		pthread_attr_t attr[1];
+		pthread_attr_init(attr);
+		pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED);
+		pthread_create(&id, attr, fn, NULL);
+	}
 }
 
 int main (int argc, char *argv[])
 {
-	int status;
-	int flags = SIGCHLD|CLONE_VM|CLONE_SIGHAND|CLONE_PARENT|CLONE_THREAD|CLONE_FILES|CLONE_FS;
-	char *stk = malloc(1<<20);
-	pid_t pid = clone(fn, stk+(1<<20), flags|CLONE_UNTRACED, NULL); /* should cause Parrot to quit */
-	fprintf(stderr, "cloned %d\\n", (int)pid);
-	sleep(2);
+	int i;
+	for (i = 0; i < 1; i++) {
+		pid_t pid = fork();
+		if (pid == 0) {
+			testparallel();
+			_exit(EXIT_SUCCESS);
+		} else if (pid > 0) {
+			int status;
+			waitpid(pid, &status, 0);
+		} else abort();
+	}
 	return 0;
 }
 EOF
@@ -48,7 +67,11 @@ EOF
 
 run()
 {
-	parrot -- ./"$exe" && return 1
+	set -e
+	for i in $(seq 5); do
+		parrot -- ./"$exe" &
+	done
+	wait
 	return 0
 }
 
