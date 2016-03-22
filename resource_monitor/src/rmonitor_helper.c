@@ -520,6 +520,8 @@ void exit_wrapper_preamble(int status)
 	did_exit_wrapper = 1;
 
 	sigset_t all_signals;
+	sigset_t old_signals;
+
 	sigfillset(&all_signals);
 	struct timespec timeout = {.tv_sec = 10, .tv_nsec = 0};
 
@@ -531,12 +533,17 @@ void exit_wrapper_preamble(int status)
 	msg.origin = getpid();
 	msg.data.n = status;
 
+	int blocking_signals = 0;
+	if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
+		blocking_signals = 1;
+	}
+
 	send_monitor_msg(&msg);
 
-	if(sigprocmask(SIG_SETMASK, &all_signals, NULL) != -1) {
-		/* Wait at most timeout for monitor to send SIGCONT */
+	if(blocking_signals) {
 		debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
 		sigtimedwait(&all_signals, NULL, &timeout);
+		sigprocmask(SIG_SETMASK, &old_signals, NULL);
 	}
 
 	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
