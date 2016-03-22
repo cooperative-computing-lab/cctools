@@ -2176,7 +2176,8 @@ int main(int argc, char *argv[])
 
 	makeflow_parse_input_outputs(d);
 
-	makeflow_prepare_node_sizes(d, storage_print);
+	if(storage_print || storage_limit)
+		makeflow_prepare_node_sizes(d, storage_print);
 
 	makeflow_prepare_nested_jobs(d);
 
