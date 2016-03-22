@@ -1227,7 +1227,7 @@ struct jx *remote_names_to_json(struct itable *r) {
 	struct jx *result = jx_object(NULL);
 	itable_firstkey(r);
 	while(itable_nextkey(r, &id, (void **)&remote)) {
-		struct dag_file *f = (struct dag_file *)id;
+		struct dag_file *f = (struct dag_file *)(uintptr_t)id;
 		jx_insert(result, jx_string(f->filename), jx_string(remote));
 	}
 	return result;
