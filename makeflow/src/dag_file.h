@@ -27,7 +27,6 @@ typedef enum {
 } dag_file_state_t;
 
 
-
 typedef enum {
 	DAG_FILE_TYPE_INPUT,       /* File has no rule that creates it or is specified as input.
                                   No input files are cleaned in garbage collection */

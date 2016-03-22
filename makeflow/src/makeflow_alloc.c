@@ -6,6 +6,7 @@
 
 #include "stringtools.h"
 
+#include "dag_file.h"
 #include "dag_node.h"
 #include "makeflow_alloc.h"
 
@@ -109,16 +110,26 @@ int makeflow_alloc_try_grow_alloc( struct makeflow_alloc *a, uint64_t inc)
 uint64_t makeflow_alloc_node_size( struct makeflow_alloc *a, struct dag_node *cur_node, struct dag_node *n)
 {
 	uint64_t alloc_size;
+	uint64_t freed_space = 0;
+	struct dag_file *f;
+	if(n->footprint_min_type != DAG_NODE_FOOTPRINT_RUN){
+		list_first_item(n->source_files);
+		while((f = list_next_item(n->source_files))){
+			if(f->reference_count == 1){
+				freed_space += dag_file_size(f);
+			}
+		}
+	}
 
 	switch(a->enabled){
 		case MAKEFLOW_ALLOC_TYPE_SIZE:
 			alloc_size = n->target_size;
 			break;
 		case MAKEFLOW_ALLOC_TYPE_MIN:
-			alloc_size = cur_node->footprint_min_size;
+			alloc_size = cur_node->footprint_min_size - freed_space;
 			break;
 		case MAKEFLOW_ALLOC_TYPE_MAX:
-			alloc_size = cur_node->footprint_max_size;
+			alloc_size = cur_node->footprint_max_size - freed_space;
 			break;
 		default:
 			alloc_size = 0;

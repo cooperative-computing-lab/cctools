@@ -732,9 +732,11 @@ void dag_node_min_footprint( struct dag_node *n)
 	if(n->delete_footprint <= n->prog_min_footprint){
 		n->footprint_min_size = n->delete_footprint;
 		n->footprint_min_files = set_duplicate(n->delete_files);
+		n->footprint_min_type = DAG_NODE_FOOTPRINT_DELETE;
 	} else {
 		n->footprint_min_size = n->prog_min_footprint;
 		n->footprint_min_files = set_duplicate(n->prog_min_files);
+		n->footprint_min_type = DAG_NODE_FOOTPRINT_DESC;
 	}
 
 	n->self_res = n->target_size;
@@ -746,6 +748,7 @@ void dag_node_min_footprint( struct dag_node *n)
 		set_delete(n->footprint_min_files);
 		n->footprint_min_size = n->run_footprint;
 		n->footprint_min_files = set_duplicate(n->run_files);
+		n->footprint_min_type = DAG_NODE_FOOTPRINT_RUN;
 	}
 }
 

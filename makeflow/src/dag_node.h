@@ -22,6 +22,13 @@ typedef enum {
 	DAG_NODE_STATE_MAX
 } dag_node_state_t;
 
+typedef enum {
+	DAG_NODE_FOOTPRINT_RUN = 0,
+	DAG_NODE_FOOTPRINT_DELETE,
+	DAG_NODE_FOOTPRINT_DESC
+} dag_node_footprint_t;
+
+
 /* struct dag_node implements a linked list of nodes. A dag_node
  * represents a production rule from source files to target
  * files. The actual dag structure is given implicitly by the
@@ -81,11 +88,14 @@ struct dag_node {
 
 	struct set *footprint_min_files;/* Set of nodes that define the min footprint */
 	uint64_t footprint_min_size;	/* Size of the minimum defined footprint */
+	dag_node_footprint_t footprint_min_type; /* Type that defines which footprint was chosen */
 
 	struct set *footprint_max_files;/* Set of nodes that define the max footprint */
 	uint64_t footprint_max_size;	/* Size of the largest defined footprint */
+	dag_node_footprint_t footprint_max_type; /* Type that defines which footprint was chosen */
 
 	uint64_t footprint_size;		/* Size decided upon by the user as the footprint between min and max */
+	dag_node_footprint_t footprint_type; /* Type that defines which footprint was chosen */
 
 	uint64_t self_res;
 	uint64_t res;
