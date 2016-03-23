@@ -398,6 +398,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 	}
 
 	dag_node_determine_children(n);
+	dag_node_reset_updated(n);
 	dag_node_prepare_node_terminal_files(n);
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
@@ -597,7 +598,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 
 	if(makeflow_alloc_commit_space(storage_allocation, n)){
 		makeflow_log_alloc_event(d, storage_allocation);
-	} else {
+	} else if (storage_allocation->locked)  {
 		printf("Unable to commit enough space for execution\n");
 	}
 
@@ -976,7 +977,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 		if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
 			makeflow_log_alloc_event(d, storage_allocation);
-		} else {
+		} else if (storage_allocation->locked) {
 			printf("Unable to release space\n");
 		}
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);

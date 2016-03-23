@@ -79,12 +79,14 @@ struct dag_node {
 
 	struct set *delete_files;		/* size of dag_files of my output's and my child's */
 	uint64_t delete_footprint;		/* size of dag_files of my output's and my child's */
+	struct list *delete_run_order;			/* list of child and the order to maintain committed size */
 
 	struct set *prog_min_files;		/* Set of nodes that define the min footprint */
 	uint64_t prog_min_footprint;	/* Size of the minimum defined footprint */
 
 	struct set *prog_max_files;		/* Set of nodes that define the max footprint */
 	uint64_t prog_max_footprint;	/* Size of the largest defined footprint */
+	struct list *prog_run_order;			/* list of child and the order to maintain committed size */
 
 	struct set *footprint_min_files;/* Set of nodes that define the min footprint */
 	uint64_t footprint_min_size;	/* Size of the minimum defined footprint */
