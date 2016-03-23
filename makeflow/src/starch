@@ -51,6 +51,7 @@ SFX_EXIT_STATUS=0
 if [ -z "$SFX_DIR" ]; then
     basename=`basename $SFX_FILE`
     SFX_DIR=`hostname`.$USER.$basename.dir
+    dir_lock=".${SFX_DIR}.lock"
 
     if [ ! -z "$CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$CONDOR_SCRATCH_DIR/$SFX_DIR
@@ -67,12 +68,29 @@ if [ -z "$SFX_DIR" ]; then
     fi
 fi
 
+extract_real () {
+    archive=`awk '/^__ARCHIVE__/ {print NR + 1; exit 0; }' $SFX_FILE`
+    tail -n+$archive $SFX_FILE | tar xj -C $SFX_DIR
+    SFX_EXIT_STATUS=$?
+}
+
 extract() {
-    if [ ! -d "$SFX_DIR" -o "$SFX_EXTRACT_FORCE" -eq 1 ]; then
-        mkdir -p $SFX_DIR 2> /dev/null
-        archive=`awk '/^__ARCHIVE__/ {print NR + 1; exit 0; }' $SFX_FILE`
-        tail -n+$archive $SFX_FILE | tar xj -C $SFX_DIR
-        SFX_EXIT_STATUS=$?
+    if [ "$SFX_EXTRACT_FORCE" -eq 1 ]; then
+        mkdir -p "${SFX_DIR}" 2> /dev/null
+        extract_real
+    elif [ ! -d "${SFX_DIR}" ]; then
+        if { mkdir -p "${SFX_DIR}" && mkdir "${dir_lock}"; } 2> /dev/null; then
+            extract_real
+            rmdir "${dir_lock}"
+        else
+            while [ -d "${dir_lock}" ]; do
+                sleep 2
+            done
+        fi
+    else
+        while [ -d "${dir_lock}" ]; do
+            sleep 2
+        done
     fi
 }
 
