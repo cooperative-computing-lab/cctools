@@ -4,9 +4,14 @@ include ../../config.mk
 include ../../rules.mk
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
-LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
-OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_helper.o
-PROGRAMS = resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker rmonitor_poll_example
+
+ifeq ($(CCTOOLS_BUILD_SYS),LINUX)
+	LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
+	PROGRAMS = resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker rmonitor_poll_example
+else
+	PROGRAMS = resource_monitor_cluster resource_monitor_histograms rmonitor_poll_example
+endif
+
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 all: $(TARGETS)
@@ -37,13 +42,13 @@ resource_monitor: resource_monitor_pb.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) resource_monitor_pb.* rmonitor_piggyback.h*
+	rm -f *.o $(TARGETS) $(PROGRAMS) resource_monitor_pb.* rmonitor_piggyback.h*
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
-	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
+	[ x$(LIBRARIES) = x ] || cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib/
 
 test: all
 
