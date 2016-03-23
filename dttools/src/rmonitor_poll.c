@@ -829,7 +829,7 @@ struct rmsummary *rmonitor_measure_host(char *path) {
 
 	if(path) {
 		path_disk_size_info_get(path, &total_disk, &file_count);
-		tr->disk = total_disk;
+		tr->disk = total_disk / MEGABYTE;
 		tr->total_files = file_count;
 	}
 	host_memory_info_get(&free_mem, &total_mem);
