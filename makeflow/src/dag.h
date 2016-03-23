@@ -43,6 +43,8 @@ struct dag {
 	struct itable *remote_job_table;    /* Mapping from unique integers dag_node->jobid to nodes. */
 	int completed_files;                /* Keeps a count of the rules in state recieved or beyond. */
 	int deleted_files;                  /* Keeps a count of the files delete in GC. */
+
+	char *cache_dir;                    /* The dirname of the cache storing all the deps specified in the mountfile */
 };
 
 struct dag *dag_create();
@@ -66,5 +68,10 @@ int dag_width_uniform_task( struct dag *d );
 
 int dag_remote_jobs_running( struct dag *d );
 int dag_local_jobs_running( struct dag *d );
+
+/* dag_mount_clean cleans up the mem space allocated due to the usage of mountfile
+ * return 0 on success, return non-zero on failure.
+ */
+int dag_mount_clean( struct dag *d );
 
 #endif

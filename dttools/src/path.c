@@ -11,6 +11,7 @@
 #include "stringtools.h"
 #include "xxmalloc.h"
 
+#include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <fnmatch.h>
@@ -467,6 +468,123 @@ char *path_join_two_strings(const char *s, const char *t, const char * sep) {
 	r = string_combine(r, s);
 	r = string_combine(r, sep);
 	r = string_combine(r, t);
+	return r;
+}
+
+char *path_concat(const char *s, const char *t) {
+	char *p = NULL;
+	char p1[PATH_MAX], p2[PATH_MAX];
+	size_t s1, s2;
+
+	assert(s);
+	assert(t);
+
+	path_collapse(s, p1, 0);
+	path_collapse(t, p2, 0);
+
+	path_remove_trailing_slashes(p1);
+	path_remove_trailing_slashes(p2);
+
+	s1 = strlen(p1);
+	s2 = strlen(p2);
+
+	p = malloc(sizeof(char) * (s1 + s2 + 2));
+	if(!p) {
+		fprintf(stderr, "path_concat malloc failed: %s!\n", strerror(errno));
+		return NULL;
+	}
+
+	snprintf(p, s1+s2+2, "%s/%s", p1, p2);
+	return p;
+}
+
+int path_has_symlink(const char *s) {
+	char *p, *q;
+
+	/* the function needs to modify the string, so make a copy and modify the copied version */
+	q = xxstrdup(s);
+
+	p = q;
+
+	while(*p) {
+		char old_p;
+		size_t n = strspn(p, "/") + strcspn(p, "/");
+
+		p += n;
+		old_p = *p;
+		*p = '\0';
+
+		if(access(q, F_OK)) {
+			*p = old_p;
+			p -= n;
+			break;
+		} else {
+			struct stat st;
+			if(lstat(q, &st)) {
+				debug(D_DEBUG, "lstat(%s) failed: %s!\n", q, strerror(errno));
+				free(q);
+				return -1;
+			}
+
+			if(S_ISLNK(st.st_mode)) {
+				debug(D_DEBUG, "%s includes symbolic link(%s)!\n", s, q);
+				free(q);
+				return -1;
+			}
+		}
+
+		*p = old_p;
+	}
+
+	free(q);
+	return 0;
+}
+
+
+int path_has_doubledots(const char *s) {
+	assert(s);
+
+	while(*s) {
+		size_t i;
+
+		s += strspn(s, "/");
+		i = strcspn(s, "/");
+
+		if(i == 2 && *s == '.' && *(s+1) == '.') return 1;
+
+		s += i;
+	}
+	return 0;
+}
+
+int path_depth(const char *s) {
+	int r = 0;
+	char *t;
+
+	assert(s);
+
+	t = (char *)s;
+
+	while(*s) {
+		size_t i;
+
+		s += strspn(s, "/");
+		i = strcspn(s, "/");
+
+		if(i == 2 && *s == '.' && *(s+1) == '.') {
+			debug(D_DEBUG, "path_depth does not support the path (%s) including double dots!\n", t);
+			return -1;
+		}
+
+		if(i == 1 && *s == '.') {
+			s += i;
+			continue;
+		}
+
+		if(i > 0) r++;
+
+		s += i;
+	}
 	return r;
 }
 

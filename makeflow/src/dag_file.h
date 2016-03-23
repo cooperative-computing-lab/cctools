@@ -35,6 +35,13 @@ typedef enum {
 	DAG_FILE_TYPE_INTERMEDIATE /* Files that are created and used in DAG, but can be deleted */
 } dag_file_type_t;
 
+/* the type of a dependency specified in the mountfile */
+typedef enum {
+	DAG_FILE_SOURCE_LOCAL,
+	DAG_FILE_SOURCE_HTTP,
+	DAG_FILE_SOURCE_UNSUPPORTED
+} dag_file_source_t;
+
 struct dag_file {
 	const char *filename;
 	struct list     *needed_by;     /* List of nodes that have this file as a source */
@@ -45,6 +52,9 @@ struct dag_file {
 	time_t creation_logged;         /* Time that file creation is logged */
 	dag_file_state_t state;         /* Enum: DAG_FILE_STATE_{INTIAL,EXPECT,...} */
 	dag_file_type_t type;           /* Enum: DAG_FILE_TYPE_{INPUT,...} */
+	char *source;                   /* the source of the file specified in the mountfile, by default is NULL */
+	char *cache_name;               /* the name of a file dependency in the cache, by default is NULL */
+	dag_file_source_t source_type;  /* the type of the source of a dependency */
 };
 
 /** Create dag file struct.
@@ -89,8 +99,6 @@ int dag_file_in_trans( const struct dag_file *f );
 */
 uint64_t dag_file_size( const struct dag_file *f );
 
-
-
 /** Report the sum of file sizes in list. Estimated size is used if actual 
 does not exist.
 @param s Pointer to list of dag_files.
@@ -112,5 +120,8 @@ set of nodes.
 @return One if used, zero if not.
 */
 int dag_file_coexist_files(struct set *s, struct dag_file *f);
+/* dag_file_mount_clean cleans up the mem space allocated for dag_file due to the usage of mountfile
+ */
+void dag_file_mount_clean( struct dag_file *df );
 
 #endif

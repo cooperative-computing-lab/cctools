@@ -37,7 +37,7 @@ execution engine.
 
 SUBSECTION(Commands)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-c, --clean, option)Clean up: remove logfile and all targets. If option [intermediates, outputs] is specified, only indicated files are removed.
+OPTION_TRIPLET(-c, --clean, option)Clean up: remove logfile and all targets. If option is one of [intermediates, outputs, cache], only indicated files are removed.
 OPTION_TRIPLET(-f, summary-log, file)Write summary of workflow to file.
 OPTION_ITEM(`-h, --help')Show this help screen.
 OPTION_TRIPLET(-m, email, email)Email summary of workflow to address.
@@ -114,6 +114,12 @@ LONGCODE_BEGIN
 }
 LONGCODE_END
 OPTION_PAIR(--amazon-ami, image-id) Specify an amazon machine image.
+OPTIONS_END
+
+SUBSECTION(Mountfile Support)
+OPTIONS_BEGIN
+OPTION_PAIR(--mounts, mountfile)Use this file as a mountlist. Every line of a mountfile can be used to specify the source and target of each input dependency in the format of BOLD(target source) (Note there should be a space between target and source.).
+OPTION_PAIR(--cache, cache_dir)Use this dir as the cache for file dependencies.
 OPTIONS_END
 
 SUBSECTION(Other Options)

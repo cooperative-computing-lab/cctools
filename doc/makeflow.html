@@ -576,6 +576,79 @@ makeflow ...
 <tr><td> analysis </td> <td> 4 </td> <td> 800  (from environment)</td> <td> 600 </td> </tr>
 </table>
 
+<h2 id="linking">Mountfile Support<a class="sectionlink" href="#mountfile" title="Link to this section.">&#x21d7;</a></h2>
+
+<p><tt>Makeflow</tt> allows the user to specify the source and target of each input dependency for a makeflow through
+<tt>--mounts mountfile</tt> option. Every line of <tt>mountfile</tt> should be in the format of <tt>target source</tt>. </p>
+
+<p>Here is an example of a mountfile:</p>
+<code>curl /usr/bin/curl
+convert ../bin/convert
+data/file1 /home/bob/input1
+1.root http://myresearch.org/1.root
+</code>
+
+<p>To limit the behavoir of a makeflow inside the current working directory, the <tt>target</tt> field should satisfy the following requirements:</p>
+<ul>
+  <li>the target path should not exist;</li>
+  <li>the target path should be relative;</li>
+  <li>the target path should not include any symbolic links; (For example,
+  if the target path is <tt>a/b/c/d</tt>, then <tt>a</tt>, <tt>b</tt>,
+  <tt>c</tt> should not be symbolic links.) This avoids the makeflow
+  leaving the current working directory through symbolic links.</li>
+  <li>the target path should not include doubledots (<tt>..</tt>) to limit
+  makeflow to the current working directory.  For example, <tt>a/../b</tt>
+  is an invalid target, however, <tt>a/b..c/d</tt> is a valid target. </li>
+  <li>the target path should be the same with its usage in Makeflow makefiles.
+  For example, the target path for the path <tt>./mycurl</tt> from a makefile
+  must also be <tt>./mycurl</tt>, can not be <tt>mycurl</tt>.
+</ul>
+
+<p>The <tt>source</tt> field can be a local file path or a http URL. When a local file path is specified,
+the following requirements should be satisfied:</p>
+<ul>
+  <li>the source path should exist;</li>
+  <li>the source path can be relative or absolute;</li>
+  <li>the source path can include doubledots (<tt>..</tt>);</li>
+  <li>the source path should only be regular files, directories, and symbolic links;</li>
+  <li>the source path should not be any ancestor directory of the target to avoid infinite loop;</li>
+</ul>
+
+<p>To execute a makeflow with a mountfile, named <tt>mountfile</tt>, specifying its input dependencies:</p>
+
+<code>makeflow --mounts mountfile example.makeflow</code>
+
+<p>Before execution, Makeflow first parses each line of the mountfile when the <tt>--mounts</tt> option is set, and copies the specified dependency from the location specified by <tt>source</tt> field into a local cache, and then links the <tt>target</tt> to the item under the cache. Makeflow also records the location of the local cache and the info (source, target, filename under the cache dir, and so on) of each dependencies specified in the mountfile into its log.</p>
+
+<p>To cleanup a makeflow together with the local cache and all the links created due to the mountfile:</p>
+<code>makeflow -c example.makeflow</code>
+
+<p>To only cleanup the local cache and all the links created due to the mountfile:</p>
+<code>makeflow -ccache example.makeflow</code>
+
+<p>By default, makeflow would create a unique directory under the current working directory to hold all the dependencies introduced by the mountfile.
+However, Makeflow also allows the user to provide a cache dir through the <tt>--cache cache_dir</tt> option, which can be empty or already has some of the depedencies, or all the dependencies.</p>
+
+<p>To limit the behavoir of a makeflow inside the current working directory, the <tt>cache_dir</tt> should satisfy the following requirements:</p>
+<ul>
+  <li>the cache_dir path should be a relative path;</li>
+  <li>the cache_dir path should not include any symbolic link; (For example,
+  if the cache_dir path is <tt>a/b/c/d</tt>, then <tt>a</tt>, <tt>b</tt>,
+  <tt>c</tt> should not be symbolic link.) This limitation aims to avoid the makeflow
+  leaving the current working directory through symbolic links.</li>
+  <li>the cache_dir path should not include doubledots (<tt>..</tt>) to limit the
+  behavoir of the makeflow within the current working directory.  For example, <tt>a/../b</tt>
+  is an invalid cache_dir, however, <tt>a/b..c/d</tt> is a valid cache_dir. </li> </ul>
+</ul>
+
+<p>To execute a makeflow with a mountfile, named <tt>mountfile</tt>, specifying its input dependencies, and a given cache, named <tt>mycache</tt>, specifying the cache location:</p>
+
+<code>makeflow --mounts mountfile --cache mycache example.makeflow</code>
+
+<p>Makeflow first checks the validity of the specified cache path, and then creates it if necessary. Then all the missing dependencies will be copied
+from the source to the cache dir, and the link from each dependency to its target under the cache dir will be created. The other part of Makeflow works
+similarly to the case when there is no <tt>--cache</tt> option.</p>
+
 <h2 id="linking">Linking Dependencies<a class="sectionlink" href="#linking" title="Link to this section.">&#x21d7;</a></h2>
 
 <p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a

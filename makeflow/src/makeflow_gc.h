@@ -25,6 +25,7 @@ typedef enum {
 	MAKEFLOW_CLEAN_NONE,          /* Clean nothing, default. */
 	MAKEFLOW_CLEAN_INTERMEDIATES, /* Clean only intermediate files. */
 	MAKEFLOW_CLEAN_OUTPUTS,       /* Clean only output files. */
+	MAKEFLOW_CLEAN_CACHE,         /* Clean the dependency cache and the links pointing to it. */
 	MAKEFLOW_CLEAN_ALL            /* Clean all created files and logs. */
 } makeflow_clean_depth;
 
@@ -32,6 +33,14 @@ void makeflow_parse_input_outputs( struct dag *d );
 void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count );
 int  makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
 void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent );
-void makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth);//, struct makeflow_wrapper *w, struct makeflow_monitor *m );
+
+/* return 0 on success; return non-zero on failure. */
+int makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth);//, struct makeflow_wrapper *w, struct makeflow_monitor *m );
+
+/* makeflow_clean_mount_target removes the target.
+ * @param target: a file path
+ * return 0 on success, -1 on failure.
+ */
+int makeflow_clean_mount_target(const char *target);
 
 #endif

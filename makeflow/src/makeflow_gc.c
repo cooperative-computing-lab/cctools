@@ -10,12 +10,14 @@ See the file COPYING for details.
 #include "timestamp.h"
 #include "host_disk_info.h"
 #include "stringtools.h"
+#include "copy_tree.h"
+#include "unlink_recursive.h"
+#include "path.h"
 
 #include "dag.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_gc.h"
-
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -174,7 +176,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)//, struct makeflow_wrapper *w, struct makeflow_monitor *m)
+int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)//, struct makeflow_wrapper *w, struct makeflow_monitor *m)
 {
 	struct dag_file *f;
 	char *name;
@@ -188,16 +190,34 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 		/* We have a record of the file, but it is no longer created or used so delete */
 		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
 			makeflow_clean_file(d, queue, f, silent);
-		if(dag_file_is_source(f))
-			continue;
 
-		if(clean_depth == MAKEFLOW_CLEAN_ALL){
+		if(dag_file_is_source(f)) {
+			if(f->source && (clean_depth == MAKEFLOW_CLEAN_CACHE || clean_depth == MAKEFLOW_CLEAN_ALL)) { /* this file is specified in the mountfile */
+				if(makeflow_clean_mount_target(f->filename)) {
+					fprintf(stderr, "Failed to remove %s!\n", f->filename);
+					return -1;
+				}
+			}
+			continue;
+		}
+
+		if(clean_depth == MAKEFLOW_CLEAN_ALL) {
 			makeflow_clean_file(d, queue, f, silent);
 		} else if(set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_OUTPUTS)) {
 			makeflow_clean_file(d, queue, f, silent);
 		} else if(!set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_INTERMEDIATES)){
 			makeflow_clean_file(d, queue, f, silent);
 		}
+	}
+
+	/* clean up the cache dir created due to the usage of mountfile */
+	if(clean_depth == MAKEFLOW_CLEAN_CACHE || clean_depth == MAKEFLOW_CLEAN_ALL) {
+		if(d->cache_dir && unlink_recursive(d->cache_dir)) {
+			fprintf(stderr, "Failed to clean up the cache dir (%s) created due to the usage of the mountfile!\n", d->cache_dir);
+			dag_mount_clean(d);
+			return -1;
+		}
+		dag_mount_clean(d);
 	}
 
 	struct dag_node *n;
@@ -214,6 +234,8 @@ void makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dep
 			free(command);
 		}
 	}
+
+	return 0;
 }
 
 /* Collect available garbage, up to a limit of maxfiles. */
@@ -279,5 +301,45 @@ void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t
 		break;
 	}
 }
+
+int makeflow_clean_mount_target(const char *target) {
+	file_type t_type;
+
+	if(!target || !*target) return 0;
+
+	/* Check whether target already exists. */
+	if(access(target, F_OK)) {
+		debug(D_DEBUG, "the target (%s) does not exist!\n", target);
+		return 0;
+	}
+
+	/* Check whether the target is an absolute path. */
+	if(target[0] == '/') {
+		debug(D_DEBUG, "the target (%s) should not be an absolute path!\n", target);
+		fprintf(stderr, "the target (%s) should not be an absolute path!\n", target);
+		return -1;
+	}
+
+	/* check whether target includes .. */
+	if(path_has_doubledots(target)) {
+		debug(D_DEBUG, "the target (%s) include ..!\n", target);
+		fprintf(stderr, "the target (%s) include ..!\n", target);
+		return -1;
+	}
+
+	/* check whether target is REG, LNK, DIR */
+	if((t_type = check_file_type(target)) == FILE_TYPE_UNSUPPORTED)
+		return -1;
+
+	if(unlink_recursive(target)) {
+		debug(D_DEBUG, "Failed to remove %s!\n", target);
+		fprintf(stderr, "Failed to remove %s!\n", target);
+		return -1;
+	}
+
+	return 0;
+}
+
+
 
 /* vim: set noexpandtab tabstop=4: */

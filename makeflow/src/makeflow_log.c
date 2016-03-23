@@ -8,11 +8,14 @@ See the file COPYING for details.
 #include "makeflow_gc.h"
 #include "dag.h"
 #include "get_line.h"
+#include "makeflow_mounts.h"
 
 #include "timestamp.h"
 #include "list.h"
 #include "debug.h"
+#include "xxmalloc.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -65,6 +68,21 @@ timestamp - the unix time (in microseconds) when this line is written to the log
 collected - the number of files were collected in this garbage collection cycle.
 time_spent - the length of time this cycle took.
 total_collected - the total number of files has been collected so far since the start this makeflow execution.
+
+Line format: # CACHE timestamp cache_dir
+
+timestamp - the unix time (in microseconds) when this line is written to the log file.
+cache_dir - the cache dir storing the files specified in a mountfile
+
+Line format: # MOUNT timestamp target source cache_name type
+
+timestamp - the unix time (in microseconds) when this line is written to the log file.
+target - the target of a dependency specified in a mountfile
+source - the source of a dependency specified in a mountfile
+cache_name - the file name of the dependency in the cache directory
+type - the type of this dependency source
+	0. LOCAL - The dependency comes from the local filesystem.
+	1. HTTP  - The dependency comes from the network via http.
 
 Line format: # STARTED timestamp
 Line format: # ABORTED timestamp
@@ -127,6 +145,16 @@ void makeflow_log_completed_event( struct dag *d )
 	makeflow_log_sync(d,1);
 }
 
+void makeflow_log_mount_event( struct dag *d, const char *target, const char *source, const char *cache_name, dag_file_source_t type ) {
+	fprintf(d->logfile, "# MOUNT %" PRIu64 " %s %s %s %d\n", timestamp_get(), target, source, cache_name, type);
+	makeflow_log_sync(d,1);
+}
+
+void makeflow_log_cache_event( struct dag *d, const char *cache_dir ) {
+	fprintf(d->logfile, "# CACHE %" PRIu64 " %s\n", timestamp_get(), cache_dir);
+	makeflow_log_sync(d,1);
+}
+
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
 	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
@@ -168,7 +196,7 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 /** The clean_mode variable was added so that we could better print out error messages
  * apply in the situation. Currently only used to silence node rerun checking.
  */
-void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode, int skip_file_check)
+int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode, int skip_file_check)
 {
 	char *line, *name, file[MAX_BUFFER_SIZE];
 	int nodeid, state, jobid, file_state;
@@ -187,6 +215,8 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 		printf("recovering from log file %s...\n",filename);
 
 		while((line = get_line(d->logfile))) {
+			char source[PATH_MAX], cache_dir[NAME_MAX], cache_name[NAME_MAX];
+			int type;
 			linenum++;
 
 			if(sscanf(line, "# FILE %" SCNu64 " %s %d %" SCNu64 "", &previous_completion_time, file, &file_state, &size) == 4) {
@@ -202,7 +232,43 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 				free(line);
 				continue;
 			}
-			if(line[0] == '#'){
+			if(sscanf(line, "# CACHE %" SCNu64 " %s", &previous_completion_time, cache_dir) == 2) {
+				/* if the user specifies a cache dir using --cache dir, ignore the info from the log file */
+				if(!d->cache_dir) {
+					d->cache_dir = xxstrdup(cache_dir);
+				} else {
+					/* There are two possible reasons for the inconsistency:
+					 * 1) the cache dir specified via the --cache opt and in the log file mismatch;
+					 * 2) the log file includes multiple different CACHE entries.
+					 */
+					if(strcmp(cache_dir, d->cache_dir)) {
+						fprintf(stderr, "The --cache option (%s) does not match the cache dir (%s) in the log file!\n", d->cache_dir, cache_dir);
+						free(line);
+						return -1;
+					}
+				}
+				free(line);
+				continue;
+			}
+			if(sscanf(line, "# MOUNT %" SCNu64 " %s %s %s %d", &previous_completion_time, file, source, cache_name, &type) == 5) {
+				f = dag_file_lookup_or_create(d, file);
+
+				if(!f->source) {
+					f->source = xxstrdup(source);
+					f->cache_name = xxstrdup(cache_name);
+					f->type = type;
+				} else {
+					/* If a mount entry is specified in the mountfile and logged in a log file at the same time, they must not conflict with each other. */
+					/* If a mount entry is logged in a log file multiple times deliberately or not, they must not conflict with each other. */
+					if(makeflow_mount_check_consistency(file, f->source, source, d->cache_dir, cache_name)) {
+						free(line);
+						return -1;
+					}
+				}
+				free(line);
+				continue;
+			}
+			if(line[0] == '#') {
 				free(line);
 				continue;
 			}
@@ -321,6 +387,8 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 				f->reference_count += -1;
 		}
 	}
+
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

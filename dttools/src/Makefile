@@ -22,6 +22,7 @@ SOURCES = \
 	compat-at.c \
 	console_login.c \
 	copy_stream.c \
+	copy_tree.c \
 	create_dir.c \
 	daemon.c \
 	datagram.c \
@@ -117,6 +118,7 @@ HEADERS_PUBLIC = \
 	auth_unix.h \
 	buffer.h \
 	category.h \
+	copy_tree.h \
 	debug.h \
 	hash_table.h \
 	http_query.h \
