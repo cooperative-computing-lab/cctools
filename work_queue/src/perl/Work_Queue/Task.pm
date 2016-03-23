@@ -222,9 +222,15 @@ sub specify_priority {
 	return work_queue_task_specify_priority($self->{_task}, $priority);
 }
 
+
 sub specify_environment_variable {
 	my ($self, $name, $value) = @_;
 	return work_queue_task_specify_enviroment_variable($self->{_task}, $name, $value);
+}
+
+sub specify_monitor_output {
+	my ($self, $directory) = @_;
+	return work_queue_task_specify_monitor_output($self->{_task}, $directory);
 }
 
 sub tag {
@@ -773,6 +779,19 @@ Name of the environment variable.
 Value of the environment variable. Variable is unset if value is not given.
 
 =back
+
+=head3 C<specify_monitor_output>
+
+Set the directory name for the resource output from the monitor.
+
+=over 12
+
+=item directory
+
+Name of the directory.
+
+=back
+
 
 =head3 C<tag>
 

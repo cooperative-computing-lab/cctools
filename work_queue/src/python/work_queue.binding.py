@@ -253,10 +253,16 @@ class Task(_object):
     def specify_running_time( self, useconds ):
         return work_queue_task_specify_running_time(self._task,useconds)
 
+    ##
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
     def specify_environment_variable( self, name, value = None ):
         return work_queue_task_specify_enviroment_variable(self._task,name,value)
+
+    ##
+    # Set a name for the resource summary output directory from the monitor.
+    def specify_monitor_output( self, directory ):
+        return work_queue_task_specify_monitor_output(self._task,directory)
 
     ##
     # Get the user-defined logical name for the task.
