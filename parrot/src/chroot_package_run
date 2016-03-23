@@ -178,8 +178,6 @@ export_env() {
 }
 export_env
 
-unset PARROT_ENABLED
-
 export PACKAGE_CHROOT_PWD="${PWD}"
 if [ -z "$1" ]; then
 	"${cmd_chroot}" "${package_path}" /bin/sh -c 'cd "${PACKAGE_CHROOT_PWD}"; exec /bin/sh'

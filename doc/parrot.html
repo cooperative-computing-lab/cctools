@@ -83,31 +83,38 @@ Now, you should be able to run any standard command using Parrot filenames.  Her
 % cat /anonftp/ftp.gnu.org/pub<b>[Press TAB here]</b>
 </code>
 
-<p>
-<center>
-<table width="75%" border=2>
-<tr bgcolor="#ffffaa">
-<td>
-Hint: You may find it useful to have some visual indication
-of when Parrot is active, so we recommend that you modify
-your shell startup scripts to change the prompt when Parrot is enabled.
-If you use <tt>tcsh</tt>, you might add something like this to your <tt>.cshrc</tt>:
-<code>if ( $?PARROT_ENABLED ) then
+<h3 id="interactive">Interactive Use of Parrot<a class="sectionlink" href="#interactive" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>You may find it useful to have some visual indication of when Parrot is
+active, so we recommend that you modify your shell startup scripts to change
+the prompt when Parrot is enabled. Scripts may execute <tt>parrot_run
+--is-running</tt> to detect if Parrot is already running in the current
+session.</p>
+
+<ul>
+    <li>If you use <tt>tcsh</tt>, add to your <tt>.cshrc</tt>:
+        <code>which parrot_run &gt; /dev/null &amp;&amp; parrot_run --is-running &gt; /dev/null
+if ($? == 0) then
     set prompt = " (Parrot) %n@%m%~%# "
 else
     set prompt = " %n@%m%~%# "
-endif
-</code>
-</table>
-</center>
+endif</code>
+    </li>
+    <li>If you use <tt>bash</tt>, add to your <tt>.bashrc</tt>:
+        <code>if parrot_run --is-running &gt; /dev/null 2&gt; /dev/null; then
+    PS1="(Parrot) ${PS1}"
+fi</code>
+    </li>
+</ul>
 
-<p>
-We have limited the examples so far to HTTP and anonymous FTP, as they are
-the only services we know that absolutely everyone is familiar with.
-There are a number of other more powerful and secure remote services
-that you may be less familiar with.  Parrot supports them in the same form:
-The filename begins with the service type, then the host name,
-then the file name.  Here are all the currently supported services:
+<h2 id="protocols">Protocols<a class="sectionlink" href="#protocols" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>We have limited the examples so far to HTTP and anonymous FTP, as they are
+the only services we know that absolutely everyone is familiar with.  There are
+a number of other more powerful and secure remote services that you may be less
+familiar with.  Parrot supports them in the same form: The filename begins with
+the service type, then the host name, then the file name.  Here are all the
+currently supported services:</p>
 
 <hr>
 <table>

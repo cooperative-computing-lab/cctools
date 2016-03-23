@@ -113,6 +113,9 @@ extern "C" {
 #ifndef BTRFS_IOC_CLONE
 #	define BTRFS_IOC_CLONE _IOW (BTRFS_IOCTL_MAGIC, 9, int)
 #endif
+#ifndef CLONE_UNTRACED
+#	define CLONE_UNTRACED 0x00800000
+#endif
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
@@ -1113,6 +1116,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				 * the child.
 				 */
 				wait_barrier = 1;
+				int flags = args[0];
+				debug(D_DEBUG, "flags = 0x%X", flags);
+				if (flags & CLONE_UNTRACED) {
+					fatal("cannot run application which does not allow tracing (CLONE_UNTRACED)");
+				}
 			}
 			break;
 
@@ -3042,6 +3050,22 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				cctools_version_debug(D_DEBUG, "parrot_debug");
 
 				divert_to_dummy(p,0);
+			}
+			break;
+
+		case SYSCALL64_parrot_version:
+			if (entering) {
+				void *uaddr = POINTER(args[0]);
+				size_t len = args[1];
+
+				if (uaddr) {
+					char buffer[4096];
+					p->syscall_result = MIN((size_t)snprintf(buffer, sizeof(buffer), "%s", CCTOOLS_VERSION),len);
+					TRACER_MEM_OP(tracer_copy_out(p->tracer,buffer,uaddr,p->syscall_result,TRACER_O_ATOMIC));
+					divert_to_dummy(p,p->syscall_result);
+				} else {
+					divert_to_dummy(p,0);
+				}
 			}
 			break;
 
