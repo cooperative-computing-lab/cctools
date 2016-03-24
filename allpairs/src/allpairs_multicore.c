@@ -23,11 +23,10 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "fast_popen.h"
 #include "text_list.h"
-#include "host_memory_info.h"
-#include "load_average.h"
 #include "macros.h"
 #include "full_io.h"
 #include "getopt_aux.h"
+#include "rmonitor_poll.h"
 
 static const char *progname = "allpairs_multicore";
 static const char *extra_arguments = "";
@@ -73,20 +72,18 @@ get in memory at once by measuring the first 100 elements of the set,
 and then choosing a number to fit within 1/2 of the available RAM.
 */
 
-int block_size_estimate( struct text_list *seta )
+int block_size_estimate( struct text_list *seta, struct rmsummary *tr )
 {
 	int count = MIN(100,text_list_size(seta));
 	int i;
-	UINT64_T total_data = 0,free_mem,total_mem;
+	UINT64_T total_data = 0,total_mem;
 	int block_size;
-
-	host_memory_info_get(&free_mem, &total_mem);
 
 	for(i=0;i<count;i++) {
 		total_data += get_file_size(text_list_get(seta,i));
 	}
 
-	total_mem = total_mem/2;
+	total_mem = tr->memory * MEGABYTE / 2;
 
 	if(total_data>=total_mem) {
 		block_size = text_list_size(seta) * total_mem / total_data;
@@ -392,11 +389,13 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if(num_cores==0) num_cores = load_average_get_cpus();
+	struct rmsummary *tr = rmonitor_measure_host(NULL);
+	if(num_cores==0) num_cores = tr->cores;
 	debug(D_DEBUG,"num_cores: %d\n",num_cores);
 
-	if(block_size==0) block_size = block_size_estimate(seta);
+	if(block_size==0) block_size = block_size_estimate(seta, tr);
 	debug(D_DEBUG,"block_size: %d elements",block_size);
+	free(tr);
 
 	allpairs_compare_t funcptr = allpairs_compare_function_get(funcpath);
 	if(funcptr) {
