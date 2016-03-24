@@ -50,4 +50,12 @@ struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime);
 */
 void catalog_query_delete(struct catalog_query *q);
 
+/** Send update text to the given hosts
+hosts is a semicolon delimited list of hosts, each of which can be host or host:port
+@param hosts A list of hosts to which to send updates
+@param text String to send
+@return The number of updates successfully sent, 
+*/
+int catalog_query_send_update(const char *hosts, const char *text);
+
 #endif

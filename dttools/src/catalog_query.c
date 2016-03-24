@@ -5,6 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <string.h>
 #include "catalog_query.h"
 #include "http_query.h"
 #include "jx.h"
@@ -13,6 +14,9 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "datagram.h"
+#include "domain_name_cache.h"
+#include "domain_name.h"
 
 struct catalog_query {
 	struct jx *data;
@@ -91,6 +95,43 @@ void catalog_query_delete(struct catalog_query *q)
 	jx_delete(q->filter_expr);
 	jx_delete(q->data);
 	free(q);
+}
+
+int catalog_query_send_update(const char *hosts, const char *text)
+{
+	int port;
+	int sent = 0;
+	const char *current_host = hosts;
+	char address[DATAGRAM_ADDRESS_MAX];
+	char host[DOMAIN_NAME_MAX + 8];
+	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
+
+	if (!d) {
+		fatal("could not create datagram port!");
+	}
+
+	do {
+		switch (sscanf(current_host, "%[^:;]:%d", host, &port)) {
+			case 1:
+				port = CATALOG_PORT;
+				break;
+			case 2:
+				break;
+			default:
+				debug(D_DEBUG, "bad host specification: %s", current_host);
+				continue;
+		}
+
+		if (domain_name_cache_lookup(host, address)) {
+			datagram_send(d, text, strlen(text), address, port);
+			sent++;
+		} else {
+			debug(D_DEBUG, "unable to lookup address of host: %s", host);
+		}
+	} while ((current_host = strchr(current_host, ';')) && current_host++);
+
+	datagram_delete(d);
+	return sent;
 }
 
 /* vim: set noexpandtab tabstop=4: */
