@@ -27,8 +27,9 @@ D5, = prune.task_add(
 	cmd='sort -m input*.txt > merged_output.txt',
 	args=[D3,D4], params=['input1.txt','input2.txt'] )
 
-
-###### Export final data ###### 
+###### Export final data ######
+# First run the 'prune_worker' command to execute the workflow,
+# then uncomment the following line and run this script again.
 #prune.export( D5, 'merged_words.txt' )
 
 

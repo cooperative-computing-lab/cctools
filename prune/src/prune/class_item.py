@@ -140,7 +140,7 @@ class Item(object):
 			if isinstance( self.body, basestring ):
 				wstr = self.body
 			else:
-				wstr = json.dumps(obj, sort_keys=True)
+				wstr = json.dumps(self.body, sort_keys=True)
 			active_stream.write( wstr )
 			if len(wstr)>45:
 				return wstr[0:20] + ' ... ' + wstr[-20:]

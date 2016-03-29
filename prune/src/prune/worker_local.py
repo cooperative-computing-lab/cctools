@@ -143,8 +143,8 @@ class Worker:
 
 
 		self.log_pathname = 'PRUNE_CALL_LOG'
-		self.open_cmd = "echo \"prune_call_start `date '+%%s.%%N'`\" > %s" % (self.log_pathname)
-		self.close_cmd = "echo \"prune_call_end `date '+%%s.%%N'`\" >> %s" % (self.log_pathname)
+		self.open_cmd = "echo \"prune_call_start `date '+%%s'`\" > %s" % (self.log_pathname)
+		self.close_cmd = "echo \"prune_call_end `date '+%%s'`\" >> %s" % (self.log_pathname)
 		self.args = []
 		self.params = []
 		
@@ -169,8 +169,8 @@ class Worker:
 				self.open_cmd = self.open_cmd + '; ' + env.body['open']
 				self.close_cmd = env.body['close'] + '; ' + self.close_cmd
 
-		self.open_cmd = self.open_cmd + '; ' + "echo \"prune_cmd_start `date '+%%s.%%N'`\" >> %s" % (self.log_pathname)
-		self.close_cmd = "echo \"prune_cmd_end `date '+%%s.%%N'`\" >> %s; " % (self.log_pathname) + self.close_cmd
+		self.open_cmd = self.open_cmd + '; ' + "echo \"prune_cmd_start `date '+%%s'`\" >> %s" % (self.log_pathname)
+		self.close_cmd = "echo \"prune_cmd_end `date '+%%s'`\" >> %s; " % (self.log_pathname) + self.close_cmd
 
 		my_env = os.environ
 
@@ -195,11 +195,11 @@ class Worker:
 				exec_file.write( self.open_cmd+"\n\n" )
 				exec_file.write( call_body['cmd']+"\n\n" )
 				exec_file.write( self.close_cmd+"\n\n" )
-				exec_file.write( "echo \"prune_stage_out_start `date '+%%s.%%N'`\" >> %s\n" % (self.log_pathname) )
+				exec_file.write( "echo \"prune_stage_out_start `date '+%%s'`\" >> %s\n" % (self.log_pathname) )
 				for ret in call_body['returns']:
 					exec_file.write( "echo \"sha1sum %s `sha1sum %s | awk '{print $1}'`\" >> %s\n" % (ret, ret, self.log_pathname) )
 					exec_file.write( "echo \"filesize %s `ls -l %s | awk '{print $5}'`\" >> %s\n" % (ret, ret, self.log_pathname) )
-				exec_file.write( "echo \"prune_stage_out_end `date '+%%s.%%N'`\" >> %s\n" % (self.log_pathname) )
+				exec_file.write( "echo \"prune_stage_out_end `date '+%%s'`\" >> %s\n" % (self.log_pathname) )
 
 
 			os.chmod( self.sandbox + 'PRUNE_EXEC', 0755);
@@ -341,6 +341,7 @@ class Worker:
 			'''
 			#shutil.rmtree( worker.sandbox )
 			timer.start('work.report')
+			print cfinish,cstart
 
 			wall_time = float(cfinish)-float(cstart)
 			env_time = (float(efinish)-float(estart)) - wall_time

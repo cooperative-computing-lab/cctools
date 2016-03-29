@@ -407,7 +407,7 @@ CREATE TABLE IF NOT EXISTS todos (
 		
 		item = self.find_one( key )
 		if not item:
-			print 'Need to wait for: %s' % key
+			print 'Not ready yet: %s' % key
 		else:
 			with open( pathname, 'w' ) as f:
 				item.stream_content( f )

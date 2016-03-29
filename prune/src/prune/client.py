@@ -249,18 +249,22 @@ class Connect:
 		more_cnt = 0
 		size = 0
 		with open( pathname, 'w' ) as f:
+			if not single_file:
+				print 'Export contains the following objects...'
 			while prid_list:
-				print 'depth',depth
+				#print 'depth',depth
 				for prid in prid_list:
 					if prid not in visited:
 						visited[prid] = True
 						item = glob.db.find_one( prid )
 						if not item:
-							if ':' in prid:
+							if single_file:
+								print "File not yet available. Don't forget to start a prune_worker"
+							elif ':' in prid:
 								task_id,file_id = prid.split(':')	
 								item = glob.db.find_one( task_id )
 						if not item:
-							print prid,item
+							print prid,'=',item
 						elif item.type=='temp':
 							#print 'temp:',item.cbid
 							task_id,file_id = item.dbid.split(':')
@@ -310,6 +314,7 @@ class Connect:
 							#print 'call',item
 							if single_file:
 								print 'task:', item.cbid, item.body['cmd']
+								print item
 								item.stream_content( f )
 							else:
 								print 'task:', item.cbid, item.body['cmd']
@@ -348,12 +353,12 @@ class Connect:
 						
 
 				
-		
-		diff = timer.stop('client.export')
-		statinfo = os.stat(pathname)
-		total_size = statinfo.st_size + size
-		print 'Export description: pathname=%s prid(s)=%s' % ( pathname, prid ), kwargs
-		print 'Export results: duration=%f size=%i file_cnt=%i task_cnt=%i temp_cnt=%i more_cnt=%i' % (diff, total_size, file_cnt, task_cnt, temp_cnt, more_cnt)
+		if not single_file:
+			diff = timer.stop('client.export')
+			statinfo = os.stat(pathname)
+			total_size = statinfo.st_size + size
+			print 'Export description: pathname=%s prid(s)=%s' % ( pathname, prid ), kwargs
+			print 'Export results: duration=%f size=%i file_cnt=%i task_cnt=%i temp_cnt=%i more_cnt=%i' % (diff, total_size, file_cnt, task_cnt, temp_cnt, more_cnt)
 		'''
 		timer.start('client.export_zip')
 
@@ -653,7 +658,7 @@ class Connect:
 
 		self.op_cnt = 0
 
-		print glob.base_dir
+		print 'Working from base directory:', glob.base_dir
 		
 		glob.ready = True
 		glob.db = Database()

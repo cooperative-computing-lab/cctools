@@ -11,10 +11,10 @@ from prune.utils import *
 from prune.class_item import Item
 
 from prune import db_sqlite
-from prune import db_net
+#from prune import db_net
 
 from prune import worker_local
-from prune import worker_wq
+#from prune import worker_wq
 
 #import worker_wq
 #import exec_wq
@@ -46,7 +46,7 @@ try:
 		# -c <concurrency>: number of concurrent workers (default: 8)
 		elif arg in ['-c','-C','--cores']:
 			argi += 1
-			cores = int(sys.argv[argi])
+			glob.exec_local_concurrency = int(sys.argv[argi])
 
 		# -h <hostname>: hostname for the master (default: None (connect to local database))
 		elif arg in ['-H','--host']:
@@ -88,10 +88,12 @@ try:
 		-d,--debug <subsystem>      Enable debugging on worker for this subsystem. (try -d all to start)
 
 		-t,--type <local|wq>      Type of workers. (default: local)
-		-c,--concurrency <num_workers>      Number of master (or worker) cores. (default: 8)
-		-h,--hostname <ip|domain>      Hostname for master. (default: localhost)
-		-p,--port <port_number>      Port number for master. (default: 8073)
+		-c,--concurrency <num_workers>      Number of concurrent workers. (default: <config file>)
+
+		-n,--name <master_name>     Work queue master name. (default: <config file>)
 			'''
+#		-h,--hostname <ip|domain>      Hostname for master. (default: localhost)
+#		-p,--port <port_number>      Port number for master. (default: 8073)
 			print message
 			sys.exit(0)
 
