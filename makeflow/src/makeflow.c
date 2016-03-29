@@ -168,6 +168,9 @@ static int did_find_archived_job = 0;
 
 static struct makeflow_alloc *storage_allocation = 0;
 
+/* Variables used to hold the time used for storage alloc. */
+uint64_t static_analysis = 0;
+
 /*
 Determines if this is a local job that will consume
 local resources, regardless of the batch queue type.
@@ -387,6 +390,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 
 static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 {
+	uint64_t start = timestamp_get();
 	struct dag_node *n = dag_node_create(d, -1);
 	n->state = DAG_NODE_STATE_COMPLETE;
 	struct dag_node *p;
@@ -404,8 +408,11 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 	dag_node_determine_footprint(n);
 	if(storage_print){
 		dag_node_print_footprint(d, storage_print);
+		printf("%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",n->footprint_min_size,n->footprint_max_size,n->residual_size);
 		exit(0);
 	}
+	uint64_t end = timestamp_get();
+	static_analysis += end - start;
 }
 
 /*
@@ -948,13 +955,23 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		if(makeflow_alloc_use_space(storage_allocation, n)){
 			makeflow_log_alloc_event(d, storage_allocation);
 		}
+
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			f->reference_count+= -1;
 			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
-				if(storage_allocation->locked)
+				if(storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
+					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
+			}
+		}
+
+		/* Delete output files that have no use and are not actual outputs */
+		if(storage_allocation->locked){
+			list_first_item(n->target_files);
+			while((f = list_next_item(n->target_files))){
+				if(f->reference_count == 0 && f->type != DAG_FILE_TYPE_OUTPUT)
 					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
 			}
 		}
@@ -980,6 +997,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		} else if (storage_allocation->locked) {
 			printf("Unable to release space\n");
 		}
+
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 	list_delete(outputs);
@@ -2337,6 +2355,8 @@ int main(int argc, char *argv[])
 	runtime = time_completed - runtime;
 
 	makeflow_log_alloc_event(d, storage_allocation);
+	makeflow_log_event(d, "STATIC_ANALYSIS", static_analysis);
+	makeflow_log_event(d, "DYNAMIC_ALLOC", makeflow_alloc_get_dynamic_alloc_time());
 
 	if(local_queue)
 		batch_queue_delete(local_queue);

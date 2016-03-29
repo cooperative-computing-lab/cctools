@@ -52,4 +52,5 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n);
 int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n);
 int makeflow_alloc_use_space( struct makeflow_alloc *a, struct dag_node *n);
 int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, uint64_t size, makeflow_alloc_release release);
+uint64_t makeflow_alloc_get_dynamic_alloc_time();
 #endif

@@ -166,6 +166,12 @@ void makeflow_log_cache_event( struct dag *d, const char *cache_dir ) {
 	makeflow_log_sync(d,1);
 }
 
+void makeflow_log_event( struct dag *d, char *name, uint64_t value)
+{
+	fprintf(d->logfile, "# EVENT\t%"PRIu64"\t%s\t%" PRIu64 "\n", timestamp_get(), name, value);
+	makeflow_log_sync(d,1);
+}
+
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
 	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
