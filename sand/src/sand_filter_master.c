@@ -488,8 +488,6 @@ static void get_options(int argc, char **argv, const char *progname)
 {
 	signed char c;
 	char tmp[512];
-	char *catalog_host = NULL;
-	int catalog_port = 0;
 
 	while((c = getopt(argc, argv, "p:P:n:d:F:N:C:s:r:R:k:w:c:o:uxvhaZ:")) > -1) {
 		switch (c) {
@@ -531,17 +529,7 @@ static void get_options(int argc, char **argv, const char *progname)
 			priority = atoi(optarg);
 			break;
 		case 'C':
-			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "sand_filter: catalog server should be given as HOSTNAME:PORT'.\n");
-				exit(1);
-			}
-
-			setenv("CATALOG_HOST", catalog_host, 1);
-
-			char *value = string_format("%d", catalog_port);
-			setenv("CATALOG_PORT", value, 1);
-			free(value);
-
+			setenv("CATALOG_HOST", optarg, 1);
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'u':
