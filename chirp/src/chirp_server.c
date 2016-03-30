@@ -2263,9 +2263,6 @@ int main(int argc, char *argv[])
 	}
 
 	while(1) {
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		struct link *l;
 		pid_t pid;
 		int status;
 
@@ -2315,7 +2312,9 @@ int main(int argc, char *argv[])
 		/* If the network port is active, accept the connection and fork the handler. */
 
 		if(FD_ISSET(link_fd(link), &rfds)) {
-			l = link_accept(link, time(0) + 5);
+			char addr[LINK_ADDRESS_MAX];
+			int port;
+			struct link *l = link_accept(link, time(0) + 5);
 			if(!l)
 				continue;
 
