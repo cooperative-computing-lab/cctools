@@ -69,7 +69,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
-	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
+	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX;
 
 	hash_table_insert(categories, name, c);
 
@@ -355,8 +355,11 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
 			break;
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
-		default:
 			return category_first_allocation_max_throughput(histogram, top_resource);
+			break;
+		case CATEGORY_ALLOCATION_MODE_MAX:
+		default:
+			return top_resource;
 			break;
 	}
 }
