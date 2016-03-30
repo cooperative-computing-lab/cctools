@@ -962,8 +962,6 @@ int main(int argc, char *argv[])
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
-	char *catalog_host;
-	int catalog_port;
 	makeflow_clean_depth clean_mode = MAKEFLOW_CLEAN_NONE;
 	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
@@ -1136,15 +1134,7 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case 'C':
-				if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-					fprintf(stderr, "makeflow: catalog server should be given as HOSTNAME:PORT'.\n");
-					exit(1);
-				}
-				setenv("CATALOG_HOST", catalog_host, 1);
-
-				char *value = string_format("%d", catalog_port);
-				setenv("CATALOG_PORT", value, 1);
-				free(value);
+				setenv("CATALOG_HOST", optarg, 1);
 				break;
 			case 'd':
 				debug_flags_set(optarg);
