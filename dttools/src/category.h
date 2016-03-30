@@ -20,6 +20,7 @@ typedef enum {
 } category_allocation_t;
 
 typedef enum {
+    CATEGORY_ALLOCATION_MODE_MAX,
 	CATEGORY_ALLOCATION_MODE_MIN_WASTE = 0,
 	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
 } category_mode_t;
@@ -73,3 +74,4 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow);
 
 #endif
+

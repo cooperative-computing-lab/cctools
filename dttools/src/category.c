@@ -69,7 +69,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
-	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
+	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX;
 
 	hash_table_insert(categories, name, c);
 
@@ -350,15 +350,17 @@ int64_t category_first_allocation_max_throughput(struct itable *histogram, int64
 }
 
 int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_mode_t mode,  int64_t top_resource) {
-	switch(mode) {
-		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
-			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
-			break;
-		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
-		default:
-			return category_first_allocation_max_throughput(histogram, top_resource);
-			break;
-	}
+    switch(mode) {
+        case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
+            return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
+            break;
+        case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
+            return category_first_allocation_max_throughput(histogram, top_resource);
+            break;
+        default:
+            return top_resource;
+            break;
+    }
 }
 
 #define update_first_allocation_field(c, top, independence, field)\
@@ -382,7 +384,7 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 		c->first_allocation = rmsummary_create(-1);
 	}
 
-	c->first_allocation->cores          = c->max_allocation->cores;
+	c->first_allocation->cores = c->max_allocation->cores;
 
 	update_first_allocation_field(c, top, 1, cpu_time);
 	update_first_allocation_field(c, top, 1, wall_time);
