@@ -84,6 +84,7 @@ struct histogram {
 	double waste_max_throughput;
 	double waste_max_throughput_brute_force;
 
+	double throughput_perfect;
 	double throughput_max;
 	double throughput_95;
 	double throughput_min_waste_time_dependence;
@@ -92,7 +93,6 @@ struct histogram {
 	double throughput_max_throughput;
 	double throughput_max_throughput_brute_force;
 
-	int retries_max;
 	int retries_95;
 	int retries_min_waste_time_dependence;
 	int retries_min_waste_time_independence;
@@ -727,7 +727,7 @@ void write_histogram_stats_header(FILE *stream)
 {
 	fprintf(stream, "resource,units,");
 	fprintf(stream, "count,mean,std_dev,");
-	fprintf(stream, "min,");
+	fprintf(stream, "min,pefect_throughput,");
 	fprintf(stream, "max,waste,throughput,");
 	fprintf(stream, "first_alloc_95,waste,throughput,retries,");
 
@@ -747,9 +747,9 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	fprintf(stream, "%s,%s,", sanitize_path_name(h->resource->name),h->resource->units);
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
-	fprintf(stream, "%.0lf,", floor(h->min_value));
+	fprintf(stream, "%.0lf,%lf,", floor(h->min_value), h->throughput_perfect);
 
-	fprintf(stream, "%.0lf,%.0lf,%lf,%d,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max, h->retries_max);
+	fprintf(stream, "%.0lf,%.0lf,%lf,%d,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max, 0);
 	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_95, ceil(h->waste_95), h->throughput_95, h->retries_95);
 
 	if(brute_force) {
@@ -760,6 +760,7 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_min_waste_time_independence, ceil(h->waste_min_waste_time_independence), h->throughput_min_waste_time_independence, h->retries_min_waste_time_independence);
 	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_min_waste_time_dependence, ceil(h->waste_min_waste_time_dependence), h->throughput_min_waste_time_dependence, h->retries_min_waste_time_dependence);
 	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_max_throughput, ceil(h->waste_max_throughput), h->throughput_max_throughput, h->retries_max_throughput);
+
 
 	fprintf(stream, "%.2lf,%.2lf,%.2lf,%.2lf\n",
 			value_of_p(h, 0.25),
@@ -850,7 +851,7 @@ double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 	return waste;
 }
 
-double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
+double throughput(struct histogram *h, struct field *f, int64_t first_alloc) {
 	double tasks_accum     = 0;
 	double wall_time_accum = 0;
 
@@ -873,11 +874,14 @@ double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 			continue;
 		}
 
+		if(first_alloc < 0)
+			current_task = max_allocation/current;
+
 		double wall_time = h->summaries_sorted[i]->wall_time;
 
 		wall_time_accum += wall_time;
 
-		if(current > first_alloc) {
+		if(first_alloc > 0 && current > first_alloc) {
 			tasks_accum     += 1;
 			wall_time_accum += wall_time;
 		} else {
@@ -1190,7 +1194,6 @@ void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_tab
 	s->overhead_max_throughput_brute_force = timestamp_get() - s->overhead_max_throughput_brute_force;
 
 	set_fa_min_waste_95(s, categories);
-
 	set_max_waste(s, categories);
 }
 
@@ -1213,7 +1216,7 @@ void set_throughputs_of_category(struct rmDsummary_set *s, struct hash_table *ca
 		h->throughput_max_throughput = throughput(h, f, h->fa_max_throughput);
 
 		h->throughput_95 = throughput(h, f, h->fa_95);
-
+		h->throughput_perfect = throughput(h, f, -1);
 
 		if(brute_force) {
 			h->throughput_min_waste_brute_force      = throughput(h, f, h->fa_min_waste_brute_force);
@@ -1235,7 +1238,6 @@ void set_retries_of_category(struct rmDsummary_set *s, struct hash_table *catego
 			continue;
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-		h->retries_max = retries(h, f, h->max_value);
 		h->retries_min_waste_time_dependence   = retries(h, f, h->fa_min_waste_time_dependence);
 		h->retries_min_waste_time_independence = retries(h, f, h->fa_min_waste_time_independence);
 		h->retries_max_throughput = retries(h, f, h->fa_max_throughput);
