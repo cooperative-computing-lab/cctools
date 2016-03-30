@@ -382,7 +382,7 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 		c->first_allocation = rmsummary_create(-1);
 	}
 
-	c->first_allocation->cores          = c->max_allocation->cores;
+	c->first_allocation->cores = c->max_allocation->cores;
 
 	update_first_allocation_field(c, top, 1, cpu_time);
 	update_first_allocation_field(c, top, 1, wall_time);
