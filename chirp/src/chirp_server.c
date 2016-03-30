@@ -2263,9 +2263,6 @@ int main(int argc, char *argv[])
 	}
 
 	while(1) {
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		struct link *l;
 		pid_t pid;
 		int status;
 
@@ -2306,16 +2303,16 @@ int main(int argc, char *argv[])
 		int maxfd = MAX(link_fd(link), config_pipe[0]) + 1;
 
 		/* Wait for activity on the listening port or the config pipe */
-		struct timeval timeout;
-		timeout.tv_usec = 5000;
-		timeout.tv_sec = 0;
+		struct timeval timeout = {.tv_sec = 1};
 		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
 			continue;
 
 		/* If the network port is active, accept the connection and fork the handler. */
 
 		if(FD_ISSET(link_fd(link), &rfds)) {
-			l = link_accept(link, time(0) + 5);
+			char addr[LINK_ADDRESS_MAX];
+			int port;
+			struct link *l = link_accept(link, time(0) + 5);
 			if(!l)
 				continue;
 
