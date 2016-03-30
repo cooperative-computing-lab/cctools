@@ -123,6 +123,7 @@ int catalog_query_send_update(const char *hosts, const char *text)
 		}
 
 		if (domain_name_cache_lookup(host, address)) {
+			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
 			datagram_send(d, text, strlen(text), address, port);
 			sent++;
 		} else {
