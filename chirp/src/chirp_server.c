@@ -2303,9 +2303,7 @@ int main(int argc, char *argv[])
 		int maxfd = MAX(link_fd(link), config_pipe[0]) + 1;
 
 		/* Wait for activity on the listening port or the config pipe */
-		struct timeval timeout;
-		timeout.tv_usec = 5000;
-		timeout.tv_sec = 0;
+		struct timeval timeout = {.tv_sec = 1};
 		if(select(maxfd, &rfds, 0, 0, &timeout) < 0)
 			continue;
 
