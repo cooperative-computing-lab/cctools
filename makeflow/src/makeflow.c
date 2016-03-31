@@ -423,7 +423,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 				max = node1->footprint_min_size;
 			}
 		}
-		printf("%s\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",dag_file, min,max,res);
+		printf("%s\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",dagfile, min,max,res);
 		exit(0);
 	}
 	uint64_t end = timestamp_get();
