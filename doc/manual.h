@@ -44,4 +44,9 @@ define(SEE_ALSO_CATALOG,
 LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
 LIST_ITEM MANPAGE(catalog_server,1), MANPAGE(catalog_update,1), MANPAGE(deltadb_query,1)
 LIST_END')dnl
+define(SEE_ALSO_PRUNE,
+`LIST_BEGIN
+LIST_ITEM MANUAL(Cooperative Computing Tools Documentation,"../index.html")
+LIST_ITEM MANUAL(Prune User Manual,"../prune.html")
+LIST_END')dnl
 dnl
