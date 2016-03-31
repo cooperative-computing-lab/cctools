@@ -87,6 +87,8 @@ struct histogram {
 	struct allocation fa_max_throughput;
 	struct allocation fa_max_throughput_brute_force;
 
+	uint64_t usage;
+
 	struct itable *buckets;
 	uint64_t  nbuckets;
 
@@ -717,7 +719,7 @@ void write_histogram_stats_header(FILE *stream)
 {
 	fprintf(stream, "resource,units,");
 	fprintf(stream, "count,mean,std_dev,");
-	fprintf(stream, "min,");
+	fprintf(stream, "min,usage,");
 
 	write_stats_header_cols(stream, perfect);
 	write_stats_header_cols(stream, max);
@@ -742,7 +744,7 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	fprintf(stream, "%s,%s,", sanitize_path_name(h->resource->name),h->resource->units);
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
-	fprintf(stream, "%.0lf,", floor(h->min_value));
+	fprintf(stream, "%.0lf,%" PRId64 ",", floor(h->min_value), h->usage);
 
 	write_stats_row(stream, h->fa_perfect);
 	write_stats_row(stream, h->fa_max);
@@ -842,6 +844,45 @@ double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 	}
 
 	return waste;
+}
+
+double total_usage(struct histogram *h, struct field *f) {
+	double usage   = 0;
+
+	int i;
+#pragma omp parallel for private(i) reduction(+: usage)
+	for(i = 0; i < h->total_count; i+=1) {
+		double current   = value_of_field(h->summaries_sorted[i], f);
+
+		double wall_time;
+		if(f->cummulative) {
+			wall_time = 1;
+		} else {
+			wall_time = h->summaries_sorted[i]->wall_time;
+		}
+
+		usage += current * wall_time;
+	}
+
+	return usage;
+}
+
+void set_usage(struct rmDsummary_set *s) {
+	struct field *f;
+	struct histogram *h;
+
+	int i;
+	for(i = WALL_TIME; i < NUM_FIELDS; i++)
+	{
+		f = (fields + i);
+
+		if(!f->active)
+			continue;
+
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+
+		h->usage = total_usage(h, f);
+	}
 }
 
 double throughput(struct histogram *h, struct field *f, int64_t first_alloc, struct allocation *alloc) {
@@ -1836,6 +1877,8 @@ int main(int argc, char **argv)
 		{
 			histograms_of_category(s);
 			set_first_allocations_of_category(s, categories);
+
+			set_usage(s);
 
 			write_stats_of_category(s);
 			write_limits_of_category(s);
