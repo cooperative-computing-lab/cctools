@@ -16,6 +16,16 @@
 #include <stdio.h>
 
 uint64_t dynamic_alloc = 0;
+FILE *out = NULL;
+
+void makeflow_alloc_print_stats(struct makeflow_alloc *a, char *event)
+{
+	if(!out)
+		out = stdout;
+	fprintf(out,"%d %"PRIu64"  %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %s\n",
+			a->nodeid, a->storage->total, a->storage->used, a->storage->greedy,
+			a->storage->commit, a->storage->free, event);
+}
 
 struct makeflow_alloc_unit * makeflow_alloc_unit_create(uint64_t size)
 {
@@ -46,11 +56,14 @@ struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc 
 	a->ordered = 1;
 	a->enabled = type;
 
+	makeflow_alloc_print_stats(a, "CREATE");
+
 	return a;
 }
 
 void makeflow_alloc_delete(struct makeflow_alloc *a)
 {
+	makeflow_alloc_print_stats(a, "DELETE");
 	makeflow_alloc_unit_delete(a->storage);
 	if(a->parent){
 		list_remove(a->parent->residuals, a);
@@ -66,6 +79,7 @@ struct makeflow_alloc * makeflow_alloc_traverse_to_node(struct makeflow_alloc *a
 	struct makeflow_alloc *alloc1, *alloc2, *tmp;
 
 	alloc1 = a;
+	makeflow_alloc_print_stats(alloc1, "TRAVERSE");
 	list_first_item(n->residual_nodes);
 	while((node = list_peek_current(n->residual_nodes))){
 		tmp = NULL;
@@ -78,6 +92,7 @@ struct makeflow_alloc * makeflow_alloc_traverse_to_node(struct makeflow_alloc *a
 		}
 		if(tmp){
 			alloc1 = tmp;
+			makeflow_alloc_print_stats(alloc1, "TRAVERSE");
 		}else{
 			break;
 		}
@@ -92,6 +107,8 @@ int makeflow_alloc_try_grow_alloc( struct makeflow_alloc *a, uint64_t inc)
 	if(!a) // Case that we are at parent and we will now try to grow
 		return 0;
 
+	printf("%"PRIu64"\t", inc);
+	makeflow_alloc_print_stats(a, "TRY GROW");
 	struct makeflow_alloc *tmp = a->parent;
 	if(a->storage->free >= inc){ // Fits in the already free space
 		return 1;
@@ -144,15 +161,19 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 	uint64_t start = timestamp_get();
 	if(!a){
 		dynamic_alloc += timestamp_get() - start;
+		makeflow_alloc_print_stats(a, "CHECK FAIL NON-EXIST");
 		return 0;
 	}
 
+	makeflow_alloc_print_stats(a, "CHECK");
 	if(a->enabled == MAKEFLOW_ALLOC_TYPE_OFF){
 		if(a->storage->used >= a->storage->total){
 			dynamic_alloc += timestamp_get() - start;
+			makeflow_alloc_print_stats(a, "CHECK FAIL OFF");
 			return 0;
 		}
 		dynamic_alloc += timestamp_get() - start;
+		makeflow_alloc_print_stats(a, "CHECK SUCCESS");
 		return 1;
 	}
 
@@ -162,11 +183,16 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 	alloc1 = makeflow_alloc_traverse_to_node(a, n);
 
 	if(alloc1->nodeid == n->nodeid){
-		if(alloc1->storage->free < n->target_size){
+		if(a->enabled != MAKEFLOW_ALLOC_TYPE_SIZE &&
+			(alloc1->storage->free < n->target_size)){
+
 			dynamic_alloc += timestamp_get() - start;
+			printf("%d\t", n->nodeid);
+			makeflow_alloc_print_stats(alloc1, "CHECK FAIL PRE-ALLOC");
 			return 0;
 		}
 		dynamic_alloc += timestamp_get() - start;
+		makeflow_alloc_print_stats(alloc1, "CHECK SUCCESS");
 		return 1;
 	}
 
@@ -176,6 +202,8 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 			|| (n == node1 && set_size(n->descendants) < 2 &&
 				makeflow_alloc_try_grow_alloc(alloc2, node1->self_res)))){
 			dynamic_alloc += timestamp_get() - start;
+			printf("%d\t%"PRIu64"\t", n->nodeid, makeflow_alloc_node_size(a, node1, n));
+			makeflow_alloc_print_stats(alloc1, "CHECK FAIL NON-FIT");
 			return 0;
 		}
 
@@ -184,6 +212,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 	}
 
 	dynamic_alloc += timestamp_get() - start;
+	makeflow_alloc_print_stats(alloc1, "CHECK SUCCESS");
 	return 1;
 }
 
@@ -194,12 +223,16 @@ int makeflow_alloc_grow_alloc( struct makeflow_alloc *a, uint64_t inc)
 	if(!a) // Case that we are at parent and we will now try to grow
 		return 0;
 
+	printf("%"PRIu64"\t", inc);
+	makeflow_alloc_print_stats(a, "GROW");
 	struct makeflow_alloc *tmp = a->parent;
 	if(a->storage->free >= inc){ // Fits in the already free space
+		makeflow_alloc_print_stats(a, "FIT");
 		return 1;
 	} else if(a->nodeid == -1 && !a->locked){ // At top and we can use more space
 		a->storage->total    += inc;
 		a->storage->free     += inc;
+		makeflow_alloc_print_stats(a, "GREW");
 		return 1;
 	} else if(tmp) { // Within an existing alloc
 		uint64_t needed = inc - a->storage->free;
@@ -209,6 +242,7 @@ int makeflow_alloc_grow_alloc( struct makeflow_alloc *a, uint64_t inc)
 			tmp->storage->free   -= needed;
 			a->storage->total    += needed;
 			a->storage->free     += needed;
+			makeflow_alloc_print_stats(a, "GREW");
 			return 1;
 		}
 	}
@@ -223,6 +257,7 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 	if(!a)
 		return 0;
 
+	makeflow_alloc_print_stats(a, "COMMIT");
 	if(a->enabled == MAKEFLOW_ALLOC_TYPE_OFF)
 		return 1;
 
@@ -231,7 +266,12 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	alloc1 = makeflow_alloc_traverse_to_node(a, n);
 
-	if(alloc1->nodeid == n->nodeid){
+	if(alloc1->nodeid == n->nodeid && (a->enabled == MAKEFLOW_ALLOC_TYPE_SIZE)){
+		if(!(makeflow_alloc_grow_alloc(alloc1, makeflow_alloc_node_size(a, n, n)))){
+			dynamic_alloc += timestamp_get() - start;
+			return 0;
+		}
+	} else if(alloc1->nodeid == n->nodeid){
 		if(alloc1->storage->free < n->target_size){
 			dynamic_alloc += timestamp_get() - start;
 			return 0;
@@ -254,10 +294,12 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	alloc1->storage->greedy += n->target_size;
 	alloc1->storage->free   -= n->target_size;
+	makeflow_alloc_print_stats(alloc1, "GREEDY");
 	alloc1 = alloc1->parent;
 	while(alloc1){
 		alloc1->storage->greedy += n->target_size;
 		alloc1->storage->commit -= n->target_size;
+		makeflow_alloc_print_stats(alloc1, "GREEDY");
 		alloc1 = alloc1->parent;
 	}
 
@@ -277,7 +319,7 @@ int makeflow_alloc_use_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	a = makeflow_alloc_traverse_to_node(a, n);
 
-	uint64_t needed;
+	uint64_t needed = 0;
 	if(inc > a->storage->greedy){
 		needed = inc - a->storage->greedy;
 
@@ -287,25 +329,41 @@ int makeflow_alloc_use_space( struct makeflow_alloc *a, struct dag_node *n)
 				dynamic_alloc += timestamp_get() - start;
 				return 0;
 			}
+			a->storage->free   -= grow;
 			a->storage->commit += grow;
+			makeflow_alloc_print_stats(a, "COMMIT");
 
 		}
 		a->storage->greedy += needed;
+		a->storage->commit -= needed;
+		makeflow_alloc_print_stats(a, "GREEDY ");
 		struct makeflow_alloc *a2 = a->parent;
 		while(a2){
 			a2->storage->greedy += needed;
 			a2->storage->commit -= needed;
+			makeflow_alloc_print_stats(a2, "GREEDY ");
 			a2 = a2->parent;
 		}
 	}
 
 	if(inc < a->storage->greedy){
 		needed = a->storage->greedy - inc;
+
+		while(a){
+			a->storage->used   += inc;
+			a->storage->commit += needed;
+			a->storage->greedy -= (inc + needed);
+			makeflow_alloc_print_stats(a, "USE EXCESS");
+			a = a->parent;
+		}
+		dynamic_alloc += timestamp_get() - start;
+		return 1;
 	}
 
 	while(a){
 		a->storage->used   += inc;
-		a->storage->greedy -= (inc + needed);
+		a->storage->greedy -= inc;
+		makeflow_alloc_print_stats(a, "USE");
 		a = a->parent;
 	}
 
@@ -321,26 +379,33 @@ int makeflow_alloc_shrink_alloc( struct makeflow_alloc *a, uint64_t dec, makeflo
 	if(release == MAKEFLOW_ALLOC_RELEASE_USED){
 		a->storage->used  -= dec;
 		a->storage->total -= dec;
+		makeflow_alloc_print_stats(a, "SHRINK USED");
 		if(a->parent){
 			a = a->parent;
 			a->storage->used -= dec;
 			a->storage->free += dec;
+			makeflow_alloc_print_stats(a, "SHRINK USED");
 		}
 		while(a->parent){
 			a = a->parent;
 			a->storage->used   -= dec;
 			a->storage->commit += dec;
+			makeflow_alloc_print_stats(a, "SHRINK USED");
 		}
 	} else {
+		makeflow_alloc_print_stats(a, "SHRINK");
 		dec = a->storage->commit;
 		a->storage->commit = 0;
 		dec += a->storage->free;
 		a->storage->free   = 0;
 		a->storage->total -= dec;
+		makeflow_alloc_print_stats(a, "SHRINK REST");
 
 		if(a->parent){
+			makeflow_alloc_print_stats(a, "SHRINK");
 			a->parent->storage->commit -= dec;
 			a->parent->storage->free   += dec;
+			makeflow_alloc_print_stats(a->parent, "SHRINK REST");
 		}
 
 
@@ -354,6 +419,7 @@ int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, 
 	uint64_t start = timestamp_get();
 	struct makeflow_alloc *alloc1;
 
+	makeflow_alloc_print_stats(a, "RELEASE");
 	if(a->enabled == MAKEFLOW_ALLOC_TYPE_OFF){
 		a->storage->used -= size;
 		dynamic_alloc += timestamp_get() - start;
@@ -374,6 +440,7 @@ int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, 
 	}
 
 	dynamic_alloc += timestamp_get() - start;
+	makeflow_alloc_print_stats(alloc1, "RELEASE");
 	return 1;
 }
 
