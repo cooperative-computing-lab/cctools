@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	q = catalog_query_create(catalog_host, 0, jexpr, stoptime);
+	q = catalog_query_create(catalog_host, jexpr, stoptime);
 	if(!q) {
 		fprintf(stderr, "couldn't query catalog: %s\n", strerror(errno));
 		return 1;
