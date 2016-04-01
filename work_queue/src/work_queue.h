@@ -683,6 +683,12 @@ void work_queue_specify_num_tasks_left(struct work_queue *q, int ntasks);
 */
 void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port);
 
+/** Specify the catalog server(s) the master should report to.
+@param q A work queue object.
+@param hosts The catalog servers given as a semicolon delimited list of hostnames or hostname:port
+*/
+void work_queue_specify_catalog_servers(struct work_queue *q, const char *hosts);
+
 /** Cancel a submitted task using its task id and remove it from queue.
 @param q A work queue object.
 @param id The taskid returned from @ref work_queue_submit.

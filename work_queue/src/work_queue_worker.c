@@ -1843,12 +1843,12 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	return 1;
 }
 
-static int serve_master_by_name( const char *catalog_host, int catalog_port, const char *project_regex )
+static int serve_master_by_name( const char *catalog_hosts, const char *project_regex )
 {
 	static char *last_addr = NULL;
 	static int   last_port = -1;
 
-	struct list *masters_list = work_queue_catalog_query_cached(catalog_host,catalog_port,project_regex);
+	struct list *masters_list = work_queue_catalog_query_cached(catalog_hosts,-1,project_regex);
 
 	debug(D_WQ,"project name %s matches %d masters",project_regex,list_size(masters_list));
 
@@ -2050,8 +2050,7 @@ int main(int argc, char *argv[])
 	int enable_capacity = 1; // enabled by default
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
-	char * catalog_host = CATALOG_HOST;
-	int catalog_port = CATALOG_PORT;
+	char * catalog_hosts = CATALOG_HOST;
 
 	worker_start_time = time(0);
 
@@ -2072,10 +2071,7 @@ int main(int argc, char *argv[])
 			//Left here for backwards compatibility
 			break;
 		case 'C':
-			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "The provided catalog server is invalid. The format of the '-C' option is '-C HOSTNAME:PORT'.\n");
-				exit(1);
-			}
+			catalog_hosts = xxstrdup(optarg);
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -2438,7 +2434,7 @@ int main(int argc, char *argv[])
 		}
 
 		if(project_regex) {
-			result = serve_master_by_name(catalog_host,catalog_port,project_regex);
+			result = serve_master_by_name(catalog_hosts, project_regex);
 		} else {
 			result = serve_master_by_hostport(master_host,master_port,0);
 		}
