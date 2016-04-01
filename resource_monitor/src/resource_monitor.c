@@ -141,6 +141,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "elfheader.h"
+#include "domain_name_cache.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
@@ -980,6 +981,15 @@ int rmonitor_final_summary()
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
 	add_verbatim_field(monitor_self_info);
 
+	char hostname[DOMAIN_NAME_MAX];
+	domain_name_cache_guess(hostname);
+
+	char *host_info = NULL;
+	if(strlen(hostname) > 0) {
+		host_info = string_format("host:%s", hostname);
+		add_verbatim_field(host_info);
+	}
+
 	if(log_inotify)
 	{
 		rmonitor_find_files_final_sizes();
@@ -1012,6 +1022,9 @@ int rmonitor_final_summary()
 
 	if(monitor_self_info)
 		free(monitor_self_info);
+
+	if(host_info)
+		free(host_info);
 
 	int status;
 
