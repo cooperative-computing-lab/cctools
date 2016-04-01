@@ -68,6 +68,7 @@ struct dag_node {
 	uint64_t target_size;			/* size of dag_files of the node's productions */
 
 	struct set *terminal_files;		/* set of dag_files that exist until the end of the Makeflow */
+	struct set *coexist_files;		/* set of dag_files that exist until the end of the Makeflow */
 
 	struct list *residual_nodes;	/* list of dag_nodes that describe residual sybc */
 	struct set *residual_files;		/* set of dag_files of the node's residual */
@@ -104,6 +105,8 @@ struct dag_node {
 	struct set *res_files;
 	uint64_t wgt;
 	struct set *wgt_files;
+	uint64_t max_wgt;
+	struct set *max_wgt_files;
 	uint64_t diff;
 
 	struct list *run_order;			/* list of child and the order to maintain committed size */

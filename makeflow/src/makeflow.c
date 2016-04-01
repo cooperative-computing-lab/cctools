@@ -420,7 +420,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 				min = node1->footprint_min_size;
 			}
 			if(node1->footprint_max_size > max){
-				max = node1->footprint_min_size;
+				max = node1->footprint_max_size;
 			}
 		}
 		printf("%s\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",dagfile, min,max,res);
