@@ -29,12 +29,13 @@
 
 #define MAX_FILE_DESCRIPTOR_COUNT 500 /* maximum depth of file tree walking */
 
-/* RM_SUCCESS:    task exit status is zero, and the monitor did not have any errors
- * RM_TASK_ERROR: task exit status is non-zero, and the monitor did not have any errors
- * RM_OVERFLOW:   task used more resources than the limits specified, and was terminated
+/* RM_SUCCESS:     task exit status is zero, and the monitor did not have any errors
+ * RM_TASK_ERROR:  task exit status is non-zero, and the monitor did not have any errors
+ * RM_OVERFLOW:    task used more resources than the limits specified, and was terminated
+ * RM_TIME_EXPIRE: task started or ended before or after 'start' and 'end' times, respectively.
  * RM_MONITOR_ERROR: monitor could not execute the task
 */
-enum rmonitor_errors { RM_SUCCESS, RM_TASK_ERROR, RM_OVERFLOW, RM_MONITOR_ERROR };
+enum rmonitor_errors { RM_SUCCESS, RM_TASK_ERROR, RM_OVERFLOW, RM_TIME_EXPIRE, RM_MONITOR_ERROR };
 
 //time in usecs, no seconds:
 struct rmonitor_cpu_time_info

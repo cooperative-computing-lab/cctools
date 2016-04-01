@@ -86,7 +86,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 
-#define FIRST_ALLOCATION_EVERY_NTASKS 20
+#define FIRST_ALLOCATION_EVERY_NTASKS 100
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -1666,8 +1666,12 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	w->finished_tasks++;
 
 	// Convert resource_monitor status into work queue status if needed.
-	if(q->monitor_mode && t->return_status == RM_OVERFLOW) {
-		update_task_result(t, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+	if(q->monitor_mode) {
+		if(t->return_status == RM_OVERFLOW) {
+			update_task_result(t, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+		} else if(t->return_status == RM_TIME_EXPIRE) {
+			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
+		}
 	}
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
@@ -5174,7 +5178,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
-				if(next == CATEGORY_ALLOCATION_ERROR) {
+				if(next != CATEGORY_ALLOCATION_ERROR) {
 					debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 					t->resource_request = next;
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
