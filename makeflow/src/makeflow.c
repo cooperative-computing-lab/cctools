@@ -656,7 +656,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
-	if(info->exited_normally && info->exit_code == 0) {
+
+	if(getenv("CCTOOLS_LOOP_DEV_FULL")) {
+		job_failed = 1;
+	}
+	else if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
 			if(!makeflow_node_check_file_was_created(n, f))
@@ -721,6 +725,21 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			{
 				makeflow_failed_flag = 1;
 			}
+		}
+		else if(getenv("CCTOOLS_LOOP_DEV_FULL")) {
+			unsetenv("CCTOOLS_LOOP_DEV_FULL");
+			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
+			int new_resources = dag_node_update_resources(n, 1);
+			if(new_resources) {
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+			} else {
+				makeflow_failed_flag = 1;
+			}
+		}
+		else
+		{
+			makeflow_failed_flag = 1;
 		}
 	} else {
 		/* Mark source files that have been used by this node */

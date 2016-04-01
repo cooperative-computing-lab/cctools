@@ -139,7 +139,7 @@ all: $(TARGETS)
 
 libdttools.a: $(OBJECTS)
 
-$(PROGRAMS) $(TEST_PROGRAMS): $(LIBRARIES)
+$(PROGRAMS) $(TEST_PROGRAMS): libdttools.a
 
 auth_globus.o: auth_globus.c
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_GLOBUS_CCFLAGS) $<

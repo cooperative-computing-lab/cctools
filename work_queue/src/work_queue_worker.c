@@ -518,7 +518,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		fstat(p->output_fd, &st);
 		output_length = st.st_size;
 		lseek(p->output_fd, 0, SEEK_SET);
-		send_master_message(master, "result %d %d %lld %llu %d\n", p->task_status, p->exit_status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->task->taskid);
+		send_master_message(master, "result %d %d %lld %llu %d %d\n", p->task_status, p->exit_status, (long long) output_length, (unsigned long long) p->execution_end-p->execution_start, p->loop_mount, p->task->taskid);
 		link_stream_from_fd(master, p->output_fd, output_length, time(0)+active_timeout);
 
 		total_task_execution_time += (p->execution_end - p->execution_start);
@@ -530,7 +530,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		} else {
 			output_length = 0;
 		}
-		send_master_message(master, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %d %lld %llu %d %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, p->loop_mount, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
@@ -620,6 +620,12 @@ static int handle_tasks(struct link *master)
 				debug(D_WQ, "task %d (pid %d) exited abnormally with signal %d",p->task->taskid,p->pid,p->exit_status);
 			} else {
 				p->exit_status = WEXITSTATUS(status);
+				FILE *loop_full_check;
+				if(p->loop_mount == 1 && (loop_full_check = fopen("./loop_dev_report.txt", "r"))) {
+					p->task_status = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
+					fclose(loop_full_check);
+					unlink("./loop_dev_report.txt");
+				}
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 			}
 

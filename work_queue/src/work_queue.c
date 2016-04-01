@@ -1648,7 +1648,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	struct work_queue_task *t;
 
-	int task_status, exit_status;
+	int task_status, exit_status, loop_dev;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
@@ -1659,11 +1659,11 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid
-	char items[4][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %s %" SCNd64, items[0], items[1], items[2], items[3], &taskid);
+	//Format: task completion status, exit status (exit code or signal), output length, execution time, loop device, taskid
+	char items[5][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "result %s %s %s %s %s %" SCNd64, items[0], items[1], items[2], items[3], items[4], &taskid);
 
-	if(n < 5) {
+	if(n < 6) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return WORKER_FAILURE;
 	}
@@ -1671,6 +1671,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	task_status = atoi(items[0]);
 	exit_status   = atoi(items[1]);
 	output_length = atoll(items[2]);
+	loop_dev = atoi(items[4]);
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
@@ -1770,8 +1771,15 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 		}
 	}
-
-	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		if(loop_dev) { //If a loop device was used, set environment variable accordingly to alert Makeflow
+			setenv("CCTOOLS_LOOP_DEV_FULL", "1", 1);
+		}
+		/* if resource exhaustion, mark the task for possible resubmission. */
+		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+	} else {
+		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	}
 
 	return SUCCESS;
 }
