@@ -25,14 +25,13 @@ Connects to a catalog server, issues a query, and waits for the results.
 The caller may specify a specific catalog host and port.
 If none is given, then the environment variables CATALOG_HOST and CATALOG_PORT will be consulted.
 If neither is set, the system will contact chirp.cse.nd.edu on port 9097.
-@param host The catalog server to query, or null for the default server.
-@param port The port of the server, or 0 for the default port.
+@param hosts A semicolon delimited list of catalog servers to query, or null for the default server.
 @param filter_expr An optional expression to filter the results in JX syntax.
  A null pointer indicates no filter.
 @param stoptime The absolute time at which to abort.
 @return A catalog query object on success, or null on failure.
 */
-struct catalog_query *catalog_query_create(const char *host, int port, struct jx *filter_expr, time_t stoptime);
+struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime);
 
 /** Read the next object from a query.
 Returns the next @ref jx expressions from the issued query.

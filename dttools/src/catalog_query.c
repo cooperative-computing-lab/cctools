@@ -24,39 +24,64 @@ struct catalog_query {
 	struct jx_item *current;
 };
 
-struct catalog_query *catalog_query_create(const char *host, int port, struct jx *filter_expr, time_t stoptime)
+/* Given a semicolon delimited list of host:port or host, set the values pointed
+   to by host and port, using the default port if not provided. Return the address
+   of the next hostport in the string, or NULL if there are no more
+*/
+const char *parse_hostlist(const char *hosts, char *host, int *port)
 {
-	if(!host)
-		host = CATALOG_HOST;
-	if(!port)
-		port = CATALOG_PORT;
-
-	char *url = string_format("http://%s:%d/query.json", host, port);
-	struct link *link = http_query(url, "GET", stoptime);
-	free(url);
-
-	if(!link) return 0;
-
-	struct jx *j = jx_parse_link(link,stoptime);
-
-	link_close(link);
-
-	if(!j) {
-		debug(D_DEBUG,"query result failed to parse as JSON");
-		return 0;
+	const char *next = strchr(hosts, ';');
+	switch (sscanf(hosts, "%[^:;]:%d", host, port)) {
+	case 1:
+		*port = CATALOG_PORT;
+		break;
+	case 2:
+		break;
+	default:
+		debug(D_DEBUG, "bad host specification: %s", hosts);
+		return NULL;
+		break;
 	}
+	return next ? next + 1 : NULL;
+}
 
-	if(!jx_istype(j,JX_ARRAY)) {
-		debug(D_DEBUG,"query result is not a JSON array");
-		jx_delete(j);
-		return 0;
-	}
+struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime)
+{
+	int port;
+	const char *next_host = hosts;
+	char host[DOMAIN_NAME_MAX];
+	
+	do {
+		next_host = parse_hostlist(next_host, host, &port);
 
-	struct catalog_query *q = xxmalloc(sizeof(*q));
-	q->data = j;
-	q->current = j->u.items;
-	q->filter_expr = filter_expr;
-	return q;
+		char *url = string_format("http://%s:%d/query.json", host, port);
+		struct link *link = http_query(url, "GET", stoptime);
+		free(url);
+
+		if(!link) continue;
+
+		struct jx *j = jx_parse_link(link,stoptime);
+
+		link_close(link);
+
+		if(!j) {
+			debug(D_DEBUG,"query result failed to parse as JSON");
+			continue;
+		}
+
+		if(!jx_istype(j,JX_ARRAY)) {
+			debug(D_DEBUG,"query result is not a JSON array");
+			jx_delete(j);
+			continue;
+		}
+
+		struct catalog_query *q = xxmalloc(sizeof(*q));
+		q->data = j;
+		q->current = j->u.items;
+		q->filter_expr = filter_expr;
+		return q;
+	} while (next_host);
+	return NULL;
 }
 
 struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime)
@@ -101,9 +126,9 @@ int catalog_query_send_update(const char *hosts, const char *text)
 {
 	int port;
 	int sent = 0;
-	const char *current_host = hosts;
+	const char *next_host = hosts;
 	char address[DATAGRAM_ADDRESS_MAX];
-	char host[DOMAIN_NAME_MAX + 8];
+	char host[DOMAIN_NAME_MAX];
 	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
 
 	if (!d) {
@@ -111,17 +136,7 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	}
 
 	do {
-		switch (sscanf(current_host, "%[^:;]:%d", host, &port)) {
-			case 1:
-				port = CATALOG_PORT;
-				break;
-			case 2:
-				break;
-			default:
-				debug(D_DEBUG, "bad host specification: %s", current_host);
-				continue;
-		}
-
+		next_host = parse_hostlist(next_host, host, &port);
 		if (domain_name_cache_lookup(host, address)) {
 			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
 			datagram_send(d, text, strlen(text), address, port);
@@ -129,7 +144,7 @@ int catalog_query_send_update(const char *hosts, const char *text)
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
 		}
-	} while ((current_host = strchr(current_host, ';')) && current_host++);
+	} while (next_host);
 
 	datagram_delete(d);
 	return sent;
