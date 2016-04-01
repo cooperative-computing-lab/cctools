@@ -908,7 +908,7 @@ void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *retrn, c
 	}
 }
 
-void dag_node_print_footprint(struct dag *d, char *output)
+void dag_node_print_footprint(struct dag *d, struct dag_node *base, char *output)
 {
 	struct dag_node *n;
 
@@ -944,6 +944,17 @@ void dag_node_print_footprint(struct dag *d, char *output)
 	for(n = d->nodes; n; n = n->next) {
 		dag_node_print_footprint_node(n, out, retrn, node_retrn, delim);
 	}
+	fprintf(out, "Base %s %"PRIu64" %s %"PRIu64" %s %"PRIu64"%s%s%s%s%s",
+				delim, base->footprint_min_size, delim, base->footprint_max_size,
+				delim, base->residual_size, delim,delim,delim,delim,node_retrn);
+
+	list_pop_tail(base->residual_nodes);
+	dag_node_print_node_list(base->residual_nodes, out, delim);
+	dag_node_print_file_set(base->footprint_min_files, out, delim);
+	dag_node_print_file_set(base->footprint_max_files, out, delim);
+	dag_node_print_file_set(base->residual_files, out, delim);
+	fprintf(out,"%s%s%s%s",
+		delim,delim,delim,retrn);
 
 	if(tex)
 		fprintf(out, "\\end{tabular}\n");

@@ -408,22 +408,27 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
 	if(storage_print){
-		dag_node_print_footprint(d, storage_print);
-
-		uint64_t min, max, res;
-
 		list_first_item(n->residual_nodes);
 		node1 = list_peek_current(n->residual_nodes);
-		res = node1->residual_size;
+		n->residual_size = node1->residual_size;
+		set_delete(n->residual_files);
+		n->residual_files = set_duplicate(node1->residual_files);
 		while((node1 = list_next_item(n->residual_nodes))){
-			if(node1->footprint_min_size > min){
-				min = node1->footprint_min_size;
+			if(node1->footprint_min_size > n->footprint_min_size){
+				set_delete(n->footprint_min_files);
+				n->footprint_min_size = node1->footprint_min_size;
+				n->footprint_min_files = set_duplicate(node1->footprint_min_files);
 			}
-			if(node1->footprint_max_size > max){
-				max = node1->footprint_max_size;
+			if(node1->footprint_max_size > n->footprint_max_size){
+				set_delete(n->footprint_max_files);
+				n->footprint_max_size = node1->footprint_max_size;
+				n->footprint_max_files = set_duplicate(node1->footprint_max_files);
 			}
 		}
-		printf("%s\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",dagfile, min,max,res);
+
+		dag_node_print_footprint(d, n, storage_print);
+		printf("%s\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",
+				dagfile,n->footprint_min_size,n->footprint_max_size,n->residual_size);
 		exit(0);
 	}
 	uint64_t end = timestamp_get();

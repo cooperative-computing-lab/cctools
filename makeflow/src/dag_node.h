@@ -167,7 +167,7 @@ void dag_node_determine_children(struct dag_node *n);
 void dag_node_prepare_node_terminal_files(struct dag_node *n);
 void dag_node_prepare_node_size(struct dag_node *n);
 void dag_node_determine_footprint(struct dag_node *n);
-void dag_node_print_footprint(struct dag *d, char *output);
+void dag_node_print_footprint(struct dag *d, struct dag_node *base, char *output);
 void dag_node_reset_updated(struct dag_node *n);
 
 int dag_node_dependencies_active(struct dag_node *n);
