@@ -29,14 +29,12 @@ See the file COPYING for details.</p>
 Parrot is a tool for attaching old programs to new storage systems.  Parrot makes a remote storage system appear as a file system to a legacy application.  Parrot does not require any special privileges, any recompiling, or any change whatsoever to existing programs.  It can be used by normal users doing normal tasks.  For example, an anonymous FTP service is made available to <tt>vi</tt> like so:
 <code>% parrot_run vi /anonftp/ftp.gnu.org/pub/README</code>
 <p>
-Parrot is useful to <i>users</i> of distributed systems, because it frees them from rewriting code to work with new systems and relying on remote administrators to trust and install new software.
-Parrot is also useful to <i>developers</i> of distributed systems, because it allows rapid deployment of new code to real applications and real users that do not have the time, inclination, or permissions to build a kernel-level filesystem.
+Parrot is particularly handy for distributed computing, because it allows
+your application to access remote software and data, regardless of where
+it is actually executing.  For example, it is commonly used in the high
+energy physics community to obtain remote access to the CVMFS distributed
+software repository.
 <p>
-Parrot currently supports a variety of remote I/O systems, all detailed below.
-We welcome contributions of new remote I/O drivers from others.
-However, if you are working on a protocol driver
-please drop us a note so that we can make sure work
-is not duplicated.
 <p>
 Almost any application - whether static or dynmically linked,
 standard or commercial, command-line or GUI - should work with
@@ -59,7 +57,7 @@ system call trapping.  Ports to other platforms and processors
 Linux may be possible in the future.
 <p>
 Like any software, Parrot is bound to have some bugs.
-Please check the <a href="http://ccl.cse.nd.edu/software/parrot/known-bugs.html">known bugs</a> page for the latest scoop.
+Please post questions to our <a href=http://ccl.cse.nd.edu/community/forum>forum</a> and bugs to our <a href=https://github.com/cooperative-computing-lab/cctools/issues>issue tracker</a>.
 
 <h2 id="installation">Installation<a class="sectionlink" href="#installation" title="Link to this section.">&#x21d7;</a></h2>
 
