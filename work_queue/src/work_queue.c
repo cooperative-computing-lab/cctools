@@ -5462,6 +5462,8 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
+	} else if(!strcmp(name, "send-receive-ratio")) {
+		work_queue_send_receive_ratio(q, value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
