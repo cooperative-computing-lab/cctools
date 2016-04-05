@@ -17,12 +17,22 @@ See the file COPYING for details.
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "domain_name.h"
+#include "set.h"
+#include "list.h"
 
 struct catalog_query {
 	struct jx *data;
 	struct jx *filter_expr;
 	struct jx_item *current;
 };
+
+struct catalog_host {
+	char *host;
+	char *url;
+	int down;
+};
+
+static struct set *down_hosts = NULL;
 
 /* Given a semicolon delimited list of host:port or host, set the values pointed
    to by host and port, using the default port if not provided. Return the address
@@ -47,18 +57,56 @@ const char *parse_hostlist(const char *hosts, char *host, int *port)
 
 struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime)
 {
-	int port;
-	const char *next_host = hosts;
-	char host[DOMAIN_NAME_MAX];
-	
+	struct catalog_query *q = NULL;
+	const char *next_host;
+	char *n;
+	struct catalog_host *h;
+	struct list *sorted_hosts;
+	struct list *previously_up = list_create();
+	struct list *previously_down = list_create();
+
+	if(string_null_or_empty(hosts)) {
+		next_host = CATALOG_HOST;
+	} else {
+		next_host = hosts;
+	}
+
+	if(!down_hosts) {
+		down_hosts = set_create(0);
+	}
+
 	do {
+		int port;
+		char host[DOMAIN_NAME_MAX];
+		h = xxmalloc(sizeof(*h));
 		next_host = parse_hostlist(next_host, host, &port);
 
-		char *url = string_format("http://%s:%d/query.json", host, port);
-		struct link *link = http_query(url, "GET", stoptime);
-		free(url);
+		h->host = xxstrdup(host);
+		h->url = string_format("http://%s:%d/query.json", host, port);
+		h->down = 0;
 
-		if(!link) continue;
+		set_first_element(down_hosts);
+		while((n = set_next_element(down_hosts))) {
+			if(!strcmp(n, host)) {
+				h->down = 1;
+			}
+		}
+		if(h->down) {
+			list_push_tail(previously_down, h);
+		} else {
+			list_push_tail(previously_up, h);
+		}
+	} while (next_host);
+
+	sorted_hosts = list_splice(previously_up, previously_down);
+
+	list_first_item(sorted_hosts);
+	while((h = list_next_item(sorted_hosts))) {
+		struct link *link = http_query(h->url, "GET", stoptime);
+
+		if(!link) {
+			goto FAILURE;
+		}
 
 		struct jx *j = jx_parse_link(link,stoptime);
 
@@ -66,22 +114,48 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 
 		if(!j) {
 			debug(D_DEBUG,"query result failed to parse as JSON");
-			continue;
+			goto FAILURE;
 		}
 
 		if(!jx_istype(j,JX_ARRAY)) {
 			debug(D_DEBUG,"query result is not a JSON array");
 			jx_delete(j);
-			continue;
+			goto FAILURE;
 		}
 
-		struct catalog_query *q = xxmalloc(sizeof(*q));
+		q = xxmalloc(sizeof(*q));
 		q->data = j;
 		q->current = j->u.items;
 		q->filter_expr = filter_expr;
-		return q;
-	} while (next_host);
-	return NULL;
+
+		if(h->down) {
+			debug(D_DEBUG,"catalog server at %s is back up", h->host);
+			set_first_element(down_hosts);
+			while((n = set_next_element(down_hosts))) {
+				if(!strcmp(n, h->host)) {
+					free(n);
+					set_remove(down_hosts, n);
+					break;
+				}
+			}
+		}
+		break;
+
+	FAILURE:
+		if(!h->down) {
+			debug(D_DEBUG,"catalog server at %s seems to be down", h->host);
+			set_insert(down_hosts, xxstrdup(h->host));
+		}
+	}
+
+	list_first_item(sorted_hosts);
+	while((h = list_next_item(sorted_hosts))) {
+		free(h->host);
+		free(h->url);
+		free(h);
+	}
+	free(sorted_hosts);
+	return q;
 }
 
 struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime)
