@@ -86,7 +86,7 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 
-#define FIRST_ALLOCATION_EVERY_NTASKS 20
+#define FIRST_ALLOCATION_EVERY_NTASKS 100
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -1687,8 +1687,12 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	w->finished_tasks++;
 
 	// Convert resource_monitor status into work queue status if needed.
-	if(q->monitor_mode && t->return_status == RM_OVERFLOW) {
-		update_task_result(t, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+	if(q->monitor_mode) {
+		if(t->return_status == RM_OVERFLOW) {
+			update_task_result(t, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+		} else if(t->return_status == RM_TIME_EXPIRE) {
+			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
+		}
 	}
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
@@ -2640,9 +2644,14 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 		limits->gpus   = MIN(label->gpus,   w->resources->gpus.total);
 	}
 
-	/* consider end time by itself, regardless of labeling. */
-	if(t->resources_requested && t->resources_requested->end > 0) {
-		limits->end = t->resources_requested->end;
+	/* consider times by themselves */
+	if(t->resources_requested) {
+
+		if(t->resources_requested->end > 0)
+			limits->end = t->resources_requested->end;
+
+		if(t->resources_requested->wall_time > 0)
+			limits->wall_time = t->resources_requested->wall_time;
 	}
 
 	return limits;
@@ -3604,7 +3613,7 @@ void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max
 
 static void set_task_unlabel_flag( struct work_queue_task *t )
 {
-	if(t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus < 0 && t->resources_requested->wall_time < 0)
+	if(t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus)
 	{
 		if(t->resource_request == CATEGORY_ALLOCATION_USER)
 			t->resource_request = CATEGORY_ALLOCATION_UNLABELED;
@@ -3678,12 +3687,6 @@ void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t usecon
 	else
 	{
 		t->resources_requested->end = useconds;
-
-		/* If end time is specified, assume at least one core is specified.
-		 * Otherwise, a single worker will get all the tasks. */
-		if(t->resources_requested->cores < 1) {
-			work_queue_task_specify_cores(t, 1);
-		}
 	}
 }
 
@@ -3696,12 +3699,6 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t us
 	else
 	{
 		t->resources_requested->wall_time = useconds;
-
-		/* If wall time is specified, assume at least one core is specified.
-		 * Otherwise, a single worker will get all the tasks. */
-		if(t->resources_requested->cores < 1) {
-			work_queue_task_specify_cores(t, 1);
-		}
 	}
 }
 
@@ -5217,7 +5214,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
-				if(next == CATEGORY_ALLOCATION_ERROR) {
+				if(next != CATEGORY_ALLOCATION_ERROR) {
 					debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 					t->resource_request = next;
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
@@ -5465,6 +5462,8 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
+	} else if(!strcmp(name, "send-receive-ratio")) {
+		work_queue_send_receive_ratio(q, value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);

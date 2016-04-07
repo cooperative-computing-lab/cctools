@@ -20,7 +20,8 @@ typedef enum {
 } category_allocation_t;
 
 typedef enum {
-	CATEGORY_ALLOCATION_MODE_MIN_WASTE = 0,
+	CATEGORY_ALLOCATION_MODE_MAX = 0,
+	CATEGORY_ALLOCATION_MODE_MIN_WASTE,
 	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
 } category_mode_t;
 
