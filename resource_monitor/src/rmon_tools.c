@@ -486,7 +486,7 @@ void rmDsummary_print(FILE *output, struct rmDsummary *so) {
 	to_internal(so, s, total_files, "files");
 	to_internal(so, s, disk, "MB");
 
-	rmsummary_print(output, s, 0);
+	rmsummary_print(output, s, /* pprint */ 1, /* extra fields */ 0);
 	rmsummary_delete(s);
 
 	return;

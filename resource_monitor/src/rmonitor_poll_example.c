@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
 			resources->cores);
 
 	fprintf(stdout, "\n\njson output:\n");
-	rmsummary_print(stdout, resources, 0);
+	rmsummary_print(stdout, resources, /* pprint */ 1, /* extra fields */ 0);
 
 	rmsummary_delete(resources);
 

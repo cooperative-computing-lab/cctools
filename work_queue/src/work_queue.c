@@ -4694,7 +4694,7 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 			jx_insert_string(extra, "master_name", q->name);
 		}
 
-		rmsummary_print(final, q->measured_local_resources, extra);
+		rmsummary_print(final, q->measured_local_resources, /* pprint */ 0, extra);
 
 		copy_fd_to_stream(summs_fd, final);
 

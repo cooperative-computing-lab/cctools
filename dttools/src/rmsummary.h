@@ -76,7 +76,7 @@ struct rmsummary_field
 	}       value;
 };
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fields);
+void rmsummary_print(FILE *stream, struct rmsummary *s, int pprint, struct jx *verbatim_fields);
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);

@@ -180,7 +180,8 @@ struct hash_table *wdirs;       /* Maps paths to working directory structures. *
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
 
-static int   follow_chdir = 0; /* Keep track of all the working directories per process. */
+static int follow_chdir = 0;    /* Keep track of all the working directories per process. */
+static int pprint_summaries = 1; /* Pretty-print json summaries. */
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 static char **inotify_watches;  /* Keeps track of created inotify watches. */
@@ -1018,7 +1019,7 @@ int rmonitor_final_summary()
 		rmonitor_file_io_summaries();
 	}
 
-	rmsummary_print(log_summary, summary, verbatim_summary_fields);
+	rmsummary_print(log_summary, summary, pprint_summaries, verbatim_summary_fields);
 
 	if(monitor_self_info)
 		free(monitor_self_info);
@@ -1666,6 +1667,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
+    fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
 }
 
 
@@ -1788,7 +1790,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_SH_CMDLINE,
 		LONG_OPT_WORKING_DIRECTORY,
 		LONG_OPT_FOLLOW_CHDIR,
-		LONG_OPT_MEASURE_DIR
+		LONG_OPT_MEASURE_DIR,
+		LONG_OPT_NO_PPRINT
 	};
 
     static const struct option long_options[] =
@@ -1805,12 +1808,13 @@ int main(int argc, char **argv) {
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
-		    {"follow-chdir", no_argument, 0,  LONG_OPT_FOLLOW_CHDIR},
-		    {"measure-dir", required_argument, 0,  LONG_OPT_MEASURE_DIR},
+		    {"follow-chdir", no_argument,       0,  LONG_OPT_FOLLOW_CHDIR},
+		    {"measure-dir",  required_argument, 0,  LONG_OPT_MEASURE_DIR},
+		    {"no-pprint",    no_argument,       0,  LONG_OPT_NO_PPRINT},
 
-		    {"with-output-files",   required_argument, 0,  'O'},
-		    {"with-time-series",    no_argument, 0, LONG_OPT_TIME_SERIES},
-		    {"with-inotify",   no_argument, 0, LONG_OPT_OPENED_FILES},
+		    {"with-output-files",      required_argument, 0,  'O'},
+		    {"with-time-series",       no_argument, 0, LONG_OPT_TIME_SERIES},
+		    {"with-inotify",           no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
 		    {0, 0, 0, 0}
@@ -1885,6 +1889,9 @@ int main(int argc, char **argv) {
 					debug(D_FATAL, "Directory '%s' does not exist.", optarg);
 					exit(RM_MONITOR_ERROR);
 				}
+				break;
+			case LONG_OPT_NO_PPRINT:
+				pprint_summaries = 0;
 				break;
 			default:
 				show_help(argv[0]);

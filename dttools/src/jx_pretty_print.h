@@ -4,8 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef JX_PRINT_H
-#define JX_PRINT_H
+#ifndef JX_PPRINT_H
+#define JX_PPRINT_H
 
 /** @file jx_print.h Print JX expressions to strings, files, and buffers. */
 

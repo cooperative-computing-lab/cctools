@@ -27,6 +27,7 @@
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_pretty_print.h"
+#include "jx_print.h"
 #include "list.h"
 #include "macros.h"
 #include "rmsummary.h"
@@ -670,7 +671,7 @@ struct rmsummary *rmsummary_parse_next(FILE *stream)
 	return s;
 }
 
-void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fields)
+void rmsummary_print(FILE *stream, struct rmsummary *s, int pprint, struct jx *verbatim_fields)
 {
 	struct jx *jsum = rmsummary_to_json(s, 0);
 
@@ -686,7 +687,12 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, struct jx *verbatim_fiel
 		}
 	}
 
-	jx_pretty_print_stream(jsum, stream);
+	if(pprint) {
+		jx_pretty_print_stream(jsum, stream);
+	} else {
+		jx_print_stream(jsum, stream);
+	}
+
 	jx_delete(jsum);
 }
 
