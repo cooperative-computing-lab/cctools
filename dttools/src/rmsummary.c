@@ -413,9 +413,45 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 	if(strcmp(key, "limits_exceeded") == 0) {
 		s->limits_exceeded = json_to_rmsummary(value);
 		return 1;
+	} else if(strcmp(key, "peak_times") == 0) {
+		s->peak_times = json_to_rmsummary(value);
+		return 1;
 	}
 
 	return 0;
+}
+
+#define peak_time_to_json(o, u, s, f)\
+	if((s)->f > -1) {\
+		jx_insert(o, jx_string(#f), u->float_flag ? jx_double(rmsummary_to_external_unit("wall_time", (s)->f)) : jx_integer(rmsummary_to_external_unit("wall_time", (s)->f)));\
+	}
+
+struct jx *peak_times_to_json(struct rmsummary *s) {
+	if(!units_initialized)
+		initialize_units();
+
+	struct jx *output = jx_object(NULL);
+
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, "wall_time");
+
+	peak_time_to_json(output, cf, s, disk);
+	peak_time_to_json(output, cf, s, total_files);
+	peak_time_to_json(output, cf, s, bandwidth);
+	peak_time_to_json(output, cf, s, bytes_sent);
+	peak_time_to_json(output, cf, s, bytes_received);
+	peak_time_to_json(output, cf, s, bytes_written);
+	peak_time_to_json(output, cf, s, bytes_read);
+	peak_time_to_json(output, cf, s, swap_memory);
+	peak_time_to_json(output, cf, s, virtual_memory);
+	peak_time_to_json(output, cf, s, memory);
+	peak_time_to_json(output, cf, s, total_processes);
+	peak_time_to_json(output, cf, s, max_concurrent_processes);
+	peak_time_to_json(output, cf, s, cores);
+	peak_time_to_json(output, cf, s, cpu_time);
+
+	jx_insert(output, jx_string("units"), jx_string(cf->external_unit));
+
+	return output;
 }
 
 
@@ -435,6 +471,13 @@ struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 		initialize_units();
 
 	struct jx *output = jx_object(NULL);
+
+	if(!only_resources) {
+		if(s->peak_times) {
+			struct jx *peaks = peak_times_to_json(s->peak_times);
+			jx_insert(output, jx_string("peak_times"), peaks);
+		}
+	}
 
 	field_to_json(output, s, disk);
 	field_to_json(output, s, total_files);
@@ -459,6 +502,7 @@ struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 		{
 			if( strcmp(s->exit_type, "signal") == 0 ) {
 				jx_insert_integer(output, "signal", s->signal);
+				jx_insert_string(output, "exit_type", "signal");
 			} else if( strcmp(s->exit_type, "limits") == 0 ) {
 				if(s->limits_exceeded) {
 					struct jx *lim = rmsummary_to_json(s->limits_exceeded, 1);
@@ -658,6 +702,7 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->exit_type = NULL;
 	s->task_id   = NULL;
 	s->limits_exceeded = NULL;
+	s->peak_times = NULL;
 
 	s->last_error  = 0;
 	s->exit_status = 0;
@@ -684,6 +729,9 @@ void rmsummary_delete(struct rmsummary *s)
 
 	if(s->limits_exceeded)
 		rmsummary_delete(s->limits_exceeded);
+
+	if(s->peak_times)
+		rmsummary_delete(s->peak_times);
 
 	free(s);
 }
@@ -748,6 +796,38 @@ static int64_t max_field(int64_t d, int64_t s)
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 {
 	rmsummary_bin_op(dest, src, max_field);
+}
+
+#define max_op_w_time(dest, src, field)\
+	if((dest)->field < (src)->field) {\
+		(dest)->field = (src)->field;\
+		(dest)->peak_times->field = (dest)->wall_time;\
+	}
+
+void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src)
+{
+	if(!dest->peak_times)
+		dest->peak_times = rmsummary_create(-1);
+
+	rmsummary_apply_op(dest, src, max_field, start);
+	rmsummary_apply_op(dest, src, max_field, end);
+	rmsummary_apply_op(dest, src, max_field, wall_time);
+
+	max_op_w_time(dest, src, max_concurrent_processes);
+	max_op_w_time(dest, src, total_processes);
+	max_op_w_time(dest, src, cpu_time);
+	max_op_w_time(dest, src, virtual_memory);
+	max_op_w_time(dest, src, memory);
+	max_op_w_time(dest, src, swap_memory);
+	max_op_w_time(dest, src, bytes_read);
+	max_op_w_time(dest, src, bytes_written);
+	max_op_w_time(dest, src, bytes_sent);
+	max_op_w_time(dest, src, bytes_received);
+	max_op_w_time(dest, src, bandwidth);
+	max_op_w_time(dest, src, total_files);
+	max_op_w_time(dest, src, disk);
+	max_op_w_time(dest, src, cores);
+	max_op_w_time(dest, src, fs_nodes);
 }
 
 /* Select the min of the fields, ignoring negative numbers */

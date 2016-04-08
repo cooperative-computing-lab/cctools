@@ -803,7 +803,7 @@ void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
     if(!tr)
         return;
 
-    rmsummary_merge_max(result, tr);
+    rmsummary_merge_max_w_time(result, tr);
 
 	/* if we are running with the --sh option, we subtract one process (the sh process). */
 	if(sh_cmd_line) {
@@ -1760,6 +1760,7 @@ int main(int argc, char **argv) {
     signal(SIGTERM, rmonitor_final_cleanup);
 
     summary          = calloc(1, sizeof(struct rmsummary));
+    summary->peak_times = rmsummary_create(-1);
     resources_limits = rmsummary_create(-1);
     resources_flags  = rmsummary_create(0);
 
