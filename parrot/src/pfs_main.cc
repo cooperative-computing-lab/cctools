@@ -378,11 +378,8 @@ static void handle_event( pid_t pid, int status, struct rusage *usage )
 		} else {
 			clone_files = p->syscall_args[0]&CLONE_FILES;
 		}
-		child = pfs_process_create(cpid,p,clone_files);
+		child = pfs_process_create(cpid,p,p->syscall_args[0]&CLONE_THREAD,clone_files);
 		child->syscall_result = 0;
-		if(p->syscall_args[0]&CLONE_THREAD)
-			child->tgid = p->tgid;
-		child->state = PFS_PROCESS_STATE_USER;
 		if (tracer_continue(p->tracer,0) == -1) /* child starts stopped. */
 			return;
 	} else if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
@@ -1221,7 +1218,7 @@ int main( int argc, char *argv[] )
 	if (tracer_attach(pid) == -1)
 		fatal("could not trace child");
 	kill(pid, SIGUSR1);
-	p = pfs_process_create(pid,NULL,0);
+	p = pfs_process_create(pid,NULL,0,0);
 	if(!p) {
 		if(pfs_write_rval) {
 			write_rval("noattach", 0);
@@ -1230,7 +1227,6 @@ int main( int argc, char *argv[] )
 		fatal("unable to attach to pid %d: %s",pid,strerror(errno));
 	}
 
-	p->state = PFS_PROCESS_STATE_USER;
 	snprintf(p->name,sizeof(p->name),"%s",argv[optind]);
 
 	/* We perform wait4 until there are no tracees left to wait for.
