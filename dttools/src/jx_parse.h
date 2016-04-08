@@ -48,6 +48,9 @@ void jx_parser_read_string( struct jx_parser *p, const char *str );
 /** Attach parser to a link.  @param p A parser object.  @param l A @ref link object.  @param stoptime The absolute time at which to stop. */
 void jx_parser_read_link( struct jx_parser *p, struct link *l, time_t stoptime );
 
+/** Parse and return a single value. This function is useful for streaming multiple independent values from a single source. @param p A parser object @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
+struct jx * jx_parser_yield( struct jx_parser *p );
+
 /** Parse a JX expression. Note that in the event of a parse error, this function can return a partial result, reflecting the text that was parseable. You must call @ref jx_parser_errors to determine if the parse was successul.  @param p A parser created by @ref jx_parser_create.  @return A JX expression, or null if nothing was parsed. */
 struct jx * jx_parse( struct jx_parser *p );
 

@@ -658,6 +658,17 @@ static struct jx * jx_parse_finish( struct jx_parser *p )
 	return j;
 }
 
+struct jx * jx_parser_yield( struct jx_parser *p )
+{
+	struct jx * j = jx_parse(p);
+	if(jx_parser_errors(p)) {
+		jx_parser_delete(p);
+		jx_delete(j);
+		return 0;
+	}
+	return j;
+}
+
 struct jx * jx_parse_string( const char *str )
 {
 	struct jx_parser *p = jx_parser_create(0);

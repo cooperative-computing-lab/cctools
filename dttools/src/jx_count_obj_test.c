@@ -32,7 +32,9 @@ int main(int argc, char **argv) {
 	int count = 0;
 
 	struct jx *j;
-	while((j = jx_parse_stream(stream))) {
+	struct jx_parser *p = jx_parser_create(0);
+	jx_parser_read_stream(p, stream);
+	while((j = jx_parser_yield(p))) {
 		char *str = jx_print_string(j);
 		fprintf(stdout, "%s\n", str);
 
@@ -41,6 +43,7 @@ int main(int argc, char **argv) {
 
 		count++;
 	}
+	jx_parser_delete(p);
 
 	if(count == n) {
 		exit(0);
