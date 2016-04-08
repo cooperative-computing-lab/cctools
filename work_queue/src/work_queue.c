@@ -5178,7 +5178,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
-				if(next != CATEGORY_ALLOCATION_ERROR) {
+				if(next == CATEGORY_ALLOCATION_AUTO_ZERO || next == CATEGORY_ALLOCATION_AUTO_FIRST || next == CATEGORY_ALLOCATION_AUTO_MAX) {
 					debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 					t->resource_request = next;
 					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);

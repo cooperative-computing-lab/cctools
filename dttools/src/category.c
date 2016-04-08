@@ -478,8 +478,12 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 /* returns the next allocation state. */
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow) {
 
-	if(resource_overflow && (current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX)) {
-		return CATEGORY_ALLOCATION_ERROR;
+	if(resource_overflow) {
+		if(current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
+			return CATEGORY_ALLOCATION_ERROR;
+		} else {
+			return CATEGORY_ALLOCATION_AUTO_MAX;
+		}
 	}
 
 	/* If user specified resources manually, respect the label. */
