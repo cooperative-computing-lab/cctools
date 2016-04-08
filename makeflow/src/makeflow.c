@@ -686,7 +686,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
 			if(n->resources_measured)
 			{
-				rmsummary_print(stderr, n->resources_measured, NULL);
+				rmsummary_print(stderr, n->resources_measured, /* pprint */ 0, /* extra fields */ NULL);
 				fprintf(stderr, "\n");
 			}
 
