@@ -20,10 +20,10 @@ typedef enum {
 } makeflow_alloc_release;
 
 typedef enum {
-	MAKEFLOW_ALLOC_TYPE_MIN,			/* Clean nothing, default. */
 	MAKEFLOW_ALLOC_TYPE_MAX,			/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_TYPE_OFF,			/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_TYPE_SIZE			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_MIN,			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_OUT,			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_OFF			/* Clean nothing, default. */
 } makeflow_alloc_type;
 
 struct makeflow_alloc_unit {

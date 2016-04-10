@@ -141,7 +141,7 @@ uint64_t makeflow_alloc_node_size( struct makeflow_alloc *a, struct dag_node *cu
 	}
 
 	switch(a->enabled){
-		case MAKEFLOW_ALLOC_TYPE_SIZE:
+		case MAKEFLOW_ALLOC_TYPE_OUT:
 			alloc_size = n->target_size;
 			break;
 		case MAKEFLOW_ALLOC_TYPE_MIN:
@@ -167,11 +167,6 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	makeflow_alloc_print_stats(a, "CHECK");
 	if(a->enabled == MAKEFLOW_ALLOC_TYPE_OFF){
-		if(a->storage->used >= a->storage->total){
-			dynamic_alloc += timestamp_get() - start;
-			makeflow_alloc_print_stats(a, "CHECK FAIL OFF");
-			return 0;
-		}
 		dynamic_alloc += timestamp_get() - start;
 		makeflow_alloc_print_stats(a, "CHECK SUCCESS");
 		return 1;
@@ -183,7 +178,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 	alloc1 = makeflow_alloc_traverse_to_node(a, n);
 
 	if(alloc1->nodeid == n->nodeid){
-		if(a->enabled != MAKEFLOW_ALLOC_TYPE_SIZE &&
+		if(a->enabled != MAKEFLOW_ALLOC_TYPE_OUT &&
 			(alloc1->storage->free < n->target_size)){
 
 			dynamic_alloc += timestamp_get() - start;
@@ -266,7 +261,7 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	alloc1 = makeflow_alloc_traverse_to_node(a, n);
 
-	if(alloc1->nodeid == n->nodeid && (a->enabled == MAKEFLOW_ALLOC_TYPE_SIZE)){
+	if(alloc1->nodeid == n->nodeid && (a->enabled == MAKEFLOW_ALLOC_TYPE_OUT)){
 		if(!(makeflow_alloc_grow_alloc(alloc1, makeflow_alloc_node_size(a, n, n)))){
 			dynamic_alloc += timestamp_get() - start;
 			return 0;

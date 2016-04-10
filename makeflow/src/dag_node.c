@@ -977,6 +977,21 @@ void dag_node_reset_updated(struct dag_node *n)
 	n->terminal_updated = set_size(n->ancestors);
 }
 
+int dag_node_dependencies_active(struct dag_node *n)
+{
+	if(!n->dependencies)
+		return 1;
+
+	struct dag_node *n1;
+	set_first_element(n->dependencies);
+	while((n1 = set_next_element(n->dependencies))){
+		if(!(n1->state == DAG_NODE_STATE_RUNNING || n1->state == DAG_NODE_STATE_COMPLETE))
+			return 0;
+	}
+
+	return 1;
+}
+
 void dag_node_init_resources(struct dag_node *n)
 {
 	struct rmsummary *rs    = n->resources_requested;
