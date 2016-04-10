@@ -78,4 +78,7 @@ int dag_local_jobs_running( struct dag *d );
  */
 int dag_mount_clean( struct dag *d );
 
+
+uint64_t dag_absolute_filesize( struct dag *d );
+
 #endif
