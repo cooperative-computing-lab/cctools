@@ -216,7 +216,7 @@ void pfs_process_bootstrapfd( void )
 	}
 }
 
-struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int share_table )
+struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int thread, int share_table )
 {
 	struct pfs_process *child;
 
@@ -231,8 +231,8 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 	memset(child->name, 0, sizeof(child->name));
 	memset(child->new_logical_name, 0, sizeof(child->new_logical_name));
 	child->pid = pid;
-	child->tgid = pid;
-	child->state = PFS_PROCESS_STATE_KERNEL;
+	child->tgid = thread ? parent->pid : pid;
+	child->state = PFS_PROCESS_STATE_USER; /* a new process always begins in userspace */
 	child->flags = PFS_PROCESS_FLAGS_STARTUP;
 	child->syscall = SYSCALL32_fork;
 	child->syscall_dummy = 0;

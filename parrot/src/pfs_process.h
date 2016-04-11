@@ -69,7 +69,7 @@ struct pfs_process {
 	char tmp[4096];
 };
 
-struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int share_table );
+struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, int thread, int share_table );
 void pfs_process_exec( struct pfs_process *p );
 void pfs_process_stop( struct pfs_process *p, int status, struct rusage *usage );
 
