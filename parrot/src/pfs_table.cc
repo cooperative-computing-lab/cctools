@@ -470,7 +470,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		}
 	}
 
-	if(pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
+	if(pattern_match(full_logical_name, "^/proc/self()", &n) >= 0 || pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
 		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
 		strcpy(pname->path, pname->logical_name);
 		pname->service = pfs_service_lookup_default();
