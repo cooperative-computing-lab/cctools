@@ -191,7 +191,7 @@ static void update_all_catalogs()
 	char *text = jx_print_string(j);
 	jx_delete(j);
 
-	list_iterate(outgoing_host_list, (int (*) (void *, const void *)) catalog_query_send_update, text);
+	list_iterate(outgoing_host_list, (list_op_t) catalog_query_send_update, text);
 	free(text);
 }
 
