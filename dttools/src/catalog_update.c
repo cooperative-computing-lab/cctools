@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 	char *text = jx_print_string(j);
 
 	if(catalog_query_send_update(host, text) < 1) {
-		fatal("Unable to send update");
+		fprintf(stderr, "Unable to send update");
 	}
 
 	jx_delete(j);
