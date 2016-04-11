@@ -55,13 +55,35 @@ const char *parse_hostlist(const char *hosts, char *host, int *port)
 	return next ? next + 1 : NULL;
 }
 
-struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime)
-{
-	struct catalog_query *q = NULL;
+struct jx *catalog_query_send_query(const char *url, time_t stoptime) {
+	struct link *link = http_query(url, "GET", stoptime);
+
+	if(!link) {
+		return NULL;
+	}
+
+	struct jx *j = jx_parse_link(link,stoptime);
+
+	link_close(link);
+
+	if(!j) {
+		debug(D_DEBUG,"query result failed to parse as JSON");
+		return NULL;
+	}
+
+	if(!jx_istype(j,JX_ARRAY)) {
+		debug(D_DEBUG,"query result is not a JSON array");
+		jx_delete(j);
+		return NULL;
+	}
+
+	return j;
+}
+
+struct list *catalog_query_sort_hostlist(const char *hosts) {
 	const char *next_host;
 	char *n;
 	struct catalog_host *h;
-	struct list *sorted_hosts;
 	struct list *previously_up = list_create();
 	struct list *previously_down = list_create();
 
@@ -98,53 +120,43 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 		}
 	} while (next_host);
 
-	sorted_hosts = list_splice(previously_up, previously_down);
+	return list_splice(previously_up, previously_down);
+}
+
+struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime)
+{
+	struct catalog_query *q = NULL;
+	char *n;
+	struct catalog_host *h;
+	struct list *sorted_hosts = catalog_query_sort_hostlist(hosts);
 
 	list_first_item(sorted_hosts);
 	while((h = list_next_item(sorted_hosts))) {
-		struct link *link = http_query(h->url, "GET", stoptime);
+		struct jx *j = catalog_query_send_query(h->url, stoptime);
 
-		if(!link) {
-			goto FAILURE;
-		}
+		if(j) {
+			q = xxmalloc(sizeof(*q));
+			q->data = j;
+			q->current = j->u.items;
+			q->filter_expr = filter_expr;
 
-		struct jx *j = jx_parse_link(link,stoptime);
-
-		link_close(link);
-
-		if(!j) {
-			debug(D_DEBUG,"query result failed to parse as JSON");
-			goto FAILURE;
-		}
-
-		if(!jx_istype(j,JX_ARRAY)) {
-			debug(D_DEBUG,"query result is not a JSON array");
-			jx_delete(j);
-			goto FAILURE;
-		}
-
-		q = xxmalloc(sizeof(*q));
-		q->data = j;
-		q->current = j->u.items;
-		q->filter_expr = filter_expr;
-
-		if(h->down) {
-			debug(D_DEBUG,"catalog server at %s is back up", h->host);
-			set_first_element(down_hosts);
-			while((n = set_next_element(down_hosts))) {
-				if(!strcmp(n, h->host)) {
-					free(n);
-					set_remove(down_hosts, n);
-					break;
+			if(h->down) {
+				debug(D_DEBUG,"catalog server at %s is back up", h->host);
+				set_first_element(down_hosts);
+				while((n = set_next_element(down_hosts))) {
+					if(!strcmp(n, h->host)) {
+						free(n);
+						set_remove(down_hosts, n);
+						break;
+					}
 				}
 			}
-		}
-		break;
-
-	FAILURE:
-		if(!h->down) {
-			debug(D_DEBUG,"catalog server at %s seems to be down", h->host);
-			set_insert(down_hosts, xxstrdup(h->host));
+			break;
+		} else {
+			if(!h->down) {
+				debug(D_DEBUG,"catalog server at %s seems to be down", h->host);
+				set_insert(down_hosts, xxstrdup(h->host));
+			}
 		}
 	}
 
