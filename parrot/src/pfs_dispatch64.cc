@@ -33,6 +33,7 @@ extern "C" {
 #include "debug.h"
 #include "int_sizes.h"
 #include "macros.h"
+#include "path.h"
 #include "pattern.h"
 #include "stringtools.h"
 #include "tracer.h"
@@ -761,6 +762,22 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		p->set_gid = p->egid;
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
+
+		{
+			char buf[PATH_MAX] = "";
+			if(pfs_readlink(logical_name, buf, sizeof buf - 1) > 0) {
+				if (buf[0] == '/') {
+					snprintf(logical_name, sizeof logical_name, "%s", buf);
+				} else {
+					char *sep = strrchr(logical_name, '/');
+					if (!sep) {
+						sep = logical_name;
+					}
+					snprintf(sep, sizeof logical_name - (size_t)(sep-logical_name), "/%s", buf);
+				}
+			}
+		}
+
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 		p->exefd = -1;
 
@@ -822,7 +839,9 @@ done:
 
 		p->completing_execve = 0;
 		if (actual == 0) {
-			p->table->complete_at_path(AT_FDCWD, p->new_logical_name, p->name);
+			char path[PATH_MAX];
+			p->table->complete_at_path(AT_FDCWD, p->new_logical_name, path);
+			path_collapse(path, p->name, 1);
 			debug(D_PROCESS, "execve: %s (%s) succeeded in 64-bit mode", p->new_logical_name, p->name);
 			/* Undo "syscall_args_changed = 1" because execve returns multiple results in syscall argument registers. */
 			p->syscall_args_changed = 0;
