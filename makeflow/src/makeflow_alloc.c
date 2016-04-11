@@ -305,7 +305,7 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 int makeflow_alloc_use_space( struct makeflow_alloc *a, struct dag_node *n)
 {
 	uint64_t start = timestamp_get();
-	uint64_t inc = dag_node_file_list_size(n->target_files);
+	uint64_t inc = dag_file_list_size(n->target_files);
 	if(a->enabled == MAKEFLOW_ALLOC_TYPE_OFF){
 		a->storage->used   += inc;
 		dynamic_alloc += timestamp_get() - start;

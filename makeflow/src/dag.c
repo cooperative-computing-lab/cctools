@@ -469,15 +469,15 @@ struct dag_file *dag_file_lookup_fail(
 
 uint64_t dag_absolute_filesize( struct dag *d )
 {
-	uint64_t size;
+	uint64_t size = 0;
 	struct dag_file *f;
 	char *filename;
 	hash_table_firstkey(d->files);
-	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
+	while((hash_table_nextkey(d->files, &filename, (void **) &f))){
 		if(f->created_by) {
 			size += dag_file_size(f);
 		}
-
+	}
 	return size;
 }
 /* vim: set noexpandtab tabstop=4: */
