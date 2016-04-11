@@ -2045,6 +2045,8 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
 
+	struct jx *a = jx_array(NULL);
+
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
@@ -2055,10 +2057,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	if(!strcmp(request, "queue")) {
 		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
-			char *str = jx_print_string(j);
-			link_write(l,str,strlen(str),stoptime);
-			jx_delete(j);
-			free(j);
+			jx_array_insert(a, j);
 		}
 	} else if(!strcmp(request, "task")) {
 		struct work_queue_task *t;
@@ -2082,8 +2081,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 					jx_insert_integer(j, "execute_cmd_start_time", t->time_execute_cmd_start);
 					jx_insert_integer(j, "current_time", timestamp_get());
 
-					jx_print_link(j,l,stoptime);
-					jx_delete(j);
+					jx_array_insert(a, j);
 				}
 			}
 		}
@@ -2092,8 +2090,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 		while((t = list_next_item(q->ready_list))) {
 			j = task_to_jx(t,"waiting",0);
 			if(j) {
-				jx_print_link(j,l,stoptime);
-				jx_delete(j);
+				jx_array_insert(a, j);
 			}
 		}
 
@@ -2101,11 +2098,9 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
 			j = task_to_jx(t,"complete",0);
 			if(j) {
-				jx_print_link(j,l,stoptime);
-				jx_delete(j);
+				jx_array_insert(a, j);
 			}
 		}
-
 	} else if(!strcmp(request, "worker")) {
 		struct work_queue_worker *w;
 		struct jx *j;
@@ -2113,17 +2108,17 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 		hash_table_firstkey(q->worker_table);
 		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-			// If the worker has not been initializd, ignore it.
+			// If the worker has not been initialized, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
 			j = worker_to_jx(q, w);
 			if(j) {
-				jx_print_link(j,l,stoptime);
-				jx_delete(j);
+				jx_array_insert(a, j);
 			}
 		}
 	}
 
-	link_write(l, "\n", 1, stoptime);
+	jx_print_link(a,l,stoptime);
+	jx_delete(a);
 
 	//do not count a status connection as a worker
 	q->stats->total_workers_joined--;
