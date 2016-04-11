@@ -406,9 +406,14 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 		return 1;
 	}
 
-	struct jx * jarray = jx_parse_link(l,stoptime);
-
 	link_putfstring(l,"%s_status\n",stoptime,query_string);
+
+	struct jx *jarray = jx_parse_link(l,stoptime);
+
+	if(!jarray || jarray->type != JX_ARRAY) {
+		fprintf(stderr,"couldn't read from %s port %d: %s",master_host,master_port,strerror(errno));
+		return 1;
+	}
 
 	if(format_mode==FORMAT_TABLE) {
 		jx_table_print_header(query_header,stdout);

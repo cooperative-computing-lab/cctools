@@ -846,6 +846,8 @@ static void add_worker(struct work_queue *q)
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
 
+	w->last_update_msg_time = w->start_time;
+
 	struct work_queue_resources *r = work_queue_resources_create();
 
 	r->cores.smallest = r->cores.largest = r->cores.total = -1;//default_resource_value;
@@ -2043,6 +2045,8 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	char request[WORK_QUEUE_LINE_MAX];
 	struct link *l = target->link;
 
+	struct jx *a = jx_array(NULL);
+
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
@@ -2053,10 +2057,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	if(!strcmp(request, "queue")) {
 		struct jx *j = queue_to_jx( q, 0 );
 		if(j) {
-			char *str = jx_print_string(j);
-			link_write(l,str,strlen(str),stoptime);
-			jx_delete(j);
-			free(j);
+			jx_array_insert(a, j);
 		}
 	} else if(!strcmp(request, "task")) {
 		struct work_queue_task *t;
@@ -2080,8 +2081,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 					jx_insert_integer(j, "execute_cmd_start_time", t->time_execute_cmd_start);
 					jx_insert_integer(j, "current_time", timestamp_get());
 
-					jx_print_link(j,l,stoptime);
-					jx_delete(j);
+					jx_array_insert(a, j);
 				}
 			}
 		}
@@ -2090,8 +2090,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 		while((t = list_next_item(q->ready_list))) {
 			j = task_to_jx(t,"waiting",0);
 			if(j) {
-				jx_print_link(j,l,stoptime);
-				jx_delete(j);
+				jx_array_insert(a, j);
 			}
 		}
 
@@ -2099,11 +2098,9 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
 			j = task_to_jx(t,"complete",0);
 			if(j) {
-				jx_print_link(j,l,stoptime);
-				jx_delete(j);
+				jx_array_insert(a, j);
 			}
 		}
-
 	} else if(!strcmp(request, "worker")) {
 		struct work_queue_worker *w;
 		struct jx *j;
@@ -2111,17 +2108,17 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 		hash_table_firstkey(q->worker_table);
 		while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-			// If the worker has not been initializd, ignore it.
+			// If the worker has not been initialized, ignore it.
 			if(!strcmp(w->hostname, "unknown")) continue;
 			j = worker_to_jx(q, w);
 			if(j) {
-				jx_print_link(j,l,stoptime);
-				jx_delete(j);
+				jx_array_insert(a, j);
 			}
 		}
 	}
 
-	link_write(l, "\n", 1, stoptime);
+	jx_print_link(a,l,stoptime);
+	jx_delete(a);
 
 	//do not count a status connection as a worker
 	q->stats->total_workers_joined--;
@@ -3279,11 +3276,23 @@ static void ask_for_workers_updates(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(q->keepalive_interval > 0) {
-			if(!strcmp(w->hostname, "unknown")){
-				last_recv_elapsed_time = (int64_t)(current_time - w->start_time)/1000000;
-			} else {
-				last_recv_elapsed_time = (int64_t)(current_time - w->last_update_msg_time)/1000000;
+
+			/* do no send message to work_queue_status. */
+			if(!strcmp(w->hostname, "QUEUE_STATUS")) {
+				continue;
 			}
+
+			/* we have not received workqueue message from worker yet, so we
+			 * simply check agains its start_time. */
+			if(!strcmp(w->hostname, "unknown")){
+				if ((int)((current_time - w->start_time)/1000000) >= q->keepalive_timeout) {
+					debug(D_WQ, "Removing worker %s (%s): hasn't sent its initialization in more than %d s", w->hostname, w->addrport, q->keepalive_timeout);
+					handle_worker_failure(q, w);
+				}
+				continue;
+			}
+
+			last_recv_elapsed_time = (int64_t)(current_time - w->last_update_msg_time)/1000000;
 
 			// send new keepalive check only (1) if we received a response since last keepalive check AND
 			// (2) we are past keepalive interval
