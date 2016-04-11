@@ -21,10 +21,10 @@ resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
 resource_monitor: rmonitor_helper_comm.o
 
 resource_monitor_histograms.o resource_monitor_cluster.o rmon_tools.o: %.o: %.c
-	$(CCTOOLS_CC) -fopenmp -g -O1 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
+	$(CCTOOLS_CC) -fopenmp -g -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
 resource_monitor_histograms resource_monitor_cluster: %: rmon_tools.o %.o
-	$(CCTOOLS_LD) -fopenmp -g -O1 -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+	$(CCTOOLS_LD) -fopenmp -g -O3 -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 rmonitor_poll_example: rmonitor_poll_example.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
