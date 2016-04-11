@@ -40,6 +40,15 @@ char *output_directory = NULL;
 
 uint64_t input_overhead;
 
+struct allocation {
+	int64_t first;
+	double   waste;
+	double   throughput;
+	double   tasks_done;
+	double   time_taken;
+	int      retries;
+};
+
 struct histogram {
 	struct field *resource;
 
@@ -69,36 +78,16 @@ struct histogram {
 	double kurtosis;
 	double skewdness;
 
-	uint64_t fa_95;
-	uint64_t fa_min_waste_time_dependence;
-	uint64_t fa_min_waste_time_independence;
-	uint64_t fa_min_waste_brute_force;
-	uint64_t fa_max_throughput;
-	uint64_t fa_max_throughput_brute_force;
+	struct allocation fa_perfect;
+	struct allocation fa_max;
+	struct allocation fa_95;
+	struct allocation fa_min_waste_time_dependence;
+	struct allocation fa_min_waste_time_independence;
+	struct allocation fa_min_waste_brute_force;
+	struct allocation fa_max_throughput;
+	struct allocation fa_max_throughput_brute_force;
 
-	double waste_max;
-	double waste_95;
-	double waste_min_waste_time_dependence;
-	double waste_min_waste_time_independence;
-	double waste_min_waste_brute_force;
-	double waste_max_throughput;
-	double waste_max_throughput_brute_force;
-
-	double throughput_max;
-	double throughput_95;
-	double throughput_min_waste_time_dependence;
-	double throughput_min_waste_time_independence;
-	double throughput_min_waste_brute_force;
-	double throughput_max_throughput;
-	double throughput_max_throughput_brute_force;
-
-	int retries_max;
-	int retries_95;
-	int retries_min_waste_time_dependence;
-	int retries_min_waste_time_independence;
-	int retries_min_waste_brute_force;
-	int retries_max_throughput;
-	int retries_max_throughput_brute_force;
+	uint64_t usage;
 
 	struct itable *buckets;
 	uint64_t  nbuckets;
@@ -462,8 +451,8 @@ void write_variables_gnuplot(struct histogram *h, struct histogram *all)
 	fprintf(f, "%s = %lf\n",        "current_mean",       h->mean);
 	fprintf(f, "%s = %lf\n",        "current_percentile75", value_of_p(h, 0.75));
 	fprintf(f, "%s = %lf\n",        "current_percentile25", value_of_p(h, 0.25));
-	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation",           h->fa_max_throughput);
-	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation_min_waste", h->fa_min_waste_time_dependence);
+	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation",           h->fa_max_throughput.first);
+	fprintf(f, "%s = %" PRId64"\n", "current_first_allocation_min_waste", h->fa_min_waste_time_dependence.first);
 	fprintf(f, "%s = %lf\n",        "current_bin_size",   h->bin_size);
 
 	if(all) {
@@ -474,8 +463,8 @@ void write_variables_gnuplot(struct histogram *h, struct histogram *all)
 		fprintf(f, "%s = %lf\n",        "all_mean",       all->mean);
 		fprintf(f, "%s = %lf\n",        "all_percentile75", value_of_p(all, 0.75));
 		fprintf(f, "%s = %lf\n",        "all_percentile25", value_of_p(all, 0.25));
-		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation",           all->fa_max_throughput);
-		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation_min_waste", all->fa_min_waste_time_dependence);
+		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation",           all->fa_max_throughput.first);
+		fprintf(f, "%s = %" PRId64"\n", "all_first_allocation_min_waste", all->fa_min_waste_time_dependence.first);
 	}
 
 	fclose(f);
@@ -723,43 +712,52 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 	return h;
 }
 
+#define write_stats_header_cols(file, name)\
+	fprintf(file, "fa_%s,waste,through,retries,time,done,", #name)
+
 void write_histogram_stats_header(FILE *stream)
 {
 	fprintf(stream, "resource,units,");
 	fprintf(stream, "count,mean,std_dev,");
-	fprintf(stream, "min,");
-	fprintf(stream, "max,waste,throughput,");
-	fprintf(stream, "first_alloc_95,waste,throughput,retries,");
+	fprintf(stream, "min,usage,");
+
+	write_stats_header_cols(stream, perfect);
+	write_stats_header_cols(stream, max);
+	write_stats_header_cols(stream, 95);
 
 	if(brute_force) {
-		fprintf(stream, "first_alloc_bf,waste,throughput,retries,");
-		fprintf(stream, "first_alloc_max_th_bf,waste,throughput,retries,");
+		write_stats_header_cols(stream, min_waste_bf);
+		write_stats_header_cols(stream, max_throu_bf);
 	}
 
-	fprintf(stream, "first_alloc_wo_time,waste,throughput,retries,");
-	fprintf(stream, "first_alloc_w_time,waste,throughput,retries,");
-	fprintf(stream, "first_alloc_max_th,waste,throughput,retries,");
+	write_stats_header_cols(stream, min_waste_ti);
+	write_stats_header_cols(stream, min_waste_td);
+	write_stats_header_cols(stream, max_throu);
 
 	fprintf(stream, "p_25,p_50,p_75,p_99\n");
 }
+
+#define write_stats_row(file, alloc)\
+	fprintf(file, "%" PRId64 ",%.0lf,%lf,%d,%0.3lf,%0.3lf,", alloc.first, ceil(alloc.waste), alloc.throughput, alloc.retries, alloc.time_taken, alloc.tasks_done)
 
 void write_histogram_stats(FILE *stream, struct histogram *h)
 {
 	fprintf(stream, "%s,%s,", sanitize_path_name(h->resource->name),h->resource->units);
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
-	fprintf(stream, "%.0lf,", floor(h->min_value));
+	fprintf(stream, "%.0lf,%" PRId64 ",", floor(h->min_value), h->usage);
 
-	fprintf(stream, "%.0lf,%.0lf,%lf,%d,", ceil(h->max_value), ceil(h->waste_max), h->throughput_max, h->retries_max);
-	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_95, ceil(h->waste_95), h->throughput_95, h->retries_95);
+	write_stats_row(stream, h->fa_perfect);
+	write_stats_row(stream, h->fa_max);
+	write_stats_row(stream, h->fa_95);
 
 	if(brute_force) {
-		fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_min_waste_brute_force, ceil(h->waste_min_waste_brute_force), h->throughput_min_waste_brute_force, h->retries_min_waste_brute_force);
-		fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_max_throughput_brute_force, ceil(h->waste_max_throughput_brute_force), h->throughput_max_throughput_brute_force, h->retries_max_throughput_brute_force);
+		write_stats_row(stream, h->fa_min_waste_brute_force);
+		write_stats_row(stream, h->fa_max_throughput_brute_force);
 	}
 
-	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_min_waste_time_independence, ceil(h->waste_min_waste_time_independence), h->throughput_min_waste_time_independence, h->retries_min_waste_time_independence);
-	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_min_waste_time_dependence, ceil(h->waste_min_waste_time_dependence), h->throughput_min_waste_time_dependence, h->retries_min_waste_time_dependence);
-	fprintf(stream, "%" PRId64 ",%.0lf,%lf,%d,", h->fa_max_throughput, ceil(h->waste_max_throughput), h->throughput_max_throughput, h->retries_max_throughput);
+	write_stats_row(stream, h->fa_min_waste_time_independence);
+	write_stats_row(stream, h->fa_min_waste_time_dependence);
+	write_stats_row(stream, h->fa_max_throughput);
 
 	fprintf(stream, "%.2lf,%.2lf,%.2lf,%.2lf\n",
 			value_of_p(h, 0.25),
@@ -818,11 +816,13 @@ void plots_of_category(struct rmDsummary_set *s)
 
 double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 	double waste   = 0;
-	double wall_time_accum = 0;
 	double max_candidate = h->max_value;
 
+	if(first_alloc < 0)
+		return 0;
+
 	int i;
-#pragma omp parallel for private(i) reduction(+: wall_time_accum, waste)
+#pragma omp parallel for private(i) reduction(+: waste)
 	for(i = 0; i < h->total_count; i+=1) {
 		double current   = value_of_field(h->summaries_sorted[i], f);
 
@@ -832,8 +832,6 @@ double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 		} else {
 			wall_time = h->summaries_sorted[i]->wall_time;
 		}
-
-		wall_time_accum += wall_time;
 
 		double current_waste;
 		if(current > first_alloc) {
@@ -845,12 +843,57 @@ double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 		waste += current_waste;
 	}
 
-	waste /= wall_time_accum;
-
 	return waste;
 }
 
-double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
+double total_usage(struct histogram *h, struct field *f) {
+	double usage   = 0;
+
+	int i;
+#pragma omp parallel for private(i) reduction(+: usage)
+	for(i = 0; i < h->total_count; i+=1) {
+		double current   = value_of_field(h->summaries_sorted[i], f);
+
+		double wall_time;
+		if(f->cummulative) {
+			wall_time = 1;
+		} else {
+			wall_time = h->summaries_sorted[i]->wall_time;
+		}
+
+		usage += current * wall_time;
+	}
+
+	return usage;
+}
+
+void set_usage(struct rmDsummary_set *s) {
+	struct field *f;
+	struct histogram *h;
+
+	int i;
+	for(i = WALL_TIME; i < NUM_FIELDS; i++)
+	{
+		f = (fields + i);
+
+		if(!f->active)
+			continue;
+
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+
+		h->usage = total_usage(h, f);
+	}
+}
+
+double throughput(struct histogram *h, struct field *f, int64_t first_alloc, struct allocation *alloc) {
+
+	if(alloc) {
+		alloc->first      = first_alloc;
+		alloc->tasks_done = 0;
+		alloc->time_taken = 0;
+		alloc->throughput = 0;
+	}
+
 	double tasks_accum     = 0;
 	double wall_time_accum = 0;
 
@@ -862,22 +905,30 @@ double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 		all = h;
 	}
 	double max_allocation  = all->max_value;
-	double current_task    = max_allocation/first_alloc;
+
 
 	int i;
 #pragma omp parallel for private(i) reduction(+: wall_time_accum, tasks_accum)
 	for(i = 0; i < h->total_count; i+=1) {
-		double current   = value_of_field(h->summaries_sorted[i], f);
+		double current_task;
+		double current = value_of_field(h->summaries_sorted[i], f);
 
 		if(current < 1) {
 			continue;
+		}
+
+		/* for perfect throughput */
+		if(first_alloc < 0) {
+			current_task = max_allocation/current;
+		} else {
+			current_task = max_allocation/first_alloc;
 		}
 
 		double wall_time = h->summaries_sorted[i]->wall_time;
 
 		wall_time_accum += wall_time;
 
-		if(current > first_alloc) {
+		if(first_alloc > 0 && current > first_alloc) {
 			tasks_accum     += 1;
 			wall_time_accum += wall_time;
 		} else {
@@ -885,11 +936,21 @@ double throughput(struct histogram *h, struct field *f, uint64_t first_alloc) {
 		}
 	}
 
+	double th;
 	if(wall_time_accum > 0) {
-		tasks_accum /= wall_time_accum;
+		th = tasks_accum/wall_time_accum;
+	} else {
+		th = 0;
+		tasks_accum = 0;
 	}
 
-	return tasks_accum;
+	if(alloc) {
+		alloc->throughput = th;
+		alloc->tasks_done = tasks_accum;
+		alloc->time_taken = wall_time_accum;
+	}
+
+	return th;
 }
 
 int retries(struct histogram *h, struct field *f, uint64_t first_alloc) {
@@ -907,7 +968,6 @@ int retries(struct histogram *h, struct field *f, uint64_t first_alloc) {
 
 	return tasks_retried;
 }
-
 
 
 void set_category_maximum(struct rmDsummary_set *s, struct hash_table *categories) {
@@ -931,15 +991,32 @@ void set_category_maximum(struct rmDsummary_set *s, struct hash_table *categorie
 	}
 }
 
-void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
+void set_fa_values(struct histogram *h, struct field *f, struct allocation *alloc, uint64_t first_allocation) {
+	alloc->first      = first_allocation;
+	alloc->waste      = total_waste(h, f, alloc->first);
+	alloc->throughput =  throughput(h, f, alloc->first, alloc);
+	alloc->retries    =     retries(h, f, alloc->first);
+}
 
+/*
+			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
+			h->fa_min_waste_time_dependence.first      = rmsummary_to_external_unit(f->name, first);
+*/
+
+void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_table *categories) {
 	struct category *c = category_lookup_or_create(categories, s->category);
 	c->time_peak_independece = 0;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
 
 	category_update_first_allocation(categories, s->category);
+
+	if(!c->first_allocation)
+		return;
+
+	struct rmDsummary *firsts = rmsummary_to_rmDsummary(c->first_allocation);
+
+	struct field *f;
+	struct histogram *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -949,28 +1026,28 @@ void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_tabl
 		if(!f->active)
 			continue;
 
-
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-
-		h->fa_min_waste_time_dependence = -1;
-		if(c->first_allocation) {
-			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
-			h->fa_min_waste_time_dependence    = rmsummary_to_external_unit(f->name, first);
-			h->waste_min_waste_time_dependence = total_waste(h, f, h->fa_min_waste_time_dependence);
-		}
+		set_fa_values(h, f, &(h->fa_min_waste_time_dependence), value_of_field(firsts, f));
 	}
+
+	free(firsts);
 }
 
 void set_fa_min_waste_time_independence(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
-
 	struct category *c = category_lookup_or_create(categories, s->category);
 	c->time_peak_independece = 1;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
 
 	category_update_first_allocation(categories, s->category);
 
+	if(!c->first_allocation)
+		return;
+
+	struct rmDsummary *firsts = rmsummary_to_rmDsummary(c->first_allocation);
+
+	struct field *f;
+	struct histogram *h;
+
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
 	{
@@ -980,26 +1057,27 @@ void set_fa_min_waste_time_independence(struct rmDsummary_set *s, struct hash_ta
 			continue;
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-
-		h->fa_min_waste_time_independence = -1;
-		if(c->first_allocation) {
-			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
-			h->fa_min_waste_time_independence    = rmsummary_to_external_unit(f->name, first);
-			h->waste_min_waste_time_independence = total_waste(h, f, h->fa_min_waste_time_independence);
-		}
+		set_fa_values(h, f, &(h->fa_min_waste_time_independence), value_of_field(firsts, f));
 	}
+
+	free(firsts);
 }
 
 void set_fa_max_throughput(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
-
 	struct category *c = category_lookup_or_create(categories, s->category);
 	c->time_peak_independece = 0;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
 
 	category_update_first_allocation(categories, s->category);
 
+	if(!c->first_allocation)
+		return;
+
+	struct rmDsummary *firsts = rmsummary_to_rmDsummary(c->first_allocation);
+
+	struct field *f;
+	struct histogram *h;
+
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
 	{
@@ -1008,19 +1086,69 @@ void set_fa_max_throughput(struct rmDsummary_set *s, struct hash_table *categori
 		if(!f->active)
 			continue;
 
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		set_fa_values(h, f, &(h->fa_max_throughput), value_of_field(firsts, f));
+	}
+
+	free(firsts);
+}
+
+void set_fa_95(struct rmDsummary_set *s, struct hash_table *categories) {
+	struct field *f;
+	struct histogram *h;
+
+	int i;
+	for(i = WALL_TIME; i < NUM_FIELDS; i++)
+	{
+		f = (fields + i);
+
+		if(!f->active)
+			continue;
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-
-		h->fa_max_throughput = -1;
-		if(c->first_allocation) {
-			int64_t first = rmsummary_get_int_field(c->first_allocation, f->name);
-			h->fa_max_throughput    = rmsummary_to_external_unit(f->name, first);
-			h->waste_max_throughput = total_waste(h, f, h->fa_max_throughput);
-		}
+		set_fa_values(h, f, &(h->fa_95), value_of_p(h, 0.95));
 	}
 }
 
-void set_fa_min_waste_brute_force_field(struct histogram *h, struct field *f) {
+void set_fa_max(struct rmDsummary_set *s, struct hash_table *categories) {
+	struct field *f;
+	struct histogram *h;
+
+	int i;
+	for(i = WALL_TIME; i < NUM_FIELDS; i++)
+	{
+		f = (fields + i);
+
+		if(!f->active)
+			continue;
+
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		set_fa_values(h, f, &(h->fa_max), h->max_value);
+	}
+}
+
+void set_fa_perfect(struct rmDsummary_set *s, struct hash_table *categories) {
+	struct field *f;
+	struct histogram *h;
+
+	int i;
+	for(i = WALL_TIME; i < NUM_FIELDS; i++)
+	{
+		f = (fields + i);
+
+		if(!f->active)
+			continue;
+
+		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		set_fa_values(h, f, &(h->fa_perfect), -1);
+
+		h->fa_perfect.first      = -1;
+		h->fa_perfect.waste      =  0;
+		h->fa_perfect.retries    =  0;
+	}
+}
+
+int64_t min_waste_brute_force_field(struct histogram *h, struct field *f) {
 	double   min_waste     = DBL_MAX;
 	uint64_t min_candidate = h->max_value;
 
@@ -1045,8 +1173,7 @@ void set_fa_min_waste_brute_force_field(struct histogram *h, struct field *f) {
 
 	debug(D_RMON, "first allocation '%s' brute force: %" PRId64, f->caption, min_candidate);
 
-	h->fa_min_waste_brute_force    = min_candidate;
-	h->waste_min_waste_brute_force = total_waste(h, f, min_candidate);
+	return min_candidate;
 }
 
 void set_fa_min_waste_brute_force(struct rmDsummary_set *s, struct hash_table *categories) {
@@ -1064,16 +1191,12 @@ void set_fa_min_waste_brute_force(struct rmDsummary_set *s, struct hash_table *c
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
 		if(brute_force) {
-			set_fa_min_waste_brute_force_field(h, f);
-		} else {
-			h->fa_min_waste_brute_force    = -1;
-			h->waste_min_waste_brute_force = -1;
+			set_fa_values(h, f, &(h->fa_min_waste_brute_force), min_waste_brute_force_field(h, f));
 		}
 	}
 }
 
-
-void set_fa_max_throughput_brute_force_field(struct histogram *h, struct field *f) {
+int64_t max_throughput_brute_force_field(struct histogram *h, struct field *f) {
 	double   best_throughput = 0;
 	uint64_t max_candidate  = h->max_value;
 
@@ -1086,7 +1209,7 @@ void set_fa_max_throughput_brute_force_field(struct histogram *h, struct field *
 				continue;
 		}
 
-		double candidate_throughput = throughput(h, f, candidate);
+		double candidate_throughput = throughput(h, f, candidate, NULL);
 
 		if(candidate_throughput > best_throughput) {
 			max_candidate  = candidate;
@@ -1098,8 +1221,7 @@ void set_fa_max_throughput_brute_force_field(struct histogram *h, struct field *
 
 	debug(D_RMON, "first allocation '%s' throughput_max: %" PRId64, f->caption, max_candidate);
 
-	h->fa_max_throughput_brute_force    = max_candidate;
-	h->waste_max_throughput_brute_force = total_waste(h, f, max_candidate);
+	return max_candidate;
 }
 
 
@@ -1118,49 +1240,8 @@ void set_fa_max_throughput_brute_force(struct rmDsummary_set *s, struct hash_tab
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
 		if(brute_force) {
-			set_fa_max_throughput_brute_force_field(h, f);
-		} else {
-			h->fa_max_throughput_brute_force    = -1;
-			h->waste_max_throughput_brute_force = -1;
+			set_fa_values(h, f, &(h->fa_max_throughput_brute_force), max_throughput_brute_force_field(h, f));
 		}
-	}
-}
-
-void set_fa_min_waste_95(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
-
-	int i;
-	for(i = WALL_TIME; i < NUM_FIELDS; i++)
-	{
-		f = (fields + i);
-
-		if(!f->active)
-			continue;
-
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-
-		h->fa_95    = value_of_p(h, 0.95);
-		h->waste_95 = total_waste(h, f, h->fa_95);
-	}
-}
-
-
-void set_max_waste(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
-
-	int i;
-	for(i = WALL_TIME; i < NUM_FIELDS; i++)
-	{
-		f = (fields + i);
-
-		if(!f->active)
-			continue;
-
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-
-		h->waste_max = total_waste(h, f, h->max_value);
 	}
 }
 
@@ -1189,67 +1270,10 @@ void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_tab
 	set_fa_max_throughput_brute_force(s, categories);
 	s->overhead_max_throughput_brute_force = timestamp_get() - s->overhead_max_throughput_brute_force;
 
-	set_fa_min_waste_95(s, categories);
-
-	set_max_waste(s, categories);
+	set_fa_perfect(s, categories);
+	set_fa_95(s, categories);
+	set_fa_max(s, categories);
 }
-
-void set_throughputs_of_category(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
-
-	int i;
-	for(i = WALL_TIME; i < NUM_FIELDS; i++)
-	{
-		f = (fields + i);
-
-		if(!f->active)
-			continue;
-
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-		h->throughput_max = throughput(h, f, h->max_value);
-		h->throughput_min_waste_time_dependence   = throughput(h, f, h->fa_min_waste_time_dependence);
-		h->throughput_min_waste_time_independence = throughput(h, f, h->fa_min_waste_time_independence);
-		h->throughput_max_throughput = throughput(h, f, h->fa_max_throughput);
-
-		h->throughput_95 = throughput(h, f, h->fa_95);
-
-
-		if(brute_force) {
-			h->throughput_min_waste_brute_force      = throughput(h, f, h->fa_min_waste_brute_force);
-			h->throughput_max_throughput_brute_force = throughput(h, f, h->fa_max_throughput_brute_force);
-		}
-	}
-}
-
-void set_retries_of_category(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct field *f;
-	struct histogram *h;
-
-	int i;
-	for(i = WALL_TIME; i < NUM_FIELDS; i++)
-	{
-		f = (fields + i);
-
-		if(!f->active)
-			continue;
-
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-		h->retries_max = retries(h, f, h->max_value);
-		h->retries_min_waste_time_dependence   = retries(h, f, h->fa_min_waste_time_dependence);
-		h->retries_min_waste_time_independence = retries(h, f, h->fa_min_waste_time_independence);
-		h->retries_max_throughput = retries(h, f, h->fa_max_throughput);
-
-		h->retries_95 = retries(h, f, h->fa_95);
-
-
-		if(brute_force) {
-			h->retries_min_waste_brute_force      = retries(h, f, h->fa_min_waste_brute_force);
-			h->retries_max_throughput_brute_force = retries(h, f, h->fa_max_throughput_brute_force);
-		}
-	}
-}
-
 
 void write_stats_of_category(struct rmDsummary_set *s)
 {
@@ -1301,7 +1325,7 @@ void write_limits_of_category(struct rmDsummary_set *s)
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
-		fprintf(f_limits, "%s: %" PRIu64 "\n", f->name, h->fa_max_throughput);
+		fprintf(f_limits, "%s: %" PRIu64 "\n", f->name, h->fa_max_throughput.first);
 	}
 
 	fclose(f_limits);
@@ -1523,29 +1547,29 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "%6.0lf\n", h->mean);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->waste_max_throughput));
-	fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_max_throughput.waste));
+	fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput.first);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->waste_min_waste_time_dependence));
-	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_dependence);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_min_waste_time_dependence.waste));
+	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_dependence.first);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->waste_min_waste_time_independence));
-	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_independence);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->fa_min_waste_time_independence.waste));
+	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_independence.first);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->waste_95));
-	fprintf(stream, "%" PRId64 "\n", h->fa_95);
+	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->fa_95.waste));
+	fprintf(stream, "%" PRId64 "\n", h->fa_95.first);
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->waste_min_waste_brute_force));
-		fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_brute_force);
+		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_min_waste_brute_force.waste));
+		fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_brute_force.first);
 		fprintf(stream, "</td>\n");
 
-		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->waste_min_waste_brute_force));
-		fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput_brute_force);
+		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_min_waste_brute_force.waste));
+		fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput_brute_force.first);
 		fprintf(stream, "</td>\n");
 	}
 
@@ -1853,8 +1877,8 @@ int main(int argc, char **argv)
 		{
 			histograms_of_category(s);
 			set_first_allocations_of_category(s, categories);
-			set_throughputs_of_category(s, categories);
-			set_retries_of_category(s, categories);
+
+			set_usage(s);
 
 			write_stats_of_category(s);
 			write_limits_of_category(s);

@@ -239,36 +239,10 @@ struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categor
 
 #define to_external(s, so, f) (s)->f = rmsummary_to_external_unit(#f, (so)->f)
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories)
-{
-	static FILE *last_stream = NULL;
-	static int   summ_id     = 1;
+struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
 
-	if(last_stream != stream)
-	{
-		last_stream = stream;
-		summ_id     = 1;
-	}
-	else
-	{
-		summ_id++;
-	}
-
-	struct rmsummary  *so = rmsummary_parse_next(stream);
-	if(!so)
-		return NULL;
-
-	if(categories) {
-		category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
-		if(so->category) {
-			category_accumulate_summary(categories, so->category, so);
-		}
-	}
-
-	struct rmDsummary *s  = malloc(sizeof(struct rmDsummary));
+	struct rmDsummary *s = malloc(sizeof(struct rmDsummary));
 	bzero(s, sizeof(*s));
-
-	s->file       = xxstrdup(filename);
 
 	if(so->command) {
 		s->command    = xxstrdup(so->command);
@@ -291,8 +265,6 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table
 	if(so->task_id)
 	{
 		s->task_id = xxstrdup(so->task_id);
-	} else {
-		s->task_id = get_rule_number(filename);
 	}
 
 	to_external(s, so, start);
@@ -325,6 +297,43 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table
 		{
 			assign_to_field(s, f, 0);
 		}
+	}
+
+	return s;
+}
+
+
+struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories)
+{
+	static FILE *last_stream = NULL;
+	static int   summ_id     = 1;
+
+	if(last_stream != stream)
+	{
+		last_stream = stream;
+		summ_id     = 1;
+	}
+	else
+	{
+		summ_id++;
+	}
+
+	struct rmsummary  *so = rmsummary_parse_next(stream);
+	if(!so)
+		return NULL;
+
+	if(categories) {
+		category_accumulate_summary(categories, ALL_SUMMARIES_CATEGORY, so);
+		if(so->category) {
+			category_accumulate_summary(categories, so->category, so);
+		}
+	}
+
+	struct rmDsummary *s  = rmsummary_to_rmDsummary(so);
+
+	s->file = xxstrdup(filename);
+	if(!s->task_id) {
+		s->task_id = get_rule_number(filename);
 	}
 
 	rmsummary_delete(so);

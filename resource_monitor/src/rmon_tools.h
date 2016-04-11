@@ -115,6 +115,8 @@ char *get_rule_number(char *filename);
 
 char *make_field_names_str(char *separator);
 
+struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so);
+
 struct rmDsummary *summary_bin_op(struct rmDsummary *s, struct rmDsummary *a, struct rmDsummary *b, double (*op)(double, double));
 struct rmDsummary *summary_unit_op(struct rmDsummary *s, struct rmDsummary *a, double u, double (*op)(double, double));
 
