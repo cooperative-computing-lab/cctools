@@ -43,6 +43,11 @@ int main(int argc, char **argv) {
 
 		count++;
 	}
+
+	if(jx_parser_errors(p)) {
+		fprintf(stderr, "%s error: %s\n", argv[0], jx_parser_error_string(p));
+	}
+
 	jx_parser_delete(p);
 
 	if(count == n) {
