@@ -1,0 +1,82 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
+<title>Chirp Protocol Version 2</title>
+<style type="text/css">
+.command {
+    margin: 10px;
+    border: 1px solid black;
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<div id="manual">
+<h1>Catalog Servers</h1>
+
+<p style="text-align: right;"><b>Last edited: 12 April 2016</b></p>
+
+<p>To check the status of all of the Chirp servers that are available for use,
+consult the Chirp <a href="http://catalog.cse.nd.edu:9097">storage catalog</a>.
+This web page is a list of all known Chirp servers and their locations.</p>
+
+<h2 id="specifying">Specifying Catalog Servers<a class="sectionlink" href="#specifying" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>Many of the tools accept command line arguments or environment variables to specify the catalog server(s) to use. The catalog host is specified as a semicolon delimited list of servers to use. Each may optionally include a port number. If no port is specified, the value of the environment variable <tt>CATALOG_PORT</tt> is used, or the default of port 9097. If no catalog server is given on the command line, the <tt>CATALOG_HOST</tt> environment variable is used. If that is unset, the default of
+<code>catalog.cse.nd.edu;backup-catalog.cse.nd.edu</code>
+This could be written more verbosely as
+<code>catalog.cse.nd.edu:9097;backup-catalog.cse.nd.edu:9097</code>
+assuming the catalog port was not set in the environment.</p>
+
+<h2 id="updates">Updates<a class="sectionlink" href="#updates" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>When any program is sending catalog updates, it will examine the environment and/or configuration options to get a list of catalog servers in use. Updates are then sent to every server listed. The program will consider it a success if at least one update can be sent successfully. If DNS resolution fails for every catalog server, for example, the program will report a failed update.</p>
+
+<h2 id="queries">Querying Catalog Servers<a class="sectionlink" href="#queries" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>When a program making catalog queries is configured with multiple servers, the program will try each in succession until receiving an answer. If no servers give valid responses, the query as a whole fails. The order in which servers are listed sets the initial query order. If a server fails to respond, it will be marked as down before trying the next server in the list. On subsequent queries, servers that were down will not be tried unless every other server is non-responsive. If in this scenario the previously down server answers the query, it will be marked as up again and used with normal priority in future queries.</p>
+
+<h2 id="running">Running a Catalog Server<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
+<p>You may want to establish your own catalog server.  This can be
+useful for keeping your systems logically distinct from the main storage pool,
+but can also help performance and availability if your catalog is close to your
+Chirp servers.  The catalog server is installed in the same place as the Chirp
+server.  Simply run it on any machine that you like and then direct your Chirp
+servers to update the new catalog with the -u option.  The catalog will be
+published via HTTP on port 9097 of the catalog machine.</p>
+
+<p>For example, suppose that you wish to run a catalog server on a machine
+named <tt>dopey</tt> and a Chirp server on a machine named <tt>sneezy</tt>:</p>
+
+<code>dopey<span class="prompt">$ </span>catalog_server
+...
+sneezy<span class="prompt">$ </span>chirp_server -u dopey [more options]
+</code>
+
+<p>Finally, point your web browser to: <tt>http://dopey:9097</tt></p>
+
+<p>Or, set an environment variable and use Parrot:</p>
+
+<code><span class="prompt">$ </span>setenv CATALOG_HOST dopey
+<span class="prompt">$ </span>parrot_run tcsh
+<span class="prompt">$ </span>ls /chirp
+</code>
+
+<p>And you will see <a href="http://catalog.cse.nd.edu:9097">something like
+this.</a> You may easily run multiple catalogs for either scalability or fault
+tolerance.  Simply give each Chirp server the name of each
+running catalog separated by semicolons, e.g.
+<code><span class="prompt">$ </span>chirp_server -u 'dopey;happy:9000;grumpy'</code>
+</p>
+
+<p>(Hint: If you want to ensure that your chirp and catalog servers run
+continuously and are automatically restarted after an upgrade, consider using
+<a href="watchdog.html">Watchdog</a>.)</p>
+</div>
+</body>
+</html>
