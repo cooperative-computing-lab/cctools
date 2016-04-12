@@ -662,7 +662,6 @@ struct jx * jx_parser_yield( struct jx_parser *p )
 {
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
-		jx_parser_delete(p);
 		jx_delete(j);
 		return 0;
 	}
