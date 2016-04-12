@@ -2926,15 +2926,15 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_fstatat64:
 			if(entering) {
 				struct pfs_stat lbuf;
-				struct pfs_kernel_stat kbuf;
 
 				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,path,POINTER(args[1]),sizeof(path),0));
 				p->syscall_result = pfs_fstatat(args[0],path,&lbuf,args[3]);
 				if(p->syscall_result<0) {
 					p->syscall_result = -errno;
 				} else {
-					COPY_STAT(lbuf,kbuf);
-					TRACER_MEM_OP(tracer_copy_out(p->tracer,&kbuf,POINTER(args[2]),sizeof(kbuf),TRACER_O_ATOMIC));
+					struct pfs_kernel_stat64 kbuf64;
+					COPY_STAT(lbuf,kbuf64);
+					TRACER_MEM_OP(tracer_copy_out(p->tracer,&kbuf64,POINTER(args[2]),sizeof(kbuf64),TRACER_O_ATOMIC));
 				}
 				divert_to_dummy(p,p->syscall_result);
 			}
