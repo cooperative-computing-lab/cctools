@@ -192,6 +192,9 @@ void jx_insert_string( struct jx *object, const char *key, const char *value );
 /** Search for a arbitrary item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The value of the matching pair, or null if none is found. */
 struct jx * jx_lookup( struct jx *object, const char *key );
 
+/* Like @ref jx_lookup, but found is set to 1 when the key is found. Useful for when value is false. */
+struct jx * jx_lookup_guard( struct jx *j, const char *key, int *found );
+
 /** Search for a string item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The C string value of the matching object, or null if it is not found, or is not a string. */
 const char * jx_lookup_string( struct jx *object, const char *key );
 
