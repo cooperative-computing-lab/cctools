@@ -493,7 +493,7 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 
 	struct category *c = category_lookup_or_create(categories, category);
 	/* If category is not labeling, and user is not labeling, return unlabeled. */
-	if(!c->max_allocation) {
+	if(c && !c->max_allocation) {
 		return CATEGORY_ALLOCATION_UNLABELED;
 	}
 
@@ -502,7 +502,7 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 		return CATEGORY_ALLOCATION_AUTO_MAX;
 	}
 
-	if(c->first_allocation) {
+	if(c && c->first_allocation) {
 		/* Use first allocation when it is available. */
 		return CATEGORY_ALLOCATION_AUTO_FIRST;
 	} else {
