@@ -1812,10 +1812,12 @@ static struct rmsummary *largest_waiting_task(struct work_queue *q) {
 
 	list_first_item(q->ready_list);
 	while((t = list_next_item(q->ready_list))) {
-		if(!t->resources_requested || t->resource_request != CATEGORY_ALLOCATION_USER) {
+		if(t->resource_request != CATEGORY_ALLOCATION_USER) {
 			continue;
 		}
-		rmsummary_merge_max(max_resources_waiting, t->resources_requested);
+
+		const struct rmsummary *r = task_dynamic_label(q, t);
+		rmsummary_merge_max(max_resources_waiting, r);
 	}
 
 	return max_resources_waiting;
