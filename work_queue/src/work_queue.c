@@ -526,7 +526,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = MSG_PROCESSED;
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
-	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
+	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);

@@ -33,6 +33,7 @@ typedef enum {
 	QUERY_QUEUE,
 	QUERY_TASKS,
 	QUERY_WORKERS,
+	QUERY_ABLE_WORKERS,
 	QUERY_MASTER_RESOURCES
 } query_t;
 
@@ -75,6 +76,16 @@ static struct jx_table worker_headers[] = {
 {NULL,NULL,0,0,0}
 };
 
+static struct jx_table workers_able_headers[] = {
+{"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  12},
+{"tasks_waiting_proper_label", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{"workers_able",  "FIT-WORKERS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{"max_cores",     "MAX-CORES",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{"max_memory",    "MAX-MEMORY",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{"max_disk",      "MAX-DISK",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{NULL,NULL,0,0,0}
+};
+
 static struct jx_table master_resource_headers[] = {
 {"project",     "MASTER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
 {"cores_total", "CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
@@ -112,6 +123,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"project-name", required_argument, 0, 'M'},
 		{"statistics", no_argument, 0, 'Q'},
 		{"workers", no_argument, 0, 'W'},
+		{"able-workers", no_argument, 0, 'A'},
 		{"tasks", no_argument, 0, 'T'},
 		{"verbose", no_argument, 0, 'l'},
 		{"resources", no_argument, 0, 'R'},
@@ -125,7 +137,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	signed int c;
 	int needs_explicit_master = 0;
 
-	while((c = getopt_long(argc, argv, "M:QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "AM:QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'C':
 			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
@@ -141,21 +153,27 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		case 'Q':
 			if(query_mode != NO_QUERY)
-				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+				fatal("Options -A, -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
 			needs_explicit_master = 0;
 			query_mode = QUERY_QUEUE;
 			break;
 		case 'T':
 			if(query_mode != NO_QUERY)
-				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+				fatal("Options -A, -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
 			needs_explicit_master = 1;
 			query_mode = QUERY_TASKS;
 			break;
 		case 'W':
 			if(query_mode != NO_QUERY)
-				fatal("Options -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+				fatal("Options -A, -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
 			needs_explicit_master = 1;
 			query_mode = QUERY_WORKERS;
+			break;
+		case 'A':
+			if(query_mode != NO_QUERY)
+				fatal("Options -A, -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+			needs_explicit_master = 1;
+			query_mode = QUERY_ABLE_WORKERS;
 			break;
 		case 'l':
 			format_mode = FORMAT_LONG;
@@ -193,7 +211,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		query_mode = QUERY_QUEUE;
 
 	if(needs_explicit_master && optind >= argc)
-		fatal("Options -T and -W need an explicit master to query.");
+		fatal("Options -A, -T and -W need an explicit master to query.");
 
 	if(*project_name && query_mode != QUERY_QUEUE)
 		fatal("Option -M,--project-name can only be used together with -Q,--statistics");
@@ -385,8 +403,8 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 
 int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 {
-	static struct jx_table *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, master_resource_headers };
-	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "master_resource"};
+	static struct jx_table *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, workers_able_headers, master_resource_headers };
+	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "wable", "master_resource"};
 
 	struct jx_table *query_header = query_headers[query_mode];
 	const char * query_string = query_strings[query_mode];
