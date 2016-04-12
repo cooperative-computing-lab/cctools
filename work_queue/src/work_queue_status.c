@@ -104,8 +104,9 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Filter results of -Q for masters matching <name>\n", "-M,--project-name<name>");
 	fprintf(stdout, " %-30s List workers connected to the given master.\n", "-W,--workers");
 	fprintf(stdout, " %-30s List tasks of the given master.\n", "-T,--tasks");
-	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
+	fprintf(stdout, " %-30s List categories of the given master, size of largest task, and workers that can run it.\n", "-A,--able-workers");
 	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
+	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
 	fprintf(stdout, " %-30s Filter results by this expression.\n","   --where=<expr>\n");
