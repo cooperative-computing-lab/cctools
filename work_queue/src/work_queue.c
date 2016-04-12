@@ -335,7 +335,7 @@ static int available_workers(struct work_queue *q) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown")){
+		if(strcmp(w->hostname, "unknown") != 0 && strcmp(w->hostname, "QUEUE_STATUS") != 0){
 			if(w->resources->unlabeled.inuse > 0)
 			{
 				if(overcommitted_resource_total(q, w->resources->workers.total, 1) > w->resources->unlabeled.inuse) {
