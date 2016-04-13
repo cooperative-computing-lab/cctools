@@ -257,6 +257,9 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 /* number of tasks with state */
 static int task_state_count( struct work_queue *q, const char *category, work_queue_task_state_t state);
 
+/* number of tasks in the ready list with a proper label for the category. */
+static int task_ready_count(struct work_queue *q, const char *category);
+
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
 
@@ -335,7 +338,7 @@ static int available_workers(struct work_queue *q) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown")){
+		if(strcmp(w->hostname, "unknown") != 0 && strcmp(w->hostname, "QUEUE_STATUS") != 0){
 			if(w->resources->unlabeled.inuse > 0)
 			{
 				if(overcommitted_resource_total(q, w->resources->workers.total, 1) > w->resources->unlabeled.inuse) {
@@ -523,7 +526,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = MSG_PROCESSED;
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
-	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status")) {
+	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
@@ -1803,6 +1806,52 @@ static char *blacklisted_to_string( struct work_queue  *q ) {
 	return result;
 }
 
+static struct rmsummary *largest_waiting_task(struct work_queue *q) {
+	struct rmsummary *max_resources_waiting = rmsummary_create(-1);
+	struct work_queue_task *t;
+
+	list_first_item(q->ready_list);
+	while((t = list_next_item(q->ready_list))) {
+		if(t->resource_request != CATEGORY_ALLOCATION_USER) {
+			continue;
+		}
+
+		const struct rmsummary *r = task_dynamic_label(q, t);
+		rmsummary_merge_max(max_resources_waiting, r);
+	}
+
+	return max_resources_waiting;
+}
+
+static int check_worker_fit(struct work_queue_worker *w, struct rmsummary *s) {
+	if(s->cores > w->resources->cores.total)
+		return 0;
+	if(s->memory > w->resources->memory.total)
+		return 0;
+	if(s->disk > w->resources->disk.total)
+		return 0;
+	if(s->gpus > w->resources->gpus.total)
+		return 0;
+
+	return 1;
+}
+
+static int count_workers_for_waiting_tasks(struct work_queue *q, struct rmsummary *s) {
+
+	int count = 0;
+
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		if( !s || check_worker_fit(w, s) ) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
 /* category_to_jx creates a jx expression with category statistics that can be
 sent to the catalog.
 */
@@ -1816,12 +1865,16 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
 
+	jx_insert_string(j, "category", category);
 	jx_insert_integer(j, "tasks_waiting", s.tasks_waiting);
 	jx_insert_integer(j, "tasks_running", s.tasks_running + s.tasks_complete);
 	jx_insert_integer(j, "total_tasks_dispatched", s.total_tasks_dispatched);
 	jx_insert_integer(j, "total_tasks_complete", s.total_tasks_complete);
 	jx_insert_integer(j, "total_tasks_failed", s.total_tasks_failed);
 	jx_insert_integer(j, "total_tasks_cancelled", s.total_tasks_cancelled);
+	jx_insert_integer(j, "workers_able", s.workers_able);
+
+	jx_insert_integer(j, "tasks_waiting_proper_label", task_ready_count(q, category));
 
 	if(c->max_allocation) {
 		if(c->max_allocation->cores > -1)
@@ -1842,6 +1895,39 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	}
 
 	return j;
+}
+
+static struct jx *categories_to_jx(struct work_queue *q) {
+	struct jx *a = jx_array(0);
+
+	struct category *c;
+	char *category_name;
+	hash_table_firstkey(q->categories);
+	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
+		jx_array_insert(a, category_to_jx(q, category_name));
+	}
+
+	int user_labeled = task_ready_count(q, NULL);
+	if(user_labeled > 0) {
+		struct jx *j = jx_object(NULL);
+		jx_insert_string(j, "category", "manual-label");
+		jx_insert_integer(j, "tasks_waiting_proper_label", user_labeled);
+
+		struct rmsummary *r = largest_waiting_task(q);
+		jx_insert_integer(j, "workers_able", count_workers_for_waiting_tasks(q, r));
+
+		if(r->cores > 0)
+			jx_insert_integer(j, "max_cores", r->cores);
+		if(r->memory > 0)
+			jx_insert_integer(j, "max_memory", r->memory);
+		if(r->disk > 0)
+			jx_insert_integer(j, "max_disk", r->disk);
+
+		rmsummary_delete(r);
+		jx_array_insert(a, j);
+	}
+
+	return a;
 }
 
 /*
@@ -1869,6 +1955,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"workers_init",info.workers_init);
 	jx_insert_integer(j,"workers_idle",info.workers_idle);
 	jx_insert_integer(j,"workers_busy",info.workers_busy);
+	jx_insert_integer(j,"workers_able",info.workers_able);
 	jx_insert_integer(j,"workers_ready",info.workers_ready); //workers_ready is deprecated
 	jx_insert_integer(j,"total_workers_connected",info.total_workers_connected);
 	jx_insert_integer(j,"total_workers_joined",info.total_workers_joined);
@@ -1942,17 +2029,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	}
 
 	//add the stats per category
-	struct jx *categories = jx_object(0);
-	if(categories) {
-		struct category *c;
-		char *category_name;
-		hash_table_firstkey(q->categories);
-		while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
-			jx_insert(categories, jx_string(category_name), category_to_jx(q, category_name));
-		}
-
-		jx_insert(j, jx_string("categories"), categories);
-	}
+	jx_insert(j, jx_string("categories"), categories_to_jx(q));
 
 	return j;
 }
@@ -2115,6 +2192,9 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 				jx_array_insert(a, j);
 			}
 		}
+	} else if(!strcmp(request, "wable")) {
+		jx_delete(a);
+		a = categories_to_jx(q);
 	}
 
 	jx_print_link(a,l,stoptime);
@@ -4903,6 +4983,26 @@ static int task_state_count(struct work_queue *q, const char *category, work_que
 	return count;
 }
 
+/* count ready tasks with a proper label for a category, or for the 'manual-label' category. */
+static int task_ready_count(struct work_queue *q, const char *category) {
+	struct work_queue_task *t;
+
+	int count = 0;
+
+	list_first_item(q->ready_list);
+	while((t = list_next_item(q->ready_list))) {
+		if(category) {
+			if(t->resource_request != CATEGORY_ALLOCATION_USER && t->category && !strcmp(category, t->category)) {
+				count++;
+			}
+		} else if(t->resource_request == CATEGORY_ALLOCATION_USER) {
+			count++;
+		}
+	}
+
+	return count;
+}
+
 int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 {
 	itable_insert(q->tasks, t->taskid, t);
@@ -5579,6 +5679,21 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_full = 0;
 	s->total_worker_slots = s->tasks_running;
 	s->avg_capacity = s->capacity;
+
+	struct rmsummary *rmax = largest_waiting_task(q);
+	char *key;
+	struct category *c;
+	hash_table_firstkey(q->categories);
+	while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+		if(c->max_allocation) {
+			rmsummary_merge_max(rmax, c->max_allocation);
+		} else if(c->first_allocation) {
+			rmsummary_merge_max(rmax, c->first_allocation);
+		}
+	}
+
+	s->workers_able = count_workers_for_waiting_tasks(q, rmax);
+	rmsummary_delete(rmax);
 }
 
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s)
@@ -5642,6 +5757,12 @@ void work_queue_get_stats_category(struct work_queue *q, const char *category, s
 	s->tasks_waiting = task_state_count(q, category, WORK_QUEUE_TASK_READY);
 	s->tasks_running = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 	s->tasks_complete = task_state_count(q, category, WORK_QUEUE_TASK_RETRIEVED);
+
+	if(c->max_allocation) {
+		s->workers_able  = count_workers_for_waiting_tasks(q, c->max_allocation);
+	} else {
+		s->workers_able  = available_workers(q);
+	}
 }
 
 /*

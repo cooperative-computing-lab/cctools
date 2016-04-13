@@ -136,21 +136,31 @@ struct jx * jx_arrayv( struct jx *value, ... )
 	return array;
 }
 
-struct jx * jx_lookup( struct jx *j, const char *key )
+struct jx * jx_lookup_guard( struct jx *j, const char *key, int *found )
 {
 	struct jx_pair *p;
+
+	if(found)
+		*found = 0;
 
 	if(!j || j->type!=JX_OBJECT) return 0;
 
 	for(p=j->u.pairs;p;p=p->next) {
 		if(p && p->key && p->key->type==JX_STRING) {
 			if(!strcmp(p->key->u.string_value,key)) {
+				if(found)
+					*found = 1;
 				return p->value;
 			}
 		}
 	}
 
 	return 0;
+}
+
+struct jx * jx_lookup( struct jx *j, const char *key )
+{
+	return jx_lookup_guard(j, key, NULL);
 }
 
 const char * jx_lookup_string( struct jx *object, const char *key )

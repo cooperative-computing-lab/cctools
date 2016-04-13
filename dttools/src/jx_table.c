@@ -56,8 +56,9 @@ void jx_table_print( struct jx_table *t, struct jx *j, FILE * f )
 			string_metric(jx_lookup_integer(j,t->name), -1, line);
 			strcat(line, "B");
 		} else {
-			struct jx *v = jx_lookup(j,t->name);
-			if(!v) {
+			int found;
+			struct jx *v = jx_lookup_guard(j,t->name,&found);
+			if(!found) {
 				line = strdup("???");
 			} else if(v->type==JX_STRING) {
 				// special case b/c we want to see

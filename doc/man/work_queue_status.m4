@@ -30,8 +30,9 @@ OPTION_ITEM(`-Q, --statistics')Show summary information about queues. (default)
 OPTION_ITEM(`-M, --project-name=<name>')Filter results of -Q for masters matching <name>.
 OPTION_ITEM(`-W, --workers')Show details of all workers connected to the master.
 OPTION_ITEM(`-T, --tasks')Show details of all tasks in the queue.
-OPTION_ITEM(`-l, --verbose')Long output.
+OPTION_ITEM(`-A, --able-workers')List categories of the given master, size of largest task, and workers that can run it.
 OPTION_ITEM(`-R, --resources')Show available resources for each master.
+OPTION_ITEM(`-l, --verbose')Long output.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_TRIPLET(-t, timeout, time)RPC timeout (default=300s).

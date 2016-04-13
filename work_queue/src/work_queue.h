@@ -207,8 +207,11 @@ struct work_queue_stats {
 	int64_t max_disk;               /**< The largest disk space in MB observed among the connected workers. */
 	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
 	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
-	int port;
-	int priority;
+
+	int workers_able;               /**< Number of workers on which the largest task can run. */
+
+	int port;                       /**< @deprecated Use ref work_queue_port Port of the queue. */
+	int priority;                   /**< @deprecated Not used. */
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
 	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
 	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */
