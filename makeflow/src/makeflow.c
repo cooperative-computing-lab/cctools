@@ -478,7 +478,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor);
 
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	dag_node_update_resources(n, /* overflow */ 0);
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
 	command = makeflow_wrap_monitor(command, n, monitor);
@@ -503,12 +502,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	if(n->resource_request == CATEGORY_ALLOCATION_UNLABELED || n->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
-		/* if task does not have a proper resources label, do not submit with one. */
-		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,NULL);
-	} else {
-		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,n->resources_needed);
-	}
+	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
 
 	/* Restore old batch job options. */
 	if(previous_batch_options) {
@@ -631,6 +625,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 {
 	struct dag_file *f;
 	int job_failed = 0;
+	int monitor_retried = 0;
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
@@ -690,27 +685,32 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				fprintf(stderr, "\n");
 			}
 
-			int new_resources = dag_node_update_resources(n, 1);
-			if(new_resources) {
+			category_allocation_t next = category_next_label(d->categories, n->category->name, n->resource_request, /* resource overflow */ 1);
+
+			if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
+				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
+				n->resource_request = next;
 				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
 				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-			} else {
-				makeflow_failed_flag = 1;
+				monitor_retried = 1;
 			}
 		}
-		else if(makeflow_retry_flag || info->exit_code == 101) {
-			n->failure_count++;
-			if(n->failure_count > makeflow_retry_max) {
-				fprintf(stderr, "job %s failed too many times.\n", n->command);
-				makeflow_failed_flag = 1;
-			} else {
-				fprintf(stderr, "will retry failed job %s\n", n->command);
-				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+
+		if(!monitor_retried) {
+			if(makeflow_retry_flag || info->exit_code == 101) {
+				n->failure_count++;
+				if(n->failure_count > makeflow_retry_max) {
+					fprintf(stderr, "job %s failed too many times.\n", n->command);
+					makeflow_failed_flag = 1;
+				} else {
+					fprintf(stderr, "will retry failed job %s\n", n->command);
+					makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+				}
 			}
-		}
-		else
-		{
-			makeflow_failed_flag = 1;
+			else
+			{
+				makeflow_failed_flag = 1;
+			}
 		}
 	} else {
 		/* Mark source files that have been used by this node */

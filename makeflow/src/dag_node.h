@@ -58,7 +58,7 @@ struct dag_node {
 	struct hash_table *variables;       /* This node settings for variables with @ syntax */
 
 	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
-	struct rmsummary *resources_needed;      /* resources required by this rule */
+	struct rmsummary *resources_requested;   /* resources required by this rule */
 	struct rmsummary *resources_measured;    /* resources measured on completion. */
 
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
@@ -97,5 +97,7 @@ const char *dag_node_state_name(dag_node_state_t state);
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
 
 struct jx * dag_node_env_create( struct dag *d, struct dag_node *n );
+
+const struct rmsummary *dag_node_dynamic_label(struct dag_node *n);
 
 #endif
