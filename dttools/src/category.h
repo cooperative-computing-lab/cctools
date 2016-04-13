@@ -73,4 +73,5 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow);
 
+const struct rmsummary *category_task_dynamic_label(category_allocation_t request, struct rmsummary *max, struct rmsummary *first, struct rmsummary *user);
 #endif

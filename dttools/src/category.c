@@ -511,6 +511,44 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	}
 }
 
+const struct rmsummary *category_task_dynamic_label(category_allocation_t request, struct rmsummary *max, struct rmsummary *first, struct rmsummary *user) {
+
+	static struct rmsummary *dynamic_label = NULL;
+
+	switch(request) {
+		case CATEGORY_ALLOCATION_AUTO_ZERO:
+		case CATEGORY_ALLOCATION_AUTO_MAX:
+			return max;
+			break;
+		case CATEGORY_ALLOCATION_AUTO_FIRST:
+			return first;
+			break;
+		case CATEGORY_ALLOCATION_USER:
+			if(!max) {
+				return user;
+			} else {
+				if(dynamic_label) {
+					rmsummary_delete(dynamic_label);
+				}
+				dynamic_label = rmsummary_create(-1);
+
+				rmsummary_merge_min(dynamic_label, max);
+				rmsummary_merge_override(dynamic_label, user);
+
+				return dynamic_label;
+			}
+			break;
+		case CATEGORY_ALLOCATION_UNLABELED:
+		default:
+			if(max) {
+				return max;
+			} else {
+				return user;
+			}
+			break;
+	}
+}
+
 void category_tune_bucket_size(const char *resource, uint64_t size) {
 	if(strcmp(resource, "memory") == 0) {
 		memory_bucket_size = size;
