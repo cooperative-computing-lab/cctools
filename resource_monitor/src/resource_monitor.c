@@ -1006,6 +1006,8 @@ int rmonitor_final_summary()
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
 
+	summary->cores     = MAX(summary->cores, peak_cores(summary->wall_time, summary->cpu_time));
+
 	summary->bandwidth = MAX(average_bandwidth(0), summary->bandwidth);
 	summary->bytes_received = total_bytes_rx;
 	summary->bytes_sent     = total_bytes_tx;
