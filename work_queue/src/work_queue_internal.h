@@ -49,5 +49,5 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 void work_queue_broadcast_message(struct work_queue *q, const char *msg);
 
 /* shortcut to set cores, memory, disk, etc. from a single function. */
-void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *rm);
+void work_queue_task_specify_resources(struct work_queue_task *t, const struct rmsummary *rm);
 

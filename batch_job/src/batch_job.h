@@ -72,7 +72,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type);
 @param resources The computational resources needed by the job.
 @return On success, returns a unique identifier for the batch job.  On failure, returns a negative number.
 */
-batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, struct rmsummary *resources);
+batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources);
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.

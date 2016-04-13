@@ -3790,7 +3790,7 @@ void work_queue_task_specify_running_time( struct work_queue_task *t, int64_t us
 	}
 }
 
-void work_queue_task_specify_resources(struct work_queue_task *t, struct rmsummary *rm) {
+void work_queue_task_specify_resources(struct work_queue_task *t, const struct rmsummary *rm) {
 	if(!rm)
 		return;
 
