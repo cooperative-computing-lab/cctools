@@ -156,8 +156,8 @@ See the file COPYING for details.
 #include "rmonitor_piggyback.h"
 
 #define DEFAULT_INTERVAL       5               /* in seconds */
-
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
+#define PEAK_CORES_NUM_SAMPLES 10
 
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
@@ -759,13 +759,51 @@ void rmonitor_summary_header()
     }
 }
 
+struct peak_cores_sample {
+	int64_t wall_time;
+	int64_t cpu_time;
+};
+
+int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
+	static struct list *samples = NULL;
+
+	if(!samples) {
+		struct peak_cores_sample *zero = malloc(sizeof(struct peak_cores_sample));
+		zero->wall_time = 0;
+		zero->cpu_time  = 0;
+
+		samples = list_create(0);
+		list_push_tail(samples,  zero);
+	}
+
+	struct peak_cores_sample *tail = malloc(sizeof(struct peak_cores_sample));
+	tail->wall_time = wall_time;
+	tail->cpu_time  = cpu_time;
+
+	list_push_tail(samples, tail);
+
+	if(list_size(samples) > PEAK_CORES_NUM_SAMPLES) {
+		free(list_pop_head(samples));
+	}
+
+	struct peak_cores_sample *head = list_peek_head(samples);
+
+	int64_t diff_wall = tail->wall_time - head->wall_time;
+	int64_t diff_cpu  = tail->cpu_time  - head->cpu_time;
+
+	if(diff_wall > 0) {
+		return (int64_t) MAX(1, ceil( ((double) diff_cpu)/diff_wall));
+	} else {
+		return 1;
+	}
+}
+
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time         = usecs_since_epoch() - summary->start;
 	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
 
-	if(tr->wall_time > 0)
-		tr->cores = (int64_t) MAX(1, ceil( ((double) tr->cpu_time)/tr->wall_time));
+	tr->cores = peak_cores(tr->wall_time, tr->cpu_time);
 
 	tr->max_concurrent_processes = (int64_t) itable_size(processes);
 	tr->total_processes          = summary->total_processes;
@@ -967,6 +1005,8 @@ int rmonitor_final_summary()
 
 	summary->end       = usecs_since_epoch();
 	summary->wall_time = summary->end - summary->start;
+
+	summary->cores     = MAX(summary->cores, peak_cores(summary->wall_time, summary->cpu_time));
 
 	summary->bandwidth = MAX(average_bandwidth(0), summary->bandwidth);
 	summary->bytes_received = total_bytes_rx;
