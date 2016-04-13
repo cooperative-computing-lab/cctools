@@ -1003,15 +1003,6 @@ int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
 
-	summary->end       = usecs_since_epoch();
-	summary->wall_time = summary->end - summary->start;
-
-	summary->cores     = MAX(summary->cores, peak_cores(summary->wall_time, summary->cpu_time));
-
-	summary->bandwidth = MAX(average_bandwidth(0), summary->bandwidth);
-	summary->bytes_received = total_bytes_rx;
-	summary->bytes_sent     = total_bytes_tx;
-
 	if(summary->limits_exceeded) {
 		summary->exit_status = 128 + SIGTERM;
 	}
@@ -1184,7 +1175,7 @@ void ping_processes(void)
         }
 }
 
-struct rmsummary *rmonitor_rusage_tree(void)
+struct rmsummary *rmonitor_final_usage_tree(void)
 {
     struct rusage usg;
     struct rmsummary *tr_usg = rmsummary_create(-1);
@@ -1197,15 +1188,22 @@ struct rmsummary *rmonitor_rusage_tree(void)
         return NULL;
     }
 
-	tr_usg->cpu_time  = 0;
-	tr_usg->cpu_time += usg.ru_utime.tv_sec*USECOND + usg.ru_utime.tv_usec;
-	tr_usg->cpu_time += usg.ru_stime.tv_sec*USECOND + usg.ru_stime.tv_usec;
-
 	if(usg.ru_majflt > 0) {
 		/* Here we add the maximum recorded + the io from memory maps */
 		tr_usg->bytes_read     =  summary->bytes_read + usg.ru_majflt * sysconf(_SC_PAGESIZE);
 		debug(D_RMON, "page faults: %ld.\n", usg.ru_majflt);
 	}
+
+	tr_usg->cpu_time  = 0;
+	tr_usg->cpu_time += usg.ru_utime.tv_sec*USECOND + usg.ru_utime.tv_usec;
+	tr_usg->cpu_time += usg.ru_stime.tv_sec*USECOND + usg.ru_stime.tv_usec;
+	tr_usg->end       = usecs_since_epoch();
+	tr_usg->wall_time = tr_usg->end - summary->start;
+	tr_usg->cores     = peak_cores(tr_usg->wall_time, tr_usg->cpu_time);
+
+	tr_usg->bandwidth      = average_bandwidth(0);
+	tr_usg->bytes_received = total_bytes_rx;
+	tr_usg->bytes_sent     = total_bytes_tx;
 
     return tr_usg;
 }
@@ -1259,8 +1257,8 @@ void rmonitor_check_child(const int signal)
     while(itable_nextkey(processes, &pid, (void **) &p))
       rmonitor_untrack_process(pid);
 
-    /* get the peak values from getrusage */
-    struct rmsummary *tr_usg = rmonitor_rusage_tree();
+    /* get the peak values from getrusage, and others. */
+    struct rmsummary *tr_usg = rmonitor_final_usage_tree();
     rmonitor_find_max_tree(summary, tr_usg);
     free(tr_usg);
 }
