@@ -30,6 +30,7 @@ See the file COPYING for details.
 #include "chirp_protocol.h"
 #include "chirp_sqlite.h"
 
+#include <sys/select.h>
 #include <sys/stat.h>
 #ifdef HAS_SYS_STATFS_H
 #	include <sys/statfs.h>
@@ -663,7 +664,8 @@ CONFUGA_API int confuga_daemon (confuga *C)
 		confugaJ_schedule(C);
 		confugaR_manager(C);
 
-		usleep(10000);
+		struct timeval tv = {.tv_sec = 1};
+		while (select(0, 0, 0, 0, &tv) == -1 && errno == EINTR) {}
 	}
 
 	rc = 0;
