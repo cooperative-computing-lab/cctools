@@ -131,8 +131,12 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 	struct list *sorted_hosts = catalog_query_sort_hostlist(hosts);
 
 	list_first_item(sorted_hosts);
-	while((h = list_next_item(sorted_hosts))) {
-		struct jx *j = catalog_query_send_query(h->url, stoptime);
+	while(time(NULL) < stoptime) {
+		if(!(h = list_next_item(sorted_hosts))) {
+			list_first_item(sorted_hosts);
+			continue;
+		}
+		struct jx *j = catalog_query_send_query(h->url, time(NULL) + 5);
 
 		if(j) {
 			q = xxmalloc(sizeof(*q));
