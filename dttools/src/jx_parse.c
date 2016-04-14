@@ -303,7 +303,18 @@ static jx_token_t jx_scan( struct jx_parser *s )
 			c = jx_getchar(s);
 			if(strchr("0123456789.",c)) {
 				s->token[i] = c;
-			} else {
+			}
+			else if(strchr("eE",c)) {
+				s->token[i] = c;
+				c = jx_getchar(s);
+				if(strchr("-+",c)) {
+					i++;
+					s->token[i] = c;
+				} else {
+					jx_ungetchar(s, c);
+				}
+			}
+			else {
 				s->token[i] = 0;
 				jx_ungetchar(s,c);
 
