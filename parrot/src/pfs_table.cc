@@ -75,7 +75,9 @@ static const int _SENTINEL1 = 0;
 static const int _SENTINEL2 = 0;
 #define SPECIAL ((pfs_pointer *)&_SENTINEL2)
 
-#define PARROT_POINTER(pointer) (!(pointer == NATIVE || pointer == SPECIAL || pointer == NULL))
+#define SPECIAL_POINTER(pointer) (pointer == SPECIAL)
+#define NATIVE_POINTER(pointer) (pointer == NATIVE)
+#define PARROT_POINTER(pointer) (!(SPECIAL_POINTER(pointer) || NATIVE_POINTER(pointer) || pointer == NULL))
 
 #define VALID_FD(fd) (0 <= fd && fd < pointer_count)
 #define PARROT_FD(fd) (VALID_FD(fd) && PARROT_POINTER(pointers[fd]))
@@ -1050,16 +1052,29 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 	int result;
 	int flags;
 
-	CHECK_FD(fd);
+	if (!VALID_FD(fd))
+		return (errno = EBADF, -1);
 
-	switch(cmd) {
-		case F_GETFD:
+	/* fcntl may operate on the *file descriptor* table or the *open file description* table */
+
+	if (cmd == F_GETFD || cmd == F_SETFD) {
+		if (!(PARROT_POINTER(pointers[fd]) || NATIVE_POINTER(pointers[fd])))
+			return (errno = EBADF, -2);
+		if (cmd == F_GETFD) {
 			result = fd_flags[fd];
-			break;
-		case F_SETFD:
+		} else if (cmd == F_SETFD) {
 			fd_flags[fd] = (intptr_t)arg;
 			result = 0;
-			break;
+		} else assert(0);
+		return result;
+	}
+
+	/* now open file description table: */
+
+	if (!PARROT_POINTER(pointers[fd]))
+		return (errno = EBADF, -1);
+
+	switch (cmd) {
 		case F_GETFL:
 			result = pointers[fd]->flags;
 			break;
@@ -1077,7 +1092,7 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 			Otherwise, we don't support it.
 		*/
 
-		#ifdef F_FREESP
+#ifdef F_FREESP
 		case F_FREESP:
 			{
 				struct flock *f = (struct flock *)arg;
@@ -1090,9 +1105,9 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 				}
 			}
 			break;
-		#endif
+#endif
 
-		#ifdef F_FREESP64
+#ifdef F_FREESP64
 		case F_FREESP64:
 			{
 				struct flock64 *f64 = (struct flock64 *)arg;
@@ -1105,7 +1120,7 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 				}
 			}
 			break;
-		#endif
+#endif
 
 		default:
 			result = pointers[fd]->file->fcntl(cmd,arg);
