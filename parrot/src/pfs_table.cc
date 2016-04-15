@@ -1077,7 +1077,7 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 			Otherwise, we don't support it.
 		*/
 
-		#ifdef F_FREESP
+#ifdef F_FREESP
 		case F_FREESP:
 			{
 				struct flock *f = (struct flock *)arg;
@@ -1090,9 +1090,9 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 				}
 			}
 			break;
-		#endif
+#endif
 
-		#ifdef F_FREESP64
+#ifdef F_FREESP64
 		case F_FREESP64:
 			{
 				struct flock64 *f64 = (struct flock64 *)arg;
@@ -1105,7 +1105,7 @@ int pfs_table::fcntl( int fd, int cmd, void *arg )
 				}
 			}
 			break;
-		#endif
+#endif
 
 		default:
 			result = pointers[fd]->file->fcntl(cmd,arg);
