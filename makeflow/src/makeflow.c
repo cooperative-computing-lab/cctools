@@ -657,7 +657,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
 
-	if(getenv("CCTOOLS_LOOP_DEV_FULL")) {
+	if(info->loop_dev_full) {
 		job_failed = 1;
 	}
 	else if(info->exited_normally && info->exit_code == 0) {
@@ -726,15 +726,16 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_failed_flag = 1;
 			}
 		}
-		else if(getenv("CCTOOLS_LOOP_DEV_FULL")) {
+		else if(info->loop_dev_full) {
 			unsetenv("CCTOOLS_LOOP_DEV_FULL");
-			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
-			int new_resources = dag_node_update_resources(n, 1);
-			if(new_resources) {
-				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
-				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-			} else {
+			fprintf(stderr, "\nrule %d failed because it exceeded the resource limits.\n", n->nodeid);
+			n->failure_count++;
+			if(n->failure_count > makeflow_retry_max) {
+				fprintf(stderr, "job %s failed too many times.\n", n->command);
 				makeflow_failed_flag = 1;
+			} else {
+				fprintf(stderr, "will retry failed job %s\n", n->command);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
 		}
 		else
