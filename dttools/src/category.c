@@ -542,11 +542,13 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	struct category *c = category_lookup_or_create(categories, category);
 
 	if(resource_overflow) {
-		int over = 0;
+		/* not autolabeling, so we return error. */
+		if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
+			return CATEGORY_ALLOCATION_ERROR;
+		}
 
-		if(current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-			over = 1;
-		} else if(measured) {
+		int over = 0;
+		if(measured) {
 			check_hard_limits(c->max_allocation, user, measured, cores,                    over);
 			check_hard_limits(c->max_allocation, user, measured, cpu_time,                 over);
 			check_hard_limits(c->max_allocation, user, measured, wall_time,                over);
@@ -563,37 +565,62 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 			check_hard_limits(c->max_allocation, user, measured, max_concurrent_processes, over);
 			check_hard_limits(c->max_allocation, user, measured, total_processes,          over);
 		}
+		if(over)
+			return CATEGORY_ALLOCATION_ERROR;
 
-		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_AUTO_MAX;
+		switch(current_label) {
+			case CATEGORY_ALLOCATION_AUTO_ZERO:
+			case CATEGORY_ALLOCATION_AUTO_FIRST:
+			case CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN:
+				if(c->max_allocation) {
+					return CATEGORY_ALLOCATION_AUTO_MAX;
+				}
+				else {
+					return CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN;
+				}
+			case CATEGORY_ALLOCATION_UNLABELED:
+			case CATEGORY_ALLOCATION_USER:
+			case CATEGORY_ALLOCATION_AUTO_MAX:
+			default:
+				return CATEGORY_ALLOCATION_ERROR;
+				break;
+		}
 	}
+
+
+	/* else... not overflow... */
 
 	/* If user specified resources manually, respect the label. */
 	if(current_label == CATEGORY_ALLOCATION_USER) {
 			return CATEGORY_ALLOCATION_USER;
 	}
 
-	/* If category is not labeling, and user is not labeling, return unlabeled. */
-	if(c && !c->max_allocation) {
+	/* Never downgrade max allocation */
+	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX || current_label == CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN) {
+		return c->max_allocation ? CATEGORY_ALLOCATION_AUTO_MAX : CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN;
+	}
+
+	/* not autolabeling. */
+	if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
 		return CATEGORY_ALLOCATION_UNLABELED;
 	}
 
-	/* Never downgrade max allocation */
-	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-		return CATEGORY_ALLOCATION_AUTO_MAX;
-	}
-
-	if(c && c->first_allocation) {
-		/* Use first allocation when it is available. */
+	/* When autolabeling, use first allocation when it is available. */
+	if(c->first_allocation) {
 		return CATEGORY_ALLOCATION_AUTO_FIRST;
 	} else {
-		/* Use default when no enough information is available. */
 		return CATEGORY_ALLOCATION_AUTO_ZERO;
 	}
 }
 
-const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struct rmsummary *first, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
 
 	static struct rmsummary *dynamic_label = NULL;
+
+	struct category *c = category_lookup_or_create(categories, category);
+
+	struct rmsummary *max   = c->max_allocation;
+	struct rmsummary *first = c->first_allocation;
 
 	switch(request) {
 		case CATEGORY_ALLOCATION_AUTO_ZERO:
@@ -628,6 +655,18 @@ const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struc
 			break;
 	}
 }
+
+const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
+
+	struct category *c = category_lookup_or_create(categories, category);
+
+	if(request == CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN) {
+		return c->max_resources_seen;
+	}
+
+	return category_dynamic_task_max_resources(categories, category, user, request);
+}
+
 
 void category_tune_bucket_size(const char *resource, uint64_t size) {
 	if(strcmp(resource, "memory") == 0) {
