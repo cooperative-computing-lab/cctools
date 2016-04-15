@@ -690,6 +690,25 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
+		if(info->loop_dev_full) {
+			fprintf(stderr, "\nrule %d failed because it exceeded its loop device allocation capacity.\n", n->nodeid);
+			if(n->resources_measured)
+			{
+				rmsummary_print(stderr, n->resources_measured, /* pprint */ 0, /* extra fields */ NULL);
+				fprintf(stderr, "\n");
+			}
+
+			category_allocation_t next = category_next_label(d->categories, n->category->name, n->resource_request, /* resource overflow */ 1);
+
+			if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
+				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
+				n->resource_request = next;
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+				monitor_retried = 1;
+			}
+		}
+
 		if(monitor && info->exit_code == RM_OVERFLOW)
 		{
 			debug(D_MAKEFLOW_RUN, "rule %d failed because it exceeded the resources limits.\n", n->nodeid);
@@ -726,18 +745,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_failed_flag = 1;
 			}
 		}
-		else if(info->loop_dev_full) {
-			unsetenv("CCTOOLS_LOOP_DEV_FULL");
-			fprintf(stderr, "\nrule %d failed because it exceeded the resource limits.\n", n->nodeid);
-			n->failure_count++;
-			if(n->failure_count > makeflow_retry_max) {
-				fprintf(stderr, "job %s failed too many times.\n", n->command);
-				makeflow_failed_flag = 1;
-			} else {
-				fprintf(stderr, "will retry failed job %s\n", n->command);
-				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-			}
-		}
+		
 		else
 		{
 			makeflow_failed_flag = 1;

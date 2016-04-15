@@ -68,6 +68,8 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
+	p->task->loop_dev_full = 0;
+	int taskid = p->task->taskid;
 	//placeholder filesystem until permanent solution
 	char *fs = "ext2";
 

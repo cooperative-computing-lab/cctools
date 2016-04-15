@@ -1661,9 +1661,9 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	//Format: task completion status, exit status (exit code or signal), output length, execution time, loop device, taskid
 	char items[5][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %s %s %" SCNd64, items[0], items[1], items[2], items[3], items[4], &taskid);
+	int n = sscanf(line, "result %s %s %s %s %" SCNd64" %s", items[0], items[1], items[2], items[3], &taskid, items[4]);
 
-	if(n < 6) {
+	if(n < 5) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		return WORKER_FAILURE;
 	}
@@ -1694,6 +1694,8 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
 	t->total_cmd_execution_time += t->cmd_execution_time;
+
+	t->loop_dev_full = loop_dev;
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -1772,9 +1774,6 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		}
 	}
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		if(loop_dev) { //If a loop device was used, set environment variable accordingly to alert Makeflow
-			setenv("CCTOOLS_LOOP_DEV_FULL", "1", 1);
-		}
 		/* if resource exhaustion, mark the task for possible resubmission. */
 		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
 	} else {
