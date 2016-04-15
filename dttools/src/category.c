@@ -46,10 +46,12 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->name       = xxstrdup(name);
 	c->fast_abort = -1;
 
+
 	c->total_tasks = 0;
 
 	c->first_allocation    = NULL;
 	c->max_allocation      = NULL;
+	c->autolabel_resource  = rmsummary_create(0);
 
 	c->max_resources_completed = rmsummary_create(-1);
 	c->max_resources_seen      = rmsummary_create(-1);
@@ -77,6 +79,43 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	hash_table_insert(categories, name, c);
 
 	return c;
+}
+
+/* set autoallocation mode for all resources, but wall and cpu times. */
+void category_specify_allocation_mode(struct hash_table *categories, const char *name, int mode) {
+	struct category *c = category_lookup_or_create(categories, name);
+	struct rmsummary *r = c->autolabel_resource;
+
+	int autolabel = 1;
+
+	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+		autolabel = 0;
+	}
+
+	r->wall_time      = 0;
+	r->cpu_time       = 0;
+
+	r->cores           = autolabel;
+	r->memory          = autolabel;
+	r->swap_memory     = autolabel;
+	r->virtual_memory  = autolabel;
+	r->bytes_read      = autolabel;
+	r->bytes_written   = autolabel;
+	r->bytes_received  = autolabel;
+	r->bytes_sent      = autolabel;
+	r->bandwidth       = autolabel;
+	r->total_files     = autolabel;
+	r->disk            = autolabel;
+	r->total_processes = autolabel;
+	r->max_concurrent_processes = autolabel;
+}
+
+/* set autolabel per resource. */
+int category_enable_auto_resource(struct hash_table *categories, const char *category_name, const char *resource_name, int autolabel) {
+
+	struct category *c = category_lookup_or_create(categories, category_name);
+	return rmsummary_assign_int_field(c->autolabel_resource, resource_name, autolabel);
+
 }
 
 static void category_clear_histogram(struct itable *h) {
@@ -153,6 +192,7 @@ void category_delete(struct hash_table *categories, const char *name) {
 
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
+	rmsummary_delete(c->autolabel_resource);
 	rmsummary_delete(c->max_resources_completed);
 	rmsummary_delete(c->max_resources_seen);
 

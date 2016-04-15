@@ -16,17 +16,20 @@ typedef enum {
 	CATEGORY_ALLOCATION_AUTO_ZERO,     /**< Pre-step for autolabeling, when the first allocation has not been computed. */
 	CATEGORY_ALLOCATION_AUTO_FIRST,    /**< Using first step value of the two-step policy. */
 	CATEGORY_ALLOCATION_AUTO_MAX,      /**< Using max of category. (2nd step of two-step policy) */
+	CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN, /**< Using max seen as minimum, max of worker. (2nd step of two-step policy when max is unknown) */
 	CATEGORY_ALLOCATION_ERROR          /**< No valid resources could be found. (E.g., after 2nd step fails) */
 } category_allocation_t;
 
 typedef enum {
-	CATEGORY_ALLOCATION_MODE_MAX = 0,
+	CATEGORY_ALLOCATION_MODE_FIXED = 0,
 	CATEGORY_ALLOCATION_MODE_MIN_WASTE,
 	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
 } category_mode_t;
 
 struct category {
 	char *name;
+	category_mode_t allocation_mode;
+
 	double fast_abort;
 
 	struct rmsummary *first_allocation;
@@ -34,6 +37,9 @@ struct category {
 
 	struct rmsummary *max_resources_seen;
 	struct rmsummary *max_resources_completed;
+
+	/* if 1, use first allocations. 0, use max fixed (if given) */
+	struct rmsummary *autolabel_resource;
 
 	/* All keys are assumed positive. Thus, we shift them to the right so that
 	 * we can have a "0" key. 0->1, 1->2, etc. */
@@ -53,8 +59,6 @@ struct category {
 	struct itable *total_files_histogram;
 	struct itable *disk_histogram;
 
-	category_mode_t allocation_mode;
-
 	uint64_t total_tasks;
 
 	/* assume that peak usage is independent of wall time */
@@ -68,6 +72,11 @@ struct category {
 	/* Mappings between variable names defined in the makeflow file and their values. */
 	struct hash_table *mf_variables;
 };
+
+/* set autoallocation mode for all resources, but wall and cpu times. */
+void category_specify_allocation_mode(struct hash_table *categories, const char *name, int mode);
+/* enable/disable autoallocation for the resource */
+int category_enable_auto_resource(struct hash_table *categories, const char *category_name, const char *resource_name, int autolabel);
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);

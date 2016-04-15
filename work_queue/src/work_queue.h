@@ -635,6 +635,21 @@ multiplier.  The value specified here applies only to tasks in the given categor
 */
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
 
+/** Turn on or off first-allocation labeling for a given category. By default, all resources are labeled, but wall, and cpu time. Turn on/off specific resources with @ref work_queue_specify_category_autolabel_resource.
+@param q A work queue object.
+@param category A category name.
+@param autolabel 0 off, 1 on.
+*/
+void work_queue_specify_category_autolabel(struct work_queue *q, const char *category, int autolabel);
+
+/** Turn on or off first-allocation labeling for a given category and resource.
+@param q A work queue object.
+@param category A category name.
+@param resource A resource name.
+@param autolabel 0 off, 1 on.
+@returns 1 if resource is valid, 0 otherwise.
+*/
+int work_queue_specify_category_autolabel_resource(struct work_queue *q, const char *category, const char *resource, int autolabel);
 
 /** Change the preference to send or receive tasks.
 @param q A work queue object.
