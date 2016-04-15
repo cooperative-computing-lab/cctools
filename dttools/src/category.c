@@ -538,7 +538,6 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 
 /* returns the next allocation state. */
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
-
 	struct category *c = category_lookup_or_create(categories, category);
 
 	if(resource_overflow) {

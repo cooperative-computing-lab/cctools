@@ -89,6 +89,7 @@ typedef enum {
 	WORK_QUEUE_URL                    /**< File-spec refers to an URL **/
 } work_queue_file_t;
 
+
 extern int wq_option_scheduler;	               /**< Initial setting for algorithm to assign tasks to
 												 workers upon creating queue . Change prior to
 												 calling work_queue_create, after queue is created
@@ -638,18 +639,18 @@ int work_queue_activate_fast_abort_category(struct work_queue *q, const char *ca
 /** Turn on or off first-allocation labeling for a given category. By default, all resources are labeled, but wall, and cpu time. Turn on/off specific resources with @ref work_queue_specify_category_autolabel_resource.
 @param q A work queue object.
 @param category A category name.
-@param autolabel 0 off, 1 on.
+@param mode     One of @ref category_allocation_t.
 */
-void work_queue_specify_category_autolabel(struct work_queue *q, const char *category, int autolabel);
+void work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode);
 
-/** Turn on or off first-allocation labeling for a given category and resource.
+/** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref work_queue_specify_category_mode.
 @param q A work queue object.
 @param category A category name.
 @param resource A resource name.
 @param autolabel 0 off, 1 on.
 @returns 1 if resource is valid, 0 otherwise.
 */
-int work_queue_specify_category_autolabel_resource(struct work_queue *q, const char *category, const char *resource, int autolabel);
+int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel);
 
 /** Change the preference to send or receive tasks.
 @param q A work queue object.
