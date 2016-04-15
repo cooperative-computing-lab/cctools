@@ -726,7 +726,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		if(monitor) {
 			category_accumulate_summary(d->categories, n->category->name, n->resources_measured);
 			if(d->node_states[DAG_NODE_STATE_COMPLETE] % 20 == 0)
-				category_update_first_allocation(d->categories, n->category->name);
+				category_update_first_allocation(d->categories, NULL, n->category->name);
 		}
 	}
 }

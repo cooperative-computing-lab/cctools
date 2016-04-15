@@ -100,7 +100,7 @@ int category_enable_auto_resource(struct hash_table *categories, const char *cat
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
-void category_update_first_allocation(struct hash_table *categories, const char *category);
+void category_update_first_allocation(struct hash_table *categories, const struct rmsummary *max_worker, const char *category);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);

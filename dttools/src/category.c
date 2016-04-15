@@ -413,7 +413,7 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 #define update_first_allocation_field(c, top, independence, field)\
 	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field)
 
-void category_update_first_allocation(struct hash_table *categories, const char *category) {
+void category_update_first_allocation(struct hash_table *categories, const struct rmsummary *max_worker, const char *category) {
 	/* buffer used only for debug output. */
 	static buffer_t *b = NULL;
 	if(!b) {
@@ -422,10 +422,17 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 	}
 
 	struct category *c = category_lookup_or_create(categories, category);
-	struct rmsummary *top = c->max_allocation;
-
-	if(!top)
+	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED)
 		return;
+
+	const struct rmsummary *top;
+	if(c->first_allocation) {
+		top = c->first_allocation;
+	} else if(max_worker) {
+		top = max_worker;
+	} else {
+		return;
+	}
 
 	if(!c->first_allocation) {
 		c->first_allocation = rmsummary_create(-1);
@@ -517,7 +524,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 
 	hash_table_firstkey(categories);
 	while(hash_table_nextkey(categories, &name, (void **) &c)) {
-		category_update_first_allocation(categories, name);
+		category_update_first_allocation(categories, NULL, name);
 		category_clear_histograms(c);
 	}
 }
