@@ -9,8 +9,9 @@ prepare()
 {
 	gcc -I../src/ -g -o "$exe" -x c - -x none -lpthread -lm <<EOF
 #include <fcntl.h>
-#include <stropts.h>
 #include <unistd.h>
+
+#include <sys/ioctl.h>
 
 #include <errno.h>
 #include <limits.h>
