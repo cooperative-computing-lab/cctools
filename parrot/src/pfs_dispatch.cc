@@ -107,6 +107,12 @@ extern "C" {
 #ifndef CLONE_UNTRACED
 #	define CLONE_UNTRACED 0x00800000
 #endif
+#ifndef FIONCLEX
+#	define FIONCLEX 0x5450
+#endif
+#ifndef FIOCLEX
+#	define FIOCLEX 0x5451
+#endif
 
 extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
@@ -2004,16 +2010,35 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_ioctl:
 			if (entering) {
-				if (p->table->isparrot(args[0])) {
-					if (args[1] == BTRFS_IOC_CLONE) {
-						debug(D_DEBUG, "starting BTRFS_IOC_CLONE operation %" PRId64 "->%" PRId64, args[2], args[0]);
-						p->syscall_result = pfs_fcopyfile(args[2],args[0]);
+				int fd = args[0];
+				int request = args[1];
+				if (request == FIONCLEX || request == FIOCLEX) {
+					p->syscall_result = pfs_fcntl(fd, F_GETFD, 0);
+					if (p->syscall_result < 0) {
+						divert_to_dummy(p,-errno);
+						goto done;
+					}
+					if (request == FIONCLEX)
+						p->syscall_result &= ~FD_CLOEXEC;
+					else if (request == FIOCLEX)
+						p->syscall_result |= FD_CLOEXEC;
+					else assert(0);
+					p->syscall_result = pfs_fcntl(fd, F_SETFD, (void *)(uintptr_t)p->syscall_result);
+					if (p->syscall_result < 0) {
+						divert_to_dummy(p,-errno);
+						goto done;
+					}
+					wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
+				} else if (request == BTRFS_IOC_CLONE) {
+					if (p->table->isparrot(fd)) {
+						debug(D_DEBUG, "starting BTRFS_IOC_CLONE operation %" PRId64 "->%d", args[2], fd);
+						p->syscall_result = pfs_fcopyfile(args[2],fd);
 						if(p->syscall_result<0) p->syscall_result = -errno;
 						divert_to_dummy(p,p->syscall_result);
 					} else {
 						divert_to_dummy(p,-ENOTTY);
 					}
-				} else if (!p->table->isnative(args[0])) {
+				} else if (!p->table->isnative(fd)) {
 					divert_to_dummy(p,-EBADF);
 				}
 			}
