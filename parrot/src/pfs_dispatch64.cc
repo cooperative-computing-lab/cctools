@@ -1986,14 +1986,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				switch(cmd) {
 					case F_GETFD:
 					case F_SETFD:
-						if (p->table->isnative(args[0])) {
-							debug(D_DEBUG, "fallthrough %s(%" PRId64 ", %" PRId64 ", %" PRId64 ")", tracer_syscall_name(p->tracer,p->syscall), args[0], args[1], args[2]);
-						} else {
-							p->syscall_result = pfs_fcntl(fd,cmd,uaddr);
-							if(p->syscall_result<0)
-								divert_to_dummy(p,-errno);
-							/* else allow the kernel to also set fd flags (e.g. FD_CLOEXEC) */
+						p->syscall_result = pfs_fcntl(fd,cmd,uaddr);
+						if(p->syscall_result<0) {
+							divert_to_dummy(p,-errno);
+							goto done;
 						}
+						/* else allow the kernel to also set fd flags (e.g. FD_CLOEXEC) */
 						wait_barrier = 1; /* this handles two processes racing on file descriptor table changes (see #1179) */
 						break;
 
@@ -2083,12 +2081,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 							} else {
 								p->table->dup2(fd, actual, 0);
 							}
-						}
-						break;
-					case F_SETFD:
-						if (p->table->isnative(fd)) {
-							debug(D_DEBUG, "updating native fd %d flags to %d", fd, (int)args[2]);
-							p->table->setnative(fd, args[2]);
 						}
 						break;
 				}
