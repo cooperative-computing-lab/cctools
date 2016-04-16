@@ -41,8 +41,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
-	n->resources_needed = rmsummary_create(-1);
-	n->resources_measured = NULL;
+	n->resources_requested = rmsummary_create(-1);
+	n->resources_measured  = NULL;
 
 	n->resource_request = CATEGORY_ALLOCATION_UNLABELED;
 
@@ -225,7 +225,7 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 
 void dag_node_init_resources(struct dag_node *n)
 {
-	struct rmsummary *rs    = n->resources_needed;
+	struct rmsummary *rs    = n->resources_requested;
 	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
 	struct dag_variable_lookup_set s_all  = { n->d, n->category, n, NULL };
 
@@ -247,7 +247,6 @@ void dag_node_init_resources(struct dag_node *n)
 	val = dag_variable_lookup(RESOURCES_GPUS, &s_node);
 	if(val)
 		n->resource_request = CATEGORY_ALLOCATION_USER;
-
 
 	int category_flag = 0;
 	/* second pass: fill fall-back values if at least one resource was individually labeled. */
@@ -281,53 +280,18 @@ void dag_node_init_resources(struct dag_node *n)
 	}
 }
 
-int dag_node_update_resources(struct dag_node *n, int overflow)
-{
-	if(overflow && (n->resource_request == CATEGORY_ALLOCATION_USER || n->resource_request == CATEGORY_ALLOCATION_AUTO_MAX || n->resource_request == CATEGORY_ALLOCATION_UNLABELED)) {
-		return 0;
-	}
-
-	struct rmsummary *rs = n->resources_needed;
-	struct rmsummary *rc = n->category->max_allocation;
-	struct rmsummary *rd = n->d->default_category->max_allocation;
-
-	if(overflow) {
-		n->resource_request = CATEGORY_ALLOCATION_AUTO_MAX;
-		rs->cores  = rc->cores  > -1 ? rc->cores  : rd->cores;
-		rs->memory = rc->memory > -1 ? rc->memory : rd->memory;
-		rs->disk   = rc->disk   > -1 ? rc->disk   : rd->disk;
-		rs->gpus   = rc->gpus   > -1 ? rc->gpus   : rd->gpus;
-
-		return 1;
-	}
-
-	if(n->category->first_allocation) {
-		rc = n->category->first_allocation;
-
-		n->resource_request = CATEGORY_ALLOCATION_AUTO_FIRST;
-		rs->cores  = rc->cores  > -1 ? rc->cores  : rd->cores;
-		rs->memory = rc->memory > -1 ? rc->memory : rd->memory;
-		rs->disk   = rc->disk   > -1 ? rc->disk   : rd->disk;
-		rs->gpus   = rc->gpus   > -1 ? rc->gpus   : rd->gpus;
-
-		return 1;
-	}
-
-	/* else, no change possible, we keep the CATEGORY_ALLOCATION_AUTO_ZERO as is. */
-
-	return 1;
-}
-
 void dag_node_print_debug_resources(struct dag_node *n)
 {
-	if( n->resources_needed->cores > -1 )
-		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      n->resources_needed->cores);
-	if( n->resources_needed->memory > -1 )
-		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", n->resources_needed->memory);
-	if( n->resources_needed->disk > -1 )
-		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", n->resources_needed->disk);
-	if( n->resources_needed->gpus > -1 )
-		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n",       n->resources_needed->gpus);
+	const struct rmsummary *r = dag_node_dynamic_label(n);
+
+	if( r->cores > -1 )
+		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      r->cores);
+	if( r->memory > -1 )
+		debug(D_MAKEFLOW_RUN, "memory:   %"PRId64" MB.\n", r->memory);
+	if( r->disk > -1 )
+		debug(D_MAKEFLOW_RUN, "disk:     %"PRId64" MB.\n", r->disk);
+	if( r->gpus > -1 )
+		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n",       r->gpus);
 }
 
 /*
@@ -352,6 +316,14 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 	}
 
 	return object;
+}
+
+/* Return resources according to request. */
+
+const struct rmsummary *dag_node_dynamic_label(struct dag_node *n) {
+	struct category *c = n->category;
+
+	return category_task_dynamic_label(n->resource_request, c->max_allocation, c->first_allocation, n->resources_requested);
 }
 
 /* vim: set noexpandtab tabstop=4: */

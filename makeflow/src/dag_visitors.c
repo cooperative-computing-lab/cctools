@@ -776,9 +776,9 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 			if(with_details) {
 				printf("subgraph cluster_S%d { \n", condense_display ? t->id : n->nodeid);
 				printf("\tstyle=unfilled;\n\tcolor=red\n");
-				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->cores);
-				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->memory);
-				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_needed->disk);
+				printf("\tcores%d [style=filled, color=white, label=\"Cores: %"PRId64"\"]\n", condense_display ? t->id : n->nodeid, n->resources_requested->cores);
+				printf("\tresMem%d [style=filled, color=white, label=\"Memory: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_requested->memory);
+				printf("\tworkDirFtprnt%d [style=filled, color=white, label=\"Footprint: %"PRId64" MB\"]\n", condense_display ? t->id : n->nodeid, n->resources_requested->disk);
 				printf("\tcores%d -> resMem%d -> workDirFtprnt%d [color=white]", condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid, condense_display ? t->id : n->nodeid);
 
 				//Source Files
@@ -1244,7 +1244,7 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 		jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
 		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
 		jx_insert_unless_empty(rule, jx_string("variables"), variables_to_json(n->variables));
-		jx_insert_unless_empty(rule, jx_string("resources_needed"), resources_to_json(n->resources_needed));
+		jx_insert_unless_empty(rule, jx_string("resources_requested"), resources_to_json(n->resources_requested));
 		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files));
 		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files));
 		jx_insert_unless_empty(rule, jx_string("remote_names"), remote_names_to_json(n->remote_names));

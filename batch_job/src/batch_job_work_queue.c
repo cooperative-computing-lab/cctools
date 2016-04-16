@@ -62,7 +62,7 @@ static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
 	}
 }
 
-static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources)
+static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
 	struct work_queue_task *t;
 

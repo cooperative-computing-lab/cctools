@@ -13,7 +13,7 @@
 #include "path.h"
 #include "xxmalloc.h"
 
-static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
+static batch_job_id_t batch_job_dryrun_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
 	FILE *log;
 	char *escaped_cmd;
