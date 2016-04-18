@@ -127,10 +127,11 @@ static int server_table_load(time_t stoptime)
 
 	struct jx *jexpr = jx_parse_string("type==\"chirp\"");
 	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, jexpr, stoptime);
-	jx_delete(jexpr);
 
-	if(!q)
+	if(!q) {
+		jx_delete(jexpr);
 		return 0;
+	}
 
 	while((j = catalog_query_read(q, stoptime))) {
 		char name[CHIRP_PATH_MAX];
