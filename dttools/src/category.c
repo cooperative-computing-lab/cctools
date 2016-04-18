@@ -611,8 +611,7 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	return CATEGORY_ALLOCATION_AUTO_FIRST;
 }
 
-const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
-
+const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
 	/* we keep an internal label so that the caller does not have to worry
 	 * about memory leaks. */
 	static struct rmsummary *internal = NULL;
@@ -628,6 +627,34 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
 
+	/* load max values */
+	rmsummary_merge_override(internal, max);
+
+	if(request == CATEGORY_ALLOCATION_AUTO_FIRST) {
+		rmsummary_merge_override(internal, first);
+	}
+
+	/* chip user values */
+	rmsummary_merge_override(internal, user);
+
+	return internal;
+
+}
+
+const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
+
+	/* we keep an internal label so that the caller does not have to worry
+	 * about memory leaks. */
+	static struct rmsummary *internal = NULL;
+
+	if(internal) {
+		rmsummary_delete(internal);
+	}
+
+	internal = rmsummary_create(-1);
+
+	struct category *c = category_lookup_or_create(categories, category);
+
 	struct rmsummary *seen       = c->max_resources_seen;
 	struct rmsummary *completed  = c->max_resources_completed;
 
@@ -639,15 +666,10 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 		internal->disk   = completed->disk;
 	}
 
+	const struct rmsummary *max = category_dynamic_task_max_declared_resources(categories, category, user, request);
+
 	/* load max values */
 	rmsummary_merge_override(internal, max);
-
-	if(request == CATEGORY_ALLOCATION_AUTO_FIRST) {
-		rmsummary_merge_override(internal, first);
-	}
-
-	/* chip user values */
-	rmsummary_merge_override(internal, user);
 
 	return internal;
 }

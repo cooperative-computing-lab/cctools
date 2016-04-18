@@ -78,11 +78,12 @@ static struct jx_table worker_headers[] = {
 
 static struct jx_table workers_able_headers[] = {
 {"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  12},
-{"tasks_waiting_proper_label", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{"tasks_running", "RUNNING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
+{"tasks_waiting", "WAITING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"workers_able",  "FIT-WORKERS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
-{"max_cores",     "MAX-CORES",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
-{"max_memory",    "MAX-MEMORY",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
-{"max_disk",      "MAX-DISK",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
+{"max_cores",     "MAX-CORES",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
+{"max_memory",    "MAX-MEMORY",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
+{"max_disk",      "MAX-DISK",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {NULL,NULL,0,0,0}
 };
 

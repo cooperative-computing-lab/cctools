@@ -107,6 +107,8 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 
 const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request);
 
+const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request);
+
 const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request);
 
 #endif
