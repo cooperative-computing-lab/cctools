@@ -7,6 +7,8 @@
 #ifndef CATCH_H
 #define CATCH_H
 
+#include "debug.h"
+
 #include <errno.h>
 #include <string.h>
 
