@@ -745,7 +745,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_failed_flag = 1;
 			}
 		}
-		
 		else
 		{
 			makeflow_failed_flag = 1;
