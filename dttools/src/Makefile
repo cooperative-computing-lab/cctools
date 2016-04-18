@@ -69,6 +69,7 @@ SOURCES = \
 	md5.c \
 	memfdexe.c \
 	mergesort.c \
+	mkdir_recursive.c \
 	mt19937-64.c \
 	nvpair.c \
 	nvpair_jx.c \
