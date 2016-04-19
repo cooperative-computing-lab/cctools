@@ -1402,6 +1402,9 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	int rschedule = 0;
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		q->stats->total_exhausted_execute_time += t->cmd_execution_time;
+		q->stats->total_exhausted_retries ++;
+
 		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
 
 		if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
@@ -2036,6 +2039,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity",info.capacity);
 	jx_insert_integer(j,"total_execute_time",info.total_execute_time);
 	jx_insert_integer(j,"total_good_execute_time",info.total_good_execute_time);
+	jx_insert_integer(j,"total_exhausted_execute_time",info.total_exhausted_execute_time);
+	jx_insert_integer(j,"total_exhausted_retries",info.total_exhausted_retries);
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
@@ -5673,6 +5678,9 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_bytes_received = qs->total_bytes_received;
 	s->total_execute_time = qs->total_execute_time;
 	s->total_good_execute_time = qs->total_good_execute_time;
+	s->total_exhausted_retries = qs->total_exhausted_retries;
+	s->total_exhausted_execute_time = qs->total_exhausted_execute_time;
+
 	timestamp_t wall_clock_time = timestamp_get() - qs->start_time;
 	if(wall_clock_time>0 && s->total_workers_connected>0) {
 		s->efficiency = (double) (qs->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
@@ -5861,8 +5869,6 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 
 void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 	const char *name              = t->category ? t->category : "default";
-	work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
-
 	struct category *c = work_queue_category_lookup_or_create(q, name);
 
 	struct work_queue_stats *s = c->wq_stats;
@@ -5876,37 +5882,23 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
-	switch(state) {
-		case WORK_QUEUE_TASK_DONE:
-			if(t->result == WORK_QUEUE_RESULT_SUCCESS)
-			{
-				c->total_tasks++;
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
+	{
+		c->total_tasks++;
 
-				s->total_tasks_complete      = c->total_tasks;
-				s->total_good_execute_time  += t->cmd_execution_time;
-				s->total_good_transfer_time += t->total_transfer_time;
-				s->total_good_execute_time  += t->cmd_execution_time;
+		s->total_tasks_complete      = c->total_tasks;
+		s->total_good_execute_time  += t->cmd_execution_time;
+		s->total_good_transfer_time += t->total_transfer_time;
 
-				category_accumulate_summary(q->categories, t->category, t->resources_measured);
+		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 
-				if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
-					if(c->max_allocation) {
-						category_update_first_allocation(q->categories, t->category);
-					}
-				}
-			} else {
-				s->total_tasks_failed++;
+		if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
+			if(c->max_allocation) {
+				category_update_first_allocation(q->categories, t->category);
 			}
-			break;
-		case WORK_QUEUE_TASK_READY:
-			s->total_tasks_dispatched++;
-			break;
-		case WORK_QUEUE_TASK_CANCELED:
-			s->total_tasks_cancelled++;
-			break;
-		default:
-			/* nothing */
-			break;
+		}
+	} else {
+		s->total_tasks_failed++;
 	}
 }
 
