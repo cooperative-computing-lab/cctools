@@ -1178,6 +1178,29 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	return result;
 }
 
+static work_queue_result_code_t get_monitor_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
+{
+	struct work_queue_file *f;
+	work_queue_result_code_t result = SUCCESS;
+
+	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
+
+	if(t->output_files) {
+		list_first_item(t->output_files);
+		while((f = list_next_item(t->output_files))) {
+			if(!strcmp(summary_name, f->remote_name)) {
+				result = get_output_file(q,w,t,f);
+				break;
+			}
+		}
+	}
+
+	// tell the worker you no longer need that task's output directory.
+	send_worker_msg(q,w, "kill %d\n",t->taskid);
+
+	return result;
+}
+
 static void delete_worker_file( struct work_queue *q, struct work_queue_worker *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
 		send_worker_msg(q,w, "unlink %s\n", filename);
@@ -1326,7 +1349,13 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
-	result = get_output_files(q,w,t);
+
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		result = get_monitor_output_file(q,w,t);
+	} else {
+		result = get_output_files(q,w,t);
+	}
+
 	if(result != SUCCESS) {
 		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
