@@ -756,6 +756,9 @@ void rmsummary_read_env_vars(struct rmsummary *s)
 typedef int64_t (*rm_bin_op)(int64_t, int64_t);
 void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bin_op fn)
 {
+	if(!src || !dest)
+		return;
+
 	rmsummary_apply_op(dest, src, fn, start);
 	rmsummary_apply_op(dest, src, fn, end);
 	rmsummary_apply_op(dest, src, fn, exit_status);
@@ -799,6 +802,9 @@ static int64_t max_field(int64_t d, int64_t s)
 
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 {
+	if(!dest || !src)
+		return;
+
 	rmsummary_bin_op(dest, src, max_field);
 }
 
@@ -810,6 +816,9 @@ void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 
 void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src)
 {
+	if(!src || !dest)
+		return;
+
 	if(!dest->peak_times)
 		dest->peak_times = rmsummary_create(-1);
 
@@ -846,11 +855,17 @@ static int64_t min_field(int64_t d, int64_t s)
 
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
 {
+	if(!dest || !src)
+		return;
+
 	rmsummary_bin_op(dest, src, min_field);
 }
 
 void rmsummary_debug_report(const struct rmsummary *s)
 {
+	if(!s)
+		return;
+
 	if(s->cores != -1)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "cores", s->cores);
 	if(s->start != -1)

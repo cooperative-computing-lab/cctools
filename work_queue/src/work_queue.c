@@ -5885,6 +5885,8 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
+	rmsummary_merge_max(c->max_resources_seen, t->resources_measured);
+
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
 		c->total_tasks++;
