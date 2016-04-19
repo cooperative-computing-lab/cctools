@@ -1351,14 +1351,13 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 			resource_monitor_compress_logs(q, t);
 	}
 
+	work_queue_category_accumulate_task(q, t);
+
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
 
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
-
-	// Record statistics information for capacity estimation
-	add_task_report(q,t);
 
 	// Update completed tasks and the total task execution time.
 	q->stats->total_tasks_complete++;
@@ -1372,12 +1371,41 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		q->stats->total_good_transfer_time += t->total_transfer_time;
 	}
 
-	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-		w->hostname,
-		w->addrport,
-		(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
-		(long long) w->total_tasks_complete,
-		w->total_task_time / w->total_tasks_complete / 1000000.0);
+	int rschedule = 0;
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
+
+		if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
+			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
+			t->resource_request = next;
+			change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+			rschedule = 1;
+		} else {
+			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+		}
+	}
+
+	if(rschedule == 0) {
+		add_task_report(q, t);
+		debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
+				w->hostname,
+				w->addrport,
+				(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
+				(long long) w->total_tasks_complete,
+				w->total_task_time / w->total_tasks_complete / 1000000.0);
+	} else if(t->resources_measured && t->resources_measured->limits_exceeded) {
+		struct jx *j = rmsummary_to_json(t->resources_requested->limits_exceeded, 1);
+		if(j) {
+			char *str = jx_print_string(j);
+			debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
+					t->taskid,
+					w->hostname,
+					w->addrport,
+					str);
+			free(str);
+			jx_delete(j);
+		}
+	}
 
 	return;
 }
@@ -1699,12 +1727,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		}
 	}
 
-	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		/* if resource exhaustion, mark the task for possible resubmission. */
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
-	} else {
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	}
+	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 
 	return SUCCESS;
 }
@@ -4892,16 +4915,12 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
-			if(t->total_submissions > 1 && old_state == WORK_QUEUE_TASK_UNKNOWN) {
-				work_queue_category_accumulate_task(q, t);
-			}
 			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
 			itable_remove(q->tasks, t->taskid);
-			work_queue_category_accumulate_task(q, t);
 			break;
 		default:
 			/* do nothing */
@@ -5319,19 +5338,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-				category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
-				if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
-					debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
-					t->resource_request = next;
-					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
-				} else {
-					debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
-					change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-				}
-			} else {
-				cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
-			}
+			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 		}
 
 		//We have the resources we have been waiting for; start task transfers
