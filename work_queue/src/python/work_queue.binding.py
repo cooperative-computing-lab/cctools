@@ -619,6 +619,19 @@ class Task(_object):
 
         return self._task.resources_measured
 
+    ##
+    # Get the resources the task exceeded. For valid field see @resources_measured.
+    #
+    @property
+    def limits_exceeded(self):
+        if not self._task.resources_measured:
+            return None
+
+        if not self._task.resources_measured.limits_exceeded:
+            return None
+
+        return self._task.resources_measured.limits_exceeded
+
 
     ##
     # Get the resources the task requested to run. For valid fields see @resources_measured.

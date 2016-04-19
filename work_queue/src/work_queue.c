@@ -241,6 +241,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_task_state_t new_state);
+static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state);
 static void count_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 static void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t );
@@ -685,8 +686,20 @@ static void clean_task_state(struct work_queue_task *t) {
 		t->cmd_execution_time = 0;
 
 		if (t->time_execute_cmd_start >= t->time_committed) {
-			t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
+			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
+			t->total_cmd_execution_time += delta_time;
+
+			switch(t->result) {
+				case WORK_QUEUE_RESULT_UNKNOWN:
+				case WORK_QUEUE_RESULT_FORSAKEN:
+					t->total_time_until_worker_failure += delta_time;
+					break;
+				default:
+					break;
+			}
 		}
+
+		t->time_execute_cmd_start = 0;
 
 		if(t->output) {
 			free(t->output);
@@ -1178,6 +1191,29 @@ static work_queue_result_code_t get_output_files( struct work_queue *q, struct w
 	return result;
 }
 
+static work_queue_result_code_t get_monitor_output_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
+{
+	struct work_queue_file *f;
+	work_queue_result_code_t result = SUCCESS;
+
+	const char *summary_name = RESOURCE_MONITOR_REMOTE_NAME ".summary";
+
+	if(t->output_files) {
+		list_first_item(t->output_files);
+		while((f = list_next_item(t->output_files))) {
+			if(!strcmp(summary_name, f->remote_name)) {
+				result = get_output_file(q,w,t,f);
+				break;
+			}
+		}
+	}
+
+	// tell the worker you no longer need that task's output directory.
+	send_worker_msg(q,w, "kill %d\n",t->taskid);
+
+	return result;
+}
+
 static void delete_worker_file( struct work_queue *q, struct work_queue_worker *w, const char *filename, int flags, int except_flags ) {
 	if(!(flags & except_flags)) {
 		send_worker_msg(q,w, "unlink %s\n", filename);
@@ -1326,7 +1362,13 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Receiving output ...
 	t->time_receive_output_start = timestamp_get();
-	result = get_output_files(q,w,t);
+
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		result = get_monitor_output_file(q,w,t);
+	} else {
+		result = get_output_files(q,w,t);
+	}
+
 	if(result != SUCCESS) {
 		debug(D_WQ, "Failed to receive output from worker %s (%s).", w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
@@ -1351,14 +1393,13 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 			resource_monitor_compress_logs(q, t);
 	}
 
+	work_queue_category_accumulate_task(q, t);
+
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
 
 	w->finished_tasks--;
 	t->time_task_finish = timestamp_get();
-
-	// Record statistics information for capacity estimation
-	add_task_report(q,t);
 
 	// Update completed tasks and the total task execution time.
 	q->stats->total_tasks_complete++;
@@ -1372,12 +1413,44 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		q->stats->total_good_transfer_time += t->total_transfer_time;
 	}
 
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+		q->stats->total_exhausted_execute_time += t->cmd_execution_time;
+		q->stats->total_exhausted_attempts++;
+
+		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
+		t->exhausted_attempts++;
+
+		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
+
+		struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
+		if(j) {
+			char *str = jx_print_string(j);
+			debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
+					t->taskid,
+					w->hostname,
+					w->addrport,
+					str);
+			free(str);
+			jx_delete(j);
+		}
+
+		if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
+			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
+			t->resource_request = next;
+			change_task_state(q, t, WORK_QUEUE_TASK_READY);
+			return;
+		} else {
+			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+		}
+	}
+
+	add_task_report(q, t);
 	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
-		w->hostname,
-		w->addrport,
-		(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
-		(long long) w->total_tasks_complete,
-		w->total_task_time / w->total_tasks_complete / 1000000.0);
+			w->hostname,
+			w->addrport,
+			(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
+			(long long) w->total_tasks_complete,
+			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
 	return;
 }
@@ -1699,12 +1772,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		}
 	}
 
-	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		/* if resource exhaustion, mark the task for possible resubmission. */
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
-	} else {
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	}
+	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 
 	return SUCCESS;
 }
@@ -1984,6 +2052,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity",info.capacity);
 	jx_insert_integer(j,"total_execute_time",info.total_execute_time);
 	jx_insert_integer(j,"total_good_execute_time",info.total_good_execute_time);
+	jx_insert_integer(j,"total_exhausted_execute_time",info.total_exhausted_execute_time);
+	jx_insert_integer(j,"total_exhausted_retries",info.total_exhausted_attempts);
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
@@ -2096,7 +2166,6 @@ static void priority_add_to_jx(struct jx *j, double priority)
 
 	free(str);
 }
-
 
 
 struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char *host )
@@ -3518,9 +3587,10 @@ static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t
 		reap_task_from_worker(q, w, t, new_state);
 
 		return 1;
+	} else {
+		change_task_state(q, t, new_state);
+		return 0;
 	}
-
-	return 0;
 }
 
 static struct work_queue_task *find_task_by_tag(struct work_queue *q, const char *tasktag) {
@@ -3604,15 +3674,10 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->env_list = list_create();
 	t->return_status = -1;
 
-	t->time_committed = 0;
-	t->time_execute_cmd_start = 0;
-	t->total_cmd_execution_time = 0;
-	t->priority = 0;
+	t->result = WORK_QUEUE_RESULT_UNKNOWN;
 
 	t->resource_request   = CATEGORY_ALLOCATION_UNLABELED;
-	t->resources_measured = NULL;
 
-	t->monitor_output_directory = NULL;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
@@ -4892,16 +4957,12 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
-			if(t->total_submissions > 1 && old_state == WORK_QUEUE_TASK_UNKNOWN) {
-				work_queue_category_accumulate_task(q, t);
-			}
 			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
 			itable_remove(q->tasks, t->taskid);
-			work_queue_category_accumulate_task(q, t);
 			break;
 		default:
 			/* do nothing */
@@ -5319,19 +5380,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-				category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
-				if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
-					debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
-					t->resource_request = next;
-					cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
-				} else {
-					debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
-					change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-				}
-			} else {
-				cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
-			}
+			change_task_state(q, t, WORK_QUEUE_TASK_READY);
 		}
 
 		//We have the resources we have been waiting for; start task transfers
@@ -5637,6 +5686,9 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_bytes_received = qs->total_bytes_received;
 	s->total_execute_time = qs->total_execute_time;
 	s->total_good_execute_time = qs->total_good_execute_time;
+	s->total_exhausted_attempts = qs->total_exhausted_attempts;
+	s->total_exhausted_execute_time = qs->total_exhausted_execute_time;
+
 	timestamp_t wall_clock_time = timestamp_get() - qs->start_time;
 	if(wall_clock_time>0 && s->total_workers_connected>0) {
 		s->efficiency = (double) (qs->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
@@ -5825,8 +5877,6 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 
 void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 	const char *name              = t->category ? t->category : "default";
-	work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
-
 	struct category *c = work_queue_category_lookup_or_create(q, name);
 
 	struct work_queue_stats *s = c->wq_stats;
@@ -5840,37 +5890,23 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
-	switch(state) {
-		case WORK_QUEUE_TASK_DONE:
-			if(t->result == WORK_QUEUE_RESULT_SUCCESS)
-			{
-				c->total_tasks++;
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
+	{
+		c->total_tasks++;
 
-				s->total_tasks_complete      = c->total_tasks;
-				s->total_good_execute_time  += t->cmd_execution_time;
-				s->total_good_transfer_time += t->total_transfer_time;
-				s->total_good_execute_time  += t->cmd_execution_time;
+		s->total_tasks_complete      = c->total_tasks;
+		s->total_good_execute_time  += t->cmd_execution_time;
+		s->total_good_transfer_time += t->total_transfer_time;
 
-				category_accumulate_summary(q->categories, t->category, t->resources_measured);
+		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 
-				if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
-					if(c->max_allocation) {
-						category_update_first_allocation(q->categories, t->category);
-					}
-				}
-			} else {
-				s->total_tasks_failed++;
+		if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
+			if(c->max_allocation) {
+				category_update_first_allocation(q->categories, t->category);
 			}
-			break;
-		case WORK_QUEUE_TASK_READY:
-			s->total_tasks_dispatched++;
-			break;
-		case WORK_QUEUE_TASK_CANCELED:
-			s->total_tasks_cancelled++;
-			break;
-		default:
-			/* nothing */
-			break;
+		}
+	} else {
+		s->total_tasks_failed++;
 	}
 }
 
