@@ -11,13 +11,10 @@ See the file COPYING for details.
 #include "timestamp.h"
 
 typedef enum {
-	CATEGORY_ALLOCATION_UNLABELED = 0, /**< No resources are explicitely requested. */
-	CATEGORY_ALLOCATION_USER,          /**< Using values explicitely requested. */
-	CATEGORY_ALLOCATION_AUTO_ZERO,     /**< Pre-step for autolabeling, when the first allocation has not been computed. */
-	CATEGORY_ALLOCATION_AUTO_FIRST,    /**< Using first step value of the two-step policy. */
-	CATEGORY_ALLOCATION_AUTO_MAX,      /**< Using max of category. (2nd step of two-step policy) */
-	CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN, /**< Using max seen as minimum, max of worker. (2nd step of two-step policy when max is unknown) */
-	CATEGORY_ALLOCATION_ERROR          /**< No valid resources could be found. (E.g., after 2nd step fails) */
+	CATEGORY_ALLOCATION_DEFAULT = 0,      /**< No automatic first-allocation is being computed or is yet available. */
+	CATEGORY_ALLOCATION_AUTO_FIRST,       /**< Using first step value of the two-step policy. */
+	CATEGORY_ALLOCATION_AUTO_MAX,         /**< Using max of category. (2nd step of two-step policy) */
+	CATEGORY_ALLOCATION_ERROR             /**< No valid resources could be found. (E.g., after 2nd step fails) */
 } category_allocation_t;
 
 

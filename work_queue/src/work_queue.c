@@ -262,9 +262,6 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 /* number of tasks with state */
 static int task_state_count( struct work_queue *q, const char *category, work_queue_task_state_t state);
 
-/* number of tasks in the ready list with a proper label for the category. */
-static int task_ready_count(struct work_queue *q, const char *category);
-
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
 
@@ -1282,8 +1279,7 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 		t->return_status = t->resources_measured->exit_status;
 	}
 
-	if(t->resource_request != CATEGORY_ALLOCATION_USER)
-		rmsummary_merge_max(t->resources_requested, task_max_resources(q, t));
+	rmsummary_merge_max(t->resources_requested, task_max_resources(q, t));
 
 	free(summary);
 }
@@ -1888,10 +1884,6 @@ static struct rmsummary *largest_waiting_task(struct work_queue *q) {
 
 	list_first_item(q->ready_list);
 	while((t = list_next_item(q->ready_list))) {
-		if(t->resource_request != CATEGORY_ALLOCATION_USER) {
-			continue;
-		}
-
 		const struct rmsummary *r = task_max_resources(q, t);
 		rmsummary_merge_max(max_resources_waiting, r);
 	}
@@ -1912,6 +1904,8 @@ static int check_worker_fit(struct work_queue_worker *w, struct rmsummary *s) {
 	if(s->memory > w->resources->memory.total/w->resources->workers.total)
 		return 0;
 	if(s->disk > w->resources->disk.total/w->resources->workers.total)
+		return 0;
+	if(s->gpus > w->resources->gpus.total/w->resources->workers.total)
 		return 0;
 
 	return w->resources->workers.total;
@@ -1953,7 +1947,7 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "total_tasks_cancelled", s.total_tasks_cancelled);
 	jx_insert_integer(j, "workers_able", s.workers_able);
 
-	jx_insert_integer(j, "tasks_waiting_proper_label", task_ready_count(q, category));
+	jx_insert_integer(j, "tasks_waiting_proper_label", task_state_count(q, category, WORK_QUEUE_TASK_READY));
 
 	if(c->max_allocation) {
 		if(c->max_allocation->cores > -1)
@@ -1984,26 +1978,6 @@ static struct jx *categories_to_jx(struct work_queue *q) {
 	hash_table_firstkey(q->categories);
 	while(hash_table_nextkey(q->categories, &category_name, (void **) &c)) {
 		jx_array_insert(a, category_to_jx(q, category_name));
-	}
-
-	int user_labeled = task_ready_count(q, NULL);
-	if(user_labeled > 0) {
-		struct jx *j = jx_object(NULL);
-		jx_insert_string(j, "category", "manual-label");
-		jx_insert_integer(j, "tasks_waiting_proper_label", user_labeled);
-
-		struct rmsummary *r = largest_waiting_task(q);
-		jx_insert_integer(j, "workers_able", count_workers_for_waiting_tasks(q, r));
-
-		if(r->cores > 0)
-			jx_insert_integer(j, "max_cores", r->cores);
-		if(r->memory > 0)
-			jx_insert_integer(j, "max_memory", r->memory);
-		if(r->disk > 0)
-			jx_insert_integer(j, "max_disk", r->disk);
-
-		rmsummary_delete(r);
-		jx_array_insert(a, j);
 	}
 
 	return a;
@@ -2782,12 +2756,12 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 	rmsummary_merge_max(limits, label);
 
-	if(t->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
-		limits->cores  = MIN(label->cores,  w->resources->cores.total);
-		limits->memory = MIN(label->memory, w->resources->memory.total);
-		limits->disk   = MIN(label->disk,   w->resources->disk.total);
-		limits->gpus   = MIN(label->gpus,   w->resources->gpus.total);
-	}
+	/* we use min here safely to remove any unset resources. min is fine, since
+	 * the task would not be schedule here if the correspoinding task resource
+	 * was larger than the worker. */
+	limits->cores  = MIN_POS(label->cores,  w->resources->cores.total);
+	limits->memory = MIN_POS(label->memory, w->resources->memory.total);
+	limits->disk   = MIN_POS(label->disk,   w->resources->disk.total);
 
 	/* consider times by themselves */
 	if(t->resources_requested) {
@@ -2957,128 +2931,49 @@ static double compute_capacity( const struct work_queue *q )
 	return (double) avg_exec_time / (avg_transfer_time + avg_app_time);
 }
 
-static int check_foreman_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
-	int64_t cores_used, disk_used, mem_used, gpus_used;
-	int ok = 1;
-
-	if(w->resources->workers.total < 1) {
-		ok = 0;
-		return ok;
-	}
-
-	if(t->resource_request == CATEGORY_ALLOCATION_UNLABELED)
-	{
-		// Unlabeled tasks run alone in a worker. Return immediately if foreman
-		// does not have workers free.
-		if(w->resources->unlabeled.inuse + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1))
-		{
-			ok = 0;
-			return ok;
-		}
-
-		// Assume unlabeled tasks use an average worker at the foreman.
-
-		cores_used = overcommitted_resource_total(q, w->resources->cores.total, 1) / w->resources->workers.total;
-		mem_used   = overcommitted_resource_total(q, w->resources->memory.total, 1) / w->resources->workers.total;
-		disk_used  = w->resources->disk.total / w->resources->workers.total;
-		gpus_used  = overcommitted_resource_total(q, w->resources->gpus.total, 1) / w->resources->workers.total;
-
-	}
-	else
-	{
-		const struct rmsummary *label = task_min_resources(q, t);
-		// Assume the task will take "whatever it can get" for unlabeled resources
-		cores_used = MAX(label->cores, 0);
-		mem_used   = MAX(label->memory, 0);
-		disk_used  = MAX(label->disk, 0);
-		gpus_used  = MAX(label->gpus, 0);
-	}
-
-	if(w->resources->cores.inuse + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
-		ok = 0;
-	} else if(w->resources->memory.inuse + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
-		ok = 0;
-	} else if(w->resources->disk.inuse + disk_used > w->resources->disk.total) { /* No overcommit disk */
-		ok = 0;
-	} else if(w->resources->gpus.inuse + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
-		ok = 0;
-	}
-
-	return ok;
-}
-
-static int check_worker_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
-	int64_t cores_used, disk_used, mem_used, gpus_used;
-	int ok = 1;
-
-	if(t->resource_request != CATEGORY_ALLOCATION_UNLABELED && w->resources->unlabeled.inuse > 0)
-	{
-		// Do not allow labeled/unlabeled mix at a regular worker.
-		ok = 0;
-		return ok;
-	}
-
-	if(t->resource_request == CATEGORY_ALLOCATION_UNLABELED)
-	{
-		if(w->resources->unlabeled.inuse + 1 > overcommitted_resource_total(q, w->resources->workers.total, 1))
-		{
-			ok = 0;
-		}
-		return ok;
-	}
-
-	const struct rmsummary *label = task_min_resources(q, t);
-	if(t->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
-		/* ZERO expands to the worker, except for cores. We always allocate the maximum cores. */
-
-		cores_used = MAX(label->cores, 1);
-		mem_used   = MIN(MAX(label->memory, 1), w->resources->memory.total);
-		disk_used  = MIN(MAX(label->disk, 1),   w->resources->disk.total);
-		gpus_used  = MIN(MAX(label->gpus, 1),   w->resources->gpus.total);
-	}
-	else
-	{
-		// Assume the task will take "whatever it can get" for unlabeled resources
-		cores_used = MAX(label->cores, 0);
-		mem_used   = MAX(label->memory, 0);
-		disk_used  = MAX(label->disk, 0);
-		gpus_used  = MAX(label->gpus, 0);
-	}
-
-	if(w->resources->cores.inuse + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
-		ok = 0;
-	} else if(w->resources->memory.inuse + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
-		ok = 0;
-	} else if(w->resources->disk.inuse + disk_used > w->resources->disk.total) { /* No overcommit disk */
-		ok = 0;
-	} else if(w->resources->gpus.inuse + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
-		ok = 0;
-	}
-
-	return ok;
-}
-
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
 	/* worker has no reported any resources yet */
 	if(w->resources->tag < 0)
 		return 0;
 
-	if(w->foreman)
-	{
-		return check_foreman_against_task(q, w, t);
+	if(w->resources->workers.total < 1) {
+		return 0;
 	}
-	else
-	{
+
+	if(!w->foreman) {
 		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
 		if (!w->foreman && info && info->blacklisted) {
 			return 0;
 		}
-		else
-		{
-			return check_worker_against_task(q, w, t);
-		}
 	}
+
+	int64_t cores_used, disk_used, mem_used, gpus_used;
+	int ok = 1;
+
+	const struct rmsummary *label = task_min_resources(q, t);
+
+	int64_t cores_avg = w->resources->cores.total  / w->resources->workers.total;
+	int64_t mem_avg   = w->resources->memory.total / w->resources->workers.total;
+	int64_t disk_avg  = w->resources->disk.total   / w->resources->workers.total;
+	int64_t gpus_avg  = w->resources->gpus.total   / w->resources->workers.total;
+
+	cores_used = MIN_POS(label->cores,  cores_avg);
+	mem_used   = MIN_POS(label->memory, mem_avg);
+	disk_used  = MIN_POS(label->disk,   disk_avg);
+	gpus_used  = MIN_POS(label->gpus,   gpus_avg);
+
+	if(w->resources->cores.inuse + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
+		ok = 0;
+	} else if(w->resources->memory.inuse + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
+		ok = 0;
+	} else if(w->resources->disk.inuse + disk_used > w->resources->disk.total) { /* No overcommit disk */
+		ok = 0;
+	} else if(w->resources->gpus.inuse + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+		ok = 0;
+	}
+
+	return ok;
 }
 
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
@@ -3204,7 +3099,7 @@ static struct work_queue_worker *find_worker_by_worst_fit(struct work_queue *q, 
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if( check_worker_against_task(q, w, t) ) {
+		if( check_hand_against_task(q, w, t) ) {
 
 			//Use total field on bres, wres to indicate free resources.
 			wres.cores.total   = w->resources->cores.total   - w->resources->cores.inuse;
@@ -3279,13 +3174,12 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 	struct work_queue_task *t;
 	uint64_t taskid;
 	int64_t cores_avg, mem_avg, disk_avg, gpus_avg;
-	int64_t cores_used, mem_used, disk_used, gpus_used, unlabeled_used;
+	int64_t cores_used, mem_used, disk_used, gpus_used;
 
 	w->resources->cores.inuse  = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
-	w->resources->unlabeled.inuse = 0;
 
 	cores_avg = 0;
 	mem_avg   = 0;
@@ -3304,30 +3198,18 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-		if(t->resource_request == CATEGORY_ALLOCATION_UNLABELED || t->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO)
-		{
-			cores_used = cores_avg;
-			mem_used  = mem_avg;
-			disk_used = disk_avg;
-			gpus_used = gpus_avg;
 
-		}
-		else
-		{
-			const struct rmsummary *label = task_min_resources(q, t);
-			cores_used = MAX(label->cores, 0);
-			mem_used   = MAX(label->memory, 0);
-			disk_used  = MAX(label->disk, 0);
-			gpus_used  = MAX(label->gpus, 0);
-		}
+		const struct rmsummary *label = task_max_resources(q, t);
 
-		unlabeled_used = (t->resource_request == CATEGORY_ALLOCATION_UNLABELED);
+		cores_used = MIN_POS(label->cores,  cores_avg);
+		mem_used   = MIN_POS(label->memory, mem_avg);
+		disk_used  = MIN_POS(label->disk,   disk_avg);
+		gpus_used  = MIN_POS(label->gpus,   gpus_avg);
 
 		w->resources->cores.inuse     += cores_used;
 		w->resources->memory.inuse    += mem_used;
 		w->resources->disk.inuse      += disk_used;
 		w->resources->gpus.inuse      += gpus_used;
-		w->resources->unlabeled.inuse += unlabeled_used;
 	}
 }
 
@@ -3367,6 +3249,7 @@ static void find_max_worker(struct work_queue *q) {
 	q->current_max_worker->cores  = 0;
 	q->current_max_worker->memory = 0;
 	q->current_max_worker->disk   = 0;
+	q->current_max_worker->gpus   = 0;
 
 	char *key;
 	struct work_queue_worker *w;
@@ -3730,7 +3613,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 	t->result = WORK_QUEUE_RESULT_UNKNOWN;
 
-	t->resource_request   = CATEGORY_ALLOCATION_UNLABELED;
+	t->resource_request   = CATEGORY_ALLOCATION_DEFAULT;
 
 
 	/* In the absence of additional information, a task consumes an entire worker. */
@@ -3818,17 +3701,6 @@ void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max
 	}
 }
 
-static void set_task_unlabel_flag( struct work_queue_task *t )
-{
-	if(t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus)
-	{
-		if(t->resource_request == CATEGORY_ALLOCATION_USER)
-			t->resource_request = CATEGORY_ALLOCATION_UNLABELED;
-	} else {
-		t->resource_request = CATEGORY_ALLOCATION_USER;
-	}
-}
-
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
 	if(memory < 0)
@@ -3839,8 +3711,6 @@ void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 	{
 		t->resources_requested->memory = memory;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
@@ -3853,8 +3723,6 @@ void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 	{
 		t->resources_requested->disk = disk;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
@@ -3867,8 +3735,6 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 	{
 		t->resources_requested->cores = cores;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
@@ -3881,8 +3747,6 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 	{
 		t->resources_requested->gpus = gpus;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds )
@@ -5096,26 +4960,6 @@ static int task_state_count(struct work_queue *q, const char *category, work_que
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
 			}
-		}
-	}
-
-	return count;
-}
-
-/* count ready tasks with a proper label for a category, or for the 'manual-label' category. */
-static int task_ready_count(struct work_queue *q, const char *category) {
-	struct work_queue_task *t;
-
-	int count = 0;
-
-	list_first_item(q->ready_list);
-	while((t = list_next_item(q->ready_list))) {
-		if(category) {
-			if(t->resource_request != CATEGORY_ALLOCATION_USER && t->category && !strcmp(category, t->category)) {
-				count++;
-			}
-		} else if(t->resource_request == CATEGORY_ALLOCATION_USER) {
-			count++;
 		}
 	}
 

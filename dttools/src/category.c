@@ -529,12 +529,32 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 				flag = 1;\
 			}\
 		}\
-		else if(max && max->field) {\
+		else if(max && max->field > -1) {\
 			if(measured->field > max->field) {\
 				flag = 1;\
 			}\
 		}\
 	}
+
+#define max_unknown_per_field(max, user, field, flag)\
+	if(flag) {\
+		if(user && user->field > -1) {\
+				flag = 0;\
+		}\
+		else if(max && max->field > -1) {\
+				flag = 0;\
+		}\
+	}
+
+int are_all_max_known(struct rmsummary *max_limits, struct rmsummary *user_limits) {
+	int unknown = 1;
+
+	max_unknown_per_field(max_limits, user_limits, cores,  unknown);
+	max_unknown_per_field(max_limits, user_limits, memory, unknown);
+	max_unknown_per_field(max_limits, user_limits, disk,   unknown);
+
+	return unknown;
+}
 
 /* returns the next allocation state. */
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
@@ -564,106 +584,80 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 			check_hard_limits(c->max_allocation, user, measured, max_concurrent_processes, over);
 			check_hard_limits(c->max_allocation, user, measured, total_processes,          over);
 		}
-		if(over)
-			return CATEGORY_ALLOCATION_ERROR;
 
-		switch(current_label) {
-			case CATEGORY_ALLOCATION_AUTO_ZERO:
-			case CATEGORY_ALLOCATION_AUTO_FIRST:
-			case CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN:
-				if(c->max_allocation) {
-					return CATEGORY_ALLOCATION_AUTO_MAX;
-				}
-				else {
-					return CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN;
-				}
-			case CATEGORY_ALLOCATION_UNLABELED:
-			case CATEGORY_ALLOCATION_USER:
-			case CATEGORY_ALLOCATION_AUTO_MAX:
-			default:
-				return CATEGORY_ALLOCATION_ERROR;
-				break;
-		}
+		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_AUTO_MAX;
 	}
-
 
 	/* else... not overflow... */
 
-	/* If user specified resources manually, respect the label. */
-	if(current_label == CATEGORY_ALLOCATION_USER) {
-			return CATEGORY_ALLOCATION_USER;
-	}
-
 	/* Never downgrade max allocation */
-	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX || current_label == CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN) {
-		return c->max_allocation ? CATEGORY_ALLOCATION_AUTO_MAX : CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN;
+	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
+		return CATEGORY_ALLOCATION_AUTO_MAX;
 	}
 
 	/* not autolabeling. */
 	if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
-		return CATEGORY_ALLOCATION_UNLABELED;
+		return CATEGORY_ALLOCATION_DEFAULT;
 	}
 
-	/* When autolabeling, use first allocation when it is available. */
-	if(c->first_allocation) {
-		return CATEGORY_ALLOCATION_AUTO_FIRST;
-	} else {
-		return CATEGORY_ALLOCATION_AUTO_ZERO;
-	}
+	/* labeling, and not max */
+	return CATEGORY_ALLOCATION_AUTO_FIRST;
 }
 
 const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
 
-	static struct rmsummary *dynamic_label = NULL;
+	/* we keep an internal label so that the caller does not have to worry
+	 * about memory leaks. */
+	static struct rmsummary *internal = NULL;
+
+	if(internal) {
+		rmsummary_delete(internal);
+	}
+
+	internal = rmsummary_create(-1);
 
 	struct category *c = category_lookup_or_create(categories, category);
 
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
 
-	switch(request) {
-		case CATEGORY_ALLOCATION_AUTO_ZERO:
-		case CATEGORY_ALLOCATION_AUTO_MAX:
-			return max;
-			break;
-		case CATEGORY_ALLOCATION_AUTO_FIRST:
-			return first;
-			break;
-		case CATEGORY_ALLOCATION_USER:
-			if(!max) {
-				return user;
-			} else {
-				if(dynamic_label) {
-					rmsummary_delete(dynamic_label);
-				}
-				dynamic_label = rmsummary_create(-1);
+	/* load max values */
+	rmsummary_merge_override(internal, max);
 
-				rmsummary_merge_min(dynamic_label, max);
-				rmsummary_merge_override(dynamic_label, user);
-
-				return dynamic_label;
-			}
-			break;
-		case CATEGORY_ALLOCATION_UNLABELED:
-		default:
-			if(max) {
-				return max;
-			} else {
-				return user;
-			}
-			break;
+	if(request == CATEGORY_ALLOCATION_AUTO_FIRST) {
+		rmsummary_merge_override(internal, first);
 	}
+
+	/* chip user values */
+	rmsummary_merge_override(internal, user);
+
+	return internal;
 }
 
 const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
 
-	struct category *c = category_lookup_or_create(categories, category);
+	static struct rmsummary *internal = NULL;
 
-	if(request == CATEGORY_ALLOCATION_AUTO_MAX_UNKNOWN) {
-		return c->max_resources_seen;
+	struct category *c = category_lookup_or_create(categories, category);
+	const struct rmsummary *max = category_dynamic_task_max_resources(categories, category, user, request);
+
+	/* if task is not being retried for resources, we do not need to set a
+	 * lower bound for all resources. */
+	if(request != CATEGORY_ALLOCATION_MODE_MAX) {
+		return max;
 	}
 
-	return category_dynamic_task_max_resources(categories, category, user, request);
+	if(internal) {
+		rmsummary_delete(internal);
+	}
+
+	internal = rmsummary_create(-1);
+
+	/* load seen values */
+	rmsummary_merge_override(internal, c->max_resources_seen);
+	rmsummary_merge_override(internal, max);
+
+	return internal;
 }
 
 
