@@ -685,8 +685,20 @@ static void clean_task_state(struct work_queue_task *t) {
 		t->cmd_execution_time = 0;
 
 		if (t->time_execute_cmd_start >= t->time_committed) {
-			t->total_cmd_execution_time += timestamp_get() - t->time_execute_cmd_start;
+			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
+			t->total_cmd_execution_time += delta_time;
+
+			switch(t->result) {
+				case WORK_QUEUE_RESULT_UNKNOWN:
+				case WORK_QUEUE_RESULT_FORSAKEN:
+					t->total_time_until_worker_failure += delta_time;
+					break;
+				default:
+					break;
+			}
 		}
+
+		t->time_execute_cmd_start = 0;
 
 		if(t->output) {
 			free(t->output);
@@ -2156,7 +2168,6 @@ static void priority_add_to_jx(struct jx *j, double priority)
 
 	free(str);
 }
-
 
 
 struct jx * task_to_jx( struct work_queue_task *t, const char *state, const char *host )
@@ -3664,15 +3675,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	t->env_list = list_create();
 	t->return_status = -1;
 
-	t->time_committed = 0;
-	t->time_execute_cmd_start = 0;
-	t->total_cmd_execution_time = 0;
-	t->priority = 0;
-
 	t->resource_request   = CATEGORY_ALLOCATION_UNLABELED;
-	t->resources_measured = NULL;
-
-	t->monitor_output_directory = NULL;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);

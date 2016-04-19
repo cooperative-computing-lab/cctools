@@ -135,6 +135,8 @@ struct work_queue_task {
 	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
 	timestamp_t total_cmd_exhausted_execute_time;          /**< Accumulated time spent in microseconds spent in attempts that executed resources. */
 
+	timestamp_t total_time_until_worker_failure;           /**< Accumulated time for runs that terminated in worker failure/disconnection. */
+
 	int exhausted_attempts;                                /**< Number of times the task failed given exhausted resources. */
 
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
