@@ -2190,6 +2190,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	//checks disk options make sense
+	if(manual_disk_option > 0 &&  manual_disk_option <= disk_avail_threshold) {
+		fatal("Disk space specified (%" PRId64 " MB) is less than minimum threshold (%"PRId64 " MB).\n See --disk and --disk-threshold options.", manual_disk_option, disk_avail_threshold);
+	}
+
 	if(!project_regex) {
 		if((argc - optind) != 2) {
 			show_help(argv[0]);
