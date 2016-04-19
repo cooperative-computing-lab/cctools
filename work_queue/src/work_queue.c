@@ -2228,22 +2228,12 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 					jx_array_insert(a, j);
 				}
-			}
-		}
-
-		list_first_item(q->ready_list);
-		while((t = list_next_item(q->ready_list))) {
-			j = task_to_jx(t,"waiting",0);
-			if(j) {
-				jx_array_insert(a, j);
-			}
-		}
-
-		itable_firstkey(q->tasks);
-		while(itable_nextkey(q->tasks,&taskid,(void**)&t)) {
-			j = task_to_jx(t,"complete",0);
-			if(j) {
-				jx_array_insert(a, j);
+			} else {
+				work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, taskid);
+				j = task_to_jx(t,task_state_str(state),0);
+				if(j) {
+					jx_array_insert(a, j);
+				}
 			}
 		}
 	} else if(!strcmp(request, "worker")) {
@@ -4977,7 +4967,7 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 
 	switch(task_state) {
 		case WORK_QUEUE_TASK_READY:
-			str = "ready";
+			str = "waiting";
 			break;
 		case WORK_QUEUE_TASK_RUNNING:
 			str = "running";
@@ -4986,7 +4976,7 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 			str = "waiting_retrieval";
 			break;
 		case WORK_QUEUE_TASK_RETRIEVED:
-			str = "retrieved";
+			str = "complete";
 			break;
 		case WORK_QUEUE_TASK_DONE:
 			str = "done";
