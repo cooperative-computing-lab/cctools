@@ -475,15 +475,49 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	}
 }
 
+#define check_hard_limits(max, user, measured, field, flag)\
+	if(!flag) {\
+		if(user && user->field > -1) {\
+			if(measured->field > user->field) {\
+				flag = 1;\
+			}\
+		}\
+		else if(max && max->field) {\
+			if(measured->field > max->field) {\
+				flag = 1;\
+			}\
+		}\
+	}
+
 /* returns the next allocation state. */
-category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow) {
+category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
+
+	struct category *c = category_lookup_or_create(categories, category);
 
 	if(resource_overflow) {
+		int over = 0;
+
 		if(current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-			return CATEGORY_ALLOCATION_ERROR;
-		} else {
-			return CATEGORY_ALLOCATION_AUTO_MAX;
+			over = 1;
+		} else if(measured) {
+			check_hard_limits(c->max_allocation, user, measured, cores,                    over);
+			check_hard_limits(c->max_allocation, user, measured, cpu_time,                 over);
+			check_hard_limits(c->max_allocation, user, measured, wall_time,                over);
+			check_hard_limits(c->max_allocation, user, measured, virtual_memory,           over);
+			check_hard_limits(c->max_allocation, user, measured, memory,                   over);
+			check_hard_limits(c->max_allocation, user, measured, swap_memory,              over);
+			check_hard_limits(c->max_allocation, user, measured, bytes_read,               over);
+			check_hard_limits(c->max_allocation, user, measured, bytes_written,            over);
+			check_hard_limits(c->max_allocation, user, measured, bytes_sent,               over);
+			check_hard_limits(c->max_allocation, user, measured, bytes_received,           over);
+			check_hard_limits(c->max_allocation, user, measured, bandwidth,                over);
+			check_hard_limits(c->max_allocation, user, measured, total_files,              over);
+			check_hard_limits(c->max_allocation, user, measured, disk,                     over);
+			check_hard_limits(c->max_allocation, user, measured, max_concurrent_processes, over);
+			check_hard_limits(c->max_allocation, user, measured, total_processes,          over);
 		}
+
+		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_AUTO_MAX;
 	}
 
 	/* If user specified resources manually, respect the label. */
@@ -491,7 +525,6 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 			return CATEGORY_ALLOCATION_USER;
 	}
 
-	struct category *c = category_lookup_or_create(categories, category);
 	/* If category is not labeling, and user is not labeling, return unlabeled. */
 	if(c && !c->max_allocation) {
 		return CATEGORY_ALLOCATION_UNLABELED;
@@ -511,7 +544,7 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	}
 }
 
-const struct rmsummary *category_task_dynamic_label(category_allocation_t request, struct rmsummary *max, struct rmsummary *first, struct rmsummary *user) {
+const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struct rmsummary *first, struct rmsummary *user, category_allocation_t request) {
 
 	static struct rmsummary *dynamic_label = NULL;
 

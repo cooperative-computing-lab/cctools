@@ -1420,8 +1420,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
 		t->exhausted_attempts++;
 
-		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
-
 		struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
 		if(j) {
 			char *str = jx_print_string(j);
@@ -1433,6 +1431,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 			free(str);
 			jx_delete(j);
 		}
+
+		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
 		if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
 			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
@@ -3368,7 +3368,7 @@ static int send_one_task( struct work_queue *q )
 	while( (t = list_next_item(q->ready_list))) {
 
 		// Assign the allocation type for the task.
-		t->resource_request = category_next_label(q->categories, t->category, t->resource_request, /*resource overflow*/ 0);
+		t->resource_request = category_next_label(q->categories, t->category, t->resource_request, /*resource overflow*/ 0, NULL, NULL);
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
@@ -5930,7 +5930,7 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	return category_task_dynamic_label(t->resource_request, c->max_allocation, c->first_allocation, t->resources_requested);
+	return category_task_dynamic_label(c->max_allocation, c->first_allocation, t->resources_requested, t->resource_request);
 }
 
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name) {
