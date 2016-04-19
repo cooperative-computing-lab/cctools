@@ -685,7 +685,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				fprintf(stderr, "\n");
 			}
 
-			category_allocation_t next = category_next_label(d->categories, n->category->name, n->resource_request, /* resource overflow */ 1);
+			category_allocation_t next = category_next_label(d->categories, n->category->name, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
 
 			if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
 				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);

@@ -71,7 +71,8 @@ void category_delete(struct hash_table *categories, const char *name);
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
 void category_update_first_allocation(struct hash_table *categories, const char *category);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
-category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow);
 
-const struct rmsummary *category_task_dynamic_label(category_allocation_t request, struct rmsummary *max, struct rmsummary *first, struct rmsummary *user);
+category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
+
+const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struct rmsummary *first, struct rmsummary *user, category_allocation_t requested);
 #endif
