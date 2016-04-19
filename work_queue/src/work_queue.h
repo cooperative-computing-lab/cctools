@@ -133,6 +133,9 @@ struct work_queue_task {
 	timestamp_t cmd_execution_time;                        /**< Time spent in microseconds for executing the command until completion on a single worker. */
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
+	timestamp_t total_cmd_exhausted_execute_time;          /**< Accumulated time spent in microseconds spent in attempts that executed resources. */
+
+	int exhausted_attempts;                                /**< Number of times the task failed given exhausted resources. */
 
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
@@ -174,7 +177,7 @@ struct work_queue_stats {
 	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
 	int total_tasks_failed;         /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
 	int total_tasks_cancelled;      /**< Total number of tasks cancelled. */
-	int total_exhausted_retries;    /**< Total number of retries given resource exhaustion. */
+	int total_exhausted_attempts;   /**< Total number of task executions that failed given resource exhaustion. */
 
 	timestamp_t start_time;         /**< Absolute time at which the master started. */
 	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
@@ -184,7 +187,6 @@ struct work_queue_stats {
 	timestamp_t total_execute_time;      /**< Total time in microseconds workers spent executing completed tasks. */
 	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
 	timestamp_t total_exhausted_execute_time; /**< Total time in microseconds workers spent on tasks that exhausted resources. */
-
 
 	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */

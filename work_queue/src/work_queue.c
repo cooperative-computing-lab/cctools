@@ -1403,7 +1403,10 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	int rschedule = 0;
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		q->stats->total_exhausted_execute_time += t->cmd_execution_time;
-		q->stats->total_exhausted_retries ++;
+		q->stats->total_exhausted_attempts++;
+
+		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
+		t->exhausted_attempts++;
 
 		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1);
 
@@ -2040,7 +2043,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"total_execute_time",info.total_execute_time);
 	jx_insert_integer(j,"total_good_execute_time",info.total_good_execute_time);
 	jx_insert_integer(j,"total_exhausted_execute_time",info.total_exhausted_execute_time);
-	jx_insert_integer(j,"total_exhausted_retries",info.total_exhausted_retries);
+	jx_insert_integer(j,"total_exhausted_retries",info.total_exhausted_attempts);
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
@@ -5678,7 +5681,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->total_bytes_received = qs->total_bytes_received;
 	s->total_execute_time = qs->total_execute_time;
 	s->total_good_execute_time = qs->total_good_execute_time;
-	s->total_exhausted_retries = qs->total_exhausted_retries;
+	s->total_exhausted_attempts = qs->total_exhausted_attempts;
 	s->total_exhausted_execute_time = qs->total_exhausted_execute_time;
 
 	timestamp_t wall_clock_time = timestamp_get() - qs->start_time;
