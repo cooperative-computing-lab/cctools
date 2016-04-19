@@ -83,7 +83,6 @@ run()
 {
 	set -e
 	parrot -- "$(pwd)/$exe"
-	parrot --work-dir=/tmp -- "$(pwd)/$exe"
 	parrot --work-dir=/http -- "$(pwd)/$exe" && return 1
 	return 0
 }
