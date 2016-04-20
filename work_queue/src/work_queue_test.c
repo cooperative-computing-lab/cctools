@@ -24,7 +24,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <unistd.h>
 
-int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_size, int count )
+int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_size, int count, char *category )
 {
 	static int ntasks=0;
 	char output_file[128];
@@ -48,6 +48,10 @@ int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_
 		work_queue_task_specify_file(t, "input.0", "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 		work_queue_task_specify_file(t, output_file, "outfile", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 		work_queue_task_specify_cores(t,1);
+
+		if(category && strlen(category) > 0)
+			work_queue_task_specify_category(t, category);
+
 		work_queue_submit(q, t);
 	}
 
@@ -66,6 +70,7 @@ void wait_for_all_tasks( struct work_queue *q )
 void work_queue_mainloop( struct work_queue *q )
 {
 	char line[1024];
+	char category[1024];
 
 	int sleep_time, run_time, input_size, output_size, count;
 
@@ -79,15 +84,17 @@ void work_queue_mainloop( struct work_queue *q )
 
 		string_chomp(line);
 
+		strcpy(category, "default");
+
 		if(sscanf(line,"sleep %d",&sleep_time)==1) {
 			printf("sleeping %d seconds...\n",sleep_time);
 			sleep(sleep_time);
 		} else if(!strcmp(line,"wait")) {
 			printf("waiting for all tasks...\n");
 			wait_for_all_tasks(q);
-		} else if(sscanf(line, "submit %d %d %d %d",&input_size, &run_time, &output_size, &count)==4) {
+		} else if(sscanf(line, "submit %d %d %d %d %s",&input_size, &run_time, &output_size, &count, category) >= 4) {
 			printf("submitting %d tasks...\n",count);
-			submit_tasks(q,input_size,run_time,output_size,count);
+			submit_tasks(q,input_size,run_time,output_size,count,category);
 		} else if(!strcmp(line,"quit") || !strcmp(line,"exit")) {
 			break;
 		} else if(!strcmp(line,"help")) {
