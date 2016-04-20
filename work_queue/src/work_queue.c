@@ -2745,29 +2745,17 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	return SUCCESS;
 }
 
-static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
+static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, const struct rmsummary *max) {
 
 	struct rmsummary *limits = rmsummary_create(-1);
-	const struct rmsummary *label = task_max_resources(q, t);
-
-	rmsummary_merge_max(limits, label);
 
 	/* we use min here safely to remove any unset resources. min is fine, since
 	 * the task would not be schedule here if the correspoinding task resource
 	 * was larger than the worker. */
-	limits->cores  = MIN_POS(label->cores,  w->resources->cores.total);
-	limits->memory = MIN_POS(label->memory, w->resources->memory.total);
-	limits->disk   = MIN_POS(label->disk,   w->resources->disk.total);
-
-	/* consider times by themselves */
-	if(t->resources_requested) {
-
-		if(t->resources_requested->end > 0)
-			limits->end = t->resources_requested->end;
-
-		if(t->resources_requested->wall_time > 0)
-			limits->wall_time = t->resources_requested->wall_time;
-	}
+	limits->cores  = MIN_POS(max->cores,  w->resources->cores.total);
+	limits->memory = MIN_POS(max->memory, w->resources->memory.total);
+	limits->disk   = MIN_POS(max->disk,   w->resources->disk.total);
+	limits->gpus   = MIN_POS(max->gpus,   w->resources->gpus.total);
 
 	return limits;
 }
@@ -2776,7 +2764,8 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 {
 	/* wrap command at the last minute, so that we have the updated information
 	 * about resources. */
-	struct rmsummary *limits = task_worker_box_size(q, w, t);
+	const struct rmsummary *max = task_max_resources(q, t);
+	struct rmsummary *limits    = task_worker_box_size(q, w, max);
 
 	char *command_line;
 	if(q->monitor_mode) {
@@ -2804,15 +2793,15 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
 
-	send_worker_msg(q,w, "cores %"PRId64"\n",  limits->cores);
-	send_worker_msg(q,w, "memory %"PRId64"\n", limits->memory);
-	send_worker_msg(q,w, "disk %"PRId64"\n",   limits->disk);
-	send_worker_msg(q,w, "gpus %"PRId64"\n",   limits->gpus);
+	send_worker_msg(q,w, "cores %"PRId64"\n",  max->cores);
+	send_worker_msg(q,w, "memory %"PRId64"\n", max->memory);
+	send_worker_msg(q,w, "disk %"PRId64"\n",   max->disk);
+	send_worker_msg(q,w, "gpus %"PRId64"\n",   max->gpus);
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == MON_DISABLED) {
-		send_worker_msg(q,w, "end_time %"PRIu64"\n",  limits->end);
-		send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
+		send_worker_msg(q,w, "end_time %"PRIu64"\n",  max->end);
+		send_worker_msg(q,w, "wall_time %"PRIu64"\n", max->wall_time);
 	}
 
 	rmsummary_delete(limits);
