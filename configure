@@ -1226,6 +1226,7 @@ optional_function strchrnul /usr/include/string.h HAVE_STRCHRNUL
 optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
 optional_function usleep /usr/include/unistd.h HAS_USLEEP HAVE_USLEEP
 optional_function utime /usr/include/utime.h HAS_UTIME HAVE_UTIME
+optional_function utimensat /usr/include/sys/stat.h HAS_UTIMENSAT
 
 # sqlite3 uses define "HAVE_*"
 optional_include attr/xattr.h HAS_ATTR_XATTR_H

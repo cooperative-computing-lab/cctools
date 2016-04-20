@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "chirp_fs_local.h"
 #include "chirp_fs_local_scheduler.h"
 
+#include "catch.h"
 #include "create_dir.h"
 #include "debug.h"
 #include "delete_dir.h"
@@ -35,6 +36,8 @@ See the file COPYING for details.
 #ifdef HAS_SYS_STATVFS_H
 #	include <sys/statvfs.h>
 #endif
+#include <sys/time.h>
+#include <sys/wait.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -43,26 +46,29 @@ See the file COPYING for details.
 #include <string.h>
 
 #if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
-/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
-#define fopen64 fopen
-#define open64 open
-#define lseek64 lseek
-#define stat64 stat
-#define fstat64 fstat
-#define lstat64 lstat
-#define fseeko64 fseeko
-#define ftruncate64 ftruncate
-#define truncate64 truncate
-#define statfs64 statfs
-#define fstatfs64 fstatfs
-#elif defined(CCTOOLS_OPSYS_DARWIN)
-#define lchown chown
+	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
+#	define stat64 stat
+#	define fstat64 fstat
+#	define ftruncate64 ftruncate
+#	define statfs64 statfs
+#	define fstatfs64 fstatfs
+#	define fstatat64 fstatat
 #elif defined(CCTOOLS_OPSYS_SUNOS)
-/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
-#define statfs statvfs
-#define fstatfs fstatvfs
-#define statfs64 statvfs64
-#define fstatfs64 fstatvfs64
+	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
+#	define statfs statvfs
+#	define fstatfs fstatvfs
+#	define statfs64 statvfs64
+#	define fstatfs64 fstatvfs64
+#endif
+
+#ifndef O_CLOEXEC
+#	define O_CLOEXEC 0
+#endif
+#ifndef O_DIRECTORY
+#	define O_DIRECTORY 0
+#endif
+#ifndef O_NOFOLLOW
+#	define O_NOFOLLOW 0
 #endif
 
 #define COPY_STAT_LOCAL_TO_CHIRP(cinfo,linfo) \
@@ -86,7 +92,7 @@ See the file COPYING for details.
 	} while (0)
 
 #ifdef CCTOOLS_OPSYS_SUNOS
-#define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
+#	define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
 	do {\
 		struct chirp_statfs *cinfop = &(cinfo);\
 		struct statfs64 *linfop = &(linfo);\
@@ -100,7 +106,7 @@ See the file COPYING for details.
 		cinfop->f_ffree = linfop->f_ffree;\
 	} while (0)
 #else
-#define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
+#	define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
 	do {\
 		struct chirp_statfs *cinfop = &(cinfo);\
 		struct statfs64 *linfop = &(linfo);\
@@ -115,39 +121,65 @@ See the file COPYING for details.
 	} while (0)
 #endif
 
-static char local_root[CHIRP_PATH_MAX];
+static int rootfd = -1;
 
 static struct {
 	INT64_T fd;
 	char path[CHIRP_PATH_MAX];
 } open_files[CHIRP_FILESYSTEM_MAXFD];
 
+static const char nulpath[1] = "";
+
 #define PREAMBLE(fmt, ...) \
 	INT64_T rc = 0;\
-	debug(D_LOCAL, fmt, __VA_ARGS__);
+	int dirfd = -1;\
+	char basename[CHIRP_PATH_MAX];\
+	debug(D_LOCAL, fmt, __VA_ARGS__);\
+	(void)rc;\
+	(void)dirfd;\
+	(void)basename[1];\
+
+#define CLOSE_DIRFD(fd) \
+	do {\
+		if (fd >= 0) {\
+			int s = errno;\
+			close(fd);\
+			errno = s;\
+			fd = -1;\
+		}\
+	} while (0)
 
 #define PROLOGUE \
+	goto out;\
+out:\
 	if (rc == -1)\
 		debug(D_LOCAL, "= -1 (errno = %d; `%s')", errno, strerror(errno));\
 	else\
 		debug(D_LOCAL, "= %" PRId64, rc);\
+	CLOSE_DIRFD(dirfd);\
 	return rc;
 
 #define fdvalid(fd) (0 <= fd && fd < CHIRP_FILESYSTEM_MAXFD && open_files[fd].fd >= 0)
 #define SETUP_FILE \
-if(!fdvalid(fd)) return (errno = EBADF, -1);\
-int lfd = open_files[fd].fd;\
-(void)lfd; /* silence unused warnings */
+	if(!fdvalid(fd)) return (errno = EBADF, -1);\
+	int lfd = open_files[fd].fd;\
+	(void)lfd; /* silence unused warnings */
 
-#define RESOLVE(path) \
-char resolved_##path[CHIRP_PATH_MAX];\
-if (chirp_fs_local_resolve(path, resolved_##path) == -1) return -1;\
-path = resolved_##path;
+#define RESOLVE(path, follow) \
+	int dirfd_##path;\
+	char basename_##path[CHIRP_PATH_MAX];\
+	if (chirp_fs_local_resolve(path, &dirfd_##path, basename_##path, follow) == -1) return -1;\
+	strcpy(basename, basename_##path);\
+	path = nulpath;\
+	dirfd = dirfd_##path;
 
-#define RESOLVENULL(path) \
-char resolved_##path[CHIRP_PATH_MAX];\
-if (chirp_fs_local_resolve(path, resolved_##path) == -1) return NULL;\
-path = resolved_##path;
+#define RESOLVENULL(path, follow) \
+	int dirfd_##path;\
+	char basename_##path[CHIRP_PATH_MAX];\
+	if (chirp_fs_local_resolve(path, &dirfd_##path, basename_##path, follow) == -1) return NULL;\
+	strcpy(basename, basename_##path);\
+	path = nulpath;\
+	dirfd = dirfd_##path;
 
 /*
  * The provided url could have any of the following forms:
@@ -161,6 +193,7 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 	PREAMBLE("init(`%s')", url);
 	int i;
 	char tmp[CHIRP_PATH_MAX];
+	char root[CHIRP_PATH_MAX];
 
 	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
 		open_files[i].fd = -1;
@@ -170,8 +203,37 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 	else
 		strcpy(tmp, url);
 
-	path_collapse(tmp, local_root, 1);
-	rc = create_dir(local_root, 0711);
+	path_collapse(tmp, root, 1);
+	if (create_dir(root, S_IRWXU|S_IXGRP|S_IXOTH)) {
+		int fd = open(root, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOCTTY);
+		if (fd >= 0) {
+#if O_DIRECTORY == 0
+			struct stat info;
+			if (fstat(fd, &info) == 0) {
+				if (S_ISDIR(info.st_mode)) {
+					rootfd = fd;
+					rc = 0;
+				} else {
+					close(fd);
+					errno = ENOTDIR;
+					rc = -1;
+				}
+			} else {
+				int s = errno;
+				close(fd);
+				errno = s;
+				rc = -1;
+			}
+#else
+			rootfd = fd;
+			rc = 0;
+#endif
+		} else {
+			rc = -1;
+		}
+	} else {
+		rc = -1;
+	}
 
 	PROLOGUE
 }
@@ -184,19 +246,136 @@ static int chirp_fs_local_fname (int fd, char path[CHIRP_PATH_MAX])
 	PROLOGUE
 }
 
-int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX])
+int chirp_fs_local_resolve (const char *path, int *dirfd, char basename[CHIRP_PATH_MAX], int follow)
 {
-	char collapse[CHIRP_PATH_MAX];
-	char absolute[CHIRP_PATH_MAX];
-	path_collapse(path, collapse, 1);
-	int n = snprintf(absolute, sizeof(absolute), "%s/%s", local_root, collapse);
-	assert(n >= 0); /* this should never happen */
-	if ((size_t)n >= CHIRP_PATH_MAX) {
-		errno = ENAMETOOLONG;
-		return -1;
+	int i;
+	int rc;
+	int fd;
+	char working[CHIRP_PATH_MAX] = "";
+	struct stat rootinfo;
+
+	if (path[0] == 0)
+		CATCH(EINVAL);
+
+	CATCHUNIX(fstat(rootfd, &rootinfo));
+
+	CATCHUNIX(fd = dup(rootfd));
+
+	CATCHUNIX(snprintf(working, sizeof(working), "%s", path));
+	if (rc >= CHIRP_PATH_MAX)
+		CATCH(ENAMETOOLONG);
+
+	for (i = 0; i < 100; i++) {
+		char component[CHIRP_PATH_MAX];
+
+		debug(D_DEBUG, "path '%s' resolution: working = '%s'", path, working);
+		strcpy(basename, ""); /* mark as incomplete */
+
+		char *slash = strchr(working, '/');
+		if (slash) {
+			if (slash == working) {
+				while (*slash == '/') slash++;
+				memmove(working, slash, strlen(slash)+1);
+				CATCHUNIX(dup2(rootfd, fd));
+				continue;
+			} else {
+				size_t len = (size_t)(slash-working);
+				memcpy(component, working, len);
+				component[len] = 0;
+				memmove(working, slash+1, strlen(slash+1)+1);
+			}
+			debug(D_DEBUG, "path '%s' resolution: component = '%s'", path, component);
+		} else {
+			if (working[0]) {
+				strcpy(basename, working);
+			} else {
+				strcpy(basename, "."); /* refer to dirfd itself */
+			}
+			debug(D_DEBUG, "path '%s' resolution: final component: %s", path, basename);
+			if (!follow)
+				break; /* we're done! */
+			strcpy(component, working);
+			strcpy(working, "");
+		}
+
+		if (strcmp(component, "..") == 0) {
+			struct stat info;
+			CATCHUNIX(fstat(fd, &info));
+			if (rootinfo.st_dev == info.st_dev && rootinfo.st_ino == info.st_ino) {
+				debug(D_DEBUG, "caught .. at root");
+				continue;
+			}
+		} else if (strcmp(component, ".") == 0) {
+			continue;
+		} else {
+			char _sym[CHIRP_PATH_MAX] = "";
+			char *sym = _sym;
+			ssize_t n = readlinkat(fd, component, sym, CHIRP_PATH_MAX);
+			if (n >= 0) {
+				if (n < CHIRP_PATH_MAX) {
+					char new[CHIRP_PATH_MAX];
+					debug(D_DEBUG, "path '%s' resolution: component link: '%s' -> '%s'", path, component, sym);
+					CATCHUNIX(snprintf(new, CHIRP_PATH_MAX, "%s/%s", sym, working));
+					if (rc >= CHIRP_PATH_MAX)
+						CATCH(ENAMETOOLONG);
+					strcpy(working, new);
+					continue;
+				} else {
+					CATCH(ENAMETOOLONG);
+				}
+			}
+		}
+
+		if (basename[0]) {
+			break; /* we found the final component and it wasn't a link, we're done */
+		}
+
+		if (working[0] == 0) {
+			/* On Linux and possibly other kernels, some system calls like
+			 * rmdir/mkdir permit a trailing slash. Strictly speaking, this
+			 * should always fail since Unix [1] specifies that paths ending in
+			 * a forward slash are equivalent to "path/." (i.e. with a trailing
+			 * . added). rmdir on a path with a trailing dot shall always fail
+			 * [2]. Obviously mkdir on . should also fail with EEXIST.
+			 *
+			 * At this point, we already removed / after this component, so we
+			 * only check if working is empty. The if above checks this. We've
+			 * already confirmed component is not a link.
+			 *
+			 * [1] http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_12
+			 * [2] http://pubs.opengroup.org/onlinepubs/9699919799/functions/rmdir.html
+			*/
+			strcpy(basename, component);
+			break;
+		}
+
+		/* XXX Unavoidable race condition here between readlinkat and openat. O_NOFOLLOW catches it if supported by kernel. */
+		/* Solution is using O_PATH if available. */
+
+		int nfd = openat(fd, component, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOFOLLOW|O_NOCTTY);
+		CATCHUNIX(nfd);
+		close(fd);
+		fd = nfd;
+#if O_DIRECTORY == 0
+		struct stat info;
+		CATCHUNIX(fstat(fd, &info));
+		if (!S_ISDIR(info.st_mode))
+			CATCH(ENOTDIR);
+#endif
 	}
-	path_collapse(absolute, resolved, 1);
-	return 0;
+	if (i == 100)
+		CATCH(ELOOP);
+
+	*dirfd = fd;
+
+	rc = 0;
+	goto out;
+out:
+	if (rc) {
+		close(fd);
+	}
+
+	return RCUNIX(rc);
 }
 
 static INT64_T getfd(void)
@@ -215,16 +394,19 @@ static INT64_T chirp_fs_local_open(const char *path, INT64_T flags, INT64_T mode
 {
 	PREAMBLE("open(`%s', 0x%" PRIx64 ", 0o%" PRIo64 ")", path, flags, mode);
 	const char *unresolved = path;
-	RESOLVE(path)
+	RESOLVE(path, 1)
 	INT64_T fd = getfd();
-	if (fd == -1) return -1;
-	mode &= S_IXUSR|S_IRWXG|S_IRWXO;
-	mode |= S_IRUSR|S_IWUSR;
-	rc = open64(path, flags, (int) mode);
-	if (rc >= 0) {
-		open_files[fd].fd = rc;
-		strcpy(open_files[fd].path, unresolved);
-		rc = fd;
+	if (fd >= 0) {
+		mode &= S_IXUSR|S_IRWXG|S_IRWXO;
+		mode |= S_IRUSR|S_IWUSR;
+		rc = openat(dirfd, basename, flags|O_NOFOLLOW, (int) mode);
+		if (rc >= 0) {
+			open_files[fd].fd = rc;
+			strcpy(open_files[fd].path, unresolved);
+			rc = fd;
+		}
+	} else {
+		rc = -1;
 	}
 	PROLOGUE
 }
@@ -297,9 +479,9 @@ static INT64_T chirp_fs_local_fstatfs(int fd, struct chirp_statfs *info)
 
 static INT64_T chirp_fs_local_fchmod(int fd, INT64_T mode)
 {
-	struct stat64 linfo;
 	PREAMBLE("fchmod(%d, 0o%" PRIo64 ")", fd, mode);
 	SETUP_FILE
+	struct stat64 linfo;
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
 	if (fstat64(lfd, &linfo) == -1)
 		return -1;
@@ -331,19 +513,19 @@ static INT64_T chirp_fs_local_fsync(int fd)
 static INT64_T chirp_fs_local_unlink(const char *path)
 {
 	PREAMBLE("unlink(`%s')", path);
-	RESOLVE(path)
+	RESOLVE(path, 0)
 
-	rc = unlink(path);
+	rc = unlinkat(dirfd, basename, 0);
 
 	/*
 	   On Solaris, an unlink on a directory
 	   returns EPERM when it should return EISDIR.
-	   Check for this cast, and then fix it.
+	   Check for this case, and then fix it.
 	 */
 
 	if(rc < 0 && errno == EPERM) {
 		struct stat64 linfo;
-		rc = stat64(path, &linfo);
+		rc = fstatat64(dirfd, basename, &linfo, AT_SYMLINK_NOFOLLOW);
 		if(rc == 0 && S_ISDIR(linfo.st_mode)) {
 			rc = -1;
 			errno = EISDIR;
@@ -359,53 +541,58 @@ static INT64_T chirp_fs_local_unlink(const char *path)
 static INT64_T chirp_fs_local_rmall(const char *path)
 {
 	PREAMBLE("rmall(`%s')", path);
-	RESOLVE(path)
-	rc = unlink_recursive(path);
+	RESOLVE(path, 0)
+	rc = unlinkat_recursive(dirfd, basename);
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_rename(const char *old, const char *new)
 {
 	PREAMBLE("rename(`%s', `%s')", old, new);
-	RESOLVE(old)
-	RESOLVE(new)
-	rc = rename(old, new);
+	RESOLVE(old, 0)
+	RESOLVE(new, 0)
+	rc = renameat(dirfd_old, basename_old, dirfd_new, basename_new);
+	dirfd = -1; /* so prologue doesn't close it */
+	CLOSE_DIRFD(dirfd_old);
+	CLOSE_DIRFD(dirfd_new);
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_link(const char *target, const char *path)
 {
 	PREAMBLE("link(`%s', `%s')", target, path);
-	RESOLVE(target)
-	RESOLVE(path)
-	rc = link(target, path);
+	RESOLVE(target, 0)
+	RESOLVE(path, 0)
+	rc = linkat(dirfd_target, basename_target, dirfd_path, basename_path, 0);
+	dirfd = -1; /* so prologue doesn't close it */
+	CLOSE_DIRFD(dirfd_target);
+	CLOSE_DIRFD(dirfd_path);
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_symlink(const char *target, const char *path)
 {
 	PREAMBLE("symlink(`%s', `%s')", target, path);
-	RESOLVE(target)
-	RESOLVE(path)
-	rc = symlink(target, path);
+	RESOLVE(path, 0)
+	rc = symlinkat(target, dirfd_path, basename_path);
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_readlink(const char *path, char *buf, INT64_T length)
 {
 	PREAMBLE("readlink(`%s', %p, %zu)", path, buf, (size_t)length);
-	RESOLVE(path)
-	rc = readlink(path, buf, length);
+	RESOLVE(path, 0)
+	rc = readlinkat(dirfd, basename, buf, length);
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_mkdir(const char *path, INT64_T mode)
 {
 	PREAMBLE("mkdir(`%s', 0o%" PRIo64 ")", path, mode);
-	RESOLVE(path)
+	RESOLVE(path, 0)
 	mode &= S_IRWXG|S_IRWXO; /* users can only set group/other bits */
 	mode |= S_IRWXU;
-	rc = mkdir(path, mode);
+	rc = mkdirat(dirfd, basename, mode);
 	PROLOGUE
 }
 
@@ -419,42 +606,60 @@ Only delete the directory if it contains only those files.
 static INT64_T chirp_fs_local_rmdir(const char *path)
 {
 	PREAMBLE("rmdir(`%s')", path);
+	RESOLVE(path, 0)
 	int empty = 1;
-	RESOLVE(path)
 
-	DIR *dir = opendir(path);
-	if(dir) {
-		struct dirent *d;
-		while((d = readdir(dir))) {
-			if(!strcmp(d->d_name, "."))
-				continue;
-			if(!strcmp(d->d_name, ".."))
-				continue;
-			if(!strncmp(d->d_name, ".__", 3))
-				continue;
-			empty = 0;
-			break;
-		}
-		closedir(dir);
+	struct stat info;
+	if (fstatat(dirfd, basename, &info, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(info.st_mode)) {
+		errno = ENOTDIR;
+		rc = -1;
+		goto out;
+	}
 
-		if(empty) {
-			rc = delete_dir(path);
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		DIR *dir = fdopendir(fd);
+		if (dir) {
+			struct dirent *d;
+			while((d = readdir(dir))) {
+				if(strcmp(d->d_name, ".") == 0)
+					continue;
+				if(strcmp(d->d_name, "..") == 0)
+					continue;
+				if(strncmp(d->d_name, ".__", 3) == 0)
+					continue;
+				empty = 0;
+				break;
+			}
+
+			if(!empty) {
+				closedir(dir);
+				errno = ENOTEMPTY;
+				rc = -1;
+				goto out;
+			}
+
+			closedir(dir);
+			rc = unlinkat_recursive(dirfd, basename);
 		} else {
-			errno = ENOTEMPTY;
+			int s = errno;
+			close(fd);
+			errno = s;
 			rc = -1;
 		}
 	} else {
 		rc = -1;
 	}
+
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *info)
 {
 	PREAMBLE("stat(`%s', %p)", path, info);
-	RESOLVE(path)
+	RESOLVE(path, 1)
 	struct stat64 linfo;
-	rc = stat64(path, &linfo);
+	rc = fstatat64(dirfd, basename, &linfo, 0);
 	if(rc == 0)
 		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
 	PROLOGUE
@@ -463,9 +668,9 @@ static INT64_T chirp_fs_local_stat(const char *path, struct chirp_stat *info)
 static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
 {
 	PREAMBLE("lstat(`%s', %p)", path, info);
-	RESOLVE(path)
+	RESOLVE(path, 0)
 	struct stat64 linfo;
-	rc = lstat64(path, &linfo);
+	rc = fstatat64(dirfd, basename, &linfo, AT_SYMLINK_NOFOLLOW);
 	if(rc == 0)
 		COPY_STAT_LOCAL_TO_CHIRP(*info, linfo);
 	PROLOGUE
@@ -474,39 +679,55 @@ static INT64_T chirp_fs_local_lstat(const char *path, struct chirp_stat *info)
 static INT64_T chirp_fs_local_statfs(const char *path, struct chirp_statfs *info)
 {
 	PREAMBLE("statfs(`%s', %p)", path, info);
-	RESOLVE(path)
-	struct statfs64 linfo;
-	rc = statfs64(path, &linfo);
-	if (rc == 0)
-		COPY_STATFS_LOCAL_TO_CHIRP(*info, linfo);
+	RESOLVE(path, 1)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
+		struct statfs64 linfo;
+		rc = fstatfs64(fd, &linfo);
+		if (rc == 0)
+			COPY_STATFS_LOCAL_TO_CHIRP(*info, linfo);
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		rc = -1;
+	}
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_access(const char *path, INT64_T amode)
 {
 	PREAMBLE("access(`%s', 0x%" PRIx64 ")", path, amode);
-	RESOLVE(path)
-	rc = access(path, amode);
+	RESOLVE(path, 1)
+	rc = faccessat(dirfd, basename, amode, 0);
 	PROLOGUE
 }
 
 struct chirp_dir {
-	char path[CHIRP_PATH_MAX];
 	DIR *dir;
 	struct chirp_dirent cd;
 };
 
 static struct chirp_dir *chirp_fs_local_opendir(const char *path)
 {
-	debug(D_LOCAL, "opendir(`%s')", path);
-	RESOLVENULL(path)
-	DIR *dir = opendir(path);
-	if(dir) {
-		struct chirp_dir *cdir = xxmalloc(sizeof(*cdir));
-		cdir->dir = dir;
-		strcpy(cdir->path, path); /* N.B. readdir passes this to chirp_fs_local_lstat */
-		debug(D_LOCAL, "= %p", cdir);
-		return cdir;
+	PREAMBLE("opendir(`%s')", path);
+	RESOLVENULL(path, 1)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		DIR *dir = fdopendir(fd);
+		if (dir) {
+			struct chirp_dir *cdir = xxmalloc(sizeof(*cdir));
+			cdir->dir = dir;
+			debug(D_LOCAL, "= %p", cdir);
+			return cdir;
+		} else {
+			int s = errno;
+			close(fd);
+			errno = s;
+			debug(D_LOCAL, "= NULL (errno = %d; `%s')", errno, strerror(errno));
+			return 0;
+		}
 	} else {
 		debug(D_LOCAL, "= NULL (errno = %d; `%s')", errno, strerror(errno));
 		return 0;
@@ -515,17 +736,15 @@ static struct chirp_dir *chirp_fs_local_opendir(const char *path)
 
 static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 {
-	debug(D_LOCAL, "readdir(%p [`%s'])", dir, dir->path);
+	debug(D_LOCAL, "readdir(%p [%d])", dir, dirfd(dir->dir));
 	struct dirent *d = readdir(dir->dir);
 	if(d) {
-		char path[CHIRP_PATH_MAX];
 		struct stat64 linfo;
-		dir->cd.name = d->d_name;
-		sprintf(path, "%s/%s", dir->path, dir->cd.name);
 		memset(&dir->cd.info, 0, sizeof(dir->cd.info));
-		dir->cd.lstatus = lstat64(path, &linfo);
+		dir->cd.lstatus = fstatat64(dirfd(dir->dir), d->d_name, &linfo, AT_SYMLINK_NOFOLLOW);
 		if(dir->cd.lstatus == 0)
 			COPY_STAT_LOCAL_TO_CHIRP(dir->cd.info, linfo);
+		dir->cd.name = d->d_name;
 		debug(D_LOCAL, "= %p [name = `%s']", &dir->cd, dir->cd.name);
 		return &dir->cd;
 	} else {
@@ -536,7 +755,7 @@ static struct chirp_dirent *chirp_fs_local_readdir(struct chirp_dir *dir)
 
 static void chirp_fs_local_closedir(struct chirp_dir *dir)
 {
-	debug(D_LOCAL, "closedir(%p [`%s'])", dir, dir->path);
+	debug(D_LOCAL, "closedir(%p [`%d'])", dir, dirfd(dir->dir));
 	closedir(dir->dir);
 	free(dir);
 }
@@ -544,37 +763,80 @@ static void chirp_fs_local_closedir(struct chirp_dir *dir)
 static INT64_T chirp_fs_local_chmod(const char *path, INT64_T mode)
 {
 	PREAMBLE("chmod(`%s', 0o%" PRIo64 ")", path, mode);
-	struct stat64 linfo;
-	RESOLVE(path)
+	RESOLVE(path, 1)
 	mode &= S_IXUSR|S_IRWXG|S_IRWXO; /* users can only set owner execute and group/other bits */
-	if (stat64(path, &linfo) == -1)
-		return -1;
-	if(S_ISDIR(linfo.st_mode)) {
-		mode |= S_IRWXU; /* all owner bits must be set */
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
+		struct stat linfo;
+		rc = fstat(fd, &linfo);
+		if (rc == 0) {
+			if(S_ISDIR(linfo.st_mode)) {
+				mode |= S_IRWXU; /* all owner bits must be set */
+			} else {
+				mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
+			}
+			rc = fchmod(fd, mode);
+		}
+		s = errno;
+		close(fd);
+		errno = s;
 	} else {
-		mode |= S_IRUSR|S_IWUSR; /* owner read/write must be set */
+		rc = -1;
 	}
-	rc = chmod(path, mode);
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_truncate(const char *path, INT64_T length)
 {
 	PREAMBLE("truncate(`%s', 0d%" PRId64 ")", path, length);
-	RESOLVE(path)
-	rc = truncate64(path, length);
+	RESOLVE(path, 1)
+	int fd = openat(dirfd, basename, O_WRONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
+		rc = ftruncate64(fd, length);
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		rc = -1;
+	}
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_utime(const char *path, time_t actime, time_t modtime)
 {
+	int status;
+	pid_t child = -1;
 	PREAMBLE("utime(`%s', actime = %" PRId64 " modtime = %" PRId64 ")", path, (int64_t)actime, (int64_t)modtime);
-	struct utimbuf ut;
-	RESOLVE(path)
-	ut.actime = actime;
-	ut.modtime = modtime;
-	rc = utime(path, &ut);
+	RESOLVE(path, 1)
+#ifdef HAS_UTIMENSAT
+	struct timespec times[2] = {{.tv_sec = actime}, {.tv_sec = modtime}};
+	rc = utimensat(dirfd, basename, times, AT_SYMLINK_NOFOLLOW);
+#else
+	child = fork();
+	if (child == 0) {
+		struct timeval times[2] = {{.tv_sec = actime}, {.tv_sec = modtime}};
+		if (fchdir(dirfd) == -1) {
+			_exit(EXIT_FAILURE);
+		}
+		if (utimes(basename, times) == -1) {
+			_exit(EXIT_FAILURE);
+		}
+		_exit(EXIT_SUCCESS);
+	} else if (child == -1) {
+		CATCH(errno);
+	}
+	CATCHUNIX((int)waitpid(child, &status, 0));
+	if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
+		CATCH(EPERM);
+	}
+#endif
 	PROLOGUE
+	if (child > 0) {
+		kill(child, SIGKILL);
+		waitpid(child, &status, 0);
+	}
 }
 
 static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
@@ -587,12 +849,21 @@ static INT64_T chirp_fs_local_setrep(const char *path, int nreps)
 static INT64_T chirp_fs_local_getxattr(const char *path, const char *name, void *data, size_t size)
 {
 	PREAMBLE("getxattr(`%s', `%s', %p, %zu)", path, name, data, size);
-	RESOLVE(path)
+	RESOLVE(path, 1)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = getxattr(path, name, data, size, 0, 0);
+		rc = fgetxattr(fd, name, data, size, 0, 0);
 #else
-	rc = getxattr(path, name, data, size);
+		rc = fgetxattr(fd, name, data, size);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		rc = -1;
+	}
 	PROLOGUE
 }
 
@@ -611,24 +882,44 @@ static INT64_T chirp_fs_local_fgetxattr(int fd, const char *name, void *data, si
 static INT64_T chirp_fs_local_lgetxattr(const char *path, const char *name, void *data, size_t size)
 {
 	PREAMBLE("lgetxattr(`%s', `%s', %p, %zu)", path, name, data, size);
-	RESOLVE(path)
+	RESOLVE(path, 0)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = getxattr(path, name, data, size, 0, XATTR_NOFOLLOW);
+		rc = fgetxattr(fd, name, data, size, 0, 0);
 #else
-	rc = lgetxattr(path, name, data, size);
+		rc = fgetxattr(fd, name, data, size);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		if (errno == ELOOP)
+			errno = ENOTSUP;
+		rc = -1;
+	}
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_listxattr(const char *path, char *list, size_t size)
 {
 	PREAMBLE("listxattr(`%s', %p, %zu)", path, list, size);
-	RESOLVE(path)
+	RESOLVE(path, 1)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = listxattr(path, list, size, 0);
+		rc = flistxattr(fd, list, size, 0);
 #else
-	rc = listxattr(path, list, size);
+		rc = flistxattr(fd, list, size);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		rc = -1;
+	}
 	PROLOGUE
 }
 
@@ -647,24 +938,44 @@ static INT64_T chirp_fs_local_flistxattr(int fd, char *list, size_t size)
 static INT64_T chirp_fs_local_llistxattr(const char *path, char *list, size_t size)
 {
 	PREAMBLE("llistxattr(`%s', %p, %zu)", path, list, size);
-	RESOLVE(path)
+	RESOLVE(path, 0)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = listxattr(path, list, size, XATTR_NOFOLLOW);
+		rc = flistxattr(fd, list, size, 0);
 #else
-	rc = llistxattr(path, list, size);
+		rc = flistxattr(fd, list, size);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		if (errno == ELOOP)
+			errno = ENOTSUP;
+		rc = -1;
+	}
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_setxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	PREAMBLE("setxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags);
-	RESOLVE(path)
+	RESOLVE(path, 1)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = setxattr(path, name, data, size, 0, flags);
+		rc = fsetxattr(fd, name, data, size, 0, flags);
 #else
-	rc = setxattr(path, name, data, size, flags);
+		rc = fsetxattr(fd, name, data, size, flags);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		rc = -1;
+	}
 	PROLOGUE
 }
 
@@ -683,24 +994,44 @@ static INT64_T chirp_fs_local_fsetxattr(int fd, const char *name, const void *da
 static INT64_T chirp_fs_local_lsetxattr(const char *path, const char *name, const void *data, size_t size, int flags)
 {
 	PREAMBLE("lsetxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags);
-	RESOLVE(path)
+	RESOLVE(path, 0)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = setxattr(path, name, data, size, 0, XATTR_NOFOLLOW | flags);
+		rc = fsetxattr(fd, name, data, size, 0, flags);
 #else
-	rc = lsetxattr(path, name, data, size, flags);
+		rc = fsetxattr(fd, name, data, size, flags);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		if (errno == ELOOP)
+			errno = ENOTSUP;
+		rc = -1;
+	}
 	PROLOGUE
 }
 
 static INT64_T chirp_fs_local_removexattr(const char *path, const char *name)
 {
 	PREAMBLE("removexattr(`%s', `%s')", path, name);
-	RESOLVE(path)
+	RESOLVE(path, 1)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = removexattr(path, name, 0);
+		rc = fremovexattr(fd, name, 0);
 #else
-	rc = removexattr(path, name);
+		rc = fremovexattr(fd, name);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		rc = -1;
+	}
 	PROLOGUE
 }
 
@@ -719,15 +1050,26 @@ static INT64_T chirp_fs_local_fremovexattr(int fd, const char *name)
 static INT64_T chirp_fs_local_lremovexattr(const char *path, const char *name)
 {
 	PREAMBLE("lremovexattr(`%s', `%s')", path, name);
-	RESOLVE(path)
+	RESOLVE(path, 0)
+	int fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY);
+	if (fd >= 0) {
+		int s;
 #ifdef CCTOOLS_OPSYS_DARWIN
-	rc = removexattr(path, name, XATTR_NOFOLLOW);
+		rc = fremovexattr(fd, name, 0);
 #else
-	rc = lremovexattr(path, name);
+		rc = fremovexattr(fd, name);
 #endif
+		s = errno;
+		close(fd);
+		errno = s;
+	} else {
+		if (errno == ELOOP)
+			errno = ENOTSUP;
+		rc = -1;
+	}
 	PROLOGUE
 }
-#endif
+#endif /* defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H) */
 
 static int chirp_fs_do_acl_check()
 {
