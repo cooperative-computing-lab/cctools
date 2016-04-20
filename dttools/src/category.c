@@ -628,6 +628,17 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
 
+	struct rmsummary *seen       = c->max_resources_seen;
+	struct rmsummary *completed  = c->max_resources_completed;
+
+	/* little hackish, if wall and cpu times are the same, we assume seen == completed,
+	 * so we use completed as a possible max for values used in worker allocations. */
+	if(seen->wall_time == completed->wall_time && seen->wall_time == completed->wall_time) {
+		internal->cores  = completed->cores;
+		internal->memory = completed->memory;
+		internal->disk   = completed->disk;
+	}
+
 	/* load max values */
 	rmsummary_merge_override(internal, max);
 
@@ -647,12 +658,6 @@ const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *c
 
 	struct category *c = category_lookup_or_create(categories, category);
 	const struct rmsummary *max = category_dynamic_task_max_resources(categories, category, user, request);
-
-	/* if task is not being retried for resources, we do not need to set a
-	 * lower bound for all resources. */
-	if(request != CATEGORY_ALLOCATION_MODE_MAX) {
-		return max;
-	}
 
 	if(internal) {
 		rmsummary_delete(internal);
