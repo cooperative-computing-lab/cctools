@@ -96,6 +96,15 @@ sub stats_category {
 	return $stats;
 }
 
+sub specify_category_mode {
+	my ($self, $category, $mode) = @_;
+	return work_queue_specify_category_mode($self->{_work_queue}, $category, $mode);
+}
+
+sub specify_category_autolabel_resource {
+	my ($self, $category, $resource, $mode, $autolabel) = @_;
+	return work_queue_enable_category_resource($self->{_work_queue}, $category, $category, $resource, $autolabel);
+}
 
 sub task_state {
 	my ($self, $taskid) = @_;
@@ -374,6 +383,75 @@ Get the tasks statistics from the particular category.
 
 		 $s = $q->stats_category("my_category")
 		 print $s->{tasks_waiting}
+
+=head3 C<specify_category_mode>
+
+Turn on or off first-allocation labeling for a given category. By default, all
+resources are labeled, but wall, and cpu time. Turn on/off specific resources
+with C<specify_category_autolabel_resource>.  NOTE: autolabeling is only
+meaningfull when task monitoring is enabled (C<enable_monitoring>). When
+monitoring is enabled and a task exhausts resources in a worker, mode dictates
+how work queue handles the exhaustion:
+
+=over 12
+
+=item category
+
+A category name. If undefined, sets the mode by default for newly created categories.
+
+=item mode
+
+One of @ref category_mode_t:
+
+=back
+
+=over 24
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_FIXED
+
+Task fails (default).
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MAX
+
+If maximum values are specified for cores, memory, or disk (e.g. via C<specify_max_category_resources> or C<specify_memory>), and one of those
+resources is exceeded, the task fails.  Otherwise it is retried until a large
+enough worker connects to the master, using the maximum values specified, and
+the maximum values so far seen for resources not specified. Use
+C<specify_max_retries> to set a limit on the number of times work queue attemps
+to complete the task.
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE
+
+As above, but work queue tries allocations to minimize resource waste.
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT
+
+As above, but work queue tries allocations to maximize throughput.
+
+=back
+
+
+=head3 C<specify_category_autolabel_resource>
+
+Turn on or off first-allocation labeling for a given category and resource.
+This function should be use to fine-tune the defaults from
+C<specify_category_mode>.
+
+=over 12
+
+=item category
+
+A category name.
+
+=item resource
+
+A resource name.
+
+=item autolabel
+
+0/1 for off/on.
+
+=back
 
 
 =head3 C<enable_monitoring($dir_name)>

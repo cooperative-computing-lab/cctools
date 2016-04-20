@@ -767,6 +767,48 @@ class WorkQueue(_object):
         return stats
 
     ##
+    # Turn on or off first-allocation labeling for a given category. By
+    # default, all resources are labeled, but wall, and cpu time. Turn on/off
+    # specific resources with @ref specify_category_autolabel_resource.
+    # NOTE: autolabeling is only meaningfull when task monitoring is enabled
+    # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
+    # resources in a worker, mode dictates how work queue handles the
+    # exhaustion:
+    # @param self Reference to the current work queue object.
+    # @param category A category name. If None, sets the mode by default for
+    # newly created categories.
+    # @param mode One of @ref category_mode_t:
+    #                  - WORK_QUEUE_ALLOCATION_MODE_FIXED Task fails (default).
+    #                  - WORK_QUEUE_ALLOCATION_MODE_MAX If maximum values are
+    #                  specified for cores, memory, or disk (e.g. via @ref
+    #                  specify_max_category_resources or @ref specify_memory),
+    #                  and one of those resources is exceeded, the task fails.
+    #                  Otherwise it is retried until a large enough worker
+    #                  connects to the master, using the maximum values
+    #                  specified, and the maximum values so far seen for
+    #                  resources not specified. Use @ref specify_max_retries to
+    #                  set a limit on the number of times work queue attemps
+    #                  to complete the task.
+    #                  - WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE As above, but
+    #                  work queue tries allocations to minimize resource waste.
+    #                  - WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT As above, but
+    #                  work queue tries allocations to maximize throughput.
+    def specify_category_mode(self, category, mode):
+        return work_queue_specify_category_mode(self._work_queue, category, mode)
+
+    ##
+    # Turn on or off first-allocation labeling for a given category and
+    # resource. This function should be use to fine-tune the defaults from @ref
+    # specify_category_mode.
+    # @param q A work queue object.
+    # @param category A category name.
+    # @param resource A resource name.
+    # @param autolabel True/False for on/off.
+    # @returns 1 if resource is valid, 0 otherwise.
+    def specify_category_autolabel_resource(self, category, resource, autolabel):
+        return work_queue_enable_category_resource(self._work_queue, category, category, resource, autolabel)
+
+    ##
     # Get current task state. See @ref work_queue_task_state_t for possible values.
     # @code
     # >>> print q.task_state(taskid)

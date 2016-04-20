@@ -5874,7 +5874,19 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 	}
 }
 
-void work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode) {
+int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode) {
+
+	switch(mode) {
+		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX:
+		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+			break;
+		default:
+			notice(D_WQ, "Unknown category mode specified.");
+			return 0;
+			break;
+	}
 
 	if(!category) {
 		q->allocation_default_mode = mode;
@@ -5882,6 +5894,8 @@ void work_queue_specify_category_mode(struct work_queue *q, const char *category
 	else {
 		category_specify_allocation_mode(q->categories, category, mode);
 	}
+
+	return 1;
 }
 
 int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel) {

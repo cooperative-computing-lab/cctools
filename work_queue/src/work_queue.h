@@ -640,8 +640,9 @@ int work_queue_activate_fast_abort_category(struct work_queue *q, const char *ca
 @param q A work queue object.
 @param category A category name.
 @param mode     One of @ref category_allocation_t.
+@returns 1 if mode is valid, 0 otherwise.
 */
-void work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode);
+int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode);
 
 /** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref work_queue_specify_category_mode.
 @param q A work queue object.
