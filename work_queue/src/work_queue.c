@@ -213,6 +213,7 @@ struct work_queue_worker {
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
+	struct itable *current_tasks_boxes;
 	int finished_tasks;
 	int64_t total_tasks_complete;
 	int64_t total_bytes_transferred;
@@ -239,7 +240,6 @@ struct blacklist_host_info {
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 
-static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
@@ -722,6 +722,7 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	char *key, *value;
 	struct work_queue_task *t;
+	struct rmsummary *r;
 	uint64_t taskid;
 
 	if(!q || !w) return;
@@ -747,7 +748,13 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 		itable_firstkey(w->current_tasks);
 	}
 
+	itable_firstkey(w->current_tasks_boxes);
+	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **) &r)) {
+		rmsummary_delete(r);
+	}
+
 	itable_clear(w->current_tasks);
+	itable_clear(w->current_tasks_boxes);
 	w->finished_tasks = 0;
 }
 
@@ -792,6 +799,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 		link_close(w->link);
 
 	itable_delete(w->current_tasks);
+	itable_delete(w->current_tasks_boxes);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
 	free(w->stats);
@@ -860,6 +868,7 @@ static void add_worker(struct work_queue *q)
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
+	w->current_tasks_boxes = itable_create(0);
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
 
@@ -2745,17 +2754,26 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	return SUCCESS;
 }
 
-static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, const struct rmsummary *max) {
+/* if max defined, use minimum of max or worker avg
+ * else if min is less than avg, chose avg, otherwise 'infinity' */
+#define task_worker_box_size_resource(w, min, max, avg, field)\
+	( max->field  >  -1 ? MIN(max->field, avg) :\
+	  min->field <= avg ? avg                  : w->resources->field.total + 1 )
+
+static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
+
+	const struct rmsummary *min = task_min_resources(q, t);
+	const struct rmsummary *max = task_max_resources(q, t);
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
-	/* we use min here safely to remove any unset resources. min is fine, since
-	 * the task would not be schedule here if the correspoinding task resource
-	 * was larger than the worker. */
-	limits->cores  = MIN_POS(max->cores,  w->resources->cores.total);
-	limits->memory = MIN_POS(max->memory, w->resources->memory.total);
-	limits->disk   = MIN_POS(max->disk,   w->resources->disk.total);
-	limits->gpus   = MIN_POS(max->gpus,   w->resources->gpus.total);
+	limits->cores = task_worker_box_size_resource(w, min, max, w->resources->cores.total / w->resources->workers.total, cores);
+
+	limits->memory = task_worker_box_size_resource(w, min, max, w->resources->memory.total / w->resources->workers.total, memory);
+
+	limits->disk = task_worker_box_size_resource(w, min, max, w->resources->disk.total / w->resources->workers.total, disk);
+
+	limits->gpus = task_worker_box_size_resource(w, min, max, w->resources->gpus.total / w->resources->workers.total, gpus);
 
 	return limits;
 }
@@ -2764,8 +2782,8 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 {
 	/* wrap command at the last minute, so that we have the updated information
 	 * about resources. */
+	struct rmsummary *limits    = task_worker_box_size(q, w, t);
 	const struct rmsummary *max = task_max_resources(q, t);
-	struct rmsummary *limits    = task_worker_box_size(q, w, max);
 
 	char *command_line;
 	if(q->monitor_mode) {
@@ -2804,7 +2822,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 		send_worker_msg(q,w, "wall_time %"PRIu64"\n", max->wall_time);
 	}
 
-	rmsummary_delete(limits);
+	itable_insert(w->current_tasks_boxes, t->taskid, limits);
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -2933,30 +2951,27 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		}
 	}
 
-	int64_t cores_used, disk_used, mem_used, gpus_used;
+	struct rmsummary *limits = task_worker_box_size(q, w, t);
+
 	int ok = 1;
 
-	const struct rmsummary *label = task_min_resources(q, t);
-
-	int64_t cores_avg = w->resources->cores.total  / w->resources->workers.total;
-	int64_t mem_avg   = w->resources->memory.total / w->resources->workers.total;
-	int64_t disk_avg  = w->resources->disk.total   / w->resources->workers.total;
-	int64_t gpus_avg  = w->resources->gpus.total   / w->resources->workers.total;
-
-	cores_used = MIN_POS(label->cores,  cores_avg);
-	mem_used   = MIN_POS(label->memory, mem_avg);
-	disk_used  = MIN_POS(label->disk,   disk_avg);
-	gpus_used  = MIN_POS(label->gpus,   gpus_avg);
-
-	if(w->resources->cores.inuse + cores_used > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
-		ok = 0;
-	} else if(w->resources->memory.inuse + mem_used > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
-		ok = 0;
-	} else if(w->resources->disk.inuse + disk_used > w->resources->disk.total) { /* No overcommit disk */
-		ok = 0;
-	} else if(w->resources->gpus.inuse + gpus_used > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+	if(w->resources->cores.inuse + limits->cores > overcommitted_resource_total(q, w->resources->cores.total, 1)) {
 		ok = 0;
 	}
+
+	if(w->resources->memory.inuse + limits->memory > overcommitted_resource_total(q, w->resources->memory.total, 0)) {
+		ok = 0;
+	}
+
+	if(w->resources->disk.inuse + limits->disk > w->resources->disk.total) { /* No overcommit disk */
+		ok = 0;
+	}
+
+	if(w->resources->gpus.inuse + limits->gpus > overcommitted_resource_total(q, w->resources->gpus.total, 0)) {
+		ok = 0;
+	}
+
+	rmsummary_delete(limits);
 
 	return ok;
 }
@@ -3156,45 +3171,27 @@ static struct work_queue_worker *find_best_worker(struct work_queue *q, struct w
 
 static void count_worker_resources(struct work_queue *q, struct work_queue_worker *w)
 {
-	struct work_queue_task *t;
+	struct rmsummary *box;
 	uint64_t taskid;
-	int64_t cores_avg, mem_avg, disk_avg, gpus_avg;
-	int64_t cores_used, mem_used, disk_used, gpus_used;
 
 	w->resources->cores.inuse  = 0;
 	w->resources->memory.inuse = 0;
 	w->resources->disk.inuse   = 0;
 	w->resources->gpus.inuse   = 0;
 
-	cores_avg = 0;
-	mem_avg   = 0;
-	disk_avg  = 0;
-	gpus_avg  = 0;
-
 	update_max_worker(q, w);
 
-	if(w->resources->workers.total > 0)
+	if(w->resources->workers.total < 1)
 	{
-		cores_avg = w->resources->cores.total / w->resources->workers.total;
-		mem_avg   = w->resources->memory.total / w->resources->workers.total;
-		disk_avg  = w->resources->disk.total / w->resources->workers.total;
-		gpus_avg  = w->resources->gpus.total / w->resources->workers.total;
+		return;
 	}
 
-	itable_firstkey(w->current_tasks);
-	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-
-		const struct rmsummary *label = task_max_resources(q, t);
-
-		cores_used = MIN_POS(label->cores,  cores_avg);
-		mem_used   = MIN_POS(label->memory, mem_avg);
-		disk_used  = MIN_POS(label->disk,   disk_avg);
-		gpus_used  = MIN_POS(label->gpus,   gpus_avg);
-
-		w->resources->cores.inuse     += cores_used;
-		w->resources->memory.inuse    += mem_used;
-		w->resources->disk.inuse      += disk_used;
-		w->resources->gpus.inuse      += gpus_used;
+	itable_firstkey(w->current_tasks_boxes);
+	while(itable_nextkey(w->current_tasks_boxes, &taskid, (void **)& box)) {
+		w->resources->cores.inuse     += box->cores;
+		w->resources->memory.inuse    += box->memory;
+		w->resources->disk.inuse      += box->disk;
+		w->resources->gpus.inuse      += box->gpus;
 	}
 }
 
@@ -3260,7 +3257,14 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 
 	t->total_submissions += 1;
 
+	work_queue_result_code_t result = start_one_task(q, w, t);
+
 	count_worker_resources(q, w);
+
+	if(result != SUCCESS) {
+		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
+		handle_failure(q, w, t, result);
+	}
 
 	log_worker_stats(q);
 }
@@ -3275,6 +3279,11 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	}
 
 	//update tables.
+	struct rmsummary *task_box = itable_lookup(w->current_tasks_boxes, t->taskid);
+	if(task_box)
+		rmsummary_delete(task_box);
+
+	itable_remove(w->current_tasks_boxes, t->taskid);
 	itable_remove(w->current_tasks, t->taskid);
 	itable_remove(q->worker_task_map, t->taskid);
 	change_task_state(q, t, new_state);
@@ -3282,17 +3291,6 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	count_worker_resources(q, w);
 
 	log_worker_stats(q);
-}
-
-static void start_task_on_worker( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
-{
-	commit_task_to_worker(q, w, t);
-
-	work_queue_result_code_t result = start_one_task(q, w, t);
-	if(result != SUCCESS) {
-		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
 }
 
 static int send_one_task( struct work_queue *q )
@@ -3314,7 +3312,7 @@ static int send_one_task( struct work_queue *q )
 		if(!w) continue;
 
 		// Otherwise, remove it from the ready list and start it:
-		start_task_on_worker(q,w,t);
+		commit_task_to_worker(q,w,t);
 
 		return 1;
 	}
