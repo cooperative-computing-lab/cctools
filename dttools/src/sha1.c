@@ -388,19 +388,13 @@ void sha1_final(unsigned char output[2], sha1_context_t * shsInfo)
 }
 
 #define BUFFER_SIZE (1<<20)
-int sha1_file(const char *filename, unsigned char digest[20])
+int sha1_fd(int fd, unsigned char digest[20])
 {
-	int fd;
 	struct stat buf;
 	sha1_context_t context;
 	sha1_init(&context);
 
-	fd = open(filename, O_RDONLY);
-	if (fd == -1)
-		return 0;
-
 	if (fstat(fd, &buf) == -1) {
-		close(fd);
 		return 0;
 	}
 
@@ -412,9 +406,7 @@ int sha1_file(const char *filename, unsigned char digest[20])
 			sha1_update(&context, buffer, n);
 		}
 		free(buffer);
-		close(fd);
 	} else {
-		close(fd);
 		posix_madvise(data, buf.st_size, POSIX_MADV_SEQUENTIAL);
 		sha1_update(&context, data, buf.st_size);
 		munmap(data, buf.st_size);
@@ -423,6 +415,16 @@ int sha1_file(const char *filename, unsigned char digest[20])
 	sha1_final(digest, &context);
 
 	return 1;
+}
+
+int sha1_file(const char *path, unsigned char digest[20])
+{
+	int fd = open(path, O_RDONLY|O_NOCTTY);
+	if (fd == -1)
+		return 0;
+	int rc = sha1_fd(fd, digest);
+	close(fd);
+	return rc;
 }
 
 void sha1_buffer(const void *buffer, size_t length, unsigned char digest[20])
