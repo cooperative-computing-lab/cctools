@@ -7,6 +7,10 @@ See the file COPYING for details.
 #ifndef UNLINK_RECURSIVE_H
 #define UNLINK_RECURSIVE_H
 
+#include "compat-at.h"
+
+#include <fcntl.h>
+
 /** @file unlink_recursive.h Unlink recursively. */
 
 /** Delete a path recursively.

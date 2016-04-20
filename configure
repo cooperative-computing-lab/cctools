@@ -1218,6 +1218,7 @@ optional_function fdatasync /usr/include/unistd.h HAVE_FDATASYNC
 optional_function isnan /usr/include/math.h HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
 optional_function localtime_r /usr/include/time.h HAVE_LOCALTIME_R
 optional_function localtime_s /usr/include/time.h HAVE_LOCALTIME_S
+optional_function openat /usr/include/fcntl.h HAS_OPENAT
 optional_function pread /usr/include/unistd.h HAS_PREAD USE_PREAD
 optional_function pread64 /usr/include/unistd.h USE_PREAD64
 optional_function pwrite /usr/include/unistd.h HAS_PWRITE USE_PWRITE

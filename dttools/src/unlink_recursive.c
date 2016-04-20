@@ -32,7 +32,7 @@ int unlinkat_recursive (int dirfd, const char *path)
 {
 	int rc = unlinkat(dirfd, path, 0);
 	if(rc == -1 && (errno == EISDIR || errno == EPERM || errno == ENOTEMPTY)) {
-		int subdirfd = openat(dirfd, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY|O_NOFOLLOW);
+		int subdirfd = openat(dirfd, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY|O_NOFOLLOW, 0);
 		if (subdirfd >= 0) {
 			DIR *dir = fdopendir(subdirfd);
 			if (dir) {
@@ -66,7 +66,7 @@ int unlink_recursive (const char *path)
 int unlink_dir_contents (const char *path)
 {
 	int rc;
-	int dirfd = openat(AT_FDCWD, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY);
+	int dirfd = openat(AT_FDCWD, path, O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOCTTY, 0);
 	if (dirfd >= 0) {
 		DIR *dir = fdopendir(dirfd);
 		if (dir) {

@@ -19,6 +19,7 @@ SOURCES = \
 	change_process_title.c \
 	chunk.c \
 	clean_dir.c \
+	compat-at.c \
 	console_login.c \
 	copy_stream.c \
 	create_dir.c \

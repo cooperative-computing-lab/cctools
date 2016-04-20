@@ -7,6 +7,8 @@ See the file COPYING for details.
 #ifndef MKDIR_RECURSIVE_H
 #define MKDIR_RECURSIVE_H
 
+#include "compat-at.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 

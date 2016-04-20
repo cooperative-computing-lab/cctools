@@ -13,6 +13,8 @@
  * o binding of symlink outputs does not follow transaction semantics (also use intermediate file with rename?)
  */
 
+#include "compat-at.h"
+
 #include "catch.h"
 #include "chirp_acl.h"
 #include "chirp_client.h"
@@ -207,7 +209,7 @@ static int interpolate (chirp_jobid_t id, int sandboxfd, const char *task_path, 
 	int fd = -1;
 	char *mark;
 
-	CATCHUNIX(fd = openat(sandboxfd, task_path, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY));
+	CATCHUNIX(fd = openat(sandboxfd, task_path, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
 
 	for (mark = serv_path; (mark = strchr(mark, '%')); ) {
 		switch (mark[1]) {
@@ -336,7 +338,7 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 				CATCHUNIX(linkat(serv_path_dirfd, serv_path_basename, sandboxfd, task_path, 0));
 				CATCHUNIX(fchmodat(sandboxfd, task_path, S_IRWXU, 0));
 			} else if (strcmp(binding, "COPY") == 0) {
-				int fdin = openat(serv_path_dirfd, serv_path_basename, O_RDONLY);
+				int fdin = openat(serv_path_dirfd, serv_path_basename, O_RDONLY, 0);
 				CATCHUNIX(fdin);
 				int fdout = openat(sandboxfd, task_path, O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU);
 				CATCHUNIX(fdout);
@@ -356,7 +358,7 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 				CATCHUNIX(linkat(sandboxfd, task_path, serv_path_dirfd, serv_path_basename, 0));
 			} else if (strcmp(binding, "COPY") == 0) {
 				int fdin, fdout;
-				CATCHUNIX(fdin = openat(sandboxfd, task_path, O_RDONLY));
+				CATCHUNIX(fdin = openat(sandboxfd, task_path, O_RDONLY, 0));
 				CATCHUNIX(fdout = openat(serv_path_dirfd, serv_path_basename, O_CREAT|O_TRUNC|O_WRONLY|O_NOFOLLOW, S_IRWXU));
 				CATCHUNIX(fchmod(fdout, S_IRWXU));
 				CATCHUNIX(copy_fd_to_fd(fdin, fdout));
