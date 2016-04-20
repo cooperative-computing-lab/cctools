@@ -1148,14 +1148,8 @@ struct jx *variables_to_json(struct hash_table *h) {
 
 struct jx *category_allocation_to_json(category_allocation_t c) {
 	switch(c) {
-		case CATEGORY_ALLOCATION_UNLABELED:
-			return jx_string("unlabeled");
-			break;
-		case CATEGORY_ALLOCATION_USER:
-			return jx_string("user");
-			break;
-		case CATEGORY_ALLOCATION_AUTO_ZERO:
-			return jx_string("auto_zero");
+		case CATEGORY_ALLOCATION_DEFAULT:
+			return jx_string("default");
 			break;
 		case CATEGORY_ALLOCATION_AUTO_FIRST:
 			return jx_string("auto_first");

@@ -44,7 +44,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->resources_requested = rmsummary_create(-1);
 	n->resources_measured  = NULL;
 
-	n->resource_request = CATEGORY_ALLOCATION_UNLABELED;
+	n->resource_request = CATEGORY_ALLOCATION_DEFAULT;
 
 	return n;
 }
@@ -223,66 +223,12 @@ void dag_node_add_target_file(struct dag_node *n, const char *filename, char *re
 	target->created_by = n;
 }
 
-void dag_node_init_resources(struct dag_node *n)
-{
-	struct rmsummary *rs    = n->resources_requested;
-	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
-	struct dag_variable_lookup_set s_all  = { n->d, n->category, n, NULL };
-
-	struct dag_variable_value *val;
-
-	/* first pass, only node variables. We only check if this node was individually labeled. */
-	val = dag_variable_lookup(RESOURCES_CORES, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	val = dag_variable_lookup(RESOURCES_DISK, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	val = dag_variable_lookup(RESOURCES_MEMORY, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	val = dag_variable_lookup(RESOURCES_GPUS, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	int category_flag = 0;
-	/* second pass: fill fall-back values if at least one resource was individually labeled. */
-	/* if not, resources will come from the category when submitting. */
-	val = dag_variable_lookup(RESOURCES_CORES, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->cores = atoll(val->value);
-	}
-
-	val = dag_variable_lookup(RESOURCES_DISK, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->disk = atoll(val->value);
-	}
-
-	val = dag_variable_lookup(RESOURCES_MEMORY, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->memory = atoll(val->value);
-	}
-
-	val = dag_variable_lookup(RESOURCES_GPUS, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->gpus = atoll(val->value);
-	}
-
-	if(n->resource_request != CATEGORY_ALLOCATION_USER && category_flag) {
-		n->resource_request = CATEGORY_ALLOCATION_AUTO_ZERO;
-	}
-}
-
 void dag_node_print_debug_resources(struct dag_node *n)
 {
 	const struct rmsummary *r = dag_node_dynamic_label(n);
+
+	if(!r)
+		return;
 
 	if( r->cores > -1 )
 		debug(D_MAKEFLOW_RUN, "cores:  %"PRId64".\n",      r->cores);
