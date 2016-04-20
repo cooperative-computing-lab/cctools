@@ -176,6 +176,8 @@ struct work_queue {
 	char *catalog_host;
 	int catalog_port;
 
+	category_mode_t allocation_default_mode;
+
 	FILE *logfile;
 	int keepalive_interval;
 	int keepalive_timeout;
@@ -4424,6 +4426,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode = MON_DISABLED;
 
+	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
 	// The value -1 indicates that fast abort is inactive by default
@@ -5837,7 +5840,13 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 }
 
 void work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode) {
-	category_specify_allocation_mode(q->categories, category, mode);
+
+	if(!category) {
+		q->allocation_default_mode = mode;
+	}
+	else {
+		category_specify_allocation_mode(q->categories, category, mode);
+	}
 }
 
 int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel) {
@@ -5860,6 +5869,8 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name) {
 	struct category *c = category_lookup_or_create(q->categories, name);
+
+	c->allocation_mode = q->allocation_default_mode;
 
 	if(!c->wq_stats) {
 		c->wq_stats = calloc(1, sizeof(struct work_queue_stats));

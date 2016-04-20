@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
 
 	if(monitor_flag) {
 		work_queue_enable_monitoring(q, NULL);
+		work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX);
 	}
 
 	int result = work_queue_mainloop(q);
