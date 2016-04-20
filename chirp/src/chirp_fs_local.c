@@ -21,19 +21,19 @@ See the file COPYING for details.
 #include <utime.h>
 
 #if defined(HAS_ATTR_XATTR_H)
-#include <attr/xattr.h>
+#	include <attr/xattr.h>
 #elif defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
+#	include <sys/xattr.h>
 #endif
 
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
+#	include <sys/statfs.h>
 #endif
 #ifdef HAS_SYS_STATVFS_H
-#include <sys/statvfs.h>
+#	include <sys/statvfs.h>
 #endif
 
 #include <assert.h>
