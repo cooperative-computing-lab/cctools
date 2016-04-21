@@ -2658,7 +2658,10 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	t->time_execute_cmd_start = timestamp_get();
 
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
-	send_worker_msg(q,w, "cmd %lld\n%s", (long long) strlen(command_line), command_line);
+
+	long long cmd_len = strlen(command_line);
+	send_worker_msg(q,w, "cmd %lld\n", (long long) cmd_len);
+	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->foreman ? q->long_timeout : q->short_timeout));
 	free(command_line);
 
 	send_worker_msg(q,w, "cores %"PRId64"\n",  limits->cores);
