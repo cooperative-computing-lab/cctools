@@ -34,8 +34,6 @@
 #include "xxmalloc.h"
 #include "hash_table.h"
 
-#define MAX_LINE 1024
-
 static int units_initialized = 0;
 static struct hash_table *conversion_fields = NULL;
 static struct hash_table *multiplier_of     = NULL;
