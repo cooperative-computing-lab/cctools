@@ -4552,6 +4552,7 @@ void work_queue_delete(struct work_queue *q)
 		hash_table_firstkey(q->worker_table);
 		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 			release_worker(q, w);
+			hash_table_firstkey(q->worker_table);
 		}
 		if(q->name) {
 			update_catalog(q, NULL, 1);
@@ -5359,6 +5360,7 @@ void release_all_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		release_worker(q, w);
+		hash_table_firstkey(q->worker_table);
 	}
 }
 
