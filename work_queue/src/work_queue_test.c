@@ -28,24 +28,29 @@ int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_
 {
 	static int ntasks=0;
 	char output_file[128];
+	char input_file[128];
 	char command[256];
 	char gen_input_cmd[256];
+
+	sprintf(input_file, "input.%d",ntasks);
+	sprintf(gen_input_cmd, "dd if=/dev/zero of=%s bs=1048576 count=%d",input_file,input_size);
+	system(gen_input_cmd);
 
 	/*
 	Note that bs=1m and similar are not portable across various
 	implementations of dd, so we spell it out as bs=1048576
 	*/
 
-	sprintf(gen_input_cmd, "dd if=/dev/zero of=input.0 bs=1048576 count=%d",input_size);
-	system(gen_input_cmd);
-
 	int i;
 	for(i=0;i<count;i++) {
-		sprintf(output_file, "output.%d",ntasks++);
+
+		sprintf(output_file, "output.%d",ntasks);
 		sprintf(command, "dd if=/dev/zero of=outfile bs=1048576 count=%d; sleep %d", output_size, run_time );
 
+		ntasks++;
+
 		struct work_queue_task *t = work_queue_task_create(command);
-		work_queue_task_specify_file(t, "input.0", "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+		work_queue_task_specify_file(t, input_file, "infile", WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
 		work_queue_task_specify_file(t, output_file, "outfile", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 		work_queue_task_specify_cores(t,1);
 
