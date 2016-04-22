@@ -107,7 +107,7 @@ static void clear_environment() {
 	/* Clear variables that we really want the user to set explicitly.
 	 * Ideally, we would start with a clean environment, but certain variables,
 	 * such as HOME are seldom set explicitly, and some executables rely on them.
-	*/ 
+	*/
 
 	unsetenv("DISPLAY");
 
