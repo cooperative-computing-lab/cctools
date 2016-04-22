@@ -29,6 +29,7 @@
 
 void buffer_init(buffer_t * b)
 {
+	bzero(b->initial, sizeof(b->initial));
 	b->buf = b->end = b->initial;
 	b->len = sizeof(b->initial);
 	b->ubuf.buf = NULL;

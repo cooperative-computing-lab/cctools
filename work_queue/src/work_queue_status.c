@@ -41,7 +41,7 @@ typedef enum {
 
 static format_t format_mode = FORMAT_TABLE;
 static query_t query_mode = NO_QUERY;
-static int work_queue_status_timeout = 300;
+static int work_queue_status_timeout = 30;
 static char *catalog_host = NULL;
 static int catalog_port = 0;
 int catalog_size = CATALOG_SIZE;
