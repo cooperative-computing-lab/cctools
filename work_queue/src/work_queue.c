@@ -1891,16 +1891,21 @@ static struct rmsummary *largest_waiting_task(struct work_queue *q) {
 }
 
 static int check_worker_fit(struct work_queue_worker *w, struct rmsummary *s) {
-	if(s->cores > w->resources->cores.total)
-		return 0;
-	if(s->memory > w->resources->memory.total)
-		return 0;
-	if(s->disk > w->resources->disk.total)
-		return 0;
-	if(s->gpus > w->resources->gpus.total)
+
+	if(w->resources->workers.total < 1)
 		return 0;
 
-	return 1;
+	if(!s)
+		return w->resources->workers.total;
+
+	if(s->cores > w->resources->cores.total/w->resources->workers.total)
+		return 0;
+	if(s->memory > w->resources->memory.total/w->resources->workers.total)
+		return 0;
+	if(s->disk > w->resources->disk.total/w->resources->workers.total)
+		return 0;
+
+	return w->resources->workers.total;
 }
 
 static int count_workers_for_waiting_tasks(struct work_queue *q, struct rmsummary *s) {
@@ -1911,9 +1916,7 @@ static int count_workers_for_waiting_tasks(struct work_queue *q, struct rmsummar
 	struct work_queue_worker *w;
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		if( !s || check_worker_fit(w, s) ) {
-			count++;
-		}
+		count += check_worker_fit(w, s);
 	}
 
 	return count;
