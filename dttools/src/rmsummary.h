@@ -64,6 +64,9 @@ struct rmsummary
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
 
+	/* convenience counter. We use it in some places to check if two summaries
+	 * were updated at the same step. */
+	int64_t tag;
 };
 
 struct rmsummary_field

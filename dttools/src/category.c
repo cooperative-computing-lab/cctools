@@ -468,9 +468,17 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 
 
 void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs) {
+	static int64_t accumulations_seen = 0;
+
+
 	const char *name = category ? category : "default";
 
 	struct category *c = category_lookup_or_create(categories, name);
+
+	rmsummary_merge_max(c->max_resources_seen, rs);
+	accumulations_seen++;
+
+	c->max_resources_seen->tag = accumulations_seen;
 
 	if(rs) {
 		rmsummary_merge_max(c->max_resources_completed, rs);
@@ -490,6 +498,20 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 		category_inc_histogram_count(c, disk,           rs, disk_bucket_size);
 		category_inc_histogram_count(c, max_concurrent_processes, rs, 1);
 		category_inc_histogram_count(c, total_processes,rs, 1);
+
+		/* only update completed tag when completed and seen are the same. */
+		struct rmsummary *seen       = c->max_resources_seen;
+		struct rmsummary *completed  = c->max_resources_completed;
+
+		if(
+				seen->wall_time == completed->wall_time &&
+				seen->cpu_time  == completed->cpu_time  &&
+				seen->cores     == completed->cores  &&
+				seen->memory    == completed->memory  &&
+				seen->disk      == completed->disk
+		  ) {
+			c->max_resources_completed->tag = accumulations_seen;
+		}
 	}
 
 }
@@ -627,10 +649,13 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
 
+	struct rmsummary *seen       = c->max_resources_seen;
+	struct rmsummary *completed  = c->max_resources_completed;
+
 	/* load max values */
 	rmsummary_merge_override(internal, max);
 
-	if(request == CATEGORY_ALLOCATION_AUTO_FIRST) {
+	if(seen->tag == completed->tag && request == CATEGORY_ALLOCATION_AUTO_FIRST) {
 		rmsummary_merge_override(internal, first);
 	}
 
@@ -658,9 +683,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 	struct rmsummary *seen       = c->max_resources_seen;
 	struct rmsummary *completed  = c->max_resources_completed;
 
-	/* little hackish, if wall and cpu times are the same, we assume seen == completed,
-	 * so we use completed as a possible max for values used in worker allocations. */
-	if(seen->wall_time == completed->wall_time && seen->wall_time == completed->wall_time) {
+	if(seen->tag == completed->tag) {
 		internal->cores  = completed->cores;
 		internal->memory = completed->memory;
 		internal->disk   = completed->disk;

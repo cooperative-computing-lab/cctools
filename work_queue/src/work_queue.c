@@ -1285,8 +1285,6 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 		t->return_status = t->resources_measured->exit_status;
 	}
 
-	rmsummary_merge_max(t->resources_requested, task_max_resources(q, t));
-
 	free(summary);
 }
 
@@ -5837,7 +5835,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
-	rmsummary_merge_max(c->max_resources_seen, t->resources_measured);
+	category_accumulate_summary(q->categories, t->category, t->resources_measured);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
@@ -5846,15 +5844,12 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 		s->total_tasks_complete      = c->total_tasks;
 		s->total_good_execute_time  += t->cmd_execution_time;
 		s->total_good_transfer_time += t->total_transfer_time;
-
-		category_accumulate_summary(q->categories, t->category, t->resources_measured);
-
-		if(c->total_tasks % first_allocation_every_n_tasks == 0) {
-			category_update_first_allocation(q->categories, q->current_max_worker, t->category);
-		}
-	}
-	else {
+	} else {
 		s->total_tasks_failed++;
+	}
+
+	if(c->total_tasks % first_allocation_every_n_tasks == 0) {
+		category_update_first_allocation(q->categories, q->current_max_worker, t->category);
 	}
 }
 

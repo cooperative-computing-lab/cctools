@@ -728,6 +728,8 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->exit_status = 0;
 	s->signal = 0;
 
+	s->tag = -1;
+
 	return s;
 }
 
