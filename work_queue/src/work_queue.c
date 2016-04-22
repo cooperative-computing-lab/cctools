@@ -191,6 +191,7 @@ struct work_queue {
 
 	char *monitor_exe;
 	struct rmsummary *measured_local_resources;
+	struct rmsummary *current_max_worker;
 
 	char *password;
 	double bandwidth;
@@ -243,6 +244,9 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_task_state_t new_state);
 static int cancel_task_on_worker(struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state);
 static void count_worker_resources(struct work_queue *q, struct work_queue_worker *w);
+
+static void find_max_worker(struct work_queue *q);
+static void update_max_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t );
 
@@ -801,6 +805,9 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	free(w->arch);
 	free(w->version);
 	free(w);
+
+	/* update the largest worker seen */
+	find_max_worker(q);
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 }
@@ -2948,6 +2955,11 @@ static int check_foreman_against_task(struct work_queue *q, struct work_queue_wo
 	int64_t cores_used, disk_used, mem_used, gpus_used;
 	int ok = 1;
 
+	if(w->resources->workers.total < 1) {
+		ok = 0;
+		return ok;
+	}
+
 	if(t->resource_request == CATEGORY_ALLOCATION_UNLABELED)
 	{
 		// Unlabeled tasks run alone in a worker. Return immediately if foreman
@@ -3274,6 +3286,8 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 	disk_avg  = 0;
 	gpus_avg  = 0;
 
+	update_max_worker(q, w);
+
 	if(w->resources->workers.total > 0)
 	{
 		cores_avg = w->resources->cores.total / w->resources->workers.total;
@@ -3308,6 +3322,54 @@ static void count_worker_resources(struct work_queue *q, struct work_queue_worke
 		w->resources->disk.inuse      += disk_used;
 		w->resources->gpus.inuse      += gpus_used;
 		w->resources->unlabeled.inuse += unlabeled_used;
+	}
+}
+
+static void update_max_worker(struct work_queue *q, struct work_queue_worker *w) {
+	if(!w)
+		return;
+
+	if(w->resources->workers.total < 1) {
+		return;
+	}
+
+	int cores_avg = w->resources->cores.total  / w->resources->workers.total;
+	int mem_avg   = w->resources->memory.total / w->resources->workers.total;
+	int disk_avg  = w->resources->disk.total   / w->resources->workers.total;
+	int gpus_avg  = w->resources->gpus.total   / w->resources->workers.total;
+
+	if(q->current_max_worker->cores < cores_avg) {
+		q->current_max_worker->cores = cores_avg;
+	}
+
+	if(q->current_max_worker->memory < mem_avg) {
+		q->current_max_worker->memory = mem_avg;
+	}
+
+	if(q->current_max_worker->disk < disk_avg) {
+		q->current_max_worker->disk = disk_avg;
+	}
+
+	if(q->current_max_worker->gpus < gpus_avg) {
+		q->current_max_worker->gpus = gpus_avg;
+	}
+}
+
+/* we call this function when a worker is disconnected. For efficiency, we use
+ * update_max_worker when a worker sends resource updates. */
+static void find_max_worker(struct work_queue *q) {
+	q->current_max_worker->cores  = 0;
+	q->current_max_worker->memory = 0;
+	q->current_max_worker->disk   = 0;
+
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(w->resources->workers.total > 0)
+		{
+			update_max_worker(q, w);
+		}
 	}
 }
 
@@ -4466,7 +4528,8 @@ struct work_queue *work_queue_create(int port)
 	q->worker_blacklist = hash_table_create(0, 0);
 	q->worker_task_map = itable_create(0);
 
-	q->measured_local_resources       = rmsummary_create(-1);
+	q->measured_local_resources   = rmsummary_create(-1);
+	q->current_max_worker         = rmsummary_create(-1);
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
@@ -4567,7 +4630,7 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	}
 
 	if(q->measured_local_resources)
-		free(q->measured_local_resources);
+		rmsummary_delete(q->measured_local_resources);
 
 	q->measured_local_resources = rmonitor_measure_process(getpid());
 	q->monitor_mode = MON_SUMMARY;
@@ -4779,6 +4842,9 @@ void work_queue_delete(struct work_queue *q)
 
 		if(q->measured_local_resources)
 			rmsummary_delete(q->measured_local_resources);
+
+		if(q->current_max_worker)
+			rmsummary_delete(q->current_max_worker);
 
 		free(q);
 	}
@@ -5877,6 +5943,8 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 	s->total_receive_time   += (t->time_receive_output_finish - t->time_receive_output_start);
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
+
+	rmsummary_merge_max(c->max_resources_seen, t->resources_measured);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{

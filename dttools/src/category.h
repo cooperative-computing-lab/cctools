@@ -32,6 +32,9 @@ struct category {
 	struct rmsummary *first_allocation;
 	struct rmsummary *max_allocation;
 
+	struct rmsummary *max_resources_seen;
+	struct rmsummary *max_resources_completed;
+
 	/* All keys are assumed positive. Thus, we shift them to the right so that
 	 * we can have a "0" key. 0->1, 1->2, etc. */
 	struct itable *cores_histogram;

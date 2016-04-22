@@ -51,6 +51,9 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->first_allocation    = NULL;
 	c->max_allocation      = NULL;
 
+	c->max_resources_completed = rmsummary_create(-1);
+	c->max_resources_seen      = rmsummary_create(-1);
+
 	c->cores_histogram          = itable_create(0);
 	c->wall_time_histogram      = itable_create(0);
 	c->cpu_time_histogram       = itable_create(0);
@@ -150,6 +153,8 @@ void category_delete(struct hash_table *categories, const char *name) {
 
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
+	rmsummary_delete(c->max_resources_completed);
+	rmsummary_delete(c->max_resources_seen);
 
 	free(c);
 }
@@ -421,6 +426,8 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 	struct category *c = category_lookup_or_create(categories, name);
 
 	if(rs) {
+		rmsummary_merge_max(c->max_resources_completed, rs);
+
 		category_inc_histogram_count(c, cores,          rs, 1);
 		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
 		category_inc_histogram_count(c, wall_time,      rs, time_bucket_size);
