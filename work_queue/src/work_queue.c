@@ -86,8 +86,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 
-#define FIRST_ALLOCATION_EVERY_NTASKS 100
-
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 // Result codes for signaling the completion of operations in WQ
@@ -119,6 +117,8 @@ static uint64_t disk_avail_threshold = 100;
 double wq_option_send_receive_ratio    = 0.5;
 
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
+
+int first_allocation_every_n_tasks = 25;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blacklist_slow_workers_timeout = 900;
@@ -5554,8 +5554,12 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
+
 	} else if(!strcmp(name, "send-receive-ratio")) {
 		work_queue_send_receive_ratio(q, value);
+
+	} else if(!strcmp(name, "first-allocation-every-n-tasks")) {
+		first_allocation_every_n_tasks = MAX(1, value);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
@@ -5838,7 +5842,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 		category_accumulate_summary(q->categories, t->category, t->resources_measured);
 
-		if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0) {
+		if(c->total_tasks % first_allocation_every_n_tasks == 0) {
 			category_update_first_allocation(q->categories, q->current_max_worker, t->category);
 		}
 	}
