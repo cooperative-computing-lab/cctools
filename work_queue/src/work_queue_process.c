@@ -103,6 +103,16 @@ void work_queue_process_delete(struct work_queue_process *p)
 	free(p);
 }
 
+static void clear_environment() {
+	/* Clear variables that we really want the user to set explicitly.
+	 * Ideally, we would start with a clean environment, but certain variables,
+	 * such as HOME are seldom set explicitly, and some executables rely on them.
+	*/ 
+
+	unsetenv("DISPLAY");
+
+}
+
 static void export_environment( struct list *env_list )
 {
 	char *name;
@@ -203,6 +213,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 		close(p->output_fd);
 
+		clear_environment();
 		export_environment(p->task->env_list);
 
 		/* overwrite CORES, MEMORY, or DISK variables, if the task used specify_* */
