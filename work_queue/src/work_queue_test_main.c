@@ -15,7 +15,8 @@ void show_help( const char *cmd )
 {
 	printf("Usage: %s [options]\n",cmd);
 	printf("Where options are:\n");
-		printf("-Z <file>  Write listening port to this file.\n");
+	printf("-m         Enable resource monitoring.\n");
+	printf("-Z <file>  Write listening port to this file.\n");
 	printf("-p <port>  Listen on this port.\n");
 	printf("-N <name>  Advertise this project name.\n");
 	printf("-d <flag>  Enable debugging for this subsystem.\n");
@@ -29,9 +30,10 @@ int main(int argc, char *argv[])
 	int port = WORK_QUEUE_DEFAULT_PORT;
 	const char *port_file=0;
 	const char *project_name=0;
+	int monitor_flag = 0;
 	char c;
 
-	while((c = getopt(argc, argv, "d:o:N:p:Z:vh"))!=-1) {
+	while((c = getopt(argc, argv, "d:o:mN:p:Z:vh"))!=-1) {
 		switch (c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -41,6 +43,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			port = atoi(optarg);
+			break;
+		case 'm':
+			monitor_flag = 1;
 			break;
 		case 'N':
 			project_name = optarg;
@@ -77,6 +82,10 @@ int main(int argc, char *argv[])
 
 	if(project_name) {
 		work_queue_specify_name(q,project_name);
+	}
+
+	if(monitor_flag) {
+		work_queue_enable_monitoring(q, NULL);
 	}
 
 	int result = work_queue_mainloop(q);
