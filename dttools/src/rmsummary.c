@@ -790,8 +790,55 @@ static int64_t override_field(int64_t d, int64_t s)
 
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src)
 {
+	if(!src) {
+		return;
+	}
+
 	rmsummary_bin_op(dest, src, override_field);
 }
+
+/* only update limit when new field value is larger than old, regardless of old
+ * limits. */
+#define merge_limit(d, s, field)\
+{\
+	int64_t df = d->field;\
+	int64_t sf = s->field;\
+	int64_t dl = -1;\
+	int64_t sl = -1;\
+	if(d->limits_exceeded) { dl = d->limits_exceeded->field; }\
+	if(s->limits_exceeded) { sl = s->limits_exceeded->field; }\
+	if(sf >= df) {\
+		if(sf > -1 && !d->limits_exceeded) { d->limits_exceeded = rmsummary_create(-1);}\
+		d->limits_exceeded->field = sl < 0 ? -1 : MAX(sl, dl);\
+	}\
+}
+
+static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
+{
+	if(!dest || !src)
+		return;
+
+	if(!dest->limits_exceeded && !src->limits_exceeded)
+		return;
+
+	merge_limit(dest, src, max_concurrent_processes);
+	merge_limit(dest, src, total_processes);
+	merge_limit(dest, src, cpu_time);
+	merge_limit(dest, src, virtual_memory);
+	merge_limit(dest, src, memory);
+	merge_limit(dest, src, swap_memory);
+	merge_limit(dest, src, bytes_read);
+	merge_limit(dest, src, bytes_written);
+	merge_limit(dest, src, bytes_sent);
+	merge_limit(dest, src, bytes_received);
+	merge_limit(dest, src, bandwidth);
+	merge_limit(dest, src, total_files);
+	merge_limit(dest, src, disk);
+	merge_limit(dest, src, cores);
+	merge_limit(dest, src, fs_nodes);
+
+}
+
 
 
 /* Select the max of the fields */
@@ -806,6 +853,14 @@ void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 		return;
 
 	rmsummary_bin_op(dest, src, max_field);
+	merge_limits(dest, src);
+
+	if(src->peak_times) {
+		if(!dest->peak_times) {
+			dest->peak_times = rmsummary_create(-1);
+		}
+		rmsummary_merge_max(dest->peak_times, src->peak_times);
+	}
 }
 
 #define max_op_w_time(dest, src, field)\
@@ -859,6 +914,14 @@ void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
 		return;
 
 	rmsummary_bin_op(dest, src, min_field);
+	merge_limits(dest, src);
+
+	if(src->peak_times) {
+		if(!dest->peak_times) {
+			dest->peak_times = rmsummary_create(-1);
+		}
+		rmsummary_merge_min(dest->peak_times, src->peak_times);
+	}
 }
 
 void rmsummary_debug_report(const struct rmsummary *s)
