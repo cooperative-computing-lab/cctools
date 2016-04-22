@@ -338,7 +338,7 @@ static int available_workers(struct work_queue *q) {
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown") != 0 && strcmp(w->hostname, "QUEUE_STATUS") != 0){
+		if(strcmp(w->hostname, "unknown") != 0) {
 			if(w->resources->unlabeled.inuse > 0)
 			{
 				if(overcommitted_resource_total(q, w->resources->workers.total, 1) > w->resources->unlabeled.inuse) {
@@ -2195,6 +2195,10 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
+	//do not count a status connection as a worker
+	q->stats->total_workers_joined--;
+	q->stats->total_workers_removed--;
+
 	if(sscanf(line, "%[^_]_status", request) != 1) {
 		return MSG_FAILURE;
 	}
@@ -2258,9 +2262,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	jx_print_link(a,l,stoptime);
 	jx_delete(a);
 
-	//do not count a status connection as a worker
-	q->stats->total_workers_joined--;
-	q->stats->total_workers_removed--;
+	remove_worker(q, target);
 
 	return MSG_PROCESSED;
 }
@@ -2328,12 +2330,8 @@ static void handle_worker(struct work_queue *q, struct link *l)
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
 		worker_failure = 1;
 	} else if(result == MSG_FAILURE){
-		if(!strcmp(w->hostname, "QUEUE_STATUS")) {
-			debug(D_WQ, "Work Queue Status worker disconnected (%s)", w->addrport);
-		} else {
-			debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
-			q->stats->total_workers_lost++;
-		}
+		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
+		q->stats->total_workers_lost++;
 		worker_failure = 1;
 	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
 
@@ -3417,11 +3415,6 @@ static void ask_for_workers_updates(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(q->keepalive_interval > 0) {
-
-			/* do no send message to work_queue_status. */
-			if(!strcmp(w->hostname, "QUEUE_STATUS")) {
-				continue;
-			}
 
 			/* we have not received workqueue message from worker yet, so we
 			 * simply check agains its start_time. */
