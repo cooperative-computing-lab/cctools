@@ -1431,16 +1431,23 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
 		t->exhausted_attempts++;
 
-		struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
-		if(j) {
-			char *str = jx_print_string(j);
-			debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
-					t->taskid,
-					w->hostname,
-					w->addrport,
-					str);
-			free(str);
-			jx_delete(j);
+		if(t->resources_measured && t->resources_measured->limits_exceeded) {
+			struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
+			if(j) {
+				char *str = jx_print_string(j);
+				debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
+						t->taskid,
+						w->hostname,
+						w->addrport,
+						str);
+				free(str);
+				jx_delete(j);
+			}
+		} else {
+				debug(D_WQ, "Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
+						t->taskid,
+						w->hostname,
+						w->addrport);
 		}
 
 		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
