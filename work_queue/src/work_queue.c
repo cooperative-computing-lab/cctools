@@ -5874,7 +5874,7 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 	}
 }
 
-int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_allocation_t mode) {
+int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
 
 	switch(mode) {
 		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
