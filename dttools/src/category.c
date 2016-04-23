@@ -74,6 +74,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
+	c->first_allocation_time = 0;
+
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
 	hash_table_insert(categories, name, c);
@@ -422,6 +424,9 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 	}
 
 	struct category *c = category_lookup_or_create(categories, category);
+
+	c->first_allocation_time = time(0);
+
 	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED)
 		return;
 

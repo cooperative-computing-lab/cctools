@@ -118,7 +118,8 @@ double wq_option_send_receive_ratio    = 0.5;
 
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
-int first_allocation_every_n_tasks = 25;
+int first_allocation_every_n_tasks   = 25;
+int first_allocation_every_n_seconds = 300;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blacklist_slow_workers_timeout = 900;
@@ -5846,7 +5847,8 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 		s->total_tasks_failed++;
 	}
 
-	if(c->total_tasks % first_allocation_every_n_tasks == 0) {
+	if(c->total_tasks % first_allocation_every_n_tasks == 0 ||
+			time(0) - c->first_allocation_time > first_allocation_every_n_seconds) {
 		category_update_first_allocation(q->categories, q->current_max_worker, t->category);
 	}
 }
