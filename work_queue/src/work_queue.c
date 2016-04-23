@@ -5682,8 +5682,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
 		if(c->max_allocation) {
 			rmsummary_merge_max(rmax, c->max_allocation);
-		} else if(c->first_allocation) {
-			rmsummary_merge_max(rmax, c->first_allocation);
 		}
 	}
 
