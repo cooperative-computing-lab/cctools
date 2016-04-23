@@ -425,14 +425,9 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED)
 		return;
 
-	const struct rmsummary *top;
-	if(c->first_allocation) {
-		top = c->first_allocation;
-	} else if(max_worker) {
-		top = max_worker;
-	} else {
-		return;
-	}
+	struct rmsummary *top = rmsummary_create(-1);
+	rmsummary_merge_override(top, max_worker);
+	rmsummary_merge_override(top, c->max_allocation);
 
 	if(!c->first_allocation) {
 		c->first_allocation = rmsummary_create(-1);
@@ -456,7 +451,6 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 
 	/* From here on we only print debugging info. */
 	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
-
 	if(jsum) {
 		char *str = jx_print_string(jsum);
 		debug(D_DEBUG, "Updating first allocation '%s':", category);
@@ -464,6 +458,17 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 		jx_delete(jsum);
 		free(str);
 	}
+
+	jsum = rmsummary_to_json(top, 1);
+	if(jsum) {
+		char *str = jx_print_string(jsum);
+		debug(D_DEBUG, "From max resources '%s':", category);
+		debug(D_DEBUG, "%s", str);
+		jx_delete(jsum);
+		free(str);
+	}
+
+	rmsummary_delete(top);
 }
 
 
