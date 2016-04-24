@@ -3,6 +3,7 @@
 #include "cctools.h"
 #include "path.h"
 #include "errno.h"
+#include "unlink_recursive.h"
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -85,9 +86,10 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_flag) {
-		work_queue_enable_monitoring(q, NULL);
-		//work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX);
+		unlink_recursive("work-queue-test-monitor");
+		work_queue_enable_monitoring(q, "work-queue-test-monitor");
 		work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+		work_queue_tune(q, "first-allocation-every-n-tasks", 1);
 	}
 
 	int result = work_queue_mainloop(q);
