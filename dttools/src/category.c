@@ -624,23 +624,12 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 			check_hard_limits(c->max_allocation, user, measured, total_processes,          over);
 		}
 
-		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_AUTO_MAX;
+		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_MAX;
 	}
 
-	/* else... not overflow... */
+	/* else... not overflow, no label change */
 
-	/* Never downgrade max allocation */
-	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-		return CATEGORY_ALLOCATION_AUTO_MAX;
-	}
-
-	/* not autolabeling. */
-	if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
-		return CATEGORY_ALLOCATION_DEFAULT;
-	}
-
-	/* labeling, and not max */
-	return CATEGORY_ALLOCATION_AUTO_FIRST;
+	return current_label;
 }
 
 const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
@@ -665,7 +654,9 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash
 	/* load max values */
 	rmsummary_merge_override(internal, max);
 
-	if(seen->tag == completed->tag && request == CATEGORY_ALLOCATION_AUTO_FIRST) {
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+			&& seen->tag == completed->tag
+			&& request == CATEGORY_ALLOCATION_FIRST) {
 		rmsummary_merge_override(internal, first);
 	}
 
@@ -693,7 +684,8 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 	struct rmsummary *seen       = c->max_resources_seen;
 	struct rmsummary *completed  = c->max_resources_completed;
 
-	if(seen->tag == completed->tag) {
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+			&& seen->tag == completed->tag) {
 		internal->cores  = completed->cores;
 		internal->memory = completed->memory;
 		internal->disk   = completed->disk;

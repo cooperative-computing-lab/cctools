@@ -44,7 +44,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->resources_requested = rmsummary_create(-1);
 	n->resources_measured  = NULL;
 
-	n->resource_request = CATEGORY_ALLOCATION_DEFAULT;
+	n->resource_request = CATEGORY_ALLOCATION_FIRST;
 
 	return n;
 }

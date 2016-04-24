@@ -3650,7 +3650,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 	t->result = WORK_QUEUE_RESULT_UNKNOWN;
 
-	t->resource_request   = CATEGORY_ALLOCATION_DEFAULT;
+	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
 
 
 	/* In the absence of additional information, a task consumes an entire worker. */
