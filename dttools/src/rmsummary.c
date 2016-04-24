@@ -508,6 +508,8 @@ struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
 					jx_insert(output, jx_string("limits_exceeded"), lim);
 				}
 				jx_insert_string(output, "exit_type", "limits");
+			} else {
+				jx_insert_string(output, "exit_type", s->exit_type);
 			}
 		}
 
@@ -710,6 +712,7 @@ struct rmsummary *rmsummary_create(signed char default_value)
 
 	s->last_error  = 0;
 	s->exit_status = 0;
+	s->signal = 0;
 
 	return s;
 }

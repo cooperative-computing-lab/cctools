@@ -904,13 +904,7 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 	/* update from any END_WAIT message received. */
 	summary->exit_status = first_process_exit_status;
 
-	if( WIFEXITED(wait_status) )
-	{
-		debug(D_RMON, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
-		summary->exit_type = xxstrdup("normal");
-		summary->exit_status = WEXITSTATUS(wait_status);
-	}
-	else if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
+	if ( WIFSIGNALED(wait_status) || WIFSTOPPED(wait_status) )
 	{
 		debug(D_RMON, "process %d terminated: %s.\n",
 		      first_process_pid,
@@ -924,6 +918,10 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 			summary->signal    = WSTOPSIG(wait_status);
 
 		summary->exit_status   = 128 + summary->signal;
+	} else {
+		debug(D_RMON, "process %d finished: %d.\n", first_process_pid, WEXITSTATUS(wait_status));
+		summary->exit_type = xxstrdup("normal");
+		summary->exit_status = WEXITSTATUS(wait_status);
 	}
 
 	if(summary->limits_exceeded)
@@ -1020,10 +1018,7 @@ int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
 
-	if(summary->limits_exceeded) {
-		summary->exit_status = 128 + SIGTERM;
-	}
-	else {
+	if(!summary->limits_exceeded) {
 		summary->exit_status = first_process_exit_status;
 	}
 
