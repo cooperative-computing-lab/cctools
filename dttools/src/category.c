@@ -490,7 +490,7 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 
 	c->max_resources_seen->tag = accumulations_seen;
 
-	if(rs) {
+	if(rs && rs->exit_type && !strcmp(rs->exit_type, "normal")) {
 		rmsummary_merge_max(c->max_resources_completed, rs);
 
 		category_inc_histogram_count(c, cores,          rs, 1);
