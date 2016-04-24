@@ -575,26 +575,6 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 		}\
 	}
 
-#define max_unknown_per_field(max, user, field, flag)\
-	if(flag) {\
-		if(user && user->field > -1) {\
-				flag = 0;\
-		}\
-		else if(max && max->field > -1) {\
-				flag = 0;\
-		}\
-	}
-
-int are_all_max_known(struct rmsummary *max_limits, struct rmsummary *user_limits) {
-	int unknown = 1;
-
-	max_unknown_per_field(max_limits, user_limits, cores,  unknown);
-	max_unknown_per_field(max_limits, user_limits, memory, unknown);
-	max_unknown_per_field(max_limits, user_limits, disk,   unknown);
-
-	return unknown;
-}
-
 /* returns the next allocation state. */
 category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
 	struct category *c = category_lookup_or_create(categories, category);

@@ -1309,8 +1309,6 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 		if(!t->resources_measured)
 		{
-			/* mark all resources with -1, to signal that no information is available. */
-			t->resources_measured = rmsummary_create(-1);
 			fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
 		}
 
@@ -3355,9 +3353,6 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
-		// Assign the allocation type for the task.
-		t->resource_request = category_next_label(q->categories, t->category, t->resource_request, /*resource overflow*/ 0, NULL, NULL);
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
