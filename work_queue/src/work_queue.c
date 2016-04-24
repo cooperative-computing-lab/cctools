@@ -1394,8 +1394,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	if(q->monitor_mode) {
 		read_measured_resources(q, t);
 
-		resource_monitor_append_report(q, t);
-
 		/* Further, if we got debug and series files, gzip them. */
 		if(q->monitor_mode == MON_FULL)
 			resource_monitor_compress_logs(q, t);
@@ -2949,6 +2947,8 @@ static void add_task_report( struct work_queue *q, struct work_queue_task *t )
 	  tr = list_pop_head(q->task_reports);
 		free(tr);
 	}
+
+	resource_monitor_append_report(q, t);
 }
 
 /*
