@@ -939,12 +939,20 @@ class WorkQueue(_object):
         return work_queue_specify_catalog_server(self._work_queue, hostname, port)
 
     ##
-    # Specify a log file that records the states of connected workers and submitted tasks.
+    # Specify a log file that records the cummulative stats of connected workers and submitted tasks.
     #
     # @param self     Reference to the current work queue object.
     # @param logfile  Filename.
     def specify_log(self, logfile):
         return work_queue_specify_log(self._work_queue, logfile)
+
+    ##
+    # Specify a log file that records the states of tasks.
+    #
+    # @param self     Reference to the current work queue object.
+    # @param logfile  Filename.
+    def specify_transactions_log(self, logfile):
+        work_queue_specify_transactions_log(self._work_queue, logfile)
 
     ##
     # Add a mandatory password that each worker must present.

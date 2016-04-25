@@ -181,6 +181,11 @@ sub specify_log {
 	return work_queue_specify_log($self->{_work_queue}, $logfile);
 }
 
+sub specify_transactions_log {
+	my ($self, $logfile) = @_;
+	return work_queue_specify_transactions_log($self->{_work_queue}, $logfile);
+}
+
 sub specify_password {
 	my ($self, $password) = @_;
 	return work_queue_specify_password($self->{_work_queue}, $password);
@@ -656,8 +661,20 @@ The port the catalog server is listening on.
 
 =head3 C<specify_log>
 
-Specify a log file that records the states of connected workers and
+Specify a log file that records cummulative stats of connected workers and
 submitted tasks.
+
+=over 12
+
+=item logfile
+
+Name of the file to write the log. If the file exists, then new records are appended.
+
+=back
+
+=head3 C<specify_transactions_log>
+
+Specify a log file that records the states of submitted tasks.
 
 =over 12
 
