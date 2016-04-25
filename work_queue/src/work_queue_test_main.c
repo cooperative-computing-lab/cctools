@@ -68,7 +68,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
 	struct work_queue *q = work_queue_create(port);
 	if(!q) fatal("couldn't listen on any port!");
 
@@ -90,7 +89,10 @@ int main(int argc, char *argv[])
 		work_queue_enable_monitoring(q, "work-queue-test-monitor");
 		work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
 		work_queue_tune(q, "first-allocation-every-n-tasks", 1);
+
+		work_queue_specify_transactions_log(q, "work-queue-test-monitor/transactions.log");
 	}
+
 
 	int result = work_queue_mainloop(q);
 
