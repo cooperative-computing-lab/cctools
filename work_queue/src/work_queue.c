@@ -3828,7 +3828,7 @@ void work_queue_task_specify_category(struct work_queue_task *t, const char *cat
 	if(t->category)
 		free(t->category);
 
-	t->category = xxstrdup(category);
+	t->category = xxstrdup(category ? category : "default");
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
