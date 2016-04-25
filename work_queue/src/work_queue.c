@@ -3485,7 +3485,7 @@ static void abort_slow_workers(struct work_queue *q)
 	itable_firstkey(q->tasks);
 	while(itable_nextkey(q->tasks, &taskid, (void **) &t)) {
 
-		c = category_lookup_or_create(q->categories, t->category);
+		c = work_queue_category_lookup_or_create(q, t->category);
 		/* Fast abort deactivated for this category */
 		if(c->fast_abort == 0)
 			continue;
@@ -4575,7 +4575,7 @@ int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
 
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
-	struct category *c = category_lookup_or_create(q->categories, category);
+	struct category *c = work_queue_category_lookup_or_create(q, category);
 
 	if(multiplier >= 1) {
 		debug(D_WQ, "Enabling fast abort multiplier for '%s': %3.3lf\n", category, multiplier);
@@ -6064,6 +6064,9 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
 
+	/* make sure category exists. */
+	work_queue_category_lookup_or_create(q, category);
+
 	switch(mode) {
 		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
 		case WORK_QUEUE_ALLOCATION_MODE_MAX:
@@ -6114,10 +6117,9 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name) {
 	struct category *c = category_lookup_or_create(q->categories, name);
 
-	c->allocation_mode = q->allocation_default_mode;
-
 	if(!c->wq_stats) {
 		c->wq_stats = calloc(1, sizeof(struct work_queue_stats));
+		category_specify_allocation_mode(q->categories, name, q->allocation_default_mode);
 	}
 
 	return c;

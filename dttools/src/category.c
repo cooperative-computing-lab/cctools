@@ -90,6 +90,8 @@ void category_specify_allocation_mode(struct hash_table *categories, const char 
 
 	int autolabel = 1;
 
+	c->allocation_mode = mode;
+
 	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
 		autolabel = 0;
 	}
@@ -110,7 +112,6 @@ void category_specify_allocation_mode(struct hash_table *categories, const char 
 	r->cores           = autolabel;
 	r->memory          = autolabel;
 	r->disk            = autolabel;
-
 }
 
 /* set autolabel per resource. */
