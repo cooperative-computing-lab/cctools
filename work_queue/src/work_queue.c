@@ -4982,13 +4982,13 @@ const char *task_result_str(work_queue_result_t result) {
 			str = "SUCCESS";
 			break;
 		case WORK_QUEUE_RESULT_INPUT_MISSING:
-			str = "INPUT_MISSING";
+			str = "INPUT_MISS";
 			break;
 		case WORK_QUEUE_RESULT_OUTPUT_MISSING:
-			str = "OUTPUT_MISSING";
+			str = "OUTPUT_MISS";
 			break;
 		case WORK_QUEUE_RESULT_STDOUT_MISSING:
-			str = "STDOUT_MISSING";
+			str = "STDOUT_MISS";
 			break;
 		case WORK_QUEUE_RESULT_SIGNAL:
 			str = "SIGNAL";
@@ -5891,7 +5891,7 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 			/* do not add any info */
 	} else if(state == WORK_QUEUE_TASK_READY) {
 		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
-		buffer_printf(&B, " %s ", allocation);
+		buffer_printf(&B, " %s %s ", t->category, allocation);
 		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
 			/* do not add any info */
@@ -5983,6 +5983,17 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 	if(q->transactions_logfile) {
 		setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
+
+		fprintf(q->transactions_logfile, "# date time master-pid MASTER START|END\n");
+		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MAX resources-max-per-task\n");
+		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
+		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name FIRST FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT resources-requested\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid WAITING category-name FIRST_RESOURCES|MAX_RESOURCES resources-requested\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RUNNING worker-address FIRST_RESOURCES|MAX_RESOURCES resources-given\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RETRIEVED|DONE task-result ...\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RETRIEVED SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid DONE SUCCESS|INPUT_MISS|OUTPUT_MISS|STDOUT_MISS|SIGNAL|END_TIME|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n\n");
 
 		write_transaction(q, "MASTER START");
 		return 1;
