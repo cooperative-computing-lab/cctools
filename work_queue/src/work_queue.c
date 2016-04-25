@@ -2813,8 +2813,8 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 /* if max defined, use minimum of max or worker avg
  * else if min is less than avg, chose avg, otherwise 'infinity' */
 #define task_worker_box_size_resource(w, min, max, avg, field)\
-	( max->field  >  -1 ? MIN(max->field, avg) :\
-	  min->field <= avg ? avg                  : w->resources->field.total + 1 )
+	( max->field  >  -1 ? max->field :\
+	  min->field <= avg ? avg        : w->resources->field.total + 1 )
 
 static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
@@ -3004,7 +3004,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	if(!w->foreman) {
 		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
-		if (!w->foreman && info && info->blacklisted) {
+		if (info && info->blacklisted) {
 			return 0;
 		}
 	}
