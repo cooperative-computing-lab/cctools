@@ -13,6 +13,8 @@
  * o binding of symlink outputs does not follow transaction semantics (also use intermediate file with rename?)
  */
 
+#include "compat-at.h"
+
 #include "catch.h"
 #include "chirp_acl.h"
 #include "chirp_client.h"
@@ -30,11 +32,13 @@
 #include "domain_name.h"
 #include "fd.h"
 #include "md5.h"
+#include "mkdir_recursive.h"
 #include "path.h"
 #include "pattern.h"
+#include "random.h"
 #include "sha1.h"
-#include "string_array.h"
 #include "sigdef.h"
+#include "string_array.h"
 #include "unlink_recursive.h"
 
 #include <unistd.h>
@@ -52,9 +56,12 @@
 #include <stdint.h>
 #include <string.h>
 
-
-extern char chirp_hostname[DOMAIN_NAME_MAX];
-extern int chirp_port;
+#ifndef O_CLOEXEC
+#	define O_CLOEXEC 0
+#endif
+#ifndef O_NOFOLLOW
+#	define O_NOFOLLOW 0
+#endif
 
 struct url_binding {
 	char path[PATH_MAX]; /* task_path */
@@ -151,38 +158,58 @@ out:
 static int sandbox_create (char sandbox[PATH_MAX], chirp_jobid_t id)
 {
 	int rc;
-	char path[PATH_MAX] = "";
+	int i;
+	int serv_path_dirfd = -1;
 
-	CATCHUNIX(snprintf(path, PATH_MAX, "/.__job.%" PRICHIRP_JOBID_T ".XXXXXX", id));
-	if (rc >= PATH_MAX)
-		CATCH(ENAMETOOLONG);
-	CATCHUNIX(chirp_fs_local_resolve(path, sandbox));
-	CATCHUNIX(mkdtemp(sandbox) ? 0 : -1);
+	{
+		char _basename[PATH_MAX];
+		CATCHUNIX(chirp_fs_local_resolve("/", &serv_path_dirfd, _basename, 0));
+	}
+
+	for (i = 0; i < 10; i++) {
+		char guid[10 + 1] = "";
+		random_hex(guid, sizeof(guid));
+		CATCHUNIX(snprintf(sandbox, PATH_MAX, ".__job.%" PRICHIRP_JOBID_T ".%s", id, guid));
+		if (rc >= PATH_MAX)
+			CATCH(ENAMETOOLONG);
+		rc = mkdirat(serv_path_dirfd, sandbox, S_IRWXU);
+		if (rc == 0)
+			break;
+	}
+
 	debug(D_DEBUG, "created new sandbox `%s'", sandbox);
 
 	rc = 0;
 	goto out;
 out:
+	close(serv_path_dirfd);
 	return rc;
 }
 
 static int sandbox_delete (const char *sandbox)
 {
 	int rc;
+	int serv_path_dirfd = -1;
+	char serv_path_basename[PATH_MAX];
 
-	CATCHUNIX(unlink_recursive(sandbox));
+	CATCHUNIX(chirp_fs_local_resolve(sandbox, &serv_path_dirfd, serv_path_basename, 0));
+	CATCHUNIX(unlinkat_recursive(serv_path_dirfd, serv_path_basename));
 
 	rc = 0;
 	goto out;
 out:
+	close(serv_path_dirfd);
 	return rc;
 }
 
 #define MAX_SIZE_HASH  (1<<24)
-static int interpolate (chirp_jobid_t id, char task_path[CHIRP_PATH_MAX], char serv_path[CHIRP_PATH_MAX])
+static int interpolate (chirp_jobid_t id, int sandboxfd, const char *task_path, char serv_path[CHIRP_PATH_MAX])
 {
 	int rc;
+	int fd = -1;
 	char *mark;
+
+	CATCHUNIX(fd = openat(sandboxfd, task_path, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
 
 	for (mark = serv_path; (mark = strchr(mark, '%')); ) {
 		switch (mark[1]) {
@@ -193,14 +220,14 @@ static int interpolate (chirp_jobid_t id, char task_path[CHIRP_PATH_MAX], char s
 				/* replace with hash of task_path */
 				unsigned char digest[SHA1_DIGEST_LENGTH];
 				if (mark[1] == 'h')
-					CATCHUNIX(sha1_file(task_path, digest) ? 0 : -1);
+					CATCHUNIX(sha1_fd(fd, digest) ? 0 : -1);
 				else if (mark[1] == 'g')
 					sqlite3_randomness(SHA1_DIGEST_LENGTH, digest);
 				else if (mark[1] == 's') {
 					struct stat64 buf;
-					CATCHUNIX(stat64(task_path, &buf));
+					CATCHUNIX(fstat64(fd, &buf));
 					if (buf.st_size <= MAX_SIZE_HASH) {
-						CATCHUNIX(sha1_file(task_path, digest) ? 0 : -1);
+						CATCHUNIX(sha1_fd(fd, digest) ? 0 : -1);
 					} else {
 						sqlite3_randomness(SHA1_DIGEST_LENGTH, digest);
 					}
@@ -245,6 +272,7 @@ static int interpolate (chirp_jobid_t id, char task_path[CHIRP_PATH_MAX], char s
 	rc = 0;
 	goto out;
 out:
+	close(fd);
 	return rc;
 }
 
@@ -259,23 +287,27 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 	int rc;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-
-	char task_path_resolved[CHIRP_PATH_MAX] = "";
+	char task_path_dir[PATH_MAX] = ""; /* directory containing task_path_resolved */
+	int sandboxfd = -1;
+	int  serv_path_dirfd = -1;
+	char serv_path_basename[CHIRP_PATH_MAX];;
 	char serv_path_interpolated[CHIRP_PATH_MAX] = "";
-	char serv_path_resolved[CHIRP_PATH_MAX] = "";
-	char task_path_dir[CHIRP_PATH_MAX] = ""; /* directory containing task_path_resolved */
 
-	CATCHUNIX(snprintf(task_path_resolved, sizeof(task_path_resolved), "%s/%s", sandbox, task_path));
-	if ((size_t)rc >= sizeof(task_path_resolved))
-		CATCH(ENAMETOOLONG);
-	path_dirname(task_path_resolved, task_path_dir);
+	{
+		char _sandbox[PATH_MAX];
+		char _basename[PATH_MAX];
+		CATCHUNIX(snprintf(_sandbox, PATH_MAX, "%s/.", sandbox));
+		CATCHUNIX(chirp_fs_local_resolve(_sandbox, &sandboxfd, _basename, 0));
+	}
+
+	path_dirname(task_path, task_path_dir);
 
 	if (strcmp(binding, "URL") == 0) {
 		if (strcmp(type, "INPUT") != 0)
 			CATCH(EINVAL);
 		if (mode == BOOTSTRAP) {
 			debug(D_DEBUG, "binding `%s' for future URL fetch `%s'", task_path, serv_path);
-			CATCHUNIX(create_dir(task_path_dir, S_IRWXU) ? 0 : -1);
+			CATCHUNIX(mkdirat_recursive(sandboxfd, task_path_dir, S_IRWXU));
 			struct url_binding *url = malloc(sizeof(struct url_binding));
 			CATCHUNIX(url ? 0 : -1);
 			memset(url, 0, sizeof(struct url_binding));
@@ -292,22 +324,29 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 
 	strncpy(serv_path_interpolated, serv_path, sizeof(serv_path_interpolated)-1);
 	if (mode == STRAPBOOT && strcmp(type, "OUTPUT") == 0)
-		CATCH(interpolate(id, task_path_resolved, serv_path_interpolated));
+		CATCH(interpolate(id, sandboxfd, task_path, serv_path_interpolated));
 	serv_path = serv_path_interpolated;
-	CATCH(chirp_fs_local_resolve(serv_path, serv_path_resolved));
+	CATCHUNIX(chirp_fs_local_resolve(serv_path, &serv_path_dirfd, serv_path_basename, 1));
 
 	if (mode == BOOTSTRAP) {
 		debug(D_DEBUG, "binding `%s' as `%s'", task_path, serv_path);
 
-		CATCHUNIX(create_dir(task_path_dir, S_IRWXU) ? 0 : -1);
+		CATCHUNIX(mkdirat_recursive(sandboxfd, task_path_dir, S_IRWXU));
 
 		if (strcmp(type, "INPUT") == 0) {
 			if (strcmp(binding, "LINK") == 0) {
-				CATCHUNIX(link(serv_path_resolved, task_path_resolved));
+				CATCHUNIX(linkat(serv_path_dirfd, serv_path_basename, sandboxfd, task_path, 0));
+				CATCHUNIX(fchmodat(sandboxfd, task_path, S_IRWXU, 0));
 			} else if (strcmp(binding, "COPY") == 0) {
-				CATCHUNIX(copy_file_to_file(serv_path_resolved, task_path_resolved));
+				int fdin = openat(serv_path_dirfd, serv_path_basename, O_RDONLY, 0);
+				CATCHUNIX(fdin);
+				int fdout = openat(sandboxfd, task_path, O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU);
+				CATCHUNIX(fdout);
+				CATCHUNIX(copy_fd_to_fd(fdin, fdout));
+				CATCHUNIX(fchmod(fdout, S_IRWXU));
+				CATCHUNIX(close(fdin));
+				CATCHUNIX(close(fdout));
 			} else assert(0);
-			CATCHUNIX(chmod(serv_path_resolved, S_IRWXU));
 		}
 	} else if (mode == STRAPBOOT) {
 		if (strcmp(type, "OUTPUT") == 0) {
@@ -315,14 +354,19 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 
 			debug(D_DEBUG, "binding output file `%s' as `%s'", task_path, serv_path);
 			if (strcmp(binding, "LINK") == 0) {
-				CATCHUNIXIGNORE(unlink(serv_path_resolved), ENOENT); /* ignore error/success */
-				CATCHUNIX(link(task_path_resolved, serv_path_resolved));
+				CATCHUNIXIGNORE(unlinkat(serv_path_dirfd, serv_path_basename, 0), ENOENT); /* ignore error/success */
+				CATCHUNIX(linkat(sandboxfd, task_path, serv_path_dirfd, serv_path_basename, 0));
 			} else if (strcmp(binding, "COPY") == 0) {
-				CATCHUNIXIGNORE(unlink(serv_path_resolved), ENOENT);
-				CATCHUNIX(copy_file_to_file(task_path_resolved, serv_path_resolved));
+				int fdin, fdout;
+				CATCHUNIX(fdin = openat(sandboxfd, task_path, O_RDONLY, 0));
+				CATCHUNIX(fdout = openat(serv_path_dirfd, serv_path_basename, O_CREAT|O_TRUNC|O_WRONLY|O_NOFOLLOW, S_IRWXU));
+				CATCHUNIX(fchmod(fdout, S_IRWXU));
+				CATCHUNIX(copy_fd_to_fd(fdin, fdout));
+				CATCHUNIX(close(fdin));
+				CATCHUNIX(close(fdout));
 			}
 
-			if (stat(serv_path_resolved, &info) == 0) {
+			if (fstatat(serv_path_dirfd, serv_path_basename, &info, AT_SYMLINK_NOFOLLOW) == 0) {
 				sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 				sqlcatch(sqlite3_bind_text(stmt, 1, serv_path, -1, SQLITE_STATIC));
 				sqlcatch(sqlite3_bind_int64(stmt, 2, info.st_size));
@@ -338,6 +382,8 @@ static int bindfile (sqlite3 *db, chirp_jobid_t id, const char *subject, const c
 	goto out;
 out:
 	sqlite3_finalize(stmt);
+	close(sandboxfd);
+	close(serv_path_dirfd);
 	return rc;
 }
 
@@ -419,59 +465,6 @@ out:
 	return rc;
 }
 
-static const char *readenv (char *const *env, const char *name)
-{
-	for (; *env; env++)
-		if (strncmp(*env, name, strlen(name)) == 0 && (*env)[strlen(name)] == '=')
-			return &(*env)[strlen(name)+1];
-	return NULL;
-}
-
-static int envinsert (char ***env, const char *name, const char *fmt, ...)
-{
-	int rc;
-	buffer_t B[1];
-	buffer_init(B);
-
-	if (!readenv(*env, name)) {
-		va_list ap;
-
-		CATCHUNIX(buffer_putfstring(B, "%s=", name));
-
-		va_start(ap, fmt);
-		rc = buffer_putvfstring(B, fmt, ap);
-		va_end(ap);
-		CATCHUNIX(rc);
-		*env = string_array_append(*env, buffer_tostring(B));
-	}
-
-	rc = 0;
-	goto out;
-out:
-	buffer_free(B);
-	return rc;
-}
-
-static int envdefaults (char ***env, chirp_jobid_t id, const char *subject, const char *sandbox)
-{
-	int rc;
-
-	CATCH(envinsert(env, "CHIRP_SUBJECT", "%s", subject));
-	CATCH(envinsert(env, "CHIRP_HOST", "%s:%d", chirp_hostname, chirp_port));
-	CATCH(envinsert(env, "HOME", "%s", sandbox));
-	CATCH(envinsert(env, "LANG", "C"));
-	CATCH(envinsert(env, "LC_ALL", "C"));
-	CATCH(envinsert(env, "PATH", "/bin:/usr/bin:/usr/local/bin"));
-	CATCH(envinsert(env, "PWD", "%s", sandbox));
-	CATCH(envinsert(env, "TMPDIR", "%s", sandbox));
-	CATCH(envinsert(env, "USER", "chirp"));
-
-	rc = 0;
-	goto out;
-out:
-	return rc;
-}
-
 static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const char *sandbox, char ***env)
 {
 	static const char SQL[] =
@@ -503,7 +496,6 @@ static int jgetenv (sqlite3 *db, chirp_jobid_t id, const char *subject, const ch
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-	CATCH(envdefaults(env, id, subject, sandbox)); /* ideally these would be set at the start and then replaced but it's awkward to replace entries in the char *[] */
 
 	rc = 0;
 	goto out;
@@ -612,20 +604,105 @@ out:
 	return rc;
 }
 
-static void run (const char *sandbox, const char *path, char *const argv[], char *const envp[], const struct url_binding *urls)
+static const char *readenv (char *const *env, const char *name)
+{
+	for (; *env; env++)
+		if (strncmp(*env, name, strlen(name)) == 0 && (*env)[strlen(name)] == '=')
+			return &(*env)[strlen(name)+1];
+	return NULL;
+}
+
+static int envdefaults (char ***env, chirp_jobid_t id, const char *subject)
+{
+	extern char chirp_hostname[DOMAIN_NAME_MAX];
+	extern int chirp_port;
+
+	int rc;
+	char cwd[PATH_MAX] = "";
+	buffer_t B[1];
+
+	buffer_init(B);
+	CATCHUNIX(getcwd(cwd, sizeof(cwd)) == NULL ? -1 : 0);
+
+	if (!readenv(*env, "CHIRP_HOST")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putfstring(B, "CHIRP_HOST=%s:%d", chirp_hostname, chirp_port));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "CHIRP_SUBJECT")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putfstring(B, "CHIRP_SUBJECT=%s", subject));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "HOME")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putfstring(B, "HOME=%s", cwd));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "LANG")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putliteral(B, "LANG=C"));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "LC_ALL")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putliteral(B, "LC_ALL=C"));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "PATH")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putliteral(B, "PATH=/bin:/usr/bin:/usr/local/bin"));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "PWD")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putfstring(B, "PWD=%s", cwd));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "TMPDIR")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putfstring(B, "TMPDIR=%s", cwd));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+	if (!readenv(*env, "USER")) {
+		buffer_rewind(B, 0);
+		CATCHUNIX(buffer_putliteral(B, "USER=chirp"));
+		*env = string_array_append(*env, buffer_tostring(B));
+	}
+
+	rc = 0;
+	goto out;
+out:
+	buffer_free(B);
+	return rc;
+}
+
+static void run (chirp_jobid_t id, const char *sandbox, const char *subject, const char *path, char *const argv[], char ***env, const struct url_binding *urls)
 {
 	int rc;
-	/* TODO don't propagate CHIRP_CLIENT_TICKETS across execve. */
+	int sandboxfd = -1;
 
 	signal(SIGUSR1, SIG_DFL);
+
+	/* create new process group */
+	CATCHUNIX(setpgid(0, 0));
+
+	/* change to sandbox directory */
+	{
+		char _sandbox[PATH_MAX];
+		char _basename[PATH_MAX];
+		CATCHUNIX(snprintf(_sandbox, PATH_MAX, "%s/.", sandbox));
+		CATCHUNIX(chirp_fs_local_resolve(_sandbox, &sandboxfd, _basename, 0));
+		CATCHUNIX(fchdir(sandboxfd));
+		CATCHUNIX(close(sandboxfd));
+		sandboxfd = -1;
+	}
 
 	/* reassign std files and close everything else */
 	CATCH(fd_nonstd_close());
 	CATCH(fd_null(STDIN_FILENO, O_RDONLY));
 	CATCH(fd_null(STDOUT_FILENO, O_WRONLY));
 	CATCH(fd_null(STDERR_FILENO, O_WRONLY));
-	CATCHUNIX(chdir(sandbox));
-	CATCHUNIX(setpgid(0, 0)); /* create new process group */
 
 	/* write debug information to `debug': can be examined by the user by adding an OUTPUT file */
 	debug_config("chirp@job");
@@ -633,6 +710,8 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	debug_flags_set("all");
 	debug_config_file(".chirp.debug");
 	cctools_version_debug(D_DEBUG, "chirp@job");
+
+	envdefaults(env, id, subject);
 
 #if defined(__linux__) && defined(SYS_ioprio_get)
 	/* Reduce the iopriority of jobs below the scheduler. */
@@ -649,7 +728,7 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	/* order matters! */
 	auth_clear();
 	auth_ticket_register();
-	auth_ticket_load(readenv(envp, CHIRP_CLIENT_TICKETS));
+	auth_ticket_load(readenv(*env, CHIRP_CLIENT_TICKETS));
 	auth_hostname_register();
 	auth_address_register();
 
@@ -662,9 +741,9 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 	}
 
 	if (strcmp(path, "@put") == 0) {
-		do_put(argv, envp);
+		do_put(argv, *env);
 	} else if (strcmp(path, "@hash") == 0) {
-		do_hash(argv, envp);
+		do_hash(argv, *env);
 	} else {
 		buffer_t B[1];
 		buffer_init(B);
@@ -677,23 +756,25 @@ static void run (const char *sandbox, const char *path, char *const argv[], char
 		}
 		debug(D_CHIRP, "execve('%s', [%s], [...])", path, buffer_tostring(B));
 		buffer_free(B);
-		CATCHUNIX(execve(path, argv, envp));
+		/* TODO don't propagate CHIRP_CLIENT_TICKETS across execve. */
+		CATCHUNIX(execve(path, argv, *env));
 	}
 
 	rc = 0;
 	goto out;
 out:
 	debug(D_FATAL, "execution failed: %s", strerror(rc));
+	close(sandboxfd);
 	raise(SIGUSR1); /* signal abnormal termination before program starts */
 	abort();
 }
 
-static int jexecute (pid_t *pid, chirp_jobid_t id, const char *sandbox, const char *path, char *const argv[], char *const envp[], const struct url_binding *urls)
+static int jexecute (pid_t *pid, chirp_jobid_t id, const char *subject, const char *sandbox, const char *path, char *const argv[], char ***env, const struct url_binding *urls)
 {
 	int rc = 0;
 	*pid = fork();
 	if (*pid == 0) { /* child */
-		run(sandbox, path, argv, envp, urls);
+		run(id, sandbox, subject, path, argv, env, urls);
 	} else if (*pid > 0) { /* parent */
 		setpgid(*pid, 0); /* handle race condition */
 		debug(D_CHIRP, "job %" PRICHIRP_JOBID_T " started as pid %d", id, (int)*pid);
@@ -738,7 +819,7 @@ static int jstart (sqlite3 *db, chirp_jobid_t id, const char *executable, const 
 	CATCH(jgetargs(db, id, &arguments));
 	CATCH(jgetenv(db, id, subject, sandbox, &environment));
 	CATCH(jbindfiles(db, id, subject, sandbox, &urls, BOOTSTRAP));
-	CATCH(jexecute(&pid, id, sandbox, executable, arguments, environment, urls));
+	CATCH(jexecute(&pid, id, subject, sandbox, executable, arguments, &environment, urls));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, (sqlite3_int64)id));

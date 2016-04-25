@@ -19,6 +19,7 @@ SOURCES = \
 	change_process_title.c \
 	chunk.c \
 	clean_dir.c \
+	compat-at.c \
 	console_login.c \
 	copy_stream.c \
 	create_dir.c \
@@ -69,6 +70,7 @@ SOURCES = \
 	md5.c \
 	memfdexe.c \
 	mergesort.c \
+	mkdir_recursive.c \
 	mt19937-64.c \
 	nvpair.c \
 	nvpair_jx.c \

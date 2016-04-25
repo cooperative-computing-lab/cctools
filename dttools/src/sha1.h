@@ -50,12 +50,14 @@ void sha1_buffer(const void *buffer, size_t length, unsigned char digest[SHA1_DI
 /** Checksum a local file.
 Note that this function produces a digest in binary form
 which  must be converted to a human readable form with @ref sha1_string.
-@param filename Path to the file to checksum.
+@param path Path to the file to checksum.
 @param digest Pointer to a buffer to store the digest.
 @return One on success, zero on failure.
 */
 
-int sha1_file(const char *filename, unsigned char digest[SHA1_DIGEST_LENGTH]);
+int sha1_file(const char *path, unsigned char digest[SHA1_DIGEST_LENGTH]);
+
+int sha1_fd(int fd, unsigned char digest[SHA1_DIGEST_LENGTH]);
 
 /** Convert an SHA1 digest into a printable string.
 @param digest A binary digest returned from @ref sha1_file.

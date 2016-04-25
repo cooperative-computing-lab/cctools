@@ -11,7 +11,7 @@ See the file COPYING for details.
 
 extern struct chirp_filesystem chirp_fs_local;
 
-int chirp_fs_local_resolve (const char *path, char resolved[CHIRP_PATH_MAX]);
+int chirp_fs_local_resolve (const char *path, int *dirfd, char basename[CHIRP_PATH_MAX], int follow);
 
 #endif
 

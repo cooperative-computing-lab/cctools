@@ -7,6 +7,8 @@
 #ifndef CATCH_H
 #define CATCH_H
 
+#include "debug.h"
+
 #include <errno.h>
 #include <string.h>
 
@@ -20,7 +22,7 @@
 	do {\
 		rc = (expr);\
 		if (rc) {\
-			debug(D_DEBUG, "%s: %s:%d[%s] error: %d `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, rc, strerror(rc));\
+			debug(D_DEBUG, "%s: %s:%d[%s] error: %d `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, (int)rc, strerror((int)rc));\
 			goto out;\
 		}\
 	} while (0)
@@ -30,7 +32,7 @@
 		rc = (expr);\
 		if (rc == -1) {\
 			rc = errno;\
-			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, rc, strerror(rc));\
+			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, (int)rc, strerror((int)rc));\
 			goto out;\
 		}\
 	} while (0)
@@ -40,12 +42,12 @@
 		rc = (expr);\
 		if (rc == -1 && errno != err) {\
 			rc = errno;\
-			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, rc, strerror(rc));\
+			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, (int)rc, strerror((int)rc));\
 			goto out;\
 		}\
 	} while (0)
 
-#define RCUNIX(rc) (rc == 0 ? 0 : (errno = rc, -1))
+#define RCUNIX(rc) (rc == 0 ? 0 : (errno = (int)rc, -1))
 
 #endif
 
