@@ -636,7 +636,7 @@ multiplier.  The value specified here applies only to tasks in the given categor
 */
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
 
-/** Turn on or off first-allocation labeling for a given category. By default, all resources are labeled, but wall, and cpu time. Turn on/off specific resources with @ref work_queue_specify_category_autolabel_resource.
+/** Turn on or off first-allocation labeling for a given category. By default, only cores, memory, and disk are labeled. Turn on/off other specific resources use @ref work_queue_specify_category_autolabel_resource.
 @param q A work queue object.
 @param category A category name.
 @param mode     One of @ref category_mode_t.

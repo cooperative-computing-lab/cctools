@@ -50,7 +50,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->total_tasks = 0;
 
 	c->first_allocation    = NULL;
-	c->max_allocation      = NULL;
+	c->max_allocation      = rmsummary_create(-1);
 	c->autolabel_resource  = rmsummary_create(0);
 
 	c->max_resources_completed = rmsummary_create(-1);
@@ -83,7 +83,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	return c;
 }
 
-/* set autoallocation mode for all resources, but wall and cpu times. */
+/* set autoallocation mode for cores, memory, and disk.  To add other resources see category_enable_auto_resource. */
 void category_specify_allocation_mode(struct hash_table *categories, const char *name, int mode) {
 	struct category *c = category_lookup_or_create(categories, name);
 	struct rmsummary *r = c->autolabel_resource;
@@ -96,20 +96,21 @@ void category_specify_allocation_mode(struct hash_table *categories, const char 
 
 	r->wall_time      = 0;
 	r->cpu_time       = 0;
+	r->swap_memory     = 0;
+	r->virtual_memory  = 0;
+	r->bytes_read      = 0;
+	r->bytes_written   = 0;
+	r->bytes_received  = 0;
+	r->bytes_sent      = 0;
+	r->bandwidth       = 0;
+	r->total_files     = 0;
+	r->total_processes = 0;
+	r->max_concurrent_processes = 0;
 
 	r->cores           = autolabel;
 	r->memory          = autolabel;
-	r->swap_memory     = autolabel;
-	r->virtual_memory  = autolabel;
-	r->bytes_read      = autolabel;
-	r->bytes_written   = autolabel;
-	r->bytes_received  = autolabel;
-	r->bytes_sent      = autolabel;
-	r->bandwidth       = autolabel;
-	r->total_files     = autolabel;
 	r->disk            = autolabel;
-	r->total_processes = autolabel;
-	r->max_concurrent_processes = autolabel;
+
 }
 
 /* set autolabel per resource. */
@@ -309,6 +310,15 @@ int64_t category_first_allocation_min_waste(struct itable *histogram, int assume
 		int64_t a  = keys[i];
 		double  Ea;
 
+		if(a < 1) {
+			continue;
+		}
+
+		if(a > top_resource) {
+			a_1 = top_resource;
+			break;
+		}
+
 		double Pa = 1 - ((double) counts_accum[i])/counts_accum[n-1];
 
 		if(assume_independence) {
@@ -369,6 +379,11 @@ int64_t category_first_allocation_max_throughput(struct itable *histogram, int64
 			continue;
 		}
 
+		if(a > top_resource) {
+			a_1 = top_resource;
+			break;
+		}
+
 		double Pbef = ((double) counts_accum[i])/counts_accum[n-1];
 		double Paft = 1 - Pbef;
 
@@ -396,24 +411,37 @@ int64_t category_first_allocation_max_throughput(struct itable *histogram, int64
 	return a_1;
 }
 
-int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_mode_t mode,  int64_t top_resource) {
+int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_mode_t mode,  int64_t max_declared, int64_t max_seen, int64_t top_resource) {
+
+	int64_t alloc;
+
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
-			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
+			alloc = category_first_allocation_min_waste(histogram, assume_independence, top_resource);
 			break;
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
-			return category_first_allocation_max_throughput(histogram, top_resource);
+			alloc = category_first_allocation_max_throughput(histogram, top_resource);
 			break;
 		case CATEGORY_ALLOCATION_MODE_FIXED:
 		case CATEGORY_ALLOCATION_MODE_MAX:
 		default:
-			return top_resource;
+			alloc = top_resource;
 			break;
 	}
+
+	if(max_declared > -1) {
+		alloc = MIN_POS(alloc, max_declared);
+	} else {
+		alloc = MIN_POS(alloc, max_seen);
+	}
+
+	return alloc;
 }
 
 #define update_first_allocation_field(c, top, independence, field)\
-	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field)
+	if(c->autolabel_resource->field) {\
+		(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, c->max_allocation->field, c->max_resources_seen->field, top->field);\
+	}
 
 void category_update_first_allocation(struct hash_table *categories, const struct rmsummary *max_worker, const char *category) {
 	/* buffer used only for debug output. */
@@ -640,7 +668,7 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash
 		rmsummary_merge_override(internal, first);
 	}
 
-	/* chip user values */
+	/* chip in user values */
 	rmsummary_merge_override(internal, user);
 
 	return internal;
@@ -666,9 +694,9 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
 			&& seen->tag == completed->tag) {
-		internal->cores  = completed->cores;
-		internal->memory = completed->memory;
-		internal->disk   = completed->disk;
+		internal->cores  = seen->cores;
+		internal->memory = seen->memory;
+		internal->disk   = seen->disk;
 	}
 
 	const struct rmsummary *max = category_dynamic_task_max_declared_resources(categories, category, user, request);
@@ -693,7 +721,13 @@ const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *c
 	internal = rmsummary_create(-1);
 
 	/* load seen values */
-	rmsummary_merge_override(internal, c->max_resources_seen);
+	struct rmsummary *seen = c->max_resources_seen;
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
+		internal->cores  = seen->cores;
+		internal->memory = seen->memory;
+		internal->disk   = seen->disk;
+	}
+
 	rmsummary_merge_override(internal, max);
 
 	return internal;

@@ -386,8 +386,8 @@ Get the tasks statistics from the particular category.
 
 =head3 C<specify_category_mode>
 
-Turn on or off first-allocation labeling for a given category. By default, all
-resources are labeled, but wall, and cpu time. Turn on/off specific resources
+Turn on or off first-allocation labeling for a given category. By default, only
+cores, memory, and disk resources are labeled. Turn on/off specific resources
 with C<specify_category_autolabel_resource>.  NOTE: autolabeling is only
 meaningfull when task monitoring is enabled (C<enable_monitoring>). When
 monitoring is enabled and a task exhausts resources in a worker, mode dictates

@@ -768,7 +768,7 @@ class WorkQueue(_object):
 
     ##
     # Turn on or off first-allocation labeling for a given category. By
-    # default, all resources are labeled, but wall, and cpu time. Turn on/off
+    # default, only cores, memory, and disk are labeled. Turn on/off other
     # specific resources with @ref specify_category_autolabel_resource.
     # NOTE: autolabeling is only meaningfull when task monitoring is enabled
     # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
@@ -965,10 +965,8 @@ class WorkQueue(_object):
         return work_queue_specify_password_file(self._work_queue, file)
 
     ##
-    # Enables resource autolabeling for tasks without an explicit category ("default" category).
-    # rm specifies the maximum resources a task in the default category may use.
-    # If rm is None, disable autolabeling for the default category.
     #
+    # Specifies the maximum resources allowed for the default category.
     # @param self      Reference to the current work queue object.
     # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
     # For example:
@@ -987,9 +985,7 @@ class WorkQueue(_object):
         return work_queue_specify_max_resources(self._work_queue, rm)
 
     ##
-    # Enables resource autolabeling for tasks in the given category.
-    # rm specifies the maximum resources a task in the category may use.
-    # If rm is None, disable autolabeling for that category.
+    # Specifies the maximum resources allowed for the default category.
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.

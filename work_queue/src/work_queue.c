@@ -4869,14 +4869,11 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	int by_priority = 1;
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		struct category *c = category_lookup_or_create(q->categories, t->category);
-		if(c->max_allocation) {
-			/* when a task is resubmitted given resource exhaustion, we
-			 * push it at the head of the list, so it gets to run as soon
-			 * as possible. This avoids the issue in which all 'big' tasks
-			 * fail because the first allocation is too small. */
-			by_priority = 0;
-		}
+		/* when a task is resubmitted given resource exhaustion, we
+		 * push it at the head of the list, so it gets to run as soon
+		 * as possible. This avoids the issue in which all 'big' tasks
+		 * fail because the first allocation is too small. */
+		by_priority = 0;
 	}
 
 	if(by_priority) {
@@ -5676,9 +5673,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	struct category *c;
 	hash_table_firstkey(q->categories);
 	while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-		if(c->max_allocation) {
-			rmsummary_merge_max(rmax, c->max_allocation);
-		}
+		rmsummary_merge_max(rmax, c->max_allocation);
 	}
 
 	s->workers_able = count_workers_for_waiting_tasks(q, rmax);
@@ -5859,19 +5854,11 @@ void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsumm
 void work_queue_specify_max_category_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
 
-	if(c->max_allocation) {
-		rmsummary_delete(c->max_allocation);
-	}
+	rmsummary_delete(c->max_allocation);
+	c->max_allocation = rmsummary_create(-1);
 
 	if(rm) {
-		c->max_allocation = rmsummary_create(-1);
 		rmsummary_merge_max(c->max_allocation, rm);
-
-		if(q->monitor_mode == MON_DISABLED) {
-			work_queue_enable_monitoring(q, NULL);
-		}
-	} else {
-		c->max_allocation = NULL;
 	}
 }
 
