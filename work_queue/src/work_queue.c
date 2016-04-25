@@ -6033,7 +6033,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 		s->total_tasks_failed++;
 	}
 
-	if(c->total_tasks % first_allocation_every_n_tasks == 0 ||
+	if((c->total_tasks + s->total_tasks_failed) % first_allocation_every_n_tasks == 0 ||
 			time(0) - c->first_allocation_time > first_allocation_every_n_seconds) {
 		category_update_first_allocation(q->categories, q->current_max_worker, t->category);
 
