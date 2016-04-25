@@ -465,7 +465,7 @@ struct jx *peak_times_to_json(struct rmsummary *s) {
 		}\
 	}
 
-struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources) {
+struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	if(!units_initialized)
 		initialize_units();
 
@@ -694,6 +694,20 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, int pprint, struct jx *v
 	}
 
 	jx_delete(jsum);
+}
+
+void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int only_resources) {
+	if(!s)
+		return;
+
+	struct jx *jsum = rmsummary_to_json(s, only_resources);
+
+	if(jsum) {
+		char *str = jx_print_string(jsum);
+		buffer_printf(B, "%s", str);
+		jx_delete(jsum);
+		free(str);
+	}
 }
 
 /* Create summary filling all numeric fields with default_value, and
