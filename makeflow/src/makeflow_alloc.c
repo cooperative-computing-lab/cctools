@@ -47,7 +47,7 @@ void makeflow_alloc_unit_delete( struct makeflow_alloc_unit *u)
 
 struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc *parent, uint64_t size, int locked, makeflow_alloc_type type)
 {
-	struct makeflow_alloc *a = malloc(sizeof(*a));
+	struct makeflow_alloc *a = malloc(sizeof(struct makeflow_alloc));
 	a->nodeid = nodeid;
 	a->storage  = makeflow_alloc_unit_create(size);
 	a->parent = parent;

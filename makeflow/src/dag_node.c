@@ -108,6 +108,53 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	return n;
 }
 
+void dag_node_delete(struct dag_node *n)
+{
+	hash_table_delete(n->variables);
+
+	itable_delete(n->remote_names);
+	hash_table_delete(n->remote_names_inv);
+
+	set_delete(n->descendants);
+	set_delete(n->ancestors);
+
+	set_delete(n->direct_children);
+	set_delete(n->accounted);
+
+	list_delete(n->source_files);
+	list_delete(n->target_files);
+
+	set_delete(n->terminal_files);
+	set_delete(n->coexist_files);
+
+	list_delete(n->residual_nodes);
+	set_delete(n->residual_files);
+
+	set_delete(n->run_files);
+
+	set_delete(n->delete_files);
+	list_delete(n->delete_run_order);
+
+	set_delete(n->prog_min_files);
+
+	set_delete(n->prog_max_files);
+	list_delete(n->prog_run_order);
+
+	set_delete(n->footprint_min_files);
+
+	set_delete(n->footprint_max_files);
+
+	set_delete(n->res_files);
+	set_delete(n->wgt_files);
+	set_delete(n->max_wgt_files);
+
+	rmsummary_delete(n->resources_requested);
+	if(n->resources_measured)
+		rmsummary_delete(n->resources_measured);
+
+	free(n);
+}
+
 int dag_node_comp(void *item, const void *arg)
 {
 	struct dag_node *node1 = (struct dag_node *)item;
@@ -185,24 +232,6 @@ int dag_node_comp_diff(const void *item, const void *arg)
 		return 1;
 
 	return 0;
-}
-
-const char *dag_node_state_name(dag_node_state_t state)
-{
-	switch (state) {
-	case DAG_NODE_STATE_WAITING:
-		return "waiting";
-	case DAG_NODE_STATE_RUNNING:
-		return "running";
-	case DAG_NODE_STATE_COMPLETE:
-		return "complete";
-	case DAG_NODE_STATE_FAILED:
-		return "failed";
-	case DAG_NODE_STATE_ABORTED:
-		return "aborted";
-	default:
-		return "unknown";
-	}
 }
 
 /* Returns the remotename used in rule n for local name filename */
@@ -632,7 +661,6 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 	} else {
 		if(set_size(n->direct_children) == 1){
 			node1 = set_next_element(n->direct_children);
-			list_push_tail(n->run_order, node1);
 			list_delete(n->residual_nodes);
 			n->residual_nodes = list_duplicate(node1->residual_nodes);
 		}
@@ -1070,6 +1098,24 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n) {
 	return category_dynamic_task_max_resources(n->category, NULL, n->resource_request);
+}
+
+const char *dag_node_state_name(dag_node_state_t state)
+{
+	switch (state) {
+	case DAG_NODE_STATE_WAITING:
+		return "waiting";
+	case DAG_NODE_STATE_RUNNING:
+		return "running";
+	case DAG_NODE_STATE_COMPLETE:
+		return "complete";
+	case DAG_NODE_STATE_FAILED:
+		return "failed";
+	case DAG_NODE_STATE_ABORTED:
+		return "aborted";
+	default:
+		return "unknown";
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

@@ -90,6 +90,7 @@ struct list *makeflow_wrapper_generate_files( struct list *result, struct list *
 			file = dag_file_lookup_or_create(n->d, filename);
 		}
 		free(f);
+		free(filename);
 		list_push_tail(files, file);
 	}
 	free(nodeid);

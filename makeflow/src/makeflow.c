@@ -433,6 +433,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 	}
 	uint64_t end = timestamp_get();
 	static_analysis += end - start;
+	dag_node_delete(n);
 }
 
 /*

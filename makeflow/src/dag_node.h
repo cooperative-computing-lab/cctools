@@ -150,6 +150,7 @@ struct dag_node {
 };
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);
+void dag_node_delete(struct dag_node *n);
 struct dag_node_size *dag_node_size_create(struct dag_node *n, uint64_t size);
 
 int dag_node_comp(void *item, const void *arg);
