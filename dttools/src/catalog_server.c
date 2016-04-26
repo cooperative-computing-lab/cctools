@@ -191,7 +191,7 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 {
 	struct jx *j = jx_object(0);
 	jx_insert_string(j,"type","catalog");
-	jx_insert_string(j,"version",CCTOOLS_VERSION);
+	jx_insert(j, jx_string("version"), jx_format("%d.%d.%d", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO));
 	jx_insert_string(j,"owner",owner);
 	jx_insert_integer(j,"starttime",starttime);
 	jx_insert_integer(j,"port",port);
