@@ -245,6 +245,7 @@ do
 		--debug)
 			optdebug=1
 			optstrict=1
+			optsanitize=1
 			;;
 		--prefix)
 			install_path=$(abspath "${arg}")
