@@ -2825,6 +2825,8 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 	struct rmsummary *limits = rmsummary_create(-1);
 
+	rmsummary_merge_override(limits, max);
+
 	limits->cores = task_worker_box_size_resource(w, min, max, w->resources->cores.total / w->resources->workers.total, cores);
 
 	limits->memory = task_worker_box_size_resource(w, min, max, w->resources->memory.total / w->resources->workers.total, memory);
