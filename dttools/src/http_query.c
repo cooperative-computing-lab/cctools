@@ -118,14 +118,14 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 			fields = sscanf(url, "http://%[^/]", actual_host);
 			if(fields == 1) {
 				actual_port = HTTP_PORT;
-				goto abspath;
+				goto prune_url;
 			} else {
 				debug(D_HTTP, "malformed url: %s", url);
 				return 0;
 			}
 		}
 
-abspath:
+prune_url:
 		{
 			/* When there is no proxy to be used, the Request-URI field should be abs_path. */
 			size_t delta = strlen("http://") + strlen(actual_host);
