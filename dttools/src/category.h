@@ -107,6 +107,9 @@ void category_specify_allocation_mode(struct category *c, int mode);
 /* enable/disable autoallocation for the resource */
 int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel);
 
+void category_specify_max_allocation(struct category *c, const struct rmsummary *s);
+void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s);
+
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);

@@ -240,7 +240,7 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 	} else if(strcmp(what, "category-limits") == 0) {
 		struct rmsummary *s = rmsummary_parse_string(value);
 		if(s) {
-			work_queue_specify_max_category_resources(q->data, s->category, s);
+			work_queue_specify_category_max_resources(q->data, s->category, s);
 			rmsummary_delete(s);
 		} else {
 			debug(D_NOTICE, "Could no parse '%s' as a summary of resorces encoded in JSON\n", value);

@@ -88,6 +88,27 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	return c;
 }
 
+void category_specify_max_allocation(struct category *c, const struct rmsummary *s) {
+	rmsummary_delete(c->max_allocation);
+	c->max_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->max_allocation, s);
+}
+
+void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
+
+	/* assume the user knows what they are doing by providing a guess. */
+	c->countdown_after_missing = 0;
+	c->first_allocation_time = time(0);
+
+	if(c->first_allocation)
+		rmsummary_delete(c->first_allocation);
+
+	c->first_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->first_allocation, s);
+}
+
 /* set autoallocation mode for cores, memory, and disk.  To add other resources see category_enable_auto_resource. */
 void category_specify_allocation_mode(struct category *c, int mode) {
 	struct rmsummary *r = c->autolabel_resource;
@@ -740,7 +761,6 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 
 	return internal;
 }
-
 
 void category_tune(const char *resource, uint64_t size) {
 	if(strcmp(resource, "memory") == 0) {

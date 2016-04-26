@@ -993,7 +993,28 @@ class WorkQueue(_object):
         return work_queue_specify_max_resources(self._work_queue, rm)
 
     ##
-    # Specifies the maximum resources allowed for the default category.
+    # Specifies the maximum resources allowed for the given category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores may be used by a task in the category:
+    # >>> q.specify_category_max_resources("my_category", {'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
+    # >>> q.specify_category_max_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_category_max_resources(self, category, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_category_max_resources(self._work_queue, category, rm)
+
+    ##
+    # Specifies the first-allocation guess for the given category
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
@@ -1006,12 +1027,12 @@ class WorkQueue(_object):
     # >>> q.specify_max_category_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def specify_max_category_resources(self, category, rmd):
+    def specify_category_first_allocation_guess(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return work_queue_specify_max_category_resources(self._work_queue, category, rm)
+        return work_queue_specify_category_first_allocation_guess(self._work_queue, category, rm)
 
     ##
     # Initialize first value of categories

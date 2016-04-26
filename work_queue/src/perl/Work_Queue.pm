@@ -257,9 +257,14 @@ sub specify_max_resources {
 	return work_queue_specify_max_resources($self->{_work_queue}, $rm);
 }
 
-sub specify_max_category_resources {
+sub specify_category_max_resources {
 	my ($self, $category, $rm) = @_;
-	return work_queue_specify_max_category_resources($self->{_work_queue}, $category, $rm);
+	return work_queue_specify_category_max_resources($self->{_work_queue}, $category, $rm);
+}
+
+sub specify_category_first_allocation_guess {
+	my ($self, $category, $rm) = @_;
+	return work_queue_specify_category_first_allocation_guess($self->{_work_queue}, $category, $rm);
 }
 
 sub initialize_categories {
@@ -851,9 +856,9 @@ Set the minimum number of seconds to wait for a keepalive response from worker b
 
 =head3 C<specify_max_resources>
 
-Enables resource autolabeling for tasks without an explicit category ("default"
+Specifies the max resources for tasks without an explicit category ("default"
 category).  rm specifies the maximum resources a task in the default category
-may use.  If rm is C<undefined>, disable autolabeling for the default category.
+may use.
 
 =over 12
 
@@ -872,11 +877,9 @@ A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 		q->specify_max_resources({'cores' => 8, 'memory' => 1024, 'disk' => 10240});
 
 
-=head3 C<specify_max_category_resources>
+=head3 C<specify_category_max_resources>
 
-Enables resource autolabeling for tasks in the given category.
-rm specifies the maximum resources a task in the category may use.
-If rm is C<undefined>, disable autolabeling for that category.
+Specifies the max resources for tasks in the given category.
 
 =over 12
 
@@ -890,11 +893,24 @@ Hash reference indicating maximum values. See @resources_measured for possible f
 
 A maximum of 4 cores is found on any worker:
 
-		q->specify_max_category_resources('my_category', {'cores' => 4});
+		q->specify_category_max_resources('my_category', {'cores' => 4});
 
 A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 
-		q->specify_max_category_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+		q->specify_category_max_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+
+
+=head3 C<specify_category_first_allocation_guess
+
+Specifies the first-allocation guess for the given category
+
+=over 12
+
+=item category
+
+Name of the category
+
+=item rm
 
 
 =head3 C<initialize_categories>

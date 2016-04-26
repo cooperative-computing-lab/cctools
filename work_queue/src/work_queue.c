@@ -6052,18 +6052,17 @@ void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *ma
 }
 
 void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm) {
-	work_queue_specify_max_category_resources(q,  "default", rm);
+	work_queue_specify_category_max_resources(q,  "default", rm);
 }
 
-void work_queue_specify_max_category_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+void work_queue_specify_category_max_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
+	category_specify_max_allocation(c, rm);
+}
 
-	rmsummary_delete(c->max_allocation);
-	c->max_allocation = rmsummary_create(-1);
-
-	if(rm) {
-		rmsummary_merge_max(c->max_allocation, rm);
-	}
+void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+	category_specify_first_allocation_guess(c, rm);
 }
 
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
