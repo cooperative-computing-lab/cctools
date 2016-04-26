@@ -118,10 +118,22 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 			fields = sscanf(url, "http://%[^/]", actual_host);
 			if(fields == 1) {
 				actual_port = HTTP_PORT;
+				goto abspath;
 			} else {
 				debug(D_HTTP, "malformed url: %s", url);
 				return 0;
 			}
+		}
+
+abspath:
+		{
+			/* When there is no proxy to be used, the Request-URI field should be abs_path. */
+			size_t delta = strlen("http://") + strlen(actual_host);
+			if(fields == 2) {
+				size_t s_port = snprintf(NULL, 0, "%d", actual_port);
+				delta = delta + 1 + s_port; /* 1 is for the colon between host and port. */
+			}
+			memmove(url, url + delta, strlen(url) - delta + 1); /* 1: copy the terminating null character */
 		}
 	}
 
