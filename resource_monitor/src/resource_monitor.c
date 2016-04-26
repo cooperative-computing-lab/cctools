@@ -1370,6 +1370,7 @@ int rmonitor_check_limits(struct rmsummary *tr)
 
 	over_limit_check(tr, start);
 	over_limit_check(tr, end);
+	over_limit_check(tr, cores);
 	over_limit_check(tr, wall_time);
 	over_limit_check(tr, cpu_time);
 	over_limit_check(tr, max_concurrent_processes);
