@@ -267,9 +267,7 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 /* Return resources according to request. */
 
 const struct rmsummary *dag_node_dynamic_label(struct dag_node *n) {
-	struct category *c = n->category;
-
-	return category_dynamic_task_max_resources(n->d->categories, c->name, NULL, n->resource_request);
+	return category_dynamic_task_max_resources(n->category, NULL, n->resource_request);
 }
 
 /* vim: set noexpandtab tabstop=4: */

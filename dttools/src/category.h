@@ -95,22 +95,23 @@ struct category {
 };
 
 /* set autoallocation mode cores, memory, and disk. For other resources see category_enable_auto_resource. */
-void category_specify_allocation_mode(struct hash_table *categories, const char *name, int mode);
+void category_specify_allocation_mode(struct category *c, int mode);
 /* enable/disable autoallocation for the resource */
-int category_enable_auto_resource(struct hash_table *categories, const char *category_name, const char *resource_name, int autolabel);
+int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel);
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
-void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
-void category_update_first_allocation(struct hash_table *categories, const struct rmsummary *max_worker, const char *category);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
-category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
+void category_accumulate_summary(struct category *c, struct rmsummary *rs);
+void category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
-const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request);
+category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
-const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request);
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
 
-const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request);
+const struct rmsummary *category_dynamic_task_max_declared_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
+
+const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
 
 #endif

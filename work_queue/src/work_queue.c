@@ -1451,7 +1451,8 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 						w->addrport);
 		}
 
-		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
+		struct category *c = work_queue_category_lookup_or_create(q, t->category);
+		category_allocation_t next = category_next_label(c, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
 		if(next != CATEGORY_ALLOCATION_ERROR) {
 			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
@@ -5942,12 +5943,12 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	buffer_init(&B);
 
 	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(q->categories, c->name , NULL, CATEGORY_ALLOCATION_MAX), 1);
+	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
 	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
-	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(q->categories, c->name , NULL, CATEGORY_ALLOCATION_MAX), 1);
+	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -5970,7 +5971,7 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	}
 
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
-	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(q->categories, c->name , NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
 	write_transaction(q, buffer_tostring(&B));
 	buffer_rewind(&B, 0);
 
@@ -6006,7 +6007,7 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 }
 
 void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
-	const char *name              = t->category ? t->category : "default";
+	const char *name   = t->category ? t->category : "default";
 	struct category *c = work_queue_category_lookup_or_create(q, name);
 
 	struct work_queue_stats *s = c->wq_stats;
@@ -6020,7 +6021,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
-	category_accumulate_summary(q->categories, t->category, t->resources_measured);
+	category_accumulate_summary(c, t->resources_measured);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
@@ -6035,7 +6036,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	if((c->total_tasks + s->total_tasks_failed) % first_allocation_every_n_tasks == 0 ||
 			time(0) - c->first_allocation_time > first_allocation_every_n_seconds) {
-		category_update_first_allocation(q->categories, q->current_max_worker, t->category);
+		category_update_first_allocation(c, q->current_max_worker);
 
 		write_transaction_category(q, c);
 	}
@@ -6058,14 +6059,9 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 	if(rm) {
 		rmsummary_merge_max(c->max_allocation, rm);
 	}
-
-	write_transaction_category(q, c);
 }
 
 int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
-
-	/* make sure category exists. */
-	work_queue_category_lookup_or_create(q, category);
 
 	switch(mode) {
 		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
@@ -6083,35 +6079,40 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 		q->allocation_default_mode = mode;
 	}
 	else {
-		category_specify_allocation_mode(q->categories, category, mode);
+		struct category *c = work_queue_category_lookup_or_create(q, category);
+		category_specify_allocation_mode(c, mode);
+		write_transaction_category(q, c);
 	}
 
 	return 1;
 }
 
 int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel) {
-	return category_enable_auto_resource(q->categories, category, resource, autolabel);
+
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+
+	return category_enable_auto_resource(c, resource, autolabel);
 }
 
 const struct rmsummary *task_max_declared_resources(struct work_queue *q, struct work_queue_task *t) {
-	/* make sure category exists */
-	work_queue_category_lookup_or_create(q, t->category);
 
-	return category_dynamic_task_max_declared_resources(q->categories, t->category, t->resources_requested, t->resource_request);
+	struct category *c = work_queue_category_lookup_or_create(q, t->category);
+
+	return category_dynamic_task_max_declared_resources(c, t->resources_requested, t->resource_request);
 }
 
 const struct rmsummary *task_max_resources(struct work_queue *q, struct work_queue_task *t) {
-	/* make sure category exists */
-	work_queue_category_lookup_or_create(q, t->category);
 
-	return category_dynamic_task_max_resources(q->categories, t->category, t->resources_requested, t->resource_request);
+	struct category *c = work_queue_category_lookup_or_create(q, t->category);
+
+	return category_dynamic_task_max_resources(c, t->resources_requested, t->resource_request);
 }
 
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {
-	/* make sure category exists */
-	work_queue_category_lookup_or_create(q, t->category);
 
-	return category_dynamic_task_min_resources(q->categories, t->category, t->resources_requested, t->resource_request);
+	struct category *c = work_queue_category_lookup_or_create(q, t->category);
+
+	return category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
 }
 
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name) {
@@ -6119,7 +6120,7 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 
 	if(!c->wq_stats) {
 		c->wq_stats = calloc(1, sizeof(struct work_queue_stats));
-		category_specify_allocation_mode(q->categories, name, q->allocation_default_mode);
+		category_specify_allocation_mode(c, q->allocation_default_mode);
 	}
 
 	return c;

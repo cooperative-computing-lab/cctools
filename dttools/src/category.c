@@ -84,8 +84,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 }
 
 /* set autoallocation mode for cores, memory, and disk.  To add other resources see category_enable_auto_resource. */
-void category_specify_allocation_mode(struct hash_table *categories, const char *name, int mode) {
-	struct category *c = category_lookup_or_create(categories, name);
+void category_specify_allocation_mode(struct category *c, int mode) {
 	struct rmsummary *r = c->autolabel_resource;
 
 	int autolabel = 1;
@@ -115,11 +114,8 @@ void category_specify_allocation_mode(struct hash_table *categories, const char 
 }
 
 /* set autolabel per resource. */
-int category_enable_auto_resource(struct hash_table *categories, const char *category_name, const char *resource_name, int autolabel) {
-
-	struct category *c = category_lookup_or_create(categories, category_name);
+int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel) {
 	return rmsummary_assign_int_field(c->autolabel_resource, resource_name, autolabel);
-
 }
 
 static void category_clear_histogram(struct itable *h) {
@@ -444,15 +440,13 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 		(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, c->max_allocation->field, c->max_resources_seen->field, top->field);\
 	}
 
-void category_update_first_allocation(struct hash_table *categories, const struct rmsummary *max_worker, const char *category) {
+void category_update_first_allocation(struct category *c, const struct rmsummary *max_worker) {
 	/* buffer used only for debug output. */
 	static buffer_t *b = NULL;
 	if(!b) {
 		b = malloc(sizeof(buffer_t));
 		buffer_init(b);
 	}
-
-	struct category *c = category_lookup_or_create(categories, category);
 
 	c->first_allocation_time = time(0);
 
@@ -487,7 +481,7 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
 	if(jsum) {
 		char *str = jx_print_string(jsum);
-		debug(D_DEBUG, "Updating first allocation '%s':", category);
+		debug(D_DEBUG, "Updating first allocation '%s':", c->name);
 		debug(D_DEBUG, "%s", str);
 		jx_delete(jsum);
 		free(str);
@@ -496,7 +490,7 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 	jsum = rmsummary_to_json(top, 1);
 	if(jsum) {
 		char *str = jx_print_string(jsum);
-		debug(D_DEBUG, "From max resources '%s':", category);
+		debug(D_DEBUG, "From max resources '%s':", c->name);
 		debug(D_DEBUG, "%s", str);
 		jx_delete(jsum);
 		free(str);
@@ -506,13 +500,8 @@ void category_update_first_allocation(struct hash_table *categories, const struc
 }
 
 
-void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs) {
+void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 	static int64_t accumulations_seen = 0;
-
-
-	const char *name = category ? category : "default";
-
-	struct category *c = category_lookup_or_create(categories, name);
 
 	rmsummary_merge_max(c->max_resources_seen, rs);
 	accumulations_seen++;
@@ -562,7 +551,6 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 		fatal("Could not read '%s' file: %s\n", strerror(errno));
 	}
 
-
 	char *name;
 	struct category *c;
 	hash_table_firstkey(categories);
@@ -578,14 +566,15 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	list_first_item(summaries);
 	while((s = list_pop_head(summaries))) {
 		if(s->category) {
-			category_accumulate_summary(categories, s->category, s);
+			c = category_lookup_or_create(categories, s->category);
+			category_accumulate_summary(c, s);
 		}
 		rmsummary_delete(s);
 	}
 
 	hash_table_firstkey(categories);
 	while(hash_table_nextkey(categories, &name, (void **) &c)) {
-		category_update_first_allocation(categories, NULL, name);
+		category_update_first_allocation(c, NULL);
 		category_clear_histograms(c);
 	}
 }
@@ -605,9 +594,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	}
 
 /* returns the next allocation state. */
-category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
-	struct category *c = category_lookup_or_create(categories, category);
-
+category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
 	if(resource_overflow) {
 		/* not autolabeling, so we return error. */
 		if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
@@ -641,7 +628,7 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 	return current_label;
 }
 
-const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_dynamic_task_max_declared_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
 	/* we keep an internal label so that the caller does not have to worry
 	 * about memory leaks. */
 	static struct rmsummary *internal = NULL;
@@ -651,8 +638,6 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash
 	}
 
 	internal = rmsummary_create(-1);
-
-	struct category *c = category_lookup_or_create(categories, category);
 
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
@@ -676,7 +661,7 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct hash
 
 }
 
-const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
 
 	/* we keep an internal label so that the caller does not have to worry
 	 * about memory leaks. */
@@ -688,8 +673,6 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 
 	internal = rmsummary_create(-1);
 
-	struct category *c = category_lookup_or_create(categories, category);
-
 	struct rmsummary *seen       = c->max_resources_seen;
 	struct rmsummary *completed  = c->max_resources_completed;
 
@@ -700,7 +683,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 		internal->disk   = seen->disk;
 	}
 
-	const struct rmsummary *max = category_dynamic_task_max_declared_resources(categories, category, user, request);
+	const struct rmsummary *max = category_dynamic_task_max_declared_resources(c, user, request);
 
 	/* load max values */
 	rmsummary_merge_override(internal, max);
@@ -708,12 +691,11 @@ const struct rmsummary *category_dynamic_task_max_resources(struct hash_table *c
 	return internal;
 }
 
-const struct rmsummary *category_dynamic_task_min_resources(struct hash_table *categories, const char *category, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
 
 	static struct rmsummary *internal = NULL;
 
-	struct category *c = category_lookup_or_create(categories, category);
-	const struct rmsummary *max = category_dynamic_task_max_resources(categories, category, user, request);
+	const struct rmsummary *max = category_dynamic_task_max_resources(c, user, request);
 
 	if(internal) {
 		rmsummary_delete(internal);
