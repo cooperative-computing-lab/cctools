@@ -630,99 +630,86 @@ out:
 	return rc;
 }
 
-static int replicate_push_synchronous (confuga *C, chirp_jobid_t id, const char *tag, sqlite3_int64 sid)
+static int replicate_push_synchronous (confuga *C)
 {
 	static const char SQL[] =
-		"BEGIN TRANSACTION;"
-		/* unreplicated files */
-		"SELECT ConfugaInputFile.fid, ConfugaJob.tag"
+		"SELECT ConfugaJob.id, ConfugaJob.tag, ConfugaJob.sid, ConfugaInputFile.fid"
 		"	FROM"
 		"		ConfugaJob"
 		"		JOIN ConfugaInputFile ON ConfugaJob.id = ConfugaInputFile.jid"
 		"		JOIN Confuga.File ON ConfugaInputFile.fid = File.id"
 		"		LEFT OUTER JOIN Confuga.Replica ON ConfugaInputFile.fid = Replica.fid AND ConfugaJob.sid = Replica.sid"
-		"	WHERE ConfugaJob.id = ?1 AND File.size >= ?2 AND Replica.fid IS NULL AND Replica.sid IS NULL;"
-		"UPDATE ConfugaJob"
-		"	SET"
-		"		state = 'REPLICATED',"
-		"		time_replicated = (strftime('%s', 'now'))"
-		"	WHERE id = ?;"
-		"END TRANSACTION;";
+		"	WHERE"
+		"		ConfugaJob.state = 'SCHEDULED' AND File.size >= ?1 AND Replica.fid IS NULL AND Replica.sid IS NULL"
+		"	ORDER BY time_scheduled ASC, File.size DESC"
+		";"
+		;
 
 	int rc;
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
 	time_t start = time(0);
-	int paused = 0;
-
-	jdebug(D_DEBUG, id, tag, "replicating files synchronously");
+	char *tag = NULL;
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, C->pull_threshold));
+	sqlcatch(sqlite3_bind_int64(stmt, 1, C->pull_threshold));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		chirp_jobid_t id = sqlite3_column_int64(stmt, 0);
+		tag = (free(tag), NULL);
+		tag = strdup((const char *)sqlite3_column_text(stmt, 1)); /* save copy before reset */
+		CATCHUNIX(tag == NULL ? -1 : 0);
+		confuga_sid_t sid = sqlite3_column_int64(stmt, 2);
 		confuga_fid_t fid;
-		assert(sqlite3_column_type(stmt, 0) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 0) == confugaF_size(fid));
-		CATCH(confugaF_set(C, &fid, sqlite3_column_blob(stmt, 0)));
-		CATCH(confugaR_replicate(C, fid, sid, (const char *)sqlite3_column_text(stmt, 1), STOPTIME));
+		assert(sqlite3_column_type(stmt, 3) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(stmt, 3) == confugaF_size(fid));
+		CATCH(confugaF_set(C, &fid, sqlite3_column_blob(stmt, 3)));
+
+		/* now release locks */
+		sqlcatch(sqlite3_reset(stmt));
+
+		jdebug(D_DEBUG, id, tag, "synchronously replicating file " CONFUGA_FID_DEBFMT, CONFUGA_FID_PRIARGS(fid));
+		CATCH(confugaR_replicate(C, fid, sid, tag, STOPTIME));
 		if (start+60 <= time(0)) {
-			paused = 1; /* if we replicate for more than 1 minutes, come back later to finish */
+			jdebug(D_DEBUG, id, tag, "exceeded one minute of replication, coming back later to finish");
 			break;
 		}
 	}
-	sqlcatchcode(rc, SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	if (paused) {
-		jdebug(D_DEBUG, id, tag, "exceeded one minute of replication, coming back later to finish");
-	} else {
-		sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-		jdebug(D_DEBUG, id, tag, "finished replicating files");
-	}
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
-
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
 	goto out;
 out:
 	sqlite3_finalize(stmt);
-	sqlend(db);
+	free(tag);
 	return rc;
 }
 
-static int replicate_push_asynchronous (confuga *C, chirp_jobid_t id, const char *tag)
+/* FIXME check for stagnant jobs */
+static int replicate_push_asynchronous (confuga *C)
 {
 	static const char SQL[] =
-		/* TODO transfer attempts, reschedule on threshold */
-		"BEGIN TRANSACTION;"
-		/* Check if job has unreplicated files: */
-		"SELECT COUNT(*)"
-		"	FROM"
-		"		ConfugaJob"
-		"		JOIN ConfugaInputFile ON ConfugaJob.id = ConfugaInputFile.jid"
-		"		JOIN Confuga.File ON ConfugaInputFile.fid = File.id"
-		"		LEFT OUTER JOIN Confuga.Replica ON ConfugaInputFile.fid = Replica.fid AND ConfugaJob.sid = Replica.sid"
-		"	WHERE ConfugaJob.id = ?1 AND File.size >= ?2 AND Replica.fid IS NULL AND Replica.sid IS NULL;"
-			/* If fully replicated, set to REPLICATED */
-			"UPDATE ConfugaJob"
-			"	SET"
-			"		state = 'REPLICATED',"
-			"		time_replicated = (strftime('%s', 'now'))"
-			"	WHERE id = ?1;"
-			/* return! */
-		/* else try to replicate... */
-		"INSERT INTO Confuga.TransferJob (state, source, source_id, fid, fsid, tag, tsid)"
+		/* TODO: Unfortunately, there seems to be a bug in SQLite [1] which
+		 * will always do a commit (resulting in a write) on this usually NO-OP
+		 * INSERT. The workaround is to check for rows in the select before
+		 * doing the insert.  The SQLite developers have so far refused to
+		 * acknowledge this bug :(.
+		 *
+		 * [1] https://www.mail-archive.com/sqlite-users@mailinglists.sqlite.org/msg05276.html
+		 */
+		"CREATE TEMPORARY TABLE IF NOT EXISTS TransferScheduleParameters____replicate_push_asynchronous ("
+		"	key TEXT PRIMARY KEY,"
+		"	value INTEGER"
+		");"
+		"INSERT OR REPLACE INTO TransferScheduleParameters____replicate_push_asynchronous"
+		"	VALUES ('pull-threshold', ?1), ('transfer-slots', ?2);"
+		"CREATE TEMPORARY VIEW IF NOT EXISTS TransferSchedule__replicate_push_asynchronous AS"
 		"	WITH"
+		"		PullThreshold AS ("
+		"			SELECT value FROM TransferScheduleParameters____replicate_push_asynchronous WHERE key = 'pull-threshold'"
+		"		),"
+		"		TransferSlots AS ("
+		"			SELECT value FROM TransferScheduleParameters____replicate_push_asynchronous WHERE key = 'transfer-slots'"
+		"		),"
 				/* Storage Node with available Transfer Slots. */
 		"		StorageNodeTransferReady AS ("
 		"			SELECT id"
@@ -735,15 +722,14 @@ static int replicate_push_asynchronous (confuga *C, chirp_jobid_t id, const char
 		"							FROM (Confuga.StorageNodeActive LEFT OUTER JOIN Confuga.ActiveTransfers ON StorageNodeActive.id = ActiveTransfers.fsid)"
 		"					)"
 		"				GROUP BY id"
-		"				HAVING (?2 == 0 OR COUNT(tjid) < ?2)"
+		"				HAVING ((SELECT * FROM TransferSlots) == 0 OR COUNT(tjid) < (SELECT * FROM TransferSlots))"
 		"		),"
 				/* This is a StorageNode we are able to use to transfer a replica. */
 		"		SourceStorageNode AS ("
-		"			SELECT FileReplicas.fid, StorageNodeActive.id as sid"
+		"			SELECT FileReplicas.fid, StorageNodeTransferReady.id as sid"
 		"				FROM"
-		"					Confuga.StorageNodeActive"
-		"					JOIN StorageNodeTransferReady ON StorageNodeActive.id = StorageNodeTransferReady.id"
-		"					JOIN Confuga.FileReplicas ON StorageNodeActive.id = FileReplicas.sid"
+		"					StorageNodeTransferReady"
+		"					JOIN Confuga.FileReplicas ON StorageNodeTransferReady.id = FileReplicas.sid"
 		"		),"
 				/* For each fid, pick a random SourceStorageNode. */
 		"		RandomSourceStorageNode AS ("
@@ -760,75 +746,113 @@ static int replicate_push_asynchronous (confuga *C, chirp_jobid_t id, const char
 		"					FROM Confuga.File JOIN Confuga.ActiveTransfers ON File.id = ActiveTransfers.fid"
 		"		),"
 				/* Files needed by the scheduled job which are not in PotentialReplicas. Ignore files with size under the pull threshold. */
-		"		NeededFiles AS ("
-		"			SELECT ConfugaJob.id, ConfugaInputFile.*"
+		"		MissingDependencies AS ("
+		"			SELECT ConfugaJob.id, File.id AS fid, File.size"
 		"				FROM"
 		"					ConfugaJob"
 		"					JOIN ConfugaInputFile ON ConfugaJob.id = ConfugaInputFile.jid"
 		"					JOIN Confuga.File ON ConfugaInputFile.fid = File.id"
 		"					LEFT OUTER JOIN PotentialReplicas ON ConfugaInputFile.fid = PotentialReplicas.fid AND ConfugaJob.sid = PotentialReplicas.sid"
-		"				WHERE File.size >= ?3 AND PotentialReplicas.fid IS NULL AND PotentialReplicas.sid IS NULL"
+		"				WHERE File.size >= (SELECT * FROM PullThreshold) AND PotentialReplicas.fid IS NULL AND PotentialReplicas.sid IS NULL"
+		"		),"
+				/* Largest ready push transfer for each ConfugaJob. Large files first as they can delay the workflow. */
+		"		LargestReadyPushTransfers AS ("
+		"			SELECT ConfugaJob.id, MissingDependencies.fid, MAX(MissingDependencies.size), RandomSourceStorageNode.sid AS fsid, ConfugaJob.sid AS tsid"
+		"				FROM"
+		"					ConfugaJob"
+		"					JOIN StorageNodeTransferReady ON ConfugaJob.sid = StorageNodeTransferReady.id"
+		"					JOIN MissingDependencies ON ConfugaJob.id = MissingDependencies.id"
+		"					JOIN RandomSourceStorageNode ON MissingDependencies.fid = RandomSourceStorageNode.fid"
+		"			GROUP BY ConfugaJob.id"
 		"		)"
-		"	SELECT 'NEW', 'JOB', ConfugaJob.id, NeededFiles.fid, RandomSourceStorageNode.sid, ConfugaJob.tag, ConfugaJob.sid"
+		"	SELECT 'NEW', 'JOB', ConfugaJob.id, ConfugaJob.tag, LargestReadyPushTransfers.fid, LargestReadyPushTransfers.fsid, LargestReadyPushTransfers.tsid"
 		"		FROM"
 		"			ConfugaJob"
-		"			JOIN StorageNodeTransferReady ON ConfugaJob.sid = StorageNodeTransferReady.id"
-		"			JOIN NeededFiles ON ConfugaJob.id = NeededFiles.id"
-		"			JOIN RandomSourceStorageNode ON NeededFiles.fid = RandomSourceStorageNode.fid"
-		"			JOIN FileReplicas ON NeededFiles.fid = FileReplicas.fid"
-		"		WHERE ConfugaJob.id = ?1"
-		"		ORDER BY FileReplicas.size DESC"
+		"			JOIN LargestReadyPushTransfers ON ConfugaJob.id = LargestReadyPushTransfers.id"
+		"		WHERE ConfugaJob.state = 'SCHEDULED'"
+		"		ORDER BY RANDOM()"
+				/* TODO it would be great to break file size ties with replica count. */
+		/*"		ORDER BY FLOOR(LOG(LargestReadyPushTransfers.size+1)) DESC, ConfugaJob.time_new ASC"*/
 		"		LIMIT 1;"
-		"END TRANSACTION;";
+		"SELECT COUNT(*) FROM TransferSchedule__replicate_push_asynchronous;"
+		"BEGIN IMMEDIATE TRANSACTION;"
+		"INSERT INTO Confuga.TransferJob (state, source, source_id, tag, fid, fsid, tsid)"
+		"	SELECT * FROM TransferSchedule__replicate_push_asynchronous;" /* Note: always only 0 or 1 rows inserted! */
+		"SELECT id, source_id, tag, fid, fsid, tsid"
+		"	FROM Confuga.TransferJob"
+		"	WHERE id = LAST_INSERT_ROWID();"
+		"END TRANSACTION;"
+		;
 
 	int rc;
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
+	sqlite3_stmt *insert = NULL;
+	sqlite3_stmt *select = NULL;
 	const char *current = SQL;
-	int finished = 0;
+	uint64_t count;
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-	sqlcatch(sqlite3_bind_int64(stmt, 2, C->pull_threshold));
+	sqlcatch(sqlite3_bind_int64(stmt, 1, C->pull_threshold));
+	sqlcatch(sqlite3_bind_int64(stmt, 2, C->replication_n));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
-	if (sqlite3_column_int(stmt, 0) == 0)
-		finished = 1;
+	if (sqlite3_column_int(stmt, 0) == 0) {
+		rc = 0;
+		goto out;
+	}
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	if (finished) {
-		jdebug(D_DEBUG, id, tag, "all dependencies are replicated");
-		sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
-	}
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	if (!finished) {
-		sqlcatch(sqlite3_bind_int64(stmt, 1, id));
-		sqlcatch(sqlite3_bind_int64(stmt, 2, C->replication_n));
-		sqlcatch(sqlite3_bind_int64(stmt, 3, C->pull_threshold));
-		do {
-			sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &insert, &current));
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &select, &current));
 
-			sqlite3_int64 changes = sqlite3_changes(db);
-			assert(changes == 1 || changes == 0);
+	/* don't schedule more than 100 transfer jobs per cycle */
+	for (count = 0; count < 100; count++) {
+		sqlite3_int64 changes;
 
-			if (changes > 0) {
-				jdebug(D_DEBUG, id, tag, "scheduled transfer job %" PRId64, (int64_t)sqlite3_last_insert_rowid(db));
-			} else {
-				/* FIXME check for stagnant jobs */
-				break;
-			}
-			sqlcatch(sqlite3_reset(stmt));
-		} while (1);
+		sqlcatch(sqlite3_reset(insert));
+		sqlcatchcode(sqlite3_step(insert), SQLITE_DONE);
+		changes = sqlite3_changes(db);
+
+		if (changes == 1) {
+			chirp_jobid_t tjid, jid;
+			const char *tag;
+			confuga_sid_t fsid, tsid;
+			confuga_fid_t fid;
+
+			sqlcatch(sqlite3_reset(select));
+			sqlcatchcode(sqlite3_step(select), SQLITE_ROW);
+			tjid = sqlite3_column_int64(select, 0);
+			jid = sqlite3_column_int64(select, 1);
+			tag = (const char *)sqlite3_column_text(select, 2);
+			assert(sqlite3_column_type(select, 3) == SQLITE_BLOB && (size_t)sqlite3_column_bytes(select, 3) == confugaF_size(fid));
+			CATCH(confugaF_set(C, &fid, sqlite3_column_blob(select, 3)));
+			fsid = sqlite3_column_int64(select, 4);
+			tsid = sqlite3_column_int64(select, 5);
+			jdebug(D_DEBUG, jid, tag, "scheduled transfer job %" PRId64 " (" CONFUGA_FID_DEBFMT ": " CONFUGA_SID_DEBFMT " -> " CONFUGA_SID_DEBFMT ")", tjid, CONFUGA_FID_PRIARGS(fid), fsid, tsid);
+		} else if (changes == 0) {
+			break;
+		} else assert(0);
 	}
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_finalize(insert); insert = NULL);
+	sqlcatch(sqlite3_finalize(select); select = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -838,46 +862,92 @@ static int replicate_push_asynchronous (confuga *C, chirp_jobid_t id, const char
 	goto out;
 out:
 	sqlite3_finalize(stmt);
+	sqlite3_finalize(insert);
+	sqlite3_finalize(select);
 	sqlend(db);
+	return rc;
+}
+
+static int set_replicated (confuga *C, chirp_jobid_t id)
+{
+	static const char SQL[] =
+			"UPDATE ConfugaJob"
+			"	SET"
+			"		state = 'REPLICATED',"
+			"		time_replicated = (strftime('%s', 'now'))"
+			"	WHERE id = ?1;"
+			;
+
+	int rc;
+	sqlite3 *db = C->db;
+	sqlite3_stmt *stmt = NULL;
+	const char *current = SQL;
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatch(sqlite3_bind_int64(stmt, 1, id));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	rc = 0;
+	goto out;
+out:
+	sqlite3_finalize(stmt);
+	return rc;
+}
+
+static int update_replicated (confuga *C)
+{
+	static const char SQL[] =
+		"SELECT ConfugaJob.id, ConfugaJob.tag"
+		"	FROM ConfugaJob"
+		"	WHERE state = 'SCHEDULED' AND NOT EXISTS ("
+		"		SELECT ConfugaJob.id"
+		"			FROM"
+		"				ConfugaInputFile"
+		"				JOIN Confuga.File ON ConfugaInputFile.fid = File.id"
+		"				LEFT OUTER JOIN Confuga.Replica ON ConfugaInputFile.fid = Replica.fid AND ConfugaJob.sid = Replica.sid"
+		"			WHERE ConfugaInputFile.jid = ConfugaJob.id AND File.size >= ?1 AND Replica.fid IS NULL AND Replica.sid IS NULL"
+		"	);"
+		;
+
+	int rc;
+	sqlite3 *db = C->db;
+	sqlite3_stmt *stmt = NULL;
+	const char *current = SQL;
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatch(sqlite3_bind_int64(stmt, 1, C->pull_threshold));
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		chirp_jobid_t id = sqlite3_column_int64(stmt, 0);
+		const char *tag = (const char *)sqlite3_column_text(stmt, 1);
+		jdebug(D_DEBUG, id, tag, "all dependencies are replicated");
+		CATCHJOB(C, id, tag, set_replicated(C, id));
+	}
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	rc = 0;
+	goto out;
+out:
+	sqlite3_finalize(stmt);
 	return rc;
 }
 
 static int job_replicate (confuga *C)
 {
-	static const char SQL[] =
-		"SELECT ConfugaJob.id, ConfugaJob.tag, ConfugaJob.sid"
-		"	FROM ConfugaJob"
-		"	WHERE state = 'SCHEDULED'"
-		"	ORDER BY time_scheduled ASC;"; /* XXX A broken job will cause this to never make progress. ---- to ensure no starvation, replicate may result in a ROLLBACK that aborts this SELECT */
-
 	int rc;
-	sqlite3 *db = C->db;
-	sqlite3_stmt *stmt = NULL;
-	const char *current = SQL;
-	time_t start = time(0);
 
-	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
-	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
-		chirp_jobid_t id = sqlite3_column_int64(stmt, 0);
-		const char *tag = (const char *)sqlite3_column_text(stmt, 1);
-		confuga_sid_t sid = sqlite3_column_int64(stmt, 2);
-		if (C->replication == CONFUGA_REPLICATION_PUSH_SYNCHRONOUS)
-			CATCHJOB(C, id, tag, replicate_push_synchronous(C, id, tag, sid));
-		else if (C->replication == CONFUGA_REPLICATION_PUSH_ASYNCHRONOUS)
-			CATCHJOB(C, id, tag, replicate_push_asynchronous(C, id, tag));
-		else assert(0);
-		if (start+60 <= time(0)) {
-			rc = SQLITE_DONE;
-			break;
-		}
-	}
-	sqlcatchcode(rc, SQLITE_DONE);
-	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+	update_replicated(C);
+
+	if (C->replication == CONFUGA_REPLICATION_PUSH_ASYNCHRONOUS)
+		replicate_push_asynchronous(C);
+	else if (C->replication == CONFUGA_REPLICATION_PUSH_SYNCHRONOUS)
+		replicate_push_synchronous(C);
+	else assert(0);
 
 	rc = 0;
 	goto out;
 out:
-	sqlite3_finalize(stmt);
 	return rc;
 }
 

@@ -557,11 +557,15 @@ out:
 static int schedule_replication (confuga *C)
 {
 	static const char SQL[] =
-		/* TODO: Unfortunately, there seems to be a bug in SQLite which will
-		 * always do a commit on this usually NO-OP INSERT, so we should check
-		 * for a result before doing INSERT.
+		/* TODO: Unfortunately, there seems to be a bug in SQLite [1] which
+		 * will always do a commit (resulting in a write) on this usually NO-OP
+		 * INSERT. The workaround is to check for rows in the select before
+		 * doing the insert.  The SQLite developers have so far refused to
+		 * acknowledge this bug :(.
+		 *
+		 * [1] https://www.mail-archive.com/sqlite-users@mailinglists.sqlite.org/msg05276.html
 		 */
-		"CREATE TEMPORARY VIEW IF NOT EXISTS ConfugaTransferSchedule AS"
+		"CREATE TEMPORARY VIEW IF NOT EXISTS TransferSchedule__schedule_replication AS"
 		"	WITH"
 				/* This a StorageNode we are able to use to transfer a replica. If it is currently transferring a file, it is excluded. */
 		"		StorageNodeActiveRandom AS ("
@@ -606,10 +610,10 @@ static int schedule_replication (confuga *C)
 		"		ORDER BY FLOOR(LOG(TargetStorageNode.avail+1)) DESC"
 				/* This limit is important because making a transfer job affects the next creation of subsequent transfer jobs. */
 		"		LIMIT 1;"
-		"SELECT COUNT(*) FROM ConfugaTransferSchedule;"
+		"SELECT COUNT(*) FROM TransferSchedule__schedule_replication;"
 		"BEGIN IMMEDIATE TRANSACTION;"
 		"INSERT INTO Confuga.TransferJob (state, source, fid, fsid, tsid, tag)"
-		"	SELECT * FROM ConfugaTransferSchedule;"
+		"	SELECT * FROM TransferSchedule__schedule_replication;"
 		"END TRANSACTION;"
 		;
 
