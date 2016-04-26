@@ -115,6 +115,7 @@ HEADERS_PUBLIC = \
 	category.h \
 	debug.h \
 	hash_table.h \
+	http_query.h \
 	int_sizes.h \
 	jx.h \
 	link.h \
