@@ -1454,13 +1454,14 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		struct category *c = work_queue_category_lookup_or_create(q, t->category);
 		category_allocation_t next = category_next_label(c, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
-		if(next != CATEGORY_ALLOCATION_ERROR) {
+		if(next == CATEGORY_ALLOCATION_ERROR) {
+			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+		}
+		else {
 			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 			t->resource_request = next;
 			change_task_state(q, t, WORK_QUEUE_TASK_READY);
 			return;
-		} else {
-			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
 		}
 	}
 

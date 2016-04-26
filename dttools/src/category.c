@@ -92,10 +92,9 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 void category_specify_allocation_mode(struct category *c, int mode) {
 	struct rmsummary *r = c->autolabel_resource;
 
-	int autolabel = 1;
-
 	c->allocation_mode = mode;
 
+	int autolabel = 1;
 	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
 		autolabel = 0;
 	}
