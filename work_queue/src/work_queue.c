@@ -36,7 +36,7 @@ The following major problems must be fixed:
 #include "rmonitor.h"
 #include "rmonitor_types.h"
 #include "rmonitor_poll.h"
-#include "category.h"
+#include "category_internal.h"
 #include "copy_stream.h"
 #include "random.h"
 #include "process.h"
@@ -4472,6 +4472,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
+	category_tune("countdown-after-missing-start", first_allocation_every_n_tasks);
 
 	// The value -1 indicates that fast abort is inactive by default
 	// fast abort depends on categories, thus set after them.
@@ -5616,6 +5617,7 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "first-allocation-every-n-tasks")) {
 		first_allocation_every_n_tasks = MAX(1, value);
+		category_tune("countdown-after-missing-start", first_allocation_every_n_tasks);
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);

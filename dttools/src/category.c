@@ -32,6 +32,9 @@ static uint64_t time_bucket_size      = 60000000;  /* 1 minute */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
+static int64_t countdown_after_missing_start = 25;   /* tasks */
+
+
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
 	struct category *c;
 
@@ -77,6 +80,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->first_allocation_time = 0;
 
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+
+	c->countdown_after_missing = countdown_after_missing_start;
 
 	hash_table_insert(categories, name, c);
 
@@ -502,14 +507,32 @@ void category_update_first_allocation(struct category *c, const struct rmsummary
 
 void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 	static int64_t accumulations_seen = 0;
+	accumulations_seen++;
+
+	if(!rs) {
+		c->countdown_after_missing = countdown_after_missing_start;
+		return;
+	}
+
+	struct rmsummary *max       = c->max_allocation;
+	struct rmsummary *seen      = c->max_resources_seen;
+	struct rmsummary *completed = c->max_resources_completed;
+
+	/* a new max has been seen, a no max_alloc was specified, so we go into
+	 * exploration mode. */
+	if( (max->cores < 0 && seen->cores < rs->cores)
+			|| (max->memory < 0 && seen->memory < rs->memory)
+			|| (max->disk   < 0 && seen->disk   < rs->disk  ) )
+	{
+		c->countdown_after_missing = countdown_after_missing_start;
+	}
 
 	rmsummary_merge_max(c->max_resources_seen, rs);
-	accumulations_seen++;
 
 	c->max_resources_seen->tag = accumulations_seen;
 
-	if(rs && rs->exit_type && !strcmp(rs->exit_type, "normal")) {
-		rmsummary_merge_max(c->max_resources_completed, rs);
+	if(!rs->exit_type || !strcmp(rs->exit_type, "normal")) {
+		rmsummary_merge_max(completed, rs);
 
 		category_inc_histogram_count(c, cores,          rs, 1);
 		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
@@ -527,6 +550,8 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 		category_inc_histogram_count(c, max_concurrent_processes, rs, 1);
 		category_inc_histogram_count(c, total_processes,rs, 1);
 
+		c->countdown_after_missing--;
+
 		/* only update completed tag when completed and seen are the same. */
 		struct rmsummary *seen       = c->max_resources_seen;
 		struct rmsummary *completed  = c->max_resources_completed;
@@ -541,7 +566,6 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 			c->max_resources_completed->tag = accumulations_seen;
 		}
 	}
-
 }
 
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file) {
@@ -649,6 +673,7 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct cate
 	rmsummary_merge_override(internal, max);
 
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+			&& c->countdown_after_missing < 1
 			&& seen->tag == completed->tag
 			&& request == CATEGORY_ALLOCATION_FIRST) {
 		rmsummary_merge_override(internal, first);
@@ -677,6 +702,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	struct rmsummary *completed  = c->max_resources_completed;
 
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+			&& c->countdown_after_missing < 1
 			&& seen->tag == completed->tag) {
 		internal->cores  = seen->cores;
 		internal->memory = seen->memory;
@@ -717,7 +743,7 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 }
 
 
-void category_tune_bucket_size(const char *resource, uint64_t size) {
+void category_tune(const char *resource, uint64_t size) {
 	if(strcmp(resource, "memory") == 0) {
 		memory_bucket_size = size;
 	} else if(strcmp(resource, "disk") == 0) {
@@ -728,5 +754,7 @@ void category_tune_bucket_size(const char *resource, uint64_t size) {
 		bytes_bucket_size = size;
 	} else if(strcmp(resource, "bandwidth") == 0) {
 		bandwidth_bucket_size = size;
+	} else if(strcmp(resource, "countdown-after-missing-start")) {
+		countdown_after_missing_start = size;
 	}
 }

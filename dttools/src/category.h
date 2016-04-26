@@ -85,6 +85,14 @@ struct category {
 	/* last time, in seconds, that the first allocation was computed. */
 	time_t first_allocation_time;
 
+	/* countdown of completed tasks after a NULL summary. Sometimes a worker
+	 * may report resource exhaustion, but no summary for a task was recovered.
+	 * On such case, this counter is reset. No first_allocation,
+	 * max_resources_completed are used unless this counter is less than one.
+	 * This gives the chance to the system to deploy tasks with maximum
+	 * allocations to collect the missing max summaries. */
+	int countdown_after_missing;
+
 	/* stats for wq */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;

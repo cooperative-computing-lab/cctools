@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		unlink_recursive("work-queue-test-monitor");
 		work_queue_enable_monitoring(q, "work-queue-test-monitor");
 		work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
-		work_queue_tune(q, "first-allocation-every-n-tasks", 1);
+		work_queue_tune(q, "first-allocation-every-n-tasks", 5);
 
 		work_queue_specify_transactions_log(q, "work-queue-test-monitor/transactions.log");
 	}
