@@ -20,7 +20,7 @@ prepare()
 
 	set +e
 	# -static requires "libc-devel" which is missing on some platforms
-	gcc -static -I../src/ -g -o "$exe" -x c - -x none <<EOF
+	gcc -static -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none <<EOF
 #include <stdio.h>
 int main (int argc, char *argv[])
 {

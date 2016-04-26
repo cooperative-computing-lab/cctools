@@ -7,7 +7,7 @@ output="chunk.output"
 
 prepare()
 {
-	gcc -g -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
+	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

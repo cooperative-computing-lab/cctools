@@ -6,7 +6,7 @@ exe="buffer.test"
 
 prepare()
 {
-	gcc -I../src/ -g -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
+	gcc -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
 #include "buffer.h"
 #include "debug.h"
 

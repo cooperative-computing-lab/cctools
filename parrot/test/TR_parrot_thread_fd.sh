@@ -7,7 +7,7 @@ exe="$0.test"
 
 prepare()
 {
-	gcc -I../src/ -g -o "$exe" -x c - -x none -lpthread -lm <<EOF
+	gcc -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -lpthread -lm <<EOF
 #include <fcntl.h>
 #include <pthread.h>
 #include <sched.h>

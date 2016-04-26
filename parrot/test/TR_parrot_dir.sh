@@ -7,7 +7,7 @@ exe="dir.test"
 
 prepare()
 {
-	gcc -I../src/ -g -o "$exe" -x c - -x none -lm <<EOF
+	gcc -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -lm <<EOF
 /* Required for O_DIRECTORY on old glibcs */
 #define _GNU_SOURCE
 

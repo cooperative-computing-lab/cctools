@@ -6,7 +6,7 @@ exe="path_collapse.test"
 
 prepare()
 {
-	gcc -g -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
+	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
