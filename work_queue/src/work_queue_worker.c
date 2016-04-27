@@ -1424,7 +1424,7 @@ static int enforce_worker_limits(struct link *master) {
 	}
 
 	if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
-		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space %"PRIu64" < %"PRIu64" MB\n", workspace, manual_disk_option, disk_measured);
+		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, disk_measured);
 
 		if(master) {
 			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_measured);
