@@ -1426,20 +1426,40 @@ static int enforce_worker_limits(struct link *master) {
 	}
 
 	if( manual_disk_option > 0 && local_resources->disk.inuse > (manual_disk_option - disk_avail_threshold) ) {
-		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, local_resources->disk.inuse);
+		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, local_resources->disk.inuse);
 
 		if(master) {
-			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) local_resources->disk.inuse);
+			send_master_message(master, "info disk_exhausted %lld\n", (long long) local_resources->disk.inuse);
 		}
 
 		return 0;
 	}
 
 	if( manual_memory_option > 0 && local_resources->memory.inuse > (manual_memory_option - memory_avail_threshold) ) {
-		fprintf(stderr,"work_queue_worker: has less than the promised memory (--memory - --memory-threshold < memory used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", manual_memory_option, memory_avail_threshold, local_resources->memory.inuse);
+		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory - --memory-threshold < memory used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", manual_memory_option, memory_avail_threshold, local_resources->memory.inuse);
 
 		if(master) {
-			send_master_message(master, "info memory_space_exhausted %lld\n", (long long) local_resources->memory.inuse);
+			send_master_message(master, "info memory_exhausted %lld\n", (long long) local_resources->memory.inuse);
+		}
+
+		return 0;
+	}
+
+	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
+		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
+
+		if(master) {
+			send_master_message(master, "info disk_error %lld\n", (long long) local_resources->disk.total);
+		}
+
+		return 0;
+	}
+
+	if( manual_memory_option > 0 && local_resources->memory.total < manual_memory_option) {
+		fprintf(stderr,"work_queue_worker: has less than the promised memory (--memory > memory total) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.total);
+
+		if(master) {
+			send_master_message(master, "info memory_error %lld\n", (long long) local_resources->memory.total);
 		}
 
 		return 0;
