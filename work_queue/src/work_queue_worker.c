@@ -163,7 +163,6 @@ static int64_t gpus_allocated = 0;
 // Allow worker to use disk_alloc loop devices for task sandbox. Disabled by default.
 static int disk_allocation = 0;
 
-static int64_t disk_measured = 0;
 static int64_t files_counted = 0;
 
 static int check_resources_interval = 5;
@@ -239,16 +238,14 @@ void reset_idle_timer()
    Measure the disk used by the worker. We only manually measure the cache directory, as processes measure themselves.
    */
 
-void measure_worker_disk() {
+int64_t measure_worker_disk() {
 	static struct path_disk_size_info *state = NULL;
 
 	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state);
 
+	int64_t disk_measured = -1;
 	if(state->last_byte_size_complete >= 0) {
 		disk_measured = (int64_t) ceil(state->last_byte_size_complete/(1.0*MEGA));
-	}
-	else {
-		disk_measured = -1;
 	}
 
 	files_counted = state->last_file_count_complete;
@@ -268,6 +265,8 @@ void measure_worker_disk() {
 			}
 		}
 	}
+
+	return disk_measured;
 }
 
 /*
@@ -285,7 +284,6 @@ void measure_worker_resources()
 	struct work_queue_resources *r = local_resources;
 
 	work_queue_resources_measure_locally(r,workspace);
-	measure_worker_disk();
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		aggregate_workers_resources(foreman_q, total_resources);
@@ -306,7 +304,7 @@ void measure_worker_resources()
 	r->disk.smallest = r->disk.largest = r->disk.total;
 	r->gpus.smallest = r->gpus.largest = r->gpus.total;
 
-	r->disk.inuse = disk_measured;
+	r->disk.inuse = measure_worker_disk();
 	r->tag = last_task_received;
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
@@ -335,7 +333,7 @@ static void send_resource_update(struct link *master)
 		total_resources->disk.inuse = local_resources->disk.inuse;
 	}
 
-	total_resources->disk.total = local_resources->disk.total - disk_avail_threshold;
+	total_resources->disk.total = local_resources->disk.total   - disk_avail_threshold;
 
 	work_queue_resources_send(master,total_resources,stoptime);
 	send_master_message(master, "info end_of_resource_update %d\n", 0);
@@ -1426,11 +1424,11 @@ static int enforce_worker_limits(struct link *master) {
 		return 0;
 	}
 
-	if( manual_disk_option > 0 && disk_measured > (manual_disk_option - disk_avail_threshold) ) {
-		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, disk_measured);
+	if( manual_disk_option > 0 && local_resources->disk.inuse > (manual_disk_option - disk_avail_threshold) ) {
+		fprintf(stderr,"work_queue_worker: %s has less than the promised disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, local_resources->disk.inuse);
 
 		if(master) {
-			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) disk_measured);
+			send_master_message(master, "info disk_space_exhausted %lld\n", (long long) local_resources->disk.inuse);
 		}
 
 		return 0;
