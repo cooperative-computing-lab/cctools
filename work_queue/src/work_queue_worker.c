@@ -2394,6 +2394,12 @@ int main(int argc, char *argv[])
 	while(1) {
 		int result;
 
+		measure_worker_resources();
+		if(!enforce_worker_limits(NULL)) {
+			abort_flag = 1;
+			break;
+		}
+
 		if(project_regex) {
 			result = serve_master_by_name(catalog_host,catalog_port,project_regex);
 		} else {
@@ -2420,11 +2426,6 @@ int main(int argc, char *argv[])
 			}
 		} else {
 			backoff_interval = MIN(backoff_interval*2,max_backoff_interval);
-		}
-
-		measure_worker_resources();
-		if(!enforce_worker_limits(NULL)) {
-			abort_flag = 1;
 		}
 
 		if(abort_flag) {
