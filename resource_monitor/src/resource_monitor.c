@@ -768,7 +768,7 @@ struct peak_cores_sample {
 int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = MIN(interval, 60);
+	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete */
 
 	if(!samples) {
 		samples = list_create(0);
@@ -804,19 +804,23 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	int64_t diff_wall = tail->wall_time - head->wall_time;
 	int64_t diff_cpu  = tail->cpu_time  - head->cpu_time;
 
-	if(diff_wall > 0) {
-		return (int64_t) MAX(1, ceil( ((double) diff_cpu)/diff_wall));
-	} else {
+	/* hack to elimiate noise. if diff_wall < 60s, we return 1. If command runs
+	 * for more than 60s, the average cpu/wall serves as a fallback in the
+	 * final summary. */
+
+	if(diff_wall < 60) {
 		return 1;
+	} else {
+		return (int64_t) MAX(1, ceil( ((double) diff_cpu)/diff_wall));
 	}
 }
 
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
-	tr->wall_time         = usecs_since_epoch() - summary->start;
-	tr->cpu_time          = p->cpu.delta + tr->cpu_time;
+	tr->wall_time  = usecs_since_epoch() - summary->start;
+	tr->cpu_time   = p->cpu.delta + tr->cpu_time;
 
-	tr->cores = peak_cores(tr->wall_time, tr->cpu_time);
+	tr->cores      = peak_cores(tr->wall_time, tr->cpu_time);
 
 	tr->max_concurrent_processes = (int64_t) itable_size(processes);
 	tr->total_processes          = summary->total_processes;
@@ -1212,7 +1216,10 @@ struct rmsummary *rmonitor_final_usage_tree(void)
 	tr_usg->cpu_time += usg.ru_stime.tv_sec*USECOND + usg.ru_stime.tv_usec;
 	tr_usg->end       = usecs_since_epoch();
 	tr_usg->wall_time = tr_usg->end - summary->start;
-	tr_usg->cores     = peak_cores(tr_usg->wall_time, tr_usg->cpu_time);
+
+	/* we do not use peak_cores here, as we may have missed some threads which
+	 * make cpu_time quite jumpy. */
+	tr_usg->cores     = MAX(1, ceil( ((double) tr_usg->cpu_time)/tr_usg->wall_time));
 
 	tr_usg->bandwidth      = average_bandwidth(0);
 	tr_usg->bytes_received = total_bytes_rx;
