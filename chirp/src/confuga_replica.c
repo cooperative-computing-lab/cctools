@@ -643,6 +643,7 @@ static int schedule_replication (confuga *C)
 	do {
 		/* continue inserting until we stop making TransferJobs */
 		sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+		C->operations++;
 	} while (sqlite3_changes(db));
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -850,6 +851,7 @@ static int transfer_create (confuga *C)
 		const char *tag = (const char *)sqlite3_column_text(stmt, 7);
 
 		CATCHJOB(create(C, id, fhostport, ffile, fticket, fdebug, thostport, topen, tag));
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -926,6 +928,7 @@ static int transfer_commit (confuga *C)
 		const char *tjids = (const char *)sqlite3_column_text(stmt, 2);
 		const char *cids = (const char *)sqlite3_column_text(stmt, 3);
 		commit(C, sid, hostport, tjids, cids);
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1029,6 +1032,7 @@ static int waitall (confuga *C, confuga_sid_t fsid, const char *fhostport)
 			continue; /* not a transfer job */
 		}
 		debug(D_CONFUGA, "transfer job %" PRICHIRP_JOBID_T " job finished", id);
+		C->operations++;
 
 		json_value *error = jsonA_getname(job, "error", json_string);
 		json_value *exit_code = jsonA_getname(job, "exit_code", json_integer);
@@ -1167,6 +1171,7 @@ static int transfer_reap (confuga *C)
 		const char *tjids = (const char *)sqlite3_column_text(stmt, 2);
 		const char *cids = (const char *)sqlite3_column_text(stmt, 3);
 		reap(C, sid, hostport, tjids, cids);
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1264,6 +1269,7 @@ static int transfer_complete (confuga *C)
 		const char *open = (const char *)sqlite3_column_text(stmt, 2);
 		const char *file = (const char *)sqlite3_column_text(stmt, 3);
 		CATCHJOB(complete(C, id, hostport, open, file));
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);

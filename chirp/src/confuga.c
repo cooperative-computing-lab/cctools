@@ -533,6 +533,7 @@ CONFUGA_API int confuga_connect (confuga **Cp, const char *uri, const char *cata
 	C->replication_n = 1; /* max one push async job per node */
 	C->scheduler = CONFUGA_SCHEDULER_FIFO;
 	C->scheduler_n = 0; /* unlimited */
+	C->operations = 0;
 
 	auth_clear();
 
@@ -645,6 +646,7 @@ CONFUGA_API int confuga_daemon (confuga *C)
 
 	while (1) {
 		time_t now = time(NULL);
+		uint64_t prevops = C->operations;
 
 		if (ticket_generated+TICKET_REFRESH <= now) {
 			CATCH(setup_ticket(C));
@@ -664,8 +666,10 @@ CONFUGA_API int confuga_daemon (confuga *C)
 		confugaJ_schedule(C);
 		confugaR_manager(C);
 
-		struct timeval tv = {.tv_sec = 1};
-		while (select(0, 0, 0, 0, &tv) == -1 && errno == EINTR) {}
+		if (prevops == C->operations) {
+			struct timeval tv = {.tv_sec = 2};
+			while (select(0, 0, 0, 0, &tv) == -1 && errno == EINTR) {}
+		}
 	}
 
 	rc = 0;

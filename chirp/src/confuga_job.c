@@ -348,6 +348,7 @@ static int job_new (confuga *C)
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	C->operations += sqlite3_changes(db);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
@@ -473,6 +474,7 @@ static int job_bind_inputs (confuga *C)
 		const char *tag = (const char *)sqlite3_column_text(stmt, 1);
 		jdebug(D_DEBUG, id, tag, "binding inputs");
 		CATCHJOB(C, id, tag, bindinputs(C, id, tag));
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -555,6 +557,7 @@ static int dispatch (confuga *C, chirp_jobid_t id, const char *tag)
 			stats.repl_bytes = sqlite3_column_int64(stmt, 2);
 			assert(sid > 0);
 			jdebug(D_CONFUGA, id, tag, "scheduling on " CONFUGA_SID_DEBFMT, sid);
+			C->operations++;
 		} else {
 			assert(sqlite3_column_type(stmt, 0) == SQLITE_NULL);
 			jdebug(D_DEBUG, id, tag, "could not schedule yet");
@@ -564,6 +567,7 @@ static int dispatch (confuga *C, chirp_jobid_t id, const char *tag)
 		jdebug(D_DEBUG, id, tag, "could not schedule yet");
 		THROW_QUIET(EAGAIN); /* come back later */
 	} else {
+		C->operations++;
 		sqlcatch(rc);
 	}
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -671,6 +675,7 @@ static int replicate_push_synchronous (confuga *C)
 
 		jdebug(D_DEBUG, id, tag, "synchronously replicating file " CONFUGA_FID_DEBFMT, CONFUGA_FID_PRIARGS(fid));
 		CATCH(confugaR_replicate(C, fid, sid, tag, STOPTIME));
+		C->operations++;
 		if (start+60 <= time(0)) {
 			jdebug(D_DEBUG, id, tag, "exceeded one minute of replication, coming back later to finish");
 			break;
@@ -848,6 +853,7 @@ static int replicate_push_asynchronous (confuga *C)
 			fsid = sqlite3_column_int64(select, 4);
 			tsid = sqlite3_column_int64(select, 5);
 			jdebug(D_DEBUG, jid, tag, "scheduled transfer job %" PRId64 " (" CONFUGA_FID_DEBFMT ": " CONFUGA_SID_DEBFMT " -> " CONFUGA_SID_DEBFMT ")", tjid, CONFUGA_FID_PRIARGS(fid), fsid, tsid);
+			C->operations++;
 		} else if (changes == 0) {
 			break;
 		} else assert(0);
@@ -924,6 +930,7 @@ static int update_replicated (confuga *C)
 		const char *tag = (const char *)sqlite3_column_text(stmt, 1);
 		jdebug(D_DEBUG, id, tag, "all dependencies are replicated");
 		CATCHJOB(C, id, tag, set_replicated(C, id));
+		C->operations++;
 	}
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1190,6 +1197,7 @@ static int job_create (confuga *C)
 		const char *tag = (const char *)sqlite3_column_text(stmt, 1);
 		const char *hostport = (const char *)sqlite3_column_text(stmt, 2);
 		CATCHJOB(C, id, tag, jcreate(C, id, tag, hostport));
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1251,6 +1259,7 @@ static int job_commit (confuga *C)
 		const char *hostport = (const char *)sqlite3_column_text(stmt, 2);
 		chirp_jobid_t cid = sqlite3_column_int64(stmt, 3);
 		CATCHJOB(C, id, tag, jcommit(C, id, tag, hostport, cid));
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1301,6 +1310,7 @@ static int jwait (confuga *C, chirp_jobid_t id, const char *tag, confuga_sid_t s
 		assert(jistype(job, json_object));
 		if (jsonA_getname(job, "id", json_integer)->u.integer == cid) {
 			jdebug(D_CONFUGA, id, tag, "storage node job %" PRICHIRP_JOBID_T " finished", cid);
+			C->operations++;
 
 			sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 			sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -1481,6 +1491,7 @@ static int job_reap (confuga *C)
 		const char *hostport = (const char *)sqlite3_column_text(stmt, 2);
 		chirp_jobid_t cid = sqlite3_column_int64(stmt, 3);
 		CATCHJOB(C, id, tag, jreap(C, id, tag, hostport, cid));
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1606,6 +1617,7 @@ static int job_complete (confuga *C)
 		} else {
 			assert(0);
 		}
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
@@ -1696,6 +1708,7 @@ static int job_kill (confuga *C)
 		const char *hostport = (const char *)sqlite3_column_text(stmt, 2);
 		chirp_jobid_t cid = sqlite3_column_int64(stmt, 3);
 		jkill(C, id, tag, hostport, cid);
+		C->operations++;
 	}
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
