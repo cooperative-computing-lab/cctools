@@ -1211,14 +1211,18 @@ static int do_invalidate_file(const char *filename) {
 	return -1;
 }
 
+static void finish_running_task(struct work_queue_process *p, work_queue_result_t result) {
+	p->task_status |= result;
+	kill(p->pid, SIGKILL);
+}
+
 static void finish_running_tasks(work_queue_result_t result) {
 	struct work_queue_process *p;
 	pid_t pid;
 
 	itable_firstkey(procs_running);
 	while(itable_nextkey(procs_running, (uint64_t*) &pid, (void**)&p)) {
-		p->task_status |= result;
-		kill(pid, SIGKILL);
+		finish_running_task(p, result);
 	}
 }
 
@@ -1242,14 +1246,15 @@ static int enforce_processes_limits() {
 	struct work_queue_process *p;
 	pid_t pid;
 
+	int ok = 1;
+
 	/* Do not check too often, as it is expensive (particularly disk) */
 	if((time(0) - last_check_time) < check_resources_interval ) return 1;
 
 	itable_firstkey(procs_table);
 	while(itable_nextkey(procs_table,(uint64_t*)&pid,(void**)&p)) {
 		if(!enforce_process_limits(p)) {
-			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
-			p->task_status = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
+			finish_running_task(p, WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 			/* we delete the sandbox, to free the exhausted resource. If a loop device is used, use remove loop device*/
 			if(p->loop_mount == 1) {
@@ -1258,13 +1263,14 @@ static int enforce_processes_limits() {
 			else {
 				delete_dir(p->sandbox);
 			}
-			return 0;
+
+			ok = 0;
 		}
 	}
 
 	last_check_time = time(0);
 
-	return 1;
+	return ok;
 }
 
 /* We check maximum_running_time by itself (not in enforce_processes_limits),
@@ -1404,13 +1410,49 @@ static int handle_master(struct link *master) {
 Return true if this task can run with the resources currently available.
 */
 
-static int check_for_resources(struct work_queue_task *t)
+static int task_resources_fit_now(struct work_queue_task *t)
 {
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
 		(memory_allocated + t->resources_requested->memory <= local_resources->memory.total) &&
 		(disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
 		(gpus_allocated   + t->resources_requested->gpus   <= local_resources->gpus.total);
+}
+
+/*
+Return true if this task can eventually run with the resources available. For
+example, this is needed for when the worker is launched without the --memory
+option, and the free available memory of the system is consumed by some other
+process.
+*/
+
+static int task_resources_fit_eventually(struct work_queue_task *t)
+{
+	struct work_queue_resources *r;
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		r = total_resources;
+	}
+	else {
+		r = local_resources;
+	}
+
+	return
+		(t->resources_requested->cores  <= r->cores.largest) &&
+		(t->resources_requested->memory <= r->memory.largest) &&
+		(t->resources_requested->disk   <= r->disk.largest) &&
+		(t->resources_requested->gpus   <= r->gpus.largest);
+}
+
+void forsake_waiting_process(struct link *master, struct work_queue_process *p) {
+
+	/* the task cannot run in this worker */
+	p->task_status = WORK_QUEUE_RESULT_FORSAKEN;
+	itable_insert(procs_complete, p->task->taskid, p);
+
+	/* we also send updated resources to the master. */
+	send_keepalive(master);
+
 }
 
 /*
@@ -1445,6 +1487,14 @@ static int enforce_worker_limits(struct link *master) {
 		return 0;
 	}
 
+	return 1;
+}
+
+/*
+If 0, the worker has less resources than promised. 1 otherwise.
+*/
+static int enforce_worker_promises(struct link *master) {
+
 	if( manual_disk_option > 0 && local_resources->disk.total < manual_disk_option) {
 		fprintf(stderr,"work_queue_worker: has less than the promised disk space (--disk > disk total) %"PRIu64" < %"PRIu64" MB\n", manual_disk_option, local_resources->disk.total);
 
@@ -1464,7 +1514,6 @@ static int enforce_worker_limits(struct link *master) {
 
 		return 0;
 	}
-
 
 	return 1;
 }
@@ -1534,14 +1583,23 @@ static void work_for_master(struct link *master) {
 
 		ok &= handle_tasks(master);
 
-		enforce_processes_max_running_time();
-		enforce_processes_limits();
-
 		measure_worker_resources();
 
-		if(!enforce_worker_limits(master)) {
+		if(!enforce_worker_promises(master)) {
 			abort_flag = 1;
 			break;
+		}
+
+		enforce_processes_max_running_time();
+
+		/* end a running processes if goes above its declared limits.
+		 * Mark offending process as RESOURCE_EXHASTION. */
+		enforce_processes_limits();
+
+		/* end running processes if worker resources are exhasusted, and
+		 * marked them as RESOURCE_EXHASTION. */
+		if(!enforce_worker_limits(master)) {
+			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 		}
 
 		if(ok && !results_to_be_sent_msg) {
@@ -1557,11 +1615,13 @@ static void work_for_master(struct link *master) {
 				struct work_queue_process *p;
 
 				p = list_pop_head(procs_waiting);
-				if(p && check_for_resources(p->task)) {
+				if(p && task_resources_fit_now(p->task)) {
 					start_process(p);
-				} else {
+				} else if(p && task_resources_fit_eventually(p->task)) {
 					list_push_tail(procs_waiting, p);
 					visited++;
+				} else {
+					forsake_waiting_process(master, p);
 				}
 			}
 
@@ -2395,7 +2455,7 @@ int main(int argc, char *argv[])
 		int result;
 
 		measure_worker_resources();
-		if(!enforce_worker_limits(NULL)) {
+		if(!enforce_worker_promises(NULL)) {
 			abort_flag = 1;
 			break;
 		}
