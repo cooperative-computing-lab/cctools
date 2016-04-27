@@ -1425,7 +1425,7 @@ static int enforce_worker_limits(struct link *master) {
 		return 0;
 	}
 
-	if( manual_disk_option > 0 && local_resources->disk.inuse > (manual_disk_option - disk_avail_threshold) ) {
+	if( manual_disk_option > 0 && local_resources->disk.inuse > (manual_disk_option - disk_avail_threshold/2) ) {
 		fprintf(stderr,"work_queue_worker: %s used more than declared disk space (--disk - --disk-threshold < disk used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", workspace, manual_disk_option, disk_avail_threshold, local_resources->disk.inuse);
 
 		if(master) {
@@ -1435,7 +1435,7 @@ static int enforce_worker_limits(struct link *master) {
 		return 0;
 	}
 
-	if( manual_memory_option > 0 && local_resources->memory.inuse > (manual_memory_option - memory_avail_threshold) ) {
+	if( manual_memory_option > 0 && local_resources->memory.inuse > (manual_memory_option - memory_avail_threshold/2) ) {
 		fprintf(stderr,"work_queue_worker: used more than declared memory (--memory - --memory-threshold < memory used) %"PRIu64" - %"PRIu64 " < %"PRIu64" MB\n", manual_memory_option, memory_avail_threshold, local_resources->memory.inuse);
 
 		if(master) {
