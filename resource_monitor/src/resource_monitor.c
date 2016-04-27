@@ -157,7 +157,8 @@ See the file COPYING for details.
 
 #define DEFAULT_INTERVAL       5               /* in seconds */
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
-#define PEAK_CORES_NUM_SAMPLES 10
+
+uint64_t interval = DEFAULT_INTERVAL;
 
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
@@ -767,26 +768,38 @@ struct peak_cores_sample {
 int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
+	int64_t max_separation = MIN(interval, 60);
+
 	if(!samples) {
+		samples = list_create(0);
+
 		struct peak_cores_sample *zero = malloc(sizeof(struct peak_cores_sample));
 		zero->wall_time = 0;
 		zero->cpu_time  = 0;
-
-		samples = list_create(0);
-		list_push_tail(samples,  zero);
+		list_push_tail(samples, zero);
 	}
 
 	struct peak_cores_sample *tail = malloc(sizeof(struct peak_cores_sample));
 	tail->wall_time = wall_time;
 	tail->cpu_time  = cpu_time;
-
 	list_push_tail(samples, tail);
 
-	if(list_size(samples) > PEAK_CORES_NUM_SAMPLES) {
-		free(list_pop_head(samples));
+	struct peak_cores_sample *head;
+
+	/* Drop entries older than max_separation, unless we only have two samples. */
+	while((head = list_peek_head(samples))) {
+		if(list_size(samples) < 2) {
+			break;
+		}
+		else if( head->wall_time + max_separation*USECOND < tail->wall_time) {
+			list_pop_head(samples);
+			free(head);
+		} else {
+			break;
+		}
 	}
 
-	struct peak_cores_sample *head = list_peek_head(samples);
+	head = list_peek_head(samples);
 
 	int64_t diff_wall = tail->wall_time - head->wall_time;
 	int64_t diff_cpu  = tail->cpu_time  - head->cpu_time;
@@ -1357,6 +1370,7 @@ int rmonitor_check_limits(struct rmsummary *tr)
 
 	over_limit_check(tr, start);
 	over_limit_check(tr, end);
+	over_limit_check(tr, cores);
 	over_limit_check(tr, wall_time);
 	over_limit_check(tr, cpu_time);
 	over_limit_check(tr, max_concurrent_processes);
@@ -1779,7 +1793,6 @@ int main(int argc, char **argv) {
     char *command_line;
     char *executable;
     int64_t c;
-    uint64_t interval = DEFAULT_INTERVAL;
 
     char *template_path = NULL;
     char *summary_path = NULL;
