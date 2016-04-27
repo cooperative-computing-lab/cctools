@@ -34,6 +34,8 @@ struct confuga {
 
 	time_t job_stats;
 	time_t transfer_stats;
+
+	uint64_t operations;
 };
 
 #define CONFUGA_TICKET_BITS 1024
