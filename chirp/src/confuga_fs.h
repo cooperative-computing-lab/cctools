@@ -32,8 +32,6 @@ struct confuga {
 
 	unsigned char ticket[20]; /* SHA1 of ticket */
 
-	time_t catalog_sync;
-	time_t sn_heartbeat;
 	time_t job_stats;
 	time_t transfer_stats;
 };
