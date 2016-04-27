@@ -593,7 +593,7 @@ out:
 	return rc;
 }
 
-static int job_schedule_fifo (confuga *C)
+static int job_schedule (confuga *C)
 {
 	static const char SQL[] =
 		"WITH"
@@ -612,6 +612,8 @@ static int job_schedule_fifo (confuga *C)
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
+
+	assert(C->scheduler == CONFUGA_SCHEDULER_FIFO);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, C->scheduler_n));
@@ -1782,9 +1784,7 @@ CONFUGA_IAPI int confugaJ_schedule (confuga *C)
 	job_stats(C);
 	job_new(C);
 	job_bind_inputs(C);
-	if (C->scheduler == CONFUGA_SCHEDULER_FIFO)
-		job_schedule_fifo(C);
-	else assert(0);
+	job_schedule(C);
 	job_replicate(C);
 	job_create(C);
 	job_commit(C);
