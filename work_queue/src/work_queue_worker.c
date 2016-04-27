@@ -1404,13 +1404,49 @@ static int handle_master(struct link *master) {
 Return true if this task can run with the resources currently available.
 */
 
-static int check_for_resources(struct work_queue_task *t)
+static int task_resources_fit_now(struct work_queue_task *t)
 {
 	return
 		(cores_allocated  + t->resources_requested->cores  <= local_resources->cores.total) &&
 		(memory_allocated + t->resources_requested->memory <= local_resources->memory.total) &&
 		(disk_allocated   + t->resources_requested->disk   <= local_resources->disk.total) &&
 		(gpus_allocated   + t->resources_requested->gpus   <= local_resources->gpus.total);
+}
+
+/*
+Return true if this task can eventually run with the resources available. For
+example, this is needed for when the worker is launched without the --memory
+option, and the free available memory of the system is consumed by some other
+process.
+*/
+
+static int task_resources_fit_eventually(struct work_queue_task *t)
+{
+	struct work_queue_resources *r;
+
+	if(worker_mode == WORKER_MODE_FOREMAN) {
+		r = total_resources;
+	}
+	else {
+		r = local_resources;
+	}
+
+	return
+		(t->resources_requested->cores  <= r->cores.largest) &&
+		(t->resources_requested->memory <= r->memory.largest) &&
+		(t->resources_requested->disk   <= r->disk.largest) &&
+		(t->resources_requested->gpus   <= r->gpus.largest);
+}
+
+void forsake_waiting_process(struct link *master, struct work_queue_process *p) {
+
+	/* the task cannot run in this worker */
+	p->task_status = WORK_QUEUE_RESULT_FORSAKEN;
+	itable_insert(procs_complete, p->task->taskid, p);
+
+	/* we also send updated resources to the master. */
+	send_keepalive(master);
+
 }
 
 /*
@@ -1557,11 +1593,13 @@ static void work_for_master(struct link *master) {
 				struct work_queue_process *p;
 
 				p = list_pop_head(procs_waiting);
-				if(p && check_for_resources(p->task)) {
+				if(p && task_resources_fit_now(p->task)) {
 					start_process(p);
-				} else {
+				} else if(p && task_resources_fit_eventually(p->task)) {
 					list_push_tail(procs_waiting, p);
 					visited++;
+				} else {
+					forsake_waiting_process(master, p);
 				}
 			}
 
