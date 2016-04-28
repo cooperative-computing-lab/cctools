@@ -12,6 +12,7 @@ COPYING for details.
 
 #include "jx.h"
 #include "int_sizes.h"
+#include "buffer.h"
 
 /* Environment variables names */
 #define RESOURCES_CORES  "CORES"
@@ -77,6 +78,7 @@ struct rmsummary_field
 };
 
 void rmsummary_print(FILE *stream, struct rmsummary *s, int pprint, struct jx *verbatim_fields);
+void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int only_resources);
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
@@ -96,7 +98,7 @@ struct list *rmsummary_parse_file_multiple(const char *filename);
 /**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
 struct rmsummary *rmsummary_parse_next(FILE *stream);
 
-struct jx *rmsummary_to_json(struct rmsummary *s, int only_resources);
+struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources);
 struct rmsummary *json_to_rmsummary(struct jx *j);
 
 struct rmsummary *rmsummary_create(signed char default_value);
