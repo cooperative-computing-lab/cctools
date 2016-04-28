@@ -82,6 +82,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
 	c->countdown_after_missing = countdown_after_missing_start;
+	c->count_good_series       = 0;
 
 	hash_table_insert(categories, name, c);
 
@@ -531,6 +532,7 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 
 	if(!rs) {
 		c->countdown_after_missing = countdown_after_missing_start;
+		c->count_good_series = 0;
 		return;
 	}
 
@@ -539,7 +541,8 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 	struct rmsummary *completed = c->max_resources_completed;
 
 	/* a new max has been seen, a no max_alloc was specified, so we go into
-	 * exploration mode. */
+	 * 'exploration mode'. tasks are dispatched using the maximum until
+	 * countdown_after_missing is less than 1.*/
 	if( (max->cores < 0 && seen->cores < rs->cores)
 			|| (max->memory < 0 && seen->memory < rs->memory)
 			|| (max->disk   < 0 && seen->disk   < rs->disk  ) )
@@ -571,8 +574,10 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 		category_inc_histogram_count(c, total_processes,rs, 1);
 
 		c->countdown_after_missing--;
+		c->count_good_series++;
 
-		/* only update completed tag when completed and seen are the same. */
+		/* update completed tag when completed and seen are the same. */
+
 		struct rmsummary *seen       = c->max_resources_seen;
 		struct rmsummary *completed  = c->max_resources_completed;
 
@@ -583,8 +588,23 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 				seen->memory    == completed->memory  &&
 				seen->disk      == completed->disk
 		  ) {
-			c->max_resources_completed->tag = accumulations_seen;
+			completed->tag = seen->tag;
 		}
+
+		/* also update the tag if enough tasks have been completed with no
+		 * error since last countdown. this is a little hackish, but avoids the
+		 * case in which the max_resources_seen are never measured again. This
+		 * sometimes occurs, for example, when the resource_monitor overcounts
+		 * memory involved in memory mapped IO.*/
+
+		if((c->count_good_series >= 2*countdown_after_missing_start)
+				&& completed->tag != seen->tag) {
+			rmsummary_merge_max(completed, seen);
+			completed->tag = seen->tag;
+		}
+	}
+	else {
+		c->count_good_series = 0;
 	}
 }
 

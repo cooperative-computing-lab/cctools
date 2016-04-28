@@ -93,6 +93,9 @@ struct category {
 	 * allocations to collect the missing max summaries. */
 	int countdown_after_missing;
 
+	/* count of summaries with "normal" exit type since the last not "normal". */
+	int count_good_series;
+
 	/* stats for wq */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;
