@@ -35,7 +35,7 @@ EOF
 	fi
 
 	echo "starting worker"
-	work_queue_worker -d all -o worker.log localhost $port --timeout 10 --cores $CORES --single-shot
+	work_queue_worker -d all -o worker.log localhost $port --timeout 10 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
 
 	echo "checking for output"
 	i=0

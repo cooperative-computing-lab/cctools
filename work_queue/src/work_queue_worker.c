@@ -291,7 +291,7 @@ void measure_worker_resources()
 		if(manual_cores_option > 0)
 			r->cores.total = manual_cores_option;
 		if(manual_memory_option)
-			r->memory.total = MIN(r->memory.total, manual_memory_option);
+			r->memory.total = manual_memory_option;
 		if(manual_gpus_option)
 			r->gpus.total = manual_gpus_option;
 	}
@@ -331,10 +331,11 @@ static void send_resource_update(struct link *master)
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		total_resources->disk.total = local_resources->disk.total;
 		total_resources->disk.inuse = local_resources->disk.inuse;
+	} else {
+		total_resources->memory.total = MAX(0, local_resources->memory.total - memory_avail_threshold);
 	}
 
-	total_resources->disk.total   = local_resources->disk.total   - disk_avail_threshold;
-	total_resources->memory.total = local_resources->memory.total - memory_avail_threshold;
+	total_resources->disk.total   = MAX(0, local_resources->disk.total - disk_avail_threshold);
 
 	work_queue_resources_send(master,total_resources,stoptime);
 	send_master_message(master, "info end_of_resource_update %d\n", 0);
@@ -1505,16 +1506,6 @@ static int enforce_worker_promises(struct link *master) {
 		return 0;
 	}
 
-	if( manual_memory_option > 0 && local_resources->memory.total < manual_memory_option) {
-		fprintf(stderr,"work_queue_worker: has less than the promised memory (--memory > memory total) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.total);
-
-		if(master) {
-			send_master_message(master, "info memory_error %lld\n", (long long) local_resources->memory.total);
-		}
-
-		return 0;
-	}
-
 	return 1;
 }
 
@@ -1623,22 +1614,6 @@ static void work_for_master(struct link *master) {
 				} else {
 					forsake_waiting_process(master, p);
 				}
-			}
-
-			// If all resources are free, but we cannot execute any of the
-			// waiting tasks, then disconnect so that the master gets the tasks
-			// back. (Imagine for example that some other process in the host
-			// running the worker used so much memory or disk, that now no task
-			// cannot be scheduled.) Note we check against procs_table, and
-			// not procs_running, so that we do not disconnect if there are
-			// results waiting to be sent back (which in turn may free some
-			// disk).  Note also this is a short-term solution. In the long
-			// term we want the worker to report to the master something like
-			// 'task not done'.
-			if(list_size(procs_waiting) > 0 && itable_size(procs_table) == 0)
-			{
-				debug(D_WQ, "No task can be executed with the available resources.\n");
-				ok = 0;
 			}
 		}
 
