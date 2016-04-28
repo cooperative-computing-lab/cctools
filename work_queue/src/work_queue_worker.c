@@ -1624,22 +1624,6 @@ static void work_for_master(struct link *master) {
 					forsake_waiting_process(master, p);
 				}
 			}
-
-			// If all resources are free, but we cannot execute any of the
-			// waiting tasks, then disconnect so that the master gets the tasks
-			// back. (Imagine for example that some other process in the host
-			// running the worker used so much memory or disk, that now no task
-			// cannot be scheduled.) Note we check against procs_table, and
-			// not procs_running, so that we do not disconnect if there are
-			// results waiting to be sent back (which in turn may free some
-			// disk).  Note also this is a short-term solution. In the long
-			// term we want the worker to report to the master something like
-			// 'task not done'.
-			if(list_size(procs_waiting) > 0 && itable_size(procs_table) == 0)
-			{
-				debug(D_WQ, "No task can be executed with the available resources.\n");
-				ok = 0;
-			}
 		}
 
 		if(!ok) break;
