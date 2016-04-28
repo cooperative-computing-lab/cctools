@@ -932,7 +932,7 @@ static int update_replicated (confuga *C)
 		CATCHJOB(C, id, tag, set_replicated(C, id));
 		C->operations++;
 	}
-	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	rc = 0;
