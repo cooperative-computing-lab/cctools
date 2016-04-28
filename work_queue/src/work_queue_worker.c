@@ -291,7 +291,7 @@ void measure_worker_resources()
 		if(manual_cores_option > 0)
 			r->cores.total = manual_cores_option;
 		if(manual_memory_option)
-			r->memory.total = MIN(r->memory.total, manual_memory_option);
+			r->memory.total = manual_memory_option;
 		if(manual_gpus_option)
 			r->gpus.total = manual_gpus_option;
 	}
@@ -1501,16 +1501,6 @@ static int enforce_worker_promises(struct link *master) {
 
 		if(master) {
 			send_master_message(master, "info disk_error %lld\n", (long long) local_resources->disk.total);
-		}
-
-		return 0;
-	}
-
-	if( manual_memory_option > 0 && local_resources->memory.total < manual_memory_option) {
-		fprintf(stderr,"work_queue_worker: has less than the promised memory (--memory > memory total) %"PRIu64" < %"PRIu64" MB\n", manual_memory_option, local_resources->memory.total);
-
-		if(master) {
-			send_master_message(master, "info memory_error %lld\n", (long long) local_resources->memory.total);
 		}
 
 		return 0;
