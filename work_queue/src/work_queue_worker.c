@@ -331,10 +331,11 @@ static void send_resource_update(struct link *master)
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		total_resources->disk.total = local_resources->disk.total;
 		total_resources->disk.inuse = local_resources->disk.inuse;
+	} else {
+		total_resources->memory.total = MAX(0, local_resources->memory.total - memory_avail_threshold);
 	}
 
-	total_resources->disk.total   = local_resources->disk.total   - disk_avail_threshold;
-	total_resources->memory.total = local_resources->memory.total - memory_avail_threshold;
+	total_resources->disk.total   = MAX(0, local_resources->disk.total - disk_avail_threshold);
 
 	work_queue_resources_send(master,total_resources,stoptime);
 	send_master_message(master, "info end_of_resource_update %d\n", 0);
