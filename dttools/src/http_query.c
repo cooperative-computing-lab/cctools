@@ -114,27 +114,23 @@ struct link *http_query_size_via_proxy(const char *proxy, const char *urlin, con
 		}
 	} else {
 		int fields = sscanf(url, "http://%[^:]:%d", actual_host, &actual_port);
+		size_t delta = strlen("http://") + strlen(actual_host);
 		if(fields != 2) {
 			fields = sscanf(url, "http://%[^/]", actual_host);
 			if(fields == 1) {
 				actual_port = HTTP_PORT;
-				goto prune_url;
 			} else {
 				debug(D_HTTP, "malformed url: %s", url);
 				return 0;
 			}
 		}
 
-prune_url:
-		{
-			/* When there is no proxy to be used, the Request-URI field should be abs_path. */
-			size_t delta = strlen("http://") + strlen(actual_host);
-			if(fields == 2) {
-				size_t s_port = snprintf(NULL, 0, "%d", actual_port);
-				delta = delta + 1 + s_port; /* 1 is for the colon between host and port. */
-			}
-			memmove(url, url + delta, strlen(url) - delta + 1); /* 1: copy the terminating null character */
+		/* When there is no proxy to be used, the Request-URI field should be abs_path. */
+		if(fields == 2) {
+			size_t s_port = snprintf(NULL, 0, "%d", actual_port);
+			delta = delta + 1 + s_port; /* 1 is for the colon between host and port. */
 		}
+		memmove(url, url + delta, strlen(url) - delta + 1); /* 1: copy the terminating null character */
 	}
 
 	debug(D_HTTP, "connect %s port %d", actual_host, actual_port);
