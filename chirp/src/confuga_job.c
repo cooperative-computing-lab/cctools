@@ -903,7 +903,7 @@ out:
 	return rc;
 }
 
-static int update_replicated (confuga *C)
+static int job_replicate (confuga *C)
 {
 	static const char SQL[] =
 		"SELECT ConfugaJob.id, ConfugaJob.tag"
@@ -915,7 +915,14 @@ static int update_replicated (confuga *C)
 		"				JOIN Confuga.File ON ConfugaInputFile.fid = File.id"
 		"				LEFT OUTER JOIN Confuga.Replica ON ConfugaInputFile.fid = Replica.fid AND ConfugaJob.sid = Replica.sid"
 		"			WHERE ConfugaInputFile.jid = ConfugaJob.id AND File.size >= ?1 AND Replica.fid IS NULL AND Replica.sid IS NULL"
-		"	);"
+		"	)"
+		";"
+		"SELECT ConfugaJob.id, ConfugaJob.tag"
+		"	FROM"
+		"		ConfugaJob"
+		"		LEFT OUTER JOIN Confuga.StorageNodeActive ON ConfugaJob.sid = StorageNodeActive.id"
+		"	WHERE ConfugaJob.state = 'SCHEDULED' AND StorageNodeActive.id IS NULL"
+		";"
 		;
 
 	int rc;
@@ -923,6 +930,7 @@ static int update_replicated (confuga *C)
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
 
+	/* check for jobs with all dependencies replicated */
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, C->pull_threshold));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -935,28 +943,28 @@ static int update_replicated (confuga *C)
 	sqlcatchcode(rc, SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-	rc = 0;
-	goto out;
-out:
-	sqlite3_finalize(stmt);
-	return rc;
-}
+	/* check for jobs scheduled on inactive storage nodes */
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		chirp_jobid_t id = sqlite3_column_int64(stmt, 0);
+		const char *tag = (const char *)sqlite3_column_text(stmt, 1);
+		jdebug(D_DEBUG, id, tag, "storage node lost");
+		reschedule(C, id, tag, ESRCH); /* someone else killed it? reschedule */
+	}
+	sqlcatchcode(rc, SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
-static int job_replicate (confuga *C)
-{
-	int rc;
-
-	update_replicated(C);
-
+	/* now replicate missing dependencies */
 	if (C->replication == CONFUGA_REPLICATION_PUSH_ASYNCHRONOUS)
-		replicate_push_asynchronous(C);
+		CATCH(replicate_push_asynchronous(C));
 	else if (C->replication == CONFUGA_REPLICATION_PUSH_SYNCHRONOUS)
-		replicate_push_synchronous(C);
+		CATCH(replicate_push_synchronous(C));
 	else assert(0);
 
 	rc = 0;
 	goto out;
 out:
+	sqlite3_finalize(stmt);
 	return rc;
 }
 
