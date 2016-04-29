@@ -90,11 +90,6 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, shm_path));
 	makeflow_log_file_expectation(n->d, enforcer_paths);
 
-	/* Create local directories to bind to /tmp, /var/tmp, and /dev/shm */
-	makeflow_make_tempdir(tmp_path);
-	makeflow_make_tempdir(vartmp_path);
-	makeflow_make_tempdir(shm_path);
-
 	makeflow_log_file_existence(n->d, enforcer_paths);
 	list_delete(enforcer_paths);
 
@@ -152,8 +147,15 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
 	}
 	fprintf(enforcer, "EOF\n\n");
+	fprintf(enforcer, "mkdir -p \"%s\"\n", tmp_path);
+	fprintf(enforcer, "mkdir -p \"%s\"\n", vartmp_path);
+	fprintf(enforcer, "mkdir -p \"%s\"\n", shm_path);
 	fprintf(enforcer, "./parrot_run -m \"$MOUNTFILE\" -- \"$@\"\n");
-	fprintf(enforcer, "exit $?\n");
+	fprintf(enforcer, "RC=$?\n");
+	fprintf(enforcer, "rm -rf \"%s\"\n", tmp_path);
+	fprintf(enforcer, "rm -rf \"%s\"\n", vartmp_path);
+	fprintf(enforcer, "rm -rf \"%s\"\n", shm_path);
+	fprintf(enforcer, "exit $RC\n");
 	fclose(enforcer);
 
 	makeflow_log_file_existence(n->d, enforcer_paths);
