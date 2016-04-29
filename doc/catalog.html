@@ -21,11 +21,11 @@
 
 <p style="text-align: right;"><b>Last edited: 29 April 2016</b></p>
 
-<p>Catalog servers function as connection points for tools that need to interact remotely. Tools can send free-form updates to a catalog server, and can query catalog servers to find other hosts matching some criteria. Catalog updates are sent via UDP, and the catalog server exposes an HTTP interface to view status and make queries.</p>
+<p>Catalog servers function as connection points for tools that need to interact remotely. Tools can send free-form updates to a catalog server, and can query catalog servers to find other hosts matching some criteria. Catalog updates are sent via UDP, and the catalog server exposes a JSON interface to view status and make queries.</p>
 
-<p>To check the status of all of the Chirp servers that are available for use,
-consult the Chirp <a href="http://catalog.cse.nd.edu:9097">storage catalog</a>.
-This web page is a list of all known Chirp servers and their locations.</p>
+<p>To check the status of servers that are available for use,
+consult <a href="http://catalog.cse.nd.edu:9097">Notre Dame's catalog server</a>.
+This web page lists details on all known servers and their locations.</p>
 
 <p>The default view for a catalog server is a human-readable summary. Machine-readable query output is also available at <tt>http://catalog-server/query.json</tt>. Many parts of cctools make use of a catalog server internally. Chirp servers send regular catalog updates indicating the host system's load, available disk space, cctools version, etc. Work Queue masters also advertise their projects through the catalog. When a worker starts, it can query the catalog to automatically discover a master to contact.</p>
 
