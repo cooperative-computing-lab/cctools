@@ -284,7 +284,7 @@ const struct rmsummary *task_max_declared_resources(struct work_queue *q, struct
 const struct rmsummary *task_max_resources(struct work_queue *q, struct work_queue_task *t);
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t);
 
-void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
+void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t, category_allocation_t request, int overflow);
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name);
 
 static void write_transaction(struct work_queue *q, const char *str);
@@ -1405,7 +1405,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 			resource_monitor_compress_logs(q, t);
 	}
 
-	work_queue_category_accumulate_task(q, t);
+	work_queue_category_accumulate_task(q, t, t->resource_request, t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 
 	// At this point, a task is completed.
 	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
@@ -4475,7 +4475,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
-	category_tune("countdown-after-missing-start", first_allocation_every_n_tasks);
+	category_tune("countdown-after-missing-start", 2*first_allocation_every_n_tasks);
 
 	// The value -1 indicates that fast abort is inactive by default
 	// fast abort depends on categories, thus set after them.
@@ -5620,8 +5620,7 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "first-allocation-every-n-tasks")) {
 		first_allocation_every_n_tasks = MAX(1, value);
-		category_tune("countdown-after-missing-start", first_allocation_every_n_tasks);
-
+		category_tune("count-needed-after-max-overflow", first_allocation_every_n_tasks);
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
@@ -6011,7 +6010,7 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 	}
 }
 
-void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
+void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t, category_allocation_t request, int overflow) {
 	const char *name   = t->category ? t->category : "default";
 	struct category *c = work_queue_category_lookup_or_create(q, name);
 
@@ -6026,7 +6025,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
-	category_accumulate_summary(c, t->resources_measured);
+	category_accumulate_summary(c, t->resources_measured, request, overflow);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{

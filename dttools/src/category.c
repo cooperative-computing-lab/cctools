@@ -32,7 +32,7 @@ static uint64_t time_bucket_size      = 60000000;  /* 1 minute */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
-static int64_t countdown_after_missing_start = 25;   /* tasks */
+static int64_t count_needed_after_max_overflow = 50;   /* tasks */
 
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
@@ -56,7 +56,6 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_allocation      = rmsummary_create(-1);
 	c->autolabel_resource  = rmsummary_create(0);
 
-	c->max_resources_completed = rmsummary_create(-1);
 	c->max_resources_seen      = rmsummary_create(-1);
 
 	c->cores_histogram          = itable_create(0);
@@ -81,7 +80,6 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
-	c->countdown_after_missing = countdown_after_missing_start;
 	c->count_good_series       = 0;
 
 	hash_table_insert(categories, name, c);
@@ -99,8 +97,8 @@ void category_specify_max_allocation(struct category *c, const struct rmsummary 
 void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
 
 	/* assume the user knows what they are doing by providing a guess. */
-	c->countdown_after_missing = 0;
 	c->first_allocation_time = time(0);
+	c->count_good_series = count_needed_after_max_overflow;
 
 	if(c->first_allocation)
 		rmsummary_delete(c->first_allocation);
@@ -219,7 +217,6 @@ void category_delete(struct hash_table *categories, const char *name) {
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
 	rmsummary_delete(c->autolabel_resource);
-	rmsummary_delete(c->max_resources_completed);
 	rmsummary_delete(c->max_resources_seen);
 
 	free(c);
@@ -526,37 +523,21 @@ void category_update_first_allocation(struct category *c, const struct rmsummary
 }
 
 
-void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
-	static int64_t accumulations_seen = 0;
-	accumulations_seen++;
-
-	if(!rs) {
-		c->countdown_after_missing = countdown_after_missing_start;
-		c->count_good_series = 0;
-		return;
-	}
-
-	struct rmsummary *max       = c->max_allocation;
-	struct rmsummary *seen      = c->max_resources_seen;
-	struct rmsummary *completed = c->max_resources_completed;
-
-	/* a new max has been seen, a no max_alloc was specified, so we go into
-	 * 'exploration mode'. tasks are dispatched using the maximum until
-	 * countdown_after_missing is less than 1.*/
-	if( (max->cores < 0 && seen->cores < rs->cores)
-			|| (max->memory < 0 && seen->memory < rs->memory)
-			|| (max->disk   < 0 && seen->disk   < rs->disk  ) )
-	{
-		c->countdown_after_missing = countdown_after_missing_start;
-	}
+void category_accumulate_summary(struct category *c, struct rmsummary *rs, category_allocation_t request, int overflow) {
 
 	rmsummary_merge_max(c->max_resources_seen, rs);
 
-	c->max_resources_seen->tag = accumulations_seen;
+	/* a new max has been seen with an overflow we go to 'exploration mode'.
+	 * tasks are dispatched using the whole workers until
+	 * c->count_good_series >= * count_needed_after_max_overflow */
+	if(overflow) {
+		if(!rs || request == CATEGORY_ALLOCATION_MAX) {
+			c->count_good_series = 0;
+		}
+		return;
+	}
 
 	if(!rs->exit_type || !strcmp(rs->exit_type, "normal")) {
-		rmsummary_merge_max(completed, rs);
-
 		category_inc_histogram_count(c, cores,          rs, 1);
 		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
 		category_inc_histogram_count(c, wall_time,      rs, time_bucket_size);
@@ -573,38 +554,7 @@ void category_accumulate_summary(struct category *c, struct rmsummary *rs) {
 		category_inc_histogram_count(c, max_concurrent_processes, rs, 1);
 		category_inc_histogram_count(c, total_processes,rs, 1);
 
-		c->countdown_after_missing--;
 		c->count_good_series++;
-
-		/* update completed tag when completed and seen are the same. */
-
-		struct rmsummary *seen       = c->max_resources_seen;
-		struct rmsummary *completed  = c->max_resources_completed;
-
-		if(
-				seen->wall_time == completed->wall_time &&
-				seen->cpu_time  == completed->cpu_time  &&
-				seen->cores     == completed->cores  &&
-				seen->memory    == completed->memory  &&
-				seen->disk      == completed->disk
-		  ) {
-			completed->tag = seen->tag;
-		}
-
-		/* also update the tag if enough tasks have been completed with no
-		 * error since last countdown. this is a little hackish, but avoids the
-		 * case in which the max_resources_seen are never measured again. This
-		 * sometimes occurs, for example, when the resource_monitor overcounts
-		 * memory involved in memory mapped IO.*/
-
-		if((c->count_good_series >= 2*countdown_after_missing_start)
-				&& completed->tag != seen->tag) {
-			rmsummary_merge_max(completed, seen);
-			completed->tag = seen->tag;
-		}
-	}
-	else {
-		c->count_good_series = 0;
 	}
 }
 
@@ -631,7 +581,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	while((s = list_pop_head(summaries))) {
 		if(s->category) {
 			c = category_lookup_or_create(categories, s->category);
-			category_accumulate_summary(c, s);
+			category_accumulate_summary(c, s, CATEGORY_ALLOCATION_MAX, /* overflow */ 0);
 		}
 		rmsummary_delete(s);
 	}
@@ -706,15 +656,11 @@ const struct rmsummary *category_dynamic_task_max_declared_resources(struct cate
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
 
-	struct rmsummary *seen       = c->max_resources_seen;
-	struct rmsummary *completed  = c->max_resources_completed;
-
 	/* load max values */
 	rmsummary_merge_override(internal, max);
 
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
-			&& c->countdown_after_missing < 1
-			&& seen->tag == completed->tag
+			&& c->count_good_series >= count_needed_after_max_overflow
 			&& request == CATEGORY_ALLOCATION_FIRST) {
 		rmsummary_merge_override(internal, first);
 	}
@@ -739,11 +685,9 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	internal = rmsummary_create(-1);
 
 	struct rmsummary *seen       = c->max_resources_seen;
-	struct rmsummary *completed  = c->max_resources_completed;
 
 	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
-			&& c->countdown_after_missing < 1
-			&& seen->tag == completed->tag) {
+			&& c->count_good_series >= count_needed_after_max_overflow) {
 		internal->cores  = seen->cores;
 		internal->memory = seen->memory;
 		internal->disk   = seen->disk;
@@ -793,7 +737,7 @@ void category_tune(const char *resource, uint64_t size) {
 		bytes_bucket_size = size;
 	} else if(strcmp(resource, "bandwidth") == 0) {
 		bandwidth_bucket_size = size;
-	} else if(strcmp(resource, "countdown-after-missing-start")) {
-		countdown_after_missing_start = size;
+	} else if(strcmp(resource, "count-needed-after-max-overflow")) {
+		count_needed_after_max_overflow = size;
 	}
 }

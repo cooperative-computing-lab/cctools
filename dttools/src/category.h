@@ -54,7 +54,6 @@ struct category {
 	struct rmsummary *max_allocation;
 
 	struct rmsummary *max_resources_seen;
-	struct rmsummary *max_resources_completed;
 
 	/* if 1, use first allocations. 0, use max fixed (if given) */
 	struct rmsummary *autolabel_resource;
@@ -85,15 +84,9 @@ struct category {
 	/* last time, in seconds, that the first allocation was computed. */
 	time_t first_allocation_time;
 
-	/* countdown of completed tasks after a NULL summary. Sometimes a worker
-	 * may report resource exhaustion, but no summary for a task was recovered.
-	 * On such case, this counter is reset. No first_allocation,
-	 * max_resources_completed are used unless this counter is less than one.
-	 * This gives the chance to the system to deploy tasks with maximum
-	 * allocations to collect the missing max summaries. */
-	int countdown_after_missing;
-
-	/* count of summaries with "normal" exit type since the last not "normal". */
+	/* count of summaries since the last resources exhaustion on a
+	 * CATEGORY_ALLOCATION_MAX. first-allocations are only used when
+	 * count_good_series >= count_needed_after_max_overflow. */
 	int count_good_series;
 
 	/* stats for wq */
@@ -117,7 +110,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
-void category_accumulate_summary(struct category *c, struct rmsummary *rs);
+void category_accumulate_summary(struct category *c, struct rmsummary *rs, category_allocation_t request, int overflow);
 void category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);

@@ -324,10 +324,10 @@ struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table
 
 	if(categories) {
 		struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
-		category_accumulate_summary(c, so);
+		category_accumulate_summary(c, so, CATEGORY_ALLOCATION_MAX, /* overflow */ 0);
 		if(so->category) {
 			c = category_lookup_or_create(categories, so->category);
-			category_accumulate_summary(c, so);
+			category_accumulate_summary(c, so, CATEGORY_ALLOCATION_MAX, /* overflow */ 0);
 		}
 	}
 
