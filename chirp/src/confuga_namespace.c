@@ -7,8 +7,10 @@ See the file COPYING for details.
 #include "confuga_fs.h"
 
 #include "catch.h"
+#include "compat-at.h"
 #include "debug.h"
 #include "full_io.h"
+#include "mkdir_recursive.h"
 #include "path.h"
 
 #include <dirent.h>
@@ -18,65 +20,216 @@ See the file COPYING for details.
 
 #include <sys/stat.h>
 #if defined(HAS_ATTR_XATTR_H)
-#include <attr/xattr.h>
+#	include <attr/xattr.h>
 #elif defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
+#	include <sys/xattr.h>
 #endif
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
-#if defined(CCTOOLS_OPSYS_CYGWIN) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
-#	include <sys/mount.h>
-#	include <sys/param.h>
-#	define fstat64 fstat
-#	define lstat64 lstat
-#	define open64 open
+#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
 #	define stat64 stat
+#	define fstat64 fstat
+#	define ftruncate64 ftruncate
 #	define statfs64 statfs
+#	define fstatfs64 fstatfs
+#	define fstatat64 fstatat
+#elif defined(CCTOOLS_OPSYS_SUNOS)
+	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
+#	define statfs statvfs
+#	define fstatfs fstatvfs
+#	define statfs64 statvfs64
+#	define fstatfs64 fstatvfs64
 #endif
 
 #ifdef CCTOOLS_OPSYS_DARWIN
-#	define _getxattr(path,name,data,size) getxattr(path,name,data,size,0,0)
-#	define _lgetxattr(path,name,data,size) getxattr(path,name,data,size,0,XATTR_NOFOLLOW)
-#	define _listxattr(path,list,size) listxattr(path,list,size,0)
-#	define _llistxattr(path,list,size) listxattr(path,list,size,XATTR_NOFOLLOW)
-#	define _lremovexattr(path,name) removexattr(path,name,XATTR_NOFOLLOW)
-#	define _lsetxattr(path,name,data,size,flags) setxattr(path,name,data,size,0,XATTR_NOFOLLOW|flags)
-#	define _removexattr(path,name) removexattr(path,name,0)
-#	define _setxattr(path,name,data,size,flags) setxattr(path,name,data,size,0,flags)
+#	define _fgetxattr(fd,name,data,size) fgetxattr(fd,name,data,size,0,0)
+#	define _flistxattr(fd,list,size) flistxattr(fd,list,size,0)
+#	define _fremovexattr(fd,name) fremovexattr(fd,name,XATTR_NOFOLLOW)
+#	define _fsetxattr(fd,name,data,size,flags) fsetxattr(fd,name,data,size,0,XATTR_NOFOLLOW|flags)
 #else
-#	define _getxattr(path,name,data,size) getxattr(path,name,data,size)
-#	define _lgetxattr(path,name,data,size) lgetxattr(path,name,data,size)
-#	define _listxattr(path,list,size) listxattr(path,list,size)
-#	define _llistxattr(path,list,size) llistxattr(path,list,size)
-#	define _lremovexattr(path,name) lremovexattr(path,name)
-#	define _lsetxattr(path,name,data,size,flags) lsetxattr(path,name,data,size,flags)
-#	define _removexattr(path,name) removexattr(path,name)
-#	define _setxattr(path,name,data,size,flags) setxattr(path,name,data,size,flags)
+#	define _fgetxattr(fd,name,data,size) fgetxattr(fd,name,data,size)
+#	define _flistxattr(fd,list,size) flistxattr(fd,list,size)
+#	define _fremovexattr(fd,name) fremovexattr(fd,name)
+#	define _fsetxattr(fd,name,data,size,flags) fsetxattr(fd,name,data,size,flags)
 #endif
 
-#define RESOLVE(path) \
-const char *unresolved_##path = path;\
-char resolved_##path[CONFUGA_PATH_MAX];\
-CATCH(resolve(C, path, resolved_##path));\
-path = resolved_##path;\
-(void)unresolved_##path; /* silence errors */
+#ifndef O_CLOEXEC
+#	define O_CLOEXEC 0
+#endif
+#ifndef O_DIRECTORY
+#	define O_DIRECTORY 0
+#endif
+#ifndef O_NOFOLLOW
+#	define O_NOFOLLOW 0
+#endif
+
+static const char nulpath[1] = "";
+
+#define RESOLVE(path, follow) \
+	int dirfd_##path;\
+	char basename_##path[CONFUGA_PATH_MAX];\
+	CATCH(resolve(C, path, &dirfd_##path, basename_##path, follow));\
+	strcpy(basename, basename_##path);\
+	path = nulpath;\
+	dirfd = dirfd_##path;
+
+#define PREAMBLE(fmt, ...) \
+	int rc;\
+	int dirfd = -1;\
+	char basename[CONFUGA_PATH_MAX];\
+	debug(D_CONFUGA, fmt, __VA_ARGS__);\
+	(void)rc;\
+	(void)dirfd;\
+	(void)basename[1];
 
 #define PROLOGUE \
-	rc = 0;\
 	goto out;\
 out:\
 	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));\
+	CLOSE_FD(dirfd);\
 	return rc;
 
-#define SIMPLE_WRAP_UNIX(expr, fmt, ...) \
-	RESOLVE(path);\
-	debug(D_CONFUGA, (fmt), __VA_ARGS__);\
-	CATCHUNIX((expr));\
+#define SIMPLE_WRAP_UNIX(follow, expr, fmt, ...) \
+	PREAMBLE(fmt, __VA_ARGS__)\
+	RESOLVE(path, (follow))\
+	rc = UNIXRC(expr);\
 	PROLOGUE
+
+static int resolve (confuga *C, const char *path, int *dirfd, char basename[CONFUGA_PATH_MAX], int follow)
+{
+	int i;
+	int rc;
+	int fd;
+	char working[CONFUGA_PATH_MAX] = "";
+	struct stat rootinfo;
+
+	if (path[0] == 0)
+		CATCH(EINVAL);
+
+	CATCHUNIX(fstat(C->nsrootfd, &rootinfo));
+
+	CATCHUNIX(fd = dup(C->nsrootfd));
+
+	CATCHUNIX(snprintf(working, sizeof(working), "%s", path));
+	if (rc >= CONFUGA_PATH_MAX)
+		CATCH(ENAMETOOLONG);
+
+	for (i = 0; i < 100; i++) {
+		char component[CONFUGA_PATH_MAX];
+
+		debug(D_DEBUG, "path '%s' resolution: working = '%s'", path, working);
+		strcpy(basename, ""); /* mark as incomplete */
+
+		char *slash = strchr(working, '/');
+		if (slash) {
+			if (slash == working) {
+				while (*slash == '/') slash++;
+				memmove(working, slash, strlen(slash)+1);
+				CATCHUNIX(dup2(C->nsrootfd, fd));
+				continue;
+			} else {
+				size_t len = (size_t)(slash-working);
+				memcpy(component, working, len);
+				component[len] = 0;
+				memmove(working, slash+1, strlen(slash+1)+1);
+			}
+			debug(D_DEBUG, "path '%s' resolution: component = '%s'", path, component);
+		} else {
+			if (working[0]) {
+				strcpy(basename, working);
+			} else {
+				strcpy(basename, "."); /* refer to dirfd itself */
+			}
+			debug(D_DEBUG, "path '%s' resolution: final component: %s", path, basename);
+			if (!follow)
+				break; /* we're done! */
+			strcpy(component, working);
+			strcpy(working, "");
+		}
+
+		if (strcmp(component, "..") == 0) {
+			struct stat info;
+			CATCHUNIX(fstat(fd, &info));
+			if (rootinfo.st_dev == info.st_dev && rootinfo.st_ino == info.st_ino) {
+				debug(D_DEBUG, "caught .. at root");
+				continue;
+			}
+		} else if (strcmp(component, ".") == 0) {
+			continue;
+		} else {
+			char _sym[CONFUGA_PATH_MAX] = "";
+			char *sym = _sym;
+			ssize_t n = readlinkat(fd, component, sym, CONFUGA_PATH_MAX);
+			if (n >= 0) {
+				if (n < CONFUGA_PATH_MAX) {
+					char new[CONFUGA_PATH_MAX];
+					debug(D_DEBUG, "path '%s' resolution: component link: '%s' -> '%s'", path, component, sym);
+					CATCHUNIX(snprintf(new, CONFUGA_PATH_MAX, "%s/%s", sym, working));
+					if (rc >= CONFUGA_PATH_MAX)
+						CATCH(ENAMETOOLONG);
+					strcpy(working, new);
+					continue;
+				} else {
+					CATCH(ENAMETOOLONG);
+				}
+			}
+		}
+
+		if (basename[0]) {
+			break; /* we found the final component and it wasn't a link, we're done */
+		}
+
+		if (working[0] == 0) {
+			/* On Linux and possibly other kernels, some system calls like
+			 * rmdir/mkdir permit a trailing slash. Strictly speaking, this
+			 * should always fail since Unix [1] specifies that paths ending in
+			 * a forward slash are equivalent to "path/." (i.e. with a trailing
+			 * . added). rmdir on a path with a trailing dot shall always fail
+			 * [2]. Obviously mkdir on . should also fail with EEXIST.
+			 *
+			 * At this point, we already removed / after this component, so we
+			 * only check if working is empty. The if above checks this. We've
+			 * already confirmed component is not a link.
+			 *
+			 * [1] http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_12
+			 * [2] http://pubs.opengroup.org/onlinepubs/9699919799/functions/rmdir.html
+			*/
+			strcpy(basename, component);
+			break;
+		}
+
+		/* XXX Unavoidable race condition here between readlinkat and openat. O_NOFOLLOW catches it if supported by kernel. */
+		/* Solution is using O_PATH if available. */
+
+		int nfd = openat(fd, component, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOFOLLOW|O_NOCTTY, 0);
+		CATCHUNIX(nfd);
+		close(fd);
+		fd = nfd;
+#if O_DIRECTORY == 0
+		struct stat info;
+		CATCHUNIX(fstat(fd, &info));
+		if (!S_ISDIR(info.st_mode))
+			CATCH(ENOTDIR);
+#endif
+	}
+	if (i == 100)
+		CATCH(ELOOP);
+
+	*dirfd = fd;
+
+	rc = 0;
+	goto out;
+out:
+	if (rc) {
+		CLOSE_FD(fd);
+	}
+
+	return rc;
+}
 
 /* Each file in the namespace is stored as a replicated file or a metadata object:
  *
@@ -89,24 +242,7 @@ enum CONFUGA_FILE_TYPE {
 	CONFUGA_META,
 };
 
-static int resolve (confuga *C, const char *path, char resolved[CONFUGA_PATH_MAX])
-{
-	int rc;
-	char collapse[CONFUGA_PATH_MAX];
-	char absolute[CONFUGA_PATH_MAX];
-	path_collapse(path, collapse, 1);
-	CATCHUNIX(snprintf(absolute, sizeof(absolute), "%s/root/%s", C->root, collapse));
-	if ((size_t)rc >= CONFUGA_PATH_MAX)
-		CATCH(ENAMETOOLONG);
-	path_collapse(absolute, resolved, 1);
-
-	rc = 0;
-	goto out;
-out:
-	return rc;
-}
-
-static int lookup (confuga *C, const char *path, confuga_fid_t *fid, confuga_off_t *size, enum CONFUGA_FILE_TYPE *type)
+static int lookup (confuga *C, int dirfd, const char *basename, confuga_fid_t *fid, confuga_off_t *size, enum CONFUGA_FILE_TYPE *type)
 {
 	int rc;
 	int fd = -1;
@@ -114,9 +250,11 @@ static int lookup (confuga *C, const char *path, confuga_fid_t *fid, confuga_off
 	char header[HEADER_LENGTH+1] = "";
 	struct stat64 info;
 
-	fd = open(path, O_RDONLY);
-	CATCHUNIX(fd);
-
+	if (basename[0]) {
+		CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY, 0));
+	} else {
+		fd = dirfd;
+	}
 	CATCHUNIX(fstat64(fd, &info));
 	if (S_ISDIR(info.st_mode))
 		CATCH(EISDIR);
@@ -132,7 +270,7 @@ static int lookup (confuga *C, const char *path, confuga_fid_t *fid, confuga_off
 	if (strncmp(current, "file:", strlen("file:")) == 0)
 		*type = CONFUGA_FILE;
 	else if (strncmp(current, "meta:", strlen("meta:")) == 0)
-		*type = CONFUGA_FILE;
+		*type = CONFUGA_META;
 	else
 		CATCH(EINVAL);
 	current += 5;
@@ -157,11 +295,12 @@ static int lookup (confuga *C, const char *path, confuga_fid_t *fid, confuga_off
 	rc = 0;
 	goto out;
 out:
-	close(fd);
+	if (fd != dirfd)
+		CLOSE_FD(fd);
 	return rc;
 }
 
-static int update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size, int flags)
+static int update (confuga *C, int dirfd, const char *basename, confuga_fid_t fid, confuga_off_t size, int flags)
 {
 	int rc;
 	int fd = -1;
@@ -172,42 +311,38 @@ static int update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_
 	if (flags & CONFUGA_O_EXCL)
 		oflags |= O_EXCL;
 
-	fd = open(path, oflags, S_IRUSR|S_IWUSR);
-	CATCHUNIX(fd);
+	CATCHUNIX(fd = openat(dirfd, basename, oflags, S_IRUSR|S_IWUSR));
 	n = snprintf(header, sizeof(header), "file:" CONFUGA_FID_PRIFMT ":%0*" PRIxCONFUGA_OFF_T "\n", CONFUGA_FID_PRIARGS(fid), (int)sizeof(confuga_off_t)*2, (confuga_off_t)size);
 	assert((size_t)n == HEADER_LENGTH);
-	rc = full_write(fd, header, HEADER_LENGTH);
-	CATCHUNIX(rc);
+	CATCHUNIX(full_write(fd, header, HEADER_LENGTH));
 	if ((size_t)rc < HEADER_LENGTH)
 		CATCH(EINVAL); /* FIXME */
-	debug(D_DEBUG, "write `%s'", header); /* debug chomps final newline */
+	debug(D_DEBUG, "write %s", header); /* debug chomps final newline */
 
 	rc = 0;
 	goto out;
 out:
-	close(fd); /* -1 is a NOP */
+	if (fd != dirfd)
+		CLOSE_FD(fd);
 	return rc;
 }
 
 CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **data, size_t *size)
 {
-	int rc;
 	int fd = -1;
 	struct stat64 info;
 	ssize_t n;
 	size_t _size;
 	char header[HEADER_LENGTH+1] = "";
 	confuga_fid_t fid;
-	RESOLVE(path);
+
+	PREAMBLE("metadata_lookup(`%s')", path)
+	RESOLVE(path, 1)
 
 	if (size == NULL)
 		size = &_size;
 
-	debug(D_CONFUGA, "metadata_lookup(`%s')", unresolved_path);
-
-	fd = open(path, O_RDONLY);
-	CATCHUNIX(fd);
-
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY, 0));
 	CATCHUNIX(fstat64(fd, &info));
 	if (S_ISDIR(info.st_mode))
 		CATCH(EISDIR);
@@ -217,7 +352,7 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	n = read(fd, header, HEADER_LENGTH);
 	if (n < (ssize_t)HEADER_LENGTH)
 		CATCH(EINVAL);
-	debug(D_DEBUG, "read `%s'", header); /* debug chomps final newline */
+	debug(D_DEBUG, "read %s", header); /* debug chomps final newline */
 
 	const char *current = header;
 	if (!(strncmp(current, "meta:", strlen("meta:")) == 0))
@@ -246,7 +381,8 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	goto out;
 out:
 	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));
-	close(fd); /* -1 is a NOP */
+	CLOSE_FD(fd);
+	CLOSE_FD(dirfd);
 	return rc;
 }
 
@@ -254,26 +390,21 @@ CONFUGA_API int confuga_metadata_update (confuga *C, const char *path, const cha
 {
 	static const confuga_fid_t fid = {""};
 
-	int rc;
 	int fd = -1;
 	int n;
 	char header[HEADER_LENGTH+1] = "";
-	RESOLVE(path);
+	PREAMBLE("metadata_update(`%s')", path)
+	RESOLVE(path, 1)
 
-	debug(D_CONFUGA, "metadata_update(`%s')", unresolved_path);
-
-	fd = open(path, O_CREAT|O_WRONLY|O_TRUNC|O_SYNC, S_IRUSR|S_IWUSR);
-	CATCHUNIX(fd);
+	CATCHUNIX(fd = openat(dirfd, basename, O_CREAT|O_WRONLY|O_TRUNC|O_SYNC, S_IRUSR|S_IWUSR));
 	n = snprintf(header, sizeof(header), "meta:" CONFUGA_FID_PRIFMT ":%0*" PRIxCONFUGA_OFF_T "\n", CONFUGA_FID_PRIARGS(fid), (int)sizeof(confuga_off_t)*2, (confuga_off_t)size);
 	assert((size_t)n == HEADER_LENGTH);
-	rc = full_write(fd, header, HEADER_LENGTH);
-	CATCHUNIX(rc);
+	CATCHUNIX(full_write(fd, header, HEADER_LENGTH));
 	if ((size_t)rc < HEADER_LENGTH)
 		CATCH(EINVAL); /* FIXME */
 	debug(D_DEBUG, "write `%s'", header); /* debug chomps final newline */
 
-	rc = full_write(fd, data, size);
-	CATCHUNIX(rc);
+	CATCHUNIX(full_write(fd, data, size));
 	if ((size_t)rc < size)
 		CATCH(EINVAL); /* FIXME */
 	debug(D_DEBUG, "write `%s'", data); /* debug chomps final newline */
@@ -282,82 +413,121 @@ CONFUGA_API int confuga_metadata_update (confuga *C, const char *path, const cha
 	goto out;
 out:
 	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));
-	close(fd); /* -1 is a NOP */
+	CLOSE_FD(fd);
+	CLOSE_FD(dirfd);
+	return rc;
+}
+
+static int dostat (confuga *C, int dirfd, const char *basename, struct confuga_stat *info, int flag)
+{
+	int rc;
+	struct stat64 linfo;
+	enum CONFUGA_FILE_TYPE type;
+	CATCHUNIX(fstatat64(dirfd, basename, &linfo, flag));
+	if (S_ISREG(linfo.st_mode)) {
+		CATCH(lookup(C, dirfd, basename, &info->fid, &info->size, &type));
+	} else {
+		info->size = linfo.st_size;
+	}
+	info->ino = linfo.st_ino;
+	info->mode = linfo.st_mode;
+	info->uid = linfo.st_uid;
+	info->gid = linfo.st_gid;
+	info->nlink = linfo.st_nlink;
+	info->atime = linfo.st_atime;
+	info->mtime = linfo.st_mtime;
+	info->ctime = linfo.st_ctime;
+	rc = 0;
+	goto out;
+out:
 	return rc;
 }
 
 struct confuga_dir {
 	confuga *C;
 	DIR *dir;
-	char path[CONFUGA_PATH_MAX];
 	struct confuga_dirent dirent;
 };
 
 CONFUGA_API int confuga_opendir(confuga *C, const char *path, confuga_dir **D)
 {
-	int rc;
-	RESOLVE(path);
-	debug(D_CONFUGA, "opendir(`%s')", unresolved_path);
+	int fd = -1;
+	DIR *dir = NULL;
+	PREAMBLE("opendir(`%s')", path)
+	RESOLVE(path, 1)
 	*D = malloc(sizeof(confuga_dir));
 	if (*D == NULL) CATCH(ENOMEM);
-	DIR *dir = opendir(path);
-	if(dir) {
-		(*D)->C = C;
-		(*D)->dir = dir;
-		strcpy((*D)->path, unresolved_path);
-		return 0;
-	} else {
-		CATCH(errno);
-	}
+	CATCHUNIX(fd = openat(dirfd, basename, O_CLOEXEC|O_DIRECTORY|O_NOCTTY|O_NOFOLLOW|O_RDONLY, 0));
+	dir = fdopendir(fd);
+	CATCHUNIX(dir ? 0 : -1);
+	debug(D_CONFUGA, "opened dirfd %d", fd);
+	(*D)->C = C;
+	(*D)->dir = dir;
+	rc = 0;
+	goto out;
 out:
 	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));
-	if (rc)
+	if (rc) {
 		free(*D);
+		CLOSE_FD(fd);
+	}
+	CLOSE_FD(dirfd);
 	return rc;
 }
 
 CONFUGA_API int confuga_readdir(confuga_dir *dir, struct confuga_dirent **dirent)
 {
 	int rc;
-	debug(D_CONFUGA, "readdir(`%s')", dir->path);
+	debug(D_CONFUGA, "readdir(%d)", dirfd(dir->dir));
 	/* N.B. only way to detect an error in readdir is to set errno to 0 and check after. */
 	errno = 0;
 	struct dirent *d = readdir(dir->dir);
 	if (d) {
-		char path[CONFUGA_PATH_MAX];
-		snprintf(path, sizeof(path)-1, "%s/%s", dir->path, d->d_name);
+		assert(strchr(d->d_name, '/') == NULL);
 		dir->dirent.name = d->d_name;
 		memset(&dir->dirent.info, 0, sizeof(dir->dirent.info));
-		dir->dirent.lstatus = confuga_lstat(dir->C, path, &dir->dirent.info);
+		dir->dirent.lstatus = do_stat(dir->C, dirfd(dir->dir), d->d_name, &dir->dirent.info, AT_SYMLINK_NOFOLLOW);
 		*dirent = &dir->dirent;
 	} else {
 		*dirent = NULL;
 		CATCH(errno);
 	}
-	PROLOGUE
+	rc = 0;
+	goto out;
+out:
+	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));
+	return rc;
 }
 
 CONFUGA_API int confuga_closedir(confuga_dir *dir)
 {
 	int rc;
 	DIR *ldir = dir->dir;
-	debug(D_CONFUGA, "closedir(`%s')", dir->path);
+	debug(D_CONFUGA, "closedir(%d)", dirfd(dir->dir));
 	free(dir);
 	CATCHUNIX(closedir(ldir));
-	PROLOGUE
+	rc = 0;
+	goto out;
+out:
+	debug(D_CONFUGA, "= %d (%s)", rc, strerror(rc));
+	return rc;
 }
 
 CONFUGA_API int confuga_unlink(confuga *C, const char *path)
 {
-	int rc;
-	SIMPLE_WRAP_UNIX(unlink(path), "unlink(`%s')", unresolved_path);
+	SIMPLE_WRAP_UNIX(0, unlinkat(dirfd, basename, 0), "unlink(`%s')", path);
 }
 
 CONFUGA_API int confuga_rename(confuga *C, const char *old, const char *path)
 {
-	int rc;
-	RESOLVE(old);
-	SIMPLE_WRAP_UNIX(rename(old, path), "rename(`%s', `%s')", unresolved_old, unresolved_path);
+	PREAMBLE("rename(`%s', `%s')", old, path)
+	RESOLVE(old, 0)
+	RESOLVE(path, 0)
+	dirfd = -1; /* so prologue doesn't close it */
+	rc = UNIXRC(renameat(dirfd_old, basename_old, dirfd_path, basename_path)); /* no CATCH so we can close dirfd */
+	CLOSE_FD(dirfd_old);
+	CLOSE_FD(dirfd_path);
+	PROLOGUE
 }
 
 CONFUGA_API int confuga_link(confuga *C, const char *target, const char *path)
@@ -372,75 +542,56 @@ CONFUGA_API int confuga_link(confuga *C, const char *target, const char *path)
 	 * The inode also points to file data which includes the Confuga file ID.
 	 * This would be an identifier for the content, not the metadata.
 	 */
-	int rc;
-	RESOLVE(target);
-	SIMPLE_WRAP_UNIX(link(target, path), "link(`%s', `%s')", unresolved_target, unresolved_path);
+	PREAMBLE("link(`%s', `%s')", target, path)
+	RESOLVE(target, 0)
+	RESOLVE(path, 0)
+	dirfd = -1; /* so prologue doesn't close it */
+	rc = UNIXRC(linkat(dirfd_target, basename_target, dirfd_path, basename_path, 0)); /* no CATCH so we can close dirfd */
+	CLOSE_FD(dirfd_target);
+	CLOSE_FD(dirfd_path);
+	PROLOGUE
 }
 
 CONFUGA_API int confuga_symlink(confuga *C, const char *target, const char *path)
 {
 	/* `target' is effectively userdata, we do not resolve it */
-	int rc;
-	SIMPLE_WRAP_UNIX(symlink(target, path), "symlink(`%s', `%s')", target, unresolved_path);
+	SIMPLE_WRAP_UNIX(0, symlinkat(target, dirfd, basename), "symlink(`%s', `%s')", target, path);
 }
 
 CONFUGA_API int confuga_readlink(confuga *C, const char *path, char *buf, size_t length)
 {
-	int rc;
-	SIMPLE_WRAP_UNIX(readlink(path, buf, length), "readlink(`%s', %p, %zu)", unresolved_path, buf, length);
+	SIMPLE_WRAP_UNIX(0, readlinkat(dirfd, basename, buf, length), "readlink(`%s', %p, %zu)", path, buf, length);
 }
 
 CONFUGA_API int confuga_mkdir(confuga *C, const char *path, int mode)
 {
-	int rc;
-	SIMPLE_WRAP_UNIX(mkdir(path, mode), "mkdir(`%s', %d)", unresolved_path, mode);
+	SIMPLE_WRAP_UNIX(0, mkdirat(dirfd, basename, mode), "mkdir(`%s', %d)", path, mode);
 }
 
 CONFUGA_API int confuga_rmdir(confuga *C, const char *path)
 {
-	int rc;
-	SIMPLE_WRAP_UNIX(rmdir(path), "rmdir(`%s')", unresolved_path);
-}
-
-static int do_stat (confuga *C, const char *path, struct confuga_stat *info, int (*statf) (const char *, struct stat64 *))
-{
-	int rc;
-	struct stat64 linfo;
-	enum CONFUGA_FILE_TYPE type;
-	RESOLVE(path)
-	CATCHUNIX(statf(path, &linfo));
-	if (S_ISREG(linfo.st_mode)) {
-		CATCH(lookup(C, path, &info->fid, &info->size, &type));
-	} else {
-		info->size = linfo.st_size;
-	}
-	info->ino = linfo.st_ino;
-	info->mode = linfo.st_mode;
-	info->uid = linfo.st_uid;
-	info->gid = linfo.st_gid;
-	info->nlink = linfo.st_nlink;
-	info->atime = linfo.st_atime;
-	info->mtime = linfo.st_mtime;
-	info->ctime = linfo.st_ctime;
-	PROLOGUE
+	SIMPLE_WRAP_UNIX(0, unlinkat(dirfd, basename, AT_REMOVEDIR), "rmdir(`%s')", path);
 }
 
 CONFUGA_API int confuga_stat(confuga *C, const char *path, struct confuga_stat *info)
 {
-	debug(D_CONFUGA, "stat(`%s', %p)", path, info);
-	return do_stat(C, path, info, stat64);
+	PREAMBLE("stat(`%s', %p)", path, info)
+	RESOLVE(path, 1)
+	rc = dostat(C, dirfd, basename, info, 0);
+	PROLOGUE
 }
 
 CONFUGA_API int confuga_lstat(confuga *C, const char *path, struct confuga_stat *info)
 {
-	debug(D_CONFUGA, "lstat(`%s', %p)", path, info);
-	return do_stat(C, path, info, lstat64);
+	PREAMBLE("lstat(`%s', %p)", path, info)
+	RESOLVE(path, 0)
+	rc = dostat(C, dirfd, basename, info, AT_SYMLINK_NOFOLLOW);
+	PROLOGUE
 }
 
 CONFUGA_API int confuga_access(confuga *C, const char *path, int mode)
 {
-	int rc;
-	SIMPLE_WRAP_UNIX(access(path, mode), "access(`%s', %d)", unresolved_path, mode);
+	SIMPLE_WRAP_UNIX(1, faccessat(dirfd, basename, mode, 0), "access(`%s', %d)", path, mode);
 }
 
 CONFUGA_API int confuga_chmod(confuga *C, const char *path, int mode)
@@ -448,43 +599,47 @@ CONFUGA_API int confuga_chmod(confuga *C, const char *path, int mode)
 	// A remote user can change some of the permissions bits,
 	// which only affect local users, but we don't let them
 	// take away the owner bits, which would affect the Chirp server.
-	int rc;
 	mode |= S_IRUSR|S_IWUSR;
 	mode &= S_IRWXU|S_IRWXG|S_IRWXO;
-	SIMPLE_WRAP_UNIX(chmod(path, mode), "chmod(`%s', %d)", unresolved_path, mode);
+	SIMPLE_WRAP_UNIX(0, fchmodat(dirfd, basename, mode, 0), "chmod(`%s', %d)", path, mode);
 }
 
 CONFUGA_API int confuga_truncate(confuga *C, const char *path, confuga_off_t length)
 {
 	static const confuga_fid_t empty = {CONFUGA_FID_EMPTY};
 
-	int rc;
-	RESOLVE(path)
-	debug(D_CONFUGA, "truncate(`%s', %" PRIuCONFUGA_OFF_T ")", unresolved_path, length);
 	confuga_fid_t fid;
 	confuga_off_t size;
 	enum CONFUGA_FILE_TYPE type;
-	CATCH(lookup(C, path, &fid, &size, &type));
+	PREAMBLE("truncate(`%s', %" PRIuCONFUGA_OFF_T ")", path, length)
+	RESOLVE(path, 1)
+	CATCH(lookup(C, dirfd, basename, &fid, &size, &type));
 	if (length > 0)
 		CATCH(EINVAL);
-	CATCH(update(C, path, empty, 0, 0));
+	CATCH(update(C, dirfd, basename, empty, 0, 0));
 	PROLOGUE
 }
 
 CONFUGA_API int confuga_utime(confuga *C, const char *path, time_t actime, time_t modtime)
 {
-	int rc;
-	struct utimbuf ut;
-	ut.actime = actime;
-	ut.modtime = modtime;
-	SIMPLE_WRAP_UNIX(utime(path, &ut), "utime(`%s', actime = %lu, modtime = %lu)", unresolved_path, (unsigned long)actime, (unsigned long)modtime);
+	struct timespec times[2] = {{.tv_sec = actime}, {.tv_sec = modtime}};
+	SIMPLE_WRAP_UNIX(0, utimensat(dirfd, basename, times, AT_SYMLINK_NOFOLLOW), "utime(`%s', actime = %lu, modtime = %lu)", path, (unsigned long)actime, (unsigned long)modtime);
 }
 
 CONFUGA_API int confuga_getxattr(confuga *C, const char *path, const char *name, void *data, size_t size)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_getxattr(path, name, data, size), "getxattr(`%s', `%s', %p, %zu)", unresolved_path, name, data, size);
+	int fd;
+	PREAMBLE("getxattr(`%s', `%s', %p, %zu)", path, name, data, size)
+	RESOLVE(path, 1)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(fgetxattr(fd, name, data, size, 0, 0));
+#else
+	rc = UNIXRC(fgetxattr(fd, name, data, size));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -492,9 +647,18 @@ CONFUGA_API int confuga_getxattr(confuga *C, const char *path, const char *name,
 
 CONFUGA_API int confuga_lgetxattr(confuga *C, const char *path, const char *name, void *data, size_t size)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_lgetxattr(path, name, data, size), "lgetxattr(`%s', `%s', %p, %zu)", unresolved_path, name, data, size);
+	int fd;
+	PREAMBLE("lgetxattr(`%s', `%s', %p, %zu)", path, name, data, size)
+	RESOLVE(path, 0)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(fgetxattr(fd, name, data, size, 0, 0));
+#else
+	rc = UNIXRC(fgetxattr(fd, name, data, size));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -502,9 +666,18 @@ CONFUGA_API int confuga_lgetxattr(confuga *C, const char *path, const char *name
 
 CONFUGA_API int confuga_listxattr(confuga *C, const char *path, char *list, size_t size)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_listxattr(path, list, size), "listxattr(`%s', %p, %zu)", unresolved_path, list, size);
+	int fd;
+	PREAMBLE("listxattr(`%s', %p, %zu)", path, list, size)
+	RESOLVE(path, 1)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(flistxattr(fd, list, size, 0));
+#else
+	rc = UNIXRC(flistxattr(fd, list, size));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -512,9 +685,18 @@ CONFUGA_API int confuga_listxattr(confuga *C, const char *path, char *list, size
 
 CONFUGA_API int confuga_llistxattr(confuga *C, const char *path, char *list, size_t size)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_llistxattr(path, list, size), "llistxattr(`%s', %p, %zu)", unresolved_path, list, size);
+	int fd;
+	PREAMBLE("llistxattr(`%s', %p, %zu)", path, list, size)
+	RESOLVE(path, 0)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(flistxattr(fd, list, size, 0));
+#else
+	rc = UNIXRC(flistxattr(fd, list, size));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -522,9 +704,18 @@ CONFUGA_API int confuga_llistxattr(confuga *C, const char *path, char *list, siz
 
 CONFUGA_API int confuga_setxattr(confuga *C, const char *path, const char *name, const void *data, size_t size, int flags)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_setxattr(path, name, data, size, flags), "setxattr(`%s', `%s', %p, %zu, %d)", unresolved_path, name, data, size, flags);
+	int fd;
+	PREAMBLE("setxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags)
+	RESOLVE(path, 1)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(fsetxattr(fd, name, data, size, 0, flags));
+#else
+	rc = UNIXRC(fsetxattr(fd, name, data, size, flags));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -532,9 +723,18 @@ CONFUGA_API int confuga_setxattr(confuga *C, const char *path, const char *name,
 
 CONFUGA_API int confuga_lsetxattr(confuga *C, const char *path, const char *name, const void *data, size_t size, int flags)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_lsetxattr(path, name, data, size, flags), "lsetxattr(`%s', `%s', %p, %zu, %d)", unresolved_path, name, data, size, flags);
+	int fd;
+	PREAMBLE("lsetxattr(`%s', `%s', %p, %zu, %d)", path, name, data, size, flags)
+	RESOLVE(path, 0)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(fsetxattr(fd, name, data, size, 0, flags));
+#else
+	rc = UNIXRC(fsetxattr(fd, name, data, size, flags));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -542,9 +742,18 @@ CONFUGA_API int confuga_lsetxattr(confuga *C, const char *path, const char *name
 
 CONFUGA_API int confuga_removexattr(confuga *C, const char *path, const char *name)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_removexattr(path, name), "removexattr(`%s', `%s')", unresolved_path, name);
+	int fd;
+	PREAMBLE("removexattr(`%s', `%s')", path, name)
+	RESOLVE(path, 1)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(fremovexattr(fd, name, 0));
+#else
+	rc = UNIXRC(fremovexattr(fd, name));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -552,9 +761,18 @@ CONFUGA_API int confuga_removexattr(confuga *C, const char *path, const char *na
 
 CONFUGA_API int confuga_lremovexattr(confuga *C, const char *path, const char *name)
 {
-	int rc;
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
-	SIMPLE_WRAP_UNIX(_lremovexattr(path, name), "lremovexattr(`%s', `%s')", unresolved_path, name);
+	int fd;
+	PREAMBLE("lremovexattr(`%s', `%s')", path, name)
+	RESOLVE(path, 0)
+	CATCHUNIX(fd = openat(dirfd, basename, O_RDONLY|O_CLOEXEC|O_NOFOLLOW|O_NOCTTY, 0));
+#ifdef CCTOOLS_OPSYS_DARWIN
+	rc = UNIXRC(fremovexattr(fd, name, 0));
+#else
+	rc = UNIXRC(fremovexattr(fd, name));
+#endif
+	CLOSE_FD(fd);
+	PROLOGUE
 #else
 	return ENOSYS;
 #endif
@@ -562,20 +780,30 @@ CONFUGA_API int confuga_lremovexattr(confuga *C, const char *path, const char *n
 
 CONFUGA_API int confuga_lookup (confuga *C, const char *path, confuga_fid_t *fid, confuga_off_t *size)
 {
-	int rc;
 	enum CONFUGA_FILE_TYPE type;
-	RESOLVE(path)
-	debug(D_CONFUGA, "lookup(`%s')", unresolved_path);
-	CATCH(lookup(C, path, fid, size, &type));
+	PREAMBLE("lookup(`%s')", path)
+	RESOLVE(path, 1)
+	CATCH(lookup(C, dirfd, basename, fid, size, &type));
 	PROLOGUE
 }
 
 CONFUGA_API int confuga_update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_t size, int flags)
 {
-	int rc;
-	RESOLVE(path)
-	debug(D_CONFUGA, "update(`%s', fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T ", flags = %d)", unresolved_path, CONFUGA_FID_PRIARGS(fid), size, flags);
-	CATCH(update(C, path, fid, size, flags));
+	PREAMBLE("update(`%s', fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T ", flags = %d)", path, CONFUGA_FID_PRIARGS(fid), size, flags)
+	RESOLVE(path, 1)
+	CATCH(update(C, dirfd, basename, fid, size, flags));
+	PROLOGUE
+}
+
+CONFUGA_IAPI int confugaN_init (confuga *C, const char *root)
+{
+	PREAMBLE("init(`%s')", root)
+	CATCHUNIX(mkdir_recursive(root, S_IRWXU));
+	CATCHUNIX(C->rootfd = open(root, O_CLOEXEC|O_DIRECTORY|O_NOCTTY|O_RDONLY));
+	CATCHUNIX(snprintf(C->root, sizeof C->root, "%s", root));
+	CATCHUNIXIGNORE(mkdirat(C->rootfd, "root", S_IRWXU), EEXIST);
+	CATCHUNIX(C->nsrootfd = openat(C->rootfd, "root", O_CLOEXEC|O_DIRECTORY|O_NOCTTY|O_RDONLY, 0));
+	rc = 0;
 	PROLOGUE
 }
 

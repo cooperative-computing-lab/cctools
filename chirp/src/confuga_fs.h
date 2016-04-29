@@ -18,6 +18,8 @@
 
 struct confuga {
 	sqlite3 *db;
+	int      rootfd;
+	int      nsrootfd;
 	char     root[CONFUGA_PATH_MAX];
 
 	uint64_t concurrency;
@@ -44,6 +46,8 @@ struct confuga {
 
 CONFUGA_IAPI int confugaI_dbload (confuga *C, sqlite3 *attachdb);
 CONFUGA_IAPI int confugaI_dbclose (confuga *C);
+
+CONFUGA_IAPI int confugaN_init (confuga *C, const char *root);
 
 CONFUGA_IAPI int confugaF_extract (confuga *C, confuga_fid_t *fid, const char *str, const char **endptr);
 CONFUGA_IAPI int confugaF_set (confuga *C, confuga_fid_t *fid, const void *id);

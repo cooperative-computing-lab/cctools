@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "confuga_fs.h"
 
 #include "auth_all.h"
+#include "compat-at.h"
 #include "buffer.h"
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -24,12 +25,14 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "pattern.h"
 #include "sha1.h"
+#include "shell.h"
 #include "stringtools.h"
 
 #include "catch.h"
 #include "chirp_protocol.h"
 #include "chirp_sqlite.h"
 
+#include <fcntl.h>
 #include <sys/select.h>
 #include <sys/stat.h>
 #ifdef HAS_SYS_STATFS_H
@@ -52,6 +55,22 @@ See the file COPYING for details.
 #include <math.h>
 #include <string.h>
 #include <time.h>
+
+#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
+#	define stat64 stat
+#	define fstat64 fstat
+#	define ftruncate64 ftruncate
+#	define statfs64 statfs
+#	define fstatfs64 fstatfs
+#	define fstatat64 fstatat
+#elif defined(CCTOOLS_OPSYS_SUNOS)
+	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
+#	define statfs statvfs
+#	define fstatfs fstatvfs
+#	define statfs64 statvfs64
+#	define fstatfs64 fstatvfs64
+#endif
 
 #define TICKET_REFRESH (6*60*60)
 
@@ -390,50 +409,34 @@ out:
 static int setup_ticket (confuga *C)
 {
 	int rc;
-	char path[PATH_MAX];
-	FILE *ticket = NULL;
+	int ticketfd = -1;
 	FILE *key = NULL;
-	char *buffer = NULL;
-	size_t len;
+	buffer_t Bout[1], Berr[1];
+	int status;
 
 	debug(D_CONFUGA, "creating new authentication ticket");
 
-	key = popen("openssl genrsa " stringify(CONFUGA_TICKET_BITS) " 2> /dev/null", "r");
-	CATCHUNIX(key ? 0 : -1);
-	CATCHUNIX(copy_stream_to_buffer(key, &buffer, &len));
+	buffer_init(Bout);
+	buffer_init(Berr);
+	CATCHUNIX(shellcode("openssl genrsa " stringify(CONFUGA_TICKET_BITS), NULL, NULL, 0, Bout, Berr, &status));
+	if (status) {
+		debug(D_CONFUGA, "openssl failed with exit status %d, stderr:\n%s", status, buffer_tostring(Berr));
+		CATCH(EIO);
+	}
+	sha1_buffer(buffer_tostring(Bout), buffer_pos(Bout), (unsigned char *)&C->ticket);
 
-	sha1_buffer(buffer, len, (unsigned char *)&C->ticket);
-
-	CATCHUNIX(snprintf(path, sizeof(path), "%s/ticket", C->root));
-	ticket = fopen(path, "w");
-	CATCHUNIX(ticket ? 0 : -1);
-	CATCHUNIX(full_fwrite(ticket, buffer, len));
+	CATCHUNIX(ticketfd = openat(C->rootfd, "ticket", O_CREAT|O_NOCTTY|O_TRUNC|O_WRONLY, S_IRUSR|S_IWUSR));
+	CATCHUNIX(full_write(ticketfd, buffer_tostring(Bout), buffer_pos(Bout)));
 
 	rc = 0;
 	goto out;
 out:
-	if (ticket)
-		fclose(ticket);
+	if (ticketfd >= 0)
+		close(ticketfd);
 	if (key)
 		pclose(key);
-	free(buffer);
-	return rc;
-}
-
-static int setroot (confuga *C, const char *root)
-{
-	int rc;
-	char namespace[CONFUGA_PATH_MAX] = "";
-
-	strncpy(C->root, root, sizeof(C->root)-1);
-	CATCHUNIX(create_dir(C->root, S_IRWXU) ? 0 : -1);
-	CATCHUNIX(snprintf(namespace, sizeof(namespace)-1, "%s/root", C->root));
-	CATCHUNIX(create_dir(namespace, S_IRWXU) ? 0 : -1);
-	CATCH(confugaI_dbload(C, NULL));
-
-	rc = 0;
-	goto out;
-out:
+	buffer_free(Bout);
+	buffer_free(Berr);
 	return rc;
 }
 
@@ -449,7 +452,8 @@ static int parse_uri (confuga *C, const char *uri, int *explicit_auth)
 	if (pattern_match(uri, "confuga://(..-)%?(.*)", &root, &options) >= 0) {
 		const char *rest = options;
 		size_t n;
-		CATCH(setroot(C, root));
+		CATCH(confugaN_init(C, root));
+		CATCH(confugaI_dbload(C, NULL));
 
 		while (pattern_match(rest, "([%w-]+)=([^&]*)&?()", &option, &value, &n) >= 0) {
 			if (strcmp(option, "auth") == 0) {
@@ -500,7 +504,8 @@ static int parse_uri (confuga *C, const char *uri, int *explicit_auth)
 			CATCH(EINVAL);
 		}
 	} else {
-		CATCH(setroot(C, uri));
+		CATCH(confugaN_init(C, root));
+		CATCH(confugaI_dbload(C, NULL));
 	}
 
 	rc = 0;
@@ -534,6 +539,8 @@ CONFUGA_API int confuga_connect (confuga **Cp, const char *uri, const char *cata
 	C->scheduler = CONFUGA_SCHEDULER_FIFO;
 	C->scheduler_n = 0; /* unlimited */
 	C->operations = 0;
+	C->rootfd = -1;
+	C->nsrootfd = -1;
 
 	auth_clear();
 
@@ -549,8 +556,13 @@ CONFUGA_API int confuga_connect (confuga **Cp, const char *uri, const char *cata
 	rc = 0;
 	goto out;
 out:
-	if (rc)
+	if (rc) {
+		if (C->rootfd >= 0)
+			close(C->rootfd);
+		if (C->nsrootfd >= 0)
+			close(C->nsrootfd);
 		free(C);
+	}
 	return rc;
 }
 
@@ -716,7 +728,7 @@ CONFUGA_API int confuga_statfs (confuga *C, struct confuga_statfs *info)
 
 	/* we can use the host values for the NS related fields */
 	struct statfs64 fsinfo;
-	CATCHUNIX(statfs64(C->root, &fsinfo));
+	CATCHUNIX(fstatfs64(C->rootfd, &fsinfo));
 	info->files = fsinfo.f_files;
 	info->ffree = fsinfo.f_ffree;
 

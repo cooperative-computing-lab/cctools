@@ -12,6 +12,29 @@
 #include <errno.h>
 #include <string.h>
 
+#define PROTECT(e) \
+	do {\
+		int s = errno;\
+		(e);\
+		errno = s;\
+	} while (0)
+
+#define CLOSE_FD(fd) \
+	do {\
+		if (fd >= 0) {\
+			PROTECT(close(fd));\
+			fd = -1;\
+		}\
+	} while (0)
+
+#define CLOSE_DIR(dir) \
+	do {\
+		if (dir) {\
+			PROTECT(closedir(dir));\
+			dir = NULL;\
+		}\
+	} while (0)
+
 #define THROW_QUIET(e) \
 	do {\
 		rc = (e);\
