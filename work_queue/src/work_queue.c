@@ -235,7 +235,6 @@ struct blacklist_host_info {
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 
-static void start_task_on_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
@@ -3372,13 +3371,21 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 
-	change_task_state(q, t, WORK_QUEUE_TASK_RUNNING);
+	work_queue_result_code_t result = start_one_task(q, w, t);
+
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
+
+	change_task_state(q, t, WORK_QUEUE_TASK_RUNNING);
 
 	t->total_submissions += 1;
 
 	count_worker_resources(q, w);
+
+	if(result != SUCCESS) {
+		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
+		handle_failure(q, w, t, result);
+	}
 
 	log_worker_stats(q);
 }
@@ -3402,17 +3409,6 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	log_worker_stats(q);
 }
 
-static void start_task_on_worker( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t )
-{
-	commit_task_to_worker(q, w, t);
-
-	work_queue_result_code_t result = start_one_task(q, w, t);
-	if(result != SUCCESS) {
-		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
-		handle_failure(q, w, t, result);
-	}
-}
-
 static int send_one_task( struct work_queue *q )
 {
 	struct work_queue_task *t;
@@ -3432,7 +3428,7 @@ static int send_one_task( struct work_queue *q )
 		if(!w) continue;
 
 		// Otherwise, remove it from the ready list and start it:
-		start_task_on_worker(q,w,t);
+		commit_task_to_worker(q,w,t);
 
 		return 1;
 	}
