@@ -86,8 +86,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 
-#define FIRST_ALLOCATION_EVERY_NTASKS 100
-
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 // Result codes for signaling the completion of operations in WQ
@@ -119,6 +117,9 @@ static uint64_t disk_avail_threshold = 100;
 double wq_option_send_receive_ratio    = 0.5;
 
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
+
+int first_allocation_every_n_tasks   = 25;
+int first_allocation_every_n_seconds = 300;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blacklist_slow_workers_timeout = 900;
@@ -5819,16 +5820,12 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 		s->total_tasks_complete      = c->total_tasks;
 		s->total_good_execute_time  += t->cmd_execution_time;
 		s->total_good_transfer_time += t->total_transfer_time;
-
-		category_accumulate_summary(q->categories, t->category, t->resources_measured);
-
-		if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
-			if(c->max_allocation) {
-				category_update_first_allocation(q->categories, t->category);
-			}
-		}
 	} else {
 		s->total_tasks_failed++;
+	}
+
+	if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
+		/* update transaction */
 	}
 }
 

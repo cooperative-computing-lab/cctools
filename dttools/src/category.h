@@ -82,6 +82,9 @@ struct category {
 	/* assume that peak usage is independent of wall time */
 	int time_peak_independece;
 
+	/* last time, in seconds, that the first allocation was computed. */
+	time_t first_allocation_time;
+
 	/* stats for wq */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;

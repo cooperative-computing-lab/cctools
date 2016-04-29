@@ -32,6 +32,8 @@ static uint64_t time_bucket_size      = 60000000;  /* 1 minute */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
+static uint64_t first_allocation_every_n_tasks = 50; /* tasks */
+
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
 	struct category *c;
 
