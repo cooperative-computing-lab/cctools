@@ -85,15 +85,6 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	char *shm_path = string_format(shm_pattern "%d", n->nodeid);
 
 	enforcer_paths = list_create();
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, tmp_path));
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, vartmp_path));
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, shm_path));
-	makeflow_log_file_expectation(n->d, enforcer_paths);
-
-	makeflow_log_file_existence(n->d, enforcer_paths);
-	list_delete(enforcer_paths);
-
-	enforcer_paths = list_create();
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
 	makeflow_log_file_expectation(n->d, enforcer_paths);
 
