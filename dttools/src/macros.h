@@ -16,6 +16,11 @@ See the file COPYING for details.
 #define MIN(a,b) ( ((a)<(b)) ? (a) : (b) )
 #endif
 
+/* treat negative numbers  as 'nulls' */
+#ifndef MIN_POS
+#define MIN_POS(a,b) ((a) < 0 ? (b) : ((b) < 0 ? (a) : MIN((a), (b))))
+#endif
+
 #ifndef ABS
 #define ABS(x) ( ((x)>=0) ? (x) : (-(x)) )
 #endif
