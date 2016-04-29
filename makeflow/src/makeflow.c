@@ -685,6 +685,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				fprintf(stderr, "\n");
 			}
 
+			category_accumulate_summary(n->category, n->resources_measured, n->resource_request, /* overflow */ 1);
+
 			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
 
 			if(next != CATEGORY_ALLOCATION_ERROR) {
@@ -724,7 +726,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 
 		if(monitor) {
-			category_accumulate_summary(n->category, n->resources_measured, CATEGORY_ALLOCATION_MAX, /* overflow */ 0);
+			category_accumulate_summary(n->category, n->resources_measured, n->resource_request, /* overflow */ 0);
 			if(d->node_states[DAG_NODE_STATE_COMPLETE] % 20 == 0)
 				category_update_first_allocation(n->category, NULL);
 		}
