@@ -1451,6 +1451,8 @@ void forsake_waiting_process(struct link *master, struct work_queue_process *p) 
 	p->task_status = WORK_QUEUE_RESULT_FORSAKEN;
 	itable_insert(procs_complete, p->task->taskid, p);
 
+	debug(D_WQ, "Waiting task %d has been forsaken.", p->task->taskid);
+
 	/* we also send updated resources to the master. */
 	send_keepalive(master);
 
