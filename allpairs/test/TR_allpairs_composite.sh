@@ -7,20 +7,28 @@ TEST_OUTPUT_STEP=composite_step.output
 TEST_OUTPUT=composite.output
 TEST_TRUTH=composites.txt
 PORT_FILE=worker.port
+WORKER_LOG=worker.log
+MASTER_PID=master.pid
+WORKER_PID=worker.pid
+DONE_FILE=allpairs.done.$$
 
 export PATH=.:../src:../../work_queue/src:$PATH
 
 cleanfiles()
 {
-		if [ -f $TEST_INPUT ]
-		then
-				xargs rm < $TEST_INPUT
-		fi
+	if [ -f $TEST_INPUT ]
+	then
+		xargs rm < $TEST_INPUT
+	fi
 
 	rm -f $TEST_INPUT
 	rm -f $TEST_OUTPUT_STEP
 	rm -f $TEST_OUTPUT
 	rm -f $PORT_FILE
+	rm -f $WORKER_LOG
+	rm -f $MASTER_PID
+	rm -f $WORKER_PID
+	rm -f $DONE_FILE
 	rm -f allpairs_multicore
 }
 
@@ -34,13 +42,13 @@ prepare()
 run()
 {
 	echo "starting master"
-	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh -d all &
+	(allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT_STEP -Z $PORT_FILE $TEST_INPUT $TEST_INPUT ./divisible.sh -d all; touch $DONE_FILE) &
+	echo $! > $MASTER_PID
 
-	echo "waiting for $PORT_FILE to be created"
-	wait_for_file_creation $PORT_FILE 5
+	run_local_worker $PORT_FILE &
+	echo $! > $WORKER_PID
 
-	echo "starting worker"
-	work_queue_worker localhost `cat $PORT_FILE` --timeout 10 --single-shot
+	wait_for_file_creation $DONE_FILE 15
 
 	echo "checking output"
 	awk '$3 ~ /^0$/{print $1}' $TEST_OUTPUT_STEP | sort -n | uniq > $TEST_OUTPUT
@@ -51,7 +59,12 @@ run()
 
 clean()
 {
-		cleanfiles
+	kill -9 $MASTER_PID
+	kill -9 $WORKER_PID
+
+	cat $WORKER_LOG 1>&2
+
+	cleanfiles
 	exit 0
 }
 

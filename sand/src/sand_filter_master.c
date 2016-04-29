@@ -373,8 +373,9 @@ static void display_progress()
 		row_count = row_limit;
 	}
 
-	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.02lf | %lu\n", (int) (current - start_time), info.workers_init + info.workers_ready, info.workers_busy, total_submitted, info.tasks_waiting, info.tasks_running, total_processed,
-		   (tasks_runtime / 1000000.0) / total_processed, cand_count);
+	double avg_time = total_processed > 0 ? (tasks_runtime / 1000000.0) / total_processed : 0;
+
+	printf("%6d | %4d %4d | %6d %4d %4d %6d %6.02lf | %lu\n", (int) (current - start_time), info.workers_init + info.workers_ready, info.workers_busy, total_submitted, info.tasks_waiting, info.tasks_running, total_processed, avg_time, cand_count);
 
 	fflush(stdout);
 	row_count--;

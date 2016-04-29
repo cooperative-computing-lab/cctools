@@ -136,9 +136,6 @@ timeout:
 		 * for the found value */
 		s->last_byte_size_complete  = s->size_so_far;
 		s->last_file_count_complete = s->count_so_far;
-
-		debug(D_DEBUG, "completed measurement on '%s', %" PRId64 " files using %3.2lf MB\n",
-				path, s->count_so_far, (double) s->size_so_far/(1024.0*1024));
 	}
 	else {
 		/* else, we hit a timeout. measurement reported is conservative, from
@@ -146,9 +143,6 @@ timeout:
 
 		s->last_byte_size_complete  = MAX(s->last_byte_size_complete, s->size_so_far);
 		s->last_file_count_complete = MAX(s->last_file_count_complete, s->count_so_far);
-
-		debug(D_DEBUG, "partial measurement on '%s', %" PRId64 " files using %3.3lf MB\n",
-				path, s->count_so_far, (double) s->size_so_far/(1024.0*1024));
 	}
 
 	return result;
