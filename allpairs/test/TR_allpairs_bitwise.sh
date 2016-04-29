@@ -5,6 +5,10 @@
 TEST_INPUT=set.list
 TEST_OUTPUT=master.out
 PORT_FILE=worker.port
+WORKER_LOG=worker.log
+MASTER_PID=master.pid
+WORKER_PID=worker.pid
+DONE_FILE=allpairs.done.$$
 
 export PATH=.:../src:../../work_queue/src:$PATH
 
@@ -12,6 +16,10 @@ cleanfiles()
 {
 	rm -f $TEST_OUTPUT
 	rm -f $PORT_FILE
+	rm -f $WORKER_LOG
+	rm -f $MASTER_PID
+	rm -f $WORKER_PID
+	rm -f $DONE_FILE
 	rm -f allpairs_multicore
 
 }
@@ -26,13 +34,13 @@ run()
 	ln -s ../src/allpairs_multicore .
 
 	echo "starting master"
-	allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE &
+	(allpairs_master -x 1 -y 1 --output-file $TEST_OUTPUT -Z $PORT_FILE $TEST_INPUT $TEST_INPUT BITWISE; touch $DONE_FILE) &
+	echo $! > $MASTER_PID
 
-	echo "waiting for $PORT_FILE to be created"
-	wait_for_file_creation $PORT_FILE 5
+	run_local_worker $PORT_FILE &
+	echo $! > $WORKER_PID
 
-	echo "starting worker"
-	work_queue_worker localhost `cat $PORT_FILE` --timeout 2
+	wait_for_file_creation $DONE_FILE 15
 
 	echo "checking output"
 	in_files=`cat "$TEST_INPUT" | awk -F"/" '{print $3}'`
@@ -58,6 +66,11 @@ run()
 
 clean()
 {
+	kill -9 $MASTER_PID
+	kill -9 $WORKER_PID
+
+	cat $WORKER_LOG 1>&2
+
 	cleanfiles
 	exit 0
 }
