@@ -328,9 +328,6 @@ int main(int argc, char *argv[])
 
 	const char *progname = "sand_align_master";
 
-	char *catalog_host = NULL;
-	int catalog_port = 0;
-
 	debug_config(progname);
 
 	// By default, turn on fast abort option since we know each job is of very similar size (in terms of runtime).
@@ -365,17 +362,7 @@ int main(int argc, char *argv[])
 			priority = atoi(optarg);
 			break;
 		case 'C':
-			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "sand_align: catalog server should be given as HOSTNAME:PORT'.\n");
-				exit(1);
-			}
-
-			setenv("CATALOG_HOST", catalog_host, 1);
-
-			char *value = string_format("%d", catalog_port);
-			setenv("CATALOG_PORT", value, 1);
-			free(value);
-
+			setenv("CATALOG_HOST", optarg, 1);
 			work_queue_master_mode = WORK_QUEUE_MASTER_MODE_CATALOG;
 			break;
 		case 'o':

@@ -131,7 +131,6 @@ struct work_queue {
 
 	char workingdir[PATH_MAX];
 
-	struct datagram  *update_port;   // outgoing udp connection to catalog
 	struct link      *master_link;   // incoming tcp connection for workers.
 	struct link_info *poll_table;
 	int poll_table_size;
@@ -173,8 +172,7 @@ struct work_queue {
 	int transfer_outlier_factor;
 	int default_transfer_rate;
 
-	char *catalog_host;
-	int catalog_port;
+	char *catalog_hosts;
 
 	FILE *logfile;
 	int keepalive_interval;
@@ -646,7 +644,6 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
 	static time_t last_update_time = 0;
-	char address[LINK_ADDRESS_MAX];
 
 	// Only advertise if we have a name.
 	if(!q->name) return;
@@ -656,24 +653,15 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 		return;
 
 	// If host and port are not set, pick defaults.
-	if(!q->catalog_host) q->catalog_host = strdup(CATALOG_HOST);
-	if(!q->catalog_port) q->catalog_port = CATALOG_PORT;
-	if(!q->update_port)  q->update_port = datagram_create(DATAGRAM_PORT_ANY);
-
-	if(!domain_name_cache_lookup(q->catalog_host, address)) {
-		debug(D_WQ,"could not resolve address of catalog server %s!",q->catalog_host);
-		// don't try again until the next update period
-		last_update_time = time(0);
-		return;
-	}
+	if(!q->catalog_hosts) q->catalog_hosts = CATALOG_HOST;
 
 	// Generate the master status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
-	debug(D_WQ, "Advertising master status to the catalog server at %s:%d ...", q->catalog_host, q->catalog_port);
-	datagram_send(q->update_port, str, strlen(str), address, q->catalog_port);
+	debug(D_WQ, "Advertising master status to the catalog server(s) at %s ...", q->catalog_hosts);
+	catalog_query_send_update(q->catalog_hosts, str);
 
 	// Clean up.
 	free(str);
@@ -4556,8 +4544,7 @@ struct work_queue *work_queue_create(int port)
 	q->stats->start_time = timestamp_get();
 	q->task_reports = list_create();
 
-	q->catalog_host = 0;
-	q->catalog_port = 0;
+	q->catalog_hosts = 0;
 
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
 	q->keepalive_timeout = WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT;
@@ -4763,16 +4750,24 @@ void work_queue_specify_master_mode(struct work_queue *q, int mode)
 
 void work_queue_specify_catalog_server(struct work_queue *q, const char *hostname, int port)
 {
-	if(hostname) {
-		if(q->catalog_host) free(q->catalog_host);
-		q->catalog_host = strdup(hostname);
-		setenv("CATALOG_HOST", hostname, 1);
+	char hostport[DOMAIN_NAME_MAX + 8];
+	if(hostname && (port > 0)) {
+		sprintf(hostport, "%s:%d", hostname, port);
+		work_queue_specify_catalog_servers(q, hostport);
+	} else if(hostname) {
+		work_queue_specify_catalog_servers(q, hostname);
+	} else if (port > 0) {
+		sprintf(hostport, "%d", port);
+		setenv("CATALOG_PORT", hostport, 1);
 	}
-	if(port > 0) {
-		char portstr[DOMAIN_NAME_MAX];
-		q->catalog_port = port;
-		snprintf(portstr, DOMAIN_NAME_MAX, "%d", port);
-		setenv("CATALOG_PORT", portstr, 1);
+}
+
+void work_queue_specify_catalog_servers(struct work_queue *q, const char *hosts)
+{
+	if(hosts) {
+		if(q->catalog_hosts) free(q->catalog_hosts);
+		q->catalog_hosts = strdup(hosts);
+		setenv("CATALOG_HOST", hosts, 1);
 	}
 }
 
@@ -4804,8 +4799,7 @@ void work_queue_delete(struct work_queue *q)
 		/* we call this function here before any of the structures are freed. */
 		work_queue_disable_monitoring(q);
 
-		if(q->catalog_host) free(q->catalog_host);
-		if(q->update_port)  free(q->update_port);
+		if(q->catalog_hosts) free(q->catalog_hosts);
 
 		hash_table_delete(q->worker_table);
 		hash_table_delete(q->worker_blacklist);

@@ -88,7 +88,6 @@ static char        address[LINK_ADDRESS_MAX];
 static time_t      advertise_alarm = 0;
 static int         advertise_timeout = 300; /* five minutes */
 static int         config_pipe[2] = {-1, -1};
-static struct      datagram *catalog_port;
 static char        hostname[DOMAIN_NAME_MAX];
 static int         idle_timeout = 60; /* one minute */
 static UINT64_T    minimum_space_free = 0;
@@ -135,16 +134,6 @@ static int space_available(INT64_T amount)
 		errno = ENOSPC;
 		return 0;
 	}
-}
-
-int update_one_catalog(void *catalog_host, const void *text)
-{
-	char addr[DATAGRAM_ADDRESS_MAX];
-	if(domain_name_cache_lookup(catalog_host, addr)) {
-		debug(D_DEBUG, "sending update to %s:%d", (char*) catalog_host, CATALOG_PORT);
-		datagram_send(catalog_port, text, strlen(text), addr, CATALOG_PORT);
-	}
-	return 1;
 }
 
 static void downgrade (void)
@@ -253,7 +242,7 @@ static int update_all_catalogs(const char *url)
 
 	char *message = jx_print_string(j);
 
-	list_iterate(catalog_host_list, update_one_catalog, message);
+	list_iterate(catalog_host_list, (list_op_t) catalog_query_send_update, message);
 
 	free(message);
 	jx_delete(j);
@@ -2219,7 +2208,6 @@ int main(int argc, char *argv[])
 		opts_write_port_file(port_file, chirp_port);
 
 	starttime = time(0);
-	catalog_port = datagram_create(0);
 	if(manual_hostname) {
 		strcpy(hostname, manual_hostname);
 	} else {

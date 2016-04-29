@@ -203,39 +203,7 @@ with this option:</p>
 
 <code><span class="prompt">$ </span>chirp_server -u -</code>
 
-<p>Alternatively, you may establish your own catalog server.  This can be
-useful for keeping your systems logically distinct from the main storage pool,
-but can also help performance and availability if your catalog is close to your
-Chirp servers.  The catalog server is installed in the same place as the Chirp
-server.  Simply run it on any machine that you like and then direct your Chirp
-servers to update the new catalog with the -u option.  The catalog will be
-published via HTTP on port 9097 of the catalog machine.</p>
-
-<p>For example, suppose that you wish to run a catalog server on a machine
-named <tt>dopey</tt> and a Chirp server on a machine named <tt>sneezy</tt>:</p>
-
-<code>dopey<span class="prompt">$ </span>catalog_server
-...
-sneezy<span class="prompt">$ </span>chirp_server -u dopey [more options]
-</code>
-
-<p>Finally, point your web browser to: <tt>http://dopey:9097</tt></p>
-
-<p>Or, set an environment variable and use Parrot:</p>
-
-<code><span class="prompt">$ </span>setenv CATALOG_HOST dopey
-<span class="prompt">$ </span>parrot_run tcsh
-<span class="prompt">$ </span>ls /chirp
-</code>
-
-<p>And you will see <a href="http://catalog.cse.nd.edu:9097">something like
-this.</a> You may easily run multiple catalogs for either scalability or fault
-tolerance.  Simply give each Chirp server multiple -u options to name each
-running catalog.</p>
-
-<p>(Hint: If you want to ensure that your chirp and catalog servers run
-continuously and are automatically restarted after an upgrade, consider using
-<a href="watchdog.html">Watchdog</a>.)</p>
+<p>Alternatively, you may establish your own catalog server. See <a href="catalog.html">Catalog Servers</a> for details.</p>
 
 <h2 id="security">Security<a class="sectionlink" href="#security" title="Link to this section.">&#x21d7;</a></h2>
 

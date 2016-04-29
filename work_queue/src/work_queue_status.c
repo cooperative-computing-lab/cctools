@@ -43,7 +43,6 @@ static format_t format_mode = FORMAT_TABLE;
 static query_t query_mode = NO_QUERY;
 static int work_queue_status_timeout = 30;
 static char *catalog_host = NULL;
-static int catalog_port = 0;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
 static const char *where_expr = "true";
@@ -141,10 +140,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 	while((c = getopt_long(argc, argv, "AM:QTWC:d:lo:O:Rt:vh", long_options, NULL)) > -1) {
 		switch (c) {
 		case 'C':
-			if(!work_queue_catalog_parse(optarg, &catalog_host, &catalog_port)) {
-				fprintf(stderr, "Cannot parse catalog description: %s. \n", optarg);
-				exit(EXIT_FAILURE);
-			}
+			catalog_host = strdup(optarg);
 			break;
 		case 'd':
 			debug_flags_set(optarg);
@@ -254,7 +250,6 @@ int get_masters( time_t stoptime )
 
 	if(!catalog_host) {
 		catalog_host = strdup(CATALOG_HOST);
-		catalog_port = CATALOG_PORT;
 	}
 
 	const char *query_expr = string_format("type==\"wq_master\" && %s",where_expr);
@@ -265,9 +260,9 @@ int get_masters( time_t stoptime )
 		exit(1);
 	}
 
-	cq = catalog_query_create(catalog_host, catalog_port, jexpr, stoptime );
+	cq = catalog_query_create(catalog_host, jexpr, stoptime );
 	if(!cq)
-		fatal("failed to query catalog server %s:%d: %s \n",catalog_host,catalog_port,strerror(errno));
+		fatal("failed to query catalog server %s: %s \n",catalog_host,strerror(errno));
 
 	while((j = catalog_query_read(cq,stoptime))) {
 		if(i == catalog_size)

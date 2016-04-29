@@ -8,9 +8,7 @@ See the file COPYING for details.
 #include "jx_parse.h"
 
 #include "catalog_query.h"
-#include "datagram.h"
 #include "debug.h"
-#include "domain_name_cache.h"
 #include "int_sizes.h"
 #include "load_average.h"
 #include "host_memory_info.h"
@@ -38,7 +36,6 @@ void show_help(const char *cmd) {
 
 int main(int argc, char *argv[]) {
 	char *host = CATALOG_HOST;
-	int   port = CATALOG_PORT;
 	const char *input_file = 0;
 
 	static const struct option long_options[] = {
@@ -74,12 +71,6 @@ int main(int argc, char *argv[]) {
 				show_help(argv[0]);
 				return EXIT_FAILURE;
 		}
-	}
-
-	struct datagram *d;
-	d = datagram_create(DATAGRAM_PORT_ANY);
-	if (!d) {
-		fatal("could not create datagram port!");
 	}
 
 	struct jx *j;
@@ -127,15 +118,11 @@ int main(int argc, char *argv[]) {
 
 	char *text = jx_print_string(j);
 
-	char address[DATAGRAM_ADDRESS_MAX];
-	if (domain_name_cache_lookup(host, address)) {
-		datagram_send(d, text, strlen(text), address, port);
-	} else {
-		fatal("unable to lookup address of host: %s", host);
+	if(catalog_query_send_update(host, text) < 1) {
+		fprintf(stderr, "Unable to send update");
 	}
 
 	jx_delete(j);
-	datagram_delete(d);
 
 	return EXIT_SUCCESS;
 }

@@ -106,7 +106,6 @@ static int outgoing_timeout = 300;
 static struct list *outgoing_host_list;
 
 struct datagram *update_dgram = 0;
-struct datagram *outgoing_dgram = 0;
 
 void shutdown_clean(int sig)
 {
@@ -176,18 +175,7 @@ static void remove_expired_records()
 	last_clean_time = current;
 }
 
-
-static int update_one_catalog( void *outgoing_host, const void *text)
-{
-	char addr[DATAGRAM_ADDRESS_MAX];
-	if(domain_name_cache_lookup(outgoing_host, addr)) {
-		debug(D_DEBUG, "sending update to %s:%d", (char*) outgoing_host, CATALOG_PORT);
-		datagram_send(outgoing_dgram, text, strlen(text), addr, CATALOG_PORT);
-	}
-	return 1;
-}
-
-static void update_all_catalogs(struct datagram *outgoing_dgram)
+static void update_all_catalogs()
 {
 	struct jx *j = jx_object(0);
 	jx_insert_string(j,"type","catalog");
@@ -203,7 +191,7 @@ static void update_all_catalogs(struct datagram *outgoing_dgram)
 	char *text = jx_print_string(j);
 	jx_delete(j);
 
-	list_iterate(outgoing_host_list, update_one_catalog, text);
+	list_iterate(outgoing_host_list, (list_op_t) catalog_query_send_update, text);
 	free(text);
 }
 
@@ -663,10 +651,6 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on TCP port %d", port);
 	}
 
-	outgoing_dgram = datagram_create(0);
-	if(!outgoing_dgram)
-		fatal("couldn't create outgoing udp port");
-
 	update_dgram = datagram_create_address(interface, port);
 	if(!update_dgram) {
 		if(interface)
@@ -687,7 +671,7 @@ int main(int argc, char *argv[])
 		remove_expired_records();
 
 		if(time(0) > outgoing_alarm) {
-			update_all_catalogs(outgoing_dgram);
+			update_all_catalogs();
 			outgoing_alarm = time(0) + outgoing_timeout;
 		}
 

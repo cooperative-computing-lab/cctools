@@ -33,19 +33,9 @@ CONFUGA_IAPI int confugaS_catalog (confuga *C, const char *catalog)
 	int rc;
 
 	if (catalog) {
-		char *port;
-		snprintf(C->catalog_host, sizeof(C->catalog_host), "%s", catalog);
-		port = strchr(C->catalog_host, ':');
-		if (port) {
-			*port = '\0';
-			port += 1;
-			C->catalog_port = strtoul(port, NULL, 10);
-		} else {
-			C->catalog_port = CATALOG_PORT_DEFAULT;
-		}
+		C->catalog_hosts = catalog;
 	} else {
-		snprintf(C->catalog_host, sizeof(C->catalog_host), "%s", CATALOG_HOST_DEFAULT);
-		C->catalog_port = CATALOG_PORT_DEFAULT;
+		C->catalog_hosts = CATALOG_HOST;
 	}
 
 	rc = 0;
@@ -108,7 +98,7 @@ CONFUGA_IAPI int confugaS_catalog_sync (confuga *C)
 
 	debug(D_DEBUG|D_CONFUGA, "syncing with catalog");
 
-	Q = catalog_query_create(C->catalog_host, C->catalog_port, 0, stoptime);
+	Q = catalog_query_create(C->catalog_hosts, 0, stoptime);
 	CATCH(Q == NULL ? errno : 0);
 
 	/* FIXME sqlcatch is silent about EAGAIN, what should we do? */

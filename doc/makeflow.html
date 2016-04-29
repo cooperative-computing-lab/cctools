@@ -228,14 +228,9 @@ work_queue_worker <b>--password</b> mypwfile ...
 
 <h3 id="workqueue.catalog">Catalog Server<a class="sectionlink" href="#workqueue.catalog" title="Link to this section.">&#x21d7;</a></h3>
 
-<p>Now let's look at how to set up your own catalog server. Say you want to
-run your catalog server on a machine named <tt>catalog.somewhere.edu</tt>.
-The default port that the catalog server will be listening on is 9097, you can
-change it via the '-p' option.</p>
+<p>It is also possible to run your own catalog server. See <a href="catalog.html">Catalog Servers</a> for details.</p>
 
-<code>catalog_server</code>
-
-<p>Now you have a catalog server listening at catalog.somewhere.edu:9097. To
+<p>Suppose you have a catalog server listening at catalog.somewhere.edu:9097. To
 make your masters and workers contact this catalog server, simply add the
 <tt>-C hostname:port</tt> option to both of your master and worker:</p>
 

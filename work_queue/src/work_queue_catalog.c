@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "domain_name.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,7 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <errno.h>
 
+// Deprecated
 int work_queue_catalog_parse( char *server_string, char **host, int *port )
 {
 	char *colon;
@@ -51,9 +53,16 @@ Return a linked list of jx expressions describing the masters.
 
 struct list * work_queue_catalog_query( const char *catalog_host, int catalog_port, const char *project_regex )
 {
+	char hostport[DOMAIN_NAME_MAX + 8];
 	time_t stoptime = time(0) + 60;
+	struct catalog_query *q;
 
-	struct catalog_query *q = catalog_query_create(catalog_host, catalog_port, 0, stoptime);
+	if(catalog_port > 0) {
+		sprintf(hostport, "%s:%d", catalog_host, catalog_port);
+		q = catalog_query_create(hostport, 0, stoptime);
+	} else {
+		q = catalog_query_create(catalog_host, 0, stoptime);
+	}
 	if(!q) {
 		debug(D_NOTICE,"unable to contact catalog server at %s:%d\n", catalog_host, catalog_port);
 		return 0;

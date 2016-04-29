@@ -123,10 +123,10 @@ static int server_table_load(time_t stoptime)
 		jx_delete(item);
 	}
 
-	debug(D_CHIRP, "querying catalog at %s:%d", CATALOG_HOST, CATALOG_PORT);
+	debug(D_CHIRP, "querying catalog at %s", CATALOG_HOST);
 
 	struct jx *jexpr = jx_parse_string("type==\"chirp\"");
-	q = catalog_query_create(CATALOG_HOST, CATALOG_PORT, jexpr, stoptime);
+	q = catalog_query_create(CATALOG_HOST, jexpr, stoptime);
 
 	if(!q) {
 		jx_delete(jexpr);

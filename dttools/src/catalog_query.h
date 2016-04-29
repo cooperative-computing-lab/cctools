@@ -14,7 +14,7 @@ See the file COPYING for details.
 Query the global catalog server for server descriptions.
 */
 
-#define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu"
+#define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu;backup-catalog.cse.nd.edu"
 #define CATALOG_PORT_DEFAULT 9097
 
 #define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
@@ -25,14 +25,13 @@ Connects to a catalog server, issues a query, and waits for the results.
 The caller may specify a specific catalog host and port.
 If none is given, then the environment variables CATALOG_HOST and CATALOG_PORT will be consulted.
 If neither is set, the system will contact chirp.cse.nd.edu on port 9097.
-@param host The catalog server to query, or null for the default server.
-@param port The port of the server, or 0 for the default port.
+@param hosts A semicolon delimited list of catalog servers to query, or null for the default server.
 @param filter_expr An optional expression to filter the results in JX syntax.
  A null pointer indicates no filter.
 @param stoptime The absolute time at which to abort.
 @return A catalog query object on success, or null on failure.
 */
-struct catalog_query *catalog_query_create(const char *host, int port, struct jx *filter_expr, time_t stoptime);
+struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_expr, time_t stoptime);
 
 /** Read the next object from a query.
 Returns the next @ref jx expressions from the issued query.
@@ -49,5 +48,13 @@ struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime);
 @param q The query to delete.
 */
 void catalog_query_delete(struct catalog_query *q);
+
+/** Send update text to the given hosts
+hosts is a semicolon delimited list of hosts, each of which can be host or host:port
+@param hosts A list of hosts to which to send updates
+@param text String to send
+@return The number of updates successfully sent, 
+*/
+int catalog_query_send_update(const char *hosts, const char *text);
 
 #endif

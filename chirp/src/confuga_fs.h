@@ -27,8 +27,7 @@ struct confuga {
 	int scheduler;
 	uint64_t scheduler_n;
 
-	char     catalog_host[256]; /* FQDN is max 255 bytes */
-	uint16_t catalog_port;
+	const char *catalog_hosts;
 
 	unsigned char ticket[20]; /* SHA1 of ticket */
 
