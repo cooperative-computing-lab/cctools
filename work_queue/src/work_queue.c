@@ -174,6 +174,8 @@ struct work_queue {
 
 	char *catalog_hosts;
 
+	category_mode_t allocation_default_mode;
+
 	FILE *logfile;
 	int keepalive_interval;
 	int keepalive_timeout;
@@ -4424,6 +4426,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->monitor_mode = MON_DISABLED;
 
+	q->allocation_default_mode = WORK_QUEUE_ALLOCATION_MODE_FIXED;
 	q->categories = hash_table_create(0, 0);
 
 	// The value -1 indicates that fast abort is inactive by default
@@ -4837,14 +4840,11 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	int by_priority = 1;
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		struct category *c = category_lookup_or_create(q->categories, t->category);
-		if(c->max_allocation) {
-			/* when a task is resubmitted given resource exhaustion, we
-			 * push it at the head of the list, so it gets to run as soon
-			 * as possible. This avoids the issue in which all 'big' tasks
-			 * fail because the first allocation is too small. */
-			by_priority = 0;
-		}
+		/* when a task is resubmitted given resource exhaustion, we
+		 * push it at the head of the list, so it gets to run as soon
+		 * as possible. This avoids the issue in which all 'big' tasks
+		 * fail because the first allocation is too small. */
+		by_priority = 0;
 	}
 
 	if(by_priority) {
@@ -5842,26 +5842,51 @@ void work_queue_initialize_categories(struct work_queue *q, struct rmsummary *ma
 }
 
 void work_queue_specify_max_resources(struct work_queue *q,  const struct rmsummary *rm) {
-	work_queue_specify_max_category_resources(q,  "default", rm);
+	work_queue_specify_category_max_resources(q,  "default", rm);
 }
 
-void work_queue_specify_max_category_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+void work_queue_specify_category_max_resources(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+	category_specify_max_allocation(c, rm);
+}
+
+void work_queue_specify_category_first_allocation_guess(struct work_queue *q,  const char *category, const struct rmsummary *rm) {
+	struct category *c = work_queue_category_lookup_or_create(q, category);
+	category_specify_first_allocation_guess(c, rm);
+}
+
+int work_queue_specify_category_mode(struct work_queue *q, const char *category, category_mode_t mode) {
+
+	switch(mode) {
+		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX:
+		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
+		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+			break;
+		default:
+			notice(D_WQ, "Unknown category mode specified.");
+			return 0;
+			break;
+	}
+
+	if(!category) {
+		q->allocation_default_mode = mode;
+	}
+	else {
+		struct category *c = work_queue_category_lookup_or_create(q, category);
+		category_specify_allocation_mode(c, mode);
+	}
+
+	return 1;
+}
+
+int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel) {
+
 	struct category *c = work_queue_category_lookup_or_create(q, category);
 
-	if(c->max_allocation) {
-		rmsummary_delete(c->max_allocation);
-	}
+	return category_enable_auto_resource(c, resource, autolabel);
+}
 
-	if(rm) {
-		c->max_allocation = rmsummary_create(-1);
-		rmsummary_merge_max(c->max_allocation, rm);
-
-		if(q->monitor_mode == MON_DISABLED) {
-			work_queue_enable_monitoring(q, NULL);
-		}
-	} else {
-		c->max_allocation = NULL;
-	}
 }
 
 const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
@@ -5875,6 +5900,7 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 
 	if(!c->wq_stats) {
 		c->wq_stats = calloc(1, sizeof(struct work_queue_stats));
+		category_specify_allocation_mode(c, q->allocation_default_mode);
 	}
 
 	return c;

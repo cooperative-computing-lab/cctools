@@ -73,13 +73,58 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
-	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX;
+	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
 	hash_table_insert(categories, name, c);
 
 	return c;
 }
 
+void category_specify_max_allocation(struct category *c, const struct rmsummary *s) {
+	rmsummary_delete(c->max_allocation);
+	c->max_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->max_allocation, s);
+}
+
+void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
+
+	if(c->first_allocation)
+		rmsummary_delete(c->first_allocation);
+
+	c->first_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->first_allocation, s);
+}
+
+/* set autoallocation mode for cores, memory, and disk.  To add other resources see category_enable_auto_resource. */
+void category_specify_allocation_mode(struct category *c, int mode) {
+	struct rmsummary *r = c->autolabel_resource;
+
+	c->allocation_mode = mode;
+
+	int autolabel = 1;
+	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+		autolabel = 0;
+	}
+
+	r->wall_time      = 0;
+	r->cpu_time       = 0;
+	r->swap_memory     = 0;
+	r->virtual_memory  = 0;
+	r->bytes_read      = 0;
+	r->bytes_written   = 0;
+	r->bytes_received  = 0;
+	r->bytes_sent      = 0;
+	r->bandwidth       = 0;
+	r->total_files     = 0;
+	r->total_processes = 0;
+	r->max_concurrent_processes = 0;
+
+	r->cores           = autolabel;
+	r->memory          = autolabel;
+	r->disk            = autolabel;
+}
 
 /* set autolabel per resource. */
 int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel) {
