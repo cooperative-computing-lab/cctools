@@ -702,9 +702,9 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		free(previous_batch_options);
 	}
 
-	free(command);
 	list_delete(input_list);
 	list_delete(output_list);
+	free(command);
 	free(input_files);
 	free(output_files);
 	jx_delete(envlist);
@@ -2407,6 +2407,14 @@ int main(int argc, char *argv[])
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
             unlink(CONTAINER_SINGULARITY_SH);
         }
+
+	if(wrapper){
+		makeflow_wrapper_delete(wrapper);
+	}
+
+	if(monitor){
+		makeflow_monitor_delete(monitor);	
+	}
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);

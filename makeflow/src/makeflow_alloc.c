@@ -29,7 +29,7 @@ void makeflow_alloc_print_stats(struct makeflow_alloc *a, char *event)
 
 struct makeflow_alloc_unit * makeflow_alloc_unit_create(uint64_t size)
 {
-	struct makeflow_alloc_unit *u = malloc(sizeof(*u));
+	struct makeflow_alloc_unit *u = malloc(sizeof(struct makeflow_alloc_unit));
 	u->total	= size;
 	u->used		= 0;
 	u->greedy	= 0;
@@ -199,6 +199,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 			dynamic_alloc += timestamp_get() - start;
 			printf("%d\t%"PRIu64"\t", n->nodeid, makeflow_alloc_node_size(a, node1, n));
 			makeflow_alloc_print_stats(alloc1, "CHECK FAIL NON-FIT");
+			makeflow_alloc_delete(alloc2);
 			return 0;
 		}
 
@@ -435,7 +436,7 @@ int makeflow_alloc_release_space( struct makeflow_alloc *a, struct dag_node *n, 
 	}
 
 	dynamic_alloc += timestamp_get() - start;
-	makeflow_alloc_print_stats(alloc1, "RELEASE");
+	makeflow_alloc_print_stats(a, "RELEASE");
 	return 1;
 }
 

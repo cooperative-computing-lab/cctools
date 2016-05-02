@@ -38,6 +38,21 @@ struct makeflow_monitor * makeflow_monitor_create()
 	return m;
 }
 
+void makeflow_monitor_delete(struct makeflow_monitor *m)
+{
+	makeflow_wrapper_delete(m->wrapper);
+	if(m->log_prefix)
+		free(m->log_prefix);
+
+	if(m->exe)
+		free(m->exe);
+
+	if(m->exe_remote)
+		free(m->exe_remote);
+
+	free(m);
+}
+
 /*
  * Prepare for monitoring by creating wrapper command and attaching the
  * appropriate input and output dependencies.

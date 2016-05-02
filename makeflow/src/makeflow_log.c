@@ -322,7 +322,6 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 			free(line);
 			exit(1);
 		}
-		free(line);
 		fclose(d->logfile);
 	}
 
