@@ -63,7 +63,6 @@ struct rmsummary
 
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
-
 };
 
 struct rmsummary_field
