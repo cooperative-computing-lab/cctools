@@ -340,13 +340,7 @@ static int available_workers(struct work_queue *q) {
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
 		if(strcmp(w->hostname, "unknown") != 0) {
-			if(w->resources->unlabeled.inuse > 0)
-			{
-				if(overcommitted_resource_total(q, w->resources->workers.total, 1) > w->resources->unlabeled.inuse) {
-					available_workers++;
-				}
-			}
-			else if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->resources->memory.inuse){
+			if(overcommitted_resource_total(q, w->resources->cores.total, 1) > w->resources->cores.inuse || w->resources->disk.total > w->resources->disk.inuse || overcommitted_resource_total(q, w->resources->memory.total, 0) > w->resources->memory.inuse){
 				available_workers++;
 			}
 		}
@@ -3715,17 +3709,6 @@ void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max
 	}
 }
 
-static void set_task_unlabel_flag( struct work_queue_task *t )
-{
-	if(t->resources_requested->cores < 0 && t->resources_requested->memory < 0 && t->resources_requested->disk < 0 && t->resources_requested->gpus)
-	{
-		if(t->resource_request == CATEGORY_ALLOCATION_USER)
-			t->resource_request = CATEGORY_ALLOCATION_UNLABELED;
-	} else {
-		t->resource_request = CATEGORY_ALLOCATION_USER;
-	}
-}
-
 void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 {
 	if(memory < 0)
@@ -3736,8 +3719,6 @@ void work_queue_task_specify_memory( struct work_queue_task *t, int64_t memory )
 	{
 		t->resources_requested->memory = memory;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
@@ -3750,8 +3731,6 @@ void work_queue_task_specify_disk( struct work_queue_task *t, int64_t disk )
 	{
 		t->resources_requested->disk = disk;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
@@ -3764,8 +3743,6 @@ void work_queue_task_specify_cores( struct work_queue_task *t, int cores )
 	{
 		t->resources_requested->cores = cores;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
@@ -3778,8 +3755,6 @@ void work_queue_task_specify_gpus( struct work_queue_task *t, int gpus )
 	{
 		t->resources_requested->gpus = gpus;
 	}
-
-	set_task_unlabel_flag(t);
 }
 
 void work_queue_task_specify_end_time( struct work_queue_task *t, int64_t useconds )
