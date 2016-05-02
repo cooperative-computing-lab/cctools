@@ -34,7 +34,7 @@ struct makeflow_wrapper * makeflow_wrapper_create()
 void makeflow_wrapper_delete(struct makeflow_wrapper *w)
 {
 	if(w->command)
-		free(w->command);	
+		free(w->command);
 
 	list_free(w->input_files);
 	list_delete(w->input_files);

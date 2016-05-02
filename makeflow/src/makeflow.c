@@ -2413,7 +2413,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor){
-		makeflow_monitor_delete(monitor);	
+		makeflow_monitor_delete(monitor);
 	}
 
 	if(makeflow_abort_flag) {

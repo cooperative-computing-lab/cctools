@@ -47,9 +47,6 @@ void makeflow_monitor_delete(struct makeflow_monitor *m)
 	if(m->exe)
 		free(m->exe);
 
-	if(m->exe_remote)
-		free(m->exe_remote);
-
 	free(m);
 }
 
