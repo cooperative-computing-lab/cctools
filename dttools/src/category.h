@@ -108,6 +108,8 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
 
-const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struct rmsummary *first, struct rmsummary *user, category_allocation_t requested);
+const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request);
+
 #endif

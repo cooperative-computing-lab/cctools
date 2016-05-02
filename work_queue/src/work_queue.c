@@ -277,7 +277,9 @@ static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits);
-const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t);
+
+const struct rmsummary *task_max_resources(struct work_queue *q, struct work_queue_task *t);
+const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t);
 
 void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name);
@@ -1272,9 +1274,6 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 		rmsummary_assign_char_field(t->resources_measured, "category", t->category);
 		t->return_status = t->resources_measured->exit_status;
 	}
-
-	if(t->resource_request != CATEGORY_ALLOCATION_USER)
-		rmsummary_merge_max(t->resources_requested, task_dynamic_label(q, t));
 
 	free(summary);
 }
@@ -5887,12 +5886,18 @@ int work_queue_enable_category_resource(struct work_queue *q, const char *catego
 	return category_enable_auto_resource(c, resource, autolabel);
 }
 
-}
+const struct rmsummary *task_max_resources(struct work_queue *q, struct work_queue_task *t) {
 
-const struct rmsummary *task_dynamic_label(struct work_queue *q, struct work_queue_task *t) {
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	return category_task_dynamic_label(c->max_allocation, c->first_allocation, t->resources_requested, t->resource_request);
+	return category_dynamic_task_max_resources(c, t->resources_requested, t->resource_request);
+}
+
+const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {
+
+	struct category *c = work_queue_category_lookup_or_create(q, t->category);
+
+	return category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
 }
 
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name) {

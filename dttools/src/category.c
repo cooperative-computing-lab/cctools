@@ -509,11 +509,6 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 		fatal("Could not read '%s' file: %s\n", strerror(errno));
 	}
 
-const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
-	/* we keep an internal label so that the caller does not have to worry
-	 * about memory leaks. */
-	static struct rmsummary *internal = NULL;
-
 	char *name;
 	struct category *c;
 	hash_table_firstkey(categories);
@@ -548,7 +543,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 				flag = 1;\
 			}\
 		}\
-		else if(max && max->field) {\
+		else if(max && max->field > -1) {\
 			if(measured->field > max->field) {\
 				flag = 1;\
 			}\
@@ -590,56 +585,58 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 	return current_label;
 }
 
-	/* Never downgrade max allocation */
-	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-		return CATEGORY_ALLOCATION_AUTO_MAX;
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
+	/* we keep an internal label so that the caller does not have to worry
+	 * about memory leaks. */
+	static struct rmsummary *internal = NULL;
+
+	if(internal) {
+		rmsummary_delete(internal);
 	}
 
-	if(c && c->first_allocation) {
-		/* Use first allocation when it is available. */
-		return CATEGORY_ALLOCATION_AUTO_FIRST;
-	} else {
-		/* Use default when no enough information is available. */
-		return CATEGORY_ALLOCATION_AUTO_ZERO;
+	internal = rmsummary_create(-1);
+
+	struct rmsummary *max   = c->max_allocation;
+	struct rmsummary *first = c->first_allocation;
+
+	/* load max values */
+	rmsummary_merge_override(internal, max);
+
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+			&& request == CATEGORY_ALLOCATION_FIRST) {
+		rmsummary_merge_override(internal, first);
 	}
+
+	/* chip in user values */
+	rmsummary_merge_override(internal, user);
+
+	return internal;
 }
 
-const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struct rmsummary *first, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
 
-	static struct rmsummary *dynamic_label = NULL;
+	static struct rmsummary *internal = NULL;
 
-	switch(request) {
-		case CATEGORY_ALLOCATION_AUTO_ZERO:
-		case CATEGORY_ALLOCATION_AUTO_MAX:
-			return max;
-			break;
-		case CATEGORY_ALLOCATION_AUTO_FIRST:
-			return first;
-			break;
-		case CATEGORY_ALLOCATION_USER:
-			if(!max) {
-				return user;
-			} else {
-				if(dynamic_label) {
-					rmsummary_delete(dynamic_label);
-				}
-				dynamic_label = rmsummary_create(-1);
+	const struct rmsummary *max = category_dynamic_task_max_resources(c, user, request);
 
-				rmsummary_merge_min(dynamic_label, max);
-				rmsummary_merge_override(dynamic_label, user);
-
-				return dynamic_label;
-			}
-			break;
-		case CATEGORY_ALLOCATION_UNLABELED:
-		default:
-			if(max) {
-				return max;
-			} else {
-				return user;
-			}
-			break;
+	if(internal) {
+		rmsummary_delete(internal);
 	}
+
+	internal = rmsummary_create(-1);
+
+	/* load seen values */
+	struct rmsummary *seen = c->max_resources_seen;
+
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
+			internal->cores  = seen->cores;
+			internal->memory = seen->memory;
+			internal->disk   = seen->disk;
+	}
+
+	rmsummary_merge_override(internal, max);
+
+	return internal;
 }
 
 void category_tune_bucket_size(const char *resource, uint64_t size) {
