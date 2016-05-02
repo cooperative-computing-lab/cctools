@@ -32,6 +32,6 @@ capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
 # If a rule is preceded by LOCAL, it executes at the local site.
-capitol.jpg : 
-	$CURL -o capitol.jpg $URL
+capitol.jpg:
+	LOCAL $CURL -o capitol.jpg $URL
 
