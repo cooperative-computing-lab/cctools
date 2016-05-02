@@ -322,6 +322,15 @@ int64_t category_first_allocation_min_waste(struct itable *histogram, int assume
 		int64_t a  = keys[i];
 		double  Ea;
 
+		if(a < 1) {
+			continue;
+		}
+
+		if(a > top_resource) {
+			a_1 = top_resource;
+			break;
+		}
+
 		double Pa = 1 - ((double) counts_accum[i])/counts_accum[n-1];
 
 		if(assume_independence) {
@@ -382,6 +391,11 @@ int64_t category_first_allocation_max_throughput(struct itable *histogram, int64
 			continue;
 		}
 
+		if(a > top_resource) {
+			a_1 = top_resource;
+			break;
+		}
+
 		double Pbef = ((double) counts_accum[i])/counts_accum[n-1];
 		double Paft = 1 - Pbef;
 
@@ -410,18 +424,24 @@ int64_t category_first_allocation_max_throughput(struct itable *histogram, int64
 }
 
 int64_t category_first_allocation(struct itable *histogram, int assume_independence, category_mode_t mode,  int64_t top_resource) {
+
+	int64_t alloc;
+
 	switch(mode) {
 		case CATEGORY_ALLOCATION_MODE_MIN_WASTE:
-			return category_first_allocation_min_waste(histogram, assume_independence, top_resource);
+			alloc = category_first_allocation_min_waste(histogram, assume_independence, top_resource);
 			break;
 		case CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT:
-			return category_first_allocation_max_throughput(histogram, top_resource);
+			alloc = category_first_allocation_max_throughput(histogram, top_resource);
 			break;
+		case CATEGORY_ALLOCATION_MODE_FIXED:
 		case CATEGORY_ALLOCATION_MODE_MAX:
 		default:
-			return top_resource;
+			alloc = top_resource;
 			break;
 	}
+
+	return alloc;
 }
 
 #define update_first_allocation_field(c, top, independence, field)\
