@@ -36,7 +36,7 @@ The following major problems must be fixed:
 #include "rmonitor.h"
 #include "rmonitor_types.h"
 #include "rmonitor_poll.h"
-#include "category.h"
+#include "category_internal.h"
 #include "copy_stream.h"
 #include "random.h"
 #include "process.h"
@@ -3716,8 +3716,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 
 	t->result = WORK_QUEUE_RESULT_UNKNOWN;
 
-	t->resource_request   = CATEGORY_ALLOCATION_UNLABELED;
-
+	t->resource_request   = CATEGORY_ALLOCATION_FIRST;
 
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);

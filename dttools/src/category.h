@@ -11,19 +11,38 @@ See the file COPYING for details.
 #include "timestamp.h"
 
 typedef enum {
-	CATEGORY_ALLOCATION_UNLABELED = 0, /**< No resources are explicitely requested. */
-	CATEGORY_ALLOCATION_USER,          /**< Using values explicitely requested. */
-	CATEGORY_ALLOCATION_AUTO_ZERO,     /**< Pre-step for autolabeling, when the first allocation has not been computed. */
-	CATEGORY_ALLOCATION_AUTO_FIRST,    /**< Using first step value of the two-step policy. */
-	CATEGORY_ALLOCATION_AUTO_MAX,      /**< Using max of category. (2nd step of two-step policy) */
-	CATEGORY_ALLOCATION_ERROR          /**< No valid resources could be found. (E.g., after 2nd step fails) */
+	CATEGORY_ALLOCATION_FIRST = 0,       /**< No automatic allocation, or using first step value of the two-step policy. */
+	CATEGORY_ALLOCATION_MAX,         /**< Using max of category. (2nd step of two-step policy) */
+	CATEGORY_ALLOCATION_ERROR             /**< No valid resources could be found. (E.g., after 2nd step fails) */
 } category_allocation_t;
 
+
+/* Names here a little ugly. We call them 'WORK_QUEUE_' to present a uniform
+name pattern for work queue applications, even when this is specific to
+categories. We add macro definitions, with nicer names. */
+
 typedef enum {
-	CATEGORY_ALLOCATION_MODE_MAX = 0,
-	CATEGORY_ALLOCATION_MODE_MIN_WASTE,
-	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT
+/**< When monitoring is disabled, all tasks run as
+  WORK_QUEUE_ALLOCATION_MODE_FIXED. If monitoring is enabled and resource
+  exhaustion occurs: */
+	WORK_QUEUE_ALLOCATION_MODE_FIXED = 0,   /**< Task fails. (default) */
+	WORK_QUEUE_ALLOCATION_MODE_MAX,         /**< If maximum values are specified for cores, memory,
+											  or disk (either a user-label or category-label) and
+											  one of those resources is exceeded, the task fails.
+											  Otherwise it is retried until a large enough worker
+											  connects to the master, using the maximum values
+											  specified, and the maximum values so far seen for
+											  resources not specified. */
+
+	WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE,   /**< As above, but tasks are tried with an automatically
+											  computed first-allocation to minimize resource waste. */
+	WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT /**< As above, but maximizing throughput. */
 } category_mode_t;
+
+#define	CATEGORY_ALLOCATION_MODE_FIXED          WORK_QUEUE_ALLOCATION_MODE_FIXED
+#define	CATEGORY_ALLOCATION_MODE_MAX            WORK_QUEUE_ALLOCATION_MODE_MAX
+#define	CATEGORY_ALLOCATION_MODE_MIN_WASTE      WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE
+#define	CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT
 
 struct category {
 	char *name;
