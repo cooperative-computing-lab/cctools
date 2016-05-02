@@ -49,7 +49,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->total_tasks = 0;
 
 	c->first_allocation    = NULL;
-	c->max_allocation      = NULL;
+	c->max_allocation      = rmsummary_create(-1);
+	c->autolabel_resource  = rmsummary_create(0);
 
 	c->max_resources_completed = rmsummary_create(-1);
 	c->max_resources_seen      = rmsummary_create(-1);
@@ -77,6 +78,12 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	hash_table_insert(categories, name, c);
 
 	return c;
+}
+
+
+/* set autolabel per resource. */
+int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel) {
+	return rmsummary_assign_int_field(c->autolabel_resource, resource_name, autolabel);
 }
 
 static void category_clear_histogram(struct itable *h) {
@@ -154,6 +161,7 @@ void category_delete(struct hash_table *categories, const char *name) {
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
 	rmsummary_delete(c->max_resources_completed);
+	rmsummary_delete(c->autolabel_resource);
 	rmsummary_delete(c->max_resources_seen);
 
 	free(c);
@@ -370,7 +378,9 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 }
 
 #define update_first_allocation_field(c, top, independence, field)\
-	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field)
+	if(c->autolabel_resource->field) {\
+		(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field);\
+	}
 
 void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */

@@ -637,6 +637,15 @@ multiplier.  The value specified here applies only to tasks in the given categor
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
 
 
+/** Turn on or off first-allocation labeling for a given category and resource. This function should be use to fine-tune the defaults from @ref work_queue_specify_category_mode.
+@param q A work queue object.
+@param category A category name.
+@param resource A resource name.
+@param autolabel 0 off, 1 on.
+@returns 1 if resource is valid, 0 otherwise.
+*/
+int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel);
+
 /** Change the preference to send or receive tasks.
 @param q A work queue object.
 @param ratio The send/receive ratio when there is a choice between sending and receiving tasks. 1 Always prefer to send (e.g., for homogenous, stable resources). 0 Always prefer to receive (e.g., for resources with hight rate of eviction). Default is 0.75 (one average, receive one task per three sent). **/

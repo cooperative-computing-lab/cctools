@@ -54,6 +54,9 @@ struct category {
 	struct rmsummary *max_resources_seen;
 	struct rmsummary *max_resources_completed;
 
+	/* if 1, use first allocations. 0, use max fixed (if given) */
+	struct rmsummary *autolabel_resource;
+
 	/* All keys are assumed positive. Thus, we shift them to the right so that
 	 * we can have a "0" key. 0->1, 1->2, etc. */
 	struct itable *cores_histogram;
@@ -87,6 +90,9 @@ struct category {
 	/* Mappings between variable names defined in the makeflow file and their values. */
 	struct hash_table *mf_variables;
 };
+
+/* enable/disable autoallocation for the resource */
+int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel);
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
