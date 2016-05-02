@@ -1413,28 +1413,36 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
 		t->exhausted_attempts++;
 
-		struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
-		if(j) {
-			char *str = jx_print_string(j);
-			debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
-					t->taskid,
-					w->hostname,
-					w->addrport,
-					str);
-			free(str);
-			jx_delete(j);
+		if(t->resources_measured && t->resources_measured->limits_exceeded) {
+			struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
+			if(j) {
+				char *str = jx_print_string(j);
+				debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
+						t->taskid,
+						w->hostname,
+						w->addrport,
+						str);
+				free(str);
+				jx_delete(j);
+			}
+		} else {
+				debug(D_WQ, "Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
+						t->taskid,
+						w->hostname,
+						w->addrport);
 		}
 
 		struct category *c = work_queue_category_lookup_or_create(q, t->category);
 		category_allocation_t next = category_next_label(c, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
-		if(next != CATEGORY_ALLOCATION_ERROR) {
+		if(next == CATEGORY_ALLOCATION_ERROR) {
+			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+		}
+		else {
 			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 			t->resource_request = next;
 			change_task_state(q, t, WORK_QUEUE_TASK_READY);
 			return;
-		} else {
-			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
 		}
 	}
 
