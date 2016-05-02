@@ -1296,8 +1296,6 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 		if(!t->resources_measured)
 		{
-			/* mark all resources with -1, to signal that no information is available. */
-			t->resources_measured = rmsummary_create(-1);
 			fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
 		}
 
@@ -1382,8 +1380,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	 * queue summary, update t->resources_used, and delete the task summary. */
 	if(q->monitor_mode) {
 		read_measured_resources(q, t);
-
-		resource_monitor_append_report(q, t);
 
 		/* Further, if we got debug and series files, gzip them. */
 		if(q->monitor_mode == MON_FULL)
@@ -2934,6 +2930,8 @@ static void add_task_report( struct work_queue *q, struct work_queue_task *t )
 	  tr = list_pop_head(q->task_reports);
 		free(tr);
 	}
+
+	resource_monitor_append_report(q, t);
 }
 
 /*
@@ -5810,8 +5808,6 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 	s->total_receive_time   += (t->time_receive_output_finish - t->time_receive_output_start);
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
-
-	rmsummary_merge_max(c->max_resources_seen, t->resources_measured);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{

@@ -144,7 +144,7 @@ struct work_queue_task {
 
 	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
 
-	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task. */
+	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 
 	category_allocation_t resource_request;                /**< See @ref category_allocation_t */
