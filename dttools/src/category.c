@@ -54,7 +54,6 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_allocation      = rmsummary_create(-1);
 	c->autolabel_resource  = rmsummary_create(0);
 
-	c->max_resources_completed = rmsummary_create(-1);
 	c->max_resources_seen      = rmsummary_create(-1);
 
 	c->cores_histogram          = itable_create(0);
@@ -75,6 +74,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
+	c->completions_since_last_reset = 0;
+
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
 	hash_table_insert(categories, name, c);
@@ -90,6 +91,9 @@ void category_specify_max_allocation(struct category *c, const struct rmsummary 
 }
 
 void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
+
+	/* assume user knows what they are doing. */
+	c->completions_since_last_reset = first_allocation_every_n_tasks;
 
 	if(c->first_allocation)
 		rmsummary_delete(c->first_allocation);
@@ -207,7 +211,6 @@ void category_delete(struct hash_table *categories, const char *name) {
 
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
-	rmsummary_delete(c->max_resources_completed);
 	rmsummary_delete(c->autolabel_resource);
 	rmsummary_delete(c->max_resources_seen);
 
@@ -449,7 +452,7 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 		(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field);\
 	}
 
-void category_update_first_allocation(struct hash_table *categories, const char *category) {
+int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker) {
 	/* buffer used only for debug output. */
 	static buffer_t *b = NULL;
 	if(!b) {
@@ -457,20 +460,24 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 		buffer_init(b);
 	}
 
-	struct category *c = category_lookup_or_create(categories, category);
-	struct rmsummary *top = c->max_allocation;
+	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED)
+		return 0;
 
-	if(!top)
-		return;
+	if(c->total_tasks < 1)
+		return 0;
+
+	struct rmsummary *top = rmsummary_create(-1);
+	rmsummary_merge_override(top, max_worker);
+	rmsummary_merge_override(top, c->max_resources_seen);
+	rmsummary_merge_override(top, c->max_allocation);
 
 	if(!c->first_allocation) {
 		c->first_allocation = rmsummary_create(-1);
 	}
 
-	c->first_allocation->cores = c->max_allocation->cores;
-
 	update_first_allocation_field(c, top, 1, cpu_time);
 	update_first_allocation_field(c, top, 1, wall_time);
+	update_first_allocation_field(c, top, c->time_peak_independece, cores);
 	update_first_allocation_field(c, top, c->time_peak_independece, virtual_memory);
 	update_first_allocation_field(c, top, c->time_peak_independece, memory);
 	update_first_allocation_field(c, top, c->time_peak_independece, swap_memory);
@@ -486,25 +493,49 @@ void category_update_first_allocation(struct hash_table *categories, const char 
 
 	/* From here on we only print debugging info. */
 	struct jx *jsum = rmsummary_to_json(c->first_allocation, 1);
-
 	if(jsum) {
 		char *str = jx_print_string(jsum);
-		debug(D_DEBUG, "Updating first allocation '%s':", category);
+		debug(D_DEBUG, "Updating first allocation '%s':", c->name);
 		debug(D_DEBUG, "%s", str);
 		jx_delete(jsum);
 		free(str);
 	}
+
+	jsum = rmsummary_to_json(top, 1);
+	if(jsum) {
+		char *str = jx_print_string(jsum);
+		debug(D_DEBUG, "From max resources '%s':", c->name);
+		debug(D_DEBUG, "%s", str);
+		jx_delete(jsum);
+		free(str);
+	}
+
+	rmsummary_delete(top);
+
+	return 1;
 }
 
 
-void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs) {
-	const char *name = category ? category : "default";
+int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker) {
 
-	struct category *c = category_lookup_or_create(categories, name);
+	int update = 0;
 
-	if(rs) {
-		rmsummary_merge_max(c->max_resources_completed, rs);
+	const struct rmsummary *max  = c->max_allocation;
+	const struct rmsummary *seen = c->max_resources_seen;
 
+	if(!rs || ((max->cores < 0 && (rs->cores > seen->cores))
+				|| (max->memory < 0 && (rs->memory > seen->memory))
+				|| (max->disk < 0 && (rs->disk > seen->disk)))) {
+		rmsummary_delete(c->first_allocation);
+		c->first_allocation =  NULL;
+		c->completions_since_last_reset = 0;
+
+		update = 1;
+	}
+
+	rmsummary_merge_max(c->max_resources_seen, rs);
+
+	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
 		category_inc_histogram_count(c, cores,          rs, 1);
 		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
 		category_inc_histogram_count(c, wall_time,      rs, time_bucket_size);
@@ -520,8 +551,15 @@ void category_accumulate_summary(struct hash_table *categories, const char *cate
 		category_inc_histogram_count(c, disk,           rs, disk_bucket_size);
 		category_inc_histogram_count(c, max_concurrent_processes, rs, 1);
 		category_inc_histogram_count(c, total_processes,rs, 1);
+
+		c->completions_since_last_reset++;
+
+		if(c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
+			update |= category_update_first_allocation(c, max_worker);
+		}
 	}
 
+	return update;
 }
 
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file) {
@@ -546,14 +584,15 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	list_first_item(summaries);
 	while((s = list_pop_head(summaries))) {
 		if(s->category) {
-			category_accumulate_summary(categories, s->category, s);
+			c = category_lookup_or_create(categories, s->category);
+			category_accumulate_summary(c, s, NULL);
 		}
 		rmsummary_delete(s);
 	}
 
 	hash_table_firstkey(categories);
 	while(hash_table_nextkey(categories, &name, (void **) &c)) {
-		category_update_first_allocation(categories, name);
+		category_update_first_allocation(c, NULL);
 		category_clear_histograms(c);
 	}
 }
@@ -620,6 +659,13 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 
 	struct rmsummary *max   = c->max_allocation;
 	struct rmsummary *first = c->first_allocation;
+	struct rmsummary *seen  = c->max_resources_seen;
+
+	if(c->completions_since_last_reset >= first_allocation_every_n_tasks) {
+		internal->cores  = seen->cores;
+		internal->memory = seen->memory;
+		internal->disk   = seen->disk;
+	}
 
 	/* load max values */
 	rmsummary_merge_override(internal, max);

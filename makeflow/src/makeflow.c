@@ -639,7 +639,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			rmsummary_delete(n->resources_measured);
 		n->resources_measured = rmsummary_parse_file_single(summary_name);
 
-		category_accumulate_summary(d->categories, n->category->name, n->resources_measured);
+		category_accumulate_summary(n->category, n->resources_measured, NULL);
 
 		free(nodeid);
 		free(log_name_prefix);
