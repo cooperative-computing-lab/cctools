@@ -454,6 +454,10 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 		fatal("Could not read '%s' file: %s\n", strerror(errno));
 	}
 
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
+	/* we keep an internal label so that the caller does not have to worry
+	 * about memory leaks. */
+	static struct rmsummary *internal = NULL;
 
 	char *name;
 	struct category *c;
@@ -497,16 +501,15 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	}
 
 /* returns the next allocation state. */
-category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
-
-	struct category *c = category_lookup_or_create(categories, category);
-
+category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
 	if(resource_overflow) {
-		int over = 0;
+		/* not autolabeling, so we return error. */
+		if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
+			return CATEGORY_ALLOCATION_ERROR;
+		}
 
-		if(current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-			over = 1;
-		} else if(measured) {
+		int over = 0;
+		if(measured) {
 			check_hard_limits(c->max_allocation, user, measured, cores,                    over);
 			check_hard_limits(c->max_allocation, user, measured, cpu_time,                 over);
 			check_hard_limits(c->max_allocation, user, measured, wall_time,                over);
@@ -524,18 +527,13 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 			check_hard_limits(c->max_allocation, user, measured, total_processes,          over);
 		}
 
-		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_AUTO_MAX;
+		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_MAX;
 	}
 
-	/* If user specified resources manually, respect the label. */
-	if(current_label == CATEGORY_ALLOCATION_USER) {
-			return CATEGORY_ALLOCATION_USER;
-	}
+	/* else... not overflow, no label change */
 
-	/* If category is not labeling, and user is not labeling, return unlabeled. */
-	if(c && !c->max_allocation) {
-		return CATEGORY_ALLOCATION_UNLABELED;
-	}
+	return current_label;
+}
 
 	/* Never downgrade max allocation */
 	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {

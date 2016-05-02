@@ -1426,9 +1426,10 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 			jx_delete(j);
 		}
 
-		category_allocation_t next = category_next_label(q->categories, t->category, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
+		struct category *c = work_queue_category_lookup_or_create(q, t->category);
+		category_allocation_t next = category_next_label(c, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
-		if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
+		if(next != CATEGORY_ALLOCATION_ERROR) {
 			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 			t->resource_request = next;
 			change_task_state(q, t, WORK_QUEUE_TASK_READY);
@@ -3417,9 +3418,6 @@ static int send_one_task( struct work_queue *q )
 	// Consider each task in the order of priority:
 	list_first_item(q->ready_list);
 	while( (t = list_next_item(q->ready_list))) {
-
-		// Assign the allocation type for the task.
-		t->resource_request = category_next_label(q->categories, t->category, t->resource_request, /*resource overflow*/ 0, NULL, NULL);
 
 		// Find the best worker for the task at the head of the list
 		w = find_best_worker(q,t);
