@@ -143,6 +143,7 @@ public:
 private:
 	int count_pointer_uses( pfs_pointer *p );
 	int count_file_uses( pfs_file *f );
+	static pfs_pointer *getopenfile( pid_t pid, int fd );
 
 	void complete_path( const char *short_path, char *long_path );
 
