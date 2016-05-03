@@ -141,7 +141,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 			m->enable_list_files);
 
 	char *nodeid = string_format("%d",n->nodeid);
-	result = string_replace_percents(result, nodeid);
+	char *result = string_replace_percents(command, nodeid);
 
 	free(executable);
 	free(extra_options);

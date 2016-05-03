@@ -412,7 +412,7 @@ void dag_node_determine_children(struct dag_node *n)
 {
 	struct dag_node *c;
 
-	/* Have un-updated children calculate their current footprint. */
+	/* Have un-updated children calculate their direct children. */
 	set_first_element(n->descendants);
 	while((c = set_next_element(n->descendants))){
 		if(!c->children_updated){

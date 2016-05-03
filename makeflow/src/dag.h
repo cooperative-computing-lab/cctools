@@ -50,7 +50,7 @@ struct dag {
 	int should_read_archive;            /* Keeps track of whether a dag should read the archiving directory and use cached jobs */
 	int should_write_to_archive;        /* Keeps track of whether a dag should write results of workflow to the archive directory */
 
-	uint64_t total_file_size;			/* Keeps a total of the existing files. */
+	uint64_t total_file_size;           /* Keeps cumulative size of existing files. */
 };
 
 struct dag *dag_create();
