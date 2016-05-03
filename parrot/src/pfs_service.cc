@@ -26,14 +26,6 @@ extern "C" {
 #include <string.h>
 #include <stdlib.h>
 
-pfs_service::pfs_service()
-{
-}
-
-pfs_service::~pfs_service()
-{
-}
-
 void * pfs_service::connect( pfs_name *name )
 {
 	errno = ENOSYS;
@@ -50,11 +42,6 @@ int pfs_service::get_default_port()
 }
 
 int pfs_service::tilde_is_special()
-{
-	return 0;
-}
-
-int pfs_service::is_seekable()
 {
 	return 0;
 }

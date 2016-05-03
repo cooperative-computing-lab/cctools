@@ -16,15 +16,14 @@ See the file COPYING for details.
 
 class pfs_service {
 public:
-	pfs_service();
-	virtual ~pfs_service();
+	virtual ~pfs_service() {};
 
 	virtual void * connect( pfs_name *name );
 	virtual void disconnect( pfs_name *name, void *cxn );
 	virtual int get_default_port();
 	virtual int get_block_size();
 	virtual int tilde_is_special();
-	virtual int is_seekable();
+	virtual int is_seekable() = 0;
 	virtual int is_local();
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode );
