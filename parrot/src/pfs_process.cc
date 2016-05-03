@@ -126,7 +126,7 @@ static void initfd( pfs_process *p, int fd )
 				/* The fd was closed and opened as a "Parrot fd" by the root tracee, find its inode: */
 				if (pfs_process_stat(p->pid, fd, &buf) == -1)
 					fatal("could not stat root tracee: %s", strerror(errno));
-				p->table->attach(fd, nfd, fdflags, S_IRUSR|S_IWUSR, "fd", &buf);
+				p->table->attach(fd, nfd, fdflags, S_IRUSR|S_IWUSR, NULL, &buf);
 			}
 		}
 	}

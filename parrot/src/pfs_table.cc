@@ -228,7 +228,16 @@ to this physical file descriptor in the tracing process.
 
 void pfs_table::attach( int logical, int physical, int flags, mode_t mode, const char *name, struct stat *buf )
 {
+	char selfname[PATH_MAX] = "";
 	assert(VALID_FD(logical) && pointers[logical] == NULL);
+	if (!name) {
+		char path[PATH_MAX];
+		snprintf(path, PATH_MAX, "/proc/self/fd/%d", physical);
+		if (::readlink(path, selfname, sizeof selfname - 1) == -1) {
+			fatal("could not get name for fd %d: %s", physical, strerror(errno));
+		}
+		name = selfname;
+	}
 	pointers[logical] = new pfs_pointer(pfs_file_bootstrap(physical,name),flags,mode);
 	fd_flags[logical] = 0;
 	setparrot(logical, logical, buf);
