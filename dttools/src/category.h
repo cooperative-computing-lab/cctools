@@ -107,6 +107,8 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker);
 int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
 
+int category_in_steady_state(struct category *c);
+
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
 const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request);

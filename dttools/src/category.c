@@ -661,7 +661,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	struct rmsummary *first = c->first_allocation;
 	struct rmsummary *seen  = c->max_resources_seen;
 
-	if(c->completions_since_last_reset >= first_allocation_every_n_tasks) {
+	if(category_in_steady_state(c)) {
 		internal->cores  = seen->cores;
 		internal->memory = seen->memory;
 		internal->disk   = seen->disk;
@@ -705,6 +705,10 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 	rmsummary_merge_override(internal, max);
 
 	return internal;
+}
+
+int category_in_steady_state(struct category *c) {
+	return (c->completions_since_last_reset >= first_allocation_every_n_tasks);
 }
 
 void category_tune_bucket_size(const char *resource, uint64_t size) {

@@ -119,7 +119,6 @@ double wq_option_send_receive_ratio    = 0.5;
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 int first_allocation_every_n_tasks   = 25;
-int first_allocation_every_n_seconds = 300;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blacklist_slow_workers_timeout = 900;
@@ -1961,7 +1960,7 @@ sent to the catalog.
 			char *max_str = string_format("%" PRId64, largest->field);\
 			jx_insert_string(j, "max_" #field, max_str);\
 			free(max_str);\
-		} else if(c->max_resources_seen->limits_exceeded && c->max_resources_seen->limits_exceeded->field > -1) {\
+		} else if(!category_in_steady_state(c) && c->max_resources_seen->limits_exceeded && c->max_resources_seen->limits_exceeded->field > -1) {\
 			char *max_str = string_format(">%" PRId64, c->max_resources_seen->field - 1);\
 			jx_insert_string(j, "max_" #field, max_str);\
 			free(max_str);\
