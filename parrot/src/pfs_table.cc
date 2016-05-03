@@ -578,6 +578,27 @@ pfs_dir * pfs_table::open_directory(pfs_name *pname, int flags)
 	return file;
 }
 
+pfs_pointer *pfs_table::getopenfile( pid_t pid, int fd )
+{
+	struct pfs_process *target = pfs_process_lookup(pid);
+	if(target && target->table) {
+		if (!target->table->isvalid(fd)) {
+			return (errno = ENOENT, (pfs_pointer *)NULL);
+		}
+		pfs_pointer *desc = target->table->pointers[fd];
+		if (PARROT_POINTER(desc)) {
+			return desc;
+		} else if (NATIVE_POINTER(desc)) {
+			return (errno = ECHILD, (pfs_pointer *)NULL); /* hack, allow open to proceed natively */
+		} else {
+			assert(desc == SPECIAL || desc == NULL);
+			return (errno = ENOENT, (pfs_pointer *)NULL);
+		}
+	} else {
+		return (errno = ESRCH, (pfs_pointer *)NULL);
+	}
+}
+
 pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, int force_cache )
 {
 	pfs_name pname;
@@ -625,9 +646,11 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 			if (pattern_match(pname.rest, "^/proc/(%d+)/fd/?$", &pid) >= 0) {
 				int i;
 				pfs_dir *dir = new pfs_dir(&pname);
+				pid_t ipid = atoi(pid);
+				/* idea here is to not include a SPECIAL fd in this directory */
 				for (i = 0; i < pointer_count; i++) {
-					/* idea here is to not include a SPECIAL fd in this directory */
-					if (pointers[i] == NATIVE || PARROT_POINTER(pointers[i])) {
+					pfs_pointer *desc = getopenfile(ipid, i);
+					if (desc || errno == ECHILD) {
 						struct dirent dirent;
 						dirent.d_ino = random_uint();
 						dirent.d_off = 0;
@@ -644,21 +667,15 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		} else if(pname.service->is_local()) {
 			char *fd = NULL;
 			if (pattern_match(pname.rest, "^/proc/(%d+)/fd/(%d+)$", &pid, &fd) >= 0) {
-				int ifd = atoi(fd);
-				if (!VALID_FD(ifd)) {
-					errno = ENOENT;
-					file = NULL;
-				} else {
-					if (PARROT_POINTER(pointers[ifd])) {
-						pointers[ifd]->file->addref();
-						return pointers[ifd]->file; /* open will create a duplicate file description (pfs_pointer) */
-					} else if (pointers[ifd] == NATIVE) {
-						errno = ECHILD; /* hack, allow open to proceed natively */
-						file = NULL;
-					} else {
-						assert(pointers[ifd] == SPECIAL || pointers[ifd] == NULL);
-						errno = ENOENT;
-						file = NULL;
+				pfs_pointer *desc = getopenfile(atoi(pid), atoi(fd));
+				if (desc) {
+					desc->file->addref();
+					return desc->file;
+				} else if (errno == ESRCH || errno == ECHILD) {
+					/* outside of Parrot or native, let kernel deal with it... */
+					file = pname.service->open(&pname,flags,mode);
+					if(!file && (errno == EISDIR)) {
+						file = open_directory(&pname, flags);
 					}
 				}
 			} else if (pattern_match(pname.rest, "^/proc/(%d+)/maps$", &pid) >= 0) {
@@ -1600,19 +1617,15 @@ int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 	if(resolve_name(0,n,&pname,R_OK,false)) {
 		char *pid = NULL, *fd = NULL;
 		if(pattern_match(pname.path, "^/proc/(%d+)/fd/(%d+)$",&pid,&fd) >= 0) {
-			struct pfs_process *target = pfs_process_lookup(atoi(pid));
-			if(target && target->table) {
-				if(target->table->isnative(atoi(fd))) {
-					result = ::readlink(pname.path,buf,size);
-				} else {
-					if(target->table->get_full_name(atoi(fd),buf)==0) {
-						result = strlen(buf);
-					} else {
-						result = -1;
-					}
-				}
+			pfs_pointer *desc = getopenfile(atoi(pid), atoi(fd));
+			if (desc) {
+				const char *path = desc->file->get_name()->path;
+				strncpy(buf,path,size);
+				result = MIN(strlen(path),(size_t)size);
+			} else if (errno == ECHILD) {
+				/* native... */
+				result = ::readlink(pname.path,buf,size);
 			} else {
-				errno = ENOENT;
 				result = -1;
 			}
 		} else if(pattern_match(pname.path, "^/proc/(%d+)/exe", &pid) >= 0) {
