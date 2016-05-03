@@ -472,24 +472,24 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		}
 	}
 
-	if(pattern_match(full_logical_name, "^/proc/self/()", &n) >= 0) {
-		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
-		strcpy(pname->path, pname->logical_name);
+	if(pattern_match(full_logical_name, "^/proc/self/?()", &n) >= 0) {
+		snprintf(pname->path, sizeof pname->path, "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
+		strcpy(pname->logical_name, pname->path);
+		strcpy(pname->rest, pname->path);
 		pname->service = pfs_service_lookup_default();
 		strcpy(pname->service_name,"local");
 		strcpy(pname->host,"localhost");
 		strcpy(pname->hostport,"localhost");
-		strcpy(pname->rest,pname->path);
 		pname->is_local = 1;
 		return 1;
-	} else if (pattern_match(full_logical_name, "^/dev/fd/()", &n) >= 0) {
-		snprintf(pname->logical_name, sizeof(pname->logical_name), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
-		strcpy(pname->path, pname->logical_name);
+	} else if (pattern_match(full_logical_name, "^/dev/fd/?()", &n) >= 0) {
+		snprintf(pname->path, sizeof pname->path, "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
+		strcpy(pname->logical_name, pname->path);
+		strcpy(pname->rest, pname->path);
 		pname->service = pfs_service_lookup_default();
 		strcpy(pname->service_name,"local");
 		strcpy(pname->host,"localhost");
 		strcpy(pname->hostport,"localhost");
-		strcpy(pname->rest,pname->path);
 		pname->is_local = 1;
 		return 1;
 	} else {
@@ -613,7 +613,7 @@ pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, in
 		}
 		char *pid = NULL;
 		if(flags&O_DIRECTORY) {
-			if (pattern_match(pname.rest, "^/proc/(%d+)/fd$", &pid) >= 0) {
+			if (pattern_match(pname.rest, "^/proc/(%d+)/fd/?$", &pid) >= 0) {
 				int i;
 				pfs_dir *dir = new pfs_dir(&pname);
 				for (i = 0; i < pointer_count; i++) {
