@@ -314,6 +314,10 @@ public:
 		}
 		return result;
 	}
+
+	virtual int is_seekable (void) {
+		return 0;
+	}
 };
 
 static pfs_service_ftp pfs_service_ftp_instance(USERPASS);

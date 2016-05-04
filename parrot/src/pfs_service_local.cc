@@ -91,17 +91,13 @@ class pfs_file_local : public pfs_file
 {
 private:
 	int fd;
-	int is_a_pipe;
-	int is_a_named_pipe;
 	pfs_off_t last_offset;
 
 public:
-	pfs_file_local( pfs_name *name, int f, int i ) : pfs_file(name) {
+	pfs_file_local( pfs_name *name, int f ) : pfs_file(name) {
 		assert(f >= 0);
 		fd = f;
 		last_offset = 0;
-		is_a_pipe = i;
-		is_a_named_pipe = -1;
 	}
 
 	virtual int canbenative (char *path, size_t len) {
@@ -120,30 +116,6 @@ public:
 		END
 	}
 
-/*
-This is a strange situation.
-
-When an application wants to open a named pipe,
-Parrot must issue a non-blocking open so that
-everything is not halted while the connection is made,
-much like what we do with sockets.
-
-However, POSIX has something interesting to say about
-a non-blocking open on a named pipe: it must instantly
-return zero, indicating success, even if there is no-one
-connected on the other side!  But, if the appl issues a
-read right away, the read returns zero immediately, because
-the pipe is not connected.
-
-We aren't able to solve this at the time of the open,
-because there appears no mechanism within POSIX to do the
-right thing.  Instead, we solve it during read().
-If read returns zero on offset zero and the file descriptor
-refers to a named pipe, then convert the result into -1
-EAGAIN, which forces higher layers of Parrot to put the
-process to sleep and wait for actual input to become ready.
-*/
-
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {
 		pfs_ssize_t result;
 
@@ -153,25 +125,6 @@ process to sleep and wait for actual input to become ready.
 		result = ::read(fd,data,length);
 		if(result>0) last_offset = offset+result;
 
-		if(result==0 && offset==0) {
-			if(is_a_named_pipe==-1) {
-				if(is_a_pipe==0) {
-					struct stat64 info;
-					::fstat64(fd,&info);
-					if(S_ISFIFO(info.st_mode)) {
-						is_a_named_pipe = 1;
-					} else {
-						is_a_named_pipe = 0;
-					}
-				} else {
-					is_a_named_pipe = 0;
-				}
-			}
-			if(is_a_named_pipe) {
-				result = -1;
-				errno = EAGAIN;
-			}
-		}
 		END
 	}
 
@@ -326,7 +279,7 @@ process to sleep and wait for actual input to become ready.
 
 	virtual int is_seekable()
 	{
-		return !is_a_pipe;
+		return 1;
 	}
 };
 
@@ -347,7 +300,7 @@ public:
 				errno = EISDIR;
 				::close(fd);
 			} else {
-				result = new pfs_file_local(name,fd,0);
+				result = new pfs_file_local(name,fd);
 			}
 		} else {
 			result = 0;
@@ -733,7 +686,7 @@ struct pfs_file * pfs_file_bootstrap( int fd, const char *path )
 	name.port = 0;
 	strcpy(name.rest,path);
 	name.is_local = 1;
-	return new pfs_file_local(&name,fd,1);
+	return new pfs_file_local(&name,fd);
 }
 
 /* vim: set noexpandtab tabstop=4: */

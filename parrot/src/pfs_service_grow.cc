@@ -846,6 +846,10 @@ public:
 		errno = EROFS;
 		return -1;
 	}
+
+	virtual int is_seekable (void) {
+		return 0;
+	}
 };
 
 static pfs_service_grow pfs_service_grow_instance;
