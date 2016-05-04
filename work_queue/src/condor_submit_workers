@@ -98,10 +98,10 @@ EOF
 	#Disk in kilobytes
 	echo "request_disk = ${disk}" >> condor_submit_file
 
-	echo "queue $count" >> condor_submit_file.$$
 
-	condor_submit condor_submit_file.$$
-	rm condor_submit_file.$$
+	echo "queue $count" >> condor_submit_file
+
+	condor_submit condor_submit_file
 }
 
 submit_workers "$@"
