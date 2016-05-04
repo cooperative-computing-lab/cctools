@@ -25,6 +25,11 @@ transfer_input_files="work_queue_worker, cctools_gpu_autodetect"
 
 parse_arguments()
 {
+	# set default values:
+	cores=${cores:-1}
+	memory=${memory:-1024}   # MB, e.g. 1 GB
+	disk=${disk:-1024}      # MB, e.g. 1 GB
+
 	while [ $# -gt 0 ]
 	do
 		case $1 in
