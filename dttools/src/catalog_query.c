@@ -40,8 +40,8 @@ static struct set *down_hosts = NULL;
 */
 const char *parse_hostlist(const char *hosts, char *host, int *port)
 {
-	const char *next = strchr(hosts, ';');
-	switch (sscanf(hosts, "%[^:;]:%d", host, port)) {
+	const char *next = strchr(hosts, ',');
+	switch (sscanf(hosts, "%[^:,]:%d", host, port)) {
 	case 1:
 		*port = CATALOG_PORT;
 		break;
