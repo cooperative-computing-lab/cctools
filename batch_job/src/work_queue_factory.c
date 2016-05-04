@@ -139,7 +139,7 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	buffer_init(&b);
 
 	if(batch_queue_get_type(queue) == BATCH_QUEUE_TYPE_CONDOR) {
-		buffer_printf(&b, " --cores=$$([TARGET.Cpus]) --memory=$$([TARGET.Memory]) --disk=$$([TARGET.DIsk/1024])");
+		buffer_printf(&b, " --cores=$$([TARGET.Cpus]) --memory=$$([TARGET.Memory]) --disk=$$([TARGET.Disk/1024])");
 	} else {
 		if(resources->cores > -1) {
 			buffer_printf(&b, " --cores=%" PRId64, resources->cores);
