@@ -30,6 +30,9 @@ parse_arguments()
 	memory=${memory:-1024}   # MB, e.g. 1 GB
 	disk=${disk:-1024}      # MB, e.g. 1 GB
 
+	# convert disk to kB to make what follows easier, as condor want disk in kB
+	disk=$((disk*1024))
+
 	while [ $# -gt 0 ]
 	do
 		case $1 in
@@ -39,25 +42,9 @@ parse_arguments()
 			;;
 
 			--autosize)
-			arguments="$arguments --cores \$\$(TotalSlotCpus) --memory \$\$(TotalSlotMemory) --disk \$\$(TotalSlotDisk)"
-
-			if [ -z "$cores" ]; then
-				cores="TotalSlotCpus"
-			else
 				cores="ifThenElse($cores > TotalSlotCpus, $cores, TotalSlotCpus)"
-			fi
-
-			if [ -z "$memory" ]; then
-				memory="TotalSlotMemory"
-			else
 				memory="ifThenElse($memory > TotalSlotMemory, $memory, TotalSlotMemory)"
-			fi
-
-			if [ -z "$disk" ]; then
-				disk="TotalSlotDisk"
-			else
 				disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
-			fi
 			;;
 
 			*)
@@ -78,7 +65,11 @@ set_up_password_file()
 
 submit_workers_command()
 {
-	cat > condor_submit_file.$$ <<EOF
+	# rewrite cores, memory, disk with size of given slot. (sometimes the slot
+	# given is larger than the minimum requested).
+	arguments="$arguments --cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024])"
+
+	cat > condor_submit_file <<EOF
 universe = vanilla
 executable = work_queue_worker
 arguments = $arguments $host $port
@@ -100,15 +91,13 @@ EOF
 		echo "request_cpus = ${cores}" >> condor_submit_file.$$
 	fi
 
-	if [ ! -z "$memory" ]; then
-		#Memory in megabytes
-		echo "request_memory = ${memory}" >> condor_submit_file.$$
-	fi
+	echo "request_cpus = ${cores}" >> condor_submit_file
 
-	if [ ! -z "$disk" ]; then
-		#Disk in kilobytes
-		echo "$disk" | awk '{ printf "request_disk =  %d\n", $1 * 1024 }' >> condor_submit_file.$$
-	fi
+	#Memory in megabytes
+	echo "request_memory = ${memory}" >> condor_submit_file
+
+	#Disk in kilobytes
+	echo "request_disk = ${disk}" >> condor_submit_file
 
 	echo "queue $count" >> condor_submit_file.$$
 
