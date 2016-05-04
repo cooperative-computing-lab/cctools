@@ -79,7 +79,6 @@ when_to_transfer_output = on_exit
 output = worker.\$(PROCESS).output
 error = worker.\$(PROCESS).error
 log = workers.log
-requirements = $requirements
 
 # Some programs assume some variables are set, like HOME, so we export the
 # environment variables with the job.  Comment the next line if you do not want
@@ -87,8 +86,8 @@ requirements = $requirements
 getenv = true
 EOF
 
-	if [ ! -z "$cores" ]; then
-		echo "request_cpus = ${cores}" >> condor_submit_file.$$
+	if [ ! -z "$requirements" ]; then
+		echo "requirements = ${requirements}" >> condor_submit_file
 	fi
 
 	echo "request_cpus = ${cores}" >> condor_submit_file
