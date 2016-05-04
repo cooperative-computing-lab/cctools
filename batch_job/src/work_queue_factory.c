@@ -459,7 +459,9 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
 
-	fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
+	if(condor_requirements) {
+		fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
+	}
 
 	if(factory_timeout > 0) {
 		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
