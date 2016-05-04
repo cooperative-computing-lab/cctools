@@ -48,10 +48,7 @@ struct dag_node {
 	int local_job;					/* Flag: does this node run locally? */
 
 	struct set *descendants;		/* The nodes of which this node is an immediate ancestor */
-	struct set *direct_children;			/* The nodes of which this node is an immediate ancestor
-										and no descendant of mine is also its parent */
 	struct set *ancestors;			/* The nodes of which this node is an immediate descendant */
-	struct set *accounted;			/* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;				/* The depth of the ancestor tree for this node */
 
 	int nested_job;					/* Flag: Is this a recursive call to makeflow? */
@@ -60,11 +57,49 @@ struct dag_node {
 
 	struct itable *remote_names;    /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
-
 	struct list *source_files;		/* list of dag_files of the node's requirements */
-	uint64_t source_size;			/* size of dag_files of the node's requirements */
-
 	struct list *target_files;		/* list of dag_files of the node's productions */
+
+	struct dag_node_footprint *footprint; /* Pointer to footprint structure created when using storage limits*/
+
+	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
+										   file labeled which tasks have comparable resource usage. */
+	struct hash_table *variables;       /* This node settings for variables with @ syntax */
+
+	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
+    struct rmsummary *resources_requested;   /* resources required explicitely by this rule alone, not taking
+                                                into account its category. Use dag_node_dynamic_label(n) for the
+                                                resources this node requests, taking into account categories,
+                                                dynamic resources, etc.  */
+    struct rmsummary *resources_allocated;   /* resources allocated to this node when submitted */
+	struct rmsummary *resources_measured;    /* resources measured on completion. */
+
+	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
+	* functions. Probably we should move them only to those functions, using
+	* hashes.*/
+	int level;                      /* The depth of a node in the dag */
+	int children;                   /* The number of nodes this node is the immediate ancestor */
+	int children_remaining;
+	int only_my_children;           /* Number of nodes this node is the only parent. */
+
+	/* dynamic properties of execution */
+	batch_job_id_t jobid;           /* The id this node get, either from the local or remote batch system. */
+	dag_node_state_t state;         /* Enum: DAG_NODE_STATE_{WAITING,RUNNING,...} */
+	int failure_count;              /* How many times has this rule failed? (see -R and -r) */
+	time_t previous_completion;
+
+	const char *umbrella_spec;      /* the umbrella spec file for executing this job */
+	char *archive_id;
+
+	struct dag_node *next;          /* The next node in the list of nodes */
+};
+
+struct dag_node_footprint {
+	struct set *direct_children;	/* The nodes of which this node is an immediate ancestor
+										and no descendant of mine is also its parent */
+	struct set *accounted;			/* The nodes of which this node is an immediate descendant */
+
+	uint64_t source_size;			/* size of dag_files of the node's requirements */
 	uint64_t target_size;			/* size of dag_files of the node's productions */
 
 	struct set *terminal_files;		/* set of dag_files that exist until the end of the Makeflow */
@@ -112,37 +147,6 @@ struct dag_node {
 	struct list *run_order;			/* list of child and the order to maintain committed size */
 	struct set *dependencies;		/* Set of nodes that need to be active prior to execution for footprint */
 
-	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
-										   file labeled which tasks have comparable resource usage. */
-	struct hash_table *variables;       /* This node settings for variables with @ syntax */
-
-	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
-    struct rmsummary *resources_requested;   /* resources required explicitely by this rule alone, not taking
-                                                into account its category. Use dag_node_dynamic_label(n) for the
-                                                resources this node requests, taking into account categories,
-                                                dynamic resources, etc.  */
-    struct rmsummary *resources_allocated;   /* resources allocated to this node when submitted */
-	struct rmsummary *resources_measured;    /* resources measured on completion. */
-
-	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
-	* functions. Probably we should move them only to those functions, using
-	* hashes.*/
-	int level;                      /* The depth of a node in the dag */
-	int children;                   /* The number of nodes this node is the immediate ancestor */
-	int children_remaining;
-	int only_my_children;           /* Number of nodes this node is the only parent. */
-
-	/* dynamic properties of execution */
-	batch_job_id_t jobid;           /* The id this node get, either from the local or remote batch system. */
-	dag_node_state_t state;         /* Enum: DAG_NODE_STATE_{WAITING,RUNNING,...} */
-	int failure_count;              /* How many times has this rule failed? (see -R and -r) */
-	time_t previous_completion;
-
-	const char *umbrella_spec;      /* the umbrella spec file for executing this job */
-	char *archive_id;
-
-	struct dag_node *next;          /* The next node in the list of nodes */
-
 	int children_updated;			/* Int indicating this node has updated its direct_children */
 	int size_updated;				/* Int indicating this node has updated its size */
 	int footprint_updated;			/* Int indicating this node has updated its footprint */
@@ -167,6 +171,7 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
 void dag_node_determine_children(struct dag_node *n);
 void dag_node_prepare_node_terminal_files(struct dag_node *n);
 void dag_node_prepare_node_size(struct dag_node *n);
+void dag_node_find_largest_residual(struct dag_node *n, struct dag_node *limit);
 void dag_node_determine_footprint(struct dag_node *n);
 void dag_node_print_footprint(struct dag *d, struct dag_node *base, char *output);
 void dag_node_reset_updated(struct dag_node *n);

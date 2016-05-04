@@ -80,8 +80,8 @@ struct makeflow_alloc * makeflow_alloc_traverse_to_node(struct makeflow_alloc *a
 
 	alloc1 = a;
 	makeflow_alloc_print_stats(alloc1, "TRAVERSE");
-	list_first_item(n->residual_nodes);
-	while((node = list_peek_current(n->residual_nodes))){
+	list_first_item(n->footprint->residual_nodes);
+	while((node = list_peek_current(n->footprint->residual_nodes))){
 		tmp = NULL;
 		list_first_item(alloc1->residuals);
 		while((alloc2 = list_next_item(alloc1->residuals))){
@@ -97,7 +97,7 @@ struct makeflow_alloc * makeflow_alloc_traverse_to_node(struct makeflow_alloc *a
 			break;
 		}
 
-		list_next_item(n->residual_nodes);
+		list_next_item(n->footprint->residual_nodes);
 	}
 	return alloc1;
 }
@@ -131,7 +131,7 @@ uint64_t makeflow_alloc_node_size( struct makeflow_alloc *a, struct dag_node *cu
 	uint64_t alloc_size;
 	uint64_t freed_space = 0;
 	struct dag_file *f;
-	if(n->footprint_min_type != DAG_NODE_FOOTPRINT_RUN){
+	if(n->footprint->footprint_min_type != DAG_NODE_FOOTPRINT_RUN){
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))){
 			if(f->reference_count == 1){
@@ -142,13 +142,13 @@ uint64_t makeflow_alloc_node_size( struct makeflow_alloc *a, struct dag_node *cu
 
 	switch(a->enabled){
 		case MAKEFLOW_ALLOC_TYPE_OUT:
-			alloc_size = n->target_size;
+			alloc_size = n->footprint->target_size;
 			break;
 		case MAKEFLOW_ALLOC_TYPE_MIN:
-			alloc_size = cur_node->footprint_min_size - freed_space;
+			alloc_size = cur_node->footprint->footprint_min_size - freed_space;
 			break;
 		case MAKEFLOW_ALLOC_TYPE_MAX:
-			alloc_size = cur_node->footprint_max_size - freed_space;
+			alloc_size = cur_node->footprint->footprint_max_size - freed_space;
 			break;
 		default:
 			alloc_size = 0;
@@ -179,7 +179,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 
 	if(alloc1->nodeid == n->nodeid){
 		if(a->enabled != MAKEFLOW_ALLOC_TYPE_OUT &&
-			(alloc1->storage->free < n->target_size)){
+			(alloc1->storage->free < n->footprint->target_size)){
 
 			dynamic_alloc += timestamp_get() - start;
 			printf("%d\t", n->nodeid);
@@ -191,11 +191,11 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 		return 1;
 	}
 
-	while((node1 = list_peek_current(n->residual_nodes))){
+	while((node1 = list_peek_current(n->footprint->residual_nodes))){
 		alloc2 = makeflow_alloc_create(node1->nodeid, alloc1, 0, 0, a->enabled);
 		if(!(makeflow_alloc_try_grow_alloc(alloc2, makeflow_alloc_node_size(a, node1, n))
 			|| (n == node1 && set_size(n->descendants) < 2 &&
-				makeflow_alloc_try_grow_alloc(alloc2, node1->self_res)))){
+				makeflow_alloc_try_grow_alloc(alloc2, node1->footprint->self_res)))){
 			dynamic_alloc += timestamp_get() - start;
 			printf("%d\t%"PRIu64"\t", n->nodeid, makeflow_alloc_node_size(a, node1, n));
 			makeflow_alloc_print_stats(alloc1, "CHECK FAIL NON-FIT");
@@ -204,7 +204,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 		}
 
 		makeflow_alloc_delete(alloc2);
-		list_next_item(n->residual_nodes);
+		list_next_item(n->footprint->residual_nodes);
 	}
 
 	dynamic_alloc += timestamp_get() - start;
@@ -268,33 +268,33 @@ int makeflow_alloc_commit_space( struct makeflow_alloc *a, struct dag_node *n)
 			return 0;
 		}
 	} else if(alloc1->nodeid == n->nodeid){
-		if(alloc1->storage->free < n->target_size){
+		if(alloc1->storage->free < n->footprint->target_size){
 			dynamic_alloc += timestamp_get() - start;
 			return 0;
 		}
 	} else {
-		while((node1 = list_peek_current(n->residual_nodes))){
+		while((node1 = list_peek_current(n->footprint->residual_nodes))){
 			alloc2 = makeflow_alloc_create(node1->nodeid, alloc1, 0, 0, a->enabled);
 			if(!(makeflow_alloc_grow_alloc(alloc2, makeflow_alloc_node_size(a, node1, n))
 				|| (n == node1 && set_size(n->descendants) < 2 &&
-					makeflow_alloc_grow_alloc(alloc2, node1->self_res)))){
+					makeflow_alloc_grow_alloc(alloc2, node1->footprint->self_res)))){
 				dynamic_alloc += timestamp_get() - start;
 				return 0;
 			}
 			list_push_tail(alloc1->residuals, alloc2);
 			alloc1 = alloc2;
 
-			list_next_item(n->residual_nodes);
+			list_next_item(n->footprint->residual_nodes);
 		}
 	}
 
-	alloc1->storage->greedy += n->target_size;
-	alloc1->storage->free   -= n->target_size;
+	alloc1->storage->greedy += n->footprint->target_size;
+	alloc1->storage->free   -= n->footprint->target_size;
 	makeflow_alloc_print_stats(alloc1, "GREEDY");
 	alloc1 = alloc1->parent;
 	while(alloc1){
-		alloc1->storage->greedy += n->target_size;
-		alloc1->storage->commit -= n->target_size;
+		alloc1->storage->greedy += n->footprint->target_size;
+		alloc1->storage->commit -= n->footprint->target_size;
 		makeflow_alloc_print_stats(alloc1, "GREEDY");
 		alloc1 = alloc1->parent;
 	}

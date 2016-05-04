@@ -392,7 +392,6 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 {
 	uint64_t start = timestamp_get();
 	struct dag_node *n = dag_node_create(d, -1);
-	struct dag_node *node1;
 	n->state = DAG_NODE_STATE_COMPLETE;
 	struct dag_node *p;
 
@@ -408,27 +407,8 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 	dag_node_prepare_node_size(n);
 	dag_node_determine_footprint(n);
 	if(storage_print){
-		list_first_item(n->residual_nodes);
-		node1 = list_peek_current(n->residual_nodes);
-		n->residual_size = node1->residual_size;
-		set_delete(n->residual_files);
-		n->residual_files = set_duplicate(node1->residual_files);
-		while((node1 = list_next_item(n->residual_nodes))){
-			if(node1->footprint_min_size > n->footprint_min_size){
-				set_delete(n->footprint_min_files);
-				n->footprint_min_size = node1->footprint_min_size;
-				n->footprint_min_files = set_duplicate(node1->footprint_min_files);
-			}
-			if(node1->footprint_max_size > n->footprint_max_size){
-				set_delete(n->footprint_max_files);
-				n->footprint_max_size = node1->footprint_max_size;
-				n->footprint_max_files = set_duplicate(node1->footprint_max_files);
-			}
-		}
-
+		dag_node_find_largest_residual(n, NULL);
 		dag_node_print_footprint(d, n, storage_print);
-		printf("%s\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\n",
-				dagfile,n->footprint_min_size,n->footprint_max_size,n->residual_size,dag_absolute_filesize(d));
 		exit(0);
 	}
 	uint64_t end = timestamp_get();
