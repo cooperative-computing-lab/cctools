@@ -34,7 +34,7 @@ struct catalog_host {
 
 static struct set *down_hosts = NULL;
 
-/* Given a semicolon delimited list of host:port or host, set the values pointed
+/* Given a comma delimited list of host:port or host, set the values pointed
    to by host and port, using the default port if not provided. Return the address
    of the next hostport in the string, or NULL if there are no more
 */

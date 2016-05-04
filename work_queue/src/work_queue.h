@@ -685,7 +685,7 @@ void work_queue_specify_catalog_server(struct work_queue *q, const char *hostnam
 
 /** Specify the catalog server(s) the master should report to.
 @param q A work queue object.
-@param hosts The catalog servers given as a semicolon delimited list of hostnames or hostname:port
+@param hosts The catalog servers given as a comma delimited list of hostnames or hostname:port
 */
 void work_queue_specify_catalog_servers(struct work_queue *q, const char *hosts);
 

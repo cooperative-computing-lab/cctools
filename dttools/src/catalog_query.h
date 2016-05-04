@@ -25,7 +25,7 @@ Connects to a catalog server, issues a query, and waits for the results.
 The caller may specify a specific catalog host and port.
 If none is given, then the environment variables CATALOG_HOST and CATALOG_PORT will be consulted.
 If neither is set, the system will contact chirp.cse.nd.edu on port 9097.
-@param hosts A semicolon delimited list of catalog servers to query, or null for the default server.
+@param hosts A comma delimited list of catalog servers to query, or null for the default server.
 @param filter_expr An optional expression to filter the results in JX syntax.
  A null pointer indicates no filter.
 @param stoptime The absolute time at which to abort.
@@ -50,7 +50,7 @@ struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime);
 void catalog_query_delete(struct catalog_query *q);
 
 /** Send update text to the given hosts
-hosts is a semicolon delimited list of hosts, each of which can be host or host:port
+hosts is a comma delimited list of hosts, each of which can be host or host:port
 @param hosts A list of hosts to which to send updates
 @param text String to send
 @return The number of updates successfully sent, 
