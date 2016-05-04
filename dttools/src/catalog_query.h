@@ -14,7 +14,7 @@ See the file COPYING for details.
 Query the global catalog server for server descriptions.
 */
 
-#define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu;backup-catalog.cse.nd.edu"
+#define CATALOG_HOST_DEFAULT "catalog.cse.nd.edu,backup-catalog.cse.nd.edu"
 #define CATALOG_PORT_DEFAULT 9097
 
 #define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
