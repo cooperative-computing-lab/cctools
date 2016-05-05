@@ -158,30 +158,29 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	if(options)
 		fprintf(file, "%s\n", options);
 
-	int64_t cores  = -1;
-	int64_t memory = -1;
-	int64_t disk   = -1;
+	/* set same deafults as condor_submit_workers */
+	int64_t cores  = 1;
+	int64_t memory = 1024;
+	int64_t disk   = 1024;
 
 	if(resources) {
-		cores  = resources->cores;
-		memory = resources->memory;
-		disk   = resources->disk;
+		cores  = resources->cores  > -1 ? resources->cores  : cores;
+		memory = resources->memory > -1 ? resources->memory : memory;
+		disk   = resources->disk   > -1 ? resources->disk   : disk;
 	}
+
+	/* convert disk to KB */
+	disk *= 1024;
 
 	if(batch_queue_get_option(q, "autosize")) {
 		fprintf(file, "request_cpus   = ifThenElse(%" PRId64 " > TotalSlotCpus, %" PRId64 ", TotalSlotCpus)\n", cores, cores);
 		fprintf(file, "request_memory = ifThenElse(%" PRId64 " > TotalSlotMemory, %" PRId64 ", TotalSlotMemory)\n", memory, memory);
-		fprintf(file, "request_disk   = ifThenElse((%" PRId64 "*1024) > TotalSlotDisk, (%" PRId64 "*1024), TotalSlotDisk)\n", disk, disk);
+		fprintf(file, "request_disk   = ifThenElse((%" PRId64 ") > TotalSlotDisk, (%" PRId64 "), TotalSlotDisk)\n", disk, disk);
 	}
 	else {
-		if(cores > -1)
 			fprintf(file, "request_cpus = %" PRId64 "\n", cores);
-
-		if(memory > -1)
 			fprintf(file, "request_memory = %" PRId64 "\n", memory);
-
-		if(disk > -1)
-			fprintf(file, "request_disk = (%" PRId64 "*1024)\n", disk);
+			fprintf(file, "request_disk = %" PRId64 "\n", disk);
 	}
 
 	fprintf(file, "queue\n");

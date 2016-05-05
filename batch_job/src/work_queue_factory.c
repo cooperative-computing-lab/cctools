@@ -138,8 +138,8 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	buffer_t b;
 	buffer_init(&b);
 
-	if(batch_queue_supports_feature(queue, "autosize") && autosize) {
-		buffer_printf(&b, " --cores=$$(TotalSlotCpus) --memory=$$(TotalSlotMemory) --disk=$$(TotalSlotDisk)");
+	if(batch_queue_get_type(queue) == BATCH_QUEUE_TYPE_CONDOR) {
+		buffer_printf(&b, " --cores=$$([TARGET.Cpus]) --memory=$$([TARGET.Memory]) --disk=$$([TARGET.Disk/1024])");
 	} else {
 		if(resources->cores > -1) {
 			buffer_printf(&b, " --cores=%" PRId64, resources->cores);
@@ -163,7 +163,7 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 	char cmd[1024];
 	char extra_input_files[1024];
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
+	sprintf(cmd,"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
 	strcpy(extra_input_files,"work_queue_worker");
 
 	if(password_file) {
@@ -459,7 +459,9 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
 
-	fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
+	if(condor_requirements) {
+		fprintf(stdout, "condor-requirements: %s\n", condor_requirements);
+	}
 
 	if(factory_timeout > 0) {
 		fprintf(stdout, "factory-timeout: %" PRId64 " MB\n", factory_timeout);
