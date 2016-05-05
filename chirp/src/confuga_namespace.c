@@ -12,12 +12,15 @@ See the file COPYING for details.
 #include "full_io.h"
 #include "mkdir_recursive.h"
 #include "path.h"
+#include "random.h"
+#include "unlink_recursive.h"
 
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <utime.h>
 
+#include <sys/file.h>
 #include <sys/stat.h>
 #if defined(HAS_ATTR_XATTR_H)
 #	include <attr/xattr.h>
@@ -237,12 +240,8 @@ out:
  * Metadata file:   "meta:0000000000000000000000000000000000000000:<length>\n<content>".
  */
 #define HEADER_LENGTH (4 /* 'file' | 'meta' */ + 1 /* ':' */ + sizeof(((confuga_fid_t *)0)->id)*2 /* SHA1 hash in hexadecimal */ + 1 /* ':' */ + sizeof(confuga_off_t)*2 /* in hexadecimal */ + 1 /* '\n' */)
-enum CONFUGA_FILE_TYPE {
-	CONFUGA_FILE,
-	CONFUGA_META,
-};
 
-static int lookup (confuga *C, int dirfd, const char *basename, confuga_fid_t *fid, confuga_off_t *size, enum CONFUGA_FILE_TYPE *type)
+CONFUGA_IAPI int confugaN_lookup (confuga *C, int dirfd, const char *basename, confuga_fid_t *fid, confuga_off_t *size, enum CONFUGA_FILE_TYPE *type, int *nlink)
 {
 	int rc;
 	int fd = -1;
@@ -291,6 +290,8 @@ static int lookup (confuga *C, int dirfd, const char *basename, confuga_fid_t *f
 		*size = strtoull(current, &endptr, 16);
 		assert(*endptr == '\n');
 	}
+	if (nlink)
+		*nlink = info.st_nlink;
 
 	rc = 0;
 	goto out;
@@ -300,18 +301,12 @@ out:
 	return rc;
 }
 
-static int update (confuga *C, int dirfd, const char *basename, confuga_fid_t fid, confuga_off_t size, int flags)
+static int fupdate (confuga *C, int fd, confuga_fid_t fid, confuga_off_t size)
 {
 	int rc;
-	int fd = -1;
 	int n;
 	char header[HEADER_LENGTH+1] = "";
-	int oflags = O_CREAT|O_WRONLY|O_TRUNC|O_SYNC;
 
-	if (flags & CONFUGA_O_EXCL)
-		oflags |= O_EXCL;
-
-	CATCHUNIX(fd = openat(dirfd, basename, oflags, S_IRUSR|S_IWUSR));
 	n = snprintf(header, sizeof(header), "file:" CONFUGA_FID_PRIFMT ":%0*" PRIxCONFUGA_OFF_T "\n", CONFUGA_FID_PRIARGS(fid), (int)sizeof(confuga_off_t)*2, (confuga_off_t)size);
 	assert((size_t)n == HEADER_LENGTH);
 	CATCHUNIX(full_write(fd, header, HEADER_LENGTH));
@@ -322,8 +317,57 @@ static int update (confuga *C, int dirfd, const char *basename, confuga_fid_t fi
 	rc = 0;
 	goto out;
 out:
-	if (fd != dirfd)
-		CLOSE_FD(fd);
+	return rc;
+}
+
+CONFUGA_IAPI int confugaN_update (confuga *C, int dirfd, const char *basename, confuga_fid_t fid, confuga_off_t size, int flags)
+{
+	int rc;
+	int fd = -1;
+	char cname[PATH_MAX] = "";
+	char name[PATH_MAX] = "";
+	struct stat info;
+
+	assert(basename && basename[0]);
+
+	rc = openat(dirfd, basename, O_WRONLY|O_SYNC, 0);
+	if (rc >= 0) {
+		fd = rc;
+		if ((flags & CONFUGA_O_EXCL)) {
+			CATCH(EEXIST);
+		} else {
+			CATCH(fupdate(C, fd, fid, size));
+			rc = 0;
+			goto out;
+		}
+	}
+
+	strcpy(cname, "store/new/");
+	random_hex(strchr(cname, '\0'), 41);
+	CATCHUNIX(fd = openat(C->rootfd, cname, O_CREAT|O_EXCL|O_WRONLY|O_SYNC, S_IRUSR|S_IWUSR));
+
+	CATCHUNIX(fstat(fd, &info));
+	CATCHUNIX(snprintf(name, sizeof name, "store/file/%"PRIu64, (uint64_t)info.st_ino));
+	CATCHUNIX(linkat(C->rootfd, cname, C->rootfd, name, 0));
+
+	CATCH(fupdate(C, fd, fid, size));
+
+	if ((flags & CONFUGA_O_EXCL)) {
+		CATCHUNIX(linkat(C->rootfd, cname, dirfd, basename, 0));
+		CATCHUNIX(unlinkat(C->rootfd, cname, 0));
+	} else {
+		CATCHUNIX(renameat(C->rootfd, cname, dirfd, basename));
+	}
+
+	debug(D_DEBUG, "created new file '%s'", name);
+
+	rc = 0;
+	goto out;
+out:
+	if (rc) {
+		unlinkat(C->rootfd, cname, 0);
+	}
+	CLOSE_FD(fd);
 	return rc;
 }
 
@@ -425,7 +469,12 @@ static int dostat (confuga *C, int dirfd, const char *basename, struct confuga_s
 	enum CONFUGA_FILE_TYPE type;
 	CATCHUNIX(fstatat64(dirfd, basename, &linfo, flag));
 	if (S_ISREG(linfo.st_mode)) {
-		CATCH(lookup(C, dirfd, basename, &info->fid, &info->size, &type));
+		CATCH(confugaN_lookup(C, dirfd, basename, &info->fid, &info->size, &type, NULL));
+		if (type == CONFUGA_FILE) {
+			debug(D_DEBUG, "%s %d", basename, (int)linfo.st_nlink);
+			assert(linfo.st_nlink > 1);
+			linfo.st_nlink--;
+		}
 	} else {
 		info->size = linfo.st_size;
 	}
@@ -486,7 +535,7 @@ CONFUGA_API int confuga_readdir(confuga_dir *dir, struct confuga_dirent **dirent
 		assert(strchr(d->d_name, '/') == NULL);
 		dir->dirent.name = d->d_name;
 		memset(&dir->dirent.info, 0, sizeof(dir->dirent.info));
-		dir->dirent.lstatus = do_stat(dir->C, dirfd(dir->dir), d->d_name, &dir->dirent.info, AT_SYMLINK_NOFOLLOW);
+		dir->dirent.lstatus = dostat(dir->C, dirfd(dir->dir), d->d_name, &dir->dirent.info, AT_SYMLINK_NOFOLLOW);
 		*dirent = &dir->dirent;
 	} else {
 		*dirent = NULL;
@@ -613,10 +662,10 @@ CONFUGA_API int confuga_truncate(confuga *C, const char *path, confuga_off_t len
 	enum CONFUGA_FILE_TYPE type;
 	PREAMBLE("truncate(`%s', %" PRIuCONFUGA_OFF_T ")", path, length)
 	RESOLVE(path, 1)
-	CATCH(lookup(C, dirfd, basename, &fid, &size, &type));
+	CATCH(confugaN_lookup(C, dirfd, basename, &fid, &size, &type, NULL));
 	if (length > 0)
 		CATCH(EINVAL);
-	CATCH(update(C, dirfd, basename, empty, 0, 0));
+	CATCH(confugaN_update(C, dirfd, basename, empty, 0, 0));
 	PROLOGUE
 }
 
@@ -783,7 +832,7 @@ CONFUGA_API int confuga_lookup (confuga *C, const char *path, confuga_fid_t *fid
 	enum CONFUGA_FILE_TYPE type;
 	PREAMBLE("lookup(`%s')", path)
 	RESOLVE(path, 1)
-	CATCH(lookup(C, dirfd, basename, fid, size, &type));
+	CATCH(confugaN_lookup(C, dirfd, basename, fid, size, &type, NULL));
 	PROLOGUE
 }
 
@@ -791,8 +840,99 @@ CONFUGA_API int confuga_update (confuga *C, const char *path, confuga_fid_t fid,
 {
 	PREAMBLE("update(`%s', fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T ", flags = %d)", path, CONFUGA_FID_PRIARGS(fid), size, flags)
 	RESOLVE(path, 1)
-	CATCH(update(C, dirfd, basename, fid, size, flags));
+	CATCH(confugaN_update(C, dirfd, basename, fid, size, flags));
 	PROLOGUE
+}
+
+static int loadtostore (confuga *C, int filefd, int dfd, const char *basename)
+{
+	int rc;
+	int fd = -1;
+	DIR *dir = NULL;
+	struct stat info;
+
+	CATCHUNIX(fd = openat(dfd, basename, O_CLOEXEC|O_NOCTTY|O_RDONLY, 0));
+	CATCHUNIX(fstat(fd, &info));
+
+	if (S_ISDIR(info.st_mode)) {
+		struct dirent *dent;
+		dir = fdopendir(fd);
+		CATCHUNIX(dir ? 0 : -1);
+		fd = -1;
+
+		debug(D_DEBUG, "reading directory %s", basename);
+		while (1) {
+			errno = 0;
+			dent = readdir(dir);
+			if (dent) {
+				assert(strchr(dent->d_name, '/') == NULL);
+				if (strcmp(dent->d_name, ".") == 0 || strcmp(dent->d_name, "..") == 0)
+					continue;
+				CATCH(loadtostore(C, filefd, dirfd(dir), dent->d_name));
+			} else {
+				CATCH(errno);
+				break;
+			}
+		}
+	} else if (S_ISREG(info.st_mode)) {
+		confuga_fid_t fid;
+		confuga_off_t size;
+		enum CONFUGA_FILE_TYPE type;
+		CATCH(confugaN_lookup(C, fd, "", &fid, &size, &type, NULL));
+		if (type == CONFUGA_FILE) {
+			char name[PATH_MAX];
+			CATCHUNIX(snprintf(name, sizeof name, "%"PRIu64, (uint64_t)info.st_ino));
+			debug(D_DEBUG, "adding %s to file store as %s", basename, name);
+			CATCHUNIXIGNORE(linkat(dfd, basename, filefd, name, AT_SYMLINK_NOFOLLOW), EEXIST);
+		}
+	} else if (!S_ISLNK(info.st_mode)) {
+		fatal("found invalid file in namespace: %s", basename);
+	}
+
+	rc = 0;
+	goto out;
+out:
+	CLOSE_FD(fd);
+	CLOSE_DIR(dir);
+	return rc;
+}
+
+static int mkfilestore (confuga *C)
+{
+	int rc;
+	int rootfd = -1;
+	int filefd = -1;
+	int created = 0;
+
+	CATCHUNIX(rootfd = openat(C->rootfd, ".", O_CLOEXEC|O_NOCTTY|O_RDONLY, 0));
+	CATCHUNIX(flock(rootfd, LOCK_EX)); /* released by close */
+
+	CATCHUNIXIGNORE(mkdirat(C->rootfd, "store", S_IRWXU), EEXIST);
+	if (rc == EEXIST) {
+		rc = 0;
+		goto out;
+	}
+	created = 1;
+
+	debug(D_DEBUG, "building file store");
+	CATCHUNIX(mkdirat(C->rootfd, "store/new", S_IRWXU));
+	CATCHUNIX(symlinkat("file.0", C->rootfd, "store/file"));
+	CATCHUNIX(mkdirat(C->rootfd, "store/file.0", S_IRWXU));
+	CATCHUNIX(filefd = openat(C->rootfd, "store/file/.", O_CLOEXEC|O_NOCTTY|O_RDONLY, 0));
+	CATCH(loadtostore(C, filefd, C->rootfd, "root")); /* initialize (and handle older versions of Confuga) */
+
+	rc = 0;
+	goto out;
+out:
+	if (rc) {
+		if (created) {
+			unlinkat_recursive(C->rootfd, "store");
+		}
+		fatal("could not create file store: %s", strerror(rc));
+	}
+	CLOSE_FD(rootfd);
+	CLOSE_FD(filefd);
+	return rc;
 }
 
 CONFUGA_IAPI int confugaN_init (confuga *C, const char *root)
@@ -803,6 +943,7 @@ CONFUGA_IAPI int confugaN_init (confuga *C, const char *root)
 	CATCHUNIX(snprintf(C->root, sizeof C->root, "%s", root));
 	CATCHUNIXIGNORE(mkdirat(C->rootfd, "root", S_IRWXU), EEXIST);
 	CATCHUNIX(C->nsrootfd = openat(C->rootfd, "root", O_CLOEXEC|O_DIRECTORY|O_NOCTTY|O_RDONLY, 0));
+	CATCH(mkfilestore(C));
 	rc = 0;
 	PROLOGUE
 }

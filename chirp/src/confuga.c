@@ -140,7 +140,79 @@ static void s_url_truncate (sqlite3_context *context, int argc, sqlite3_value **
 	}
 }
 
-static int db_init (confuga *C)
+static int dbupgrade (confuga *C)
+{
+	int rc;
+	sqlite3 *db = C->db;
+	sqlite3_stmt *stmt = NULL;
+	int version;
+
+	rc = sqlite3_prepare_v2(db, "SELECT value FROM Confuga.State WHERE key = 'db-version';", -1, &stmt, NULL);
+	if (rc) {
+		sqlcatch(sqlite3_prepare_v2(db, "SELECT 1 FROM Confuga.Option;", -1, &stmt, NULL));
+		sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
+		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+		version = 0;
+	} else {
+		sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
+		version = sqlite3_column_int64(stmt, 0);
+		sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+	}
+
+	if (version == CONFUGA_DB_VERSION) {
+		rc = 0;
+		goto out;
+	} else if (version > CONFUGA_DB_VERSION) {
+		fatal("This version of Confuga is too old for this database version (%d)", version);
+	}
+
+	sqlcatch(sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, NULL));
+
+	switch (version) {
+		case 0: {
+			static const char SQL[] =
+				"CREATE TABLE Confuga.State ("
+				"	key TEXT PRIMARY KEY,"
+				"	value NOT NULL"
+				") WITHOUT ROWID;" /* SQLite optimization */
+				"INSERT INTO Confuga.State (key, value)"
+				"	SELECT key, value FROM Confuga.Option;"
+				"DROP TABLE Confuga.Option;"
+				"CREATE TABLE Confuga.DeadReplica ("
+				"	fid BLOB NOT NULL,"
+				"	sid INTEGER NOT NULL REFERENCES StorageNode (id),"
+				"	PRIMARY KEY (fid, sid)"
+				");"
+				;
+
+			debug(D_DEBUG, "upgrading db to v1");
+			sqlcatch(sqlite3_exec(db, SQL, NULL, NULL, NULL));
+			/* fallthrough */
+		}
+		default: {
+			static const char SQL[] =
+				"INSERT OR REPLACE INTO Confuga.State (key, value)"
+				"	VALUES ('db-version', " xstr(CONFUGA_DB_VERSION) ");"
+				;
+			sqlcatch(sqlite3_exec(db, SQL, NULL, NULL, NULL));
+			break;
+		}
+	}
+
+	sqlcatch(sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, NULL));
+
+	rc = 0;
+	goto out;
+out:
+	sqlite3_finalize(stmt);
+	sqlend(db);
+	if (rc) {
+		fatal("failed to upgrade database: %s", strerror(rc));
+	}
+	return rc;
+}
+
+static int dbload (confuga *C)
 {
 	static const char SQL[] =
 		"PRAGMA foreign_keys = ON;"
@@ -151,12 +223,13 @@ static int db_init (confuga *C)
 		");"
 		/* Create the database in one transaction. If it already exists, it will fail. */
 		"BEGIN TRANSACTION;"
-		"CREATE TABLE Confuga.Option ("
+		"CREATE TABLE Confuga.State ("
 		"	key TEXT PRIMARY KEY,"
-		"	value TEXT NOT NULL"
+		"	value NOT NULL"
 		") WITHOUT ROWID;" /* SQLite optimization */
-		"INSERT INTO Confuga.Option VALUES"
-		"	('id', (PRINTF('confuga:%s', UPPER(HEX(RANDOMBLOB(20))))))" /* Confuga FS GUID */
+		"INSERT INTO Confuga.State VALUES"
+		"	('id', (PRINTF('confuga:%s', UPPER(HEX(RANDOMBLOB(20))))))," /* Confuga FS GUID */
+		"	('db-version', " xstr(CONFUGA_DB_VERSION) ")"
 		"	;"
 		"CREATE TABLE Confuga.File ("
 		"	id BLOB PRIMARY KEY," /* SHA1 binary hash */
@@ -176,6 +249,11 @@ static int db_init (confuga *C)
 		"	time_health DATETIME," /* last confirmation that the replica exists and has the correct checksum */
 		"	PRIMARY KEY (fid, sid)"
 		") WITHOUT ROWID;" /* SQLite optimization */
+		"CREATE TABLE Confuga.DeadReplica ("
+		"   fid BLOB NOT NULL,"
+		"   sid INTEGER NOT NULL REFERENCES StorageNode (id),"
+		"	PRIMARY KEY (fid, sid)"
+		");"
 		"CREATE TABLE Confuga.StorageNode ("
 		"	id INTEGER PRIMARY KEY,"
 		/* Confuga fields (some overlap with catalog_server fields) */
@@ -302,14 +380,18 @@ static int db_init (confuga *C)
 
 	debug(D_DEBUG, "initializing Confuga");
 	do {
-		char *errmsg;
+		char *errmsg = NULL;
 		rc = sqlite3_exec(db, SQL, NULL, NULL, &errmsg); /* Ignore any errors. */
 		if (rc) {
-			if (!strstr(sqlite3_errmsg(db), "already exists"))
-				debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, rc, sqlite3_errstr(rc), sqlite3_errmsg(db));
 			sqlite3_exec(db, "ROLLBACK TRANSACTION;", NULL, NULL, NULL);
+			if (strstr(errmsg, "already exists")) {
+				CATCH(dbupgrade(C));
+			} else {
+				debug(D_DEBUG, "[%s:%d] sqlite3 error: %d `%s': %s", __FILE__, __LINE__, rc, sqlite3_errstr(rc), errmsg);
+			}
 		}
 		sqlite3_free(errmsg);
+		sqlcatch(rc);
 	} while (rc == SQLITE_BUSY);
 
 	rc = 0;
@@ -322,7 +404,7 @@ out:
 CONFUGA_IAPI int confugaI_dbload (confuga *C, sqlite3 *attachdb)
 {
 	static const char SQL[] =
-		"SELECT value FROM Confuga.Option WHERE key = 'id';"
+		"SELECT value FROM Confuga.State WHERE key = 'id';"
 		;
 
 	int rc;
@@ -359,7 +441,7 @@ CONFUGA_IAPI int confugaI_dbload (confuga *C, sqlite3 *attachdb)
 	(void)trace;
 #endif
 
-	CATCH(db_init(C));
+	CATCH(dbload(C));
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	if ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
@@ -655,6 +737,7 @@ CONFUGA_API int confuga_daemon (confuga *C)
 	time_t catalog_sync = 0;
 	time_t node_setup = 0;
 	time_t ticket_generated = 0;
+	time_t gc = 0;
 
 	while (1) {
 		time_t now = time(NULL);
@@ -673,6 +756,11 @@ CONFUGA_API int confuga_daemon (confuga *C)
 		if (node_setup+60 <= now) {
 			confugaS_setup(C);
 			node_setup = now;
+		}
+
+		if (gc+120 <= now) {
+			confugaG_fullgc(C);
+			gc = now;
 		}
 
 		confugaJ_schedule(C);
