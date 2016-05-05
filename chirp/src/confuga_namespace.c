@@ -126,7 +126,7 @@ static int lookup (confuga *C, const char *path, confuga_fid_t *fid, confuga_off
 	n = full_read(fd, header, HEADER_LENGTH);
 	if (n < (ssize_t)HEADER_LENGTH)
 		CATCH(EINVAL);
-	debug(D_DEBUG, "read `%s'", header); /* debug chomps final newline */
+	debug(D_DEBUG, "read %s", header); /* debug chomps final newline */
 
 	const char *current = header;
 	if (strncmp(current, "file:", strlen("file:")) == 0)
@@ -180,7 +180,7 @@ static int update (confuga *C, const char *path, confuga_fid_t fid, confuga_off_
 	CATCHUNIX(rc);
 	if ((size_t)rc < HEADER_LENGTH)
 		CATCH(EINVAL); /* FIXME */
-	debug(D_DEBUG, "write `%s'", header); /* debug chomps final newline */
+	debug(D_DEBUG, "write %s", header); /* debug chomps final newline */
 
 	rc = 0;
 	goto out;
@@ -217,7 +217,7 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	n = read(fd, header, HEADER_LENGTH);
 	if (n < (ssize_t)HEADER_LENGTH)
 		CATCH(EINVAL);
-	debug(D_DEBUG, "read `%s'", header); /* debug chomps final newline */
+	debug(D_DEBUG, "read %s", header); /* debug chomps final newline */
 
 	const char *current = header;
 	if (!(strncmp(current, "meta:", strlen("meta:")) == 0))
@@ -240,7 +240,7 @@ CONFUGA_API int confuga_metadata_lookup (confuga *C, const char *path, char **da
 	n = read(fd, *data, *size);
 	if (n < (ssize_t)*size)
 		CATCH(EINVAL);
-	debug(D_DEBUG, "read `%s'", *data); /* debug chomps final newline */
+	debug(D_DEBUG, "read '%s'", *data); /* debug chomps final newline */
 
 	rc = 0;
 	goto out;
@@ -270,13 +270,13 @@ CONFUGA_API int confuga_metadata_update (confuga *C, const char *path, const cha
 	CATCHUNIX(rc);
 	if ((size_t)rc < HEADER_LENGTH)
 		CATCH(EINVAL); /* FIXME */
-	debug(D_DEBUG, "write `%s'", header); /* debug chomps final newline */
+	debug(D_DEBUG, "write %s", header); /* debug chomps final newline */
 
 	rc = full_write(fd, data, size);
 	CATCHUNIX(rc);
 	if ((size_t)rc < size)
 		CATCH(EINVAL); /* FIXME */
-	debug(D_DEBUG, "write `%s'", data); /* debug chomps final newline */
+	debug(D_DEBUG, "write '%s'", data); /* debug chomps final newline */
 
 	rc = 0;
 	goto out;
