@@ -230,4 +230,13 @@ void auth_replace (struct auth_state *new)
 	state = *new;
 }
 
+void auth_free (struct auth_state *as)
+{
+	while (as->ops) {
+		struct auth_ops *n = as->ops->next;
+		free(as->ops);
+		as->ops = n;
+	}
+}
+
 /* vim: set noexpandtab tabstop=4: */

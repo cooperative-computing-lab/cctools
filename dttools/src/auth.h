@@ -29,5 +29,6 @@ void auth_clear(void);
 
 struct auth_state *auth_clone(void);
 void auth_replace(struct auth_state *);
+void auth_free(struct auth_state *);
 
 #endif

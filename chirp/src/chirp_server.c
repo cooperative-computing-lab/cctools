@@ -1769,6 +1769,7 @@ static void chirp_receive(struct link *link, char url[CHIRP_PATH_MAX])
 
 		debug(D_LOGIN, "disconnected");
 	} else {
+		auth_free(backend_state);
 		debug(D_LOGIN, "authentication failed from %s:%d", addr, port);
 	}
 
