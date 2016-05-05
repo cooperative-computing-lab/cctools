@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
 <link rel="stylesheet" type="text/css" href="manual.css">
-<title>Chirp Protocol Version 2</title>
+<title>Catalog Servers</title>
 <style type="text/css">
 .command {
     margin: 10px;
@@ -19,7 +19,7 @@
 <div id="manual">
 <h1>Catalog Servers</h1>
 
-<p style="text-align: right;"><b>Last edited: 29 April 2016</b></p>
+<p style="text-align: right;"><b>Last edited: 4 May 2016</b></p>
 
 <p>Catalog servers function as connection points for tools that need to interact remotely. Tools can send free-form updates to a catalog server, and can query catalog servers to find other hosts matching some criteria. Catalog updates are sent via UDP, and the catalog server exposes a JSON interface to view status and make queries.</p>
 
@@ -31,10 +31,10 @@ This web page lists details on all known servers and their locations.</p>
 
 <h2 id="specifying">Specifying Catalog Servers<a class="sectionlink" href="#specifying" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>Many of the tools accept command line arguments or environment variables to specify the catalog server(s) to use. The catalog host is specified as a semicolon delimited list of servers to use. Each may optionally include a port number. If no port is specified, the value of the environment variable <tt>CATALOG_PORT</tt> is used, or the default of port 9097. If no catalog server is given on the command line, the <tt>CATALOG_HOST</tt> environment variable is used. If that is unset, the default of
-<code>catalog.cse.nd.edu;backup-catalog.cse.nd.edu</code>
+<p>Many of the tools accept command line arguments or environment variables to specify the catalog server(s) to use. The catalog host is specified as a comma delimited list of servers to use. Each may optionally include a port number. If no port is specified, the value of the environment variable <tt>CATALOG_PORT</tt> is used, or the default of port 9097. If no catalog server is given on the command line, the <tt>CATALOG_HOST</tt> environment variable is used. If that is unset, the default of
+<code>catalog.cse.nd.edu,backup-catalog.cse.nd.edu</code>
 This could be written more verbosely as
-<code>catalog.cse.nd.edu:9097;backup-catalog.cse.nd.edu:9097</code>
+<code>catalog.cse.nd.edu:9097,backup-catalog.cse.nd.edu:9097</code>
 assuming the catalog port was not set in the environment.</p>
 
 <h2 id="updates">Updates<a class="sectionlink" href="#updates" title="Link to this section.">&#x21d7;</a></h2>
@@ -74,8 +74,8 @@ sneezy<span class="prompt">$ </span>chirp_server -u dopey [more options]
 <p>And you will see <a href="http://catalog.cse.nd.edu:9097">something like
 this.</a> You may easily run multiple catalogs for either scalability or fault
 tolerance.  Simply give each Chirp server the name of each
-running catalog separated by semicolons, e.g.
-<code><span class="prompt">$ </span>chirp_server -u 'dopey;happy:9000;grumpy'</code>
+running catalog separated by commas, e.g.
+<code><span class="prompt">$ </span>chirp_server -u 'dopey,happy:9000,grumpy'</code>
 </p>
 
 <p>(Hint: If you want to ensure that your chirp and catalog servers run
