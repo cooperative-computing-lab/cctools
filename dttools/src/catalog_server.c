@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "macros.h"
 #include "daemon.h"
 #include "getopt_aux.h"
+#include "change_process_title.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -497,8 +498,12 @@ int main(int argc, char *argv[])
 	int is_daemon = 0;
 	char *pidfile = NULL;
 	char *interface = NULL;
+	char raddr[LINK_ADDRESS_MAX];
+	int rport;
 
 	outgoing_host_list = list_create();
+
+	change_process_title_init(argv);
 
 	debug_config(argv[0]);
 
@@ -710,6 +715,8 @@ int main(int argc, char *argv[])
 				if(fork_mode) {
 					pid_t pid = fork();
 					if(pid == 0) {
+						link_address_remote(link, raddr, &rport);
+						change_process_title("catalog_server [%s]", raddr);
 						alarm(child_procs_timeout);
 						handle_query(link);
 						_exit(0);
