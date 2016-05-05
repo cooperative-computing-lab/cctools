@@ -11,19 +11,21 @@ See the file COPYING for details.
 
 void url_encode(const char *s, char *t, int length)
 {
-	while(*s && length > 1) {
-		if(*s <= 32 || *s == '%' || *s == '\\' || *s == '<' || *s == '>' || *s == '\'' || *s == '\"' || *s > 122) {
-			if(length > 3) {
-				snprintf(t, length, "%%%2X", *s);
-				t += 3;
-				length -= 3;
-				s++;
+	if(s) {
+		while(*s && length > 1) {
+			if(*s <= 32 || *s == '%' || *s == '\\' || *s == '<' || *s == '>' || *s == '\'' || *s == '\"' || *s > 122) {
+				if(length > 3) {
+					snprintf(t, length, "%%%2X", *s);
+					t += 3;
+					length -= 3;
+					s++;
+				} else {
+					break;
+				}
 			} else {
-				break;
+				*t++ = *s++;
+				length--;
 			}
-		} else {
-			*t++ = *s++;
-			length--;
 		}
 	}
 	*t = 0;
