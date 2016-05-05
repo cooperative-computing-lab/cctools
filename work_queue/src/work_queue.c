@@ -653,7 +653,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 		return;
 
 	// If host and port are not set, pick defaults.
-	if(!q->catalog_hosts) q->catalog_hosts = CATALOG_HOST;
+	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
 	// Generate the master status in an jx, and print it to a buffer.
 	struct jx *j = queue_to_jx(q,foreman_uplink);
