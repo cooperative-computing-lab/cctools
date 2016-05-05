@@ -462,20 +462,31 @@ CONFUGA_API int confuga_file_close (confuga_file *file, confuga_fid_t *fid, conf
 {
 	int rc;
 	confuga *C = file->C;
-	if (file->stream == NULL)
-		return EINVAL;
-	debug(D_CONFUGA, "file_close(stream = '%s%s')", file->host.hostport, file->path);
-	CATCHUNIX(chirp_reli_close(file->stream, stoptime));
-	file->stream = NULL;
-	sha1_final(fid->id, &file->context);
-	*size = file->size;
+	confuga_file fcopy = *file;
 	char replica[CONFUGA_PATH_MAX];
-	snprintf(replica, sizeof(replica), "%s/file/" CONFUGA_FID_PRIFMT, file->host.root, CONFUGA_FID_PRIARGS(*fid));
-	CATCHUNIX(chirp_reli_rename(file->host.hostport, file->path, replica, stoptime));
-	CATCH(confugaR_register(C, *fid, file->size, file->sid));
+	int concrete = 0;
+
+	file = realloc(file, 0);
+
+	if (fcopy.stream) {
+		debug(D_CONFUGA, "file_close(stream = '%s%s')", fcopy.host.hostport, fcopy.path);
+		CATCHUNIX(chirp_reli_close(fcopy.stream, stoptime));
+		fcopy.stream = NULL;
+		sha1_final(fid->id, &fcopy.context);
+		*size = fcopy.size;
+	}
+
+	CATCHUNIX(snprintf(replica, sizeof(replica), "%s/file/" CONFUGA_FID_PRIFMT, fcopy.host.root, CONFUGA_FID_PRIARGS(*fid)));
+	CATCHUNIX(chirp_reli_rename(fcopy.host.hostport, fcopy.path, replica, stoptime));
+	concrete = 1;
+	CATCH(confugaR_register(C, *fid, fcopy.size, fcopy.sid));
+
 	rc = 0;
 	goto out;
 out:
+	if (rc && !concrete) {
+		chirp_reli_unlink(fcopy.host.hostport, fcopy.path, stoptime);
+	}
 	debug(D_CONFUGA, "= %d (%s) [fid = " CONFUGA_FID_PRIFMT ", size = %" PRIuCONFUGA_OFF_T "]", rc, strerror(rc), CONFUGA_FID_PRIARGS(*fid), *size);
 	return rc;
 }
