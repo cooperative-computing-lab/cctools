@@ -27,6 +27,10 @@
 		}\
 	} while (0)
 
+#define RCUNIX(rc) (rc == 0 ? 0 : (errno = (int)rc, -1))
+
+#define UNIXRC(ux) ((ux) == -1 ? errno : 0)
+
 #define CATCHUNIX(expr) \
 	do {\
 		rc = (expr);\
@@ -40,14 +44,14 @@
 #define CATCHUNIXIGNORE(expr,err) \
 	do {\
 		rc = (expr);\
-		if (rc == -1 && errno != err) {\
+		if (rc == -1) {\
 			rc = errno;\
-			debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, (int)rc, strerror((int)rc));\
-			goto out;\
+			if (errno != err) {\
+				debug(D_DEBUG, "%s: %s:%d[%s] unix error: -1 (errno = %d) `%s'", __func__, __FILE__, __LINE__, CCTOOLS_SOURCE, (int)rc, strerror((int)rc));\
+				goto out;\
+			}\
 		}\
 	} while (0)
-
-#define RCUNIX(rc) (rc == 0 ? 0 : (errno = (int)rc, -1))
 
 #endif
 
