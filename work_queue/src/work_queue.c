@@ -209,6 +209,8 @@ struct work_queue_worker {
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
 
+	char *workerid;
+
 	struct hash_table *current_files;
 	struct link *link;
 	struct itable *current_tasks;
@@ -286,6 +288,7 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 static void write_transaction(struct work_queue *q, const char *str);
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
 static void write_transaction_category(struct work_queue *q, struct category *c);
+static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -493,6 +496,9 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		q->stats->total_workers_idled_out++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
+	} else if(string_prefix_is(field, "worker-id")) {
+		w->workerid = xxstrdup(value);
+		write_transaction_worker(q, w, 0);
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -781,6 +787,8 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	q->stats->total_workers_removed++;
 
+	write_transaction_worker(q, w, 1);
+
 	cleanup_worker(q, w);
 
 	hash_table_remove(q->worker_table, w->hashkey);
@@ -796,6 +804,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	itable_delete(w->current_tasks_boxes);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+
+	if(w->workerid)
+		free(w->workerid);
+
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
@@ -876,6 +888,8 @@ static void add_worker(struct work_queue *q)
 	r->gpus.smallest = r->gpus.largest = r->gpus.total = -1;//default_resource_value;
 
 	w->resources = r;
+
+	w->workerid = NULL;
 
 	w->stats     = calloc(1, sizeof(struct work_queue_stats));
 	link_to_hash_key(link, w->hashkey);
@@ -5963,7 +5977,23 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
 	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
 	write_transaction(q, buffer_tostring(&B));
-	buffer_rewind(&B, 0);
+
+	buffer_free(&B);
+}
+
+static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving) {
+	struct buffer B;
+	buffer_init(&B);
+
+	buffer_printf(&B, "WORKER %s %s ", w->workerid, w->addrport);
+
+	if(leaving) {
+		buffer_printf(&B, " DISCONNECTION");
+	} else {
+		buffer_printf(&B, " CONNECTION");
+	}
+
+	write_transaction(q, buffer_tostring(&B));
 
 	buffer_free(&B);
 }
