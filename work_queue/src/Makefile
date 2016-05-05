@@ -27,7 +27,7 @@ PROGRAMS = work_queue_worker work_queue_status work_queue_example
 PUBLIC_HEADERS = work_queue.h
 SCRIPTS = work_queue_submit_common condor_submit_workers sge_submit_workers torque_submit_workers pbs_submit_workers ec2_submit_workers ec2_remove_workers slurm_submit_workers work_queue_graph_log
 TEST_PROGRAMS = work_queue_example work_queue_test work_queue_test_watch work_queue_priority_test
-TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers bindings
+TARGETS = $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) work_queue_submit_common sge_submit_workers bindings
 
 all: $(TARGETS)
 
@@ -50,9 +50,18 @@ clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
 $(CCTOOLS_SWIG_BINDINGS_CLEAN):
 	@$(MAKE) -C $(@:clean-%=%) clean
 
-sge_submit_workers: sge_submit_workers_common
-	sed -e "s/SGE_CUSTOM_PARAMETERS/${CCTOOLS_SGE_PARAMETERS}/" $< > $@
-	chmod 755 $@
+sge_submit_workers: sge_submit_workers.template
+	@echo "Generating sge_submit_workers..."
+	@sed -e "s/^SGE_CUSTOM_PARAMETERS/${CCTOOLS_SGE_PARAMETERS}/" $< > $@
+	@chmod 755 $@
+
+work_queue_submit_common: work_queue_submit_common.template
+	@echo "Generating work_queue_submit_common..."
+	@sed -e "s/^CCTOOLS_DEFAULT_RESOURCES/\
+cores=${CCTOOLS_DEFAULT_CORES}\n\
+memory=${CCTOOLS_DEFAULT_MEMORY}\n\
+disk=${CCTOOLS_DEFAULT_DISK}/" $< > $@
+	@chmod 755 $@
 
 install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
@@ -66,7 +75,7 @@ install: all install-bindings
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 
 clean: clean-bindings
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers work_queue_submit_common
 
 test: all
 
