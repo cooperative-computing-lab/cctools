@@ -279,6 +279,7 @@ class Client:
     # @param timeout             If given, maximum number of seconds to
     #                            wait for a server response.
     def rm(self, path, absolute_stop_time=None, timeout=None):
+
         status = chirp_reli_rmall(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
 
         if status < 0:
