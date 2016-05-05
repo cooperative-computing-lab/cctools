@@ -65,9 +65,6 @@ void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_pat
 	makeflow_wrapper_add_input_file(w, local_parrot_path);
 	makeflow_wrapper_add_input_file(w, xxstrdup(enforcer_pattern "%%"));
 	makeflow_wrapper_add_input_file(w, xxstrdup(mountlist_pattern "%%"));
-	makeflow_wrapper_add_input_file(w, xxstrdup(tmp_pattern "%%"));
-	makeflow_wrapper_add_input_file(w, xxstrdup(vartmp_pattern "%%"));
-	makeflow_wrapper_add_input_file(w, xxstrdup(shm_pattern "%%"));
 	w->command = xxstrdup("./" enforcer_pattern "%%");
 }
 
