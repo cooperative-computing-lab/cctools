@@ -176,14 +176,69 @@ void dag_node_footprint_delete(struct dag_node_footprint *f)
 	free(f);
 }
 
+int dag_node_compare(struct dag_node *node1, struct dag_node *node2, dag_node_sort_t type)
+{
+	uint64_t size1 = 0;
+	uint64_t size2 = 0;
+	uint64_t size3 = 0;
+	uint64_t size4 = 0;
+
+	switch (type) {
+		case DAG_NODE_SORT_COMP:
+			if(node1 == node2)
+				return 1;
+			break;
+		case DAG_NODE_SORT_WGT_REV:
+			size1 = node1->footprint->wgt;
+			size2 = node2->footprint->wgt;
+			break;
+		case DAG_NODE_SORT_WGT:
+			size2 = node1->footprint->wgt;
+			size1 = node2->footprint->wgt;
+			break;
+		case DAG_NODE_SORT_RES_REV:
+			size1 = node1->footprint->res;
+			size2 = node2->footprint->res;
+			break;
+		case DAG_NODE_SORT_RES:
+			size2 = node1->footprint->res;
+			size1 = node2->footprint->res;
+			break;
+		case DAG_NODE_SORT_DIFF_REV:
+			size1 = node1->footprint->diff;
+			size2 = node2->footprint->diff;
+			size3 = node1->footprint->res;
+			size4 = node2->footprint->res;
+			break;
+		case DAG_NODE_SORT_DIFF:
+			size2 = node1->footprint->diff;
+			size1 = node2->footprint->diff;
+			size4 = node1->footprint->res;
+			size3 = node2->footprint->res;
+			break;
+		default:
+			return 0;
+	}
+
+	if(size1 > size2)
+		return 1;
+	else if(size1 < size2)
+		return -1;
+
+	if(size3 > size4)
+		return -1;
+	else if(size3 < size4)
+		return 1;
+
+	return 0;
+}
+
 int dag_node_comp(void *item, const void *arg)
 {
-	struct dag_node *node1 = (struct dag_node *)item;
-	struct dag_node *node2 = (struct dag_node *)arg;
+	struct dag_node **node1 = (void *)item;
+	struct dag_node **node2 = (void *)arg;
 
-	if(node1 == node2)
-		return 1;
-	return 0;
+	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_COMP);
 }
 
 int dag_node_comp_wgt(const void *item, const void *arg)
@@ -191,14 +246,7 @@ int dag_node_comp_wgt(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	uint64_t size1 = (*node1)->footprint->wgt;
-	uint64_t size2 = (*node2)->footprint->wgt;
-
-	if(size1 > size2)
-		return 1;
-	else if(size1 < size2)
-		return -1;
-	return 0;
+	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_WGT);
 }
 
 int dag_node_comp_wgt_rev(const void *item, const void *arg)
@@ -206,14 +254,7 @@ int dag_node_comp_wgt_rev(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	uint64_t size1 = (*node1)->footprint->wgt;
-	uint64_t size2 = (*node2)->footprint->wgt;
-
-	if(size1 < size2)
-		return 1;
-	else if(size1 > size2)
-		return -1;
-	return 0;
+	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_WGT_REV);
 }
 
 int dag_node_comp_res(const void *item, const void *arg)
@@ -221,14 +262,7 @@ int dag_node_comp_res(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	uint64_t size1 = (*node1)->footprint->res;
-	uint64_t size2 = (*node2)->footprint->res;
-
-	if(size1 > size2)
-		return 1;
-	else if(size1 < size2)
-		return -1;
-	return 0;
+	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_RES);
 }
 
 int dag_node_comp_diff(const void *item, const void *arg)
@@ -236,23 +270,7 @@ int dag_node_comp_diff(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	uint64_t size1 = (*node1)->footprint->diff;
-	uint64_t size2 = (*node2)->footprint->diff;
-
-	if(size1 > size2)
-		return -1;
-	else if(size1 < size2)
-		return 1;
-
-	size1 = (*node1)->footprint->res;
-	size2 = (*node2)->footprint->res;
-
-	if(size1 > size2)
-		return -1;
-	else if(size1 < size2)
-		return 1;
-
-	return 0;
+	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_DIFF);
 }
 
 /* Returns the remotename used in rule n for local name filename */

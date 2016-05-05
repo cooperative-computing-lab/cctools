@@ -28,6 +28,16 @@ typedef enum {
 	DAG_NODE_FOOTPRINT_DESC
 } dag_node_footprint_t;
 
+typedef enum {
+	DAG_NODE_SORT_COMP = 0,
+	DAG_NODE_SORT_WGT,
+	DAG_NODE_SORT_WGT_REV,
+	DAG_NODE_SORT_RES,
+	DAG_NODE_SORT_RES_REV,
+	DAG_NODE_SORT_DIFF,
+	DAG_NODE_SORT_DIFF_REV,
+} dag_node_sort_t;
+
 
 /* struct dag_node implements a linked list of nodes. A dag_node
  * represents a production rule from source files to target
