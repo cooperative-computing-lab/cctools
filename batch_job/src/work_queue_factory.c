@@ -619,9 +619,13 @@ static void show_help(const char *cmd)
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
-	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
-	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
+	printf( " %-30s (default=%d)\n", "", CCTOOLS_DEFAULT_CORES);
+	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>");
+	printf( " %-30s (default=%d)\n", "", CCTOOLS_DEFAULT_MEMORY);
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
+	printf( " %-30s (default=%d)\n", "", CCTOOLS_DEFAULT_DISK);
+	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
+	printf( " %-30s (default=0)\n", "");
 	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
 	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
@@ -676,6 +680,9 @@ int main(int argc, char *argv[])
 	debug_config(argv[0]);
 
 	resources = rmsummary_create(-1);
+	resources->cores  = CCTOOLS_DEFAULT_CORES;
+	resources->memory = CCTOOLS_DEFAULT_MEMORY;
+	resources->disk   = CCTOOLS_DEFAULT_DISK;
 
 	int c;
 
