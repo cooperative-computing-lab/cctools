@@ -577,7 +577,7 @@ CONFUGA_API int confuga_nodes (confuga *C, const char *nodes)
 		CATCH(confugaS_node_insert(C, hostname, root));
 		rest += n;
 		hostname = realloc(hostname, 0);
-		root = realloc(hostname, 0);
+		root = realloc(root, 0);
 	}
 
 	rc = 0;
