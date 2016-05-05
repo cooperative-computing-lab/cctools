@@ -121,6 +121,10 @@ public:
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
 		return this->stat(name,buf);
 	}
+
+	virtual int is_seekable (void) {
+		return 0;
+	}
 };
 
 static pfs_service_http pfs_service_http_instance;
