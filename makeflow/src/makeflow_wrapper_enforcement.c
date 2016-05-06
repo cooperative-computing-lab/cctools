@@ -63,7 +63,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 
 	struct list *enforcer_paths;
 	struct dag_file *f;
-	FILE *enforcer;
+	FILE *enforcer = NULL;
 	char *enforcer_path = string_format(enforcer_pattern "%d", n->nodeid);
 	char *mountlist_path = string_format(mountlist_pattern "%d", n->nodeid);
 	char *tmp_path = string_format(tmp_pattern "%d", n->nodeid);
