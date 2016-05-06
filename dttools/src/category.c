@@ -94,6 +94,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 	/* assume user knows what they are doing. */
 	c->completions_since_last_reset = first_allocation_every_n_tasks;
+	rmsummary_merge_max(c->max_resources_seen, s);
 
 	if(c->first_allocation)
 		rmsummary_delete(c->first_allocation);
