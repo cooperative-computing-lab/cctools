@@ -5623,6 +5623,10 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "send-receive-ratio")) {
 		work_queue_send_receive_ratio(q, value);
+
+	} else if(!strcmp(name, "category-steady-n-tasks")) {
+		category_tune_bucket_size("category-steady-n-tasks", (int) value);
+
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;
