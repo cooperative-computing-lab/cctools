@@ -382,6 +382,17 @@ class Task(_object):
         return self._task.total_submissions
 
     ##
+    # Get the number of times the task has been failed given resource exhaustion.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.exhausted_attempts
+    # @endcode
+    @property
+    def exhausted_attempts(self):
+        return self._task.exhausted_attempts
+
+    ##
     # Get the address and port of the host on which the task ran.
     # Must be called only after the task completes execution.
     # @a Note: This is defined using property decorator. So it must be called without parentheses
@@ -428,6 +439,17 @@ class Task(_object):
     @property
     def finish_time(self):
         return self._task.time_task_finish
+
+    ##
+    # Get the total time the task executed and failed given resource exhaustion.
+    # @a Note: This is defined using property decorator. So it must be called without parentheses
+    # (). For example:
+    # @code
+    # >>> print t.total_cmd_exhausted_execute_time
+    # @endcode
+    @property
+    def total_cmd_exhausted_execute_time(self):
+        return self._task.total_cmd_exhausted_execute_time
 
     ##
     # Get the time spent in upper-level application (outside of work_queue_wait).
