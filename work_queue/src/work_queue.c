@@ -684,20 +684,6 @@ static void clean_task_state(struct work_queue_task *t) {
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
 
-		if (t->time_execute_cmd_start >= t->time_committed) {
-			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
-			t->total_cmd_execution_time += delta_time;
-
-			switch(t->result) {
-				case WORK_QUEUE_RESULT_UNKNOWN:
-				case WORK_QUEUE_RESULT_FORSAKEN:
-					t->total_time_until_worker_failure += delta_time;
-					break;
-				default:
-					break;
-			}
-		}
-
 		t->time_execute_cmd_start = 0;
 
 		if(t->output) {
@@ -736,6 +722,13 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
+
+		if (t->time_execute_cmd_start >= t->time_committed) {
+			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
+			t->total_time_until_worker_failure += delta_time;
+			t->total_cmd_execution_time += delta_time;
+		}
+
 		clean_task_state(t);
 		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
