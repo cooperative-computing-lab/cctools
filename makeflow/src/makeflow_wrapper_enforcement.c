@@ -24,21 +24,10 @@
 #define enforcer_pattern "enforcer_"
 #define mountlist_pattern "mount_"
 #define tmp_pattern "tmp_"
-#define vartmp_pattern "vartmp_"
-#define shm_pattern "shm_"
 #define local_parrot_path "parrot_run"
 
 void makeflow_log_file_expectation( struct dag *d, struct list *file_list );
 void makeflow_log_file_existence( struct dag *d, struct list *file_list );
-
-void makeflow_make_tempdir(const char* path) {
-	struct stat buf;
-	if (mkdir(path, S_IRWXU)) {
-		if ((errno != EEXIST) || stat(path, &buf) || !S_ISDIR(buf.st_mode) ) {
-			fatal("could not create temp directory: %s", strerror(errno));
-		}
-	}
-}
 
 void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_path) {
 	struct stat stat_buf;
@@ -78,8 +67,6 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	char *enforcer_path = string_format(enforcer_pattern "%d", n->nodeid);
 	char *mountlist_path = string_format(mountlist_pattern "%d", n->nodeid);
 	char *tmp_path = string_format(tmp_pattern "%d", n->nodeid);
-	char *vartmp_path = string_format(vartmp_pattern "%d", n->nodeid);
-	char *shm_path = string_format(shm_pattern "%d", n->nodeid);
 
 	enforcer_paths = list_create();
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
@@ -110,9 +97,6 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "MOUNTFILE='%s'\n", mountlist_path);
 	fprintf(enforcer, "cat > \"$MOUNTFILE\" <<EOF\n");
 	fprintf(enforcer, "/\t\trx\n");
-	fprintf(enforcer, "/tmp\t$PWD/%s\trwx\n", tmp_path);
-	fprintf(enforcer, "/var/tmp\t$PWD/%s\trwx\n", vartmp_path);
-	fprintf(enforcer, "/dev/shm\t$PWD/%s\trwx\n", shm_path);
 	fprintf(enforcer, "/dev/null\trwx\n");
 	fprintf(enforcer, "/dev/zero\trwx\n");
 	fprintf(enforcer, "/dev/full\trwx\n");
@@ -136,13 +120,10 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	}
 	fprintf(enforcer, "EOF\n\n");
 	fprintf(enforcer, "mkdir -p \"%s\"\n", tmp_path);
-	fprintf(enforcer, "mkdir -p \"%s\"\n", vartmp_path);
-	fprintf(enforcer, "mkdir -p \"%s\"\n", shm_path);
+	fprintf(enforcer, "export \"TMPDIR=%s\"\n", tmp_path);
 	fprintf(enforcer, "./parrot_run -m \"$MOUNTFILE\" -- \"$@\"\n");
 	fprintf(enforcer, "RC=$?\n");
 	fprintf(enforcer, "rm -rf \"%s\"\n", tmp_path);
-	fprintf(enforcer, "rm -rf \"%s\"\n", vartmp_path);
-	fprintf(enforcer, "rm -rf \"%s\"\n", shm_path);
 	fprintf(enforcer, "exit $RC\n");
 	fclose(enforcer);
 
@@ -152,8 +133,6 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	free(enforcer_path);
 	free(mountlist_path);
 	free(tmp_path);
-	free(vartmp_path);
-	free(shm_path);
 
 	return makeflow_wrap_wrapper(result, n, w);
 }
