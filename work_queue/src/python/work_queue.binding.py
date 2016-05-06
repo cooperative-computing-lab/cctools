@@ -656,14 +656,25 @@ class Task(_object):
 
 
     ##
-    # Get the resources the task requested to run. For valid fields see @resources_measured.
+    # Get the resources the task requested to run. For valid fields see
+    # @resources_measured.
     #
     @property
     def resources_requested(self):
         if not self._task.resources_requested:
             return None
-
         return self._task.resources_requested
+
+    ##
+    # Get the resources allocated to the task in its latest attempt. For valid
+    # fields see @resources_measured.
+    #
+    @property
+    def resources_allocated(self):
+        if not self._task.resources_allocated:
+            return None
+        return self._task.resources_allocated
+
 
 ##
 # Python Work Queue object

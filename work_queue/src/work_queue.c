@@ -2883,6 +2883,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	}
 
 	itable_insert(w->current_tasks_boxes, t->taskid, limits);
+	rmsummary_merge_override(t->resources_allocated, limits);
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -3661,6 +3662,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured  = rmsummary_create(-1);
+	t->resources_allocated = rmsummary_create(-1);
 
 	t->category = xxstrdup("default");
 
@@ -3696,6 +3698,11 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   if(task->resources_measured) {
 	  new->resources_measured = malloc(sizeof(struct rmsummary));
 	  memcpy(new->resources_measured, task->resources_measured, sizeof(sizeof(struct rmsummary)));
+  }
+
+  if(task->resources_allocated) {
+	  new->resources_allocated = malloc(sizeof(struct rmsummary));
+	  memcpy(new->resources_allocated, task->resources_allocated, sizeof(sizeof(struct rmsummary)));
   }
 
   if(task->monitor_output_directory) {
@@ -4352,6 +4359,8 @@ void work_queue_task_delete(struct work_queue_task *t)
 			rmsummary_delete(t->resources_requested);
 		if(t->resources_measured)
 			rmsummary_delete(t->resources_measured);
+		if(t->resources_allocated)
+			rmsummary_delete(t->resources_allocated);
 		if(t->monitor_output_directory)
 			free(t->monitor_output_directory);
 

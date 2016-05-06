@@ -378,6 +378,11 @@ sub resources_requested {
 	return $self->{_task}->{resources_requested};
 }
 
+sub resources_allocated {
+	my ($self) = @_;
+	return $self->{_task}->{resources_allocated};
+}
+
 1;
 
 __END__
@@ -1020,6 +1025,12 @@ Must be called only after the task completes execution.
 	Get the resources requested by the task. See @resources_measured for possible fields.
 
 	Must be called only after the task completes execution.
+
+=head3 C<resources_allocated>
+
+	Get the resources allocatet to the task in its latest attempt. See @resources_measured for possible fields.
+
+=cut
 
 
 =cut
