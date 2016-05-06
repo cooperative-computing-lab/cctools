@@ -971,9 +971,9 @@ out:
 static int encode (confuga *C, chirp_jobid_t id, const char *tag, buffer_t *B, struct job_stats *stats)
 {
 	static const char SQL[] =
-		"SELECT executable, Option.value"
-		"	FROM Job JOIN Confuga.Option"
-		"	WHERE Job.id = ? AND Option.key = 'id'"
+		"SELECT executable, State.value"
+		"	FROM Job JOIN Confuga.State"
+		"	WHERE Job.id = ? AND State.key = 'id'"
 		";"
 		"SELECT arg FROM JobArgument WHERE id = ? ORDER BY n"
 		";"

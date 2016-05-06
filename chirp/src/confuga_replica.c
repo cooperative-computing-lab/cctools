@@ -46,6 +46,63 @@ struct confuga_file {
 	confuga_off_t size; /* running size */
 };
 
+CONFUGA_IAPI int confugaR_delete (confuga *C, confuga_sid_t sid, confuga_fid_t fid)
+{
+	static const char SQL[] =
+		"SAVEPOINT confugaR_delete;"
+		"INSERT OR IGNORE INTO Confuga.DeadReplica (fid, sid)"
+		"	VALUES (?, ?)"
+		";"
+		"DELETE FROM Confuga.Replica"
+		"	WHERE fid = ? AND sid = ?"
+		";"
+		"DELETE FROM Confuga.File"
+		"	WHERE id = ?1 AND NOT EXISTS (SELECT sid FROM Confuga.Replica WHERE fid = ?1)"
+		";"
+		"RELEASE SAVEPOINT confugaR_delete;"
+		;
+
+	int rc;
+	sqlite3 *db = C->db;
+	sqlite3_stmt *stmt = NULL;
+	const char *current = SQL;
+
+	debug(D_DEBUG, "deleting replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
+	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	rc = 0;
+	goto out;
+out:
+	sqlite3_finalize(stmt);
+	sqlendsavepoint(confugaR_delete);
+	return rc;
+}
+
+
 CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, confuga_sid_t sid)
 {
 	static const char SQL[] =
@@ -835,13 +892,13 @@ static int transfer_create (confuga *C)
 		"		PRINTF('%s/debug.%%j', tsn.root),"
 		"		tsn.hostport,"
 		"		PRINTF('%s/open/%s', tsn.root, UPPER(HEX(RANDOMBLOB(16)))),"
-		"		Option.value"
+		"		State.value"
 		"	FROM"
-		"		Confuga.Option,"
+		"		Confuga.State,"
 		"		Confuga.TransferJob"
 		"		JOIN Confuga.StorageNode AS fsn ON TransferJob.fsid = fsn.id"
 		"		JOIN Confuga.StorageNode AS tsn ON TransferJob.tsid = tsn.id"
-		"	WHERE state = 'NEW' AND Option.key = 'id'" /* TODO: AND TransferJob.last_attempt + TransferJob.attempts^2 < strftime('%s', 'now') */
+		"	WHERE state = 'NEW' AND State.key = 'id'" /* TODO: AND TransferJob.last_attempt + TransferJob.attempts^2 < strftime('%s', 'now') */
 		"	ORDER BY RANDOM()" /* to ensure no starvation, create may result in a ROLLBACK that aborts this SELECT */
 		";";
 
@@ -1405,6 +1462,85 @@ out:
 	return rc;
 }
 
+static int unlinkthedead (confuga *C)
+{
+	static const char SQL[] =
+		"BEGIN TRANSACTION;"
+		/* Undo any intents to unlink a Replica where the Replica has been recreated. */
+		"DELETE FROM Confuga.DeadReplica"
+		"	WHERE EXISTS (SELECT NULL FROM Confuga.Replica WHERE DeadReplica.fid = Replica.fid AND DeadReplica.sid = Replica.sid)"
+		";"
+		/* unlink a DeadReplica only when the StorageNode is not executing a job! A job may create a new replica with the same RepID! */
+		"SELECT DeadReplica.fid, DeadReplica.sid, StorageNodeActive.hostport, PRINTF('%s/file/%s', StorageNodeActive.root, UPPER(HEX(DeadReplica.fid)))"
+		"	FROM Confuga.DeadReplica"
+		"		JOIN Confuga.StorageNodeActive ON DeadReplica.sid = StorageNodeActive.id"
+		"		LEFT OUTER JOIN ConfugaJobExecuting ON StorageNodeActive.id = ConfugaJobExecuting.sid"
+		"	WHERE ConfugaJobExecuting.id IS NULL"
+		"	ORDER BY RANDOM()"
+		"	LIMIT 1"
+		";"
+		"DELETE FROM Confuga.DeadReplica"
+		"	WHERE fid = ?1 AND sid = ?2"
+		";"
+		"END TRANSACTION;"
+		;
+
+	int rc;
+	sqlite3 *db = C->db;
+	sqlite3_stmt *stmt = NULL;
+	sqlite3_stmt *select = NULL;
+	sqlite3_stmt *delete = NULL;
+	const char *current = SQL;
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &select, &current));
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &delete, &current));
+
+	while ((rc = sqlite3_step(select)) == SQLITE_ROW) {
+		confuga_fid_t fid;
+		confuga_sid_t sid;
+		const char *hostport;
+		const char *path;
+		CATCH(confugaF_set(C, &fid, sqlite3_column_blob(select, 0)));
+		sid = sqlite3_column_int64(select, 1);
+		hostport = (const char *)sqlite3_column_text(select, 2);
+		path = (const char *)sqlite3_column_text(select, 3);
+
+		debug(D_DEBUG, "unlinking dead replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
+		CATCHUNIX(chirp_reli_unlink(hostport, path, STOPTIME));
+
+		sqlcatch(sqlite3_bind_blob(delete, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
+		sqlcatch(sqlite3_bind_int64(delete, 2, sid));
+		sqlcatchcode(sqlite3_step(delete), SQLITE_DONE);
+
+		sqlcatch(sqlite3_reset(select));
+		sqlcatch(sqlite3_reset(delete));
+	}
+	sqlcatchcode(rc, SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(select); select = NULL);
+	sqlcatch(sqlite3_finalize(delete); delete = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	rc = 0;
+	goto out;
+out:
+	sqlite3_finalize(stmt);
+	sqlite3_finalize(select);
+	sqlite3_finalize(delete);
+	sqlend(db);
+	return rc;
+}
+
 CONFUGA_IAPI int confugaR_manager (confuga *C)
 {
 	int rc;
@@ -1418,6 +1554,8 @@ CONFUGA_IAPI int confugaR_manager (confuga *C)
 	transfer_reap(C);
 	transfer_complete(C);
 	transfer_progress(C);
+
+	unlinkthedead(C);
 
 	(void)do_upkeep;
 

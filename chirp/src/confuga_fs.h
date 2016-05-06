@@ -18,6 +18,8 @@
 
 struct confuga {
 	sqlite3 *db;
+	int      rootfd;
+	int      nsrootfd;
 	char     root[CONFUGA_PATH_MAX];
 
 	uint64_t concurrency;
@@ -44,11 +46,24 @@ struct confuga {
 CONFUGA_IAPI int confugaI_dbload (confuga *C, sqlite3 *attachdb);
 CONFUGA_IAPI int confugaI_dbclose (confuga *C);
 
+enum CONFUGA_FILE_TYPE {
+	CONFUGA_FILE,
+	CONFUGA_META,
+};
+
+CONFUGA_IAPI int confugaN_init (confuga *C, const char *root);
+CONFUGA_IAPI int confugaN_lookup (confuga *C, int dirfd, const char *basename, confuga_fid_t *fid, confuga_off_t *size, enum CONFUGA_FILE_TYPE *type, int *nlink);
+CONFUGA_IAPI int confugaN_update (confuga *C, int dirfd, const char *basename, confuga_fid_t fid, confuga_off_t size, int flags);
+
 CONFUGA_IAPI int confugaF_extract (confuga *C, confuga_fid_t *fid, const char *str, const char **endptr);
+CONFUGA_IAPI int confugaF_renew (confuga *C, confuga_fid_t fid);
 CONFUGA_IAPI int confugaF_set (confuga *C, confuga_fid_t *fid, const void *id);
 #define confugaF_id(fid) ((fid).id)
 #define confugaF_size(fid) (sizeof (fid).id)
 
+CONFUGA_IAPI int confugaG_fullgc (confuga *C);
+
+CONFUGA_IAPI int confugaR_delete (confuga *C, confuga_sid_t sid, confuga_fid_t fid);
 CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_t sid, const char *tag, time_t stoptime);
 CONFUGA_IAPI int confugaR_register (confuga *C, confuga_fid_t fid, confuga_off_t size, confuga_sid_t sid);
 CONFUGA_IAPI int confugaR_manager (confuga *C);
@@ -59,6 +74,11 @@ CONFUGA_IAPI int confugaS_setup (confuga *C);
 CONFUGA_IAPI int confugaS_node_insert (confuga *C, const char *hostport, const char *root);
 
 CONFUGA_IAPI int confugaJ_schedule (confuga *C);
+
+#define CONFUGA_DB_VERSION  1
+
+#define str(s) #s
+#define xstr(s) str(s)
 
 #endif
 
