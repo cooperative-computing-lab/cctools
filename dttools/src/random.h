@@ -8,6 +8,7 @@
 #define RANDOM_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 /** @file random.h A PRNG library.
  */
