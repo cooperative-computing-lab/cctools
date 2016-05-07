@@ -10,11 +10,11 @@ See the file COPYING for details.
 
 #include "catch.h"
 #include "compat-at.h"
-#include "create_dir.h"
 #include "debug.h"
 #include "delete_dir.h"
 #include "full_io.h"
 #include "int_sizes.h"
+#include "mkdir_recursive.h"
 #include "path.h"
 #include "xxmalloc.h"
 
@@ -203,37 +203,25 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 		strcpy(tmp, url);
 
 	path_collapse(tmp, root, 1);
-	if (create_dir(root, S_IRWXU|S_IXGRP|S_IXOTH)) {
-		int fd = open(root, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOCTTY);
-		if (fd >= 0) {
+	CATCHUNIX(mkdir_recursive(root, S_IRWXU|S_IXGRP|S_IXOTH));
+	CATCHUNIX(rootfd = open(root, O_RDONLY|O_CLOEXEC|O_DIRECTORY|O_NOCTTY));
 #if O_DIRECTORY == 0
-			struct stat info;
-			if (fstat(fd, &info) == 0) {
-				if (S_ISDIR(info.st_mode)) {
-					rootfd = fd;
-					rc = 0;
-				} else {
-					close(fd);
-					errno = ENOTDIR;
-					rc = -1;
-				}
-			} else {
-				int s = errno;
-				close(fd);
-				errno = s;
-				rc = -1;
+	if (rootfd >= 0) {
+		struct stat info;
+		rc = UNIXRC(fstat(rootfd, &info));
+		if (rc == 0) {
+			if (!S_ISDIR(info.st_mode)) {
+				PROTECT(close(rootfd));
+				CATCH(ENOTDIR);
 			}
-#else
-			rootfd = fd;
-			rc = 0;
-#endif
 		} else {
-			rc = -1;
+			PROTECT(close(rootfd));
+			CATCH(rc);
 		}
-	} else {
-		rc = -1;
 	}
+#endif
 
+	rc = 0;
 	PROLOGUE
 }
 
