@@ -85,10 +85,7 @@ static struct {
 	rc = 0;\
 	goto out;\
 out:\
-	if (rc)\
-		return (errno = rc, -1);\
-	else\
-		return 0;
+	return RCUNIX(rc);
 
 extern struct list *catalog_host_list;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
