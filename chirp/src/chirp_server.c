@@ -43,6 +43,7 @@
 #include "stringtools.h"
 #include "url_encode.h"
 #include "username.h"
+#include "uuid.h"
 #include "xxmalloc.h"
 
 #include <dirent.h>
@@ -98,6 +99,7 @@ static const char *safe_username = 0;
 static int         sim_latency = 0;
 static int         stall_timeout = 3600; /* one hour */
 static time_t      starttime;
+static uuid_t      uuid[1];
 
 /* space_available() is a simple mechanism to ensure that a runaway client does
  * not use up every last drop of disk space on a machine.  This function
@@ -151,7 +153,7 @@ static void downgrade (void)
 
 static int backend_setup(const char *url)
 {
-	if(cfs->init(url) == -1)
+	if(cfs->init(url, uuid) == -1)
 		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
 	if(!chirp_acl_init_root("/"))
@@ -225,6 +227,7 @@ static int update_all_catalogs(const char *url)
 	jx_insert_integer(j,"port",chirp_port);
 	jx_insert_integer(j,"starttime",starttime);
 	jx_insert_integer(j,"total",info.f_blocks * info.f_bsize);
+	jx_insert_string (j,"uuid",uuid->str);
 
 	if (strlen(chirp_project_name)) {
 		jx_insert_string(j,"project",chirp_project_name);

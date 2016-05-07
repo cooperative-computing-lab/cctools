@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "int_sizes.h"
 #include "mkdir_recursive.h"
 #include "path.h"
+#include "uuid.h"
 #include "xxmalloc.h"
 
 #include <dirent.h>
@@ -187,10 +188,11 @@ out:\
  * o `path'
  */
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
+static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], uuid_t *uuid)
 {
 	PREAMBLE("init(`%s')", url);
 	int i;
+	int fd = -1;
 	char tmp[CHIRP_PATH_MAX];
 	char root[CHIRP_PATH_MAX];
 
@@ -220,6 +222,25 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX])
 		}
 	}
 #endif
+
+	rc = openat(rootfd, ".__uuid", O_RDONLY);
+	if (rc >= 0) {
+		fd = rc;
+		memset(uuid->str, 0, sizeof uuid->str);
+		rc = full_read(fd, uuid->str, UUID_LEN);
+		PROTECT(close(fd));
+		CATCHUNIX(rc);
+		if ((size_t)rc < UUID_LEN)
+			fatal("bad uuid");
+	} else if (rc == -1 && errno == ENOENT) {
+		uuid_create(uuid);
+		CATCHUNIX(fd = openat(rootfd, ".__uuid", O_WRONLY|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR));
+		rc = full_write(fd, uuid->str, UUID_LEN);
+		PROTECT(close(fd));
+		CATCHUNIX(rc);
+		if ((size_t)rc < UUID_LEN)
+			fatal("bad uuid write");
+	}
 
 	rc = 0;
 	PROLOGUE

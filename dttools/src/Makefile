@@ -100,6 +100,7 @@ SOURCES = \
 	uptime.c \
 	url_encode.c \
 	username.c \
+	uuid.c \
 	xxmalloc.c
 
 HEADERS_PUBLIC = \

@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 #include "debug.h"
 #include "path.h"
+#include "uuid.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -46,7 +47,7 @@ path = resolved_##path;
 #define STOPTIME (time(0)+chirp_timeout)
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
+static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX], uuid_t *uuid)
 {
 	int i;
 	char *path;
@@ -65,6 +66,8 @@ static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX])
 
 	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
 		open_files[i].file = NULL;
+
+	uuid_create(uuid);
 
 	return cfs_create_dir("/", 0711);
 }

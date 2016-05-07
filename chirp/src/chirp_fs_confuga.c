@@ -14,6 +14,8 @@ See the file COPYING for details.
 #include "list.h"
 #include "macros.h"
 #include "path.h"
+#include "pattern.h"
+#include "uuid.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -89,17 +91,31 @@ out:\
 
 extern struct list *catalog_host_list;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX])
+static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX], uuid_t *uuid)
 {
 	int rc;
 	int i;
+	char *confuga_id = NULL;
+	char *confuga_uuid = NULL;
 
 	CATCH_CONFUGA(confuga_connect(&C, url, list_peek_head(catalog_host_list)));
+	CATCH(confuga_getid(C, &confuga_id));
+
+	if (pattern_match(confuga_id, "confuga:(%x+)", &confuga_uuid) >= 0) {
+		uuid_loadhex(uuid, confuga_uuid);
+	} else {
+		fatal("unexpected confuga id: %s", confuga_id);
+	}
 
 	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
 		open_files[i].type = CHIRP_FS_CONFUGA_CLOSED;
 
-	PROLOGUE
+	rc = 0;
+	goto out;
+out:
+	free(confuga_id);
+	free(confuga_uuid);
+	return RCUNIX(rc);
 }
 
 static void chirp_fs_confuga_destroy (void)

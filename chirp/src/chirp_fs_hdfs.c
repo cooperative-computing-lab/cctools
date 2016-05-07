@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "path.h"
 #include "stringtools.h"
 #include "username.h"
+#include "uuid.h"
 #include "xxmalloc.h"
 
 #include "hdfs_library.h"
@@ -90,7 +91,7 @@ if (chirp_fs_hdfs_resolve(path, resolved_##path) == -1) return NULL;\
 path = resolved_##path;
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
+static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX], uuid_t *uuid)
 {
 	static const char *groups[] = { "supergroup" };
 	int i;
@@ -138,6 +139,8 @@ static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX])
 
 	for (i = 0; i < CHIRP_FILESYSTEM_MAXFD; i++)
 		open_files[i].file = NULL;
+
+	uuid_create(uuid);
 
 	return cfs_create_dir("/", 0711);
 }
