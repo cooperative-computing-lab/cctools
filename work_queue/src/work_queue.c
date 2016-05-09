@@ -177,6 +177,7 @@ struct work_queue {
 	category_mode_t allocation_default_mode;
 
 	FILE *logfile;
+	FILE *transactions_logfile;
 	int keepalive_interval;
 	int keepalive_timeout;
 	timestamp_t link_poll_end;	//tracks when we poll link; used to timeout unacknowledged keepalive checks
@@ -207,6 +208,8 @@ struct work_queue_worker {
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+
+	char *workerid;
 
 	struct hash_table *current_files;
 	struct link *link;
@@ -254,6 +257,7 @@ static void push_task_to_ready_list( struct work_queue *q, struct work_queue_tas
 static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state);
 
 const char *task_state_str(work_queue_task_state_t state);
+const char *task_result_str(work_queue_result_t result);
 
 /* 1, 0 whether t is in state */
 static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task_state_t state);
@@ -280,6 +284,11 @@ const struct rmsummary *task_min_resources(struct work_queue *q, struct work_que
 
 void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t);
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name);
+
+static void write_transaction(struct work_queue *q, const char *str);
+static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
+static void write_transaction_category(struct work_queue *q, struct category *c);
+static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -487,6 +496,9 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		q->stats->total_workers_idled_out++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
+	} else if(string_prefix_is(field, "worker-id")) {
+		w->workerid = xxstrdup(value);
+		write_transaction_worker(q, w, 0);
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -775,6 +787,8 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	q->stats->total_workers_removed++;
 
+	write_transaction_worker(q, w, 1);
+
 	cleanup_worker(q, w);
 
 	hash_table_remove(q->worker_table, w->hashkey);
@@ -790,6 +804,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	itable_delete(w->current_tasks_boxes);
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
+
+	if(w->workerid)
+		free(w->workerid);
+
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
@@ -870,6 +888,8 @@ static void add_worker(struct work_queue *q)
 	r->gpus.smallest = r->gpus.largest = r->gpus.total = -1;//default_resource_value;
 
 	w->resources = r;
+
+	w->workerid = NULL;
 
 	w->stats     = calloc(1, sizeof(struct work_queue_stats));
 	link_to_hash_key(link, w->hashkey);
@@ -4739,6 +4759,12 @@ void work_queue_delete(struct work_queue *q)
 			fclose(q->logfile);
 		}
 
+		if(q->transactions_logfile) {
+			write_transaction(q, "MASTER END");
+			fclose(q->transactions_logfile);
+		}
+
+
 		if(q->measured_local_resources)
 			rmsummary_delete(q->measured_local_resources);
 
@@ -4918,6 +4944,8 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			break;
 	}
 
+	write_transaction_task(q, t);
+
 	return old_state;
 }
 
@@ -4926,35 +4954,77 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 
 	switch(task_state) {
 		case WORK_QUEUE_TASK_READY:
-			str = "waiting";
+			str = "WAITING";
 			break;
 		case WORK_QUEUE_TASK_RUNNING:
-			str = "running";
+			str = "RUNNING";
 			break;
 		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
-			str = "waiting_retrieval";
+			str = "WAITING_RETRIEVAL";
 			break;
 		case WORK_QUEUE_TASK_RETRIEVED:
-			str = "complete";
+			str = "RETRIEVED";
 			break;
 		case WORK_QUEUE_TASK_DONE:
-			str = "done";
+			str = "DONE";
 			break;
 		case WORK_QUEUE_TASK_CANCELED:
-			str = "canceled";
+			str = "CANCELED";
 			break;
 		case WORK_QUEUE_TASK_WAITING_RESUBMISSION:
-			str = "waiting_resubmission";
+			str = "WAITING_RESUBMISSION";
 			break;
 		case WORK_QUEUE_TASK_UNKNOWN:
 		default:
-			str = "unknown";
+			str = "UNKNOWN";
 			break;
 	}
 
 	return str;
 }
 
+const char *task_result_str(work_queue_result_t result) {
+	const char *str;
+
+	switch(result) {
+		case WORK_QUEUE_RESULT_SUCCESS:
+			str = "SUCCESS";
+			break;
+		case WORK_QUEUE_RESULT_INPUT_MISSING:
+			str = "INPUT_MISS";
+			break;
+		case WORK_QUEUE_RESULT_OUTPUT_MISSING:
+			str = "OUTPUT_MISS";
+			break;
+		case WORK_QUEUE_RESULT_STDOUT_MISSING:
+			str = "STDOUT_MISS";
+			break;
+		case WORK_QUEUE_RESULT_SIGNAL:
+			str = "SIGNAL";
+			break;
+		case WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION:
+			str = "RESOURCE_EXHAUSTION";
+			break;
+		case WORK_QUEUE_RESULT_TASK_TIMEOUT:
+			str = "END_TIME";
+			break;
+		case WORK_QUEUE_RESULT_FORSAKEN:
+			str = "FORSAKEN";
+			break;
+		case WORK_QUEUE_RESULT_MAX_RETRIES:
+			str = "MAX_RETRIES";
+			break;
+		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
+			str = "MAX_WALL_TIME";
+			break;
+		case WORK_QUEUE_RESULT_UNKNOWN:
+		default:
+			str = "UNKNOWN";
+			break;
+	}
+
+	return str;
+}
 
 static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task_state_t state) {
 	return itable_lookup(q->task_state_map, taskid) == (void *) state;
@@ -5801,6 +5871,161 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 	}
 }
 
+static void write_transaction(struct work_queue *q, const char *str) {
+	if(!q->transactions_logfile)
+		return;
+
+	fprintf(q->transactions_logfile, "%" PRIu64, timestamp_get());
+	fprintf(q->transactions_logfile, " %d", getpid());
+	fprintf(q->transactions_logfile, " %s", str);
+	fprintf(q->transactions_logfile, "\n");
+}
+
+static void write_transaction_task(struct work_queue *q, struct work_queue_task *t) {
+	if(!q->transactions_logfile)
+		return;
+
+	struct buffer B;
+	buffer_init(&B);
+
+	work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+
+	buffer_printf(&B, "TASK %d %s", t->taskid, task_state_str(state));
+
+	if(state == WORK_QUEUE_TASK_UNKNOWN) {
+			/* do not add any info */
+	} else if(state == WORK_QUEUE_TASK_READY) {
+		const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
+		buffer_printf(&B, " %s %s ", t->category, allocation);
+		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
+	} else if(state == WORK_QUEUE_TASK_CANCELED) {
+			/* do not add any info */
+	} else if(state == WORK_QUEUE_TASK_WAITING_RESUBMISSION) {
+			/* do not add any info */
+	} else if(state == WORK_QUEUE_TASK_DONE) {
+		buffer_printf(&B, " %s ", task_result_str(t->result));
+		rmsummary_print_buffer(&B, t->resources_measured, 1);
+	} else if(state == WORK_QUEUE_TASK_RETRIEVED) {
+		buffer_printf(&B, " %s ", task_result_str(t->result));
+		if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+			if(t->resources_measured) {
+				rmsummary_print_buffer(&B, t->resources_measured->limits_exceeded, 1);
+			}
+		}
+	} else {
+		struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
+		const char *worker_str = "worker-info-not-available";
+
+		if(w) {
+			worker_str = w->addrport;
+			buffer_printf(&B, " %s ", worker_str);
+
+			if(state == WORK_QUEUE_TASK_RUNNING) {
+				const char *allocation = (t->resource_request == CATEGORY_ALLOCATION_FIRST ? "FIRST_RESOURCES" : "MAX_RESOURCES");
+				buffer_printf(&B, " %s ", allocation);
+				const struct rmsummary *box = itable_lookup(w->current_tasks_boxes, t->taskid);
+				rmsummary_print_buffer(&B, box, 1);
+			} else if(state == WORK_QUEUE_TASK_WAITING_RETRIEVAL) {
+				/* do not add any info */
+			}
+		}
+	}
+
+	write_transaction(q, buffer_tostring(&B));
+	buffer_free(&B);
+}
+
+static void write_transaction_category(struct work_queue *q, struct category *c) {
+
+	if(!q->transactions_logfile)
+		return;
+
+	if(!c)
+		return;
+
+	struct buffer B;
+	buffer_init(&B);
+
+	buffer_printf(&B, "CATEGORY %s MAX ", c->name);
+	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_MAX), 1);
+	write_transaction(q, buffer_tostring(&B));
+	buffer_rewind(&B, 0);
+
+	buffer_printf(&B, "CATEGORY %s MIN ", c->name);
+	rmsummary_print_buffer(&B, category_dynamic_task_min_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	write_transaction(q, buffer_tostring(&B));
+	buffer_rewind(&B, 0);
+
+	const char *mode;
+
+	switch(c->allocation_mode) {
+		case WORK_QUEUE_ALLOCATION_MODE_MAX:
+			mode = "MAX";
+			break;
+		case WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE:
+			mode = "MIN_WASTE";
+			break;
+		case WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT:
+			mode = "MAX_THROUGHPUT";
+			break;
+		case WORK_QUEUE_ALLOCATION_MODE_FIXED:
+		default:
+			mode = "FIXED";
+			break;
+	}
+
+	buffer_printf(&B, "CATEGORY %s FIRST %s ", c->name, mode);
+	rmsummary_print_buffer(&B, category_dynamic_task_max_resources(c, NULL, CATEGORY_ALLOCATION_FIRST), 1);
+	write_transaction(q, buffer_tostring(&B));
+
+	buffer_free(&B);
+}
+
+static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving) {
+	struct buffer B;
+	buffer_init(&B);
+
+	buffer_printf(&B, "WORKER %s %s ", w->workerid, w->addrport);
+
+	if(leaving) {
+		buffer_printf(&B, " DISCONNECTION");
+	} else {
+		buffer_printf(&B, " CONNECTION");
+	}
+
+	write_transaction(q, buffer_tostring(&B));
+
+	buffer_free(&B);
+}
+
+
+int work_queue_specify_transactions_log(struct work_queue *q, const char *logfile) {
+	q->transactions_logfile =fopen(logfile, "a");
+	if(q->transactions_logfile) {
+		setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
+		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
+
+		fprintf(q->transactions_logfile, "# date time master-pid MASTER START|END\n");
+		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MAX resources-max-per-task\n");
+		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
+		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name FIRST FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT resources-requested\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid WAITING category-name FIRST_RESOURCES|MAX_RESOURCES resources-requested\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RUNNING worker-address FIRST_RESOURCES|MAX_RESOURCES resources-given\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RETRIEVED|DONE task-result ...\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RETRIEVED SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n");
+		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid DONE SUCCESS|INPUT_MISS|OUTPUT_MISS|STDOUT_MISS|SIGNAL|END_TIME|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n\n");
+
+		write_transaction(q, "MASTER START");
+		return 1;
+	}
+	else
+	{
+		debug(D_NOTICE | D_WQ, "couldn't open transactions logfile %s: %s\n", logfile, strerror(errno));
+		return 0;
+	}
+}
+
 void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue_task *t) {
 	const char *name   = t->category ? t->category : "default";
 	struct category *c = work_queue_category_lookup_or_create(q, name);
@@ -5828,7 +6053,7 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 	}
 
 	if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
-		/* update transaction */
+		write_transaction_category(q, c);
 	}
 }
 
@@ -5870,6 +6095,7 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 	else {
 		struct category *c = work_queue_category_lookup_or_create(q, category);
 		category_specify_allocation_mode(c, mode);
+		write_transaction_category(q, c);
 	}
 
 	return 1;

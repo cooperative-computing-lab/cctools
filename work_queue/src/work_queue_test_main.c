@@ -3,6 +3,7 @@
 #include "cctools.h"
 #include "path.h"
 #include "errno.h"
+#include "unlink_recursive.h"
 
 #include <getopt.h>
 #include <stdlib.h>
@@ -67,7 +68,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
 	struct work_queue *q = work_queue_create(port);
 	if(!q) fatal("couldn't listen on any port!");
 
@@ -85,8 +85,13 @@ int main(int argc, char *argv[])
 	}
 
 	if(monitor_flag) {
-		work_queue_enable_monitoring(q, NULL);
+		unlink_recursive("work-queue-test-monitor");
+		work_queue_enable_monitoring(q, "work-queue-test-monitor");
+		work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
+
+		work_queue_specify_transactions_log(q, "work-queue-test-monitor/transactions.log");
 	}
+
 
 	int result = work_queue_mainloop(q);
 
