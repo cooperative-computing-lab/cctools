@@ -685,9 +685,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				fprintf(stderr, "\n");
 			}
 
-			category_allocation_t next = category_next_label(d->categories, n->category->name, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
+			category_accumulate_summary(n->category, n->resources_measured, n->resource_request, /* overflow */ 1);
 
-			if(next == CATEGORY_ALLOCATION_AUTO_MAX) {
+			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
+
+			if(next != CATEGORY_ALLOCATION_ERROR) {
 				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
 				n->resource_request = next;
 				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
@@ -724,9 +726,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 
 		if(monitor) {
-			category_accumulate_summary(d->categories, n->category->name, n->resources_measured);
+			category_accumulate_summary(n->category, n->resources_measured, n->resource_request, /* overflow */ 0);
 			if(d->node_states[DAG_NODE_STATE_COMPLETE] % 20 == 0)
-				category_update_first_allocation(d->categories, n->category->name);
+				category_update_first_allocation(n->category, NULL);
 		}
 	}
 }

@@ -24,7 +24,6 @@ struct work_queue_resources {
 	struct work_queue_resource cores;
 	struct work_queue_resource memory;
 	struct work_queue_resource gpus;
-	struct work_queue_resource unlabeled;
 };
 
 struct work_queue_resources * work_queue_resources_create();

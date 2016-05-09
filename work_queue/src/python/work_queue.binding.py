@@ -789,6 +789,48 @@ class WorkQueue(_object):
         return stats
 
     ##
+    # Turn on or off first-allocation labeling for a given category. By
+    # default, only cores, memory, and disk are labeled. Turn on/off other
+    # specific resources with @ref specify_category_autolabel_resource.
+    # NOTE: autolabeling is only meaningfull when task monitoring is enabled
+    # (@ref enable_monitoring). When monitoring is enabled and a task exhausts
+    # resources in a worker, mode dictates how work queue handles the
+    # exhaustion:
+    # @param self Reference to the current work queue object.
+    # @param category A category name. If None, sets the mode by default for
+    # newly created categories.
+    # @param mode One of @ref category_mode_t:
+    #                  - WORK_QUEUE_ALLOCATION_MODE_FIXED Task fails (default).
+    #                  - WORK_QUEUE_ALLOCATION_MODE_MAX If maximum values are
+    #                  specified for cores, memory, or disk (e.g. via @ref
+    #                  specify_max_category_resources or @ref specify_memory),
+    #                  and one of those resources is exceeded, the task fails.
+    #                  Otherwise it is retried until a large enough worker
+    #                  connects to the master, using the maximum values
+    #                  specified, and the maximum values so far seen for
+    #                  resources not specified. Use @ref specify_max_retries to
+    #                  set a limit on the number of times work queue attemps
+    #                  to complete the task.
+    #                  - WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE As above, but
+    #                  work queue tries allocations to minimize resource waste.
+    #                  - WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT As above, but
+    #                  work queue tries allocations to maximize throughput.
+    def specify_category_mode(self, category, mode):
+        return work_queue_specify_category_mode(self._work_queue, category, mode)
+
+    ##
+    # Turn on or off first-allocation labeling for a given category and
+    # resource. This function should be use to fine-tune the defaults from @ref
+    # specify_category_mode.
+    # @param q A work queue object.
+    # @param category A category name.
+    # @param resource A resource name.
+    # @param autolabel True/False for on/off.
+    # @returns 1 if resource is valid, 0 otherwise.
+    def specify_category_autolabel_resource(self, category, resource, autolabel):
+        return work_queue_enable_category_resource(self._work_queue, category, category, resource, autolabel)
+
+    ##
     # Get current task state. See @ref work_queue_task_state_t for possible values.
     # @code
     # >>> print q.task_state(taskid)
@@ -919,12 +961,20 @@ class WorkQueue(_object):
         return work_queue_specify_catalog_server(self._work_queue, hostname, port)
 
     ##
-    # Specify a log file that records the states of connected workers and submitted tasks.
+    # Specify a log file that records the cummulative stats of connected workers and submitted tasks.
     #
     # @param self     Reference to the current work queue object.
     # @param logfile  Filename.
     def specify_log(self, logfile):
         return work_queue_specify_log(self._work_queue, logfile)
+
+    ##
+    # Specify a log file that records the states of tasks.
+    #
+    # @param self     Reference to the current work queue object.
+    # @param logfile  Filename.
+    def specify_transactions_log(self, logfile):
+        work_queue_specify_transactions_log(self._work_queue, logfile)
 
     ##
     # Add a mandatory password that each worker must present.
@@ -945,10 +995,8 @@ class WorkQueue(_object):
         return work_queue_specify_password_file(self._work_queue, file)
 
     ##
-    # Enables resource autolabeling for tasks without an explicit category ("default" category).
-    # rm specifies the maximum resources a task in the default category may use.
-    # If rm is None, disable autolabeling for the default category.
     #
+    # Specifies the maximum resources allowed for the default category.
     # @param self      Reference to the current work queue object.
     # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
     # For example:
@@ -967,9 +1015,28 @@ class WorkQueue(_object):
         return work_queue_specify_max_resources(self._work_queue, rm)
 
     ##
-    # Enables resource autolabeling for tasks in the given category.
-    # rm specifies the maximum resources a task in the category may use.
-    # If rm is None, disable autolabeling for that category.
+    # Specifies the maximum resources allowed for the given category.
+    #
+    # @param self      Reference to the current work queue object.
+    # @param category  Name of the category.
+    # @param rm        Dictionary indicating maximum values. See @resources_measured for possible fields.
+    # For example:
+    # @code
+    # >>> # A maximum of 4 cores may be used by a task in the category:
+    # >>> q.specify_category_max_resources("my_category", {'cores': 4})
+    # >>> # A maximum of 8 cores, 1GB of memory, and 10GB may be used by a task:
+    # >>> q.specify_category_max_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
+    # @endcode
+
+    def specify_category_max_resources(self, category, rmd):
+        rm = rmsummary_create(-1)
+        for k in rmd:
+            old_value = getattr(rm, k) # to raise an exception for unknown keys
+            setattr(rm, k, rmd[k])
+        return work_queue_specify_category_max_resources(self._work_queue, category, rm)
+
+    ##
+    # Specifies the first-allocation guess for the given category
     #
     # @param self      Reference to the current work queue object.
     # @param category  Name of the category.
@@ -982,12 +1049,12 @@ class WorkQueue(_object):
     # >>> q.specify_max_category_resources("my_category", {'cores': 8, 'memory':  1024, 'disk': 10240})
     # @endcode
 
-    def specify_max_category_resources(self, category, rmd):
+    def specify_category_first_allocation_guess(self, category, rmd):
         rm = rmsummary_create(-1)
         for k in rmd:
             old_value = getattr(rm, k) # to raise an exception for unknown keys
             setattr(rm, k, rmd[k])
-        return work_queue_specify_max_category_resources(self._work_queue, category, rm)
+        return work_queue_specify_category_first_allocation_guess(self._work_queue, category, rm)
 
     ##
     # Initialize first value of categories

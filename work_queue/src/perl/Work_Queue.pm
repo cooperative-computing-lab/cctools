@@ -96,6 +96,15 @@ sub stats_category {
 	return $stats;
 }
 
+sub specify_category_mode {
+	my ($self, $category, $mode) = @_;
+	return work_queue_specify_category_mode($self->{_work_queue}, $category, $mode);
+}
+
+sub specify_category_autolabel_resource {
+	my ($self, $category, $resource, $mode, $autolabel) = @_;
+	return work_queue_enable_category_resource($self->{_work_queue}, $category, $category, $resource, $autolabel);
+}
 
 sub task_state {
 	my ($self, $taskid) = @_;
@@ -172,6 +181,11 @@ sub specify_log {
 	return work_queue_specify_log($self->{_work_queue}, $logfile);
 }
 
+sub specify_transactions_log {
+	my ($self, $logfile) = @_;
+	return work_queue_specify_transactions_log($self->{_work_queue}, $logfile);
+}
+
 sub specify_password {
 	my ($self, $password) = @_;
 	return work_queue_specify_password($self->{_work_queue}, $password);
@@ -243,9 +257,14 @@ sub specify_max_resources {
 	return work_queue_specify_max_resources($self->{_work_queue}, $rm);
 }
 
-sub specify_max_category_resources {
+sub specify_category_max_resources {
 	my ($self, $category, $rm) = @_;
-	return work_queue_specify_max_category_resources($self->{_work_queue}, $category, $rm);
+	return work_queue_specify_category_max_resources($self->{_work_queue}, $category, $rm);
+}
+
+sub specify_category_first_allocation_guess {
+	my ($self, $category, $rm) = @_;
+	return work_queue_specify_category_first_allocation_guess($self->{_work_queue}, $category, $rm);
 }
 
 sub initialize_categories {
@@ -374,6 +393,75 @@ Get the tasks statistics from the particular category.
 
 		 $s = $q->stats_category("my_category")
 		 print $s->{tasks_waiting}
+
+=head3 C<specify_category_mode>
+
+Turn on or off first-allocation labeling for a given category. By default, only
+cores, memory, and disk resources are labeled. Turn on/off specific resources
+with C<specify_category_autolabel_resource>.  NOTE: autolabeling is only
+meaningfull when task monitoring is enabled (C<enable_monitoring>). When
+monitoring is enabled and a task exhausts resources in a worker, mode dictates
+how work queue handles the exhaustion:
+
+=over 12
+
+=item category
+
+A category name. If undefined, sets the mode by default for newly created categories.
+
+=item mode
+
+One of @ref category_mode_t:
+
+=back
+
+=over 24
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_FIXED
+
+Task fails (default).
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MAX
+
+If maximum values are specified for cores, memory, or disk (e.g. via C<specify_max_category_resources> or C<specify_memory>), and one of those
+resources is exceeded, the task fails.  Otherwise it is retried until a large
+enough worker connects to the master, using the maximum values specified, and
+the maximum values so far seen for resources not specified. Use
+C<specify_max_retries> to set a limit on the number of times work queue attemps
+to complete the task.
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE
+
+As above, but work queue tries allocations to minimize resource waste.
+
+=item $Work_Queue::WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT
+
+As above, but work queue tries allocations to maximize throughput.
+
+=back
+
+
+=head3 C<specify_category_autolabel_resource>
+
+Turn on or off first-allocation labeling for a given category and resource.
+This function should be use to fine-tune the defaults from
+C<specify_category_mode>.
+
+=over 12
+
+=item category
+
+A category name.
+
+=item resource
+
+A resource name.
+
+=item autolabel
+
+0/1 for off/on.
+
+=back
 
 
 =head3 C<enable_monitoring($dir_name)>
@@ -578,8 +666,20 @@ The port the catalog server is listening on.
 
 =head3 C<specify_log>
 
-Specify a log file that records the states of connected workers and
+Specify a log file that records cummulative stats of connected workers and
 submitted tasks.
+
+=over 12
+
+=item logfile
+
+Name of the file to write the log. If the file exists, then new records are appended.
+
+=back
+
+=head3 C<specify_transactions_log>
+
+Specify a log file that records the states of submitted tasks.
 
 =over 12
 
@@ -756,9 +856,9 @@ Set the minimum number of seconds to wait for a keepalive response from worker b
 
 =head3 C<specify_max_resources>
 
-Enables resource autolabeling for tasks without an explicit category ("default"
+Specifies the max resources for tasks without an explicit category ("default"
 category).  rm specifies the maximum resources a task in the default category
-may use.  If rm is C<undefined>, disable autolabeling for the default category.
+may use.
 
 =over 12
 
@@ -777,11 +877,9 @@ A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 		q->specify_max_resources({'cores' => 8, 'memory' => 1024, 'disk' => 10240});
 
 
-=head3 C<specify_max_category_resources>
+=head3 C<specify_category_max_resources>
 
-Enables resource autolabeling for tasks in the given category.
-rm specifies the maximum resources a task in the category may use.
-If rm is C<undefined>, disable autolabeling for that category.
+Specifies the max resources for tasks in the given category.
 
 =over 12
 
@@ -795,11 +893,24 @@ Hash reference indicating maximum values. See @resources_measured for possible f
 
 A maximum of 4 cores is found on any worker:
 
-		q->specify_max_category_resources('my_category', {'cores' => 4});
+		q->specify_category_max_resources('my_category', {'cores' => 4});
 
 A maximum of 8 cores, 1GB of memory, and 10GB disk are found on any worker:
 
-		q->specify_max_category_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+		q->specify_category_max_resources('my_category', {'cores' => 8, 'memory' => 1024, 'disk' => 10240});
+
+
+=head3 C<specify_category_first_allocation_guess
+
+Specifies the first-allocation guess for the given category
+
+=over 12
+
+=item category
+
+Name of the category
+
+=item rm
 
 
 =head3 C<initialize_categories>

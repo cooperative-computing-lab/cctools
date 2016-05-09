@@ -1008,7 +1008,7 @@ void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_tabl
 	c->time_peak_independece = 0;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
 
-	category_update_first_allocation(categories, s->category);
+	category_update_first_allocation(c, NULL);
 
 	if(!c->first_allocation)
 		return;
@@ -1038,7 +1038,7 @@ void set_fa_min_waste_time_independence(struct rmDsummary_set *s, struct hash_ta
 	c->time_peak_independece = 1;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
 
-	category_update_first_allocation(categories, s->category);
+	category_update_first_allocation(c, NULL);
 
 	if(!c->first_allocation)
 		return;
@@ -1068,7 +1068,7 @@ void set_fa_max_throughput(struct rmDsummary_set *s, struct hash_table *categori
 	c->time_peak_independece = 0;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
 
-	category_update_first_allocation(categories, s->category);
+	category_update_first_allocation(c, NULL);
 
 	if(!c->first_allocation)
 		return;
@@ -1793,9 +1793,9 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				/* brute force, small bucket size */
-				category_tune_bucket_size("time",   10*USECOND);
-				category_tune_bucket_size("memory", 1);
-				category_tune_bucket_size("disk",   1);
+				category_tune("time",   10*USECOND);
+				category_tune("memory", 1);
+				category_tune("disk",   1);
 				break;
 			case 'n':
 				webpage_mode = 0;
