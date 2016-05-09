@@ -425,15 +425,11 @@ int read_config_file(const char *config_file) {
 	}
 
 	if(new_foremen_regex != foremen_regex) {
-		if(foremen_regex)
-			free(foremen_regex);
 		free(foremen_regex);
 		foremen_regex = xxstrdup(new_foremen_regex);
 	}
 
 	if(extra_worker_args != new_extra_worker_args) {
-		if(extra_worker_args)
-			free(extra_worker_args);
 		free(extra_worker_args);
 		extra_worker_args = xxstrdup(new_extra_worker_args);
 	}
