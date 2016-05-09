@@ -363,7 +363,7 @@ int jx_equals( struct jx *j, struct jx *k )
 		case JX_OBJECT:
 			return jx_pair_equals(j->u.pairs,k->u.pairs);
 		case JX_OPERATOR:
-			return j->u.oper.type == j->u.oper.type
+			return j->u.oper.type == k->u.oper.type
 				&& jx_equals(j->u.oper.left,k->u.oper.right)
 				&& jx_equals(j->u.oper.right,j->u.oper.right);
 	}
