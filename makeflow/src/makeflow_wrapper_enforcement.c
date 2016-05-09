@@ -95,7 +95,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fchmod(enforcer_fd, 0755);
 	fprintf(enforcer, "#!/bin/sh\n\n");
 	fprintf(enforcer, "MOUNTFILE='%s'\n", mountlist_path);
-	fprintf(enforcer, "cat > \"$MOUNTFILE\" <<EOF\n");
+	fprintf(enforcer, "cat > \"$PWD/$MOUNTFILE\" <<EOF\n");
 	fprintf(enforcer, "/\t\trx\n");
 	fprintf(enforcer, "/dev/null\trwx\n");
 	fprintf(enforcer, "/dev/zero\trwx\n");
@@ -119,11 +119,11 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
 	}
 	fprintf(enforcer, "EOF\n\n");
-	fprintf(enforcer, "mkdir -p \"%s\"\n", tmp_path);
-	fprintf(enforcer, "export \"TMPDIR=%s\"\n", tmp_path);
-	fprintf(enforcer, "./parrot_run -m \"$MOUNTFILE\" -- \"$@\"\n");
+	fprintf(enforcer, "mkdir -p \"$PWD/%s\"\n", tmp_path);
+	fprintf(enforcer, "export \"TMPDIR=$PWD/%s\"\n", tmp_path);
+	fprintf(enforcer, "./parrot_run -m \"$PWD/$MOUNTFILE\" -- \"$@\"\n");
 	fprintf(enforcer, "RC=$?\n");
-	fprintf(enforcer, "rm -rf \"%s\"\n", tmp_path);
+	fprintf(enforcer, "rm -rf \"$PWD/%s\"\n", tmp_path);
 	fprintf(enforcer, "exit $RC\n");
 	fclose(enforcer);
 
