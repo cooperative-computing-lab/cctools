@@ -149,9 +149,9 @@ static struct work_queue_resources * total_resources = 0;
 static struct work_queue_resources * total_resources_last = 0;
 
 static int64_t last_task_received  = 0;
-static int64_t manual_cores_option = 1;
-static int64_t manual_disk_option = 0;
-static int64_t manual_memory_option = 0;
+static int64_t manual_cores_option  = CCTOOLS_DEFAULT_CORES;
+static int64_t manual_disk_option   = CCTOOLS_DEFAULT_DISK;
+static int64_t manual_memory_option = CCTOOLS_DEFAULT_MEMORY;
 static int64_t manual_gpus_option = 0;
 static time_t  manual_wall_time_option = 0;
 
@@ -290,13 +290,13 @@ void measure_worker_resources()
 	} else {
 		if(manual_cores_option > 0)
 			r->cores.total = manual_cores_option;
-		if(manual_memory_option)
+		if(manual_memory_option > 0)
 			r->memory.total = manual_memory_option;
-		if(manual_gpus_option)
+		if(manual_gpus_option > 0)
 			r->gpus.total = manual_gpus_option;
 	}
 
-	if(manual_disk_option)
+	if(manual_disk_option > 0)
 		r->disk.total = MIN(r->disk.total, manual_disk_option);
 
 	r->cores.smallest = r->cores.largest = r->cores.total;
@@ -1971,12 +1971,16 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
 	printf( " %-30s Show version string\n", "-v,--version");
 	printf( " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
-	printf( " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
-	printf( " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
-	printf( " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
-	printf( " %-30s Set the number of GPUs reported by this worker. (default=0)\n", "--gpus=<n>");
-	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>           ");
+	printf( " %-30s Set the maximum bandwidth the foreman will consume in bytes per second.\n", "--bandwidth=<Bps>");
+	printf( " %-30s Example: 100M for 100MBps. (default=unlimited)\n", "");
+	printf( " %-30s Set the number of cores reported by this worker.\n", "--cores=<n>");
+	printf( " %-30s (default=%"PRId64")\n", "", manual_cores_option);
+	printf( " %-30s Manually set the amount of memory (in MB) reported by this worker.\n", "--memory=<mb>");
+	printf( " %-30s (default %" PRId64 " MB)\n", "", manual_memory_option);
 	printf( " %-30s Manually set the amount of disk (in MB) reported by this worker.\n", "--disk=<mb>");
+	printf( " %-30s (default %" PRId64 " MB)\n", "", manual_disk_option);
+	printf( " %-30s Set the number of GPUs reported by this worker.\n", "--gpus=<n>");
+	printf( " %-30s (default=0)\n", "");
 	printf( " %-30s Use loop devices for task sandboxes (default=disabled, requires root access).\n", "--disk-allocation");
 	printf( " %-30s Set the maximum number of seconds the worker may be active. (in s).\n", "--wall-time=<s>");
 	printf( " %-30s Forbid the use of symlinks for cache management.\n", "--disable-symlinks");
@@ -2192,25 +2196,13 @@ int main(int argc, char *argv[])
 			setenv("WORK_QUEUE_RESET_DEBUG_FILE", "yes", 1);
 			break;
 		case LONG_OPT_CORES:
-			if(!strncmp(optarg, "all", 3)) {
-				manual_cores_option = 0;
-			} else {
-				manual_cores_option = atoi(optarg);
-			}
+			manual_cores_option = atoi(optarg);
 			break;
 		case LONG_OPT_MEMORY:
-			if(!strncmp(optarg, "all", 3)) {
-				manual_memory_option = 0;
-			} else {
-				manual_memory_option = atoll(optarg);
-			}
+			manual_memory_option = atoll(optarg);
 			break;
 		case LONG_OPT_DISK:
-			if(!strncmp(optarg, "all", 3)) {
-				manual_disk_option = 0;
-			} else {
-				manual_disk_option = atoll(optarg);
-			}
+			manual_disk_option = atoll(optarg);
 			break;
 		case LONG_OPT_GPUS:
 			if(!strncmp(optarg, "all", 3)) {

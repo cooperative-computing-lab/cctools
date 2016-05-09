@@ -181,6 +181,10 @@ fi
 
 install_path="$HOME/cctools"
 
+default_cores=1
+default_memory=1024  # MB, e.g., 1 GB
+default_disk=1024    # MB, e.g., 1 GB
+
 readline_path="/usr"
 globus_path="/usr"
 fuse_path="/usr"
@@ -251,6 +255,15 @@ do
 			;;
 		--strict)
 			optstrict=1
+			;;
+		--default-cores)
+			default_cores=${arg}
+			;;
+		--default-memory)
+			default_memory=${arg}
+			;;
+		--default-disk)
+			default_disk=${arg}
 			;;
 		--sge-parameter)
 			if [ -z "$sge_parameters" ]
@@ -385,6 +398,9 @@ Where options are:
   --tcp-high-port      <port>
   --with-PACKAGE-path  <path>
   --without-system-SYSTEM
+  --default-cores  <n>     Cores used if --cores is not specified (default $default_cores)
+  --default-memory <n>     Memory (MB) used if --memory is not specified (default $default_memory)
+  --default-disk   <n>     Disk (MB) used if --disk is not specified (default $default_disk)
 
 Where PACKAGE may be:
 	readline
@@ -1292,6 +1308,9 @@ ccflags_append_define \
 	"CCTOOLS_VERSION_MAJOR=$MAJOR" \
 	"CCTOOLS_VERSION_MICRO=$MICRO" \
 	"CCTOOLS_VERSION_MINOR=$MINOR" \
+	"CCTOOLS_DEFAULT_CORES=$default_cores" \
+	"CCTOOLS_DEFAULT_MEMORY=$default_memory" \
+	"CCTOOLS_DEFAULT_DISK=$default_disk" \
 	"INSTALL_PATH='\"${install_path}\"'" \
 	"_GNU_SOURCE" \
 	"_REENTRANT"
@@ -1425,6 +1444,10 @@ CCTOOLS_BUILD_LIB32PARROT_HELPER=${build_lib32parrot_helper}
 
 CCTOOLS_VERSION=${VERSION}
 CCTOOLS_RELEASEDATE=${RELEASE_DATE}
+
+CCTOOLS_DEFAULT_CORES=$default_cores
+CCTOOLS_DEFAULT_MEMORY=$default_memory
+CCTOOLS_DEFAULT_DISK=$default_disk
 
 CCTOOLS_IRODS_LDFLAGS=${irods_ldflags}
 CCTOOLS_IRODS_CCFLAGS=${irods_ccflags}
