@@ -130,22 +130,22 @@ static void show_help(const char *cmd)
 
 static void display_progress( struct work_queue *q )
 {
-		struct work_queue_stats info;
-		time_t current = time(0);
+	struct work_queue_stats info;
+	time_t current = time(0);
 
-		work_queue_get_stats(queue,&info);
+	work_queue_get_stats(queue,&info);
 
-		if(current == start_time)
+	if(current == start_time)
 		current++;
 
-		double speedup = (sequential_run_time*tasks_done)/(current-start_time);
+	double speedup = (sequential_run_time*tasks_done)/(current-start_time);
 
-		printf("%2.02lf%% %6d %6ds %4d %4d %4d %4d %4d %4d %.02lf\n",100.0*cells_complete/cells_total,cells_complete,(int)(time(0)-start_time),info.workers_init,info.workers_ready,info.workers_busy,info.tasks_waiting,info.tasks_running,info.tasks_complete,speedup);
+	printf("%2.02lf%% %6d %6ds %4d %4d %4d %4d %4d %4d %.02lf\n",100.0*cells_complete/cells_total,cells_complete,(int)(time(0)-start_time),info.workers_init,info.workers_ready,info.workers_busy,info.tasks_waiting,info.tasks_running,info.tasks_complete,speedup);
 
 	if(bmap)
 		bitmap_save_bmp(bmap,progress_bitmap_file);
 
-		last_display_time = current;
+	last_display_time = current;
 }
 
 void wavefront_bitmap_initialize( struct bitmap *b )
