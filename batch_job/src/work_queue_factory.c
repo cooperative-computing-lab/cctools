@@ -421,7 +421,8 @@ int read_config_file(const char *config_file) {
 	resources->disk   = new_num_disk_option;
 
 	if(new_project_regex != project_regex) {
-		if(project_regex) free(project_regex); project_regex = xxstrdup(new_project_regex);
+		free(project_regex);
+		project_regex = xxstrdup(new_project_regex);
 	}
 
 	if(new_foremen_regex != foremen_regex) {
@@ -435,9 +436,7 @@ int read_config_file(const char *config_file) {
 	}
 
 	if(new_condor_requirements != condor_requirements) {
-		if(condor_requirements) {
-			free(condor_requirements);
-		}
+		free(condor_requirements);
 		condor_requirements = xxstrdup(new_condor_requirements);
 	}
 
