@@ -86,8 +86,6 @@ extern int setenv(const char *name, const char *value, int overwrite);
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
 
-#define FIRST_ALLOCATION_EVERY_NTASKS 100
-
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
 // Result codes for signaling the completion of operations in WQ
@@ -119,6 +117,8 @@ static uint64_t disk_avail_threshold = 100;
 double wq_option_send_receive_ratio    = 0.5;
 
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
+
+int first_allocation_every_n_tasks   = 25;
 
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blacklist_slow_workers_timeout = 900;
@@ -1295,8 +1295,6 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 
 		if(!t->resources_measured)
 		{
-			/* mark all resources with -1, to signal that no information is available. */
-			t->resources_measured = rmsummary_create(-1);
 			fprintf(q->monitor_file, "# Summary for task %d was not available.\n", t->taskid);
 		}
 
@@ -1382,8 +1380,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	if(q->monitor_mode) {
 		read_measured_resources(q, t);
 
-		resource_monitor_append_report(q, t);
-
 		/* Further, if we got debug and series files, gzip them. */
 		if(q->monitor_mode == MON_FULL)
 			resource_monitor_compress_logs(q, t);
@@ -1416,28 +1412,36 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
 		t->exhausted_attempts++;
 
-		struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
-		if(j) {
-			char *str = jx_print_string(j);
-			debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
-					t->taskid,
-					w->hostname,
-					w->addrport,
-					str);
-			free(str);
-			jx_delete(j);
+		if(t->resources_measured && t->resources_measured->limits_exceeded) {
+			struct jx *j = rmsummary_to_json(t->resources_measured->limits_exceeded, 1);
+			if(j) {
+				char *str = jx_print_string(j);
+				debug(D_WQ, "Task %d exhausted resources on %s (%s): %s\n",
+						t->taskid,
+						w->hostname,
+						w->addrport,
+						str);
+				free(str);
+				jx_delete(j);
+			}
+		} else {
+				debug(D_WQ, "Task %d exhausted resources on %s (%s), but not resource usage was available.\n",
+						t->taskid,
+						w->hostname,
+						w->addrport);
 		}
 
 		struct category *c = work_queue_category_lookup_or_create(q, t->category);
 		category_allocation_t next = category_next_label(c, t->resource_request, /* resource overflow */ 1, t->resources_requested, t->resources_measured);
 
-		if(next != CATEGORY_ALLOCATION_ERROR) {
+		if(next == CATEGORY_ALLOCATION_ERROR) {
+			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
+		}
+		else {
 			debug(D_WQ, "Task %d resubmitted using new resource allocation.\n", t->taskid);
 			t->resource_request = next;
 			change_task_state(q, t, WORK_QUEUE_TASK_READY);
 			return;
-		} else {
-			debug(D_WQ, "Task %d failed given max resource exhaustion.\n", t->taskid);
 		}
 	}
 
@@ -1956,7 +1960,7 @@ sent to the catalog.
 			char *max_str = string_format("%" PRId64, largest->field);\
 			jx_insert_string(j, "max_" #field, max_str);\
 			free(max_str);\
-		} else if(c->max_resources_seen->limits_exceeded && c->max_resources_seen->limits_exceeded->field > -1) {\
+		} else if(!category_in_steady_state(c) && c->max_resources_seen->limits_exceeded && c->max_resources_seen->limits_exceeded->field > -1) {\
 			char *max_str = string_format(">%" PRId64, c->max_resources_seen->field - 1);\
 			jx_insert_string(j, "max_" #field, max_str);\
 			free(max_str);\
@@ -2933,6 +2937,8 @@ static void add_task_report( struct work_queue *q, struct work_queue_task *t )
 	  tr = list_pop_head(q->task_reports);
 		free(tr);
 	}
+
+	resource_monitor_append_report(q, t);
 }
 
 /*
@@ -5810,8 +5816,6 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
 
-	rmsummary_merge_max(c->max_resources_seen, t->resources_measured);
-
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
 		c->total_tasks++;
@@ -5819,16 +5823,12 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 		s->total_tasks_complete      = c->total_tasks;
 		s->total_good_execute_time  += t->cmd_execution_time;
 		s->total_good_transfer_time += t->total_transfer_time;
-
-		category_accumulate_summary(q->categories, t->category, t->resources_measured);
-
-		if(c->total_tasks % FIRST_ALLOCATION_EVERY_NTASKS == 0 && c->max_allocation) {
-			if(c->max_allocation) {
-				category_update_first_allocation(q->categories, t->category);
-			}
-		}
 	} else {
 		s->total_tasks_failed++;
+	}
+
+	if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
+		/* update transaction */
 	}
 }
 

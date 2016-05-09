@@ -52,9 +52,7 @@ struct category {
 
 	struct rmsummary *first_allocation;
 	struct rmsummary *max_allocation;
-
 	struct rmsummary *max_resources_seen;
-	struct rmsummary *max_resources_completed;
 
 	/* if 1, use first allocations. 0, use max fixed (if given) */
 	struct rmsummary *autolabel_resource;
@@ -82,6 +80,9 @@ struct category {
 	/* assume that peak usage is independent of wall time */
 	int time_peak_independece;
 
+	/* completions since last time first-allocation was updated. */
+	uint64_t completions_since_last_reset;
+
 	/* stats for wq */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;
@@ -101,10 +102,12 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
-void category_accumulate_summary(struct hash_table *categories, const char *category, struct rmsummary *rs);
-void category_update_first_allocation(struct hash_table *categories, const char *category);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);
 
+int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker);
+int category_update_first_allocation(struct category *c, const struct rmsummary *max_worker);
+
+int category_in_steady_state(struct category *c);
 
 category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured);
 
