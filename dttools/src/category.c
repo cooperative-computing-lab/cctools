@@ -49,7 +49,8 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->total_tasks = 0;
 
 	c->first_allocation    = NULL;
-	c->max_allocation      = NULL;
+	c->max_allocation      = rmsummary_create(-1);
+	c->autolabel_resource  = rmsummary_create(0);
 
 	c->max_resources_completed = rmsummary_create(-1);
 	c->max_resources_seen      = rmsummary_create(-1);
@@ -72,11 +73,62 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
-	c->allocation_mode = CATEGORY_ALLOCATION_MODE_MAX;
+	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
 	hash_table_insert(categories, name, c);
 
 	return c;
+}
+
+void category_specify_max_allocation(struct category *c, const struct rmsummary *s) {
+	rmsummary_delete(c->max_allocation);
+	c->max_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->max_allocation, s);
+}
+
+void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
+
+	if(c->first_allocation)
+		rmsummary_delete(c->first_allocation);
+
+	c->first_allocation = rmsummary_create(-1);
+
+	rmsummary_merge_max(c->first_allocation, s);
+}
+
+/* set autoallocation mode for cores, memory, and disk.  To add other resources see category_enable_auto_resource. */
+void category_specify_allocation_mode(struct category *c, int mode) {
+	struct rmsummary *r = c->autolabel_resource;
+
+	c->allocation_mode = mode;
+
+	int autolabel = 1;
+	if(c->allocation_mode == CATEGORY_ALLOCATION_MODE_FIXED) {
+		autolabel = 0;
+	}
+
+	r->wall_time      = 0;
+	r->cpu_time       = 0;
+	r->swap_memory     = 0;
+	r->virtual_memory  = 0;
+	r->bytes_read      = 0;
+	r->bytes_written   = 0;
+	r->bytes_received  = 0;
+	r->bytes_sent      = 0;
+	r->bandwidth       = 0;
+	r->total_files     = 0;
+	r->total_processes = 0;
+	r->max_concurrent_processes = 0;
+
+	r->cores           = autolabel;
+	r->memory          = autolabel;
+	r->disk            = autolabel;
+}
+
+/* set autolabel per resource. */
+int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel) {
+	return rmsummary_assign_int_field(c->autolabel_resource, resource_name, autolabel);
 }
 
 static void category_clear_histogram(struct itable *h) {
@@ -154,6 +206,7 @@ void category_delete(struct hash_table *categories, const char *name) {
 	rmsummary_delete(c->max_allocation);
 	rmsummary_delete(c->first_allocation);
 	rmsummary_delete(c->max_resources_completed);
+	rmsummary_delete(c->autolabel_resource);
 	rmsummary_delete(c->max_resources_seen);
 
 	free(c);
@@ -370,7 +423,9 @@ int64_t category_first_allocation(struct itable *histogram, int assume_independe
 }
 
 #define update_first_allocation_field(c, top, independence, field)\
-	(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field)
+	if(c->autolabel_resource->field) {\
+		(c)->first_allocation->field = category_first_allocation((c)->field##_histogram, independence, (c)->allocation_mode, top->field);\
+	}
 
 void category_update_first_allocation(struct hash_table *categories, const char *category) {
 	/* buffer used only for debug output. */
@@ -454,7 +509,6 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 		fatal("Could not read '%s' file: %s\n", strerror(errno));
 	}
 
-
 	char *name;
 	struct category *c;
 	hash_table_firstkey(categories);
@@ -489,7 +543,7 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 				flag = 1;\
 			}\
 		}\
-		else if(max && max->field) {\
+		else if(max && max->field > -1) {\
 			if(measured->field > max->field) {\
 				flag = 1;\
 			}\
@@ -497,16 +551,15 @@ void categories_initialize(struct hash_table *categories, struct rmsummary *top,
 	}
 
 /* returns the next allocation state. */
-category_allocation_t category_next_label(struct hash_table *categories, const char *category, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
-
-	struct category *c = category_lookup_or_create(categories, category);
-
+category_allocation_t category_next_label(struct category *c, category_allocation_t current_label, int resource_overflow, struct rmsummary *user, struct rmsummary *measured) {
 	if(resource_overflow) {
-		int over = 0;
+		/* not autolabeling, so we return error. */
+		if(c->allocation_mode ==  CATEGORY_ALLOCATION_MODE_FIXED) {
+			return CATEGORY_ALLOCATION_ERROR;
+		}
 
-		if(current_label == CATEGORY_ALLOCATION_USER || current_label == CATEGORY_ALLOCATION_UNLABELED || current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-			over = 1;
-		} else if(measured) {
+		int over = 0;
+		if(measured) {
 			check_hard_limits(c->max_allocation, user, measured, cores,                    over);
 			check_hard_limits(c->max_allocation, user, measured, cpu_time,                 over);
 			check_hard_limits(c->max_allocation, user, measured, wall_time,                over);
@@ -524,69 +577,66 @@ category_allocation_t category_next_label(struct hash_table *categories, const c
 			check_hard_limits(c->max_allocation, user, measured, total_processes,          over);
 		}
 
-		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_AUTO_MAX;
+		return over ? CATEGORY_ALLOCATION_ERROR : CATEGORY_ALLOCATION_MAX;
 	}
 
-	/* If user specified resources manually, respect the label. */
-	if(current_label == CATEGORY_ALLOCATION_USER) {
-			return CATEGORY_ALLOCATION_USER;
-	}
+	/* else... not overflow, no label change */
 
-	/* If category is not labeling, and user is not labeling, return unlabeled. */
-	if(c && !c->max_allocation) {
-		return CATEGORY_ALLOCATION_UNLABELED;
-	}
-
-	/* Never downgrade max allocation */
-	if(current_label == CATEGORY_ALLOCATION_AUTO_MAX) {
-		return CATEGORY_ALLOCATION_AUTO_MAX;
-	}
-
-	if(c && c->first_allocation) {
-		/* Use first allocation when it is available. */
-		return CATEGORY_ALLOCATION_AUTO_FIRST;
-	} else {
-		/* Use default when no enough information is available. */
-		return CATEGORY_ALLOCATION_AUTO_ZERO;
-	}
+	return current_label;
 }
 
-const struct rmsummary *category_task_dynamic_label(struct rmsummary *max, struct rmsummary *first, struct rmsummary *user, category_allocation_t request) {
+const struct rmsummary *category_dynamic_task_max_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
+	/* we keep an internal label so that the caller does not have to worry
+	 * about memory leaks. */
+	static struct rmsummary *internal = NULL;
 
-	static struct rmsummary *dynamic_label = NULL;
-
-	switch(request) {
-		case CATEGORY_ALLOCATION_AUTO_ZERO:
-		case CATEGORY_ALLOCATION_AUTO_MAX:
-			return max;
-			break;
-		case CATEGORY_ALLOCATION_AUTO_FIRST:
-			return first;
-			break;
-		case CATEGORY_ALLOCATION_USER:
-			if(!max) {
-				return user;
-			} else {
-				if(dynamic_label) {
-					rmsummary_delete(dynamic_label);
-				}
-				dynamic_label = rmsummary_create(-1);
-
-				rmsummary_merge_min(dynamic_label, max);
-				rmsummary_merge_override(dynamic_label, user);
-
-				return dynamic_label;
-			}
-			break;
-		case CATEGORY_ALLOCATION_UNLABELED:
-		default:
-			if(max) {
-				return max;
-			} else {
-				return user;
-			}
-			break;
+	if(internal) {
+		rmsummary_delete(internal);
 	}
+
+	internal = rmsummary_create(-1);
+
+	struct rmsummary *max   = c->max_allocation;
+	struct rmsummary *first = c->first_allocation;
+
+	/* load max values */
+	rmsummary_merge_override(internal, max);
+
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+			&& request == CATEGORY_ALLOCATION_FIRST) {
+		rmsummary_merge_override(internal, first);
+	}
+
+	/* chip in user values */
+	rmsummary_merge_override(internal, user);
+
+	return internal;
+}
+
+const struct rmsummary *category_dynamic_task_min_resources(struct category *c, struct rmsummary *user, category_allocation_t request) {
+
+	static struct rmsummary *internal = NULL;
+
+	const struct rmsummary *max = category_dynamic_task_max_resources(c, user, request);
+
+	if(internal) {
+		rmsummary_delete(internal);
+	}
+
+	internal = rmsummary_create(-1);
+
+	/* load seen values */
+	struct rmsummary *seen = c->max_resources_seen;
+
+	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
+			internal->cores  = seen->cores;
+			internal->memory = seen->memory;
+			internal->disk   = seen->disk;
+	}
+
+	rmsummary_merge_override(internal, max);
+
+	return internal;
 }
 
 void category_tune_bucket_size(const char *resource, uint64_t size) {
