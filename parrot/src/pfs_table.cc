@@ -2553,7 +2553,7 @@ int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 	uintptr_t s = logical_addr & ~(pgsize-1); /* first page; 0 out lower bits */
 	uintptr_t e = (logical_addr+length+pgsize-1) & ~(pgsize-1); /* first page NOT IN MAPPING; 0 out lower bits */
 
-	debug(D_DEBUG, "munmap(%016"PRIxPTR", %"PRIxPTR") --> unmap [%016"PRIxPTR", %016"PRIxPTR")", logical_addr, length, s, e);
+	debug(D_DEBUG, "munmap(%016" PRIxPTR ", %" PRIxPTR ") --> unmap [%016" PRIxPTR ", %016" PRIxPTR ")", logical_addr, length, s, e);
 
 	for(pfs_mmap *m = mmap_list, **p = &mmap_list; m; p=&m->next, m=m->next) {
 		if( s >= m->logical_addr && ( s < (m->logical_addr+m->map_length ) ) ) {
@@ -2574,7 +2574,7 @@ int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 					newmap->map_length = s - m->logical_addr;
 					newmap->next = *p;
 					*p = newmap;
-					debug(D_DEBUG, "split off memory fragment [%016"PRIxPTR", %016"PRIxPTR") size = %zu", newmap->logical_addr, newmap->logical_addr+newmap->map_length, newmap->map_length);
+					debug(D_DEBUG, "split off memory fragment [%016" PRIxPTR ", %016" PRIxPTR ") size = %zu", newmap->logical_addr, newmap->logical_addr+newmap->map_length, newmap->map_length);
 				}
 
 				// If there is a fragment left over after the unmap, add it as a new map
@@ -2587,7 +2587,7 @@ int pfs_table::mmap_delete( uintptr_t logical_addr, size_t length )
 					newmap->file_offset += e - m->logical_addr;
 					newmap->next = *p;
 					*p = newmap;
-					debug(D_DEBUG, "split off memory fragment [%016"PRIxPTR", %016"PRIxPTR") size = %zu", newmap->logical_addr, newmap->logical_addr+newmap->map_length, newmap->map_length);
+					debug(D_DEBUG, "split off memory fragment [%016" PRIxPTR ", %016" PRIxPTR ") size = %zu", newmap->logical_addr, newmap->logical_addr+newmap->map_length, newmap->map_length);
 				}
 			}
 

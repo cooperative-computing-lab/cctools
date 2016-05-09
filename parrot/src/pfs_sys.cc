@@ -535,7 +535,7 @@ int pfs_get_full_name( int fd, char *name )
 pfs_size_t pfs_mmap_create( int fd, pfs_size_t file_offset, size_t length, int prot, int flags )
 {
 	BEGIN
-	debug(D_LIBCALL,"mmap_create %d %llx %"PRIxPTR" %x %x",fd,(long long)file_offset,length,prot,flags);
+	debug(D_LIBCALL,"mmap_create %d %llx %" PRIxPTR " %x %x",fd,(long long)file_offset,length,prot,flags);
 	result = pfs_current->table->mmap_create(fd,file_offset,length,prot,flags);
 	END
 }
@@ -543,7 +543,7 @@ pfs_size_t pfs_mmap_create( int fd, pfs_size_t file_offset, size_t length, int p
 int	pfs_mmap_update( uintptr_t logical_address, pfs_size_t channel_address )
 {
 	BEGIN
-	debug(D_LIBCALL,"mmap_update %016"PRIxPTR" %llx",logical_address,(long long)channel_address);
+	debug(D_LIBCALL,"mmap_update %016" PRIxPTR " %llx",logical_address,(long long)channel_address);
 	result = pfs_current->table->mmap_update(logical_address,channel_address);
 	END
 }
@@ -551,7 +551,7 @@ int	pfs_mmap_update( uintptr_t logical_address, pfs_size_t channel_address )
 int	pfs_mmap_delete( uintptr_t logical_address, size_t length )
 {
 	BEGIN
-	debug(D_LIBCALL,"mmap_delete %016"PRIxPTR" %zu",logical_address,length);
+	debug(D_LIBCALL,"mmap_delete %016" PRIxPTR " %zu",logical_address,length);
 	result = pfs_current->table->mmap_delete(logical_address,length);
 	END
 }
