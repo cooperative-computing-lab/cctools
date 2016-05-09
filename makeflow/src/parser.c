@@ -149,6 +149,10 @@ void dag_close_over_environment(struct dag *d)
 			{
 				dag_variable_add_value(name, d->default_category->mf_variables, 0, value_env);
 			}
+
+			if(!value_env && !strcmp(name, RESOURCES_CORES)) {
+				dag_variable_add_value(name, d->default_category->mf_variables, 0, "1");
+			}
 		}
 	}
 
