@@ -118,8 +118,6 @@ double wq_option_send_receive_ratio    = 0.5;
 
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
-int first_allocation_every_n_tasks   = 25;
-
 /* default timeout for slow workers to come back to the pool */
 double wq_option_blacklist_slow_workers_timeout = 900;
 
@@ -684,20 +682,6 @@ static void clean_task_state(struct work_queue_task *t) {
 		t->total_transfer_time = 0;
 		t->cmd_execution_time = 0;
 
-		if (t->time_execute_cmd_start >= t->time_committed) {
-			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
-			t->total_cmd_execution_time += delta_time;
-
-			switch(t->result) {
-				case WORK_QUEUE_RESULT_UNKNOWN:
-				case WORK_QUEUE_RESULT_FORSAKEN:
-					t->total_time_until_worker_failure += delta_time;
-					break;
-				default:
-					break;
-			}
-		}
-
 		t->time_execute_cmd_start = 0;
 
 		if(t->output) {
@@ -736,6 +720,13 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
+
+		if (t->time_execute_cmd_start >= t->time_committed) {
+			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
+			t->total_time_until_worker_failure += delta_time;
+			t->total_cmd_execution_time += delta_time;
+		}
+
 		clean_task_state(t);
 		if(t->max_retries > 0 && (t->total_submissions >= t->max_retries)) {
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
@@ -2883,6 +2874,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	}
 
 	itable_insert(w->current_tasks_boxes, t->taskid, limits);
+	rmsummary_merge_override(t->resources_allocated, limits);
 
 	/* Note that even when environment variables after resources, values for
 	 * CORES, MEMORY, etc. will be set at the worker to the values of
@@ -3661,6 +3653,7 @@ struct work_queue_task *work_queue_task_create(const char *command_line)
 	/* In the absence of additional information, a task consumes an entire worker. */
 	t->resources_requested = rmsummary_create(-1);
 	t->resources_measured  = rmsummary_create(-1);
+	t->resources_allocated = rmsummary_create(-1);
 
 	t->category = xxstrdup("default");
 
@@ -3696,6 +3689,11 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   if(task->resources_measured) {
 	  new->resources_measured = malloc(sizeof(struct rmsummary));
 	  memcpy(new->resources_measured, task->resources_measured, sizeof(sizeof(struct rmsummary)));
+  }
+
+  if(task->resources_allocated) {
+	  new->resources_allocated = malloc(sizeof(struct rmsummary));
+	  memcpy(new->resources_allocated, task->resources_allocated, sizeof(sizeof(struct rmsummary)));
   }
 
   if(task->monitor_output_directory) {
@@ -4352,6 +4350,8 @@ void work_queue_task_delete(struct work_queue_task *t)
 			rmsummary_delete(t->resources_requested);
 		if(t->resources_measured)
 			rmsummary_delete(t->resources_measured);
+		if(t->resources_allocated)
+			rmsummary_delete(t->resources_allocated);
 		if(t->monitor_output_directory)
 			free(t->monitor_output_directory);
 
@@ -5621,6 +5621,10 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "send-receive-ratio")) {
 		work_queue_send_receive_ratio(q, value);
+
+	} else if(!strcmp(name, "category-steady-n-tasks")) {
+		category_tune_bucket_size("category-steady-n-tasks", (int) value);
+
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);
 		return -1;

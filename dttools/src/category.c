@@ -32,7 +32,7 @@ static uint64_t time_bucket_size      = 60000000;  /* 1 minute */
 static uint64_t bytes_bucket_size     = MEGABYTE;  /* 1 M */
 static uint64_t bandwidth_bucket_size = 1000000;   /* 1 Mbit/s */
 
-static uint64_t first_allocation_every_n_tasks = 50; /* tasks */
+static uint64_t first_allocation_every_n_tasks = 25; /* tasks */
 
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
 	struct category *c;
@@ -94,6 +94,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 
 	/* assume user knows what they are doing. */
 	c->completions_since_last_reset = first_allocation_every_n_tasks;
+	rmsummary_merge_max(c->max_resources_seen, s);
 
 	if(c->first_allocation)
 		rmsummary_delete(c->first_allocation);
@@ -722,5 +723,7 @@ void category_tune_bucket_size(const char *resource, uint64_t size) {
 		bytes_bucket_size = size;
 	} else if(strcmp(resource, "bandwidth") == 0) {
 		bandwidth_bucket_size = size;
+	} else if(strcmp(resource, "category-steady-n-tasks") == 0) {
+		first_allocation_every_n_tasks = size;
 	}
 }
