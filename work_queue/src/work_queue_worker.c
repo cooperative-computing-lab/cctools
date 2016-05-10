@@ -390,6 +390,7 @@ static void report_worker_ready( struct link *master )
 	domain_name_cache_guess(hostname);
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_keepalive(master);
+	send_master_message(master, "info worker-id %s\n", worker_id);
 }
 
 
@@ -1824,8 +1825,6 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	measure_worker_resources();
 
 	report_worker_ready(master);
-
-	send_master_message(master, "info worker-id %s\n", worker_id);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		foreman_for_master(master);

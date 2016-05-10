@@ -495,6 +495,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
 	} else if(string_prefix_is(field, "worker-id")) {
+		free(w->workerid);
 		w->workerid = xxstrdup(value);
 		write_transaction_worker(q, w, 0);
 	}
@@ -796,9 +797,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
 
-	if(w->workerid)
-		free(w->workerid);
-
+	free(w->workerid);
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
