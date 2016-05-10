@@ -371,9 +371,16 @@ static void send_stats_update(struct link *master)
 	}
 }
 
-static int send_keepalive(struct link *master){
+static int send_keepalive(struct link *master, int force_resources){
+
 	send_master_message(master, "alive\n");
-	send_resource_update(master);
+
+	/* for regular workers we only send resources on special ocassions, thus
+	 * the force_resources. */
+	if(force_resources || worker_mode == WORKER_MODE_FOREMAN) {
+		send_resource_update(master);
+	}
+
 	send_stats_update(master);
 
 	return 1;
@@ -389,8 +396,8 @@ static void report_worker_ready( struct link *master )
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	send_keepalive(master);
 	send_master_message(master, "info worker-id %s\n", worker_id);
+	send_keepalive(master, 1);
 }
 
 
@@ -1389,7 +1396,7 @@ static int handle_master(struct link *master) {
 			abort_flag = 1;
 			r = 1;
 		} else if(!strncmp(line, "check", 6)) {
-			r = send_keepalive(master);
+			r = send_keepalive(master, 0);
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
@@ -1455,8 +1462,7 @@ void forsake_waiting_process(struct link *master, struct work_queue_process *p) 
 	debug(D_WQ, "Waiting task %d has been forsaken.", p->task->taskid);
 
 	/* we also send updated resources to the master. */
-	send_keepalive(master);
-
+	send_keepalive(master, 1);
 }
 
 /*
@@ -1654,7 +1660,7 @@ static void foreman_for_master(struct link *master) {
 		/* if the number of workers changed by more than %10, send an status update */
 		int curr_num_workers = total_resources->workers.total;
 		if(10*abs(curr_num_workers - prev_num_workers) > prev_num_workers) {
-			send_keepalive(master);
+			send_keepalive(master, 0);
 		}
 		prev_num_workers = curr_num_workers;
 
