@@ -130,7 +130,7 @@ static int resolve (confuga *C, const char *path, int *dirfd, char basename[CONF
 		char *slash = strchr(working, '/');
 		if (slash) {
 			if (slash == working) {
-				while (*slash == '/') slash++;
+				slash += strspn(slash, "/");
 				memmove(working, slash, strlen(slash)+1);
 				CATCHUNIX(dup2(C->nsrootfd, fd));
 				continue;
@@ -138,7 +138,8 @@ static int resolve (confuga *C, const char *path, int *dirfd, char basename[CONF
 				size_t len = (size_t)(slash-working);
 				memcpy(component, working, len);
 				component[len] = 0;
-				memmove(working, slash+1, strlen(slash+1)+1);
+				slash += strspn(slash, "/");
+				memmove(working, slash, strlen(slash)+1);
 			}
 			debug(D_DEBUG, "path '%s' resolution: component = '%s'", path, component);
 		} else {
