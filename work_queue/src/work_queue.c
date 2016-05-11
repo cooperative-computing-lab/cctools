@@ -5378,7 +5378,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			change_task_state(q, t, WORK_QUEUE_TASK_READY);
+			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 		}
 
 		//We have the resources we have been waiting for; start task transfers
