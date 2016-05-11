@@ -1602,6 +1602,25 @@ static void work_for_master(struct link *master) {
 			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 		}
 
+		if(ok) {
+			struct work_queue_process *p;
+			int visited;
+			int waiting = list_size(procs_waiting);
+
+			for(visited = 0; visited < waiting; visited++) {
+				p = list_pop_head(procs_waiting);
+				if(!p) {
+					break;
+				} else if(task_resources_fit_now(p->task)) {
+					start_process(p);
+				} else if(task_resources_fit_eventually(p->task)) {
+					list_push_tail(procs_waiting, p);
+				} else {
+					forsake_waiting_process(master, p);
+				}
+			}
+		}
+
 		if(ok && !results_to_be_sent_msg) {
 			if(work_queue_watcher_check(watcher) || itable_size(procs_complete) > 0) {
 				send_master_message(master, "available_results\n");
@@ -1609,22 +1628,6 @@ static void work_for_master(struct link *master) {
 			}
 		}
 
-		if(ok) {
-			int visited = 0;
-			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
-				struct work_queue_process *p;
-
-				p = list_pop_head(procs_waiting);
-				if(p && task_resources_fit_now(p->task)) {
-					start_process(p);
-				} else if(p && task_resources_fit_eventually(p->task)) {
-					list_push_tail(procs_waiting, p);
-					visited++;
-				} else {
-					forsake_waiting_process(master, p);
-				}
-			}
-		}
 
 		if(!ok) break;
 
