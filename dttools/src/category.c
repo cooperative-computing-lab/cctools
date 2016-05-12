@@ -74,6 +74,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->time_peak_independece = 0;
 
+	c->steady_state = 0;
 	c->completions_since_last_reset = 0;
 
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
@@ -93,11 +94,10 @@ void category_specify_max_allocation(struct category *c, const struct rmsummary 
 void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s) {
 
 	/* assume user knows what they are doing. */
-	c->completions_since_last_reset = first_allocation_every_n_tasks;
+	c->steady_state = 1;
 	rmsummary_merge_max(c->max_resources_seen, s);
 
-	if(c->first_allocation)
-		rmsummary_delete(c->first_allocation);
+	rmsummary_delete(c->first_allocation);
 
 	c->first_allocation = rmsummary_create(-1);
 
@@ -518,24 +518,32 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 
 
 int category_accumulate_summary(struct category *c, const struct rmsummary *rs, const struct rmsummary *max_worker) {
-
 	int update = 0;
 
 	const struct rmsummary *max  = c->max_allocation;
 	const struct rmsummary *seen = c->max_resources_seen;
 
-	if(!rs || ((max->cores < 0 && (rs->cores > seen->cores))
-				|| (max->memory < 0 && (rs->memory > seen->memory))
-				|| (max->disk < 0 && (rs->disk > seen->disk)))) {
+	int new_maximum ;
+	if(rs
+			&& (max->cores  > 0 || rs->cores  <= seen->cores)
+			&& (max->memory > 0 || rs->memory <= seen->memory)
+			&& (max->disk   > 0 || rs->disk   <= seen->disk)) {
+		new_maximum = 0;
+	} else {
+		new_maximum = 1;
+	}
+
+	/* a new maximum has been seen, first-allocation is obsolete. */
+	if(new_maximum) {
 		rmsummary_delete(c->first_allocation);
 		c->first_allocation =  NULL;
 		c->completions_since_last_reset = 0;
-
 		update = 1;
 	}
 
-	rmsummary_merge_max(c->max_resources_seen, rs);
+	c->steady_state = c->completions_since_last_reset >= first_allocation_every_n_tasks;
 
+	rmsummary_merge_max(c->max_resources_seen, rs);
 	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
 		category_inc_histogram_count(c, cores,          rs, 1);
 		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
@@ -555,8 +563,13 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 
 		c->completions_since_last_reset++;
 
-		if(c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
+		if(new_maximum || c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
 			update |= category_update_first_allocation(c, max_worker);
+		}
+
+		/* a task completed using a new maximum, so we consider that the new steady_state. */
+		if(new_maximum) {
+			c->steady_state = 1;
 		}
 	}
 
@@ -662,7 +675,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	struct rmsummary *first = c->first_allocation;
 	struct rmsummary *seen  = c->max_resources_seen;
 
-	if(category_in_steady_state(c)) {
+	if(c->steady_state) {
 		internal->cores  = seen->cores;
 		internal->memory = seen->memory;
 		internal->disk   = seen->disk;
@@ -709,7 +722,7 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 }
 
 int category_in_steady_state(struct category *c) {
-	return (c->completions_since_last_reset >= first_allocation_every_n_tasks);
+	return c->first_allocation != NULL;
 }
 
 void category_tune_bucket_size(const char *resource, uint64_t size) {
