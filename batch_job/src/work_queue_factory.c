@@ -420,6 +420,10 @@ int read_config_file(const char *config_file) {
 	resources->memory = new_num_memory_option;
 	resources->disk   = new_num_disk_option;
 
+	if(tasks_per_worker < 1) {
+		tasks_per_worker = resources->cores > 0 ? resources->cores : 1;
+	}
+
 	if(new_project_regex != project_regex) {
 		free(project_regex);
 		project_regex = xxstrdup(new_project_regex);
