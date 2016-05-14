@@ -733,6 +733,7 @@ out:
 CONFUGA_API int confuga_daemon (confuga *C)
 {
 	int rc;
+	unsigned long delay = 1;
 
 	time_t catalog_sync = 0;
 	time_t node_setup = 0;
@@ -767,8 +768,16 @@ CONFUGA_API int confuga_daemon (confuga *C)
 		confugaR_manager(C);
 
 		if (prevops == C->operations) {
-			struct timeval tv = {.tv_sec = 2};
+			struct timeval tv = {.tv_sec = delay / 1000000, .tv_usec = delay % 1000000};
+			if (tv.tv_sec >= 2) {
+				tv.tv_sec = 2;
+				tv.tv_usec = 0;
+			} else {
+				delay <<= 1;
+			}
 			while (select(0, 0, 0, 0, &tv) == -1 && errno == EINTR) {}
+		} else {
+			delay = 1;
 		}
 	}
 
