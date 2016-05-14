@@ -56,8 +56,11 @@ CONFUGA_IAPI int confugaR_delete (confuga *C, confuga_sid_t sid, confuga_fid_t f
 		"DELETE FROM Confuga.Replica"
 		"	WHERE fid = ? AND sid = ?"
 		";"
+		"DELETE FROM Confuga.TransferJob"
+		"	WHERE TransferJob.fid = ?1 AND NOT EXISTS (SELECT 1 FROM Confuga.Replica WHERE fid = ?1)"
+		";"
 		"DELETE FROM Confuga.File"
-		"	WHERE id = ?1 AND NOT EXISTS (SELECT sid FROM Confuga.Replica WHERE fid = ?1)"
+		"	WHERE File.id = ?1 AND NOT EXISTS (SELECT 1 FROM Confuga.Replica WHERE fid = ?1)"
 		";"
 		"RELEASE SAVEPOINT confugaR_delete;"
 		;
@@ -67,7 +70,7 @@ CONFUGA_IAPI int confugaR_delete (confuga *C, confuga_sid_t sid, confuga_fid_t f
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
 
-	debug(D_DEBUG, "deleting replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
+	debug(D_DEBUG, "deleting Replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
@@ -83,11 +86,20 @@ CONFUGA_IAPI int confugaR_delete (confuga *C, confuga_sid_t sid, confuga_fid_t f
 	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatch(sqlite3_bind_int64(stmt, 2, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	if (sqlite3_changes(db))
+		debug(D_DEBUG, "deleted Replica fid = " CONFUGA_FID_PRIFMT " sid = " CONFUGA_SID_PRIFMT, CONFUGA_FID_PRIARGS(fid), sid);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
+	sqlcatch(sqlite3_bind_blob(stmt, 1, confugaF_id(fid), confugaF_size(fid), SQLITE_STATIC));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
+	if (sqlite3_changes(db))
+		debug(D_DEBUG, "deleted File fid = " CONFUGA_FID_PRIFMT, CONFUGA_FID_PRIARGS(fid));
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
