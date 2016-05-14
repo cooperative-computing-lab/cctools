@@ -889,7 +889,7 @@ static int transfer_create (confuga *C)
 		"		fsn.hostport,"
 		"		PRINTF('%s/file/%s', fsn.root, UPPER(HEX(TransferJob.fid))),"
 		"		PRINTF('%s/ticket', fsn.root),"
-		"		PRINTF('%s/debug.%%j', tsn.root),"
+		"		PRINTF('%s/debug.%%j', fsn.root),"
 		"		tsn.hostport,"
 		"		PRINTF('%s/open/%s', tsn.root, UPPER(HEX(RANDOMBLOB(16)))),"
 		"		State.value"
