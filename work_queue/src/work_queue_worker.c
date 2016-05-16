@@ -1600,7 +1600,7 @@ static void work_for_master(struct link *master) {
 		enforce_processes_limits();
 
 		/* end running processes if worker resources are exhasusted, and
-		 * marked them as RESOURCE_EXHASTION. */
+		 * marked them as RESOURCE_EXHAUSTION. */
 		if(!enforce_worker_limits(master)) {
 			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 		}
@@ -2396,6 +2396,7 @@ int main(int argc, char *argv[])
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
+		work_queue_specify_category_mode(foreman_q, NULL, WORK_QUEUE_ALLOCATION_MODE_FIXED);
 
 	}
 
