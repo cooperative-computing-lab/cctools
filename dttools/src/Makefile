@@ -71,7 +71,7 @@ SOURCES = \
 	memfdexe.c \
 	mergesort.c \
 	mkdir_recursive.c \
-	mt19937-64.c \
+	twister.c \
 	nvpair.c \
 	nvpair_jx.c \
 	password_cache.c \
