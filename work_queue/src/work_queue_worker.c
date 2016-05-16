@@ -2065,7 +2065,7 @@ int main(int argc, char *argv[])
 	debug_config(argv[0]);
 	read_resources_env_vars();
 
-	while((c = getopt_long(argc, argv, "acC:d:f:F:t:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != (char) -1) {
+	while((c = getopt_long(argc, argv, "acC:d:f:F:t:o:p:M:N:P:w:i:b:z:A:O:s:vZ:h", long_options, 0)) != -1) {
 		switch (c) {
 		case 'a':
 			//Left here for backwards compatibility

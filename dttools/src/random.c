@@ -17,7 +17,7 @@
 #include <string.h>
 #include <time.h>
 
-extern void twister_init_by_array64 (uint64_t *, size_t);
+extern void twister_init_by_array64 (uint64_t *, uint64_t);
 extern void twister_init_genrand64 (uint64_t);
 extern int64_t twister_genrand64_int64 (void);
 extern int64_t twister_genrand64_real3 (void);

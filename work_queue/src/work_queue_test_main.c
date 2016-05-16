@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 	const char *port_file=0;
 	const char *project_name=0;
 	int monitor_flag = 0;
-	char c;
+	int c;
 
 	while((c = getopt(argc, argv, "d:o:mN:p:Z:vh"))!=-1) {
 		switch (c) {
