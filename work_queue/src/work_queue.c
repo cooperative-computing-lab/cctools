@@ -2860,6 +2860,8 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
 
+	send_worker_msg(q,w, "category %s\n", t->category);
+
 	send_worker_msg(q,w, "cores %"PRId64"\n",  max->cores);
 	send_worker_msg(q,w, "memory %"PRId64"\n", max->memory);
 	send_worker_msg(q,w, "disk %"PRId64"\n",   max->disk);

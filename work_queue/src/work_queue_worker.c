@@ -831,6 +831,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char localname[WORK_QUEUE_LINE_MAX];
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
+	char category[WORK_QUEUE_LINE_MAX];
 	int flags, length;
 	int64_t n;
 	int disk_alloc = disk_allocation;
@@ -843,6 +844,8 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
+		} else if(sscanf(line, "category %s",category)) {
+			work_queue_task_specify_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(master,cmd,length,stoptime);
