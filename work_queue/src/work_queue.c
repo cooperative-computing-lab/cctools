@@ -467,7 +467,6 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	char value[WORK_QUEUE_LINE_MAX];
 
 	int n = sscanf(line,"info %s %[^\n]", field, value);
-	debug(D_WQ, "Receiving %s info from worker (%s)", field, w->addrport);
 
 	if(n != 2)
 		return MSG_FAILURE;
