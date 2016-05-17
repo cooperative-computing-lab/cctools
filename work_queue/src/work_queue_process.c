@@ -137,8 +137,9 @@ static void clear_environment() {
 
 }
 
-static void export_environment( struct list *env_list )
+static void export_environment( struct work_queue_process *p )
 {
+	struct list *env_list = p->task->env_list;
 	char *name;
 	list_first_item(env_list);
 	while((name=list_next_item(env_list))) {
@@ -152,6 +153,14 @@ static void export_environment( struct list *env_list )
 			/* Without =, we remove the variable */
 			unsetenv(name);
 		}
+	}
+
+	/* we set TMPDIR after env_list on purpose. We do not want a task writing
+	 * to some other tmp dir. */
+	if(p->tmpdir) {
+		setenv("TMPDIR", p->tmpdir, 1);
+		setenv("TEMP",   p->tmpdir, 1);
+		setenv("TMP",    p->tmpdir, 1);
 	}
 }
 
@@ -238,7 +247,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 		close(p->output_fd);
 
 		clear_environment();
-		export_environment(p->task->env_list);
+		export_environment(p);
 
 		/* overwrite CORES, MEMORY, or DISK variables, if the task used specify_* */
 		specify_resources_vars(p);
