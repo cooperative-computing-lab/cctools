@@ -11,6 +11,7 @@
 #include "delete_dir.h"
 #include "list.h"
 #include "disk_alloc.h"
+#include "xxmalloc.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -34,16 +35,36 @@
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
+// return 1 on error, 0 otherwise
+static int create_task_directories(struct work_queue_process *p) {
+	char tmpdir_template[1024];
+
+	p->sandbox = string_format("t.%d", p->task->taskid);
+	sprintf(tmpdir_template, "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
+
+	if(create_dir(p->sandbox, 0777) != 0) {
+		return 1;
+	}
+
+	if(mkdtemp(tmpdir_template) == NULL) {
+		return 1;
+	}
+
+	p->tmpdir  = xxstrdup(tmpdir_template);
+	if(chmod(p->tmpdir, 0777) != 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
 struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
-	int taskid = p->task->taskid;
 	//placeholder filesystem until permanent solution
 	char *fs = "ext2";
-
-	p->sandbox = string_format("t.%d", taskid);
 
 	if(disk_allocation == 1) {
 	work_queue_process_compute_disk_needed(p);
@@ -56,7 +77,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 				return p;
 			}
 		}
-		if(!create_dir(p->sandbox, 0777)) {
+		if(!create_task_directories(p)) {
 			work_queue_process_delete(p);
 			return 0;
 		}
@@ -65,7 +86,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 		return p;
 	}
 	else {
-		if(!create_dir(p->sandbox, 0777)) {
+		if(!create_task_directories(p)) {
 			work_queue_process_delete(p);
 			return 0;
 		}
@@ -99,6 +120,9 @@ void work_queue_process_delete(struct work_queue_process *p)
 		}
 		free(p->sandbox);
 	}
+
+	if(p->tmpdir)
+		free(p->tmpdir);
 
 	free(p);
 }
