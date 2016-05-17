@@ -11,6 +11,7 @@
 #include "delete_dir.h"
 #include "list.h"
 #include "disk_alloc.h"
+#include "xxmalloc.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -34,16 +35,36 @@
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
+// return 1 on error, 0 otherwise
+static int create_task_directories(struct work_queue_process *p) {
+	char tmpdir_template[1024];
+
+	p->sandbox = string_format("t.%d", p->task->taskid);
+	sprintf(tmpdir_template, "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
+
+	if(create_dir(p->sandbox, 0777) != 0) {
+		return 1;
+	}
+
+	if(mkdtemp(tmpdir_template) == NULL) {
+		return 1;
+	}
+
+	p->tmpdir  = xxstrdup(tmpdir_template);
+	if(chmod(p->tmpdir, 0777) != 0) {
+		return 1;
+	}
+
+	return 0;
+}
+
 struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)
 {
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
-	int taskid = p->task->taskid;
 	//placeholder filesystem until permanent solution
 	char *fs = "ext2";
-
-	p->sandbox = string_format("t.%d", taskid);
 
 	if(disk_allocation == 1) {
 	work_queue_process_compute_disk_needed(p);
@@ -56,7 +77,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 				return p;
 			}
 		}
-		if(!create_dir(p->sandbox, 0777)) {
+		if(!create_task_directories(p)) {
 			work_queue_process_delete(p);
 			return 0;
 		}
@@ -65,7 +86,7 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 		return p;
 	}
 	else {
-		if(!create_dir(p->sandbox, 0777)) {
+		if(!create_task_directories(p)) {
 			work_queue_process_delete(p);
 			return 0;
 		}
@@ -100,6 +121,9 @@ void work_queue_process_delete(struct work_queue_process *p)
 		free(p->sandbox);
 	}
 
+	if(p->tmpdir)
+		free(p->tmpdir);
+
 	free(p);
 }
 
@@ -113,8 +137,9 @@ static void clear_environment() {
 
 }
 
-static void export_environment( struct list *env_list )
+static void export_environment( struct work_queue_process *p )
 {
+	struct list *env_list = p->task->env_list;
 	char *name;
 	list_first_item(env_list);
 	while((name=list_next_item(env_list))) {
@@ -128,6 +153,14 @@ static void export_environment( struct list *env_list )
 			/* Without =, we remove the variable */
 			unsetenv(name);
 		}
+	}
+
+	/* we set TMPDIR after env_list on purpose. We do not want a task writing
+	 * to some other tmp dir. */
+	if(p->tmpdir) {
+		setenv("TMPDIR", p->tmpdir, 1);
+		setenv("TEMP",   p->tmpdir, 1);
+		setenv("TMP",    p->tmpdir, 1);
 	}
 }
 
@@ -214,7 +247,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 		close(p->output_fd);
 
 		clear_environment();
-		export_environment(p->task->env_list);
+		export_environment(p);
 
 		/* overwrite CORES, MEMORY, or DISK variables, if the task used specify_* */
 		specify_resources_vars(p);

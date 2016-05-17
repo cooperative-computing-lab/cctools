@@ -1693,8 +1693,12 @@ static int workspace_create() {
 		workdir = user_specified_workdir;
 	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
+	} else if(getenv("TEMPDIR")) {
+		workdir = getenv("TEMPDIR");
 	} else if(getenv("TEMP")) {
 		workdir = getenv("TEMP");
+	} else if(getenv("TMP")) {
+		workdir = getenv("TMP");
 	} else {
 		workdir = "/tmp";
 	}
