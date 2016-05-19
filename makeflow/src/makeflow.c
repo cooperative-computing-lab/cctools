@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx.h"
 #include "jx_print.h"
+#include "jx_parse.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -37,6 +38,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_docker.h"
 #include "makeflow_wrapper_monitor.h"
 #include "parser.h"
+#include "parser_jx.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -109,6 +111,8 @@ static int output_len_check = 0;
 static int skip_file_check = 0;
 
 static int cache_mode = 1;
+
+static int json_input = 0;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
@@ -946,6 +950,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
 	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
+	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1044,6 +1049,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_JSON,
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_ALLOCATION_MODE
 	};
@@ -1108,6 +1114,7 @@ int main(int argc, char *argv[])
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+		{"json", no_argument, 0, LONG_OPT_JSON},
 		{0, 0, 0, 0}
 	};
 
@@ -1356,6 +1363,8 @@ int main(int argc, char *argv[])
 				} else {
 					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
 				}
+			case LONG_OPT_JSON:
+				json_input = 1;
 				break;
 			default:
 				show_help_run(argv[0]);
@@ -1416,7 +1425,14 @@ int main(int argc, char *argv[])
 		logfilename = string_format("%s.makeflowlog", dagfile);
 
 	printf("parsing %s...\n",dagfile);
-	struct dag *d = dag_from_file(dagfile);
+	struct dag *d;
+	if (json_input) {
+		struct jx *j = jx_parse_file(dagfile);
+		d = dag_from_jx(j);
+		jx_delete(j);
+	} else {
+		d = dag_from_file(dagfile);
+	}
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
