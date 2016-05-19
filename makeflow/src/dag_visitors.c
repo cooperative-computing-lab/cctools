@@ -1180,19 +1180,7 @@ struct jx *resources_to_json(struct rmsummary *r) {
 
 struct jx *category_to_json(struct category *c) {
 	struct jx *result = resources_to_json(c->max_allocation);
-	jx_insert_unless_empty(result, jx_string("variables"), variables_to_json(c->mf_variables));
-	return result;
-}
-
-struct jx *env_to_json(struct dag *d) {
-	char *name;
-	struct jx *result = jx_object(NULL);
-
-	set_first_element(d->export_vars);
-	while((name = set_next_element(d->export_vars))) {
-		jx_insert(result, jx_string(name), jx_null());
-	}
-
+	jx_insert_unless_empty(result, jx_string("environment"), variables_to_json(c->mf_variables));
 	return result;
 }
 
@@ -1234,8 +1222,8 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 		rule = jx_object(NULL);
 		jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
 		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
-		jx_insert_unless_empty(rule, jx_string("variables"), variables_to_json(n->variables));
-		jx_insert_unless_empty(rule, jx_string("resources_requested"), resources_to_json(n->resources_requested));
+		jx_insert_unless_empty(rule, jx_string("environment"), variables_to_json(n->variables));
+		jx_insert_unless_empty(rule, jx_string("resources"), resources_to_json(n->resources_requested));
 		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files));
 		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files));
 		jx_insert_unless_empty(rule, jx_string("remote_names"), remote_names_to_json(n->remote_names));
@@ -1262,7 +1250,6 @@ struct jx *dag_to_json(struct dag *d) {
 	void *value;
 	struct jx *result = jx_object(NULL);
 	struct jx *categories = jx_object(NULL);
-	jx_insert_unless_empty(result, jx_string("environment"), env_to_json(d));
 	jx_insert(result, jx_string("rules"), dag_nodes_to_json(d->nodes));
 	hash_table_firstkey(d->categories);
 	while(hash_table_nextkey(d->categories, &key,& value)) {
