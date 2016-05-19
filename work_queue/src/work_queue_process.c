@@ -11,6 +11,7 @@
 #include "delete_dir.h"
 #include "list.h"
 #include "disk_alloc.h"
+#include "path.h"
 #include "xxmalloc.h"
 
 #include <math.h>
@@ -40,12 +41,16 @@ static int create_task_directories(struct work_queue_process *p) {
 	char tmpdir_template[1024];
 
 	p->sandbox = string_format("t.%d", p->task->taskid);
-	sprintf(tmpdir_template, "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
-
 	if(!create_dir(p->sandbox, 0777)) {
 		return 0;
 	}
 
+	char absolute[1024];
+	path_absolute(p->sandbox, absolute, 1);
+	free(p->sandbox);
+	p->sandbox = xxstrdup(absolute);
+
+	sprintf(tmpdir_template, "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
 	}
@@ -282,8 +287,9 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 			if((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
 				sprintf(curr_wrk_dir, "%s/%s", wrk_space, p->sandbox);
-			} else
+			} else {
 				perror("getenv() error");
+			}
 
 			if(container_mode == DOCKER) {
 				va_start(arg_lst, container_mode);
