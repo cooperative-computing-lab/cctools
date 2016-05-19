@@ -183,6 +183,16 @@ jx_int_t jx_lookup_integer( struct jx *object, const char *key )
 	}
 }
 
+int jx_lookup_boolean( struct jx *object, const char *key )
+{
+	struct jx *j = jx_lookup(object,key);
+	if(j && jx_istype(j,JX_BOOLEAN)) {
+		return !!j->u.boolean_value;
+	} else {
+		return 0;
+	}
+}
+
 double jx_lookup_double( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);
