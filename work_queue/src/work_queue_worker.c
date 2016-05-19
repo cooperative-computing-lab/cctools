@@ -896,6 +896,10 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 
 	struct work_queue_process *p = work_queue_process_create(task, disk_alloc);
 
+	if(!p) {
+		return 0;
+	}
+
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
 
