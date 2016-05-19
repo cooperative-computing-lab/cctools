@@ -1704,6 +1704,8 @@ workspace_create is done once when the worker starts.
 */
 
 static int workspace_create() {
+	char absolute[WORK_QUEUE_LINE_MAX];
+
 	// Setup working space(dir)
 	const char *workdir;
 	if (user_specified_workdir){
@@ -1719,14 +1721,19 @@ static int workspace_create() {
 	} else {
 		workdir = "/tmp";
 	}
-	//}
 
 	if(!workspace) {
 		workspace = string_format("%s/worker-%d-%d", workdir, (int) getuid(), (int) getpid());
 	}
 
 	printf( "work_queue_worker: creating workspace %s\n", workspace);
-	if(!create_dir(workspace,0777)) return 0;
+	if(!create_dir(workspace,0777)) {
+		return 0;
+	}
+
+	path_absolute(workspace, absolute, 1);
+	free(workspace);
+	workspace = xxstrdup(absolute);
 
 	return 1;
 }
@@ -1739,8 +1746,15 @@ static int workspace_prepare()
 {
 	debug(D_WQ,"preparing workspace %s",workspace);
 	char *cachedir = string_format("%s/cache",workspace);
-	int result = create_dir (cachedir,0777);
+	int result = create_dir(cachedir,0777);
 	free(cachedir);
+
+	char *tmp_name = string_format("%s/cache/tmp", workspace);
+	result |= create_dir(tmp_name,0777);
+
+	setenv("WORKER_TMPDIR", tmp_name, 1);
+	free(tmp_name);
+
 	return result;
 }
 
