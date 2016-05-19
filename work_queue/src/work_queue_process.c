@@ -35,27 +35,27 @@
 #define TMP_SCRIPT "tmp.sh"
 #define DEFAULT_EXE_APP "#!/bin/sh"
 
-// return 1 on error, 0 otherwise
+// return 0 on error, 1 otherwise
 static int create_task_directories(struct work_queue_process *p) {
 	char tmpdir_template[1024];
 
 	p->sandbox = string_format("t.%d", p->task->taskid);
 	sprintf(tmpdir_template, "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
 
-	if(create_dir(p->sandbox, 0777) != 0) {
-		return 1;
+	if(!create_dir(p->sandbox, 0777)) {
+		return 0;
 	}
 
 	if(mkdtemp(tmpdir_template) == NULL) {
-		return 1;
+		return 0;
 	}
 
 	p->tmpdir  = xxstrdup(tmpdir_template);
 	if(chmod(p->tmpdir, 0777) != 0) {
-		return 1;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_task, int disk_allocation)

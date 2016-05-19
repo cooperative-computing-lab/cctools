@@ -371,9 +371,16 @@ static void send_stats_update(struct link *master)
 	}
 }
 
-static int send_keepalive(struct link *master){
+static int send_keepalive(struct link *master, int force_resources){
+
 	send_master_message(master, "alive\n");
-	send_resource_update(master);
+
+	/* for regular workers we only send resources on special ocassions, thus
+	 * the force_resources. */
+	if(force_resources || worker_mode == WORKER_MODE_FOREMAN) {
+		send_resource_update(master);
+	}
+
 	send_stats_update(master);
 
 	return 1;
@@ -389,7 +396,8 @@ static void report_worker_ready( struct link *master )
 	char hostname[DOMAIN_NAME_MAX];
 	domain_name_cache_guess(hostname);
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
-	send_keepalive(master);
+	send_master_message(master, "info worker-id %s\n", worker_id);
+	send_keepalive(master, 1);
 }
 
 
@@ -823,6 +831,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	char localname[WORK_QUEUE_LINE_MAX];
 	char taskname[WORK_QUEUE_LINE_MAX];
 	char taskname_encoded[WORK_QUEUE_LINE_MAX];
+	char category[WORK_QUEUE_LINE_MAX];
 	int flags, length;
 	int64_t n;
 	int disk_alloc = disk_allocation;
@@ -835,6 +844,8 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	while(recv_master_message(master,line,sizeof(line),stoptime)) {
 		if(!strcmp(line,"end")) {
 			break;
+		} else if(sscanf(line, "category %s",category)) {
+			work_queue_task_specify_category(task, category);
 		} else if(sscanf(line,"cmd %d",&length)==1) {
 			char *cmd = malloc(length+1);
 			link_read(master,cmd,length,stoptime);
@@ -884,6 +895,10 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 	last_task_received = task->taskid;
 
 	struct work_queue_process *p = work_queue_process_create(task, disk_alloc);
+
+	if(!p) {
+		return 0;
+	}
 
 	// Every received task goes into procs_table.
 	itable_insert(procs_table,taskid,p);
@@ -1388,7 +1403,7 @@ static int handle_master(struct link *master) {
 			abort_flag = 1;
 			r = 1;
 		} else if(!strncmp(line, "check", 6)) {
-			r = send_keepalive(master);
+			r = send_keepalive(master, 0);
 		} else if(!strncmp(line, "auth", 4)) {
 			fprintf(stderr,"work_queue_worker: this master requires a password. (use the -P option)\n");
 			r = 0;
@@ -1454,8 +1469,7 @@ void forsake_waiting_process(struct link *master, struct work_queue_process *p) 
 	debug(D_WQ, "Waiting task %d has been forsaken.", p->task->taskid);
 
 	/* we also send updated resources to the master. */
-	send_keepalive(master);
-
+	send_keepalive(master, 1);
 }
 
 /*
@@ -1590,9 +1604,28 @@ static void work_for_master(struct link *master) {
 		enforce_processes_limits();
 
 		/* end running processes if worker resources are exhasusted, and
-		 * marked them as RESOURCE_EXHASTION. */
+		 * marked them as RESOURCE_EXHAUSTION. */
 		if(!enforce_worker_limits(master)) {
 			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+		}
+
+		if(ok) {
+			struct work_queue_process *p;
+			int visited;
+			int waiting = list_size(procs_waiting);
+
+			for(visited = 0; visited < waiting; visited++) {
+				p = list_pop_head(procs_waiting);
+				if(!p) {
+					break;
+				} else if(task_resources_fit_now(p->task)) {
+					start_process(p);
+				} else if(task_resources_fit_eventually(p->task)) {
+					list_push_tail(procs_waiting, p);
+				} else {
+					forsake_waiting_process(master, p);
+				}
+			}
 		}
 
 		if(ok && !results_to_be_sent_msg) {
@@ -1602,22 +1635,6 @@ static void work_for_master(struct link *master) {
 			}
 		}
 
-		if(ok) {
-			int visited = 0;
-			while(list_size(procs_waiting) > visited && cores_allocated < local_resources->cores.total) {
-				struct work_queue_process *p;
-
-				p = list_pop_head(procs_waiting);
-				if(p && task_resources_fit_now(p->task)) {
-					start_process(p);
-				} else if(p && task_resources_fit_eventually(p->task)) {
-					list_push_tail(procs_waiting, p);
-					visited++;
-				} else {
-					forsake_waiting_process(master, p);
-				}
-			}
-		}
 
 		if(!ok) break;
 
@@ -1653,7 +1670,7 @@ static void foreman_for_master(struct link *master) {
 		/* if the number of workers changed by more than %10, send an status update */
 		int curr_num_workers = total_resources->workers.total;
 		if(10*abs(curr_num_workers - prev_num_workers) > prev_num_workers) {
-			send_keepalive(master);
+			send_keepalive(master, 0);
 		}
 		prev_num_workers = curr_num_workers;
 
@@ -1693,8 +1710,8 @@ static int workspace_create() {
 		workdir = user_specified_workdir;
 	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
 		workdir = getenv("_CONDOR_SCRATCH_DIR");
-	} else if(getenv("TEMPDIR")) {
-		workdir = getenv("TEMPDIR");
+	} else if(getenv("TMPDIR")) {
+		workdir = getenv("TMPDIR");
 	} else if(getenv("TEMP")) {
 		workdir = getenv("TEMP");
 	} else if(getenv("TMP")) {
@@ -1828,8 +1845,6 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	measure_worker_resources();
 
 	report_worker_ready(master);
-
-	send_master_message(master, "info worker-id %s\n", worker_id);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		foreman_for_master(master);
@@ -2385,6 +2400,7 @@ int main(int argc, char *argv[])
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);
 		work_queue_specify_log(foreman_q, foreman_stats_filename);
+		work_queue_specify_category_mode(foreman_q, NULL, WORK_QUEUE_ALLOCATION_MODE_FIXED);
 
 	}
 

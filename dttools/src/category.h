@@ -83,6 +83,10 @@ struct category {
 	/* completions since last time first-allocation was updated. */
 	uint64_t completions_since_last_reset;
 
+
+	/* category is somewhat confident of the maximum seen value. */
+	int steady_state;
+
 	/* stats for wq */
 	uint64_t average_task_time;
 	struct work_queue_stats *wq_stats;

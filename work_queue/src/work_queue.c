@@ -467,7 +467,6 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	char value[WORK_QUEUE_LINE_MAX];
 
 	int n = sscanf(line,"info %s %[^\n]", field, value);
-	debug(D_WQ, "Receiving %s info from worker (%s)", field, w->addrport);
 
 	if(n != 2)
 		return MSG_FAILURE;
@@ -495,6 +494,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
 	} else if(string_prefix_is(field, "worker-id")) {
+		free(w->workerid);
 		w->workerid = xxstrdup(value);
 		write_transaction_worker(q, w, 0);
 	}
@@ -796,9 +796,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_delete(w->current_files);
 	work_queue_resources_delete(w->resources);
 
-	if(w->workerid)
-		free(w->workerid);
-
+	free(w->workerid);
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
@@ -2862,6 +2860,8 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
 
+	send_worker_msg(q,w, "category %s\n", t->category);
+
 	send_worker_msg(q,w, "cores %"PRId64"\n",  max->cores);
 	send_worker_msg(q,w, "memory %"PRId64"\n", max->memory);
 	send_worker_msg(q,w, "disk %"PRId64"\n",   max->disk);
@@ -3395,7 +3395,6 @@ static int receive_one_task( struct work_queue *q )
 static void ask_for_workers_updates(struct work_queue *q) {
 	struct work_queue_worker *w;
 	char *key;
-	int64_t last_recv_elapsed_time;
 	timestamp_t current_time = timestamp_get();
 
 	hash_table_firstkey(q->worker_table);
@@ -3412,12 +3411,12 @@ static void ask_for_workers_updates(struct work_queue *q) {
 				continue;
 			}
 
-			last_recv_elapsed_time = (int64_t)(current_time - w->last_update_msg_time)/1000000;
 
 			// send new keepalive check only (1) if we received a response since last keepalive check AND
 			// (2) we are past keepalive interval
-			if(w->last_msg_recv_time >= w->last_update_msg_time) {
-				if(last_recv_elapsed_time >= q->keepalive_interval) {
+			if(w->last_msg_recv_time > w->last_update_msg_time) {
+				int64_t last_update_elapsed_time = (int64_t)(current_time - w->last_update_msg_time)/1000000;
+				if(last_update_elapsed_time >= q->keepalive_interval) {
 					if(send_worker_msg(q,w, "check\n")<0) {
 						debug(D_WQ, "Failed to send keepalive check to worker %s (%s).", w->hostname, w->addrport);
 						handle_worker_failure(q, w);
@@ -5379,7 +5378,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		//Re-enqueue the tasks that workers labeled for resubmission.
 		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			change_task_state(q, t, WORK_QUEUE_TASK_READY);
+			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 		}
 
 		//We have the resources we have been waiting for; start task transfers
