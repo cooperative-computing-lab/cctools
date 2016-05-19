@@ -187,7 +187,7 @@ static const char *dag_node_add_remote_name(struct dag_node *n, const char *file
 /* Adds the local name to the list of source files of the node,
  * and adds the node as a dependant of the file. If remotename is
  * not NULL, it is added to the namespace of the node. */
-void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename)
+void dag_node_add_source_file(struct dag_node *n, const char *filename, const char *remotename)
 {
 	struct dag_file *source = dag_file_lookup_or_create(n->d, filename);
 
@@ -206,7 +206,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, char *re
 /* Adds the local name as a target of the node, and register the
  * node as the producer of the file. If remotename is not NULL,
  * it is added to the namespace of the node. */
-void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename)
+void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename)
 {
 	struct dag_file *target = dag_file_lookup_or_create(n->d, filename);
 
