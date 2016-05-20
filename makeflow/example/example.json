@@ -1,5 +1,5 @@
 {
-  "#":[
+  "comment":[
     "This is a sample Makeflow script that retrieves an image from the web",
     "creates four variations of it, and then combines them into an animation"
   ],
@@ -72,7 +72,7 @@
       "environment":{
         "URL":"http://ccl.cse.nd.edu/images/capitol.jpg"
       },
-      "#":"If a rule is specified with local_job, it executes at the local site",
+      "comment":"If a rule is specified with local_job, it executes at the local site",
       "local_job":true
     }
   ]
