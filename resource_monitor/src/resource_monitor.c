@@ -738,17 +738,18 @@ void rmonitor_summary_header()
 	    fprintf(log_series, "# wall_clock, max_concurrent_processes, virtual, resident, swap, files, and disk show values at the sample point.\n");
 
 	    fprintf(log_series, "#");
-	    fprintf(log_series,  "%-20s", "wall_clock");
-	    fprintf(log_series, " %20s", "cpu_time");
-	    fprintf(log_series, " %25s", "max_concurrent_processes");
-	    fprintf(log_series, " %25s", "virtual_memory");
-	    fprintf(log_series, " %25s", "memory");
-	    fprintf(log_series, " %25s", "swap_memory");
-	    fprintf(log_series, " %25s", "bytes_read");
-	    fprintf(log_series, " %25s", "bytes_written");
-	    fprintf(log_series, " %25s", "bytes_received");
-	    fprintf(log_series, " %25s", "bytes_sent");
-	    fprintf(log_series, " %25s", "bandwidth");
+	    fprintf(log_series,  "%s", "wall_clock");
+	    fprintf(log_series, " %s", "cpu_time");
+	    fprintf(log_series, " %s", "cores");
+	    fprintf(log_series, " %s", "max_concurrent_processes");
+	    fprintf(log_series, " %s", "virtual_memory");
+	    fprintf(log_series, " %s", "memory");
+	    fprintf(log_series, " %s", "swap_memory");
+	    fprintf(log_series, " %s", "bytes_read");
+	    fprintf(log_series, " %s", "bytes_written");
+	    fprintf(log_series, " %s", "bytes_received");
+	    fprintf(log_series, " %s", "bytes_sent");
+	    fprintf(log_series, " %s", "bandwidth");
 
 	    if(resources_flags->disk)
 	    {
@@ -871,25 +872,29 @@ void rmonitor_log_row(struct rmsummary *tr)
 {
 	if(log_series)
 	{
-		fprintf(log_series,  "%-18" PRId64, tr->wall_time + summary->start);
-		fprintf(log_series, " %18" PRId64, tr->cpu_time);
-		fprintf(log_series, " %20" PRId64, tr->max_concurrent_processes);
-		fprintf(log_series, " %20" PRId64, tr->virtual_memory);
-		fprintf(log_series, " %20" PRId64, tr->memory);
-		fprintf(log_series, " %20" PRId64, tr->swap_memory);
-		fprintf(log_series, " %20" PRId64, tr->bytes_read);
-		fprintf(log_series, " %20" PRId64, tr->bytes_written);
-		fprintf(log_series, " %20" PRId64, tr->bytes_received);
-		fprintf(log_series, " %20" PRId64, tr->bytes_sent);
-		fprintf(log_series, " %20" PRId64, tr->bandwidth);
+		fprintf(log_series,  "%" PRId64, tr->wall_time + summary->start);
+		fprintf(log_series, " %" PRId64, tr->cpu_time);
+		fprintf(log_series, " %" PRId64, tr->cores);
+		fprintf(log_series, " %" PRId64, tr->max_concurrent_processes);
+		fprintf(log_series, " %" PRId64, tr->virtual_memory);
+		fprintf(log_series, " %" PRId64, tr->memory);
+		fprintf(log_series, " %" PRId64, tr->swap_memory);
+		fprintf(log_series, " %" PRId64, tr->bytes_read);
+		fprintf(log_series, " %" PRId64, tr->bytes_written);
+		fprintf(log_series, " %" PRId64, tr->bytes_received);
+		fprintf(log_series, " %" PRId64, tr->bytes_sent);
+		fprintf(log_series, " %" PRId64, tr->bandwidth);
 
 		if(resources_flags->disk)
 		{
-			fprintf(log_series, " %20" PRId64, tr->total_files);
-			fprintf(log_series, " %20" PRId64, tr->disk);
+			fprintf(log_series, " %" PRId64, tr->total_files);
+			fprintf(log_series, " %" PRId64, tr->disk);
 		}
 
 		fprintf(log_series, "\n");
+
+		fflush(log_series);
+		fsync(fileno(log_series));
 
 		/* are we going to keep monitoring the whole filesystem? */
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
