@@ -893,6 +893,9 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 		fprintf(log_series, "\n");
 
+		fflush(log_series);
+		fsync(fileno(log_series));
+
 		/* are we going to keep monitoring the whole filesystem? */
 		// fprintf(log_series "%" PRId64 "\n", tr->fs_nodes);
 	}
