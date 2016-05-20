@@ -3,9 +3,11 @@
     "This is a sample Makeflow script that retrieves an image from the web",
     "creates four variations of it, and then combines them into an animation"
   ],
-  "environment":{
-    "CONVERT":"/usr/bin/convert",
+  "variables":{
     "CURL":"/usr/bin/curl"
+  },
+  "environment":{
+    "CONVERT":"/usr/bin/convert"
   },
   "rules":[
     {
@@ -58,14 +60,14 @@
       ]
     },
     {
-      "command":"$CURL -o capitol.jpg \"$URL\"",
+      "command":CURL + " -o capitol.jpg " + URL,
       "outputs":[
         "capitol.jpg"
       ],
       "inputs":[
 
       ],
-      "environment":{
+      "variables":{
         "URL":"http://ccl.cse.nd.edu/images/capitol.jpg"
       },
       "comment":"If a rule is specified with local_job, it executes at the local site",

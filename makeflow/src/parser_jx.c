@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "debug.h"
 #include "parser.h"
+#include "jx_eval.h"
 
 static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_table *h, struct jx *env) {
 	debug(D_MAKEFLOW_PARSER, "Parsing environment");
@@ -85,12 +86,12 @@ static int resources_from_jx(struct hash_table *h, struct jx *j) {
 	return 1;
 }
 
-static int rule_from_jx(struct dag *d, struct jx *j) {
+static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	debug(D_MAKEFLOW_PARSER, "Parsing rule");
 	struct dag_node *n;
 
 	struct jx *makeflow = jx_lookup(j, "makeflow");
-	struct jx *command = jx_lookup(j, "command");
+	struct jx *command = jx_eval(jx_lookup(j, "command"), context);
 
 	if (makeflow && command) {
 		debug(D_MAKEFLOW_PARSER, "Rule must not have both command and submakeflow");
@@ -217,6 +218,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 		debug(D_MAKEFLOW_PARSER, "environment malformed or missing");
 	}
 
+	jx_delete(command);
 	return 1;
 }
 
@@ -242,6 +244,12 @@ struct dag *dag_from_jx(struct jx *j) {
 	}
 
 	struct dag *d = dag_create();
+	struct jx *dummy_context = jx_object(NULL);
+	struct jx *variables = jx_lookup(j, "variables");
+	if (variables && !jx_istype(variables, JX_OBJECT)) {
+		debug(D_MAKEFLOW_PARSER, "Expected variables to be an object");
+		return NULL;
+	}
 
 	debug(D_MAKEFLOW_PARSER, "Parsing categories");
 	struct jx *categories = jx_lookup(j, "categories");
@@ -283,15 +291,18 @@ struct dag *dag_from_jx(struct jx *j) {
 	struct jx *rules = jx_lookup(j, "rules");
 	if (jx_istype(rules, JX_ARRAY)) {
 		for (struct jx_item *i = rules->u.items; i; i = i->next) {
-			if (!rule_from_jx(d, i->value)) {
+			struct jx *rule_context = jx_merge(variables ? variables : dummy_context, jx_lookup(i->value, "variables"));
+			if (!rule_from_jx(d, rule_context, i->value)) {
 				debug(D_MAKEFLOW_PARSER, "Failure parsing rule");
 				return NULL;
 			}
+			jx_delete(rule_context);
 		}
 	}
 
 	dag_close_over_environment(d);
 	dag_close_over_categories(d);
+	jx_delete(dummy_context);
 	return d;
 }
 

@@ -442,6 +442,20 @@ struct jx  *jx_copy( struct jx *j )
 	return 0;
 }
 
+struct jx *jx_merge(struct jx *j, ...) {
+	va_list ap;
+	va_start (ap, j);
+	struct jx *result = jx_object(NULL);
+	for (struct jx *next = j; jx_istype(next, JX_OBJECT); next = va_arg(ap, struct jx *)) {
+		for (struct jx_pair *p = next->u.pairs; p; p = p->next) {
+			jx_delete(jx_remove(result, p->key));
+			jx_insert(result, jx_copy(p->key), jx_copy(p->value));
+		}
+	}
+	va_end(ap);
+	return result;
+}
+
 int jx_pair_is_constant( struct jx_pair *p )
 {
 	return jx_is_constant(p->key)
