@@ -3,13 +3,9 @@
     "This is a sample Makeflow script that retrieves an image from the web",
     "creates four variations of it, and then combines them into an animation"
   ],
-  "categories":{
-    "default":{
-      "environment":{
-        "CONVERT":"/usr/bin/convert",
-        "CURL":"/usr/bin/curl"
-      }
-    }
+  "environment":{
+    "CONVERT":"/usr/bin/convert",
+    "CURL":"/usr/bin/curl"
   },
   "rules":[
     {

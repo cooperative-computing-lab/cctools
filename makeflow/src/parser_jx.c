@@ -220,6 +220,20 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	return 1;
 }
 
+static int category_from_jx(struct dag *d, const char *name, struct jx *j) {
+	struct category *c = makeflow_category_lookup_or_create(d, name);
+	if (!resources_from_jx(c->mf_variables, j)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
+		return 0;
+	}
+	struct jx *environment = jx_lookup(j, "environment");
+	if (environment && !environment_from_jx(d, NULL, c->mf_variables, environment)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing environment");
+		return 0;
+	}
+	return 1;
+}
+
 // This leaks memory on failure, but it's assumed that if the DAG can't be
 // parsed, the program will be exiting soon anyway
 struct dag *dag_from_jx(struct jx *j) {
@@ -234,14 +248,9 @@ struct dag *dag_from_jx(struct jx *j) {
 	if (jx_istype(categories, JX_OBJECT)) {
 		for (struct jx_pair *p = categories->u.pairs; p; p = p->next) {
 			if (jx_istype(p->key, JX_STRING)) {
-				struct category *c = makeflow_category_lookup_or_create(d, p->key->u.string_value);
-				if (!resources_from_jx(c->mf_variables, p->value)) {
-					debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
+				if (!category_from_jx(d, p->key->u.string_value, p->value)) {
+					debug(D_MAKEFLOW_PARSER, "Failure parsing category");
 					return NULL;
-				}
-				struct jx *environment = jx_lookup(p->value, "environment");
-				if (environment) {
-					environment_from_jx(d, NULL, c->mf_variables, environment);
 				}
 			} else {
 				debug(D_MAKEFLOW_PARSER, "Category names must be strings");
@@ -260,6 +269,16 @@ struct dag *dag_from_jx(struct jx *j) {
 		default_category = "default";
 	}
 	d->default_category = makeflow_category_lookup_or_create(d, default_category);
+
+	struct jx *environment = jx_lookup(j, "environment");
+	if (j) {
+		if (!environment_from_jx(d, NULL, d->default_category->mf_variables, environment)) {
+			debug(D_MAKEFLOW_PARSER, "Failure parsing top-level category");
+			return NULL;
+		}
+	} else {
+		debug(D_MAKEFLOW_PARSER, "Top-level environment malformed or missing");
+	}
 
 	struct jx *rules = jx_lookup(j, "rules");
 	if (jx_istype(rules, JX_ARRAY)) {
