@@ -267,7 +267,7 @@ To put an entire directory tree, see @ref chirp_recursive_put instead.
 @return The size of the file in bytes, or less than zero on error.
 */
 
-INT64_T chirp_reli_putfile_buffer(const char *host, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime);
+INT64_T chirp_reli_putfile_buffer(const char *host, const char *path, const void *buffer, INT64_T mode, size_t length, time_t stoptime);
 
 /** Open a file search stream
 Performs a search operation on the Chirp server and stores its results to be read via readsearch

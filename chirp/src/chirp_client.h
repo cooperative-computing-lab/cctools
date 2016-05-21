@@ -43,7 +43,7 @@ INT64_T chirp_client_ftruncate(struct chirp_client *c, INT64_T fd, INT64_T lengt
 INT64_T chirp_client_getfile(struct chirp_client *c, const char *name, FILE * stream, time_t stoptime);
 INT64_T chirp_client_getfile_buffer(struct chirp_client *c, const char *name, char **buffer, time_t stoptime);
 INT64_T chirp_client_putfile(struct chirp_client *c, const char *name, FILE * stream, INT64_T mode, INT64_T length, time_t stoptime);
-INT64_T chirp_client_putfile_buffer(struct chirp_client *c, const char *name, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime);
+INT64_T chirp_client_putfile_buffer(struct chirp_client *c, const char *name, const void *buffer, INT64_T mode, size_t length, time_t stoptime);
 INT64_T chirp_client_thirdput(struct chirp_client *c, const char *path, const char *hostname, const char *newpath, time_t stoptime);
 
 INT64_T chirp_client_getstream(struct chirp_client *c, const char *path, time_t stoptime);

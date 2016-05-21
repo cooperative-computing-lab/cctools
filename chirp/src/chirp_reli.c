@@ -523,7 +523,7 @@ INT64_T chirp_reli_putfile( const char *host, const char *path, FILE *stream, IN
 	)
 }
 
-INT64_T chirp_reli_putfile_buffer( const char *host, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime )
+INT64_T chirp_reli_putfile_buffer( const char *host, const char *path, const void *buffer, INT64_T mode, size_t length, time_t stoptime )
 {
 	RETRY_ATOMIC( result = chirp_client_putfile_buffer(client,path,buffer,mode,length,stoptime); )
 }

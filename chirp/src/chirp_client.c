@@ -1290,7 +1290,7 @@ INT64_T chirp_client_putfile(struct chirp_client * c, const char *path, FILE * s
 	return get_result(c, stoptime);
 }
 
-INT64_T chirp_client_putfile_buffer(struct chirp_client * c, const char *path, const char *buffer, INT64_T mode, INT64_T length, time_t stoptime)
+INT64_T chirp_client_putfile_buffer(struct chirp_client * c, const char *path, const void *buffer, INT64_T mode, size_t length, time_t stoptime)
 {
 	INT64_T result;
 
@@ -1302,7 +1302,7 @@ INT64_T chirp_client_putfile_buffer(struct chirp_client * c, const char *path, c
 		return result;
 
 	result = link_putlstring(c->link, buffer, length, stoptime);
-	if(result != length) {
+	if((size_t)result != length) {
 		c->broken = 1;
 		errno = ECONNRESET;
 		return -1;
