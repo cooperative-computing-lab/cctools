@@ -649,8 +649,8 @@ static int schedule_replication (confuga *C)
 		"	WITH"
 				/* This a StorageNode we are able to use to transfer a replica. If it is currently transferring a file, it is excluded. */
 		"		StorageNodeActiveRandom AS ("
-		"			SELECT StorageNodeActive.*, RANDOM() AS _r"
-		"				FROM StorageNodeActive"
+		"			SELECT StorageNodeAuthenticated.*, RANDOM() AS _r"
+		"				FROM StorageNodeAuthenticated"
 		"		),"
 		"		SourceStorageNode AS ("
 		"			SELECT Replica.fid, StorageNodeActiveRandom.id AS sid, MIN(StorageNodeActiveRandom._r)"
@@ -661,7 +661,9 @@ static int schedule_replication (confuga *C)
 				/* This contains all the Replica of a File AND ongoing transfers of the File to some StorageNode */
 		"		Replicas AS ("
 		"				SELECT FileReplicas.id AS fid, FileReplicas.sid"
-		"					FROM Confuga.FileReplicas"
+		"					FROM"
+		"						Confuga.FileReplicas"
+		"						JOIN Confuga.StorageNodeActive ON FileReplicas.sid = StorageNodeActive.id"
 		"			UNION ALL"
 		"				SELECT File.id AS fid, ActiveTransfers.tsid AS sid"
 		"					FROM Confuga.File JOIN Confuga.ActiveTransfers ON File.id = ActiveTransfers.fid"
@@ -669,7 +671,7 @@ static int schedule_replication (confuga *C)
 				/* These are degraded files, insufficient replicas exist. */
 		"		DegradedFile AS ("
 		"			SELECT File.id, File.size, COUNT(Replicas.sid) AS count, File.minimum_replicas AS min"
-		"				FROM Confuga.File JOIN Replicas ON File.id = Replicas.fid"
+		"				FROM Confuga.File LEFT OUTER JOIN Replicas ON File.id = Replicas.fid"
 		"				WHERE File.time_create < (strftime('%s', 'now')-60)"
 		"				GROUP BY File.id"
 		"				HAVING COUNT(Replicas.sid) < File.minimum_replicas"
@@ -910,7 +912,7 @@ static int transfer_create (confuga *C)
 		"		Confuga.TransferJob"
 		"		JOIN Confuga.StorageNode AS fsn ON TransferJob.fsid = fsn.id"
 		"		JOIN Confuga.StorageNode AS tsn ON TransferJob.tsid = tsn.id"
-		"	WHERE state = 'NEW' AND State.key = 'id'" /* TODO: AND TransferJob.last_attempt + TransferJob.attempts^2 < strftime('%s', 'now') */
+		"	WHERE TransferJob.state = 'NEW' AND State.key = 'id'" /* TODO: AND TransferJob.last_attempt + TransferJob.attempts^2 < strftime('%s', 'now') */
 		"	ORDER BY RANDOM()" /* to ensure no starvation, create may result in a ROLLBACK that aborts this SELECT */
 		";";
 
@@ -991,7 +993,7 @@ static int transfer_commit (confuga *C)
 	static const char SQL[] =
 		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
-		"	WHERE state = 'CREATED'"
+		"	WHERE TransferJob.state = 'CREATED'"
 		"	GROUP BY StorageNode.id"
 		"	ORDER BY RANDOM()" /* to ensure no starvation, complete may result in a ROLLBACK that aborts this SELECT */
 		";";
@@ -1161,7 +1163,7 @@ static int transfer_wait (confuga *C)
 		"	FROM"
 		"		Confuga.TransferJob"
 		"		JOIN Confuga.StorageNode AS fsn ON TransferJob.fsid = fsn.id"
-		"	WHERE state = 'COMMITTED'"
+		"	WHERE TransferJob.state = 'COMMITTED'"
 		"	ORDER BY RANDOM()" /* to ensure no starvation, complete may result in a ROLLBACK that aborts this SELECT */
 		";";
 
@@ -1234,7 +1236,7 @@ static int transfer_reap (confuga *C)
 	static const char SQL[] =
 		"SELECT StorageNode.id, StorageNode.hostport, PRINTF('[%s]', GROUP_CONCAT(TransferJob.id, ', ')), PRINTF('[%s]', GROUP_CONCAT(TransferJob.cid, ','))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.fsid = StorageNode.id"
-		"	WHERE state = 'WAITED'"
+		"	WHERE TransferJob.state = 'WAITED'"
 		"	GROUP BY StorageNode.id"
 		"	ORDER BY RANDOM()" /* to ensure no starvation, complete may result in a ROLLBACK that aborts this SELECT */
 		";";
@@ -1329,7 +1331,7 @@ static int transfer_complete (confuga *C)
 		"	WHERE state = 'REAPED' AND NOT (status = 'FINISHED' AND exit_status = 'EXITED' AND exit_code = 0);"
 		"SELECT TransferJob.id, StorageNode.hostport, TransferJob.open, PRINTF('%s/file/%s', StorageNode.root, UPPER(HEX(TransferJob.fid)))"
 		"	FROM Confuga.TransferJob JOIN Confuga.StorageNode ON TransferJob.tsid = StorageNode.id"
-		"	WHERE state = 'REAPED'"
+		"	WHERE TransferJob.state = 'REAPED'"
 		"	ORDER BY RANDOM()" /* to ensure no starvation, complete may result in a ROLLBACK that aborts this SELECT */
 		";";
 
@@ -1445,7 +1447,7 @@ static int transfer_progress (confuga *C)
 	static const char SQL[] =
 		"SELECT TransferJob.id, tsn.hostport, TransferJob.open"
 		"	FROM TransferJob JOIN Confuga.StorageNode AS tsn ON TransferJob.tsid = tsn.id"
-		"	WHERE state = 'COMMITTED'"
+		"	WHERE TransferJob.state = 'COMMITTED'"
 			/* Use ORDER BY so that we hit the same storage node repeatedly so we don't lose a connection. */
 			/* TODO Even better would by a batch operation like getlongdir on /open and go through results. */
 		"	ORDER BY tsn.id"
@@ -1483,10 +1485,10 @@ static int unlinkthedead (confuga *C)
 		"	WHERE EXISTS (SELECT NULL FROM Confuga.Replica WHERE DeadReplica.fid = Replica.fid AND DeadReplica.sid = Replica.sid)"
 		";"
 		/* unlink a DeadReplica only when the StorageNode is not executing a job! A job may create a new replica with the same RepID! */
-		"SELECT DeadReplica.fid, DeadReplica.sid, StorageNodeActive.hostport, PRINTF('%s/file/%s', StorageNodeActive.root, UPPER(HEX(DeadReplica.fid)))"
+		"SELECT DeadReplica.fid, DeadReplica.sid, StorageNodeAuthenticated.hostport, PRINTF('%s/file/%s', StorageNodeAuthenticated.root, UPPER(HEX(DeadReplica.fid)))"
 		"	FROM Confuga.DeadReplica"
-		"		JOIN Confuga.StorageNodeActive ON DeadReplica.sid = StorageNodeActive.id"
-		"		LEFT OUTER JOIN ConfugaJobExecuting ON StorageNodeActive.id = ConfugaJobExecuting.sid"
+		"		JOIN Confuga.StorageNodeAuthenticated ON DeadReplica.sid = StorageNodeAuthenticated.id"
+		"		LEFT OUTER JOIN ConfugaJobExecuting ON StorageNodeAuthenticated.id = ConfugaJobExecuting.sid"
 		"	WHERE ConfugaJobExecuting.id IS NULL"
 		"	ORDER BY RANDOM()"
 		"	LIMIT 1"

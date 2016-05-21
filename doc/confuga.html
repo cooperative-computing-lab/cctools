@@ -93,21 +93,10 @@
             <h3 id="starting.cluster">Running a Test Cluster<a class="sectionlink" href="#starting.cluster" title="Link to this section.">&#x21d7;</a></h3>
 
                 <p>Let's get started quickly by setting up a 2 storage node
-                test cluster on your local workstation. Because we are running
-                these storage nodes on <tt>localhost</tt>, we use a self-hosted
-                catalog. Otherwise, the head node will not be able to match
-                storage nodes (localhost is ambiguous in a global list of
-                servers).</p>
+                test cluster on your local workstation.</p>
 
-                <p><b>The Catalog:</b>
-                <code><span class="prompt">$ </span>catalog_server --history=catalog.history \
-    --update-log=catalog.update \
-    --interface=127.0.0.1 \
-    &amp;</code>
-
-                <p><b>Storage Node 1:</b>
+                <p><b>Start Storage Node 1:</b>
                 <code><span class="prompt">$ </span>chirp_server \
-    --advertise=localhost \
     --catalog-name=localhost \
     --catalog-update=10s \
     --interface=127.0.0.1 \
@@ -120,9 +109,8 @@
     &amp;</code>
                 </p>
 
-                <p><b>Storage Node 2:</b>
+                <p><b>Start Storage Node 2:</b>
                 <code><span class="prompt">$ </span>chirp_server \
-    --advertise=localhost \
     --catalog-name=localhost \
     --catalog-update=10s \
     --interface=127.0.0.1 \
@@ -135,16 +123,19 @@
     &amp;</code>
                 </p>
 
-                <p><b>The Head Node:</b>
+                <p><b>Add the Storage Nodes to Confuga:</b>
+                <code><span class="prompt">$ </span>confuga_adm confuga:///$(pwd)/confuga.root/ sn-add address localhost:9001
+<span class="prompt">$ </span>confuga_adm confuga:///$(pwd)/confuga.root/ sn-add address localhost:9002</code>
+
+                <p><b>Start the Head Node:</b>
                 <code><span class="prompt">$ </span>chirp_server \
-    --advertise=localhost \
     --catalog-name=localhost \
     --catalog-update=30s \
     --debug=confuga \
     --jobs \
     --port=9000 \
     --project-name=`whoami`-test \
-    --root='confuga://./confuga.root/?auth=unix&amp;nodes=node:chirp://localhost:9001/,chirp://localhost:9002/'</code>
+    --root="confuga://$(pwd)/confuga.root/?auth=unix"</code>
                 </p>
 
                 <p>Confuga will output debug information to your terminal, so
@@ -152,11 +143,11 @@
                 <tt>chirp_status</tt> to query the catalog allowing you to see
                 the status of the cluster:</p>
 
-                <code><span class="prompt">$ </span>chirp_status --catalog=localhost --server-project=`whoami`-test
+                <code><span class="prompt">$ </span>chirp_status --server-project=`whoami`-test
 TYPE     NAME                      PORT  OWNER      VERSION     TOTAL    AVAIL
-chirp    localhost.localdomain     9002  batrick    4.4.0     81.6 GB  17.0 GB
-chirp    localhost.localdomain     9001  batrick    4.4.0     81.6 GB  17.0 GB
-chirp    localhost.localdomain     9094  batrick    4.4.0    163.1 GB  34.0 GB</code>
+chirp    *.*.*.*                   9002  batrick    6.0.0     81.6 GB  56.2 GB
+chirp    *.*.*.*                   9001  batrick    6.0.0     81.6 GB  56.2 GB
+chirp    *.*.*.*                   9000  batrick    6.0.0    163.1 GB 112.4 GB</code>
 
                 <p>This example cluster also appears at the end of the Confuga manpage <a class="man" href="man/confuga.html">confuga(1)</a>.</p>
 
@@ -202,8 +193,9 @@ nothing left to do.</code>
             <h3 id="confuga.nodes">Running Storage Nodes<a class="sectionlink" href="#starting.nodes" title="Link to this section.">&#x21d7;</a></h3>
 
                 <p>Confuga uses regular Chirp servers as storage nodes. Each
-                storage node is specified using the <tt>nodes</tt> Confuga
-                option.  All storage node Chirp servers must be run with:</p>
+                storage node is added to the cluster using the <a class="man"
+                href="man/confuga_adm.html">confuga_adm(1)</a>. command.  All
+                storage node Chirp servers must be run with:</p>
 
                 <ul>
                     <li>Ticket authentication enabled (<tt>--auth=ticket</tt>). Remember by default all authentication mechanisms are enabled.)</li>
@@ -236,20 +228,13 @@ nothing left to do.</code>
 
                 <p>The workspace path is the location Confuga maintains metadata
                 and databases for the head node. Confuga specific options are
-                also passed through the URI. The two primary options are
-                documented below.</p>
+                also passed through the URI. The primary option is documented below.</p>
 
                 <ul>
 
                     <li><tt style="font-weight: bold;">auth=method</tt> Enable this method for Head Node to
                     Storage Node authentication. The default is to enable all
                     available authentication mechanisms.</li>
-
-                    <li><tt style="font-weight: bold;">nodes=node-list</tt> Sets the whitespace or comma
-                    delimited list of storage nodes to use for the cluster. May
-                    be specified directly as a list
-                    <tt>node:&lt;node1,node2,...&gt;</tt> or as a file
-                    <tt>file:&lt;node file&gt;</tt>.
 
                 </ul>
 
@@ -362,13 +347,6 @@ nothing left to do.</code>
                 <tt>LINK</tt> file binding. For this reason, it cannot use
                 Chirp servers running with <tt>--root</tt> on AFS.</p>
 
-        <h2 id="missing">Missing Features<a class="sectionlink" href="#missing" title="Link to this section.">&#x21d7;</a></h2>
-
-            <p>Confuga is a beta quality software and is presently missing a few features that will be addressed in future releases:</p>
-
-            <ul>
-                <li><b>Organize storage nodes by project name.</b> Attaching a project name to storage nodes would allow Confuga to dynamically pick up new storage nodes. It also greatly simplifies specifying storage nodes. Please see issue <a href="https://github.com/cooperative-computing-lab/cctools/issues/828">#828</a> for updates.</li>
-            </ul>
     </div>
 </body>
 

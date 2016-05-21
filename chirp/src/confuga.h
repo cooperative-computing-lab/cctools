@@ -54,11 +54,6 @@ typedef uint64_t confuga_off_t; /* maximum file size */
 typedef struct confuga_replica confuga_replica;
 typedef struct confuga_file confuga_file;
 
-struct confuga_host {
-	char hostport[256+8]; /* Maximum length of FQDN is 255 octets per RFC, +8 for port */
-	char root[CONFUGA_PATH_MAX];
-};
-
 struct confuga_stat {
 	/* file content */
 	confuga_fid_t fid;
@@ -114,7 +109,11 @@ CONFUGA_API int confuga_daemon(confuga *C);
 
 CONFUGA_API int confuga_concurrency (confuga *C, uint64_t n);
 
-CONFUGA_API int confuga_nodes (confuga *C, const char *nodes);
+#define CONFUGA_SN_UUID 1
+#define CONFUGA_SN_ADDR 2
+CONFUGA_API int confuga_snadd (confuga *C, const char *id, const char *root, const char *password, int flag);
+CONFUGA_API int confuga_snrm (confuga *C, const char *id, int flag);
+CONFUGA_API int confuga_nodes (confuga *C, const char *nodes); /* deprecated */
 
 #define CONFUGA_SCHEDULER_FIFO 1
 CONFUGA_API int confuga_scheduler_strategy (confuga *C, int strategy, uint64_t n);

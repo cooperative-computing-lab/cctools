@@ -35,7 +35,6 @@ the end of this manual.
 OPTIONS_BEGIN
 OPTION_PAIR(auth,method)Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
 OPTION_PAIR(concurrency,limit)Limits the number of concurrent jobs executed by the cluster. The default is 0 for limitless.
-OPTION_PAIR(nodes,node-list)Sets the whitespace or comma delimited list of storage nodes to use for the cluster. May be specified directly as a list BOLD(`node:<node1,node2,...>') or as a file BOLD(`file:<node file>').
 OPTION_PAIR(pull-threshold,bytes)Sets the threshold for pull transfers. The default is 128MB.
 OPTION_PAIR(replication,type)Sets the replication mode for satisfying job dependencies. BOLD(type) may be BOLD(push-sync) or BOLD(push-async-N). The default is BOLD(push-async-1).
 OPTION_PAIR(scheduler,type)Sets the scheduler used to assign jobs to storage nodes. The default is BOLD(fifo-0).
@@ -46,8 +45,8 @@ SECTION(STORAGE NODES)
 
 PARA
 Confuga uses regular Chirp servers as storage nodes. Each storage node is
-specified using the BOLD(nodes) Confuga option. All storage node Chirp servers
-must be run with:
+added to the cluster using the MANPAGE(confuga_adm,1) command.  All storage
+node Chirp servers must be run with:
 
 LIST_BEGIN
 LIST_ITEM(Ticket authentication enabled (BOLD(--auth=ticket)). Remember by default all authentication mechanisms are enabled.)
@@ -68,6 +67,12 @@ You must also ensure that the storage nodes and the Confuga head node are using
 the same MANPAGE(catalog_server,1). By default, this should be the case. The
 BOLD(EXAMPLES) section below includes an example cluster using a manually
 hosted catalog server.
+
+SUBSECTION(ADDING STORAGE NODES)
+
+PARA
+To add storage nodes to the Confuga cluster, use the MANPAGE(confuga_adm,1)
+administrative tool.
 
 SECTION(EXECUTING WORKFLOWS)
 
@@ -124,17 +129,19 @@ LONGCODE_END
 SECTION(EXAMPLES)
 
 PARA
-Launch a head node with workspace BOLD(./confuga.root), replication mode of BOLD(push-async-1), and a storage node list in file BOLD(nodes.lst):
+Launch a head node with Confuga state stored in BOLD(./confuga.root):
 
 LONGCODE_BEGIN
-chirp_server --jobs --root='confuga://./confuga.root/?replication=push-async-1&nodes=file:nodes.lst'
+chirp_server --jobs --root="confuga://$(pwd)/confuga.root/"
 LONGCODE_END
 
 PARA
-Launch a head node with workspace BOLD(/tmp/confuga.root) using storage nodes BOLD(chirp://localhost:10001/) and BOLD(chirp://localhost:10002/):
+Launch a head node with workspace BOLD(/tmp/confuga.root) using storage nodes BOLD(chirp://localhost:10001) and BOLD(chirp://localhost:10002/u/joe/confuga):
 
 LONGCODE_BEGIN
-chirp_server --jobs --root='confuga:///tmp/confuga.root/?nodes=node:chirp://localhost:10001/,chirp://localhost:10002/'
+chirp_server --jobs --root='confuga:///tmp/confuga.root/'
+confuga_adm confuga:///tmp/confuga.root/ sn-add address localhost:10001
+confuga_adm confuga:///tmp/confuga.root/ sn-add -r /u/joe/confuga address localhost:10001
 LONGCODE_END
 
 PARA
@@ -174,13 +181,15 @@ chirp_server --advertise=localhost \\
              &
 # sleep for a time so catalog can receive storage node status
 sleep 5
+confuga_adm confuga:///$(pwd)/confuga.root/ sn-add address localhost:9001
+confuga_adm confuga:///$(pwd)/confuga.root/ sn-add address localhost:9002
 # start the Confuga head node
 chirp_server --advertise=localhost \\
              --catalog-name=localhost \\
              --catalog-update=30s \\
              --debug=confuga \\
              --jobs \\
-             --root='confuga://./confuga.root/?auth=unix&nodes=node:chirp://localhost:9001/,chirp://localhost:9002/' \\
+             --root="confuga://$(pwd)/confuga.root/?auth=unix" \\
              --port=9000
 LONGCODE_END
 
@@ -188,6 +197,6 @@ SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
 
 SECTION(SEE ALSO)
-SEE_ALSO_CHIRP
+MANPAGE(confuga_adm,1) SEE_ALSO_CHIRP
 
 FOOTER
