@@ -47,7 +47,7 @@ path = resolved_##path;
 #define STOPTIME (time(0)+chirp_timeout)
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX], uuid_t *uuid)
+static int chirp_fs_chirp_init(const char url[CHIRP_PATH_MAX], uuid *uuid)
 {
 	int i;
 	char *path;

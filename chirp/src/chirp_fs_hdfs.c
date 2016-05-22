@@ -91,7 +91,7 @@ if (chirp_fs_hdfs_resolve(path, resolved_##path) == -1) return NULL;\
 path = resolved_##path;
 
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX], uuid_t *uuid)
+static int chirp_fs_hdfs_init(const char url[CHIRP_PATH_MAX], uuid *uuid)
 {
 	static const char *groups[] = { "supergroup" };
 	int i;

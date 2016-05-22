@@ -91,7 +91,7 @@ out:\
 
 extern struct list *catalog_host_list;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX], uuid_t *uuid)
+static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX], uuid *uuid)
 {
 	int rc;
 	int i;

@@ -188,7 +188,7 @@ out:\
  * o `path'
  */
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], uuid_t *uuid)
+static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], uuid *uuid)
 {
 	PREAMBLE("init(`%s')", url);
 	int i;

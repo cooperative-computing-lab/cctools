@@ -24,7 +24,7 @@ enum {
 typedef struct CHIRP_FILE CHIRP_FILE;
 
 struct chirp_filesystem {
-	int (*init) ( const char url[CHIRP_PATH_MAX], uuid_t *uuid );
+	int (*init) ( const char url[CHIRP_PATH_MAX], uuid *uuid );
 	void (*destroy) ( void );
 
 	int (*fname) ( int fd, char path[CHIRP_PATH_MAX] );
