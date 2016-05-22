@@ -223,7 +223,7 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], uuid *uuid)
 	}
 #endif
 
-	rc = openat(rootfd, ".__uuid", O_RDONLY);
+	rc = openat(rootfd, ".__uuid", O_RDONLY, 0);
 	if (rc >= 0) {
 		fd = rc;
 		memset(uuid->str, 0, sizeof uuid->str);
