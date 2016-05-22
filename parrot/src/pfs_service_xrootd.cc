@@ -20,16 +20,18 @@ sensitive to this setting.
 #ifdef HAS_XROOTD
 
 #include "pfs_service.h"
+#include "pfs_types.h"
 
 extern "C" {
 #include "debug.h"
-#include "stringtools.h"
 #include "domain_name.h"
-#include "link.h"
 #include "file_cache.h"
 #include "full_io.h"
 #include "http_query.h"
+#include "link.h"
+#include "stringtools.h"
 }
+
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
@@ -38,7 +40,6 @@ extern "C" {
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
-#include <pfs_types.h>
 #include <string.h>
 #include <XrdPosix/XrdPosixExtern.hh>
 

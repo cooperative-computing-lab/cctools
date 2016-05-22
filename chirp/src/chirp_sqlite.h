@@ -11,7 +11,7 @@
 #include "catch.h"
 #include "debug.h"
 
-#include <sqlite3.h>
+#include "sqlite3.h"
 
 #define CHIRP_SQLITE_TIMEOUT (5000)
 

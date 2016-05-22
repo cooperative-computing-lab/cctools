@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include "json.h"
 #include "json_aux.h"
 
-#include <sqlite3.h>
+#include "sqlite3.h"
 
 #include <errno.h>
 #include <float.h>
