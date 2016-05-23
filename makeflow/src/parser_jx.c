@@ -306,7 +306,7 @@ struct dag *dag_from_jx(struct jx *j) {
 	struct jx *rules = jx_lookup(j, "rules");
 	if (jx_istype(rules, JX_ARRAY)) {
 		for (struct jx_item *i = rules->u.items; i; i = i->next) {
-			struct jx *rule_context = jx_merge(variables ? variables : dummy_context, jx_lookup(i->value, "variables"));
+			struct jx *rule_context = jx_merge(variables ? variables : dummy_context, jx_lookup(i->value, "variables"), NULL);
 			if (!rule_from_jx(d, rule_context, i->value)) {
 				debug(D_MAKEFLOW_PARSER, "Failure parsing rule");
 				return NULL;
