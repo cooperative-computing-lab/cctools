@@ -622,6 +622,7 @@ static int handle_tasks(struct link *master)
 				p->exit_status = WEXITSTATUS(status);
 				FILE *loop_full_check;
 				if(p->loop_mount == 1 && (loop_full_check = fopen("./loop_dev_report.txt", "r"))) {
+					fprintf(stderr, "loop device full\n");
 					p->task_status = WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION;
 					p->task->loop_dev_full = 1;
 					fclose(loop_full_check);
@@ -654,7 +655,8 @@ static int handle_tasks(struct link *master)
 				if(rename(sandbox_name,f->payload) == -1) {
 					debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
 					if(copy_file_to_file(sandbox_name, f->payload)  == -1) {
-						debug(D_WQ, "could not rename output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
+						fprintf(stderr, "copy_file_to_file: %s to %s\n", sandbox_name, f->payload);
+						debug(D_WQ, "could not copy output file %s to %s: %s",sandbox_name,f->payload,strerror(errno));
 					}
 				}
 

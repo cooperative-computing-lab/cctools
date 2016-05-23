@@ -1659,7 +1659,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	//Format: task completion status, exit status (exit code or signal), output length, execution time, loop device, taskid
+	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid, loop device
 	char items[5][WORK_QUEUE_PROTOCOL_FIELD_MAX];
 	int n = sscanf(line, "result %s %s %s %s %" SCNd64" %s", items[0], items[1], items[2], items[3], &taskid, items[4]);
 
@@ -1773,7 +1773,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 		}
 	}
-	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+	if(t->loop_dev_full) {
 		/* if resource exhaustion, mark the task for possible resubmission. */
 		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
 	} else {
