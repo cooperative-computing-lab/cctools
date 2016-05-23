@@ -12,61 +12,32 @@
   "rules":[
     {
       "command":"$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif",
-      "outputs":[
-        "capitol.montage.gif"
-      ],
-      "inputs":[
-        "capitol.jpg",
-        "capitol.90.jpg",
-        "capitol.180.jpg",
-        "capitol.270.jpg",
-        "capitol.360.jpg"
-      ]
+      "outputs":["capitol.montage.gif"],
+      "inputs":["capitol.jpg", "capitol.90.jpg", "capitol.180.jpg", "capitol.270.jpg", "capitol.360.jpg"]
     },
     {
       "command":"$CONVERT -swirl 90 capitol.jpg capitol.90.jpg",
-      "outputs":[
-        "capitol.90.jpg"
-      ],
-      "inputs":[
-        "capitol.jpg"
-      ]
+      "outputs":["capitol.90.jpg"],
+      "inputs":["capitol.jpg"]
     },
     {
       "command":"$CONVERT -swirl 180 capitol.jpg capitol.180.jpg",
-      "outputs":[
-        "capitol.180.jpg"
-      ],
-      "inputs":[
-        "capitol.jpg"
-      ]
+      "outputs":["capitol.180.jpg"],
+      "inputs":["capitol.jpg"]
     },
     {
       "command":"$CONVERT -swirl 270 capitol.jpg capitol.270.jpg",
-      "outputs":[
-        "capitol.270.jpg"
-      ],
-      "inputs":[
-        "capitol.jpg"
-      ]
+      "outputs":["capitol.270.jpg"],
+      "inputs":["capitol.jpg"]
     },
     {
       "command":"$CONVERT -swirl 360 capitol.jpg capitol.360.jpg",
-      "outputs":[
-        "capitol.360.jpg"
-      ],
-      "inputs":[
-        "capitol.jpg"
-      ]
+      "outputs":["capitol.360.jpg"],
+      "inputs":["capitol.jpg"]
     },
     {
       "command":CURL + " -o capitol.jpg " + URL,
-      "outputs":[
-        "capitol.jpg"
-      ],
-      "inputs":[
-
-      ],
+      "outputs":["capitol.jpg"],
       "variables":{
         "URL":"http://ccl.cse.nd.edu/images/capitol.jpg"
       },

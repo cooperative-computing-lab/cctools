@@ -1184,30 +1184,18 @@ struct jx *category_to_json(struct category *c) {
 	return result;
 }
 
-struct jx *files_to_json(struct list *files) {
+struct jx *files_to_json(struct list *files, struct itable *remote_names) {
 	struct jx *result = jx_array(NULL);
-	struct dag_file *f;
+	struct dag_file *file;
+	const char *r;
 	list_first_item(files);
-	while((f = list_next_item(files))) {
-		jx_array_insert(result, jx_string(f->filename));
-	}
-	return result;
-}
-
-/*
-Note the odd cast here: the pointer to the file structure
-is being used as an integer entry in the itable.
-Strange, but matches the use in dag_node.c
-*/
-
-struct jx *remote_names_to_json(struct itable *r) {
-	uint64_t id;
-	char *remote;
-	struct jx *result = jx_object(NULL);
-	itable_firstkey(r);
-	while(itable_nextkey(r, &id, (void **)&remote)) {
-		struct dag_file *f = (struct dag_file *)(uintptr_t)id;
-		jx_insert(result, jx_string(f->filename), jx_string(remote));
+	while((file = list_next_item(files))) {
+		struct jx *f = jx_object(NULL);
+		jx_insert(f, jx_string("name"), jx_string(file->filename));
+		if((r = itable_lookup(remote_names, (uintptr_t) file))) {
+			jx_insert(f, jx_string("source"), jx_string(r));
+		}
+		jx_array_insert(result, f);
 	}
 	return result;
 }
@@ -1224,9 +1212,8 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
 		jx_insert_unless_empty(rule, jx_string("environment"), variables_to_json(n->variables));
 		jx_insert_unless_empty(rule, jx_string("resources"), resources_to_json(n->resources_requested));
-		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files));
-		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files));
-		jx_insert_unless_empty(rule, jx_string("remote_names"), remote_names_to_json(n->remote_names));
+		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files, n->remote_names));
+		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files, n->remote_names));
 		jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
 
 		if(n->nested_job) {

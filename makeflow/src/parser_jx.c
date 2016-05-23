@@ -86,6 +86,51 @@ static int resources_from_jx(struct hash_table *h, struct jx *j) {
 	return 1;
 }
 
+static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
+	if (jx_istype(j, JX_STRING)) {
+		if (input) {
+			debug(D_MAKEFLOW_PARSER, "Input %s", j->u.string_value);
+			dag_node_add_source_file(n, j->u.string_value, NULL);
+		} else {
+			debug(D_MAKEFLOW_PARSER, "Output %s", j->u.string_value);
+			dag_node_add_target_file(n, j->u.string_value, NULL);
+		}
+		return 1;
+	} else if (jx_istype(j, JX_OBJECT)) {
+		const char *name = jx_lookup_string(j, "name");
+		const char *source = jx_lookup_string(j, "source");
+		if (!name) {
+			debug(D_MAKEFLOW_PARSER, "File lacks a name");
+			return 0;
+		}
+		if (input) {
+			debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", name, source ? source : "NULL");
+			dag_node_add_source_file(n, name, source);
+		} else {
+			debug(D_MAKEFLOW_PARSER, "Output %s, remote name %s", name, source ? source : "NULL");
+			dag_node_add_target_file(n, name, source);
+		}
+		return 1;
+	} else {
+		debug(D_MAKEFLOW_PARSER, "Input must be a string or object");
+		return 0;
+	}
+}
+
+static int files_from_jx(struct dag_node *n, int inputs, struct jx *j) {
+	if (jx_istype(j, JX_ARRAY)) {
+		for (struct jx_item *i = j->u.items; i; i = i->next) {
+			if (!file_from_jx(n, inputs, i->value)) {
+				return 0;
+			}
+		}
+		return 1;
+	} else {
+		debug(D_MAKEFLOW_PARSER, "files malformed or missing");
+		return 1;
+	}
+}
+
 static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	debug(D_MAKEFLOW_PARSER, "Parsing rule");
 	struct dag_node *n;
@@ -151,45 +196,17 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 		return 0;
 	}
 
-	struct jx *remotes = jx_eval(jx_lookup(j, "remote_names"), context);
 	struct jx *inputs = jx_eval(jx_lookup(j, "inputs"), context);
-	if (jx_istype(inputs, JX_ARRAY)) {
-		for (struct jx_item *i = inputs->u.items; i; i = i->next) {
-			if (jx_istype(i->value, JX_STRING)) {
-				debug(D_MAKEFLOW_PARSER, "Input %s", i->value->u.string_value);
-				const char *r = jx_lookup_string(remotes, i->value->u.string_value);
-				if (r) {
-					debug(D_MAKEFLOW_PARSER, "Remote name %s", r);
-				} else {
-					debug(D_MAKEFLOW_PARSER, "Remote name malformed or missing");
-				}
-				dag_node_add_source_file(n, i->value->u.string_value, r);
-			} else {
-				debug(D_MAKEFLOW_PARSER, "Input must be a string");
-				return 0;
-			}
-		}
-	} else {
-		debug(D_MAKEFLOW_PARSER, "inputs malformed or missing");
+	debug(D_MAKEFLOW_PARSER, "Parsing inputs");
+	if (!files_from_jx(n, 1, inputs)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing inputs");
+		return 0;
 	}
-
 	struct jx *outputs = jx_eval(jx_lookup(j, "outputs"), context);
-	if (jx_istype(outputs, JX_ARRAY)) {
-		for (struct jx_item *i = outputs->u.items; i; i = i->next) {
-			if (jx_istype(i->value, JX_STRING)) {
-				debug(D_MAKEFLOW_PARSER, "Output %s", i->value->u.string_value);
-				const char *r = jx_lookup_string(remotes, i->value->u.string_value);
-				if (r) {
-					debug(D_MAKEFLOW_PARSER, "Remote name %s", r);
-				}
-				dag_node_add_target_file(n, i->value->u.string_value, r);
-			} else {
-				debug(D_MAKEFLOW_PARSER, "Output must be a string");
-				return 0;
-			}
-		}
-	} else {
-		debug(D_MAKEFLOW_PARSER, "Outputs malformed or missing");
+	debug(D_MAKEFLOW_PARSER, "Parsing outputs");
+	if (!files_from_jx(n, 0, outputs)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing outputs");
+		return 0;
 	}
 
 	struct jx *allocation = jx_eval(jx_lookup(j, "allocation"), context);
@@ -279,11 +296,9 @@ struct dag *dag_from_jx(struct jx *j) {
 	d->default_category = makeflow_category_lookup_or_create(d, default_category);
 
 	struct jx *environment = jx_lookup(j, "environment");
-	if (j) {
-		if (!environment_from_jx(d, NULL, d->default_category->mf_variables, environment)) {
-			debug(D_MAKEFLOW_PARSER, "Failure parsing top-level category");
-			return NULL;
-		}
+	if (environment && !environment_from_jx(d, NULL, d->default_category->mf_variables, environment)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing top-level category");
+		return NULL;
 	} else {
 		debug(D_MAKEFLOW_PARSER, "Top-level environment malformed or missing");
 	}
