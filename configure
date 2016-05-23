@@ -449,7 +449,7 @@ do
 		packages="${packages} $p"
 		if [ -d `pwd`/$p/src ]
 		then
-			internal_ccflags="${internal_ccflags} -iquote $(pwd)/$p/src"
+			internal_ccflags="${internal_ccflags} -I $(pwd)/$p/src"
 		fi
 	else
 		echo "package $p not found (that's ok)"
