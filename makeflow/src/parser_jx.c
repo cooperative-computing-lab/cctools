@@ -90,7 +90,7 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	debug(D_MAKEFLOW_PARSER, "Parsing rule");
 	struct dag_node *n;
 
-	struct jx *makeflow = jx_lookup(j, "makeflow");
+	struct jx *makeflow = jx_eval(jx_lookup(j, "makeflow"), context);
 	struct jx *command = jx_eval(jx_lookup(j, "command"), context);
 
 	if (makeflow && command) {
@@ -131,28 +131,28 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 
 	// If we got this far, the rule specification is valid and the dag_node exists
 
-	int local_job = jx_lookup_boolean(j, "local_job");
-	if (local_job) {
+	struct jx *local_job = jx_eval(jx_lookup(j, "local_job"), context);
+	if (jx_istype(local_job, JX_BOOLEAN) && local_job->u.boolean_value) {
 		debug(D_MAKEFLOW_PARSER, "Local job");
 		n->local_job = 1;
 	}
 
-	const char *category = jx_lookup_string(j, "category");
-	if (category) {
-		debug(D_MAKEFLOW_PARSER, "Category %s", category);
-		n->category = makeflow_category_lookup_or_create(d, category);
+	struct jx *category = jx_eval(jx_lookup(j, "category"), context);
+	if (jx_istype(category, JX_STRING)) {
+		debug(D_MAKEFLOW_PARSER, "Category %s", category->u.string_value);
+		n->category = makeflow_category_lookup_or_create(d, category->u.string_value);
 	} else {
 		debug(D_MAKEFLOW_PARSER, "category malformed or missing, using default");
 		n->category = makeflow_category_lookup_or_create(d, "default");
 	}
 
-	if (!resources_from_jx(n->variables, jx_lookup(j, "resources"))) {
+	if (!resources_from_jx(n->variables, jx_eval(jx_lookup(j, "resources"), context))) {
 		debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
 		return 0;
 	}
 
-	struct jx *remotes = jx_lookup(j, "remote_names");
-	struct jx *inputs = jx_lookup(j, "inputs");
+	struct jx *remotes = jx_eval(jx_lookup(j, "remote_names"), context);
+	struct jx *inputs = jx_eval(jx_lookup(j, "inputs"), context);
 	if (jx_istype(inputs, JX_ARRAY)) {
 		for (struct jx_item *i = inputs->u.items; i; i = i->next) {
 			if (jx_istype(i->value, JX_STRING)) {
@@ -173,7 +173,7 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 		debug(D_MAKEFLOW_PARSER, "inputs malformed or missing");
 	}
 
-	struct jx *outputs = jx_lookup(j, "outputs");
+	struct jx *outputs = jx_eval(jx_lookup(j, "outputs"), context);
 	if (jx_istype(outputs, JX_ARRAY)) {
 		for (struct jx_item *i = outputs->u.items; i; i = i->next) {
 			if (jx_istype(i->value, JX_STRING)) {
@@ -192,15 +192,15 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 		debug(D_MAKEFLOW_PARSER, "Outputs malformed or missing");
 	}
 
-	const char *allocation = jx_lookup_string(j, "allocation");
-	if (allocation) {
-		if (!strcmp(allocation, "first")) {
+	struct jx *allocation = jx_eval(jx_lookup(j, "allocation"), context);
+	if (jx_istype(allocation, JX_STRING)) {
+		if (!strcmp(allocation->u.string_value, "first")) {
 			debug(D_MAKEFLOW_PARSER, "first allocation");
 			n->resource_request = CATEGORY_ALLOCATION_FIRST;
-		} else if (!strcmp(allocation, "max")) {
+		} else if (!strcmp(allocation->u.string_value, "max")) {
 			debug(D_MAKEFLOW_PARSER, "max allocation");
 			n->resource_request = CATEGORY_ALLOCATION_MAX;
-		} else if (!strcmp(allocation, "error")) {
+		} else if (!strcmp(allocation->u.string_value, "error")) {
 			debug(D_MAKEFLOW_PARSER, "error allocation");
 			n->resource_request = CATEGORY_ALLOCATION_ERROR;
 		} else {
