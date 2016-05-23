@@ -84,7 +84,7 @@ char         chirp_owner[USERNAME_MAX] = "";
 int          chirp_port = CHIRP_PORT;
 char         chirp_project_name[128];
 char         chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
-uuid         chirp_uuid[1];
+cctools_uuid_t chirp_uuid[1];
 
 static char        address[LINK_ADDRESS_MAX];
 static time_t      advertise_alarm = 0;

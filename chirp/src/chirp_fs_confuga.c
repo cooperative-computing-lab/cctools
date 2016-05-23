@@ -91,7 +91,7 @@ out:\
 
 extern struct list *catalog_host_list;
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX], uuid *uuid)
+static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX], cctools_uuid_t *uuid)
 {
 	int rc;
 	int i;
@@ -102,7 +102,7 @@ static int chirp_fs_confuga_init (const char url[CHIRP_PATH_MAX], uuid *uuid)
 	CATCH(confuga_getid(C, &confuga_id));
 
 	if (pattern_match(confuga_id, "confuga:(%x+)", &confuga_uuid) >= 0) {
-		uuid_loadhex(uuid, confuga_uuid);
+		cctools_uuid_loadhex(uuid, confuga_uuid);
 	} else {
 		fatal("unexpected confuga id: %s", confuga_id);
 	}

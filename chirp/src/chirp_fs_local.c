@@ -188,7 +188,7 @@ out:\
  * o `path'
  */
 #define strprfx(s,p) (strncmp(s,p "",sizeof(p)-1) == 0)
-static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], uuid *uuid)
+static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], cctools_uuid_t *uuid)
 {
 	PREAMBLE("init(`%s')", url);
 	int i;
@@ -233,7 +233,7 @@ static int chirp_fs_local_init(const char url[CHIRP_PATH_MAX], uuid *uuid)
 		if ((size_t)rc < UUID_LEN)
 			fatal("bad uuid");
 	} else if (rc == -1 && errno == ENOENT) {
-		uuid_create(uuid);
+		cctools_uuid_create(uuid);
 		CATCHUNIX(fd = openat(rootfd, ".__uuid", O_WRONLY|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR));
 		rc = full_write(fd, uuid->str, UUID_LEN);
 		PROTECT(close(fd));

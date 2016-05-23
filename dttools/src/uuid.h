@@ -4,16 +4,16 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifndef UUID_H
-#define UUID_H
+#ifndef CCTOOLS_UUID_H
+#define CCTOOLS_UUID_H
 
 /* RFC 4122 V4 */
 #define UUID_LEN (sizeof "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx" - 1)
 typedef struct {
 	char str[UUID_LEN + 1 /* for NUL */];
-} uuid;
+} cctools_uuid_t;
 
-void uuid_create (uuid *uuid);
-void uuid_loadhex (uuid *uuid, const char *hex);
+void cctools_uuid_create (cctools_uuid_t *uuid);
+void cctools_uuid_loadhex (cctools_uuid_t *uuid, const char *hex);
 
 #endif
