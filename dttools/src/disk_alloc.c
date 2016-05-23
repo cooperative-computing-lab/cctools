@@ -70,7 +70,7 @@ int disk_alloc_create(char *loc, char *fs, int64_t size) {
 		}
 
 		losetup_args = string_format("losetup /dev/loop%d %s", j, device_loc);
-		mk_args = string_format("mkfs /dev/loop%d", j);
+		mk_args = string_format("mkfs /dev/loop%d -t %s", j, fs);
 		mount_args = string_format("/dev/loop%d", j);
 
 		if(system(losetup_args) == 0) {
