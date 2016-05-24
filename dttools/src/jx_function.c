@@ -8,8 +8,16 @@ See the file COPYING for details.
 #include <stdarg.h>
 #include "jx.h"
 #include "jx_eval.h"
+#include "jx_print.h"
 #include "jx_function.h"
 
+struct jx *jx_function_str( struct jx_operator *o, struct jx *context ) {
+	struct jx *args = jx_eval(o->right, context);
+	if (!args) return NULL;
+	const char *result = jx_print_string(args);
+	jx_delete(args);
+	return jx_string(result);
+}
 
 // see https://docs.python.org/2/library/functions.html#range
 struct jx *jx_function_range( struct jx_operator *o, struct jx *context ) {

@@ -86,6 +86,7 @@ typedef enum {
 	JX_OP_OR,
 	JX_OP_NOT,
 	JX_OP_LOOKUP,
+	JX_OP_STR,
 	JX_OP_RANGE,
 	JX_OP_INVALID
 } jx_operator_t;
