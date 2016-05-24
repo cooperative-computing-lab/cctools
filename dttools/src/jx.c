@@ -500,6 +500,7 @@ int jx_is_function( jx_operator_t op )
 {
 	switch(op) {
 		case JX_OP_RANGE:
+		case JX_OP_FOREACH:
 		case JX_OP_STR:
 			return 1;
 		default:

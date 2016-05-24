@@ -45,6 +45,7 @@ typedef enum {
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
 	JX_TOKEN_RANGE,
+	JX_TOKEN_FOREACH,
 	JX_TOKEN_STR,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_EOF,
@@ -352,6 +353,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_NULL;
 				} else if(!strcmp(s->token,"range")) {
 					return JX_TOKEN_RANGE;
+				} else if(!strcmp(s->token,"foreach")) {
+					return JX_TOKEN_FOREACH;
 				} else if(!strcmp(s->token,"str")) {
 					return JX_TOKEN_STR;
 				} else {
@@ -559,6 +562,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_RANGE:	return JX_OP_RANGE;
+		case JX_TOKEN_FOREACH:	return JX_OP_FOREACH;
 		case JX_TOKEN_STR:	return JX_OP_STR;
 		default:		return JX_OP_INVALID;
 	}
@@ -568,6 +572,7 @@ static int jx_operator_is_unary( jx_operator_t op )
 {
 	switch(op) {
 		case JX_OP_RANGE:
+		case JX_OP_FOREACH:
 		case JX_OP_STR:
 		case JX_OP_NOT:
 			return 1;
@@ -612,6 +617,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 	jx_token_t t = jx_scan(s);
 	switch(t) {
 		case JX_TOKEN_RANGE:
+		case JX_TOKEN_FOREACH:
 		case JX_TOKEN_STR:
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:

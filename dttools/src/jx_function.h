@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 int jx_function_parse_args(struct jx *array, int argc, ...);
 struct jx *jx_function_range( struct jx_operator *o, struct jx *context );
+struct jx *jx_function_foreach( struct jx_operator *o, struct jx *context );
 struct jx *jx_function_str( struct jx_operator *o, struct jx *context );
 
 #endif

@@ -208,6 +208,8 @@ static struct jx *jx_eval_function( struct jx_operator *o, struct jx *context )
 	switch(o->type) {
 		case JX_OP_RANGE:
 			return jx_function_range(o, context);
+		case JX_OP_FOREACH:
+			return jx_function_foreach(o, context);
 		case JX_OP_STR:
 			return jx_function_str(o, context);
 		default:
