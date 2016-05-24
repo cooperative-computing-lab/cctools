@@ -124,3 +124,16 @@ object["house"]
 "memory":16,
 "disk":1
 }
+
+range[5]
+range[3, 7]
+range [7, 3]
+range[-1, 10, 2]
+
+str(2)
+str(x + y)
+str(range[10])
+
+foreach["too", "few"]
+foreach[x, "nope", str(x)]
+foreach[x, range[5], "item" + str(x)]
