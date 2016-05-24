@@ -52,8 +52,8 @@ static const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_NOT:	return "!";
 		// note that the closing bracket is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
-		case JX_OP_RANGE: return "range";
-		case JX_OP_STR:	return "str";
+		case JX_OP_RANGE: return "range(";
+		case JX_OP_STR:	return "str(";
 		default:        return "???";
 	}
 }
@@ -157,6 +157,7 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b,jx_operator_string(j->u.oper.type));
 			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
 			if(j->u.oper.type==JX_OP_LOOKUP) buffer_putstring(b,"]");
+			if(jx_is_function(j->u.oper.type)) buffer_putstring(b,")");
 			break;
 	}
 }

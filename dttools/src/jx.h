@@ -224,6 +224,9 @@ struct jx * jx_array_index( struct jx *j, int nth );
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
 
+/** Determine whether the given operator is a function. @param op The operator to check. @return A true or false value depending on whether op is an operator. */
+int jx_is_function( jx_operator_t op );
+
 /** Export a jx object as a set of environment variables.  @param j A JX_OBJECT. */
 void jx_export( struct jx *j );
 

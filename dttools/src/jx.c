@@ -496,6 +496,17 @@ int jx_is_constant( struct jx *j )
 	return 0;
 }
 
+int jx_is_function( jx_operator_t op )
+{
+	switch(op) {
+		case JX_OP_RANGE:
+		case JX_OP_STR:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 void jx_export( struct jx *j )
 {
 	if(!j || !jx_istype(j,JX_OBJECT)) return;
