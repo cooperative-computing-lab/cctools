@@ -44,6 +44,7 @@ typedef enum {
 	JX_TOKEN_NULL,
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
+	JX_TOKEN_RANGE,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
@@ -348,6 +349,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_FALSE;
 				} else if(!strcmp(s->token,"null")) {
 					return JX_TOKEN_NULL;
+				} else if(!strcmp(s->token,"range")) {
+					return JX_TOKEN_RANGE;
 				} else {
 					return JX_TOKEN_SYMBOL;
 				}
@@ -552,6 +555,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
+		case JX_TOKEN_RANGE:	return JX_OP_RANGE;
 		default:		return JX_OP_INVALID;
 	}
 }
@@ -559,6 +563,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 static int jx_operator_is_unary( jx_operator_t op )
 {
 	switch(op) {
+		case JX_OP_RANGE:
 		case JX_OP_NOT:
 			return 1;
 		default:
@@ -601,6 +606,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 
 	jx_token_t t = jx_scan(s);
 	switch(t) {
+		case JX_TOKEN_RANGE:
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
 		case JX_TOKEN_NOT:

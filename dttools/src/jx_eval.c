@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "jx_eval.h"
+#include "jx_function.h"
 #include "debug.h"
 
 #include <string.h>
@@ -202,6 +203,16 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 	}
 }
 
+static struct jx *jx_eval_function( struct jx_operator *o, struct jx *context )
+{
+	switch(o->type) {
+		case JX_OP_RANGE:
+			return jx_function_range(o, context);
+		default:
+			return NULL;
+	}
+}
+
 /*
 Type conversion rules:
 Generally, operators are not meant to be applied to unequal types.
@@ -214,6 +225,16 @@ Exception: The lookup operation can be "object[string]" or "array[integer]"
 static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
 	if(!o) return 0;
+
+	/*
+	Functions need access to their unevaluated operands.
+	If this isn't a function, just fall through and process other operators.
+	If function application fails (e.g. bad arguments), the other handlers here
+	won't know what to do with a function operator, so the end result will
+	be a jx_null().
+	*/
+	struct jx *result = jx_eval_function(o, context);
+	if(result) return result;
 
 	struct jx *left = jx_eval(o->left,context);
 	struct jx *right = jx_eval(o->right,context);
@@ -247,7 +268,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		}
 	}
 
-	struct jx *result;
+
 
 	switch(right->type) {
 		case JX_NULL:

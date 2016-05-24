@@ -52,6 +52,7 @@ static const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_NOT:	return "!";
 		// note that the closing bracket is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
+		case JX_OP_RANGE: return "range";
 		default:        return "???";
 	}
 }
