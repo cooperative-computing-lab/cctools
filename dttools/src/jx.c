@@ -295,6 +295,14 @@ struct jx * jx_array_index( struct jx *j, int nth )
 	return item ? item->value : NULL;
 }
 
+int jx_array_length( struct jx *array )
+{
+	if(!jx_istype(array, JX_ARRAY)) return -1;
+	int count = 0;
+	for(struct jx_item *i = array->u.items; i; i = i->next) ++count;
+	return count;
+}
+
 void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;

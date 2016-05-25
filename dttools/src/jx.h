@@ -171,6 +171,9 @@ int jx_istrue( struct jx *j );
 */
 int jx_equals( struct jx *j, struct jx *k );
 
+/** Get the length of an array. Returns -1 if array is null or not an array. @param array The array to check. */
+int jx_array_length( struct jx *array );
+
 /** Duplicate an expression. @param j An expression. @return A copy of the expression, which must be deleted by @ref jx_delete
 */
 struct jx * jx_copy( struct jx *j );
