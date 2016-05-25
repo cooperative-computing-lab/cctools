@@ -367,10 +367,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	}
 }
 
-static struct jx_item * jx_parse_item_list( struct jx_parser *s )
+static struct jx_item * jx_parse_item_list( struct jx_parser *s, int arglist )
 {
+	jx_token_t rdelim = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
 	jx_token_t t = jx_scan(s);
-	if(t==JX_TOKEN_RBRACKET) {
+	if(t==rdelim) {
 		// empty list
 		return 0;
 	}
@@ -388,11 +389,11 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s )
 
 	t = jx_scan(s);
 	if(t==JX_TOKEN_COMMA) {
-		i->next = jx_parse_item_list(s);
-	} else if(t==JX_TOKEN_RBRACKET) {
+		i->next = jx_parse_item_list(s, arglist);
+	} else if(t==rdelim) {
 		i->next = 0;
 	} else {
-		jx_parse_error(s,"array items missing a comma or closing brace");
+		jx_parse_error(s,"list of items missing a comma or closing delimiter");
 		jx_item_delete(i);
 		return 0;
 	}
@@ -455,9 +456,18 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	return p;
 }
 
-static struct jx * jx_parse_atomic( struct jx_parser *s )
+static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
 {
 	jx_token_t t = jx_scan(s);
+
+	if(arglist) {
+		if(t == JX_TOKEN_LPAREN) {
+			t = JX_TOKEN_LBRACKET;
+		} else {
+			jx_parse_error(s,"function missing opening parenthesis");
+			return NULL;
+		}
+	}
 
 	switch(t) {
 	case JX_TOKEN_EOF:
@@ -466,7 +476,7 @@ static struct jx * jx_parse_atomic( struct jx_parser *s )
 	case JX_TOKEN_LBRACE:
 		return jx_object(jx_parse_pair_list(s));
 	case JX_TOKEN_LBRACKET:
-		return jx_array(jx_parse_item_list(s));
+		return jx_array(jx_parse_item_list(s, arglist));
 	case JX_TOKEN_STRING:
 		return jx_string(s->token);
 	case JX_TOKEN_INTEGER:
@@ -570,9 +580,9 @@ static int jx_operator_is_unary( jx_operator_t op )
 	}
 }
 
-static struct jx * jx_parse_postfix( struct jx_parser *s )
+static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
 {
-	struct jx *a = jx_parse_atomic(s);
+	struct jx *a = jx_parse_atomic(s, arglist);
 	if(!a) return 0;
 
 	jx_token_t t = jx_scan(s);
@@ -609,7 +619,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
 		case JX_TOKEN_NOT:
-			j = jx_parse_postfix(s);
+			j = jx_parse_postfix(s, 0);
 			if(j) {
 				return jx_operator(jx_token_to_operator(t),0,j);
 			} else {
@@ -618,16 +628,17 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			break;
 		case JX_TOKEN_FUNCTION:
 			if((f = jx_function_name_from_string(s->token)) &&
-			   (j = jx_parse_postfix(s)) &&
+			   (j = jx_parse_postfix(s, 1)) &&
 			   jx_istype(j, JX_ARRAY)) {
 				return jx_function(f, j);
 			} else {
+				jx_parse_error(s,"invalid function");
 				return NULL;
 			}
 			break;
 		default:
 			jx_unscan(s,t);
-			return jx_parse_postfix(s);
+			return jx_parse_postfix(s, 0);
 	}
 }
 

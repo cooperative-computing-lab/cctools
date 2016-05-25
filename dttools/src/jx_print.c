@@ -166,9 +166,9 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			break;
 		case JX_FUNCTION:
 			buffer_putstring(b, jx_function_name_to_string(j->u.func.function));
-			buffer_putstring(b, "[");
+			buffer_putstring(b, "(");
 			jx_print_args(j->u.func.arguments, b);
-			buffer_putstring(b, "]");
+			buffer_putstring(b, ")");
 			break;
 	}
 }
