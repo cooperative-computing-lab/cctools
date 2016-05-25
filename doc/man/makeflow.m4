@@ -88,6 +88,7 @@ OPTION_ITEM(`--monitor-with-time-series')Enable monitor time series.            
 OPTION_ITEM(`--monitor-with-opened-files')Enable monitoring of openened files.        (default is disabled)
 OPTION_PAIR(--monitor-interval, #)Set monitor interval to <#> seconds. (default 1 second)
 OPTION_PAIR(--monitor-log-fmt, fmt)Format for monitor logs. (default resource-rule-%06.6d, %d -> rule number)
+OPTION_PAIR(--allocation, waste,throughput)When monitoring is enabled, automatically assign resource allocations to tasks. Makeflow will try to minimize CODE(waste) or maximize CODE(throughput).
 OPTIONS_END
 
 SUBSECTION(Docker Support)
