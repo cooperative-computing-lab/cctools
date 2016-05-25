@@ -47,7 +47,7 @@ int disk_alloc_create(char *loc, char *fs, int64_t size) {
 	}
 
 	//Create Image
-	dd_args = string_format("dd if=/dev/zero of=%s bs=1024 count=%"PRId64" > /dev/null", device_loc, size);
+	dd_args = string_format("dd if=/dev/zero of=%s bs=1024 count=%"PRId64" > /dev/null 2> /dev/null", device_loc, size);
 	if(system(dd_args) != 0) {
 		debug(D_NOTICE, "Failed to allocate junk space for loop device image: %s.\n", strerror(errno));
 		if(unlink(device_loc) == -1) {
@@ -70,9 +70,9 @@ int disk_alloc_create(char *loc, char *fs, int64_t size) {
 		}
 
 		//Binds the first available loop device to the specified mount point from input
-		losetup_args = string_format("losetup /dev/loop%d %s > /dev/null", j, device_loc);
+		losetup_args = string_format("losetup /dev/loop%d %s > /dev/null 2> /dev/null", j, device_loc);
 		//Makes the specified filesystem from input at the first available loop device
-		mk_args = string_format("mkfs /dev/loop%d -t %s > /dev/null", j, fs);
+		mk_args = string_format("mkfs /dev/loop%d -t %s > /dev/null 2> /dev/null", j, fs);
 		//Mounts the first available loop device
 		mount_args = string_format("/dev/loop%d", j);
 
