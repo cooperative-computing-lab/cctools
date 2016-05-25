@@ -680,11 +680,12 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 		if(monitor && info->exit_code == RM_OVERFLOW)
 		{
-			fprintf(stderr, "\nrule %d failed because it exceeded the resources limits.\n", n->nodeid);
-			if(n->resources_measured)
+			debug(D_MAKEFLOW_RUN, "rule %d failed because it exceeded the resources limits.\n", n->nodeid);
+			if(n->resources_measured && n->resources_measured->limits_exceeded)
 			{
-				rmsummary_print(stderr, n->resources_measured, /* pprint */ 0, /* extra fields */ NULL);
-				fprintf(stderr, "\n");
+				char *str = rmsummary_print_string(n->resources_measured->limits_exceeded, 1);
+				debug(D_MAKEFLOW_RUN, "%s", str);
+				free(str);
 			}
 
 			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
@@ -692,7 +693,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			if(next != CATEGORY_ALLOCATION_ERROR) {
 				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
 				n->resource_request = next;
-				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
 				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 				monitor_retried = 1;
 			}
@@ -702,10 +702,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			if(makeflow_retry_flag || info->exit_code == 101) {
 				n->failure_count++;
 				if(n->failure_count > makeflow_retry_max) {
-					fprintf(stderr, "job %s failed too many times.\n", n->command);
+					notice(D_MAKEFLOW_RUN, "job %s failed too many times.", n->command);
 					makeflow_failed_flag = 1;
 				} else {
-					fprintf(stderr, "will retry failed job %s\n", n->command);
+					notice(D_MAKEFLOW_RUN, "will retry failed job %s", n->command);
 					makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 				}
 			}
@@ -985,6 +985,8 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+
 
 	random_init();
 	debug_config(argv[0]);
@@ -1038,11 +1040,13 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_SKIP_FILE_CHECK
+		LONG_OPT_SKIP_FILE_CHECK,
+		LONG_OPT_ALLOCATION_MODE
 	};
 
 	static const struct option long_options_run[] = {
 		{"advertise", no_argument, 0, 'a'},
+		{"allocation", required_argument, 0, LONG_OPT_ALLOCATION_MODE},
 		{"auth", required_argument, 0, LONG_OPT_AUTH},
 		{"batch-log", required_argument, 0, 'L'},
 		{"batch-options", required_argument, 0, 'B'},
@@ -1338,6 +1342,17 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOCKER_TAR:
 				image_tar = xxstrdup(optarg);
 				break;
+			case LONG_OPT_ALLOCATION_MODE:
+				if(!strcmp(optarg, "throughput")) {
+					allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
+				} else if(!strcmp(optarg, "waste")) {
+					allocation_mode = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
+				} else if(!strcmp(optarg, "fixed")) {
+					allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+				} else {
+					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
+				}
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1401,6 +1416,8 @@ int main(int argc, char *argv[])
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
+
+	d->allocation_mode = allocation_mode;
 
 	// Makeflows running LOCAL batch type have only one queue that behaves as if remote
 	// This forces -J vs -j to behave correctly

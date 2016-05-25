@@ -47,6 +47,8 @@ struct dag *dag_create()
 	d->categories   = hash_table_create(0, 0);
 	d->default_category = makeflow_category_lookup_or_create(d, "default");
 
+	d->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+
 	/* Add GC_*_LIST to variables table to ensure it is in
 	 * global DAG scope. /
 	hash_table_insert(d->variables,"GC_PRESERVE_LIST"   , dag_variable_create(NULL, ""));
