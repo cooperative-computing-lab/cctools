@@ -700,14 +700,28 @@ void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int onl
 	if(!s)
 		return;
 
+	char *str = rmsummary_print_string(s, only_resources);
+
+	if(str) {
+		buffer_printf(B, "%s", str);
+		free(str);
+	}
+}
+
+char *rmsummary_print_string(const struct rmsummary *s, int only_resources) {
+	if(!s)
+		return NULL;
+
 	struct jx *jsum = rmsummary_to_json(s, only_resources);
 
 	if(jsum) {
 		char *str = jx_print_string(jsum);
-		buffer_printf(B, "%s", str);
 		jx_delete(jsum);
-		free(str);
+
+		return str;
 	}
+
+	return NULL;
 }
 
 /* Create summary filling all numeric fields with default_value, and
