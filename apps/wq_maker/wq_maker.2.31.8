@@ -1,0 +1,414 @@
+#!/usr/bin/env perl
+
+# wq_maker
+# 
+# Copyright (C) 2013- The University of Notre Dame
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details.
+# 
+# This program implements elastic genome annotation using the cctools work queue
+# framework and the MAKER annotation pipeline as described in the following
+# paper:
+# 
+# Andrew Thrasher, Zachary Musgrave, Douglas Thain, Scott Emrich,
+#  "Shifting the Bioinformatics Computing Paradigm: A Case Study in
+#   Parallelizing Genome Annotation Using Maker and Work Queue",
+# IEEE International Conference on Computational Advances in Bio and Medical
+# Sciences, February, 2012.
+
+use strict "refs";
+use strict "vars";
+use warnings;
+
+use Cwd;
+use Cwd qw(abs_path);
+use Error qw(:try);
+use Error::Simple;
+use Getopt::Long qw(:config no_ignore_case);
+Getopt::Long::Configure("pass_through");
+use Time::HiRes qw(gettimeofday); 
+use Work_Queue;
+
+#Record starting time.
+my $start_time = time; 
+
+$| = 1; #turn on autoflush.
+
+my $version = `maker -v`;
+if( chomp($version) ne "2.31.8"){
+	print "WQ_MAKER supports version 2.31.8. Current version : $version\n";
+}
+
+
+my $maker_help = `maker -h`;
+
+my $genome;
+my $base_name;
+my $mpi_arg = "";
+my $resources = 0;
+my $total_tiers = 0;
+my $tasks = 0;
+my $tolerable_task_failures = 0;
+my %task_failures;
+
+my $usage = "$maker_help
+Work Queue Options:
+
+     -port <int>           Sets the port for work_queue to listen on (default: 9135)
+ 
+     -fa   <int>           Sets the work_queue fast abort option with the given multiplier. 
+
+     -chunks <int>         Specify the number of chunks created from FASTA file. 
+
+     -N <project>          Sets the project name to <project>.
+
+     -resources <int>      Specify the number of resources that will be provisioned (default: $resources). 
+     
+     -d <level>            Sets the debug flag for Work Queue. For all debugging output, try 'all'.
+	 
+     -bw <integer>         Sets the expected network bandwidth in MBytes/second.
+
+     -MPI                  Specifies that each task should utilize mpiexec to execute.
+";
+
+#---Process options on the command line 
+my %OPT;
+try{
+    GetOptions("CTL" => sub { `maker -CTL`; exit(0);},
+               "OPTS" => sub { `maker -OPTS`; exit(0);},
+               "BOPTS" => sub { `maker -BOPTS`; exit(0);},
+               "EXE" => sub { `maker -EXE`; exit(0);},
+               "base=s" => \$OPT{base},
+               "genome|g=s" => \$OPT{genome},
+	       "port=i" => \$OPT{port},
+	       "fa=i" => \$OPT{fast_abort},
+	       "N=s" => \$OPT{project},
+	       "d=s" => \$OPT{debug},
+ 	       "resources=i" => \$OPT{resources},
+ 	       "chunks=i" => \$OPT{chunks},
+ 	       "bw=i" => \$OPT{bw},
+           "MPI" => sub {$mpi_arg = "mpiexec -n ";},
+	       "help|?" => sub {print $usage; exit(0)}
+	       );
+
+} catch Error::Simple with{
+    my $E = shift;
+    print STDERR $E->{-text};
+    die "Failed to parse command line options.\n";
+};
+
+if(!defined($OPT{"genome"})) {
+	print "Genome file not specified. Using the specification in the CTL files.\n";
+} else {
+	$genome = $OPT{"genome"};
+	$genome_arg = "-g ".$OPT{"genome"};
+}
+
+try{
+    #get arguments off the command line
+    if (not (-e "maker_opts.ctl" && -e "maker_bopts.ctl" && -e "maker_exe.ctl")) {
+        print STDERR "Maker control files not found\n";
+        print STDERR $usage;
+        exit(0);
+    }
+	
+    `maker -check @ARGV`;
+
+    #---set up blast databases and indexes for analyisis
+    print STDERR "STATUS: Processing and indexing input FASTA files...\n";
+    
+} catch Error::Simple with{
+    my $E = shift;
+    print STDERR $E->{-text};
+    my $code = 2;
+    $code = $E->{-value} if (defined($E->{-value}));
+    exit($code);
+};
+
+if(defined $OPT{"tasks"}){
+	$tasks = $OPT{"tasks"}; 
+}
+
+if(defined($OPT{"resources"})) {
+	$resources = $OPT{"resources"}; 
+}
+
+#Call main loop here
+main(); 
+
+
+#------------------------------- FUNCTION DEFINITIONS -------------------------------------
+
+sub main {
+	my $tiers_to_annotate = $total_tiers;
+	
+	my $start_tier = 0;
+	my $tiers_annotated = 0;
+	my $total_tiers_annotated = 0;
+
+	my $partition_time_start;
+	my $actual_partition_time = 0;
+
+	###Begin WorkQueue section
+	my $wq_start_time = time; 
+	
+	my $wq = setup_workqueue();
+	my $common_input_files = parse_maker_opts();
+	my $unique_input_files = parse_genome_file();
+
+	if($OPT{"base"}){
+		$base_name = $OPT{"base"};
+	}
+	
+	my $workers_used = 0;	
+
+	my $optimal_tasks = $tasks;
+	my $optimal_tasks_to_submit = $tasks;
+	my $tasks_submitted = 0;
+		
+	print localtime()." :: Number of workers setup with data is $workers_used\n";
+	
+	submit_tasks($wq, $unique_input_files, $common_input_files);
+
+	process_completed_tasks($wq, scalar @$unique_input_files, 5);	
+
+	delete_workqueue($wq);
+
+	`maker -dsindex -g $genome -base $base_name`
+
+	print "\n".localtime()." :: File $base_name annotated :: ".scalar @$unique_input_files." in total \n";
+
+	my $wq_total_time = time - $wq_start_time;
+	my $total_time = time - $start_time;
+	
+	exit(0);
+}
+
+sub get_wkdir {
+	my $wkdir = cwd();
+	$wkdir .= "/";
+	return $wkdir;
+}
+
+sub setup_workqueue {
+	if(defined($OPT{"debug"})){
+		work_queue::cctools_debug_flags_set($OPT{"debug"}); 
+		print localtime()." :: Work Queue debug flags set :: ".$OPT{"debug"}.".\n";
+	}
+
+	my $port = "9155";
+	if(defined($OPT{"port"})) {
+		$port = $OPT{"port"}; 
+	} 
+	my $wq = work_queue::work_queue_create($port);
+	if(defined($wq)) {
+		print localtime()." :: Work Queue listening on port $port.\n";
+	} else {
+		print STDERR "Failed to create Work Queue on port $port.\n"; 
+		exit(0);
+	}
+	if(defined($OPT{"fast_abort"})) {
+		my $multiplier = $OPT{"fast_abort"}; 
+		my $fa = work_queue::work_queue_activate_fast_abort($wq, $multiplier); 
+		print localtime()." :: Work Queue fast abort set to $multiplier.\n";
+	}
+	if(defined($OPT{"project"})) {
+		work_queue::work_queue_specify_name($wq, $OPT{"project"});
+		work_queue::work_queue_specify_master_mode($wq, 1);
+		print localtime()." :: Work Queue project name set to ".$OPT{"project"}.".\n";
+	}
+	
+	work_queue::work_queue_specify_log($wq, "maker_wq.stats");
+
+	return $wq;
+}
+
+sub parse_maker_opts {
+	my @files;
+	open my $opts, '<', 'maker_opts.ctl' or die "Could not open maker_opts.ctl $!\n";
+	while (my $line = <$opts>) {
+		chomp $line;
+		my $info = substr($line, 0 , index($line, '#'));
+		if( $info =~ m/^(makergff|est|altest|est_gff|altest_gff|protein|protein_gff|rmlib|repeat_protein|rm_gff|snaphmm|gmhmm|augustus_species|fgenesh_par_file|pred_gff|model_gff|snoscan_rrna|other_gff)=/ ) {
+			my $input = substr($info, index($info, '=')+1);
+			$input =~ s/^\s+|\s+$//g;
+			if(length $input > 0 and not($input =~ m/^\//)){
+				push @files, $input;
+			} elsif ( $input =~ m/^\// ) {
+				print "$input is absolute path, please use relative path within cwd\n";
+				exit(1);
+			}
+		} elsif ( $info =~ m/^genome=/ and not $genome ) {
+			my $input = substr($info, index($info, '=')+1);
+			$input =~ s/^\s+|\s+$//g;
+			if(length $input > 0 and not($input =~ m/^\//)){
+				$genome = $input;
+			} elsif ( $input =~ m/^\// ) {
+				print "$input is absolute path, please use relative path within cwd.\n";
+				exit(1);
+			}
+		}
+	}
+	return \@files;
+}
+
+sub parse_genome_file {
+	my $chunks = 10;
+	if($OPT{"chunks"}){
+		$chunks = $OPT{"chunks"};
+	}
+
+	`fasta_tool --chunks $chunks $genome`;
+
+	my $base_dir = substr($genome, 0, rindex($genome, '/')+1);
+	my $name_length = rindex($genome, '.') - (rindex($genome, '/')+1);
+	if($name_length > 0){
+		$base_name = substr($genome, rindex($genome, '/')+1, $name_length);
+	} else {
+		$base_name = substr($genome, rindex($genome, '/')+1);
+	}
+	opendir(DIR, $base_dir);
+	my @files = grep(/$base_name\_\d*\.fasta/, readdir(DIR));
+	closedir(DIR);
+
+	my @files_path;
+	foreach my $file (@files) {
+		push @files_path, $base_dir.$file;
+	}
+	return \@files_path;
+}
+
+sub submit_tasks {
+	my($wq, $genome_chunks, $common_input_files) = @_;
+	
+	foreach my $genome_chunk (@$genome_chunks) {
+		print localtime()." :: Submitting file $genome_chunk for processing.\n";
+		
+		submit_task($wq, $genome_chunk, $common_input_files);
+	}
+}
+
+sub submit_task {
+	my($wq, $genome_chunk, $common_input_files) = @_;
+
+	my $task_command .= "$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
+	
+	my $task = work_queue::work_queue_task_create("$task_command"); 
+	my $task_tag = substr($genome_chunk, rindex($genome_chunk, '_')+1, rindex($genome_chunk, '.')-(rindex($genome_chunk, '_')+1)); 
+	work_queue::work_queue_task_specify_tag($task, $task_tag); 
+
+	work_queue::work_queue_task_specify_file($task, $genome_chunk, $genome_chunk, 0, 1); 
+	work_queue::work_queue_task_specify_file($task, "maker_opts.ctl", "maker_opts.ctl", 0, 1); 
+	work_queue::work_queue_task_specify_file($task, "maker_bopts.ctl", "maker_bopts.ctl", 0, 1); 
+	work_queue::work_queue_task_specify_file($task, "maker_exe.ctl", "maker_exe.ctl", 0, 1); 
+	submit_input_files($task, $common_input_files);
+	work_queue::work_queue_task_specify_file($task, $base_name.".maker.output", $base_name.".maker.output", 1, 1); 
+	
+	my $taskid = work_queue::work_queue_submit($wq, $task);
+	print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
+
+	return 1;
+}
+
+sub submit_input_files {
+	my($task, $inputs) = @_;
+	foreach my $input (@$inputs){
+		if(-e $input){
+			work_queue::work_queue_task_specify_file($task, $input, "$input", 0, 1); 
+		}
+	}
+}
+
+sub delete_workqueue {
+	my($wq) = @_;
+	work_queue::work_queue_delete($wq);
+}
+
+sub get_busy_workers {
+	my($wq) = @_;
+
+	my $wq_stats = work_queue::work_queue_stats->new();
+	work_queue_get_stats($wq, $wq_stats);
+	return $wq_stats->{workers_busy};	
+}
+
+sub call_wq_wait {
+	my($wq, $timeout) = @_;
+
+	my $task_execution_time = 0;
+	my $transfered_bytes= 0;
+	my $transfer_time = 0;
+
+	my $tasktimes_fh;
+	if(defined($OPT{"tasktimes_file"})) {
+		my $tasktimes_file = $OPT{"tasktimes_file"}; 
+		open $tasktimes_fh, ">>$tasktimes_file"; 
+	}
+
+	my $taskoverheads_fh;
+	if(defined($OPT{"taskoverheads_file"})) {
+		my $taskoverheads_file = $OPT{"taskoverheads_file"}; 
+		open $taskoverheads_fh, ">>$taskoverheads_file"; 
+	}
+		
+	my $t = work_queue::work_queue_wait($wq, $timeout); 
+	if(defined($t)) {
+		my $tasktag = $t->{tag}; 
+
+		$transfer_time = $t->{total_transfer_time};
+		$transfered_bytes = $t->{total_bytes_transferred};
+		$task_execution_time = $t->{cmd_execution_time}/1000000;
+
+		#Check if return status indicates failure
+		my $output = $t->{output};
+		open (task_outfile, '>>task_outputs.txt'); 
+		print task_outfile "$output\n";
+		print task_outfile "=================================\n\n";
+		close (task_outfile);
+		
+		my $retStatus = index($output, "EXIT:");
+		if ($retStatus != -1) {
+			$retStatus = substr($output, $retStatus+5, 2);
+			$retStatus = sprintf("%d", $retStatus);
+		}
+		if($retStatus == 0 || $retStatus == 1) {
+			my $task_result = $t->{result}; 	
+			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
+			work_queue::work_queue_task_delete($t);
+		} else { #tier resubmission on failure 
+			$task_failures{$tasktag} += 1; 
+			if($task_failures{$tasktag} <= $tolerable_task_failures){
+				print localtime()." :: Failed, resubmitting WQ task for tiers $tasktag\n";
+				work_queue::work_queue_submit($wq, $t);
+			} else{
+				print localtime()." :: Giving up on task for tiers $tasktag since it has failed $tolerable_task_failures times\n"; 
+				work_queue::work_queue_task_delete($t);
+			}
+		}
+	}		
+	return ($task_execution_time, $transfered_bytes, $transfer_time);
+}
+
+sub process_completed_tasks {
+	my($wq, $tasks_to_retrieve, $timeout) = @_;
+	
+	# Currently ignored, but may need to be addressed later -Nick #somewhere MAKER launches "maintain.pl" which becomes a zombie script, it needs to be reaped before WQ wait. 
+	#Proc::Signal::reap_children_by_name(9, 'maintain.pl');
+
+	my $total_task_execution_times = 0;
+	my $total_transfered_bytes= 0;
+	my $total_transfer_time = 0;
+	
+	my $retrieved_tasks = 0;
+	while ($retrieved_tasks < $tasks_to_retrieve) {
+		my ($task_execution_time, $transfered_bytes, $transfer_time) = call_wq_wait($wq, $timeout); 
+		if($task_execution_time > 0 || $transfered_bytes > 0 || $transfer_time > 0) {
+			$retrieved_tasks++;
+			$total_task_execution_times += $task_execution_time;
+			$total_transfered_bytes += $transfered_bytes;
+			$total_transfer_time += $transfer_time;
+			print localtime()." :: Retrieved $retrieved_tasks so far.\n";
+		}	
+	}	
+}
+
