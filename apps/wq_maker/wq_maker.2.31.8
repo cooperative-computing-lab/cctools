@@ -44,7 +44,7 @@ my $maker_help = `maker -h`;
 
 my $genome;
 my $base_name;
-my $mpi_arg = "";
+my $mpi_arg;
 my $resources = 0;
 my $total_tiers = 0;
 my $tasks = 0;
@@ -87,7 +87,7 @@ try{
  	       "resources=i" => \$OPT{resources},
  	       "chunks=i" => \$OPT{chunks},
  	       "bw=i" => \$OPT{bw},
-           "MPI" => sub {$mpi_arg = "mpiexec -n ";},
+               "MPI" => sub {$mpi_arg = "mpiexec -n ";},
 	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
@@ -101,7 +101,6 @@ if(!defined($OPT{"genome"})) {
 	print "Genome file not specified. Using the specification in the CTL files.\n";
 } else {
 	$genome = $OPT{"genome"};
-	$genome_arg = "-g ".$OPT{"genome"};
 }
 
 try{
@@ -131,6 +130,12 @@ if(defined $OPT{"tasks"}){
 
 if(defined($OPT{"resources"})) {
 	$resources = $OPT{"resources"}; 
+}
+
+if(defined($mpi_arg)){
+	$mpi_arg .= "8 ";
+} else {
+	$mpi_arg = "";
 }
 
 #Call main loop here
@@ -174,7 +179,7 @@ sub main {
 
 	delete_workqueue($wq);
 
-	`maker -dsindex -g $genome -base $base_name`
+	`maker -dsindex -g $genome -base $base_name`;
 
 	print "\n".localtime()." :: File $base_name annotated :: ".scalar @$unique_input_files." in total \n";
 
@@ -291,7 +296,8 @@ sub submit_tasks {
 sub submit_task {
 	my($wq, $genome_chunk, $common_input_files) = @_;
 
-	my $task_command .= "$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
+	my $task_command .= "echo \"$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV)."\"; ";
+	$task_command .= "$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
 	
 	my $task = work_queue::work_queue_task_create("$task_command"); 
 	my $task_tag = substr($genome_chunk, rindex($genome_chunk, '_')+1, rindex($genome_chunk, '.')-(rindex($genome_chunk, '_')+1)); 
