@@ -121,6 +121,13 @@ struct jx * jx_operator( jx_operator_t type, struct jx *left, struct jx *right )
 	return j;
 }
 
+struct jx *jx_function( jx_function_t func, struct jx *args ) {
+	struct jx * j = jx_create(JX_FUNCTION);
+	j->u.func.function = func;
+	j->u.func.arguments = args;
+	return j;
+}
+
 struct jx * jx_arrayv( struct jx *value, ... )
 {
 	va_list args;
@@ -346,6 +353,8 @@ void jx_delete( struct jx *j )
 			jx_delete(j->u.oper.left);
 			jx_delete(j->u.oper.right);
 			break;
+		case JX_FUNCTION:
+			jx_delete(j->u.func.arguments);
 	}
 	free(j);
 }
@@ -401,6 +410,9 @@ int jx_equals( struct jx *j, struct jx *k )
 			return j->u.oper.type == k->u.oper.type
 				&& jx_equals(j->u.oper.left,k->u.oper.right)
 				&& jx_equals(j->u.oper.right,j->u.oper.right);
+		case JX_FUNCTION:
+			return j->u.func.function == k->u.func.function
+				&& jx_equals(j->u.func.arguments, k->u.func.arguments);
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -449,6 +461,8 @@ struct jx  *jx_copy( struct jx *j )
 			return jx_object(jx_pair_copy(j->u.pairs));
 		case JX_OPERATOR:
 			return jx_operator(j->u.oper.type,jx_copy(j->u.oper.left),jx_copy(j->u.oper.right));
+		case JX_FUNCTION:
+			return jx_function(j->u.func.function, jx_copy(j->u.func.arguments));
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -498,22 +512,12 @@ int jx_is_constant( struct jx *j )
 			return jx_pair_is_constant(j->u.pairs);
 		case JX_OPERATOR:
 			return 0;
+		case JX_FUNCTION:
+			return 0;
 	}
 
 	/* not reachable, but some compilers complain. */
 	return 0;
-}
-
-int jx_is_function( jx_operator_t op )
-{
-	switch(op) {
-		case JX_OP_RANGE:
-		case JX_OP_FOREACH:
-		case JX_OP_STR:
-			return 1;
-		default:
-			return 0;
-	}
 }
 
 void jx_export( struct jx *j )

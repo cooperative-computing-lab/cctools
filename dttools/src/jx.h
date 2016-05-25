@@ -58,6 +58,7 @@ typedef enum {
 	JX_ARRAY,	/**< array containing values */
 	JX_OBJECT,	/**< object containing key-value pairs */
 	JX_OPERATOR,	/**< operator on multiple values. */
+	JX_FUNCTION,	/**< function to be applied to some values */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
@@ -93,9 +94,6 @@ typedef enum {
 	JX_OP_OR,
 	JX_OP_NOT,
 	JX_OP_LOOKUP,
-	JX_OP_STR,
-	JX_OP_RANGE,
-	JX_OP_FOREACH,
 	JX_OP_INVALID
 } jx_operator_t;
 
@@ -103,6 +101,18 @@ struct jx_operator {
 	jx_operator_t type;
 	struct jx *left;
 	struct jx *right;
+};
+
+typedef enum {
+	JX_FUNCTION_INVALID = 0,
+	JX_FUNCTION_RANGE,
+	JX_FUNCTION_STR,
+	JX_FUNCTION_FOREACH,
+} jx_function_t;
+
+struct jx_function {
+	jx_function_t function;
+	struct jx *arguments;
 };
 
 /** JX value representing any expression type. */
@@ -118,6 +128,7 @@ struct jx {
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
+		struct jx_function func; /**< function of @ref JX_FUNCTION */
 	} u;
 };
 
@@ -138,6 +149,9 @@ struct jx * jx_string( const char *string_value );
 
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
+
+/** Create a JX function on the given arguments. @param func The function to be applied. @param args The function arguments. */
+struct jx *jx_function( jx_function_t func, struct jx *args );
 
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
@@ -234,9 +248,6 @@ struct jx * jx_array_index( struct jx *j, int nth );
 
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
-
-/** Determine whether the given operator is a function. @param op The operator to check. @return A true or false value depending on whether op is an operator. */
-int jx_is_function( jx_operator_t op );
 
 /** Export a jx object as a set of environment variables.  @param j A JX_OBJECT. */
 void jx_export( struct jx *j );

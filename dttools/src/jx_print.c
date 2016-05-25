@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "jx_function.h"
 
 #include <ctype.h>
 
@@ -52,12 +53,10 @@ static const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_NOT:	return "!";
 		// note that the closing bracket is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
-		case JX_OP_RANGE: return "range(";
-		case JX_OP_FOREACH: return "foreach(";
-		case JX_OP_STR:	return "str(";
 		default:        return "???";
 	}
 }
+
 
 void jx_escape_string( const char *s, buffer_t *b )
 {
@@ -120,6 +119,12 @@ void jx_print_subexpr( struct jx *j, jx_operator_t parent, buffer_t *b )
 	if(do_parens) buffer_putstring(b,")");
 }
 
+void jx_print_args( struct jx *j, buffer_t *b )
+{
+	if(!jx_istype(j, JX_ARRAY)) return;
+	jx_item_print(j->u.items, b);
+}
+
 void jx_print_buffer( struct jx *j, buffer_t *b )
 {
 	if(!j) return;
@@ -158,7 +163,12 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b,jx_operator_string(j->u.oper.type));
 			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
 			if(j->u.oper.type==JX_OP_LOOKUP) buffer_putstring(b,"]");
-			if(jx_is_function(j->u.oper.type)) buffer_putstring(b,")");
+			break;
+		case JX_FUNCTION:
+			buffer_putstring(b, jx_function_name_to_string(j->u.func.function));
+			buffer_putstring(b, "[");
+			jx_print_args(j->u.func.arguments, b);
+			buffer_putstring(b, "]");
 			break;
 	}
 }

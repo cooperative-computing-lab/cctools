@@ -203,16 +203,19 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 	}
 }
 
-static struct jx *jx_eval_function( struct jx_operator *o, struct jx *context )
+static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 {
-	switch(o->type) {
-		case JX_OP_RANGE:
-			return jx_function_range(o, context);
-		case JX_OP_FOREACH:
-			return jx_function_foreach(o, context);
-		case JX_OP_STR:
-			return jx_function_str(o, context);
+	switch(f->function) {
+		case JX_FUNCTION_RANGE:
+			return jx_function_range(f, context);
+		case JX_FUNCTION_FOREACH:
+			return jx_function_foreach(f, context);
+		case JX_FUNCTION_STR:
+			return jx_function_str(f, context);
+		case JX_FUNCTION_INVALID:
+			return jx_null();
 		default:
+			// not reachable
 			return NULL;
 	}
 }
@@ -229,16 +232,6 @@ Exception: The lookup operation can be "object[string]" or "array[integer]"
 static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
 	if(!o) return 0;
-
-	/*
-	Functions need access to their unevaluated operands.
-	If this isn't a function, just fall through and process other operators.
-	If function application fails (e.g. bad arguments), the other handlers here
-	won't know what to do with a function operator, so the end result will
-	be a jx_null().
-	*/
-	struct jx *result = jx_eval_function(o, context);
-	if(result) return result;
 
 	struct jx *left = jx_eval(o->left,context);
 	struct jx *right = jx_eval(o->right,context);
@@ -272,7 +265,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		}
 	}
 
-
+	struct jx *result;
 
 	switch(right->type) {
 		case JX_NULL:
@@ -345,6 +338,8 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			return jx_object(jx_eval_pair(j->u.pairs,context));
 		case JX_OPERATOR:
 			return jx_eval_operator(&j->u.oper,context);
+		case JX_FUNCTION:
+			return jx_eval_function(&j->u.func,context);
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;

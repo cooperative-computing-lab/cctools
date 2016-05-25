@@ -11,19 +11,54 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_function.h"
 
-struct jx *jx_function_str( struct jx_operator *o, struct jx *context ) {
-	struct jx *args = jx_eval(o->right, context);
-	if (!args) return NULL;
-	const char *result = jx_print_string(args);
-	jx_delete(args);
-	return jx_string(result);
+const char *jx_function_name_to_string(jx_function_t func) {
+	switch (func) {
+		case JX_FUNCTION_STR: return "str";
+		case JX_FUNCTION_RANGE: return "range";
+		case JX_FUNCTION_FOREACH: return "foreach";
+		default: return "???";
+	}
 }
 
-struct jx *jx_function_foreach( struct jx_operator *o, struct jx *context ) {
-	struct jx *var, *array, *body;
+jx_function_t jx_function_name_from_string(const char *name) {
+	if (!strcmp(name, "str")) return JX_FUNCTION_STR;
+	else if (!strcmp(name, "range")) return JX_FUNCTION_RANGE;
+	else if (!strcmp(name, "foreach")) return JX_FUNCTION_FOREACH;
+	else return JX_FUNCTION_INVALID;
+}
+
+struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
+	struct jx *args;
+
+	switch (jx_array_length(f->arguments)) {
+	case -1:
+		return jx_null();
+	case 0:
+		return jx_string("");
+	default:
+		args = jx_eval(f->arguments, context);
+		break;
+	}
+	if (!args) return jx_null();
+
+	buffer_t b;
+	char *s;
+	buffer_init(&b);
+	jx_print_args(args, &b);
+	buffer_dup(&b,&s);
+	buffer_free(&b);
+	jx_delete(args);
+	return jx_string(s);
+}
+
+struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
+	struct jx *var = NULL;
+	struct jx *array = NULL;
+	struct jx *body = NULL;
 	struct jx *result = NULL;
 
-	if (jx_function_parse_args(o->right, 3, JX_SYMBOL, &var, JX_ANY, &array, JX_ANY, &body) != 3) {
+	if (jx_function_parse_args(f->arguments, 3, JX_SYMBOL, &var, JX_ANY, &array, JX_ANY, &body) != 3) {
+		result = jx_null();
 		goto DONE;
 	}
 	// shuffle around to avoid leaking memory
@@ -31,7 +66,10 @@ struct jx *jx_function_foreach( struct jx_operator *o, struct jx *context ) {
 	array = jx_eval(array, context);
 	jx_delete(result);
 	result = NULL;
-	if (!jx_istype(array, JX_ARRAY)) goto DONE;
+	if (!jx_istype(array, JX_ARRAY)) {
+		result = jx_null();
+		goto DONE;
+	}
 
 	result = jx_array(NULL);
 	for (struct jx_item *i = array->u.items; i; i = i->next) {
@@ -51,9 +89,9 @@ DONE:
 }
 
 // see https://docs.python.org/2/library/functions.html#range
-struct jx *jx_function_range( struct jx_operator *o, struct jx *context ) {
+struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 	jx_int_t start, stop, step;
-	struct jx *args = jx_eval(o->right, context);
+	struct jx *args = jx_eval(f->arguments, context);
 	switch (jx_function_parse_args(args, 3, JX_INTEGER, &start, JX_INTEGER, &stop, JX_INTEGER, &step)) {
 	case 1:
 		stop = start;
@@ -67,7 +105,7 @@ struct jx *jx_function_range( struct jx_operator *o, struct jx *context ) {
 		break;
 	default:
 		jx_delete(args);
-		return NULL;
+		return jx_null();
 	}
 	jx_delete(args);
 
@@ -116,6 +154,10 @@ int jx_function_parse_args(struct jx *array, int argc, ...) {
 			break;
 		case JX_ARRAY:
 			if (!jx_istype(item->value, JX_ARRAY)) goto DONE;
+			*va_arg(ap, struct jx **) = jx_copy(item->value);
+			break;
+		case JX_FUNCTION:
+			if (!jx_istype(item->value, JX_FUNCTION)) goto DONE;
 			*va_arg(ap, struct jx **) = jx_copy(item->value);
 			break;
 		case JX_ANY:
