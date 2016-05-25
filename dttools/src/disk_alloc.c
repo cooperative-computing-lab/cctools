@@ -69,8 +69,11 @@ int disk_alloc_create(char *loc, char *fs, int64_t size) {
 			break;
 		}
 
+		//Binds the first available loop device to the specified mount point from input
 		losetup_args = string_format("losetup /dev/loop%d %s", j, device_loc);
+		//Makes the specified filesystem from input at the first available loop device
 		mk_args = string_format("mkfs /dev/loop%d -t %s", j, fs);
+		//Mounts the first available loop device
 		mount_args = string_format("/dev/loop%d", j);
 
 		if(system(losetup_args) == 0) {
