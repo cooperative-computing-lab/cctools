@@ -1023,10 +1023,6 @@ int rmonitor_final_summary()
 {
 	decode_zombie_status(summary, first_process_sigchild_status);
 
-	if(!summary->limits_exceeded) {
-		summary->exit_status = first_process_exit_status;
-	}
-
 	char *monitor_self_info = string_format("monitor_version:%9s %d.%d.%d.%.8s", "", CCTOOLS_VERSION_MAJOR, CCTOOLS_VERSION_MINOR, CCTOOLS_VERSION_MICRO, CCTOOLS_COMMIT);
 	add_verbatim_field(monitor_self_info);
 
