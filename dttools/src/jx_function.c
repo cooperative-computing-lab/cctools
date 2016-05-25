@@ -127,45 +127,48 @@ int jx_function_parse_args(struct jx *array, int argc, ...) {
 	va_start(ap, argc);
 	for (int i = 0; i < argc; i++) {
 		if (!item) goto DONE;
-		switch (va_arg(ap, jx_type_t)) {
-		case JX_INTEGER:
-			if (!jx_istype(item->value, JX_INTEGER)) goto DONE;
-			*va_arg(ap, jx_int_t *) = item->value->u.integer_value;
-			break;
-		case JX_BOOLEAN:
-			if (!jx_istype(item->value, JX_BOOLEAN)) goto DONE;
-			*va_arg(ap, int *) = item->value->u.boolean_value;
-			break;
-		case JX_DOUBLE:
-			if (!jx_istype(item->value, JX_DOUBLE)) goto DONE;
-			*va_arg(ap, double *) = item->value->u.double_value;
-			break;
-		case JX_STRING:
-			if (!jx_istype(item->value, JX_STRING)) goto DONE;
-			strcpy(va_arg(ap, char *), item->value->u.string_value);
-			break;
-		case JX_SYMBOL:
-			if (!jx_istype(item->value, JX_SYMBOL)) goto DONE;
-			*va_arg(ap, struct jx **) = jx_copy(item->value);
-			break;
-		case JX_OBJECT:
-			if (!jx_istype(item->value, JX_OBJECT)) goto DONE;
-			*va_arg(ap, struct jx **) = jx_copy(item->value);
-			break;
-		case JX_ARRAY:
-			if (!jx_istype(item->value, JX_ARRAY)) goto DONE;
-			*va_arg(ap, struct jx **) = jx_copy(item->value);
-			break;
-		case JX_FUNCTION:
-			if (!jx_istype(item->value, JX_FUNCTION)) goto DONE;
-			*va_arg(ap, struct jx **) = jx_copy(item->value);
-			break;
-		case JX_ANY:
+		jx_type_t t = va_arg(ap, jx_type_t);
+
+		if (t == (jx_type_t) JX_ANY) {
 			if (!item->value) goto DONE;
 			*va_arg(ap, struct jx **) = jx_copy(item->value);
-			break;
-		default:
-			goto DONE;
+		} else {
+			switch (t) {
+			case JX_INTEGER:
+				if (!jx_istype(item->value, JX_INTEGER)) goto DONE;
+				*va_arg(ap, jx_int_t *) = item->value->u.integer_value;
+				break;
+			case JX_BOOLEAN:
+				if (!jx_istype(item->value, JX_BOOLEAN)) goto DONE;
+				*va_arg(ap, int *) = item->value->u.boolean_value;
+				break;
+			case JX_DOUBLE:
+				if (!jx_istype(item->value, JX_DOUBLE)) goto DONE;
+				*va_arg(ap, double *) = item->value->u.double_value;
+				break;
+			case JX_STRING:
+				if (!jx_istype(item->value, JX_STRING)) goto DONE;
+				strcpy(va_arg(ap, char *), item->value->u.string_value);
+				break;
+			case JX_SYMBOL:
+				if (!jx_istype(item->value, JX_SYMBOL)) goto DONE;
+				*va_arg(ap, struct jx **) = jx_copy(item->value);
+				break;
+			case JX_OBJECT:
+				if (!jx_istype(item->value, JX_OBJECT)) goto DONE;
+				*va_arg(ap, struct jx **) = jx_copy(item->value);
+				break;
+			case JX_ARRAY:
+				if (!jx_istype(item->value, JX_ARRAY)) goto DONE;
+				*va_arg(ap, struct jx **) = jx_copy(item->value);
+				break;
+			case JX_FUNCTION:
+				if (!jx_istype(item->value, JX_FUNCTION)) goto DONE;
+				*va_arg(ap, struct jx **) = jx_copy(item->value);
+				break;
+			default:
+				goto DONE;
+			}
 		}
 		matched++;
 		item = item->next;
