@@ -10,7 +10,7 @@
  * Each file is compressed with gzip and returned to the user.
  * */
 
-#include <work_queue.h>
+#include "work_queue.h"
 
 #include <stdio.h>
 #include <stdlib.h>

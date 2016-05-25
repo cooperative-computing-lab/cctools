@@ -648,6 +648,33 @@ out:
 	return rc;
 }
 
+CONFUGA_API int confuga_getid (confuga *C, char **id)
+{
+	static const char SQL[] =
+		"SELECT value FROM Confuga.State WHERE key = 'id';"
+		;
+
+	int rc;
+	sqlite3 *db = C->db;
+	sqlite3_stmt *stmt = NULL;
+	const char *current = SQL;
+
+	*id = NULL;
+
+	sqlcatch(sqlite3_prepare_v2(db, current, strlen(current)+1, &stmt, &current));
+	sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
+	*id = strdup((const char *)sqlite3_column_text(stmt, 0));
+	if (!*id) CATCH(ENOMEM);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	rc = 0;
+	goto out;
+out:
+	if (rc)
+		*id = (free(*id), NULL);
+	return rc;
+}
+
 CONFUGA_API int confuga_nodes (confuga *C, const char *nodes)
 {
 	int rc;

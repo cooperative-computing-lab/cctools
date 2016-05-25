@@ -1,4 +1,4 @@
-#include <dpopen.h>
+#include "dpopen.h"
 
 #include <unistd.h>
 #include <sys/wait.h>

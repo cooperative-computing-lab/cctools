@@ -43,6 +43,7 @@
 #include "stringtools.h"
 #include "url_encode.h"
 #include "username.h"
+#include "uuid.h"
 #include "xxmalloc.h"
 
 #include <dirent.h>
@@ -83,6 +84,7 @@ char         chirp_owner[USERNAME_MAX] = "";
 int          chirp_port = CHIRP_PORT;
 char         chirp_project_name[128];
 char         chirp_transient_path[PATH_MAX] = "."; /* local file system stuff */
+cctools_uuid_t chirp_uuid[1];
 
 static char        address[LINK_ADDRESS_MAX];
 static time_t      advertise_alarm = 0;
@@ -151,7 +153,7 @@ static void downgrade (void)
 
 static int backend_setup(const char *url)
 {
-	if(cfs->init(url) == -1)
+	if(cfs->init(url, chirp_uuid) == -1)
 		fatal("could not initialize %s backend filesystem: %s", url, strerror(errno));
 
 	if(!chirp_acl_init_root("/"))
@@ -225,6 +227,7 @@ static int update_all_catalogs(const char *url)
 	jx_insert_integer(j,"port",chirp_port);
 	jx_insert_integer(j,"starttime",starttime);
 	jx_insert_integer(j,"total",info.f_blocks * info.f_bsize);
+	jx_insert_string (j,"uuid",chirp_uuid->str);
 
 	if (strlen(chirp_project_name)) {
 		jx_insert_string(j,"project",chirp_project_name);

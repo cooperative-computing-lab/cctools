@@ -5,9 +5,9 @@
 */
 
 #include "buffer.h"
+#include "debug.h"
 
 #include <assert.h>
-#include <debug.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>

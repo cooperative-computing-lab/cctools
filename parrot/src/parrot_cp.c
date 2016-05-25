@@ -4,18 +4,20 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "pfs_types.h"
 #include "full_io.h"
+#include "getopt.h"
 #include "parrot_client.h"
+#include "pfs_types.h"
 
-#include <stdio.h>
-#include <syscall.h>
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <syscall.h>
+#include <unistd.h>
+
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static int verbose_mode = 0;
 static int recursive_mode = 0;
