@@ -216,6 +216,8 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 			return jx_function_join(f, context);
 		case JX_FUNCTION_DBG:
 			return jx_function_dbg(f, context);
+		case JX_FUNCTION_CONCAT:
+			return jx_function_concat(f, context);
 		case JX_FUNCTION_INVALID:
 			return jx_null();
 		default:
