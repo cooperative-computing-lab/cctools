@@ -5267,9 +5267,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - go to S
 */
 {
-	struct work_queue_task *t;
-	time_t stoptime;
-
 	static timestamp_t last_left_time = 0;
 	if(last_left_time!=0) {
 		q->total_app_time += timestamp_get() - last_left_time;
@@ -5278,12 +5275,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	print_password_warning(q);
 
 	// compute stoptime
-	if(timeout == WORK_QUEUE_WAITFORTASK) {
-		stoptime = 0;
-	} else {
-		stoptime = time(0) + timeout;
-	}
+	time_t stoptime = (timeout == WORK_QUEUE_WAITFORTASK) ? 0 : time(0) + timeout;
 
+	struct work_queue_task *t;
 	// time left?
 	while(stoptime && time(0) >= stoptime) {
 
@@ -5299,8 +5293,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				q->stats->total_tasks_failed++;
 			}
 
-			// return completed task to the user
-			return t;
+			// return completed task (t) to the user. We do not return right
+			// away, and insted break out of the loop to correctly update the
+			// queue time statistics.
+			break;
 		}
 
 		 // update catalog if appropiate
@@ -5355,7 +5351,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
 			break;
 
-
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
 			break;
@@ -5364,7 +5359,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	last_left_time = timestamp_get();
 
-	return 0;
+	return t;
 }
 
 int work_queue_hungry(struct work_queue *q)
