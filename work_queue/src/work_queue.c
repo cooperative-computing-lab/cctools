@@ -113,11 +113,6 @@ typedef enum {
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
-/* Default: When there is a choice, send a task rather than receive 1 out of 2 times.
- * Classical WQ:   1.0 (always prefer to send)
- * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
-double wq_option_send_receive_ratio    = 0.5;
-
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
 /* default timeout for slow workers to come back to the pool */
@@ -150,12 +145,9 @@ struct work_queue {
 	struct work_queue_stats *stats;
 	struct work_queue_stats *stats_disconnected_workers;
 
-	double  send_receive_ratio;
-
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
-	int workers_to_wait;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
 	int long_timeout;		// timeout to send/recv a brief message from a foreman
@@ -4448,11 +4440,8 @@ struct work_queue *work_queue_create(int port)
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->send_receive_ratio = wq_option_send_receive_ratio;
-
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->process_pending_check = 0;
-	q->workers_to_wait = 0;
 
 	q->short_timeout = 5;
 	q->long_timeout = 3600;
@@ -4555,22 +4544,6 @@ int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output
 	return status;
 }
 
-int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
-{
-
-	if(ratio > 1) {
-		q->send_receive_ratio = 1;
-		return 1;
-	} else if(ratio < 0) {
-		q->send_receive_ratio = 0;
-		return 1;
-	} else {
-		q->send_receive_ratio = ratio;
-		return 0;
-	}
-
-}
-
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
@@ -4607,11 +4580,6 @@ int work_queue_port(struct work_queue *q)
 	} else {
 		return 0;
 	}
-}
-
-void work_queue_activate_worker_waiting(struct work_queue *q, int value)
-{
-	q->workers_to_wait = value;
 }
 
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
@@ -5570,9 +5538,6 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
-
-	} else if(!strcmp(name, "send-receive-ratio")) {
-		work_queue_send_receive_ratio(q, value);
 
 	} else if(!strcmp(name, "category-steady-n-tasks")) {
 		category_tune_bucket_size("category-steady-n-tasks", (int) value);
