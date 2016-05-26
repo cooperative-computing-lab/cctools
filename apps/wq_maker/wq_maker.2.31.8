@@ -133,7 +133,7 @@ if(defined($OPT{"resources"})) {
 }
 
 if(defined($mpi_arg)){
-	$mpi_arg .= "8 ";
+	$mpi_arg .= "4 ";
 } else {
 	$mpi_arg = "";
 }
@@ -309,6 +309,7 @@ sub submit_task {
 	work_queue::work_queue_task_specify_file($task, "maker_exe.ctl", "maker_exe.ctl", 0, 1); 
 	submit_input_files($task, $common_input_files);
 	work_queue::work_queue_task_specify_file($task, $base_name.".maker.output", $base_name.".maker.output", 1, 1); 
+	work_queue::work_queue_task_specify_cores($task, 4);
 	
 	my $taskid = work_queue::work_queue_submit($wq, $task);
 	print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
