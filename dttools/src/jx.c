@@ -310,6 +310,23 @@ int jx_array_length( struct jx *array )
 	return count;
 }
 
+struct jx *jx_array_concat( struct jx *array, ...) {
+	struct jx *result = jx_array(NULL);
+	struct jx_item **tail = &result->u.items;
+	va_list ap;
+	va_start(ap, array);
+	for(struct jx *a = array; a; a = va_arg(ap, struct jx *)) {
+		if (!jx_istype(a, JX_ARRAY)) {
+			break;
+		}
+		*tail = a->u.items;
+		while(*tail) tail = &(*tail)->next;
+		free(a);
+	}
+	va_end(ap);
+	return result;
+}
+
 void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;
