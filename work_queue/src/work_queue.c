@@ -5176,16 +5176,19 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
+static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active, int busy_waiting)
 {
 	int n = build_poll_table(q, foreman_uplink);
 
-	// Wait no longer than the caller's patience.
-	int msec;
+	// We poll in at most small time segments (1/4 of a second). This lets
+	// promptly dispatch tasks, while avoiding busy waiting.
+	int msec = busy_waiting ? 250 : 0;
 	if(stoptime) {
-		msec = MAX(0, (stoptime - time(0)) * 1000);
-	} else {
-		msec = 5000;
+		msec = MIN(msec, (stoptime - time(0)) * 1000);
+	}
+
+	if(msec < 1) {
+		return 0;
 	}
 
 	// Poll all links for activity.
@@ -5274,6 +5277,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	// compute stoptime
 	time_t stoptime = (timeout == WORK_QUEUE_WAITFORTASK) ? 0 : time(0) + timeout;
 
+	int busy_waiting = 0;
 	struct work_queue_task *t;
 	// time left?
 	while(stoptime && time(0) >= stoptime) {
@@ -5291,12 +5295,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			}
 
 			// return completed task (t) to the user. We do not return right
-			// away, and insted break out of the loop to correctly update the
+			// away, and instead break out of the loop to correctly update the
 			// queue time statistics.
 			break;
 		}
 
-		 // update catalog if appropiate
+		 // update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
 		}
@@ -5305,7 +5309,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			update_resource_report(q);
 
 		// retrieve worker status messages
-		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active);
+		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting);
+		busy_waiting = 0;
 
 		// tasks waiting to be retrieved?
 		if(receive_one_task(q)) {
@@ -5313,16 +5318,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			continue;
 		}
 
-		//We have the resources we have been waiting for; start task transfers
-		int known = known_workers(q);
-		if(known > 0 && known >= q->workers_to_wait) {
-			q->workers_to_wait = 0; // disable it after we started dipatching tasks
-
-			// tasks waiting to be dispatched?
-			if(send_one_task(q)) {
-				// send one task and go to start.
-				continue;
-			}
+		// tasks waiting to be dispatched?
+		if(send_one_task(q)) {
+			// send one task and go to start.
+			continue;
 		}
 
 		// send keepalives to appropriate workers
@@ -5352,6 +5351,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(foreman_uplink) {
 			break;
 		}
+
+		/* if we got here, no events were triggered. we set the busy_waiting
+		 * flag so that link_poll waits for some time the next time around. */
+		busy_waiting = 1;
 	}
 
 	last_left_time = timestamp_get();
