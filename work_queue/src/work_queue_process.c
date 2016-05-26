@@ -252,10 +252,11 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 		close(p->output_fd);
 
 		clear_environment();
-		export_environment(p);
 
 		/* overwrite CORES, MEMORY, or DISK variables, if the task used specify_* */
 		specify_resources_vars(p);
+
+		export_environment(p);
 
 		va_list arg_lst;
 		if(container_mode == NONE) {
