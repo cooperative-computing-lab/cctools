@@ -52,12 +52,12 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 }
 
 struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
-	struct jx *var = NULL;
+	char *symbol = NULL;
 	struct jx *array = NULL;
 	struct jx *body = NULL;
 	struct jx *result = NULL;
 
-	if (jx_function_parse_args(f->arguments, 3, JX_SYMBOL, &var, JX_ANY, &array, JX_ANY, &body) != 3) {
+	if ((jx_function_parse_args(f->arguments, 3, JX_SYMBOL, &symbol, JX_ANY, &array, JX_ANY, &body) != 3) || !symbol) {
 		result = jx_null();
 		goto DONE;
 	}
@@ -75,14 +75,14 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 	for (struct jx_item *i = array->u.items; i; i = i->next) {
 		struct jx *local_context = jx_copy(context);
 		if (!local_context) local_context = jx_object(NULL);
-		jx_insert(local_context, jx_string(var->u.symbol_name), jx_copy(i->value));
+		jx_insert(local_context, jx_string(symbol), jx_copy(i->value));
 		struct jx *local_result = jx_eval(body, local_context);
 		jx_array_append(result, local_result);
 		jx_delete(local_context);
 	}
 
 DONE:
-	jx_delete(var);
+	if (symbol) free(symbol);
 	jx_delete(array);
 	jx_delete(body);
 	return result;
@@ -148,11 +148,11 @@ int jx_function_parse_args(struct jx *array, int argc, ...) {
 				break;
 			case JX_STRING:
 				if (!jx_istype(item->value, JX_STRING)) goto DONE;
-				strcpy(va_arg(ap, char *), item->value->u.string_value);
+				*va_arg(ap, char **) = strdup(item->value->u.string_value);
 				break;
 			case JX_SYMBOL:
 				if (!jx_istype(item->value, JX_SYMBOL)) goto DONE;
-				*va_arg(ap, struct jx **) = jx_copy(item->value);
+				*va_arg(ap, char **) = strdup(item->value->u.symbol_name);
 				break;
 			case JX_OBJECT:
 				if (!jx_istype(item->value, JX_OBJECT)) goto DONE;
