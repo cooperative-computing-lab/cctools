@@ -212,6 +212,8 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 			return jx_function_foreach(f, context);
 		case JX_FUNCTION_STR:
 			return jx_function_str(f, context);
+		case JX_FUNCTION_JOIN:
+			return jx_function_join(f, context);
 		case JX_FUNCTION_INVALID:
 			return jx_null();
 		default:

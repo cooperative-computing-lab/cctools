@@ -303,3 +303,24 @@ value:      null
 expression: foreach(x,range(5),"item"+str(x))
 value:      ["item0","item1","item2","item3","item4"]
 
+expression: join(["a","b",c])
+value:      null
+
+expression: join([1,2])
+value:      null
+
+expression: join(["a",2])
+value:      null
+
+expression: join([])
+value:      ""
+
+expression: join(["a"])
+value:      "a"
+
+expression: join(["a","b","c"])
+value:      "a b c"
+
+expression: join(["a","b","c"],", ")
+value:      "a, b, c"
+

@@ -3,6 +3,7 @@ Copyright (C) 2016- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
+#include <stdio.h>
 
 #include <string.h>
 #include <stdarg.h>
@@ -10,12 +11,15 @@ See the file COPYING for details.
 #include "jx_eval.h"
 #include "jx_print.h"
 #include "jx_function.h"
+#include "xxmalloc.h"
+#include "stringtools.h"
 
 const char *jx_function_name_to_string(jx_function_t func) {
 	switch (func) {
 		case JX_FUNCTION_STR: return "str";
 		case JX_FUNCTION_RANGE: return "range";
 		case JX_FUNCTION_FOREACH: return "foreach";
+		case JX_FUNCTION_JOIN: return "join";
 		default: return "???";
 	}
 }
@@ -24,6 +28,7 @@ jx_function_t jx_function_name_from_string(const char *name) {
 	if (!strcmp(name, "str")) return JX_FUNCTION_STR;
 	else if (!strcmp(name, "range")) return JX_FUNCTION_RANGE;
 	else if (!strcmp(name, "foreach")) return JX_FUNCTION_FOREACH;
+	else if (!strcmp(name, "join")) return JX_FUNCTION_JOIN;
 	else return JX_FUNCTION_INVALID;
 }
 
@@ -57,7 +62,7 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 	struct jx *body = NULL;
 	struct jx *result = NULL;
 
-	if ((jx_function_parse_args(f->arguments, 3, JX_SYMBOL, &symbol, JX_ANY, &array, JX_ANY, &body) != 3) || !symbol) {
+	if ((jx_function_parse_args(f->arguments, 3, JX_SYMBOL, &symbol, JX_ANY, &array, JX_ANY, &body) != 3)) {
 		result = jx_null();
 		goto DONE;
 	}
@@ -117,6 +122,49 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 	return result;
 }
 
+struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
+	char *sep = NULL;
+	struct jx *result;
+	struct jx *array = NULL;
+	struct jx *args = jx_eval(f->arguments, context);
+	switch (jx_function_parse_args(args, 2, JX_ARRAY, &array, JX_STRING, &sep)) {
+		case 1:
+		case 2:
+			break;
+		default:
+			result = jx_null();
+			goto DONE;
+	}
+	if (!sep) sep = xxstrdup(" ");
+
+	if (jx_array_length(array) == 0) {
+		result = jx_string("");
+		goto DONE;
+	}
+	struct jx_item *i = array->u.items;
+	if (!jx_istype(i->value, JX_STRING)) {
+		result = jx_null();
+		goto DONE;
+	}
+
+	result = jx_string(i->value->u.string_value);
+	for (i = i->next; i; i = i->next) {
+		if (!jx_istype(i->value, JX_STRING)) {
+			jx_delete(result);
+			result = jx_null();
+			goto DONE;
+		}
+		result->u.string_value = string_combine(result->u.string_value, sep);
+		result->u.string_value = string_combine(result->u.string_value, i->value->u.string_value);
+	}
+
+DONE:
+	free(sep);
+	jx_delete(array);
+	jx_delete(args);
+	return result;
+}
+
 int jx_function_parse_args(struct jx *array, int argc, ...) {
 	if (!jx_istype(array, JX_ARRAY)) return 0;
 
@@ -148,11 +196,11 @@ int jx_function_parse_args(struct jx *array, int argc, ...) {
 				break;
 			case JX_STRING:
 				if (!jx_istype(item->value, JX_STRING)) goto DONE;
-				*va_arg(ap, char **) = strdup(item->value->u.string_value);
+				*va_arg(ap, char **) = xxstrdup(item->value->u.string_value);
 				break;
 			case JX_SYMBOL:
 				if (!jx_istype(item->value, JX_SYMBOL)) goto DONE;
-				*va_arg(ap, char **) = strdup(item->value->u.symbol_name);
+				*va_arg(ap, char **) = xxstrdup(item->value->u.symbol_name);
 				break;
 			case JX_OBJECT:
 				if (!jx_istype(item->value, JX_OBJECT)) goto DONE;

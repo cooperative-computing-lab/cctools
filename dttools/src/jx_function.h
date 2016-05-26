@@ -15,5 +15,6 @@ int jx_function_parse_args(struct jx *array, int argc, ...);
 struct jx *jx_function_range(struct jx_function *f, struct jx *context);
 struct jx *jx_function_foreach(struct jx_function *f, struct jx *context);
 struct jx *jx_function_str(struct jx_function *f, struct jx *context);
+struct jx *jx_function_join(struct jx_function *f, struct jx *context);
 
 #endif

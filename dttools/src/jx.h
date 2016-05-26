@@ -108,6 +108,7 @@ typedef enum {
 	JX_FUNCTION_RANGE,
 	JX_FUNCTION_STR,
 	JX_FUNCTION_FOREACH,
+	JX_FUNCTION_JOIN,
 } jx_function_t;
 
 struct jx_function {
