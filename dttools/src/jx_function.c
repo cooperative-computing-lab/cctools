@@ -14,22 +14,46 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "stringtools.h"
 
+#define STR "str"
+#define RANGE "range"
+#define FOREACH "foreach"
+#define JOIN "join"
+#define DBG "dbg"
+
 const char *jx_function_name_to_string(jx_function_t func) {
 	switch (func) {
-		case JX_FUNCTION_STR: return "str";
-		case JX_FUNCTION_RANGE: return "range";
-		case JX_FUNCTION_FOREACH: return "foreach";
-		case JX_FUNCTION_JOIN: return "join";
-		default: return "???";
+	case JX_FUNCTION_STR: return STR;
+	case JX_FUNCTION_RANGE: return RANGE;
+	case JX_FUNCTION_FOREACH: return FOREACH;
+	case JX_FUNCTION_JOIN: return JOIN;
+	case JX_FUNCTION_DBG: return DBG;
+	default: return "???";
 	}
 }
 
 jx_function_t jx_function_name_from_string(const char *name) {
-	if (!strcmp(name, "str")) return JX_FUNCTION_STR;
-	else if (!strcmp(name, "range")) return JX_FUNCTION_RANGE;
-	else if (!strcmp(name, "foreach")) return JX_FUNCTION_FOREACH;
-	else if (!strcmp(name, "join")) return JX_FUNCTION_JOIN;
+	if (!strcmp(name, STR)) return JX_FUNCTION_STR;
+	else if (!strcmp(name, RANGE)) return JX_FUNCTION_RANGE;
+	else if (!strcmp(name, FOREACH)) return JX_FUNCTION_FOREACH;
+	else if (!strcmp(name, JOIN)) return JX_FUNCTION_JOIN;
+	else if (!strcmp(name, DBG)) return JX_FUNCTION_DBG;
 	else return JX_FUNCTION_INVALID;
+}
+
+struct jx *jx_function_dbg(struct jx_function *f, struct jx *context) {
+	struct jx *result;
+	// we want to detect more than one arg, so try to match twice
+	if (jx_function_parse_args(f->arguments, 2, JX_ANY, &result, JX_ANY, &result) != 1) {
+		return jx_null();
+	}
+	fprintf(stderr, "dbg  in: ");
+	jx_print_stream(result, stderr);
+	fprintf(stderr, "\n");
+	result = jx_eval(result, context);
+	fprintf(stderr, "dbg out: ");
+	jx_print_stream(result, stderr);
+	fprintf(stderr, "\n");
+	return result;
 }
 
 struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
@@ -128,12 +152,12 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 	struct jx *array = NULL;
 	struct jx *args = jx_eval(f->arguments, context);
 	switch (jx_function_parse_args(args, 2, JX_ARRAY, &array, JX_STRING, &sep)) {
-		case 1:
-		case 2:
-			break;
-		default:
-			result = jx_null();
-			goto DONE;
+	case 1:
+	case 2:
+		break;
+	default:
+		result = jx_null();
+		goto DONE;
 	}
 	if (!sep) sep = xxstrdup(" ");
 

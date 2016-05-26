@@ -109,6 +109,7 @@ typedef enum {
 	JX_FUNCTION_STR,
 	JX_FUNCTION_FOREACH,
 	JX_FUNCTION_JOIN,
+	JX_FUNCTION_DBG,
 } jx_function_t;
 
 struct jx_function {
