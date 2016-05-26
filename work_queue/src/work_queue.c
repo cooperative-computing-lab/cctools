@@ -2831,8 +2831,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 {
 	/* wrap command at the last minute, so that we have the updated information
 	 * about resources. */
-	struct rmsummary *limits    = task_worker_box_size(q, w, t);
-	const struct rmsummary *max = task_max_resources(q, t);
+	struct rmsummary *limits = task_worker_box_size(q, w, t);
 
 	char *command_line;
 	if(q->monitor_mode) {
@@ -2862,15 +2861,15 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	send_worker_msg(q,w, "category %s\n", t->category);
 
-	send_worker_msg(q,w, "cores %"PRId64"\n",  max->cores);
-	send_worker_msg(q,w, "memory %"PRId64"\n", max->memory);
-	send_worker_msg(q,w, "disk %"PRId64"\n",   max->disk);
-	send_worker_msg(q,w, "gpus %"PRId64"\n",   max->gpus);
+	send_worker_msg(q,w, "cores %"PRId64"\n",  limits->cores);
+	send_worker_msg(q,w, "memory %"PRId64"\n", limits->memory);
+	send_worker_msg(q,w, "disk %"PRId64"\n",   limits->disk);
+	send_worker_msg(q,w, "gpus %"PRId64"\n",   limits->gpus);
 
 	/* Do not specify end, wall_time if running the resource monitor. We let the monitor police these resources. */
 	if(q->monitor_mode == MON_DISABLED) {
-		send_worker_msg(q,w, "end_time %"PRIu64"\n",  max->end);
-		send_worker_msg(q,w, "wall_time %"PRIu64"\n", max->wall_time);
+		send_worker_msg(q,w, "end_time %"PRIu64"\n",  limits->end);
+		send_worker_msg(q,w, "wall_time %"PRIu64"\n", limits->wall_time);
 	}
 
 	itable_insert(w->current_tasks_boxes, t->taskid, limits);
