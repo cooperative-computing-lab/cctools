@@ -161,8 +161,6 @@ struct work_queue {
 	int long_timeout;		// timeout to send/recv a brief message from a foreman
 
 	struct list * task_reports;	// list of last N work_queue_task_reports
-	timestamp_t total_idle_time;	// sum of time spent waiting for workers
-	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
 	double asynchrony_multiplier;     /* Times the resource value, but disk */
 	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
@@ -2980,7 +2978,7 @@ static double compute_capacity( const struct work_queue *q )
 
 	// Compute the average time spent outside of work_queue_wait
 	if(q->stats->total_tasks_complete==0) return WORK_QUEUE_DEFAULT_CAPACITY;
-	timestamp_t avg_app_time = q->total_app_time / q->stats->total_tasks_complete;
+	timestamp_t avg_app_time = q->stats->total_app_time / q->stats->total_tasks_complete;
 
 	// Capacity is the ratio of task execution time to time spent in the master doing other things.
 	if(avg_transfer_time==0) return WORK_QUEUE_DEFAULT_CAPACITY;
@@ -5194,8 +5192,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	timestamp_t link_poll_start = timestamp_get();
 	int result = link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
-	q->total_idle_time += q->link_poll_end - link_poll_start;
-
+	q->stats->total_idle_time += q->link_poll_end - link_poll_start;
 
 	int i, j = 1;
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
@@ -5269,7 +5266,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 {
 	static timestamp_t last_left_time = 0;
 	if(last_left_time!=0) {
-		q->total_app_time += timestamp_get() - last_left_time;
+		q->stats->total_app_time += timestamp_get() - last_left_time;
 	}
 
 	print_password_warning(q);
@@ -5650,7 +5647,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		s->efficiency = (double) (qs->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
 	}
 	if(wall_clock_time>0) {
-		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
+		s->idle_percentage = (double) q->stats->total_idle_time / wall_clock_time;
 	}
 	s->capacity = compute_capacity(q);
 

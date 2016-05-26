@@ -192,6 +192,9 @@ struct work_queue_stats {
 	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
 	timestamp_t total_exhausted_execute_time; /**< Total time in microseconds workers spent on tasks that exhausted resources. */
 
+	timestamp_t total_app_time;     /**< Total time in microseconds spent outside work_queue_wait. */
+	timestamp_t total_idle_time;    /**< Total time in microseconds polling workers. */
+
 	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */
