@@ -1773,12 +1773,8 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 			update_task_result(t, WORK_QUEUE_RESULT_TASK_TIMEOUT);
 		}
 	}
-	if(t->loop_dev_full) {
-		/* if resource exhaustion, mark the task for possible resubmission. */
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
-	} else {
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	}
+
+	change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 
 	return SUCCESS;
 }
