@@ -393,9 +393,9 @@ static void log_worker_stats(struct work_queue *q)
 	fprintf(q->logfile, "%" PRIu64 " ", timestamp_get());
 	fprintf(q->logfile, "%d %d %d %d %d %d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);
 	fprintf(q->logfile, "%d %d %d %d %d %d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
-	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %f %f %d ", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
-	fprintf(q->logfile, "%f %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
-	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
+	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRId64 " %" PRId64 " %f %f %d ", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
+	fprintf(q->logfile, "%f %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
+	fprintf(q->logfile, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
 	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " ", s.total_execute_time, s.total_good_execute_time);
 	fprintf(q->logfile, "\n");
 }
@@ -869,14 +869,7 @@ static void add_worker(struct work_queue *q)
 
 	w->last_update_msg_time = w->start_time;
 
-	struct work_queue_resources *r = work_queue_resources_create();
-
-	r->cores.smallest = r->cores.largest = r->cores.total = -1;//default_resource_value;
-	r->memory.smallest = r->memory.largest = r->memory.total = -1;//default_resource_value;
-	r->disk.smallest = r->disk.largest = r->disk.total = -1;//default_resource_value;
-	r->gpus.smallest = r->gpus.largest = r->gpus.total = -1;//default_resource_value;
-
-	w->resources = r;
+	w->resources = work_queue_resources_create();
 
 	w->workerid = NULL;
 
@@ -5833,7 +5826,10 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
-			work_queue_resources_add(total,w->resources);
+		if(w->resources->tag < 0)
+			continue;
+
+		work_queue_resources_add(total,w->resources);
 	}
 }
 
