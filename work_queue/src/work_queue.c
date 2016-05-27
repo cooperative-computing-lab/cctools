@@ -2390,9 +2390,10 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	n = 1;
 
 	if(master) {
-		q->poll_table[n].link = master;
-		q->poll_table[n].events = LINK_READ;
-		q->poll_table[n].revents = 0;
+		/* foreman uplink */
+		q->poll_table[1].link = master;
+		q->poll_table[1].events = LINK_READ;
+		q->poll_table[1].revents = 0;
 		n++;
 	}
 
@@ -5155,7 +5156,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
 
-	if(msec < 1) {
+	if(msec < 0) {
 		return 0;
 	}
 
@@ -5211,7 +5212,7 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 		do {
 			add_worker(q);
 			new_workers++;
-		} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime > time(0) && (max_new_workers > new_workers)));
+		} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime >= time(0) && (max_new_workers > new_workers)));
 	}
 
 	return new_workers;
@@ -5235,6 +5236,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - go to S
 */
 {
+	static int busy_waiting = 0;
+
 	static timestamp_t last_left_time = 0;
 	if(last_left_time!=0) {
 		q->stats->total_app_time += timestamp_get() - last_left_time;
@@ -5245,7 +5248,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	// compute stoptime
 	time_t stoptime = (timeout == WORK_QUEUE_WAITFORTASK) ? 0 : time(0) + timeout;
 
-	int busy_waiting = 0;
 	struct work_queue_task *t = NULL;
 	// time left?
 	while(stoptime && time(0) <= stoptime) {
@@ -5315,14 +5317,14 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
 			break;
 
+		/* if we got here, no events were triggered. we set the busy_waiting
+		 * flag so that link_poll waits for some time the next time around. */
+		busy_waiting = 1;
+
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
 			break;
 		}
-
-		/* if we got here, no events were triggered. we set the busy_waiting
-		 * flag so that link_poll waits for some time the next time around. */
-		busy_waiting = 1;
 	}
 
 	last_left_time = timestamp_get();

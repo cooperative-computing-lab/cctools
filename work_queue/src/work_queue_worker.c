@@ -1339,8 +1339,6 @@ static void disconnect_master(struct link *master) {
 		}
 	}
 
-
-
 	if(released_by_master) {
 		released_by_master = 0;
 	} else if(abort_flag) {
@@ -1661,7 +1659,7 @@ static void foreman_for_master(struct link *master) {
 		struct work_queue_task *task = NULL;
 
 		if(time(0) > idle_stoptime && work_queue_empty(foreman_q)) {
-			debug(D_NOTICE, "work_queue_worker: giving up because did not receive any task in %d seconds.\n", idle_timeout);
+			debug(D_NOTICE, "giving up because did not receive any task in %d seconds.\n", idle_timeout);
 			break;
 		}
 
