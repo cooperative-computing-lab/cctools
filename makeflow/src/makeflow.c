@@ -657,7 +657,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
 
-	if(info->loop_dev_full) {
+	if(info->disk_alloc_full) {
 		job_failed = 1;
 	}
 	else if(info->exited_normally && info->exit_code == 0) {
@@ -690,7 +690,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		if(info->loop_dev_full) {
+		if(info->disk_alloc_full) {
 			fprintf(stderr, "\nrule %d failed because it exceeded its loop device allocation capacity.\n", n->nodeid);
 			if(n->resources_measured)
 			{
