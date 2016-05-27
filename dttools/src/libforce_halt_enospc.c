@@ -58,7 +58,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
 
 	if(real_count < 0 && errno == ENOSPC) {
 		int fd;
-		fd = open("../loop_dev_report.txt", O_RDWR | O_CREAT);
+		fd = open("../disk_alloc_report.txt", O_RDWR | O_CREAT);
 		if(fd < 0) { original_write(STDERR_FILENO, "WRITE ERROR: could not alert Work Queue of full loop device.\n", 61); }
 		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
 		return real_count;

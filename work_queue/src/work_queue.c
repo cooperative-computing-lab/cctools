@@ -1648,7 +1648,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	struct work_queue_task *t;
 
-	int task_status, exit_status, loop_dev;
+	int task_status, exit_status, disk_alloc;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
@@ -1671,7 +1671,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	task_status = atoi(items[0]);
 	exit_status   = atoi(items[1]);
 	output_length = atoll(items[2]);
-	loop_dev = atoi(items[4]);
+	disk_alloc = atoi(items[4]);
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
@@ -1695,7 +1695,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	t->total_cmd_execution_time += t->cmd_execution_time;
 
-	t->loop_dev_full = loop_dev;
+	t->disk_alloc_full = disk_alloc;
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
