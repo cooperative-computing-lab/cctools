@@ -5250,7 +5250,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	struct work_queue_task *t = NULL;
 	// time left?
-	while(stoptime && time(0) <= stoptime) {
+	while( (stoptime == 0) || (time(0) <= stoptime) ) {
 
 		// task completed?
 		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
@@ -5311,7 +5311,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			continue;
 		}
 
-		// 6. return if queue is empty.
+		// return if queue is empty.
 		if( q->process_pending_check && process_pending() )
 			break;
 		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
