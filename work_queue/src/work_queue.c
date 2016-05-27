@@ -5246,9 +5246,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	time_t stoptime = (timeout == WORK_QUEUE_WAITFORTASK) ? 0 : time(0) + timeout;
 
 	int busy_waiting = 0;
-	struct work_queue_task *t;
+	struct work_queue_task *t = NULL;
 	// time left?
-	while(stoptime && time(0) >= stoptime) {
+	while(stoptime && time(0) <= stoptime) {
 
 		// task completed?
 		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
@@ -5286,6 +5286,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			continue;
 		}
 
+		// expired tasks
+		if(expire_waiting_tasks(q)) {
+			// mark expired as retrieved, and go to start.
+			continue;
+		}
+
 		// tasks waiting to be dispatched?
 		if(send_one_task(q)) {
 			// send one task and go to start.
@@ -5300,12 +5306,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// if new workers, connect n of them
 		if(connect_new_workers(q, stoptime, MAX_NEW_WORKERS)) {
-			continue;
-		}
-
-		// expired tasks
-		if(expire_waiting_tasks(q)) {
-			// mark expired as retrieved, and go to start.
 			continue;
 		}
 
