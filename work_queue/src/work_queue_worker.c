@@ -243,14 +243,14 @@ int64_t measure_worker_disk() {
 
 	path_disk_size_info_get_r("./cache", max_time_on_measurement, &state);
 
-	int64_t disk_measured = -1;
+	int64_t disk_measured = 0;
 	if(state->last_byte_size_complete >= 0) {
 		disk_measured = (int64_t) ceil(state->last_byte_size_complete/(1.0*MEGA));
 	}
 
 	files_counted = state->last_file_count_complete;
 
-	if(state->complete_measurement && disk_measured > -1) {
+	if(state->complete_measurement) {
 		/* if a complete measurement has been done, then update
 		 * for the found value, and add the known values of the processes. */
 
@@ -2454,6 +2454,10 @@ int main(int argc, char *argv[])
 	local_resources = work_queue_resources_create();
 	total_resources = work_queue_resources_create();
 	total_resources_last = work_queue_resources_create();
+
+	if(manual_cores_option == 0) {
+		manual_cores_option = load_average_get_cpus();
+	}
 
 	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
