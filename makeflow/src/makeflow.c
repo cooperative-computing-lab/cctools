@@ -705,7 +705,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				n->resource_request = next;
 				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
 				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-				monitor_retried = 1;
 			}
 		}
 
