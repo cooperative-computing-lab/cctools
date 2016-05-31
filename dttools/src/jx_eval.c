@@ -166,6 +166,19 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 	}
 }
 
+static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *right )
+{
+	switch(op) {
+		case JX_OP_EQ:
+			return jx_boolean(jx_equals(left, right));
+		case JX_OP_ADD:
+			return jx_array_concat(jx_copy(left), jx_copy(right), NULL);
+		default:
+			return jx_null();
+
+	}
+}
+
 /*
 Handle a lookup operator, which has two valid cases:
 1 - left is an object, right is a string, return the named item in the object.
@@ -286,6 +299,9 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			break;
 		case JX_STRING:
 			result = jx_eval_string(o->type,left,right);
+			break;
+		case JX_ARRAY:
+			result = jx_eval_array(o->type,left,right);
 			break;
 		default:
 			result = jx_null();

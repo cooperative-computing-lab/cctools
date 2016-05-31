@@ -149,3 +149,11 @@ join(["a", "b", "c"])
 join(["a", "b", "c"], ", ")
 
 dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + dbg(str(dbg(dbg(x) + dbg(1)))) )))))
+
+;10 + [1]
+;"abc" + [2]
+;[] + []
+;[] + [1]
+;[1] + []
+;[1, 2] + [3]
+;[1, 2] + [] + [4, [5, 6]]

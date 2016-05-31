@@ -327,3 +327,24 @@ value:      "a, b, c"
 expression: dbg(join(dbg(foreach(x,dbg(range(dbg(3))),dbg(dbg(str(dbg(x)))+dbg(".")+dbg(str(dbg(dbg(x)+dbg(1)))))))))
 value:      "0.1 1.2 2.3"
 
+expression: 10+[1]
+value:      null
+
+expression: "abc"+[2]
+value:      null
+
+expression: []+[]
+value:      []
+
+expression: []+[1]
+value:      [1]
+
+expression: [1]+[]
+value:      [1]
+
+expression: [1,2]+[3]
+value:      [1,2,3]
+
+expression: [1,2]+[]+[4,[5,6]]
+value:      [1,2,4,[5,6]]
+
