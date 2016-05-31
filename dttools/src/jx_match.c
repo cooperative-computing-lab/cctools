@@ -147,7 +147,7 @@ int jx_match_object(struct jx *j, ...) {
 	va_start(ap, j);
 	while ((out = va_arg(ap, void *))) {
 		jx_type_t t = va_arg(ap, jx_type_t);
-		struct jx *item = jx_lookup(item, va_arg(ap, const char *));
+		struct jx *item = jx_lookup(j, va_arg(ap, const char *));
 		if (!item) goto DONE;
 
 		if (t == (jx_type_t) JX_ANY) {
