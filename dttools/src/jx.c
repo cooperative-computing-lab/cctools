@@ -466,3 +466,54 @@ void jx_export( struct jx *j )
 		}
 	}
 }
+
+struct jx * jx_iterate_array(struct jx *j, void **i) {
+	if (!i) return NULL;
+	if (*i) {
+		struct jx_item *next = ((struct jx_item *) *i)->next;
+		if (next) {
+			*i = next;
+			return next->value;
+		} else {
+			return NULL;
+		}
+	} else {
+		if (!j) return NULL;
+		*i = j->u.items;
+		return *i ? ((struct jx_item *) *i)->value : NULL;
+	}
+}
+
+struct jx * jx_iterate_keys(struct jx *j, void **i) {
+	if (!i) return NULL;
+	if (*i) {
+		struct jx_pair *next = ((struct jx_pair *) *i)->next;
+		if (next) {
+			*i = next;
+			return next->key;
+		} else {
+			return NULL;
+		}
+	} else {
+		if (!j) return NULL;
+		*i = j->u.pairs;
+		return *i ? ((struct jx_pair *) *i)->key : NULL;
+	}
+}
+
+struct jx * jx_iterate_values(struct jx *j, void **i) {
+	if (!i) return NULL;
+	if (*i) {
+		struct jx_pair *next = ((struct jx_pair *) *i)->next;
+		if (next) {
+			*i = next;
+			return next->value;
+		} else {
+			return NULL;
+		}
+	} else {
+		if (!j) return NULL;
+		*i = j->u.pairs;
+		return *i ? ((struct jx_pair *) *i)->value : NULL;
+	}
+}
