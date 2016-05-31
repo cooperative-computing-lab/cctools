@@ -116,12 +116,12 @@ struct work_queue_task {
 
 	timestamp_t time_committed;                            /**< The time at which a task was committed to a worker. */
 
-	timestamp_t time_task_submit;                          /**< The time at which this task was submitted. */
-	timestamp_t time_task_finish;                          /**< The time at which this task was finished. */
+	timestamp_t time_task_submit;                          /**< The time at which this task was added to the queue. */
+	timestamp_t time_task_finish;                          /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
 	timestamp_t time_send_input_start;                     /**< The time at which it started to transfer input files. */
 	timestamp_t time_send_input_finish;                    /**< The time at which it finished transferring input files. */
-	timestamp_t time_execute_cmd_start;                    /**< The time at which the task began. */
-	timestamp_t time_execute_cmd_finish;                   /**< The time at which the task finished (discovered by the master). */
+	timestamp_t time_execute_cmd_start;                    /**< The time at which the task began executing at a worker. */
+	timestamp_t time_execute_cmd_finish;                   /**< The time at which the task finished executing at a worker (as known by the master). */
 	timestamp_t time_receive_result_start;                 /**< The time at which it started to transfer the results. */
 	timestamp_t time_receive_result_finish;                /**< The time at which it finished transferring the results. */
 	timestamp_t time_receive_output_start;                 /**< The time at which it started to transfer output files. */
