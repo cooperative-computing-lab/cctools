@@ -148,11 +148,4 @@ join(["a"])
 join(["a", "b", "c"])
 join(["a", "b", "c"], ", ")
 
-concat("a")
-concat([1, 2], 3)
-concat()
-concat([])
-concat([1], [2, 3])
-concat([1,2], [], [3], [[], [4,5]])
-
 dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + dbg(str(dbg(dbg(x) + dbg(1)))) )))))

@@ -324,24 +324,6 @@ value:      "a b c"
 expression: join(["a","b","c"],", ")
 value:      "a, b, c"
 
-expression: concat("a")
-value:      null
-
-expression: concat([1,2],3)
-value:      null
-
-expression: concat()
-value:      []
-
-expression: concat([])
-value:      []
-
-expression: concat([1],[2,3])
-value:      [1,2,3]
-
-expression: concat([1,2],[],[3],[[],[4,5]])
-value:      [1,2,3,[],[4,5]]
-
 expression: dbg(join(dbg(foreach(x,dbg(range(dbg(3))),dbg(dbg(str(dbg(x)))+dbg(".")+dbg(str(dbg(dbg(x)+dbg(1)))))))))
 value:      "0.1 1.2 2.3"
 

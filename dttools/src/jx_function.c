@@ -19,7 +19,6 @@ See the file COPYING for details.
 #define FOREACH "foreach"
 #define JOIN "join"
 #define DBG "dbg"
-#define CONCAT "concat"
 
 const char *jx_function_name_to_string(jx_function_t func) {
 	switch (func) {
@@ -28,7 +27,6 @@ const char *jx_function_name_to_string(jx_function_t func) {
 	case JX_FUNCTION_FOREACH: return FOREACH;
 	case JX_FUNCTION_JOIN: return JOIN;
 	case JX_FUNCTION_DBG: return DBG;
-	case JX_FUNCTION_CONCAT: return CONCAT;
 	default: return "???";
 	}
 }
@@ -39,7 +37,6 @@ jx_function_t jx_function_name_from_string(const char *name) {
 	else if (!strcmp(name, FOREACH)) return JX_FUNCTION_FOREACH;
 	else if (!strcmp(name, JOIN)) return JX_FUNCTION_JOIN;
 	else if (!strcmp(name, DBG)) return JX_FUNCTION_DBG;
-	else if (!strcmp(name, CONCAT)) return JX_FUNCTION_CONCAT;
 	else return JX_FUNCTION_INVALID;
 }
 
@@ -56,22 +53,6 @@ struct jx *jx_function_dbg(struct jx_function *f, struct jx *context) {
 	fprintf(stderr, "dbg out: ");
 	jx_print_stream(result, stderr);
 	fprintf(stderr, "\n");
-	return result;
-}
-
-struct jx *jx_function_concat(struct jx_function *f, struct jx *context) {
-	struct jx *result = jx_array(NULL);
-	struct jx *args = jx_eval(f->arguments, context);
-	for (struct jx_item *i = args->u.items; i; i = i->next) {
-		if (!jx_istype(i->value, JX_ARRAY)) {
-			jx_delete(result);
-			result = jx_null();
-			goto DONE;
-		}
-		result = jx_array_concat(result, jx_copy(i->value));
-	}
-DONE:
-	jx_delete(args);
 	return result;
 }
 
