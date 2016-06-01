@@ -50,7 +50,7 @@ double *jx_match_double(struct jx *j, double *v) {
 char **jx_match_string(struct jx *j, char **v) {
 	if (jx_istype(j, JX_STRING)) {
 		if (v) {
-			*v = strdup(j->u.string_value);
+			if (!(*v = strdup(j->u.string_value))) return NULL;
 		}
 		return &j->u.string_value;
 	} else {
@@ -61,7 +61,7 @@ char **jx_match_string(struct jx *j, char **v) {
 char **jx_match_symbol(struct jx *j, char **v) {
 	if (jx_istype(j, JX_SYMBOL)) {
 		if (v) {
-			*v = strdup(j->u.symbol_name);
+			if (!(*v = strdup(j->u.symbol_name))) return NULL;
 		}
 		return &j->u.symbol_name;
 	} else {
@@ -72,7 +72,7 @@ char **jx_match_symbol(struct jx *j, char **v) {
 struct jx *jx_match_operator(struct jx *j, struct jx **v) {
 	if (jx_istype(j, JX_OPERATOR)) {
 		if (v) {
-			*v = jx_copy(j);
+			if (!(*v = jx_copy(j))) return NULL;
 		}
 		return j;
 	} else {
@@ -112,19 +112,19 @@ int jx_match_array(struct jx *j, ...) {
 				break;
 			case JX_OBJECT:
 				if (!jx_istype(item, JX_OBJECT)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_ARRAY:
 				if (!jx_istype(item, JX_ARRAY)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_OPERATOR:
 				if (!jx_istype(item, JX_OPERATOR)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_NULL:
 				if (!jx_match_null(item)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			default:
 				goto DONE;
@@ -171,19 +171,19 @@ int jx_match_object(struct jx *j, ...) {
 				break;
 			case JX_OBJECT:
 				if (!jx_istype(item, JX_OBJECT)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_ARRAY:
 				if (!jx_istype(item, JX_ARRAY)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_OPERATOR:
 				if (!jx_istype(item, JX_OPERATOR)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_NULL:
 				if (!jx_match_null(item)) goto DONE;
-				*((struct jx **) out) = jx_copy(item);
+				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			default:
 				goto DONE;

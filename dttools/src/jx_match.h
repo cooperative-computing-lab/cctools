@@ -18,7 +18,11 @@ See the file COPYING for details.
  * DO NOT attempt to free() the returned values.
  * The match functions can also give the caller a copy of
  * the matched value. For heap-allocated types, the caller is responsible
- * for free()ing/jx_delete()ing the copied values.
+ * for free()ing/jx_delete()ing the copied values. In the case that the
+ * caller requested a heap-allocated copy but malloc() fails, the match
+ * as a whole will fail. This ensures that it is always safe to dereference
+ * the copy given back, but might falsely indicate an incorrect type. Code
+ * that needs to run in out of memory conditions must not request copies.
  *
  * The common use case is that programs will have some stack allocated
  * variables for local use, and would like to read the value in a JX struct.
