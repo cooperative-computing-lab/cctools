@@ -41,6 +41,8 @@ struct dag {
 	struct itable *remote_job_table;    /* Mapping from unique integers dag_node->jobid to nodes. */
 	int completed_files;                /* Keeps a count of the rules in state recieved or beyond. */
 	int deleted_files;                  /* Keeps a count of the files delete in GC. */
+
+	char *error_dir;                    /* Directory where stderr's per rule are written, for batch systems that support it. */
 };
 
 struct dag *dag_create();

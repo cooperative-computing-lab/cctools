@@ -43,6 +43,7 @@ struct dag *dag_create()
 	d->special_vars = set_create(0);
 	d->completed_files = 0;
 	d->deleted_files = 0;
+	d->error_dir = 0;
 
 	d->categories   = hash_table_create(0, 0);
 	d->default_category = makeflow_category_lookup_or_create(d, "default");

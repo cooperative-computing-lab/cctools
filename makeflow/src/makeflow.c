@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "cctools.h"
 #include "copy_stream.h"
+#include "create_dir.h"
 #include "debug.h"
 #include "getopt_aux.h"
 #include "hash_table.h"
@@ -421,7 +422,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, const char *error, struct jx *envlist, const struct rmsummary *resources)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -431,7 +432,7 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	printf("submitting job: %s\n", command);
 
 	while(1) {
-		jobid = batch_job_submit(queue, command, input_files, output_files, envlist, resources);
+		jobid = batch_job_submit(queue, command, input_files, output_files, error, envlist, resources);
 		if(jobid >= 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
 			return jobid;
@@ -495,6 +496,11 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		free(batch_options);
 	}
 
+	char *error_file = NULL;
+	if(d->error_dir) {
+		error_file = string_format("%s/%d.error", d->error_dir, n->nodeid);
+	}
+
 	/* Generate the environment vars specific to this node. */
 	struct jx *envlist = dag_node_env_create(d,n);
 
@@ -502,7 +508,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
+	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,error_file,envlist,dag_node_dynamic_label(n));
 
 	/* Restore old batch job options. */
 	if(previous_batch_options) {
@@ -527,6 +533,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	free(output_list);
 	free(input_files);
 	free(output_files);
+	free(error_file);
 	jx_delete(envlist);
 }
 
@@ -949,6 +956,9 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Enable monitor time series.				 (default is disabled)\n", "   --monitor-with-time-series");
 	printf(" %-30s Enable monitoring of openened files.		(default is disabled)\n", "   --monitor-with-opened-files");
 	printf(" %-30s Format for monitor logs.					(default %s)\n", "   --monitor-log-fmt=<fmt>", DEFAULT_MONITOR_LOG_FORMAT);
+
+	printf("\n*Experimental:\n\n");
+	printf(" %-30s Write error files to this directory (right now only implemented for -Tcondor).\n", "--error-dir=<dir>");
 }
 
 int main(int argc, char *argv[])
@@ -985,6 +995,7 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+	char *error_dir = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1038,7 +1049,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_SKIP_FILE_CHECK
+		LONG_OPT_SKIP_FILE_CHECK,
+		LONG_OPT_ERROR_DIR
 	};
 
 	static const struct option long_options_run[] = {
@@ -1055,6 +1067,7 @@ int main(int argc, char *argv[])
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
+		{"error-dir", required_argument, 0, LONG_OPT_ERROR_DIR},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"gc", required_argument, 0, 'g'},
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
@@ -1198,6 +1211,10 @@ int main(int argc, char *argv[])
 				break;
 			case 'm':
 				email_summary_to = xxstrdup(optarg);
+				break;
+			case LONG_OPT_ERROR_DIR:
+				free(error_dir);
+				error_dir = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MONITOR:
 				if (!monitor) monitor = makeflow_monitor_create();
@@ -1400,6 +1417,13 @@ int main(int argc, char *argv[])
 	struct dag *d = dag_from_file(dagfile);
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
+	}
+
+	if(error_dir) {
+		if(!create_dir(error_dir, 0777)) {
+			fatal("makeflow: couldn't create error directory %s: %s\n", error_dir, strerror(errno));
+		}
+		d->error_dir = xxstrdup(error_dir);
 	}
 
 	// Makeflows running LOCAL batch type have only one queue that behaves as if remote

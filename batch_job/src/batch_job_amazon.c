@@ -19,7 +19,7 @@ char *amazon_ec2_script =
 
 char *amazon_script_filename = "_temp_amazon_ec2_script.sh";
 
-static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *error_file, struct jx *envlist, const struct rmsummary *resources)
 {
 	int jobid;
 	struct batch_job_info *info = malloc(sizeof(*info));

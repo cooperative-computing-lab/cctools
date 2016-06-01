@@ -82,7 +82,7 @@ static char *blacklisted_expression(struct batch_queue *q) {
 }
 
 
-static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *error_file, struct jx *envlist, const struct rmsummary *resources )
 {
 	FILE *file;
 	int njobs;
@@ -127,6 +127,11 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
+
+
+	if(error_file) {
+		fprintf(file, "error = %s\n", error_file);
+	}
 
 	const char *c_req = batch_queue_get_option(q, "condor-requirements");
 	char *bexp = blacklisted_expression(q);
