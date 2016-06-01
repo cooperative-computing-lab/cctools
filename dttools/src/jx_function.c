@@ -69,7 +69,13 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 		return jx_null();
 	}
 	if (!args) return jx_null();
-	return jx_string(jx_print_string(args));
+	if(jx_istype(args, JX_STRING)) {
+		return args;
+	} else {
+		struct jx *result = jx_string(jx_print_string(args));
+		jx_delete(args);
+		return result;
+	}
 }
 
 struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {

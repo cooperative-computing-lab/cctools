@@ -139,6 +139,7 @@ str(2)
 str(x + y)
 str(x, y)
 str(range(10))
+str("a")
 
 foreach("too", "few")
 foreach(x, "nope", str(x))
