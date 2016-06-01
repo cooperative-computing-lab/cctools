@@ -201,9 +201,9 @@ const char *batch_queue_type_string()
 }
 
 
-batch_job_id_t batch_job_submit(struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, const char *error_file, struct jx *envlist, const struct rmsummary *resources)
 {
-	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, envlist, resources);
+	return q->module->job.submit(q, cmd, extra_input_files, extra_output_files, error_file, envlist, resources);
 }
 
 batch_job_id_t batch_job_wait(struct batch_queue * q, struct batch_job_info * info)
