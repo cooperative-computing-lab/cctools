@@ -133,7 +133,25 @@ static int files_from_jx(struct dag_node *n, int inputs, struct jx *j) {
 
 static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	debug(D_MAKEFLOW_PARSER, "Parsing rule");
-	struct dag_node *n;
+	struct dag_node *n = dag_node_create(d, 0);
+	context = jx_copy(context);
+	jx_insert_integer(context, "RULENO", n->nodeid);
+
+	struct jx *inputs = jx_eval(jx_lookup(j, "inputs"), context);
+	debug(D_MAKEFLOW_PARSER, "Parsing inputs");
+	if (!files_from_jx(n, 1, inputs)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing inputs");
+		return 0;
+	}
+	struct jx *outputs = jx_eval(jx_lookup(j, "outputs"), context);
+	debug(D_MAKEFLOW_PARSER, "Parsing outputs");
+	if (!files_from_jx(n, 0, outputs)) {
+		debug(D_MAKEFLOW_PARSER, "Failure parsing outputs");
+		return 0;
+	}
+
+	jx_insert(context, jx_string("INPUTS"), inputs);
+	jx_insert(context, jx_string("OUTPUTS"), outputs);
 
 	struct jx *makeflow = jx_eval(jx_lookup(j, "makeflow"), context);
 	struct jx *command = jx_eval(jx_lookup(j, "command"), context);
@@ -144,14 +162,12 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	}
 
 	if (jx_istype(command, JX_STRING)) {
-		n = dag_node_create(d, 0);
 		n->command = xxstrdup(command->u.string_value);
 		debug(D_MAKEFLOW_PARSER, "command: %s", command->u.string_value);
 	} else if (jx_istype(makeflow, JX_OBJECT)) {
 		const char *path = jx_lookup_string(makeflow, "path");
 		if (path) {
 			debug(D_MAKEFLOW_PARSER, "Submakeflow at %s", path);
-			n = dag_node_create(d, 0);
 			n->nested_job = 1;
 			n->makeflow_dag = xxstrdup(path);
 			const char *cwd = jx_lookup_string(makeflow, "cwd");
@@ -173,14 +189,15 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	n->next = d->nodes;
 	d->nodes = n;
 	itable_insert(d->node_table, n->nodeid, n);
-
-	// If we got this far, the rule specification is valid and the dag_node exists
+	jx_delete(makeflow);
+	jx_delete(command);
 
 	struct jx *local_job = jx_eval(jx_lookup(j, "local_job"), context);
 	if (jx_istype(local_job, JX_BOOLEAN) && local_job->u.boolean_value) {
 		debug(D_MAKEFLOW_PARSER, "Local job");
 		n->local_job = 1;
 	}
+	jx_delete(local_job);
 
 	struct jx *category = jx_eval(jx_lookup(j, "category"), context);
 	if (jx_istype(category, JX_STRING)) {
@@ -190,24 +207,14 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 		debug(D_MAKEFLOW_PARSER, "category malformed or missing, using default");
 		n->category = makeflow_category_lookup_or_create(d, "default");
 	}
+	jx_delete(category);
 
-	if (!resources_from_jx(n->variables, jx_eval(jx_lookup(j, "resources"), context))) {
+	struct jx *resources = jx_eval(jx_lookup(j, "resources"), context);
+	if (!resources_from_jx(n->variables, resources)) {
 		debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
 		return 0;
 	}
-
-	struct jx *inputs = jx_eval(jx_lookup(j, "inputs"), context);
-	debug(D_MAKEFLOW_PARSER, "Parsing inputs");
-	if (!files_from_jx(n, 1, inputs)) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing inputs");
-		return 0;
-	}
-	struct jx *outputs = jx_eval(jx_lookup(j, "outputs"), context);
-	debug(D_MAKEFLOW_PARSER, "Parsing outputs");
-	if (!files_from_jx(n, 0, outputs)) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing outputs");
-		return 0;
-	}
+	jx_delete(resources);
 
 	struct jx *allocation = jx_eval(jx_lookup(j, "allocation"), context);
 	if (jx_istype(allocation, JX_STRING)) {
@@ -227,15 +234,17 @@ static int rule_from_jx(struct dag *d, struct jx *context, struct jx *j) {
 	} else {
 		debug(D_MAKEFLOW_PARSER, "Allocation malformed or missing");
 	}
+	jx_delete(allocation);
 
-	struct jx *environment = jx_lookup(j, "environment");
+	struct jx *environment = jx_eval(jx_lookup(j, "environment"), context);
 	if (environment) {
 		environment_from_jx(d, n, n->variables, environment);
 	} else {
 		debug(D_MAKEFLOW_PARSER, "environment malformed or missing");
 	}
+	jx_delete(environment);
 
-	jx_delete(command);
+	jx_delete(context);
 	return 1;
 }
 
