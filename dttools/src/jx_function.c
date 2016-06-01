@@ -60,24 +60,16 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 	struct jx *args;
 
 	switch (jx_array_length(f->arguments)) {
-	case -1:
-		return jx_null();
 	case 0:
 		return jx_string("");
-	default:
-		args = jx_eval(f->arguments, context);
+	case 1:
+		args = jx_eval(f->arguments->u.items->value, context);
 		break;
+	default:
+		return jx_null();
 	}
 	if (!args) return jx_null();
-
-	buffer_t b;
-	char *s;
-	buffer_init(&b);
-	jx_print_args(args, &b);
-	buffer_dup(&b,&s);
-	buffer_free(&b);
-	jx_delete(args);
-	return jx_string(s);
+	return jx_string(jx_print_string(args));
 }
 
 struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
