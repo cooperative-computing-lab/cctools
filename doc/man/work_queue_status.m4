@@ -39,6 +39,89 @@ OPTION_TRIPLET(-t, timeout, time)RPC timeout (default=300s).
 OPTION_ITEM(`-h, --help')Show this help message.
 OPTIONS_END
 
+SECTION(EXAMPLES)
+
+Without arguments, CODE(work_queue_status) shows a summary of all of the
+projects currently reporting to the default catalog server. Waiting, running,
+and complete columns refer to number of tasks:
+
+LONGCODE_BEGIN
+$ work_queue_status
+PROJECT            HOST                   PORT WAITING RUNNING COMPLETE WORKERS
+shrimp             cclws16.cse.nd.edu     9001     963      37        2      33
+crustacea          terra.solar.edu        9000       0    2310    32084     700
+LONGCODE_END
+
+With the CODE(-R) option, a summary of the resources available to each master is shown:
+
+LONGCODE_BEGIN
+$ work_queue_status -R
+MASTER                         CORES      MEMORY          DISK
+shrimp                         228        279300          932512
+crustacea                      4200       4136784         9049985
+LONGCODE_END
+
+Use the CODE(-W) option to list the workers connected to a particular master.
+Completed and running columns refer to numbers of tasks:
+
+LONGCODE_BEGIN
+$ work_queue_status -W cclws16.cse.nd.edu 9001
+HOST                     ADDRESS          COMPLETED RUNNING
+mccourt02.helios.nd.edu  10.176.48.102:40         0 4
+cse-ws-23.cse.nd.edu     129.74.155.120:5         0 0
+mccourt50.helios.nd.edu  10.176.63.50:560         4 4
+dirt02.cse.nd.edu        129.74.20.156:58         4 4
+cclvm03.virtual.crc.nd.e 129.74.246.235:3         0 0
+LONGCODE_END
+
+With the CODE(-T) option, a list of all the tasks submitted to the queue is shown:
+
+LONGCODE_BEGIN
+$ work_queue_status -T cclws16.cse.nd.edu 9001
+ID       STATE    PRIORITY HOST                     COMMAND
+1000     WAITING         0 ???                      ./rmapper-cs -M fast -M 50bp 1
+999      WAITING         0 ???                      ./rmapper-cs -M fast -M 50bp 1
+21       running         0 cse-ws-35.cse.nd.edu     ./rmapper-cs -M fast -M 50bp 3
+20       running         0 cse-ws-35.cse.nd.edu     ./rmapper-cs -M fast -M 50bp 2
+19       running         0 cse-ws-35.cse.nd.edu     ./rmapper-cs -M fast -M 50bp 2
+18       running         0 cse-ws-35.cse.nd.edu     ./rmapper-cs -M fast -M 50bp 2
+...
+LONGCODE_END
+
+
+The CODE(-A) option shows a summary of the resources observed per task
+category.
+
+LONGCODE_BEGIN
+$ work_queue_status -T cclws16.cse.nd.edu 9001
+CATEGORY        RUNNING    WAITING  FIT-WORKERS  MAX-CORES MAX-MEMORY   MAX-DISK
+analysis            216        784           54          4      ~1011      ~3502
+merge                20         92           30         ~1      ~4021      21318
+default               1         25           54         >1       ~503       >243
+LONGCODE_END
+
+With the -A option:
+LIST_BEGIN
+LIST_ITEM(Running and waiting correspond to number of tasks in the category.)
+LIST_ITEM(Fit-workers shows the number of connected workers able to run the largest task in the category.)
+LIST_ITEM()max-cores, max-memory, and max-disk show the corresponding largest value in the category.
+LIST_END
+
+The value may have the following prefixes:
+LIST_BEGIN
+LIST_ITEM(No prefix.) The maximum value was manually specified.
+LIST_ITEM(~) All the task have run with at most this quantity of resources.
+LIST_ITEM(>) There is at least one task that has used more than this quantity of resources, but the maximum remains unknown.
+LIST_END
+
+
+Finally, the CODE(-l) option shows statistics of the queue in a JSON object:
+
+LONGCODE_BEGIN
+$ work_queue_status -l cclws16.cse.nd.edu 9001
+{"categories":[{"max_disk":"3500","max_memory":"1024","max_cores":"1",...
+LONGCODE_END
+
 SECTION(EXIT STATUS)
 On success, returns zero.  On failure, returns non-zero.
 
