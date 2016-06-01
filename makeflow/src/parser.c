@@ -372,7 +372,7 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	}
 	else
 	{
-		current_table = bk->d->default_category->mf_variables;
+		current_table = bk->category->mf_variables;
 		nodeid        = bk->d->nodeid_counter;
 	}
 
