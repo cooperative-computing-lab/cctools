@@ -115,7 +115,9 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 
 	fprintf(file, "universe = vanilla\n");
 	fprintf(file, "executable = condor.sh\n");
-	fprintf(file, "arguments = %s\n",cmd);
+	char *escaped = string_escape_condor(cmd);
+	fprintf(file, "arguments = %s\n", escaped);
+	free(escaped);
 	if(extra_input_files)
 		fprintf(file, "transfer_input_files = %s\n", extra_input_files);
 	// Note that we do not use transfer_output_files, because that causes the job
