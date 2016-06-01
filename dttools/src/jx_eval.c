@@ -168,6 +168,8 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 
 static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *right )
 {
+	if (!(left && right)) return jx_null();
+
 	switch(op) {
 		case JX_OP_EQ:
 			return jx_boolean(jx_equals(left, right));
