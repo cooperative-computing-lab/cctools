@@ -130,8 +130,19 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 	}
 	jx_delete(args);
 
+	if (step == 0) {
+		// won't make progress
+		return jx_null();
+	}
+
 	struct jx *result = jx_array(NULL);
-	for (jx_int_t i = start; i < stop; i += step) {
+
+	if (((stop - start) * step) < 0) {
+		// step is pointing the wrong way
+		return result;
+	}
+
+	for (jx_int_t i = start; stop >= start ? i < stop : i > stop; i += step) {
 		jx_array_append(result, jx_integer(i));
 	}
 
