@@ -128,6 +128,11 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
 
+
+	if(error_file) {
+		fprintf(file, "error = %s\n", error_file);
+	}
+
 	const char *c_req = batch_queue_get_option(q, "condor-requirements");
 	char *bexp = blacklisted_expression(q);
 
