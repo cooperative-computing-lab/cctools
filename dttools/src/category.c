@@ -675,7 +675,7 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	struct rmsummary *first = c->first_allocation;
 	struct rmsummary *seen  = c->max_resources_seen;
 
-	if(c->steady_state) {
+	if(c->steady_state && c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED) {
 		internal->cores  = seen->cores;
 		internal->memory = seen->memory;
 		internal->disk   = seen->disk;
