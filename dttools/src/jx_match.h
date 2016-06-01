@@ -64,7 +64,7 @@ See the file COPYING for details.
  * @code
  *     jx_int_t a;
  *     double b;
- *     switch (jx_match_positional(j, &a, JX_INTEGER, &b, JX_DOUBLE)) {
+ *     switch (jx_match_array(j, &a, JX_INTEGER, &b, JX_DOUBLE)) {
  *     case 1:
  *         printf("got int %d\n", a);
  *     case 2:
@@ -84,7 +84,7 @@ See the file COPYING for details.
  * @code
  *     struct jx *a;
  *     struct jx *b;
- *     if (jx_match_keyword(j, &a, JX_ARRAY, "array key", &b, JX_ANY, "???") == 2) {
+ *     if (jx_match_object(j, &a, JX_ARRAY, "array key", &b, JX_ANY, "???") == 2) {
  *         printf("got JX_ARRAY at %p\n", a);
  *         if (jx_istype(b, JX_STRING)) {
  *             printf("no longer supported\n");
