@@ -69,12 +69,29 @@ void t_string_time_parse (void)
 	a_int64eql(string_time_parse("1023 d"), 1023LL*60*60*24);
 }
 
+void t_string_escape_shell (void)
+{
+	a_streql(string_escape_shell("$ test var"), "\\"\\\\$ test var\\"");
+	a_streql(string_escape_shell("\`test var\`"), "\\"\\\\\`test var\\\\\`\\"");
+	a_streql(string_escape_shell("\\\\test var"), "\\"\\\\\\\\test var\\"");
+	a_streql(string_escape_shell("\"test var\""), "\\"\\\\\\"test var\\\\\\"\\"");
+}
+
+void t_string_escape_condor (void)
+{
+	a_streql(string_escape_condor("test var"), "\\"test var \\"");
+	a_streql(string_escape_condor("test \\"var\\""), "\\"test \\"\\"var\\"\\" \\"");
+	a_streql(string_escape_condor("test 'var'"), "\\"test '''var''' \\"");
+	a_streql(string_escape_condor("\\"test 'var'\\""), "\\"\\"\\"test '''var'''\\"\\" \\"");
+}
 
 int main (int argc, char *argv[])
 {
 	t_string_metric();
 	t_string_parse();
 	t_string_time_parse();
+	t_string_escape_shell();
+	t_string_escape_condor();
 
 	return 0;
 }
