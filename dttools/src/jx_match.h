@@ -8,14 +8,11 @@ See the file COPYING for details.
  *
  * The functions in this header are intended to make JX types more usable
  * from C code. All unwrap JX values in some manner, allowing access to
- * native C types. For the collection types, the match functions can be
- * used to destructure their arguments, extracting and type-checking
+ * native C types. For the arrays, the match function can be
+ * used to destructure its arguments, extracting and type-checking
  * components in a single call.
- * The match functions for single values return a pointer to a primitive
- * type, e.g. (int *), that references the value inside the given JX struct.
- * On match failure, NULL is returned. This allows arbitrary data
- * manipulation, but also requires care in how the matched values are used.
- * DO NOT attempt to free() the returned values.
+ * The match functions for single values return an int indicating the
+ * result of the match. On match failure, 0 is returned, or 1 on success.
  * The match functions can also give the caller a copy of
  * the matched value. For heap-allocated types, the caller is responsible
  * for free()ing/jx_delete()ing the copied values. In the case that the
@@ -38,33 +35,23 @@ See the file COPYING for details.
  *
  * Here, the return value is used to check that the given JX struct was
  * in fact a double, and to copy the value onto the local function's
- * stack. If a function needs to modify the JX structure, it should
- * capture the returned pointer.
+ * stack. If a function needs to modify the JX structure, it must
+ * access the struct fields directly.
  *
- * @code
- *     double *ptr = jx_match_double(j, NULL);
- *     if (ptr) {
- *         *ptr /= 2;
- *         printf("now halved: %f\n", *ptr)
- *     } else {
- *         printf("bad value\n");
- *     }
- * @endcode
- *
- * There are also matching functions to extract multiple positional or
- * keyword values from an array/object and validate types in a single call.
- * These functions have a scanf()-like interface.
- * The collection matching functions take a JX struct
+ * There is also a matching function to extract multiple positional
+ * values from an array and validate types in a single call.
+ * This function has a scanf()-like interface.
+ * The array matching function takes a JX struct
  * and a sequence of item specifications. Each item
- * spec includes a JX type, the location of a pointer that will reference
- * the extracted value, and for objects, a key name. The match functions
- * process each specification in turn, stopping on an invalid spec,
+ * spec includes a JX type and the location of a pointer that will reference
+ * the extracted value. The match function
+ * processes each specification in turn, stopping on an invalid spec,
  * or NULL, and returning the number of items succesfully matched.
  *
  * @code
  *     jx_int_t a;
  *     double b;
- *     switch (jx_match_array(j, &a, JX_INTEGER, &b, JX_DOUBLE)) {
+ *     switch (jx_match_array(j, &a, JX_INTEGER, &b, JX_DOUBLE, NULL)) {
  *     case 1:
  *         printf("got int %d\n", a);
  *     case 2:
@@ -74,7 +61,7 @@ See the file COPYING for details.
  *     }
  * @endcode
  *
- * It's also possible to match on a position/key without looking at the
+ * It's also possible to match on a position without looking at the
  * type of the matched value. The pseudo-type JX_ANY is provided
  * for this purpose. Since the type of the value matched by JX_ANY is
  * unknown, the caller might want to use the other match functions to
@@ -84,7 +71,7 @@ See the file COPYING for details.
  * @code
  *     struct jx *a;
  *     struct jx *b;
- *     if (jx_match_object(j, &a, JX_ARRAY, "array key", &b, JX_ANY, "???") == 2) {
+ *     if (jx_match_array(j, &a, JX_ARRAY, &b, JX_ANY, NULL) == 2) {
  *         printf("got JX_ARRAY at %p\n", a);
  *         if (jx_istype(b, JX_STRING)) {
  *             printf("no longer supported\n");
@@ -146,28 +133,25 @@ See the file COPYING for details.
  * @param j The JX structure to match.
  * @param v An address to copy the boolean value to, or NULL if copying
  * the value is unnecessary.
- * @return A pointer to the boolean value within j if j is a JX_BOOLEAN,
- * or NULL otherwise.
+ * @return A truth value indicating the result of the match.
  */
-int *jx_match_boolean(struct jx *j, int *v) __wur;
+int jx_match_boolean(struct jx *j, int *v) __wur;
 
 /** Unwrap an integer value.
  * @param j The JX structure to match.
  * @param v An address to copy the integer value to, or NULL if copying
  * the value is unnecessary.
- * @return A pointer to the integer value within j if j is a JX_INTEGER,
- * or NULL otherwise.
+ * @return A truth value indicating the result of the match.
  */
-jx_int_t *jx_match_integer(struct jx *j, jx_int_t *v) __wur;
+int jx_match_integer(struct jx *j, jx_int_t *v) __wur;
 
 /** Unwrap a double value.
  * @param j The JX structure to match.
  * @param v An address to copy the double value to, or NULL if copying
  * the value is unnecessary.
- * @return A pointer to the double value within j if j is a JX_DOUBLE,
- * or NULL otherwise.
+ * @return A truth value indicating the result of the match.
  */
-double *jx_match_double(struct jx *j, double *v) __wur;
+int jx_match_double(struct jx *j, double *v) __wur;
 
 /** Unwrap a string value.
  * Since C strings are just pointers to char arrays, the interface
@@ -182,16 +166,12 @@ double *jx_match_double(struct jx *j, double *v) __wur;
  *     }
  * @endcode
  *
- * The return value is the address of the (char *) within the JX struct.
- * This way, it's possible to change which string the struct is using.
- *
  * @param j The JX structure to match.
  * @param v The address of a (char *) in which to store the address of
  * the newly malloc()ed string, or NULL if copying the value is unnecessary.
- * @return A pointer to the (char *) within j if j is a JX_STRING,
- * or NULL otherwise.
+ * @return A truth value indicating the result of the match.
  */
-char **jx_match_string(struct jx *j, char **v) __wur;
+int jx_match_string(struct jx *j, char **v) __wur;
 
 /** Unwrap a symbol value.
  * This function accesses the symbol name as a string.
@@ -201,10 +181,9 @@ char **jx_match_string(struct jx *j, char **v) __wur;
  * @param v The address of a (char *) in which to store the address of
  * the newly malloc()ed symbol name, or NULL
  * if copying the value is unnecessary.
- * @return A pointer to the (char *) within j if j is a JX_SYMBOL,
- * or NULL otherwise.
+ * @return A truth value indicating the result of the match.
  */
-char **jx_match_symbol(struct jx *j, char **v) __wur;
+int jx_match_symbol(struct jx *j, char **v) __wur;
 
 /** Destructure an array.
  * This function accepts an arbitrary number of positional specifications

@@ -10,58 +10,58 @@ See the file COPYING for details.
 #include "jx.h"
 #include "jx_match.h"
 
-int *jx_match_boolean(struct jx *j, int *v) {
+int jx_match_boolean(struct jx *j, int *v) {
 	if (jx_istype(j, JX_BOOLEAN)) {
 		if (v) {
 			*v = !!j->u.boolean_value;
 		}
-		return &j->u.boolean_value;
+		return 1;
 	} else {
-		return NULL;
+		return 0;
 	}
 }
 
-jx_int_t *jx_match_integer(struct jx *j, jx_int_t *v) {
+int jx_match_integer(struct jx *j, jx_int_t *v) {
 	if (jx_istype(j, JX_INTEGER)) {
 		if (v) {
 			*v = j->u.integer_value;
 		}
-		return &j->u.integer_value;
+		return 1;
 	} else {
-		return NULL;
+		return 0;
 	}
 }
 
-double *jx_match_double(struct jx *j, double *v) {
+int jx_match_double(struct jx *j, double *v) {
 	if (jx_istype(j, JX_DOUBLE)) {
 		if (v) {
 			*v = j->u.double_value;
 		}
-		return &j->u.double_value;
+		return 1;
 	} else {
-		return NULL;
+		return 0;
 	}
 }
 
-char **jx_match_string(struct jx *j, char **v) {
+int jx_match_string(struct jx *j, char **v) {
 	if (jx_istype(j, JX_STRING)) {
 		if (v) {
-			if (!(*v = strdup(j->u.string_value))) return NULL;
+			if (!(*v = strdup(j->u.string_value))) return 0;
 		}
-		return &j->u.string_value;
+		return 1;
 	} else {
-		return NULL;
+		return 0;
 	}
 }
 
-char **jx_match_symbol(struct jx *j, char **v) {
+int jx_match_symbol(struct jx *j, char **v) {
 	if (jx_istype(j, JX_SYMBOL)) {
 		if (v) {
-			if (!(*v = strdup(j->u.symbol_name))) return NULL;
+			if (!(*v = strdup(j->u.symbol_name))) return 0;
 		}
-		return &j->u.symbol_name;
+		return 1;
 	} else {
-		return NULL;
+		return 0;
 	}
 }
 
@@ -108,7 +108,7 @@ int jx_match_array(struct jx *j, ...) {
 				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			case JX_NULL:
-				if (!jx_match_null(item)) goto DONE;
+				if (!jx_istype(item, JX_NULL)) goto DONE;
 				if (!(*((struct jx **) out) = jx_copy(item))) goto DONE;
 				break;
 			default:
