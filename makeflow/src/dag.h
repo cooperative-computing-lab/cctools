@@ -21,16 +21,18 @@ See the file COPYING for details.
 
 struct dag {
 	/* Static properties of the DAG */
-	char *filename;                     /* Source makeflow file path. */
-	struct dag_node *nodes;             /* Linked list of all production rules, without ordering. */
-	struct itable *node_table;          /* Mapping from unique integers dag_node->nodeid to nodes. */
-	struct hash_table *files;           /* Maps every filename to a struct dag_file. */
-	struct set *inputs;                 /* Set of every struct dag_file specified as input. */
-	struct set *outputs;                /* Set of every struct dag_file specified as output. */
-	struct hash_table *categories;      /* Mapping from labels to category structures. */
-	struct category *default_category;  /* Default for all rules and variables without an explicit category. */
-	struct set *export_vars;            /* List of variables with prefix export. (these are setenv'ed eventually). */
-	struct set *special_vars;           /* List of special variables, such as category, cores, memory, etc. */
+	char *filename;                    /* Source makeflow file path. */
+	struct dag_node *nodes;            /* Linked list of all production rules, without ordering. */
+	struct itable *node_table;         /* Mapping from unique integers dag_node->nodeid to nodes. */
+	struct hash_table *files;          /* Maps every filename to a struct dag_file. */
+	struct set *inputs;                /* Set of every struct dag_file specified as input. */
+	struct set *outputs;               /* Set of every struct dag_file specified as output. */
+	struct hash_table *categories;     /* Mapping from labels to category structures. */
+	struct category *default_category; /* Default for all rules and variables without an explicit category. */
+	struct set *export_vars;           /* List of variables with prefix export. (these are setenv'ed eventually). */
+	struct set *special_vars;          /* List of special variables, such as category, cores, memory, etc. */
+	category_mode_t allocation_mode;   /* One of CATEGORY_ALLOCATION_MODE_{FIXED,MAX_THROUGHTPUT,MIN_WASTE} */
+
 
 	/* Dynamic states related to execution via Makeflow. */
 	FILE *logfile;

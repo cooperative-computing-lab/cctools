@@ -15,5 +15,7 @@ struct category *makeflow_category_lookup_or_create(const struct dag *d, const c
 		c->mf_variables = hash_table_create(0, 0);
 	}
 
+	category_specify_allocation_mode(c, d->allocation_mode);
+
 	return c;
 }

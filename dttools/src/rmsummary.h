@@ -78,6 +78,7 @@ struct rmsummary_field
 
 void rmsummary_print(FILE *stream, struct rmsummary *s, int pprint, struct jx *verbatim_fields);
 void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int only_resources);
+char *rmsummary_print_string(const struct rmsummary *s, int only_resources);
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);

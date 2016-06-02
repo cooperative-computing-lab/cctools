@@ -46,7 +46,7 @@ void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, struct batch_q
 		fatal("Monitor mode was enabled, but could not find resource_monitor in PATH.");
 	}
 
-	if (batch_queue_supports_feature(queue, "remote_rename")) {
+	if(batch_queue_supports_feature(queue, "remote_rename")) {
 		m->exe_remote = path_basename(m->exe);
 	} else {
 		m->exe_remote = NULL;
