@@ -53,6 +53,46 @@ char *string_escape_shell( const char *str )
 	return result;
 }
 
+/*
+ * Based on HTCondor documentation:
+ * -The white space characters of spaces or tabs delimit arguments.
+ * -To embed white space characters of spaces or tabs within a single argument, 
+ * surround the entire argument with single quote marks.
+ * -To insert a literal single quote mark, escape it within an argument already 
+ * delimited by single quote marks by adding another single quote mark.
+ *
+ * We surround the whole string with double quotes to enable quote escaping in
+ * Condor. Then when a double quote is encountered we escape with another double
+ * quote. When a single quote is encountered we add a single quote to enter 
+ * 'single quote mode' and then escape the quote with another single quote. This
+ * does not attempt to match single quotes or double quotes, just tries to escape 
+ * every kind of quote.
+ * */
+char *string_escape_condor( const char *str )
+{
+	buffer_t B[1];
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
+
+	const char *s;
+	buffer_putliteral(B,"\"");
+	for(s=str;*s;s++) {
+		if(*s=='"')
+			buffer_putliteral(B,"\"");
+		if(*s=='\'')
+			buffer_putliteral(B,"\'\'");
+		buffer_putlstring(B,s,1);
+	}
+	buffer_putliteral(B," ");
+	buffer_putliteral(B,"\"");
+
+	char *result;
+	buffer_dup(B,&result);
+	buffer_free(B);
+
+	return result;
+}
+
 void string_from_ip_address(const unsigned char *bytes, char *str)
 {
 	sprintf(str, "%u.%u.%u.%u", (unsigned) bytes[0], (unsigned) bytes[1], (unsigned) bytes[2], (unsigned) bytes[3]);

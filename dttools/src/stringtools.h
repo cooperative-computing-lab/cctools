@@ -23,6 +23,14 @@ typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
   @return String with special characters escaped.
   */
 char *string_escape_shell (const char *str);
+
+/** Takes a command string, escapes double quotes with another double 
+  quote, and escapes single quotes with two additional single quotes.
+  This is a utilized when putting wrapped and nested commands in Condor.
+  @param str Command string presented to be escaped.
+  @return String with special characters escaped.
+  */
+char *string_escape_condor( const char *str);
 void string_from_ip_address(const unsigned char *ip_addr_bytes, char *str);
 int string_to_ip_address(const char *str, unsigned char *ip_addr_bytes);
 int string_ip_subnet(const char *addr, char *subnet);
