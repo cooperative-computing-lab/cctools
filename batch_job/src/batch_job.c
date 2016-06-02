@@ -146,13 +146,13 @@ int batch_queue_port(struct batch_queue *q)
 void batch_queue_set_option (struct batch_queue *q, const char *what, const char *value)
 {
 	char *current = hash_table_remove(q->options, what);
-	free(current);
 	if(value) {
 		hash_table_insert(q->options, what, xxstrdup(value));
 		debug(D_BATCH, "set option `%s' to `%s'", what, value);
 	} else {
 		debug(D_BATCH, "cleared option `%s'", what);
 	}
+	free(current);
 	q->module->option_update(q, what, value);
 }
 
@@ -166,6 +166,7 @@ void batch_queue_set_feature (struct batch_queue *q, const char *what, const cha
 	} else {
 		debug(D_BATCH, "cleared feature `%s'", what);
 	}
+	free(current);
 }
 
 void batch_queue_set_int_option(struct batch_queue *q, const char *what, int value) {
