@@ -273,6 +273,18 @@ void jx_array_append( struct jx *array, struct jx *value )
 	*i = jx_item(value,0);
 }
 
+struct jx * jx_array_index( struct jx *j, int nth )
+{
+	if (!jx_istype(j, JX_ARRAY)) return NULL;
+	struct jx_item *item = j->u.items;
+
+	for(int i = 0; i < nth; i++) {
+		if (!item) return NULL;
+		item = item->next;
+	}
+	return item ? item->value : NULL;
+}
+
 void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;

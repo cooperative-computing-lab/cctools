@@ -210,6 +210,9 @@ void jx_array_insert( struct jx *array, struct jx *value );
 /** Append an item at the end of an array.  @param array The array to modify.  @param value The value to append. */
 void jx_array_append( struct jx *array, struct jx *value );
 
+/** Get the nth item in an array.  @param array The array to search.  @param nth The index of the desired value. @return The nth element, or NULL if the index is out of bounds. */
+struct jx * jx_array_index( struct jx *j, int nth );
+
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
 
