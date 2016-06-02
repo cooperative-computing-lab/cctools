@@ -252,6 +252,24 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 
 	struct jx *object = jx_object(0);
 
+	char *num_cores = dag_variable_lookup_string(RESOURCES_CORES, &s);
+	char *num_omp_threads = dag_variable_lookup_string("OMP_NUM_THREADS", &s);
+
+	if (num_cores && !num_omp_threads) {
+		// if number of cores is set, number of omp threads is not set,
+		// then we set number of omp threads to number of cores
+		jx_insert(object, jx_string("OMP_NUM_THREADS"), jx_string(num_cores));
+	} else if (num_omp_threads) {
+		// if number of omp threads is set, then we set number of cores
+		// to the number of omp threads
+		jx_insert(object, jx_string(RESOURCES_CORES), jx_string(num_omp_threads));
+	} else {
+		// if both number of cores and omp threads are not set, we
+		// set them to 1
+		jx_insert(object, jx_string("OMP_NUM_THREADS"), jx_string("1"));
+		jx_insert(object, jx_string(RESOURCES_CORES), jx_string("1"));
+	}
+
 	set_first_element(d->export_vars);
 	while((key = set_next_element(d->export_vars))) {
 		char *value = dag_variable_lookup_string(key, &s);
@@ -260,6 +278,9 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
 		}
 	}
+
+	free(num_cores);
+	free(num_omp_threads);
 
 	return object;
 }
