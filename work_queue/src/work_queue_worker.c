@@ -2413,9 +2413,11 @@ int main(int argc, char *argv[])
 
 		work_queue_specify_estimate_capacity_on(foreman_q, enable_capacity);
 		work_queue_activate_fast_abort(foreman_q, fast_abort_multiplier);
-		work_queue_specify_log(foreman_q, foreman_stats_filename);
 		work_queue_specify_category_mode(foreman_q, NULL, WORK_QUEUE_ALLOCATION_MODE_FIXED);
 
+		if(foreman_stats_filename) {
+			work_queue_specify_log(foreman_q, foreman_stats_filename);
+		}
 	}
 
 	if(container_mode == DOCKER && load_from_tar == 1) {
