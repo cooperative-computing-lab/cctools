@@ -231,7 +231,7 @@ do
 			opt=${opt%%=*}
 			;;
 			# empty arg only for these options
-		--debug|--strict|--without-*|--help)
+		--debug|--strict|--sanitize|--without-*|--help)
 			arg=''
 			;;
 		--*)
@@ -245,12 +245,16 @@ do
 		--debug)
 			optdebug=1
 			optstrict=1
+			optsanitize=1
 			;;
 		--prefix)
 			install_path=$(abspath "${arg}")
 			;;
 		--strict)
 			optstrict=1
+			;;
+		--sanitize)
+			optsanitize=1
 			;;
 		--sge-parameter)
 			if [ -z "$sge_parameters" ]
@@ -378,6 +382,7 @@ Where options are:
   --prefix             <path>
   --debug
   --strict
+  --sanitize
   --sge-parameter      <parameter>
   --globus-flavor      <flavor>
   --xrootd-arch        <arch>
@@ -510,6 +515,12 @@ then
 		ldflags=""
 else
 		ldflags="-static-libgcc"
+fi
+
+if [ "$optsanitize" = 1 ]; then
+	ccflags="${ccflags} -fno-omit-frame-pointer -fsanitize=address -fsanitize=undefined"
+	ldflags="-fsanitize=address -lasan -lubsan ${ldflags}"
+	test_ccflags="-lasan -lubsan"
 fi
 
 ##########################################################################
@@ -1443,6 +1454,7 @@ CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
 
 CCTOOLS_GLOBUS_LDFLAGS=${globus_ldflags}
 CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}
+export CCTOOLS_TEST_CCFLAGS=${test_ccflags}
 EOF
 
 echo ""

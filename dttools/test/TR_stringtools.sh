@@ -6,7 +6,7 @@ exe="stringtools.test"
 
 prepare()
 {
-	gcc -g -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
+	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
 #include "stringtools.h"
 
 #include <inttypes.h>

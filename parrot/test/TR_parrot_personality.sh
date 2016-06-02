@@ -8,7 +8,7 @@ exe="$name.test"
 
 prepare()
 {
-	gcc -g -o "$exe" -x c - -x none -lm <<EOF
+	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -lm <<EOF
 #include <unistd.h>
 
 #ifdef __linux__

@@ -7,7 +7,7 @@ exe=$PWD/parrot_fake_setuid.$PPID
 
 prepare()
 {
-	gcc -g -o "$exe" -x c - -x none <<EOF
+	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none <<EOF
 #define _GNU_SOURCE
 #include <unistd.h>
 #include <sys/fsuid.h>

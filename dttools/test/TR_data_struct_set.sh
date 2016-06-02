@@ -6,7 +6,7 @@ exe="data_struct_set.test"
 
 prepare()
 {
-	gcc -g -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
+	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

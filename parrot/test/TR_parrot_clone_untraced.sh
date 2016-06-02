@@ -7,7 +7,7 @@ exe="${0}.test"
 
 prepare()
 {
-	gcc -I../src/ -g -o "$exe" -x c - -x none -lm <<EOF
+	gcc -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -lm <<EOF
 #define _GNU_SOURCE
 
 #include <fcntl.h>

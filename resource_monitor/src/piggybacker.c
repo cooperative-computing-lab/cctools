@@ -45,7 +45,6 @@ uint64_t write_h_file(char *path_h, char *str_var, char *path_lib)
 	}
 	else
 	{
-		lib_data = calloc(n, sizeof(char));
 		copy_stream_to_buffer(fl, (char **) &lib_data, NULL);
 
 		fprintf(fh, "static char lib_helper_data[%" PRIu64 "] = {\n", (uint64_t) n);
