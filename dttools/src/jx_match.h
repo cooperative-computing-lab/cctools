@@ -142,14 +142,6 @@ See the file COPYING for details.
 #endif
 #endif
 
-/** Unwrap a null value.
- * Since by definition there is no associated data, this function returns
- * an opaque, non-NULL pointer in the case that j is of type JX_NULL.
- * @param j The JX structure to match.
- * @return An opaque, non-NULL pointer if j is a JX_NULL, or NULL otherwise
- */
-void *jx_match_null(struct jx *j) __wur;
-
 /** Unwrap a boolean value.
  * @param j The JX structure to match.
  * @param v An address to copy the boolean value to, or NULL if copying
@@ -214,19 +206,6 @@ char **jx_match_string(struct jx *j, char **v) __wur;
  */
 char **jx_match_symbol(struct jx *j, char **v) __wur;
 
-/** Unwrap an operator.
- * Operators don't have a natural C representation, but a match function
- * is still included for completeness. This function simply returns the
- * address of the operator passed in, and optionally gives back a
- * copy as well.
- * @param j The JX structure to match.
- * @param v The address of a (struct jx *) to store the newly copied
- * operator. The caller is responsible for deleting the copy.
- * @return The address of the passed in operator, or NULL if j
- * is not a JX_OPERATOR.
- */
-struct jx *jx_match_operator(struct jx *j, struct jx **v) __wur;
-
 /** Destructure an array.
  * This function accepts an arbitrary number of positional specifications
  * to attempt to match. Each specification is of the form
@@ -243,23 +222,5 @@ struct jx *jx_match_operator(struct jx *j, struct jx **v) __wur;
  * @return The number of elements successfully matched.
  */
 int jx_match_array(struct jx *j, ...) __wur __sentinel;
-
-/** Destructure an object.
- * This function accepts an arbitrary number of keyword specifications
- * to attempt to match. Each specification is of the form
- *
- *     <address>, <jx type>, <key>
- *
- * where <jx type> is JX_INTEGER, JX_ANY, etc., <key> is a string key in
- * the object j, and <address> is the address
- * to store the matched value. The last argument must be NULL to mark the
- * end of the specifications. The specifications will be matched
- * in the order given, and matching ends on the first failure. If the JX
- * value passed in was not an object, this is considered a failure before
- * any matches succeed, so 0 is returned.
- * @param j The JX structure to match.
- * @return The number of elements successfully matched.
- */
-int jx_match_object(struct jx *j, ...) __wur __sentinel;
 
 #endif
