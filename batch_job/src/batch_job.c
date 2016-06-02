@@ -159,7 +159,6 @@ void batch_queue_set_option (struct batch_queue *q, const char *what, const char
 void batch_queue_set_feature (struct batch_queue *q, const char *what, const char *value)
 {
 	char *current = hash_table_remove(q->features, what);
-	free(current);
 	if(value) {
 		hash_table_insert(q->features, what, xxstrdup(value));
 		debug(D_BATCH, "set feature `%s' to `%s'", what, value);
