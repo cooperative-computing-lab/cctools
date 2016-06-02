@@ -192,6 +192,9 @@ struct work_queue_stats {
 	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
 	timestamp_t total_exhausted_execute_time; /**< Total time in microseconds workers spent on tasks that exhausted resources. */
 
+	timestamp_t total_app_time;     /**< Total time in microseconds spent outside work_queue_wait. */
+	timestamp_t total_idle_time;    /**< Total time in microseconds polling workers. */
+
 	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
 	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
 	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */
@@ -654,11 +657,6 @@ int work_queue_specify_category_mode(struct work_queue *q, const char *category,
 */
 int work_queue_enable_category_resource(struct work_queue *q, const char *category, const char *resource, int autolabel);
 
-/** Change the preference to send or receive tasks.
-@param q A work queue object.
-@param ratio The send/receive ratio when there is a choice between sending and receiving tasks. 1 Always prefer to send (e.g., for homogenous, stable resources). 0 Always prefer to receive (e.g., for resources with hight rate of eviction). Default is 0.75 (one average, receive one task per three sent). **/
-int work_queue_send_receive_ratio(struct work_queue *q, double ratio);
-
 /** Change the worker selection algorithm.
 This function controls which <b>worker</b> will be selected for a given task.
 @param q A work queue object.
@@ -918,14 +916,5 @@ int work_queue_task_specify_output_file(struct work_queue_task *t, const char *r
 int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
 //@}
-
-/* Experimental feature - intentionally left undocumented.
-This feature exists to simplify performance evaulation and is not recommended
-for production use since it delays execution of the workload.
-Force the master to wait for the given number of workers to connect before
-starting to dispatch tasks.
-@param q A work queue object.
-@param worker The number of workers to wait before tasks are dispatched.*/
-void work_queue_activate_worker_waiting(struct work_queue *q, int resources);
 
 #endif

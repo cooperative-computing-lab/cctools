@@ -88,6 +88,8 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
+#define MAX_NEW_WORKERS 10
+
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	SUCCESS = 0,
@@ -110,11 +112,6 @@ typedef enum {
 
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
-
-/* Default: When there is a choice, send a task rather than receive 1 out of 2 times.
- * Classical WQ:   1.0 (always prefer to send)
- * Evictionphobic: 0.0 (always prefer to receive completed tasks) */
-double wq_option_send_receive_ratio    = 0.5;
 
 int wq_option_scheduler = WORK_QUEUE_SCHEDULE_TIME;
 
@@ -148,19 +145,14 @@ struct work_queue {
 	struct work_queue_stats *stats;
 	struct work_queue_stats *stats_disconnected_workers;
 
-	double  send_receive_ratio;
-
 	int worker_selection_algorithm;
 	int task_ordering;
 	int process_pending_check;
-	int workers_to_wait;
 
 	int short_timeout;		// timeout to send/recv a brief message from worker
 	int long_timeout;		// timeout to send/recv a brief message from a foreman
 
 	struct list * task_reports;	// list of last N work_queue_task_reports
-	timestamp_t total_idle_time;	// sum of time spent waiting for workers
-	timestamp_t total_app_time;	// sum of time spend above work_queue_wait
 
 	double asynchrony_multiplier;     /* Times the resource value, but disk */
 	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
@@ -1471,9 +1463,10 @@ static void expire_waiting_task(struct work_queue *q, struct work_queue_task *t)
 	return;
 }
 
-static void expire_waiting_tasks(struct work_queue *q)
+static int expire_waiting_tasks(struct work_queue *q)
 {
 	struct work_queue_task *t;
+	int expired = 0;
 	int count;
 
 	timestamp_t current_time = timestamp_get();
@@ -1488,12 +1481,15 @@ static void expire_waiting_tasks(struct work_queue *q)
 		if(t->resources_requested->end > 0 && (uint64_t) t->resources_requested->end <= current_time)
 		{
 			expire_waiting_task(q, t);
+			expired++;
 		}
 		else
 		{
 			list_push_tail(q->ready_list, t);
 		}
 	}
+
+	return expired;
 }
 
 
@@ -2386,6 +2382,7 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 			return 0;
 		}
 	}
+
 	// The first item in the poll table is the master link, which accepts new connections.
 	q->poll_table[0].link = q->master_link;
 	q->poll_table[0].events = LINK_READ;
@@ -2393,9 +2390,10 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	n = 1;
 
 	if(master) {
-		q->poll_table[n].link = master;
-		q->poll_table[n].events = LINK_READ;
-		q->poll_table[n].revents = 0;
+		/* foreman uplink */
+		q->poll_table[1].link = master;
+		q->poll_table[1].events = LINK_READ;
+		q->poll_table[1].revents = 0;
 		n++;
 	}
 
@@ -2973,7 +2971,7 @@ static double compute_capacity( const struct work_queue *q )
 
 	// Compute the average time spent outside of work_queue_wait
 	if(q->stats->total_tasks_complete==0) return WORK_QUEUE_DEFAULT_CAPACITY;
-	timestamp_t avg_app_time = q->total_app_time / q->stats->total_tasks_complete;
+	timestamp_t avg_app_time = q->stats->total_app_time / q->stats->total_tasks_complete;
 
 	// Capacity is the ratio of task execution time to time spent in the master doing other things.
 	if(avg_transfer_time==0) return WORK_QUEUE_DEFAULT_CAPACITY;
@@ -4443,11 +4441,8 @@ struct work_queue *work_queue_create(int port)
 	// (and resized) as needed by build_poll_table.
 	q->poll_table_size = 8;
 
-	q->send_receive_ratio = wq_option_send_receive_ratio;
-
 	q->worker_selection_algorithm = wq_option_scheduler;
 	q->process_pending_check = 0;
-	q->workers_to_wait = 0;
 
 	q->short_timeout = 5;
 	q->long_timeout = 3600;
@@ -4550,22 +4545,6 @@ int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output
 	return status;
 }
 
-int work_queue_send_receive_ratio(struct work_queue *q, double ratio)
-{
-
-	if(ratio > 1) {
-		q->send_receive_ratio = 1;
-		return 1;
-	} else if(ratio < 0) {
-		q->send_receive_ratio = 0;
-		return 1;
-	} else {
-		q->send_receive_ratio = ratio;
-		return 0;
-	}
-
-}
-
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
@@ -4602,11 +4581,6 @@ int work_queue_port(struct work_queue *q)
 	} else {
 		return 0;
 	}
-}
-
-void work_queue_activate_worker_waiting(struct work_queue *q, int value)
-{
-	q->workers_to_wait = value;
 }
 
 void work_queue_specify_estimate_capacity_on(struct work_queue *q, int value)
@@ -5171,48 +5145,28 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active, int last_tasks_transfered)
+static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active, int busy_waiting)
 {
 	int n = build_poll_table(q, foreman_uplink);
 
-	static int busy_waiting = 0;
-
-	// Wait no longer than the caller's patience.
-	int msec;
+	// We poll in at most small time segments (1/4 of a second). This lets
+	// promptly dispatch tasks, while avoiding busy waiting.
+	int msec = busy_waiting ? 250 : 0;
 	if(stoptime) {
-		msec = MAX(0, (stoptime - time(0)) * 1000);
-	} else {
-		msec = 5000;
+		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
 
-	// If workers are available and tasks waiting to be dispatched, don't wait
-	// on a message. However, take care of not busy waiting, if no available
-	// worker can execute a task in the ready list.
-
-	if( (last_tasks_transfered || !busy_waiting) && available_workers(q) > 0 && (task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL)) ) {
-		msec = 0;
-		busy_waiting = 1;        //Mark that we may be busy waiting, so that if no task are transfered, we force a wait next cycle.
-	}
-	else {
-		busy_waiting = 0;
+	if(msec < 0) {
+		return 0;
 	}
 
 	// Poll all links for activity.
 	timestamp_t link_poll_start = timestamp_get();
 	int result = link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
-	q->total_idle_time += q->link_poll_end - link_poll_start;
-
-
-	// If the master link was awake, then accept as many workers as possible.
-	if(q->poll_table[0].revents) {
-		do {
-			add_worker(q);
-		} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime > time(0)));
-	}
+	q->stats->total_idle_time += q->link_poll_end - link_poll_start;
 
 	int i, j = 1;
-
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
 	if(foreman_uplink) {
 		if(q->poll_table[1].revents) {
@@ -5246,103 +5200,59 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 	return result;
 }
 
-static int wait_loop_transfer_tasks(struct work_queue *q, time_t stoptime)
+
+static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_workers)
 {
-	int task_sent = 0, total_tasks_sent = 0;
-	int task_received = 0, total_tasks_received = 0;
+	int new_workers = 0;
 
-	do
-	{
-		task_sent     = 0;
-		task_received = 0;
+	// If the master link was awake, then accept as many workers as possible.
+	// Note we are using the information gathered in poll_active_workers, which
+	// is a little ugly.
+	if(q->poll_table[0].revents) {
+		do {
+			add_worker(q);
+			new_workers++;
+		} while(link_usleep(q->master_link, 0, 1, 0) && (stoptime >= time(0) && (max_new_workers > new_workers)));
+	}
 
-		double coin          = random() / ((double) RAND_MAX);
-		int    send_decision = coin < q->send_receive_ratio;
-
-		struct work_queue_task *t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-
-		if(task_state_any(q, WORK_QUEUE_TASK_READY) && (!t || send_decision))
-		{
-			task_sent         = send_one_task(q);
-			total_tasks_sent += task_sent;
-		}
-
-		if(t && (!task_sent || !send_decision))
-		{
-			task_received         = receive_one_task(q);
-			total_tasks_received += task_received;
-		}
-
-	} while((time(0) < stoptime) && (task_sent || task_received));
-
-	return total_tasks_sent + total_tasks_received;
+	return new_workers;
 }
+
 
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active)
 /*
-	  --------------------
-	 |  compute stoptime  |
-	  --------------------
-			   |
-			   v
-		 --------------
-+------>|  poll links  |
-|        --------------
-|              |
-|              v
-|        -------------
-|       |transfer task|<----------------+
-|        -------------                  |
-|              |                    yes |
-|              v                        |
-|     ------------------  yes   -----------------
-|    | tasks remaining? |----->| time remaining? |
-|     ------------------        -----------------
-|           no |                    no |
-|              v                       |
-|     ------------------               |
-|    |fast abort workers|              |
-|     ------------------               |
-|              |                       |
-|              v                       |
-| yes  -----------------               |
-+-----| time remaining? |              |
-	   -----------------               |
-			no |                       |
-			   |-----------------------+
-			   v
-		   ----------
-		  |  return  |
-		   ----------
+   - compute stoptime
+   S time left?                              No:  return null
+   - task completed?                         Yes: return completed task to user
+   - update catalog if appropiate
+   - retrieve workers status messages
+   - tasks waiting to be retrieved?          Yes: retrieve one task and go to S.
+   - tasks waiting to be dispatched?         Yes: dispatch one task and go to S.
+   - send keepalives to appropiate workers
+   - fast-abort workers
+   - if new workers, connect n of them
+   - expired tasks?                          Yes: mark expired tasks as retrieved and go to S.
+   - queue empty?                            Yes: return null
+   - go to S
 */
 {
-	struct work_queue_task *t;
-	time_t stoptime;
-	int    tasks_transfered = 0;
+	static int busy_waiting = 0;
 
 	static timestamp_t last_left_time = 0;
 	if(last_left_time!=0) {
-		q->total_app_time += timestamp_get() - last_left_time;
+		q->stats->total_app_time += timestamp_get() - last_left_time;
 	}
 
 	print_password_warning(q);
 
-	if(timeout == WORK_QUEUE_WAITFORTASK) {
-		stoptime = 0;
-	} else {
-		stoptime = time(0) + timeout;
-	}
+	// compute stoptime
+	time_t stoptime = (timeout == WORK_QUEUE_WAITFORTASK) ? 0 : time(0) + timeout;
 
-	while(1) {
-		if(q->name) {
-			update_catalog(q, foreman_uplink, 0);
-		}
+	struct work_queue_task *t = NULL;
+	// time left?
+	while( (stoptime == 0) || (time(0) <= stoptime) ) {
 
-		if(q->monitor_mode)
-			update_resource_report(q);
-
-		ask_for_workers_updates(q);
-
+		// task completed?
 		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
@@ -5354,51 +5264,72 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 				q->stats->total_tasks_failed++;
 			}
 
-			return t;
-
-		}
-
-		if( q->process_pending_check && process_pending() )
+			// return completed task (t) to the user. We do not return right
+			// away, and instead break out of the loop to correctly update the
+			// queue time statistics.
 			break;
-
-		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
-			break;
-
-		wait_loop_poll_links(q, stoptime, foreman_uplink, foreman_uplink_active, tasks_transfered);
-
-		expire_waiting_tasks(q);
-
-		//Re-enqueue the tasks that workers labeled for resubmission.
-		while((t = task_state_any(q, WORK_QUEUE_TASK_WAITING_RESUBMISSION))) {
-			cancel_task_on_worker(q, t, WORK_QUEUE_TASK_READY);
 		}
 
-		//We have the resources we have been waiting for; start task transfers
-		int known = known_workers(q);
-		if(known > 0 && known >= q->workers_to_wait) {
-			tasks_transfered = wait_loop_transfer_tasks(q, stoptime);
-			q->workers_to_wait = 0; //disable it after we started dipatching tasks
+		 // update catalog if appropriate
+		if(q->name) {
+			update_catalog(q, foreman_uplink, 0);
 		}
+
+		if(q->monitor_mode)
+			update_resource_report(q);
+
+		// retrieve worker status messages
+		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting);
+		busy_waiting = 0;
+
+		// tasks waiting to be retrieved?
+		if(receive_one_task(q)) {
+			// retrieve one task and go to start.
+			continue;
+		}
+
+		// expired tasks
+		if(expire_waiting_tasks(q)) {
+			// mark expired as retrieved, and go to start.
+			continue;
+		}
+
+		// tasks waiting to be dispatched?
+		if(send_one_task(q)) {
+			// send one task and go to start.
+			continue;
+		}
+
+		// send keepalives to appropriate workers
+		ask_for_workers_updates(q);
 
 		// If fast abort is enabled, kill off slow workers.
 		abort_slow_workers(q);
+
+		// if new workers, connect n of them
+		if(connect_new_workers(q, stoptime, MAX_NEW_WORKERS)) {
+			continue;
+		}
+
+		// return if queue is empty.
+		if( q->process_pending_check && process_pending() )
+			break;
+		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
+			break;
+
+		/* if we got here, no events were triggered. we set the busy_waiting
+		 * flag so that link_poll waits for some time the next time around. */
+		busy_waiting = 1;
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
 			break;
 		}
-
-		// If nothing was awake, restart the loop or return without a task.
-		if(stoptime && time(0) >= stoptime) {
-			break;
-		} else {
-			continue;
-		}
 	}
 
 	last_left_time = timestamp_get();
 
-	return 0;
+	return t;
 }
 
 int work_queue_hungry(struct work_queue *q)
@@ -5610,9 +5541,6 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
 
-	} else if(!strcmp(name, "send-receive-ratio")) {
-		work_queue_send_receive_ratio(q, value);
-
 	} else if(!strcmp(name, "category-steady-n-tasks")) {
 		category_tune_bucket_size("category-steady-n-tasks", (int) value);
 
@@ -5689,7 +5617,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		s->efficiency = (double) (qs->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
 	}
 	if(wall_clock_time>0) {
-		s->idle_percentage = (double) q->total_idle_time / wall_clock_time;
+		s->idle_percentage = (double) q->stats->total_idle_time / wall_clock_time;
 	}
 	s->capacity = compute_capacity(q);
 
