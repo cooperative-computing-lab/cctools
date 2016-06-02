@@ -306,7 +306,7 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 
 	struct jx *object = jx_object(0);
 
-    char *num_cores = dag_variable_lookup_string(RESOURCES_CORES, &s);
+	char *num_cores = dag_variable_lookup_string(RESOURCES_CORES, &s);
 	char *num_omp_threads = dag_variable_lookup_string("OMP_NUM_THREADS", &s);
 
 	if (num_cores && !num_omp_threads) {
@@ -326,14 +326,15 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 
 	set_first_element(d->export_vars);
 	while((key = set_next_element(d->export_vars))) {
-
 		char *value = dag_variable_lookup_string(key, &s);
 		if(value) {
 			jx_insert(object,jx_string(key),jx_string(value));
 			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
 		}
-
 	}
+
+	free(num_cores);
+	free(num_omp_threads);
 
 	return object;
 }
