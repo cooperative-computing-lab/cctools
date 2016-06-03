@@ -111,6 +111,9 @@ static double worker_volatility = 0.0;
 // This can be set by Ctrl-C or by any condition that prevents further progress.
 static int abort_flag = 0;
 
+// Record the signal received, to inform the master if appropiate.
+static int abort_signal_received = 0;
+
 // Flag used to indicate a child must be waited for.
 static int sigchld_received_flag = 0;
 
@@ -1874,6 +1877,10 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		work_for_master(master);
 	}
 
+	if(abort_signal_received) {
+		send_master_message(master, "info vacating %d\n", abort_signal_received);
+	}
+
 	last_task_received     = 0;
 	results_to_be_sent_msg = 0;
 
@@ -1951,6 +1958,7 @@ void set_worker_id() {
 static void handle_abort(int sig)
 {
 	abort_flag = 1;
+	abort_signal_received = sig;
 }
 
 static void handle_sigchld(int sig)
