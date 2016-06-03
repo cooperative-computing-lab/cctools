@@ -101,62 +101,87 @@ extern int wq_option_scheduler;	               /**< Initial setting for algorith
  * examine (but not modify) this structure once a task has completed.
 */
 struct work_queue_task {
-	char *tag;                                             /**< An optional user-defined logical name for the task. */
-	char *command_line;                                    /**< The program(s) to execute, as a shell command line. */
-	work_queue_schedule_t worker_selection_algorithm;      /**< How to choose worker to run the task. */
-	char *output;                                          /**< The standard output of the task. */
-	struct list *input_files;                              /**< The files to transfer to the worker and place in the executing directory. */
-	struct list *output_files;                             /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
-	struct list *env_list;                                 /**< Environment variables applied to the task. */
-	int taskid;                                            /**< A unique task id number. */
-	int return_status;                                     /**< The exit code of the command line. */
-	work_queue_result_t result;                            /**< The result of the task (see @ref work_queue_result_t */
-	char *host;                                            /**< The address and port of the host on which it ran. */
-	char *hostname;                                        /**< The name of the host on which it ran. */
+	char *tag;                                        /**< An optional user-defined logical name for the task. */
+	char *command_line;                               /**< The program(s) to execute, as a shell command line. */
+	work_queue_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
+	char *output;                                     /**< The standard output of the task. */
+	struct list *input_files;                         /**< The files to transfer to the worker and place in the executing directory. */
+	struct list *output_files;                        /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
+	struct list *env_list;                            /**< Environment variables applied to the task. */
+	int taskid;                                       /**< A unique task id number. */
+	int return_status;                                /**< The exit code of the command line. */
+	work_queue_result_t result;                       /**< The result of the task (see @ref work_queue_result_t */
+	char *host;                                       /**< The address and port of the host on which it ran. */
+	char *hostname;                                   /**< The name of the host on which it ran. */
 
-	timestamp_t time_committed;                            /**< The time at which a task was committed to a worker. */
+	char *category;                         /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
+	category_allocation_t resource_request; /**< See @ref category_allocation_t */
 
-	timestamp_t time_task_submit;                          /**< The time at which this task was added to the queue. */
-	timestamp_t time_task_finish;                          /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
-	timestamp_t time_send_input_start;                     /**< The time at which it started to transfer input files. */
-	timestamp_t time_send_input_finish;                    /**< The time at which it finished transferring input files. */
-	timestamp_t time_execute_cmd_start;                    /**< The time at which the task began executing at a worker. */
-	timestamp_t time_execute_cmd_finish;                   /**< The time at which the task finished executing at a worker (as known by the master). */
-	timestamp_t time_receive_result_start;                 /**< The time at which it started to transfer the results. */
-	timestamp_t time_receive_result_finish;                /**< The time at which it finished transferring the results. */
-	timestamp_t time_receive_output_start;                 /**< The time at which it started to transfer output files. */
-	timestamp_t time_receive_output_finish;                /**< The time at which it finished transferring output files. */
+	double priority;        /**< The priority of this task relative to others in the queue: higher number run earlier. */
+	int max_retries;        /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
+	int total_submissions;  /**< The number of times the task has been submitted. */
+	int exhausted_attempts; /**< Number of times the task failed given exhausted resources. */
+
+	/* All times in microseconds */
+	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
+	timestamp_t time_when_submitted;                       /**< The time at which this task was added to the queue. */
+	timestamp_t time_when_done;                            /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
+
+	timestamp_t time_when_dispatched;                      /**< The time at which a task was dispatched to a worker. */
+	timestamp_t time_when_retrieved;                       /**< The time at which a task was retrieved from a worker. */
+
+	timestamp_t time_when_input_start;                     /**< The time at which it started to transfer input files. */
+	timestamp_t time_when_input_finish;                    /**< The time at which it finished transferring input files. */
+
+	timestamp_t time_when_result_start;                    /**< The time at which it started to transfer the results. */
+	timestamp_t time_when_result_finish;                   /**< The time at which it finished transferring the results. */
+
+	timestamp_t time_when_output_start;                    /**< The time at which it started to transfer output files. */
+	timestamp_t time_when_output_finish;                   /**< The time at which it finished transferring output files. */
 
 	timestamp_t time_send;                                 /**< Time spend transfering this task to a worker. */
 	timestamp_t time_receive;                              /**< Time spend transfering this task results from a worker. */
 
-	int64_t total_bytes_received;                          /**< Number of bytes received since task has last started receiving input data. */
-	int64_t total_bytes_sent;                              /**< Number of bytes sent since task has last started sending input data. */
-	int64_t total_bytes_transferred;                       /**< Number of bytes transferred since task has last started transferring input data. */
-	timestamp_t cmd_execution_time;                        /**< Time spent in microseconds for executing the command until completion on a single worker. */
-	int total_submissions;                                 /**< The number of times the task has been submitted. */
-	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
-	timestamp_t total_cmd_exhausted_execute_time;          /**< Accumulated time spent in microseconds spent in attempts that executed resources. */
+	timestamp_t time_workers_execute_last;                 /**< Duration of the last complete execution for this task. */
+	timestamp_t time_workers_execute_all;                  /**< Accumulated time for executing the command on any worker, regardless of whether the task completed (i.e., this includes time running on workers that disconnected). */
+	timestamp_t time_workers_execute_exhaustion;           /**< Accumulated time spent in attempts that exhausted resources. */
+	timestamp_t time_workers_execute_failure;              /**< Accumulated time for runs that terminated in worker failure/disconnection. */
 
-	timestamp_t total_time_until_worker_failure;           /**< Accumulated time for runs that terminated in worker failure/disconnection. */
-
-	int exhausted_attempts;                                /**< Number of times the task failed given exhausted resources. */
-
-	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
-
-	int max_retries;                                       /**< Number of times the task is retried on worker errors until success. If less than one, the task is retried indefinitely. */
+	int64_t bytes_received;                                /**< Number of bytes received since task has last started receiving input data. */
+	int64_t bytes_sent;                                    /**< Number of bytes sent since task has last started sending input data. */
+	int64_t bytes_transferred;                             /**< Number of bytes transferred since task has last started transferring input data. */
 
 	struct rmsummary *resources_allocated;                 /**< Resources allocated to the task its latest attempt. */
 	struct rmsummary *resources_measured;                  /**< When monitoring is enabled, it points to the measured resources used by the task in its latest attempt. */
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
-
-	category_allocation_t resource_request;                /**< See @ref category_allocation_t */
-
-	char *category;                                        /**< User-provided label for the task. It is expected that all task with the same category will have similar resource usage. See @ref work_queue_task_specify_category. If no explicit category is given, the label "default" is used. **/
-
 	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref work_queue_enable_monitoring */
 
-	timestamp_t total_time_transfer;                       /**< @deprecated Use @ref time_send + time_receive. */
+	/* deprecated fields */
+	timestamp_t time_task_submit;                          /**< @deprecated Use time_when_submitted. */
+	timestamp_t time_task_finish;                          /**< @deprecated Use time_when_done. */
+	timestamp_t time_committed;                            /**< @deprecated Use time_when_input_start. */
+
+	timestamp_t time_send_input_start;                     /**< @deprecated Use time_when_input_start instead. */
+	timestamp_t time_send_input_finish;                    /**< @deprecated Use time_when_input_finish instead. */
+	timestamp_t time_receive_result_start;                 /**< @deprecated Use time_when_result_start instead. */
+	timestamp_t time_receive_result_finish;                /**< @deprecated Use time_when_result_finish instead. */
+	timestamp_t time_receive_output_start;                 /**< @deprecated Use time_when_output_start instead. */
+	timestamp_t time_receive_output_finish;                /**< @deprecated Use time_when_output_finish instead. */
+
+	timestamp_t time_execute_cmd_start;                    /**< @deprecated Use time_when_dispatched instead. */
+	timestamp_t time_execute_cmd_finish;                   /**< @deprecated Use time_when_done instead. */
+
+	timestamp_t total_time_transfer;                       /**< @deprecated Use time_send + time_receive. */
+
+	timestamp_t cmd_execution_time;                        /**< @deprecated Use time_workers_execute_last instead. */
+	timestamp_t total_cmd_execution_time;                  /**< @deprecated Use time_workers_execute_all instead. */
+	timestamp_t total_cmd_exhausted_execute_time;          /**< @deprecated Use time_workers_execute_exhaustion instead. */
+	timestamp_t total_time_until_worker_failure;           /**< @deprecated Use time_workers_execute_failure instead. */
+
+	int64_t total_bytes_received;                          /**< @deprecated Use bytes_received instead. */
+	int64_t total_bytes_sent;                              /**< @deprecated Use bytes_sent instead. */
+	int64_t total_bytes_transferred;                       /**< @deprecated Use bytes_transferred instead. */
+
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
 
@@ -239,34 +264,34 @@ struct work_queue_stats {
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
 
 	/**< deprecated fields: */
-	int total_workers_connected;    /**< @deprecated Use @ref workers_connected instead. */
-	int total_workers_joined;       /**< @deprecated Use @ref workers_joined instead. */
-	int total_workers_removed;      /**< @deprecated Use @ref workers_removed instead. */
-	int total_workers_lost;         /**< @deprecated Use @ref workers_lost instead. */
-	int total_workers_idled_out;    /**< @deprecated Use @ref workers_idled_out instead. */
-	int total_workers_fast_aborted; /**< @deprecated Use @ref workers_fast_aborted instead. */
+	int total_workers_connected;    /**< @deprecated Use workers_connected instead. */
+	int total_workers_joined;       /**< @deprecated Use workers_joined instead. */
+	int total_workers_removed;      /**< @deprecated Use workers_removed instead. */
+	int total_workers_lost;         /**< @deprecated Use workers_lost instead. */
+	int total_workers_idled_out;    /**< @deprecated Use workers_idled_out instead. */
+	int total_workers_fast_aborted; /**< @deprecated Use workers_fast_aborted instead. */
 
-	int tasks_complete;             /**< @deprecated Use @ref tasks_with_results. */
+	int tasks_complete;             /**< @deprecated Use tasks_with_results. */
 
-	int total_tasks_dispatched;     /**< @deprecated Use @ref tasks_dispatched instead. */
-	int total_tasks_complete;       /**< @deprecated Use @ref tasks_done instead. */
-	int total_tasks_failed;         /**< @deprecated Use @ref tasks_failed instead. */
-	int total_tasks_cancelled;      /**< @deprecated Use @ref tasks_cancelled instead. */
-	int total_exhausted_attempts;   /**< @deprecated Use @ref tasks_exhausted_attempts instead. */
+	int total_tasks_dispatched;     /**< @deprecated Use tasks_dispatched instead. */
+	int total_tasks_complete;       /**< @deprecated Use tasks_done instead. */
+	int total_tasks_failed;         /**< @deprecated Use tasks_failed instead. */
+	int total_tasks_cancelled;      /**< @deprecated Use tasks_cancelled instead. */
+	int total_exhausted_attempts;   /**< @deprecated Use tasks_exhausted_attempts instead. */
 
-	 timestamp_t start_time;               /**< @deprecated Use @ref time_when_started. */
-	 timestamp_t total_send_time;          /**< @deprecated Use @ref time_send.    */
-	 timestamp_t total_receive_time;       /**< @deprecated Use @ref time_receive. */
-	 timestamp_t total_good_transfer_time; /**< @deprecated Use @ref time_send_good + time_receive_good. */
+	 timestamp_t start_time;               /**< @deprecated Use time_when_started. */
+	 timestamp_t total_send_time;          /**< @deprecated Use time_send.    */
+	 timestamp_t total_receive_time;       /**< @deprecated Use time_receive. */
+	 timestamp_t total_good_transfer_time; /**< @deprecated Use time_send_good + time_receive_good. */
 
-	 timestamp_t total_execute_time;           /**< @deprecated Use @ref time_workers_execute. */
-	 timestamp_t total_good_execute_time;      /**< @deprecated Use @ref time_workers_execute_good. */
-	 timestamp_t total_exhausted_execute_time; /**< @deprecated Use @ref time_workers_execute_exhaustion. */
+	 timestamp_t total_execute_time;           /**< @deprecated Use time_workers_execute. */
+	 timestamp_t total_good_execute_time;      /**< @deprecated Use time_workers_execute_good. */
+	 timestamp_t total_exhausted_execute_time; /**< @deprecated Use time_workers_execute_exhaustion. */
 
-	int64_t total_bytes_sent;     /**< @deprecated Use @ref bytes_sent. */
-	int64_t total_bytes_received; /**< @deprecated Use @ref bytes_received. */
+	int64_t total_bytes_sent;     /**< @deprecated Use bytes_sent. */
+	int64_t total_bytes_received; /**< @deprecated Use bytes_received. */
 
-	double capacity; /**< @deprecated Use @ref capacity_cores. */
+	double capacity; /**< @deprecated Use capacity_cores. */
 
 	int64_t total_gpus;       /**< @deprecated: broken. */
 	int64_t committed_gpus;   /**< @deprecated: broken. */
@@ -275,10 +300,10 @@ struct work_queue_stats {
 
 	int port;                       /**< @deprecated Use @ref work_queue_port Port of the queue. */
 	int priority;                   /**< @deprecated Not used. */
-	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
-	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
-	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */
-	int avg_capacity;               /**< @deprecated Use @ref capacity_cores instead. */
+	int workers_ready;              /**< @deprecated Use workers_idle instead. */
+	int workers_full;               /**< @deprecated Use workers_busy insead. */
+	int total_worker_slots;         /**< @deprecated Use tasks_running instead. */
+	int avg_capacity;               /**< @deprecated Use capacity_cores instead. */
 };
 
 

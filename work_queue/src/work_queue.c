@@ -740,15 +740,15 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 
 static void clean_task_state(struct work_queue_task *t) {
 
-		t->total_bytes_transferred = 0;
-		t->total_bytes_received = 0;
-		t->total_bytes_sent = 0;
+		t->bytes_transferred = 0;
+		t->bytes_received = 0;
+		t->bytes_sent = 0;
 
 		t->time_send    = 0;
 		t->time_receive = 0;
 
-		t->cmd_execution_time = 0;
-		t->time_execute_cmd_start = 0;
+		t->time_workers_execute_last = 0;
+		t->time_when_dispatched = 0;
 
 		if(t->output) {
 			free(t->output);
@@ -786,11 +786,10 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	itable_firstkey(w->current_tasks);
 	while(itable_nextkey(w->current_tasks, &taskid, (void **)&t)) {
-
-		if (t->time_execute_cmd_start >= t->time_committed) {
-			timestamp_t delta_time = timestamp_get() - t->time_execute_cmd_start;
-			t->total_time_until_worker_failure += delta_time;
-			t->total_cmd_execution_time += delta_time;
+		if (t->time_when_dispatched >= t->time_when_input_start) {
+			timestamp_t delta_time = timestamp_get() - t->time_when_dispatched;
+			t->time_workers_execute_failure += delta_time;
+			t->time_workers_execute_all     += delta_time;
 		}
 
 		clean_task_state(t);
@@ -1211,12 +1210,11 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 
 	if(total_bytes>0) {
 		q->stats->bytes_received += total_bytes;
-		q->stats->time_receive         += sum_time;
+		q->stats->time_receive   += sum_time;
 
-		t->total_bytes_received        += total_bytes;
-		t->total_bytes_transferred     += total_bytes;
-
-		t->time_receive                += sum_time;
+		t->bytes_received    += total_bytes;
+		t->bytes_transferred += total_bytes;
+		t->time_receive      += sum_time;
 
 		w->total_bytes_transferred += total_bytes;
 		w->total_transfer_time += sum_time;
@@ -1431,7 +1429,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	}
 
 	// Receiving output ...
-	t->time_receive_output_start = timestamp_get();
+	t->time_when_output_start = timestamp_get();
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		result = get_monitor_output_file(q,w,t);
@@ -1447,7 +1445,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	if(result == WORKER_FAILURE)
 		return;
 
-	t->time_receive_output_finish = timestamp_get();
+	t->time_when_output_finish = timestamp_get();
 
 	delete_uncacheable_files(q,w,t);
 
@@ -1474,16 +1472,16 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
-		q->stats->time_workers_execute_good += t->cmd_execution_time;
+		q->stats->time_workers_execute_good += t->time_workers_execute_last;
 		q->stats->time_send_good            += t->time_send;
 		q->stats->time_receive_good         += t->time_receive;
 	}
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		q->stats->time_workers_execute_exhaustion += t->cmd_execution_time;
+		q->stats->time_workers_execute_exhaustion += t->time_workers_execute_last;
 		q->stats->tasks_exhausted_attempts++;
 
-		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
+		t->time_workers_execute_exhaustion += t->time_workers_execute_last;
 		t->exhausted_attempts++;
 
 		if(t->resources_measured && t->resources_measured->limits_exceeded) {
@@ -1523,7 +1521,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	debug(D_WQ, "%s (%s) done in %.02lfs total tasks %lld average %.02lfs",
 			w->hostname,
 			w->addrport,
-			(t->time_receive_output_finish - t->time_send_input_start) / 1000000.0,
+			(t->time_when_output_finish - t->time_when_input_start) / 1000000.0,
 			(long long) w->total_tasks_complete,
 			w->total_task_time / w->total_tasks_complete / 1000000.0);
 
@@ -1588,7 +1586,7 @@ static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w
 	application may resubmit the task and the resubmitted task may produce
 	different outputs. */
 	if(t) {
-		if(t->time_execute_cmd_start > 0) {
+		if(t->time_when_dispatched > 0) {
 			delete_task_output_files(q,w,t);
 		}
 	}
@@ -1766,13 +1764,13 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 		return SUCCESS;
 	}
 
-	t->time_receive_result_start = timestamp_get();
-	observed_execution_time = timestamp_get() - t->time_execute_cmd_start;
+	t->time_when_result_start = timestamp_get();
+	observed_execution_time = timestamp_get() - t->time_when_dispatched;
 
 	execution_time = atoll(items[3]);
-	t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
+	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
-	t->total_cmd_execution_time += t->cmd_execution_time;
+	t->time_workers_execute_all += t->time_workers_execute_last;
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -1832,13 +1830,12 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	if(t->output)
 		t->output[actual] = 0;
 
-	t->time_receive_result_finish = timestamp_get();
+	t->time_when_result_finish = timestamp_get();
 
 	t->result        = task_status;
 	t->return_status = exit_status;
 
-	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
-	q->stats->time_workers_execute += t->cmd_execution_time;
+	q->stats->time_workers_execute += t->time_workers_execute_last;
 
 	w->finished_tasks++;
 
@@ -2337,9 +2334,9 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 					jx_insert_string(j, "address_port", w->addrport);
 
 					// Timestamps on running task related events
-					jx_insert_integer(j, "submit_to_queue_time", t->time_task_submit);
-					jx_insert_integer(j, "send_input_start_time", t->time_send_input_start);
-					jx_insert_integer(j, "execute_cmd_start_time", t->time_execute_cmd_start);
+					jx_insert_integer(j, "time_when_submitted", t->time_when_submitted);
+					jx_insert_integer(j, "time_when_input_start", t->time_when_input_start);
+					jx_insert_integer(j, "time_when_dispatched", t->time_when_dispatched);
 					jx_insert_integer(j, "current_time", timestamp_get());
 
 					jx_array_insert(a, j);
@@ -2799,8 +2796,8 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		timestamp_t close_time = timestamp_get();
 		timestamp_t elapsed_time = close_time-open_time;
 
-		t->total_bytes_sent += total_bytes;
-		t->total_bytes_transferred += total_bytes;
+		t->bytes_sent        += total_bytes;
+		t->bytes_transferred += total_bytes;
 
 		t->time_send     += elapsed_time;
 
@@ -2917,16 +2914,16 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 		command_line = xxstrdup(t->command_line);
 	}
 
-	t->time_send_input_start = timestamp_get();
+	t->time_when_input_start  = timestamp_get();
 	work_queue_result_code_t result = send_input_files(q, w, t);
-	t->time_send_input_finish = timestamp_get(); //record end time in case we return prematurely below.
+	t->time_when_input_finish = timestamp_get(); //record end time in case we return prematurely below.
 
 	if (result != SUCCESS) {
 		free(command_line);
 		return result;
 	}
 
-	t->time_execute_cmd_start = timestamp_get();
+	t->time_when_dispatched = timestamp_get();
 
 	send_worker_msg(q,w, "task %lld\n",  (long long) t->taskid);
 
@@ -2989,7 +2986,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
 	int result_msg = send_worker_msg(q,w, "end\n");
-	t->time_send_input_finish = timestamp_get();
+	t->time_when_input_finish = timestamp_get();
 
 	if(result_msg > -1)
 	{
@@ -3017,7 +3014,7 @@ static void add_task_report( struct work_queue *q, struct work_queue_task *t )
 	if(!tr) return;
 
 	tr->transfer_time = t->time_send + t->time_receive;
-	tr->exec_time     = t->cmd_execution_time;
+	tr->exec_time     = t->time_workers_execute_last;
 
 	list_push_tail(q->task_reports,tr);
 
@@ -3381,8 +3378,6 @@ static void find_max_worker(struct work_queue *q) {
 
 static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t)
 {
-	t->time_committed = timestamp_get();
-
 	t->hostname = xxstrdup(w->hostname);
 	t->host = xxstrdup(w->addrport);
 
@@ -3413,7 +3408,7 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	{
 		debug(D_WQ, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
 	} else {
-		w->total_task_time += t->cmd_execution_time;
+		w->total_task_time += t->time_workers_execute_last;
 	}
 
 	//update tables.
@@ -3568,7 +3563,7 @@ static void abort_slow_workers(struct work_queue *q)
 		if(c->fast_abort == 0)
 			continue;
 
-		timestamp_t runtime = current - t->time_send_input_start;
+		timestamp_t runtime = current - t->time_when_input_start;
 		timestamp_t average_task_time = c->average_task_time;
 
 		/* Not enough samples, skip the task. */
@@ -4971,6 +4966,34 @@ work_queue_task_state_t work_queue_task_state(struct work_queue *q, int taskid) 
 	return (int)(uintptr_t)itable_lookup(q->task_state_map, taskid);
 }
 
+static void fill_deprecated_tasks_stats(struct work_queue_task *t) {
+	t->time_task_submit = t->time_when_submitted;
+	t->time_task_finish = t->time_when_done;
+	t->time_committed = t->time_when_input_start;
+
+	t->time_send_input_start = t->time_when_input_start;
+	t->time_send_input_finish = t->time_when_input_finish;
+	t->time_receive_result_start = t->time_when_result_start;
+	t->time_receive_result_finish = t->time_when_result_finish;
+	t->time_receive_output_start = t->time_when_output_start;
+	t->time_receive_output_finish = t->time_when_output_finish;
+
+	t->time_execute_cmd_start = t->time_when_dispatched;
+	t->time_execute_cmd_finish = t->time_when_done;
+
+	t->total_time_transfer = t->time_send + t->time_receive;
+
+	t->cmd_execution_time = t->time_workers_execute_last;
+	t->total_cmd_execution_time = t->time_workers_execute_all;
+	t->total_cmd_exhausted_execute_time = t->time_workers_execute_exhaustion;
+	t->total_time_until_worker_failure = t->time_workers_execute_failure;
+
+	t->total_bytes_received = t->bytes_received;
+	t->total_bytes_sent = t->bytes_sent;
+	t->total_bytes_transferred = t->bytes_transferred;
+}
+
+
 /* Changes task state. Returns old state */
 /* State of the task. One of WORK_QUEUE_TASK(UNKNOWN|READY|RUNNING|WAITING_RETRIEVAL|RETRIEVED|DONE) */
 static work_queue_task_state_t change_task_state( struct work_queue *q, struct work_queue_task *t, work_queue_task_state_t new_state ) {
@@ -4995,7 +5018,11 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 		case WORK_QUEUE_TASK_DONE:
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
+			fill_deprecated_tasks_stats(t);
 			itable_remove(q->tasks, t->taskid);
+			break;
+		case WORK_QUEUE_TASK_RETRIEVED:
+			t->time_when_done = timestamp_get();
 			break;
 		default:
 			/* do nothing */
@@ -5129,7 +5156,7 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 
-	t->time_task_submit = timestamp_get();
+	t->time_when_submitted = timestamp_get();
 	q->stats->tasks_dispatched++;
 
 	if(q->monitor_mode != MON_DISABLED)
@@ -6121,10 +6148,10 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	struct work_queue_stats *s = c->wq_stats;
 
-	s->bytes_sent     += t->total_bytes_sent;
-	s->bytes_received += t->total_bytes_received;
+	s->bytes_sent     += t->bytes_sent;
+	s->bytes_received += t->bytes_received;
 
-	s->time_workers_execute += t->cmd_execution_time;
+	s->time_workers_execute += t->time_workers_execute_last;
 
 	s->time_send    += t->time_send;
 	s->time_receive += t->time_receive;
@@ -6136,14 +6163,14 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 		c->total_tasks++;
 
 		s->tasks_done                 = c->total_tasks;
-		s->time_workers_execute_good += t->cmd_execution_time;
+		s->time_workers_execute_good += t->time_workers_execute_last;
 		s->time_send_good            += t->time_send;
 		s->time_receive_good         += t->time_receive;
 	} else {
 		s->tasks_failed++;
 
 		if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-			s->time_workers_execute_exhaustion += t->cmd_execution_time;
+			s->time_workers_execute_exhaustion += t->time_workers_execute_last;
 		}
 	}
 

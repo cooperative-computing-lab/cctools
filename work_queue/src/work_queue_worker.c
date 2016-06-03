@@ -538,12 +538,12 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		} else {
 			output_length = 0;
 		}
-		send_master_message(master, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->time_workers_execute_last, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
 
-		total_task_execution_time += t->cmd_execution_time;
+		total_task_execution_time += t->time_workers_execute_last;
 		total_tasks_executed++;
 	}
 

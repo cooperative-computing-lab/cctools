@@ -118,9 +118,9 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 
 	struct work_queue_task *t = work_queue_wait(q->data, timeout);
 	if(t) {
-		info->submitted = t->time_task_submit / 1000000;
-		info->started = t->time_send_input_start / 1000000;
-		info->finished = t->time_receive_output_finish / 1000000;
+		info->submitted = t->time_when_submitted / 1000000;
+		info->started = t->time_when_input_start / 1000000;
+		info->finished = t->time_when_input_finish / 1000000;
 		info->exited_normally = 1;
 		info->exit_code = t->return_status;
 		info->exit_signal = 0;
