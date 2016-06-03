@@ -516,7 +516,10 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	 * restore it after we submit. */
 	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
 	char *batch_options          = dag_variable_lookup_string("BATCH_OPTIONS", &s);
-	char *previous_batch_options = xxstrdup(batch_queue_get_option(queue, "batch-options"));
+
+	char *previous_batch_options = NULL;
+	if(batch_queue_get_option(queue, "batch-options"))
+		previous_batch_options = xxstrdup(batch_queue_get_option(queue, "batch-options"));
 
 	if(batch_options) {
 		debug(D_MAKEFLOW_RUN, "Batch options: %s\n", batch_options);
