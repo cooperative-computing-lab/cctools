@@ -103,14 +103,14 @@ extern int wq_option_scheduler;	               /**< Initial setting for algorith
 struct work_queue_task {
 	char *tag;                                             /**< An optional user-defined logical name for the task. */
 	char *command_line;                                    /**< The program(s) to execute, as a shell command line. */
-	work_queue_schedule_t worker_selection_algorithm; /**< How to choose worker to run the task. */
+	work_queue_schedule_t worker_selection_algorithm;      /**< How to choose worker to run the task. */
 	char *output;                                          /**< The standard output of the task. */
 	struct list *input_files;                              /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;                             /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;                                 /**< Environment variables applied to the task. */
 	int taskid;                                            /**< A unique task id number. */
 	int return_status;                                     /**< The exit code of the command line. */
-	work_queue_result_t result;                       /**< The result of the task (see @ref work_queue_result_t */
+	work_queue_result_t result;                            /**< The result of the task (see @ref work_queue_result_t */
 	char *host;                                            /**< The address and port of the host on which it ran. */
 	char *hostname;                                        /**< The name of the host on which it ran. */
 
@@ -127,10 +127,12 @@ struct work_queue_task {
 	timestamp_t time_receive_output_start;                 /**< The time at which it started to transfer output files. */
 	timestamp_t time_receive_output_finish;                /**< The time at which it finished transferring output files. */
 
+	timestamp_t time_send;                                 /**< Time spend transfering this task to a worker. */
+	timestamp_t time_receive;                              /**< Time spend transfering this task results from a worker. */
+
 	int64_t total_bytes_received;                          /**< Number of bytes received since task has last started receiving input data. */
 	int64_t total_bytes_sent;                              /**< Number of bytes sent since task has last started sending input data. */
 	int64_t total_bytes_transferred;                       /**< Number of bytes transferred since task has last started transferring input data. */
-	timestamp_t total_transfer_time;                       /**< Time comsumed in microseconds for transferring total_bytes_transferred. */
 	timestamp_t cmd_execution_time;                        /**< Time spent in microseconds for executing the command until completion on a single worker. */
 	int total_submissions;                                 /**< The number of times the task has been submitted. */
 	timestamp_t total_cmd_execution_time;                  /**< Accumulated time spent in microseconds for executing the command on any worker, regardless of whether the task finished (i.e., this includes time running on workers that disconnected). */
@@ -154,79 +156,129 @@ struct work_queue_task {
 
 	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref work_queue_enable_monitoring */
 
+	timestamp_t total_time_transfer;                       /**< @deprecated Use @ref time_send + time_receive. */
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
 
 /** Statistics describing a work queue. */
 
 struct work_queue_stats {
-	int total_workers_connected;	/**< Total number of workers currently connected to the master. */
-	int workers_init;               /**< Number of workers initializing.*/
-	int workers_idle;               /**< Number of workers that are not running a task. */
-	int workers_busy;               /**< Number of workers that are running at least one task. */
+	/* Stats for the current state of workers: */
+	int workers_connected;	  /**< Number of workers currently connected to the master. */
+	int workers_init;         /**< Number of workers connected, but that have not send their available resources report yet.*/
+	int workers_idle;         /**< Number of workers that are not running a task. */
+	int workers_busy;         /**< Number of workers that are running at least one task. */
+	int workers_able;         /**< Number of workers on which the largest task can run. */
 
-	int total_workers_joined;       /**< Total number of worker connections that were established to the master. */
-	int total_workers_removed;      /**< Total number of worker connections that were lost or terminated by the master. */
-	int total_workers_lost;         /**< Total number of worker connections that were unexpectedly lost. */
-	int total_workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
-	int total_workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref work_queue_activate_fast_abort) */
+	/* Cummulative stats for workers: */
+	int workers_joined;       /**< Total number of worker connections that were established to the master. */
+	int workers_removed;      /**< Total number of worker connections that were lost or terminated by the master. */
+	int workers_vacated;      /**< Total number of worker connections that got SIGTERM signal (e.g. eviction from Condor), and were able to exit cleanly. */
+	int workers_idled_out;    /**< Total number of worker that disconnected for being idle. */
+	int workers_fast_aborted; /**< Total number of worker connections terminated for being too slow. (see @ref work_queue_activate_fast_abort) */
+	int workers_lost;         /**< Total number of worker connections that were unexpectedly lost. (includes workers_vacated) */
 
 	/* Stats for the current state of tasks: */
-	int tasks_waiting;              /**< Number of tasks waiting to be run. */
-	int tasks_running;              /**< Number of tasks currently running. */
-	int tasks_complete;             /**< Number of tasks waiting to be returned to user. */
+	int tasks_waiting;        /**< Number of tasks waiting to be dispatched. */
+	int tasks_on_workers;     /**< Number of tasks currently dispatched to some worker. */
+	int tasks_running;        /**< Number of tasks currently executing at some worker. */
+	int tasks_with_results;   /**< Number of tasks with retrieved results and waiting to be returned to user. */
 
 	/* Cummulative stats for tasks: */
-	int total_tasks_dispatched;     /**< Total number of tasks dispatch to workers. */
-	int total_tasks_complete;       /**< Total number of tasks completed and returned to user. */
-	int total_tasks_failed;         /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
-	int total_tasks_cancelled;      /**< Total number of tasks cancelled. */
-	int total_exhausted_attempts;   /**< Total number of task executions that failed given resource exhaustion. */
+	int tasks_submitted;           /**< Total number of tasks submitted to the queue. */
+	int tasks_dispatched;          /**< Total number of tasks dispatch to workers. */
+	int tasks_done;                /**< Total number of tasks completed and returned to user. (includes tasks_failed) */
+	int tasks_failed;              /**< Total number of tasks completed and returned to user with result other than WQ_RESULT_SUCCESS. */
+	int tasks_cancelled;           /**< Total number of tasks cancelled. */
+	int tasks_exhausted_attempts;  /**< Total number of task executions that failed given resource exhaustion. */
 
-	timestamp_t start_time;         /**< Absolute time at which the master started. */
-	timestamp_t total_send_time;    /**< Total time in microseconds spent in sending data to workers. */
-	timestamp_t total_receive_time; /**< Total time in microseconds spent in receiving data from workers. */
-	timestamp_t total_good_transfer_time;    /**< Total time in microseconds spent in sending and receiving data to workers for tasks with result WQ_RESULT_SUCCESS. */
+	/* All times in microseconds */
+	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
 
-	timestamp_t total_execute_time;      /**< Total time in microseconds workers spent executing completed tasks. */
-	timestamp_t total_good_execute_time; /**< Total time in microseconds workers spent executing successful tasks. */
-	timestamp_t total_exhausted_execute_time; /**< Total time in microseconds workers spent on tasks that exhausted resources. */
+	/* Master time statistics: */
+	timestamp_t time_when_started; /**< Absolute time at which the master started. */
+	timestamp_t time_send;         /**< Total time spent in sending data to workers (tasks descriptions, input files, requests for status, etc.). */
+	timestamp_t time_receive;      /**< Total time spent in receiving data from workers (output files, status reports, etc.). */
+	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
+	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
+	timestamp_t time_application;  /**< Total time spent outside work_queue_wait. */
+	timestamp_t time_idle;         /**< Total time blocking waiting for worker communications (i.e., polling workers). */
 
-	timestamp_t total_app_time;     /**< Total time in microseconds spent outside work_queue_wait. */
-	timestamp_t total_idle_time;    /**< Total time in microseconds polling workers. */
+	/* Workers time statistics: */
+	timestamp_t time_workers_execute;            /**< Total time workers spent executing done tasks. */
+	timestamp_t time_workers_execute_good;       /**< Total time workers spent executing done tasks with result WQ_RESULT_SUCCESS. */
+	timestamp_t time_workers_execute_exhaustion; /**< Total time workers spent executing tasks that exhausted resources. */
 
-	int64_t total_bytes_sent;       /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
-	int64_t total_bytes_received;   /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
-	double efficiency;              /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */
-	double idle_percentage;         /**< The fraction of time that the master is idle waiting for workers to respond. */
-	int capacity;                   /**< The estimated number of workers that this master can effectively support. */
+	/* BW statistics */
+	int64_t bytes_sent;     /**< Total number of file bytes (not including protocol control msg bytes) sent out to the workers by the master. */
+	int64_t bytes_received; /**< Total number of file bytes (not including protocol control msg bytes) received from the workers by the master. */
+	double  bandwidth;      /**< Average network bandwidth in MB/S observed by the master when transferring to workers. */
 
-	double  bandwidth;              /**< Average network bandwidth in MB/S observed by the master when transferring to workers. */
-	int64_t total_cores;            /**< Total number of cores aggregated across the connected workers. */
-	int64_t total_memory;           /**< Total memory in MB aggregated across the connected workers. */
-	int64_t total_disk;	            /**< Total disk space in MB aggregated across the connected workers. */
-	int64_t total_gpus;             /**< Total number of GPUs aggregated across the connected workers. */
-	int64_t committed_cores;        /**< Committed number of cores aggregated across the connected workers. */
-	int64_t committed_memory;       /**< Committed memory in MB aggregated across the connected workers. */
-	int64_t committed_disk;	        /**< Committed disk space in MB aggregated across the connected workers. */
-	int64_t committed_gpus;         /**< Committed number of GPUs aggregated across the connected workers. */
-	int64_t min_cores;              /**< The lowest number of cores observed among the connected workers. */
-	int64_t max_cores;              /**< The highest number of cores observed among the connected workers. */
-	int64_t min_memory;             /**< The smallest memory size in MB observed among the connected workers. */
-	int64_t max_memory;             /**< The largest memory size in MB observed among the connected workers. */
-	int64_t min_disk;               /**< The smallest disk space in MB observed among the connected workers. */
-	int64_t max_disk;               /**< The largest disk space in MB observed among the connected workers. */
-	int64_t min_gpus;               /**< The lowest number of GPUs observed among the connected workers. */
-	int64_t max_gpus;               /**< The highest number of GPUs observed among the connected workers. */
+	/* resources statistics */
+	double efficiency;      /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */
+	double idle_percentage; /**< The fraction of time that the master is idle waiting for workers to respond. */
 
-	int workers_able;               /**< Number of workers on which the largest task can run. */
+	int capacity_cores;     /**< The estimated number of workers' cores that this master can effectively support. (not implemented) */
+	int capacity_memory;    /**< The estimated number of workers' MB of RAM that this master can effectively support. (not implemented) */
+	int capacity_disk;      /**< The estimated number of workers' MB of disk that this master can effectively support. (not implemented) */
 
-	int port;                       /**< @deprecated Use ref work_queue_port Port of the queue. */
+	int64_t total_cores;      /**< Total number of cores aggregated across the connected workers. */
+	int64_t total_memory;     /**< Total memory in MB aggregated across the connected workers. */
+	int64_t total_disk;	      /**< Total disk space in MB aggregated across the connected workers. */
+
+	int64_t committed_cores;  /**< Committed number of cores aggregated across the connected workers. */
+	int64_t committed_memory; /**< Committed memory in MB aggregated across the connected workers. */
+	int64_t committed_disk;	  /**< Committed disk space in MB aggregated across the connected workers. */
+
+	int64_t max_cores;        /**< The highest number of cores observed among the connected workers. */
+	int64_t max_memory;       /**< The largest memory size in MB observed among the connected workers. */
+	int64_t max_disk;         /**< The largest disk space in MB observed among the connected workers. */
+
+	int64_t min_cores;        /**< The lowest number of cores observed among the connected workers. */
+	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
+	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
+
+	/**< deprecated fields: */
+	int total_workers_connected;    /**< @deprecated Use @ref workers_connected instead. */
+	int total_workers_joined;       /**< @deprecated Use @ref workers_joined instead. */
+	int total_workers_removed;      /**< @deprecated Use @ref workers_removed instead. */
+	int total_workers_lost;         /**< @deprecated Use @ref workers_lost instead. */
+	int total_workers_idled_out;    /**< @deprecated Use @ref workers_idled_out instead. */
+	int total_workers_fast_aborted; /**< @deprecated Use @ref workers_fast_aborted instead. */
+
+	int tasks_complete;             /**< @deprecated Use @ref tasks_with_results. */
+
+	int total_tasks_dispatched;     /**< @deprecated Use @ref tasks_dispatched instead. */
+	int total_tasks_complete;       /**< @deprecated Use @ref tasks_done instead. */
+	int total_tasks_failed;         /**< @deprecated Use @ref tasks_failed instead. */
+	int total_tasks_cancelled;      /**< @deprecated Use @ref tasks_cancelled instead. */
+	int total_exhausted_attempts;   /**< @deprecated Use @ref tasks_exhausted_attempts instead. */
+
+	 timestamp_t start_time;               /**< @deprecated Use @ref time_when_started. */
+	 timestamp_t total_send_time;          /**< @deprecated Use @ref time_send.    */
+	 timestamp_t total_receive_time;       /**< @deprecated Use @ref time_receive. */
+	 timestamp_t total_good_transfer_time; /**< @deprecated Use @ref time_send_good + time_receive_good. */
+
+	 timestamp_t total_execute_time;           /**< @deprecated Use @ref time_workers_execute. */
+	 timestamp_t total_good_execute_time;      /**< @deprecated Use @ref time_workers_execute_good. */
+	 timestamp_t total_exhausted_execute_time; /**< @deprecated Use @ref time_workers_execute_exhaustion. */
+
+	int64_t total_bytes_sent;     /**< @deprecated Use @ref bytes_sent. */
+	int64_t total_bytes_received; /**< @deprecated Use @ref bytes_received. */
+
+	double capacity; /**< @deprecated Use @ref capacity_cores. */
+
+	int64_t total_gpus;       /**< @deprecated: broken. */
+	int64_t committed_gpus;   /**< @deprecated: broken. */
+	int64_t max_gpus;         /**< @deprecated: broken. */
+	int64_t min_gpus;         /**< @deprecated: broken. */
+
+	int port;                       /**< @deprecated Use @ref work_queue_port Port of the queue. */
 	int priority;                   /**< @deprecated Not used. */
 	int workers_ready;              /**< @deprecated Use @ref workers_idle instead. */
 	int workers_full;               /**< @deprecated Use @ref workers_busy insead. */
 	int total_worker_slots;         /**< @deprecated Use @ref tasks_running instead. */
-	int avg_capacity;               /**< @deprecated Use @ref capacity instead. */
+	int avg_capacity;               /**< @deprecated Use @ref capacity_cores instead. */
 };
 
 

@@ -381,15 +381,85 @@ static void log_worker_stats(struct work_queue *q)
 
 	work_queue_get_stats(q, &s);
 
-	//print in the order described by the headers in specify_log().
-	fprintf(q->logfile, "%" PRIu64 " ", timestamp_get());
-	fprintf(q->logfile, "%d %d %d %d %d %d ", s.total_workers_connected, s.workers_init, s.workers_idle, s.workers_busy, s.total_workers_joined, s.total_workers_removed);
-	fprintf(q->logfile, "%d %d %d %d %d %d ", s.tasks_waiting, s.tasks_running, s.tasks_complete, s.total_tasks_dispatched, s.total_tasks_complete, s.total_tasks_cancelled);
-	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRId64 " %" PRId64 " %f %f %d ", s.start_time, s.total_send_time, s.total_receive_time, s.total_bytes_sent, s.total_bytes_received, s.efficiency, s.idle_percentage, s.capacity);
-	fprintf(q->logfile, "%f %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " ", s.bandwidth, s.total_cores, s.total_memory, s.total_disk, s.total_gpus);
-	fprintf(q->logfile, "%" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " ", s.min_cores, s.max_cores, s.min_memory, s.max_memory, s.min_disk, s.max_disk, s.min_gpus, s.max_gpus);
-	fprintf(q->logfile, "%" PRIu64 " %" PRIu64 " ", s.total_execute_time, s.total_good_execute_time);
-	fprintf(q->logfile, "\n");
+	buffer_t B;
+	buffer_init(&B);
+
+	buffer_printf(&B, "%" PRIu64, timestamp_get());
+
+	/* Stats for the current state of workers: */
+	buffer_printf(&B, " %d", s.workers_connected);
+	buffer_printf(&B, " %d", s.workers_init);
+	buffer_printf(&B, " %d", s.workers_idle);
+	buffer_printf(&B, " %d", s.workers_busy);
+	buffer_printf(&B, " %d", s.workers_able);
+
+	/* Cummulative stats for workers: */
+	buffer_printf(&B, " %d", s.workers_joined);
+	buffer_printf(&B, " %d", s.workers_removed);
+	buffer_printf(&B, " %d", s.workers_vacated);
+	buffer_printf(&B, " %d", s.workers_idled_out);
+	buffer_printf(&B, " %d", s.workers_fast_aborted);
+	buffer_printf(&B, " %d", s.workers_lost);
+
+	/* Stats for the current state of tasks: */
+	buffer_printf(&B, " %d", s.tasks_waiting);
+	buffer_printf(&B, " %d", s.tasks_on_workers);
+	buffer_printf(&B, " %d", s.tasks_running);
+	buffer_printf(&B, " %d", s.tasks_with_results);
+
+	/* Cummulative stats for tasks: */
+	buffer_printf(&B, " %d", s.tasks_dispatched);
+	buffer_printf(&B, " %d", s.tasks_done);
+	buffer_printf(&B, " %d", s.tasks_failed);
+	buffer_printf(&B, " %d", s.tasks_cancelled);
+	buffer_printf(&B, " %d", s.tasks_exhausted_attempts);
+
+	/* Master time statistics: */
+	buffer_printf(&B, " %" PRIu64, s.time_when_started);
+	buffer_printf(&B, " %" PRIu64, s.time_send);
+	buffer_printf(&B, " %" PRIu64, s.time_receive);
+	buffer_printf(&B, " %" PRIu64, s.time_send_good);
+	buffer_printf(&B, " %" PRIu64, s.time_receive_good);
+	buffer_printf(&B, " %" PRIu64, s.time_application);
+	buffer_printf(&B, " %" PRIu64, s.time_idle);
+
+	/* Workers time statistics: */
+	buffer_printf(&B, " %" PRIu64, s.time_workers_execute);
+	buffer_printf(&B, " %" PRIu64, s.time_workers_execute_good);
+	buffer_printf(&B, " %" PRIu64, s.time_workers_execute_exhaustion);
+
+	/* BW statistics */
+	buffer_printf(&B, " %" PRIu64, s.bytes_sent);
+	buffer_printf(&B, " %" PRIu64, s.bytes_received);
+	buffer_printf(&B, " %f", s.bandwidth);
+
+	/* resources statistics */
+	buffer_printf(&B, " %f", s.efficiency);
+	buffer_printf(&B, " %f", s.idle_percentage);
+
+	buffer_printf(&B, " %d", s.capacity_cores);
+	buffer_printf(&B, " %d", s.capacity_memory);
+	buffer_printf(&B, " %d", s.capacity_disk);
+
+	buffer_printf(&B, " %" PRId64, s.total_cores);
+	buffer_printf(&B, " %" PRId64, s.total_memory);
+	buffer_printf(&B, " %" PRId64, s.total_disk);
+
+	buffer_printf(&B, " %" PRId64, s.committed_cores);
+	buffer_printf(&B, " %" PRId64, s.committed_memory);
+	buffer_printf(&B, " %" PRId64, s.committed_disk);
+
+	buffer_printf(&B, " %" PRId64, s.max_cores);
+	buffer_printf(&B, " %" PRId64, s.max_memory);
+	buffer_printf(&B, " %" PRId64, s.max_disk);
+
+	buffer_printf(&B, " %" PRId64, s.min_cores);
+	buffer_printf(&B, " %" PRId64, s.min_memory);
+	buffer_printf(&B, " %" PRId64, s.min_disk);
+
+	fprintf(q->logfile, "%s\n", buffer_tostring(&B));
+
+	buffer_free(&B);
 }
 
 static void link_to_hash_key(struct link *link, char *key)
@@ -463,26 +533,28 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	if(n != 2)
 		return MSG_FAILURE;
 
-	if(string_prefix_is(field, "total_workers_joined")) {
-		w->stats->total_workers_joined = atoll(value);
-	} else if(string_prefix_is(field, "total_workers_removed")) {
-		w->stats->total_workers_removed = atoll(value);
-	} else if(string_prefix_is(field, "total_send_time")) {
-		w->stats->total_send_time = atoll(value);
-	} else if(string_prefix_is(field, "total_receive_time")) {
-		w->stats->total_receive_time = atoll(value);
-	} else if(string_prefix_is(field, "total_execute_time")) {
-		w->stats->total_execute_time = atoll(value);
-	} else if(string_prefix_is(field, "total_bytes_sent")) {
-		w->stats->total_bytes_sent = atoll(value);
-	} else if(string_prefix_is(field, "total_bytes_received")) {
-		w->stats->total_bytes_received = atoll(value);
+	if(string_prefix_is(field, "workers_joined")) {
+		w->stats->workers_joined = atoll(value);
+	} else if(string_prefix_is(field, "workers_removed")) {
+		w->stats->workers_removed = atoll(value);
+	} else if(string_prefix_is(field, "time_send")) {
+		w->stats->time_send = atoll(value);
+	} else if(string_prefix_is(field, "time_receive")) {
+		w->stats->time_receive = atoll(value);
+	} else if(string_prefix_is(field, "time_workers_execute")) {
+		w->stats->time_workers_execute = atoll(value);
+	} else if(string_prefix_is(field, "bytes_sent")) {
+		w->stats->bytes_sent = atoll(value);
+	} else if(string_prefix_is(field, "bytes_received")) {
+		w->stats->bytes_received = atoll(value);
 	} else if(string_prefix_is(field, "tasks_waiting")) {
 		w->stats->tasks_waiting = atoll(value);
 	} else if(string_prefix_is(field, "tasks_running")) {
 		w->stats->tasks_running = atoll(value);
 	} else if(string_prefix_is(field, "idle-disconnecting")) {
-		q->stats->total_workers_idled_out++;
+		q->stats->workers_idled_out++;
+	} else if(string_prefix_is(field, "vacating")) {
+		q->stats->workers_vacated++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
 	} else if(string_prefix_is(field, "worker-id")) {
@@ -570,8 +642,8 @@ work_queue_msg_code_t recv_worker_msg_retry( struct work_queue *q, struct work_q
 static double get_queue_transfer_rate(struct work_queue *q, char **data_source)
 {
 	double queue_transfer_rate; // bytes per second
-	int64_t     q_total_bytes_transferred = q->stats->total_bytes_sent + q->stats->total_bytes_received;
-	timestamp_t q_total_transfer_time     = q->stats->total_send_time  + q->stats->total_receive_time;
+	int64_t     q_total_bytes_transferred = q->stats->bytes_sent + q->stats->bytes_received;
+	timestamp_t q_total_transfer_time     = q->stats->time_send  + q->stats->time_receive;
 
 	// Note q_total_transfer_time is timestamp_t with units of milliseconds.
 	if(q_total_transfer_time>1000000) {
@@ -671,9 +743,11 @@ static void clean_task_state(struct work_queue_task *t) {
 		t->total_bytes_transferred = 0;
 		t->total_bytes_received = 0;
 		t->total_bytes_sent = 0;
-		t->total_transfer_time = 0;
-		t->cmd_execution_time = 0;
 
+		t->time_send    = 0;
+		t->time_receive = 0;
+
+		t->cmd_execution_time = 0;
 		t->time_execute_cmd_start = 0;
 
 		if(t->output) {
@@ -748,18 +822,22 @@ static void record_removed_worker_stats(struct work_queue *q, struct work_queue_
 	struct work_queue_stats *qs = q->stats_disconnected_workers;
 	struct work_queue_stats *ws = w->stats;
 
-	accumulate_stat(qs, ws, total_workers_joined);
-	accumulate_stat(qs, ws, total_workers_idled_out);
-	accumulate_stat(qs, ws, total_workers_lost);
-	accumulate_stat(qs, ws, total_workers_fast_aborted);
-	accumulate_stat(qs, ws, total_send_time);
-	accumulate_stat(qs, ws, total_receive_time);
-	accumulate_stat(qs, ws, total_execute_time);
-	accumulate_stat(qs, ws, total_bytes_sent);
-	accumulate_stat(qs, ws, total_bytes_received);
+	accumulate_stat(qs, ws, workers_joined);
+	accumulate_stat(qs, ws, workers_removed);
+	accumulate_stat(qs, ws, workers_vacated);
+	accumulate_stat(qs, ws, workers_idled_out);
+	accumulate_stat(qs, ws, workers_fast_aborted);
+	accumulate_stat(qs, ws, workers_lost);
+
+	accumulate_stat(qs, ws, time_send);
+	accumulate_stat(qs, ws, time_receive);
+	accumulate_stat(qs, ws, time_workers_execute);
+
+	accumulate_stat(qs, ws, bytes_sent);
+	accumulate_stat(qs, ws, bytes_received);
 
 	//Count all the workers joined as removed.
-	qs->total_workers_removed = ws->total_workers_joined;
+	qs->workers_removed = ws->workers_joined;
 }
 
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -768,7 +846,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	q->stats->total_workers_removed++;
+	q->stats->workers_removed++;
 
 	write_transaction_worker(q, w, 1);
 
@@ -870,7 +948,7 @@ static void add_worker(struct work_queue *q)
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
 	log_worker_stats(q);
-	q->stats->total_workers_joined++;
+	q->stats->workers_joined++;
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 
@@ -1132,13 +1210,17 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 	timestamp_t sum_time = close_time - open_time;
 
 	if(total_bytes>0) {
-		q->stats->total_bytes_received += total_bytes;
-		q->stats->total_receive_time += sum_time;
-		t->total_bytes_received += total_bytes;
-		t->total_bytes_transferred += total_bytes;
-		t->total_transfer_time += sum_time;
+		q->stats->bytes_received += total_bytes;
+		q->stats->time_receive         += sum_time;
+
+		t->total_bytes_received        += total_bytes;
+		t->total_bytes_transferred     += total_bytes;
+
+		t->time_receive                += sum_time;
+
 		w->total_bytes_transferred += total_bytes;
 		w->total_transfer_time += sum_time;
+
 		debug(D_WQ, "%s (%s) sent %.2lf MB in %.02lfs (%.02lfs MB/s) average %.02lfs MB/s", w->hostname, w->addrport, total_bytes / 1000000.0, sum_time / 1000000.0, (double) total_bytes / sum_time, (double) w->total_bytes_transferred / w->total_transfer_time);
 	}
 
@@ -1385,23 +1467,21 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
 
 	w->finished_tasks--;
-	t->time_task_finish = timestamp_get();
 
 	// Update completed tasks and the total task execution time.
-	q->stats->total_tasks_complete++;
+	q->stats->tasks_done++;
 	w->total_tasks_complete++;
-
-	w->total_task_time += t->cmd_execution_time;
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
-		q->stats->total_good_execute_time  += t->cmd_execution_time;
-		q->stats->total_good_transfer_time += t->total_transfer_time;
+		q->stats->time_workers_execute_good += t->cmd_execution_time;
+		q->stats->time_send_good            += t->time_send;
+		q->stats->time_receive_good         += t->time_receive;
 	}
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
-		q->stats->total_exhausted_execute_time += t->cmd_execution_time;
-		q->stats->total_exhausted_attempts++;
+		q->stats->time_workers_execute_exhaustion += t->cmd_execution_time;
+		q->stats->tasks_exhausted_attempts++;
 
 		t->total_cmd_exhausted_execute_time += t->cmd_execution_time;
 		t->exhausted_attempts++;
@@ -1758,7 +1838,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	t->return_status = exit_status;
 
 	t->time_execute_cmd_finish = t->time_execute_cmd_start + t->cmd_execution_time;
-	q->stats->total_execute_time += t->cmd_execution_time;
+	q->stats->time_workers_execute += t->cmd_execution_time;
 
 	w->finished_tasks++;
 
@@ -1977,20 +2057,20 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	struct work_queue_stats s;
 	work_queue_get_stats_category(q, category, &s);
 
-	if(s.tasks_waiting + s.tasks_running + s.tasks_complete < 1)
+	if(s.tasks_waiting + s.tasks_running + s.tasks_done < 1)
 		return 0;
 
 	struct jx *j = jx_object(0);
 	if(!j) return 0;
 
-	jx_insert_string(j, "category", category);
-	jx_insert_integer(j, "tasks_waiting", s.tasks_waiting);
-	jx_insert_integer(j, "tasks_running", s.tasks_running + s.tasks_complete);
-	jx_insert_integer(j, "total_tasks_dispatched", s.total_tasks_dispatched);
-	jx_insert_integer(j, "total_tasks_complete", s.total_tasks_complete);
-	jx_insert_integer(j, "total_tasks_failed", s.total_tasks_failed);
-	jx_insert_integer(j, "total_tasks_cancelled", s.total_tasks_cancelled);
-	jx_insert_integer(j, "workers_able", s.workers_able);
+	jx_insert_string(j,  "category",         category);
+	jx_insert_integer(j, "tasks_waiting",    s.tasks_waiting);
+	jx_insert_integer(j, "tasks_running",    s.tasks_running);
+	jx_insert_integer(j, "tasks_dispatched", s.tasks_dispatched);
+	jx_insert_integer(j, "tasks_complete",   s.tasks_done);
+	jx_insert_integer(j, "tasks_failed",     s.tasks_failed);
+	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
+	jx_insert_integer(j, "workers_able",     s.workers_able);
 
 	category_jx_insert_max(j, c, cores);
 	category_jx_insert_max(j, c, memory);
@@ -2045,42 +2125,47 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
 	//send info on workers
-	jx_insert_integer(j,"workers",info.total_workers_connected);
+	jx_insert_integer(j,"workers",info.workers_connected);
+	jx_insert_integer(j,"total_workers_connected",info.workers_connected);
 	jx_insert_integer(j,"workers_init",info.workers_init);
 	jx_insert_integer(j,"workers_idle",info.workers_idle);
 	jx_insert_integer(j,"workers_busy",info.workers_busy);
 	jx_insert_integer(j,"workers_able",info.workers_able);
-	jx_insert_integer(j,"workers_ready",info.workers_ready); //workers_ready is deprecated
-	jx_insert_integer(j,"total_workers_connected",info.total_workers_connected);
-	jx_insert_integer(j,"total_workers_joined",info.total_workers_joined);
-	jx_insert_integer(j,"total_workers_removed",info.total_workers_removed);
-	jx_insert_integer(j,"total_workers_idled_out",info.total_workers_idled_out);
-	jx_insert_integer(j,"total_workers_lost",info.total_workers_lost);
-	jx_insert_integer(j,"total_workers_fast_aborted",info.total_workers_fast_aborted);
+
+	jx_insert_integer(j,"workers_joined",info.workers_joined);
+	jx_insert_integer(j,"workers_removed",info.workers_removed);
+	jx_insert_integer(j,"workers_vacated",info.workers_vacated);
+	jx_insert_integer(j,"workers_idled_out",info.workers_idled_out);
+	jx_insert_integer(j,"workers_fast_aborted",info.workers_fast_aborted);
+	jx_insert_integer(j,"workers_lost",info.workers_lost);
 
 	//send info on tasks
 	jx_insert_integer(j,"tasks_waiting",info.tasks_waiting);
+	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_running",info.tasks_running);
-	// KNOWN HACK: The following line is inconsistent but kept for compatibility reasons.
-	// Everyone wants to know total_tasks_complete, but few are interested in tasks_complete.
-	jx_insert_integer(j,"tasks_complete",info.total_tasks_complete);
-	jx_insert_integer(j,"total_tasks_complete",info.total_tasks_complete);
-	jx_insert_integer(j,"total_tasks_dispatched",info.total_tasks_dispatched);
-	jx_insert_integer(j,"total_tasks_cancelled",info.total_tasks_cancelled);
+	jx_insert_integer(j,"tasks_with_results",info.tasks_with_results);
+
+	jx_insert_integer(j,"tasks_dispatched",info.tasks_dispatched);
+	jx_insert_integer(j,"tasks_done",info.tasks_done);
+	jx_insert_integer(j,"tasks_failed",info.tasks_failed);
+	jx_insert_integer(j,"tasks_cancelled",info.tasks_cancelled);
+	jx_insert_integer(j,"tasks_exhausted_attempts",info.tasks_exhausted_attempts);
 
 	//send info on queue
-	jx_insert_integer(j,"start_time",info.start_time);
-	jx_insert_integer(j,"total_send_time",info.total_send_time);
-	jx_insert_integer(j,"total_receive_time",info.total_receive_time);
-	jx_insert_integer(j,"total_bytes_sent",info.total_bytes_sent);
-	jx_insert_integer(j,"total_bytes_received",info.total_bytes_received);
+	jx_insert_integer(j,"time_when_started",info.time_when_started);
+	jx_insert_integer(j,"time_send",info.time_send);
+	jx_insert_integer(j,"time_receive",info.time_receive);
+	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
+	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
+	jx_insert_integer(j,"time_workers_execute_exhaustion",info.time_workers_execute_exhaustion);
+
+	jx_insert_integer(j,"bytes_sent",info.bytes_sent);
+	jx_insert_integer(j,"bytes_received",info.bytes_received);
 	jx_insert_double(j,"efficiency",info.efficiency);
 	jx_insert_double(j,"idle_percentage",info.idle_percentage);
-	jx_insert_integer(j,"capacity",info.capacity);
-	jx_insert_integer(j,"total_execute_time",info.total_execute_time);
-	jx_insert_integer(j,"total_good_execute_time",info.total_good_execute_time);
-	jx_insert_integer(j,"total_exhausted_execute_time",info.total_exhausted_execute_time);
-	jx_insert_integer(j,"total_exhausted_retries",info.total_exhausted_attempts);
+	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
+	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
+	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
@@ -2101,7 +2186,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	// Add special properties expected by the catalog server
 	jx_insert_string(j,"type","wq_master");
 	if(q->name) jx_insert_string(j,"project",q->name);
-	jx_insert_integer(j,"starttime",(q->stats->start_time/1000000)); // catalog expects time_t not timestamp_t
+	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j,"working_dir",q->workingdir);
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
@@ -2223,8 +2308,8 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
 	//do not count a status connection as a worker
-	q->stats->total_workers_joined--;
-	q->stats->total_workers_removed--;
+	q->stats->workers_joined--;
+	q->stats->workers_removed--;
 
 	if(sscanf(line, "%[^_]_status", request) != 1) {
 		return MSG_FAILURE;
@@ -2358,7 +2443,7 @@ static void handle_worker(struct work_queue *q, struct link *l)
 		worker_failure = 1;
 	} else if(result == MSG_FAILURE){
 		debug(D_WQ, "Failed to read from worker %s (%s)", w->hostname, w->addrport);
-		q->stats->total_workers_lost++;
+		q->stats->workers_lost++;
 		worker_failure = 1;
 	} // otherwise do nothing..message was consumed and processed in recv_worker_msg()
 
@@ -2716,13 +2801,14 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 
 		t->total_bytes_sent += total_bytes;
 		t->total_bytes_transferred += total_bytes;
-		t->total_transfer_time += elapsed_time;
+
+		t->time_send     += elapsed_time;
 
 		w->total_bytes_transferred += total_bytes;
-		w->total_transfer_time += elapsed_time;
+		w->total_transfer_time     += elapsed_time;
 
-		q->stats->total_bytes_sent += total_bytes;
-		q->stats->total_send_time += elapsed_time;
+		q->stats->bytes_sent += total_bytes;
+		q->stats->time_send  += elapsed_time;
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
@@ -2929,8 +3015,10 @@ static void add_task_report( struct work_queue *q, struct work_queue_task *t )
 	// Create a new report object and add it to the list.
 	tr = malloc(sizeof(struct work_queue_task_report));
 	if(!tr) return;
-	tr->transfer_time = t->total_transfer_time;
+
+	tr->transfer_time = t->time_send + t->time_receive;
 	tr->exec_time     = t->cmd_execution_time;
+
 	list_push_tail(q->task_reports,tr);
 
 	// Trim the list to the current number of useful workers.
@@ -2970,8 +3058,11 @@ static double compute_capacity( const struct work_queue *q )
 	avg_exec_time /= count;
 
 	// Compute the average time spent outside of work_queue_wait
-	if(q->stats->total_tasks_complete==0) return WORK_QUEUE_DEFAULT_CAPACITY;
-	timestamp_t avg_app_time = q->stats->total_app_time / q->stats->total_tasks_complete;
+	if(q->stats->tasks_done==0) {
+		return WORK_QUEUE_DEFAULT_CAPACITY;
+	}
+
+	timestamp_t avg_app_time = q->stats->time_application / q->stats->tasks_done;
 
 	// Capacity is the ratio of task execution time to time spent in the master doing other things.
 	if(avg_transfer_time==0) return WORK_QUEUE_DEFAULT_CAPACITY;
@@ -3321,6 +3412,8 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	if(wr != w)
 	{
 		debug(D_WQ, "Cannot reap task %d from worker. It is not being run by %s (%s)\n", t->taskid, w->hostname, w->addrport);
+	} else {
+		w->total_task_time += t->cmd_execution_time;
 	}
 
 	//update tables.
@@ -3454,7 +3547,7 @@ static void abort_slow_workers(struct work_queue *q)
 			continue;
 		}
 
-		c->average_task_time = (stats->total_good_execute_time + stats->total_good_transfer_time) / c->total_tasks;
+		c->average_task_time = (stats->time_workers_execute_good + stats->time_send_good + stats->time_receive_good) / c->total_tasks;
 
 		if(c->fast_abort > 0)
 			fast_abort_flag = 1;
@@ -3502,7 +3595,7 @@ static void abort_slow_workers(struct work_queue *q)
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
 				remove_worker(q, w);
-				q->stats->total_workers_fast_aborted++;
+				q->stats->workers_fast_aborted++;
 			}
 		}
 	}
@@ -4447,7 +4540,7 @@ struct work_queue *work_queue_create(int port)
 	q->short_timeout = 5;
 	q->long_timeout = 3600;
 
-	q->stats->start_time = timestamp_get();
+	q->stats->time_when_started = timestamp_get();
 	q->task_reports = list_create();
 
 	q->catalog_hosts = 0;
@@ -5037,7 +5130,7 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 
 	t->time_task_submit = timestamp_get();
-	q->stats->total_tasks_dispatched++;
+	q->stats->tasks_dispatched++;
 
 	if(q->monitor_mode != MON_DISABLED)
 		work_queue_monitor_add_files(q, t);
@@ -5164,7 +5257,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	timestamp_t link_poll_start = timestamp_get();
 	int result = link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
-	q->stats->total_idle_time += q->link_poll_end - link_poll_start;
+	q->stats->time_idle += q->link_poll_end - link_poll_start;
 
 	int i, j = 1;
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
@@ -5240,7 +5333,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 	static timestamp_t last_left_time = 0;
 	if(last_left_time!=0) {
-		q->stats->total_app_time += timestamp_get() - last_left_time;
+		q->stats->time_application += timestamp_get() - last_left_time;
 	}
 
 	print_password_warning(q);
@@ -5261,7 +5354,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
-				q->stats->total_tasks_failed++;
+				q->stats->tasks_failed++;
 			}
 
 			// return completed task (t) to the user. We do not return right
@@ -5334,8 +5427,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 int work_queue_hungry(struct work_queue *q)
 {
-	if(q->stats->total_tasks_dispatched < 100)
-		return (100 - q->stats->total_tasks_dispatched);
+	if(q->stats->tasks_dispatched < 100)
+		return (100 - q->stats->tasks_dispatched);
 
 	//BUG: fix this so that it actually looks at the number of cores available.
 
@@ -5398,7 +5491,7 @@ struct work_queue_task *work_queue_cancel_by_taskid(struct work_queue *q, int ta
 	/* change state even if task is not running on a worker. */
 	change_task_state(q, matched_task, WORK_QUEUE_TASK_CANCELED);
 
-	q->stats->total_tasks_cancelled++;
+	q->stats->tasks_cancelled++;
 
 	return matched_task;
 }
@@ -5454,7 +5547,7 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q) {
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_CANCELED);
 
 			list_push_tail(l, t);
-			q->stats->total_tasks_cancelled++;
+			q->stats->tasks_cancelled++;
 			itable_firstkey(w->current_tasks);
 		}
 	}
@@ -5573,6 +5666,42 @@ double work_queue_get_effective_bandwidth(struct work_queue *q)
 	return queue_bandwidth;
 }
 
+static void fill_deprecated_queue_stats(struct work_queue_stats *s) {
+	s->total_workers_connected = s->workers_connected;
+	s->total_workers_joined = s->workers_joined;
+	s->total_workers_removed = s->workers_removed;
+	s->total_workers_lost = s->workers_lost;
+	s->total_workers_idled_out = s->workers_idled_out;
+	s->total_workers_fast_aborted = s->workers_fast_aborted;
+
+	s->tasks_complete = s->tasks_with_results;
+
+	s->total_tasks_dispatched = s->tasks_dispatched;
+	s->total_tasks_complete = s->tasks_done;
+	s->total_tasks_failed = s->tasks_failed;
+	s->total_tasks_cancelled = s->tasks_cancelled;
+	s->total_exhausted_attempts = s->tasks_exhausted_attempts;
+
+	s->start_time = s->time_when_started;
+	s->total_send_time = s->time_send;
+	s->total_receive_time = s->time_receive;
+	s->total_good_transfer_time = s->time_send_good + s->time_receive_good;
+
+	s->total_execute_time = s->time_workers_execute;
+	s->total_good_execute_time = s->time_workers_execute_good;
+	s->total_exhausted_execute_time = s->time_workers_execute_exhaustion;
+
+	s->total_bytes_sent = s->bytes_sent;
+	s-> total_bytes_received = s->bytes_received;
+
+	s->capacity = s->capacity_cores;
+
+	s->workers_ready = s->workers_idle;
+	s->workers_full  = s->workers_busy;
+	s->total_worker_slots = s->tasks_dispatched;
+	s->avg_capacity = s->capacity_cores;
+}
+
 void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 {
 	struct work_queue_stats *qs;
@@ -5581,45 +5710,58 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	memset(s, 0, sizeof(*s));
 
 	//info about workers
-	s->total_workers_connected = hash_table_size(q->worker_table);
+	s->workers_connected = hash_table_size(q->worker_table);
 	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
 	s->workers_idle = known_workers(q) - workers_with_tasks(q); //returns workers that are not running any tasks.
 	s->workers_busy = workers_with_tasks(q);
+	// s->workers_able computed below.
 
-	s->total_workers_joined       = qs->total_workers_joined;
-	s->total_workers_removed      = qs->total_workers_removed;
-	s->total_workers_idled_out    = qs->total_workers_idled_out;
-	s->total_workers_lost         = qs->total_workers_lost;
-	s->total_workers_fast_aborted = qs->total_workers_fast_aborted;
+	s->workers_joined       = qs->workers_joined;
+	s->workers_removed      = qs->workers_removed;
+	s->workers_vacated      = qs->workers_vacated;
+	s->workers_idled_out    = qs->workers_idled_out;
+	s->workers_fast_aborted = qs->workers_fast_aborted;
+	s->workers_lost         = qs->workers_lost;
 
 	//info about tasks
-	s->tasks_waiting = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-	s->tasks_running = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_complete = task_state_count(q, NULL, WORK_QUEUE_TASK_RETRIEVED);
+	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
+	s->tasks_on_workers   = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	s->tasks_running      = s->tasks_on_workers; // for better tasks_running, use work_queue_get_stats_hierarchy
+	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_RETRIEVED);
 
-	s->total_tasks_dispatched = qs->total_tasks_dispatched;
-	s->total_tasks_complete = qs->total_tasks_complete;
-	s->total_tasks_cancelled = qs->total_tasks_cancelled;
+	s->tasks_submitted          = qs->tasks_submitted;
+	s->tasks_dispatched         = qs->tasks_dispatched;
+	s->tasks_done               = qs->tasks_done;
+	s->tasks_failed             = qs->tasks_failed;
+	s->tasks_cancelled          = qs->tasks_cancelled;
+	s->tasks_exhausted_attempts = qs->tasks_exhausted_attempts;
 
-	//info about queue
-	s->start_time = qs->start_time;
-	s->total_send_time = qs->total_send_time;
-	s->total_receive_time = qs->total_receive_time;
-	s->total_bytes_sent = qs->total_bytes_sent;
-	s->total_bytes_received = qs->total_bytes_received;
-	s->total_execute_time = qs->total_execute_time;
-	s->total_good_execute_time = qs->total_good_execute_time;
-	s->total_exhausted_attempts = qs->total_exhausted_attempts;
-	s->total_exhausted_execute_time = qs->total_exhausted_execute_time;
+	// Master time statistics:
+	s->time_when_started        = qs->time_when_started;
+	s->time_send         = qs->time_send;
+	s->time_receive      = qs->time_receive;
+	s->time_send_good    = qs->time_send_good;
+	s->time_receive_good = qs->time_receive_good;
+	s->time_application  = qs->time_application;
+	s->time_idle         = qs->time_idle;
 
-	timestamp_t wall_clock_time = timestamp_get() - qs->start_time;
-	if(wall_clock_time>0 && s->total_workers_connected>0) {
-		s->efficiency = (double) (qs->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
+	// Workers time statistics:
+	s->time_workers_execute            = qs->time_workers_execute;
+	s->time_workers_execute_good       = qs->time_workers_execute_good;
+	s->time_workers_execute_exhaustion = qs->time_workers_execute_exhaustion;
+
+	s->bytes_sent     = qs->bytes_sent;
+	s->bytes_received = qs->bytes_received;
+
+	timestamp_t wall_clock_time = timestamp_get() - qs->time_when_started;
+	if(wall_clock_time > 0 && s->workers_connected > 0) {
+		s->efficiency = (double) (qs->time_workers_execute_good) / (wall_clock_time * s->workers_connected);
 	}
 	if(wall_clock_time>0) {
-		s->idle_percentage = (double) q->stats->total_idle_time / wall_clock_time;
+		s->idle_percentage = (double) q->stats->time_idle / wall_clock_time;
 	}
-	s->capacity = compute_capacity(q);
+
+	s->capacity_cores = compute_capacity(q);
 
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);
@@ -5645,14 +5787,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->min_gpus = r.gpus.smallest;
 	s->max_gpus = r.gpus.largest;
 
-	//deprecated fields
-	s->port = q->port;
-	s->priority = q->priority;
-	s->workers_ready = s->workers_idle;
-	s->workers_full = 0;
-	s->total_worker_slots = s->tasks_running;
-	s->avg_capacity = s->capacity;
-
 	struct rmsummary *rmax = largest_waiting_measured_resources(q, NULL);
 	char *key;
 	struct category *c;
@@ -5663,6 +5797,8 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	s->workers_able = count_workers_for_waiting_tasks(q, rmax);
 	rmsummary_delete(rmax);
+
+	fill_deprecated_queue_stats(s);
 }
 
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s)
@@ -5674,22 +5810,30 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 
 	/* Consider running only if reported by some hand. */
 	s->tasks_running = 0;
-	s->total_workers_connected = 0;
+	s->workers_connected = 0;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
 		if(w->foreman)
 		{
-			accumulate_stat(s, w->stats, total_workers_joined);
-			accumulate_stat(s, w->stats, total_workers_removed);
-			accumulate_stat(s, w->stats, total_workers_idled_out);
-			accumulate_stat(s, w->stats, total_workers_lost);
-			accumulate_stat(s, w->stats, total_workers_fast_aborted);
-			accumulate_stat(s, w->stats, total_send_time);
-			accumulate_stat(s, w->stats, total_receive_time);
-			accumulate_stat(s, w->stats, total_execute_time);
-			accumulate_stat(s, w->stats, total_bytes_sent);
-			accumulate_stat(s, w->stats, total_bytes_received);
+			accumulate_stat(s, w->stats, workers_joined);
+			accumulate_stat(s, w->stats, workers_removed);
+			accumulate_stat(s, w->stats, workers_vacated);
+			accumulate_stat(s, w->stats, workers_idled_out);
+			accumulate_stat(s, w->stats, workers_fast_aborted);
+			accumulate_stat(s, w->stats, workers_lost);
+
+			accumulate_stat(s, w->stats, time_send);
+			accumulate_stat(s, w->stats, time_receive);
+			accumulate_stat(s, w->stats, time_send_good);
+			accumulate_stat(s, w->stats, time_receive_good);
+
+			accumulate_stat(s, w->stats, time_workers_execute);
+			accumulate_stat(s, w->stats, time_workers_execute_good);
+			accumulate_stat(s, w->stats, time_workers_execute_exhaustion);
+
+			accumulate_stat(s, w->stats, bytes_sent);
+			accumulate_stat(s, w->stats, bytes_received);
 		}
 
 		accumulate_stat(s, w->stats, tasks_waiting);
@@ -5697,23 +5841,33 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 	}
 
 	/* Account also for workers connected directly to the master. */
-	s->total_workers_connected = s->total_workers_joined - s->total_workers_removed;
+	s->workers_connected = s->workers_joined - s->workers_removed;
 
-	s->total_workers_joined  += q->stats_disconnected_workers->total_workers_joined;
-	s->total_workers_removed += q->stats_disconnected_workers->total_workers_removed;
-	s->total_workers_idled_out    += q->stats_disconnected_workers->total_workers_idled_out;
-	s->total_workers_lost         += q->stats_disconnected_workers->total_workers_lost;
-	s->total_workers_fast_aborted += q->stats_disconnected_workers->total_workers_fast_aborted;
-	s->total_send_time       += q->stats_disconnected_workers->total_send_time;
-	s->total_receive_time    += q->stats_disconnected_workers->total_receive_time;
-	s->total_execute_time    += q->stats_disconnected_workers->total_execute_time;
-	s->total_bytes_sent      += q->stats_disconnected_workers->total_bytes_sent;
-	s->total_bytes_received  += q->stats_disconnected_workers->total_bytes_received;
+	s->workers_joined       += q->stats_disconnected_workers->workers_joined;
+	s->workers_removed      += q->stats_disconnected_workers->workers_removed;
+	s->workers_vacated      += q->stats_disconnected_workers->workers_vacated;
+	s->workers_idled_out    += q->stats_disconnected_workers->workers_idled_out;
+	s->workers_fast_aborted += q->stats_disconnected_workers->workers_fast_aborted;
+	s->workers_lost         += q->stats_disconnected_workers->workers_lost;
 
-	timestamp_t wall_clock_time = timestamp_get() - q->stats->start_time;
-	if(wall_clock_time>0 && s->total_workers_connected>0) {
-		s->efficiency = (double) (q->stats->total_good_execute_time) / (wall_clock_time * s->total_workers_connected);
+	s->time_send         += q->stats_disconnected_workers->time_send;
+	s->time_receive      += q->stats_disconnected_workers->time_receive;
+	s->time_send_good    += q->stats_disconnected_workers->time_send_good;
+	s->time_receive_good += q->stats_disconnected_workers->time_receive_good;
+
+	s->time_workers_execute            += q->stats_disconnected_workers->time_workers_execute;
+	s->time_workers_execute_good       += q->stats_disconnected_workers->time_workers_execute_good;
+	s->time_workers_execute_exhaustion += q->stats_disconnected_workers->time_workers_execute_exhaustion;
+
+	s->bytes_sent      += q->stats_disconnected_workers->bytes_sent;
+	s->bytes_received  += q->stats_disconnected_workers->bytes_received;
+
+	timestamp_t wall_clock_time = timestamp_get() - q->stats->time_when_started;
+	if(wall_clock_time > 0 && s->workers_connected > 0) {
+		s->efficiency = (double) (q->stats->time_workers_execute_good) / (wall_clock_time * s->workers_connected);
 	}
+
+	fill_deprecated_queue_stats(s);
 }
 
 void work_queue_get_stats_category(struct work_queue *q, const char *category, struct work_queue_stats *s)
@@ -5723,9 +5877,9 @@ void work_queue_get_stats_category(struct work_queue *q, const char *category, s
 	memcpy(s, cs, sizeof(*s));
 
 	//info about tasks
-	s->tasks_waiting = task_state_count(q, category, WORK_QUEUE_TASK_READY);
-	s->tasks_running = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_complete = task_state_count(q, category, WORK_QUEUE_TASK_RETRIEVED);
+	s->tasks_waiting      = task_state_count(q, category, WORK_QUEUE_TASK_READY);
+	s->tasks_running      = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+	s->tasks_with_results = task_state_count(q, category, WORK_QUEUE_TASK_RETRIEVED);
 
 	struct rmsummary *rmax = largest_waiting_measured_resources(q, c->name);
 
@@ -5765,25 +5919,34 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 {
 	q->logfile = fopen(logfile, "a");
 	if(q->logfile) {
-		setvbuf(q->logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
+		setvbuf(q->logfile, NULL, _IOLBF, 2048); // line buffered, we don't want incomplete lines
 		fprintf(q->logfile,
 				// start with a comment
 				"#"
 			// time:
-			"timestamp "
-			//workers:
-			"total_workers_connected workers_init workers_idle workers_busy total_workers_joined total_workers_removed "
-			// tasks:
-			"tasks_waiting tasks_running tasks_complete total_tasks_dispatched total_tasks_complete total_tasks_cancelled "
-			// queue:
-			"start_time total_send_time total_receive_time total_bytes_sent total_bytes_received efficiency idle_percentage capacity "
-			// resource totals:
-			"bandwidth total_cores total_memory total_disk total_gpus "
-			//mins/maxs:
-			"min_cores max_cores min_memory max_memory min_disk max_disk min_gpus max_gpus "
-			//execute/good execute time
-			"total_execute_time total_good_execute_time "
-			//end with a newline
+			" timestamp"
+			// workers current:
+			" workers_connected workers_init workers_idle workers_busy workers_able"
+			// workers cummulative:
+			" workers_joined workers_removed workers_vacated workers_idled_out workers_fast_aborted workers_lost"
+			// tasks current:
+			" tasks_waiting tasks_on_workers tasks_running tasks_with_results"
+			// tasks cummulative
+			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
+			// master time statistics:
+			" time_when_started time_send time_receive time_send_good time_receive_good time_application time_idle"
+			// workers time statistics:
+			" time_workers_execute time_workers_execute_good time_workers_execute_exhaustion"
+			// bandwidth:
+			" bytes_sent bytes_received"
+			// resources:
+			" efficiency idle_percentage"
+			" capacity_cores capacity_memory capacity_disk"
+			" total_cores total_memory total_disk"
+			" committed_cores committed_memory committed_disk"
+			" max_cores max_memory max_disk"
+			" min_cores min_memory min_disk"
+			// end with a newline
 			"\n"
 			);
 		log_worker_stats(q);
@@ -5958,24 +6121,30 @@ void work_queue_category_accumulate_task(struct work_queue *q, struct work_queue
 
 	struct work_queue_stats *s = c->wq_stats;
 
-	s->total_bytes_sent     += t->total_bytes_sent;
-	s->total_bytes_received += t->total_bytes_received;
-	s->total_execute_time   += t->cmd_execution_time;
+	s->bytes_sent     += t->total_bytes_sent;
+	s->bytes_received += t->total_bytes_received;
 
-	s->total_send_time      += (t->time_send_input_finish     - t->time_send_input_start);
-	s->total_receive_time   += (t->time_receive_output_finish - t->time_receive_output_start);
+	s->time_workers_execute += t->cmd_execution_time;
 
-	s->bandwidth = (1.0*MEGABYTE*(s->total_bytes_sent + s->total_bytes_received))/(s->total_send_time + s->total_receive_time + 1);
+	s->time_send    += t->time_send;
+	s->time_receive += t->time_receive;
+
+	s->bandwidth = (1.0*MEGABYTE*(s->bytes_sent + s->bytes_received))/(s->time_send + s->time_receive + 1);
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
 		c->total_tasks++;
 
-		s->total_tasks_complete      = c->total_tasks;
-		s->total_good_execute_time  += t->cmd_execution_time;
-		s->total_good_transfer_time += t->total_transfer_time;
+		s->tasks_done                 = c->total_tasks;
+		s->time_workers_execute_good += t->cmd_execution_time;
+		s->time_send_good            += t->time_send;
+		s->time_receive_good         += t->time_receive;
 	} else {
-		s->total_tasks_failed++;
+		s->tasks_failed++;
+
+		if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+			s->time_workers_execute_exhaustion += t->cmd_execution_time;
+		}
 	}
 
 	if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
