@@ -124,23 +124,13 @@ struct work_queue_task {
 
 	/* All times in microseconds */
 	/* A time_when_* refers to an instant in time, otherwise it refers to a length of time. */
-	timestamp_t time_when_submitted;                       /**< The time at which this task was added to the queue. */
-	timestamp_t time_when_done;                            /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
+	timestamp_t time_when_submitted;    /**< The time at which this task was added to the queue. */
+	timestamp_t time_when_done;         /**< The time at which the task is mark as retrieved, after transfering output files and other final processing. */
 
-	timestamp_t time_when_dispatched;                      /**< The time at which a task was dispatched to a worker. */
-	timestamp_t time_when_retrieved;                       /**< The time at which a task was retrieved from a worker. */
+	timestamp_t time_when_commit_start; /**< The time when the task starts to be transfered to a worker. */
+	timestamp_t time_when_commit_end;   /**< The time when the task is completely transfered to a worker. */
 
-	timestamp_t time_when_input_start;                     /**< The time at which it started to transfer input files. */
-	timestamp_t time_when_input_finish;                    /**< The time at which it finished transferring input files. */
-
-	timestamp_t time_when_result_start;                    /**< The time at which it started to transfer the results. */
-	timestamp_t time_when_result_finish;                   /**< The time at which it finished transferring the results. */
-
-	timestamp_t time_when_output_start;                    /**< The time at which it started to transfer output files. */
-	timestamp_t time_when_output_finish;                   /**< The time at which it finished transferring output files. */
-
-	timestamp_t time_send;                                 /**< Time spend transfering this task to a worker. */
-	timestamp_t time_receive;                              /**< Time spend transfering this task results from a worker. */
+	timestamp_t time_when_retrieval;    /**< The time when output files start to be transfered back to the master. time_done - time_when_retrieval is the time taken to transfer output files. */
 
 	timestamp_t time_workers_execute_last;                 /**< Duration of the last complete execution for this task. */
 	timestamp_t time_workers_execute_all;                  /**< Accumulated time for executing the command on any worker, regardless of whether the task completed (i.e., this includes time running on workers that disconnected). */
@@ -159,19 +149,19 @@ struct work_queue_task {
 	/* deprecated fields */
 	timestamp_t time_task_submit;                          /**< @deprecated Use time_when_submitted. */
 	timestamp_t time_task_finish;                          /**< @deprecated Use time_when_done. */
-	timestamp_t time_committed;                            /**< @deprecated Use time_when_input_start. */
+	timestamp_t time_committed;                            /**< @deprecated Use time_when_commit_start. */
 
-	timestamp_t time_send_input_start;                     /**< @deprecated Use time_when_input_start instead. */
-	timestamp_t time_send_input_finish;                    /**< @deprecated Use time_when_input_finish instead. */
-	timestamp_t time_receive_result_start;                 /**< @deprecated Use time_when_result_start instead. */
-	timestamp_t time_receive_result_finish;                /**< @deprecated Use time_when_result_finish instead. */
-	timestamp_t time_receive_output_start;                 /**< @deprecated Use time_when_output_start instead. */
-	timestamp_t time_receive_output_finish;                /**< @deprecated Use time_when_output_finish instead. */
+	timestamp_t time_send_input_start;                     /**< @deprecated Use time_when_commit_start. */
+	timestamp_t time_send_input_finish;                    /**< @deprecated Use time_when_commit_end. */
+	timestamp_t time_receive_result_start;                 /**< @deprecated Use time_when_retrieval instead. */
+	timestamp_t time_receive_result_finish;                /**< @deprecated Use time_when_done instead. */
+	timestamp_t time_receive_output_start;                 /**< @deprecated Use time_when_retrieval. */
+	timestamp_t time_receive_output_finish;                /**< @deprecated Use time_when_done instead. */
 
-	timestamp_t time_execute_cmd_start;                    /**< @deprecated Use time_when_dispatched instead. */
-	timestamp_t time_execute_cmd_finish;                   /**< @deprecated Use time_when_done instead. */
+	timestamp_t time_execute_cmd_start;                    /**< @deprecated Use time_when_commit_end instead. */
+	timestamp_t time_execute_cmd_finish;                   /**< @deprecated Use time_when_retrieval instead. */
 
-	timestamp_t total_time_transfer;                       /**< @deprecated Use time_send + time_receive. */
+	timestamp_t total_time_transfer;                       /**< @deprecated Use (time_when_commit_end - time_when_commit_start) + (time_when_done - time_when_retrieval). */
 
 	timestamp_t cmd_execution_time;                        /**< @deprecated Use time_workers_execute_last instead. */
 	timestamp_t total_cmd_execution_time;                  /**< @deprecated Use time_workers_execute_all instead. */
@@ -222,12 +212,14 @@ struct work_queue_stats {
 
 	/* Master time statistics: */
 	timestamp_t time_when_started; /**< Absolute time at which the master started. */
-	timestamp_t time_send;         /**< Total time spent in sending data to workers (tasks descriptions, input files, requests for status, etc.). */
-	timestamp_t time_receive;      /**< Total time spent in receiving data from workers (output files, status reports, etc.). */
+	timestamp_t time_send;         /**< Total time spent in sending tasks to workers (tasks descriptions, and input files.). */
+	timestamp_t time_receive;      /**< Total time spent in receiving results from workers (output files.). */
 	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
 	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
-	timestamp_t time_application;  /**< Total time spent outside work_queue_wait. */
+	timestamp_t time_status_msgs;  /**< Total time spent sending and receiving status messages to and from workers . */
+	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
 	timestamp_t time_idle;         /**< Total time blocking waiting for worker communications (i.e., polling workers). */
+	timestamp_t time_application;  /**< Total time spent outside work_queue_wait. */
 
 	/* Workers time statistics: */
 	timestamp_t time_workers_execute;            /**< Total time workers spent executing done tasks. */
@@ -278,11 +270,10 @@ struct work_queue_stats {
 	int total_tasks_failed;         /**< @deprecated Use tasks_failed instead. */
 	int total_tasks_cancelled;      /**< @deprecated Use tasks_cancelled instead. */
 	int total_exhausted_attempts;   /**< @deprecated Use tasks_exhausted_attempts instead. */
-
-	 timestamp_t start_time;               /**< @deprecated Use time_when_started. */
-	 timestamp_t total_send_time;          /**< @deprecated Use time_send.    */
-	 timestamp_t total_receive_time;       /**< @deprecated Use time_receive. */
-	 timestamp_t total_good_transfer_time; /**< @deprecated Use time_send_good + time_receive_good. */
+	timestamp_t start_time;               /**< @deprecated Use time_when_started. */
+	timestamp_t total_send_time;          /**< @deprecated Use time_send.    */
+	timestamp_t total_receive_time;       /**< @deprecated Use time_receive. */
+	timestamp_t total_good_transfer_time; /**< @deprecated Use time_send_good + time_receive_good. */
 
 	 timestamp_t total_execute_time;           /**< @deprecated Use time_workers_execute. */
 	 timestamp_t total_good_execute_time;      /**< @deprecated Use time_workers_execute_good. */
