@@ -216,7 +216,7 @@ struct work_queue_stats {
 	timestamp_t time_receive;      /**< Total time spent in receiving results from workers (output files.). */
 	timestamp_t time_send_good;    /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
 	timestamp_t time_receive_good; /**< Total time spent in sending data to workers for tasks with result WQ_RESULT_SUCCESS. */
-	timestamp_t time_status_msgs;  /**< Total time spent sending and receiving status messages to and from workers . */
+	timestamp_t time_status_msgs;  /**< Total time spent sending and receiving status messages to and from workers, including workers' standard output, new workers connections, resources updates, etc. */
 	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
 	timestamp_t time_idle;         /**< Total time blocking waiting for worker communications (i.e., polling workers). */
 	timestamp_t time_application;  /**< Total time spent outside work_queue_wait. */

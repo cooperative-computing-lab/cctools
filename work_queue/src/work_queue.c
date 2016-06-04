@@ -420,8 +420,10 @@ static void log_worker_stats(struct work_queue *q)
 	buffer_printf(&B, " %" PRIu64, s.time_receive);
 	buffer_printf(&B, " %" PRIu64, s.time_send_good);
 	buffer_printf(&B, " %" PRIu64, s.time_receive_good);
-	buffer_printf(&B, " %" PRIu64, s.time_application);
+	buffer_printf(&B, " %" PRIu64, s.time_status_msgs);
+	buffer_printf(&B, " %" PRIu64, s.time_internal);
 	buffer_printf(&B, " %" PRIu64, s.time_idle);
+	buffer_printf(&B, " %" PRIu64, s.time_application);
 
 	/* Workers time statistics: */
 	buffer_printf(&B, " %" PRIu64, s.time_workers_execute);
@@ -1210,7 +1212,6 @@ static work_queue_result_code_t get_output_file( struct work_queue *q, struct wo
 
 	if(total_bytes>0) {
 		q->stats->bytes_received += total_bytes;
-		q->stats->time_receive   += sum_time;
 
 		t->bytes_received    += total_bytes;
 		t->bytes_transferred += total_bytes;
@@ -2788,7 +2789,6 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		w->total_transfer_time     += elapsed_time;
 
 		q->stats->bytes_sent += total_bytes;
-		q->stats->time_send  += elapsed_time;
 
 		// Avoid division by zero below.
 		if(elapsed_time==0) elapsed_time = 1;
@@ -5237,6 +5237,10 @@ static void print_password_warning( struct work_queue *q )
 	}
 }
 
+timestamp_t _stamp = 0;
+#define BEGIN_ACCUM_TIME(stat) {assert(!_stamp); _stamp = timestamp_get();}
+#define END_ACCUM_TIME(stat)   {stat += timestamp_get() - _stamp; _stamp = 0;}
+
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
@@ -5258,10 +5262,10 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	}
 
 	// Poll all links for activity.
-	timestamp_t link_poll_start = timestamp_get();
+	BEGIN_ACCUM_TIME(q->stats->time_idle);
 	int result = link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
-	q->stats->time_idle += q->link_poll_end - link_poll_start;
+	END_ACCUM_TIME(q->stats->time_idle);
 
 	int i, j = 1;
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
@@ -5274,6 +5278,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		j++;
 	}
 
+	BEGIN_ACCUM_TIME(q->stats->time_status_msgs);
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
@@ -5291,6 +5296,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 			hash_table_firstkey(q->workers_with_available_results);
 		}
 	}
+	END_ACCUM_TIME(q->stats->time_status_msgs);
 
 	work_queue_blacklist_clear_by_time(q, time(0));
 
@@ -5302,7 +5308,7 @@ static int connect_new_workers(struct work_queue *q, int stoptime, int max_new_w
 {
 	int new_workers = 0;
 
-	// If the master link was awake, then accept as many workers as possible.
+	// If the master link was awake, then accept at most max_new_workers.
 	// Note we are using the information gathered in poll_active_workers, which
 	// is a little ugly.
 	if(q->poll_table[0].revents) {
@@ -5345,6 +5351,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	// compute stoptime
 	time_t stoptime = (timeout == WORK_QUEUE_WAITFORTASK) ? 0 : time(0) + timeout;
 
+	int result;
 	struct work_queue_task *t = NULL;
 	// time left?
 	while( (stoptime == 0) || (time(0) <= stoptime) ) {
@@ -5367,6 +5374,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			break;
 		}
 
+
+
+		BEGIN_ACCUM_TIME(q->stats->time_internal);
+
 		 // update catalog if appropriate
 		if(q->name) {
 			update_catalog(q, foreman_uplink, 0);
@@ -5375,36 +5386,55 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->monitor_mode)
 			update_resource_report(q);
 
+		END_ACCUM_TIME(q->stats->time_internal);
+
 		// retrieve worker status messages
 		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting);
 		busy_waiting = 0;
 
 		// tasks waiting to be retrieved?
-		if(receive_one_task(q)) {
-			// retrieve one task and go to start.
+		BEGIN_ACCUM_TIME(q->stats->time_receive);
+		result = receive_one_task(q);
+		END_ACCUM_TIME(q->stats->time_receive);
+		if(result) {
+			// retrieved at least one task
 			continue;
 		}
 
 		// expired tasks
-		if(expire_waiting_tasks(q)) {
-			// mark expired as retrieved, and go to start.
+		BEGIN_ACCUM_TIME(q->stats->time_internal);
+		result = expire_waiting_tasks(q);
+		END_ACCUM_TIME(q->stats->time_internal);
+		if(result) {
+			// expired at least one task
 			continue;
 		}
 
 		// tasks waiting to be dispatched?
-		if(send_one_task(q)) {
-			// send one task and go to start.
+		BEGIN_ACCUM_TIME(q->stats->time_send);
+		result = send_one_task(q);
+		END_ACCUM_TIME(q->stats->time_send);
+		if(result) {
+			// sent at least one task
 			continue;
 		}
 
 		// send keepalives to appropriate workers
+		BEGIN_ACCUM_TIME(q->stats->time_status_msgs);
 		ask_for_workers_updates(q);
+		END_ACCUM_TIME(q->stats->time_status_msgs);
 
 		// If fast abort is enabled, kill off slow workers.
+		BEGIN_ACCUM_TIME(q->stats->time_internal);
 		abort_slow_workers(q);
+		END_ACCUM_TIME(q->stats->time_internal);
 
 		// if new workers, connect n of them
-		if(connect_new_workers(q, stoptime, MAX_NEW_WORKERS)) {
+		BEGIN_ACCUM_TIME(q->stats->time_status_msgs);
+		result = connect_new_workers(q, stoptime, MAX_NEW_WORKERS);
+		END_ACCUM_TIME(q->stats->time_status_msgs);
+		if(result) {
+			// accepted at least one worker
 			continue;
 		}
 
@@ -5938,7 +5968,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// tasks cummulative
 			" tasks_submitted tasks_dispatched tasks_done tasks_failed tasks_cancelled tasks_exhausted_attempts"
 			// master time statistics:
-			" time_when_started time_send time_receive time_send_good time_receive_good time_application time_idle"
+			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_idle time_application"
 			// workers time statistics:
 			" time_workers_execute time_workers_execute_good time_workers_execute_exhaustion"
 			// bandwidth:
