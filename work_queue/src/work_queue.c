@@ -4961,7 +4961,7 @@ static void fill_deprecated_tasks_stats(struct work_queue_task *t) {
 	t->time_execute_cmd_start  = t->time_when_commit_start;
 	t->time_execute_cmd_finish = t->time_when_retrieval;
 
-	t->total_time_transfer = (t->time_when_commit_end - t->time_when_commit_start) - (t->time_when_done - t->time_when_retrieval);
+	t->total_transfer_time = (t->time_when_commit_end - t->time_when_commit_start) - (t->time_when_done - t->time_when_retrieval);
 
 	t->cmd_execution_time = t->time_workers_execute_last;
 	t->total_cmd_execution_time = t->time_workers_execute_all;

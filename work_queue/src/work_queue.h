@@ -161,7 +161,7 @@ struct work_queue_task {
 	timestamp_t time_execute_cmd_start;                    /**< @deprecated Use time_when_commit_end instead. */
 	timestamp_t time_execute_cmd_finish;                   /**< @deprecated Use time_when_retrieval instead. */
 
-	timestamp_t total_time_transfer;                       /**< @deprecated Use (time_when_commit_end - time_when_commit_start) + (time_when_done - time_when_retrieval). */
+	timestamp_t total_transfer_time;                       /**< @deprecated Use (time_when_commit_end - time_when_commit_start) + (time_when_done - time_when_retrieval). */
 
 	timestamp_t cmd_execution_time;                        /**< @deprecated Use time_workers_execute_last instead. */
 	timestamp_t total_cmd_execution_time;                  /**< @deprecated Use time_workers_execute_all instead. */
