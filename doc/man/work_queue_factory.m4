@@ -50,6 +50,7 @@ OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can
 OPTION_TRIPLET(-T,batch-type, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
 OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
 OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
+OPTION_PAIR(--workers-per-cycle,workers) Maximum number of new workers per 30 seconds.  ( less than 1 disables limit, default=5)
 OPTION_ITEM(`--autosize')Automatically size a worker to an available slot (Condor only).
 OPTION_ITEM(-c --capacity) Use worker capacity reported by masters.
 OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to master.
@@ -129,6 +130,7 @@ master-name
 foremen-name
 min-workers
 max-workers
+workers-per-cycle
 task-per-worker
 timeout
 worker-extra-options
@@ -142,10 +144,6 @@ SECTION(KNOWN BUGS)
 
 The capacity measurement currently assumes single-core tasks running on single-core
 workers, and behaves unexpectedly with multi-core tasks or multi-core workers.
-
-When generating a worker pool for a foreman, specify a minimum number of workers
-to run at all times.  Otherwise, the master will not assign any tasks to the foreman,
-because it (initally) has no workers.
 
 SECTION(COPYRIGHT)
 COPYRIGHT_BOILERPLATE
