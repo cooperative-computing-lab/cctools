@@ -170,7 +170,7 @@ static int submit_worker( struct batch_queue *queue, const char *master_regex )
 	char cmd[1024];
 	char extra_input_files[1024];
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
+	sprintf(cmd,"./work_queue_worker -M %s -t %d -C %s:%d -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
 	strcpy(extra_input_files,"work_queue_worker");
 
 	if(password_file) {
