@@ -45,14 +45,21 @@ See the file COPYING for details.
 
 static const char *catalog_host = 0;
 static int catalog_port = 0;
+
+static int factory_period = 30; // in seconds
+
 static int workers_min = 5;
 static int workers_max = 100;
+static int workers_per_cycle = 5; // same as workers_min
+
 static double tasks_per_worker = -1;
 static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
+
 static char *project_regex = 0;
 static char *foremen_regex = 0;
+
 static char *extra_worker_args=0;
 static const char *resource_args=0;
 static int abort_flag = 0;
@@ -362,6 +369,7 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_workers_max, workers_max, max-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
+	assign_new_value(new_workers_per_cycle, workers_per_cycle, workers-per-cycle, int, JX_INTEGER, integer_value)
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
@@ -411,7 +419,8 @@ int read_config_file(const char *config_file) {
 
 	workers_max    = new_workers_max;
 	workers_min    = new_workers_min;
-	worker_timeout = new_worker_timeout;
+	workers_per_cycle = new_workers_per_cycle;
+	worker_timeout    = new_worker_timeout;
 	tasks_per_worker = new_tasks_per_worker;
 	autosize         = new_autosize_option;
 	factory_timeout  = new_factory_timeout_option;
@@ -453,6 +462,7 @@ int read_config_file(const char *config_file) {
 	}
 	fprintf(stdout, "max-workers: %d\n", workers_max);
 	fprintf(stdout, "min-workers: %d\n", workers_min);
+	fprintf(stdout, "workers-per-cycle: %d\n", workers_per_cycle);
 
 	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
@@ -556,6 +566,11 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		int new_workers_needed = workers_needed - workers_submitted;
 
+		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
+			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
+			new_workers_needed = workers_per_cycle;
+		}
+
 		debug(D_WQ,"workers needed: %d",    workers_needed);
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
@@ -596,7 +611,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		delete_projects_list(masters_list);
 		delete_projects_list(foremen_list);
 
-		sleep(30);
+		sleep(factory_period);
 	}
 
 	remove_all_workers(queue,job_table);
@@ -614,6 +629,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
+	printf(" %-30s Maximum number of new workers per %d s.  (less than 1 disables limit, default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
 	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker");
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
@@ -633,7 +649,8 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS };
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE};
+
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
@@ -642,6 +659,7 @@ static const struct option long_options[] = {
 	{"config-file", required_argument, 0, 'C'},
 	{"min-workers", required_argument, 0, 'w'},
 	{"max-workers", required_argument, 0, 'W'},
+	{"workers-per-cycle", required_argument, 0, LONG_OPT_WORKERS_PER_CYCLE},
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
 	{"extra-options", required_argument, 0, 'E'},
@@ -705,6 +723,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'W':
 				workers_max = atoi(optarg);
+				break;
+			case LONG_OPT_WORKERS_PER_CYCLE:
+				workers_per_cycle = atoi(optarg);
 				break;
 			case LONG_OPT_TASKS_PER_WORKER:
 				tasks_per_worker = atof(optarg);
