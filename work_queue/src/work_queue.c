@@ -408,6 +408,7 @@ static void log_worker_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.tasks_with_results);
 
 	/* Cummulative stats for tasks: */
+	buffer_printf(&B, " %d", s.tasks_submitted);
 	buffer_printf(&B, " %d", s.tasks_dispatched);
 	buffer_printf(&B, " %d", s.tasks_done);
 	buffer_printf(&B, " %d", s.tasks_failed);
@@ -2050,7 +2051,7 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "tasks_waiting",    s.tasks_waiting);
 	jx_insert_integer(j, "tasks_running",    s.tasks_running);
 	jx_insert_integer(j, "tasks_dispatched", s.tasks_dispatched);
-	jx_insert_integer(j, "tasks_complete",   s.tasks_done);
+	jx_insert_integer(j, "tasks_done",       s.tasks_done);
 	jx_insert_integer(j, "tasks_failed",     s.tasks_failed);
 	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
 	jx_insert_integer(j, "workers_able",     s.workers_able);
@@ -5974,7 +5975,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// workers time statistics:
 			" time_workers_execute time_workers_execute_good time_workers_execute_exhaustion"
 			// bandwidth:
-			" bytes_sent bytes_received"
+			" bytes_sent bytes_received bandwidth"
 			// resources:
 			" efficiency idle_percentage"
 			" capacity_cores capacity_memory capacity_disk"
