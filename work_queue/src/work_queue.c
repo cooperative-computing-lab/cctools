@@ -2103,7 +2103,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	struct work_queue_stats info;
 	work_queue_get_stats(q,&info);
 
-	jx_insert_integer(j,"port",info.port);
+	jx_insert_integer(j,"port",work_queue_port(q));
 	jx_insert_integer(j,"priority",info.priority);
 	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
@@ -5700,7 +5700,7 @@ double work_queue_get_effective_bandwidth(struct work_queue *q)
 	return queue_bandwidth;
 }
 
-static void fill_deprecated_queue_stats(struct work_queue_stats *s) {
+static void fill_deprecated_queue_stats(struct work_queue *q, struct work_queue_stats *s) {
 	s->total_workers_connected = s->workers_connected;
 	s->total_workers_joined = s->workers_joined;
 	s->total_workers_removed = s->workers_removed;
@@ -5730,6 +5730,8 @@ static void fill_deprecated_queue_stats(struct work_queue_stats *s) {
 
 	s->capacity = s->capacity_cores;
 
+	s->port = q->port;
+	s->priority = q->priority;
 	s->workers_ready = s->workers_idle;
 	s->workers_full  = s->workers_busy;
 	s->total_worker_slots = s->tasks_dispatched;
@@ -5832,7 +5834,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_able = count_workers_for_waiting_tasks(q, rmax);
 	rmsummary_delete(rmax);
 
-	fill_deprecated_queue_stats(s);
+	fill_deprecated_queue_stats(q, s);
 }
 
 void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stats *s)
@@ -5901,7 +5903,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 		s->efficiency = (double) (q->stats->time_workers_execute_good) / (wall_clock_time * s->workers_connected);
 	}
 
-	fill_deprecated_queue_stats(s);
+	fill_deprecated_queue_stats(q, s);
 }
 
 void work_queue_get_stats_category(struct work_queue *q, const char *category, struct work_queue_stats *s)
