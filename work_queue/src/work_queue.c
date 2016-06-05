@@ -143,6 +143,7 @@ struct work_queue {
 	struct hash_table *workers_with_available_results;
 
 	struct work_queue_stats *stats;
+	struct work_queue_stats *stats_measure;
 	struct work_queue_stats *stats_disconnected_workers;
 
 	int worker_selection_algorithm;
@@ -368,7 +369,7 @@ static int workers_with_tasks(struct work_queue *q) {
 	return workers_with_tasks;
 }
 
-static void log_worker_stats(struct work_queue *q)
+static void log_queue_stats(struct work_queue *q)
 {
 	struct work_queue_stats s;
 
@@ -858,7 +859,6 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 	hash_table_remove(q->workers_with_available_results, w->hashkey);
 
 	record_removed_worker_stats(q, w);
-	log_worker_stats(q);
 
 	if(w->link)
 		link_close(w->link);
@@ -949,7 +949,6 @@ static void add_worker(struct work_queue *q)
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
-	log_worker_stats(q);
 	q->stats->workers_joined++;
 
 	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
@@ -1631,7 +1630,6 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 		w->foreman = 1;
 	}
 
-	log_worker_stats(q);
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 
 	if(cctools_version_cmp(CCTOOLS_VERSION, w->version) != 0) {
@@ -2374,8 +2372,6 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	{
 		/* Shortcut, total has the tag, as "resources tag" only sends one value */
 		w->resources->tag = r.total;
-		log_worker_stats(q);
-
 	} else if(n == 4) {
 
 		/* inuse is computed by the master, so we save it here */
@@ -3377,8 +3373,6 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 		debug(D_WQ, "Failed to send task %d to worker %s (%s).", t->taskid, w->hostname, w->addrport);
 		handle_failure(q, w, t, result);
 	}
-
-	log_worker_stats(q);
 }
 
 static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_task_state_t new_state)
@@ -3403,8 +3397,6 @@ static void reap_task_from_worker(struct work_queue *q, struct work_queue_worker
 	change_task_state(q, t, new_state);
 
 	count_worker_resources(q, w);
-
-	log_worker_stats(q);
 }
 
 static int send_one_task( struct work_queue *q )
@@ -4503,6 +4495,7 @@ struct work_queue *work_queue_create(int port)
 
 	q->stats                      = calloc(1, sizeof(struct work_queue_stats));
 	q->stats_disconnected_workers = calloc(1, sizeof(struct work_queue_stats));
+	q->stats_measure              = calloc(1, sizeof(struct work_queue_stats));
 
 	q->workers_with_available_results = hash_table_create(0, 0);
 
@@ -4780,6 +4773,7 @@ void work_queue_delete(struct work_queue *q)
 
 		free(q->stats);
 		free(q->stats_disconnected_workers);
+		free(q->stats_measure);
 
 		if(q->name)
 			free(q->name);
@@ -5238,9 +5232,18 @@ static void print_password_warning( struct work_queue *q )
 	}
 }
 
-timestamp_t _stamp = 0;
-#define BEGIN_ACCUM_TIME(stat) {assert(!_stamp); _stamp = timestamp_get();}
-#define END_ACCUM_TIME(stat)   {stat += timestamp_get() - _stamp; _stamp = 0;}
+#define BEGIN_ACCUM_TIME(q, stat) {\
+	if(q->stats_measure->stat != 0) {\
+		fatal("Double-counting stat %s. This should not happen, and it is Work Queue bug.");\
+	} else {\
+		q->stats_measure->stat = timestamp_get();\
+	}\
+}
+
+#define END_ACCUM_TIME(q, stat) {\
+	q->stats->stat += timestamp_get() - q->stats_measure->stat;\
+	q->stats_measure->stat = 0;\
+}
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
@@ -5263,10 +5266,10 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	}
 
 	// Poll all links for activity.
-	BEGIN_ACCUM_TIME(q->stats->time_idle);
+	BEGIN_ACCUM_TIME(q, time_idle);
 	int result = link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
-	END_ACCUM_TIME(q->stats->time_idle);
+	END_ACCUM_TIME(q, time_idle);
 
 	int i, j = 1;
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
@@ -5279,7 +5282,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		j++;
 	}
 
-	BEGIN_ACCUM_TIME(q->stats->time_status_msgs);
+	BEGIN_ACCUM_TIME(q, time_status_msgs);
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
@@ -5297,9 +5300,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 			hash_table_firstkey(q->workers_with_available_results);
 		}
 	}
-	END_ACCUM_TIME(q->stats->time_status_msgs);
-
-	work_queue_blacklist_clear_by_time(q, time(0));
+	END_ACCUM_TIME(q, time_status_msgs);
 
 	return result;
 }
@@ -5343,7 +5344,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	static int busy_waiting = 0;
 
 	static timestamp_t last_left_time = 0;
-	if(last_left_time!=0) {
+	if(last_left_time != 0) {
 		q->stats->time_application += timestamp_get() - last_left_time;
 	}
 
@@ -5362,8 +5363,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			last_left_time = timestamp_get();
-
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
 				q->stats->tasks_failed++;
@@ -5375,9 +5374,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			break;
 		}
 
-
-
-		BEGIN_ACCUM_TIME(q->stats->time_internal);
+		BEGIN_ACCUM_TIME(q, time_internal);
 
 		 // update catalog if appropriate
 		if(q->name) {
@@ -5387,53 +5384,54 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(q->monitor_mode)
 			update_resource_report(q);
 
-		END_ACCUM_TIME(q->stats->time_internal);
+		END_ACCUM_TIME(q, time_internal);
 
 		// retrieve worker status messages
 		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting);
 		busy_waiting = 0;
 
 		// tasks waiting to be retrieved?
-		BEGIN_ACCUM_TIME(q->stats->time_receive);
+		BEGIN_ACCUM_TIME(q, time_receive);
 		result = receive_one_task(q);
-		END_ACCUM_TIME(q->stats->time_receive);
+		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
 			continue;
 		}
 
 		// expired tasks
-		BEGIN_ACCUM_TIME(q->stats->time_internal);
+		BEGIN_ACCUM_TIME(q, time_internal);
 		result = expire_waiting_tasks(q);
-		END_ACCUM_TIME(q->stats->time_internal);
+		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// expired at least one task
 			continue;
 		}
 
 		// tasks waiting to be dispatched?
-		BEGIN_ACCUM_TIME(q->stats->time_send);
+		BEGIN_ACCUM_TIME(q, time_send);
 		result = send_one_task(q);
-		END_ACCUM_TIME(q->stats->time_send);
+		END_ACCUM_TIME(q, time_send);
 		if(result) {
 			// sent at least one task
 			continue;
 		}
 
 		// send keepalives to appropriate workers
-		BEGIN_ACCUM_TIME(q->stats->time_status_msgs);
+		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		ask_for_workers_updates(q);
-		END_ACCUM_TIME(q->stats->time_status_msgs);
+		END_ACCUM_TIME(q, time_status_msgs);
 
 		// If fast abort is enabled, kill off slow workers.
-		BEGIN_ACCUM_TIME(q->stats->time_internal);
+		BEGIN_ACCUM_TIME(q, time_internal);
 		abort_slow_workers(q);
-		END_ACCUM_TIME(q->stats->time_internal);
+		work_queue_blacklist_clear_by_time(q, time(0));
+		END_ACCUM_TIME(q, time_internal);
 
 		// if new workers, connect n of them
-		BEGIN_ACCUM_TIME(q->stats->time_status_msgs);
+		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		result = connect_new_workers(q, stoptime, MAX_NEW_WORKERS);
-		END_ACCUM_TIME(q->stats->time_status_msgs);
+		END_ACCUM_TIME(q, time_status_msgs);
 		if(result) {
 			// accepted at least one worker
 			continue;
@@ -5454,6 +5452,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			break;
 		}
 	}
+
+	log_queue_stats(q);
 
 	last_left_time = timestamp_get();
 
@@ -5986,7 +5986,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// end with a newline
 			"\n"
 			);
-		log_worker_stats(q);
+		log_queue_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 		return 1;
 	}
