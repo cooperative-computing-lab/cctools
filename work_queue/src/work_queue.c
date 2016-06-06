@@ -5797,7 +5797,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 	s->tasks_on_workers   = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 	s->tasks_running      = s->tasks_on_workers; // for better tasks_running, use work_queue_get_stats_hierarchy
-	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_RETRIEVED);
+	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 
 	s->tasks_submitted          = qs->tasks_submitted;
 	s->tasks_dispatched         = qs->tasks_dispatched;
@@ -5949,7 +5949,7 @@ void work_queue_get_stats_category(struct work_queue *q, const char *category, s
 	//info about tasks
 	s->tasks_waiting      = task_state_count(q, category, WORK_QUEUE_TASK_READY);
 	s->tasks_running      = task_state_count(q, category, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_with_results = task_state_count(q, category, WORK_QUEUE_TASK_RETRIEVED);
+	s->tasks_with_results = task_state_count(q, category, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
 
 	struct rmsummary *rmax = largest_waiting_measured_resources(q, c->name);
 
