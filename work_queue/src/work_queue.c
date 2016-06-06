@@ -2416,7 +2416,7 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	return MSG_PROCESSED;
 }
 
-static void handle_worker(struct work_queue *q, struct link *l)
+static work_queue_result_code_t handle_worker(struct work_queue *q, struct link *l)
 {
 	char line[WORK_QUEUE_LINE_MAX];
 	char key[WORK_QUEUE_LINE_MAX];
@@ -2440,7 +2440,10 @@ static void handle_worker(struct work_queue *q, struct link *l)
 
 	if(worker_failure) {
 		handle_worker_failure(q, w);
+		return WORKER_FAILURE;
 	}
+
+	return SUCCESS;
 }
 
 static int build_poll_table(struct work_queue *q, struct link *master)
@@ -5267,6 +5270,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
+/* return number of workers lost */
 static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active, int busy_waiting)
 {
 	int n = build_poll_table(q, foreman_uplink);
@@ -5284,7 +5288,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	// Poll all links for activity.
 	BEGIN_ACCUM_TIME(q, time_idle);
-	int result = link_poll(q->poll_table, n, msec);
+	link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
 	END_ACCUM_TIME(q, time_idle);
 
@@ -5299,11 +5303,15 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		j++;
 	}
 
+	int workers_removed = 0;
+
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
-			handle_worker(q, q->poll_table[i].link);
+			if(handle_worker(q, q->poll_table[i].link) == WORKER_FAILURE) {
+				workers_removed++;
+			}
 		}
 	}
 
@@ -5319,7 +5327,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 	}
 	END_ACCUM_TIME(q, time_status_msgs);
 
-	return result;
+	return workers_removed;
 }
 
 
@@ -5406,7 +5414,14 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_internal);
 
 		// retrieve worker status messages
-		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting);
+		if(poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting) > 0) {
+			//at least one worker was removed.
+			events++;
+			// note we keep going, and we do not restart the loop as we do in
+			// further events. This is because we give top priority to
+			// returning and retrieving tasks.
+		}
+
 		busy_waiting = 0;
 
 		// tasks waiting to be retrieved?
