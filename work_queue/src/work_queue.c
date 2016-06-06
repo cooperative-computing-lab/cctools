@@ -545,7 +545,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		w->stats->time_send = atoll(value);
 	} else if(string_prefix_is(field, "time_receive")) {
 		w->stats->time_receive = atoll(value);
-	} else if(string_prefix_is(field, "time_workers_execute")) {
+	} else if(string_prefix_is(field, "time_execute")) {
 		w->stats->time_workers_execute = atoll(value);
 	} else if(string_prefix_is(field, "bytes_sent")) {
 		w->stats->bytes_sent = atoll(value);
@@ -6181,7 +6181,6 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 	s->bandwidth = (1.0*MEGABYTE*(s->bytes_sent + s->bytes_received))/(s->time_send + s->time_receive + 1);
 
 	q->stats->tasks_done++;
-	q->stats->time_workers_execute += t->time_workers_execute_last;
 
 	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
