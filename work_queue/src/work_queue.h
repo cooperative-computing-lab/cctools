@@ -235,9 +235,10 @@ struct work_queue_stats {
 	double efficiency;      /**< Parallel efficiency of the system, sum(task execution times) / sum(worker lifetimes) */
 	double idle_percentage; /**< The fraction of time that the master is idle waiting for workers to respond. */
 
-	int capacity_cores;     /**< The estimated number of workers' cores that this master can effectively support. (not implemented) */
-	int capacity_memory;    /**< The estimated number of workers' MB of RAM that this master can effectively support. (not implemented) */
-	int capacity_disk;      /**< The estimated number of workers' MB of disk that this master can effectively support. (not implemented) */
+	int capacity_tasks;     /**< The estimated number of tasks that this master can effectively support. */
+	int capacity_cores;     /**< The estimated number of workers' cores that this master can effectively support.*/
+	int capacity_memory;    /**< The estimated number of workers' MB of RAM that this master can effectively support.*/
+	int capacity_disk;      /**< The estimated number of workers' MB of disk that this master can effectively support.*/
 
 	int64_t total_cores;      /**< Total number of cores aggregated across the connected workers. */
 	int64_t total_memory;     /**< Total memory in MB aggregated across the connected workers. */
