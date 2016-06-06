@@ -5856,8 +5856,18 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//info about tasks
 	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 	s->tasks_on_workers   = task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
-	s->tasks_running      = s->tasks_on_workers; // for better tasks_running, use work_queue_get_stats_hierarchy
 	s->tasks_with_results = task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL);
+
+	{
+		//accumulate tasks running, from workers:
+		char *key;
+		struct work_queue_worker *w;
+		s->tasks_running = 0;
+		hash_table_firstkey(q->worker_table);
+		while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+			accumulate_stat(s, w->stats, tasks_running);
+		}
+	}
 
 	s->tasks_submitted          = qs->tasks_submitted;
 	s->tasks_dispatched         = qs->tasks_dispatched;
@@ -5918,16 +5928,18 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->min_gpus = r.gpus.smallest;
 	s->max_gpus = r.gpus.largest;
 
-	struct rmsummary *rmax = largest_waiting_measured_resources(q, NULL);
-	char *key;
-	struct category *c;
-	hash_table_firstkey(q->categories);
-	while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
-		rmsummary_merge_max(rmax, c->max_allocation);
-	}
+	{
+		struct rmsummary *rmax = largest_waiting_measured_resources(q, NULL);
+		char *key;
+		struct category *c;
+		hash_table_firstkey(q->categories);
+		while(hash_table_nextkey(q->categories, &key, (void **) &c)) {
+			rmsummary_merge_max(rmax, c->max_allocation);
+		}
 
-	s->workers_able = count_workers_for_waiting_tasks(q, rmax);
-	rmsummary_delete(rmax);
+		s->workers_able = count_workers_for_waiting_tasks(q, rmax);
+		rmsummary_delete(rmax);
+	}
 
 	fill_deprecated_queue_stats(q, s);
 }
