@@ -185,7 +185,7 @@ struct work_queue_stats {
 	int workers_busy;         /**< Number of workers that are running at least one task. */
 	int workers_able;         /**< Number of workers on which the largest task can run. */
 
-	/* Cummulative stats for workers: */
+	/* Cumulative stats for workers: */
 	int workers_joined;       /**< Total number of worker connections that were established to the master. */
 	int workers_removed;      /**< Total number of worker connections that were lost or terminated by the master. */
 	int workers_vacated;      /**< Total number of worker connections that got SIGTERM signal (e.g. eviction from Condor), and were able to exit cleanly. */
@@ -199,7 +199,7 @@ struct work_queue_stats {
 	int tasks_running;        /**< Number of tasks currently executing at some worker. */
 	int tasks_with_results;   /**< Number of tasks with retrieved results and waiting to be returned to user. */
 
-	/* Cummulative stats for tasks: */
+	/* Cumulative stats for tasks: */
 	int tasks_submitted;           /**< Total number of tasks submitted to the queue. */
 	int tasks_dispatched;          /**< Total number of tasks dispatch to workers. */
 	int tasks_done;                /**< Total number of tasks completed and returned to user. (includes tasks_failed) */

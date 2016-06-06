@@ -2127,6 +2127,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_running",info.tasks_running);
 	jx_insert_integer(j,"tasks_with_results",info.tasks_with_results);
 
+	jx_insert_integer(j,"tasks_submitted",info.tasks_submitted);
 	jx_insert_integer(j,"tasks_dispatched",info.tasks_dispatched);
 	jx_insert_integer(j,"tasks_done",info.tasks_done);
 	jx_insert_integer(j,"tasks_failed",info.tasks_failed);
@@ -2137,17 +2138,27 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"time_when_started",info.time_when_started);
 	jx_insert_integer(j,"time_send",info.time_send);
 	jx_insert_integer(j,"time_receive",info.time_receive);
+	jx_insert_integer(j,"time_send_good",info.time_send_good);
+	jx_insert_integer(j,"time_receive_good",info.time_receive_good);
+	jx_insert_integer(j,"time_status_msgs",info.time_status_msgs);
+	jx_insert_integer(j,"time_internal",info.time_internal);
+	jx_insert_integer(j,"time_idle",info.time_idle);
+	jx_insert_integer(j,"time_application",info.time_application);
+
 	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
 	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
 	jx_insert_integer(j,"time_workers_execute_exhaustion",info.time_workers_execute_exhaustion);
 
 	jx_insert_integer(j,"bytes_sent",info.bytes_sent);
 	jx_insert_integer(j,"bytes_received",info.bytes_received);
+
 	jx_insert_double(j,"efficiency",info.efficiency);
 	jx_insert_double(j,"idle_percentage",info.idle_percentage);
+
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
+
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
@@ -3366,6 +3377,7 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	change_task_state(q, t, WORK_QUEUE_TASK_RUNNING);
 
 	t->total_submissions += 1;
+	q->stats->tasks_dispatched += 1;
 
 	count_worker_resources(q, w);
 
@@ -5129,7 +5141,7 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 	change_task_state(q, t, WORK_QUEUE_TASK_READY);
 
 	t->time_when_submitted = timestamp_get();
-	q->stats->tasks_dispatched++;
+	q->stats->tasks_submitted++;
 
 	if(q->monitor_mode != MON_DISABLED)
 		work_queue_monitor_add_files(q, t);
@@ -5973,7 +5985,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// master time statistics:
 			" time_when_started time_send time_receive time_send_good time_receive_good time_status_msgs time_internal time_idle time_application"
 			// workers time statistics:
-			" time_workers_execute time_workers_execute_good time_workers_execute_exhaustion"
+			" time_execute time_execute_good time_execute_exhaustion"
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
