@@ -3502,7 +3502,7 @@ static void ask_for_workers_updates(struct work_queue *q) {
 	}
 }
 
-static void abort_slow_workers(struct work_queue *q)
+static int abort_slow_workers(struct work_queue *q)
 {
 	struct category *c;
 	char *category_name;
@@ -3510,6 +3510,8 @@ static void abort_slow_workers(struct work_queue *q)
 	struct work_queue_worker *w;
 	struct work_queue_task *t;
 	uint64_t taskid;
+
+	int removed = 0;
 
 	/* optimization. If no category has a fast abort multiplier, simply return. */
 	int fast_abort_flag = 0;
@@ -3534,7 +3536,7 @@ static void abort_slow_workers(struct work_queue *q)
 	}
 
 	if(!fast_abort_flag)
-		return;
+		return 0;
 
 	struct category *c_def = work_queue_category_lookup_or_create(q, "default");
 
@@ -3576,9 +3578,12 @@ static void abort_slow_workers(struct work_queue *q)
 				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
 				remove_worker(q, w);
 				q->stats->workers_fast_aborted++;
+				removed++;
 			}
 		}
 	}
+
+	return removed;
 }
 
 static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -5354,6 +5359,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 */
 {
 	static int busy_waiting = 0;
+	int events = 0;
 
 	static timestamp_t last_left_time = 0;
 	if(last_left_time != 0) {
@@ -5383,6 +5389,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// return completed task (t) to the user. We do not return right
 			// away, and instead break out of the loop to correctly update the
 			// queue time statistics.
+			events++;
 			break;
 		}
 
@@ -5408,6 +5415,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_receive);
 		if(result) {
 			// retrieved at least one task
+			events++;
 			continue;
 		}
 
@@ -5417,6 +5425,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
 			// expired at least one task
+			events++;
 			continue;
 		}
 
@@ -5426,6 +5435,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_send);
 		if(result) {
 			// sent at least one task
+			events++;
 			continue;
 		}
 
@@ -5436,9 +5446,14 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		// If fast abort is enabled, kill off slow workers.
 		BEGIN_ACCUM_TIME(q, time_internal);
-		abort_slow_workers(q);
+		result = abort_slow_workers(q);
 		work_queue_blacklist_clear_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
+		if(result) {
+			// removed at least one worker
+			events++;
+			continue;
+		}
 
 		// if new workers, connect n of them
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
@@ -5446,12 +5461,16 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		END_ACCUM_TIME(q, time_status_msgs);
 		if(result) {
 			// accepted at least one worker
+			events++;
 			continue;
 		}
 
-		// return if queue is empty.
-		if( q->process_pending_check && process_pending() )
+		if( q->process_pending_check && process_pending() ) {
+			events++;
 			break;
+		}
+
+		// return if queue is empty.
 		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
 			break;
 
@@ -5465,7 +5484,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 	}
 
-	log_queue_stats(q);
+	if(events > 0) {
+		log_queue_stats(q);
+	}
 
 	last_left_time = timestamp_get();
 
