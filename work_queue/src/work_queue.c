@@ -378,14 +378,15 @@ static void log_queue_stats(struct work_queue *q)
 {
 	struct work_queue_stats s;
 
-	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
-		hash_table_size(q->worker_table),
-		known_workers(q),
-		available_workers(q));
-
-	if(!q->logfile) return;
-
 	work_queue_get_stats(q, &s);
+
+	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
+			s.workers_connected,
+			s.workers_connected - s.workers_init,
+			available_workers(q));
+
+	if(!q->logfile)
+		return;
 
 	buffer_t B;
 	buffer_init(&B);
@@ -5836,11 +5837,13 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	memset(s, 0, sizeof(*s));
 
+	int known = known_workers(q); 
+
 	//info about workers
 	s->workers_connected = hash_table_size(q->worker_table);
-	s->workers_init = hash_table_size(q->worker_table) - known_workers(q);
-	s->workers_idle = known_workers(q) - workers_with_tasks(q); //returns workers that are not running any tasks.
-	s->workers_busy = workers_with_tasks(q);
+	s->workers_init      = s->workers_connected - known;
+	s->workers_busy      = workers_with_tasks(q);
+	s->workers_idle      = known - s->workers_busy;
 	// s->workers_able computed below.
 
 	s->workers_joined       = qs->workers_joined;
