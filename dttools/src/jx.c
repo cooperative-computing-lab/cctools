@@ -94,7 +94,7 @@ struct jx * jx_double( double double_value )
 struct jx * jx_boolean( int boolean_value )
 {
 	struct jx *j = jx_create(JX_BOOLEAN);
-	j->u.boolean_value = boolean_value;
+	j->u.boolean_value = !!boolean_value;
 	return j;
 }
 
@@ -125,6 +125,13 @@ struct jx *jx_function( jx_function_t func, struct jx *args ) {
 	struct jx * j = jx_create(JX_FUNCTION);
 	j->u.func.function = func;
 	j->u.func.arguments = args;
+	return j;
+}
+
+struct jx * jx_error( struct jx *err )
+{
+	struct jx *j = jx_create(JX_ERROR);
+	j->u.err = err;
 	return j;
 }
 
@@ -372,6 +379,10 @@ void jx_delete( struct jx *j )
 			break;
 		case JX_FUNCTION:
 			jx_delete(j->u.func.arguments);
+			break;
+		case JX_ERROR:
+			jx_delete(j->u.err);
+			break;
 	}
 	free(j);
 }
@@ -430,6 +441,8 @@ int jx_equals( struct jx *j, struct jx *k )
 		case JX_FUNCTION:
 			return j->u.func.function == k->u.func.function
 				&& jx_equals(j->u.func.arguments, k->u.func.arguments);
+		case JX_ERROR:
+			return jx_equals(j->u.err, k->u.err);
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -480,6 +493,8 @@ struct jx  *jx_copy( struct jx *j )
 			return jx_operator(j->u.oper.type,jx_copy(j->u.oper.left),jx_copy(j->u.oper.right));
 		case JX_FUNCTION:
 			return jx_function(j->u.func.function, jx_copy(j->u.func.arguments));
+		case JX_ERROR:
+			return jx_error(jx_copy(j->u.err));
 	}
 
 	/* not reachable, but some compilers complain. */
@@ -527,9 +542,9 @@ int jx_is_constant( struct jx *j )
 			return jx_item_is_constant(j->u.items);
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->u.pairs);
-		case JX_OPERATOR:
-			return 0;
 		case JX_FUNCTION:
+		case JX_ERROR:
+		case JX_OPERATOR:
 			return 0;
 	}
 

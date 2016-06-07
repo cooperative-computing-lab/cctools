@@ -59,6 +59,7 @@ typedef enum {
 	JX_OBJECT,	/**< object containing key-value pairs */
 	JX_OPERATOR,	/**< operator on multiple values. */
 	JX_FUNCTION,	/**< function to be applied to some values */
+	JX_ERROR,	/**< indicates failed evaluation */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
@@ -131,6 +132,7 @@ struct jx {
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
 		struct jx_function func; /**< function of @ref JX_FUNCTION */
+		struct jx *err;  /**< error value of @ref JX_ERROR */
 	} u;
 };
 
@@ -158,6 +160,9 @@ struct jx *jx_function( jx_function_t func, struct jx *args );
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );
+
+/** Create a JX_ERROR. @param err The associated data for the error. @return A JX error value. */
+struct jx * jx_error( struct jx *err );
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );

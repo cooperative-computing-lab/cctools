@@ -34,7 +34,7 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 	}
 }
 
-static const char * jx_operator_string( jx_operator_t type )
+const char * jx_operator_string( jx_operator_t type )
 {
 	switch(type) {
 		case JX_OP_EQ: return "==";
@@ -170,6 +170,10 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			jx_print_args(j->u.func.arguments, b);
 			buffer_putstring(b, ")");
 			break;
+		case JX_ERROR:
+			// invalid JX
+			buffer_putstring(b,"&ERROR&");
+			break;
 	}
 }
 
@@ -184,6 +188,7 @@ void jx_print_stream( struct jx *j, FILE *file )
 
 void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
 {
+
 	buffer_t buffer;
 	buffer_init(&buffer);
 	jx_print_buffer(j,&buffer);
@@ -197,6 +202,7 @@ void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
 
 char * jx_print_string( struct jx *j )
 {
+
 	buffer_t buffer;
 	char *str;
 	buffer_init(&buffer);

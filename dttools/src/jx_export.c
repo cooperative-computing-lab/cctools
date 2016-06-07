@@ -115,6 +115,10 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		jx_print_stream(j,stream);
 		fprintf(stream,"</func>\n");
 		break;
+	case JX_ERROR:
+		// invalid XML
+		fprintf(stream,"&ERROR&");
+		break;
 	}
 }
 
