@@ -210,10 +210,72 @@ void jx_array_insert( struct jx *array, struct jx *value );
 /** Append an item at the end of an array.  @param array The array to modify.  @param value The value to append. */
 void jx_array_append( struct jx *array, struct jx *value );
 
+/** Get the nth item in an array.  @param array The array to search.  @param nth The index of the desired value. @return The nth element, or NULL if the index is out of bounds. */
+struct jx * jx_array_index( struct jx *j, int nth );
+
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
 
 /** Export a jx object as a set of environment variables.  @param j A JX_OBJECT. */
 void jx_export( struct jx *j );
+
+/** Iterate over the values in an array.
+ * The iteration state is stored by the caller in an opaque pointer variable. When starting iteration,
+ * the caller MUST pass the address of a pointer initialized to NULL as i. It is undefined behavior
+ * to pass a non-NULL iterator variable not set by a previous call. Subsequent calls should
+ * use the same variable to continue iteration. After the initial call, the value of j is ignored.
+ *
+ *     struct jx *item;
+ *     for (void *i = NULL; (item = jx_iterate_array(j, &i));) {
+ *         printf("array item: ");
+ *         jx_print_stream(item, stdout);
+ *         printf("\n");
+ *     }
+ *
+ * @param j The JX_ARRAY to iterate over.
+ * @param i A variable to store the iteration state.
+ * @return A pointer to each item in the array, and NULL when iteration is finished.
+ */
+struct jx * jx_iterate_array(struct jx *j, void **i);
+
+/** Iterate over the values in an object.
+ * The iteration state is stored by the caller in an opaque pointer variable. When starting iteration,
+ * the caller MUST pass the address of a pointer initialized to NULL as i. It is undefined behavior
+ * to pass a non-NULL iterator variable not set by a previous call. Subsequent calls should
+ * use the same variable to continue iteration. After the initial call, the value of j is ignored.
+ *
+ *     struct jx *item;
+ *     void *i = NULL;
+ *     while ((item = jx_iterate_values(j, &i))) {
+ *         printf("object value: ");
+ *         jx_print_stream(item, stdout);
+ *         printf("\n");
+ *     }
+ *
+ * @param j The JX_OBJECT to iterate over.
+ * @param i A variable to store the iteration state.
+ * @return A pointer to each value in the object, and NULL when iteration is finished.
+ */
+struct jx * jx_iterate_values(struct jx *j, void **i);
+
+/** Iterate over the keys in an object.
+ * The iteration state is stored by the caller in an opaque pointer variable. When starting iteration,
+ * the caller MUST pass the address of a pointer initialized to NULL as i. It is undefined behavior
+ * to pass a non-NULL iterator variable not set by a previous call. Subsequent calls should
+ * use the same variable to continue iteration. After the initial call, the value of j is ignored.
+ *
+ *     struct jx *item;
+ *     void *i = NULL;
+ *     while ((item = jx_iterate_keys(j, &i))) {
+ *         printf("object key: ");
+ *         jx_print_stream(item, stdout);
+ *         printf("\n");
+ *     }
+ *
+ * @param j The JX_OBJECT to iterate over.
+ * @param i A variable to store the iteration state.
+ * @return A pointer to each key in the object, and NULL when iteration is finished.
+ */
+struct jx * jx_iterate_key(struct jx *j, void **i);
 
 #endif

@@ -57,6 +57,7 @@ SOURCES = \
 	json_aux.c \
 	jx.c \
 	jx_database.c \
+	jx_match.c \
 	jx_parse.c \
 	jx_print.c \
 	jx_pretty_print.c \
@@ -119,6 +120,7 @@ HEADERS_PUBLIC = \
 	http_query.h \
 	int_sizes.h \
 	jx.h \
+	jx_match.h \
 	link.h \
 	md5.h \
 	rmonitor_poll.h \

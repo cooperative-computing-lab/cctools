@@ -273,6 +273,18 @@ void jx_array_append( struct jx *array, struct jx *value )
 	*i = jx_item(value,0);
 }
 
+struct jx * jx_array_index( struct jx *j, int nth )
+{
+	if (!jx_istype(j, JX_ARRAY)) return NULL;
+	struct jx_item *item = j->u.items;
+
+	for(int i = 0; i < nth; i++) {
+		if (!item) return NULL;
+		item = item->next;
+	}
+	return item ? item->value : NULL;
+}
+
 void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;
@@ -464,5 +476,56 @@ void jx_export( struct jx *j )
 		if(p->key->type==JX_STRING && p->value->type==JX_STRING) {
 			setenv(p->key->u.string_value,p->value->u.string_value,1);
 		}
+	}
+}
+
+struct jx * jx_iterate_array(struct jx *j, void **i) {
+	if (!i) return NULL;
+	if (*i) {
+		struct jx_item *next = ((struct jx_item *) *i)->next;
+		if (next) {
+			*i = next;
+			return next->value;
+		} else {
+			return NULL;
+		}
+	} else {
+		if (!jx_istype(j, JX_ARRAY)) return NULL;
+		*i = j->u.items;
+		return *i ? ((struct jx_item *) *i)->value : NULL;
+	}
+}
+
+struct jx * jx_iterate_keys(struct jx *j, void **i) {
+	if (!i) return NULL;
+	if (*i) {
+		struct jx_pair *next = ((struct jx_pair *) *i)->next;
+		if (next) {
+			*i = next;
+			return next->key;
+		} else {
+			return NULL;
+		}
+	} else {
+		if (!jx_istype(j, JX_OBJECT)) return NULL;
+		*i = j->u.pairs;
+		return *i ? ((struct jx_pair *) *i)->key : NULL;
+	}
+}
+
+struct jx * jx_iterate_values(struct jx *j, void **i) {
+	if (!i) return NULL;
+	if (*i) {
+		struct jx_pair *next = ((struct jx_pair *) *i)->next;
+		if (next) {
+			*i = next;
+			return next->value;
+		} else {
+			return NULL;
+		}
+	} else {
+		if (!jx_istype(j, JX_OBJECT)) return NULL;
+		*i = j->u.pairs;
+		return *i ? ((struct jx_pair *) *i)->value : NULL;
 	}
 }
