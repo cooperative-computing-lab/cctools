@@ -68,11 +68,12 @@ The following major problems must be fixed:
 extern int setenv(const char *name, const char *value, int overwrite);
 #endif
 
-// The default capacity reported before information is available.
-#define WORK_QUEUE_DEFAULT_CAPACITY 10
+// The default tasks capacity reported before information is available.
+// Default capacity also implies 1 core, 1024 MB of disk and 512 memory per task.
+#define WORK_QUEUE_DEFAULT_CAPACITY_TASKS 10
 
 // The minimum number of task reports to keep
-#define WORK_QUEUE_TASK_REPORT_MIN_SIZE 20
+#define WORK_QUEUE_TASK_REPORT_MIN_SIZE 50
 
 // Seconds between updates to the catalog
 #define WORK_QUEUE_UPDATE_INTERVAL 60
@@ -153,7 +154,7 @@ struct work_queue {
 	int short_timeout;		// timeout to send/recv a brief message from worker
 	int long_timeout;		// timeout to send/recv a brief message from a foreman
 
-	struct list * task_reports;	// list of last N work_queue_task_reports
+	struct list *task_reports;	      /* list of last N work_queue_task_reports. */
 
 	double asynchrony_multiplier;     /* Times the resource value, but disk */
 	int    asynchrony_modifier;       /* Plus this many cores or unlabeled tasks */
@@ -224,6 +225,10 @@ struct work_queue_worker {
 struct work_queue_task_report {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
+
+	int64_t cores;
+	int64_t memory;
+	int64_t disk;
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -3008,22 +3013,33 @@ Keep a list of reports equal to the number of workers connected.
 Used for computing queue capacity below.
 */
 
-static void add_task_report( struct work_queue *q, struct work_queue_task *t )
+static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct work_queue_task_report *tr;
 
 	// Create a new report object and add it to the list.
-	tr = malloc(sizeof(struct work_queue_task_report));
-	if(!tr) return;
-	tr->transfer_time = t->total_transfer_time;
-	tr->exec_time     = t->cmd_execution_time;
-	list_push_tail(q->task_reports,tr);
+	tr = calloc(1, sizeof(struct work_queue_task_report));
 
-	// Trim the list to the current number of useful workers.
-	int count = MAX(WORK_QUEUE_TASK_REPORT_MIN_SIZE, hash_table_size(q->worker_table) );
+	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
+	tr->exec_time     = t->time_workers_execute_last;
+
+	if(!t->resources_allocated) {
+		return;
+	}
+
+	tr->cores  = t->resources_allocated->cores;
+	tr->memory = t->resources_allocated->memory;
+	tr->disk   = t->resources_allocated->disk;
+
+	list_push_tail(q->task_reports, tr);
+
+	// Trim the list, but never below its previous size.
+	static int count = WORK_QUEUE_TASK_REPORT_MIN_SIZE;
+	count = MAX(count, 2*q->stats->tasks_on_workers);
+
 	while(list_size(q->task_reports) >= count) {
 	  tr = list_pop_head(q->task_reports);
-		free(tr);
+	  free(tr);
 	}
 
 	resource_monitor_append_report(q, t);
@@ -3034,34 +3050,67 @@ Compute queue capacity based on stored task reports
 and the summary of master activity.
 */
 
-static double compute_capacity( const struct work_queue *q )
+static void compute_capacity(const struct work_queue *q, struct work_queue_stats *s)
 {
-	timestamp_t avg_transfer_time = 0;
-	timestamp_t avg_exec_time = 0;
-	int count = 0;
+	struct work_queue_task_report capacity;
+	bzero(&capacity, sizeof(capacity));
 
-	struct list_node *n;
+	struct work_queue_task_report *tr;
 
-	// Sum up the task reports available.
-	for(n=q->task_reports->head;n;n=n->next) {
-		struct work_queue_task_report *tr = n->data;
-		avg_transfer_time += tr->transfer_time;
-		avg_exec_time += tr->exec_time;
-		count++;
-	}
+	int count = list_size(q->task_reports);
 
 	// Compute the average task properties.
-	if(count==0) return WORK_QUEUE_DEFAULT_CAPACITY;
-	avg_transfer_time /= count;
-	avg_exec_time /= count;
+	if(count < 1) {
+		capacity.cores  = WORK_QUEUE_DEFAULT_CAPACITY_TASKS * 1;
+		capacity.memory = WORK_QUEUE_DEFAULT_CAPACITY_TASKS * 512;
+		capacity.disk   = WORK_QUEUE_DEFAULT_CAPACITY_TASKS * 1024;
+		count = 1;
+	} else {
+		// Sum up the task reports available.
+		list_first_item(q->task_reports);
+		while((tr = list_next_item(q->task_reports))) {
+			capacity.transfer_time += tr->transfer_time;
+			capacity.exec_time     += tr->exec_time;
 
-	// Compute the average time spent outside of work_queue_wait
-	if(q->stats->total_tasks_complete==0) return WORK_QUEUE_DEFAULT_CAPACITY;
-	timestamp_t avg_app_time = q->stats->time_application / q->stats->total_tasks_complete;
+			capacity.cores  += tr->cores;
+			capacity.memory += tr->memory;
+			capacity.disk   += tr->disk;
+		}
+	}
 
-	// Capacity is the ratio of task execution time to time spent in the master doing other things.
-	if(avg_transfer_time==0) return WORK_QUEUE_DEFAULT_CAPACITY;
-	return (double) avg_exec_time / (avg_transfer_time + avg_app_time);
+	capacity.transfer_time = (int) ceil(((double) capacity.transfer_time) / count);
+	capacity.exec_time     = (int) ceil(((double) capacity.exec_time    ) / count);
+	capacity.cores         = (int) ceil(((double) capacity.cores        ) / count);
+	capacity.memory        = (int) ceil(((double) capacity.memory       ) / count);
+	capacity.disk          = (int) ceil(((double) capacity.disk         ) / count);
+
+	/*we stop using the defaults when at least 10 tasks have been completed.*/
+	if(q->stats->tasks_done > 10) {
+		capacity.transfer_time +=
+			(q->stats->time_status_msgs
+			 + q->stats->time_internal
+			 + q->stats->time_application)
+			/ q->stats->tasks_done;
+	} else {
+		capacity.transfer_time = 0;
+	}
+
+	// Capacity is the ratio of task execution time to time spent in the master
+	// doing other things.
+	double ratio;
+	if(capacity.transfer_time > 0) {
+		ratio = ((double) capacity.exec_time) / capacity.transfer_time;
+	} else {
+		ratio = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+	}
+
+	// Never go below the default capacity
+	ratio = MAX(ratio, WORK_QUEUE_DEFAULT_CAPACITY_TASKS);
+
+	s->capacity_tasks  = (int) ceil(ratio);
+	s->capacity_cores  = (int) ceil(capacity.cores  * ratio);
+	s->capacity_memory = (int) ceil(capacity.memory * ratio);
+	s->capacity_disk   = (int) ceil(capacity.disk   * ratio);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
