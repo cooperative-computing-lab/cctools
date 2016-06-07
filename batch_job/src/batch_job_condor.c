@@ -339,6 +339,7 @@ static int batch_job_condor_remove (struct batch_queue *q, batch_job_id_t jobid)
 static int batch_queue_condor_create (struct batch_queue *q)
 {
 	strncpy(q->logfile, "condor.logfile", sizeof(q->logfile));
+	batch_queue_set_feature(q, "output_directories", NULL);
 	batch_queue_set_feature(q, "batch_log_name", "%s.condorlog");
 	batch_queue_set_feature(q, "autosize", "yes");
 
