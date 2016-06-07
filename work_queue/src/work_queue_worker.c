@@ -354,19 +354,31 @@ static void send_stats_update(struct link *master)
 		struct work_queue_stats s;
 		work_queue_get_stats_hierarchy(foreman_q, &s);
 
-		send_master_message(master, "info total_workers_joined %lld\n", (long long) s.total_workers_joined);
-		send_master_message(master, "info total_workers_removed %lld\n", (long long) s.total_workers_removed);
-		send_master_message(master, "info total_workers_lost %lld\n", (long long) s.total_workers_lost);
-		send_master_message(master, "info total_workers_idled_out %lld\n", (long long) s.total_workers_idled_out);
-		send_master_message(master, "info total_workers_fast_aborted %lld\n", (long long) s.total_workers_fast_aborted);
-		send_master_message(master, "info total_send_time %lld\n", (long long) s.total_send_time);
-		send_master_message(master, "info total_receive_time %lld\n", (long long) s.total_receive_time);
-		send_master_message(master, "info total_execute_time %lld\n", (long long) s.total_execute_time);
-		send_master_message(master, "info total_bytes_sent %lld\n", (long long) s.total_bytes_sent);
-		send_master_message(master, "info total_bytes_received %lld\n", (long long) s.total_bytes_received);
+		send_master_message(master, "info workers_joined %lld\n", (long long) s.workers_joined);
+		send_master_message(master, "info workers_removed %lld\n", (long long) s.workers_removed);
+		send_master_message(master, "info workers_released %lld\n", (long long) s.workers_released);
+		send_master_message(master, "info workers_idled_out %lld\n", (long long) s.workers_idled_out);
+		send_master_message(master, "info workers_fast_aborted %lld\n", (long long) s.workers_fast_aborted);
+		send_master_message(master, "info workers_blacklisted %lld\n", (long long) s.workers_blacklisted);
+		send_master_message(master, "info workers_lost %lld\n", (long long) s.workers_lost);
 
 		send_master_message(master, "info tasks_waiting %lld\n", (long long) s.tasks_waiting);
+		send_master_message(master, "info tasks_on_workers %lld\n", (long long) s.tasks_on_workers);
 		send_master_message(master, "info tasks_running %lld\n", (long long) s.tasks_running);
+		send_master_message(master, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
+		send_master_message(master, "info tasks_with_results %lld\n", (long long) s.tasks_with_results);
+
+		send_master_message(master, "info time_send %lld\n", (long long) s.time_send);
+		send_master_message(master, "info time_receive %lld\n", (long long) s.time_receive);
+		send_master_message(master, "info time_send_good %lld\n", (long long) s.time_send_good);
+		send_master_message(master, "info time_receive_good %lld\n", (long long) s.time_receive_good);
+
+		send_master_message(master, "info time_workers_execute %lld\n", (long long) s.time_workers_execute);
+		send_master_message(master, "info time_workers_execute_good %lld\n", (long long) s.time_workers_execute_good);
+		send_master_message(master, "info time_workers_execute_exhaustion %lld\n", (long long) s.time_workers_execute_exhaustion);
+
+		send_master_message(master, "info bytes_sent %lld\n", (long long) s.bytes_sent);
+		send_master_message(master, "info bytes_received %lld\n", (long long) s.bytes_received);
 	}
 	else {
 		send_master_message(master, "info tasks_running %lld\n", (long long) itable_size(procs_running));
@@ -530,12 +542,12 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		} else {
 			output_length = 0;
 		}
-		send_master_message(master, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->cmd_execution_time, t->taskid);
+		send_master_message(master, "result %d %d %lld %llu %d\n", t->result, t->return_status, (long long) output_length, (unsigned long long) t->time_workers_execute_last, t->taskid);
 		if(output_length) {
 			link_putlstring(master, t->output, output_length, time(0)+active_timeout);
 		}
 
-		total_task_execution_time += t->cmd_execution_time;
+		total_task_execution_time += t->time_workers_execute_last;
 		total_tasks_executed++;
 	}
 
