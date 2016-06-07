@@ -490,7 +490,7 @@ struct jx * jx_iterate_array(struct jx *j, void **i) {
 			return NULL;
 		}
 	} else {
-		if (!j) return NULL;
+		if (!jx_istype(j, JX_ARRAY)) return NULL;
 		*i = j->u.items;
 		return *i ? ((struct jx_item *) *i)->value : NULL;
 	}
@@ -507,7 +507,7 @@ struct jx * jx_iterate_keys(struct jx *j, void **i) {
 			return NULL;
 		}
 	} else {
-		if (!j) return NULL;
+		if (!jx_istype(j, JX_OBJECT)) return NULL;
 		*i = j->u.pairs;
 		return *i ? ((struct jx_pair *) *i)->key : NULL;
 	}
@@ -524,7 +524,7 @@ struct jx * jx_iterate_values(struct jx *j, void **i) {
 			return NULL;
 		}
 	} else {
-		if (!j) return NULL;
+		if (!jx_istype(j, JX_OBJECT)) return NULL;
 		*i = j->u.pairs;
 		return *i ? ((struct jx_pair *) *i)->value : NULL;
 	}

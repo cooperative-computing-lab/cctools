@@ -68,10 +68,11 @@ int jx_match_symbol(struct jx *j, char **v) {
 int jx_match_array(struct jx *j, ...) {
 	va_list ap;
 	int matched = 0;
-	struct jx *item;
 
 	va_start(ap, j);
-	for (void *i = NULL; (item = jx_iterate_array(j, &i));) {
+	void *i = NULL;
+	struct jx *item;
+	while ((item = jx_iterate_array(j, &i))) {
 		void *out = va_arg(ap, void *);
 		if (!out) goto DONE;
 		jx_type_t t = va_arg(ap, jx_type_t);
