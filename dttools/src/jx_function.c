@@ -46,7 +46,7 @@ struct jx *jx_function_dbg(struct jx_function *f, struct jx *context) {
 	// we want to detect more than one arg, so try to match twice
 	if (jx_match_array(f->arguments, &result, JX_ANY, &result, JX_ANY, NULL) != 1) {
 		struct jx *err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "only one argument is allowed");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -76,7 +76,7 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 		break;
 	default:
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "at most one argument is allowed");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -105,7 +105,7 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 
 	if ((jx_match_array(f->arguments, &symbol, JX_SYMBOL, &array, JX_ANY, &body, JX_ANY, NULL) != 3)) {
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -120,7 +120,7 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 	result = NULL;
 	if (!jx_istype(array, JX_ARRAY)) {
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "second argument must evaluate to an array");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -169,7 +169,7 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 		break;
 	default:
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -180,7 +180,7 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 
 	if (step == 0) {
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "step must be nonzero");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -217,7 +217,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 		break;
 	default:
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "SyntaxError");
+		jx_insert_string(err, "name", "SyntaxError");
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -234,7 +234,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 		if (!jx_istype(item, JX_STRING)) {
 			jx_delete(result);
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "SyntaxError");
+			jx_insert_string(err, "name", "SyntaxError");
 			jx_insert_string(err, "message", "joined items must be strings");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);

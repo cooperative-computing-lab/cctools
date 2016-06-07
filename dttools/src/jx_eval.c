@@ -25,7 +25,7 @@ static struct jx * jx_eval_null( jx_operator_t op )
 			return jx_boolean(0);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "unsupported operator on type null");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -53,7 +53,7 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 			return jx_boolean(!b);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "unsupported operator on type boolean");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -94,7 +94,7 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 		case JX_OP_DIV:
 			if(b==0) {
 				err = jx_object(NULL);
-				jx_insert_string(err, "error", "RangeError");
+				jx_insert_string(err, "name", "RangeError");
 				jx_insert_string(err, "message", "dividing by zero");
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
@@ -105,7 +105,7 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 		case JX_OP_MOD:
 			if(b==0) {
 				err = jx_object(NULL);
-				jx_insert_string(err, "error", "RangeError");
+				jx_insert_string(err, "name", "RangeError");
 				jx_insert_string(err, "message", "dividing by zero");
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
@@ -115,7 +115,7 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 			return jx_integer(a%b);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "unsupported operator on type integer");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -166,7 +166,7 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 			return jx_double((jx_int_t)a%(jx_int_t)b);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "unsupported operator on type double");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -198,7 +198,7 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 			return jx_format("%s%s",a,b);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "unsupported operator on type string");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -219,7 +219,7 @@ static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *
 			return jx_array_concat(jx_copy(left), jx_copy(right), NULL);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "unsupported operator on type array");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -243,7 +243,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			return jx_copy(r);
 		} else {
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "ReferenceError");
+			jx_insert_string(err, "name", "ReferenceError");
 			jx_insert_string(err, "message", "key not found");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -256,7 +256,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 
 		if(count<0) {
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "RangeError");
+			jx_insert_string(err, "name", "RangeError");
 			jx_insert_string(err, "message", "index must be positive");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -267,7 +267,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 		while(count>0) {
 			if(!item) {
 				err = jx_object(NULL);
-				jx_insert_string(err, "error", "RangeError");
+				jx_insert_string(err, "name", "RangeError");
 				jx_insert_string(err, "message", "index out of range");
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
@@ -282,7 +282,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			return jx_copy(item->value);
 		} else {
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "RangeError");
+			jx_insert_string(err, "name", "RangeError");
 			jx_insert_string(err, "message", "index out of range");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -291,7 +291,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 		}
 	} else {
 		err = jx_object(NULL);
-		jx_insert_string(err, "error", "TypeError");
+		jx_insert_string(err, "name", "TypeError");
 		jx_insert_string(err, "message", "invalid type for lookup");
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
@@ -319,7 +319,7 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 			return jx_function_dbg(f, context);
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "SyntaxError");
+			jx_insert_string(err, "name", "SyntaxError");
 			jx_insert_string(err, "message", "invalid function");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -381,7 +381,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			return r;
 		} else {
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "mismatched types for operator");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -411,7 +411,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			break;
 		default:
 			err = jx_object(NULL);
-			jx_insert_string(err, "error", "TypeError");
+			jx_insert_string(err, "name", "TypeError");
 			jx_insert_string(err, "message", "bad type of rvalue");
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
@@ -488,7 +488,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 					return jx_copy(result);
 				} else {
 					struct jx *err = jx_object(NULL);
-					jx_insert_string(err, "error", "ReferenceError");
+					jx_insert_string(err, "name", "ReferenceError");
 					jx_insert_string(err, "message", "undefined symbol");
 					jx_insert_string(err, "file", __FILE__);
 					jx_insert_integer(err, "line", __LINE__);
