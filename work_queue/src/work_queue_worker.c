@@ -366,7 +366,6 @@ static void send_stats_update(struct link *master)
 		send_master_message(master, "info tasks_running %lld\n", (long long) s.tasks_running);
 	}
 	else {
-		send_master_message(master, "info tasks_waiting %lld\n", (long long) list_size(procs_waiting));
 		send_master_message(master, "info tasks_running %lld\n", (long long) itable_size(procs_running));
 	}
 }
@@ -1607,6 +1606,7 @@ static void work_for_master(struct link *master) {
 			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
 		}
 
+		int task_event = 0;
 		if(ok) {
 			struct work_queue_process *p;
 			int visited;
@@ -1618,12 +1618,18 @@ static void work_for_master(struct link *master) {
 					break;
 				} else if(task_resources_fit_now(p->task)) {
 					start_process(p);
+					task_event++;
 				} else if(task_resources_fit_eventually(p->task)) {
 					list_push_tail(procs_waiting, p);
 				} else {
 					forsake_waiting_process(master, p);
+					task_event++;
 				}
 			}
+		}
+
+		if(task_event > 0) {
+			send_stats_update(master);
 		}
 
 		if(ok && !results_to_be_sent_msg) {
