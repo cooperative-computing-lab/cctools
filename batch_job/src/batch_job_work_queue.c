@@ -13,7 +13,7 @@
 #include <string.h>
 #include <errno.h>
 
-static void specify_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
+static int specify_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
 {
 	char *f, *p, *files;
 
@@ -24,10 +24,14 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag);
+				if(!work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag)){
+					exit(1);
+				}
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag);
+				if(!work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag)){
+					exit(1);
+				}
 			}
 			f = strtok(0, " \t,");
 		}
@@ -41,15 +45,20 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag);
+				if(!work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag)){
+					exit(1);
+				}
 				*p = '=';
 			} else {
-				work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag);
+				if(!work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag)){
+					exit(1);
+				}
 			}
 			f = strtok(0, " \t,");
 		}
 		free(files);
 	}
+	return 0;
 }
 
 static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
@@ -76,7 +85,8 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 
 	t = work_queue_task_create(cmd);
 
-	specify_files(t, extra_input_files, extra_output_files, caching_flag);
+	if(specify_files(t, extra_input_files, extra_output_files, caching_flag))
+		return -1;
 	specify_envlist(t,envlist);
 
 	if(envlist) {
@@ -175,6 +185,7 @@ static int batch_queue_wq_create (struct batch_queue *q)
 	if ((q->data = work_queue_create(0)) == NULL)
 		return -1;
 	work_queue_enable_process_module(q->data);
+	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
 	batch_queue_set_feature(q, "batch_log_name", "%s.wqlog");
 	return 0;
