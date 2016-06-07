@@ -27,8 +27,8 @@ parse_arguments()
 {
 	# set default values:
 	cores=${cores:-1}
-	memory=${memory:-1024}   # MB, e.g. 1 GB
-	disk=${disk:-1024}      # MB, e.g. 1 GB
+	memory=${memory:-512}   # MB, e.g. 0.5 GB
+	disk=${disk:-1024}      # MB, e.g. 1   GB
 
 	# convert disk to kB to make what follows easier, as condor want disk in kB
 	disk=$((disk*1024))
