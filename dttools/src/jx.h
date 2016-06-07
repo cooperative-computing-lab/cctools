@@ -40,14 +40,6 @@ Will create the following output:
 #include <assert.h>
 
 /** JX atomic type.  */
-
-/*
-Not a real type
-Used to signal that a function can take any type of arg
-See jx_function.
-*/
-#define JX_ANY -1
-
 typedef enum {
 	JX_NULL = 0,	/**< null value */
 	JX_BOOLEAN,	/**< true or false */
