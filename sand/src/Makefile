@@ -18,7 +18,7 @@ libsandtools.a: $(OBJECTS)
 $(PROGRAMS): $(LIBRARIES) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(PROGRAMS) $(LIBRARIES)
+	rm -f $(OBJECTS) $(PROGRAMS) $(LIBRARIES) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
