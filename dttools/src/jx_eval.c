@@ -159,10 +159,26 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 			return jx_double(a*b);
 			break;
 		case JX_OP_DIV:
-			if(b==0) return jx_null();
+			if(b==0) {
+				err = jx_object(NULL);
+				jx_insert_string(err, "name", "RangeError");
+				jx_insert_string(err, "message", "dividing by zero");
+				jx_insert_string(err, "file", __FILE__);
+				jx_insert_integer(err, "line", __LINE__);
+				jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				return jx_error(err);
+			}
 			return jx_double(a/b);
 		case JX_OP_MOD:
-			if(b==0) return jx_null();
+			if(b==0) {
+				err = jx_object(NULL);
+				jx_insert_string(err, "name", "RangeError");
+				jx_insert_string(err, "message", "dividing by zero");
+				jx_insert_string(err, "file", __FILE__);
+				jx_insert_integer(err, "line", __LINE__);
+				jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				return jx_error(err);
+			}
 			return jx_double((jx_int_t)a%(jx_int_t)b);
 		default:
 			err = jx_object(NULL);
@@ -210,7 +226,15 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *right )
 {
 	struct jx *err;
-	if (!(left && right)) return jx_null();
+	if (!(left && right)) {
+		err = jx_object(NULL);
+		jx_insert_string(err, "name", "TypeError");
+		jx_insert_string(err, "message", "missing arguments to array operator");
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "line", __LINE__);
+		jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+		return jx_error(err);
+	}
 
 	switch(op) {
 		case JX_OP_EQ:
