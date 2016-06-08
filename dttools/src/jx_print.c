@@ -171,8 +171,8 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			buffer_putstring(b, ")");
 			break;
 		case JX_ERROR:
-			// invalid JX
-			buffer_putstring(b,"&ERROR&");
+			buffer_putstring(b,"Error");
+			jx_print_buffer(j->u.err, b);
 			break;
 	}
 }

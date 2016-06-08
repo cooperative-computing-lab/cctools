@@ -20,6 +20,7 @@ typedef enum {
 	JX_TOKEN_DOUBLE,
 	JX_TOKEN_STRING,
 	JX_TOKEN_FUNCTION,
+	JX_TOKEN_ERROR,
 	JX_TOKEN_LBRACKET,
 	JX_TOKEN_RBRACKET,
 	JX_TOKEN_LBRACE,
@@ -350,6 +351,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_FALSE;
 				} else if(!strcmp(s->token,"null")) {
 					return JX_TOKEN_NULL;
+				} else if(!strcmp(s->token, "Error")) {
+					return JX_TOKEN_ERROR;
 				} else if (jx_function_name_from_string(s->token)) {
 					return JX_TOKEN_FUNCTION;
 				} else {
@@ -633,6 +636,14 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				return jx_function(f, j);
 			} else {
 				jx_parse_error(s,"invalid function");
+				return NULL;
+			}
+			break;
+		case JX_TOKEN_ERROR:
+			if ((j = jx_parse_postfix(s, 0)) && jx_istype(j, JX_OBJECT)) {
+				return jx_error(j);
+			} else {
+				jx_parse_error(s, "invalid Error specification");
 				return NULL;
 			}
 			break;

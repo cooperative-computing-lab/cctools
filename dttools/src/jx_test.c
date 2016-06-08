@@ -50,14 +50,7 @@ int main( int argc, char *argv[] )
 			struct jx *k = jx_eval(j,context);
 			printf("value:      ");
 			jx_print_stream(k,stdout);
-			printf("\n");
-
-			if(jx_istype(k, JX_ERROR)) {
-				fprintf(stderr, "error:      ");
-				jx_print_stream(k->u.err, stderr);
-				fprintf(stderr, "\n");
-			}
-			printf("\n");
+			printf("\n\n");
 
 			jx_delete(j);
 			jx_delete(k);
