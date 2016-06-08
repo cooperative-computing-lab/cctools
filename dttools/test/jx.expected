@@ -151,16 +151,16 @@ expression: a!=b
 value:      true
 
 expression: a<b
-value:      Error{"op":true<false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true<false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a>b
-value:      Error{"op":true>false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true>false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a<=b
-value:      Error{"op":true<=false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true<=false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a>=b
-value:      Error{"op":true>=false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true>=false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: f==g
 value:      false
@@ -199,19 +199,19 @@ expression: x>=y
 value:      false
 
 expression: a+b
-value:      Error{"op":true+false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true+false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a-b
-value:      Error{"op":true-false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true-false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a*b
-value:      Error{"op":true*false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true*false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a/b
-value:      Error{"op":true/false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true/false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: a%b
-value:      Error{"op":true%false,"line":55,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":true%false,"line":56,"file":"jx_eval.c","message":"unsupported operator on type boolean","name":"TypeError"}
 
 expression: f+g
 value:      3.64159
@@ -286,7 +286,7 @@ expression: range(-1,10,2)
 value:      [-1,1,3,5,7,9]
 
 expression: range(1,10,0)
-value:      Error{"func":range(1,10,0),"line":186,"file":"jx_function.c","message":"step must be nonzero","name":"SyntaxError"}
+value:      Error{"source":"jx_eval","func":range(1,10,0),"line":191,"file":"jx_function.c","message":"step must be nonzero","name":"SyntaxError"}
 
 expression: range(0,5,-1)
 value:      []
@@ -307,7 +307,7 @@ expression: str(x+y)
 value:      "30"
 
 expression: str(x,y)
-value:      Error{"func":str(x,y),"line":82,"file":"jx_function.c","message":"at most one argument is allowed","name":"SyntaxError"}
+value:      Error{"source":"jx_eval","func":str(x,y),"line":83,"file":"jx_function.c","message":"at most one argument is allowed","name":"SyntaxError"}
 
 expression: str(range(10))
 value:      "[0,1,2,3,4,5,6,7,8,9]"
@@ -316,22 +316,22 @@ expression: str("a")
 value:      "a"
 
 expression: foreach("too","few")
-value:      Error{"func":foreach("too","few"),"line":111,"file":"jx_function.c","message":"invalid arguments","name":"SyntaxError"}
+value:      Error{"source":"jx_eval","func":foreach("too","few"),"line":113,"file":"jx_function.c","message":"invalid arguments","name":"SyntaxError"}
 
 expression: foreach(x,"nope",str(x))
-value:      Error{"func":foreach(x,"nope",str(x)),"line":126,"file":"jx_function.c","message":"second argument must evaluate to an array","name":"SyntaxError"}
+value:      Error{"source":"jx_eval","func":foreach(x,"nope",str(x)),"line":129,"file":"jx_function.c","message":"second argument must evaluate to an array","name":"SyntaxError"}
 
 expression: foreach(x,range(5),"item"+str(x))
 value:      ["item0","item1","item2","item3","item4"]
 
 expression: join(["a","b",c])
-value:      Error{"context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"line":516,"file":"jx_eval.c","message":"undefined symbol","name":"ReferenceError"}
+value:      Error{"source":"jx_eval","context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"line":535,"file":"jx_eval.c","message":"undefined symbol","name":"ReferenceError"}
 
 expression: join([1,2])
-value:      Error{"func":join([1,2]),"line":240,"file":"jx_function.c","message":"joined items must be strings","name":"SyntaxError"}
+value:      Error{"source":"jx_eval","func":join([1,2]),"line":247,"file":"jx_function.c","message":"joined items must be strings","name":"SyntaxError"}
 
 expression: join(["a",2])
-value:      Error{"func":join(["a",2]),"line":240,"file":"jx_function.c","message":"joined items must be strings","name":"SyntaxError"}
+value:      Error{"source":"jx_eval","func":join(["a",2]),"line":247,"file":"jx_function.c","message":"joined items must be strings","name":"SyntaxError"}
 
 expression: join([])
 value:      ""
@@ -349,10 +349,10 @@ expression: dbg(join(dbg(foreach(x,dbg(range(dbg(3))),dbg(dbg(str(dbg(x)))+dbg("
 value:      "0.1 1.2 2.3"
 
 expression: 10+[1]
-value:      Error{"op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":10+[1],"line":426,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 
 expression: "abc"+[2]
-value:      Error{"op":"abc"+[2],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":"abc"+[2],"line":426,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 
 expression: []+[]
 value:      []
@@ -381,6 +381,6 @@ value:      false
 expression: [1,2,[3,4]]==[1,2,[3,4]]
 value:      true
 
-expression: Error{"op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
-value:      Error{"op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+expression: Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+value:      Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 

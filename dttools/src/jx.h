@@ -153,7 +153,7 @@ struct jx *jx_function( jx_function_t func, struct jx *args );
 */
 struct jx * jx_symbol( const char *symbol_name );
 
-/** Create a JX_ERROR. @param err The associated data for the error. @return A JX error value. */
+/** Create a JX_ERROR. @param err The associated data for the error. This object MUST have a string at the "source" key. @return A JX error value, or NULL if "source" is missing. */
 struct jx * jx_error( struct jx *err );
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */

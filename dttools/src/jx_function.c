@@ -51,6 +51,7 @@ struct jx *jx_function_dbg(struct jx_function *f, struct jx *context) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
 	fprintf(stderr, "dbg  in: ");
@@ -81,6 +82,7 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 
 	}
@@ -110,6 +112,7 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		result =  jx_error(err);
 		goto DONE;
 	}
@@ -125,6 +128,7 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		result =  jx_error(err);
 		goto DONE;
 	}
@@ -174,6 +178,7 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
 	jx_delete(args);
@@ -185,6 +190,7 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
 
@@ -222,6 +228,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "source", "jx_eval");
 		result = jx_error(err);
 		goto DONE;
 	}
@@ -239,6 +246,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+			jx_insert_string(err, "source", "jx_eval");
 			result = jx_error(err);
 			goto DONE;
 		}

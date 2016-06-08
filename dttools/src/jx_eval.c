@@ -26,6 +26,7 @@ static struct jx * jx_eval_null( jx_operator_t op )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert_string(err, "op", jx_operator_string(op));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -54,6 +55,7 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -95,6 +97,7 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
 				jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}
 			return jx_integer(a/b);
@@ -106,6 +109,7 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
 				jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}
 			return jx_integer(a%b);
@@ -116,6 +120,7 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -162,6 +167,7 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
 				jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}
 			return jx_double(a/b);
@@ -173,6 +179,7 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
 				jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}
 			return jx_double((jx_int_t)a%(jx_int_t)b);
@@ -183,6 +190,7 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -215,6 +223,7 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -229,6 +238,7 @@ static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
 
@@ -246,6 +256,7 @@ static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -270,6 +281,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 		}
 	} else if(left->type==JX_ARRAY && right->type==JX_INTEGER) {
@@ -283,6 +295,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 		}
 
@@ -294,6 +307,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 				jx_insert_string(err, "file", __FILE__);
 				jx_insert_integer(err, "line", __LINE__);
 				jx_insert(err, jx_string("op"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
+				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}
 			item = item->next;
@@ -309,6 +323,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 		}
 	} else {
@@ -318,6 +333,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 		jx_insert_string(err, "file", __FILE__);
 		jx_insert_integer(err, "line", __LINE__);
 		jx_insert(err, jx_string("op"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
+		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 
 	}
@@ -346,6 +362,7 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 	}
 }
@@ -408,6 +425,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(o->type, left, right));
+			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 		}
 	}
@@ -438,6 +456,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_insert_string(err, "file", __FILE__);
 			jx_insert_integer(err, "line", __LINE__);
 			jx_insert(err, jx_string("op"), jx_operator(o->type, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "source", "jx_eval");
 			result = jx_error(err);
 			break;
 	}
@@ -516,6 +535,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 					jx_insert_integer(err, "line", __LINE__);
 					jx_insert(err, jx_string("symbol"), jx_copy(j));
 					jx_insert(err, jx_string("context"), jx_copy(context));
+					jx_insert_string(err, "source", "jx_eval");
 					return jx_error(err);
 				}
 			}

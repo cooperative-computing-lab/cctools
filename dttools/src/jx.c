@@ -130,6 +130,7 @@ struct jx *jx_function( jx_function_t func, struct jx *args ) {
 
 struct jx * jx_error( struct jx *err )
 {
+	if(!jx_lookup_string(err, "source")) return NULL;
 	struct jx *j = jx_create(JX_ERROR);
 	j->u.err = err;
 	return j;
