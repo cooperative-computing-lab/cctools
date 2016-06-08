@@ -18,10 +18,6 @@ static struct jx * jx_eval_null( jx_operator_t op )
 		case JX_OP_EQ:
 			return jx_boolean(1);
 		case JX_OP_NE:
-		case JX_OP_LT:
-		case JX_OP_LE:
-		case JX_OP_GT:
-		case JX_OP_GE:
 			return jx_boolean(0);
 		default:
 			err = jx_object(NULL);
@@ -239,6 +235,8 @@ static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *
 	switch(op) {
 		case JX_OP_EQ:
 			return jx_boolean(jx_equals(left, right));
+		case JX_OP_NE:
+			return jx_boolean(!jx_equals(left, right));
 		case JX_OP_ADD:
 			return jx_array_concat(jx_copy(left), jx_copy(right), NULL);
 		default:
