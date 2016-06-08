@@ -46,7 +46,7 @@ typedef enum {
 	JX_TOKEN_NULL,
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
-	JX_TOKEN_ERROR,
+	JX_TOKEN_PARSE_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
 
@@ -251,12 +251,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		char d = jx_getchar(s);
 		if(d=='&') return JX_TOKEN_AND;
 		jx_parse_error(s,"invalid character: &");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='|') {
 		char d = jx_getchar(s);
 		if(d=='|') return JX_TOKEN_OR;
 		jx_parse_error(s,"invalid character: |");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='!') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
@@ -266,7 +266,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
 		jx_parse_error(s,"invalid character: =");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='<') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_LE;
@@ -283,7 +283,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 			int n = jx_scan_string_char(s);
 			if(n==EOF) {
 				jx_parse_error(s,"missing end quote");
-				return JX_TOKEN_ERROR;
+				return JX_TOKEN_PARSE_ERROR;
 			} else if(n==0) {
 				s->token[i] = n;
 				return JX_TOKEN_STRING;
@@ -292,7 +292,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 			}
 		}
 		jx_parse_error(s,"string constant too long");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 
 	} else if(c=='(') {
 		return JX_TOKEN_LPAREN;
@@ -329,11 +329,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				if(!*endptr) return JX_TOKEN_DOUBLE;
 
 				jx_parse_error(s,"invalid number format");
-				return JX_TOKEN_ERROR;
+				return JX_TOKEN_PARSE_ERROR;
 			}
 		}
 		jx_parse_error(s,"integer constant too long");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(isalpha(c) || c=='_') {
 		s->token[0] = c;
 		int i;
@@ -358,12 +358,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 			}
 		}
 		jx_parse_error(s,"symbol too long");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 	} else {
 		s->token[0] = c;
 		s->token[1] = 0;
 		jx_parse_error(s,"invalid character");
-		return JX_TOKEN_ERROR;
+		return JX_TOKEN_PARSE_ERROR;
 	}
 }
 
