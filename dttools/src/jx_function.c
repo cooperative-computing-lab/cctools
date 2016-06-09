@@ -46,11 +46,13 @@ struct jx *jx_function_dbg(struct jx_function *f, struct jx *context) {
 	// we want to detect more than one arg, so try to match twice
 	if (jx_match_array(f->arguments, &result, JX_ANY, &result, JX_ANY, NULL) != 1) {
 		struct jx *err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "only one argument is allowed");
-		jx_insert_string(err, "file", __FILE__);
+		int code = 6;
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "only one argument is allowed");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
@@ -68,6 +70,7 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 	struct jx *args;
 	struct jx *err;
 	struct jx *result;
+	int code;
 
 	switch (jx_array_length(f->arguments)) {
 	case 0:
@@ -76,12 +79,14 @@ struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 		args = jx_eval(f->arguments->u.items->value, context);
 		break;
 	default:
+		code = 6;
 		err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "at most one argument is allowed");
-		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "at most one argument is allowed");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 
@@ -104,14 +109,17 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 	struct jx *body = NULL;
 	struct jx *result = NULL;
 	struct jx *err;
+	int code;
 
 	if ((jx_match_array(f->arguments, &symbol, JX_SYMBOL, &array, JX_ANY, &body, JX_ANY, NULL) != 3)) {
+		code = 6;
 		err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "invalid arguments");
-		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "invalid arguments");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		result =  jx_error(err);
 		goto DONE;
@@ -122,12 +130,14 @@ struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 	jx_delete(result);
 	result = NULL;
 	if (!jx_istype(array, JX_ARRAY)) {
+		code = 6;
 		err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "second argument must evaluate to an array");
-		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "second argument must evaluate to an array");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		result =  jx_error(err);
 		goto DONE;
@@ -155,6 +165,7 @@ DONE:
 // see https://docs.python.org/2/library/functions.html#range
 struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 	jx_int_t start, stop, step;
+	int code;
 	struct jx *err;
 	struct jx *args = jx_eval(f->arguments, context);
 	if (jx_istype(args, JX_ERROR)) {
@@ -172,24 +183,28 @@ struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 	case 3:
 		break;
 	default:
+		code = 6;
 		err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "invalid arguments");
-		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "invalid arguments");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
 	jx_delete(args);
 
 	if (step == 0) {
+		code = 6;
 		err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "step must be nonzero");
-		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "file", __FILE__);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "step must be nonzero");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
@@ -214,6 +229,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 	struct jx *array = NULL;
 	struct jx *args = jx_eval(f->arguments, context);
 	struct jx *err;
+	int code;
 	if (jx_istype(args, JX_ERROR)) {
 		return args;
 	}
@@ -222,12 +238,14 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 	case 2:
 		break;
 	default:
+		code = 6;
 		err = jx_object(NULL);
-		jx_insert_string(err, "name", "SyntaxError");
-		jx_insert_string(err, "message", "invalid arguments");
-		jx_insert_string(err, "file", __FILE__);
+		jx_insert_integer(err, "code", code);
 		jx_insert_integer(err, "line", __LINE__);
+		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "invalid arguments");
+		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		result = jx_error(err);
 		goto DONE;
@@ -240,12 +258,14 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 	while ((item = jx_iterate_array(array, &i))) {
 		if (!jx_istype(item, JX_STRING)) {
 			jx_delete(result);
+			code = 6;
 			err = jx_object(NULL);
-			jx_insert_string(err, "name", "SyntaxError");
-			jx_insert_string(err, "message", "joined items must be strings");
-			jx_insert_string(err, "file", __FILE__);
+			jx_insert_integer(err, "code", code);
 			jx_insert_integer(err, "line", __LINE__);
+			jx_insert_string(err, "file", __FILE__);
 			jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+			jx_insert_string(err, "message", "joined items must be strings");
+			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
 			result = jx_error(err);
 			goto DONE;

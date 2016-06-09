@@ -316,4 +316,7 @@ struct jx * jx_iterate_keys(struct jx *j, void **i);
 /** Merge an arbitrary number of JX_OBJECTs into a single new one. The constituent objects are not consumed. Objects are merged in the order given, i.e. a key can replace an identical key in a preceding object. The last argument must be NULL to mark the end of the list. @return A merged JX_OBJECT that must be deleted with jx_delete. */
 struct jx *jx_merge(struct jx *j, ...);
 
+/** Get a human-readable name from an error code. @param code The numeric error code to check. */
+const char *jx_error_name(int code);
+
 #endif

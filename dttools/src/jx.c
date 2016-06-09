@@ -615,3 +615,16 @@ struct jx * jx_iterate_values(struct jx *j, void **i) {
 		return *i ? ((struct jx_pair *) *i)->value : NULL;
 	}
 }
+
+const char *jx_error_name(int code) {
+	switch (code) {
+	case 0: return "undefined symbol";
+	case 1: return "unsupported operator";
+	case 2: return "mismatched types";
+	case 3: return "key not found";
+	case 4: return "range error";
+	case 5: return "arithmetic error";
+	case 6: return "invalid arguments";
+	default: return "unknown error";
+	}
+}
