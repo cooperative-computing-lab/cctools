@@ -284,20 +284,23 @@ static struct jx_table queue_headers[] = {
 {NULL,NULL,0,0,0}
 };
 
-void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested)
+void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected)
 {
 	struct timeval tv;
 	struct tm *tm;
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	needed    = needed    > 0 ? needed    : 0;
-	requested = requested > 0 ? requested : 0;
+	int to_connect = submitted - connected;
+
+	needed     = needed     > 0 ? needed    : 0;
+	requested  = requested  > 0 ? requested : 0;
+	to_connect = to_connect > 0 ? to_connect : 0;
 
 	fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
-			"|submitted: %d |needed: %d |requested: %d \n",
+			"|submitted: %d |needed: %d |waiting connection: %d |requested: %d \n",
 			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
-			submitted, needed, requested);
+			submitted, needed, to_connect, requested);
 
 	int master_count = 0;
 	master_count += masters ? list_size(masters) : 0;
@@ -507,6 +510,8 @@ int read_config_file(const char *config_file) {
 		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
 	}
 
+	fprintf(stdout, "\n");
+
 end:
 	jx_delete(J);
 	return !error_found;
@@ -600,7 +605,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
-		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
+		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
 		update_blacklisted_workers(queue, masters_list);
 
