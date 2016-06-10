@@ -140,6 +140,25 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 	return needed_workers;
 }
 
+static int count_workers_connected( struct list *masters_list )
+{
+	int connected_workers=0;
+	struct jx *j;
+
+	if(!masters_list) {
+		return connected_workers;
+	}
+
+	list_first_item(masters_list);
+	while((j=list_next_item(masters_list))) {
+		const int workers = jx_lookup_integer(j,"workers");
+		connected_workers += workers;
+	}
+
+	return connected_workers;
+}
+
+
 static void set_worker_resources_options( struct batch_queue *queue )
 {
 	buffer_t b;
@@ -538,7 +557,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		}
 	
 		debug(D_WQ,"evaluating master list...");
-		int workers_needed = count_workers_needed(masters_list, 0);
+		int workers_needed    = count_workers_needed(masters_list, 0);
+		int workers_connected = count_workers_connected(masters_list);
 
 		debug(D_WQ,"%d total workers needed across %d masters",
 				workers_needed,
@@ -569,6 +589,11 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
 			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
 			new_workers_needed = workers_per_cycle;
+		}
+
+		if(workers_per_cycle > 0 && workers_submitted > new_workers_needed + workers_connected) {
+			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_submitted - workers_connected);
+			new_workers_needed = 0;
 		}
 
 		debug(D_WQ,"workers needed: %d",    workers_needed);
