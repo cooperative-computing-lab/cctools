@@ -19,4 +19,13 @@ If the expression is invalid in some way, an object of type @ref JX_NULL is retu
 */
 struct jx * jx_eval( struct jx *j, struct jx *context );
 
+typedef enum {
+	JX_EVAL_MODE_ERROR,
+	JX_EVAL_MODE_ENV,
+	JX_EVAL_MODE_PARTIAL,
+	JX_EVAL_MODE_DEFAULT
+} jx_eval_mode_t;
+
+struct jx * jx_eval_1( struct jx *j, struct jx *context, jx_eval_mode_t mode, struct jx *default_value );
+
 #endif
