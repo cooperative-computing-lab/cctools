@@ -319,4 +319,7 @@ struct jx *jx_merge(struct jx *j, ...);
 /** Get a human-readable name from an error code. @param code The numeric error code to check. */
 const char *jx_error_name(int code);
 
+/** Check if the given JX object has all the required fields for an error. @param j The object to check. */
+int jx_error_valid(struct jx *j);
+
 #endif

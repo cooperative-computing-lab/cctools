@@ -615,7 +615,6 @@ static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
 static struct jx * jx_parse_unary( struct jx_parser *s )
 {
 	struct jx *j;
-	struct jx *k;
 	jx_function_t f;
 
 	jx_token_t t = jx_scan(s);
@@ -641,13 +640,15 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			}
 			break;
 		case JX_TOKEN_ERROR:
-			if ((j = jx_parse_postfix(s, 0)) &&
-			    jx_istype(j, JX_OBJECT) &&
-			    (k = jx_lookup(j, "source")) &&
-			    jx_istype(k, JX_STRING)) {
-				return jx_error(j);
+			if ((j = jx_parse_postfix(s, 0))) {
+				if (jx_error_valid(j)) {
+					return jx_error(j);
+				} else {
+					jx_parse_error(s, "error is missing a required field");
+					return NULL;
+				}
 			} else {
-				jx_parse_error(s, "invalid Error specification");
+				jx_parse_error(s, "invalid error specification");
 				return NULL;
 			}
 			break;

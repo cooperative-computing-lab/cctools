@@ -130,7 +130,7 @@ struct jx *jx_function( jx_function_t func, struct jx *args ) {
 
 struct jx * jx_error( struct jx *err )
 {
-	if(!jx_lookup_string(err, "source")) return NULL;
+	if(!jx_error_valid(err)) return NULL;
 	struct jx *j = jx_create(JX_ERROR);
 	j->u.err = err;
 	return j;
@@ -627,4 +627,12 @@ const char *jx_error_name(int code) {
 	case 6: return "invalid arguments";
 	default: return "unknown error";
 	}
+}
+
+int jx_error_valid(struct jx *j) {
+	if (!jx_istype(j, JX_OBJECT)) return 0;
+	if (!jx_istype(jx_lookup(j, "source"), JX_STRING)) return 0;
+	if (!jx_istype(jx_lookup(j, "name"), JX_STRING)) return 0;
+	if (!jx_istype(jx_lookup(j, "message"), JX_STRING)) return 0;
+	return 1;
 }
