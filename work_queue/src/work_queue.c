@@ -1648,7 +1648,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	struct work_queue_task *t;
 
-	int task_status, exit_status, disk_alloc;
+	int task_status, exit_status;
 	uint64_t taskid;
 	int64_t output_length, retrieved_output_length;
 	timestamp_t execution_time;
@@ -1661,7 +1661,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid, loop device
 	char items[5][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %s %" SCNd64" %s", items[0], items[1], items[2], items[3], &taskid, items[4]);
+	int n = sscanf(line, "result %s %s %s %s %" SCNd64"", items[0], items[1], items[2], items[3], &taskid);
 
 	if(n < 5) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -1671,7 +1671,6 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	task_status = atoi(items[0]);
 	exit_status   = atoi(items[1]);
 	output_length = atoll(items[2]);
-	disk_alloc = atoi(items[4]);
 
 	t = itable_lookup(w->current_tasks, taskid);
 	if(!t) {
@@ -1695,7 +1694,8 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	t->total_cmd_execution_time += t->cmd_execution_time;
 
-	t->disk_alloc_full = disk_alloc;
+	if(task_status == WORK_QUEUE_RESULT_DISK_ALLOC_FULL) { t->disk_alloc_full = 1; }
+	else { t->disk_alloc_full = 0; }
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
