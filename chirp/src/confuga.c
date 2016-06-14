@@ -19,7 +19,6 @@ See the file COPYING for details.
 #include "auth_all.h"
 #include "compat-at.h"
 #include "buffer.h"
-#include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
 #include "full_io.h"
@@ -147,6 +146,12 @@ static int dbupgrade (confuga *C)
 	sqlite3_stmt *stmt = NULL;
 	int version;
 
+	/* This "alter table" protocol comes from:
+	 *
+	 *   https://www.sqlite.org/lang_altertable.html#otheralter
+	 */
+	sqlcatch(sqlite3_exec(db, "PRAGMA foreign_keys = OFF; BEGIN TRANSACTION;", NULL, NULL, NULL));
+
 	rc = sqlite3_prepare_v2(db, "SELECT value FROM Confuga.State WHERE key = 'db-version';", -1, &stmt, NULL);
 	if (rc) {
 		sqlcatch(sqlite3_prepare_v2(db, "SELECT 1 FROM Confuga.Option;", -1, &stmt, NULL));
@@ -160,13 +165,10 @@ static int dbupgrade (confuga *C)
 	}
 
 	if (version == CONFUGA_DB_VERSION) {
-		rc = 0;
-		goto out;
+		goto done;
 	} else if (version > CONFUGA_DB_VERSION) {
 		fatal("This version of Confuga is too old for this database version (%d)", version);
 	}
-
-	sqlcatch(sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, NULL));
 
 	switch (version) {
 		case 0: {
@@ -186,7 +188,105 @@ static int dbupgrade (confuga *C)
 				;
 
 			debug(D_DEBUG, "upgrading db to v1");
-			sqlcatch(sqlite3_exec(db, SQL, NULL, NULL, NULL));
+			sqlcatchexec(db,SQL);
+			/* fallthrough */
+		}
+		case 1: {
+			static const char SQL[] =
+				"DROP VIEW Confuga.StorageNodeActive;"
+				"DROP VIEW Confuga.StorageNodeAlive;"
+				"DROP TRIGGER Confuga.StorageNode_UpdateTrigger;"
+				"CREATE TABLE Confuga.NewStorageNode ("
+				"	id INTEGER PRIMARY KEY,"
+				"	authenticated INTEGER DEFAULT 0 NOT NULL,"
+				"	hostport TEXT,"
+				"	password BLOB,"
+				"	root TEXT NOT NULL DEFAULT '" CONFUGA_SN_ROOT_DEFAULT "',"
+				"	state TEXT NOT NULL DEFAULT 'BUILDING' REFERENCES StorageNodeState (state),"
+				"	ticket BLOB,"
+				"	time_authenticated DATETIME,"
+				"	time_create DATETIME NOT NULL DEFAULT (strftime('%s', 'now')),"
+				"	time_delete DATETIME,"
+				"	time_lastcontact DATETIME,"
+				"	time_ticket DATETIME,"
+				"	time_update DATETIME NOT NULL DEFAULT (strftime('%s', 'now')),"
+				"	uuid TEXT UNIQUE,"
+				"	address TEXT,"
+				"	avail INTEGER,"
+				"	backend TEXT,"
+				"	bytes_read INTEGER,"
+				"	bytes_written INTEGER,"
+				"	cpu TEXT,"
+				"	cpus INTEGER,"
+				"	lastheardfrom DATETIME,"
+				"	load1 REAL,"
+				"	load5 REAL,"
+				"	load15 REAL,"
+				"	memory_avail TEXT,"
+				"	memory_total TEXT,"
+				"	minfree INTEGER,"
+				"	name TEXT,"
+				"	opsys TEXT,"
+				"	opsysversion TEXT,"
+				"	owner TEXT,"
+				"	port INTEGER,"
+				"	starttime DATETIME,"
+				"	total INTEGER,"
+				"	total_ops INTEGER,"
+				"	url TEXT,"
+				"	version TEXT"
+				");"
+				"INSERT INTO Confuga.NewStorageNode (id, hostport, state, root, ticket, time_create, time_delete, time_update, address, avail, backend, bytes_read, bytes_written, cpu, cpus, lastheardfrom, load1, load5, load15, memory_avail, memory_total, minfree, name, opsys, opsysversion, owner, port, starttime, total, total_ops, url, version)"
+				"       SELECT id, hostport, CASE WHEN initialized THEN 'ONLINE' ELSE 'BUILDING' END, root, ticket, time_create, time_delete, time_update, address, avail, backend, bytes_read, bytes_written, cpu, cpus, lastheardfrom, load1, load5, load15, memory_avail, memory_total, minfree, name, opsys, opsysversion, owner, port, starttime, total, total_ops, url, version FROM Confuga.StorageNode"
+				";"
+				"DROP TABLE Confuga.StorageNode;"
+				"ALTER TABLE Confuga.NewStorageNode RENAME TO StorageNode;"
+				"CREATE TRIGGER Confuga.StorageNode_Trigger1"
+				"	AFTER UPDATE ON StorageNode"
+				"	FOR EACH ROW"
+				"	BEGIN"
+				"		UPDATE StorageNode SET time_update = (strftime('%s', 'now')) WHERE id = NEW.id;"
+				"	END;"
+				"CREATE TRIGGER Confuga.StorageNode_Trigger2"
+				"	AFTER UPDATE OF hostport ON StorageNode"
+				"	FOR EACH ROW"
+				"	WHEN (OLD.hostport != NEW.hostport)"
+				"	BEGIN"
+				"		UPDATE StorageNode SET authenticated = 0 WHERE id = NEW.id;"
+				"	END;"
+				"CREATE TRIGGER Confuga.StorageNode_Trigger3"
+				"	BEFORE UPDATE OF root ON StorageNode"
+				"	FOR EACH ROW"
+				"	BEGIN"
+				"		SELECT RAISE(ABORT, 'cannot update immutable column \"root\" of StorageNode');"
+				"	END;"
+				"CREATE TABLE Confuga.StorageNodeState ("
+				"	state TEXT PRIMARY KEY,"
+				"	active INTEGER NOT NULL"
+				") WITHOUT ROWID;"
+				"INSERT INTO Confuga.StorageNodeState (state, active) VALUES"
+				"	('BUILDING', 0),"
+				"	('FAULTED', 0),"
+				"	('OFFLINE', 0),"
+				"	('ONLINE', 1),"
+				"	('REMOVING', 0)"
+				"	;"
+				"CREATE VIEW Confuga.StorageNodeAlive AS"
+				"	SELECT StorageNode.*"
+				"		FROM StorageNode"
+				"		WHERE uuid IS NOT NULL AND lastheardfrom IS NOT NULL AND strftime('%s', 'now', '-15 minutes') <= lastheardfrom;"
+				"CREATE VIEW Confuga.StorageNodeAuthenticated AS"
+				"	SELECT StorageNodeAlive.*"
+				"		FROM StorageNodeAlive"
+				"		WHERE authenticated AND strftime('%s', 'now', '-15 minutes') < time_authenticated;"
+				"CREATE VIEW Confuga.StorageNodeActive AS"
+				"	SELECT StorageNodeAuthenticated.*"
+				"		FROM StorageNodeAuthenticated JOIN StorageNodeState ON StorageNodeAuthenticated.state = StorageNodeState.state"
+				"		WHERE StorageNodeState.active;"
+				;
+
+			debug(D_DEBUG, "upgrading db to v2");
+			sqlcatchexec(db,SQL);
 			/* fallthrough */
 		}
 		default: {
@@ -194,12 +294,24 @@ static int dbupgrade (confuga *C)
 				"INSERT OR REPLACE INTO Confuga.State (key, value)"
 				"	VALUES ('db-version', " xstr(CONFUGA_DB_VERSION) ");"
 				;
-			sqlcatch(sqlite3_exec(db, SQL, NULL, NULL, NULL));
+			sqlcatchexec(db,SQL);
 			break;
 		}
 	}
 
-	sqlcatch(sqlite3_exec(db, "END TRANSACTION;", NULL, NULL, NULL));
+done:
+	sqlcatch(sqlite3_prepare_v2(db, "PRAGMA Confuga.foreign_key_check;", -1, &stmt, NULL));
+	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+		const char *tblname = (const char *)sqlite3_column_text(stmt, 0);
+		int rowid = sqlite3_column_int64(stmt, 1);
+		const char *ref =(const char *)sqlite3_column_text(stmt, 2);
+		debug(D_DEBUG, "foreign key failure: %s[%d] references table %s", tblname, rowid, ref);
+		CATCH(EIO);
+	}
+	sqlcatchcode(rc, SQLITE_DONE);
+	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
+
+	sqlcatch(sqlite3_exec(db, "END TRANSACTION; PRAGMA foreign_keys=ON;", NULL, NULL, NULL));
 
 	rc = 0;
 	goto out;
@@ -256,15 +368,21 @@ static int dbload (confuga *C)
 		");"
 		"CREATE TABLE Confuga.StorageNode ("
 		"	id INTEGER PRIMARY KEY,"
-		/* Confuga fields (some overlap with catalog_server fields) */
-		"	hostport TEXT UNIQUE NOT NULL,"
-		"	initialized INTEGER NOT NULL DEFAULT 0,"
-		"	root TEXT NOT NULL DEFAULT '/.confuga',"
+		/* Confuga fields (some overlap with Catalog fields) */
+		"	authenticated INTEGER DEFAULT 0 NOT NULL,"
+		"	hostport TEXT,"
+		"	password BLOB,"
+		"	root TEXT NOT NULL DEFAULT '" CONFUGA_SN_ROOT_DEFAULT "',"
+		"	state TEXT NOT NULL DEFAULT 'BUILDING' REFERENCES StorageNodeState (state),"
 		"	ticket BLOB," /* ticket currently used by SN */
+		"	time_authenticated DATETIME,"
 		"	time_create DATETIME NOT NULL DEFAULT (strftime('%s', 'now')),"
 		"	time_delete DATETIME,"
+		"	time_lastcontact DATETIME,"
+		"	time_ticket DATETIME,"
 		"	time_update DATETIME NOT NULL DEFAULT (strftime('%s', 'now')),"
-		/* catalog_server fields */
+		"	uuid TEXT UNIQUE,"
+		/* Catalog fields */
 		"	address TEXT,"
 		"	avail INTEGER,"
 		"	backend TEXT,"
@@ -290,18 +408,49 @@ static int dbload (confuga *C)
 		"	url TEXT,"
 		"	version TEXT"
 		");"
-		"CREATE TRIGGER Confuga.StorageNode_UpdateTrigger AFTER UPDATE ON StorageNode"
+		"CREATE TRIGGER Confuga.StorageNode_Trigger1"
+		"	AFTER UPDATE ON StorageNode"
+		"	FOR EACH ROW"
 		"	BEGIN"
-		"		UPDATE StorageNode SET time_update = datetime('now') WHERE id = NEW.id;"
+		"		UPDATE StorageNode SET time_update = (strftime('%s', 'now')) WHERE id = NEW.id;"
 		"	END;"
+		"CREATE TRIGGER Confuga.StorageNode_Trigger2"
+		"	AFTER UPDATE OF hostport ON StorageNode"
+		"	FOR EACH ROW"
+		"	WHEN (OLD.hostport != NEW.hostport)"
+		"	BEGIN"
+		"		UPDATE StorageNode SET authenticated = 0 WHERE id = NEW.id;"
+		"	END;"
+		"CREATE TRIGGER Confuga.StorageNode_Trigger3"
+		"	BEFORE UPDATE OF root ON StorageNode"
+		"	FOR EACH ROW"
+		"	BEGIN"
+		"		SELECT RAISE(ABORT, 'cannot update immutable column \"root\" of StorageNode');"
+		"	END;"
+		"CREATE TABLE Confuga.StorageNodeState ("
+		"	state TEXT PRIMARY KEY,"
+		"	active INTEGER NOT NULL"
+		") WITHOUT ROWID;"
+		"INSERT INTO Confuga.StorageNodeState (state, active) VALUES"
+		"	('BUILDING', 0),"
+		"	('FAULTED', 0),"
+		"	('OFFLINE', 0),"
+		"	('ONLINE', 1),"
+		"	('REMOVING', 0)"
+		"	;"
+		IMMUTABLE("Confuga.StorageNodeState")
 		"CREATE VIEW Confuga.StorageNodeAlive AS"
-		"	SELECT *"
+		"	SELECT StorageNode.*"
 		"		FROM StorageNode"
-		"		WHERE lastheardfrom IS NOT NULL AND strftime('%s', 'now', '-15 minutes') <= lastheardfrom;"
-		"CREATE VIEW Confuga.StorageNodeActive AS"
-		"	SELECT *"
+		"		WHERE uuid IS NOT NULL AND lastheardfrom IS NOT NULL AND strftime('%s', 'now', '-15 minutes') <= lastheardfrom;"
+		"CREATE VIEW Confuga.StorageNodeAuthenticated AS"
+		"	SELECT StorageNodeAlive.*"
 		"		FROM StorageNodeAlive"
-		"		WHERE initialized != 0;"
+		"		WHERE authenticated AND strftime('%s', 'now', '-15 minutes') < time_authenticated;"
+		"CREATE VIEW Confuga.StorageNodeActive AS"
+		"	SELECT StorageNodeAuthenticated.*"
+		"		FROM StorageNodeAuthenticated JOIN StorageNodeState ON StorageNodeAuthenticated.state = StorageNodeState.state"
+		"		WHERE StorageNodeState.active;"
 		"CREATE VIEW Confuga.FileReplicas AS"
 		"	SELECT * FROM File JOIN Replica ON File.id = Replica.fid;"
 		"CREATE TABLE Confuga.TransferJob ("
@@ -531,7 +680,7 @@ static int parse_uri (confuga *C, const char *uri, int *explicit_auth)
 	char *value = NULL;
 	char *subvalue = NULL;
 
-	if (pattern_match(uri, "confuga://(..-)%?(.*)", &root, &options) >= 0) {
+	if (pattern_match(uri, "^confuga://([^?]+)(.-)$", &root, &options) >= 0) {
 		const char *rest = options;
 		size_t n;
 		CATCH(confugaN_init(C, root));
@@ -586,7 +735,7 @@ static int parse_uri (confuga *C, const char *uri, int *explicit_auth)
 			CATCH(EINVAL);
 		}
 	} else {
-		CATCH(confugaN_init(C, root));
+		CATCH(confugaN_init(C, uri));
 		CATCH(confugaI_dbload(C, NULL));
 	}
 
@@ -675,43 +824,6 @@ out:
 	return rc;
 }
 
-CONFUGA_API int confuga_nodes (confuga *C, const char *nodes)
-{
-	int rc;
-	FILE *file = NULL;
-	char *node = NULL;
-	const char *rest;
-	char *hostname = NULL;
-	char *root = NULL;
-	size_t n;
-
-	if (pattern_match(nodes, "^node:(.*)", &node) >= 0) {
-		/* do nothing */
-	} else if (pattern_match(nodes, "^file:(.*)", &node) >= 0) {
-		file = fopen(node, "r");
-		CATCHUNIX(file ? 0 : -1);
-		CATCHUNIX(copy_stream_to_buffer(file, &node, NULL));
-	} else CATCH(EINVAL);
-
-	rest = node;
-	while (pattern_match(rest, "^[%s,]*chirp://([^/,%s]+)([^,%s]*)()", &hostname, &root, &n) >= 0) {
-		CATCH(confugaS_node_insert(C, hostname, root));
-		rest += n;
-		hostname = realloc(hostname, 0);
-		root = realloc(root, 0);
-	}
-
-	rc = 0;
-	goto out;
-out:
-	if (file)
-		fclose(file);
-	free(node);
-	free(hostname);
-	free(root);
-	return rc;
-}
-
 CONFUGA_API int confuga_concurrency (confuga *C, uint64_t n)
 {
 	debug(D_CONFUGA, "setting concurrency to %" PRIu64, n);
@@ -763,7 +875,6 @@ CONFUGA_API int confuga_daemon (confuga *C)
 	unsigned long delay = 1;
 
 	time_t catalog_sync = 0;
-	time_t node_setup = 0;
 	time_t ticket_generated = 0;
 	time_t gc = 0;
 
@@ -781,11 +892,6 @@ CONFUGA_API int confuga_daemon (confuga *C)
 			catalog_sync = now;
 		}
 
-		if (node_setup+60 <= now) {
-			confugaS_setup(C);
-			node_setup = now;
-		}
-
 		if (gc+120 <= now) {
 			confugaG_fullgc(C);
 			gc = now;
@@ -793,6 +899,7 @@ CONFUGA_API int confuga_daemon (confuga *C)
 
 		confugaJ_schedule(C);
 		confugaR_manager(C);
+		confugaS_manager(C);
 
 		if (prevops == C->operations) {
 			struct timeval tv = {.tv_sec = delay / 1000000, .tv_usec = delay % 1000000};

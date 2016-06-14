@@ -1189,7 +1189,7 @@ static int job_create (confuga *C)
 	static const char SQL[] =
 		"SELECT ConfugaJob.id, ConfugaJob.tag, StorageNode.hostport"
 		"	FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
-		"	WHERE state = 'REPLICATED'"
+		"	WHERE ConfugaJob.state = 'REPLICATED'"
 		"	ORDER BY RANDOM()" /* to ensure no starvation, create may result in a ROLLBACK that aborts this SELECT */
 		"	LIMIT (CASE WHEN ?1 == 0 THEN -1 ELSE MAX(0, (?1 - (SELECT COUNT(*) FROM ConfugaJobExecuting))) END);";
 
@@ -1253,7 +1253,7 @@ static int job_commit (confuga *C)
 	static const char SQL[] =
 		"SELECT ConfugaJob.id, ConfugaJob.tag, StorageNode.hostport, ConfugaJob.cid"
 		"	FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
-		"	WHERE state = 'CREATED';";
+		"	WHERE ConfugaJob.state = 'CREATED';";
 
 	int rc;
 	sqlite3 *db = C->db;
@@ -1485,7 +1485,7 @@ static int job_reap (confuga *C)
 	static const char SQL[] =
 		"SELECT ConfugaJob.id, ConfugaJob.tag, StorageNode.hostport, ConfugaJob.cid"
 		"	FROM ConfugaJob INNER JOIN Confuga.StorageNode ON ConfugaJob.sid = StorageNode.id"
-		"	WHERE state = 'WAITED';";
+		"	WHERE ConfugaJob.state = 'WAITED';";
 
 	int rc;
 	sqlite3 *db = C->db;

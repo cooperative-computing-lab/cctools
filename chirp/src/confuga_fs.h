@@ -39,6 +39,13 @@ struct confuga {
 	uint64_t operations;
 };
 
+struct confuga_host {
+	char hostport[256+8]; /* Maximum length of FQDN is 255 octets per RFC, +8 for port */
+	char root[CONFUGA_PATH_MAX];
+};
+
+#define CONFUGA_SN_ROOT_DEFAULT "/.confuga"
+
 #define CONFUGA_TICKET_BITS 1024
 #define _stringify(D) #D
 #define stringify(D) _stringify(D)
@@ -70,12 +77,12 @@ CONFUGA_IAPI int confugaR_manager (confuga *C);
 
 CONFUGA_IAPI int confugaS_catalog (confuga *C, const char *catalog);
 CONFUGA_IAPI int confugaS_catalog_sync (confuga *C);
-CONFUGA_IAPI int confugaS_setup (confuga *C);
+CONFUGA_IAPI int confugaS_manager (confuga *C);
 CONFUGA_IAPI int confugaS_node_insert (confuga *C, const char *hostport, const char *root);
 
 CONFUGA_IAPI int confugaJ_schedule (confuga *C);
 
-#define CONFUGA_DB_VERSION  1
+#define CONFUGA_DB_VERSION  2
 
 #define str(s) #s
 #define xstr(s) str(s)
