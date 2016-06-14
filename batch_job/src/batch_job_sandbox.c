@@ -29,7 +29,7 @@ Eventually, this module will supersede "local" as the default.
 
 static struct itable * sandbox_table = 0;
 
-static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
+static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
 
