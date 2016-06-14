@@ -309,7 +309,7 @@ sub parse_contig_dirs {
 	open my $output_db, '<', "$base_name.maker.output/$base_name\_master_datastore_index.log" or die "Could not open $base_name\_master_datastore_index.log $!\n";
 	while (my $line = <$output_db>) {
 		print $line;
-		if( (my $contig, my $location) = $line =~ m/^(\w*)\s*(.*)\s*STARTED/ ) {
+		if( (my $contig, my $location) = $line =~ m/^(\w*)\s*(.*)\/.*\/\s*STARTED/ ) {
 			print "Contig found : $contig at $location \n";
 			$output_dirs->{$contig} = $location;
 		}
@@ -346,8 +346,8 @@ sub submit_task {
 	my $contigs = $input_to_contigs->{$genome_chunk};
 	foreach my $contig (@$contigs) {
 		my $location = $output_dirs->{$contig};
-		work_queue::work_queue_task_specify_file($task, $base_name.".maker.output/$location", $base_name.".maker.output", 1, 1); 
-		work_queue::work_queue_task_specify_file($task, $base_name.".maker.output/$location/$contig.run.log", $base_name.".maker.output/$location/run.log", 1, 1); 
+		work_queue::work_queue_task_specify_file($task, "$base_name.maker.output/$location", "$base_name.maker.output/$location", 1, 1); 
+#		work_queue::work_queue_task_specify_file($task, $base_name.".maker.output/$location/$contig.run.log", $base_name.".maker.output/$location/run.log", 1, 1); 
 	}
 
 	work_queue::work_queue_task_specify_cores($task, 4);
