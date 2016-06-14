@@ -140,6 +140,25 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 	return needed_workers;
 }
 
+static int count_workers_connected( struct list *masters_list )
+{
+	int connected_workers=0;
+	struct jx *j;
+
+	if(!masters_list) {
+		return connected_workers;
+	}
+
+	list_first_item(masters_list);
+	while((j=list_next_item(masters_list))) {
+		const int workers = jx_lookup_integer(j,"workers");
+		connected_workers += workers;
+	}
+
+	return connected_workers;
+}
+
+
 static void set_worker_resources_options( struct batch_queue *queue )
 {
 	buffer_t b;
@@ -265,20 +284,23 @@ static struct jx_table queue_headers[] = {
 {NULL,NULL,0,0,0}
 };
 
-void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested)
+void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected)
 {
 	struct timeval tv;
 	struct tm *tm;
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	needed    = needed    > 0 ? needed    : 0;
-	requested = requested > 0 ? requested : 0;
+	int to_connect = submitted - connected;
+
+	needed     = needed     > 0 ? needed    : 0;
+	requested  = requested  > 0 ? requested : 0;
+	to_connect = to_connect > 0 ? to_connect : 0;
 
 	fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
-			"|submitted: %d |needed: %d |requested: %d \n",
+			"|submitted: %d |needed: %d |waiting connection: %d |requested: %d \n",
 			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
-			submitted, needed, requested);
+			submitted, needed, to_connect, requested);
 
 	int master_count = 0;
 	master_count += masters ? list_size(masters) : 0;
@@ -488,6 +510,8 @@ int read_config_file(const char *config_file) {
 		fprintf(stdout, "worker-extra-options: %s", extra_worker_args);
 	}
 
+	fprintf(stdout, "\n");
+
 end:
 	jx_delete(J);
 	return !error_found;
@@ -538,7 +562,8 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		}
 	
 		debug(D_WQ,"evaluating master list...");
-		int workers_needed = count_workers_needed(masters_list, 0);
+		int workers_needed    = count_workers_needed(masters_list, 0);
+		int workers_connected = count_workers_connected(masters_list);
 
 		debug(D_WQ,"%d total workers needed across %d masters",
 				workers_needed,
@@ -571,11 +596,16 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 			new_workers_needed = workers_per_cycle;
 		}
 
+		if(workers_per_cycle > 0 && workers_submitted > new_workers_needed + workers_connected) {
+			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_submitted - workers_connected);
+			new_workers_needed = 0;
+		}
+
 		debug(D_WQ,"workers needed: %d",    workers_needed);
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
-		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed);
+		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
 		update_blacklisted_workers(queue, masters_list);
 
