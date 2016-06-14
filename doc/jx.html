@@ -1,0 +1,493 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
+<title>JX: JSON + Expressions</title>
+<style type="text/css">
+.command {
+    margin: 10px;
+    border: 1px solid black;
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<div id="manual">
+<h1 id="jx">JX (JSON + Expressions)<a class="sectionlink" href="#jx" title="Link to this section.">&#x21d7;</a></h1>
+
+<p style="text-align: right;"><b>Last edited: 14 June 2016</b></p>
+
+<p>JX is a superset of JSON with additional syntax for dynamically generating data. The use case in mind when designing JX was writing job descriptions for a workflow manager accepting JSON input. For workflows with a large number of rules with similar structure, it is sometimes necessary to write a script in another language like Python to generate the JSON output. It would be desirable to have a special-purpose language that can dynamically generate rules while still bearing a resemblance to JSON, and more importantly, still being readable. JX is much lighter than a full-featured language like Python or JavaScript, and is suited to embedding in other systems like a workflow manager.</p>
+
+<p>Standard JSON syntax is supported, with two important additions: operators and functions. Operators include the usual arithmetic, comparison, and logical operators (e.g. +, &lt;=, &amp;&amp;) and are useful for simple computations. Note that JX is less forgiving than JavaScript with respect to type; values will <em>not</em> be coerced. JX syntax is styled after JavaScript, but does not strictly adhere to JS. While JX can often be interpreted as valid JS, the result is not necessarily the same between the two. This is especially apparent with the type coercions that JS performs. For all operators and functions, invalid invocation (wrong number of arguments, wrong arguments types, etc.) will return an error. The main exception is that integers will be promoted to doubles as needed. Thus JX is a superset of JSON, and (with care) mostly a subset of JS.</p>
+
+<pre><code>"123" + 4
+=&gt; Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","operator":"123"+4,"code":2}
+
+"123" + "4"
+=&gt; "1234"
+
+123 + 4
+=&gt; 127
+</code></pre>
+
+<p>JX supports the same basic types as JSON</p>
+
+<ul>
+<li>Null</li>
+<li>Boolean</li>
+<li>Integer</li>
+<li>Double</li>
+<li>String</li>
+<li>Object</li>
+<li>Array</li>
+</ul>
+
+<p>Note that unlike JSON, JX makes a distinction between integer and floating point values. Unevaluated JX may also contain</p>
+
+<ul>
+<li>Symbol</li>
+<li>Function</li>
+<li>Operator</li>
+<li>Error</li>
+</ul>
+
+<p>but evaluation will produce the plain JSON types above, assuming the evaluation succeeded. If an error occurs, evaluation stops and an error is returned to the caller. Error objects can include additional information indicating where the failure occurred and what the cause was. Details on the syntax and usage of Errors is given in a following section. If a non-error type is returned, then evaluation succeeded and the result contains only plain JSON types. JX expressions are evaluated in a <em>context</em>, which is an object mapping names to arbitrary JX values. On evaluating a symbol, the symbol's name is looked up in the current context. If found, the value from the context is substituted in place of the symbol. If the symbol is not found in the context, an error is returned.</p>
+
+<p>Functions allow for more advanced manipulations on the data. The details of required arguments, return type, side effects, etc. vary, but in general,</p>
+
+<ul>
+<li>functions are designed for generating/expanding data. This means no I/O access on the host, and (mostly) no side effects.</li>
+<li>the set of built in functions is fairly minimal.</li>
+<li>functions are strict about the types of their arguments, as are operators.</li>
+<li>evaluating a JX expression must have a finite time bound. This means no while loops and no lambda.</li>
+</ul>
+
+<p>In this example, foreach, range, and str are used to generate a list of filenames.</p>
+
+<pre><code>foreach(x, range(4), "input" + str(x) + ".dat")
+=&gt; ["input0.dat", "input1.dat", "input2.dat", "input3.dat"]
+</code></pre>
+
+<p>Functions may be nested or composed as needed, and will produce plain JSON when evaluated. Functions do not need to be given at the top level, and may be used to generate object keys, array elements, operands to JX operators, etc. The following sections give detailed descriptions of the currently supported operators and functions. </p>
+
+<h2 id="unary">Unary Operators<a class="sectionlink" href="#unary" title="Link to this section.">&#x21d7;</a></h2>
+
+<h3 id="complement">Logical Complement<a class="sectionlink" href="#complement" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>!Boolean -&gt; Boolean
+</code></pre>
+</blockquote>
+
+<p>Computes the logical NOT of the given boolean. Unlike C, integers may <em>not</em> be used as truth values.</p>
+
+<h3 id="negation">Negation<a class="sectionlink" href="#negation" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>-A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double</p>
+</blockquote>
+
+<p>Computes the additive inverse of its operand.</p>
+
+<h3 id="positive_prefix">Positive Prefix<a class="sectionlink" href="#positive_prefix" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>+A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double|String</p>
+</blockquote>
+
+<p>Returns its operand unmodified.</p>
+
+<h2 id="binary">Binary Operators<a class="sectionlink" href="#binary" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>For complicated expressions, parentheses may be used as grouping symbols. In the absence of parentheses, operators are evaluated left to right in order of precedence. From highest to lowest precedence,</p>
+
+<ul>
+<li>lookup</li>
+<li>*, %, /</li>
+<li>+, -</li>
+<li>==, !=, &lt;, &lt;=, &gt;, &gt;=</li>
+<li>||</li>
+<li>&amp;&amp;</li>
+</ul>
+
+<h3 id="lookup">Lookup<a class="sectionlink" href="#lookup" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A[B] -&gt; C
+</code></pre>
+
+<p>where A,B = Array,Integer or A,B = Object,String</p>
+</blockquote>
+
+<p>Gets the item at the given index/key in a collection type. If the key/index is not present, returns null.</p>
+
+<h3 id="addition">Addition<a class="sectionlink" href="#addition" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A + A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double|String|Array</p>
+</blockquote>
+
+<p>The behaviour of the addition operator depends on the type of its operands.</p>
+
+<ul>
+<li>Integer, Double: sum</li>
+<li>String, Array: concatenation</li>
+</ul>
+
+<h3 id="subtraction">Subtraction<a class="sectionlink" href="#subtraction" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A - A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double</p>
+</blockquote>
+
+<p>Computes the difference of its operands.</p>
+
+<h3 id="multiplication">Multiplication<a class="sectionlink" href="#multiplication" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A * A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double</p>
+</blockquote>
+
+<p>Computes the product of its operands.</p>
+
+<h3 id="division">Division<a class="sectionlink" href="#division" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A / A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double</p>
+</blockquote>
+
+<p>Computes the quotient of its operands.
+Division by zero is an error.</p>
+
+<h3 id="modulo">Modulo<a class="sectionlink" href="#modulo" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A % A -&gt; A
+</code></pre>
+
+<p>where A = Integer|Double</p>
+</blockquote>
+
+<p>Computes the modulus of its operands.
+Division by zero is an error.</p>
+
+<h3 id="conjunction">Conjunction<a class="sectionlink" href="#conjunction" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A &amp;&amp; A -&gt; A
+</code></pre>
+
+<p>where A = Boolean|Integer</p>
+</blockquote>
+
+<p>The behaviour of the conjunction operator depends on the type of its operands.</p>
+
+<ul>
+<li>Boolean: logical AND</li>
+<li>Integer: bitwise AND</li>
+</ul>
+
+<h3 id="disjunction">Disjunction<a class="sectionlink" href="#disjunction" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>Boolean || Boolean -&gt; Boolean
+</code></pre>
+
+<p>where A = Boolean|Integer</p>
+</blockquote>
+
+<p>The behaviour of the disjunction operator depends on the type of its operands.</p>
+
+<ul>
+<li>Boolean: logical OR</li>
+<li>Integer: bitwise OR</li>
+</ul>
+
+<h3 id="equality">Equality<a class="sectionlink" href="#equality" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A == B -&gt; Boolean
+</code></pre>
+
+<p>where A,B = Null|Boolean|Integer|Double|String|Array</p>
+</blockquote>
+
+<p>Returns true iff its operands have the same value. All instances of null are considered to be equal. For arrays and objects, equality is checked recursively. Note that if x and y are of incompatible types, x == y returns false.</p>
+
+<h3 id="inequality">Inequality<a class="sectionlink" href="#inequality" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A != B -&gt; Boolean
+</code></pre>
+
+<p>where A,B = Null|Boolean|Integer|Double|String|Array</p>
+</blockquote>
+
+<p>Returns true iff its operands have different values. All instances of null are considered to be equal. For arrays and objects, equality is checked recursively. Note that if x and y are of incompatible types, x != y returns true.</p>
+
+<h3 id="lt">Less than<a class="sectionlink" href="#lt" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A &lt; A -&gt; Boolean
+</code></pre>
+
+<p>where A = Integer|Double|String</p>
+</blockquote>
+
+<p>The behaviour of the less than operator depends on the type of its arguments.</p>
+
+<ul>
+<li>Integer, Double: compares its operands numerically</li>
+<li>String: compares its operands in lexicographical order (as given by strcmp(3))</li>
+</ul>
+
+<h3 id="le">Less than or equal to<a class="sectionlink" href="#le" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A &lt;= A -&gt; Boolean
+</code></pre>
+
+<p>where A = Integer|Double|String</p>
+</blockquote>
+
+<p>The behaviour of the less than or equal to  operator depends on the type of its arguments.</p>
+
+<ul>
+<li>Integer, Double: compares its operands numerically</li>
+<li>String: compares its operands in lexicographical order (as given by strcmp(3))</li>
+</ul>
+
+<h3 id="gt">Greater than<a class="sectionlink" href="#gt" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A &gt; A -&gt; Boolean
+</code></pre>
+
+<p>where A = Integer|Double|String</p>
+</blockquote>
+
+<p>The behaviour of the greater than operator depends on the type of its arguments.</p>
+
+<ul>
+<li>Integer, Double: compares its operands numerically</li>
+<li>String: compares its operands in lexicographical order (as given by strcmp(3))</li>
+</ul>
+
+<h3 id="ge">Greater than or equal to<a class="sectionlink" href="#ge" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>A &gt;= A -&gt; Boolean
+</code></pre>
+
+<p>where A = Integer|Double|String and B = Boolean</p>
+</blockquote>
+
+<p>The behaviour of the greater than or equal to operator depends on the type of its arguments.</p>
+
+<ul>
+<li>Integer, Double: compares its operands numerically</li>
+<li>String: compares its operands in lexicographical order (as given by strcmp(3))</li>
+</ul>
+
+<h2 id="functions">Functions<a class="sectionlink" href="#functions" title="Link to this section.">&#x21d7;</a></h2>
+
+<h3>str</h3>
+
+<blockquote>
+<pre><code>str(A) -&gt; String
+</code></pre>
+</blockquote>
+
+<p>Returns a string representation of the given value.</p>
+
+<h3 id="range">range<a class="sectionlink" href="#range" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>range(A) -&gt; Array
+range(A, A[, A]) -&gt; Array
+</code></pre>
+
+<p>where A = Integer</p>
+</blockquote>
+
+<p>Returns an array of integers ranging over the given values. This function is a reimplementation of <a href="https://docs.python.org/2/library/functions.html#range">Python's range function</a>. range has two forms,</p>
+
+<pre><code>range(stop)
+range(start, stop[, step])
+</code></pre>
+
+<p>The first form returns an array of integers from zero to stop (exclusive).</p>
+
+<pre><code>range(10)
+=&gt; [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+</code></pre>
+
+<p>The second form returns an array of integers ranging from start (inclusive) to stop (exclusive).</p>
+
+<pre><code>range(3, 7)
+=&gt; [3, 4, 5, 6]
+
+range(7, 3)
+=&gt; []
+</code></pre>
+
+<p>The second form also allows an optional third parameter, step. If not given, step defaults to one.</p>
+
+<pre><code>range(-1, 10, 2)
+=&gt; [-1,1,3,5,7,9]
+
+range(5,0,-1)
+=&gt; [5, 4, 3, 2, 1]
+</code></pre>
+
+<p>Calling with step = 0 is an error.</p>
+
+<h3 id="foreach">foreach<a class="sectionlink" href="#foreach" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>foreach(Symbol, A, B) -&gt; C
+</code></pre>
+
+<p>where and A = [_] and C = [B]</p>
+</blockquote>
+
+<p>foreach provides similar functionality to the map function in other languages, but has reduced semantics to limit recursion. foreach requires three arguments.</p>
+
+<pre><code>foreach(var, items, body)
+</code></pre>
+
+<ul>
+<li>var: a Symbol to be used as the iteration variable</li>
+<li>items: an Array</li>
+<li>body: an arbitrary expression, probably containing var</li>
+</ul>
+
+<p>Evaluating foreach results in an Array of the same length as items, or null on invalid arguments. We bind var to each value in items in turn, and evaluate body with this extra binding.</p>
+
+<pre><code>foreach(x, range(4), x * 2)
+=&gt; [0, 2, 4, 6]
+
+foreach(x, [-1, 2.2, "foo"], str(x))
+=&gt; ["-1", "2.2", "foo"]
+</code></pre>
+
+<h3 id="join">join<a class="sectionlink" href="#join" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>join(A[, B]) -&gt; String
+</code></pre>
+
+<p>where A = [String] and B = String</p>
+</blockquote>
+
+<p>Takes an array of strings, and concatenates them into a single string. If the optional second argument is given, it is used as the separator, or " " otherwise.</p>
+
+<pre><code>join(["1", "2", "3"])
+=&gt; "1 2 3"
+
+join(["a", "b", "c"], ", ")
+=&gt; "a, b, c"
+</code></pre>
+
+<h3 id="dbg">dbg<a class="sectionlink" href="#dbg" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>dbg(A) -&gt; A
+</code></pre>
+</blockquote>
+
+<p>This function simply returns its argument. As a side effect, it prints its argument before and after evaluation to stderr. This function might be useful to debug evaluation issues, as it lets you see the evaluation of arbitrary parts of an expression.</p>
+
+<pre><code>join(foreach(x, range(5), x))
+=&gt; Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","func":join(foreach(x,range(5),x)),"code":6}
+
+join(dbg(foreach(x, range(5), x)))
++ dbg  in: foreach(x,range(5),x)
++ dbg out: [0,1,2,3,4]
+</code></pre>
+
+<p>Recalling that join takes an array of Strings, not Integers, we should use</p>
+
+<pre><code>join(dbg(foreach(x, range(5), str(x))))
++ dbg  in: foreach(x,range(5),str(x))
++ dbg out: ["0","1","2","3","4"]
+=&gt; "0 1 2 3 4"
+</code></pre>
+
+<h2 id="errors">Errors<a class="sectionlink" href="#errors" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>JX has a special type, Error, to indicate some kind of failure or exceptional condition. If a function or operator is misapplied, jx_eval will return an error indicating the cause of the failure. While errors are valid JX, they are special in that they have no JSON equivalent. Furthermore, errors do not evaluate in the same way as other types. The additional information in an error is protected from evaluation, so calling jx_eval on an Error simply returns a copy. It is therefore safe to directly include the invalid function/operator in the body of an error. If a function or operator encounters an error as an argument, evaluation is aborted and the Error is returned as the result of evaluation. Thus if an error occurs deeply nested within a structure, the error will be passed up as the result of the entire evaluation. Errors are defined using the keyword Error followed by a body enclosed in curly braces.</p>
+
+<pre><code>Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
+</code></pre>
+
+<p>All errors <em>MUST</em> include some special keys with string values.</p>
+
+<ul>
+<li>"source": indicates where the error comes from, and the structure of the additional data.</li>
+<li>"name": the general category of the error, e.g. "syntax error" or "timed out"</li>
+<li>"message": some human-readable details about the conditions of the error.</li>
+</ul>
+
+<p>Errors from "jx_eval" have some additional keys, described below, to aid in debugging. Other sources are free to use any structure for their additional error data.</p>
+
+<h3 id="jx_errors">JX Errors<a class="sectionlink" href="#jx_errors" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>Errors produced during evaluation of a JX structure all include some common keys.</p>
+
+<ul>
+<li>"source": "jx_eval"</li>
+<li>"code": A numeric identifier for the type of error.</li>
+</ul>
+
+<p>The following codes and names are used by jx_eval.</p>
+
+<ul>
+<li>0: "undefined symbol"
+The given symbol was not present in the evaluation context. This error includes two additional keys:
+<ul><li>"symbol": the symbol name being looked up</li>
+<li>"context": the evaluation context</li></ul></li>
+<li>1: "unsupported operator"
+The operator cannot be applied to the type given. This error also includes an "operator" key containing the operator that caused the error, as well as its operands.</li>
+<li>2: "mismatched types"
+The binary operator can only be applied to operands of the same type. This error also includes an "operator" key containing the operator that caused the error, as well as its operands.</li>
+<li>3: "key not found"
+Object lookup failed because the given object does not contain the requested key. This error also includes two additional keys:
+<ul><li>"key"</li>
+<li>"object"</li></ul></li>
+<li>4: "range error"
+Array lookup failed because the requested index is outside the given array's bounds. This error also includes two additional keys:
+<ul><li>"index"</li>
+<li>"array"</li></ul></li>
+<li>5: "arithmetic error"
+The the operands are outside the given arithmetic operator's range. This error also includes an "operator" key containing the operator that caused the error, as well as its operands.</li>
+<li>6: "invalid arguments"
+The function arguments are not valid for the given function. This error also includes a "function" key containing the function that caused the error, as well as its arguments.</li>
+</ul>
+
+</div>
+</body>
+</html>
