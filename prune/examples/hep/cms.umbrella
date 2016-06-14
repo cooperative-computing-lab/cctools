@@ -1,0 +1,48 @@
+{
+	"comment": "a CMS application whose software dependencies are all from CVMFS, and whose data dependencies are not from CVMFS.",
+	"hardware": {
+		"cores": "2",
+		"disk": "3GB",
+		"arch": "x86_64",
+		"memory": "2GB"
+	},
+	"kernel": {
+		"version": ">=2.6.32",
+		"name": "linux"
+	},
+	"os": {
+		"name": "Redhat",
+		"format": "tgz",
+		"checksum": "669ab5ef94af84d273f8f92a86b7907a",
+		"source": [
+			"http://ccl.cse.nd.edu/research/data/hep-case-study/669ab5ef94af84d273f8f92a86b7907a/redhat-6.5-x86_64.tar.gz"
+		],
+		"version": "6.5",
+		"uncompressed_size": "1743656960",
+		"id": "669ab5ef94af84d273f8f92a86b7907a",
+		"size": "633848940"
+	},
+	"software": {
+		"cmssw-5.2.5-slc5-amd64": {
+			"mountpoint": "/cvmfs/cms.cern.ch",
+			"mount_env": "CMS_DIR",
+			"id": "cvmfs://cvmfs/cms.cern.ch",
+			"source": [
+				"cvmfs://cvmfs/cms.cern.ch"
+			]
+		}
+	},
+	"data": {
+	},
+	"environ": {
+		"PWD": "/tmp",
+		"CMS_VERSION": "CMSSW_5_2_5",
+		"SCRAM_ARCH": "slc5_amd64_gcc462"
+	},
+	"output": {
+		"files": [],
+		"dirs": [
+			"/tmp/final_data"
+		]
+	}
+}
