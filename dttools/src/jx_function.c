@@ -48,8 +48,6 @@ struct jx *jx_function_dbg(struct jx_function *f, struct jx *context, jx_eval_mo
 		struct jx *err = jx_object(NULL);
 		int code = 6;
 		jx_insert_integer(err, "code", code);
-		jx_insert_integer(err, "line", __LINE__);
-		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "only one argument is allowed");
 		jx_insert_string(err, "name", jx_error_name(code));
@@ -82,8 +80,6 @@ struct jx *jx_function_str(struct jx_function *f, struct jx *context, jx_eval_mo
 		code = 6;
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
-		jx_insert_integer(err, "line", __LINE__);
-		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "at most one argument is allowed");
 		jx_insert_string(err, "name", jx_error_name(code));
@@ -119,8 +115,6 @@ struct jx *jx_function_foreach(struct jx_function *f, struct jx *context, jx_eva
 		code = 6;
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
-		jx_insert_integer(err, "line", __LINE__);
-		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "name", jx_error_name(code));
@@ -142,8 +136,6 @@ struct jx *jx_function_foreach(struct jx_function *f, struct jx *context, jx_eva
 			code = 6;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert_integer(err, "line", __LINE__);
-			jx_insert_string(err, "file", __FILE__);
 			jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 			jx_insert_string(err, "message", "second argument must evaluate to an array");
 			jx_insert_string(err, "name", jx_error_name(code));
@@ -200,8 +192,6 @@ struct jx *jx_function_range(struct jx_function *f, struct jx *context, jx_eval_
 		code = 6;
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
-		jx_insert_integer(err, "line", __LINE__);
-		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "name", jx_error_name(code));
@@ -214,8 +204,6 @@ struct jx *jx_function_range(struct jx_function *f, struct jx *context, jx_eval_
 		code = 6;
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
-		jx_insert_integer(err, "line", __LINE__);
-		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "step must be nonzero");
 		jx_insert_string(err, "name", jx_error_name(code));
@@ -259,8 +247,6 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context, jx_eval_m
 		code = 6;
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
-		jx_insert_integer(err, "line", __LINE__);
-		jx_insert_string(err, "file", __FILE__);
 		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "name", jx_error_name(code));
@@ -279,8 +265,6 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context, jx_eval_m
 			code = 6;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert_integer(err, "line", __LINE__);
-			jx_insert_string(err, "file", __FILE__);
 			jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
 			jx_insert_string(err, "message", "joined items must be strings");
 			jx_insert_string(err, "name", jx_error_name(code));
