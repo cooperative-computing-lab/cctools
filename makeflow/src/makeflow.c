@@ -873,7 +873,7 @@ static void makeflow_run( struct dag *d )
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
-					makeflow_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, local_queue, &info);
 			}
 		}
 

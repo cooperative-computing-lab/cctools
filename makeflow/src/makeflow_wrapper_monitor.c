@@ -4,6 +4,7 @@
  * See the file COPYING for details.
  * */
 
+#include "create_dir.h"
 #include "debug.h"
 #include "path.h"
 #include "rmonitor.h"
@@ -51,6 +52,8 @@ void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, struct batch_q
 	} else {
 		m->exe_remote = NULL;
 	}
+
+	create_dir(log_dir, 0777);
 
 	m->log_prefix = string_format("%s/%s", log_dir, log_format);
 	char *log_name;
@@ -126,4 +129,56 @@ char *makeflow_wrap_monitor( char *result, struct dag_node *n, struct makeflow_m
 	free(monitor_command);
 
 	return result;
+}
+
+int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m)
+{
+	if(!batch_queue_supports_feature(queue, "output_directories")) {
+
+		char *nodeid = string_format("%d",n->nodeid);
+		char *log_prefix = string_replace_percents(m->log_prefix, nodeid);
+
+
+		char *output_prefix = xxstrdup(path_basename(log_prefix));
+
+		if(!strcmp(log_prefix, output_prefix)) // They are in the same location so no move
+			return 0;
+
+		char *old_path = string_format("%s.summary", output_prefix);
+		char *new_path = string_format("%s.summary", log_prefix);
+		if(rename(old_path, new_path)){
+			printf("Failed to move %s -> %s", old_path, new_path);
+			return 1;
+		}
+		free(old_path);
+		free(new_path);
+	
+		if(m->enable_time_series)
+		{
+			char *old_path = string_format("%s.series", output_prefix);
+			char *new_path = string_format("%s.series", log_prefix);
+			if(rename(old_path, new_path)){
+				printf("Failed to move %s -> %s", old_path, new_path);
+				return 1;
+			}
+			free(old_path);
+			free(new_path);
+		}
+	
+		if(m->enable_list_files)
+		{
+			char *old_path = string_format("%s.files", output_prefix);
+			char *new_path = string_format("%s.files", log_prefix);
+			if(rename(old_path, new_path)){
+				printf("Failed to move %s -> %s", old_path, new_path);
+				return 1;
+			}
+			free(old_path);
+			free(new_path);
+		}
+	
+		free(log_prefix);
+		free(output_prefix);
+	}	
+	return 0;
 }
