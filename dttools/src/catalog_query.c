@@ -183,7 +183,7 @@ struct jx *catalog_query_read(struct catalog_query *q, time_t stoptime)
 		if(q->filter_expr) {
 			struct jx * b;
 			b = jx_eval(q->filter_expr,q->current->value);
-			if(b && b->type && b->u.boolean_value) {
+			if(jx_istype(b, JX_BOOLEAN) && b->u.boolean_value) {
 				keepit = 1;
 			} else {
 				keepit = 0;
