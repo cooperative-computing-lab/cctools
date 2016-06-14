@@ -13,8 +13,6 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 
-#define MAKEFLOW_DEFAULT_FILE_SIZE 1024*1024*1024 // Default size of 1GB
-
 struct dag_file * dag_file_create( const char *filename )
 {
 	struct dag_file *f = malloc(sizeof(*f));

@@ -68,7 +68,6 @@ struct dag_node_footprint *dag_node_footprint_create()
 	struct dag_node_footprint *f;
 
 	f = malloc(sizeof(struct dag_node_footprint));
-	memset(f, 0, sizeof(struct dag_node_footprint));
 
 	f->direct_children = set_create(0);
 	f->accounted = set_create(0);
