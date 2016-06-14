@@ -518,6 +518,7 @@ struct jx *jx_merge(struct jx *j, ...) {
 
 int jx_pair_is_constant( struct jx_pair *p )
 {
+	if(!p) return 1;
 	return jx_is_constant(p->key)
 		&& jx_is_constant(p->value)
 		&& jx_pair_is_constant(p->next);
@@ -525,11 +526,13 @@ int jx_pair_is_constant( struct jx_pair *p )
 
 int jx_item_is_constant( struct jx_item *i )
 {
+	if(!i) return 1;
 	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 
 int jx_is_constant( struct jx *j )
 {
+	if(!j) return 0;
 	switch(j->type) {
 		case JX_SYMBOL:
 			return 0;
