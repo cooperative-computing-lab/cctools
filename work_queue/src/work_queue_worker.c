@@ -621,11 +621,12 @@ static int handle_tasks(struct link *master)
 			} else {
 				p->exit_status = WEXITSTATUS(status);
 				FILE *loop_full_check;
-				if(p->loop_mount == 1 && (loop_full_check = fopen("./cctools_disk_alloc_report.log", "r"))) {
+				char *disk_alloc_filename = work_queue_generate_disk_alloc_full_filename(p->task->taskid);
+				if(p->loop_mount == 1 && (loop_full_check = fopen(disk_alloc_filename, "r"))) {
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
 					p->task->disk_alloc_full = 1;
 					fclose(loop_full_check);
-					unlink("./cctools_disk_alloc_report.log");
+					unlink(disk_alloc_filename);
 				}
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 			}

@@ -16,8 +16,20 @@
 #include <inttypes.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+
+char *strconcat(char *s1, char *s2)
+{
+    char *result = malloc(strlen(s1)+strlen(s2)+1);
+	if(!result) {
+		return "";
+	}
+    strcpy(result, s1);
+    strcat(result, s2);
+    return result;
+}
 
 int open(const char *path, int flags, ...)
 {
@@ -36,6 +48,21 @@ int open(const char *path, int flags, ...)
 	fd = original_open(path, flags, mode);
 
 	if(fd == -1 && errno == ENOSPC) {
+		int err_fd;
+		char *filename;
+		char *parent = "../";
+		char *env_name = getenv("CCTOOLS_DISK_ALLOC");
+		unsetenv("CCTOOLS_DISK_ALLOC");
+		filename = strconcat(parent, env_name);
+		if(strlen(filename) == 0) {
+			fprintf(stderr, "OPEN ERROR: could not generate filename for alerting Work Queue of loop device inode exhaustion.\n");
+			fprintf(stderr, "OPEN ERROR: inode capacity reached.\n");
+			free(filename);
+			return fd;
+		}
+		err_fd = open(filename, O_RDWR | O_CREAT);
+		free(filename);
+		if(err_fd < 0) { fprintf(stderr, "OPEN ERROR: could not alert Work Queue of loop device inode exhaustion.\n"); }
 		fprintf(stderr, "OPEN ERROR: inode capacity reached.\n");
 		return fd;
 	}
@@ -58,8 +85,20 @@ ssize_t write(int fd, const void *buf, size_t count) {
 
 	if(real_count < 0 && errno == ENOSPC) {
 		int fd;
-		fd = open("../cctools_disk_alloc_report.log", O_RDWR | O_CREAT);
-		if(fd < 0) { original_write(STDERR_FILENO, "WRITE ERROR: could not alert Work Queue of full loop device.\n", 61); }
+		char *filename;
+		char *parent = "../";
+		char *env_name = getenv("CCTOOLS_DISK_ALLOC");
+		unsetenv("CCTOOLS_DISK_ALLOC");
+		filename = strconcat(parent, env_name);
+		if(strlen(filename) == 0) {
+			original_write(STDERR_FILENO, "WRITE ERROR: could not generate filename for alerting Work Queue that loop device is full.\n", 91);
+			original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+			free(filename);
+			return real_count;
+		}
+		fd = open(filename, O_RDWR | O_CREAT);
+		free(filename);
+		if(fd < 0) { original_write(STDERR_FILENO, "WRITE ERROR: could not alert Work Queue of full loop device.\n", 61); }	
 		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
 		return real_count;
 	}

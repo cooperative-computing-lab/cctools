@@ -917,6 +917,12 @@ int work_queue_task_specify_output_file(struct work_queue_task *t, const char *r
 */
 int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
 
+/** Generate a worker-level unique filename to indicate a disk allocation being full.
+ @param p The process for which we generate a unique disk allocation filename.
+ @return The string corresponding to the filename.
+*/
+char *work_queue_generate_disk_alloc_full_filename(int taskid);
+
 //@}
 
 #endif
