@@ -201,6 +201,9 @@ const char * jx_lookup_string( struct jx *object, const char *key );
 /** Search for an integer item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The integer value of the matching object, or zero if it is not found, or is not an integer. */
 jx_int_t jx_lookup_integer( struct jx *object, const char *key );
 
+/** Search for a boolean item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return One if the value of the matching object is true, or zero if it is false, not found, or not a boolean. */
+int jx_lookup_boolean( struct jx *object, const char *key );
+
 /** Search for a double item in an object.  The key is an ordinary string value.  @param object The object in which to search.  @param key The string key to match.  @return The double value of the matching object, or null if it is not found, or is not a double. */
 double jx_lookup_double( struct jx *object, const char *key );
 
@@ -276,6 +279,9 @@ struct jx * jx_iterate_values(struct jx *j, void **i);
  * @param i A variable to store the iteration state.
  * @return A pointer to each key in the object, and NULL when iteration is finished.
  */
-struct jx * jx_iterate_key(struct jx *j, void **i);
+struct jx * jx_iterate_keys(struct jx *j, void **i);
+
+/** Merge an arbitrary number of JX_OBJECTs into a single new one. The constituent objects are not consumed. Objects are merged in the order given, i.e. a key can replace an identical key in a preceding object. The last argument must be NULL to mark the end of the list. @return A merged JX_OBJECT that must be deleted with jx_delete. */
+struct jx *jx_merge(struct jx *j, ...);
 
 #endif

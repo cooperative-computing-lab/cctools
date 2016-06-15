@@ -183,6 +183,16 @@ jx_int_t jx_lookup_integer( struct jx *object, const char *key )
 	}
 }
 
+int jx_lookup_boolean( struct jx *object, const char *key )
+{
+	struct jx *j = jx_lookup(object,key);
+	if(j && jx_istype(j,JX_BOOLEAN)) {
+		return !!j->u.boolean_value;
+	} else {
+		return 0;
+	}
+}
+
 double jx_lookup_double( struct jx *object, const char *key )
 {
 	struct jx *j = jx_lookup(object,key);
@@ -430,6 +440,20 @@ struct jx  *jx_copy( struct jx *j )
 
 	/* not reachable, but some compilers complain. */
 	return 0;
+}
+
+struct jx *jx_merge(struct jx *j, ...) {
+	va_list ap;
+	va_start (ap, j);
+	struct jx *result = jx_object(NULL);
+	for (struct jx *next = j; jx_istype(next, JX_OBJECT); next = va_arg(ap, struct jx *)) {
+		for (struct jx_pair *p = next->u.pairs; p; p = p->next) {
+			jx_delete(jx_remove(result, p->key));
+			jx_insert(result, jx_copy(p->key), jx_copy(p->value));
+		}
+	}
+	va_end(ap);
+	return result;
 }
 
 int jx_pair_is_constant( struct jx_pair *p )

@@ -80,8 +80,8 @@ struct dag_node {
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);
 
-void dag_node_add_source_file(struct dag_node *n, const char *filename, char *remotename);
-void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename);
+void dag_node_add_source_file(struct dag_node *n, const char *filename, const char *remotename);
+void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename );
 const char *dag_node_get_local_name(struct dag_node *n, const char *filename );
