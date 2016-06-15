@@ -785,22 +785,22 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
 			if(n->local_job) {
-				debug(D_ERROR, "remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d.\n", n->nodeid);
+				debug(D_ERROR, "Remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d.\n", n->nodeid);
 				error = 1;
 				break;
 			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
-				debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+				debug(D_ERROR, "Remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
 				error = 1;
 				break;
 			}
 		}
 
-		if(!batch_queue_supports_feature(remote_queue, "absolute_path")){
+		if(!batch_queue_supports_feature(remote_queue, "absolute_path") && !n->local_job){
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)) && !error) {
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
-					debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
 					error = 1;
 					break;
 				}
@@ -810,7 +810,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 			while((f = list_next_item(n->target_files)) && !error) {
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
-					debug(D_ERROR, "remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
+					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
 					error = 1;
 					break;
 				}
