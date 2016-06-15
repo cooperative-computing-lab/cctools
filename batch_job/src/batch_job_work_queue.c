@@ -25,12 +25,12 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 			if(p) {
 				*p = 0;
 				if(!work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag)){
-					fatal("Failed to specify file %s->%s in Work Queue", f, p+1);
+					fatal("Error while specifying file: %s->%s.", f, p+1);
 				}
 				*p = '=';
 			} else {
 				if(!work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag)){
-					fatal("Failed to specify file %s in Work Queue", f);
+					fatal("Error while specifying file: %s.", f);
 				}
 			}
 			f = strtok(0, " \t,");
@@ -46,12 +46,12 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 			if(p) {
 				*p = 0;
 				if(!work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag)){
-					fatal("Failed to specify file %s->%s in Work Queue", f, p+1);
+					fatal("Error while specifying file: %s->%s.", f, p+1);
 				}
 				*p = '=';
 			} else {
 				if(!work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag)){
-					fatal("Failed to specify file %s in Work Queue", f);
+					fatal("Error while specifying file: %s.", f);
 				}
 			}
 			f = strtok(0, " \t,");
