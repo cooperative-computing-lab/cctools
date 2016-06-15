@@ -3865,7 +3865,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		return 0;
 	}
 	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s contains absolute path.\n", remote_name);
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 		return 0;
 	}
 
@@ -3934,7 +3934,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s contains absolute path.\n", remote_name);
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 		return 0;
 	}
 
@@ -4003,7 +4003,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s contains absolute path.\n", remote_name);
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 		return 0;
 	}
 
@@ -4044,7 +4044,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s contains absolute path.\n", remote_name);
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 		return 0;
 	}
 
@@ -4116,7 +4116,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s contains absolute path.\n", remote_name);
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 		return 0;
 	}
 
@@ -4165,7 +4165,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
-		fatal("Error: Remote name %s contains absolute path.\n", remote_name);
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 		return 0;
 	}
 
