@@ -13,7 +13,7 @@
 #include <string.h>
 #include <errno.h>
 
-static int specify_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
+static void specify_files(struct work_queue_task *t, const char *input_files, const char *output_files, int caching_flag )
 {
 	char *f, *p, *files;
 
@@ -58,7 +58,6 @@ static int specify_files(struct work_queue_task *t, const char *input_files, con
 		}
 		free(files);
 	}
-	return 0;
 }
 
 static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
@@ -85,8 +84,7 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 
 	t = work_queue_task_create(cmd);
 
-	if(specify_files(t, extra_input_files, extra_output_files, caching_flag))
-		return -1;
+	specify_files(t, extra_input_files, extra_output_files, caching_flag);
 	specify_envlist(t,envlist);
 
 	if(envlist) {

@@ -785,7 +785,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
 			if(n->local_job) {
-				debug(D_ERROR, "remote renaming is not supported locally. Rule %d.\n", n->nodeid);
+				debug(D_ERROR, "remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d.\n", n->nodeid);
 				error = 1;
 				break;
 			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
