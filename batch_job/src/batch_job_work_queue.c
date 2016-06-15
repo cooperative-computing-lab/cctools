@@ -24,14 +24,10 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				if(!work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag)){
-					fatal("Error while specifying file: %s->%s.", f, p+1);
-				}
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_INPUT, caching_flag);
 				*p = '=';
 			} else {
-				if(!work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag)){
-					fatal("Error while specifying file: %s.", f);
-				}
+				work_queue_task_specify_file(t, f, f, WORK_QUEUE_INPUT, caching_flag);
 			}
 			f = strtok(0, " \t,");
 		}
@@ -45,14 +41,10 @@ static void specify_files(struct work_queue_task *t, const char *input_files, co
 			p = strchr(f, '=');
 			if(p) {
 				*p = 0;
-				if(!work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag)){
-					fatal("Error while specifying file: %s->%s.", f, p+1);
-				}
+				work_queue_task_specify_file(t, f, p + 1, WORK_QUEUE_OUTPUT, caching_flag);
 				*p = '=';
 			} else {
-				if(!work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag)){
-					fatal("Error while specifying file: %s.", f);
-				}
+				work_queue_task_specify_file(t, f, f, WORK_QUEUE_OUTPUT, caching_flag);
 			}
 			f = strtok(0, " \t,");
 		}
