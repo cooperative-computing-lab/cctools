@@ -1571,21 +1571,6 @@ int main(int argc, char *argv[])
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
 	}
 
-	if(monitor) {
-		if(!log_dir)
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
-
-		if(!log_format)
-			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
-
-		if(monitor->interval < 1)
-			fatal("Monitoring interval should be positive.");
-
-		makeflow_prepare_for_monitoring(monitor, remote_queue, log_dir, log_format);
-		free(log_dir);
-		free(log_format);
-	}
-
 	makeflow_parse_input_outputs(d);
 	makeflow_prepare_nested_jobs(d);
 
@@ -1606,6 +1591,21 @@ int main(int argc, char *argv[])
 	setlinebuf(stderr);
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check );
+
+	if(monitor) {
+		if(!log_dir)
+			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
+
+		if(!log_format)
+			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
+
+		if(monitor->interval < 1)
+			fatal("Monitoring interval should be positive.");
+
+		makeflow_prepare_for_monitoring(d, monitor, remote_queue, log_dir, log_format);
+		free(log_dir);
+		free(log_format);
+	}
 
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);

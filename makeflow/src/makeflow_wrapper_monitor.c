@@ -12,6 +12,8 @@
 #include "xxmalloc.h"
 
 #include "dag.h"
+#include "dag_file.h"
+#include "makeflow_log.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_wrapper_monitor.h"
 
@@ -40,7 +42,7 @@ struct makeflow_monitor * makeflow_monitor_create()
  * Prepare for monitoring by creating wrapper command and attaching the
  * appropriate input and output dependencies.
  * */
-void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, struct batch_queue *queue, char *log_dir, char *log_format)
+void makeflow_prepare_for_monitoring( struct dag *d, struct makeflow_monitor *m, struct batch_queue *queue, char *log_dir, char *log_format)
 {
 	m->exe = resource_monitor_locate(NULL);
 	if(!m->exe) {
@@ -53,7 +55,18 @@ void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, struct batch_q
 		m->exe_remote = NULL;
 	}
 
-	create_dir(log_dir, 0777);
+	int result = mkdir(log_dir, 0777);
+	if(result == -1){
+		if(errno == ENOENT){
+			result = !create_dir(log_dir, 0777);
+		} else if(errno != EEXIST){
+			fatal("Monitor mode was enabled, but could not created output directory. %s", strerror(errno));	
+		}
+	}
+	if(result == 0){ // Either the mkdir was successful, or create_dir was successful. aka created in Makeflow
+		struct dag_file *f = dag_file_lookup_or_create(d, log_dir);
+		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+	}
 
 	m->log_prefix = string_format("%s/%s", log_dir, log_format);
 	char *log_name;
