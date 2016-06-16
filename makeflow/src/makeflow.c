@@ -641,7 +641,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
 		char *output_prefix = NULL;
- 		if(batch_queue_supports_feature(queue, "output_directories") && !n->local_job) {
+ 		if(batch_queue_supports_feature(queue, "output_directories") || n->local_job) {
 			output_prefix = xxstrdup(monitor->log_prefix);
 		} else {
 			output_prefix = xxstrdup(path_basename(monitor->log_prefix));
