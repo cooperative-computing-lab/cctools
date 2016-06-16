@@ -2379,7 +2379,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 		if(!q->poll_table) {
 			//if we can't allocate a poll table, we can't do anything else.
 			fatal("allocating memory for poll table failed.");
-			return 0;
 		}
 	}
 
@@ -2407,7 +2406,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 			if(q->poll_table == NULL) {
 				//if we can't allocate a poll table, we can't do anything else.
 				fatal("reallocating memory for poll table failed.");
-				return 0;
 			}
 		}
 
@@ -3866,7 +3864,6 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 	}
 	if(remote_name[0] == '/') {
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-		return 0;
 	}
 
 	if(type == WORK_QUEUE_INPUT) {
@@ -3935,7 +3932,6 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-		return 0;
 	}
 
 
@@ -4004,7 +4000,6 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-		return 0;
 	}
 
 	if(type == WORK_QUEUE_OUTPUT || recursive) {
@@ -4045,7 +4040,6 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-		return 0;
 	}
 
 	if(end_byte < start_byte) {
@@ -4117,7 +4111,6 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-		return 0;
 	}
 
 	list_first_item(t->input_files);
@@ -4166,7 +4159,6 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
 		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
-		return 0;
 	}
 
 	if(type == WORK_QUEUE_INPUT) {
