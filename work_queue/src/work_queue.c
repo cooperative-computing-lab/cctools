@@ -2379,7 +2379,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 		if(!q->poll_table) {
 			//if we can't allocate a poll table, we can't do anything else.
 			fatal("allocating memory for poll table failed.");
-			return 0;
 		}
 	}
 
@@ -2407,7 +2406,6 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 			if(q->poll_table == NULL) {
 				//if we can't allocate a poll table, we can't do anything else.
 				fatal("reallocating memory for poll table failed.");
-				return 0;
 			}
 		}
 
@@ -3865,8 +3863,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		return 0;
 	}
 	if(remote_name[0] == '/') {
-		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
-		return 0;
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
 	if(type == WORK_QUEUE_INPUT) {
@@ -3934,8 +3931,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
-		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
-		return 0;
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
 
@@ -4003,8 +3999,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	// the worker(the worker on which the task will be executed) is unlikely to
 	// be known. Thus @param remote_name should not be an absolute path.
 	if(remote_name[0] == '/') {
-		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
-		return 0;
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
 	if(type == WORK_QUEUE_OUTPUT || recursive) {
@@ -4044,8 +4039,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
-		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
-		return 0;
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
 	if(end_byte < start_byte) {
@@ -4116,8 +4110,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
-		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
-		return 0;
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
 	list_first_item(t->input_files);
@@ -4165,8 +4158,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	// @param remote_name should not be an absolute path. @see
 	// work_queue_task_specify_file
 	if(remote_name[0] == '/') {
-		fprintf(stderr, "Error: Remote name %s contains absolute path.\n", remote_name);
-		return 0;
+		fatal("Error: Remote name %s is an absolute path.\n", remote_name);
 	}
 
 	if(type == WORK_QUEUE_INPUT) {

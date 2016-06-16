@@ -175,6 +175,7 @@ static int batch_queue_wq_create (struct batch_queue *q)
 	if ((q->data = work_queue_create(0)) == NULL)
 		return -1;
 	work_queue_enable_process_module(q->data);
+	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
 	batch_queue_set_feature(q, "batch_log_name", "%s.wqlog");
 	return 0;
