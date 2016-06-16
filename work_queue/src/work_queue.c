@@ -6062,12 +6062,13 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 	return c;
 }
 
-char *work_queue_generate_disk_alloc_full_filename(int taskid) {
+char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid) {
 
+	path_remove_trailing_slashes(pwd);
 	if(!taskid) {
-		return "cctools_disk_alloc_report.log";
+		return string_format("%s/cctools_disk_allocation_exhausted.log", pwd);
 	}
-	return string_format("cctools_disk_alloc_report.%d.log", taskid);
+	return string_format("%s/cctools_disk_allocation_exhausted.%d.log", pwd, taskid);
 }
 
 /* vim: set noexpandtab tabstop=4: */
