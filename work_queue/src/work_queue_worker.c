@@ -621,7 +621,8 @@ static int handle_tasks(struct link *master)
 			} else {
 				p->exit_status = WEXITSTATUS(status);
 				FILE *loop_full_check;
-				char *pwd = get_current_dir_name();
+				char *buf = malloc(PATH_MAX);
+				char *pwd = getcwd(buf, PATH_MAX);
 				char *disk_alloc_filename = work_queue_generate_disk_alloc_full_filename(pwd, p->task->taskid);
 				if(p->loop_mount == 1 && (loop_full_check = fopen(disk_alloc_filename, "r"))) {
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
@@ -629,6 +630,7 @@ static int handle_tasks(struct link *master)
 					fclose(loop_full_check);
 					unlink(disk_alloc_filename);
 				}
+				free(buf);
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 			}
 

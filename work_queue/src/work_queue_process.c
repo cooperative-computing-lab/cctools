@@ -211,9 +211,11 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 	}
 
 	if(p->loop_mount) {
-		char *pwd = get_current_dir_name();
+		char *buf = malloc(PATH_MAX);
+		char *pwd = getcwd(buf, PATH_MAX);
 		char *filename = work_queue_generate_disk_alloc_full_filename(pwd, p->task->taskid);
 		p->task->command_line = string_format("export CCTOOLS_DISK_ALLOC=%s; %s", filename, p->task->command_line);
+		free(buf);
 	}
 
 	p->execution_start = timestamp_get();
