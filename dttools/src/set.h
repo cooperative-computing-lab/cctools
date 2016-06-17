@@ -100,7 +100,7 @@ This call will return 1 if all elements of s2 exist or are added to the set.
 Also note that you cannot insert a null set into the set.
 @param s A pointer to a set.
 @param s2 A pointer to a set to be inserted.
-@return One if the insert succeeded, 0 otherwise.
+@return Number of items added to set.
 */
 
 int set_insert_set(struct set *s, struct set *s2);
@@ -110,7 +110,7 @@ This call will return 1 if all elements of list exist or are added to the set.
 Also note that you cannot insert a null list into the set.
 @param s A pointer to a set.
 @param s2 A pointer to a list to be inserted.
-@return One if the insert succeeded, 0 otherwise.
+@return Number of items added to set.
 */
 
 int set_insert_list(struct set *s, struct list *l);
