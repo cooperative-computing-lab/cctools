@@ -20,7 +20,7 @@ struct dag_file * dag_file_create( const char *filename )
 	f->needed_by = list_create();
 	f->created_by = 0;
 	f->actual_size = 0;
-	f->estimated_size = 0;
+	f->estimated_size = GIGABYTE;
 	f->reference_count = 0;
 	f->state = DAG_FILE_STATE_UNKNOWN;
 	f->type = DAG_FILE_TYPE_INTERMEDIATE;

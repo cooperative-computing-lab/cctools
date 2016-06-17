@@ -605,6 +605,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 		else {
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
+			f->actual_size = buf.st_size;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
