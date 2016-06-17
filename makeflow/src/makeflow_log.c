@@ -312,7 +312,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 			struct dag_file *f;
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)))
-				f->ref_count += -1;
+				f->reference_count += -1;
 		}
 	}
 }

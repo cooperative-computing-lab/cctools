@@ -200,7 +200,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 	/* register this file as a requirement of the node */
 	list_push_head(source->needed_by, n);
 
-	source->ref_count++;
+	source->reference_count++;
 }
 
 /* Adds the local name as a target of the node, and register the
