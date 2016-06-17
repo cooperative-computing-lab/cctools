@@ -919,14 +919,14 @@ int string_equal(const char *str1, const char *str2){
 
 char * string_wrap_command( const char *command, const char *wrapper_command )
 {
-	if(!wrapper_command) return strdup(command);
+	if(!wrapper_command) return xxstrdup(command);
 
 	char * braces = strstr(wrapper_command,"{}");
 	char * square = strstr(wrapper_command,"[]");
 	char * new_command;
 
 	if(braces) {
-		new_command = strdup(command);
+		new_command = xxstrdup(command);
 	} else {
 		new_command = string_escape_shell(command);
 	}
