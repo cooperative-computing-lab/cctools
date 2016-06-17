@@ -64,8 +64,14 @@ enum { LONG_OPT_PPM_ROW,
 	   LONG_OPT_DOT_CONDENSE,
 	   LONG_OPT_DOT_LABELS,
 	   LONG_OPT_DOT_NO_LABELS,
+	   LONG_OPT_DOT_TASK_ID,
 	   LONG_OPT_DOT_DETAILS,
-	   LONG_OPT_DOT_NO_DETAILS
+	   LONG_OPT_DOT_NO_DETAILS,
+	   LONG_OPT_DOT_GRAPH,
+	   LONG_OPT_DOT_NODE,
+	   LONG_OPT_DOT_EDGE,
+	   LONG_OPT_DOT_TASK,
+	   LONG_OPT_DOT_FILE
 };
 
 static void show_help_viz(const char *cmd)
@@ -84,6 +90,13 @@ static void show_help_viz(const char *cmd)
 	fprintf(stdout, " %-30s Change the size of the boxes proportional to file size.\n", "--dot-proportional");
 	fprintf(stdout, " %-30s Show only shapes with no text labels.\n","--dot-no-labels");
 	fprintf(stdout, " %-30s Include extra details in graph.\n","--dot-details");
+	fprintf(stdout, " %-30s Set task label to ID number instead of command.\n","--dot-task-id");
+	fprintf(stdout, " %-30s Set graph attributes.\n","--dot-graph-attr");
+	fprintf(stdout, " %-30s Set node attributes.\n","--dot-node-attr");
+	fprintf(stdout, " %-30s Set edge attributes.\n","--dot-edge-attr");
+	fprintf(stdout, " %-30s Set task attributes.\n","--dot-task-attr");
+	fprintf(stdout, " %-30s Set file attributes.\n","--dot-file-attr");
+
 	fprintf(stdout, "\nThe following options for ppm generation are mutually exclusive:\n\n");
 	fprintf(stdout, " %-30s Highlight row <row> in completion grap\n", "--ppm-highlight-row=<row>");
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
@@ -106,6 +119,12 @@ int main(int argc, char *argv[])
 	int ppm_mode = 0;
 	int dot_labels = 1;
 	int dot_details = 0;
+	int dot_task_id = 0;
+	char *graph_attr = NULL;
+	char *node_attr = NULL;
+	char *edge_attr = NULL;
+	char *task_attr = NULL;
+	char *file_attr = NULL;
 	char *ppm_option = NULL;
 
 	static const struct option long_options_viz[] = {
@@ -115,8 +134,14 @@ int main(int argc, char *argv[])
 		{"dot-proportional",  no_argument, 0,  LONG_OPT_DOT_PROPORTIONAL},
 		{"dot-no-labels", no_argument, 0, LONG_OPT_DOT_NO_LABELS},
 		{"dot-labels", no_argument, 0, LONG_OPT_DOT_LABELS},
+		{"dot-task-id", no_argument, 0, LONG_OPT_DOT_TASK_ID},
 		{"dot-details", no_argument, 0, LONG_OPT_DOT_DETAILS},
 		{"dot-no-details", no_argument, 0, LONG_OPT_DOT_NO_DETAILS},
+		{"dot-graph-attr", required_argument, 0, LONG_OPT_DOT_GRAPH},
+		{"dot-node-attr", required_argument, 0, LONG_OPT_DOT_NODE},
+		{"dot-edge-attr", required_argument, 0, LONG_OPT_DOT_EDGE},
+		{"dot-task-attr", required_argument, 0, LONG_OPT_DOT_TASK},
+		{"dot-file-attr", required_argument, 0, LONG_OPT_DOT_FILE},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -158,11 +183,29 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOT_NO_LABELS:
 				dot_labels = 0;
 				break;
+			case LONG_OPT_DOT_TASK_ID:
+				dot_task_id = 1;
+				break;
 			case LONG_OPT_DOT_DETAILS:
 				dot_details = 1;
 				break;
 			case LONG_OPT_DOT_NO_DETAILS:
 				dot_details = 0;
+				break;
+			case LONG_OPT_DOT_GRAPH:
+				graph_attr = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DOT_NODE:
+				node_attr = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DOT_EDGE:
+				edge_attr = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DOT_TASK:
+				task_attr = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DOT_FILE:
+				file_attr = xxstrdup(optarg);
 				break;
 			case LONG_OPT_PPM_EXE:
 				display_mode = SHOW_DAG_PPM;
@@ -216,7 +259,8 @@ int main(int argc, char *argv[])
 		switch(display_mode)
 		{
 			case SHOW_DAG_DOT:
-				dag_to_dot(d, condense_display, change_size, dot_labels, dot_details );
+				dag_to_dot(d, condense_display, change_size, dot_labels, dot_task_id, dot_details,
+							graph_attr, node_attr, edge_attr, task_attr, file_attr );
 				break;
 			case SHOW_DAG_PPM:
 				dag_to_ppm(d, ppm_mode, ppm_option);

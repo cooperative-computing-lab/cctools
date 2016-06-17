@@ -675,7 +675,7 @@ void dag_to_cyto(struct dag *d, int condense_display, int change_size)
 }
 
 
-void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels, int with_details )
+void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_labels, int task_id, int with_details, char *graph_attr, char *node_attr, char *edge_attr, char *task_attr, char *file_attr )
 {
 	struct dag_node *n;
 	struct dag_file *f;
@@ -710,11 +710,20 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		}
 	}
 
+	if(graph_attr)
+		printf( "graph [%s]\n", graph_attr);
+	if(node_attr)
+		printf( "node [%s]\n", node_attr);
+	if(edge_attr)
+		printf( "edge [%s]\n", edge_attr);
 
 	h = hash_table_create(0, 0);
 
-	printf( "node [shape=ellipse,color = green,style = %s,fixedsize = false];\n", with_labels ? "unfilled" : "filled" );
-
+	if(task_attr)
+		printf( "\nnode [shape=ellipse,color = green,style = %s,%s];\n", with_labels ? "unfilled" : "filled", task_attr );
+	else
+		printf( "\nnode [shape=ellipse,color = green,style = %s,fixedsize = false];\n", with_labels ? "unfilled" : "filled" );
+  
 	for(n = d->nodes; n; n = n->next) {
 		name = xxstrdup(n->command);
 		label = strtok(name, " \t\n");
@@ -810,9 +819,17 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 			}
 
 			if((t->count == 1) || !condense_display) {
-				printf( "N%d [label=\"%s\"];\n", condense_display ? t->id : n->nodeid, with_labels ? label : "");
+				if(task_id && with_labels){
+					printf( "N%d [label=\"%d\"];\n", condense_display ? t->id : n->nodeid, n->nodeid);
+				} else {
+					printf( "N%d [label=\"%s\"];\n", condense_display ? t->id : n->nodeid, with_labels ? label : "");
+				}
 			} else {
-				printf( "N%d [label=\"%s x%d\"];\n", t->id, with_labels ? label : "", t->count);
+				if(task_id && with_labels){
+					printf( "N%d [label=\"%d x%d\"];\n", t->id, n->nodeid, t->count);
+				} else {
+					printf( "N%d [label=\"%s x%d\"];\n", t->id, with_labels ? label : "", t->count);
+				}
 			}
 
 			if(with_details) {
@@ -825,7 +842,10 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		free(name);
 	}
 
-	printf( "node [shape=box,color=blue,style=%s,fixedsize=false];\n",with_labels ? "unfilled" : "filled" );
+	if(file_attr)
+		printf( "\nnode [shape=box,color=blue,style=%s,%s];\n", with_labels ? "unfilled" : "filled", task_attr );
+	else
+		printf( "\nnode [shape=box,color=blue,style=%s,fixedsize=false];\n", with_labels ? "unfilled" : "filled" );
 
 	hash_table_firstkey(g);
 	while(hash_table_nextkey(g, &label, (void **) &e)) {
