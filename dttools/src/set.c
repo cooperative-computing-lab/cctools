@@ -50,6 +50,34 @@ struct set *set_create(int bucket_count)
 	return s;
 }
 
+struct set *set_duplicate(struct set *s)
+{
+	struct set *s2;
+
+	s2 = set_create(0);
+	set_first_element(s);
+	const void *element;
+	while((element = set_next_element(s)))
+		set_insert(s2, element);
+
+	return s2;
+
+}
+
+struct set *set_union(struct set *s1, struct set *s2)
+{
+
+	struct set *s = set_duplicate(s1);
+
+	set_first_element(s2);
+	const void *element;
+	while((element = set_next_element(s2)))
+		set_insert(s, element);
+
+	return s;
+
+}
+
 void set_clear(struct set *s)
 {
 	struct entry *e, *f;
@@ -172,6 +200,30 @@ int set_insert(struct set *s, const void *element)
 	s->size++;
 
 	return 1;
+}
+
+int set_insert_set(struct set *s, struct set *s2)
+{
+	set_first_element(s2);
+	int additions = 0;
+	const void *element;
+	while((element = set_next_element(s2))){
+		additions += set_insert(s, element);
+	}
+
+	return additions;
+}
+
+int set_insert_list(struct set *s, struct list *l)
+{
+	list_first_item(l);
+	int additions = 0;
+	const void *element;
+	while((element = list_next_item(l))){
+		additions += set_insert(s, element);
+	}
+
+	return additions;
 }
 
 int set_push(struct set *s, const void *element)
