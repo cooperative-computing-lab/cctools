@@ -710,19 +710,23 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		}
 	}
 
-	if(graph_attr)
+	if(graph_attr){
 		printf( "graph [%s]\n", graph_attr);
-	if(node_attr)
+	}
+	if(node_attr){
 		printf( "node [%s]\n", node_attr);
-	if(edge_attr)
+	}
+	if(edge_attr){
 		printf( "edge [%s]\n", edge_attr);
+	}
 
 	h = hash_table_create(0, 0);
 
-	if(task_attr)
+	if(task_attr){
 		printf( "\nnode [shape=ellipse,color = green,style = %s,%s];\n", with_labels ? "unfilled" : "filled", task_attr );
-	else
+	} else {
 		printf( "\nnode [shape=ellipse,color = green,style = %s,fixedsize = false];\n", with_labels ? "unfilled" : "filled" );
+	}
   
 	for(n = d->nodes; n; n = n->next) {
 		name = xxstrdup(n->command);
@@ -842,10 +846,11 @@ void dag_to_dot(struct dag *d, int condense_display, int change_size, int with_l
 		free(name);
 	}
 
-	if(file_attr)
+	if(file_attr){
 		printf( "\nnode [shape=box,color=blue,style=%s,%s];\n", with_labels ? "unfilled" : "filled", task_attr );
-	else
+	} else {
 		printf( "\nnode [shape=box,color=blue,style=%s,fixedsize=false];\n", with_labels ? "unfilled" : "filled" );
+	}
 
 	hash_table_firstkey(g);
 	while(hash_table_nextkey(g, &label, (void **) &e)) {
