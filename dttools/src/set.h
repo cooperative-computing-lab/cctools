@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define SET_H
 
 #include "int_sizes.h"
+#include "list.h"
 
 /** @file set.h A set data structure.
 Arbitrary objects that are equal (the same location in memory) appear only once
@@ -47,16 +48,33 @@ while(element = set_next_element(s)) {
 
 struct set *set_create(int buckets);
 
+/** Duplicate a set from an existing set.
+NOTE: This does not duplicated the element pointers, beware of double frees.
+@param s The set to be duplicated.
+@return A pointer to a new set.
+*/
+
+struct set *set_duplicate(struct set *s);
+
+/** Unions two sets into one set. Could also be called Merge.
+NOTE: This does not duplicated the element pointers, beware of double frees.
+@param s1 A pointer to the first set to be unioned.
+@param s2 A pointer to the second set to be unioned.
+@return A pointer to a new set.
+*/
+
+struct set *set_union(struct set *s1, struct set *s2);
+
 /** Remove all entries from a set.
 Note that this function will not free all of the objects contained within the set.
-@param s The set to delete.
+@param s A pointer to a set.
 */
 
 void set_clear(struct set *s);
 
 /** Delete a set.
 Note that this function will not free all of the objects contained within the set.
-@param s The set to delete.
+@param s A pointer to a set.
 */
 
 void set_delete(struct set *s);
@@ -68,7 +86,7 @@ void set_delete(struct set *s);
 
 int set_size(struct set *s);
 
-/** Insert a element to the set.
+/** Insert an element to the set.
 This call will return 0 if element was already in the set.
 You must call @ref set_remove to remove it.
 Also note that you cannot insert a null element into the set.
@@ -79,7 +97,29 @@ Also note that you cannot insert a null element into the set.
 
 int set_insert(struct set *s, const void *element);
 
-/** Insert a element to the set.
+/** Insert an existing set into the set.
+This call will return 1 if all elements of s2 exist or are added to the set.
+Also note that you cannot insert a null set into the set.
+NOTE: This does not duplicated the element pointers, beware of double frees.
+@param s A pointer to a set.
+@param s2 A pointer to a set to be inserted.
+@return Number of items added to set.
+*/
+
+int set_insert_set(struct set *s, struct set *s2);
+
+/** Insert an existing list into the set.
+This call will return 1 if all elements of list exist or are added to the set.
+Also note that you cannot insert a null list into the set.
+NOTE: This does not duplicated the element pointers, beware of double frees.
+@param s A pointer to a set.
+@param s2 A pointer to a list to be inserted.
+@return Number of items added to set.
+*/
+
+int set_insert_list(struct set *s, struct list *l);
+
+/** Insert an element to the set.
 This is equivalent to set_insert
 */
 
