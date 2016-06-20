@@ -49,6 +49,7 @@ while(element = set_next_element(s)) {
 struct set *set_create(int buckets);
 
 /** Duplicate a set from an existing set.
+NOTE: This does not duplicated the element pointers, beware of double frees.
 @param s The set to be duplicated.
 @return A pointer to a new set.
 */
@@ -56,6 +57,7 @@ struct set *set_create(int buckets);
 struct set *set_duplicate(struct set *s);
 
 /** Unions two sets into one set. Could also be called Merge.
+NOTE: This does not duplicated the element pointers, beware of double frees.
 @param s1 A pointer to the first set to be unioned.
 @param s2 A pointer to the second set to be unioned.
 @return A pointer to a new set.
@@ -98,6 +100,7 @@ int set_insert(struct set *s, const void *element);
 /** Insert an existing set into the set.
 This call will return 1 if all elements of s2 exist or are added to the set.
 Also note that you cannot insert a null set into the set.
+NOTE: This does not duplicated the element pointers, beware of double frees.
 @param s A pointer to a set.
 @param s2 A pointer to a set to be inserted.
 @return Number of items added to set.
@@ -108,6 +111,7 @@ int set_insert_set(struct set *s, struct set *s2);
 /** Insert an existing list into the set.
 This call will return 1 if all elements of list exist or are added to the set.
 Also note that you cannot insert a null list into the set.
+NOTE: This does not duplicated the element pointers, beware of double frees.
 @param s A pointer to a set.
 @param s2 A pointer to a list to be inserted.
 @return Number of items added to set.
