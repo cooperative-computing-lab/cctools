@@ -11,8 +11,10 @@ EOF
 
 cat >test.dot.expected <<EOF
 digraph {
+
 node [shape=ellipse,color = green,style = unfilled,fixedsize = false];
 N0 [label="echo"];
+
 node [shape=box,color=blue,style=unfilled,fixedsize=false];
 F1 [label = "a"];
 F0 [label = "b"];
