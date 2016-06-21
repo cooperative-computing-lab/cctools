@@ -11,50 +11,59 @@
 #include <errno.h>
 #include <signal.h>
 
+#define FILE_RUN_TASKS "task_to_run"
+#define FILE_FINISH_TASKS "finished_tasks"
+
 static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
-
+	
 	fflush(NULL);
+
+	// TODO is there better way to track each job instead of using process id?
 	jobid = fork();
+
 	if(jobid > 0) {
-		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
+
+		debug(D_BATCH, "job %" PRIbjid " is ready", jobid);
 		struct batch_job_info *info = malloc(sizeof(*info));
 		memset(info, 0, sizeof(*info));
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
+
+		FILE *fp;
+
+		if(access(FILE_RUN_TASKS, F_OK) != -1) {
+			fp = fopen(FILE_RUN_TASKS, "a");
+		} else {
+			fp = fopen(FILE_RUN_TASKS, "w+");
+		}
+			
+		fprintf(fp, "Taskid %" PRIbjid "\n", jobid);
+		fprintf(fp, "cmd: %s\n", cmd);
+		fprintf(fp, "Input files: %s\n", extra_input_files);
+		fprintf(fp, "Output files: %s\n\n", extra_output_files);
+
+		fclose(fp);
+
 		return jobid;
+
 	} else if(jobid < 0) {
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-		/** The following code works but would duplicates the current process because of the system() function.
-		int result = system(cmd);
-		if(WIFEXITED(result)) {
-			_exit(WEXITSTATUS(result));
-		} else {
-			_exit(1);
-		}*/
-
+		// child process do nothing
 		if(envlist) {
 			jx_export(envlist);
 		}
 
-		/** A note from "man system 3" as of Jan 2012:
-		 * Do not use system() from a program with set-user-ID or set-group-ID
-		 * privileges, because strange values for some environment variables
-		 * might be used to subvert system integrity. Use the exec(3) family of
-		 * functions instead, but not execlp(3) or execvp(3). system() will
-		 * not, in fact, work properly from programs with set-user-ID or
-		 * set-group-ID privileges on systems on which /bin/sh is bash version
-		 * 2, since bash 2 drops privileges on startup. (Debian uses a modified
-		 * bash which does not do this when invoked as sh.)
-		 */
-
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
+
+		exit(0);	
 	}
+
 	return -1;
 }
 
