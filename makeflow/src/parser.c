@@ -275,8 +275,11 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 			n->category = category;
 			debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
 		}
-		else
+		else {
+			/* set value of current category */
 			bk->category = category;
+			dag_variable_add_value("CATEGORY", bk->category->mf_variables, nodeid, value);
+		}
 	}
 	/* else if some other special variable .... */
 	/* ... */
