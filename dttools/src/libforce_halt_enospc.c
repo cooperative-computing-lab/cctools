@@ -10,33 +10,15 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <signal.h>
 #include <inttypes.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
-
-ssize_t write(int fd, const void *buf, size_t count) {
-
-	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
-
-	int real_count;
-	int prev_errno = errno;
-	errno = 0;
-	real_count = original_write(fd, buf, count);
-
-	if(real_count < 0 && errno == ENOSPC) {
-		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
-		return real_count;
-	}
-
-	if(!errno) {
-	   errno = prev_errno;
-	}
-
-	return real_count;
-}
+#include <sys/stat.h>
 
 int open(const char *path, int flags, ...)
 {
@@ -55,7 +37,16 @@ int open(const char *path, int flags, ...)
 	fd = original_open(path, flags, mode);
 
 	if(fd == -1 && errno == ENOSPC) {
-		fprintf(stderr, "OPEN ERROR: inode capacity reached.\n");
+		int err_fd;
+		char *filename = getenv("CCTOOLS_DISK_ALLOC");
+		if(!filename) {
+			fprintf(stderr, "OPEN ERROR: could not set flag to alert resource management system that loop device is full.\n");
+			fprintf(stderr, "OPEN ERROR: device capacity reached.\n");
+			return fd;
+		}
+		err_fd = open(filename, O_RDWR | O_CREAT);
+		if(err_fd < 0) { fprintf(stderr, "OPEN ERROR: could not alert resource management system that loop device is full.\n"); }
+		fprintf(stderr, "OPEN ERROR: device capacity reached.\n");
 		return fd;
 	}
 
@@ -64,4 +55,34 @@ int open(const char *path, int flags, ...)
 	}
 
 	return fd;
+}
+
+ssize_t write(int fd, const void *buf, size_t count) {
+
+	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
+
+	int real_count;
+	int prev_errno = errno;
+	errno = 0;
+	real_count = original_write(fd, buf, count);
+
+	if(real_count < 0 && errno == ENOSPC) {
+		int fd;
+		char *filename = getenv("CCTOOLS_DISK_ALLOC");
+		if(!filename) {
+			original_write(STDERR_FILENO, "WRITE ERROR: could not set flag to alert resource management system that loop device is full.\n", 94);
+			original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+			return real_count;
+		}
+		fd = open(filename, O_RDWR | O_CREAT);
+		if(fd < 0) { original_write(STDERR_FILENO, "WRITE ERROR: could not alert resource management system that loop device is full.\n", 77); }	
+		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+		return real_count;
+	}
+
+	if(!errno) {
+	   errno = prev_errno;
+	}
+
+	return real_count;
 }

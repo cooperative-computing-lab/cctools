@@ -656,7 +656,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
-	if(info->exited_normally && info->exit_code == 0) {
+
+	if(info->disk_alloc_full) {
+		job_failed = 1;
+	}
+	else if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
 			if(!makeflow_node_check_file_was_created(n, f))
@@ -683,6 +687,25 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_clean_file(d, remote_queue, f, 1);
 			} else {
 				makeflow_clean_file(d, remote_queue, f, 0);
+			}
+		}
+
+		if(info->disk_alloc_full) {
+			fprintf(stderr, "\nrule %d failed because it exceeded its loop device allocation capacity.\n", n->nodeid);
+			if(n->resources_measured)
+			{
+				rmsummary_print(stderr, n->resources_measured, /* pprint */ 0, /* extra fields */ NULL);
+				fprintf(stderr, "\n");
+			}
+
+			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
+
+			if(next != CATEGORY_ALLOCATION_ERROR) {
+				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
+				n->resource_request = next;
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+				if(monitor) { monitor_retried = 1; }
 			}
 		}
 
@@ -721,6 +744,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			{
 				makeflow_failed_flag = 1;
 			}
+		}
+		else
+		{
+			makeflow_failed_flag = 1;
 		}
 	} else {
 		/* Mark source files that have been used by this node */

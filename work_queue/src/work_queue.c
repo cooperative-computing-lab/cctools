@@ -1659,9 +1659,9 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid
-	char items[4][WORK_QUEUE_PROTOCOL_FIELD_MAX];
-	int n = sscanf(line, "result %s %s %s %s %" SCNd64, items[0], items[1], items[2], items[3], &taskid);
+	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid, loop device
+	char items[5][WORK_QUEUE_PROTOCOL_FIELD_MAX];
+	int n = sscanf(line, "result %s %s %s %s %" SCNd64"", items[0], items[1], items[2], items[3], &taskid);
 
 	if(n < 5) {
 		debug(D_WQ, "Invalid message from worker %s (%s): %s", w->hostname, w->addrport, line);
@@ -1693,6 +1693,9 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	t->cmd_execution_time = observed_execution_time > execution_time ? execution_time : observed_execution_time;
 
 	t->total_cmd_execution_time += t->cmd_execution_time;
+
+	if(task_status == WORK_QUEUE_RESULT_DISK_ALLOC_FULL) { t->disk_alloc_full = 1; }
+	else { t->disk_alloc_full = 0; }
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
@@ -6049,6 +6052,15 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 	}
 
 	return c;
+}
+
+char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid) {
+
+	path_remove_trailing_slashes(pwd);
+	if(!taskid) {
+		return string_format("%s/cctools_disk_allocation_exhausted.log", pwd);
+	}
+	return string_format("%s/cctools_disk_allocation_exhausted.%d.log", pwd, taskid);
 }
 
 /* vim: set noexpandtab tabstop=4: */

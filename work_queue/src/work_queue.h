@@ -67,6 +67,7 @@ typedef enum {
 	WORK_QUEUE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was neither a task or worker error **/
 	WORK_QUEUE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
 	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
+	WORK_QUEUE_RESULT_DISK_ALLOC_FULL     = 8 << 3  /**< The task filled its loop device allocation but needed more space. **/
 } work_queue_result_t;
 
 typedef enum {
@@ -139,6 +140,7 @@ struct work_queue_task {
 	timestamp_t total_time_until_worker_failure;           /**< Accumulated time for runs that terminated in worker failure/disconnection. */
 
 	int exhausted_attempts;                                /**< Number of times the task failed given exhausted resources. */
+	int disk_alloc_full;									   /**< Non-zero if a task filled its loop device allocation, zero otherwise. */
 
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 
@@ -914,6 +916,12 @@ int work_queue_task_specify_output_file(struct work_queue_task *t, const char *r
 @deprecated See @ref work_queue_task_specify_file instead.
 */
 int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, const char *rname, const char *fname);
+
+/** Generate a worker-level unique filename to indicate a disk allocation being full.
+ @param p The process for which we generate a unique disk allocation filename.
+ @return The string corresponding to the filename.
+*/
+char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
 
 //@}
 
