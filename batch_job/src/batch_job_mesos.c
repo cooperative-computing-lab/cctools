@@ -10,61 +10,41 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #define FILE_RUN_TASKS "task_to_run"
 #define FILE_FINISH_TASKS "finished_tasks"
 
+static int counter = 0;
+
 static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
-	batch_job_id_t jobid;
-	
-	fflush(NULL);
+	int task_id = ++counter;
 
-	// TODO is there better way to track each job instead of using process id?
-	jobid = fork();
+	debug(D_BATCH, "task %" PRIbjid " is ready", task_id);
+	struct batch_job_info *info = malloc(sizeof(*info));
+	memset(info, 0, sizeof(*info));
+	info->submitted = time(0);
+	info->started = time(0);
+	itable_insert(q->job_table, task_id, info);
 
-	if(jobid > 0) {
+	FILE *fp;
 
-		debug(D_BATCH, "job %" PRIbjid " is ready", jobid);
-		struct batch_job_info *info = malloc(sizeof(*info));
-		memset(info, 0, sizeof(*info));
-		info->submitted = time(0);
-		info->started = time(0);
-		itable_insert(q->job_table, jobid, info);
-
-		FILE *fp;
-
-		if(access(FILE_RUN_TASKS, F_OK) != -1) {
-			fp = fopen(FILE_RUN_TASKS, "a");
-		} else {
-			fp = fopen(FILE_RUN_TASKS, "w+");
-		}
-			
-		fprintf(fp, "Taskid %" PRIbjid "\n", jobid);
-		fprintf(fp, "cmd: %s\n", cmd);
-		fprintf(fp, "Input files: %s\n", extra_input_files);
-		fprintf(fp, "Output files: %s\n\n", extra_output_files);
-
-		fclose(fp);
-
-		return jobid;
-
-	} else if(jobid < 0) {
-		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
-		return -1;
+	if(access(FILE_RUN_TASKS, F_OK) != -1) {
+		fp = fopen(FILE_RUN_TASKS, "a");
 	} else {
-		// child process do nothing
-		if(envlist) {
-			jx_export(envlist);
-		}
-
-		execlp("sh", "sh", "-c", cmd, (char *) 0);
-		_exit(127);	// Failed to execute the cmd.
-
-		exit(0);	
+		fp = fopen(FILE_RUN_TASKS, "w+");
 	}
+		
+	fprintf(fp, "task_id %" PRIbjid "\n", task_id);
+	fprintf(fp, "cmd: %s\n", cmd);
+	fprintf(fp, "Input files: %s\n", extra_input_files);
+	fprintf(fp, "Output files: %s\n\n", extra_output_files);
 
-	return -1;
+	fclose(fp);
+
+	return task_id;
 }
 
 static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
