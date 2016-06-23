@@ -1695,10 +1695,10 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	t->total_cmd_execution_time += t->cmd_execution_time;
 
 	if(task_status == WORK_QUEUE_RESULT_DISK_ALLOC_FULL) {
-		t->disk_loop_device_exhausted = 1;
+		t->disk_allocation_exhausted = 1;
 	}
 	else {
-		t->disk_loop_device_exhausted = 0;
+		t->disk_allocation_exhausted = 0;
 	}
 
 	if(q->bandwidth) {

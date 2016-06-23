@@ -626,7 +626,7 @@ static int handle_tasks(struct link *master)
 				char *disk_alloc_filename = work_queue_generate_disk_alloc_full_filename(pwd, p->task->taskid);
 				if(p->loop_mount == 1 && (loop_full_check = fopen(disk_alloc_filename, "r"))) {
 					p->task_status = WORK_QUEUE_RESULT_DISK_ALLOC_FULL;
-					p->task->disk_loop_device_exhausted = 1;
+					p->task->disk_allocation_exhausted = 1;
 					fclose(loop_full_check);
 					unlink(disk_alloc_filename);
 				}

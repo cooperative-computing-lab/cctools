@@ -140,7 +140,7 @@ struct work_queue_task {
 	timestamp_t total_time_until_worker_failure;           /**< Accumulated time for runs that terminated in worker failure/disconnection. */
 
 	int exhausted_attempts;                                /**< Number of times the task failed given exhausted resources. */
-	int disk_loop_device_exhausted;                        /**< Non-zero if a task filled its loop device allocation, zero otherwise. */
+	int disk_allocation_exhausted;                        /**< Non-zero if a task filled its loop device allocation, zero otherwise. */
 
 	double priority;                                       /**< The priority of this task relative to others in the queue: higher number run earlier. */
 

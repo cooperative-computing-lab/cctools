@@ -124,7 +124,7 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 		info->exited_normally = 1;
 		info->exit_code = t->return_status;
 		info->exit_signal = 0;
-		info->disk_loop_device_exhausted = t->disk_loop_device_exhausted;
+		info->disk_allocation_exhausted = t->disk_allocation_exhausted;
 
 		/*
 		   If the standard ouput of the job is not empty,
