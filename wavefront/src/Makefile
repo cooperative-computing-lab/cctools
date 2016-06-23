@@ -9,7 +9,7 @@ all: $(PROGRAMS)
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(PROGRAMS)
+	rm -f $(PROGRAMS) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
