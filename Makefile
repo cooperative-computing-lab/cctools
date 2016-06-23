@@ -25,7 +25,6 @@ $(CCTOOLS_PACKAGES): config.mk
 
 CLEAN_PACKAGES = $(CCTOOLS_PACKAGES:%=clean-%)
 $(CLEAN_PACKAGES):
-	-rm .configure.tmp.o
 	@$(MAKE) -C $(@:clean-%=%) clean
 clean: $(CLEAN_PACKAGES)
 
