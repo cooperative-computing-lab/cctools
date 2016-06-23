@@ -30,7 +30,7 @@ enum {
 
 static struct jx_table headers[] = {
 	{"type", "TYPE", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
-	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 25},
+	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -25},
 	{"port", "PORT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 5},
 	{"owner", "OWNER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
 	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
@@ -202,6 +202,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	int columns = 80;
+	char *column_str = getenv("COLUMNS");
+	if(column_str) {
+		columns = atoi(column_str);
+		columns = columns < 1 ? 80 : columns;
+	}
+
 	stoptime = time(0) + timeout;
 
 	const char *query_expr;
@@ -225,7 +232,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(mode == MODE_TABLE) {
-		jx_table_print_header(headers,stdout);
+		jx_table_print_header(headers,stdout,columns);
 	} else if(mode==MODE_LONG) {
 		printf("[\n");
 	}
@@ -266,7 +273,7 @@ int main(int argc, char *argv[])
 			if(i!=0) printf(",\n");
 			jx_print_stream(table[i],stdout);
 		} else if(mode == MODE_TABLE) {
-			jx_table_print(headers, table[i], stdout);
+			jx_table_print(headers, table[i], stdout, columns);
 		} else if(mode == MODE_TOTAL) {
 			sum_avail += jx_lookup_integer(table[i], "avail");
 			sum_total += jx_lookup_integer(table[i], "total");
@@ -283,7 +290,7 @@ int main(int argc, char *argv[])
 		printf("AVAIL: %6sB\n", string_metric(sum_avail, -1, 0));
 		printf("INUSE: %6sB\n", string_metric(sum_total - sum_avail, -1, 0));
 	} else if(mode == MODE_TABLE) {
-		jx_table_print_footer(headers,stdout);
+		jx_table_print_footer(headers,stdout,columns);
 	} else if(mode==MODE_LONG) {
 		printf("\n]\n");
 	}

@@ -23,8 +23,8 @@ struct jx_table {
 	int width;
 };
 
-void jx_table_print_header( struct jx_table *t, FILE *f );
-void jx_table_print( struct jx_table *t, struct jx *j, FILE *f );
-void jx_table_print_footer( struct jx_table *t, FILE *f );
+void jx_table_print_header( struct jx_table *t, FILE *f, int columns );
+void jx_table_print( struct jx_table *t, struct jx *j, FILE *f, int columns );
+void jx_table_print_footer( struct jx_table *t, FILE *f, int columns );
 
 #endif

@@ -274,8 +274,8 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 }
 
 static struct jx_table queue_headers[] = {
-{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 18},
-{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 21},
+{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -18},
+{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -21},
 {"port",          "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
 {"tasks_waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
 {"tasks_running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
@@ -312,7 +312,14 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		return;
 	}
 
-	jx_table_print_header(queue_headers,stdout);
+	int columns = 80;
+	char *column_str = getenv("COLUMNS");
+	if(column_str) {
+		columns = atoi(column_str);
+		columns = columns < 1 ? 80 : columns;
+	}
+
+	jx_table_print_header(queue_headers,stdout,columns);
 
 	struct jx *j;
 	if(masters && list_size(masters) > 0)
@@ -322,7 +329,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		list_first_item(masters);
 		while((j = list_next_item(masters)))
 		{
-			jx_table_print(queue_headers, j, stdout);
+			jx_table_print(queue_headers, j, stdout, columns);
 		}
 	}
 
@@ -333,7 +340,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		list_first_item(foremen);
 		while((j = list_next_item(foremen)))
 		{
-			jx_table_print(queue_headers, j, stdout);
+			jx_table_print(queue_headers, j, stdout, columns);
 
 		}
 	}
