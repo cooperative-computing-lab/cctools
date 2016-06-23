@@ -211,7 +211,6 @@ config_mysql_path=auto
 config_perl_path=auto
 config_python_path=auto
 config_python3_path=auto
-config_zlib_path=yes
 
 config_irods_path=no
 config_xrootd_path=no
@@ -262,57 +261,116 @@ do
 			;;
 		--with-globus-path)
 			globus_path=${arg}
-			config_globus_path=yes
+			if [ "$globus_path" = 'no' ];
+			then
+				config_globus_path=no
+			else
+				config_globus_path=yes
+			fi
 			;;
 		--globus-flavor)
 			globus_flavor=${arg}
 			;;
 		--with-readline-path)
 			readline_path=${arg}
-			config_readline_path=yes
+			if [ "$readline_path" = 'no' ];
+			then
+				config_readline_path=no
+			else
+				config_readline_path=yes
+			fi
 			;;
 		--with-fuse-path)
 			fuse_path=${arg}
-			config_fuse_path=yes
+			if [ "$fuse_path" = 'no' ];
+			then
+				config_fuse_path=no
+			else
+				config_fuse_path=yes
+			fi
 			;;
 		--with-irods-path)
 			irods_path=${arg}
-			config_irods_path=yes
+			if [ "$irods_path" = 'no' ];
+			then
+				config_irods_path=no
+			else
+				config_irods_path=yes
+			fi
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
-			config_mysql_path=yes
+			if [ "$mysql_path" = 'no' ];
+			then
+				config_mysql_path=no
+			else
+				config_mysql_path=yes
+			fi
 			;;
 		--with-perl-path)
 			perl_path=${arg}
-			config_perl_path=yes
+			if [ "$perl_path" = 'no' ];
+			then
+				config_perl_path=no
+			else
+				config_perl_path=yes
+			fi
 			;;
 		--with-python-path)
 			python_path=${arg}
-			config_python_path=yes
+			if [ "$python_path" = 'no' ];
+			then
+				config_python_path=no
+			else
+				config_python_path=yes
+			fi
 			;;
 		--with-python3-path)
 			python3_path=${arg}
-			config_python3_path=yes
+			if [ "$python3_path" = 'no' ];
+			then
+				config_python3_path=no
+			else
+				config_python3_path=yes
+			fi
 			;;
 		--with-xrootd-path)
 			xrootd_path=${arg}
-			config_xrootd_path=yes
+			if [ "$xrootd_path" = 'no' ];
+			then
+				config_xrootd_path=no
+			else
+				config_xrootd_path=yes
+			fi
 			;;
 		--with-cvmfs-path)
 			cvmfs_path=${arg}
-			config_cvmfs_path=yes
+			if [ "$cvmfs_path" = 'no' ];
+			then
+				config_cvmfs_path=no
+			else
+				config_cvmfs_path=yes
+			fi
 			;;
 		--with-uuid-path)
 			uuid_path=${arg}
 			;;
 		--with-zlib-path)
 			zlib_path=${arg}
-			config_zlib_path=yes
+			if [ "$zlib_path" = 'no' ];
+			then
+				echo "*** zlib is not optional"
+				exit 1
+			fi
 			;;
 		--with-swig-path)
 			swig_path=${arg}
-			config_swig_path=yes
+			if [ "$swig_path" = 'no' ];
+			then
+				config_swig_path=no
+			else
+				config_swig_path=yes
+			fi
 			;;
 		--without-system-sand)
 			include_package_sand=""
@@ -530,7 +588,7 @@ fi
 
 echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
 
-if [ $config_globus_path != no ]
+if [ "$config_globus_path" != no ]
 then
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
