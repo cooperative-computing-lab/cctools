@@ -1659,7 +1659,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	timestamp_t effective_stoptime = 0;
 	time_t stoptime;
 
-	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid, loop device
+	//Format: task completion status, exit status (exit code or signal), output length, execution time, taskid
 	char items[5][WORK_QUEUE_PROTOCOL_FIELD_MAX];
 	int n = sscanf(line, "result %s %s %s %s %" SCNd64"", items[0], items[1], items[2], items[3], &taskid);
 
@@ -1694,8 +1694,12 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	t->total_cmd_execution_time += t->cmd_execution_time;
 
-	if(task_status == WORK_QUEUE_RESULT_DISK_ALLOC_FULL) { t->disk_alloc_full = 1; }
-	else { t->disk_alloc_full = 0; }
+	if(task_status == WORK_QUEUE_RESULT_DISK_ALLOC_FULL) {
+		t->disk_loop_device_exhausted = 1;
+	}
+	else {
+		t->disk_loop_device_exhausted = 0;
+	}
 
 	if(q->bandwidth) {
 		effective_stoptime = (output_length/q->bandwidth)*1000000 + timestamp_get();
