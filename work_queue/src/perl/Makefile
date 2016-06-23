@@ -23,7 +23,7 @@ work_queue_wrap.c work_queue.pm: work_queue.i $(EXTERNAL_DEPENDENCIES)
 $(WQPERLSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) work_queue_wrap.c
+	rm -f $(OBJECTS) $(TARGETS) *.o work_queue_wrap.c
 
 test: all
 

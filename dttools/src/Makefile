@@ -140,7 +140,7 @@ auth_test: auth_test.o libdttools.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) auth_test.o
+	rm -f $(OBJECTS) $(TARGETS) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
