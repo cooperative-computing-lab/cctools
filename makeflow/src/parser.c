@@ -51,6 +51,7 @@ See the file COPYING for details.
 
 static int dag_parse(struct dag *d, FILE * dag_stream);
 static int dag_parse_variable(struct lexer *bk, struct dag_node *n);
+static int dag_parse_directive(struct lexer *bk, struct dag_node *n);
 static int dag_parse_node(struct lexer *bk);
 static int dag_parse_syntax(struct lexer *bk);
 static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n);
@@ -240,6 +241,9 @@ static int dag_parse(struct dag *d, FILE *stream)
 		case TOKEN_VARIABLE:
 			dag_parse_variable(bk, NULL);
 			break;
+		case TOKEN_DIRECTIVE:
+			dag_parse_directive(bk, NULL);
+			break;
 		default:
 			lexer_report_error(bk, "Unexpected token. Expected one of NEWLINE, SPACE, SYNTAX, FILES, or VARIABLE, but got: %s\n:", lexer_print_token(t));
 			break;
@@ -400,6 +404,68 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 
 	free(name);
 	free(value);
+
+	return result;
+}
+
+static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
+{
+	struct token *t = lexer_next_token(bk);
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Literal variable name expected.");
+	}
+
+	char *name = xxstrdup(t->lexeme);
+	lexer_free_token(t);
+
+	int result = 1;
+	if(!strcmp(".SIZE", name)){
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		char *filename = xxstrdup(t->lexeme);
+
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		char *size = xxstrdup(t->lexeme);
+		lexer_free_token(t);
+
+		struct dag_file *f = NULL;
+		if(filename)
+			f = dag_file_lookup_or_create(bk->d, filename);
+		if(f)
+			f->estimated_size = string_metric_parse(size);
+
+		free(filename);
+		free(size);
+	} else if(!strcmp(".RESOURCE", name)){
+
+		struct hash_table *current_table;
+		int nodeid;
+		if(n)
+		{
+			current_table = n->variables;
+			nodeid        = n->nodeid;
+		}
+		else
+		{
+			current_table = bk->category->mf_variables;
+			nodeid        = bk->d->nodeid_counter;
+		}
+	} else {
+		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", t->lexeme);
+		result = 0;
+	}
+
+	free(name);
 
 	return result;
 }
