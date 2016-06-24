@@ -23,6 +23,7 @@
 
 static int counter = 0;
 static int finished_tasks[NUM_OF_TASKS];
+static int num_finished_tasks = 0;
 
 static int is_in_array(int a, int *int_array, int size) 
 {
@@ -108,7 +109,6 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 	size_t len = 0;
 	ssize_t read_len;
 	FILE *fp;
-	fp = fopen(FILE_FINISH_TASKS, "r");
 
 	while(1) {
 
@@ -117,20 +117,29 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 		// if the file size has changed
 		if (oup_fn_stat.st_size - oup_fn_size > 0) {
 			char *task_id_ch;
-			char *task_stat_ch;
+			char *task_stat_str;
 			int task_id;
-			
+					
+			fp = fopen(FILE_FINISH_TASKS, "r");
 	    	while((read_len = getline(&line, &len, fp)) != -1) {
+
+				// trim the newline character
+				if (line[read_len-1] == '\n') {
+					line[read_len-1] = '\0';
+					--read_len;
+				}
+
 				task_id_ch = strtok(line, " ");
 				task_id = atoi(task_id_ch);
 
 				// There is a new task finished
-				if(!is_in_array(task_id, finished_tasks, NUM_OF_TASKS)) {
-					struct batch_job_info *info = itable_remove(q->job_table, task_id);	
+				if(!is_in_array(task_id, finished_tasks, num_finished_tasks)) {
+					struct batch_job_info *info = itable_remove(q->job_table, task_id);
+				    	
 					info->finished = time(0);
-					task_stat_ch = strtok(NULL, " ");
+					task_stat_str = strtok(NULL, " ");
 
-					if (strcmp(task_stat_ch, "finished") == 0) {
+					if (strcmp(task_stat_str, "finished") == 0) {
 						info->exited_normally = 1;
 					} else {
 						info->exited_normally = 0;
@@ -139,6 +148,10 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 					memcpy(info_out, info, sizeof(*info));
 					free(info);
 					fclose(fp);
+
+					finished_tasks[num_finished_tasks] = task_id;	
+					num_finished_tasks++;
+
 					return task_id;
 				}
 			}

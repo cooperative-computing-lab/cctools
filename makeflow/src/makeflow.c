@@ -87,6 +87,7 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+#define FILE_RUN_TASKS "task_to_run" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -1927,6 +1928,13 @@ if (enforcer && wrapper_umbrella) {
             unlink(CONTAINER_DOCKER_SH);
         }
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		FILE *fp;
+		fp = fopen(FILE_RUN_TASKS, "a");
+		fputs("done", fp);
+		fclose(fp);
+	}
+
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
@@ -1940,6 +1948,8 @@ if (enforcer && wrapper_umbrella) {
 		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
+
+	
 
 	return 0;
 }
