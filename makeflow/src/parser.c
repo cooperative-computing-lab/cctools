@@ -259,6 +259,27 @@ static int dag_parse(struct dag *d, FILE *stream)
 	return 1;
 }
 
+static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int nodeid, char* value)
+{
+	/* If we have never seen this label, then create
+	 * a new category, otherwise retrieve the category. */
+	struct category *category = makeflow_category_lookup_or_create(bk->d, value);
+
+	/* If we are parsing inside a node, make category
+	 * the category of the node, but do not update
+	 * the global task_category. Else, update the
+	 * global task category. */
+	if(n) {
+		n->category = category;
+		debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
+	}
+	else {
+		/* set value of current category */
+		bk->category = category;
+		dag_variable_add_value("CATEGORY", bk->category->mf_variables, nodeid, value);
+	}
+}
+
 //return 1 if name was processed as special variable, 0 otherwise
 static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
@@ -267,23 +288,7 @@ static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node 
 
 	if(strcmp("CATEGORY", name) == 0 || strcmp("SYMBOL", name) == 0) {
 		special = 1;
-		/* If we have never seen this label, then create
-		 * a new category, otherwise retrieve the category. */
-		struct category *category = makeflow_category_lookup_or_create(d, value);
-
-		/* If we are parsing inside a node, make category
-		 * the category of the node, but do not update
-		 * the global task_category. Else, update the
-		 * global task category. */
-		if(n) {
-			n->category = category;
-			debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
-		}
-		else {
-			/* set value of current category */
-			bk->category = category;
-			dag_variable_add_value("CATEGORY", bk->category->mf_variables, nodeid, value);
-		}
+		dag_parse_process_category(bk, n, nodeid, value);
 	}
 	/* else if some other special variable .... */
 	/* ... */
@@ -347,13 +352,9 @@ static int dag_parse_syntax(struct lexer *bk)
 	return 1;
 }
 
-static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
+static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char mode)
 {
 	struct token *t = lexer_next_token(bk);
-	char mode       = t->lexeme[0];            //=, or + (assign or append)
-	lexer_free_token(t);
-
-	t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
 	{
 		lexer_report_error(bk, "Literal variable name expected.");
@@ -408,6 +409,15 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	return result;
 }
 
+static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
+{
+	struct token *t = lexer_next_token(bk);
+	char mode       = t->lexeme[0];            //=, or + (assign or append)
+	lexer_free_token(t);
+
+	return dag_parse_variable_wmode(bk, n, mode);
+}
+
 static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t = lexer_next_token(bk);
@@ -451,19 +461,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 		free(filename);
 		free(size);
 	} else if(!strcmp(".RESOURCE", name)){
-
-		struct hash_table *current_table;
-		int nodeid;
-		if(n)
-		{
-			current_table = n->variables;
-			nodeid        = n->nodeid;
-		}
-		else
-		{
-			current_table = bk->category->mf_variables;
-			nodeid        = bk->d->nodeid_counter;
-		}
+		dag_parse_variable_wmode(bk, n, '=');
 	} else {
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", t->lexeme);
 		result = 0;
@@ -571,6 +569,9 @@ static int dag_parse_node(struct lexer *bk)
 		switch (t->type) {
 		case TOKEN_VARIABLE:
 			dag_parse_variable(bk, n);
+			break;
+		case TOKEN_DIRECTIVE:
+			dag_parse_directive(bk, n);
 			break;
 		default:
 			lexer_report_error(bk, "Expected COMMAND or VARIABLE, got: %s", lexer_print_token(t));
