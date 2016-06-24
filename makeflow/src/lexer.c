@@ -1054,21 +1054,26 @@ int lexer_read_directive(struct lexer *lx, struct token *name)
 
 	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_DIRECTIVE));
 	lexer_push_token(lx, name);
+
 	int c;
 
+	lexer_discard_white_space(lx);
+
 	while((c = lexer_next_peek(lx)) != '\n') {
-		lexer_discard_white_space(lx);
 		if(c == '#') {
 			lexer_discard_comments(lx);
 			lexer_roll_back(lx, 1);	//Recover the newline
 			break;
 		}
 
-		lexer_push_token(lx, lexer_read_syntax_name(lx));
+		lexer_read_literal(lx);
+		struct token *t = lexer_pack_token(lx, TOKEN_LITERAL);
+		lexer_push_token(lx, t);
+		lexer_discard_white_space(lx);
 	}
 
-	if(lexer_next_char(lx) != '\n')
-		lexer_report_error(lx, "Missing newline at end of directive definition.");
+	lexer_add_to_lexeme(lx, lexer_next_char(lx));	//Drop the newline
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_NEWLINE));
 
 	return 1;
 }
@@ -1165,8 +1170,6 @@ int lexer_read_syntax_or_variable(struct lexer * lx)
 
 	char c = lexer_next_peek(lx);
 	struct token *name = lexer_read_syntax_name(lx);
-
-	printf("%s\n", name->lexeme);
 
 	if(strcmp("export", name->lexeme) == 0)
 		return lexer_read_syntax_export(lx, name);

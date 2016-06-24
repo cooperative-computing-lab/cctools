@@ -411,9 +411,13 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t = lexer_next_token(bk);
+	lexer_free_token(t);
+
+
+	t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
 	{
-		lexer_report_error(bk, "Literal variable name expected.");
+		lexer_report_error(bk, "Literal directive expected.");
 	}
 
 	char *name = xxstrdup(t->lexeme);
