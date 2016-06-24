@@ -22,17 +22,17 @@
 #define NUM_OF_TASKS 1024
 
 static int counter = 0;
-static int finished_task[NUM_OF_TASKS];
+static int finished_tasks[NUM_OF_TASKS];
 
-static bool is_in_array(int a, int *int_array, int size) 
+static int is_in_array(int a, int *int_array, int size) 
 {
 	int i = 0;
 	for(i = 0; i < size; i++) {
 		if(int_array[i] == a) {
-			return true;
+			return 1;
 		}
 	}
-	return false;
+	return 0;
 }
 
 static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
@@ -94,14 +94,11 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 
-	return 0;
-	/*
 	// read FILE_FINISH_TASKS and check if there is job finished
 	// remove the job from batch_queue->job_table 
 
 	struct stat oup_fn_stat;
-	int oup_fn_status = 0;
-	oup_fn_status = stat(FILE_FINISH_TASKS, &oup_fn_stat);
+	stat(FILE_FINISH_TASKS, &oup_fn_stat);
 	off_t oup_fn_size = oup_fn_stat.st_size;
 
 	// polling the FILE_FINISH_TASKS to check if there is
@@ -115,19 +112,20 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 
 	while(1) {
 
-		oup_fn_status = stat(FILE_FINISH_TASKS, &oup_fn_stat);
+		stat(FILE_FINISH_TASKS, &oup_fn_stat);
+
 		// if the file size has changed
 		if (oup_fn_stat.st_size - oup_fn_size > 0) {
 			char *task_id_ch;
 			char *task_stat_ch;
 			int task_id;
 			
-	    	while((read_len = getline(&line, &len, )) != -1) {
+	    	while((read_len = getline(&line, &len, fp)) != -1) {
 				task_id_ch = strtok(line, " ");
 				task_id = atoi(task_id_ch);
 
 				// There is a new task finished
-				if(!is_in_array(task_id, finished_tasks)) {
+				if(!is_in_array(task_id, finished_tasks, NUM_OF_TASKS)) {
 					struct batch_job_info *info = itable_remove(q->job_table, task_id);	
 					info->finished = time(0);
 					task_stat_ch = strtok(NULL, " ");
@@ -151,7 +149,6 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 
 		oup_fn_size = oup_fn_stat.st_size;	
 	}
-	*/
 
 }
 
