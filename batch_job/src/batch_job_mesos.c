@@ -6,6 +6,8 @@
 #include "stringtools.h"
 #include "path.h"
 #include "xxmalloc.h"
+#include "jx.h"
+#include "jx_print.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -19,7 +21,7 @@
 #define FILE_RUN_TASKS "task_to_run"
 #define FILE_FINISH_TASKS "finished_tasks"
 
-#define NUM_OF_TASKS 1024
+#define NUM_OF_TASKS 4096
 
 static int counter = 0;
 static int finished_tasks[NUM_OF_TASKS];
