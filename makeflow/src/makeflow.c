@@ -994,7 +994,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	printf(" %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	printf(" %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
-	printf(" %-30s Disable Work Queue caching.				 (default is false)\n", "   --disable-wq-cache");
+	printf(" %-30s Disable batch system caching.				 (default is false)\n", "   --disable-cache");
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
