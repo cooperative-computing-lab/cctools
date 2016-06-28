@@ -5538,9 +5538,16 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			continue;
 		}
 
-		if( q->process_pending_check && process_pending() ) {
-			events++;
-			break;
+		if(q->process_pending_check) {
+
+			BEGIN_ACCUM_TIME(q, time_internal);
+			int pending = process_pending();
+			END_ACCUM_TIME(q, time_internal);
+
+			if(pending) {
+				events++;
+				break;
+			}
 		}
 
 		// return if queue is empty.
@@ -5557,11 +5564,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 	}
 
+	BEGIN_ACCUM_TIME(q, time_internal);
 	if(events > 0) {
 		log_queue_stats(q);
 	}
-
 	q->last_outside_waiting = timestamp_get();
+	END_ACCUM_TIME(q, time_internal);
 
 	return t;
 }
