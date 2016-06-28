@@ -1928,13 +1928,6 @@ if (enforcer && wrapper_umbrella) {
             unlink(CONTAINER_DOCKER_SH);
         }
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		FILE *fp;
-		fp = fopen(FILE_RUN_TASKS, "a");
-		fputs("done", fp);
-		fclose(fp);
-	}
-
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
@@ -1946,6 +1939,14 @@ if (enforcer && wrapper_umbrella) {
 	} else {
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
+
+		if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+			FILE *fp;
+			fp = fopen(FILE_RUN_TASKS, "a");
+			fputs("done", fp);
+			fclose(fp);
+		}
+
 		exit(EXIT_SUCCESS);
 	}
 
