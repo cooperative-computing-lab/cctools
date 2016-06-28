@@ -1652,13 +1652,6 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		FILE *fp;
-		fp = fopen(FILE_RUN_TASKS, "a");
-		fputs("done", fp);
-		fclose(fp);
-	}
-
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
@@ -1670,6 +1663,14 @@ int main(int argc, char *argv[])
 	} else {
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
+
+		if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+			FILE *fp;
+			fp = fopen(FILE_RUN_TASKS, "a");
+			fputs("done", fp);
+			fclose(fp);
+		}
+
 		exit(EXIT_SUCCESS);
 	}
 
