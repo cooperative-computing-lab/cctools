@@ -164,6 +164,11 @@ struct work_queue {
 
 	char *catalog_hosts;
 
+	time_t catalog_last_update_time;
+	time_t resources_last_update_time;
+	int    busy_waiting_flag;
+	time_t last_outside_waiting;
+
 	category_mode_t allocation_default_mode;
 
 	FILE *logfile;
@@ -640,13 +645,11 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
-	static time_t last_update_time = 0;
-
 	// Only advertise if we have a name.
 	if(!q->name) return;
 
 	// Only advertise every last_update_time seconds.
-	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
+	if(!force_update && (time(0) - q->catalog_last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
 		return;
 
 	// If host and port are not set, pick defaults.
@@ -663,7 +666,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	// Clean up.
 	free(str);
 	jx_delete(j);
-	last_update_time = time(0);
+	q->catalog_last_update_time = time(0);
 }
 
 static void clean_task_state(struct work_queue_task *t) {
@@ -4473,6 +4476,8 @@ struct work_queue *work_queue_create(int port)
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
 
+	q->last_outside_waiting = timestamp_get();
+
 	q->master_preferred_connection = xxstrdup("by_ip");
 
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
@@ -4740,15 +4745,13 @@ void work_queue_delete(struct work_queue *q)
 }
 
 void update_resource_report(struct work_queue *q) {
-	static time_t last_update_time = 0;
-
 	// Only measure every few seconds.
-	if((time(0) - last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
+	if((time(0) - q->resources_last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
 
-	last_update_time = time(0);
+	q->resources_last_update_time = time(0);
 }
 
 void work_queue_disable_monitoring(struct work_queue *q) {
@@ -5144,13 +5147,13 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active, int busy_waiting)
+static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	int n = build_poll_table(q, foreman_uplink);
 
 	// We poll in at most small time segments (1/4 of a second). This lets
 	// promptly dispatch tasks, while avoiding busy waiting.
-	int msec = busy_waiting ? 250 : 0;
+	int msec = q->busy_waiting_flag ? 250 : 0;
 	if(stoptime) {
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
@@ -5235,11 +5238,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
    - go to S
 */
 {
-	static int busy_waiting = 0;
-
-	static timestamp_t last_left_time = 0;
-	if(last_left_time!=0) {
-		q->stats->total_app_time += timestamp_get() - last_left_time;
+	if(q->last_outside_waiting!=0) {
+		q->stats->total_app_time += timestamp_get() - q->last_outside_waiting;
 	}
 
 	print_password_warning(q);
@@ -5256,7 +5256,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			last_left_time = timestamp_get();
+			q->last_outside_waiting = timestamp_get();
 
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
@@ -5278,8 +5278,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			update_resource_report(q);
 
 		// retrieve worker status messages
-		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active, busy_waiting);
-		busy_waiting = 0;
+		poll_active_workers(q, stoptime, foreman_uplink, foreman_uplink_active);
+		q->busy_waiting_flag = 0;
 
 		// tasks waiting to be retrieved?
 		if(receive_one_task(q)) {
@@ -5318,7 +5318,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 		/* if we got here, no events were triggered. we set the busy_waiting
 		 * flag so that link_poll waits for some time the next time around. */
-		busy_waiting = 1;
+		q->busy_waiting_flag = 1;
 
 		// If the foreman_uplink is active then break so the caller can handle it.
 		if(foreman_uplink) {
@@ -5326,7 +5326,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 	}
 
-	last_left_time = timestamp_get();
+	q->last_outside_waiting = timestamp_get();
 
 	return t;
 }
