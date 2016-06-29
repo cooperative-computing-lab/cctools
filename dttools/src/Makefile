@@ -151,7 +151,7 @@ libforce_halt_enospc.so: libforce_halt_enospc.o
 	$(CCTOOLS_CC) -shared -fPIC $^ -o $@ -ldl
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) auth_test.o
+	rm -f $(OBJECTS) $(TARGETS) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
