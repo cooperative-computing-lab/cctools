@@ -484,7 +484,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
-	command = makeflow_wrap_monitor(command, n, monitor);
+	command = makeflow_wrap_monitor(command, n, queue, monitor);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -629,7 +629,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
 */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info)
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job_info *info)
 {
 	struct dag_file *f;
 	int job_failed = 0;
@@ -640,7 +640,13 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
-		char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
+		char *output_prefix = NULL;
+ 		if(batch_queue_supports_feature(queue, "output_directories") || n->local_job) {
+			output_prefix = xxstrdup(monitor->log_prefix);
+		} else {
+			output_prefix = xxstrdup(path_basename(monitor->log_prefix));
+		}
+		char *log_name_prefix = string_replace_percents(output_prefix, nodeid);
 		char *summary_name = string_format("%s.summary", log_name_prefix);
 
 		if(n->resources_measured)
@@ -648,6 +654,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		n->resources_measured = rmsummary_parse_file_single(summary_name);
 
 		category_accumulate_summary(n->category, n->resources_measured, NULL);
+
+		makeflow_monitor_move_output_if_needed(n, queue, monitor);
 
 		free(nodeid);
 		free(log_name_prefix);
@@ -881,7 +889,7 @@ static void makeflow_run( struct dag *d )
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
-					makeflow_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, remote_queue, &info);
 			}
 		}
 
@@ -900,7 +908,7 @@ static void makeflow_run( struct dag *d )
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
-					makeflow_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, local_queue, &info);
 			}
 		}
 
@@ -1590,21 +1598,6 @@ int main(int argc, char *argv[])
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
 	}
 
-	if(monitor) {
-		if(!log_dir)
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
-
-		if(!log_format)
-			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
-
-		if(monitor->interval < 1)
-			fatal("Monitoring interval should be positive.");
-
-		makeflow_prepare_for_monitoring(monitor, remote_queue, log_dir, log_format);
-		free(log_dir);
-		free(log_format);
-	}
-
 	makeflow_parse_input_outputs(d);
 	makeflow_prepare_nested_jobs(d);
 
@@ -1625,6 +1618,21 @@ int main(int argc, char *argv[])
 	setlinebuf(stderr);
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check );
+
+	if(monitor) {
+		if(!log_dir)
+			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
+
+		if(!log_format)
+			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
+
+		if(monitor->interval < 1)
+			fatal("Monitoring interval should be positive.");
+
+		makeflow_prepare_for_monitoring(d, monitor, remote_queue, log_dir, log_format);
+		free(log_dir);
+		free(log_format);
+	}
 
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
