@@ -174,8 +174,13 @@ struct work_queue {
 	int transfer_outlier_factor;
 	int default_transfer_rate;
 
-	char *catalog_host;
-	int catalog_port;
+	char  *catalog_host;
+	int    catalog_port;
+
+	time_t catalog_last_update_time;
+	time_t resource_last_update_time;
+	time_t last_outside_wait_time;
+	time_t busy_waiting_flag;
 
 	FILE *logfile;
 	int keepalive_interval;
@@ -639,14 +644,13 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 
 void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force_update )
 {
-	static time_t last_update_time = 0;
 	char address[LINK_ADDRESS_MAX];
 
 	// Only advertise if we have a name.
 	if(!q->name) return;
 
 	// Only advertise every last_update_time seconds.
-	if(!force_update && (time(0) - last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
+	if(!force_update && (time(0) - q->catalog_last_update_time) < WORK_QUEUE_UPDATE_INTERVAL)
 		return;
 
 	// If host and port are not set, pick defaults.
@@ -657,7 +661,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	if(!domain_name_cache_lookup(q->catalog_host, address)) {
 		debug(D_WQ,"could not resolve address of catalog server %s!",q->catalog_host);
 		// don't try again until the next update period
-		last_update_time = time(0);
+		q->catalog_last_update_time = time(0);
 		return;
 	}
 
@@ -672,7 +676,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	// Clean up.
 	free(str);
 	jx_delete(j);
-	last_update_time = time(0);
+	q->catalog_last_update_time = time(0);
 }
 
 static void clean_task_state(struct work_queue_task *t) {
@@ -4609,15 +4613,13 @@ void work_queue_delete(struct work_queue *q)
 }
 
 void update_resource_report(struct work_queue *q) {
-	static time_t last_update_time = 0;
-
 	// Only measure every few seconds.
-	if((time(0) - last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
+	if((time(0) - q->resource_last_update_time) < WORK_QUEUE_RESOURCE_MEASUREMENT_INTERVAL)
 		return;
 
 	rmonitor_measure_process_update_to_peak(q->measured_local_resources, getpid());
 
-	last_update_time = time(0);
+	q->resource_last_update_time = time(0);
 }
 
 void work_queue_disable_monitoring(struct work_queue *q) {
@@ -4983,8 +4985,6 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 {
 	int n = build_poll_table(q, foreman_uplink);
 
-	static int busy_waiting = 0;
-
 	// Wait no longer than the caller's patience.
 	int msec;
 	if(stoptime) {
@@ -4997,12 +4997,12 @@ static int wait_loop_poll_links(struct work_queue *q, int stoptime, struct link 
 	// on a message. However, take care of not busy waiting, if no available
 	// worker can execute a task in the ready list.
 
-	if( (last_tasks_transfered || !busy_waiting) && available_workers(q) > 0 && (task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL)) ) {
+	if( (last_tasks_transfered || !q->busy_waiting_flag) && available_workers(q) > 0 && (task_state_any(q, WORK_QUEUE_TASK_READY) || task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL)) ) {
 		msec = 0;
-		busy_waiting = 1;        //Mark that we may be busy waiting, so that if no task are transfered, we force a wait next cycle.
+		q->busy_waiting_flag = 1;        //Mark that we may be busy waiting, so that if no task are transfered, we force a wait next cycle.
 	}
 	else {
-		busy_waiting = 0;
+		q->busy_waiting_flag = 0;
 	}
 
 	// Poll all links for activity.
@@ -5128,9 +5128,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	time_t stoptime;
 	int    tasks_transfered = 0;
 
-	static timestamp_t last_left_time = 0;
-	if(last_left_time!=0) {
-		q->total_app_time += timestamp_get() - last_left_time;
+	if(q->last_outside_wait_time !=0) {
+		q->total_app_time += timestamp_get() - q->last_outside_wait_time;
 	}
 
 	print_password_warning(q);
@@ -5155,7 +5154,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			last_left_time = timestamp_get();
+			q->last_outside_wait_time = timestamp_get();
 
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
@@ -5217,7 +5216,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 	}
 
-	last_left_time = timestamp_get();
+	q->last_outside_wait_time = timestamp_get();
 
 	return 0;
 }
