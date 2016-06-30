@@ -311,7 +311,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		p = f1->created_by;
 		if(p) {
 			makeflow_node_force_rerun(rerun_table, d, p);
-			f1->ref_count += 1;
+			f1->reference_count += 1;
 		}
 	}
 
@@ -605,6 +605,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 		else {
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
+			f->actual_size = buf.st_size;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
@@ -761,8 +762,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			f->ref_count+= -1;
-			if(f->ref_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
+			f->reference_count+= -1;
+			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 

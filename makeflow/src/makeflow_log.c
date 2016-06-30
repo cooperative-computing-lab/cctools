@@ -105,25 +105,25 @@ static void makeflow_log_sync( struct dag *d, int force )
 
 void makeflow_log_started_event( struct dag *d )
 {
-	fprintf(d->logfile, "# STARTED\t%" PRIu64 "\n", timestamp_get());
+	fprintf(d->logfile, "# STARTED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
 
 void makeflow_log_aborted_event( struct dag *d )
 {
-	fprintf(d->logfile, "# ABORTED\t%" PRIu64 "\n", timestamp_get());
+	fprintf(d->logfile, "# ABORTED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
 
 void makeflow_log_failed_event( struct dag *d )
 {
-	fprintf(d->logfile, "# FAILED\t%" PRIu64 "\n", timestamp_get());
+	fprintf(d->logfile, "# FAILED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
 
 void makeflow_log_completed_event( struct dag *d )
 {
-	fprintf(d->logfile, "# COMPLETED\t%" PRIu64 "\n", timestamp_get());
+	fprintf(d->logfile, "# COMPLETED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
 
@@ -149,7 +149,7 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 	f->state = newstate;
 
 	timestamp_t time = timestamp_get();
-	fprintf(d->logfile, "# %d %s %" PRIu64 "\n", f->state, f->filename, time);
+	fprintf(d->logfile, "# FILE %" PRIu64 " %s %d %" PRIu64 "\n", time, f->filename, f->state, dag_file_size(f));
 	if(f->state == DAG_FILE_STATE_EXISTS){
 		d->completed_files += 1;
 		f->creation_logged = (time_t) (time / 1000000);
@@ -161,7 +161,7 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
-	fprintf(d->logfile, "# GC\t%" PRIu64 "\t%d\t%" PRIu64 "\t%d\n", timestamp_get(), collected, elapsed, total_collected);
+	fprintf(d->logfile, "# GC %" PRIu64 " %d %" PRIu64 " %d\n", timestamp_get(), collected, elapsed, total_collected);
 	makeflow_log_sync(d,0);
 }
 
@@ -177,6 +177,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 	struct dag_file *f;
 	struct stat buf;
 	timestamp_t previous_completion_time;
+	uint64_t size;
 
 	d->logfile = fopen(filename, "r");
 	if(d->logfile) {
@@ -188,7 +189,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 		while((line = get_line(d->logfile))) {
 			linenum++;
 
-			if(sscanf(line, "# %d %s %" SCNu64 "", &file_state, file, &previous_completion_time) == 3) {
+			if(sscanf(line, "# FILE %" SCNu64 " %s %d %" SCNu64 "", &previous_completion_time, file, &file_state, &size) == 4) {
 
 				f = dag_file_lookup_or_create(d, file);
 				f->state = file_state;
@@ -198,10 +199,13 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 				} else if(file_state == DAG_FILE_STATE_DELETE){
 					d->deleted_files += 1;
 				}
+				free(line);
 				continue;
 			}
-			if(line[0] == '#')
+			if(line[0] == '#'){
+				free(line);
 				continue;
+			}
 			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
 				n = itable_lookup(d->node_table, nodeid);
 				if(n) {
@@ -209,11 +213,13 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 					n->jobid = jobid;
 					/* Log timestamp is in microseconds, we need seconds for diff. */
 					n->previous_completion = (time_t) (previous_completion_time / 1000000);
+					free(line);
 					continue;
 				}
 			}
 
 			fprintf(stderr, "makeflow: %s appears to be corrupted on line %d\n", filename, linenum);
+			free(line);
 			exit(1);
 		}
 		fclose(d->logfile);
@@ -312,7 +318,7 @@ void makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode,
 			struct dag_file *f;
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)))
-				f->ref_count += -1;
+				f->reference_count += -1;
 		}
 	}
 }
