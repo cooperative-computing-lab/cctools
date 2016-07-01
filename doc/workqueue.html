@@ -31,10 +31,10 @@ padding: 10px;
 <div id="manual">
 <h1>Work Queue User's Manual</h1>
 
-<p>Work Queue is Copyright (C) 2016- The University of Notre Dame.<br>
-All rights reserved.<br>
-This software is distributed under the GNU General Public License.<br>
-See the file COPYING for details.</p>
+<p>Work Queue is Copyright (C) 2016- The University of Notre Dame. 
+All rights reserved.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
 
 <h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -59,7 +59,7 @@ bioinformatics, data mining, and other fields.
 It can also be used as an execution system for the
 <a href="http://ccl.cse.nd.edu/software/makeflow">Makeflow</a> workflow engine.
 To see some of the Work Queue applications running right now,
-view the <a href=http://ccl.cse.nd.edu/software/workqueue/status>real time status page</a>.
+view the <a href="http://ccl.cse.nd.edu/software/workqueue/status">real time status page</a>.
 
 <p>
 
@@ -347,7 +347,7 @@ all is done, delete the queue:
 Full details of all of the Work Queue functions can be found in
 the <a href="http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html">Work Queue API</a>.
 
-<h2 id="names">Project names<a class="sectionlink" href="#names" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="names">Project Names and the Catalog Server<a class="sectionlink" href="#names" title="Link to this section.">&#x21d7;</a></h2>
 Keeping track of the master's hostname and port can get cumbersome, especially
 if there are multiple masters. To help with difficulty, we provide the project
 name feature to identify a Work Queue master with a more recognizable project
@@ -401,88 +401,6 @@ Your job 153097 ("worker.sh") has been submitted
 Your job 153098 ("worker.sh") has been submitted
 Your job 153099 ("worker.sh") has been submitted
 ...
-</pre></div>
-
-<h2 id="security">Security<a class="sectionlink" href="#security" title="Link to this section.">&#x21d7;</a></h2>
-
-<p>
-By default, Work Queue does <b>not</b> perform any authentication,
-so any workers will be able to connect to your master, and
-vice versa.  This may be fine for a short running anonymous application,
-but is not safe for a long running application with a public name.
-</p>
-<p>
-We recommend that you enable a password for your applications.  Create
-a file (e.g. <tt>mypwfile</tt>) that contains any password (or other
-long phrase) that you like (e.g. <tt>This is my password</tt>).  The password
-will be particular to your application and should not match any other
-passwords that you own.  Note that the contents of the file are taken
-verbatim as the password; this means that any new line character at
-the end of the phrase will be considered as part of the password.
-</p>
-<p>
-Then, modify your master program to use the password:
-</p>
-<div class="code_area">
-<h4 class="code_header">C/Perl</h4>
-<pre class="code_snip">
- work_queue_specify_password_file(q,mypwfile);
-</pre>
-<h4 class="code_header">Python</h4>
-<pre class="code_snip">
- q.specify_password_file(mypwfile)
-</pre>
-</div>
-<p>
-And give the <tt>--password</tt> option to give the same password file to your
-workers:
-</p>
-<div class="code_area"><pre class="code_snip">
-work_queue_worker --password mypwfile  MACHINENAME 9123
-</pre></div>
-<p>
-With this option enabled, both the master and the workers will
-verify that the other has the matching password before proceeding.
-The password is not sent in the clear, but is securely verified
-through a SHA1-based challenge-response protocol.
-</p>
-
-<h2 id="foremen">Work Queue Foremen<a class="sectionlink" href="#foremen" title="Link to this section.">&#x21d7;</a></h2>
-<p>A Work Queue foreman allows Work Queue workers to be managed in an
-hierarchical manner. Each foreman connects to the Work Queue master and accepts
-tasks as though it were a worker. It then accepts connections from Work Queue
-workers and dispatches tasks to them as if it were the master.</p>
-
-<p>A setup using foremen is beneficial when there are common files that need to
-be transmitted to workers and cached for subsequent executions.  In this case,
-the foremen transfer the common files to their workers without requiring any
-intervention from the master, thereby lowering the communication and transfer
-overheads at the master. </p>
-
-<p>Foremen are also useful when harnessing resources from multiple clusters. A
-foreman can be run on the head node of a cluster acting as a single
-communications hub for the workers in that cluster.  This reduces the network
-connections leaving the cluster and minimizes the transfer costs for sending
-data into the cluster over wide area networks. </p>
-
-<p>To start a Work Queue foreman, invoke <tt>work_queue_worker</tt> with the
-<tt>--foreman</tt> option. The foreman can advertise a project name using the
-<tt>-f,--foreman-name</tt> option to enable workers to find and connect to it
-without being given its hostname and port.  On the other end, the foreman will
-connect to the master with the same project name specified in <tt>-M</tt>
-argument (alternatively, the hostname and port of the master can be provided
-instead of its project name).
-
-<p>For example, to run a foreman that works for a master with project name
-<tt>myproject</tt> and advertises itself as <tt>foreman_myproject</tt>:
-<div class="code_area"><pre class="code_snip">
-% work_queue_worker -f foreman_myproject -M myproject
-</pre></div>
-
-<p>To run a worker that connects to a foreman, specify the foreman's project name
-in the <tt>-N</tt> option. For example:
-<div class="code_area"><pre class="code_snip">
-% work_queue_worker -N foreman_myproject
 </pre></div>
 
 <h2 id="multitask">Running Multiple Tasks per Worker<a class="sectionlink" href="#multitask" title="Link to this section.">&#x21d7;</a></h2>
@@ -539,9 +457,7 @@ specify its memory or disk requirements, then Work Queue will schedule two such
 tasks to a two-task worker, regardless of their memory or disk usage.
 </p>
 
-<h3 id="multitask_scripts">Submission scripts<a class="sectionlink" href="#multitask_script" title="Link to this section.">&#x21d7;</a></h3>
-
-<p> You may use the --cores, --memory, and --disk options when using batch
+<p> You may also use the --cores, --memory, and --disk options when using batch
 submission scripts such as <tt>condor_submit_workers</tt> or
 <tt>slurm_submit_workers</tt>, and the script will correctly ask the batch
 system for an appropiate node. 
@@ -575,7 +491,91 @@ cores:
 <p> The variables <tt> $cores </tt>, <tt> $memory </tt>, and <tt> $disk </tt>, have
 the values of the options passed to <tt>--cores</tt>, <tt>--memory</tt>, <tt>--disk. </tt>
 
-<h2 id="debugging">Debugging<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="foremen">Scaling Up with Foremen<a class="sectionlink" href="#foremen" title="Link to this section.">&#x21d7;</a></h2>
+<p>A Work Queue foreman allows Work Queue workers to be managed in an
+hierarchical manner. Each foreman connects to the Work Queue master and accepts
+tasks as though it were a worker. It then accepts connections from Work Queue
+workers and dispatches tasks to them as if it were the master.</p>
+
+<p>A setup using foremen is beneficial when there are common files that need to
+be transmitted to workers and cached for subsequent executions.  In this case,
+the foremen transfer the common files to their workers without requiring any
+intervention from the master, thereby lowering the communication and transfer
+overheads at the master. </p>
+
+<p>Foremen are also useful when harnessing resources from multiple clusters. A
+foreman can be run on the head node of a cluster acting as a single
+communications hub for the workers in that cluster.  This reduces the network
+connections leaving the cluster and minimizes the transfer costs for sending
+data into the cluster over wide area networks. </p>
+
+<p>To start a Work Queue foreman, invoke <tt>work_queue_worker</tt> with the
+<tt>--foreman</tt> option. The foreman can advertise a project name using the
+<tt>-f,--foreman-name</tt> option to enable workers to find and connect to it
+without being given its hostname and port.  On the other end, the foreman will
+connect to the master with the same project name specified in <tt>-M</tt>
+argument (alternatively, the hostname and port of the master can be provided
+instead of its project name).
+
+<p>For example, to run a foreman that works for a master with project name
+<tt>myproject</tt> and advertises itself as <tt>foreman_myproject</tt>:
+<div class="code_area"><pre class="code_snip">
+% work_queue_worker -f foreman_myproject -M myproject
+</pre></div>
+
+<p>To run a worker that connects to a foreman, specify the foreman's project name
+in the <tt>-N</tt> option. For example:
+<div class="code_area"><pre class="code_snip">
+% work_queue_worker -N foreman_myproject
+</pre></div>
+
+<h2 id="recommended">Recommended Practices<a class="sectionlink" href="#recommended" title="Link to this section.">&#x21d7;</a></h2>
+
+<h3 id="security">Security<a class="sectionlink" href="#security" title="Link to this section.">&#x21d7;</a></h3>
+
+<p>
+By default, Work Queue does <b>not</b> perform any authentication,
+so any workers will be able to connect to your master, and
+vice versa.  This may be fine for a short running anonymous application,
+but is not safe for a long running application with a public name.
+</p>
+<p>
+We recommend that you enable a password for your applications.  Create
+a file (e.g. <tt>mypwfile</tt>) that contains any password (or other
+long phrase) that you like (e.g. <tt>This is my password</tt>).  The password
+will be particular to your application and should not match any other
+passwords that you own.  Note that the contents of the file are taken
+verbatim as the password; this means that any new line character at
+the end of the phrase will be considered as part of the password.
+</p>
+<p>
+Then, modify your master program to use the password:
+</p>
+<div class="code_area">
+<h4 class="code_header">C/Perl</h4>
+<pre class="code_snip">
+ work_queue_specify_password_file(q,mypwfile);
+</pre>
+<h4 class="code_header">Python</h4>
+<pre class="code_snip">
+ q.specify_password_file(mypwfile)
+</pre>
+</div>
+<p>
+And give the <tt>--password</tt> option to give the same password file to your
+workers:
+</p>
+<div class="code_area"><pre class="code_snip">
+work_queue_worker --password mypwfile  MACHINENAME 9123
+</pre></div>
+<p>
+With this option enabled, both the master and the workers will
+verify that the other has the matching password before proceeding.
+The password is not sent in the clear, but is securely verified
+through a SHA1-based challenge-response protocol.
+</p>
+
+<h3 id="debugging">Debugging<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h3>
 <p>Work Queue can be set up to print debug messages at the master and worker to
 help troubleshoot failures,
 bugs, and errors.
@@ -635,10 +635,7 @@ work_queue_worker -d all MACHINENAME 9123
 work_queue_worker -d all -o worker.debug MACHINENAME 9123
 </pre></div>
 
-
-<h2 id="recommended">Recommended Practices<a class="sectionlink" href="#recommended" title="Link to this section.">&#x21d7;</a></h2>
-
-<h3> logging and plotting </h3>
+<h3>Logging and Plotting</h3>
 
 You can specify a log file to obtain a time series of work queue statistics. Usually this log file is specified just after the creation of the queue as follows:
 
@@ -672,7 +669,8 @@ transfering tasks, number of tasks running, and workers connected:
 We find it very helpful to plot these statistics when diagnosing a problem with
 work queue applications.
 
-<h3> stdout size limit </h3>
+<h3>Standard Output Limits</h3>
+
 <p> The output printed by a task to stdout can be accessed in the
 <tt>output</tt> buffer in <a
 href="api/html/structwork__queue__task.html">work_queue_task struct</a>. The
@@ -681,41 +679,52 @@ truncated. So, please redirect the stdout of the task to a file and specify the
 file as an output file of the task using <tt>work_queue_task_specify_file</tt>
 (<tt>specify_file</tt> in Python) as described above.
 
-<h2 id="advanced">Advanced Usage<a class="sectionlink" href="#advanced" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="advanced">Advanced Topics<a class="sectionlink" href="#advanced" title="Link to this section.">&#x21d7;</a></h2>
 
-The technique described above is suitable for distributed programs of
-tens to hundreds of workers.  As you scale your program up to larger sizes,
-you may find the following features helpful.  All are described in the
+A variety of advanced features are available for programs
+with unusual needs or very large scales.  Each feature is
+described briefly here, and more details may be found in
+the 
 <a href="http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html">Work Queue API</a>.
 
-<ul>
-<li><b>Pipelined Submission.</b>  If you have a <b>very</b> large number of tasks to run,
+<h3>Pipelined Submission.</h3>
+If you have a <b>very</b> large number of tasks to run,
 it may not be possible to submit all of the tasks, and then wait for all of them.  Instead,
 submit a small number of tasks, then alternate waiting and submiting to keep a constant
 number in the queue.  <tt>work_queue_hungry</tt> will tell you if more submission are warranted.
-<p>
-<li><b>Watched Files.</b>  If you would like to see the output of a task as it is produced,
+
+<h3>Watching Output Files</h3>
+
+If you would like to see the output of a task as it is produced,
 add WORK_QUEUE_WATCH to the flags argument of <tt>work_queue_specify_file</tt>.
 This will cause the worker to periodically send output appended to that file back to the master.
 This is useful for a program that produces a log or progress bar as part of its output.
-<p>
-<li><b>Asynchronous transfer.</b> If you have tasks with a balanced or large
+
+<h3>Asynchronous transfer</h3>
+
+If you have tasks with a balanced or large
 computation-to-data ratio, this feature can help improve the CPU utilization and
 lower the runtime overheads incurred due to data transfer. This feature
 asynchronously streams the data inputs and outputs to and from the workers when
 they are executing tasks. See <tt>work_queue_specify_asynchrony</tt>.
-<p>
-<li><b>Fast Abort.</b>  A large computation can often be slowed down by stragglers.  If you have
+
+<h3>Fast Abort</h3>
+
+A large computation can often be slowed down by stragglers.  If you have
 a large number of small tasks that take a short amount of time, then Fast Abort can help.
 The Fast Abort feature keeps statistics on tasks execution times and proactively aborts tasks
 that are statistical outliers.  See <tt>work_queue_activate_fast_abort</tt>.
-<p>
-<li><b>Immediate Data.</b>  For a large number of tasks or workers, it may be impractical
+
+<h3>Immediate Data</h3>
+
+For a large number of tasks or workers, it may be impractical
 to create local input files for each one.  If the master already has the necessary input
 data in memory, it can pass the data directly to the remote task with
 <tt>work_queue_task_specify_buffer</tt>.
-<p>
-<li><b>String Interpolation.</b>  If you have workers distributed across
+
+<h3>String Interpolation</h3>
+
+If you have workers distributed across
 multiple operating systems (such as Linux, Cygwin, Solaris) and/or architectures (such
 as i686, x86_64) and have files specific to each of these systems, this feature
 will help. The strings $OS and $ARCH are available for use in the specification of input
@@ -741,8 +750,10 @@ input file names for different platforms and architectures. Also, this is
 different from the $WORK_QUEUE_SANDBOX shell environment variable that exports
 the location of the working directory of the worker to its execution
 environment.
-<p>
-<li><b>Cancel Task.</b> This feature is useful in workflows where there are redundant tasks
+
+<h3>Task Cancellations</h3>
+
+This feature is useful in workflows where there are redundant tasks
 or tasks that become obsolete as other tasks finish. Tasks that have been submitted can be
 cancelled and immediately retrieved without waiting for Work Queue to return them in
 <tt>work_queue_wait</tt>. The tasks to cancel can be identified by either their
@@ -761,8 +772,9 @@ This cancels a task with <tt>tag</tt> named 'task3'. Note that in the presence o
 the same tag, <tt>work_queue_cancel_by_tasktag</tt> will cancel and retrieve only one of the
 matching tasks.
 
-<p>
-<li><b>Blacklist workers.</b> You may find that certain hosts are not correctly
+<h3>Worker Blacklist</h3>
+
+You may find that certain hosts are not correctly
 configured to run your tasks. The master can be directed to ignore certain
 workers with the blacklist feature. For example:
 
@@ -789,11 +801,11 @@ workers with the blacklist feature. For example:
 </pre>
 </div>
 
-<p>
-<li><b>Statistics.</b>  The queue tracks a fair number of statistics that count the number
+<h3>Performance Statistics</h3>
+
+The queue tracks a fair number of statistics that count the number
 of tasks, number of workers, number of failures, and so forth.  Obtain this data with <tt>work_queue_get_stats</tt>
 in order to make a progress bar or other user-visible information.
-</ul>
 
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
