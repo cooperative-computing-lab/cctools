@@ -527,7 +527,7 @@ negligible.  For example, if you annotate a task as using 1 core, but don't
 specify its memory or disk requirements, then Work Queue will schedule two such
 tasks to a two-slot worker, regardless of their memory or disk usage.
 
-<h3 id="multislot_scripts">Submission scripts<a class="sectionlink" href="#multislot_script" title="Link to this section.">&#x21d7;</a></h2>
+<h3 id="multislot_scripts">Submission scripts<a class="sectionlink" href="#multislot_script" title="Link to this section.">&#x21d7;</a></h3>
 
 <p> You may use the --cores, --memory, and --disk options when using batch
 submission scripts such as <tt>condor_submit_workers</tt> or
@@ -561,8 +561,7 @@ cores:
 </pre></div>
 
 <p> The variables <tt> $cores </tt>, <tt> $memory </tt>, and <tt> $disk </tt>, have
-the values of the options passed to <tt> --cores, </tt> <tt> --memory, <tt>
---disk. </tt>
+the values of the options passed to <tt>--cores</tt>, <tt>--memory</tt>, <tt>--disk. </tt>
 
 <h2 id="debugging">Debugging<a class="sectionlink" href="#debugging" title="Link to this section.">&#x21d7;</a></h2>
 <p>Work Queue can be set up to print debug messages at the master and worker to
@@ -615,12 +614,12 @@ href="http://ccl.cse.nd.edu/software/manuals/api/html/debug_8h.html">here</a>.
 </div>
 
 <p>To enable debugging at the worker, set the <tt>-d</tt> option:
-<div class ="code_area"><pre class="code_snip">
+<div class="code_area"><pre class="code_snip">
 work_queue_worker -d all MACHINENAME 9123
 </pre></div>
 
 <p>To redirect the debug messages, specify the <tt>-o</tt> option:
-<div class ="code_area"><pre class="code_snip">
+<div class="code_area"><pre class="code_snip">
 work_queue_worker -d all -o worker.debug MACHINENAME 9123
 </pre></div>
 
