@@ -12,34 +12,32 @@
 <div id="manual">
 <h1>Makeflow User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: March 2016</b></p>
-
-<p>Makeflow is Copyright (C) 2009- The University of Notre Dame.<br>
-This software is distributed under the GNU General Public License.<br>
-See the file COPYING for details.</p>
+<p>Makeflow is Copyright (C) 2016- The University of Notre Dame. This software is distributed under the GNU General Public License. See the file COPYING for details.</p>
 
 <h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>Makeflow is a <b>workflow engine</b> for distributed computing.  It accepts
-a specification of a large amount of work to be performed, and runs it on
+<p>Makeflow is a <b>workflow engine</b> for large scale distributed computing.
+It accepts a specification of a large amount of work to be performed,
+and runs it on
 remote machines in parallel where possible.  In addition, Makeflow is
 fault-tolerant, so you can use it to coordinate very large tasks that may run
 for days or weeks in the face of failures.  Makeflow is designed to be similar
 to <b>Make</b>, so if you can write a Makefile, then you can write a
 Makeflow.</p>
 
-<p>You can run a Makeflow on your local machine to test it out.  If you have a
-multi-core machine, then you can run multiple tasks simultaneously.  If you
-have a cluster or a batch system, then you can send your
-jobs there to run.  If you don't already have a batch system, Makeflow comes
-with a system called Work Queue that will let you distribute the load across
-any collection of machines, large or small.</p>
+<p>Makeflow makes it easy to move a large amount of work from one facility to another.  After writing a workflow, you can test it out on your local laptop,
+then run it at your university computing center, move it over to a national
+computing facility like <a href=http://www.xsede.org>XSEDE</a>, and
+then again to a commercial cloud system.  Tasks can also be run using
+Docker containers.  Using the (bundled) Work Queue system, you can
+even run across multiple systems simultaneously.  No matter where you run your tasks, the workflow language stays the same.</p>
 
-<p>Makeflow also supports the use of Docker containers to set up the
-appropriate environment for each task.  This requires that Docker is
-already operational on the machine sthat you intend to use.</p>
+<p>Makeflow is used in production to support large scale problems
+in science and engineering.  Researchers in fields such as bioinformatics,
+biometrics, geography, and high energy physics all use Makeflow to compose
+workflows from existing applications.</p>
 
-<p>Makeflow currently supports the following batch systems:
+<p>Makeflow currently supports these batch systems:
 <table>
 <tr><td>local    <td> Local execution on the submitting machine, using multiple cores if available.
 <tr><td>wq       <td> <a href=http://ccl.cse.nd.edu/software/workqueue>Work Queue</a> distributed application system, included with Makeflow.
@@ -127,9 +125,9 @@ you can direct Makeflow to run your jobs there:</p>
 
 <code>
 makeflow -T condor example.makeflow
-# or:
+
 makeflow -T sge example.makeflow
-# or:
+
 makeflow -T torque example.makeflow
 ...
 </code>
@@ -180,8 +178,7 @@ change batch options or other details. Please refer to <a href="workqueue.html"<
 
 <p>Makeflow listens on a port which the remote workers would connect to.  The
 default port number is 9123.  Sometimes, however, the port number might be not
-available on your system. You can change the default port via the <tt>-p
-&lt;port number&gt;</tt> option. For example, if you want the master to listen
+available on your system. You can change the default port via the <tt>-p</tt> option. For example, if you want the master to listen
 on port 9567 by default, you can run the following command:</p>
 
 <code>makeflow -T wq -p 9567 example.makeflow</code>
@@ -238,7 +235,7 @@ make your masters and workers contact this catalog server, simply add the
 work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj
 </code>
 
-<h2 id="docker">Makeflow and Docker<a class="sectionlink" href="#docker" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="docker">Running Makeflow with Docker<a class="sectionlink" href="#docker" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>Makeflow can be used with Docker to create a precise execution environment for each task.  In this mode, Makeflow will
 invoke Docker to set up the environment, copy the input files into the container, run the command, and then save the
@@ -404,7 +401,7 @@ with the following syntax:
 </code>
 
 The input and output files are specified as usual, describing the files
-consumed and created by the child makeflow as a whole.  Then, the <tt>MAKEFLOW</tt>keyword</tt> introduces the child makeflow specification, and an
+consumed and created by the child makeflow as a whole.  Then, the <tt>MAKEFLOW</tt> keyword< introduces the child makeflow specification, and an
 optional working directory into which the makeflow will be executed.
 If not given, the current working directory is assumed.
 
