@@ -1,5 +1,6 @@
 body {
   background: gray;
+  font: normal normal normal 18px Times, serif;
 }
 #manual {
   background: white;
@@ -38,12 +39,6 @@ hr {
   width: 80%;
   height: 5px;
   color: black;
-}
-p {
-  font: normal normal normal 18px Times, serif;
-}
-ul, ol {
-  font: normal normal normal 20px Times, serif;
 }
 table {
   background: #dddddd;
