@@ -130,7 +130,7 @@ HEADERS_PUBLIC = \
 LIBRARIES = libdttools.a
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = catalog_update catalog_server watchdog disk_allocator
+PROGRAMS = catalog_update catalog_server catalog_query watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
 TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test
@@ -146,6 +146,9 @@ auth_globus.o: auth_globus.c
 
 auth_test: auth_test.o libdttools.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+
+catalog_query: catalog_query_tool.o
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 libforce_halt_enospc.so: libforce_halt_enospc.o
 	$(CCTOOLS_CC) -shared -fPIC $^ -o $@ -ldl
