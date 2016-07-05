@@ -56,9 +56,9 @@ specifically for Chirp servers or Work Queue applications, then use
 the <tt>chirp_status</tt> or <tt>work_queue_status</tt> tools, which
 query the server and display fields specific for those uses.</p>
 
-<p>To view all kinds of records in raw JSON format, use the <tt>--all</tt>
-and <tt>--long</tt> options to <tt>chirp_status</tt>:</p>
-<code>chirp_status --all --long
+<p>To view all kinds of records in raw JSON format, use the <tt>-a</tt>
+and <tt>-l</tt> options to <tt>chirp_status</tt>:</p>
+<code>chirp_status -a -l
 </code>
 
 <p>When a program making catalog queries is configured with multiple servers, the program will try each in succession until receiving an answer. If no servers give valid responses, the query as a whole fails. The order in which servers are listed sets the initial query order. If a server fails to respond, it will be marked as down before trying the next server in the list. On subsequent queries, servers that were down will not be tried unless every other server is non-responsive. If in this scenario the previously down server answers the query, it will be marked as up again and used with normal priority in future queries.</p>
