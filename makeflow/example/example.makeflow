@@ -16,8 +16,6 @@ URL=http://ccl.cse.nd.edu/images/capitol.jpg
 MAKEFLOW_INPUTS=
 MAKEFLOW_OUTPUTS=capitol.montage.gif
 
-.SIZE capitol.jpg 10M
-
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 

@@ -21,6 +21,10 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 # Rules belong to the category of the most recent CATEGORY statement.
 .RESOURCE CATEGORY merge
 
+# To provide accurate assessment of the output size, estimated file sizes can
+# be specified via the .SIZE directive.
+.SIZE capitol.jpg 51274
+
 # Resources needed for a single task in category may be included (optional).
 # MEMORY and DISK in MB.
 .RESOURCE CORES 1
