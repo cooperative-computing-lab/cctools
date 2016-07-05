@@ -56,12 +56,23 @@ specifically for Chirp servers or Work Queue applications, then use
 the <tt>chirp_status</tt> or <tt>work_queue_status</tt> tools, which
 query the server and display fields specific for those uses.</p>
 
-<p>To view all kinds of records in raw JSON format, use the <tt>-a</tt>
-and <tt>-l</tt> options to <tt>chirp_status</tt>:</p>
-<code>chirp_status -a -l
-</code>
+<p>To view all kinds of records in raw JSON format, use the
+<tt>catalog_query</tt> tool.  This can be used to simply dump
+all records in JSON format:</p>
 
-<p>When a program making catalog queries is configured with multiple servers, the program will try each in succession until receiving an answer. If no servers give valid responses, the query as a whole fails. The order in which servers are listed sets the initial query order. If a server fails to respond, it will be marked as down before trying the next server in the list. On subsequent queries, servers that were down will not be tried unless every other server is non-responsive. If in this scenario the previously down server answers the query, it will be marked as up again and used with normal priority in future queries.</p>
+<code>catalog_query</code>
+
+<p>Or, use the <tt>--where</tt> option to show only records matching an expression.  (The expression must be quoted to protect it from the shell.)</p>
+
+<p>For example, to show all records of catalog servers:</p>
+
+<code>catalog_query --where 'type=="catalog"'</code>
+
+<p>Or to show all chirp servers with more than 4 cpus:</p>
+
+<code>catalog_query --where 'type=="chirp" && cpus > 4'</code>
+
+<p>When any of these tools are configured with multiple servers, the program will try each in succession until receiving an answer. If no servers give valid responses, the query as a whole fails. The order in which servers are listed sets the initial query order. If a server fails to respond, it will be marked as down before trying the next server in the list. On subsequent queries, servers that were down will not be tried unless every other server is non-responsive. If in this scenario the previously down server answers the query, it will be marked as up again and used with normal priority in future queries.</p>
 
 <h2 id="updates">Updating Catalog Servers<a class="sectionlink" href="#updates" title="Link to this section.">&#x21d7;</a></h2>
 

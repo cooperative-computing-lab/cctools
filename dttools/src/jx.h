@@ -154,6 +154,9 @@ struct jx_item * jx_item( struct jx *value, struct jx_item *next );
 /** Test an expression's type.  @param j An expression. @param type The desired type. @return True if the expression type matches, false otherwise. */
 int jx_istype( struct jx *j, jx_type_t type );
 
+/** Test an expression for the boolean value TRUE.  @param j An expression to test.  @return True if the expression is boolean and true. */
+int jx_istrue( struct jx *j );
+
 /** Test two expressions for equality. @param j A constant expression. @param k A constant expression. @return True if equal, false if not.
 */
 int jx_equals( struct jx *j, struct jx *k );

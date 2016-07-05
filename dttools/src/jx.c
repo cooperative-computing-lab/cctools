@@ -347,6 +347,11 @@ int jx_istype( struct jx *j, jx_type_t type )
 	return j && j->type==type;
 }
 
+int jx_istrue( struct jx *j )
+{
+	return j && j->type==JX_BOOLEAN && j->u.boolean_value;
+}
+
 int jx_pair_equals( struct jx_pair *j, struct jx_pair *k )
 {
 	if(!j && !k) return 1;
