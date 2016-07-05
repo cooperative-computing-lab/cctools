@@ -259,7 +259,7 @@ static int dag_parse(struct dag *d, FILE *stream)
 	return 1;
 }
 
-static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int nodeid, char* value)
+static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int nodeid, const char* value)
 {
 	/* If we have never seen this label, then create
 	 * a new category, otherwise retrieve the category. */
@@ -283,7 +283,6 @@ static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int
 //return 1 if name was processed as special variable, 0 otherwise
 static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
-	struct dag *d = bk->d;
 	int   special = 0;
 
 	if(strcmp("CATEGORY", name) == 0 || strcmp("SYMBOL", name) == 0) {
