@@ -1,11 +1,11 @@
 body {
   background: gray;
+  font: normal normal normal 18px Times, serif;
 }
 #manual {
   background: white;
   border: 2px solid #000000;
   padding: 20px;
-  max-width: 1000px;
   margin: 20px auto 20px auto;
 }
 h1 {
@@ -39,12 +39,6 @@ hr {
   width: 80%;
   height: 5px;
   color: black;
-}
-p {
-  font: normal normal normal 18px Times, serif;
-}
-ul, ol {
-  font: normal normal normal 20px Times, serif;
 }
 table {
   background: #dddddd;
