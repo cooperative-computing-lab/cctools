@@ -10,7 +10,6 @@ See the file COPYING for details.
 #include "debug.h"
 
 #include <string.h>
-#include <stdlib.h>
 
 static struct jx * jx_eval_null( jx_operator_t op )
 {
@@ -234,7 +233,7 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 	}
 }
 
-static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *right, jx_eval_mode_t mode )
+static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *right )
 {
 	struct jx *err;
 	int code;
@@ -251,19 +250,9 @@ static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *
 
 	switch(op) {
 		case JX_OP_EQ:
-			if ((mode == JX_EVAL_MODE_PARTIAL)
-				&& !(jx_is_constant(left) && jx_is_constant(right))) {
-				return jx_operator(op, jx_copy(left), jx_copy(right));
-			} else {
-				return jx_boolean(jx_equals(left, right));
-			}
+			return jx_boolean(jx_equals(left, right));
 		case JX_OP_NE:
-			if ((mode == JX_EVAL_MODE_PARTIAL)
-				&& !(jx_is_constant(left) && jx_is_constant(right))) {
-				return jx_operator(op, jx_copy(left), jx_copy(right));
-			} else {
-				return jx_boolean(!jx_equals(left, right));
-			}
+			return jx_boolean(!jx_equals(left, right));
 		case JX_OP_ADD:
 			return jx_array_concat(jx_copy(left), jx_copy(right), NULL);
 		default:
@@ -284,7 +273,7 @@ Handle a lookup operator, which has two valid cases:
 2 - left is an array, right is an integer, return the nth item in the array.
 */
 
-static struct jx * jx_eval_lookup( struct jx *left, struct jx *right, jx_eval_mode_t mode )
+static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 {
 	struct jx *err;
 	int code;
@@ -348,9 +337,6 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right, jx_eval_mo
 			jx_insert_string(err, "source", "jx_eval");
 			return jx_error(err);
 		}
-	} else if ((mode == JX_EVAL_MODE_PARTIAL)
-		&& !(jx_is_constant(left) && jx_is_constant(right))) {
-		return jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right));
 	} else {
 		code = 1;
 		err = jx_object(NULL);
@@ -364,20 +350,20 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right, jx_eval_mo
 	}
 }
 
-static struct jx *jx_eval_function( struct jx_function *f, struct jx *context, jx_eval_mode_t mode, struct jx *default_value )
+static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 {
 	if(!f) return NULL;
 	switch(f->function) {
 		case JX_FUNCTION_RANGE:
-			return jx_function_range(f, context, mode, default_value);
+			return jx_function_range(f, context);
 		case JX_FUNCTION_FOREACH:
-			return jx_function_foreach(f, context, mode, default_value);
+			return jx_function_foreach(f, context);
 		case JX_FUNCTION_STR:
-			return jx_function_str(f, context, mode, default_value);
+			return jx_function_str(f, context);
 		case JX_FUNCTION_JOIN:
-			return jx_function_join(f, context, mode, default_value);
+			return jx_function_join(f, context);
 		case JX_FUNCTION_DBG:
-			return jx_function_dbg(f, context, mode, default_value);
+			return jx_function_dbg(f, context);
 		case JX_FUNCTION_INVALID:
 			return NULL;
 	}
@@ -393,12 +379,12 @@ Exception: integers are promoted to doubles as needed.
 Exception: The lookup operation can be "object[string]" or "array[integer]"
 */
 
-static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context, jx_eval_mode_t mode, struct jx *default_value )
+static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
 	if(!o) return 0;
 
-	struct jx *left = jx_eval_1(o->left,context,mode,default_value);
-	struct jx *right = jx_eval_1(o->right,context,mode,default_value);
+	struct jx *left = jx_eval(o->left,context);
+	struct jx *right = jx_eval(o->right,context);
 	struct jx *err;
 	struct jx *result;
 	int code;
@@ -432,24 +418,19 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context, 
 			jx_delete(right);
 			return jx_boolean(1);
 		} else if(o->type==JX_OP_LOOKUP) {
-			struct jx *r = jx_eval_lookup(left,right,mode);
+			struct jx *r = jx_eval_lookup(left,right);
 			jx_delete(left);
 			jx_delete(right);
 			return r;
 		} else {
-			if ((mode == JX_EVAL_MODE_PARTIAL)
-				&& !(jx_is_constant(left) && jx_is_constant(right))) {
-				return jx_operator(o->type, left, right);
-			} else {
-				code = 2;
-				err = jx_object(NULL);
-				jx_insert_integer(err, "code", code);
-				jx_insert(err, jx_string("operator"), jx_operator(o->type, left, right));
-				jx_insert_string(err, "message", "mismatched types for operator");
-				jx_insert_string(err, "name", jx_error_name(code));
-				jx_insert_string(err, "source", "jx_eval");
-				return jx_error(err);
-			}
+			code = 2;
+			err = jx_object(NULL);
+			jx_insert_integer(err, "code", code);
+			jx_insert(err, jx_string("operator"), jx_operator(o->type, left, right));
+			jx_insert_string(err, "message", "mismatched types for operator");
+			jx_insert_string(err, "name", jx_error_name(code));
+			jx_insert_string(err, "source", "jx_eval");
+			return jx_error(err);
 		}
 	}
 
@@ -470,23 +451,18 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context, 
 			result = jx_eval_string(o->type,left,right);
 			break;
 		case JX_ARRAY:
-			result = jx_eval_array(o->type,left,right,mode);
+			result = jx_eval_array(o->type,left,right);
 			break;
 		default:
-			if ((mode == JX_EVAL_MODE_PARTIAL)
-				&& !(jx_is_constant(left) && jx_is_constant(right))) {
-				return jx_operator(o->type, left, right);
-			} else {
-				code = 1;
-				err = jx_object(NULL);
-				jx_insert_integer(err, "code", code);
-				jx_insert(err, jx_string("operator"), jx_operator(o->type, jx_copy(left), jx_copy(right)));
-				jx_insert_string(err, "message", "rvalue does not support operators");
-				jx_insert_string(err, "name", jx_error_name(code));
-				jx_insert_string(err, "source", "jx_eval");
-				result = jx_error(err);
-				break;
-			}
+			code = 1;
+			err = jx_object(NULL);
+			jx_insert_integer(err, "code", code);
+			jx_insert(err, jx_string("operator"), jx_operator(o->type, jx_copy(left), jx_copy(right)));
+			jx_insert_string(err, "message", "rvalue does not support operators");
+			jx_insert_string(err, "name", jx_error_name(code));
+			jx_insert_string(err, "source", "jx_eval");
+			result = jx_error(err);
+			break;
 	}
 
 DONE:
@@ -496,24 +472,24 @@ DONE:
 	return result;
 }
 
-static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context, jx_eval_mode_t mode, struct jx *default_value )
+static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context )
 {
 	if(!pair) return 0;
 
 	return jx_pair(
-		jx_eval_1(pair->key,context,mode,default_value),
-		jx_eval_1(pair->value,context,mode,default_value),
-		jx_eval_pair(pair->next,context,mode,default_value)
+		jx_eval(pair->key,context),
+		jx_eval(pair->value,context),
+		jx_eval_pair(pair->next,context)
 	);
 }
 
-static struct jx_item * jx_eval_item( struct jx_item *item, struct jx *context, jx_eval_mode_t mode, struct jx *default_value)
+static struct jx_item * jx_eval_item( struct jx_item *item, struct jx *context )
 {
 	if(!item) return 0;
 
 	return jx_item(
-		jx_eval_1(item->value,context,mode,default_value),
-		jx_eval_item(item->next,context,mode,default_value)
+		jx_eval(item->value,context),
+		jx_eval_item(item->next,context)
 	);
 }
 
@@ -545,49 +521,29 @@ static struct jx *jx_check_errors(struct jx *j)
 	}
 }
 
-static struct jx * jx_eval_symbol(struct jx *j, struct jx *context, jx_eval_mode_t mode, struct jx *default_value) {
-	struct jx *err;
-	int code;
-	if (!jx_istype(j, JX_SYMBOL)) return NULL;
-
-	struct jx *default_context = context ? NULL : jx_object(NULL);
-	char *env_value;
-
-	struct jx *result = jx_lookup(context ? context : default_context, j->u.symbol_name);
-	jx_delete(default_context);
-	if(result) {
-		return jx_copy(result);
-	} else {
-		switch (mode) {
-		case JX_EVAL_MODE_DEFAULT:
-			return jx_copy(default_value);
-		case JX_EVAL_MODE_PARTIAL:
-			return jx_copy(j);
-		case JX_EVAL_MODE_ENV:
-			env_value = getenv(j->u.symbol_name);
-			if (env_value) return jx_string(strdup(env_value));
-		case JX_EVAL_MODE_ERROR:
-			err = jx_object(NULL);
-			code = 0;
-			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("symbol"), jx_copy(j));
-			jx_insert(err, jx_string("context"), jx_copy(context));
-			jx_insert_string(err, "message", "undefined symbol");
-			jx_insert_string(err, "name", jx_error_name(code));
-			jx_insert_string(err, "source", "jx_eval");
-			return jx_error(err);
-		}
-	}
-	return NULL;
-}
-
-struct jx * jx_eval_1( struct jx *j, struct jx *context, jx_eval_mode_t mode, struct jx *default_value )
+struct jx * jx_eval( struct jx *j, struct jx *context )
 {
 	if(!j) return 0;
 
 	switch(j->type) {
 		case JX_SYMBOL:
-			return jx_eval_symbol(j, context, mode, default_value);
+			if(context) {
+				struct jx *result = jx_lookup(context,j->u.symbol_name);
+				if(result) {
+					return jx_copy(result);
+				} else {
+					struct jx *err = jx_object(NULL);
+					int code = 0;
+					jx_insert_integer(err, "code", code);
+					jx_insert(err, jx_string("symbol"), jx_copy(j));
+					jx_insert(err, jx_string("context"), jx_copy(context));
+					jx_insert_string(err, "message", "undefined symbol");
+					jx_insert_string(err, "name", jx_error_name(code));
+					jx_insert_string(err, "source", "jx_eval");
+					return jx_error(err);
+				}
+			}
+			return jx_null();
 		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
@@ -595,22 +551,16 @@ struct jx * jx_eval_1( struct jx *j, struct jx *context, jx_eval_mode_t mode, st
 		case JX_NULL:
 			return jx_copy(j);
 		case JX_ARRAY:
-			return jx_check_errors(jx_array(jx_eval_item(j->u.items,context,mode,default_value)));
+			return jx_check_errors(jx_array(jx_eval_item(j->u.items,context)));
 		case JX_OBJECT:
-			return jx_check_errors(jx_object(jx_eval_pair(j->u.pairs,context,mode,default_value)));
+			return jx_check_errors(jx_object(jx_eval_pair(j->u.pairs,context)));
 		case JX_OPERATOR:
-			return jx_eval_operator(&j->u.oper,context,mode,default_value);
+			return jx_eval_operator(&j->u.oper,context);
 		case JX_FUNCTION:
-			return jx_eval_function(&j->u.func,context,mode,default_value);
+			return jx_eval_function(&j->u.func,context);
 		case JX_ERROR:
 			return jx_copy(j);
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;
-}
-
-
-struct jx * jx_eval( struct jx *j, struct jx *context )
-{
-	return jx_eval_1(j, context, JX_EVAL_MODE_ERROR, NULL);
 }

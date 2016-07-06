@@ -41,7 +41,7 @@ jx_function_t jx_function_name_from_string(const char *name) {
 	else return JX_FUNCTION_INVALID;
 }
 
-struct jx *jx_function_dbg(struct jx_function *f, struct jx *context, jx_eval_mode_t mode, struct jx *default_value) {
+struct jx *jx_function_dbg(struct jx_function *f, struct jx *context) {
 	struct jx *result;
 	// we want to detect more than one arg, so try to match twice
 	if (jx_match_array(f->arguments, &result, JX_ANY, &result, JX_ANY, NULL) != 1) {
@@ -57,14 +57,14 @@ struct jx *jx_function_dbg(struct jx_function *f, struct jx *context, jx_eval_mo
 	fprintf(stderr, "dbg  in: ");
 	jx_print_stream(result, stderr);
 	fprintf(stderr, "\n");
-	result = jx_eval_1(result, context, mode, default_value);
+	result = jx_eval(result, context);
 	fprintf(stderr, "dbg out: ");
 	jx_print_stream(result, stderr);
 	fprintf(stderr, "\n");
 	return result;
 }
 
-struct jx *jx_function_str(struct jx_function *f, struct jx *context, jx_eval_mode_t mode, struct jx *default_value) {
+struct jx *jx_function_str( struct jx_function *f, struct jx *context ) {
 	struct jx *args;
 	struct jx *err;
 	struct jx *result;
@@ -74,7 +74,7 @@ struct jx *jx_function_str(struct jx_function *f, struct jx *context, jx_eval_mo
 	case 0:
 		return jx_string("");
 	case 1:
-		args = jx_eval_1(f->arguments->u.items->value, context, mode, default_value);
+		args = jx_eval(f->arguments->u.items->value, context);
 		break;
 	default:
 		code = 6;
@@ -93,17 +93,13 @@ struct jx *jx_function_str(struct jx_function *f, struct jx *context, jx_eval_mo
 	case JX_STRING:
 		return args;
 	default:
-		if ((mode == JX_EVAL_MODE_PARTIAL) && !jx_is_constant(args)) {
-			return jx_function(JX_FUNCTION_STR, jx_array(jx_item(args, NULL)));
-		} else {
-			result = jx_string(jx_print_string(args));
-			jx_delete(args);
-			return result;
-		}
+		result = jx_string(jx_print_string(args));
+		jx_delete(args);
+		return result;
 	}
 }
 
-struct jx *jx_function_foreach(struct jx_function *f, struct jx *context, jx_eval_mode_t mode, struct jx *default_value) {
+struct jx *jx_function_foreach( struct jx_function *f, struct jx *context ) {
 	char *symbol = NULL;
 	struct jx *array = NULL;
 	struct jx *body = NULL;
@@ -124,25 +120,19 @@ struct jx *jx_function_foreach(struct jx_function *f, struct jx *context, jx_eva
 	}
 	// shuffle around to avoid leaking memory
 	result = array;
-	array = jx_eval_1(array, context, mode, default_value);
+	array = jx_eval(array, context);
 	jx_delete(result);
 	result = NULL;
 	if (!jx_istype(array, JX_ARRAY)) {
-		if ((mode == JX_EVAL_MODE_PARTIAL) && !jx_is_constant(array) ) {
-			struct jx *s = jx_symbol(symbol);
-			free(symbol);
-			return jx_function(JX_FUNCTION_FOREACH, jx_array(jx_item(s, jx_item(array, jx_item(body, NULL)))));
-		} else {
-			code = 6;
-			err = jx_object(NULL);
-			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
-			jx_insert_string(err, "message", "second argument must evaluate to an array");
-			jx_insert_string(err, "name", jx_error_name(code));
-			jx_insert_string(err, "source", "jx_eval");
-			result =  jx_error(err);
-			goto DONE;
-		}
+		code = 6;
+		err = jx_object(NULL);
+		jx_insert_integer(err, "code", code);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "second argument must evaluate to an array");
+		jx_insert_string(err, "name", jx_error_name(code));
+		jx_insert_string(err, "source", "jx_eval");
+		result =  jx_error(err);
+		goto DONE;
 	}
 
 	result = jx_array(NULL);
@@ -152,7 +142,7 @@ struct jx *jx_function_foreach(struct jx_function *f, struct jx *context, jx_eva
 		struct jx *local_context = jx_copy(context);
 		if (!local_context) local_context = jx_object(NULL);
 		jx_insert(local_context, jx_string(symbol), jx_copy(item));
-		struct jx *local_result = jx_eval_1(body, local_context, mode, default_value);
+		struct jx *local_result = jx_eval(body, local_context);
 		jx_array_append(result, local_result);
 		jx_delete(local_context);
 	}
@@ -165,18 +155,14 @@ DONE:
 }
 
 // see https://docs.python.org/2/library/functions.html#range
-struct jx *jx_function_range(struct jx_function *f, struct jx *context, jx_eval_mode_t mode, struct jx *default_value) {
+struct jx *jx_function_range( struct jx_function *f, struct jx *context ) {
 	jx_int_t start, stop, step;
 	int code;
 	struct jx *err;
-	struct jx *args = jx_eval_1(f->arguments, context, mode, default_value);
+	struct jx *args = jx_eval(f->arguments, context);
 	if (jx_istype(args, JX_ERROR)) {
 		return args;
 	}
-	if ((mode == JX_EVAL_MODE_PARTIAL) && !jx_is_constant(args)) {
-		return jx_function(JX_FUNCTION_RANGE, args);
-	}
-
 	switch (jx_match_array(args, &start, JX_INTEGER, &stop, JX_INTEGER, &step, JX_INTEGER, NULL)) {
 	case 1:
 		stop = start;
@@ -225,20 +211,16 @@ struct jx *jx_function_range(struct jx_function *f, struct jx *context, jx_eval_
 	return result;
 }
 
-struct jx *jx_function_join(struct jx_function *f, struct jx *context, jx_eval_mode_t mode, struct jx *default_value) {
+struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 	char *sep = NULL;
 	struct jx *result;
 	struct jx *array = NULL;
-	struct jx *args = jx_eval_1(f->arguments, context, mode, default_value);
+	struct jx *args = jx_eval(f->arguments, context);
 	struct jx *err;
 	int code;
 	if (jx_istype(args, JX_ERROR)) {
 		return args;
 	}
-	if ((mode == JX_EVAL_MODE_PARTIAL) && !jx_is_constant(args)) {
-		return jx_function(JX_FUNCTION_JOIN, args);
-	}
-
 	switch (jx_match_array(args, &array, JX_ARRAY, &sep, JX_STRING, NULL)) {
 	case 1:
 	case 2:
