@@ -33,4 +33,9 @@ void jx_print_link( struct jx *j, struct link *l, time_t stoptime );
 /** Print a C string in JSON format (with escape codes) into a buffer.  @param s A C string.  @param b The buffer for output.  @see buffer.h */
 void jx_escape_string( const char *s, buffer_t *b );
 
+/** Print a list of arguments to a buffer. @param j Array of arguments to print. @param b The buffer for output. */
+void jx_print_args( struct jx *j, buffer_t *b );
+
+/** Get a string representation of an operator. @param type The operator to get. */
+const char * jx_operator_string( jx_operator_t type );
 #endif

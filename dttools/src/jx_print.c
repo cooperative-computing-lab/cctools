@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "jx_function.h"
 
 #include <ctype.h>
 
@@ -33,7 +34,7 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 	}
 }
 
-static const char * jx_operator_string( jx_operator_t type )
+const char * jx_operator_string( jx_operator_t type )
 {
 	switch(type) {
 		case JX_OP_EQ: return "==";
@@ -55,6 +56,7 @@ static const char * jx_operator_string( jx_operator_t type )
 		default:        return "???";
 	}
 }
+
 
 void jx_escape_string( const char *s, buffer_t *b )
 {
@@ -117,6 +119,12 @@ void jx_print_subexpr( struct jx *j, jx_operator_t parent, buffer_t *b )
 	if(do_parens) buffer_putstring(b,")");
 }
 
+void jx_print_args( struct jx *j, buffer_t *b )
+{
+	if(!jx_istype(j, JX_ARRAY)) return;
+	jx_item_print(j->u.items, b);
+}
+
 void jx_print_buffer( struct jx *j, buffer_t *b )
 {
 	if(!j) return;
@@ -156,6 +164,16 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
 			if(j->u.oper.type==JX_OP_LOOKUP) buffer_putstring(b,"]");
 			break;
+		case JX_FUNCTION:
+			buffer_putstring(b, jx_function_name_to_string(j->u.func.function));
+			buffer_putstring(b, "(");
+			jx_print_args(j->u.func.arguments, b);
+			buffer_putstring(b, ")");
+			break;
+		case JX_ERROR:
+			buffer_putstring(b,"Error");
+			jx_print_buffer(j->u.err, b);
+			break;
 	}
 }
 
@@ -170,6 +188,7 @@ void jx_print_stream( struct jx *j, FILE *file )
 
 void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
 {
+
 	buffer_t buffer;
 	buffer_init(&buffer);
 	jx_print_buffer(j,&buffer);
@@ -183,6 +202,7 @@ void jx_print_link( struct jx *j, struct link *l, time_t stoptime )
 
 char * jx_print_string( struct jx *j )
 {
+
 	buffer_t buffer;
 	char *str;
 	buffer_init(&buffer);
