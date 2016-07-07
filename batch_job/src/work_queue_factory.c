@@ -101,6 +101,11 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		return needed_workers;
 	}
 
+	double time_execute_previous = 0;
+	double time_transfer_previous = 0;
+	double capacity_weighted_previous = 0;
+	double alpha = 0.1;
+
 	list_first_item(masters_list);
 	while((j=list_next_item(masters_list))) {
 
@@ -111,7 +116,69 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
-		const int capacity = jx_lookup_integer(j,"capacity");
+		int capacity_tasks = jx_lookup_integer(j, "capacity_tasks");
+		int capacity_cores = jx_lookup_integer(j, "capacity_cores");
+		int capacity_memory = jx_lookup_integer(j, "capacity_memory");
+		int capacity_disk = jx_lookup_integer(j, "capacity_disk");
+		const int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
+		const int time_execute = jx_lookup_integer(j, "time_workers_execute");
+
+		const int cores = resources->cores;
+		const int memory = resources->memory;
+		const int disk = resources->disk;
+
+		double execute_delta = time_execute - time_execute_previous;
+		double transfer_delta = time_transfer - time_transfer_previous;
+		double time_execute_weighted;
+		double time_transfer_weighted;
+
+		if(execute_delta > 0 && transfer_delta > 0) {
+			time_execute_weighted = (alpha * execute_delta) + ((1 - alpha) * time_execute_previous);
+			time_transfer_weighted = (alpha * transfer_delta) + ((1 - alpha) * time_transfer_previous);
+		}
+		else {
+			time_execute_weighted = time_execute_previous;
+			time_transfer_weighted = time_transfer_previous;
+		}
+
+		int capacity_weighted = capacity_weighted_previous;
+		if(time_transfer_weighted > 0) {
+			capacity_weighted = (int) (time_execute_weighted / time_transfer_weighted);
+		}
+
+		if(execute_delta > 0 && transfer_delta > 0) {
+			capacity_weighted_previous = capacity_weighted;
+			time_execute_previous = time_execute_weighted;
+			time_transfer_previous = time_transfer_weighted;
+		}
+
+		const int temp_capacity_tasks = capacity_tasks;
+		if(tasks_per_worker > 0) {
+			capacity_tasks = capacity_tasks / tasks_per_worker;
+		}
+		if(capacity_tasks <= 0) {
+			capacity_tasks = temp_capacity_tasks;
+		}
+		if(cores > 0) {
+			capacity_cores = capacity_cores / cores;
+		}
+		if(capacity_cores <= 0) {
+			capacity_cores = capacity_tasks;
+		}
+		if(memory > 0) {
+			capacity_memory = capacity_memory / memory;
+		}
+		if(capacity_memory <= 0) {
+			capacity_memory = capacity_tasks;
+		}
+		if(disk > 0) {
+			capacity_disk = capacity_disk / disk;
+		}
+		if(capacity_disk <= 0) {
+			capacity_disk = capacity_tasks;
+		}
+	
+		int capacity = MIN(capacity_weighted, MIN(capacity_tasks, MIN(capacity_cores, MIN(capacity_memory, capacity_disk))));
 
 		int tasks = tr+tw+tl;
 
@@ -127,6 +194,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			need = MIN(capacity,tasks);
 		}
 
+		fprintf(stderr, "|cores: %d |memory: %d |disk: %d |tasks: %d |smooth growth: %d |\n", capacity_cores, capacity_memory, capacity_disk, capacity_tasks, capacity_weighted);
 		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
 
 		needed_workers += need;
