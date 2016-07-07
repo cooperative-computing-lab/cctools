@@ -194,7 +194,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			need = MIN(capacity,tasks);
 		}
 
-		fprintf(stderr, "|cores: %d |memory: %d |disk: %d |tasks: %d |smooth growth: %d |\n", capacity_cores, capacity_memory, capacity_disk, capacity_tasks, capacity_weighted);
 		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
 
 		needed_workers += need;

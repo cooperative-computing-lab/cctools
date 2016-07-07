@@ -91,7 +91,7 @@ def read_log_entries(file, fields):
             if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0): 
                 record['time_transfer_weighted'] = alpha * ((record['time_transfer']) - prev_line['time_transfer']) + ((1 - alpha) * prev_line['time_transfer_weighted'])
                 record['time_execute_weighted'] = alpha * (record['time_execute'] - prev_line['time_execute']) + ((1 - alpha) * prev_line['time_execute_weighted'])
-             else: 
+            else: 
                 record['time_transfer_weighted'] = prev_line['time_transfer_weighted']
                 record['time_execute_weighted'] = prev_line['time_execute_weighted']
 
@@ -130,7 +130,7 @@ def read_log_entries(file, fields):
         capacity_mean += cap
         capacity_mean = (int) (capacity_mean / j)
 
-    print "Median capacity: ", capacity_median, "\nMean capacity: ", capacity_mean
+    print "Median capacity: ", capacity_median
     return log_entries
 
 def sort_time(log_entries):
