@@ -68,10 +68,10 @@ static batch_job_id_t batch_job_wq_submit (struct batch_queue * q, const char *c
 
 	int caching_flag = WORK_QUEUE_CACHE;
 
-	if(string_istrue(hash_table_lookup(q->options, "caching"))) {
-		caching_flag = WORK_QUEUE_CACHE;
-	} else {
+	if(string_istrue(hash_table_lookup(q->options, "disable-cache"))) {
 		caching_flag = WORK_QUEUE_NOCACHE;
+	} else {
+		caching_flag = WORK_QUEUE_CACHE;
 	}
 
 	t = work_queue_task_create(cmd);
@@ -234,6 +234,7 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_master_preferred_connection(q->data, value);
 		else
 			work_queue_master_preferred_connection(q->data, "by_ip");
+	} else if(strcmp(what, "disable-cache") == 0) {
 	} else if(strcmp(what, "category-limits") == 0) {
 		struct rmsummary *s = rmsummary_parse_string(value);
 		if(s) {
