@@ -78,7 +78,7 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
-#define FILE_RUN_TASKS "task_to_run" 
+#define MF_DONE_FILE "makeflow_done" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -904,7 +904,7 @@ Signal handler to catch abort signals.  Note that permissible actions in signal 
 static void handle_abort(int sig)
 {
 	static int abort_count_to_exit = 5;
-
+	
 	abort_count_to_exit -= 1;
 	int fd = open("/dev/tty", O_WRONLY);
 	if (fd >= 0) {
@@ -913,9 +913,11 @@ static void handle_abort(int sig)
 		write(fd, buf, strlen(buf));
 		close(fd);
 	}
+
 	if (abort_count_to_exit == 1)
 		signal(sig, SIG_DFL);
 	makeflow_abort_flag = 1;
+
 }
 
 
@@ -1652,6 +1654,21 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		FILE *fp;
+		fp = fopen(MF_DONE_FILE, "w");
+
+		if(makeflow_abort_flag) {
+			fputs("aborted", fp);
+		} else if(makeflow_failed_flag) {
+			fputs("failed", fp);
+		} else {
+			fputs("finished", fp);
+		}
+
+		fclose(fp);
+	}
+
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
@@ -1663,18 +1680,9 @@ int main(int argc, char *argv[])
 	} else {
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
-
-		if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-			FILE *fp;
-			fp = fopen(FILE_RUN_TASKS, "a");
-			fputs("done", fp);
-			fclose(fp);
-		}
-
+		
 		exit(EXIT_SUCCESS);
 	}
-
-	
 
 	return 0;
 }
