@@ -17,15 +17,108 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <time.h>
 
-#define FILE_RUN_TASKS "task_to_run"
-#define FILE_FINISH_TASKS "finished_tasks"
+#define FILE_TASK_INFO "task_info"
+#define FILE_TASK_STATE "task_state"
 
 #define NUM_OF_TASKS 4096
 
 static int counter = 0;
 static int finished_tasks[NUM_OF_TASKS];
 static int num_finished_tasks = 0;
+static time_t old_time;
+static int is_first_time = 1;
+
+// mesos task struct
+typedef struct mesos_task{
+	int task_id;
+	char *task_cmd;
+	int num_input_files;
+	char **task_input_files;
+	int num_output_files;
+	char **task_output_files;
+} mesos_task;
+
+// get list of input files 
+char **build_str_lst_from_str(int *num_str, const char *str) 
+{
+	char **str_lst = NULL;
+
+	*num_str = 0;
+	char *pch = NULL;
+	char *str_cpy_1 = strdup(str);
+	pch = strtok(str_cpy_1, ",");
+	while(pch != NULL) {
+		(*num_str)++;
+		pch = strtok(NULL, ",");
+	}
+	free(str_cpy_1);
+
+	str_lst = malloc(sizeof(char *) * (*num_str));
+
+	char *str_cpy_2 = strdup(str);
+    char *tmp_str = NULL;
+	int i = 0;	
+	pch = strtok(str_cpy_2, ",");
+	while(pch != NULL) {
+		tmp_str = xxstrdup(pch);
+		str_lst[i++] = tmp_str;
+		pch = strtok(NULL, ",");
+	} 
+	free(str_cpy_2);	
+
+	return str_lst;
+}
+
+struct mesos_task *create_mesos_task(int task_id, const char *cmd, const char *extra_input_files, const char *extra_output_files)
+{
+	mesos_task *mt = malloc(sizeof(*mt));
+	mt->task_id = task_id;
+	mt->task_cmd = xxstrdup(cmd);
+
+	if (extra_input_files != NULL) {
+	    mt->task_input_files = build_str_lst_from_str(&(mt->num_input_files), extra_input_files);
+		char *path_buf = path_getcwd();
+		char *tmp_fn_path = string_combine(path_buf, "/");
+		char *tmp_fn_abs_path = NULL;
+		int i = 0;
+		for(i = 0; i < mt->num_input_files; i++) {
+			if (mt->task_input_files[i][0] != '/') {
+				tmp_fn_abs_path = string_combine(tmp_fn_path, mt->task_input_files[i]);
+				mt->task_input_files[i] = tmp_fn_abs_path;
+			}
+		}	
+	} else {
+		mt->task_input_files = NULL;
+		mt->num_input_files = 0;
+	}
+
+	if (extra_output_files != NULL) {
+		mt->task_output_files = build_str_lst_from_str(&(mt->num_output_files), extra_output_files);
+	} else {
+		mt->task_output_files = NULL;
+		mt->num_output_files = 0;
+	}
+
+	return mt;
+}
+
+void destroy_mesos_task(mesos_task *mt) 
+{
+	free(mt->task_cmd);
+	int i = 0;
+	for (i = 0; i < mt->num_input_files; i++) {
+		free(mt->task_input_files[i]);
+	}
+	free(mt->task_input_files);	
+	int j = 0;
+	for (j = 0; j < mt->num_output_files; j++) {
+		free(mt->task_output_files[j]);
+	}
+	free(mt->task_output_files);
+	free(mt);
+}
 
 static int is_in_array(int a, int *int_array, int size) 
 {
@@ -36,6 +129,27 @@ static int is_in_array(int a, int *int_array, int size)
 		}
 	}
 	return 0;
+}
+
+// check is file is exist
+int is_file_exist(const char *path) 
+{
+	return access(path, F_OK) != -1;
+}
+
+// check the is file is modified since @old_time
+int is_file_modified(const char *path) {
+	struct stat file_stat;
+	int err = stat(path, &file_stat);
+	if (err != 0) {
+		exit(errno);
+	}
+	if (file_stat.st_mtime > old_time) {
+		old_time = file_stat.st_mtime;
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
@@ -49,47 +163,45 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	info->started = time(0);
 	itable_insert(q->job_table, task_id, info);
 
-	FILE *fp;
+	FILE *fp_1;
 
-	if(access(FILE_RUN_TASKS, F_OK) != -1) {
-		fp = fopen(FILE_RUN_TASKS, "a");
+	if(access(FILE_TASK_INFO, F_OK) != -1) {
+		fp_1 = fopen(FILE_TASK_INFO, "a");
 	} else {
-		fp = fopen(FILE_RUN_TASKS, "w+");
+		fp_1 = fopen(FILE_TASK_INFO, "w+");
 	}
+	
+	mesos_task *mt = create_mesos_task(task_id, cmd, extra_input_files, extra_output_files);
 
-	fprintf(fp, "task_id: %d\n", task_id);
-	fprintf(fp, "cmd: %s\n", cmd);
+	fprintf(fp_1, "%d,%s,", mt->task_id, mt->task_cmd);
 
 	// Get the absolut path of each input file
-	
+
 	if (extra_input_files != NULL) {
-		fputs("input files: ", fp);
-		char *path_buf = path_getcwd();
-		char *pch;
-		char *input_files_cpy = xxstrdup(extra_input_files); 
-		pch = strtok(input_files_cpy, " ,");
-		char *tmp_fn_path;
-		char *tmp_fn_abs_path;
-		while(pch != NULL) {
-			if(pch[0] != '/') {
-				tmp_fn_path = string_combine(path_buf, "/");
-				tmp_fn_abs_path = string_combine(tmp_fn_path, pch);
-				fprintf(fp, "%s,", tmp_fn_abs_path);
-			} else {
-				fprintf(fp, "%s,", pch);
-			}	
-			pch = strtok (NULL, " ,");
+
+		int j = 0;
+		for (j = 0; j < (mt->num_input_files-1); j++) {
+			fprintf(fp_1, "%s ", mt->task_input_files[j]);
 		}
-		free(path_buf);
+		fprintf(fp_1, "%s,", mt->task_input_files[mt->num_input_files-1]);
 
-		fputs("\n", fp);
 	} else {
-		fputs("input files: \n", fp);
+		fputs(",", fp_1);
 	}
-		
-	fprintf(fp, "output files: %s\n", extra_output_files);
+    
+	if (extra_output_files != NULL) {
+		int j = 0;
+		for (j = 0; j < (mt->num_output_files-1); j++) {
+			fprintf(fp_1, "%s ", mt->task_output_files[j]);
+		}
+		fprintf(fp_1, "%s,", mt->task_output_files[mt->num_output_files-1]);
+	} else {
+		fputs(",", fp_1);
+	}
+	fputs("running\n", fp_1);
 
-	fclose(fp);
+	destroy_mesos_task(mt);
+	fclose(fp_1);
 
 	return task_id;
 }
@@ -97,14 +209,15 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 
-	// read FILE_FINISH_TASKS and check if there is job finished
+	// read FILE_TASK_STATE and check if there is job finished
 	// remove the job from batch_queue->job_table 
 
-	struct stat oup_fn_stat;
-	stat(FILE_FINISH_TASKS, &oup_fn_stat);
-	off_t oup_fn_size = oup_fn_stat.st_size;
+	//struct stat oup_fn_stat;
+	//stat(FILE_TASK_STATE, &oup_fn_stat);
+	//task_info_file_size = oup_fn_stat.st_size;
+	//off_t oup_curr_size;
 
-	// polling the FILE_FINISH_TASKS to check if there is
+	// polling the FILE_TASK_STATE to check if there is
 	// new task finished
 	
 	char *line = NULL;
@@ -112,17 +225,22 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 	ssize_t read_len;
 	FILE *fp;
 
+	while(!is_file_exist(FILE_TASK_STATE)) {}
+
+	if (is_first_time) {
+		old_time = time(0);
+		is_first_time = 0;
+	}
+
 	while(1) {
 
-		stat(FILE_FINISH_TASKS, &oup_fn_stat);
-
 		// if the file size has changed
-		if (oup_fn_stat.st_size - oup_fn_size > 0) {
+		if (is_file_modified(FILE_TASK_STATE)) {
 			char *task_id_ch;
 			char *task_stat_str;
 			int task_id;
 					
-			fp = fopen(FILE_FINISH_TASKS, "r");
+			fp = fopen(FILE_TASK_STATE, "r");
 	    	while((read_len = getline(&line, &len, fp)) != -1) {
 
 				// trim the newline character
@@ -131,7 +249,7 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 					--read_len;
 				}
 
-				task_id_ch = strtok(line, " ");
+				task_id_ch = strtok(line, ",");
 				task_id = atoi(task_id_ch);
 
 				// There is a new task finished
@@ -139,7 +257,7 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 					struct batch_job_info *info = itable_remove(q->job_table, task_id);
 				    	
 					info->finished = time(0);
-					task_stat_str = strtok(NULL, " ");
+					task_stat_str = strtok(NULL, ",");
 
 					if (strcmp(task_stat_str, "finished") == 0) {
 						info->exited_normally = 1;
@@ -162,13 +280,23 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 			sleep(1);
 		}
 
-		oup_fn_size = oup_fn_stat.st_size;	
+		if(stoptime != 0 && time(0) >= stoptime) {
+			return -1;
+		}
 	}
 
 }
 
 static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
+	struct batch_job_info *info = itable_lookup(q->job_table, jobid);
+	info->finished = time(0);
+	info->exited_normally = 0;
+	info->exit_signal = 0;
+	// append the new task state to the "task_info" file
+	char *cmd = string_format("awk -F \',\' \'{if($1==\"%" PRIbjid "\"){gsub(\"running\",\"aborting\",$5);print $1\",\"$2\",\"$3\",\"$4\",\"$5}}\' %s >> %s", jobid, FILE_TASK_INFO, FILE_TASK_INFO);
+	system(cmd);
+	free(cmd);
 	return 0;
 }
 
