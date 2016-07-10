@@ -13,6 +13,7 @@ If CODE(chroot) is used to help repeat one experiment, common directories like B
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(`-p, --package-path')The path of the package.
+OPTION_ITEM(`-e, --env-list')The path of the environment file. (Default: package-path/env_list)
 OPTION_ITEM(`-h, --help')Show this help message.
 OPTIONS_END
 

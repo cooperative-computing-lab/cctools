@@ -8,11 +8,13 @@ SECTION(SYNOPSIS)
 CODE(BOLD(parrot_package_create [options]))
 
 SECTION(DESCRIPTION)
-After recording the accessed files and environment variables of one program with the help of the CODE(--name-list) parameter and the CODE(--env-list) of CODE(parrot_run), CODE(parrot_package_create) can generate a package containing all the accessed files.
+After recording the accessed files and environment variables of one program with the help of the CODE(--name-list) parameter and the CODE(--env-list) of CODE(parrot_run), CODE(parrot_package_create) can generate a package containing all the accessed files. You can also add the dependencies recorded in a new namelist file into an existing package.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_TRIPLET(-a, add, path)The path of an existing package.
 OPTION_TRIPLET(-e, env-list, path)The path of the environment variables.
+OPTION_ITEM(`    --new-env')The relative path of the environment variable file under the package.
 OPTION_TRIPLET(-n, name-list, path)The path of the namelist list.
 OPTION_TRIPLET(-p, package-path, path)The path of the package.
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this sub-system.
@@ -59,6 +61,12 @@ After the execution of this command, one shell will be returned, where you can r
 LONGCODE_BEGIN
 % exit
 LONGCODE_END
+
+You can also add the dependencies recorded in a new namelist file, BOLD(namelist1), into an existing package:
+LONGCODE_BEGIN
+% parrot_package_create --name-list namelist1 --env-list envlist1 --new-env envlist1  --add /tmp/package
+LONGCODE_END
+After executing this command, all the new dependencies mentioned in BOLD(namelist1) will be added into BOLD(/tmp/package), the new envlist, BOLD(envlist1), will also be added into BOLD(/tmp/package) with the name specified by the BOLD(--new-env) option.
 
 SECTION(COPYRIGHT)
 
