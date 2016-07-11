@@ -43,32 +43,34 @@ if( chomp($version) ne "2.31.8"){
 my $maker_help = `maker -h`;
 
 my $genome;
+my $augustus;
 my $base_name;
 my $mpi_arg;
 my $resources = 0;
 my $total_tiers = 0;
 my $tasks = 0;
+my $cores = 6;
 my $tolerable_task_failures = 0;
 my %task_failures;
 
 my $usage = "$maker_help
 Work Queue Options:
 
-     -port <int>           Sets the port for work_queue to listen on (default: 9135)
+     -port <int>              Sets the port for work_queue to listen on (default: 9135)
  
-     -fa   <int>           Sets the work_queue fast abort option with the given multiplier. 
+     -fa   <int>              Sets the work_queue fast abort option with the given multiplier. 
 
-     -chunks <int>         Specify the number of chunks created from FASTA file. 
+     -contigs-per-split <int> Specify the number of chunks created from FASTA file. 
 
-     -N <project>          Sets the project name to <project>.
+     -N <project>             Sets the project name to <project>.
 
-     -resources <int>      Specify the number of resources that will be provisioned (default: $resources). 
+     -resources <int>         Specify the number of resources that will be provisioned (default: $resources). 
      
-     -d <level>            Sets the debug flag for Work Queue. For all debugging output, try 'all'.
+     -d <level>               Sets the debug flag for Work Queue. For all debugging output, try 'all'.
 	 
-     -bw <integer>         Sets the expected network bandwidth in MBytes/second.
+     -bw <integer>            Sets the expected network bandwidth in MBytes/second.
 
-     -MPI                  Specifies that each task should utilize mpiexec to execute.
+     -MPI                     Specifies that each task should utilize mpiexec to execute.
 ";
 
 #---Process options on the command line 
@@ -134,7 +136,7 @@ if(defined($OPT{"resources"})) {
 }
 
 if(defined($mpi_arg)){
-	$mpi_arg .= "4 ";
+	$mpi_arg .= "$cores ";
 } else {
 	$mpi_arg = "";
 }
@@ -180,8 +182,6 @@ sub main {
 
 	process_completed_tasks($wq, scalar (keys %$input_to_contigs), 5);	
 
-	delete_workqueue($wq);
-
 	`maker -dsindex -g $genome -base $base_name`;
 
 	print "\n".localtime()." :: File $base_name annotated :: ".scalar (keys %$input_to_contigs)." in total \n";
@@ -200,7 +200,7 @@ sub get_wkdir {
 
 sub setup_workqueue {
 	if(defined($OPT{"debug"})){
-		work_queue::cctools_debug_flags_set($OPT{"debug"}); 
+		Work_Queue::cctools_debug_flags_set($OPT{"debug"}); 
 		print localtime()." :: Work Queue debug flags set :: ".$OPT{"debug"}.".\n";
 	}
 
@@ -208,7 +208,7 @@ sub setup_workqueue {
 	if(defined($OPT{"port"})) {
 		$port = $OPT{"port"}; 
 	} 
-	my $wq = work_queue::work_queue_create($port);
+	my $wq = Work_Queue->new($port);
 	if(defined($wq)) {
 		print localtime()." :: Work Queue listening on port $port.\n";
 	} else {
@@ -217,16 +217,15 @@ sub setup_workqueue {
 	}
 	if(defined($OPT{"fast_abort"})) {
 		my $multiplier = $OPT{"fast_abort"}; 
-		my $fa = work_queue::work_queue_activate_fast_abort($wq, $multiplier); 
+		my $fa = $wq->activate_fast_abort($multiplier); 
 		print localtime()." :: Work Queue fast abort set to $multiplier.\n";
 	}
 	if(defined($OPT{"project"})) {
-		work_queue::work_queue_specify_name($wq, $OPT{"project"});
-		work_queue::work_queue_specify_master_mode($wq, 1);
+		$wq->specify_name($OPT{"project"});
 		print localtime()." :: Work Queue project name set to ".$OPT{"project"}.".\n";
 	}
 	
-	work_queue::work_queue_specify_log($wq, "maker_wq.stats");
+	$wq->specify_log("maker_wq.stats");
 
 	return $wq;
 }
@@ -237,13 +236,22 @@ sub parse_maker_opts {
 	while (my $line = <$opts>) {
 		chomp $line;
 		my $info = substr($line, 0 , index($line, '#'));
-		if( $info =~ m/^(makergff|est|altest|est_gff|altest_gff|protein|protein_gff|rmlib|repeat_protein|rm_gff|snaphmm|gmhmm|augustus_species|fgenesh_par_file|pred_gff|model_gff|snoscan_rrna|other_gff)=/ ) {
+		if( $info =~ m/^(makergff|est|altest|est_gff|altest_gff|protein|protein_gff|rmlib|repeat_protein|rm_gff|snaphmm|gmhmm|fgenesh_par_file|pred_gff|model_gff|snoscan_rrna|other_gff)=/ ) {
 			my $input = substr($info, index($info, '=')+1);
 			$input =~ s/^\s+|\s+$//g;
 			if(length $input > 0 and not($input =~ m/^\//)){
 				push @files, $input;
 			} elsif ( $input =~ m/^\// ) {
 				print "$input is absolute path, please use relative path within cwd\n";
+				exit(1);
+			} 
+		} elsif ( $info =~ m/^augustus_species=/ and not $augustus ) {
+			my $input = substr($info, index($info, '=')+1);
+			$input =~ s/^\s+|\s+$//g;
+			if(length $input > 0 and not($input =~ m/^\//)){
+				$augustus = $input;
+			} elsif ( $input =~ m/^\// ) {
+				print "$input is absolute path, please use relative path within cwd.\n";
 				exit(1);
 			}
 		} elsif ( $info =~ m/^genome=/ and not $genome ) {
@@ -278,26 +286,29 @@ sub parse_genome_file {
 		$base_name = substr($genome, rindex($genome, '/')+1);
 	}
 
+	print "Contigs found : ";
+
 	my $inputs_to_contigs = {};
 	open my $genome_file, '<', "$genome" or die "Could not open input Genome $genome $!\n";
 	my $output = sprintf("$genome\_%06d", $splits_currently);
 	open my $genome_output, '>', "$output" or die "Could not open output Genome $output $!\n";
 	while (my $line = <$genome_file>) {
 		if( (my $contig) = $line =~ m/^>\s*(\w*)/ ) {
-			print "Contig found : $contig\n";
 			$contigs_currently += 1;
 			if($contigs_currently == $contigs_per_split) {
 				$contigs_currently = 0;
 				$splits_currently += 1;
+				printf("%d : ", ($contigs_per_split*$splits_currently));
 				close($genome_output);
 				$output = sprintf("$genome\_%06d", $splits_currently);
 				open $genome_output, '>', "$output" or die "Could not open output Genome $output $!\n";
 				$inputs_to_contigs->{$output} = [];
 			}
-			push($inputs_to_contigs->{$output}, $contig);
+			push(@{$inputs_to_contigs->{$output}}, $contig);
 		}
 		print $genome_output $line;
 	}
+	printf("%d : ", ($contigs_per_split*$splits_currently)+$contigs_currently);
 	close($genome_file);
 	close($genome_output);
 
@@ -310,7 +321,7 @@ sub parse_contig_dirs {
 	while (my $line = <$output_db>) {
 		print $line;
 		if( (my $contig, my $location) = $line =~ m/^(\w*)\s*(.*)\/.*\/\s*STARTED/ ) {
-			print "Contig found : $contig at $location \n";
+			#print "Contig found : $contig at $location \n";
 			$output_dirs->{$contig} = $location;
 		}
 	}
@@ -332,27 +343,28 @@ sub submit_task {
 	my($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs) = @_;
 
 	my $task_command .= "echo \"$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV)."\"; ";
-	$task_command .= "$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
+	$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; $mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
 	
-	my $task = work_queue::work_queue_task_create("$task_command"); 
+	my $task = Work_Queue::Task->new($task_command); 
 	my $task_tag = substr($genome_chunk, rindex($genome_chunk, '_')+1, rindex($genome_chunk, '.')-(rindex($genome_chunk, '_')+1)); 
-	work_queue::work_queue_task_specify_tag($task, $task_tag); 
+	$task->specify_tag($task_tag); 
 
-	work_queue::work_queue_task_specify_file($task, $genome_chunk, $genome_chunk, 0, 1); 
-	work_queue::work_queue_task_specify_file($task, "maker_opts.ctl", "maker_opts.ctl", 0, 1); 
-	work_queue::work_queue_task_specify_file($task, "maker_bopts.ctl", "maker_bopts.ctl", 0, 1); 
-	work_queue::work_queue_task_specify_file($task, "maker_exe.ctl", "maker_exe.ctl", 0, 1); 
+	$task->specify_input_file($genome_chunk); 
+	$task->specify_input_file("maker_opts.ctl"); 
+	$task->specify_input_file("maker_bopts.ctl"); 
+	$task->specify_input_file("maker_exe.ctl"); 
 	submit_input_files($task, $common_input_files);
+	submit_augustus_files($task);
 	my $contigs = $input_to_contigs->{$genome_chunk};
 	foreach my $contig (@$contigs) {
 		my $location = $output_dirs->{$contig};
-		work_queue::work_queue_task_specify_file($task, "$base_name.maker.output/$location", "$base_name.maker.output/$location", 1, 1); 
-#		work_queue::work_queue_task_specify_file($task, $base_name.".maker.output/$location/$contig.run.log", $base_name.".maker.output/$location/run.log", 1, 1); 
+		$task->specify_output_file("$base_name.maker.output/$location"); 
+#		$task->specify_file($task, $base_name.".maker.output/$location/$contig.run.log", $base_name.".maker.output/$location/run.log", 1, 1); 
 	}
 
-	work_queue::work_queue_task_specify_cores($task, 4);
+	$task->specify_cores($cores);
 	
-	my $taskid = work_queue::work_queue_submit($wq, $task);
+	my $taskid = $wq->submit($task);
 	print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
 
 	return 1;
@@ -362,22 +374,18 @@ sub submit_input_files {
 	my($task, $inputs) = @_;
 	foreach my $input (@$inputs){
 		if(-e $input){
-			work_queue::work_queue_task_specify_file($task, $input, "$input", 0, 1); 
+			if(-d $input){
+				$task->specify_directory($input);
+			} else {
+				$task->specify_input_file($input); 
+			}
 		}
 	}
 }
 
-sub delete_workqueue {
-	my($wq) = @_;
-	work_queue::work_queue_delete($wq);
-}
-
-sub get_busy_workers {
-	my($wq) = @_;
-
-	my $wq_stats = work_queue::work_queue_stats->new();
-	work_queue_get_stats($wq, $wq_stats);
-	return $wq_stats->{workers_busy};	
+sub submit_augustus_files {
+	my($task) = @_;
+	$task->specify_input_file("config");
 }
 
 sub call_wq_wait {
@@ -399,16 +407,16 @@ sub call_wq_wait {
 		open $taskoverheads_fh, ">>$taskoverheads_file"; 
 	}
 		
-	my $t = work_queue::work_queue_wait($wq, $timeout); 
-	if(defined($t)) {
-		my $tasktag = $t->{tag}; 
+	my $t = $wq->wait($timeout); 
+	if($t) {
+		my $tasktag = $t->id; 
 
-		$transfer_time = $t->{total_transfer_time};
-		$transfered_bytes = $t->{total_bytes_transferred};
-		$task_execution_time = $t->{cmd_execution_time}/1000000;
+		$transfer_time = $t->total_transfer_time;
+		$transfered_bytes = $t->total_bytes_transferred;
+		$task_execution_time = $t->cmd_execution_time/1000000;
 
 		#Check if return status indicates failure
-		my $output = $t->{output};
+		my $output = $t->output;
 		open (task_outfile, '>>task_outputs.txt'); 
 		print task_outfile "$output\n";
 		print task_outfile "=================================\n\n";
@@ -420,9 +428,8 @@ sub call_wq_wait {
 			$retStatus = sprintf("%d", $retStatus);
 		}
 		if($retStatus == 0 || $retStatus == 1) {
-			my $task_result = $t->{result}; 	
+			my $task_result = $t->result; 	
 			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
-			work_queue::work_queue_task_delete($t);
 		} else { #tier resubmission on failure 
 			$task_failures{$tasktag} += 1; 
 			if($task_failures{$tasktag} <= $tolerable_task_failures){
@@ -430,7 +437,6 @@ sub call_wq_wait {
 				work_queue::work_queue_submit($wq, $t);
 			} else{
 				print localtime()." :: Giving up on task for tiers $tasktag since it has failed $tolerable_task_failures times\n"; 
-				work_queue::work_queue_task_delete($t);
 			}
 		}
 	}		
