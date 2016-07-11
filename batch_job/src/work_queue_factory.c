@@ -745,7 +745,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
-	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
+	printf(" %-30s Use worker capacity reported by masters.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");

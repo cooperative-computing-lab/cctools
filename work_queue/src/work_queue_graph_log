@@ -47,16 +47,7 @@ def read_log_entries(file, fields):
     pairs = zip(idxs, fields)
     epoch = None
     count_lines = 0
-    prev_line = {}
-    prev_line['time_execute'] = 0
-    prev_line['time_send'] = 0
-    prev_line['time_receive'] = 0
-    prev_line['time_execute'] = 0
-    prev_line['time_transfer'] = 0
-    prev_line['time_execute_weighted'] = 0
-    prev_line['time_transfer_weighted'] = 0
-    prev_line['capacity_weighted'] = 0
-    prev_line['capacity_tasks'] = 0
+    prev_line = None
     alpha = 0.1
     capacity_total = []
     j = 0
@@ -87,6 +78,13 @@ def read_log_entries(file, fields):
                 record['capacity_tasks'] = (record['time_execute'] + record['time_polling']) / (record['time_transfer'] + record['time_master'] - record['time_polling'])
             except ArithmeticError:
                 record['capacity_tasks'] = record['capacity_tasks']
+
+            if(prev_line is None):
+                prev_line = record
+                prev_line['time_transfer_weighted'] = 0
+                prev_line['time_execute_weighted'] = 0
+                prev_line['capacity_weighted'] = 0
+                prev_line['capacity_tasks'] = 0
 
             if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0): 
                 record['time_transfer_weighted'] = alpha * ((record['time_transfer']) - prev_line['time_transfer']) + ((1 - alpha) * prev_line['time_transfer_weighted'])
