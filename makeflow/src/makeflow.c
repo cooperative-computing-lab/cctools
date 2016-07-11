@@ -110,7 +110,7 @@ static int port = 0;
 static int output_len_check = 0;
 static int skip_file_check = 0;
 
-static int cache_mode = 0;
+static int cache_mode = 1;
 
 static int json_input = 0;
 
@@ -1370,7 +1370,7 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case LONG_OPT_DISABLE_BATCH_CACHE:
-				cache_mode = 1;
+				cache_mode = 0;
 				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 				wq_wait_queue_size = optarg;
@@ -1571,7 +1571,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "priority", priority);
 	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
-	batch_queue_set_option(remote_queue, "disable-cache", cache_mode ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-credentials", amazon_credentials);
 	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
