@@ -132,7 +132,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 		output_prefix = xxstrdup(path_basename(m->log_prefix));
 	}
 
-	char * result = resource_monitor_write_command(executable,
+	char * command = resource_monitor_write_command(executable,
 			output_prefix,
 			dag_node_dynamic_label(n),
 			extra_options,
@@ -147,6 +147,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 	free(extra_options);
 	free(nodeid);
 	free(output_prefix);
+	free(command);
 
 	return result;
 }

@@ -89,7 +89,6 @@ struct dag_node_footprint *dag_node_footprint_create()
 	f->delete_footprint = 0;
 	f->delete_run_order = list_create();
 
-	n->resource_request = CATEGORY_ALLOCATION_FIRST;
 	f->prog_min_files = set_create(0);
 	f->prog_min_footprint = 0;
 
@@ -427,7 +426,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 /* Adds the local name as a target of the node, and register the
  * node as the producer of the file. If remotename is not NULL,
  * it is added to the namespace of the node. */
-void dag_node_add_target_file(struct dag_node *n, const char *filename, char *remotename)
+void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename)
 {
 	struct dag_file *target = dag_file_lookup_or_create(n->d, filename);
 
@@ -1041,65 +1040,6 @@ int dag_node_dependencies_active(struct dag_node *n)
 	}
 
 	return 1;
-}
-
-
-
-void dag_node_init_resources(struct dag_node *n)
-{
-	struct rmsummary *rs    = n->resources_requested;
-	struct dag_variable_lookup_set s_node = { NULL, NULL, n, NULL };
-	struct dag_variable_lookup_set s_all  = { n->d, n->category, n, NULL };
-
-	struct dag_variable_value *val;
-
-	/* first pass, only node variables. We only check if this node was individually labeled. */
-	val = dag_variable_lookup(RESOURCES_CORES, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	val = dag_variable_lookup(RESOURCES_DISK, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	val = dag_variable_lookup(RESOURCES_MEMORY, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	val = dag_variable_lookup(RESOURCES_GPUS, &s_node);
-	if(val)
-		n->resource_request = CATEGORY_ALLOCATION_USER;
-
-	int category_flag = 0;
-	/* second pass: fill fall-back values if at least one resource was individually labeled. */
-	/* if not, resources will come from the category when submitting. */
-	val = dag_variable_lookup(RESOURCES_CORES, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->cores = atoll(val->value);
-	}
-
-	val = dag_variable_lookup(RESOURCES_DISK, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->disk = atoll(val->value);
-	}
-
-	val = dag_variable_lookup(RESOURCES_MEMORY, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->memory = atoll(val->value);
-	}
-
-	val = dag_variable_lookup(RESOURCES_GPUS, &s_all);
-	if(val) {
-		category_flag = 1;
-		rs->gpus = atoll(val->value);
-	}
-
-	if(n->resource_request != CATEGORY_ALLOCATION_USER && category_flag) {
-		n->resource_request = CATEGORY_ALLOCATION_AUTO_ZERO;
-	}
 }
 
 void dag_node_print_debug_resources(struct dag_node *n)
