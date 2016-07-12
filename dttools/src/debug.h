@@ -88,8 +88,9 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_MAKEFLOW_RUN    (1LL<<40)  /**< Debug makeflow's dag run */
 #define D_MAKEFLOW_LEXER  (1LL<<41)  /**< Debug makeflow's lexer */
 #define D_MAKEFLOW_PARSER (1LL<<42)  /**< Debug makeflow's parser */
-#define D_CONFUGA  (1LL<<43)  /**< Debug Confuga Storage Cluster */
-#define D_JX  (1LL<<44)  /**< Debug JX */
+#define D_MAKEFLOW_ALLOC  (1LL<<43)  /**< Debug makeflow's alloc */
+#define D_CONFUGA  (1LL<<44)  /**< Debug Confuga Storage Cluster */
+#define D_JX       (1LL<<45)  /**< Debug JX */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)

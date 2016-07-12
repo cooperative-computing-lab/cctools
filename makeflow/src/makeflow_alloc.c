@@ -8,6 +8,7 @@
 
 #include "dag_file.h"
 #include "dag_node.h"
+#include "debug.h"
 #include "makeflow_alloc.h"
 
 #include "list.h"
@@ -16,13 +17,10 @@
 #include <stdio.h>
 
 uint64_t dynamic_alloc = 0;
-FILE *out = NULL;
 
 void makeflow_alloc_print_stats(struct makeflow_alloc *a, char *event)
 {
-	if(!out)
-		out = stdout;
-	fprintf(out,"%d %"PRIu64"  %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %s\n",
+	debug(D_MAKEFLOW_ALLOC, "%d %"PRIu64"  %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %s\n",
 			a->nodeid, a->storage->total, a->storage->used, a->storage->greedy,
 			a->storage->commit, a->storage->free, event);
 }
