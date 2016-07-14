@@ -5731,10 +5731,6 @@ void work_queue_specify_max_category_resources(struct work_queue *q,  const char
 	if(rm) {
 		c->max_allocation = rmsummary_create(-1);
 		rmsummary_merge_max(c->max_allocation, rm);
-
-		if(q->monitor_mode == MON_DISABLED) {
-			work_queue_enable_monitoring(q, NULL);
-		}
 	} else {
 		c->max_allocation = NULL;
 	}
