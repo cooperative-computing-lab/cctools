@@ -8,6 +8,8 @@ See the file COPYING for details.
 #include "macros.h"
 #include "category.h"
 
+#include "jx_parse.h"
+
 double usecs_to_secs(double usecs)
 {
 	return usecs/1000000;
@@ -223,20 +225,6 @@ void parse_fields_options(char *field_str)
 	}
 }
 
-struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categories)
-{
-	FILE *stream;
-	stream = fopen(filename, "r");
-	if(!stream)
-		fatal("Cannot open resources summary file: %s : %s\n", filename, strerror(errno));
-
-	struct rmDsummary *s = parse_summary(stream, filename, categories);
-
-	fclose(stream);
-
-	return s;
-}
-
 #define to_external(s, so, f) (s)->f = rmsummary_to_external_unit(#f, (so)->f)
 
 struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
@@ -303,22 +291,29 @@ struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
 }
 
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories)
+struct rmDsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
 {
-	static FILE *last_stream = NULL;
-	static int   summ_id     = 1;
+	static struct jx_parser *last_p = NULL;
+	static int summ_id     = 1;
 
-	if(last_stream != stream)
+	if(last_p != p)
 	{
-		last_stream = stream;
-		summ_id     = 1;
+		last_p  = p;
+		summ_id = 1;
 	}
 	else
 	{
 		summ_id++;
 	}
 
-	struct rmsummary  *so = rmsummary_parse_next(stream);
+	struct jx *j = jx_parser_yield(p);
+
+	if(!j)
+		return NULL;
+
+	struct rmsummary *so = json_to_rmsummary(j);
+	jx_delete(j);
+
 	if(!so)
 		return NULL;
 
@@ -377,9 +372,13 @@ void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, st
 		if(!stream)
 			fatal("Cannot open resources summary file: %s : %s\n", file_summ, strerror(errno));
 
-		while((s = parse_summary(stream, file_summ, categories)))
+		struct jx_parser *p = jx_parser_create(0);
+		jx_parser_read_stream(p, stream);
+
+		while((s = parse_summary(p, file_summ, categories)))
 			list_push_tail(dest->summaries, s);
 
+		jx_parser_delete(p);
 		fclose(stream);
 	}
 }
@@ -406,9 +405,13 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct 
 			if(!stream)
 				fatal("Cannot open resources summary file: %s : %s\n", entry->fts_accpath, strerror(errno));
 
-			while((s = parse_summary(stream, entry->fts_path, categories)))
+			struct jx_parser *p = jx_parser_create(0);
+			jx_parser_read_stream(p, stream);
+
+			while((s = parse_summary(p, entry->fts_path, categories)))
 				list_push_tail(dest->summaries, s);
 
+			jx_parser_delete(p);
 			fclose(stream);
 		}
 

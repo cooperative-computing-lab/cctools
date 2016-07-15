@@ -128,8 +128,6 @@ double divide(double a, double b);
 
 void parse_fields_options(char *field_str);
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories);
-struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categories);
 char *parse_executable_name(char *command);
 
 void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories);

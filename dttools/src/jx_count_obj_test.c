@@ -37,6 +37,8 @@ int main(int argc, char **argv) {
 	while((j = jx_parser_yield(p))) {
 		char *str = jx_print_string(j);
 		fprintf(stdout, "%s\n", str);
+		
+		fprintf(stdout, "%d\n", j->type);
 
 		jx_delete(j);
 		free(str);

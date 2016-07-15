@@ -607,8 +607,14 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename)
 		return NULL;
 	}
 
-	struct rmsummary *s = rmsummary_parse_next(stream);
+	struct jx *j = jx_parse_stream(stream);
 	fclose(stream);
+
+	if(!j)
+		return NULL;
+
+	struct rmsummary *s = json_to_rmsummary(j);
+	jx_delete(j);
 
 	return s;
 }
@@ -641,18 +647,28 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 		return NULL;
 	}
 
+	struct jx_parser *p = jx_parser_create(0);
+	jx_parser_read_stream(p, stream);
+
 	struct list      *lst = list_create(0);
 	struct rmsummary *s;
 
 	do
 	{
-		s = rmsummary_parse_next(stream);
+		struct jx *j = jx_parser_yield(p);
+
+		if(!j)
+			break;
+
+		s = json_to_rmsummary(j);
+		jx_delete(j);
 
 		if(s)
 			list_push_tail(lst, s);
 	} while(s);
 
 	fclose(stream);
+	jx_parser_delete(p);
 
 	return lst;
 }
@@ -661,7 +677,6 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 struct rmsummary *rmsummary_parse_next(FILE *stream)
 {
 	struct jx *j = jx_parse_stream(stream);
-
 	if(!j)
 		return NULL;
 
