@@ -44,6 +44,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -1634,6 +1635,32 @@ int main(int argc, char *argv[])
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
+	}
+
+	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		pid_t mesos_PID;
+		mesos_PID = fork();			
+
+		char *mesos_cwd;
+		mesos_cwd = path_getcwd();
+
+		if(mesos_PID == 0) {
+			int mesos_fd = open("mesos_scheduler.log", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+
+		    dup2(mesos_fd, 1);
+		    dup2(mesos_fd, 2);
+
+			close(mesos_fd);
+
+			execlp("/usr/bin/python", "python", "/home/zc/cctools/bin/mf_mesos_scheduler.py", mesos_cwd, (char *) 0);
+			_exit(127);
+		}
+
+		if(mesos_PID < 0) {
+			debug(D_MAKEFLOW_RUN, "couldn't create new process: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
 	}
 
 	makeflow_run(d);

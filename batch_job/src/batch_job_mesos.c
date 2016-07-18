@@ -166,7 +166,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	FILE *fp_1;
 
 	if(access(FILE_TASK_INFO, F_OK) != -1) {
-		fp_1 = fopen(FILE_TASK_INFO, "a");
+		fp_1 = fopen(FILE_TASK_INFO, "a+");
 	} else {
 		fp_1 = fopen(FILE_TASK_INFO, "w+");
 	}
@@ -198,7 +198,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	} else {
 		fputs(",", fp_1);
 	}
-	fputs("running\n", fp_1);
+	fputs("submitted\n", fp_1);
 
 	destroy_mesos_task(mt);
 	fclose(fp_1);
@@ -211,12 +211,7 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 
 	// read FILE_TASK_STATE and check if there is job finished
 	// remove the job from batch_queue->job_table 
-
-	//struct stat oup_fn_stat;
-	//stat(FILE_TASK_STATE, &oup_fn_stat);
-	//task_info_file_size = oup_fn_stat.st_size;
-	//off_t oup_curr_size;
-
+	//
 	// polling the FILE_TASK_STATE to check if there is
 	// new task finished
 	
@@ -294,7 +289,8 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 	info->exited_normally = 0;
 	info->exit_signal = 0;
 	// append the new task state to the "task_info" file
-	char *cmd = string_format("awk -F \',\' \'{if($1==\"%" PRIbjid "\"){gsub(\"running\",\"aborting\",$5);print $1\",\"$2\",\"$3\",\"$4\",\"$5}}\' %s >> %s", jobid, FILE_TASK_INFO, FILE_TASK_INFO);
+	char *cmd = string_format("awk -F \',\' \'{if($1==\"%" PRIbjid "\"){gsub(\"submitted\",\"aborting\",$5);print $1\",\"$2\",\"$3\",\"$4\",\"$5}}\' %s >> %s", \
+			jobid, FILE_TASK_INFO, FILE_TASK_INFO);
 	system(cmd);
 	free(cmd);
 	return 0;
