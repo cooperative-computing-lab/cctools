@@ -27,8 +27,6 @@ test ! -e ${PROTOBUF} && \
 
 MESOS_EGGS=$(find ${MESOS_BUILD_DIR}/src/python/dist -name "*.egg" | tr "\\n" ":")
 
-#SCRIPT=/home/zc/Work/py_wk/mf_mesos_framework/mf_mesos_executor.py
-
 SCRIPT=${CCTOOLS}/bin/mf_mesos_executor.py
 
 test ! -e ${SCRIPT} && \
