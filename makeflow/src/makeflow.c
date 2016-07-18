@@ -1916,11 +1916,18 @@ if (enforcer && wrapper_umbrella) {
 	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		pid_t mesos_PID;
 		mesos_PID = fork();			
-
 		char *mesos_cwd;
 		mesos_cwd = path_getcwd();
 
-		if(mesos_PID == 0) {
+		char *cctools_path = getenv("CCTOOLS");
+		char *exe_py_path = string_format("%s/bin/mf_mesos_scheduler.py", cctools_path);
+
+		if (mesos_PID > 0) {
+
+			printf("start makeflow mesos scheduler.");
+
+		} else if (mesos_PID == 0) {
+
 			int mesos_fd = open("mesos_scheduler.log", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 
 		    dup2(mesos_fd, 1);
@@ -1928,13 +1935,14 @@ if (enforcer && wrapper_umbrella) {
 
 			close(mesos_fd);
 
-			execlp("/usr/bin/python", "python", "/home/zc/cctools/bin/mf_mesos_scheduler.py", mesos_cwd, (char *) 0);
+			execlp("/usr/bin/python", "python", exe_py_path, mesos_cwd, (char *) 0);
 			_exit(127);
-		}
 
-		if(mesos_PID < 0) {
+		} else {
+
 			debug(D_MAKEFLOW_RUN, "couldn't create new process: %s\n", strerror(errno));
 			exit(EXIT_FAILURE);
+
 		}
 
 	}

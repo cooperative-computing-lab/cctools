@@ -293,7 +293,47 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 			jobid, FILE_TASK_INFO, FILE_TASK_INFO);
 	system(cmd);
 	free(cmd);
-	return 0;
+
+	char *line = NULL;
+	size_t len = 0;
+	ssize_t read_len;
+	FILE *fp;
+	char *task_id_ch;
+	char *task_stat_str;
+	int task_id;
+	// TODO what is the proper timeout?
+	int timeout = 40;
+
+	fp = fopen(FILE_TASK_STATE, "r");
+	while(1) {
+		while((read_len = getline(&line, &len, fp)) != -1) {
+			// trim the newline character
+			if (line[read_len-1] == '\n') {
+				line[read_len-1] = '\0';
+				--read_len;
+			}
+
+			task_id_ch = strtok(line, ",");
+			task_id = atoi(task_id_ch);
+			task_stat_str = strtok(NULL, ",");
+
+			if (task_id == (int)jobid && \
+					(strcmp(task_stat_str, "finished") == 0 || \
+					 strcmp(task_stat_str, "failed") == 0 || \
+					 strcmp(task_stat_str, "aborted") == 0)) {
+
+				fclose(fp);
+				return 0;
+
+			}
+		}
+		sleep(1);
+
+		if(timeout != 0 && time(0) >= timeout) {
+			fclose(fp);
+			return 1;
+		}
+	}
 }
 
 static int batch_queue_mesos_create (struct batch_queue *q)

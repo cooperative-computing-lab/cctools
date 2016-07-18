@@ -133,14 +133,15 @@ class MakeflowScheduler(Scheduler):
             oup_fn = open(FILE_TASK_STATE, "a", 0)
         else:
             logging.error("{} is not created in advanced".format(FILE_TASK_STATE))
-
-        if update.state == mesos_pb2.TASK_FAILED:
-            oup_fn.write("{},failed\n".format(update.task_id.value))
-        if update.state == mesos_pb2.TASK_FINISHED:
-            oup_fn.write("{},finished\n".format(update.task_id.value))
+            exit(1)
 
         with mms.lock:
-            mms.tasks_info_dict[update.task_id.value].action = "done"
+            if update.state == mesos_pb2.TASK_FAILED:
+                oup_fn.write("{},failed\n".format(update.task_id.value))
+                mms.tasks_info_dict[update.task_id.value].action = "failed"
+            if update.state == mesos_pb2.TASK_FINISHED:
+                oup_fn.write("{},finished\n".format(update.task_id.value))
+                mms.tasks_info_dict[update.task_id.value].action = "finished"
         
         oup_fn.close()
 
@@ -247,23 +248,31 @@ class MakefowMonitor(threading.Thread):
             self.driver.stop()  
     
     
-    def abort_mesos_task(self):
+    def abort_mesos_task(self, task_id):
         logging.info("Makeflow is trying to abort task {}.".format(task_id))
+       
+        if mms.tasks_info_dict[task_id].action == "finished" or \
+                mms.tasks_info_dict[task_id].action == "failed" or \
+                mms.tasks_info_dict[task_id].action == "aborted":
+                return
+
+        with mms.lock:
+            if mms.tasks_info_dict[task_id].action == "submitted":
+                mms.tasks_info_dict[task_id].action = "aborted"
+            if mms.tasks_info_dict[task_id].action == "running":
+                py_task_id = mesos_pb2.TaskID()
+                py_task_id.value = task_id 
+                self.driver.killTask(py_task_id)
+                mms.tasks_info_dict[task_id].action = "aborted"
+
+        if os.path.isfile(FILE_TASK_STATE): 
+            oup_fn = open(FILE_TASK_STATE, "a", 0)
+        else:
+            logging.error("{} is not created in advanced".format(FILE_TASK_STATE))
+            exit(1)
         
-        mms.tasks_info_dict[task_id].action \
-                = "aborting"
-
-        abort_executor_id = \
-                mms.tasks_info_dict[task_id].\
-                executor_info.executor_id
-
-        abort_slave_id = \
-                mms.tasks_info_dict[task_id].\
-                executor_info.slave_id
-
-        self.driver.sendFrameworkMessage(executor_id, slave_id, \
-                "[SCHEDULER_REQUEST] abort")
-
+        oup_fn.write("{},aborted\n".format(task_id))
+        oup_fn.close()
 
     def run(self):
 
