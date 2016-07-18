@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# This script uses MESOS_SOURCE_DIR and MESOS_BUILD_DIR which come
+# from configuration substitutions.
+MESOS_SOURCE_DIR=/home/zc/Work/mesos
+MESOS_BUILD_DIR=/home/zc/Work/mesos/build
+
+# Use colors for errors.
+. ${MESOS_SOURCE_DIR}/support/colors.sh
+
+# Force the use of the Python interpreter configured during building.
+test ! -z "${PYTHON}" && \
+  echo "${RED}Ignoring PYTHON environment variable (using @PYTHON@)${NORMAL}"
+
+PYTHON=/usr/bin/python
+
+SETUPTOOLS=`echo ${MESOS_BUILD_DIR}/3rdparty/setuptools-*/`
+
+# Just warn in the case when build with --disable-bundled.
+test ! -e ${SETUPTOOLS} && \
+  echo "${RED}Failed to find ${SETUPTOOLS}${NORMAL}"
+
+PROTOBUF=`echo ${MESOS_BUILD_DIR}/3rdparty/libprocess/3rdparty/protobuf-*/python/`
+
+test ! -e ${PROTOBUF} && \
+  echo "${RED}Failed to find ${PROTOBUF}${NORMAL}"
+
+MESOS_EGGS=$(find ${MESOS_BUILD_DIR}/src/python/dist -name "*.egg" | tr "\\n" ":")
+
+#SCRIPT=/home/zc/Work/py_wk/mf_mesos_framework/mf_mesos_executor.py
+
+SCRIPT=${CCTOOLS}/bin/mf_mesos_executor.py
+
+test ! -e ${SCRIPT} && \
+  echo "${RED}Failed to find ${SCRIPT}${NORMAL}" && \
+  exit 1
+
+PYTHONPATH="${SETUPTOOLS}:${PROTOBUF}:${MESOS_EGGS}" \
+  exec ${PYTHON} ${SCRIPT} "${@}"
