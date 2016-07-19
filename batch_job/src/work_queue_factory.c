@@ -131,7 +131,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		double transfer_delta = time_transfer - time_transfer_previous;
 		double time_execute_weighted;
 		double time_transfer_weighted;
-		bool positive_deltas = (execute_delta > 0 && transfer_delta > 0);
+		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
 
 		if(positive_deltas) {
 			time_execute_weighted = (alpha * execute_delta) + ((1 - alpha) * time_execute_previous);
