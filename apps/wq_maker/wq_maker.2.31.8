@@ -49,8 +49,10 @@ my $mpi_arg;
 my $resources = 0;
 my $total_tiers = 0;
 my $tasks = 0;
-my $cores = 6;
-my $tolerable_task_failures = 0;
+my $cores  = 1;
+my $disk   = 0;
+my $memory = 0;
+my $tolerable_task_failures = 2;
 my %task_failures;
 
 my $usage = "$maker_help
@@ -64,12 +66,13 @@ Work Queue Options:
 
      -N <project>             Sets the project name to <project>.
 
-     -resources <int>         Specify the number of resources that will be provisioned (default: $resources). 
+     -cores  <int>            Specify the number of cores to be used by each contig. 
+     -disk   <int>            Specify the amount of disk (in MB) to be used by each contig. 
+     -memory <int>            Specify the amount of memory (in MB) to be used by each contig. 
      
      -d <level>               Sets the debug flag for Work Queue. For all debugging output, try 'all'.
+     -o <debug file>          Sets the debug file for Work Queue.
 	 
-     -bw <integer>            Sets the expected network bandwidth in MBytes/second.
-
      -MPI                     Specifies that each task should utilize mpiexec to execute.
 ";
 
@@ -86,11 +89,13 @@ try{
 	       "fa=i" => \$OPT{fast_abort},
 	       "N=s" => \$OPT{project},
 	       "d=s" => \$OPT{debug},
- 	       "resources=i" => \$OPT{resources},
- 	       "chunks=i" => \$OPT{chunks},
+	       "o=s" => \$OPT{debug_file},
+ 	       "cores=i" => \$OPT{cores},
+ 	       "disk=i" => \$OPT{disk},
+ 	       "memory=i" => \$OPT{memory},
 	       "contigs-per-split=i" => \$OPT{contigs_per_split},
  	       "bw=i" => \$OPT{bw},
-               "MPI" => sub {$mpi_arg = "mpiexec -n ";},
+           "MPI" => sub {$mpi_arg = "mpiexec -n ";},
 	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
@@ -127,12 +132,16 @@ try{
     exit($code);
 };
 
-if(defined $OPT{"tasks"}){
-	$tasks = $OPT{"tasks"}; 
+if(defined($OPT{"cores"})) {
+	$cores = $OPT{"cores"}; 
 }
 
-if(defined($OPT{"resources"})) {
-	$resources = $OPT{"resources"}; 
+if(defined($OPT{"disk"})) {
+	$disk = $OPT{"disk"}; 
+}
+
+if(defined($OPT{"memory"})) {
+	$memory = $OPT{"memory"}; 
 }
 
 if(defined($mpi_arg)){
@@ -148,8 +157,6 @@ main();
 #------------------------------- FUNCTION DEFINITIONS -------------------------------------
 
 sub main {
-	my $tiers_to_annotate = $total_tiers;
-	
 	my $start_tier = 0;
 	my $tiers_annotated = 0;
 	my $total_tiers_annotated = 0;
@@ -192,15 +199,12 @@ sub main {
 	exit(0);
 }
 
-sub get_wkdir {
-	my $wkdir = cwd();
-	$wkdir .= "/";
-	return $wkdir;
-}
-
 sub setup_workqueue {
 	if(defined($OPT{"debug"})){
 		Work_Queue::cctools_debug_flags_set($OPT{"debug"}); 
+		if(defined($OPT{"debug_file"})){
+			Work_Queue::cctools_debug_config_file($OPT{"debug_file"}); 
+		}
 		print localtime()." :: Work Queue debug flags set :: ".$OPT{"debug"}.".\n";
 	}
 
@@ -292,9 +296,9 @@ sub parse_genome_file {
 	open my $genome_file, '<', "$genome" or die "Could not open input Genome $genome $!\n";
 	my $output = sprintf("$genome\_%06d", $splits_currently);
 	open my $genome_output, '>', "$output" or die "Could not open output Genome $output $!\n";
+
 	while (my $line = <$genome_file>) {
 		if( (my $contig) = $line =~ m/^>\s*(\w*)/ ) {
-			$contigs_currently += 1;
 			if($contigs_currently == $contigs_per_split) {
 				$contigs_currently = 0;
 				$splits_currently += 1;
@@ -305,10 +309,16 @@ sub parse_genome_file {
 				$inputs_to_contigs->{$output} = [];
 			}
 			push(@{$inputs_to_contigs->{$output}}, $contig);
+			$contigs_currently += 1;
 		}
 		print $genome_output $line;
 	}
-	printf("%d : ", ($contigs_per_split*$splits_currently)+$contigs_currently);
+	printf("%d\n", ($contigs_per_split*$splits_currently)+$contigs_currently);
+	if($contigs_currently > 0){
+		$splits_currently += 1;
+	}
+	printf("Total number of input files : %d\n", $splits_currently);
+	$total_tiers = $splits_currently;
 	close($genome_file);
 	close($genome_output);
 
@@ -363,7 +373,13 @@ sub submit_task {
 	}
 
 	$task->specify_cores($cores);
-	
+	if($disk){
+		$task->specify_cores($disk);
+	}
+	if($memory){
+		$task->specify_cores($memory);
+	}
+
 	my $taskid = $wq->submit($task);
 	print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
 
@@ -422,21 +438,17 @@ sub call_wq_wait {
 		print task_outfile "=================================\n\n";
 		close (task_outfile);
 		
-		my $retStatus = index($output, "EXIT:");
-		if ($retStatus != -1) {
-			$retStatus = substr($output, $retStatus+5, 2);
-			$retStatus = sprintf("%d", $retStatus);
-		}
+		my $retStatus = $t->return_status;
 		if($retStatus == 0 || $retStatus == 1) {
 			my $task_result = $t->result; 	
 			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
 		} else { #tier resubmission on failure 
 			$task_failures{$tasktag} += 1; 
 			if($task_failures{$tasktag} <= $tolerable_task_failures){
-				print localtime()." :: Failed, resubmitting WQ task for tiers $tasktag\n";
-				work_queue::work_queue_submit($wq, $t);
+				print localtime()." :: Failed, resubmitting WQ task for task $tasktag\n";
+				$wq->submit($t);
 			} else{
-				print localtime()." :: Giving up on task for tiers $tasktag since it has failed $tolerable_task_failures times\n"; 
+				print localtime()." :: Giving up on task $tasktag since it has failed $tolerable_task_failures times\n"; 
 			}
 		}
 	}		
