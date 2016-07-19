@@ -47,6 +47,10 @@ def read_log_entries(file, fields):
     pairs = zip(idxs, fields)
     epoch = None
     count_lines = 0
+    prev_line = None
+    alpha = 0.1
+    capacity_total = []
+    j = 0
 
     for line in file:
         count_lines = count_lines + 1
@@ -75,7 +79,35 @@ def read_log_entries(file, fields):
             except ArithmeticError:
                 record['capacity_tasks'] = record['capacity_tasks']
 
+            if(prev_line is None):
+                prev_line = record
+                prev_line['time_transfer_weighted'] = 0
+                prev_line['time_execute_weighted'] = 0
+                prev_line['capacity_weighted'] = 0
+                prev_line['capacity_tasks'] = 0
+
+            if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0): 
+                record['time_transfer_weighted'] = alpha * ((record['time_transfer']) - prev_line['time_transfer']) + ((1 - alpha) * prev_line['time_transfer_weighted'])
+                record['time_execute_weighted'] = alpha * (record['time_execute'] - prev_line['time_execute']) + ((1 - alpha) * prev_line['time_execute_weighted'])
+            else: 
+                record['time_transfer_weighted'] = prev_line['time_transfer_weighted']
+                record['time_execute_weighted'] = prev_line['time_execute_weighted']
+
             log_entries[record['timestamp']] = record
+
+            if(record['time_transfer_weighted'] > 0):
+                record['capacity_weighted'] = (int) (record['time_execute_weighted'] / record['time_transfer_weighted'])
+            else:
+                record['capacity_weighted'] = prev_line['capacity_weighted']
+            if(record['time_transfer'] > 0):
+                record['capacity_tasks'] = (int) (record['time_execute'] / record['time_transfer'])
+            else:
+                record['capacity_tasks'] = prev_line['capacity_tasks']
+            if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0):
+                prev_line = record
+
+            capacity_total.append(record['capacity_weighted'])
+            j += 1
 
         except ValueError:
             sys.stderr.write('Line %d has an invalid value. Ignoring.\n' % (count_lines, ))
@@ -84,6 +116,19 @@ def read_log_entries(file, fields):
             sys.stderr.write('Line %d has less than %d fields. Aborting.\n' % (count_lines, len(fields)))
             sys.exit(1)
 
+    capacity_total = sorted(capacity_total, cmp=lambda x,y: cmp(x, y))
+    capacity_median = 0
+    if(j % 2 != 0):
+        capacity_median = ((int) (capacity_total[((int) (j / 2))] + capacity_total[(int) ((j / 2) + 1)]) / 2)
+    else:
+        capacity_median = capacity_total[(j / 2)]
+
+    capacity_mean = 0
+    for cap in capacity_total:
+        capacity_mean += cap
+        capacity_mean = (int) (capacity_mean / j)
+
+    print "Median capacity: ", capacity_median
     return log_entries
 
 def sort_time(log_entries):
@@ -266,8 +311,13 @@ if __name__ == '__main__':
 
         plots['tasks'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous counts",
-                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks'],
-                labels = ['waiting', 'on workers', 'running', 'with results', 'capacity'])
+                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks', 'capacity_weighted'],
+                labels = ['waiting', 'on workers', 'running', 'with results', 'capacity', 'weighted capacity'])
+
+        plots['tasks-all-capacities'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+                title = "tasks instantaneous capacities",
+                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks', 'capacity_cores', 'capacity_memory', 'capacity_disk'],
+                labels = ['waiting', 'on workers', 'running', 'with results', 'task capacity', 'cores capacity', 'memory capacity', 'disk capacity'])
 
         plots['tasks-accum'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks cumulative counts",
