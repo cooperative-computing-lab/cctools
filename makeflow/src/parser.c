@@ -462,7 +462,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 	} else if(!strcmp(".RESOURCE", name)){
 		dag_parse_variable_wmode(bk, n, '=');
 	} else {
-		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", t->lexeme);
+		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
 		result = 0;
 	}
 
