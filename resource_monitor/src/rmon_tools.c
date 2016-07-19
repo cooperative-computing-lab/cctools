@@ -53,7 +53,7 @@ struct field fields[NUM_FIELDS + 1] = {
 	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "Mbps",     0, 1, offsetof(struct rmDsummary, bandwidth)},
 	[FILES    ] = {"n", "total_files",    "num files",       "files",    0, 1, offsetof(struct rmDsummary, total_files)},
 	[DISK]      = {"z", "disk",           "disk",            "MB",       0, 1, offsetof(struct rmDsummary, disk)},
-	[CORES    ] = {"C", "cores",          "cores",           "cores",    0, 0, offsetof(struct rmDsummary, cores)},
+	[CORES    ] = {"C", "cores",          "cores",           "cores",    0, 1, offsetof(struct rmDsummary, cores)},
 	[MAX_PROCESSES]   = {"p", "max_concurrent_processes", "max processes",   "procs", 0, 0, offsetof(struct rmDsummary, max_concurrent_processes)},
 	[TOTAL_PROCESSES] = {"P", "total_processes",          "total processes", "procs", 0, 0, offsetof(struct rmDsummary, total_processes)},
 	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, 0, 0, 0}
@@ -317,9 +317,10 @@ struct rmDsummary *parse_summary(struct jx_parser *p, char *filename, struct has
 	if(!so)
 		return NULL;
 
+	struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
+	category_accumulate_summary(c, so, NULL);
+
 	if(categories) {
-		struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
-		category_accumulate_summary(c, so, NULL);
 		if(so->category) {
 			c = category_lookup_or_create(categories, so->category);
 			category_accumulate_summary(c, so, NULL);

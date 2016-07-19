@@ -6306,9 +6306,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		q->stats->time_send_good            += t->time_when_commit_end - t->time_when_commit_end;
 		q->stats->time_receive_good         += t->time_when_done - t->time_when_retrieval;
 
-		c->total_tasks++;
-
-		s->tasks_done                 = c->total_tasks;
+		s->tasks_done++;
 		s->time_workers_execute_good += t->time_workers_execute_last;
 		s->time_send_good            += t->time_when_commit_end - t->time_when_commit_end;
 		s->time_receive_good         += t->time_when_done - t->time_when_retrieval;

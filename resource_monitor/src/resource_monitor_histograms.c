@@ -1247,6 +1247,14 @@ void set_fa_max_throughput_brute_force(struct rmDsummary_set *s, struct hash_tab
 
 void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_table *categories) {
 
+	/* activate first allocation for all resources. */
+	char *name;
+	struct category *c;
+	hash_table_firstkey(categories);
+	while(hash_table_nextkey(categories, &name, (void *) &c)) {
+		rmsummary_delete(c->autolabel_resource);
+		c->autolabel_resource = rmsummary_create(1);
+	}
 
 	set_category_maximum(s, categories);
 
@@ -1512,7 +1520,7 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >mode <br> &#9653;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max t.p<br> &#9663; </td>");
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. min waste<br> &#9663; </td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. min waste </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. ind.</td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. 0.95</td>");
 
@@ -1521,7 +1529,7 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. m.t.</td>");
 	}
 
-	fprintf(stream, "<td class=\"datahdr\" >&sigma;/&mu;</td>");
+	fprintf(stream, "<td class=\"datahdr\" >(&mu;+&sigma;)/&mu;</td>");
 	fprintf(stream, "<td class=\"datahdr\" >p<sub>99</sub></td>");
 	fprintf(stream, "<td class=\"datahdr\" >p<sub>95</sub></td>");
 }
@@ -1547,34 +1555,34 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "%6.0lf\n", h->mean);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_max_throughput.waste));
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput.first);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_min_waste_time_dependence.waste));
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_dependence.first);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->fa_min_waste_time_independence.waste));
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_independence.first);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> (w: %.0lf ) <br><br>\n", ceil(h->fa_95.waste));
+	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%" PRId64 "\n", h->fa_95.first);
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_min_waste_brute_force.waste));
+		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 		fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_brute_force.first);
 		fprintf(stream, "</td>\n");
 
-		fprintf(stream, "<td class=\"data\"> (w: %.0lf) <br><br>\n", ceil(h->fa_min_waste_brute_force.waste));
+		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 		fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput_brute_force.first);
 		fprintf(stream, "</td>\n");
 	}
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.2lf\n", h->mean > 0 ? h->std_dev/h->mean : -1);
+	fprintf(stream, "%6.2lf\n", h->mean > 0 ? (h->mean + h->std_dev)/h->mean : -1);
 	fprintf(stream, "</td>\n");
 
 	struct rmDsummary *s;
@@ -1655,7 +1663,7 @@ void write_front_page(char *workflow_name)
 	char *filename = string_format("%s/index.html", output_directory);
 	fo = fopen(filename, "w");
 
-	int columns = brute_force ? 11 : 9;
+	int columns = brute_force ? 12 : 10;
 
 	if(!fo)
 		fatal("Could not open file %s for writing: %s\n", strerror(errno));

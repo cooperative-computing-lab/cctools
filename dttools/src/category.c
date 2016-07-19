@@ -571,6 +571,8 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 		if(new_maximum) {
 			c->steady_state = 1;
 		}
+
+        c->total_tasks++;
 	}
 
 	return update;
