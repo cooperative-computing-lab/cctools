@@ -57,6 +57,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_resources_seen      = rmsummary_create(-1);
 
 	c->cores_histogram          = itable_create(0);
+	c->cores_avg_histogram      = itable_create(0);
 	c->wall_time_histogram      = itable_create(0);
 	c->cpu_time_histogram       = itable_create(0);
 	c->memory_histogram         = itable_create(0);
@@ -155,6 +156,7 @@ static void category_clear_histograms(struct category *c) {
 		return;
 
 	category_clear_histogram(c->cores_histogram);
+	category_clear_histogram(c->cores_avg_histogram);
 	category_clear_histogram(c->wall_time_histogram);
 	category_clear_histogram(c->cpu_time_histogram);
 	category_clear_histogram(c->max_concurrent_processes_histogram);
@@ -178,6 +180,7 @@ static void category_delete_histograms(struct category *c) {
 	category_clear_histograms(c);
 
 	itable_delete(c->cores_histogram);
+	itable_delete(c->cores_avg_histogram);
 	itable_delete(c->wall_time_histogram);
 	itable_delete(c->cpu_time_histogram);
 	itable_delete(c->max_concurrent_processes_histogram);

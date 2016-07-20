@@ -56,6 +56,8 @@ struct rmsummary
 	int64_t  disk;
 
 	int64_t  cores;
+	double   cores_avg;
+
 	int64_t  gpus;
 
 	struct rmsummary *limits_exceeded;
@@ -84,6 +86,7 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
 int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);
+double  rmsummary_get_double_field(struct rmsummary *s, const char *key);
 const char *rmsummary_get_char_field(struct rmsummary *s, const char *key);
 
 /**  Reads a single summary file from filename **/

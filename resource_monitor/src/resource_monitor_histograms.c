@@ -1401,7 +1401,8 @@ void write_scatters_of_category(struct rmDsummary_set *s)
 	write_scatters_of_field(c, BANDWIDTH,       bandwidth)
 	write_scatters_of_field(c, FILES,           total_files)
 	write_scatters_of_field(c, DISK,            disk)
-	write_scatters_of_field(c, CORES,           cores)
+	write_scatters_of_field(c, CORES_PEAK,      cores)
+	write_scatters_of_field(c, CORES_AVG,       cores_avg)
 }
 
 void write_overheads_of_category(struct rmDsummary_set *s)
@@ -1487,10 +1488,20 @@ void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *pr
 		prefix = "";
 	}
 
+	char control_str[128];
+	snprintf(control_str, sizeof(control_str) - 1, "%%%s\n", f->format); 
+
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
 	fprintf(stream, "<br><br>\n");
-	fprintf(stream, "%d\n", (int) value_of_field(s, f));
+
+
+	if(!strcmp(f->format, PRId64)) {
+		fprintf(stream, control_str, (int64_t) value_of_field(s, f));
+	} else {
+		fprintf(stream, control_str, value_of_field(s, f));
+	}
+
 	fprintf(stream, "</td>\n");
 }
 
@@ -1547,6 +1558,9 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	}
 	fprintf(stream, "</td>");
 
+	char control_str[128];
+	snprintf(control_str, sizeof(control_str) - 1, "%%%s\n", f->format); 
+
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%6.0lf\n", h->value_at_max_count);
 	fprintf(stream, "</td>\n");
@@ -1556,28 +1570,28 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput.first);
+	fprintf(stream, control_str, h->fa_max_throughput.first);
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_dependence.first);
+	fprintf(stream, control_str, h->fa_min_waste_time_dependence.first);
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_independence.first);
+	fprintf(stream, control_str, h->fa_min_waste_time_independence.first);
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_95.first);
+	fprintf(stream, control_str, h->fa_95.first);
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_brute_force.first);
+		fprintf(stream, control_str, h->fa_min_waste_brute_force.first);
 		fprintf(stream, "</td>\n");
 
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput_brute_force.first);
+		fprintf(stream, control_str, h->fa_max_throughput_brute_force.first);
 		fprintf(stream, "</td>\n");
 	}
 
@@ -1592,7 +1606,6 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 
 	s = h->summaries_sorted[index_of_p(h, 0.95)];
 	write_outlier(stream, s, f, prefix);
-
 }
 
 void write_individual_histogram_webpage(struct histogram *h)

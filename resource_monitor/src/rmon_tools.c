@@ -41,22 +41,23 @@ double Mbytes_to_Gbytes(double bytes)
 }
 
 struct field fields[NUM_FIELDS + 1] = {
-	[WALL_TIME] = {"t", "wall_time",      "wall time",       "s",        1, 1, offsetof(struct rmDsummary, wall_time)},
-	[CPU_TIME]  = {"c", "cpu_time",       "cpu time",        "s",        1, 1, offsetof(struct rmDsummary, cpu_time)},
-	[VIRTUAL  ] = {"v", "virtual_memory", "virtual memory",  "MB",       0, 1, offsetof(struct rmDsummary, virtual_memory)},
-	[RESIDENT ] = {"m", "memory",         "resident memory", "MB",       0, 1, offsetof(struct rmDsummary, memory)},
-	[SWAP     ] = {"s", "swap_memory",    "swap memory",     "MB",       0, 1, offsetof(struct rmDsummary, swap_memory)},
-	[B_READ   ] = {"r", "bytes_read",     "read bytes",      "MB",       0, 1, offsetof(struct rmDsummary, bytes_read)},
-	[B_WRITTEN] = {"w", "bytes_written",  "written bytes",   "MB",       0, 1, offsetof(struct rmDsummary, bytes_written)},
-	[B_RX   ]   = {"R", "bytes_received", "received bytes",  "MB",       0, 1, offsetof(struct rmDsummary, bytes_received)},
-	[B_TX]      = {"W", "bytes_sent",     "bytes_sent",      "MB",       0, 1, offsetof(struct rmDsummary, bytes_sent)},
-	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "Mbps",     0, 1, offsetof(struct rmDsummary, bandwidth)},
-	[FILES    ] = {"n", "total_files",    "num files",       "files",    0, 1, offsetof(struct rmDsummary, total_files)},
-	[DISK]      = {"z", "disk",           "disk",            "MB",       0, 1, offsetof(struct rmDsummary, disk)},
-	[CORES    ] = {"C", "cores",          "cores",           "cores",    0, 1, offsetof(struct rmDsummary, cores)},
-	[MAX_PROCESSES]   = {"p", "max_concurrent_processes", "max processes",   "procs", 0, 0, offsetof(struct rmDsummary, max_concurrent_processes)},
-	[TOTAL_PROCESSES] = {"P", "total_processes",          "total processes", "procs", 0, 0, offsetof(struct rmDsummary, total_processes)},
-	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, 0, 0, 0}
+	[WALL_TIME]  = {"t", "wall_time",      "wall time",       "s",        PRId64, 1, 1, offsetof(struct rmDsummary, wall_time)},
+	[CPU_TIME]   = {"c", "cpu_time",       "cpu time",        "s",        PRId64, 1, 1, offsetof(struct rmDsummary, cpu_time)},
+	[VIRTUAL  ]  = {"v", "virtual_memory", "virtual memory",  "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, virtual_memory)},
+	[RESIDENT ]  = {"m", "memory",         "resident memory", "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, memory)},
+	[SWAP     ]  = {"s", "swap_memory",    "swap memory",     "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, swap_memory)},
+	[B_READ   ]  = {"r", "bytes_read",     "read bytes",      "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_read)},
+	[B_WRITTEN]  = {"w", "bytes_written",  "written bytes",   "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_written)},
+	[B_RX   ]    = {"R", "bytes_received", "received bytes",  "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_received)},
+	[B_TX]       = {"W", "bytes_sent",     "bytes_sent",      "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_sent)},
+	[BANDWIDTH]  = {"B", "bandwidth",      "bandwidth",       "Mbps",     PRId64, 0, 1, offsetof(struct rmDsummary, bandwidth)},
+	[FILES    ]  = {"f", "total_files",    "num files",       "files",    PRId64, 0, 1, offsetof(struct rmDsummary, total_files)},
+	[DISK]       = {"z", "disk",           "disk",            "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, disk)},
+	[CORES_AVG]  = {"C", "cores_avg",      "cores avg",       "cores",    ".2f",    0, 1, offsetof(struct rmDsummary, cores_avg)},
+	[CORES_PEAK] = {"P", "cores_peak",     "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmDsummary, cores)},
+	[MAX_PROCESSES]   = {"N", "max_concurrent_processes", "max processes",   "procs", PRId64, 0, 0, offsetof(struct rmDsummary, max_concurrent_processes)},
+	[TOTAL_PROCESSES] = {"n", "total_processes",          "total processes", "procs", PRId64, 0, 0, offsetof(struct rmDsummary, total_processes)},
+	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, NULL, 0, 0, 0}
 };
 
 char *sanitize_path_name(char *name)
@@ -165,11 +166,11 @@ void parse_fields_options(char *field_str)
 				fields[WALL_TIME].active = 1;
 				debug(D_RMON, "adding field: wall time\n");
 				break;
-			case 'p':
+			case 'N':
 				fields[MAX_PROCESSES].active = 1;
 				debug(D_RMON, "adding field: concurrent processes\n");
 				break;
-			case 'P':
+			case 'n':
 				fields[TOTAL_PROCESSES].active = 1;
 				debug(D_RMON, "adding field: total processes\n");
 				break;
@@ -205,7 +206,7 @@ void parse_fields_options(char *field_str)
 				fields[B_TX].active = 1;
 				debug(D_RMON, "adding field: bytes sent\n");
 				break;
-			case 'n':
+			case 'f':
 				fields[FILES].active = 1;
 				debug(D_RMON, "adding field: number of files\n");
 				break;
@@ -213,9 +214,13 @@ void parse_fields_options(char *field_str)
 				fields[DISK].active = 1;
 				debug(D_RMON, "adding field: footprint\n");
 				break;
+			case 'P':
+				fields[CORES_PEAK].active = 1;
+				debug(D_RMON, "adding field: cores peak\n");
+				break;
 			case 'C':
-				fields[CORES].active = 1;
-				debug(D_RMON, "adding field: cores\n");
+				fields[CORES_AVG].active = 1;
+				debug(D_RMON, "adding field: cores avg\n");
 				break;
 			default:
 				fatal("'%c' is not a field option\n", *c);
@@ -259,8 +264,15 @@ struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
 	to_external(s, so, end);
 	to_external(s, so, wall_time);
 	to_external(s, so, cpu_time);
-
 	to_external(s, so, cores);
+
+	// use fractional cores if possible
+	if(s->wall_time > 0 && s->cpu_time > 0) {
+		s->cores_avg = s->cpu_time/s->wall_time;
+	} else {
+		s->cores_avg = so->cores;
+	}
+
 	to_external(s, so, total_processes);
 	to_external(s, so, max_concurrent_processes);
 
@@ -281,6 +293,7 @@ struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
 	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
+		// if a value is negative, set it to zero
 		if(value_of_field(s, f) < 0)
 		{
 			assign_to_field(s, f, 0);
@@ -483,7 +496,8 @@ void rmDsummary_print(FILE *output, struct rmDsummary *so) {
 	to_internal(so, s, wall_time, "s");
 	to_internal(so, s, cpu_time,  "s");
 
-	to_internal(so, s, cores,                   "cores");
+	s->cores = so->cores;
+
 	to_internal(so, s, total_processes,         "procs");
 	to_internal(so, s, max_concurrent_processes,"procs");
 
