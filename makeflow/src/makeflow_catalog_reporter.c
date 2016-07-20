@@ -26,7 +26,7 @@ See the file COPYING for details.
 
 int makeflow_catalog_summary(struct dag* d, char* name){
     struct dag_node *n;
-    const char *fn;
+    const char *fn = 0;
     dag_node_state_t state;
     
     struct list *failed_tasks; 

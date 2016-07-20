@@ -40,6 +40,8 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
+#include "makeflow_catalog_reporter.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -132,6 +134,10 @@ static int log_verbose_mode = 0;
  *  * files. */
 static struct makeflow_wrapper *wrapper = 0;
 static struct makeflow_monitor *monitor = 0;
+
+/* is true only if the -N command is used. Useful for catalog reporting.
+ */
+static int in_n_mode = 0;
 
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
@@ -874,7 +880,12 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+        timestamp_t last_time = timestamp_get();
 
+        //reporting to catalog
+        if(in_n_mode){
+            makeflow_catalog_summary(d, project);
+        }
 
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
@@ -913,6 +924,13 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
+                //report to catalog
+                timestamp_t now = timestamp_get();
+                if(in_n_mode && ((now-last_time) > (60 * 1000 * 1000)) ){
+                    makeflow_catalog_summary(d, project);
+                    last_time = now;
+                }
+                
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
@@ -922,6 +940,11 @@ static void makeflow_run( struct dag *d )
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
+        
+        //reporting to catalog
+        if(in_n_mode){
+            makeflow_catalog_summary(d, project);
+        }
 
 	if(makeflow_abort_flag) {
 		makeflow_abort_all(d);
@@ -1306,6 +1329,7 @@ int main(int argc, char *argv[])
 				free(project);
 				project = xxstrdup(optarg);
 				work_queue_master_mode = "catalog";
+                                in_n_mode = 1; //set to true
 				break;
 			case 'o':
 				debug_config_file(optarg);
