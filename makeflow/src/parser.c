@@ -356,7 +356,7 @@ static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char m
 	struct token *t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
 	{
-		lexer_report_error(bk, "Literal variable name expected.");
+		lexer_report_error(bk, "Literal variable name expected. %s\n", lexer_print_token(t));
 	}
 
 	char *name = xxstrdup(t->lexeme);
@@ -441,6 +441,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 		}
 
 		char *filename = xxstrdup(t->lexeme);
+		lexer_free_token(t);
 
 		t = lexer_next_token(bk);
 		if(t->type != TOKEN_LITERAL)
@@ -460,6 +461,32 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 		free(filename);
 		free(size);
 	} else if(!strcmp(".RESOURCE", name)){
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		struct token *t2 = lexer_next_token(bk);
+		if(t2->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
+		}
+
+		if((!strcmp("CORES", t->lexeme)) || (!strcmp("DISK", t->lexeme)) || (!strcmp("MEMORY", t->lexeme))){
+			if(!(string_metric_parse(t2->lexeme) >= 0))
+				lexer_report_error(bk, "Expected numeric value for %s, got: %s\n", t->lexeme, t2->lexeme);
+		} else if(!strcmp("CATEGORY", t->lexeme)){
+			if(!(t2->lexeme))
+				lexer_report_error(bk, "Expected name for CATEGORY");
+		} else {
+			lexer_report_error(bk, "Unsupported .RESOURCE type, got: %s\n", t->lexeme);
+			return 0;
+		}
+
+		lexer_preppend_token(bk, t2);
+		lexer_preppend_token(bk, t);
+
 		dag_parse_variable_wmode(bk, n, '=');
 	} else {
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
