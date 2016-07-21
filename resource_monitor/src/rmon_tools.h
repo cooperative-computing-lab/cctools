@@ -139,4 +139,6 @@ struct rmDsummary_set *make_new_set(char *category);
 
 void rmDsummary_print(FILE *output, struct rmDsummary *so);
 
+char *field_str(struct field *f, double value);
+
 #endif

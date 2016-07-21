@@ -54,7 +54,7 @@ struct field fields[NUM_FIELDS + 1] = {
 	[FILES    ]  = {"f", "total_files",    "num files",       "files",    PRId64, 0, 1, offsetof(struct rmDsummary, total_files)},
 	[DISK]       = {"z", "disk",           "disk",            "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, disk)},
 	[CORES_AVG]  = {"C", "cores_avg",      "cores avg",       "cores",    ".2f",    0, 1, offsetof(struct rmDsummary, cores_avg)},
-	[CORES_PEAK] = {"P", "cores_peak",     "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmDsummary, cores)},
+	[CORES_PEAK] = {"P", "cores",          "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmDsummary, cores)},
 	[MAX_PROCESSES]   = {"N", "max_concurrent_processes", "max processes",   "procs", PRId64, 0, 0, offsetof(struct rmDsummary, max_concurrent_processes)},
 	[TOTAL_PROCESSES] = {"n", "total_processes",          "total processes", "procs", PRId64, 0, 0, offsetof(struct rmDsummary, total_processes)},
 	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, NULL, 0, 0, 0}
@@ -520,5 +520,17 @@ void rmDsummary_print(FILE *output, struct rmDsummary *so) {
 
 	return;
 }
+
+char *field_str(struct field *f, double value) {
+	char control_str[128];
+	snprintf(control_str, sizeof(control_str) - 1, "%%%s", f->format);
+
+	if(strcmp(f->format, PRId64) != 0) {
+		return string_format(control_str, value);
+	} else {
+		return string_format(control_str, (int64_t) value);
+	}
+}
+
 
 /* vim: set noexpandtab tabstop=4: */

@@ -276,6 +276,9 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->gpus;
 	}
 
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
+
 	return 0;
 }
 
@@ -283,6 +286,8 @@ double rmsummary_get_double_field(struct rmsummary *s, const char *key) {
 	if(strcmp(key, "cores_avg") == 0) {
 		return s->cores_avg;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return 0;
 }
@@ -303,6 +308,8 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 	if(strcmp(key, "task_id") == 0) {
 		return s->task_id;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return NULL;
 }
@@ -413,6 +420,8 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
 	return 0;
 }
 
@@ -422,6 +431,8 @@ int rmsummary_assign_double_field(struct rmsummary *s, const char *key, double v
 		s->cores_avg = value;
 		return 1;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return 0;
 }
@@ -436,6 +447,8 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 		s->peak_times = json_to_rmsummary(value);
 		return 1;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return 0;
 }
