@@ -62,7 +62,7 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type)
     
     timestamp_t now= timestamp_get();
     
-    char* batch_type = batch_queue_type_to_string(type);
+    const char* batch_type = batch_queue_type_to_string(type);
     
     //creates memory
     char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\",\"time_started\":%lu,\"batch_type\":\"%s\"}",
