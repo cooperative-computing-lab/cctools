@@ -9,10 +9,11 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "list.h"
 #include "makeflow_summary.h"
-#include "../../dttools/src/catalog_query.h"
-#include "../../dttools/src/json.h"
-#include "../../dttools/src/json_aux.h"
-#include "../../dttools/src/username.h"
+#include "catalog_query.h"
+#include "json.h"
+#include "json_aux.h"
+#include "username.h"
+#include "batch_job.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,7 +26,7 @@ See the file COPYING for details.
 
 //waiting means: inputs not ready, running means: took job and submitted
 
-int makeflow_catalog_summary(struct dag* d, char* name){
+int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type){
     struct dag_node *n;
     const char *fn = 0;
     dag_node_state_t state;
@@ -59,9 +60,13 @@ int makeflow_catalog_summary(struct dag* d, char* name){
     char username[USERNAME_MAX];
     username_get(username);
     
+    timestamp_t now= timestamp_get();
+    
+    char* batch_type = batch_queue_type_to_string(type);
+    
     //creates memory
-    char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\"}",
-                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, list_size(failed_tasks),name,username);
+    char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\",\"time_started\":%lu,\"batch_type\":\"%s\"}",
+                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, list_size(failed_tasks),name,username,now,batch_type);
     
     int resp = catalog_query_send_update(host, text);
     

@@ -885,7 +885,7 @@ static void makeflow_run( struct dag *d )
 
         //reporting to catalog
         if(in_n_mode){
-            makeflow_catalog_summary(d, project);
+            makeflow_catalog_summary(d, project, batch_queue_type);
         }
 
 	while(!makeflow_abort_flag) {
@@ -928,7 +928,7 @@ static void makeflow_run( struct dag *d )
                 //report to catalog
                 timestamp_t now = timestamp_get();
                 if(in_n_mode && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
-                    makeflow_catalog_summary(d, project);
+                    makeflow_catalog_summary(d, project,batch_queue_type);
                     last_time = now;
                     first_report = 0;
                 }
@@ -945,7 +945,7 @@ static void makeflow_run( struct dag *d )
         
         //reporting to catalog
         if(in_n_mode){
-            makeflow_catalog_summary(d, project);
+            makeflow_catalog_summary(d, project,batch_queue_type);
         }
 
 	if(makeflow_abort_flag) {
