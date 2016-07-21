@@ -61,12 +61,15 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type)
     username_get(username);
     
     timestamp_t now= timestamp_get();
+    char timestamp[25];//uint64 largest number is only 21 digits long, give it 25 for good measure
+    timestamp_fmt(timestamp, 25, TIMESTAMP_FORMAT, now);
+    char* time = string_trim_spaces(timestamp);
     
     const char* batch_type = batch_queue_type_to_string(type);
     
     //creates memory
-    char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\",\"time_started\":%lu,\"batch_type\":\"%s\"}",
-                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, list_size(failed_tasks),name,username,now,batch_type);
+    char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\",\"time_started\":%s,\"batch_type\":\"%s\"}",
+                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, list_size(failed_tasks),name,username,time,batch_type);
     
     int resp = catalog_query_send_update(host, text);
     
