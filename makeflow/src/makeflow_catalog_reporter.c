@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "../../dttools/src/catalog_query.h"
 #include "../../dttools/src/json.h"
 #include "../../dttools/src/json_aux.h"
+#include "../../dttools/src/username.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -52,13 +53,15 @@ int makeflow_catalog_summary(struct dag* d, char* name){
     }
     
     //transmit report here
-    char* text;
-    char* host = malloc(sizeof(char)*strlen(CATALOG_HOST));
-    host = string_combine_multi(host,":",CATALOG_PORT); // creates memory
+    //creates memory
+    char* host = string_format("%s:%i",CATALOG_HOST,CATALOG_PORT);
+    
+    char username[USERNAME_MAX];
+    username_get(username);
     
     //creates memory
-    text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\"}",
-                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, list_size(failed_tasks),name);
+    char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\"}",
+                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, list_size(failed_tasks),name,username);
     
     int resp = catalog_query_send_update(host, text);
     
