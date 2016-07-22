@@ -79,14 +79,13 @@ struct mesos_task *create_mesos_task(int task_id, const char *cmd, const char *e
 
 	if (extra_input_files != NULL) {
 	    mt->task_input_files = build_str_lst_from_str(&(mt->num_input_files), extra_input_files);
-		char *path_buf = path_getcwd();
-		char *tmp_fn_path = string_combine(path_buf, "/");
-		char *tmp_fn_abs_path = NULL;
 		int i = 0;
 		for(i = 0; i < mt->num_input_files; i++) {
 			if (mt->task_input_files[i][0] != '/') {
-				tmp_fn_abs_path = string_combine(tmp_fn_path, mt->task_input_files[i]);
-				mt->task_input_files[i] = tmp_fn_abs_path;
+				char *path_buf = path_getcwd();
+				string_combine(path_buf, "/");
+				string_combine(path_buf, mt->task_input_files[i]);
+				mt->task_input_files[i] = path_buf;
 			}
 		}	
 	} else {
@@ -200,7 +199,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	}
 	fputs("submitted\n", fp_1);
 
-	destroy_mesos_task(mt);
+	//destroy_mesos_task(mt);
 	fclose(fp_1);
 
 	return task_id;
@@ -230,7 +229,7 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 	while(1) {
 
 		// if the file size has changed
-		if (is_file_modified(FILE_TASK_STATE)) {
+		//if (is_file_modified(FILE_TASK_STATE)) {
 			char *task_id_ch;
 			char *task_stat_str;
 			int task_id;
@@ -270,10 +269,9 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 					return task_id;
 				}
 			}
-
-		} else {
+		//} else {
 			sleep(1);
-		}
+		//}
 
 		if(stoptime != 0 && time(0) >= stoptime) {
 			return -1;
