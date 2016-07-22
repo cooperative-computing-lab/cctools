@@ -74,28 +74,33 @@ class MakeflowScheduler(Scheduler):
        
         mf_mesos_task_info = mms.tasks_info_dict[task_id] 
 
+        # initialize a ExecutorInfo instance
         executor = self.new_mesos_executor(\
             mf_mesos_task_info, \
             offer.framework_id.value)
 
         mesos_task.executor.MergeFrom(executor)
 
+        # TODO for version0 one executor only run with one task, in the future
+        # we may wanna change the number of tasks running by one executor
         mf_mesos_executor_info = \
                 mms.MfMesosExecutorInfo(\
                 executor.executor_id, \
-                offer.slave_id.value, offer.hostname) 
+                offer.slave_id.value, offer.hostname)
+
+        mf_mesos_executor_info.tasks.append(task_id)
 
         mms.executors_info_dict[executor.executor_id.value] = \
                 mf_mesos_executor_info
 
-        mf_mesos_task_info.executor_info = \
-                mf_mesos_executor_info
+        # combine mesos TaskInfo with ExecutorInfo
+        mf_mesos_task_info.executor_id = \
+                executor.executor_id.value
 
         mms.tasks_info_dict[task_id] \
                 = mf_mesos_task_info 
         
-        # create mesos task and launch it with 
-        # offer 
+        # create mesos task and launch it with offer 
         logging.info("Launching task {} using offer {}.".format(\
                         task_id, offer.id.value))
 
@@ -210,8 +215,10 @@ class MakefowMonitor(threading.Thread):
                 task_action = task_info_list[4]
                 if task_action == "aborting":
                     mf_task = mms.tasks_info_dict[task_id]
+
                     self.driver.sendFrameworkMessage(self, \
-                            mf_task.executor_id, mf_task.slave_id, \
+                            mf_task.executor_id, \
+                            mms.executors_info_dict[mf_task.executor_id].slave_id, \
                             "[SCHEDULER_REQUEST] abort")
     
         task_action_fn.close()
@@ -235,12 +242,12 @@ class MakefowMonitor(threading.Thread):
             fn_run_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_INFO)
             fn_finish_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_STATE)
 
-            #if os.path.isfile(mf_done_fn_path):
-            #    os.remove(mf_done_fn_path)
-            #if os.path.isfile(fn_run_tks_path):
-            #    os.remove(fn_run_tks_path)
-            #if os.path.isfile(fn_finish_tks_path):
-            #    os.remove(fn_finish_tks_path)
+            if os.path.isfile(mf_done_fn_path):
+                os.remove(mf_done_fn_path)
+            if os.path.isfile(fn_run_tks_path):
+                os.remove(fn_run_tks_path)
+            if os.path.isfile(fn_finish_tks_path):
+                os.remove(fn_finish_tks_path)
            
             while(not self.is_all_executor_stopped()):
                 pass
