@@ -48,6 +48,7 @@ SOURCES = \
 	hash_cache.c \
 	hash_table.c \
 	hdfs_library.c \
+	histogram.c \
 	hmac.c \
 	host_disk_info.c \
 	host_memory_info.c \
