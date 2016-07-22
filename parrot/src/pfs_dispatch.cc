@@ -1370,10 +1370,12 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				 * the child.
 				 */
 				wait_barrier = 1;
-				int flags = args[0];
-				debug(D_DEBUG, "flags = 0x%X", flags);
-				if (flags & CLONE_UNTRACED) {
-					fatal("cannot run application which does not allow tracing (CLONE_UNTRACED)");
+				if(p->syscall==SYSCALL32_clone) {
+					int flags = args[0];
+					debug(D_DEBUG, "flags = 0x%X", flags);
+					if (flags & CLONE_UNTRACED) {
+						fatal("cannot run application which does not allow tracing (CLONE_UNTRACED)");
+					}
 				}
 			}
 			break;

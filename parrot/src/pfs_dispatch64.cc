@@ -1136,15 +1136,17 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_fork:
 		case SYSCALL64_clone:
 			if(entering) {
-				/* Once a fork is started, we must trace only that pid so that
+				/* Once a fork or clone is started, we must trace only that pid so that
 				 * we can determine the child pid before seeing any events from
 				 * the child.
 				 */
 				wait_barrier = 1;
-				int flags = args[0];
-				debug(D_DEBUG, "flags = 0x%X", flags);
-				if (flags & CLONE_UNTRACED) {
-					fatal("cannot run application which does not allow tracing (CLONE_UNTRACED)");
+				if(p->syscall==SYSCALL64_clone) {
+					int flags = args[0];
+					debug(D_DEBUG, "flags = 0x%X", flags);
+					if (flags & CLONE_UNTRACED) {
+						fatal("cannot run application which does not allow tracing (CLONE_UNTRACED)");
+					}
 				}
 			}
 			break;
