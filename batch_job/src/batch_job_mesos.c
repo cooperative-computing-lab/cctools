@@ -199,7 +199,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	}
 	fputs("submitted\n", fp_1);
 
-	//destroy_mesos_task(mt);
+	destroy_mesos_task(mt);
 	fclose(fp_1);
 
 	return task_id;

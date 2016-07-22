@@ -17,6 +17,11 @@ FILE_TASK_INFO = "task_info"
 FILE_TASK_STATE = "task_state"
 MF_DONE_FILE = "makeflow_done"
 
+TASK_CPUS = 0.01
+TASK_MEM = 32
+
+EXECUTOR_CPUS = 0.01
+EXECUTOR_MEM = 32
 
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
@@ -36,17 +41,29 @@ class MakeflowScheduler(Scheduler):
         executor.command.value = "{} \"{}\" {} {}".format(sh_path, mf_task.cmd, 
                 executor.executor_id.value, executor.framework_id.value)
 
+        cpus = executor.resources.add()
+        cpus.name = "cpus"
+        cpus.type = mesos_pb2.Value.SCALAR
+        cpus.scalar.value = EXECUTOR_CPUS
+
+        mem = executor.resources.add()
+        mem.name = "mem"
+        mem.type = mesos_pb2.Value.SCALAR
+        mem.scalar.value = EXECUTOR_MEM
+
         # add $CCTOOLS as the env variables for executor command
         cctools_env = executor.command.environment.variables.add()
         cctools_env.name = "CCTOOLS"
         cctools_env.value = cctools_path
 
+        # add input files list to the executor_info
         for fn in mf_task.inp_fns:
             uri = executor.command.uris.add()
             logging.info("input file is: {}".format(fn.strip(' \t\n\r')))
             uri.value = fn.strip(' \t\n\r')
             uri.executable = False
             uri.extract = False
+
         return executor
     
     # Create a TaskInfo instance
@@ -59,12 +76,12 @@ class MakeflowScheduler(Scheduler):
         cpus = mesos_task.resources.add()
         cpus.name = "cpus"
         cpus.type = mesos_pb2.Value.SCALAR
-        cpus.scalar.value = 1
+        cpus.scalar.value = TASK_CPUS
     
         mem = mesos_task.resources.add()
         mem.name = "mem"
         mem.type = mesos_pb2.Value.SCALAR
-        mem.scalar.value = 1
+        mem.scalar.value = TASK_MEM
     
         return mesos_task
 
@@ -118,13 +135,35 @@ class MakeflowScheduler(Scheduler):
         idle_task = False 
 
         for offer in offers:
-            
+          
+            offer_cpus = 0
+            offer_mem = 0
+
+            for resource in offer.resources:
+                if resource.name == "cpus":
+                    offer_cpus += resource.scalar.value
+                if resource.name == "mem":
+                    offer_mem += resource.scalar.value
+
+            logging.info("Received resource offer {} with cpus {} and mem: {}\
+                    ".format(offer.id.value, offer_cpus, offer_mem))
+
+            remaining_cpus = offer_cpus
+            remaining_mem = offer_mem
+
             with mms.lock:
                 for task_info in mms.tasks_info_dict.itervalues():
-                    if task_info.action == "submitted":
+                    if task_info.action == "submitted" and \
+                            remaining_cpus >= TASK_CPUS and \
+                            remaining_mem >= TASK_MEM:
+
                         idle_task = True
                         task_id = task_info.task_id
                         mms.tasks_info_dict[task_id].action = "running"
+
+                        remaining_cpus -= TASK_CPUS
+                        remaining_mem -= TASK_MEM
+
                         self.launch_mesos_task(driver, offer, task_id)
                         break
             
@@ -141,6 +180,10 @@ class MakeflowScheduler(Scheduler):
             exit(1)
 
         with mms.lock:
+            if update.state == mesos_pb2.TASK_ERROR:
+                oup_fn.write("{},error".format(update.task_id.value))
+                mms.tasks_info_dict[update.task_id.value].action = "error"
+                logging.error("{}".format(update.message.value))
             if update.state == mesos_pb2.TASK_FAILED:
                 oup_fn.write("{},failed\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "failed"
