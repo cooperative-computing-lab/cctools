@@ -56,6 +56,8 @@ struct rmsummary
 	int64_t  disk;
 
 	int64_t  cores;
+	double   cores_avg;
+
 	int64_t  gpus;
 
 	struct rmsummary *limits_exceeded;
@@ -81,9 +83,11 @@ void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int onl
 char *rmsummary_print_string(const struct rmsummary *s, int only_resources);
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
+int rmsummary_assign_double_field(struct rmsummary *s, const char *key, double value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
 int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);
+double  rmsummary_get_double_field(struct rmsummary *s, const char *key);
 const char *rmsummary_get_char_field(struct rmsummary *s, const char *key);
 
 /**  Reads a single summary file from filename **/
@@ -94,9 +98,6 @@ struct rmsummary *rmsummary_parse_string(const char *str);
 
 /**  Reads all summaries from filename **/
 struct list *rmsummary_parse_file_multiple(const char *filename);
-
-/**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
-struct rmsummary *rmsummary_parse_next(FILE *stream);
 
 struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources);
 struct rmsummary *json_to_rmsummary(struct jx *j);

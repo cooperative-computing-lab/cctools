@@ -44,7 +44,7 @@ See the file COPYING for details.
 
 #define MAX_LINE 1024
 
-enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES, NUM_FIELDS};
+enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES_PEAK, CORES_AVG, NUM_FIELDS};
 
 struct rmDsummary
 {
@@ -73,8 +73,9 @@ struct rmDsummary
 	double  bandwidth;
 	double  total_files;
 	double  disk;
-	double  cores;
 
+	double  cores;
+	double  cores_avg;
 };
 
 struct rmDsummary_set
@@ -97,6 +98,7 @@ struct field {
 	char  *name;
 	char  *caption;
 	char  *units;
+	char  *format;
 	int    cummulative;
 	int    active;
 	size_t offset;
@@ -128,8 +130,6 @@ double divide(double a, double b);
 
 void parse_fields_options(char *field_str);
 
-struct rmDsummary *parse_summary(FILE *stream, char *filename, struct hash_table *categories);
-struct rmDsummary *parse_summary_file(char *filename, struct hash_table *categories);
 char *parse_executable_name(char *command);
 
 void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories);
@@ -138,5 +138,7 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct 
 struct rmDsummary_set *make_new_set(char *category);
 
 void rmDsummary_print(FILE *output, struct rmDsummary *so);
+
+char *field_str(struct field *f, double value);
 
 #endif

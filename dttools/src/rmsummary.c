@@ -77,6 +77,7 @@ void initialize_units() {
 	add_conversion_field("bytes_sent",               "B",      "MB",      1);
 	add_conversion_field("bandwidth",                "bps",    "Mbps",    1);
 	add_conversion_field("cores",                    "cores",  "cores",   0);
+	add_conversion_field("cores_avg",                "cores",  "cores",   1);
 	add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
 	add_conversion_field("total_processes",          "procs",  "procs",   0);
 	add_conversion_field("total_files",              "files",  "files",   0);
@@ -275,6 +276,19 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->gpus;
 	}
 
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
+
+	return 0;
+}
+
+double rmsummary_get_double_field(struct rmsummary *s, const char *key) {
+	if(strcmp(key, "cores_avg") == 0) {
+		return s->cores_avg;
+	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
 	return 0;
 }
 
@@ -294,6 +308,8 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 	if(strcmp(key, "task_id") == 0) {
 		return s->task_id;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return NULL;
 }
@@ -404,8 +420,23 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
 	return 0;
 }
+
+int rmsummary_assign_double_field(struct rmsummary *s, const char *key, double value) {
+
+	if(strcmp(key, "cores_avg") == 0) {
+		s->cores_avg = value;
+		return 1;
+	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
+	return 0;
+}
+
 
 int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *value) {
 
@@ -416,6 +447,8 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 		s->peak_times = json_to_rmsummary(value);
 		return 1;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return 0;
 }
@@ -491,6 +524,7 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	field_to_json(output, s, total_processes);
 	field_to_json(output, s, max_concurrent_processes);
 	field_to_json(output, s, cores);
+	field_to_json(output, s, cores_avg);
 	field_to_json(output, s, cpu_time);
 	field_to_json(output, s, wall_time);
 	field_to_json(output, s, end);
@@ -607,8 +641,14 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename)
 		return NULL;
 	}
 
-	struct rmsummary *s = rmsummary_parse_next(stream);
+	struct jx *j = jx_parse_stream(stream);
 	fclose(stream);
+
+	if(!j)
+		return NULL;
+
+	struct rmsummary *s = json_to_rmsummary(j);
+	jx_delete(j);
 
 	return s;
 }
@@ -641,18 +681,28 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 		return NULL;
 	}
 
+	struct jx_parser *p = jx_parser_create(0);
+	jx_parser_read_stream(p, stream);
+
 	struct list      *lst = list_create(0);
 	struct rmsummary *s;
 
 	do
 	{
-		s = rmsummary_parse_next(stream);
+		struct jx *j = jx_parser_yield(p);
+
+		if(!j)
+			break;
+
+		s = json_to_rmsummary(j);
+		jx_delete(j);
 
 		if(s)
 			list_push_tail(lst, s);
 	} while(s);
 
 	fclose(stream);
+	jx_parser_delete(p);
 
 	return lst;
 }
@@ -661,7 +711,6 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 struct rmsummary *rmsummary_parse_next(FILE *stream)
 {
 	struct jx *j = jx_parse_stream(stream);
-
 	if(!j)
 		return NULL;
 
@@ -738,6 +787,8 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->limits_exceeded = NULL;
 	s->peak_times = NULL;
 
+	s->cores_avg   = (double) default_value;
+
 	s->last_error  = 0;
 	s->exit_status = 0;
 	s->signal = 0;
@@ -810,6 +861,8 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, disk);
 
 	rmsummary_apply_op(dest, src, fn, cores);
+	rmsummary_apply_op(dest, src, fn, cores_avg);
+
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
 }
 
@@ -866,6 +919,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 	merge_limit(dest, src, total_files);
 	merge_limit(dest, src, disk);
 	merge_limit(dest, src, cores);
+	merge_limit(dest, src, cores_avg);
 	merge_limit(dest, src, fs_nodes);
 
 }
@@ -911,6 +965,7 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	rmsummary_apply_op(dest, src, max_field, start);
 	rmsummary_apply_op(dest, src, max_field, end);
 	rmsummary_apply_op(dest, src, max_field, wall_time);
+	rmsummary_apply_op(dest, src, max_field, cores_avg);
 
 	max_op_w_time(dest, src, max_concurrent_processes);
 	max_op_w_time(dest, src, total_processes);

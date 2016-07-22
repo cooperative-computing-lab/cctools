@@ -60,6 +60,7 @@ struct category {
 	/* All keys are assumed positive. Thus, we shift them to the right so that
 	 * we can have a "0" key. 0->1, 1->2, etc. */
 	struct itable *cores_histogram;
+	struct itable *cores_avg_histogram;
 	struct itable *wall_time_histogram;
 	struct itable *cpu_time_histogram;
 	struct itable *max_concurrent_processes_histogram;
