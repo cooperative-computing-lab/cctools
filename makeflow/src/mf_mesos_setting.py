@@ -15,6 +15,7 @@ offers_queue = Queue.Queue()
 # default makeflow working directory
 mf_wk_dir = "."
 DEBUG_FILE = "debug_mesos"
+SLEEP = 0
 
 def print_task_id_state():
     if os.path.isfile(DEBUG_FILE):
