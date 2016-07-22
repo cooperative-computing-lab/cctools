@@ -27,7 +27,7 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 # Resources needed for a single task in category may be included (optional).
 # MEMORY and DISK in MB.
-.RESOURCE CORES 1
+.RESOURCE CORES unsupported
 .RESOURCE MEMORY 50
 .RESOURCE DISK 100
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg

@@ -19,7 +19,7 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 # Similar rules can be arbitrarily labeled to form sets, called categories. In
 # this example we define three categories: preprocess, analysis, and merge.
 # Rules belong to the category of the most recent CATEGORY statement.
-.RESOURCE CATEGORY merge
+.RESOURCE NOT_DIRECTIVE unsupported
 
 # To provide accurate assessment of the output size, estimated file sizes can
 # be specified via the .SIZE directive.
