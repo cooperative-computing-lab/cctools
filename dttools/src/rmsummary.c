@@ -684,7 +684,7 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 	struct jx_parser *p = jx_parser_create(0);
 	jx_parser_read_stream(p, stream);
 
-	struct list      *lst = list_create(0);
+	struct list      *lst = list_create();
 	struct rmsummary *s;
 
 	do

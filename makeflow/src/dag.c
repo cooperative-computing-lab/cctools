@@ -164,7 +164,7 @@ struct list *dag_input_files(struct dag *d)
 	char *filename;
 	struct list *il;
 
-	il = list_create(0);
+	il = list_create();
 
 	hash_table_firstkey(d->files);
 	while((hash_table_nextkey(d->files, &filename, (void **) &f)))
