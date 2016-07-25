@@ -722,6 +722,10 @@ then
 	then
 		ccflags="${ccflags} -DHAS_MYSQL_MYSQL_H"
 	fi
+
+	# When mysql is enabled, we also need ssl
+	config_openssl_path=auto
+
 else
 	if [ $config_mysql_path = yes ]
 	then
