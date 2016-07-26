@@ -723,7 +723,6 @@ char *rmonitor_get_command_line(pid_t pid)
 		if(cmdline[i] == '\0')
 			cmdline[i] = ' ';
 	}
-        fclose(fline);
 
 	return xxstrdup(cmdline);
 }
