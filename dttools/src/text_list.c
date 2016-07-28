@@ -42,10 +42,6 @@ struct text_list *text_list_load(const char *path)
 
 char *text_list_get(struct text_list *t, int i)
 {
-	int j = 0;
-	while(j < t->used_length) {
-		j++;
-	}
 	if(i >= 0 && i < t->used_length) {
 		return t->items[i];
 	} else {

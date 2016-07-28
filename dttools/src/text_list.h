@@ -8,4 +8,5 @@ int text_list_append(struct text_list *t, const char *item);
 int text_list_size(struct text_list *t);
 void text_list_delete(struct text_list *t);
 
+
 #endif
