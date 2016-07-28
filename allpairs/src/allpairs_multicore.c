@@ -202,7 +202,6 @@ static int main_loop_threaded( allpairs_compare_t funcptr, struct text_list *set
 		for(i=0;i<block_size;i++) {
 			xdata_id[i] = x + i;
 			xname[i] = text_list_get(seta,x+i);
-			fprintf(stderr, "Horizontal member: %s\n", xname[i]);
 			xdata[i] = load_one_file(text_list_get(seta,x+i),&xdata_length[i]);
 		}
 
