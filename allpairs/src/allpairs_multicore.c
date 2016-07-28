@@ -16,7 +16,6 @@ See the file COPYING for details.
 #include <pthread.h>
 
 #include "allpairs_compare.h"
-#include "allpairs_text_list.h"
 
 #include "cctools.h"
 #include "debug.h"
