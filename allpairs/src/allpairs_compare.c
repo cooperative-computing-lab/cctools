@@ -10,6 +10,9 @@ See the file COPYING for details.
 #include <pthread.h>
 
 #include "allpairs_compare.h"
+#include "path.h"
+#include "stringtools.h"
+#include "text_list.h"
 
 #include "../../sand/src/matrix.h"
 #include "../../sand/src/align.h"
@@ -215,5 +218,26 @@ allpairs_compare_t allpairs_compare_function_get( const char *name )
 	}
 }
 
+struct text_list *allpairs_remote_create(const char *path, const char *set)
+{
+	char line[1024];
+
+	FILE *file = fopen(path, "r");
+	if(!file)
+		return 0;
+
+	struct text_list *t = text_list_create();
+	int i = 0;
+	while(fgets(line, sizeof(line), file)) {
+		string_chomp(line);
+		char *name = string_format("%s_%d_%s", set, i, path_basename(line));
+		text_list_append(t, name);
+		i++;
+	}
+
+	fclose(file);
+
+	return t;
+}
 
 /* vim: set noexpandtab tabstop=4: */

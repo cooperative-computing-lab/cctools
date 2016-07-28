@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "path.h"
 
 #include "allpairs_compare.h"
+#include "allpairs_text_list.h"
 
 #define ALLPAIRS_LINE_MAX 4096
 
@@ -239,7 +240,10 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 			return 0;
 	}
 
-	buf = text_list_string(seta,xcurrent,xcurrent+xblock);
+	buf = text_list_string(seta_remote,xcurrent,xcurrent+xblock);
+	//fprintf(stderr, "Set A: %s\n", buf);
+	//char *cat = string_format("cat %s", buf);
+	//system(cat);
 	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"A",WORK_QUEUE_NOCACHE)) {
 		free(buf);
 		return 0;
@@ -247,7 +251,9 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 
 	free(buf);
 
-	buf = text_list_string(setb,ycurrent,ycurrent+yblock);
+	buf = text_list_string(setb_remote,ycurrent,ycurrent+yblock);
+	//fprintf(stderr, "Set B: %s\n", buf);
+	//system(cat);
 	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"B",WORK_QUEUE_NOCACHE)) {
 		free(buf);
 		return 0;
@@ -257,7 +263,9 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 
 	for(x=xcurrent;x<(xcurrent+xblock);x++) {
 		name = text_list_get(seta,x);
+		//fprintf(stderr, "Set A:\n");
 		remote_name = text_list_get(seta_remote,x);
+		//fprintf(stderr, "Remote name for current item in Set A #%d: %s\n", x, remote_name);
 		if(!name) break;
 		if(!work_queue_task_specify_file(task,name,remote_name,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
 			return 0;
@@ -265,7 +273,9 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 
 	for(y=ycurrent;y<(ycurrent+yblock);y++) {
 		name = text_list_get(setb,y);
+		//fprintf(stderr, "Set B:\n");
 		remote_name = text_list_get(setb_remote,y);
+		//fprintf(stderr, "Remote name for current item in Set B #%d: %s\n", y, remote_name);
 		if(!name) break;
 		if(!work_queue_task_specify_file(task,name,remote_name,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
 			return 0;
@@ -415,7 +425,7 @@ int main(int argc, char **argv)
 	}
 
 	struct text_list *seta = text_list_load(argv[optind]);
-	struct text_list *seta_remote = text_list_allpairs_remote_create(argv[optind], "A");
+	struct text_list *seta_remote = allpairs_remote_create(argv[optind], "A");
 	if(!seta) {
 		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind+1],strerror(errno));
 		return 1;
@@ -424,7 +434,7 @@ int main(int argc, char **argv)
 	fprintf(stdout, "%s: %s has %d elements\n",progname,argv[optind],text_list_size(seta));
 
 	struct text_list *setb = text_list_load(argv[optind+1]);
-	struct text_list *setb_remote = text_list_allpairs_remote_create(argv[optind+1], "B");
+	struct text_list *setb_remote = allpairs_remote_create(argv[optind+1], "B");
 	if(!setb) {
 		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind+1],strerror(errno));
 		return 1;

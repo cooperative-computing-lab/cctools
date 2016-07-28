@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "path.h"
 #include "stringtools.h"
 #include "text_list.h"
 
@@ -43,6 +42,10 @@ struct text_list *text_list_load(const char *path)
 
 char *text_list_get(struct text_list *t, int i)
 {
+	int j = 0;
+	while(j < t->used_length) {
+		j++;
+	}
 	if(i >= 0 && i < t->used_length) {
 		return t->items[i];
 	} else {
@@ -75,28 +78,5 @@ void text_list_delete(struct text_list *t)
 	free(t->items);
 	free(t);
 }
-
-struct text_list *text_list_allpairs_remote_create(const char *path, const char *set)
-{
-	char line[1024];
-
-	FILE *file = fopen(path, "r");
-	if(!file)
-		return 0;
-
-	struct text_list *t = text_list_create();
-	int i = 0;
-	while(fgets(line, sizeof(line), file)) {
-		string_chomp(line);
-		char *name = string_format("%s_%d_%s", set, i, path_basename(line));
-		text_list_append(t, name);
-		i++;
-	}
-
-	fclose(file);
-
-	return t;
-}
-
 
 /* vim: set noexpandtab tabstop=4: */

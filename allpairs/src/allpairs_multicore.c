@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <pthread.h>
 
 #include "allpairs_compare.h"
+#include "allpairs_text_list.h"
 
 #include "cctools.h"
 #include "debug.h"
@@ -202,6 +203,7 @@ static int main_loop_threaded( allpairs_compare_t funcptr, struct text_list *set
 		for(i=0;i<block_size;i++) {
 			xdata_id[i] = x + i;
 			xname[i] = text_list_get(seta,x+i);
+			fprintf(stderr, "Horizontal member: %s\n", xname[i]);
 			xdata[i] = load_one_file(text_list_get(seta,x+i),&xdata_length[i]);
 		}
 
@@ -250,7 +252,7 @@ forking a comparison function for each result.  Up to num_cores
 programes will be running simultaneously.
 */
 
-static int main_loop_program( const char *funcpath, struct text_list *seta, struct text_list *setb, struct text_list *seta_remote, struct text_list *setb_remote )
+static int main_loop_program( const char *funcpath, struct text_list *seta, struct text_list *setb )
 {
 	int x,i,j,c;
 	char line[1024];
@@ -279,7 +281,7 @@ static int main_loop_program( const char *funcpath, struct text_list *seta, stru
 					if((nindex == 2 && (index_array[0] + i + c) <= (index_array[1] + j)) || //calcuate xindex and yindex of the unit in the original matrix of allpairs_master
 						(is_symmetric == 0 && nindex == 0) ||
 						(is_symmetric && (i+c) <= j)) {
-							sprintf(line,"%s %s %s %s\n",funcpath,extra_arguments,text_list_get(seta_remote,i+c),text_list_get(setb_remote,j));
+							sprintf(line,"%s %s %s %s\n",funcpath,extra_arguments,text_list_get(seta,i+c),text_list_get(setb,j));
 							proc[c] = fast_popen(line);
 							if(!proc[c]) {
 								fprintf(stderr,"%s: couldn't execute %s: %s\n",progname,line,strerror(errno));
@@ -378,14 +380,12 @@ int main(int argc, char *argv[])
 	const char * funcpath = argv[optind+2];
 
 	struct text_list *seta = text_list_load(setapath);
-	struct text_list *seta_remote = text_list_allpairs_remote_create(setapath, "A");
 	if(!seta) {
 		fprintf(stderr, "allpairs_multicore: cannot open %s: %s\n",setapath,strerror(errno));
 		exit(1);
 	}
 
 	struct text_list *setb = text_list_load(setbpath);
-	struct text_list *setb_remote = text_list_allpairs_remote_create(setbpath, "B");
 	if(!setb) {
 		fprintf(stderr, "allpairs_multicore: cannot open %s: %s\n",setbpath,strerror(errno));
 		exit(1);
@@ -407,7 +407,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "%s: %s is neither an executable program nor an internal function.\n",progname,funcpath);
 			return 1;
 		}
-		result = main_loop_program(funcpath,seta,setb,seta_remote,setb_remote);
+		result = main_loop_program(funcpath,seta,setb);
 	}
 
 	return result;

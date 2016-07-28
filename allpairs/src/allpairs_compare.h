@@ -11,4 +11,6 @@ typedef void (*allpairs_compare_t) ( const char *name1, const char *data1, int s
 
 allpairs_compare_t allpairs_compare_function_get( const char *name );
 
+struct text_list *allpairs_remote_create(const char *path, const char *set);
+
 #endif
