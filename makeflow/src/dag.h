@@ -32,6 +32,7 @@ struct dag {
 	struct set *export_vars;           /* List of variables with prefix export. (these are setenv'ed eventually). */
 	struct set *special_vars;          /* List of special variables, such as category, cores, memory, etc. */
 	category_mode_t allocation_mode;   /* One of CATEGORY_ALLOCATION_MODE_{FIXED,MAX_THROUGHTPUT,MIN_WASTE} */
+        int wrapped_in_container;          /* Indicates whether or not the current makeflow is wrapped in a container*/
 
 
 	/* Dynamic states related to execution via Makeflow. */

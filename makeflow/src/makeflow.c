@@ -41,6 +41,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
 #include "makeflow_wrapper_enforcement.h"
+#include "makeflow_wrapper_singularity.h"
 #include "parser.h"
 #include "parser_jx.h"
 
@@ -1099,6 +1100,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Path to parrot_run (defaults to current directory).\n", "--parrot-path=<path>");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
+        printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1208,6 +1210,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
+        LONG_OPT_SINGULARITY,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1279,6 +1282,7 @@ int main(int argc, char *argv[])
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
+        {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{0, 0, 0, 0}
 	};
 
@@ -1526,6 +1530,11 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOCKER_TAR:
 				image_tar = xxstrdup(optarg);
 				break;
+                        case LONG_OPT_SINGULARITY:
+                                if(!wrapper) wrapper = makeflow_wrapper_create();
+                                container_mode = CONTAINER_MODE_SINGULARITY;
+                                container_image = xxstrdup(optarg);
+                                break;
 			case LONG_OPT_ALLOCATION_MODE:
 				if(!strcmp(optarg, "throughput")) {
 					allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
@@ -1879,8 +1888,14 @@ if (enforcer && wrapper_umbrella) {
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
-	}
+            makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
+            d->wrapped_in_container = 1;
+	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
+            makeflow_wrapper_singularity_init(wrapper, container_image);
+            d->wrapped_in_container = 1;
+        }else{
+            d->wrapped_in_container = 0;
+        }
 
 	makeflow_run(d);
 	time_completed = timestamp_get();
@@ -1895,10 +1910,14 @@ if (enforcer && wrapper_umbrella) {
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-		char *cmd = string_format("rm %s", CONTAINER_SH);
-		system(cmd);
-		free(cmd);
-	}
+            char *cmd = string_format("rm %s", CONTAINER_SH);
+            system(cmd);
+            free(cmd);
+	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
+            char* cmd = string_format("rm %s",CONTAINER_SINGULARITY_SH);
+            system(cmd);
+            free(cmd);
+        }
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
