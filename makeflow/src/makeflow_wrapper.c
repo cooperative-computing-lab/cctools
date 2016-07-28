@@ -20,8 +20,8 @@ struct makeflow_wrapper * makeflow_wrapper_create()
 	struct makeflow_wrapper *w = malloc(sizeof(*w));
 	w->command = NULL;
 
-	w->input_files = list_create(0);
-	w->output_files = list_create(0);
+	w->input_files = list_create();
+	w->output_files = list_create();
 
 	w->remote_names = itable_create(0);
 	w->remote_names_inv = hash_table_create(0, 0);
