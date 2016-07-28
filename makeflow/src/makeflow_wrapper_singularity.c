@@ -24,9 +24,10 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     wrapper_fn = fopen(CONTAINER_SINGULARITY_SH, "w");
 
     char* filedata;
+    //$@ passes in everything, thus this should be awesome and just say "singularity exect <contimg> ALL THE THINGS
     filedata = string_format("%s\n%s\n",
                              "#!/bin/sh",
-                             "singularity exec %s %%s");
+                             "singularity exec %s \"$@\"");
     
     fprintf(wrapper_fn, filedata, container_image);
 
