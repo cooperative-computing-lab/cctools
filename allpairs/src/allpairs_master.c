@@ -175,7 +175,6 @@ char * text_list_string( struct text_list *t, int a, int b )
 	for(i=a;i<b;i++) {
 		const char *str = text_list_get(t,i);
 		if(!str) break;
-		str = path_basename(str);
 		while( (int) (strlen(str) + buffer_pos + 3) >= buffer_size) {
 			buffer_size *= 2;
 			buffer = realloc(buffer,buffer_size);
@@ -195,10 +194,10 @@ xblock, yblock, and then construct a task with a list of files
 on each axis, and attach the necessary files.
 */
 
-struct work_queue_task * ap_task_create( struct text_list *seta, struct text_list *setb )
+struct work_queue_task * ap_task_create( struct text_list *seta, struct text_list *setb, struct text_list *seta_remote, struct text_list *setb_remote )
 {
 	int x,y;
-	char *buf, *name;
+	char *buf, *name, *remote_name;
 	empty_task = 0;
 
 	if(xcurrent>=xstop) {
@@ -240,7 +239,7 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 			return 0;
 	}
 
-	buf = text_list_string(seta,xcurrent,xcurrent+xblock);
+	buf = text_list_string(seta_remote,xcurrent,xcurrent+xblock);
 	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"A",WORK_QUEUE_NOCACHE)) {
 		free(buf);
 		return 0;
@@ -248,7 +247,7 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 
 	free(buf);
 
-	buf = text_list_string(setb,ycurrent,ycurrent+yblock);
+	buf = text_list_string(setb_remote,ycurrent,ycurrent+yblock);
 	if(!work_queue_task_specify_buffer(task,buf,strlen(buf),"B",WORK_QUEUE_NOCACHE)) {
 		free(buf);
 		return 0;
@@ -258,15 +257,17 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 
 	for(x=xcurrent;x<(xcurrent+xblock);x++) {
 		name = text_list_get(seta,x);
+		remote_name = text_list_get(seta_remote,x);
 		if(!name) break;
-		if(!work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+		if(!work_queue_task_specify_file(task,name,remote_name,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
 			return 0;
 	}
 
 	for(y=ycurrent;y<(ycurrent+yblock);y++) {
 		name = text_list_get(setb,y);
+		remote_name = text_list_get(setb_remote,y);
 		if(!name) break;
-		if(!work_queue_task_specify_file(task,name,path_basename(name),WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
+		if(!work_queue_task_specify_file(task,name,remote_name,WORK_QUEUE_INPUT,WORK_QUEUE_CACHE))
 			return 0;
 	}
 
@@ -414,6 +415,7 @@ int main(int argc, char **argv)
 	}
 
 	struct text_list *seta = text_list_load(argv[optind]);
+	struct text_list *seta_remote = allpairs_remote_create(argv[optind], "A");
 	if(!seta) {
 		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind+1],strerror(errno));
 		return 1;
@@ -422,6 +424,7 @@ int main(int argc, char **argv)
 	fprintf(stdout, "%s: %s has %d elements\n",progname,argv[optind],text_list_size(seta));
 
 	struct text_list *setb = text_list_load(argv[optind+1]);
+	struct text_list *setb_remote = allpairs_remote_create(argv[optind+1], "B");
 	if(!setb) {
 		fprintf(stderr,"%s: couldn't open %s: %s\n",progname,argv[optind+1],strerror(errno));
 		return 1;
@@ -494,7 +497,7 @@ int main(int argc, char **argv)
 	while(1) {
 		struct work_queue_task *task = NULL;
 		while(work_queue_hungry(q)) {
-			task = ap_task_create(seta,setb);
+			task = ap_task_create(seta,setb,seta_remote,setb_remote);
 			if(task) {
 				work_queue_submit(q, task);
 			} else if(empty_task) {
