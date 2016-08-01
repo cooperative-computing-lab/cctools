@@ -4,7 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "rmon_tools.h"
+#include "resource_monitor_tools.h"
 #include "macros.h"
 #include "category.h"
 
