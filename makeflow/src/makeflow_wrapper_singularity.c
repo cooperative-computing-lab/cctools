@@ -22,6 +22,7 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     FILE *wrapper_fn;
 
     wrapper_fn = fopen(CONTAINER_SINGULARITY_SH, "w");
+    char* file_sans_compress = string_format("%s",container_image);
 
     char* filedata;
     //$@ passes in everything, thus this should be awesome and just say "singularity exect <contimg> ALL THE THINGS
@@ -30,19 +31,22 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
                                  "#!/bin/sh",
                                  "tar -xxvf $s",
                                  "singularity exec %s \"$@\"");
-        fprintf(wrapper_fn, filedata, container_image, container_image);
+        file_sans_compress[strlen(container_image)-3] = '\0';
+        fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".xz") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
                                  "xz --decompress %s",
                                  "singularity exec %s \"$@\"");
-        fprintf(wrapper_fn, filedata, container_image, container_image);
+        file_sans_compress[strlen(container_image)-3] = '\0';
+        fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".bz2") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
                                  "tar -xjvf %s",
                                  "singularity exec %s \"$@\"");
-        fprintf(wrapper_fn, filedata, container_image, container_image);
+        file_sans_compress[strlen(container_image)-4] = '\0';
+        fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else{
         filedata = string_format("%s\n%s\n",
                                  "#!/bin/sh",
@@ -62,4 +66,5 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     makeflow_wrapper_add_command(w, global_cmd);
     
     free(filedata);
+    free(file_sans_compress);
 }
