@@ -534,7 +534,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* Now submit the actual job, retrying failures as needed. */
-	if(n->resource_request == CATEGORY_ALLOCATION_UNLABELED || n->resource_request == CATEGORY_ALLOCATION_AUTO_ZERO) {
+	if(n->resource_request == CATEGORY_ALLOCATION_UNLABELED) {
 		/* if task does not have a proper resources label, do not submit with one. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist,NULL);
 	} else {
