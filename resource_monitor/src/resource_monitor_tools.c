@@ -41,22 +41,22 @@ double Mbytes_to_Gbytes(double bytes)
 }
 
 struct field fields[NUM_FIELDS + 1] = {
-	[WALL_TIME]  = {"t", "wall_time",      "wall time",       "s",        PRId64, 1, 1, offsetof(struct rmDsummary, wall_time)},
-	[CPU_TIME]   = {"c", "cpu_time",       "cpu time",        "s",        PRId64, 1, 1, offsetof(struct rmDsummary, cpu_time)},
-	[VIRTUAL  ]  = {"v", "virtual_memory", "virtual memory",  "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, virtual_memory)},
-	[RESIDENT ]  = {"m", "memory",         "resident memory", "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, memory)},
-	[SWAP     ]  = {"s", "swap_memory",    "swap memory",     "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, swap_memory)},
-	[B_READ   ]  = {"r", "bytes_read",     "read bytes",      "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_read)},
-	[B_WRITTEN]  = {"w", "bytes_written",  "written bytes",   "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_written)},
-	[B_RX   ]    = {"R", "bytes_received", "received bytes",  "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_received)},
-	[B_TX]       = {"W", "bytes_sent",     "bytes_sent",      "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_sent)},
-	[BANDWIDTH]  = {"B", "bandwidth",      "bandwidth",       "Mbps",     PRId64, 0, 1, offsetof(struct rmDsummary, bandwidth)},
-	[FILES    ]  = {"f", "total_files",    "num files",       "files",    PRId64, 0, 1, offsetof(struct rmDsummary, total_files)},
-	[DISK]       = {"z", "disk",           "disk",            "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, disk)},
-	[CORES_AVG]  = {"C", "cores_avg",      "cores avg",       "cores",    ".2f",    0, 1, offsetof(struct rmDsummary, cores_avg)},
-	[CORES_PEAK] = {"P", "cores",          "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmDsummary, cores)},
-	[MAX_PROCESSES]   = {"N", "max_concurrent_processes", "max processes",   "procs", PRId64, 0, 0, offsetof(struct rmDsummary, max_concurrent_processes)},
-	[TOTAL_PROCESSES] = {"n", "total_processes",          "total processes", "procs", PRId64, 0, 0, offsetof(struct rmDsummary, total_processes)},
+	[WALL_TIME]  = {"t", "wall_time",      "wall time",       "s",        PRId64, 1, 1, offsetof(struct rmsummary, wall_time)},
+	[CPU_TIME]   = {"c", "cpu_time",       "cpu time",        "s",        PRId64, 1, 1, offsetof(struct rmsummary, cpu_time)},
+	[VIRTUAL  ]  = {"v", "virtual_memory", "virtual memory",  "MB",       PRId64, 0, 1, offsetof(struct rmsummary, virtual_memory)},
+	[RESIDENT ]  = {"m", "memory",         "resident memory", "MB",       PRId64, 0, 1, offsetof(struct rmsummary, memory)},
+	[SWAP     ]  = {"s", "swap_memory",    "swap memory",     "MB",       PRId64, 0, 1, offsetof(struct rmsummary, swap_memory)},
+	[B_READ   ]  = {"r", "bytes_read",     "read bytes",      "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_read)},
+	[B_WRITTEN]  = {"w", "bytes_written",  "written bytes",   "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_written)},
+	[B_RX   ]    = {"R", "bytes_received", "received bytes",  "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_received)},
+	[B_TX]       = {"W", "bytes_sent",     "bytes_sent",      "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_sent)},
+	[BANDWIDTH]  = {"B", "bandwidth",      "bandwidth",       "Mbps",     PRId64, 0, 1, offsetof(struct rmsummary, bandwidth)},
+	[FILES    ]  = {"f", "total_files",    "num files",       "files",    PRId64, 0, 1, offsetof(struct rmsummary, total_files)},
+	[DISK]       = {"z", "disk",           "disk",            "MB",       PRId64, 0, 1, offsetof(struct rmsummary, disk)},
+	[CORES_AVG]  = {"C", "cores_avg",      "cores avg",       "cores",    ".2f",    0, 1, offsetof(struct rmsummary, cores_avg)},
+	[CORES_PEAK] = {"P", "cores",          "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmsummary, cores)},
+	[MAX_PROCESSES]   = {"N", "max_concurrent_processes", "max processes",   "procs", PRId64, 0, 0, offsetof(struct rmsummary, max_concurrent_processes)},
+	[TOTAL_PROCESSES] = {"n", "total_processes",          "total processes", "procs", PRId64, 0, 0, offsetof(struct rmsummary, total_processes)},
 	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, NULL, 0, 0, 0}
 };
 
@@ -232,79 +232,7 @@ void parse_fields_options(char *field_str)
 
 #define to_external(s, so, f) (s)->f = rmsummary_to_external_unit(#f, (so)->f)
 
-struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
-
-	struct rmDsummary *s = malloc(sizeof(struct rmDsummary));
-	bzero(s, sizeof(*s));
-
-	if(so->command) {
-		s->command    = xxstrdup(so->command);
-	}
-
-	if(so->category)
-	{
-		s->category   = xxstrdup(so->category);
-	}
-	else if(so->command)
-	{
-		s->category   = parse_executable_name(so->command);
-	}
-	else
-	{
-		s->category   = xxstrdup(DEFAULT_CATEGORY);
-		s->command    = xxstrdup(DEFAULT_CATEGORY);
-	}
-
-	if(so->task_id)
-	{
-		s->task_id = xxstrdup(so->task_id);
-	}
-
-	to_external(s, so, start);
-	to_external(s, so, end);
-	to_external(s, so, wall_time);
-	to_external(s, so, cpu_time);
-	to_external(s, so, cores);
-
-	// use fractional cores if possible
-	if(s->wall_time > 0 && s->cpu_time > 0) {
-		s->cores_avg = s->cpu_time/s->wall_time;
-	} else {
-		s->cores_avg = so->cores;
-	}
-
-	to_external(s, so, total_processes);
-	to_external(s, so, max_concurrent_processes);
-
-	to_external(s, so, memory);
-	to_external(s, so, virtual_memory);
-	to_external(s, so, swap_memory);
-
-	to_external(s, so, bytes_read);
-	to_external(s, so, bytes_written);
-
-	to_external(s, so, bytes_received);
-	to_external(s, so, bytes_sent);
-	to_external(s, so, bandwidth);
-
-	to_external(s, so, disk);
-	to_external(s, so, total_files);
-
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		// if a value is negative, set it to zero
-		if(value_of_field(s, f) < 0)
-		{
-			assign_to_field(s, f, 0);
-		}
-	}
-
-	return s;
-}
-
-
-struct rmDsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
+struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
 {
 	static struct jx_parser *last_p = NULL;
 	static int summ_id     = 1;
@@ -330,6 +258,29 @@ struct rmDsummary *parse_summary(struct jx_parser *p, char *filename, struct has
 	if(!so)
 		return NULL;
 
+	if(!so->task_id) {
+		so->task_id = get_rule_number(filename);
+	}
+
+	if(!so->category) {
+		if(so->command) {
+			so->category   = parse_executable_name(so->command);
+		} else {
+			so->category   = xxstrdup(DEFAULT_CATEGORY);
+			so->command    = xxstrdup(DEFAULT_CATEGORY);
+		}
+	}
+
+	// if a value is negative, set it to zero
+	struct field *f;
+	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
+	{
+		if(value_of_field(so, f) < 0)
+		{
+			assign_to_field(so, f, 0);
+		}
+	}
+
 	struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
 	category_accumulate_summary(c, so, NULL);
 
@@ -340,19 +291,10 @@ struct rmDsummary *parse_summary(struct jx_parser *p, char *filename, struct has
 		}
 	}
 
-	struct rmDsummary *s  = rmsummary_to_rmDsummary(so);
-
-	s->file = xxstrdup(filename);
-	if(!s->task_id) {
-		s->task_id = get_rule_number(filename);
-	}
-
-	rmsummary_delete(so);
-
-	return s;
+	return so;
 }
 
-void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories)
+void parse_summary_from_filelist(struct rmsummary_set *dest, char *filename, struct hash_table *categories)
 {
 	FILE *flist;
 
@@ -367,7 +309,7 @@ void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, st
 			fatal("Cannot open resources summary list: %s : %s\n", filename, strerror(errno));
 	}
 
-	struct rmDsummary *s;
+	struct rmsummary *s;
 	char   file_summ[MAX_LINE];
 	while((fgets(file_summ, MAX_LINE, flist)))
 	{
@@ -398,7 +340,7 @@ void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, st
 }
 
 
-void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct hash_table *categories)
+void parse_summary_recursive(struct rmsummary_set *dest, char *dirname, struct hash_table *categories)
 {
 
 	FTS *hierarchy;
@@ -410,7 +352,7 @@ void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct 
 	if(!hierarchy)
 		fatal("fts_open error: %s\n", strerror(errno));
 
-	struct rmDsummary *s;
+	struct rmsummary *s;
 	while( (entry = fts_read(hierarchy)) )
 		if( S_ISREG(entry->fts_statp->st_mode) && strstr(entry->fts_name, RULE_SUFFIX) ) //bug: no links
 		{
@@ -449,9 +391,9 @@ char *parse_executable_name(char *command)
 	return executable;
 }
 
-struct rmDsummary_set *make_new_set(char *category)
+struct rmsummary_set *make_new_set(char *category)
 {
-	struct rmDsummary_set *ss = malloc(sizeof(struct rmDsummary_set));
+	struct rmsummary_set *ss = malloc(sizeof(struct rmsummary_set));
 
 	ss->category  = category;
 
@@ -460,65 +402,6 @@ struct rmDsummary_set *make_new_set(char *category)
 	ss->summaries = list_create();
 
 	return ss;
-}
-
-#define to_internal(so, s, f, u) rmsummary_to_internal_unit(#f, (so)->f, &(s->f), u)
-
-void rmDsummary_print(FILE *output, struct rmDsummary *so) {
-	struct rmsummary *s = rmsummary_create(-1);
-
-	s->command    = xxstrdup(so->command);
-
-	if(so->category)
-	{
-		s->category   = xxstrdup(so->category);
-	}
-	else if(so->command)
-	{
-		s->category   = xxstrdup(so->command);
-	}
-	else
-	{
-		s->category   = xxstrdup(DEFAULT_CATEGORY);
-		s->command    = xxstrdup(DEFAULT_CATEGORY);
-	}
-
-	if(so->task_id) {
-		s->task_id = xxstrdup(so->task_id);
-	}
-
-	s->start     = so->start;
-	s->end       = so->end;
-	s->wall_time = so->wall_time;
-
-	to_internal(so, s, start,     "us");
-	to_internal(so, s, end,       "us");
-	to_internal(so, s, wall_time, "s");
-	to_internal(so, s, cpu_time,  "s");
-
-	s->cores = so->cores;
-
-	to_internal(so, s, total_processes,         "procs");
-	to_internal(so, s, max_concurrent_processes,"procs");
-
-	to_internal(so, s, memory,         "MB");
-	to_internal(so, s, virtual_memory, "MB");
-	to_internal(so, s, swap_memory,    "MB");
-
-	to_internal(so, s, bytes_read,    "MB");
-	to_internal(so, s, bytes_written, "MB");
-
-	to_internal(so, s, bytes_received, "MB");
-	to_internal(so, s, bytes_sent,     "MB");
-	to_internal(so, s, bandwidth,      "Mbps");
-
-	to_internal(so, s, total_files, "files");
-	to_internal(so, s, disk, "MB");
-
-	rmsummary_print(output, s, /* pprint */ 1, /* extra fields */ 0);
-	rmsummary_delete(s);
-
-	return;
 }
 
 char *field_str(struct field *f, double value) {

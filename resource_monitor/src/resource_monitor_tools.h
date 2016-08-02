@@ -46,39 +46,7 @@ See the file COPYING for details.
 
 enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES_PEAK, CORES_AVG, NUM_FIELDS};
 
-struct rmDsummary
-{
-	char    *command;
-	char    *category;
-	char    *task_id;
-
-	char    *file;
-
-
-	double start;
-	double end;
-	double number_of_tasks;
-
-	double  wall_time;
-	double  total_processes;
-	double  max_concurrent_processes;
-	double  cpu_time;
-	double  virtual_memory;
-	double  memory;
-	double  swap_memory;
-	double  bytes_read;
-	double  bytes_written;
-	double  bytes_received;
-	double  bytes_sent;
-	double  bandwidth;
-	double  total_files;
-	double  disk;
-
-	double  cores;
-	double  cores_avg;
-};
-
-struct rmDsummary_set
+struct rmsummary_set
 {
 	char  *category;
 	struct list *summaries;
@@ -117,27 +85,15 @@ char *get_rule_number(char *filename);
 
 char *make_field_names_str(char *separator);
 
-struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so);
 
-struct rmDsummary *summary_bin_op(struct rmDsummary *s, struct rmDsummary *a, struct rmDsummary *b, double (*op)(double, double));
-struct rmDsummary *summary_unit_op(struct rmDsummary *s, struct rmDsummary *a, double u, double (*op)(double, double));
-
-double plus(double a, double b);
-double minus(double a, double b);
-double mult(double a, double b);
-double minus_squared(double a, double b);
-double divide(double a, double b);
 
 void parse_fields_options(char *field_str);
-
 char *parse_executable_name(char *command);
 
-void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories);
-void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct hash_table *categories);
+void parse_summary_from_filelist(struct rmsummary_set *dest, char *filename, struct hash_table *categories);
+void parse_summary_recursive(struct rmsummary_set *dest, char *dirname, struct hash_table *categories);
 
-struct rmDsummary_set *make_new_set(char *category);
-
-void rmDsummary_print(FILE *output, struct rmDsummary *so);
+struct rmsummary_set *make_new_set(char *category);
 
 char *field_str(struct field *f, double value);
 

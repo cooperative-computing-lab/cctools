@@ -109,6 +109,7 @@ void rmsummary_read_env_vars(struct rmsummary *s);
 
 void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src);
 
+struct rmsummary *rmsummary_copy(const struct rmsummary *src);
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);

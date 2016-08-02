@@ -881,6 +881,37 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	rmsummary_bin_op(dest, src, override_field);
 }
 
+struct rmsummary *rmsummary_copy(const struct rmsummary *src)
+{
+	struct rmsummary *dest = rmsummary_create(-1);
+
+	if(src) {
+		memcpy(dest, src, sizeof(*dest));
+
+		if(src->command) {
+			dest->command = xxstrdup(src->command);
+		}
+
+		if(src->category) {
+			dest->category = xxstrdup(src->category);
+		}
+
+		if(src->task_id) {
+			dest->task_id = xxstrdup(src->task_id);
+		}
+
+		if(src->limits_exceeded) {
+			dest->limits_exceeded = rmsummary_copy(src->limits_exceeded);
+		}
+
+		if(src->peak_times) {
+			dest->peak_times = rmsummary_copy(src->peak_times);
+		}
+	}
+
+	return dest;
+}
+
 /* only update limit when new field value is larger than old, regardless of old
  * limits. */
 #define merge_limit(d, s, field)\
