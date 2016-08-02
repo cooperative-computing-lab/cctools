@@ -25,11 +25,32 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
 
     char* filedata;
     //$@ passes in everything, thus this should be awesome and just say "singularity exect <contimg> ALL THE THINGS
-    filedata = string_format("%s\n%s\n",
-                             "#!/bin/sh",
-                             "singularity exec %s \"$@\"");
+    if(strstr(container_image,".gz") != NULL){
+        filedata = string_format("%s\n%s\n%s\n",
+                                 "#!/bin/sh",
+                                 "tar -xxvf $s",
+                                 "singularity exec %s \"$@\"");
+        fprintf(wrapper_fn, filedata, container_image, container_image);
+    }else if(strstr(container_image,".xz") != NULL){
+        filedata = string_format("%s\n%s\n%s\n",
+                                 "#!/bin/sh",
+                                 "xz --decompress %s",
+                                 "singularity exec %s \"$@\"");
+        fprintf(wrapper_fn, filedata, container_image, container_image);
+    }else if(strstr(container_image,".bz2") != NULL){
+        filedata = string_format("%s\n%s\n%s\n",
+                                 "#!/bin/sh",
+                                 "tar -xjvf %s",
+                                 "singularity exec %s \"$@\"");
+        fprintf(wrapper_fn, filedata, container_image, container_image);
+    }else{
+        filedata = string_format("%s\n%s\n",
+                                 "#!/bin/sh",
+                                 "singularity exec %s \"$@\"");
+        fprintf(wrapper_fn, filedata, container_image);
+    }
     
-    fprintf(wrapper_fn, filedata, container_image);
+    //fprintf(wrapper_fn, filedata, container_image);
 
     fclose(wrapper_fn);
 
