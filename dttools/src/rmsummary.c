@@ -594,7 +594,7 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 		return NULL;
 	}
 
-	struct list      *lst = list_create(0);
+	struct list      *lst = list_create();
 	struct rmsummary *s;
 
 	do

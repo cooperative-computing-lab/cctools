@@ -351,7 +351,7 @@ void cluster_collect_summaries_recursive(struct cluster *c, struct list *accum)
 
 struct list *cluster_collect_summaries(struct cluster *c)
 {
-	struct list *summaries = list_create(0);
+	struct list *summaries = list_create();
 
 	cluster_collect_summaries_recursive(c, summaries);
 
@@ -378,7 +378,7 @@ struct cluster *nearest_neighbor_clustering(struct list *initial_clusters, doubl
 	if(list_size(initial_clusters) < 2)
 		return top;
 
-	stack = list_create(0);
+	stack = list_create();
 	list_push_head(stack, top);
 
 	/* Add all of the initial clusters as active clusters. */
@@ -472,7 +472,7 @@ struct list *collect_final_clusters(struct cluster *final, int max_clusters)
 	struct cluster *c, *cmax;
 	double dmax;
 
-	clusters = list_create(0);
+	clusters = list_create();
 	list_push_head(clusters, final);
 
 	/* At each count, we split the cluster with the maximal
@@ -481,7 +481,7 @@ struct list *collect_final_clusters(struct cluster *final, int max_clusters)
 	 * clusters can be split. */
 	for(count = 1; count < max_clusters && count == list_size(clusters); count++)
 	{
-		clusters_next = list_create(0);
+		clusters_next = list_create();
 		list_first_item(clusters);
 
 		cmax = NULL;
@@ -658,7 +658,7 @@ void report_clusters_rules(FILE *freport, struct list *clusters)
 struct list *create_initial_clusters(struct list *summaries)
 {
 	struct rmDsummary *s;
-	struct list *initial_clusters = list_create(0);
+	struct list *initial_clusters = list_create();
 
 	list_first_item(summaries);
 	while( (s = list_next_item(summaries)) )

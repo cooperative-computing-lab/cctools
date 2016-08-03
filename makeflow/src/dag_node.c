@@ -30,8 +30,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
 
-	n->source_files = list_create(0);
-	n->target_files = list_create(0);
+	n->source_files = list_create();
+	n->target_files = list_create();
 
 	n->remote_names = itable_create(0);
 	n->remote_names_inv = hash_table_create(0, 0);
