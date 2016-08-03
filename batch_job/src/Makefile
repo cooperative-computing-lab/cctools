@@ -12,6 +12,7 @@ SOURCES = \
 	batch_job_amazon.c \
 	batch_job_chirp.c \
 	batch_job_cluster.c \
+	batch_job_blue_waters.c \
 	batch_job_condor.c \
 	batch_job_local.c \
 	batch_job_work_queue.c
