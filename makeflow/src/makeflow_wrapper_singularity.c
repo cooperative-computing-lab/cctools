@@ -58,6 +58,8 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
 
     fclose(wrapper_fn);
 
+    makeflow_wrapper_add_input_file(w, container_image);
+    
     chmod(CONTAINER_SINGULARITY_SH, 0755);
 
     makeflow_wrapper_add_input_file(w, CONTAINER_SINGULARITY_SH);
