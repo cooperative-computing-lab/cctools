@@ -1206,7 +1206,7 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 
 	lx->line_number = line_number;
 	lx->column_number = column_number;
-	lx->column_numbers = list_create(0);
+	lx->column_numbers = list_create();
 
 	lx->stream = NULL;
 	lx->buffer = NULL;
@@ -1218,7 +1218,7 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 	lx->lexeme_size = 0;
 	lx->lexeme_max = BUFFER_CHUNK_SIZE;
 
-	lx->token_queue = list_create(0);
+	lx->token_queue = list_create();
 
 	lx->buffer = calloc(2 * BUFFER_CHUNK_SIZE, sizeof(char));
 	if(!lx->buffer)

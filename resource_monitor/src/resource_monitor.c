@@ -1764,7 +1764,7 @@ int main(int argc, char **argv) {
 
 	total_bytes_rx = 0;
 	total_bytes_tx = 0;
-	tx_rx_sizes    = list_create(0);
+	tx_rx_sizes    = list_create();
 
     rmsummary_read_env_vars(resources_limits);
 
