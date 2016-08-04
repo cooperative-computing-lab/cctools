@@ -788,6 +788,11 @@ After forking, each process will maintain its own connection to each Chirp serve
 
 void chirp_reli_cleanup_before_fork();
 
+/** Closes the link to the host, if active.
+@param host A hostname may be a domain name or an IP address, followed by an optional colon and port number.
+*/
+void chirp_reli_disconnect( const char *host );
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */
