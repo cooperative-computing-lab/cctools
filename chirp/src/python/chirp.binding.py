@@ -56,6 +56,12 @@ class Client:
         if self.identity is '':
             raise AuthenticationFailure(authentication)
 
+    def __exit__(self):
+        chirp_reli_disconnect(self.hostport)
+
+    def __del__(self):
+        chirp_reli_disconnect(self.hostport)
+
     def __stoptime(self, absolute_stop_time=None, timeout=None):
         if timeout is None:
             timeout = self.timeout
