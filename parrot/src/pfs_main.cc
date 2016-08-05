@@ -46,6 +46,7 @@ extern "C" {
 #include "tracer.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
+#include "jx.h"
 }
 
 #include <fcntl.h>
@@ -124,6 +125,8 @@ bool pfs_cvmfs_repo_switching = false;
 char pfs_cvmfs_alien_cache_dir[PATH_MAX];
 char pfs_cvmfs_locks_dir[PATH_MAX];
 bool pfs_cvmfs_enable_alien  = true;
+char pfs_cvmfs_option_file[PATH_MAX];
+struct jx *pfs_cvmfs_options = NULL;
 
 int pfs_irods_debug_level = 0;
 
@@ -146,6 +149,8 @@ enum {
 	LONG_OPT_CVMFS_CONFIG,
 	LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE,
 	LONG_OPT_CVMFS_REPO_SWITCHING,
+	LONG_OPT_CVMFS_OPTION,
+	LONG_OPT_CVMFS_OPTION_FILE,
 	LONG_OPT_HELPER,
 	LONG_OPT_NO_SET_FOREGROUND,
 	LONG_OPT_SYSCALL_DISABLE_DEBUG,
@@ -276,11 +281,13 @@ static void show_help( const char *cmd )
 	printf( " %-30s Use this HTTP proxy server.                       (HTTP_PROXY)\n", "-p,--proxy=<hst:p>");
 	printf( "\n");
 	printf("CVMFS filesystem options:\n");
-	printf( " %-30s CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
+	printf( " %-30s Path to CVMFS options file.               (PARROT_CVMFS_OPTION_FILE)\n", "   --cvmfs-option-file=<config>");
+	printf( " %-30s Set a CVMFS option.\n", "   --cvmfs-option CVMFS_XXX=yyy");
+	printf( " %-30s (deprecated) CVMFS common configuration.               (PARROT_CVMFS_CONFIG)\n", "   --cvmfs-config=<config>");
 	printf( " %-30s CVMFS repositories to enable.               (PARROT_CVMFS_REPO)\n", "-r,--cvmfs-repos=<repos>");
 	printf( " %-30s Allow repository switching when using CVMFS.\n","   --cvmfs-repo-switching");
-	printf( " %-30s Set CVMFS common cache directory.    (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
-	printf( " %-30s Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
+	printf( " %-30s (deprecated) Set CVMFS common cache directory.    (PARROT_CVMFS_ALIEN_CACHE)\n","   --cvmfs-alien-cache=<dir>");
+	printf( " %-30s (deprecated) Disable CVMFS common cache directory.\n","   --cvmfs-disable-alien-cache");
 	printf("\n");
 	printf( "Debug flags are: ");
 	debug_flags_print(stdout);
@@ -664,108 +671,115 @@ int main( int argc, char *argv[] )
 	hash_table_insert(available_services, "cvmfs", pfs_service_cvmfs);
 #endif
 
-	{
-		const char *s;
+	const char *s;
+	char *key;
+	char *value = NULL;
 
-		s = getenv("PARROT_BLOCK_SIZE");
-		if(s) pfs_service_set_block_size(string_metric_parse(s));
+	s = getenv("PARROT_BLOCK_SIZE");
+	if(s) pfs_service_set_block_size(string_metric_parse(s));
 
-		s = getenv("PARROT_MOUNT_FILE");
-		if(s) pfs_resolve_file_config(s);
+	s = getenv("PARROT_MOUNT_FILE");
+	if(s) pfs_resolve_file_config(s);
 
-		s = getenv("PARROT_MOUNT_STRING");
-		if(s) pfs_resolve_manual_config(s);
+	s = getenv("PARROT_MOUNT_STRING");
+	if(s) pfs_resolve_manual_config(s);
 
-		s = getenv("PARROT_FORCE_STREAM");
-		if(s) pfs_force_stream = 1;
+	s = getenv("PARROT_FORCE_STREAM");
+	if(s) pfs_force_stream = 1;
 
-		s = getenv("PARROT_FORCE_CACHE");
-		if(s) pfs_force_cache = 1;
+	s = getenv("PARROT_FORCE_CACHE");
+	if(s) pfs_force_cache = 1;
 
-		s = getenv("PARROT_FOLLOW_SYMLINKS");
-		if(s) pfs_follow_symlinks = atoi(s);
+	s = getenv("PARROT_FOLLOW_SYMLINKS");
+	if(s) pfs_follow_symlinks = atoi(s);
 
-		s = getenv("PARROT_SESSION_CACHE");
-		if(s) pfs_session_cache = 1;
+	s = getenv("PARROT_SESSION_CACHE");
+	if(s) pfs_session_cache = 1;
 
-		s = getenv("PARROT_HOST_NAME");
-		if(s) pfs_false_uname = xxstrdup(pfs_false_uname);
+	s = getenv("PARROT_HOST_NAME");
+	if(s) pfs_false_uname = xxstrdup(pfs_false_uname);
 
-		s = getenv("PARROT_UID");
-		if(s) pfs_uid = atoi(s);
+	s = getenv("PARROT_UID");
+	if(s) pfs_uid = atoi(s);
 
-		s = getenv("PARROT_GID");
-		if(s) pfs_gid = atoi(s);
+	s = getenv("PARROT_GID");
+	if(s) pfs_gid = atoi(s);
 
-		s = getenv("PARROT_TIMEOUT");
-		if(s) pfs_master_timeout = string_time_parse(s);
+	s = getenv("PARROT_TIMEOUT");
+	if(s) pfs_master_timeout = string_time_parse(s);
 
-		s = getenv("PARROT_FORCE_SYNC");
-		if(s) pfs_force_sync = 1;
+	s = getenv("PARROT_FORCE_SYNC");
+	if(s) pfs_force_sync = 1;
 
-		s = getenv("PARROT_LDSO_PATH");
-		if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
+	s = getenv("PARROT_LDSO_PATH");
+	if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
 
-		s = getenv("PARROT_DEBUG_FLAGS");
-		if(s) {
-			char *x = xxstrdup(s);
-			int nargs;
-			char **args;
-			if(string_split(x,&nargs,&args)) {
-				for(int i=0;i<nargs;i++) {
-					debug_flags_set(args[i]);
-				}
-			}
-			free(x);
-			envdebug = 1;
-		}
-
-		s = getenv("PARROT_CHIRP_AUTH");
-		if(s) {
-			char *x = xxstrdup(s);
-			int nargs;
-			char **args;
-			if(string_split(x,&nargs,&args)) {
-				for(int i=0;i<nargs;i++) {
-					if (!auth_register_byname(optarg))
-						fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
-					chose_auth = 1;
-				}
-			}
-			free(x);
-			envauth = 1;
-		}
-
-		s = getenv("PARROT_USER_PASS");
-		if(s) {
-			char *x = xxstrdup(s);
-			int nargs;
-			char **args;
-			if(string_split(x,&nargs,&args)) {
-				pfs_password_cache = password_cache_init(args[0], args[1]);
+	s = getenv("PARROT_DEBUG_FLAGS");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			for(int i=0;i<nargs;i++) {
+				debug_flags_set(args[i]);
 			}
 		}
+		free(x);
+		envdebug = 1;
+	}
 
-		s = getenv("TMPDIR");
-		if(s) {
-			snprintf(sys_temp_dir, sizeof(sys_temp_dir), "%s", s);
+	s = getenv("PARROT_CHIRP_AUTH");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			for(int i=0;i<nargs;i++) {
+				if (!auth_register_byname(optarg))
+					fatal("could not register authentication method `%s': %s", optarg, strerror(errno));
+				chose_auth = 1;
+			}
 		}
+		free(x);
+		envauth = 1;
+	}
 
-		s = getenv("PARROT_TEMP_DIR");
-		if(s) {
-			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s", s);
-		} else {
-			assert(sys_temp_dir[0]);
-			snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
+	s = getenv("PARROT_USER_PASS");
+	if(s) {
+		char *x = xxstrdup(s);
+		int nargs;
+		char **args;
+		if(string_split(x,&nargs,&args)) {
+			pfs_password_cache = password_cache_init(args[0], args[1]);
 		}
+	}
 
-		s = getenv("PARROT_CVMFS_ALIEN_CACHE");
-		if(s) {
-			snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s", s);
-		} else {
-			assert(pfs_temp_dir[0]);
-			snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s/cvmfs", pfs_temp_dir);
-		}
+	s = getenv("TMPDIR");
+	if(s) {
+		snprintf(sys_temp_dir, sizeof(sys_temp_dir), "%s", s);
+	}
+
+	s = getenv("PARROT_TEMP_DIR");
+	if(s) {
+		snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s", s);
+	} else {
+		assert(sys_temp_dir[0]);
+		snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
+	}
+
+	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
+	if(s) {
+		snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s", s);
+	} else {
+		assert(pfs_temp_dir[0]);
+		snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s/cvmfs", pfs_temp_dir);
+	}
+
+	s = getenv("PARROT_CVMFS_OPTION_FILE");
+	if (s) {
+		snprintf(pfs_cvmfs_option_file, sizeof(pfs_cvmfs_option_file), "%s", s);
+	} else {
+		memset(pfs_cvmfs_option_file, 0, sizeof(pfs_cvmfs_option_file));
 	}
 
 	static const struct option long_options[] = {
@@ -779,6 +793,8 @@ int main( int argc, char *argv[] )
 		{"cvmfs-disable-alien-cache", no_argument, 0, LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE},
 		{"cvmfs-repo-switching", no_argument, 0, LONG_OPT_CVMFS_REPO_SWITCHING},
 		{"cvmfs-repos", required_argument, 0, 'r'},
+		{"cvmfs-option", required_argument, 0, LONG_OPT_CVMFS_OPTION},
+		{"cvmfs-option-file", required_argument, 0, LONG_OPT_CVMFS_OPTION_FILE},
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-level-irods", required_argument, 0, 'I'},
@@ -951,6 +967,24 @@ int main( int argc, char *argv[] )
 			break;
 		case LONG_OPT_CVMFS_DISABLE_ALIEN_CACHE:
 			pfs_cvmfs_enable_alien = false;
+			break;
+		case LONG_OPT_CVMFS_OPTION_FILE:
+			snprintf(pfs_cvmfs_option_file, sizeof(pfs_cvmfs_option_file), "%s", optarg);
+			break;
+		case LONG_OPT_CVMFS_OPTION:
+			if (!pfs_cvmfs_options) {
+				pfs_cvmfs_options = jx_object(NULL);
+				assert(pfs_cvmfs_options);
+			}
+			s = xxstrdup(optarg);
+			// Somewhat lazy option parsing: just split on the first =
+			// No whitespace stripping, so don't write CVMFS_OPTION = x
+			key = strtok_r((char *) s, "=", &value);
+			if (!(key && value)) {
+				fprintf(stderr, "Malformed CVMFS option\n");
+				exit(EXIT_FAILURE);
+			}
+			jx_insert(pfs_cvmfs_options, jx_string(key), jx_string(value));
 			break;
 		case 'R':
 			pfs_root_checksum = optarg;
