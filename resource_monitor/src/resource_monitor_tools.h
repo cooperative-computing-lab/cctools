@@ -44,7 +44,7 @@ See the file COPYING for details.
 
 #define MAX_LINE 1024
 
-enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES_PEAK, CORES_AVG, NUM_FIELDS};
+enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES, NUM_FIELDS};
 
 struct rmsummary_set
 {
@@ -66,7 +66,6 @@ struct field {
 	char  *name;
 	char  *caption;
 	char  *units;
-	char  *format;
 	int    cummulative;
 	int    active;
 	size_t offset;
@@ -74,7 +73,7 @@ struct field {
 
 extern struct field fields[];
 
-#define value_of_field(s, f) (*((double *) ((char *) s + (f)->offset)))
+#define value_of_field(s, f) (*((int64_t *) ((char *) s + (f)->offset)))
 
 #define assign_to_field(s, f, v)\
 	*((double *) ((char *) s + (f)->offset)) = (double) v

@@ -410,14 +410,8 @@ void write_variables_gnuplot(struct field_stats *h, struct field_stats *all)
 	fprintf(f, "%s = %lf\n",        "current_percentile75", value_of_p(h, 0.75));
 	fprintf(f, "%s = %lf\n",        "current_percentile25", value_of_p(h, 0.25));
 
-	char *value;
-	value = field_str(h->resource, h->fa_max_throughput.first);
-	fprintf(f, "%s = %s\n", "current_first_allocation", value);
-	free(value);
-
-	value = field_str(h->resource, h->fa_min_waste_time_dependence.first);
-	fprintf(f, "%s = %s\n", "current_first_allocation_min_waste", value);
-	free(value);
+	fprintf(f, "%s = %" PRId64 "\n", "current_first_allocation", h->fa_max_throughput.first);
+	fprintf(f, "%s = %" PRId64 "\n", "current_first_allocation_min_waste", h->fa_min_waste_time_dependence.first);
 
 	fprintf(f, "%s = %lf\n",        "current_bin_size",   h->bin_size);
 
@@ -430,13 +424,9 @@ void write_variables_gnuplot(struct field_stats *h, struct field_stats *all)
 		fprintf(f, "%s = %lf\n",        "all_percentile75", value_of_p(all, 0.75));
 		fprintf(f, "%s = %lf\n",        "all_percentile25", value_of_p(all, 0.25));
 
-		value = field_str(h->resource, all->fa_max_throughput.first);
-		fprintf(f, "%s = %s\n", "all_first_allocation", value);
-		free(value);
+		fprintf(f, "%s = %" PRId64 "\n", "all_first_allocation", all->fa_max_throughput.first);
 
-		value = field_str(h->resource, all->fa_min_waste_time_dependence.first);
-		fprintf(f, "%s = %s\n", "all_first_allocation_min_waste", value);
-		free(value);
+		fprintf(f, "%s = %" PRId64 "\n", "all_first_allocation_min_waste", all->fa_min_waste_time_dependence.first);
 	}
 
 	fclose(f);
@@ -956,12 +946,7 @@ void set_category_maximum(struct rmsummary_set *s, struct hash_table *categories
 
 		int64_t value;
 		rmsummary_to_internal_unit(f->name, h->max_value, &value, f->units);
-
-		if(strcmp(f->format, PRId64) != 0) {
-			rmsummary_assign_double_field(c->max_allocation, f->name, value);
-		} else {
-			rmsummary_assign_int_field(c->max_allocation, f->name, value);
-		}
+		rmsummary_assign_int_field(c->max_allocation, f->name, value);
 	}
 }
 
@@ -1302,9 +1287,7 @@ void write_limits_of_category(struct rmsummary_set *s)
 
 		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
 
-		char *value = field_str(f, h->fa_max_throughput.first);
-		fprintf(f_limits, "%s: %s\n", f->name, value);
-		free(value);
+		fprintf(f_limits, "%s: %" PRId64 "\n", f->name, h->fa_max_throughput.first);
 	}
 
 	fclose(f_limits);
@@ -1371,8 +1354,7 @@ void write_scatters_of_category(struct rmsummary_set *s)
 	write_scatters_of_field(c, BANDWIDTH,       bandwidth)
 	write_scatters_of_field(c, FILES,           total_files)
 	write_scatters_of_field(c, DISK,            disk)
-	write_scatters_of_field(c, CORES_PEAK,      cores)
-	write_scatters_of_field(c, CORES_AVG,       cores_avg)
+	write_scatters_of_field(c, CORES,           cores)
 }
 
 void write_overheads_of_category(struct rmsummary_set *s)
@@ -1458,16 +1440,11 @@ void write_outlier(FILE *stream, struct rmsummary *s, struct field *f, char *pre
 		prefix = "";
 	}
 
-	char control_str[128];
-	snprintf(control_str, sizeof(control_str) - 1, "%%%s\n", f->format); 
-
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
 	fprintf(stream, "<br><br>\n");
 
-	char *value = field_str(f, value_of_field(s, f));
-	fprintf(stream, "%s\n", value);
-	free(value);
+	fprintf(stream, "%" PRId64 "\n", value_of_field(s, f));
 
 	fprintf(stream, "</td>\n");
 }
@@ -1525,8 +1502,6 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	}
 	fprintf(stream, "</td>");
 
-	char *value;
-	
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, "%6.0lf\n", h->value_at_max_count);
 	fprintf(stream, "</td>\n");
@@ -1535,42 +1510,30 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	fprintf(stream, "%6.0lf\n", h->mean);
 	fprintf(stream, "</td>\n");
 
-	value = field_str(f, h->fa_max_throughput.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput.first);
 	fprintf(stream, "</td>\n");
-	free(value);
 
-	value = field_str(f, h->fa_min_waste_time_dependence.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_dependence.first);
 	fprintf(stream, "</td>\n");
-	free(value);
 
-	value = field_str(f, h->fa_min_waste_time_independence.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_independence.first);
 	fprintf(stream, "</td>\n");
-	free(value);
 
-	value = field_str(f, h->fa_95.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%" PRId64 "\n", h->fa_95.first);
 	fprintf(stream, "</td>\n");
-	free(value);
 
 	if(brute_force) {
-		value = field_str(f, h->fa_min_waste_brute_force.first);
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%s\n", value);
+		fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_brute_force.first);
 		fprintf(stream, "</td>\n");
-		free(value);
 
-		value = field_str(f, h->fa_max_throughput_brute_force.first);
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%s\n", value);
+		fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput_brute_force.first);
 		fprintf(stream, "</td>\n");
-		free(value);
 	}
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
@@ -1584,6 +1547,7 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 
 	s = h->summaries_sorted[index_of_p(h, 0.95)];
 	write_outlier(stream, s, f, prefix);
+
 }
 
 void write_individual_histogram_webpage(struct field_stats *h)

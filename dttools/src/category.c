@@ -158,7 +158,6 @@ static void category_clear_histograms(struct category *c) {
 		return;
 
 	category_clear_histogram(c->cores_histogram);
-	category_clear_histogram(c->cores_avg_histogram);
 	category_clear_histogram(c->wall_time_histogram);
 	category_clear_histogram(c->cpu_time_histogram);
 	category_clear_histogram(c->max_concurrent_processes_histogram);

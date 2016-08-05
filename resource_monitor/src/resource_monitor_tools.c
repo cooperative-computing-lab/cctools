@@ -41,23 +41,22 @@ double Mbytes_to_Gbytes(double bytes)
 }
 
 struct field fields[NUM_FIELDS + 1] = {
-	[WALL_TIME]  = {"t", "wall_time",      "wall time",       "s",        PRId64, 1, 1, offsetof(struct rmsummary, wall_time)},
-	[CPU_TIME]   = {"c", "cpu_time",       "cpu time",        "s",        PRId64, 1, 1, offsetof(struct rmsummary, cpu_time)},
-	[VIRTUAL  ]  = {"v", "virtual_memory", "virtual memory",  "MB",       PRId64, 0, 1, offsetof(struct rmsummary, virtual_memory)},
-	[RESIDENT ]  = {"m", "memory",         "resident memory", "MB",       PRId64, 0, 1, offsetof(struct rmsummary, memory)},
-	[SWAP     ]  = {"s", "swap_memory",    "swap memory",     "MB",       PRId64, 0, 1, offsetof(struct rmsummary, swap_memory)},
-	[B_READ   ]  = {"r", "bytes_read",     "read bytes",      "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_read)},
-	[B_WRITTEN]  = {"w", "bytes_written",  "written bytes",   "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_written)},
-	[B_RX   ]    = {"R", "bytes_received", "received bytes",  "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_received)},
-	[B_TX]       = {"W", "bytes_sent",     "bytes_sent",      "MB",       PRId64, 0, 1, offsetof(struct rmsummary, bytes_sent)},
-	[BANDWIDTH]  = {"B", "bandwidth",      "bandwidth",       "Mbps",     PRId64, 0, 1, offsetof(struct rmsummary, bandwidth)},
-	[FILES    ]  = {"f", "total_files",    "num files",       "files",    PRId64, 0, 1, offsetof(struct rmsummary, total_files)},
-	[DISK]       = {"z", "disk",           "disk",            "MB",       PRId64, 0, 1, offsetof(struct rmsummary, disk)},
-	[CORES_AVG]  = {"C", "cores_avg",      "cores avg",       "cores",    ".2f",    0, 1, offsetof(struct rmsummary, cores_avg)},
-	[CORES_PEAK] = {"P", "cores",          "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmsummary, cores)},
-	[MAX_PROCESSES]   = {"N", "max_concurrent_processes", "max processes",   "procs", PRId64, 0, 0, offsetof(struct rmsummary, max_concurrent_processes)},
-	[TOTAL_PROCESSES] = {"n", "total_processes",          "total processes", "procs", PRId64, 0, 0, offsetof(struct rmsummary, total_processes)},
-	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, NULL, 0, 0, 0}
+	[WALL_TIME] = {"t", "wall_time",      "wall time",       "s",        1, 1, offsetof(struct rmsummary, wall_time)},
+	[CPU_TIME]  = {"c", "cpu_time",       "cpu time",        "s",        1, 1, offsetof(struct rmsummary, cpu_time)},
+	[VIRTUAL  ] = {"v", "virtual_memory", "virtual memory",  "MB",       0, 1, offsetof(struct rmsummary, virtual_memory)},
+	[RESIDENT ] = {"m", "memory",         "resident memory", "MB",       0, 1, offsetof(struct rmsummary, memory)},
+	[SWAP     ] = {"s", "swap_memory",    "swap memory",     "MB",       0, 1, offsetof(struct rmsummary, swap_memory)},
+	[B_READ   ] = {"r", "bytes_read",     "read bytes",      "MB",       0, 1, offsetof(struct rmsummary, bytes_read)},
+	[B_WRITTEN] = {"w", "bytes_written",  "written bytes",   "MB",       0, 1, offsetof(struct rmsummary, bytes_written)},
+	[B_RX   ]   = {"R", "bytes_received", "received bytes",  "MB",       0, 1, offsetof(struct rmsummary, bytes_received)},
+	[B_TX]      = {"W", "bytes_sent",     "bytes_sent",      "MB",       0, 1, offsetof(struct rmsummary, bytes_sent)},
+	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "Mbps",     0, 1, offsetof(struct rmsummary, bandwidth)},
+	[FILES    ] = {"n", "total_files",    "num files",       "files",    0, 1, offsetof(struct rmsummary, total_files)},
+	[DISK]      = {"z", "disk",           "disk",            "MB",       0, 1, offsetof(struct rmsummary, disk)},
+	[CORES    ] = {"C", "cores",          "cores",           "cores",    0, 1, offsetof(struct rmsummary, cores)},
+	[MAX_PROCESSES]   = {"p", "max_concurrent_processes", "max processes",   "procs", 0, 0, offsetof(struct rmsummary, max_concurrent_processes)},
+	[TOTAL_PROCESSES] = {"P", "total_processes",          "total processes", "procs", 0, 0, offsetof(struct rmsummary, total_processes)},
+	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, 0, 0, 0}
 };
 
 char *sanitize_path_name(char *name)
@@ -166,11 +165,11 @@ void parse_fields_options(char *field_str)
 				fields[WALL_TIME].active = 1;
 				debug(D_RMON, "adding field: wall time\n");
 				break;
-			case 'N':
+			case 'p':
 				fields[MAX_PROCESSES].active = 1;
 				debug(D_RMON, "adding field: concurrent processes\n");
 				break;
-			case 'n':
+			case 'P':
 				fields[TOTAL_PROCESSES].active = 1;
 				debug(D_RMON, "adding field: total processes\n");
 				break;
@@ -206,7 +205,7 @@ void parse_fields_options(char *field_str)
 				fields[B_TX].active = 1;
 				debug(D_RMON, "adding field: bytes sent\n");
 				break;
-			case 'f':
+			case 'n':
 				fields[FILES].active = 1;
 				debug(D_RMON, "adding field: number of files\n");
 				break;
@@ -214,13 +213,9 @@ void parse_fields_options(char *field_str)
 				fields[DISK].active = 1;
 				debug(D_RMON, "adding field: footprint\n");
 				break;
-			case 'P':
-				fields[CORES_PEAK].active = 1;
-				debug(D_RMON, "adding field: cores peak\n");
-				break;
 			case 'C':
-				fields[CORES_AVG].active = 1;
-				debug(D_RMON, "adding field: cores avg\n");
+				fields[CORES].active = 1;
+				debug(D_RMON, "adding field: cores\n");
 				break;
 			default:
 				fatal("'%c' is not a field option\n", *c);
@@ -403,17 +398,5 @@ struct rmsummary_set *make_new_set(char *category)
 
 	return ss;
 }
-
-char *field_str(struct field *f, double value) {
-	char control_str[128];
-	snprintf(control_str, sizeof(control_str) - 1, "%%%s", f->format);
-
-	if(strcmp(f->format, PRId64) != 0) {
-		return string_format(control_str, value);
-	} else {
-		return string_format(control_str, (int64_t) value);
-	}
-}
-
 
 /* vim: set noexpandtab tabstop=4: */
