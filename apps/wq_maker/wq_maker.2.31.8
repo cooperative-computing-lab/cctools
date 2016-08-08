@@ -35,7 +35,8 @@ my $start_time = time;
 $| = 1; #turn on autoflush.
 
 my $version = `maker -v`;
-if( chomp($version) ne "2.31.8"){
+chomp($version);
+if( $version ne "2.31.8"){
 	print "WQ_MAKER supports version 2.31.8. Current version : $version\n";
 }
 
