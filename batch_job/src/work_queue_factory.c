@@ -69,6 +69,7 @@ static char *config_file = 0;
 static char *amazon_credentials = NULL;
 static char *amazon_ami = NULL;
 static char *condor_requirements = NULL;
+static char *batch_submit_options = NULL;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -730,6 +731,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
+	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
@@ -795,14 +797,19 @@ int main(int argc, char *argv[])
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
 
+	batch_submit_options = getenv("BATCH_OPTIONS");
+
 	debug_config(argv[0]);
 
 	resources = rmsummary_create(-1);
 
 	int c;
 
-	while((c = getopt_long(argc, argv, "C:F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "B:C:F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
+			case 'B':
+				batch_submit_options = xxstrdup(optarg);
+				break;
 			case 'C':
 				config_file = xxstrdup(optarg);
 				break;
@@ -976,6 +983,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	batch_queue_set_option(queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 	set_worker_resources_options( queue );
 
