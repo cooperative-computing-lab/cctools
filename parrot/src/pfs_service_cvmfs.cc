@@ -512,6 +512,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
 		debug(D_CVMFS|D_NOTICE, "CVMFS requires an http proxy.  None has been configured!");
 		debug(D_CVMFS, "Ignoring configuration of CVMFS repository %s", fqrn);
+		free(proxy);
 		return false;
 	}
 	free(proxy);
@@ -543,6 +544,13 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 #endif
 
 	char *proxy = getenv("HTTP_PROXY");
+#if LIBCVMFS_REVISION < 23
+	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
+	debug(D_CVMFS|D_NOTICE, "CVMFS requires an http proxy.  None has been configured!");
+	debug(D_CVMFS, "Ignoring configuration of CVMFS repository %s", fqrn);
+	return false;
+	}
+#endif
 
 	if( !user_options ) {
 		user_options = "";
