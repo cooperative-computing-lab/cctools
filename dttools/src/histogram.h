@@ -129,4 +129,32 @@ void histogram_attach_data(struct histogram *h, double value, void *data);
 
 void *histogram_get_data(struct histogram *h, double value);
 
+/** Return the total number of samples in the histogram.
+@param h A pointer to a histogram.
+@return Count of all the samples.
+*/
+
+int histogram_total_count(struct histogram *h);
+
+/** Return the maximum value inserted in the histogram.
+@param h A pointer to a histogram.
+@return Maximum value inserted.
+*/
+
+double histogram_max_value(struct histogram *h);
+
+/** Return the minimum value inserted in the histogram.
+@param h A pointer to a histogram.
+@return Minimum value inserted.
+*/
+
+double histogram_min_value(struct histogram *h);
+
+/** Return the mode of the histogram.
+@param h A pointer to a histogram.
+@return Histogram mode.
+*/
+
+double histogram_mode(struct histogram *h);
+
 #endif
