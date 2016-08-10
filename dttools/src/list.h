@@ -199,6 +199,18 @@ and advances the internal iterator to the next item.
 
 void *list_next_item(struct list *list);
 
+/** Get the current element during traversal
+This function returns the current list item
+@param list The list being traversed.
+@return The current item in the list.
+*/
+void *list_current_item(struct list *list);
+
+/** Advance the internal iterator to next list item
+@param The list to traverse.
+*/
+void list_advance_iterator(struct list *list);
+
 /** Apply a function to a list.
 Invokes op on every member of the list.
 @param list The list to operate on.
