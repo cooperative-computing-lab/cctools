@@ -29,28 +29,28 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     if(strstr(container_image,".gz") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
-                                 "tar -xxvf $s",
-                                 "singularity exec %s \"$@\"");
+                                 "tar -xzf $s",
+                                 "singularity --debug exec %s \"$@\"");
         file_sans_compress[strlen(container_image)-3] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".xz") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
-                                 "xz --decompress %s",
-                                 "singularity exec %s \"$@\"");
+                                 "tar -xf %s",
+                                 "singularity --debug exec %s \"$@\"");
         file_sans_compress[strlen(container_image)-3] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".bz2") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
-                                 "tar -xjvf %s",
-                                 "singularity exec %s \"$@\"");
+                                 "tar -xjf %s",
+                                 "singularity --debug exec %s \"$@\"");
         file_sans_compress[strlen(container_image)-4] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else{
         filedata = string_format("%s\n%s\n",
                                  "#!/bin/sh",
-                                 "singularity exec %s \"$@\"");
+                                 "singularity --debug exec %s \"$@\"");
         fprintf(wrapper_fn, filedata, container_image);
     }
     
