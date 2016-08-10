@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include <netdb.h>
 #include <errno.h>
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,40 +60,62 @@ int domain_name_lookup_reverse(const char *addr, char *name)
 
 int domain_name_lookup(const char *name, char *addr)
 {
+	int tries;
 	struct addrinfo hints;
-	struct addrinfo *result, *resultptr;
-	char ipstr[LINK_ADDRESS_MAX];
-	int err;
 
 	debug(D_DNS, "looking up name %s", name);
 
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+	hints.ai_family = AF_INET; /* Currently only lookup IPv4 addresses */
 
-	if ((err = getaddrinfo(name, NULL, &hints, &result)) != 0) {
-		debug(D_DNS, "couldn't look up %s: %s", name, gai_strerror(err));
-		return 0;
-	}
+	for (tries = 0; tries < 10; tries++) {
+		struct addrinfo *result;
+		if (tries) {
+			sleep(1<<(tries-1));
+		}
+		int rc = getaddrinfo(name, NULL, &hints, &result);
+		if (rc == 0) {
+			struct addrinfo *iresult;
+			/* N.B. this for loop is not really necessary since we always use the first result. */
+			for (iresult = result; iresult; iresult = iresult->ai_next) {
+				char ipstr[INET6_ADDRSTRLEN] = "";
+				switch (iresult->ai_family) {
+					case AF_INET:
+						inet_ntop(AF_INET, &((struct sockaddr_in *)iresult->ai_addr)->sin_addr, ipstr, sizeof(ipstr));
+						break;
+					case AF_INET6:
+						inet_ntop(AF_INET6, &((struct sockaddr_in6 *)iresult->ai_addr)->sin6_addr, ipstr, sizeof(ipstr));
+						break;
+					default: assert(0);
+				}
+				debug(D_DNS, "%s is %s", name, ipstr);
+				strcpy(addr, ipstr);
+				break;
+			}
+			freeaddrinfo(result);
+			return 1;
+		} else {
+			debug(D_DNS, "couldn't look up %s: %s", name, gai_strerror(rc));
 
-	for (resultptr = result; resultptr != NULL; resultptr = resultptr->ai_next) {
-		void *ipaddr;
+			/* glibc returns EAI_NONAME for many transient network failures.
+			 * Unfortunately this gives us no information on how to proceed. If
+			 * the network interface is temporarily down or if a packet get
+			 * dropped, we should retry...
+			 *
+			 * This deficiency has been brought up in [1] but my (batrick) own
+			 * experiments show that this continues to exist in glibc 2.20 for
+			 * all settings of hints.ai_family.
+			 *
+			 * [1] https://bugzilla.redhat.com/show_bug.cgi?id=1044628
+			 */
 
-		/* For ipv4 use struct sockaddr_in and sin_addr field;
-		   for ipv6 use struct sockaddr_in6 and sin6_addr field. */
-		// But right now, only find ipv4 address.
-		if (resultptr->ai_family == AF_INET) {
-			struct sockaddr_in *addr_ipv4 = (struct sockaddr_in *)resultptr->ai_addr;
-			ipaddr = &(addr_ipv4->sin_addr);
-			inet_ntop(resultptr->ai_family, ipaddr, ipstr, sizeof(ipstr));
-			debug(D_DNS, "%s is %s", name, ipstr);
-			break;
+			if (!(rc == EAI_AGAIN || rc == EAI_NODATA || rc == EAI_NONAME || rc == EAI_SYSTEM))
+				return 0; /* permanent failure */
 		}
 	}
-	strcpy(addr, ipstr);
-	freeaddrinfo(result);
-
-	return 1;
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */
