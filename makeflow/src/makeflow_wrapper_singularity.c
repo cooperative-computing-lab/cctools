@@ -52,7 +52,7 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
                                  "#!/bin/sh",
                                  "LOC=`pwd`",
                                  "print \"location: $LOC\n\"",
-                                 "singularity --debug exec %s \"$@\"");
+                                 "singularity exec %s \"$@\"");
         fprintf(wrapper_fn, filedata, container_image);
     }
     
