@@ -234,6 +234,7 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 			work_queue_master_preferred_connection(q->data, value);
 		else
 			work_queue_master_preferred_connection(q->data, "by_ip");
+	} else if(strcmp(what, "caching") == 0) {
 	} else if(strcmp(what, "category-limits") == 0) {
 		struct rmsummary *s = rmsummary_parse_string(value);
 		if(s) {
