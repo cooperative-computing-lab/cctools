@@ -11,6 +11,7 @@
 # - @ref work_queue::WorkQueue
 # - @ref work_queue::Task
 
+import copy
 import os
 
 def set_debug_flag(*flags):
@@ -55,6 +56,16 @@ class Task(_object):
             flags &= ~WORK_QUEUE_CACHE
 
         return flags
+
+    ##
+    # Return a copy of this task
+    #
+    def clone(self):
+        """Return a (deep)copy this task that can also be submitted to the WorkQueue."""
+        new = copy.copy(self)
+        new._task = work_queue_task_clone(self._task)
+        return new
+
    
     ##
     # Set the command to be executed by the task.
