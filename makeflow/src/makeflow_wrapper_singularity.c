@@ -27,32 +27,46 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     char* filedata;
     //$@ passes in everything, thus this should be awesome and just say "singularity exect <contimg> ALL THE THINGS
     if(strstr(container_image,".gz") != NULL){
-        filedata = string_format("%s\n%s\n%s\n",
+        filedata = string_format("%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
                                  "#!/bin/sh",
+                                 "oldhome = $HOME",
+                                 "HOME=`pwd`",
+                                 "print \"location: $HOME\n\"",
                                  "tar -xzf $s",
-                                 "singularity --debug exec %s \"$@\"");
+                                 "singularity --debug exec %s \"$@\"",
+                                 "HOME=$oldhome");
         file_sans_compress[strlen(container_image)-3] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".xz") != NULL){
-        filedata = string_format("%s\n%s\n%s\n",
+        filedata = string_format("%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
                                  "#!/bin/sh",
+                                 "oldhome = $HOME",
+                                 "HOME=`pwd`",
+                                 "print \"location: $HOME\n\"",
                                  "tar -xf %s",
-                                 "singularity --debug exec %s \"$@\"");
+                                 "singularity --debug exec %s \"$@\"",
+                                 "HOME=$oldhome");
         file_sans_compress[strlen(container_image)-3] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".bz2") != NULL){
-        filedata = string_format("%s\n%s\n%s\n",
+        filedata = string_format("%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
                                  "#!/bin/sh",
+                                 "oldhome = $HOME",
+                                 "HOME=`pwd`",
+                                 "print \"location: $HOME\n\"",
                                  "tar -xjf %s",
-                                 "singularity --debug exec %s \"$@\"");
+                                 "singularity --debug exec %s \"$@\"",
+                                 "HOME=$oldhome");
         file_sans_compress[strlen(container_image)-4] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else{
-        filedata = string_format("%s\n%s\n%s\n%s\n",
+        filedata = string_format("%s\n%s\n%s\n%s\n%s\n%s\n",
                                  "#!/bin/sh",
-                                 "LOC=`pwd`",
-                                 "print \"location: $LOC\n\"",
-                                 "singularity exec %s \"$@\"");
+                                 "oldhome = $HOME",
+                                 "HOME=`pwd`",
+                                 "print \"location: $HOME\n\"",
+                                 "singularity exec %s \"$@\"",
+                                 "HOME=$oldhome");
         fprintf(wrapper_fn, filedata, container_image);
     }
     
