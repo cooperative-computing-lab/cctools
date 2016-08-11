@@ -291,6 +291,7 @@ static void write_transaction(struct work_queue *q, const char *str);
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
 static void write_transaction_category(struct work_queue *q, struct category *c);
 static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving);
+static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 /** Clone a @ref work_queue_file
 This performs a deep copy of the file struct.
@@ -571,6 +572,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 		q->stats->workers_idled_out++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
+		write_transaction_worker_resources(q, w);
 	} else if(string_prefix_is(field, "worker-id")) {
 		free(w->workerid);
 		w->workerid = xxstrdup(value);
@@ -6254,6 +6256,28 @@ static void write_transaction_worker(struct work_queue *q, struct work_queue_wor
 	buffer_free(&B);
 }
 
+static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w) {
+
+	struct rmsummary *s = rmsummary_create(-1);
+
+	s->cores  = w->resources->cores.total;
+	s->memory = w->resources->memory.total;
+	s->disk   = w->resources->disk.total;
+
+	char *rjx = rmsummary_print_string(s, 1);
+
+
+	struct buffer B;
+	buffer_init(&B);
+
+	buffer_printf(&B, "WORKER %s RESOURCES %s", w->workerid, rjx);
+
+	write_transaction(q, buffer_tostring(&B));
+
+	buffer_free(&B);
+	free(rjx);
+}
+
 
 int work_queue_specify_transactions_log(struct work_queue *q, const char *logfile) {
 	q->transactions_logfile =fopen(logfile, "a");
@@ -6262,6 +6286,8 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
 
 		fprintf(q->transactions_logfile, "# date time master-pid MASTER START|END\n");
+		fprintf(q->transactions_logfile, "# date time master-pid WORKER worker-id host:port CONNECTION|DISCONNECTION\n");
+		fprintf(q->transactions_logfile, "# date time master-pid WORKER worker-id RESOURCES resources\n");
 		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MAX resources-max-per-task\n");
 		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
 		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name FIRST FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT resources-requested\n");
