@@ -556,6 +556,19 @@ Once returned, it is safe to re-submit the same take object via @ref work_queue_
 */
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t);
 
+
+/** Set the minimum taskid of future submitted tasks.
+Further submitted tasks are guaranteed to have a taskid larger or equal to
+minid.  This function is useful to make taskids consistent in a workflow that
+consists of sequential masters. (Note: This function is rarely used).  If the
+minimum id provided is smaller than the last taskid computed, the minimum id
+provided is ignored.
+@param q A work queue object.
+@param minid Minimum desired taskid
+@return Returns the actual minimum taskid for future tasks.
+*/
+int work_queue_specify_min_taskid(struct work_queue *q, int minid);
+
 /** Blacklist hostname from a queue.
 @param q A work queue object.
 @param hostname A string for hostname.

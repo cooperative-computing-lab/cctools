@@ -125,6 +125,8 @@ struct work_queue {
 	int priority;
 	int num_tasks_left;
 
+	int next_taskid;
+
 	char workingdir[PATH_MAX];
 
 	struct link      *master_link;   // incoming tcp connection for workers.
@@ -4555,6 +4557,8 @@ struct work_queue *work_queue_create(int port)
 
 	getcwd(q->workingdir,PATH_MAX);
 
+	q->next_taskid = 1;
+
 	q->ready_list = list_create();
 
 	q->tasks          = itable_create(0);
@@ -5217,12 +5221,10 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
-	static int next_taskid = 1;
-
-	t->taskid = next_taskid;
+	t->taskid = q->next_taskid;
 
 	//Increment taskid. So we get a unique taskid for every submit.
-	next_taskid++;
+	q->next_taskid++;
 
 	return work_queue_submit_internal(q, t);
 }
@@ -6412,6 +6414,15 @@ char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid) {
 		return string_format("%s/cctools_disk_allocation_exhausted.log", pwd);
 	}
 	return string_format("%s/cctools_disk_allocation_exhausted.%d.log", pwd, taskid);
+}
+
+int work_queue_specify_min_taskid(struct work_queue *q, int minid) {
+
+	if(minid > q->next_taskid) {
+		q->next_taskid = minid;
+	}
+
+	return q->next_taskid;
 }
 
 /* vim: set noexpandtab tabstop=4: */
