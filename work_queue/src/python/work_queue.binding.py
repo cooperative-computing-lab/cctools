@@ -939,6 +939,21 @@ class WorkQueue(_object):
         return work_queue_specify_name(self._work_queue, name)
 
     ##
+    # Set the minimum taskid of future submitted tasks.
+    #
+    # Further submitted tasks are guaranteed to have a taskid larger or equal
+    # to minid.  This function is useful to make taskids consistent in a
+    # workflow that consists of sequential masters. (Note: This function is
+    # rarely used).  If the minimum id provided is smaller than the last taskid
+    # computed, the minimum id provided is ignored.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param minid  Minimum desired taskid
+    # @return Returns the actual minimum taskid for future tasks.
+    def specify_min_taskid(self, minid):
+        return work_queue_specify_min_taskid(self._work_queue, minid)
+
+    ##
     # Change the project priority for the given queue.
     #
     # @param self       Reference to the current work queue object.
