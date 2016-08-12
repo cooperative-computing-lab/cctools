@@ -54,7 +54,7 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
                                  "ls -R /etc",
                                  "ls -R /usr/libexec",
                                  "whereis singularity",
-                                 "cat /usr/local/etc/singularity/singularity.conf",
+                                 "cat /etc/singularity/default-nsswitch.conf",
                                  "singularity --debug exec %s \"$@\"");
         fprintf(wrapper_fn, filedata, container_image);
     }
