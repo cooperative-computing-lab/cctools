@@ -50,7 +50,7 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     }else{
         filedata = string_format("%s\n%s\n",
                                  "#!/bin/sh",
-                                 "singularity exec %s \"$@\"");
+                                 "singularity --debug exec %s \"$@\"");
         fprintf(wrapper_fn, filedata, container_image);
     }
     
