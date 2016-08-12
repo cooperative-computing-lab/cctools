@@ -6416,10 +6416,31 @@ const struct rmsummary *task_max_resources(struct work_queue *q, struct work_que
 }
 
 const struct rmsummary *task_min_resources(struct work_queue *q, struct work_queue_task *t) {
-
 	struct category *c = work_queue_category_lookup_or_create(q, t->category);
 
-	return category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
+	const struct rmsummary *s = category_dynamic_task_min_resources(c, t->resources_requested, t->resource_request);
+
+	if(t->resources_requested != CATEGORY_ALLOCATION_FIRST || !q->current_max_worker) {
+		return s;
+	}
+
+	// If this task is being tried for the first time, we take the minimum as
+	// the minimum between we have observed and the largest worker. This is to
+	// eliminate observed outliers that would prevent new tasks to run.
+	if((q->current_max_worker->cores > 0 && q->current_max_worker->cores < s->cores)
+			|| (q->current_max_worker->memory > 0 && q->current_max_worker->memory < s->memory)
+			|| (q->current_max_worker->disk   > 0 && q->current_max_worker->disk   < s->disk)) {
+
+		struct rmsummary *r = rmsummary_create(-1);
+
+		rmsummary_merge_override(r, q->current_max_worker);
+		rmsummary_merge_override(r, t->resources_requested);
+
+		s = category_dynamic_task_min_resources(c, r, t->resource_request);
+		rmsummary_delete(r);
+	}
+
+	return s;
 }
 
 struct category *work_queue_category_lookup_or_create(struct work_queue *q, const char *name) {
