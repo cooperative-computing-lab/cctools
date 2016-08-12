@@ -48,9 +48,11 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
         file_sans_compress[strlen(container_image)-4] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else{
-        filedata = string_format("%s\n%s\n%s\n%s\n%s\n",
+        filedata = string_format("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
                                  "#!/bin/sh",
-                                 "`pwd`",
+                                 "ls -R /usr/bin/",
+                                 "ls -R /etc",
+                                 "ls -R /usr/libexec",
                                  "whereis singularity",
                                  "cat /usr/local/etc/singularity/singularity.conf",
                                  "singularity --debug exec %s \"$@\"");
