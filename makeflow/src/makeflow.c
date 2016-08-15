@@ -1153,6 +1153,7 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+	char *mesos_master = "127.0.0.1:5050/";
 
 
 	random_init();
@@ -1215,10 +1216,11 @@ int main(int argc, char *argv[])
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
 		LONG_OPT_UMBRELLA_MODE,
 		LONG_OPT_UMBRELLA_SPEC,
-		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
+		LONG_OPT_ALLOCATION_MODE,
+		LONG_OPT_MESOS_MASTER
 	};
 
 	static const struct option long_options_run[] = {
@@ -1291,6 +1293,7 @@ int main(int argc, char *argv[])
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{0, 0, 0, 0}
 	};
 
@@ -1571,6 +1574,8 @@ int main(int argc, char *argv[])
 			case LONG_OPT_UMBRELLA_SPEC:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
+			case LONG_OPT_MESOS_MASTER:
+				mesos_master = xxstrdup(optarg);
 				break;
 			default:
 				show_help_run(argv[0]);
@@ -1935,7 +1940,7 @@ if (enforcer && wrapper_umbrella) {
 
 			close(mesos_fd);
 
-			execlp("/usr/bin/python", "python", exe_py_path, mesos_cwd, (char *) 0);
+			execlp("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, (char *) 0);
 			_exit(127);
 
 		} else {
