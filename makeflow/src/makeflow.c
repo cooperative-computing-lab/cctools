@@ -1022,6 +1022,7 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+	char *mesos_master = "127.0.0.1:5050/";
 
 
 	random_init();
@@ -1078,7 +1079,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_JSON,
 		LONG_OPT_SKIP_FILE_CHECK,
-		LONG_OPT_ALLOCATION_MODE
+		LONG_OPT_ALLOCATION_MODE,
+		LONG_OPT_MESOS_MASTER
 	};
 
 	static const struct option long_options_run[] = {
@@ -1142,6 +1144,7 @@ int main(int argc, char *argv[])
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{0, 0, 0, 0}
 	};
 
@@ -1392,6 +1395,9 @@ int main(int argc, char *argv[])
 				}
 			case LONG_OPT_JSON:
 				json_input = 1;
+				break;
+			case LONG_OPT_MESOS_MASTER:
+				mesos_master = xxstrdup(optarg);
 				break;
 			default:
 				show_help_run(argv[0]);
@@ -1659,7 +1665,7 @@ int main(int argc, char *argv[])
 
 			close(mesos_fd);
 
-			execlp("/usr/bin/python", "python", exe_py_path, mesos_cwd, (char *) 0);
+			execlp("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, (char *) 0);
 			_exit(127);
 
 		} else {

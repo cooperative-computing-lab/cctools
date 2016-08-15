@@ -373,6 +373,7 @@ class MakefowMonitor(threading.Thread):
 if __name__ == '__main__':
     # make us a framework
     mms.mf_wk_dir = sys.argv[1]
+    mesos_master_addr = sys.argv[2]
 
     # create the "task_state" and "task_info" file
     if not os.path.isfile(FILE_TASK_STATE):
@@ -388,7 +389,7 @@ if __name__ == '__main__':
     driver = MesosSchedulerDriver(
         MakeflowScheduler(mms.mf_wk_dir),
         framework,
-        "127.0.0.1:5050/"  # assumes running on the master
+        mesos_master_addr  # assumes running on the master
     )
   
     mf_monitor = MakefowMonitor(driver, created_time)
