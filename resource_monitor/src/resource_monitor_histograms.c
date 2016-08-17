@@ -550,6 +550,7 @@ struct field_stats *histogram_of_field(struct rmsummary_set *source, struct fiel
 {
 	struct field_stats *h = malloc(sizeof(struct field_stats));
 
+	h->total_count = list_size(source->summaries);
 	h->summaries_sorted= malloc(h->total_count * sizeof(struct rmsummary *));
 
 	struct rmsummary *s;
@@ -560,6 +561,7 @@ struct field_stats *histogram_of_field(struct rmsummary_set *source, struct fiel
 		h->summaries_sorted[i] = s;
 		i++;
 	}
+
 	sort_by_field(h, f);
 
 	h->resource  = f;
@@ -866,8 +868,7 @@ void set_category_maximum(struct rmsummary_set *s, struct hash_table *categories
 
 		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
-		int64_t value;
-		rmsummary_to_internal_unit(f->name, histogram_max_value(h->histogram), &value, f->units);
+		int64_t value = histogram_max_value(h->histogram);
 		rmsummary_assign_int_field(c->max_allocation, f->name, value);
 	}
 }
@@ -1302,8 +1303,7 @@ void write_outlier(FILE *stream, struct rmsummary *s, struct field *f, char *pre
 	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
 	fprintf(stream, "<br><br>\n");
 
-	fprintf(stream, "%" PRId64 "\n", value_of_field(s, f));
-
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(f->name, value_of_field(s, f)));
 	fprintf(stream, "</td>\n");
 }
 
@@ -1361,36 +1361,36 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	fprintf(stream, "</td>");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", histogram_max_value(h->histogram));
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, histogram_mode(h->histogram)));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->mean);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->mean));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput.first);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_max_throughput.first));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_dependence.first);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_min_waste_time_dependence.first));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_time_independence.first);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_min_waste_time_independence.first));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%" PRId64 "\n", h->fa_95.first);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_95.first));
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%" PRId64 "\n", h->fa_min_waste_brute_force.first);
+		fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_min_waste_brute_force.first));
 		fprintf(stream, "</td>\n");
 
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%" PRId64 "\n", h->fa_max_throughput_brute_force.first);
+		fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_max_throughput_brute_force.first));
 		fprintf(stream, "</td>\n");
 	}
 

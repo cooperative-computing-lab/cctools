@@ -81,7 +81,6 @@ void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int onl
 char *rmsummary_print_string(const struct rmsummary *s, int only_resources);
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
-int rmsummary_assign_double_field(struct rmsummary *s, const char *key, double value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
 int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);

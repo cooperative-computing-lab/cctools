@@ -230,8 +230,9 @@ void category_inc_histogram_count_aux(struct histogram *h, double value, double 
 
 		if(!time_accum) {
 			time_accum = malloc(sizeof(double));
-			time_accum = 0;
 			histogram_attach_data(h, value, time_accum);
+
+			*time_accum = 0;
 		}
 
 		// accumulate time (in seconds) for this bucket
@@ -258,7 +259,7 @@ void category_first_allocation_accum_times(struct histogram *h, double *keys, do
 	for(i = 0; i < n; i++) {
 		double previous    = i > 0 ? counts_cdp[i - 1] : 0;
 		int count          = histogram_count(h, keys[i]);
-		double *time_value = (double *) histogram_get_data(h, keys[i+1]);
+		double *time_value = (double *) histogram_get_data(h, keys[i]);
 		counts_cdp[i]      = previous + count;
 		times_mean[i]      = (*time_value)/count;
 	}

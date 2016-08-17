@@ -142,8 +142,6 @@ void parse_fields_options(char *field_str)
 	}
 }
 
-#define to_external(s, so, f) (s)->f = rmsummary_to_external_unit(#f, (so)->f)
-
 struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
 {
 	static struct jx_parser *last_p = NULL;
