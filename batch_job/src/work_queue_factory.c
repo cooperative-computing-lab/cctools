@@ -736,7 +736,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
 	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
-	printf(" %-30s Maximum number of new workers per %d s.  (less than 1 disables limit, default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
+	printf(" %-30s Maximum number of new workers per factory period.  (less than 1 disables limit, default=%d)\n", "--workers-per-cycle", workers_per_cycle);
 	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker");
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
@@ -747,6 +747,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
 	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
+	printf(" %-30s Check the catalog server for updates every <n> seconds. (default=30)\n", "--factory-cycle");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
@@ -756,7 +757,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE};
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_FACTORY_CYCLE, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE};
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
@@ -785,6 +786,7 @@ static const struct option long_options[] = {
 	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
+	{"factory-cycle", required_argument, 0, LONG_OPT_FACTORY_CYCLE},
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{0,0,0,0}
 };
@@ -868,6 +870,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FACTORY_TIMEOUT:
 				factory_timeout = MAX(0, atoi(optarg));
+				break;
+			case LONG_OPT_FACTORY_CYCLE:
+				factory_period = atoi(optarg);
 				break;
 			case LONG_OPT_CONDOR_REQUIREMENTS:
 				if(condor_requirements) {
