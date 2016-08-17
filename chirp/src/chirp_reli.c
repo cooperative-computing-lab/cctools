@@ -135,7 +135,7 @@ static INT64_T connect_to_file( struct chirp_client *client, struct chirp_file *
 	return 1;
 }
 
-static void invalidate_host( const char *host )
+void chirp_reli_disconnect( const char *host )
 {
 	struct chirp_client *c;
 	c = hash_table_remove(table,host);
@@ -173,7 +173,7 @@ struct chirp_file * chirp_reli_open( const char *host, const char *path, INT64_T
 			} else {
 				if(errno!=ECONNRESET) return 0;
 			}
-			invalidate_host(host);
+			chirp_reli_disconnect(host);
 		} else {
 			if(errno==ENOENT) return 0;
 		}
@@ -224,7 +224,7 @@ INT64_T chirp_reli_close( struct chirp_file *file, time_t stoptime )
 				if(result>=0 || errno!=ECONNRESET) return result; \
 			} \
 			if(errno==ESTALE) return -1; \
-			invalidate_host(file->host); \
+			chirp_reli_disconnect(file->host); \
 		} else { \
 			if(errno==ENOENT) return -1; \
 			if(errno==EPERM) return -1; \
@@ -454,7 +454,7 @@ INT64_T chirp_reli_fsync( struct chirp_file *file, time_t stoptime )
 			if(result>=0) { \
 				return result; \
 			} else if (errno == ECONNRESET) { \
-				invalidate_host(host); \
+				chirp_reli_disconnect(host); \
 			} else if (errno == EAGAIN) { \
 				if (_NOEAGAIN) \
 					return result; \
@@ -983,7 +983,7 @@ static INT64_T chirp_reli_bulkio_once( struct chirp_bulkio *v, int count, time_t
 	failure:
 	for(i=0;i<count;i++) {
 		struct chirp_bulkio *b = &v[i];
-		invalidate_host(b->file->host);
+		chirp_reli_disconnect(b->file->host);
 	}
 	errno = ECONNRESET;
 	return -1;
@@ -1027,7 +1027,7 @@ void chirp_reli_cleanup_before_fork()
 
 	hash_table_firstkey(table);
 	while(hash_table_nextkey(table,&host,(void**)&value)) {
-		invalidate_host(host);
+		chirp_reli_disconnect(host);
 	}
 }
 
