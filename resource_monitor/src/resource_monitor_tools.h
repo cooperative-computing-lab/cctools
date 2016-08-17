@@ -46,19 +46,21 @@ See the file COPYING for details.
 
 enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES, NUM_FIELDS};
 
+// Summaries in a set belong to the same category.
+// The *stats are divided per resource.
 struct rmsummary_set
 {
-	char  *category;
+	char  *category_name;
 	struct list *summaries;
-
-	//per resource, address by field
-	struct itable *histograms;
 
 	uint64_t overhead_min_waste_time_dependence;
 	uint64_t overhead_min_waste_time_independence;
 	uint64_t overhead_min_waste_brute_force;
 	uint64_t overhead_max_throughput;
 	uint64_t overhead_max_throughput_brute_force;
+
+	//per resource, address by field
+	struct itable *stats;
 };
 
 struct field {

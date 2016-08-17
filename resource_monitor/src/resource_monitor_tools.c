@@ -10,36 +10,6 @@ See the file COPYING for details.
 
 #include "jx_parse.h"
 
-double usecs_to_secs(double usecs)
-{
-	return usecs/1000000;
-}
-
-double secs_to_usecs(double secs)
-{
-	return secs*1000000;
-}
-
-double Mbytes_to_bytes(double Mbytes)
-{
-	return Mbytes*1e6;
-}
-
-double bytes_to_Mbytes(double bytes)
-{
-	return bytes/1e6;
-}
-
-double bytes_to_Gbytes(double bytes)
-{
-	return bytes/1e9;
-}
-
-double Mbytes_to_Gbytes(double bytes)
-{
-	return bytes/1e3;
-}
-
 struct field fields[NUM_FIELDS + 1] = {
 	[WALL_TIME] = {"t", "wall_time",      "wall time",       "s",        1, 1, offsetof(struct rmsummary, wall_time)},
 	[CPU_TIME]  = {"c", "cpu_time",       "cpu time",        "s",        1, 1, offsetof(struct rmsummary, cpu_time)},
@@ -69,59 +39,6 @@ char *sanitize_path_name(char *name)
 		*next = '_';
 
 	return new;
-}
-
-struct rmDsummary *summary_bin_op(struct rmDsummary *s, struct rmDsummary *a, struct rmDsummary *b, double (*op)(double, double))
-{
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		if(f->active)
-		{
-			assign_to_field(s, f, op(value_of_field(a, f), value_of_field(b, f)));
-		}
-	}
-
-	return s;
-}
-
-struct rmDsummary *summary_unit_op(struct rmDsummary *s, struct rmDsummary *a, double u, double (*op)(double, double))
-{
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		if(f->active)
-		{
-			assign_to_field(s, f, op(value_of_field(a, f), u));
-		}
-	}
-
-	return s;
-}
-
-double plus(double a, double b)
-{
-	return a + b;
-}
-
-double minus(double a, double b)
-{
-	return a - b;
-}
-
-double mult(double a, double b)
-{
-	return a * b;
-}
-
-double minus_squared(double a, double b)
-{
-	return pow(a - b, 2);
-}
-
-double divide(double a, double b)
-{
-	return a/b;
 }
 
 char *make_field_names_str(char *separator)
@@ -279,13 +196,6 @@ struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash
 	struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
 	category_accumulate_summary(c, so, NULL);
 
-	if(categories) {
-		if(so->category) {
-			c = category_lookup_or_create(categories, so->category);
-			category_accumulate_summary(c, so, NULL);
-		}
-	}
-
 	return so;
 }
 
@@ -390,11 +300,9 @@ struct rmsummary_set *make_new_set(char *category)
 {
 	struct rmsummary_set *ss = malloc(sizeof(struct rmsummary_set));
 
-	ss->category  = category;
-
-	ss->histograms = itable_create(0);
-
-	ss->summaries = list_create();
+	ss->category_name = category;
+	ss->stats         = itable_create(0);
+	ss->summaries     = list_create();
 
 	return ss;
 }
