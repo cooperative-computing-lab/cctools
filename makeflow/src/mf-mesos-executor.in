@@ -2,8 +2,8 @@
 
 # This script uses MESOS_SOURCE_DIR and MESOS_BUILD_DIR which come
 # from configuration substitutions.
-MESOS_SOURCE_DIR=/home/zc/Work/mesos
-MESOS_BUILD_DIR=/home/zc/Work/mesos/build
+MESOS_SOURCE_DIR=/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/src/mesos-0.26.0_build
+MESOS_BUILD_DIR=/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/src/mesos-0.26.0_build/build
 
 # Use colors for errors.
 . ${MESOS_SOURCE_DIR}/support/colors.sh
@@ -14,11 +14,11 @@ test ! -z "${PYTHON}" && \
 
 PYTHON=/usr/bin/python
 
-SETUPTOOLS=`echo ${MESOS_BUILD_DIR}/3rdparty/setuptools-*/`
+# SETUPTOOLS=`echo ${MESOS_BUILD_DIR}/3rdparty/setuptools-*/`
 
 # Just warn in the case when build with --disable-bundled.
-test ! -e ${SETUPTOOLS} && \
-  echo "${RED}Failed to find ${SETUPTOOLS}${NORMAL}"
+# test ! -e ${SETUPTOOLS} && \
+#  echo "${RED}Failed to find ${SETUPTOOLS}${NORMAL}"
 
 PROTOBUF=`echo ${MESOS_BUILD_DIR}/3rdparty/libprocess/3rdparty/protobuf-*/python/`
 
@@ -33,5 +33,6 @@ test ! -e ${SCRIPT} && \
   echo "${RED}Failed to find ${SCRIPT}${NORMAL}" && \
   exit 1
 
-PYTHONPATH="${SETUPTOOLS}:${PROTOBUF}:${MESOS_EGGS}" \
-  exec ${PYTHON} ${SCRIPT} "${@}"
+PYTHONPATH="${PROTOBUF}:${MESOS_EGGS}" \
+LD_PRELOAD="/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so" \
+exec ${PYTHON} ${SCRIPT} "${@}"
