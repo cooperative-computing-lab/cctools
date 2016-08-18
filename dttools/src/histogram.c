@@ -21,6 +21,11 @@ struct box_count {
 struct histogram {
 	struct itable *buckets;
 	double bucket_size;
+
+	int    total_count;
+	double max_value;
+	double min_value;
+	double mode;
 };
 
 struct histogram *histogram_create(double bucket_size) {
@@ -29,10 +34,15 @@ struct histogram *histogram_create(double bucket_size) {
 		fatal("Bucket size should be larger than zero: %lf", bucket_size);
 	}
 
-	struct histogram *h = malloc(sizeof(struct histogram));
+	struct histogram *h = calloc(1, sizeof(struct histogram));
 
 	h->bucket_size = bucket_size;
 	h->buckets     = itable_create(0);
+
+	h->total_count = 0;
+	h->max_value   = 0;
+	h->min_value   = 0;
+	h->mode        = 0;
 
 	return h;
 }
@@ -46,6 +56,11 @@ void histogram_clear(struct histogram *h) {
 	while(itable_nextkey(h->buckets, &key, (void **) &box)) {
 		free(box);
 	}
+
+	h->total_count = 0;
+	h->max_value   = 0;
+	h->min_value   = 0;
+	h->mode        = 0;
 
 	itable_clear(h->buckets);
 }
@@ -97,20 +112,6 @@ uint64_t bucket_of(struct histogram *h, double value) {
 	return b;
 }
 
-int histogram_insert(struct histogram *h, double value) {
-	uint64_t bucket = bucket_of(h, value);
-
-	struct box_count *box = itable_lookup(h->buckets, bucket);
-	if(!box) {
-		box = calloc(1, sizeof(*box));
-		itable_insert(h->buckets, bucket, box);
-	}
-
-	box->count++;
-
-	return box->count;
-}
-
 /* return the smallest value that would fall inside the bucket id */
 double start_of(struct histogram *h, uint64_t b) {
 
@@ -125,6 +126,35 @@ double start_of(struct histogram *h, uint64_t b) {
 	}
 
 	return start;
+}
+
+int histogram_insert(struct histogram *h, double value) {
+	uint64_t bucket = bucket_of(h, value);
+
+	struct box_count *box = itable_lookup(h->buckets, bucket);
+	if(!box) {
+		box = calloc(1, sizeof(*box));
+		itable_insert(h->buckets, bucket, box);
+	}
+
+	h->total_count++;
+	box->count++;
+
+	int mode_count = histogram_count(h, histogram_mode(h));
+
+	if(value > h->max_value || mode_count == 0) {
+		h->max_value = value;
+	}
+
+	if(value < h->min_value || mode_count == 0) {
+		h->min_value = value;
+	}
+
+	if(box->count > mode_count) {
+		h->mode       = start_of(h, bucket);
+	}
+
+	return box->count;
 }
 
 int histogram_count(struct histogram *h, double value) {
@@ -210,4 +240,21 @@ void *histogram_get_data(struct histogram *h, double value) {
 	}
 
 	return box->data;
+}
+
+int histogram_total_count(struct histogram *h) {
+	return h->total_count;
+}
+
+double histogram_max_value(struct histogram *h) {
+	return h->max_value;
+}
+
+
+double histogram_min_value(struct histogram *h) {
+	return h->min_value;
+}
+
+double histogram_mode(struct histogram *h) {
+	return h->mode;
 }

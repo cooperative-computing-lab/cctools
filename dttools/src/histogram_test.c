@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
 
 	// bucket [22.5, 23.0)
 	histogram_insert(h, 22.50);
+	histogram_insert(h, 22.99);
 
 	// bucket [-22.0, -21.5)
 	histogram_insert(h, -21.51);
@@ -41,7 +42,7 @@ int main(int argc, char **argv) {
 	double *buckets = histogram_buckets(h);
 	double b        = histogram_bucket_size(h);
 
-	int expected_counts[] = {2, 3, 2, 1, 3, 1};
+	int expected_counts[] = {2, 3, 2, 1, 3, 2};
 
 	int i;
 	for(i = 0; i < histogram_size(h); i++) {
@@ -56,6 +57,11 @@ int main(int argc, char **argv) {
 
 		fprintf(stdout, "[%6.2lf, %6.2f) count: %d\n", start, start + b, histogram_count(h, start));
 	}
+
+	fprintf(stdout, "max: %6.2lf\n",    histogram_max_value(h));
+	fprintf(stdout, "min: %6.2lf\n",    histogram_min_value(h));
+	fprintf(stdout, "mode: %6.2lf\n",   histogram_mode(h));
+	fprintf(stdout, "mode count: %d\n", histogram_count(h, histogram_mode(h)));
 
 	free(buckets);
 	histogram_delete(h);

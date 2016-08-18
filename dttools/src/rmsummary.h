@@ -56,8 +56,6 @@ struct rmsummary
 	int64_t  disk;
 
 	int64_t  cores;
-	double   cores_avg;
-
 	int64_t  gpus;
 
 	struct rmsummary *limits_exceeded;
@@ -83,11 +81,9 @@ void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int onl
 char *rmsummary_print_string(const struct rmsummary *s, int only_resources);
 
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
-int rmsummary_assign_double_field(struct rmsummary *s, const char *key, double value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
 int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key);
-double  rmsummary_get_double_field(struct rmsummary *s, const char *key);
 const char *rmsummary_get_char_field(struct rmsummary *s, const char *key);
 
 /**  Reads a single summary file from filename **/
@@ -109,6 +105,7 @@ void rmsummary_read_env_vars(struct rmsummary *s);
 
 void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src);
 
+struct rmsummary *rmsummary_copy(const struct rmsummary *src);
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);

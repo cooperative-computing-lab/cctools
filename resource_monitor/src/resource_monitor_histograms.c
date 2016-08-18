@@ -7,7 +7,7 @@ See the file COPYING for details.
 #include <float.h>
 #include <omp.h>
 
-#include "rmon_tools.h"
+#include "resource_monitor_tools.h"
 #include "create_dir.h"
 #include "category_internal.h"
 #include "macros.h"
@@ -41,7 +41,7 @@ char *output_directory = NULL;
 uint64_t input_overhead;
 
 struct allocation {
-	double first;
+	int64_t first;
 	double waste;
 	double throughput;
 	double tasks_done;
@@ -49,34 +49,16 @@ struct allocation {
 	int    retries;
 };
 
-struct histogram {
+struct field_stats {
 	struct field *resource;
+	struct histogram *histogram;
 
-	struct rmDsummary_set *source;
-	struct rmDsummary **summaries_sorted;
+	struct rmsummary_set *source;
+	struct rmsummary **summaries_sorted;
 	int    total_count;
-
-	double bin_size;
-
-	double z_95;
-	double z_99;
-
-	uint64_t min_value;
-	uint64_t max_value;
-	uint64_t count_at_min_value;
-	uint64_t count_at_max_value;
-
-	uint64_t  max_count;             //i.e., how many times the mode occurs.
-	uint64_t  min_count;
-	double    value_at_max_count;    //i.e., mode
-	double    value_at_min_count;
 
 	double mean;
 	double variance;
-	double std_dev;
-
-	double kurtosis;
-	double skewdness;
 
 	struct allocation fa_perfect;
 	struct allocation fa_max;
@@ -97,8 +79,8 @@ struct histogram {
 
 struct list *all_sets;
 
-struct rmDsummary *max_values;
-struct rmDsummary_set *all_summaries;
+struct rmsummary *max_values;
+struct rmsummary_set *all_summaries;
 
 struct hash_table *unique_strings;
 
@@ -107,14 +89,14 @@ struct hash_table *categories;
 
 int brute_force = 0;
 
-void split_summaries_on_category(struct rmDsummary_set *source)
+void split_summaries_on_category(struct rmsummary_set *source)
 {
 	debug(D_RMON, "Splitting categories.");
 
 	struct hash_table *splits = hash_table_create(0, 0);
 
-	struct rmDsummary *s;
-	struct rmDsummary_set *bucket;
+	struct rmsummary *s;
+	struct rmsummary_set *bucket;
 
 	list_first_item(source->summaries);
 	while((s = list_next_item(source->summaries)))
@@ -137,79 +119,47 @@ void split_summaries_on_category(struct rmDsummary_set *source)
 static struct field *sort_field;
 int less_than(const void *a, const void *b)
 {
-	struct rmDsummary *sa = * (struct rmDsummary * const *) a;
-	struct rmDsummary *sb = * (struct rmDsummary * const *) b;
+	struct rmsummary *sa = * (struct rmsummary * const *) a;
+	struct rmsummary *sb = * (struct rmsummary * const *) b;
 
-	double fa = value_of_field(sa, sort_field);
-	double fb = value_of_field(sb, sort_field);
+	int64_t fa = value_of_field(sa, sort_field);
+	int64_t fb = value_of_field(sb, sort_field);
 
 	return (fa > fb);
 }
 
-void sort_by_field(struct histogram *h, struct field *f)
+void sort_by_field(struct field_stats *h, struct field *f)
 {
 	sort_field = f;
 
-	qsort(h->summaries_sorted, h->total_count, sizeof(struct rmDsummary *), less_than);
+	qsort(h->summaries_sorted, h->total_count, sizeof(struct rmsummary *), less_than);
 }
 
-int index_of_p(struct histogram *h, double p)
+int index_of_p(struct field_stats *h, double p)
 {
 	return (int) ceil((h->total_count - 1) * p);
 }
 
-double value_of_p(struct histogram *h, double p)
+double value_of_p(struct field_stats *h, double p)
 {
 	return value_at_index(h, index_of_p(h, p));
 }
 
-double set_bin_size_by_iqr(struct histogram *h)
+double bucket_size_by_iqr(struct field_stats *h)
 {
-	double v_25 = value_of_p(h, 0.25);
-	double v_75 = value_of_p(h, 0.75);
+	int64_t v_25 = value_of_p(h, 0.25);
+	int64_t v_75 = value_of_p(h, 0.75);
 
-	if(v_75 > v_25)
-		return h->bin_size = 2*(v_75 - v_25)*pow((double) h->total_count, (-1.0/3.0));
-	else
-		return h->bin_size = 1.0;
+	double bin_size = 1;
+
+	if(v_75 > v_25) {
+		bin_size = 2*(v_75 - v_25)*pow((double) h->total_count, (-1.0/3.0));
+	}
+
+	return bin_size;
 }
 
-uint64_t get_bucket_count(struct histogram *h, uint64_t bucket)
-{
-	return (uint64_t) ((uintptr_t) itable_lookup(h->buckets, bucket + 1));
-}
-
-double get_bucket_value(struct histogram *h, uint64_t bucket)
-{
-	return h->bin_size * (bucket);
-}
-
-uint64_t bucket_of(struct histogram *h, double value)
-{
-	return (uint64_t) floor(value/h->bin_size);
-}
-
-uint64_t increment_bucket(struct histogram *h, double value)
-{
-	uint64_t bucket = bucket_of(h, value);
-	uint64_t count = get_bucket_count(h, bucket);
-	count += 1;
-
-	itable_insert(h->buckets, bucket + 1, (void *) ((uintptr_t) count));
-
-	return count;
-}
-
-void set_min_max_value_of_field(struct histogram *h, struct field *f)
-{
-	h->min_value = floor(value_of_field(h->summaries_sorted[0], f));
-	h->max_value = ceil(value_of_field(h->summaries_sorted[h->total_count - 1], f));
-
-	h->count_at_min_value = (uintptr_t) get_bucket_count(h, bucket_of(h, h->min_value));
-	h->count_at_max_value = (uintptr_t) get_bucket_count(h, bucket_of(h, h->max_value));
-}
-
-double set_average_of_field(struct histogram *h, struct field *f)
+double set_average_of_field(struct field_stats *h, struct field *f)
 {
 	double accum = 0;
 
@@ -222,7 +172,7 @@ double set_average_of_field(struct histogram *h, struct field *f)
 	return h->mean;
 }
 
-double set_variance_of_field(struct histogram *h, struct field *f)
+double set_variance_of_field(struct field_stats *h, struct field *f)
 {
 	double accum = 0;
 
@@ -233,88 +183,18 @@ double set_variance_of_field(struct histogram *h, struct field *f)
 	if(h->total_count > 1)
 	{
 		h->variance = accum/(h->total_count - 1);
-		h->std_dev  = sqrt(h->variance);
 	}
 	else
 	{
 		h->variance = -1;
-		h->std_dev  = -1;
 	}
 
 	return h->variance;
 }
 
-double set_skewdness_of_field(struct histogram *h, struct field *f)
+char *path_common(struct field_stats *h, int only_base_name)
 {
-	double accum = 0;
-
-	int i;
-	for(i = 0; i < h->total_count; i++)
-		accum += pow(value_of_field(h->summaries_sorted[i], f) - h->mean, 3);
-
-	if(h->total_count > 1 && h->variance != 0)
-		h->skewdness = (accum/(pow(h->std_dev, 3) * (h->total_count - 1)));
-	else
-		h->skewdness = 0;
-
-	return h->skewdness;
-}
-
-double set_kurtosis_of_field(struct histogram *h, struct field *f)
-{
-	double accum = 0;
-
-	int i;
-	for(i = 0; i < h->total_count; i++)
-		accum += pow(value_of_field(h->summaries_sorted[i], f) - h->mean, 4);
-
-	if(h->total_count > 1 && h->variance != 0)
-		h->kurtosis = (accum/(pow(h->variance, 2) * (h->total_count - 1))) - 3;
-	else
-		h->kurtosis = 0;
-
-	return h->kurtosis;
-}
-
-void set_z_scores(struct histogram *h)
-{
-	//one tail
-	h->z_95 = h->mean + h->std_dev * 1.645;
-	h->z_99 = h->mean + h->std_dev * 2.33;
-}
-
-uint64_t set_min_max_count(struct histogram *h)
-{
-	uint64_t  bucket;
-	uint64_t  count;
-
-	h->max_count = 0;
-	h->min_count = INT_MAX;
-
-	h->value_at_max_count = 0;
-
-	itable_firstkey(h->buckets);
-	while(itable_nextkey(h->buckets, &bucket, (void *) &count))
-	{
-		if(count > h->max_count)
-		{
-			h->value_at_max_count = get_bucket_value(h, bucket - 1);
-			h->max_count          = count;
-		}
-
-		if(count < h->min_count)
-		{
-			h->value_at_min_count = get_bucket_value(h, bucket - 1);
-			h->min_count          = count;
-		}
-	}
-
-	return h->max_count;
-}
-
-char *path_common(struct histogram *h, int only_base_name)
-{
-	char *category = sanitize_path_name(h->source->category);
+	char *category = sanitize_path_name(h->source->category_name);
 
 	char *prefix;
 	if(only_base_name)
@@ -333,7 +213,7 @@ char *path_common(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_table(struct histogram *h, int only_base_name)
+char *path_of_table(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s_table.data", common);
@@ -343,7 +223,7 @@ char *path_of_table(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_variables_script(struct histogram *h, int only_base_name)
+char *path_of_variables_script(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s_vars.gnuplot", common);
@@ -352,7 +232,7 @@ char *path_of_variables_script(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_thumbnail_script(struct histogram *h, int only_base_name)
+char *path_of_thumbnail_script(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s_%dx%d.gnuplot", common, width_thumb, height_thumb);
@@ -361,7 +241,7 @@ char *path_of_thumbnail_script(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_thumbnail_image(struct histogram *h, int only_base_name)
+char *path_of_thumbnail_image(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s_%dx%d.%s", common, width_thumb, height_thumb, format);
@@ -370,7 +250,7 @@ char *path_of_thumbnail_image(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_image_script(struct histogram *h, int only_base_name)
+char *path_of_image_script(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s_%dx%d.gnuplot", common, width, height);
@@ -379,7 +259,7 @@ char *path_of_image_script(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_image(struct histogram *h, int only_base_name)
+char *path_of_image(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s_%dx%d.%s", common, width, height, format);
@@ -388,7 +268,7 @@ char *path_of_image(struct histogram *h, int only_base_name)
 	return path;
 }
 
-char *path_of_page(struct histogram *h, int only_base_name)
+char *path_of_page(struct field_stats *h, int only_base_name)
 {
 	char *common = path_common(h, only_base_name);
 	char *path   = string_format("%s.html", common);
@@ -398,9 +278,9 @@ char *path_of_page(struct histogram *h, int only_base_name)
 }
 
 
-void create_output_directory(struct histogram *h)
+void create_output_directory(struct field_stats *h)
 {
-	char *category = sanitize_path_name(h->source->category);
+	char *category = sanitize_path_name(h->source->category_name);
 	char *all_path = string_format("%s/%s/", output_directory, category);
 
 	if(create_dir(all_path, 0755) < 0 && errno != EEXIST)
@@ -420,71 +300,64 @@ FILE *open_file(char *filename)
 	return file;
 }
 
-void write_histogram_table(struct histogram *h)
+void write_histogram_table(struct field_stats *h)
 {
 	char *fname = path_of_table(h, 0);
 	FILE *f     = open_file(fname);
 	free(fname);
 
-	uint64_t  bucket;
-	uint64_t  count;
+	double *buckets = histogram_buckets(h->histogram);
 
-	itable_firstkey(h->buckets);
-	while(itable_nextkey(h->buckets, &bucket, (void *) &count))
-		fprintf(f, "%lf %" PRIu64 "\n", get_bucket_value(h, bucket - 1), count);
-
-	fclose(f);
-}
-
-void write_variables_gnuplot(struct histogram *h, struct histogram *all)
-{
-	char *fname = path_of_variables_script(h, 0);
-	FILE *f     = open_file(fname);
-	free(fname);
-
-	fprintf(f, "%s = %" PRId64"\n", "current_buckets",    h->nbuckets);
-	fprintf(f, "%s = %" PRId64"\n", "current_minimum",    h->min_value);
-	fprintf(f, "%s = %" PRId64"\n", "current_maximum",    h->max_value);
-	fprintf(f, "%s = %lf\n",        "current_mode",       h->value_at_max_count);
-	fprintf(f, "%s = %" PRId64"\n", "current_mode_count", h->max_count);
-	fprintf(f, "%s = %" PRId64"\n", "current_min_count",  h->min_count);
-	fprintf(f, "%s = %lf\n",        "current_mean",       h->mean);
-	fprintf(f, "%s = %lf\n",        "current_percentile75", value_of_p(h, 0.75));
-	fprintf(f, "%s = %lf\n",        "current_percentile25", value_of_p(h, 0.25));
-
-	char *value;
-	value = field_str(h->resource, h->fa_max_throughput.first);
-	fprintf(f, "%s = %s\n", "current_first_allocation", value);
-	free(value);
-
-	value = field_str(h->resource, h->fa_min_waste_time_dependence.first);
-	fprintf(f, "%s = %s\n", "current_first_allocation_min_waste", value);
-	free(value);
-
-	fprintf(f, "%s = %lf\n",        "current_bin_size",   h->bin_size);
-
-	if(all) {
-		fprintf(f, "%s = %" PRId64"\n", "all_minimum",    all->min_value);
-		fprintf(f, "%s = %" PRId64"\n", "all_maximum",    all->max_value);
-		fprintf(f, "%s = %lf\n",        "all_mode",       all->value_at_max_count);
-		fprintf(f, "%s = %" PRId64"\n", "all_mode_count", all->max_count);
-		fprintf(f, "%s = %lf\n",        "all_mean",       all->mean);
-		fprintf(f, "%s = %lf\n",        "all_percentile75", value_of_p(all, 0.75));
-		fprintf(f, "%s = %lf\n",        "all_percentile25", value_of_p(all, 0.25));
-
-		value = field_str(h->resource, all->fa_max_throughput.first);
-		fprintf(f, "%s = %s\n", "all_first_allocation", value);
-		free(value);
-
-		value = field_str(h->resource, all->fa_min_waste_time_dependence.first);
-		fprintf(f, "%s = %s\n", "all_first_allocation_min_waste", value);
-		free(value);
+	int i;
+	for(i = 0; i < histogram_size(h->histogram); i++) {
+		int count = histogram_count(h->histogram, buckets[i]);
+		fprintf(f, "%lf %d\n", buckets[i], count);
 	}
 
 	fclose(f);
 }
 
-void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
+void write_variables_gnuplot(struct field_stats *h, struct field_stats *all)
+{
+	char *fname = path_of_variables_script(h, 0);
+	FILE *f     = open_file(fname);
+	free(fname);
+
+	fprintf(f, "%s = %d\n",  "current_buckets",    histogram_size(h->histogram));
+	fprintf(f, "%s = %lf\n", "current_minimum",    histogram_min_value(h->histogram));
+	fprintf(f, "%s = %lf\n", "current_maximum",    histogram_max_value(h->histogram));
+	fprintf(f, "%s = %lf\n", "current_mode",       histogram_mode(h->histogram));
+	fprintf(f, "%s = %d\n",  "current_mode_count", histogram_count(h->histogram, histogram_mode(h->histogram)));
+	fprintf(f, "%s = %d\n",  "current_max_count",  histogram_count(h->histogram, histogram_max_value(h->histogram)));
+	fprintf(f, "%s = %d\n",  "current_min_count",  histogram_count(h->histogram, histogram_min_value(h->histogram)));
+	fprintf(f, "%s = %lf\n", "current_mean",         h->mean);
+	fprintf(f, "%s = %lf\n", "current_percentile75", value_of_p(h, 0.75));
+	fprintf(f, "%s = %lf\n", "current_percentile25", value_of_p(h, 0.25));
+
+	fprintf(f, "%s = %" PRId64 "\n", "current_first_allocation", h->fa_max_throughput.first);
+	fprintf(f, "%s = %" PRId64 "\n", "current_first_allocation_min_waste", h->fa_min_waste_time_dependence.first);
+
+	fprintf(f, "%s = %lf\n",        "current_bin_size",   histogram_bucket_size(h->histogram));
+
+	if(all) {
+
+		fprintf(f, "%s = %lf\n", "all_minimum",    histogram_min_value(all->histogram));
+		fprintf(f, "%s = %lf\n", "all_maximum",    histogram_max_value(all->histogram));
+		fprintf(f, "%s = %lf\n", "all_mode",       histogram_mode(all->histogram));
+		fprintf(f, "%s = %d\n",  "all_mode_count", histogram_count(all->histogram, histogram_mode(all->histogram)));
+		fprintf(f, "%s = %lf\n", "all_mean",         all->mean);
+		fprintf(f, "%s = %lf\n", "all_percentile75", value_of_p(h, 0.75));
+		fprintf(f, "%s = %lf\n", "all_percentile25", value_of_p(h, 0.25));
+
+		fprintf(f, "%s = %" PRId64 "\n", "all_first_allocation", all->fa_max_throughput.first);
+
+		fprintf(f, "%s = %" PRId64 "\n", "all_first_allocation_min_waste", all->fa_min_waste_time_dependence.first);
+	}
+
+	fclose(f);
+}
+
+void write_thumbnail_gnuplot(struct field_stats *h, struct field_stats *all)
 {
 	char *fname = path_of_thumbnail_script(h, 0);
 	FILE *f     = open_file(fname);
@@ -541,7 +414,7 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 
 	char *table_name = path_of_table(h, 1);
 
-	if(all->max_count > 10000*all->min_count)
+	if(histogram_max_value(all->histogram) > 10000*histogram_min_value(all->histogram))
 	{
 		fprintf(f, "set yrange [0:(log10(all_mode_count))]\n");
 		fprintf(f, "set label sprintf(\"log(%%d)\",current_mode_count) at current_mode,(log10(current_mode_count)) tc ls 1 left front nopoint offset 0,character 0.5\n");
@@ -563,7 +436,7 @@ void write_thumbnail_gnuplot(struct histogram *h, struct histogram *all)
 }
 
 
-void write_image_gnuplot(struct histogram *h, struct histogram *all)
+void write_image_gnuplot(struct field_stats *h, struct field_stats *all)
 {
 	char *fname = path_of_image_script(h, 0);
 	FILE *f     = open_file(fname);
@@ -616,7 +489,7 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	}
 
 	char *table_name = path_of_table(h, 1);
-	if(h->max_count > 10000*h->min_count)
+	if(histogram_max_value(h->histogram) > 10000*histogram_min_value(h->histogram))
 	{
 		fprintf(f, "set yrange [0:(log10(all_mode_count))]\n");
 		fprintf(f, "set label sprintf(\"log(%%d)\",current_mode_count) at current_mode,(log10(current_mode_count)) tc ls 1 left front nopoint offset 0,character 0.5\n");
@@ -637,7 +510,7 @@ void write_image_gnuplot(struct histogram *h, struct histogram *all)
 	fclose(f);
 }
 
-void write_images(struct histogram *h)
+void write_images(struct field_stats *h)
 {
 	pid_t pid;
 
@@ -648,7 +521,7 @@ void write_images(struct histogram *h)
 	}
 
 	if(pid == 0) {
-		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category));
+		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category_name));
 		if(chdir(path) == 0) {
 			execlp(gnuplot_path, "gnuplot", path_of_thumbnail_script(h, 1), NULL);
 		}
@@ -663,7 +536,7 @@ void write_images(struct histogram *h)
 	}
 
 	if(pid == 0) {
-		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category));
+		char *path = string_format("%s/%s", output_directory, sanitize_path_name(h->source->category_name));
 		if(chdir(path) == 0) {
 			execlp(gnuplot_path, "gnuplot", path_of_image_script(h, 1), NULL);
 		}
@@ -673,14 +546,14 @@ void write_images(struct histogram *h)
 	gnuplots_running += 2;
 }
 
-struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field *f, char *out_dir)
+struct field_stats *histogram_of_field(struct rmsummary_set *source, struct field *f, char *out_dir)
 {
-	struct histogram *h = malloc(sizeof(struct histogram));
+	struct field_stats *h = malloc(sizeof(struct field_stats));
 
 	h->total_count = list_size(source->summaries);
-	h->summaries_sorted = malloc(h->total_count * sizeof(struct rmDsummary *));
+	h->summaries_sorted= malloc(h->total_count * sizeof(struct rmsummary *));
 
-	struct rmDsummary *s;
+	struct rmsummary *s;
 	list_first_item(source->summaries);
 	int i = 0;
 	while((s = list_next_item(source->summaries)))
@@ -688,40 +561,36 @@ struct histogram *histogram_of_field(struct rmDsummary_set *source, struct field
 		h->summaries_sorted[i] = s;
 		i++;
 	}
+
 	sort_by_field(h, f);
 
-	h->source   = source;
-	h->buckets  = itable_create(0);
-
-	h->resource = f;
+	h->resource  = f;
+	h->source    = source;
+	h->histogram = histogram_create(bucket_size_by_iqr(h));
 
 	create_output_directory(h);
-
-	set_bin_size_by_iqr(h);
-
-	double value;
 
 	list_first_item(source->summaries);
 	while((s = list_next_item(source->summaries)))
 	{
-		value = value_of_field(s, f);
-		increment_bucket(h, value);
+		histogram_insert(h->histogram, value_of_field(s, f));
+
+		struct category *c = category_lookup_or_create(categories, s->category);
+		category_accumulate_summary(c, s, NULL);
 	}
-
-	h->nbuckets = itable_size(h->buckets);
-
-	set_min_max_value_of_field(h, f);
-	set_min_max_count(h);
 
 	set_average_of_field(h,  f);
 	set_variance_of_field(h, f);
-	set_skewdness_of_field(h,f);
-	set_kurtosis_of_field(h, f);
-	set_z_scores(h);
 
-	itable_insert(source->histograms, (uint64_t) ((uintptr_t) f), (void *) h);
+	itable_insert(source->stats, (uint64_t) ((uintptr_t) f), (void *) h);
 
-	debug(D_RMON, "%s-%s:\n buckets: %" PRIu64 " bin_size: %lf max_count: %" PRIu64 " mode: %lf\n", h->source->category, h->resource->caption, h->nbuckets, h->bin_size, h->max_count, h->value_at_max_count);
+	debug(D_RMON, "%s-%s:\n buckets: %d bin_size: %lf max_count: %d mode: %.0lf\n",
+		h->source->category_name,
+		h->resource->caption,
+		histogram_size(h->histogram),
+		histogram_bucket_size(h->histogram),
+		histogram_count(h->histogram, histogram_mode(h->histogram)),
+		histogram_mode(h->histogram));
 
 	return h;
 }
@@ -752,13 +621,13 @@ void write_histogram_stats_header(FILE *stream)
 }
 
 #define write_stats_row(file, alloc)\
-	fprintf(file, "%.2lf,%.0lf,%lf,%d,%0.3lf,%0.3lf,", alloc.first, ceil(alloc.waste), alloc.throughput, alloc.retries, alloc.time_taken, alloc.tasks_done)
+	fprintf(file, "%" PRId64 ",%.0lf,%lf,%d,%0.3lf,%0.3lf,", alloc.first, ceil(alloc.waste), alloc.throughput, alloc.retries, alloc.time_taken, alloc.tasks_done)
 
-void write_histogram_stats(FILE *stream, struct histogram *h)
+void write_histogram_stats(FILE *stream, struct field_stats *h)
 {
 	fprintf(stream, "%s,%s,", sanitize_path_name(h->resource->name),h->resource->units);
-	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), h->std_dev);
-	fprintf(stream, "%.0lf,%" PRId64 ",", floor(h->min_value), h->usage);
+	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), sqrt(h->variance));
+	fprintf(stream, "%.0lf,%" PRId64 ",", histogram_min_value(h->histogram), h->usage);
 
 	write_stats_row(stream, h->fa_perfect);
 	write_stats_row(stream, h->fa_max);
@@ -780,36 +649,36 @@ void write_histogram_stats(FILE *stream, struct histogram *h)
 			value_of_p(h, 0.99));
 }
 
-void histograms_of_category(struct rmDsummary_set *ss)
+void histograms_of_category(struct rmsummary_set *ss)
 {
-	/* construct histograms of category across all resources */
+	/* construct field_statss of category across all resources */
 	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
 
-		debug(D_RMON, "Computing histogram of %s.%s", ss->category, f->name);
+		debug(D_RMON, "Computing histogram of %s.%s", ss->category_name, f->name);
 
 		histogram_of_field(ss, f, output_directory);
 	}
 
 }
 
-void plots_of_category(struct rmDsummary_set *s)
+void plots_of_category(struct rmsummary_set *s)
 {
-	struct histogram     *h;
+	struct field_stats     *h;
 
-	/* construct histograms of category across all resources */
+	/* construct field_statss of category across all resources */
 	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
-		struct histogram *all = itable_lookup(all_summaries->histograms, (uint64_t) ((uintptr_t) f));
+		struct field_stats *all = itable_lookup(all_summaries->stats, (uint64_t) ((uintptr_t) f));
 		if(!all)
 			all = h;
 
@@ -828,9 +697,9 @@ void plots_of_category(struct rmDsummary_set *s)
 	}
 }
 
-double total_waste(struct histogram *h, struct field *f, double first_alloc) {
+double total_waste(struct field_stats *h, struct field *f, double first_alloc) {
 	double waste   = 0;
-	double max_candidate = h->max_value;
+	double max_candidate = histogram_max_value(h->histogram);
 
 	if(first_alloc < 0)
 		return 0;
@@ -860,7 +729,7 @@ double total_waste(struct histogram *h, struct field *f, double first_alloc) {
 	return waste;
 }
 
-double total_usage(struct histogram *h, struct field *f) {
+double total_usage(struct field_stats *h, struct field *f) {
 	double usage   = 0;
 
 	int i;
@@ -881,9 +750,9 @@ double total_usage(struct histogram *h, struct field *f) {
 	return usage;
 }
 
-void set_usage(struct rmDsummary_set *s) {
+void set_usage(struct rmsummary_set *s) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -893,13 +762,13 @@ void set_usage(struct rmDsummary_set *s) {
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
 		h->usage = total_usage(h, f);
 	}
 }
 
-double throughput(struct histogram *h, struct field *f, double first_alloc, struct allocation *alloc) {
+double throughput(struct field_stats *h, struct field *f, double first_alloc, struct allocation *alloc) {
 
 	if(alloc) {
 		alloc->first      = first_alloc;
@@ -914,11 +783,11 @@ double throughput(struct histogram *h, struct field *f, double first_alloc, stru
 	if(first_alloc == 0)
 		return 0;
 
-	struct histogram *all = itable_lookup(all_summaries->histograms, (uint64_t) ((uintptr_t) f));
+	struct field_stats *all = itable_lookup(all_summaries->stats, (uint64_t) ((uintptr_t) f));
 	if(!all) {
 		all = h;
 	}
-	double max_allocation  = all->max_value;
+	double max_allocation  = histogram_max_value(all->histogram);
 
 
 	int i;
@@ -967,7 +836,7 @@ double throughput(struct histogram *h, struct field *f, double first_alloc, stru
 	return th;
 }
 
-int retries(struct histogram *h, struct field *f, double first_alloc) {
+int retries(struct field_stats *h, struct field *f, double first_alloc) {
 	int tasks_retried     = 0;
 
 	int i;
@@ -984,11 +853,11 @@ int retries(struct histogram *h, struct field *f, double first_alloc) {
 }
 
 
-void set_category_maximum(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_category_maximum(struct rmsummary_set *s, struct hash_table *categories) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
-	struct category *c = category_lookup_or_create(categories, s->category);
+	struct category *c = category_lookup_or_create(categories, s->category_name);
 	if(!c->max_allocation)
 		c->max_allocation = rmsummary_create(-1);
 
@@ -997,28 +866,22 @@ void set_category_maximum(struct rmDsummary_set *s, struct hash_table *categorie
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
-		int64_t value;
-		rmsummary_to_internal_unit(f->name, h->max_value, &value, f->units);
-
-		if(strcmp(f->format, PRId64) != 0) {
-			rmsummary_assign_double_field(c->max_allocation, f->name, value);
-		} else {
-			rmsummary_assign_int_field(c->max_allocation, f->name, value);
-		}
+		int64_t value = histogram_max_value(h->histogram);
+		rmsummary_assign_int_field(c->max_allocation, f->name, value);
 	}
 }
 
-void set_fa_values(struct histogram *h, struct field *f, struct allocation *alloc, double first_allocation) {
+void set_fa_values(struct field_stats *h, struct field *f, struct allocation *alloc, double first_allocation) {
 	alloc->first      = first_allocation;
 	alloc->waste      = total_waste(h, f, alloc->first);
 	alloc->throughput =  throughput(h, f, alloc->first, alloc);
 	alloc->retries    =     retries(h, f, alloc->first);
 }
 
-void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct category *c = category_lookup_or_create(categories, s->category);
+void set_fa_min_waste_time_dependence(struct rmsummary_set *s, struct hash_table *categories) {
+	struct category *c = category_lookup_or_create(categories, s->category_name);
 	c->time_peak_independece = 0;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
 
@@ -1027,10 +890,10 @@ void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_tabl
 	if(!c->first_allocation)
 		return;
 
-	struct rmDsummary *firsts = rmsummary_to_rmDsummary(c->first_allocation);
+	struct rmsummary *firsts = rmsummary_copy(c->first_allocation);
 
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1040,15 +903,15 @@ void set_fa_min_waste_time_dependence(struct rmDsummary_set *s, struct hash_tabl
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 		set_fa_values(h, f, &(h->fa_min_waste_time_dependence), value_of_field(firsts, f));
 	}
 
 	free(firsts);
 }
 
-void set_fa_min_waste_time_independence(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct category *c = category_lookup_or_create(categories, s->category);
+void set_fa_min_waste_time_independence(struct rmsummary_set *s, struct hash_table *categories) {
+	struct category *c = category_lookup_or_create(categories, s->category_name);
 	c->time_peak_independece = 1;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MIN_WASTE;
 
@@ -1057,10 +920,10 @@ void set_fa_min_waste_time_independence(struct rmDsummary_set *s, struct hash_ta
 	if(!c->first_allocation)
 		return;
 
-	struct rmDsummary *firsts = rmsummary_to_rmDsummary(c->first_allocation);
+	struct rmsummary *firsts = rmsummary_copy(c->first_allocation);
 
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1070,15 +933,15 @@ void set_fa_min_waste_time_independence(struct rmDsummary_set *s, struct hash_ta
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 		set_fa_values(h, f, &(h->fa_min_waste_time_independence), value_of_field(firsts, f));
 	}
 
 	free(firsts);
 }
 
-void set_fa_max_throughput(struct rmDsummary_set *s, struct hash_table *categories) {
-	struct category *c = category_lookup_or_create(categories, s->category);
+void set_fa_max_throughput(struct rmsummary_set *s, struct hash_table *categories) {
+	struct category *c = category_lookup_or_create(categories, s->category_name);
 	c->time_peak_independece = 0;
 	c->allocation_mode       = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
 
@@ -1087,10 +950,10 @@ void set_fa_max_throughput(struct rmDsummary_set *s, struct hash_table *categori
 	if(!c->first_allocation)
 		return;
 
-	struct rmDsummary *firsts = rmsummary_to_rmDsummary(c->first_allocation);
+	struct rmsummary *firsts = rmsummary_copy(c->first_allocation);
 
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1100,16 +963,16 @@ void set_fa_max_throughput(struct rmDsummary_set *s, struct hash_table *categori
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 		set_fa_values(h, f, &(h->fa_max_throughput), value_of_field(firsts, f));
 	}
 
 	free(firsts);
 }
 
-void set_fa_95(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_fa_95(struct rmsummary_set *s, struct hash_table *categories) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1119,14 +982,14 @@ void set_fa_95(struct rmDsummary_set *s, struct hash_table *categories) {
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 		set_fa_values(h, f, &(h->fa_95), value_of_p(h, 0.95));
 	}
 }
 
-void set_fa_max(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_fa_max(struct rmsummary_set *s, struct hash_table *categories) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1136,14 +999,14 @@ void set_fa_max(struct rmDsummary_set *s, struct hash_table *categories) {
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
-		set_fa_values(h, f, &(h->fa_max), h->max_value);
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
+		set_fa_values(h, f, &(h->fa_max), histogram_max_value(h->histogram));
 	}
 }
 
-void set_fa_perfect(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_fa_perfect(struct rmsummary_set *s, struct hash_table *categories) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1153,7 +1016,7 @@ void set_fa_perfect(struct rmDsummary_set *s, struct hash_table *categories) {
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 		set_fa_values(h, f, &(h->fa_perfect), -1);
 
 		h->fa_perfect.first      = -1;
@@ -1162,9 +1025,9 @@ void set_fa_perfect(struct rmDsummary_set *s, struct hash_table *categories) {
 	}
 }
 
-int64_t min_waste_brute_force_field(struct histogram *h, struct field *f) {
+int64_t min_waste_brute_force_field(struct field_stats *h, struct field *f) {
 	double   min_waste     = DBL_MAX;
-	uint64_t min_candidate = h->max_value;
+	uint64_t min_candidate = histogram_max_value(h->histogram);
 
 	uint64_t prev = 0;
 	for(int i = 0; i < h->total_count; i++) {
@@ -1190,9 +1053,9 @@ int64_t min_waste_brute_force_field(struct histogram *h, struct field *f) {
 	return min_candidate;
 }
 
-void set_fa_min_waste_brute_force(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_fa_min_waste_brute_force(struct rmsummary_set *s, struct hash_table *categories) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1202,7 +1065,7 @@ void set_fa_min_waste_brute_force(struct rmDsummary_set *s, struct hash_table *c
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
 		if(brute_force) {
 			set_fa_values(h, f, &(h->fa_min_waste_brute_force), min_waste_brute_force_field(h, f));
@@ -1210,9 +1073,9 @@ void set_fa_min_waste_brute_force(struct rmDsummary_set *s, struct hash_table *c
 	}
 }
 
-int64_t max_throughput_brute_force_field(struct histogram *h, struct field *f) {
+int64_t max_throughput_brute_force_field(struct field_stats *h, struct field *f) {
 	double   best_throughput = 0;
-	uint64_t max_candidate  = h->max_value;
+	uint64_t max_candidate  = histogram_max_value(h->histogram);
 
 	uint64_t prev = 0;
 	for(int i = 0; i < h->total_count; i++) {
@@ -1239,9 +1102,9 @@ int64_t max_throughput_brute_force_field(struct histogram *h, struct field *f) {
 }
 
 
-void set_fa_max_throughput_brute_force(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_fa_max_throughput_brute_force(struct rmsummary_set *s, struct hash_table *categories) {
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 
 	int i;
 	for(i = WALL_TIME; i < NUM_FIELDS; i++)
@@ -1251,7 +1114,7 @@ void set_fa_max_throughput_brute_force(struct rmDsummary_set *s, struct hash_tab
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
 		if(brute_force) {
 			set_fa_values(h, f, &(h->fa_max_throughput_brute_force), max_throughput_brute_force_field(h, f));
@@ -1259,7 +1122,7 @@ void set_fa_max_throughput_brute_force(struct rmDsummary_set *s, struct hash_tab
 	}
 }
 
-void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_table *categories) {
+void set_first_allocations_of_category(struct rmsummary_set *s, struct hash_table *categories) {
 
 	/* activate first allocation for all resources. */
 	char *name;
@@ -1297,9 +1160,9 @@ void set_first_allocations_of_category(struct rmDsummary_set *s, struct hash_tab
 	set_fa_max(s, categories);
 }
 
-void write_stats_of_category(struct rmDsummary_set *s)
+void write_stats_of_category(struct rmsummary_set *s)
 {
-	char *name_raw   = sanitize_path_name(s->category);
+	char *name_raw   = sanitize_path_name(s->category_name);
 	char *filename      = string_format("%s/%s.stats", output_directory, name_raw);
 
 	FILE *f_stats  = open_file(filename);
@@ -1307,28 +1170,28 @@ void write_stats_of_category(struct rmDsummary_set *s)
 	free(name_raw);
 	free(filename);
 
-	debug(D_RMON, "Writing stats for %s", s->category);
+	debug(D_RMON, "Writing stats for %s", s->category_name);
 
 	write_histogram_stats_header(f_stats);
 
-	struct histogram *h;
+	struct field_stats *h;
 	struct field *f;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 		write_histogram_stats(f_stats, h);
 	}
 
 	fclose(f_stats);
 }
 
-void write_limits_of_category(struct rmDsummary_set *s)
+void write_limits_of_category(struct rmsummary_set *s)
 {
 
-	char *name_raw   = sanitize_path_name(s->category);
+	char *name_raw   = sanitize_path_name(s->category_name);
 	char *filename      = string_format("%s/%s.limits", output_directory, name_raw);
 
 	FILE *f_limits      = open_file(filename);
@@ -1336,623 +1199,31 @@ void write_limits_of_category(struct rmDsummary_set *s)
 	free(filename);
 	free(name_raw);
 
-	debug(D_RMON, "Writing limits for %s", s->category);
+	debug(D_RMON, "Writing limits for %s", s->category_name);
 
 	struct field *f;
-	struct histogram *h;
+	struct field_stats *h;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
 			continue;
 
-		h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+		h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 
-		char *value = field_str(f, h->fa_max_throughput.first);
-		fprintf(f_limits, "%s: %s\n", f->name, value);
-		free(value);
+		fprintf(f_limits, "%s: %" PRId64 "\n", f->name, h->fa_max_throughput.first);
 	}
 
 	fclose(f_limits);
 }
 
-void write_scatters_of_category_aux(struct itable *hc, char *cat_name, char *field_name) {
-/*
-Copyright (C) 2015- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
-#include "rmon_tools.h"
-#include "macros.h"
-#include "category.h"
-
-#include "jx_parse.h"
-
-double usecs_to_secs(double usecs)
+void write_overheads_of_category(struct rmsummary_set *s)
 {
-	return usecs/1000000;
-}
-
-double secs_to_usecs(double secs)
-{
-	return secs*1000000;
-}
-
-double Mbytes_to_bytes(double Mbytes)
-{
-	return Mbytes*1e6;
-}
-
-double bytes_to_Mbytes(double bytes)
-{
-	return bytes/1e6;
-}
-
-double bytes_to_Gbytes(double bytes)
-{
-	return bytes/1e9;
-}
-
-double Mbytes_to_Gbytes(double bytes)
-{
-	return bytes/1e3;
-}
-
-struct field fields[NUM_FIELDS + 1] = {
-	[WALL_TIME]  = {"t", "wall_time",      "wall time",       "s",        PRId64, 1, 1, offsetof(struct rmDsummary, wall_time)},
-	[CPU_TIME]   = {"c", "cpu_time",       "cpu time",        "s",        PRId64, 1, 1, offsetof(struct rmDsummary, cpu_time)},
-	[VIRTUAL  ]  = {"v", "virtual_memory", "virtual memory",  "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, virtual_memory)},
-	[RESIDENT ]  = {"m", "memory",         "resident memory", "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, memory)},
-	[SWAP     ]  = {"s", "swap_memory",    "swap memory",     "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, swap_memory)},
-	[B_READ   ]  = {"r", "bytes_read",     "read bytes",      "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_read)},
-	[B_WRITTEN]  = {"w", "bytes_written",  "written bytes",   "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_written)},
-	[B_RX   ]    = {"R", "bytes_received", "received bytes",  "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_received)},
-	[B_TX]       = {"W", "bytes_sent",     "bytes_sent",      "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, bytes_sent)},
-	[BANDWIDTH]  = {"B", "bandwidth",      "bandwidth",       "Mbps",     PRId64, 0, 1, offsetof(struct rmDsummary, bandwidth)},
-	[FILES    ]  = {"f", "total_files",    "num files",       "files",    PRId64, 0, 1, offsetof(struct rmDsummary, total_files)},
-	[DISK]       = {"z", "disk",           "disk",            "MB",       PRId64, 0, 1, offsetof(struct rmDsummary, disk)},
-	[CORES_AVG]  = {"C", "cores_avg",      "cores avg",       "cores",    ".2f",    0, 1, offsetof(struct rmDsummary, cores_avg)},
-	[CORES_PEAK] = {"P", "cores_peak",     "cores peak",      "cores",    PRId64,    0, 1, offsetof(struct rmDsummary, cores)},
-	[MAX_PROCESSES]   = {"N", "max_concurrent_processes", "max processes",   "procs", PRId64, 0, 0, offsetof(struct rmDsummary, max_concurrent_processes)},
-	[TOTAL_PROCESSES] = {"n", "total_processes",          "total processes", "procs", PRId64, 0, 0, offsetof(struct rmDsummary, total_processes)},
-	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, NULL, 0, 0, 0}
-};
-
-char *sanitize_path_name(char *name)
-{
-	char *new = xxstrdup(name);
-
-	char *next = new;
-
-	while( (next = strpbrk(next, " /.\n")) )
-		*next = '_';
-
-	return new;
-}
-
-struct rmDsummary *summary_bin_op(struct rmDsummary *s, struct rmDsummary *a, struct rmDsummary *b, double (*op)(double, double))
-{
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		if(f->active)
-		{
-			assign_to_field(s, f, op(value_of_field(a, f), value_of_field(b, f)));
-		}
-	}
-
-	return s;
-}
-
-struct rmDsummary *summary_unit_op(struct rmDsummary *s, struct rmDsummary *a, double u, double (*op)(double, double))
-{
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		if(f->active)
-		{
-			assign_to_field(s, f, op(value_of_field(a, f), u));
-		}
-	}
-
-	return s;
-}
-
-double plus(double a, double b)
-{
-	return a + b;
-}
-
-double minus(double a, double b)
-{
-	return a - b;
-}
-
-double mult(double a, double b)
-{
-	return a * b;
-}
-
-double minus_squared(double a, double b)
-{
-	return pow(a - b, 2);
-}
-
-double divide(double a, double b)
-{
-	return a/b;
-}
-
-char *make_field_names_str(char *separator)
-{
-	char *str;
-	struct buffer b;
-	buffer_init(&b);
-
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-		if(f->active)
-			buffer_printf(&b, "%s: %s%s",  f->abbrev, f->name, separator);
-
-	buffer_dup(&b, &str);
-	buffer_free(&b);
-
-	return str;
-}
-
-char *get_rule_number(char *filename)
-{
-	char  name[MAX_LINE];
-	const char *base =  path_basename(filename);
-
-	sscanf(base, RULE_PREFIX "%6c" RULE_SUFFIX, name);
-	return xxstrdup(name);
-}
-
-void parse_fields_options(char *field_str)
-{
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-		f->active = 0;
-
-	char *c = field_str;
-	while( *c != '\0' )
-	{
-		switch(*c)
-		{
-			case 't':
-				fields[WALL_TIME].active = 1;
-				debug(D_RMON, "adding field: wall time\n");
-				break;
-			case 'N':
-				fields[MAX_PROCESSES].active = 1;
-				debug(D_RMON, "adding field: concurrent processes\n");
-				break;
-			case 'n':
-				fields[TOTAL_PROCESSES].active = 1;
-				debug(D_RMON, "adding field: total processes\n");
-				break;
-			case 'c':
-				fields[CPU_TIME].active = 1;
-				debug(D_RMON, "adding field: cpu time\n");
-				break;
-			case 'v':
-				fields[VIRTUAL].active = 1;
-				debug(D_RMON, "adding field: virtual memory\n");
-				break;
-			case 'm':
-				fields[RESIDENT].active = 1;
-				debug(D_RMON, "adding field: resident memory\n");
-				break;
-			case 's':
-				fields[SWAP].active = 1;
-				debug(D_RMON, "adding field: swap memory\n");
-				break;
-			case 'r':
-				fields[B_READ].active = 1;
-				debug(D_RMON, "adding field: bytes read\n");
-				break;
-			case 'w':
-				fields[B_WRITTEN].active = 1;
-				debug(D_RMON, "adding field: bytes written\n");
-				break;
-			case 'R':
-				fields[B_RX].active = 1;
-				debug(D_RMON, "adding field: bytes received\n");
-				break;
-			case 'W':
-				fields[B_TX].active = 1;
-				debug(D_RMON, "adding field: bytes sent\n");
-				break;
-			case 'f':
-				fields[FILES].active = 1;
-				debug(D_RMON, "adding field: number of files\n");
-				break;
-			case 'z':
-				fields[DISK].active = 1;
-				debug(D_RMON, "adding field: footprint\n");
-				break;
-			case 'P':
-				fields[CORES_PEAK].active = 1;
-				debug(D_RMON, "adding field: cores peak\n");
-				break;
-			case 'C':
-				fields[CORES_AVG].active = 1;
-				debug(D_RMON, "adding field: cores avg\n");
-				break;
-			default:
-				fatal("'%c' is not a field option\n", *c);
-				break;
-		}
-		c++;
-	}
-}
-
-#define to_external(s, so, f) (s)->f = rmsummary_to_external_unit(#f, (so)->f)
-
-struct rmDsummary *rmsummary_to_rmDsummary(struct rmsummary *so) {
-
-	struct rmDsummary *s = malloc(sizeof(struct rmDsummary));
-	bzero(s, sizeof(*s));
-
-	if(so->command) {
-		s->command    = xxstrdup(so->command);
-	}
-
-	if(so->category)
-	{
-		s->category   = xxstrdup(so->category);
-	}
-	else if(so->command)
-	{
-		s->category   = parse_executable_name(so->command);
-	}
-	else
-	{
-		s->category   = xxstrdup(DEFAULT_CATEGORY);
-		s->command    = xxstrdup(DEFAULT_CATEGORY);
-	}
-
-	if(so->task_id)
-	{
-		s->task_id = xxstrdup(so->task_id);
-	}
-
-	to_external(s, so, start);
-	to_external(s, so, end);
-	to_external(s, so, wall_time);
-	to_external(s, so, cpu_time);
-	to_external(s, so, cores);
-
-	// use fractional cores if possible
-	if(s->wall_time > 0 && s->cpu_time > 0) {
-		s->cores_avg = s->cpu_time/s->wall_time;
-	} else {
-		s->cores_avg = so->cores;
-	}
-
-	to_external(s, so, total_processes);
-	to_external(s, so, max_concurrent_processes);
-
-	to_external(s, so, memory);
-	to_external(s, so, virtual_memory);
-	to_external(s, so, swap_memory);
-
-	to_external(s, so, bytes_read);
-	to_external(s, so, bytes_written);
-
-	to_external(s, so, bytes_received);
-	to_external(s, so, bytes_sent);
-	to_external(s, so, bandwidth);
-
-	to_external(s, so, disk);
-	to_external(s, so, total_files);
-
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		// if a value is negative, set it to zero
-		if(value_of_field(s, f) < 0)
-		{
-			assign_to_field(s, f, 0);
-		}
-	}
-
-	return s;
-}
-
-
-struct rmDsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
-{
-	static struct jx_parser *last_p = NULL;
-	static int summ_id     = 1;
-
-	if(last_p != p)
-	{
-		last_p  = p;
-		summ_id = 1;
-	}
-	else
-	{
-		summ_id++;
-	}
-
-	struct jx *j = jx_parser_yield(p);
-
-	if(!j)
-		return NULL;
-
-	struct rmsummary *so = json_to_rmsummary(j);
-	jx_delete(j);
-
-	if(!so)
-		return NULL;
-
-	struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
-	category_accumulate_summary(c, so, NULL);
-
-	if(categories) {
-		if(so->category) {
-			c = category_lookup_or_create(categories, so->category);
-			category_accumulate_summary(c, so, NULL);
-		}
-	}
-
-	struct rmDsummary *s  = rmsummary_to_rmDsummary(so);
-
-	s->file = xxstrdup(filename);
-	if(!s->task_id) {
-		s->task_id = get_rule_number(filename);
-	}
-
-	rmsummary_delete(so);
-
-	return s;
-}
-
-void parse_summary_from_filelist(struct rmDsummary_set *dest, char *filename, struct hash_table *categories)
-{
-	FILE *flist;
-
-	if(strcmp(filename, "-") == 0)
-	{
-		flist = stdin;
-	}
-	else
-	{
-		flist = fopen(filename, "r");
-		if(!flist)
-			fatal("Cannot open resources summary list: %s : %s\n", filename, strerror(errno));
-	}
-
-	struct rmDsummary *s;
-	char   file_summ[MAX_LINE];
-	while((fgets(file_summ, MAX_LINE, flist)))
-	{
-		FILE *stream;
-
-		int n = strlen(file_summ);
-		if(n < 1)
-			continue;
-
-		if(file_summ[n - 1] == '\n')
-		{
-			file_summ[n - 1] = '\0';
-		}
-
-		stream = fopen(file_summ, "r");
-		if(!stream)
-			fatal("Cannot open resources summary file: %s : %s\n", file_summ, strerror(errno));
-
-		struct jx_parser *p = jx_parser_create(0);
-		jx_parser_read_stream(p, stream);
-
-		while((s = parse_summary(p, file_summ, categories)))
-			list_push_tail(dest->summaries, s);
-
-		jx_parser_delete(p);
-		fclose(stream);
-	}
-}
-
-
-void parse_summary_recursive(struct rmDsummary_set *dest, char *dirname, struct hash_table *categories)
-{
-
-	FTS *hierarchy;
-	FTSENT *entry;
-	char *argv[] = {dirname, NULL};
-
-	hierarchy = fts_open(argv, FTS_PHYSICAL, NULL);
-
-	if(!hierarchy)
-		fatal("fts_open error: %s\n", strerror(errno));
-
-	struct rmDsummary *s;
-	while( (entry = fts_read(hierarchy)) )
-		if( S_ISREG(entry->fts_statp->st_mode) && strstr(entry->fts_name, RULE_SUFFIX) ) //bug: no links
-		{
-			FILE *stream;
-			stream = fopen(entry->fts_accpath, "r");
-			if(!stream)
-				fatal("Cannot open resources summary file: %s : %s\n", entry->fts_accpath, strerror(errno));
-
-			struct jx_parser *p = jx_parser_create(0);
-			jx_parser_read_stream(p, stream);
-
-			while((s = parse_summary(p, entry->fts_path, categories)))
-				list_push_tail(dest->summaries, s);
-
-			jx_parser_delete(p);
-			fclose(stream);
-		}
-
-	fts_close(hierarchy);
-}
-
-char *parse_executable_name(char *command)
-{
-	command = string_trim_spaces(command);
-
-	char *space = strchr(command, ' ');
-
-	if(space)
-		*space = '\0';
-
-	char *executable = command;
-
-	if(space)
-		*space = ' ';
-
-	return executable;
-}
-
-struct rmDsummary_set *make_new_set(char *category)
-{
-	struct rmDsummary_set *ss = malloc(sizeof(struct rmDsummary_set));
-
-	ss->category  = category;
-
-	ss->histograms = itable_create(0);
-
-	ss->summaries = list_create();
-
-	return ss;
-}
-
-#define to_internal(so, s, f, u) rmsummary_to_internal_unit(#f, (so)->f, &(s->f), u)
-
-void rmDsummary_print(FILE *output, struct rmDsummary *so) {
-	struct rmsummary *s = rmsummary_create(-1);
-
-	s->command    = xxstrdup(so->command);
-
-	if(so->category)
-	{
-		s->category   = xxstrdup(so->category);
-	}
-	else if(so->command)
-	{
-		s->category   = xxstrdup(so->command);
-	}
-	else
-	{
-		s->category   = xxstrdup(DEFAULT_CATEGORY);
-		s->command    = xxstrdup(DEFAULT_CATEGORY);
-	}
-
-	if(so->task_id) {
-		s->task_id = xxstrdup(so->task_id);
-	}
-
-	s->start     = so->start;
-	s->end       = so->end;
-	s->wall_time = so->wall_time;
-
-	to_internal(so, s, start,     "us");
-	to_internal(so, s, end,       "us");
-	to_internal(so, s, wall_time, "s");
-	to_internal(so, s, cpu_time,  "s");
-
-	s->cores = so->cores;
-
-	to_internal(so, s, total_processes,         "procs");
-	to_internal(so, s, max_concurrent_processes,"procs");
-
-	to_internal(so, s, memory,         "MB");
-	to_internal(so, s, virtual_memory, "MB");
-	to_internal(so, s, swap_memory,    "MB");
-
-	to_internal(so, s, bytes_read,    "MB");
-	to_internal(so, s, bytes_written, "MB");
-
-	to_internal(so, s, bytes_received, "MB");
-	to_internal(so, s, bytes_sent,     "MB");
-	to_internal(so, s, bandwidth,      "Mbps");
-
-	to_internal(so, s, total_files, "files");
-	to_internal(so, s, disk, "MB");
-
-	rmsummary_print(output, s, /* pprint */ 1, /* extra fields */ 0);
-	rmsummary_delete(s);
-
-	return;
-}
-
-/* vim: set noexpandtab tabstop=4: */
-
-	int n = itable_size(hc);
-	if(n < 1)
-		return;
-
-	int64_t *keys         = malloc(n*sizeof(intptr_t));
-	int64_t *counts_accum = malloc(n*sizeof(intptr_t));
-	double  *times_mean   = malloc(n*sizeof(intptr_t));
-	double  *times_accum  = malloc(n*sizeof(intptr_t));
-	double tau_mean;
-
-	category_first_allocation_accum_times(hc, &tau_mean, keys, counts_accum, times_mean, times_accum);
-
-	char *name_raw   = sanitize_path_name(cat_name);
-	char *filename   = string_format("%s/%s/scatter_%s_time.data", output_directory, name_raw, field_name);
-	FILE *f_rt = open_file(filename);
-
-	fprintf(f_rt, "mean_time = %lf\n", tau_mean);
-	fprintf(f_rt, "# resource mean_time >mean_time\n");
-	fprintf(f_rt, "$DATA << EOD\n");
-
-	int i;
-	for(i = 0; i < n; i++) {
-		double Pa = 1 - ((double) counts_accum[i])/counts_accum[n-1];
-		double mean_rest = Pa > 0 ? times_accum[i]/Pa : 0;
-
-		fprintf(f_rt, "%" PRId64 " %lf %lf\n", keys[i], times_mean[i], mean_rest);
-	}
-
-	fprintf(f_rt, "EOD\n");
-	fclose(f_rt);
-
-	free(keys);
-	free(counts_accum);
-	free(times_mean);
-	free(times_accum);
-}
-
-#define write_scatters_of_field(c, id, field) if(fields[id].active) { write_scatters_of_category_aux((c)->field##_histogram, c->name, #field); }
-
-void write_scatters_of_category(struct rmDsummary_set *s)
-{
-
-	struct category *c = category_lookup_or_create(categories, s->category);
-
-	debug(D_RMON, "Writing scatters for %s", s->category);
-
-	write_scatters_of_field(c, WALL_TIME,       wall_time)
-	write_scatters_of_field(c, CPU_TIME,        cpu_time)
-	write_scatters_of_field(c, MAX_PROCESSES,   max_concurrent_processes)
-	write_scatters_of_field(c, TOTAL_PROCESSES, total_processes)
-	write_scatters_of_field(c, VIRTUAL,         virtual_memory)
-	write_scatters_of_field(c, RESIDENT,        memory)
-	write_scatters_of_field(c, SWAP,            swap_memory)
-	write_scatters_of_field(c, B_READ,          bytes_read)
-	write_scatters_of_field(c, B_WRITTEN,       bytes_written)
-	write_scatters_of_field(c, B_RX,            bytes_received)
-	write_scatters_of_field(c, B_TX,            bytes_sent)
-	write_scatters_of_field(c, BANDWIDTH,       bandwidth)
-	write_scatters_of_field(c, FILES,           total_files)
-	write_scatters_of_field(c, DISK,            disk)
-	write_scatters_of_field(c, CORES_PEAK,      cores)
-	write_scatters_of_field(c, CORES_AVG,       cores_avg)
-}
-
-void write_overheads_of_category(struct rmDsummary_set *s)
-{
-	char *name_raw   = sanitize_path_name(s->category);
+	char *name_raw   = sanitize_path_name(s->category_name);
 	char *filename   = string_format("%s/%s.overheads", output_directory, name_raw);
 
 	FILE *f_ovhs  = open_file(filename);
 
-	debug(D_RMON, "Writing overheads for %s", s->category);
+	debug(D_RMON, "Writing overheads for %s", s->category_name);
 
 	free(name_raw);
 	free(filename);
@@ -1987,7 +1258,7 @@ void write_overheads_of_category(struct rmDsummary_set *s)
 }
 
 
-char *copy_outlier(struct rmDsummary *s)
+char *copy_outlier(struct rmsummary *s)
 {
 	static int count = 0;
 	count++;
@@ -2001,7 +1272,7 @@ char *copy_outlier(struct rmDsummary *s)
 
 	FILE *output = fopen(outlier, "w");
 	if(output) {
-		rmDsummary_print(output, s);
+		rmsummary_print(output, s, 1, NULL);
 		fclose(output);
 	} else {
 		debug(D_NOTICE, "Could not create outlier summary: %s\n", outlier);
@@ -2014,7 +1285,7 @@ char *copy_outlier(struct rmDsummary *s)
 }
 
 
-void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *prefix)
+void write_outlier(FILE *stream, struct rmsummary *s, struct field *f, char *prefix)
 {
 	char *outlier_name;
 
@@ -2028,17 +1299,11 @@ void write_outlier(FILE *stream, struct rmDsummary *s, struct field *f, char *pr
 		prefix = "";
 	}
 
-	char control_str[128];
-	snprintf(control_str, sizeof(control_str) - 1, "%%%s\n", f->format); 
-
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
 	fprintf(stream, "<br><br>\n");
 
-	char *value = field_str(f, value_of_field(s, f));
-	fprintf(stream, "%s\n", value);
-	free(value);
-
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(f->name, value_of_field(s, f)));
 	fprintf(stream, "</td>\n");
 }
 
@@ -2056,7 +1321,7 @@ void write_css_style(FILE *stream)
 
 }
 
-void write_webpage_stats_header(FILE *stream, struct histogram *h)
+void write_webpage_stats_header(FILE *stream, struct field_stats *h)
 {
 	fprintf(stream, "<td class=\"data\">%s", h->resource->caption);
 	if(h->resource->units)
@@ -2082,7 +1347,7 @@ void write_webpage_stats_header(FILE *stream, struct histogram *h)
 	fprintf(stream, "<td class=\"datahdr\" >p<sub>95</sub></td>");
 }
 
-void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int include_thumbnail)
+void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int include_thumbnail)
 {
 	struct field *f = h->resource;
 
@@ -2095,68 +1360,55 @@ void write_webpage_stats(FILE *stream, struct histogram *h, char *prefix, int in
 	}
 	fprintf(stream, "</td>");
 
-	char *value;
-	
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->value_at_max_count);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, histogram_mode(h->histogram)));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", h->mean);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->mean));
 	fprintf(stream, "</td>\n");
 
-	value = field_str(f, h->fa_max_throughput.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_max_throughput.first));
 	fprintf(stream, "</td>\n");
-	free(value);
 
-	value = field_str(f, h->fa_min_waste_time_dependence.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_min_waste_time_dependence.first));
 	fprintf(stream, "</td>\n");
-	free(value);
 
-	value = field_str(f, h->fa_min_waste_time_independence.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_min_waste_time_independence.first));
 	fprintf(stream, "</td>\n");
-	free(value);
 
-	value = field_str(f, h->fa_95.first);
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%s\n", value);
+	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_95.first));
 	fprintf(stream, "</td>\n");
-	free(value);
 
 	if(brute_force) {
-		value = field_str(f, h->fa_min_waste_brute_force.first);
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%s\n", value);
+		fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_min_waste_brute_force.first));
 		fprintf(stream, "</td>\n");
-		free(value);
 
-		value = field_str(f, h->fa_max_throughput_brute_force.first);
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%s\n", value);
+		fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->resource->name, h->fa_max_throughput_brute_force.first));
 		fprintf(stream, "</td>\n");
-		free(value);
 	}
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.2lf\n", h->mean > 0 ? (h->mean + h->std_dev)/h->mean : -1);
+	fprintf(stream, "%6.2lf\n", h->mean > 0 ? (h->mean + sqrt(h->variance))/h->mean : -1);
 	fprintf(stream, "</td>\n");
 
-	struct rmDsummary *s;
+	struct rmsummary *s;
 
 	s = h->summaries_sorted[index_of_p(h, 0.99)];
 	write_outlier(stream, s, f, prefix);
 
 	s = h->summaries_sorted[index_of_p(h, 0.95)];
 	write_outlier(stream, s, f, prefix);
+
 }
 
-void write_individual_histogram_webpage(struct histogram *h)
+void write_individual_histogram_webpage(struct field_stats *h)
 {
 
 	char *fname = path_of_page(h, 0);
@@ -2166,7 +1418,7 @@ void write_individual_histogram_webpage(struct histogram *h)
 	struct field *f = h->resource;
 
 	fprintf(fo, "<head>\n");
-	fprintf(fo, "<title> %s : %s </title>\n", h->source->category, f->caption);
+	fprintf(fo, "<title> %s : %s </title>\n", h->source->category_name, f->caption);
 	write_css_style(fo);
 	fprintf(fo, "</head>\n");
 
@@ -2184,7 +1436,7 @@ void write_individual_histogram_webpage(struct histogram *h)
 	fprintf(fo, "</tr>\n");
 
 	int i;
-	struct rmDsummary *s;
+	struct rmsummary *s;
 	int outliers = h->total_count < OUTLIER_N  ? h->total_count : OUTLIER_N;
 	for(i = 0; i < outliers; i++)
 	{
@@ -2241,17 +1493,17 @@ void write_front_page(char *workflow_name)
 
 	fprintf(fo, "<tr>\n");
 
-	struct rmDsummary_set *s;
+	struct rmsummary_set *s;
 
 	list_first_item(all_sets);
 	while((s = list_next_item(all_sets)))
 	{
-		fprintf(fo, "<td class=\"datahdr\" colspan=\"%d\">%s: %d</td>", columns, s->category, list_size(s->summaries));
+		fprintf(fo, "<td class=\"datahdr\" colspan=\"%d\">%s: %d</td>", columns, s->category_name, list_size(s->summaries));
 	}
 	fprintf(fo, "</tr>\n");
 
 	struct field *f;
-	struct histogram      *h;
+	struct field_stats      *h;
 	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 	{
 		if(!f->active)
@@ -2261,7 +1513,7 @@ void write_front_page(char *workflow_name)
 		list_first_item(all_sets);
 		while((s = list_next_item(all_sets)))
 		{
-			h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+			h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 			write_webpage_stats_header(fo, h);
 		}
 		fprintf(fo, "</tr>\n");
@@ -2270,7 +1522,7 @@ void write_front_page(char *workflow_name)
 		list_first_item(all_sets);
 		while((s = list_next_item(all_sets)))
 		{
-			h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+			h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 			write_webpage_stats(fo, h, NULL, 1);
 		}
 		fprintf(fo, "</tr>\n");
@@ -2289,18 +1541,18 @@ void write_webpage(char *workflow_name)
 
 	write_front_page(workflow_name);
 
-	struct rmDsummary_set *s;
+	struct rmsummary_set *s;
 	list_first_item(all_sets);
 	while((s = list_next_item(all_sets)))
 	{
-		struct histogram *h;
+		struct field_stats *h;
 		struct field *f;
 		for(f = &fields[WALL_TIME]; f->name != NULL; f++)
 		{
 			if(!f->active)
 				continue;
 
-			h = itable_lookup(s->histograms, (uint64_t) ((uintptr_t) f));
+			h = itable_lookup(s->stats, (uint64_t) ((uintptr_t) f));
 			write_individual_histogram_webpage(h);
 		}
 	}
@@ -2439,8 +1691,8 @@ int main(int argc, char **argv)
 			split_summaries_on_category(all_summaries);
 		}
 
-		/* construct histograms across all categories/resources. */
-		struct rmDsummary_set *s;
+		/* construct field_statss across all categories/resources. */
+		struct rmsummary_set *s;
 		list_first_item(all_sets);
 		while((s = list_next_item(all_sets)))
 		{
@@ -2452,7 +1704,6 @@ int main(int argc, char **argv)
 			write_stats_of_category(s);
 			write_limits_of_category(s);
 			write_overheads_of_category(s);
-			write_scatters_of_category(s);
 
 			if(webpage_mode)
 			{

@@ -77,7 +77,6 @@ void initialize_units() {
 	add_conversion_field("bytes_sent",               "B",      "MB",      1);
 	add_conversion_field("bandwidth",                "bps",    "Mbps",    1);
 	add_conversion_field("cores",                    "cores",  "cores",   0);
-	add_conversion_field("cores_avg",                "cores",  "cores",   1);
 	add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
 	add_conversion_field("total_processes",          "procs",  "procs",   0);
 	add_conversion_field("total_files",              "files",  "files",   0);
@@ -282,16 +281,6 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 	return 0;
 }
 
-double rmsummary_get_double_field(struct rmsummary *s, const char *key) {
-	if(strcmp(key, "cores_avg") == 0) {
-		return s->cores_avg;
-	}
-
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
-
-	return 0;
-}
-
 const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 	if(strcmp(key, "category") == 0) {
 		return s->category;
@@ -425,19 +414,6 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 	return 0;
 }
 
-int rmsummary_assign_double_field(struct rmsummary *s, const char *key, double value) {
-
-	if(strcmp(key, "cores_avg") == 0) {
-		s->cores_avg = value;
-		return 1;
-	}
-
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
-
-	return 0;
-}
-
-
 int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *value) {
 
 	if(strcmp(key, "limits_exceeded") == 0) {
@@ -524,7 +500,6 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	field_to_json(output, s, total_processes);
 	field_to_json(output, s, max_concurrent_processes);
 	field_to_json(output, s, cores);
-	field_to_json(output, s, cores_avg);
 	field_to_json(output, s, cpu_time);
 	field_to_json(output, s, wall_time);
 	field_to_json(output, s, end);
@@ -787,8 +762,6 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->limits_exceeded = NULL;
 	s->peak_times = NULL;
 
-	s->cores_avg   = (double) default_value;
-
 	s->last_error  = 0;
 	s->exit_status = 0;
 	s->signal = 0;
@@ -861,8 +834,6 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, disk);
 
 	rmsummary_apply_op(dest, src, fn, cores);
-	rmsummary_apply_op(dest, src, fn, cores_avg);
-
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
 }
 
@@ -879,6 +850,37 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	}
 
 	rmsummary_bin_op(dest, src, override_field);
+}
+
+struct rmsummary *rmsummary_copy(const struct rmsummary *src)
+{
+	struct rmsummary *dest = rmsummary_create(-1);
+
+	if(src) {
+		memcpy(dest, src, sizeof(*dest));
+
+		if(src->command) {
+			dest->command = xxstrdup(src->command);
+		}
+
+		if(src->category) {
+			dest->category = xxstrdup(src->category);
+		}
+
+		if(src->task_id) {
+			dest->task_id = xxstrdup(src->task_id);
+		}
+
+		if(src->limits_exceeded) {
+			dest->limits_exceeded = rmsummary_copy(src->limits_exceeded);
+		}
+
+		if(src->peak_times) {
+			dest->peak_times = rmsummary_copy(src->peak_times);
+		}
+	}
+
+	return dest;
 }
 
 /* only update limit when new field value is larger than old, regardless of old
@@ -919,7 +921,6 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 	merge_limit(dest, src, total_files);
 	merge_limit(dest, src, disk);
 	merge_limit(dest, src, cores);
-	merge_limit(dest, src, cores_avg);
 	merge_limit(dest, src, fs_nodes);
 
 }
@@ -965,7 +966,6 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	rmsummary_apply_op(dest, src, max_field, start);
 	rmsummary_apply_op(dest, src, max_field, end);
 	rmsummary_apply_op(dest, src, max_field, wall_time);
-	rmsummary_apply_op(dest, src, max_field, cores_avg);
 
 	max_op_w_time(dest, src, max_concurrent_processes);
 	max_op_w_time(dest, src, total_processes);
