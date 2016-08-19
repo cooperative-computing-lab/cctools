@@ -19,10 +19,10 @@ FILE_TASK_INFO = "task_info"
 FILE_TASK_STATE = "task_state"
 MF_DONE_FILE = "makeflow_done"
 
-TASK_CPUS = 0.01
+TASK_CPUS = 1
 TASK_MEM = 32
 
-EXECUTOR_CPUS = 0.01
+EXECUTOR_CPUS = 1
 EXECUTOR_MEM = 32
 
 # Makeflow mesos scheduler
