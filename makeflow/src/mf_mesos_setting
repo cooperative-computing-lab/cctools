@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This module defined global variables and classes 
 # used by mf_mesos_scheduler.py
 

@@ -14,7 +14,7 @@ test ! -z "${PYTHON}" && \
 
 PYTHON=/usr/bin/python
 
-SCRIPT=${CCTOOLS}/bin/mf_mesos_executor.py
+SCRIPT=${CCTOOLS}/bin/mf_mesos_executor
 
 LD_PRELOAD="/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so" \
 exec ${PYTHON} ${SCRIPT} "${@}"
