@@ -582,7 +582,8 @@ System                  2                   2
 
 			<p><b>Common Attributes of OS, Software, Data Dependencies:</b></p>
 			<p>Each OS, software
-			and data dependency can have the following attributes: source, checksum, size, format, uncompressed_size.</p>
+			and data dependency can have the following attributes: source, checksum, size, format,
+			uncompressed_size, and upload.</p>
 
 			<p> These attributes are required in a self-contained umbrella specification,
 			but not required in an umbrella specification which is attached to a Metadata
@@ -619,6 +620,10 @@ System                  2                   2
 
 				<li><b>uncompressed_size</b>: the uncompressed size of the dependency in bytes, only meaningful
 				when the format attribute is not plain text.</li>
+
+				<li><b>upload (optional)</b>: whether this dependency will be uploaded into the storage services
+				like OSF and S3 or not. The type of this field is boolean. This field can be set to be
+				<tt>false</tt> or <tt>true</tt>.</li>
 
 			</ul>
 
