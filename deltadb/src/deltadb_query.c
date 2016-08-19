@@ -61,7 +61,7 @@ int deltadb_boolean_expr( struct jx *expr, struct jx *data )
 	if(!expr) return 1;
 
 	struct jx *j = jx_eval(expr,data);
-	int result = j && j->type==JX_BOOLEAN && j->u.boolean_value;
+	int result = j && !jx_istype(j, JX_ERROR) && j->type==JX_BOOLEAN && j->u.boolean_value;
 	jx_delete(j);
 	return result;
 }
@@ -160,7 +160,7 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 		for(n=db->reduce_exprs->head;n;n=n->next) {
 			struct deltadb_reduction *r = n->data;
 			struct jx *value = jx_eval(r->expr,jobject);
-			if(value) {
+			if(value && !jx_istype(value, JX_ERROR)) {
 				if(value->type==JX_INTEGER) {
 					deltadb_reduction_update(n->data,(double)value->u.integer_value);
 				} else if(value->type==JX_DOUBLE) {

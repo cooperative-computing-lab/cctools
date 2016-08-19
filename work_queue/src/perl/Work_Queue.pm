@@ -156,6 +156,11 @@ sub specify_name {
 	return work_queue_specify_name($self->{_work_queue}, $name);
 }
 
+sub specify_min_taskid {
+	my ($self, $minid) = @_;
+	return work_queue_specify_min_taskid($self->{_work_queue}, $minid);
+}
+
 sub specify_priority {
 	my ($self, $priority) = @_;
 	return work_queue_specify_priority($self->{_work_queue}, $priority);
@@ -596,6 +601,31 @@ Change the project name for the given queue.
 =item name
 
 The new project name.
+
+=back
+
+=head3 C<specify_min_taskid>
+
+
+Set the minimum taskid of future submitted tasks.
+
+Further submitted tasks are guaranteed to have a taskid larger or equal to
+minid.  This function is useful to make taskids consistent in a workflow that
+consists of sequential masters. (Note: This function is rarely used).  If the
+minimum id provided is smaller than the last taskid computed, the minimum id
+provided is ignored.
+
+Returns the actual minimum taskid for future tasks.
+
+=over 12
+
+=item q
+
+A work queue object.
+
+=item minid
+
+Minimum desired taskid
 
 =back
 

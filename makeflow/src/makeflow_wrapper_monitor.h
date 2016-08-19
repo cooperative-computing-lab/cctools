@@ -27,7 +27,8 @@ struct makeflow_monitor {
 };
 
 struct makeflow_monitor * makeflow_monitor_create();
-void makeflow_prepare_for_monitoring( struct makeflow_monitor *m, struct batch_queue *queue, char *log_dir, char *log_format);
-char *makeflow_wrap_monitor( char *result, struct dag_node *n, struct makeflow_monitor *m );
+void makeflow_prepare_for_monitoring( struct dag *d, struct makeflow_monitor *m, struct batch_queue *queue, char *log_dir, char *log_format);
+char *makeflow_wrap_monitor( char *result, struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m );
+int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m);
 
 #endif

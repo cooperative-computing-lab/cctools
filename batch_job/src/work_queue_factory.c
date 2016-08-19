@@ -69,6 +69,7 @@ static char *config_file = 0;
 static char *amazon_credentials = NULL;
 static char *amazon_ami = NULL;
 static char *condor_requirements = NULL;
+static char *batch_submit_options = NULL;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -101,6 +102,11 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		return needed_workers;
 	}
 
+	double time_execute_previous = 0;
+	double time_transfer_previous = 0;
+	double capacity_weighted_previous = 0;
+	double alpha = 0.1;
+
 	list_first_item(masters_list);
 	while((j=list_next_item(masters_list))) {
 
@@ -108,10 +114,73 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
 		const char *owner =  jx_lookup_string(j,"owner");
-		const int tr =       jx_lookup_integer(j,"tasks_running");
+		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
-		const int capacity = jx_lookup_integer(j,"capacity");
+		int capacity_tasks = jx_lookup_integer(j, "capacity_tasks");
+		int capacity_cores = jx_lookup_integer(j, "capacity_cores");
+		int capacity_memory = jx_lookup_integer(j, "capacity_memory");
+		int capacity_disk = jx_lookup_integer(j, "capacity_disk");
+		const int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
+		const int time_execute = jx_lookup_integer(j, "time_workers_execute");
+
+		const int cores = resources->cores;
+		const int memory = resources->memory;
+		const int disk = resources->disk;
+
+		double execute_delta = time_execute - time_execute_previous;
+		double transfer_delta = time_transfer - time_transfer_previous;
+		double time_execute_weighted;
+		double time_transfer_weighted;
+		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
+
+		if(positive_deltas) {
+			time_execute_weighted = (alpha * execute_delta) + ((1 - alpha) * time_execute_previous);
+			time_transfer_weighted = (alpha * transfer_delta) + ((1 - alpha) * time_transfer_previous);
+		}
+		else {
+			time_execute_weighted = time_execute_previous;
+			time_transfer_weighted = time_transfer_previous;
+		}
+
+		int capacity_weighted = capacity_weighted_previous;
+		if(time_transfer_weighted > 0) {
+			capacity_weighted = (int) (time_execute_weighted / time_transfer_weighted);
+		}
+
+		if(positive_deltas) {
+			capacity_weighted_previous = capacity_weighted;
+			time_execute_previous = time_execute_weighted;
+			time_transfer_previous = time_transfer_weighted;
+		}
+
+		const int temp_capacity_tasks = capacity_tasks;
+		if(tasks_per_worker > 0) {
+			capacity_tasks = capacity_tasks / tasks_per_worker;
+		}
+		if(capacity_tasks <= 0) {
+			capacity_tasks = temp_capacity_tasks;
+		}
+		if(cores > 0) {
+			capacity_cores = capacity_cores / cores;
+		}
+		if(capacity_cores <= 0) {
+			capacity_cores = capacity_tasks;
+		}
+		if(memory > 0) {
+			capacity_memory = capacity_memory / memory;
+		}
+		if(capacity_memory <= 0) {
+			capacity_memory = capacity_tasks;
+		}
+		if(disk > 0) {
+			capacity_disk = capacity_disk / disk;
+		}
+		if(capacity_disk <= 0) {
+			capacity_disk = capacity_tasks;
+		}
+	
+		int capacity = MIN(capacity_weighted, MIN(capacity_tasks, MIN(capacity_cores, MIN(capacity_memory, capacity_disk))));
 
 		int tasks = tr+tw+tl;
 
@@ -274,13 +343,13 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 }
 
 static struct jx_table queue_headers[] = {
-{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 18},
-{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 21},
-{"port",          "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
-{"tasks_waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
-{"tasks_running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
-{"tasks_complete","COMPLETE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
-{"workers",       "WORKERS", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"project",           "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -18},
+{"name",              "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -21},
+{"port",              "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
+{"tasks_waiting",     "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_running",     "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_done",        "COMPLETE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
+{"workers_connected", "WORKERS", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
 {NULL,NULL,0,0,0}
 };
 
@@ -312,7 +381,14 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		return;
 	}
 
-	jx_table_print_header(queue_headers,stdout);
+	int columns = 80;
+	char *column_str = getenv("COLUMNS");
+	if(column_str) {
+		columns = atoi(column_str);
+		columns = columns < 1 ? 80 : columns;
+	}
+
+	jx_table_print_header(queue_headers,stdout,columns);
 
 	struct jx *j;
 	if(masters && list_size(masters) > 0)
@@ -322,7 +398,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		list_first_item(masters);
 		while((j = list_next_item(masters)))
 		{
-			jx_table_print(queue_headers, j, stdout);
+			jx_table_print(queue_headers, j, stdout, columns);
 		}
 	}
 
@@ -333,7 +409,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 		list_first_item(foremen);
 		while((j = list_next_item(foremen)))
 		{
-			jx_table_print(queue_headers, j, stdout);
+			jx_table_print(queue_headers, j, stdout, columns);
 
 		}
 	}
@@ -655,6 +731,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
+	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
 	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
@@ -671,7 +748,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
-	printf(" %-30s Use worker capacity reported by masters.","-c,--capacity");
+	printf(" %-30s Use worker capacity reported by masters.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
@@ -720,14 +797,19 @@ int main(int argc, char *argv[])
 	catalog_host = CATALOG_HOST;
 	catalog_port = CATALOG_PORT;
 
+	batch_submit_options = getenv("BATCH_OPTIONS");
+
 	debug_config(argv[0]);
 
 	resources = rmsummary_create(-1);
 
 	int c;
 
-	while((c = getopt_long(argc, argv, "C:F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
+	while((c = getopt_long(argc, argv, "B:C:F:N:M:T:t:w:W:E:P:S:cd:o:O:vh", long_options, NULL)) > -1) {
 		switch (c) {
+			case 'B':
+				batch_submit_options = xxstrdup(optarg);
+				break;
 			case 'C':
 				config_file = xxstrdup(optarg);
 				break;
@@ -901,6 +983,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	batch_queue_set_option(queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 	set_worker_resources_options( queue );
 

@@ -12,239 +12,338 @@ import getopt
 from subprocess import Popen, PIPE
 
 gnuplot_cmd   = 'gnuplot'
-format        = 'png'
+format        = 'svg'
 extension     = format
-resolution    = 1000000      # this many useconds to one log entry. Default is one second.
-x_range       = None         # If unspecified, then plot all the valid range.
+resolution    = 30          # this many seconds to one log entry. Default is 30 seconds.
+x_range       = None        # If unspecified, then plot all the valid range.
 
 log_entries   = None
 times         = None
 
-unit_labels   = {'s' : 'seconds', 'm' : 'minutes', 'h' : 'hours', 'd' : 'days'}
-unit_factors  = {'s' : 1, 'm' : 60, 'h' : 3600, 'd' : 86400}
+unit_labels   = {'s' : 'seconds', 'm' : 'minutes', 'h' : 'hours', 'd' : 'days', 'GB' : 'GB' }
+unit_factors  = {'s' : 1, 'm' : 60, 'h' : 3600, 'd' : 86400, 'GB' : 1073741824}
 x_units       = 'm'          # Default is minutes.
 
 def read_fields(file, lines_patience = 10):
-  for line in file:
-    if line[0] != '#':
-      lines_patience = lines_patience - 1
-    else:
-      return line.strip('#\n\r\t ').split()
-    if lines_patience < 1:
-      break
-  sys.stderr.write("Could not find fields descriptions (a line such as # timestamp total_....)\n")
-  sys.exit(1)
+    for line in file:
+        if line[0] != '#':
+            lines_patience = lines_patience - 1
+        else:
+            return line.strip('#\n\r\t ').split()
+        if lines_patience < 1:
+            break
+    sys.stderr.write("Could not find fields descriptions (a line such as # timestamp workers_....)\n")
+    sys.exit(1)
 
 def time_to_resolution(t):
-	return (t - (t % resolution)) / resolution
+    return (t - (t % (resolution * 1000000))) / 1000000
 
 def time_field_p(field):
-  return (field == 'timestamp' or re.search('.*_time$', field))
+    return (field == 'timestamp' or re.search('^time_.*$', field))
 
 def read_log_entries(file, fields):
-  log_entries = {}
-  idxs  = range(0, len(fields))
-  pairs = zip(idxs, fields)
-  epoch = None
-  count_lines = 0
+    log_entries = {}
+    idxs  = range(0, len(fields))
+    pairs = zip(idxs, fields)
+    epoch = None
+    count_lines = 0
+    prev_line = None
+    alpha = 0.1
+    capacity_total = []
+    j = 0
 
-  for line in file:
-    count_lines = count_lines + 1
-    try:
-      numbers = [float(x) for x in line.split()]
-      record  = {}
+    for line in file:
+        count_lines = count_lines + 1
+        try:
+            numbers = [float(x) for x in line.split()]
+            record  = {}
 
 
-      for (i, field) in pairs:
-        if time_field_p(field):
-          numbers[i] = time_to_resolution(numbers[i])
-        if field == 'timestamp':
-          if not epoch:
-            epoch = numbers[i]
-          numbers[i] = numbers[i] - epoch
-        record[field] = numbers[i]
+            for (i, field) in pairs:
+                if time_field_p(field):
+                    numbers[i] = time_to_resolution(numbers[i])
+                if field == 'timestamp':
+                    if not epoch:
+                        epoch = numbers[i]
+                    numbers[i] = numbers[i] - epoch
+                record[field] = numbers[i]
 
-      record['total_transfer_time']    = record['total_send_time'] + record['total_receive_time']
-      record['total_master_time']      = record['timestamp'] - record['total_transfer_time']
-      log_entries[record['timestamp']] = record
+            record['time_transfer'] = record['time_send'] + record['time_receive']
+            record['time_master']   = record['time_status_msgs'] + record['time_internal'] + record['time_polling'] + record['time_application']
+            record['bytes_sent'] /= unit_factors['GB']
+            record['bytes_received'] /= unit_factors['GB']
+            record['bytes_transfered'] = record['bytes_sent'] + record['bytes_received']
 
-    except ValueError:
-      sys.stderr.write('Line %d has an invalid value. Ignoring.\n' % (count_lines, ))
-      continue
-    except IndexError:
-      sys.stderr.write('Line %d has less than %d fields. Aborting.\n' % (count_lines, len(fields)))
-      sys.exit(1)
+            try:
+                record['capacity_tasks'] = (record['time_execute'] + record['time_polling']) / (record['time_transfer'] + record['time_master'] - record['time_polling'])
+            except ArithmeticError:
+                record['capacity_tasks'] = record['capacity_tasks']
 
-  return log_entries
+            if(prev_line is None):
+                prev_line = record
+                prev_line['time_transfer_weighted'] = 0
+                prev_line['time_execute_weighted'] = 0
+                prev_line['capacity_weighted'] = 0
+                prev_line['capacity_tasks'] = 0
+
+            if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0): 
+                record['time_transfer_weighted'] = alpha * ((record['time_transfer']) - prev_line['time_transfer']) + ((1 - alpha) * prev_line['time_transfer_weighted'])
+                record['time_execute_weighted'] = alpha * (record['time_execute'] - prev_line['time_execute']) + ((1 - alpha) * prev_line['time_execute_weighted'])
+            else: 
+                record['time_transfer_weighted'] = prev_line['time_transfer_weighted']
+                record['time_execute_weighted'] = prev_line['time_execute_weighted']
+
+            log_entries[record['timestamp']] = record
+
+            if(record['time_transfer_weighted'] > 0):
+                record['capacity_weighted'] = (int) (record['time_execute_weighted'] / record['time_transfer_weighted'])
+            else:
+                record['capacity_weighted'] = prev_line['capacity_weighted']
+            if(record['time_transfer'] > 0):
+                record['capacity_tasks'] = (int) (record['time_execute'] / record['time_transfer'])
+            else:
+                record['capacity_tasks'] = prev_line['capacity_tasks']
+            if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0):
+                prev_line = record
+
+            capacity_total.append(record['capacity_weighted'])
+            j += 1
+
+        except ValueError:
+            sys.stderr.write('Line %d has an invalid value. Ignoring.\n' % (count_lines, ))
+            continue
+        except IndexError:
+            sys.stderr.write('Line %d has less than %d fields. Aborting.\n' % (count_lines, len(fields)))
+            sys.exit(1)
+
+    capacity_total = sorted(capacity_total, cmp=lambda x,y: cmp(x, y))
+    capacity_median = 0
+    if(j % 2 != 0):
+        capacity_median = ((int) (capacity_total[((int) (j / 2))] + capacity_total[(int) ((j / 2) + 1)]) / 2)
+    else:
+        capacity_median = capacity_total[(j / 2)]
+
+    capacity_mean = 0
+    for cap in capacity_total:
+        capacity_mean += cap
+        capacity_mean = (int) (capacity_mean / j)
+
+    print "Median capacity: ", capacity_median
+    return log_entries
 
 def sort_time(log_entries):
-  times = []
-  for k in log_entries.keys():
-    times.append(k)
-  times.sort()
-  return times
+    times = []
+    for k in log_entries.keys():
+        times.append(k)
+    times.sort()
+    return times
 
 def pout(file, str):
-  file.write(str)
-  file.write('\n')
+    file.write(str)
+    file.write('\n')
 
 class WQPlot:
-  def __init__(self, ylabel, fields, labels=None, x_units = x_units, range = x_range):
-    self.fields      = fields
-    self.labels      = labels or self.fields
-    self.x_units     = x_units
-    self.ylabel      = ylabel
-    self.range       = range
+    def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range):
+        self.title   = title
+        self.fields  = fields
+        self.labels  = labels or self.fields
+        self.x_units = x_units
+        self.y_units = y_units
+        self.ylabel  = ylabel
+        self.range   = range
 
-  def preamble(self, file):
-    self.__preamble_common(file)
+    def preamble(self, file):
+        self.__preamble_common(file)
 
-  def __preamble_common(self, file):
-    pout(file, """
-set term %s linewidth 2;
-set xlabel '%s';
-set ylabel '%s';
-set noborder;
-set tics nomirror;
-set key right top;
-  """ % (format, unit_labels[self.x_units], self.ylabel))
-    if self.range:
-      pout(file, 'set xrange [%s]' % (self.range,))
+    def __preamble_common(self, file):
+        pout(file, """
+set term {fmt} butt linewidth 1
+set title  '{title}'
+set xlabel '{x_units}'
+set ylabel '{y_units}'
+set noborder
+set tics nomirror out
+set key left top
+""".format(fmt=format, title=self.title, x_units=unit_labels[self.x_units], y_units=self.ylabel))
 
-  def __data_one_time_field(self, file, field):
-    time_scale = unit_factors[self.x_units]
-    # if a time field, then scale
-    mod = time_field_p(field) and time_scale or 1
+        intervals = [len(log_entries.keys())/x for x in [19,17,13,11,7,5,3]]
 
-    for t in times:
-      r = log_entries[t]
-      try:
-        pout(file, '%lf %lf' % (t/time_scale, r[field]/mod))
-      except KeyError:
-        sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
-        break
-    pout(file, 'EOF')
+        pout(file, """
+set style line 1 pt 5   lc rgb '#1b9e77' pointinterval {0}
+set style line 2 pt 13  lc rgb '#d95f02' pointinterval {1}
+set style line 3 pt 7   lc rgb '#7570b3' pointinterval {2}
+set style line 4 pt 9   lc rgb '#e7298a' pointinterval {3}
+set style line 5 pt 10  lc rgb '#66a61e' pointinterval {4}
+set style line 6 pt 2   lc rgb '#e6ab02' pointinterval {5}
+set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
+""".format(*intervals))
 
-  def plot_line(self, label):
-   return "'-' using 1:2 title '%s' with lines" % (label,)
+        if self.range:
+            pout(file, 'set xrange [%s]' % (self.range,))
 
-  def write_plot(self, file):
-    self.preamble(file)
+    def __data_one_time_field(self, file, field):
+        time_scale = unit_factors[self.x_units]
+        # if a time field, then scale
+        mod = time_field_p(field) and unit_factors[self.y_units] or 1
 
-    plots = [ self.plot_line(label) for label in self.labels ]
-    pout(file, 'plot %s;' % (',\\\n'.join(plots),))
+        for t in times:
+            r = log_entries[t]
+            try:
+                pout(file, '%lf %lf' % (t/time_scale, r[field]/mod))
+            except KeyError:
+                sys.stderr.write("Field '%s' does not exist in the log\n" % (field,))
+                break
+        pout(file, 'EOF')
 
-    for field in self.fields:
-      self.__data_one_time_field(file, field)
+    def plot_line(self, label, place):
+        return "'-' using 1:2 title '%s' with linespoints ls %d lw 3" % (label,place+1)
 
-  def __plot_internal(self, output, command):
-      sys.stdout.write("Generating '%s'.\n" % (output,))
-      fout = open(output, 'w')
-      gnuplot = Popen(command, stdin = PIPE, stdout = fout)
-      self.write_plot(gnuplot.stdin)
-      gnuplot.stdin.close()
-      gnuplot.wait()
+    def write_plot(self, file):
+        self.preamble(file)
 
-  def plot(self, output):
-    try:
-      self.__plot_internal(output, command = gnuplot_cmd)
-    except IOError:
-      sys.stderr.write("Could not generate file %s.\n" % (output,))
-      exit(1)
-    except OSError:
-      sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
-      exit(1)
+        plots = []
+        for i in range(len(self.labels)):
+            plots.append(self.plot_line(self.labels[i], i))
+
+        pout(file, 'plot %s;' % (',\\\n'.join(plots),))
+
+        for field in self.fields:
+            self.__data_one_time_field(file, field)
+
+    def __plot_internal(self, output, command):
+        sys.stdout.write("Generating '%s'.\n" % (output,))
+        fout = open(output, 'w')
+        gnuplot = Popen(command, stdin = PIPE, stdout = fout)
+        self.write_plot(gnuplot.stdin)
+        gnuplot.stdin.close()
+        gnuplot.wait()
+
+    def plot(self, output):
+        try:
+            self.__plot_internal(output, command = gnuplot_cmd)
+        except IOError:
+            sys.stderr.write("Could not generate file %s.\n" % (output,))
+            exit(1)
+        except OSError:
+            sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+            exit(1)
 
 
 class WQPlotLog(WQPlot):
-  def preamble(self, file):
-    WQPlot.preamble(self, file)
-    pout(file, 'set logscale y')
-    pout(file, '')
+    def preamble(self, file):
+        WQPlot.preamble(self, file)
+        pout(file, 'set logscale y')
+        pout(file, '')
 
 def show_usage():
-  print '%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
-  print '\t-h\t\t\tThis message.'
-  print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
-  print '\t\t\t\tDefault is gnuplot.'
-  print '\t-o <prefix-output>\tGenerate prefix-output.{time,time-log,tasks,tasks-log}.%s.' % (format,)
-  print '\t\t\t\tDefault is <work-queue-log>.'
-  print '\t-r <range>\t\tRange of time to plot, in time units (see -u) from'
-  print '\t\t\t\tthe start of execution. Of the form: min:max, min:, or :max.'
-  print '\t-T <output-format>\tSet output format. Default is png.'
-  print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
-  print '\t-u <time-unit>\t\tTime scale to output. One of s,m,h or d, for seconds,'
-  print '\t\t\t\tminutes (default), hours or days.'
+    print '%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
+    print '\t-h\t\t\tThis message.'
+    print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
+    print '\t\t\t\tDefault is gnuplot.'
+    print '\t-o <prefix-output>\tGenerate prefix-output.{workers,workers-accum,tasks,tasks-accum,time-master,time-workers,transfer,cores}.%s.' % (format,)
+    print '\t\t\t\tDefault is <work-queue-log>.'
+    print '\t-s <seconds>\t\tSample log every <seconds> (default is %f).\n' % (resolution,)
+    print '\t-r <range>\t\tRange of time to plot, in time units (see -u) from'
+    print '\t\t\t\tthe start of execution. Of the form: min:max, min:, or :max.'
+    print '\t-T <output-format>\tSet output format. Default is png.'
+    print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
+    print '\t-u <time-unit>\t\tTime scale to output. One of s,m,h or d, for seconds,'
+    print '\t\t\t\tminutes (default), hours or days.'
 
 if __name__ == '__main__':
 
-  try:
-    optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:r:T:u:')
-  except getopt.GetoptError as e:
-    sys.stderr.write(str(e) + '\n')
-    show_usage()
-    sys.exit(1)
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:r:s:T:u:')
+    except getopt.GetoptError as e:
+        sys.stderr.write(str(e) + '\n')
+        show_usage()
+        sys.exit(1)
 
-  if len(args) < 1:
-    show_usage()
-    sys.exit(1)
+    if len(args) < 1:
+        show_usage()
+        sys.exit(1)
 
-  logname = args[0]
-  prefix  = logname
+    logname = args[0]
+    prefix  = logname
 
-  for opt, arg in optlist:
-    if   opt == '-c':
-      gnuplot_cmd = arg
-    elif opt == '-o':
-      prefix = arg
-    elif opt == '-h':
-      show_usage()
-      sys.exit(0)
-    elif opt == '-r':
-      x_range = arg
-    elif opt == '-T':
-      if arg == 'text':
-        gnuplot_cmd = 'cat'
-        extension   = format + '.gnuplot'
-      else:
-        format    = arg
-        extension = format
-    elif opt == '-u':
-      if arg in unit_factors:
-        x_units = arg
-      else:
-        sys.stderr.write("Time scale factor '%s' is not valid. Options: s,m,h or d.\n"  % (arg,))
-        exit(1)
+    for opt, arg in optlist:
+        if   opt == '-c':
+            gnuplot_cmd = arg
+        elif opt == '-o':
+            prefix = arg
+        elif opt == '-h':
+            show_usage()
+            sys.exit(0)
+        elif opt == '-r':
+            x_range = arg
+        elif opt == '-s':
+            resolution = float(arg)
+        elif opt == '-T':
+            if arg == 'text':
+                gnuplot_cmd = 'cat'
+                extension   = format + '.gnuplot'
+            else:
+                format    = arg
+                extension = format
+        elif opt == '-u':
+            if arg in unit_factors:
+                x_units = arg
+            else:
+                sys.stderr.write("Time scale factor '%s' is not valid. Options: s,m,h or d.\n"  % (arg,))
+                exit(1)
 
-  try:
-    file        = open(logname)
-    log_entries = read_log_entries(file, read_fields(file))
-    times       = sort_time(log_entries)
-    file.close()
+    try:
+        file        = open(logname)
+        log_entries = read_log_entries(file, read_fields(file))
+        times       = sort_time(log_entries)
+        file.close()
 
-    plot_of_times = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
-        fields = ['timestamp', 'total_transfer_time', 'total_master_time',
-                  'total_send_time', 'total_receive_time'],
-        labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec'])
+        plots = {}
+        plots['workers'] = WQPlot(x_units = x_units, ylabel = 'workers', range = x_range,
+                title = "workers instantaneous counts",
+                fields = ['workers_connected', 'workers_idle', 'workers_busy'],
+                labels = ['connected', 'idle', 'busy'])
 
-    plot_of_times_log = WQPlotLog(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
-        fields = ['timestamp', 'total_transfer_time', 'total_master_time',
-                  'total_send_time', 'total_receive_time', 'total_execute_time'],
-        labels = ['wall time', 'sent+recv', 'master', 'sent', 'rec', 'exec'])
+        plots['workers-accum'] = WQPlot(x_units = x_units, ylabel = 'workers', range = x_range,
+                title = "workers cumulative counts",
+                fields = ['workers_joined', 'workers_removed', 'workers_released', 'workers_fast_aborted', 'workers_idled_out', 'workers_lost'],
+                labels = ['joined', 'removed', 'released', 'fast aborted', 'idled out,', 'lost'])
 
-    plot_of_tasks = WQPlot(x_units = x_units, ylabel = 'number of tasks/workers/cores', range = x_range,
-        fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores'],
-        labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores'])
+        plots['tasks'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+                title = "tasks instantaneous counts",
+                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks', 'capacity_weighted'],
+                labels = ['waiting', 'on workers', 'running', 'with results', 'capacity', 'weighted capacity'])
 
-    plot_of_tasks_log = WQPlotLog(x_units = x_units, ylabel = 'number of tasks/workers/cores', range = x_range,
-        fields =['tasks_running', 'tasks_waiting', 'total_workers_connected', 'workers_busy', 'total_cores', 'total_tasks_complete'],
-        labels = ['tasks running', 'tasks waiting', 'workers connected', 'workers busy', 'cores', 'tasks completed'])
+        plots['tasks-all-capacities'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+                title = "tasks instantaneous capacities",
+                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks', 'capacity_cores', 'capacity_memory', 'capacity_disk'],
+                labels = ['waiting', 'on workers', 'running', 'with results', 'task capacity', 'cores capacity', 'memory capacity', 'disk capacity'])
 
-    plot_of_times.plot(prefix     + '.time.'      + extension)
-    plot_of_times_log.plot(prefix + '.time-log.'  + extension)
-    plot_of_tasks.plot(prefix     + '.tasks.'     + extension)
-    plot_of_tasks_log.plot(prefix + '.tasks-log.' + extension)
+        plots['tasks-accum'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+                title = "tasks cumulative counts",
+                fields = ['tasks_submitted', 'tasks_dispatched', 'tasks_done', 'tasks_failed', 'tasks_cancelled', 'tasks_exhausted_attempts'],
+                labels = ['submitted', 'dispatched', 'done', 'failed', 'cancelled', 'exhausted attempts'])
 
-  except IOError:
-    sys.stderr.write("Could not open file %s\n" % (logname,))
-    sys.exit(1)
+        plots['time-master'] = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
+            title = "cumulative times at the master",
+            fields = ['time_send', 'time_receive', 'time_transfer', 'time_polling', 'time_status_msgs', 'time_application', 'time_master'],
+            labels = ['send', 'receive', 'send+recv', 'master polling', 'master status msgs', 'master external', 'msgs+external+idle'])
+
+        plots['time-workers'] = WQPlot(x_units = x_units, y_units = 'h', ylabel = unit_labels['h'], range = x_range,
+            title = "cumulative times at workers",
+            fields = ['time_execute', 'time_execute_good', 'time_execute_exhaustion'],
+            labels = ['execute', 'execute good', 'execute exhaustion'])
+
+        plots['transfer'] = WQPlot(x_units = x_units, y_units = 'GB', ylabel = 'GB', range = x_range,
+            title = "master data transfer",
+            fields = ['bytes_sent', 'bytes_received', 'bytes_transfered'],
+            labels = ['sent', 'received', 'transfered'])
+
+        for name in plots.keys():
+            plots[name].plot(prefix     + '.' + name + '.' + extension)
+
+    except IOError:
+        sys.stderr.write("Could not open file %s\n" % (logname,))
+        sys.exit(1)
+
+# vim: tabstop=8 shiftwidth=4 softtabstop=4 expandtab shiftround autoindent

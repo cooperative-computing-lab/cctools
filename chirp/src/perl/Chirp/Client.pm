@@ -74,6 +74,11 @@ sub Chirp::Client::new {
 	return $c;
 }
 
+sub DESTROY {
+    my ($self) = @_;
+    chirp_reli_disconnect($self->hostport);
+}
+
 sub __set_tickets {
 	my ($self, $tickets) = @_;
 

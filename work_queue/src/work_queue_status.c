@@ -46,10 +46,14 @@ static char *catalog_host = NULL;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
 static const char *where_expr = "true";
+static int columns = 80;
+
+/* negative columns mean a minimum of abs(value), but the column may expand if
+ * columns available. */
 
 static struct jx_table queue_headers[] = {
-{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 18},
-{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 21},
+{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -18},
+{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -21},
 {"port",          "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
 {"tasks_waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
 {"tasks_running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
@@ -62,13 +66,13 @@ static struct jx_table task_headers[] = {
 {"taskid",       "ID",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
 {"state",        "STATE",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  8},
 {"priority",     "PRIORITY",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
-{"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 24},
-{"command",      "COMMAND", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
+{"host",         "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -24},
+{"command",      "COMMAND", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -30},
 {NULL,NULL,0,0,0}
 };
 
 static struct jx_table worker_headers[] = {
-{"hostname",            "HOST",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 24},
+{"hostname",            "HOST",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -24},
 {"address_port",        "ADDRESS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,16},
 {"total_tasks_complete","COMPLETED",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 9},
 {"total_tasks_running", "RUNNING",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,8},
@@ -76,7 +80,7 @@ static struct jx_table worker_headers[] = {
 };
 
 static struct jx_table workers_able_headers[] = {
-{"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  12},
+{"category",      "CATEGORY",     JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT,  -12},
 {"tasks_running", "RUNNING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"tasks_waiting", "WAITING",      JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 10},
 {"workers_able",  "FIT-WORKERS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 12},
@@ -338,7 +342,7 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 			jproject->u.string_value = branch;
 
 			if(format_mode==FORMAT_TABLE) {
-				jx_table_print(headers,global_catalog[i], stdout);
+				jx_table_print(headers,global_catalog[i], stdout, columns);
 			}
 
 			find_child_relations(spaces + 1,
@@ -359,7 +363,7 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 	int first = 1;
 
 	if(format_mode==FORMAT_TABLE) {
-		jx_table_print_header(headers,stdout);
+		jx_table_print_header(headers,stdout,columns);
 	} else {
 		printf("[\n");
 	}
@@ -377,7 +381,7 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 			if( !temp_my_master || !strcmp(temp_my_master, "127.0.0.1:-1") ) { //this master has no master
 
 				if(!project_name || whole_string_match_regex(jx_lookup_string(global_catalog[i], "project"), project_name)) {
-					jx_table_print(headers,global_catalog[i], stdout);
+					jx_table_print(headers,global_catalog[i], stdout, columns);
 					find_child_relations(1,
 							jx_lookup_string(global_catalog[i], "name"),
 							jx_lookup_integer(global_catalog[i], "port"),
@@ -390,7 +394,7 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 	}
 
 	if(format_mode == FORMAT_TABLE){
-		jx_table_print_footer(headers,stdout);
+		jx_table_print_footer(headers,stdout,columns);
 	} else {
 		printf("\n]\n");
 	}
@@ -431,13 +435,13 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 	}
 
 	if(format_mode==FORMAT_TABLE) {
-		jx_table_print_header(query_header,stdout);
+		jx_table_print_header(query_header,stdout,columns);
 	}
 
 	struct jx_item *i;
 	for(i=jarray->u.items;i;i=i->next) {
 		if(format_mode == FORMAT_TABLE) {
-			jx_table_print(query_header,i->value,stdout);
+			jx_table_print(query_header,i->value,stdout,columns);
 		} else {
 			// XXX need to print the whole array syntax
 			jx_print_stream(i->value,stdout);
@@ -447,7 +451,7 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 	jx_delete(jarray);
 
 	if(format_mode == FORMAT_TABLE) {
-		jx_table_print_footer(query_header,stdout);
+		jx_table_print_footer(query_header,stdout,columns);
 	}
 
 	return EXIT_SUCCESS;
@@ -464,6 +468,14 @@ int main(int argc, char *argv[])
 	work_queue_status_parse_command_line_arguments(argc, argv, &master_host, &master_port, &project_name);
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	char *columns_str = getenv("COLUMNS");
+	if(columns_str) {
+		columns = atoi(columns_str);
+		/* use default of 80 columns when the value of columns_str is suspect. */
+		columns = columns < 1 ? 80 : columns;
+	}
+
 
 	time_t stoptime = time(0) + work_queue_status_timeout;
 

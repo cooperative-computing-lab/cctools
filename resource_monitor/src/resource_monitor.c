@@ -772,7 +772,7 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete */
 
 	if(!samples) {
-		samples = list_create(0);
+		samples = list_create();
 
 		struct peak_cores_sample *zero = malloc(sizeof(struct peak_cores_sample));
 		zero->wall_time = 0;
@@ -1822,7 +1822,7 @@ int main(int argc, char **argv) {
 
 	total_bytes_rx = 0;
 	total_bytes_tx = 0;
-	tx_rx_sizes    = list_create(0);
+	tx_rx_sizes    = list_create();
 
     rmsummary_read_env_vars(resources_limits);
 

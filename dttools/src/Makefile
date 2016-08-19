@@ -48,6 +48,7 @@ SOURCES = \
 	hash_cache.c \
 	hash_table.c \
 	hdfs_library.c \
+	histogram.c \
 	hmac.c \
 	host_disk_info.c \
 	host_memory_info.c \
@@ -57,6 +58,7 @@ SOURCES = \
 	json_aux.c \
 	jx.c \
 	jx_database.c \
+	jx_function.c \
 	jx_match.c \
 	jx_parse.c \
 	jx_print.c \
@@ -130,16 +132,16 @@ HEADERS_PUBLIC = \
 LIBRARIES = libdttools.a
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = catalog_update catalog_server watchdog disk_allocator
+PROGRAMS = catalog_update catalog_server catalog_query watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test
 
 all: $(TARGETS)
 
 libdttools.a: $(OBJECTS)
 
-$(PROGRAMS) $(TEST_PROGRAMS): $(LIBRARIES)
+$(PROGRAMS) $(TEST_PROGRAMS): libdttools.a
 
 auth_globus.o: auth_globus.c
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_GLOBUS_CCFLAGS) $<
@@ -147,11 +149,14 @@ auth_globus.o: auth_globus.c
 auth_test: auth_test.o libdttools.a
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
+catalog_query: catalog_query_tool.o
+	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+
 libforce_halt_enospc.so: libforce_halt_enospc.o
 	$(CCTOOLS_CC) -shared -fPIC $^ -o $@ -ldl
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) auth_test.o
+	rm -f $(OBJECTS) $(TARGETS) *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

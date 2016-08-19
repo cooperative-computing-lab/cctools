@@ -73,17 +73,19 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	struct jx *j;
+	struct jx *custom;
 
 	if(input_file) {
-		j = jx_parse_file(input_file);
-		if(!j) {
+		custom = jx_parse_file(input_file);
+		if(!custom) {
 			fprintf(stderr,"catalog_update: %s does not contain a valid json record!\n",input_file);
 			return 1;
 		}
 	} else {
-		j = jx_object(0);
+		custom = jx_object(0);
 	}
+
+	struct jx *j = jx_object(0);
 
 	struct utsname name;
 	int cpus;
@@ -116,7 +118,9 @@ int main(int argc, char *argv[]) {
 	jx_insert_integer(j,"uptime,",uptime);
 	jx_insert_string(j,"owner",owner);
 
-	char *text = jx_print_string(j);
+	struct jx *merged = jx_merge(j,custom,0);
+
+	char *text = jx_print_string(merged);
 
 	if(catalog_query_send_update(host, text) < 1) {
 		fprintf(stderr, "Unable to send update");

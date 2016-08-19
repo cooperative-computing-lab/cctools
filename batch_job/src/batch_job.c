@@ -77,6 +77,7 @@ struct batch_queue *batch_queue_create(batch_queue_type_t type)
 
 	batch_queue_set_feature(q, "local_job_queue", "yes");
 	batch_queue_set_feature(q, "absolute_path", "yes");
+	batch_queue_set_feature(q, "output_directories", "yes");
 	batch_queue_set_feature(q, "batch_log_name", "%s.batchlog");
 	batch_queue_set_feature(q, "gc_size", "yes");
 

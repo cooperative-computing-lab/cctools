@@ -95,9 +95,6 @@ struct rmsummary *rmsummary_parse_string(const char *str);
 /**  Reads all summaries from filename **/
 struct list *rmsummary_parse_file_multiple(const char *filename);
 
-/**  Reads a single summary from stream. summaries are separated by '#' or '\n'. **/
-struct rmsummary *rmsummary_parse_next(FILE *stream);
-
 struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources);
 struct rmsummary *json_to_rmsummary(struct jx *j);
 
@@ -108,6 +105,7 @@ void rmsummary_read_env_vars(struct rmsummary *s);
 
 void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src);
 
+struct rmsummary *rmsummary_copy(const struct rmsummary *src);
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);

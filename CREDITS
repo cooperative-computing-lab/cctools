@@ -58,13 +58,25 @@ and other items.  In alphabetical order:
 	University of Wisconsin
 	Debugged and deployed ftp_lite.
 
+	Nicholas Hazekamp
+	University of Notre Dame
+	Contributed to the development of resource management in Makeflow
+
 	Jeffrey Hemmes
 	University of Notre Dame
 	Developed support for distributed access control lists.
 
+	Peter Ivie
+	University of Notre Dame
+	Created the DeltaDB system for catalog queries and the Prune preservation system.
+
 	Miron Livny
 	University of Wisconsin
 	Provided excellent strategic and technical advice as my Ph.D. advisor.
+
+	Haiyan Meng
+	University of Notre Dame
+	Created the Umbrella environment specification system.
 
 	Zach Miller
 	University of Wisconsin
@@ -127,6 +139,10 @@ and other items.  In alphabetical order:
 	FZH Hamburg
 	Contributed RFIO driver and Infiniband support for Parrot.
 
+	Tim Shaffer
+	University of Notre Dame
+	Contributed to Parrot, catalog redundancy, and the JX language.
+
 	Igor Sfiligoi, Aureliano Rama, Simone Pagan Griso, Donatella Lucchesi
 	INFN Padova and Fermi National Laboratory
 	Contributed to the Design and implementation of the GROW filesystem.
@@ -140,7 +156,12 @@ and other items.  In alphabetical order:
 	Contributed to Makeflow, Work Queue, Parrot, Chirp, and resource monitoring.
 
 	Li Yu
-	Notre Dame
+	University of Notre Dame
 	Contributed to work queue, makeflow, all-pairs, and SAND.
+
+	Charles Zheng
+	University of Notre Dame
+	Contributed to container integration in Work Queue and Makeflow.
+
 
 Thanks to one and all!

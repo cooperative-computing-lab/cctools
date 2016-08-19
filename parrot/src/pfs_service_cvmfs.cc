@@ -453,8 +453,6 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 		f->cvmfs_options.replace(cern_it1_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT1_KEY_PLACEHOLDER),cern_it1_key_fname);
 	}
 
-	cvmfs_set_log_fn(cvmfs_parrot_logger);
-
 	// Internally, cvmfs will attempt to lock this file,
 	// and then block silently if it cannot run.  Since
 	// we are linked against cvmfs anyhow, we use the same
@@ -479,6 +477,7 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 
 #if LIBCVMFS_VERSION == 1
 	debug(D_CVMFS, "cvmfs_init(%s)", f->cvmfs_options.c_str());
+	cvmfs_set_log_fn(cvmfs_parrot_logger);
 	int rc = cvmfs_init(f->cvmfs_options.c_str());
 
 	if(rc != 0) {
@@ -692,6 +691,7 @@ static void cvmfs_read_config()
 
 	debug(D_CVMFS|D_DEBUG, "Using CVMFS global options: %s", cvmfs_global_options);
 
+	cvmfs_set_log_fn(cvmfs_parrot_logger);
 	const int init_retval = cvmfs_init(cvmfs_global_options);
 	if (init_retval != 0) {
 		debug(D_CVMFS, "ERROR: failed to initialize cvmfs (%d)", init_retval);

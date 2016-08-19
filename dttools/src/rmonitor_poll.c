@@ -454,7 +454,7 @@ int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 		/* add the info to a sorted list per map, by start. Overlaping maps will be merged later. */
 		struct list *infos = hash_table_lookup(maps, info->map_name);
 		if(!infos) {
-			infos = list_create(0);
+			infos = list_create();
 			hash_table_insert(maps, info->map_name, infos);
 		}
 
@@ -723,6 +723,7 @@ char *rmonitor_get_command_line(pid_t pid)
 		if(cmdline[i] == '\0')
 			cmdline[i] = ' ';
 	}
+        fclose(fline);
 
 	return xxstrdup(cmdline);
 }

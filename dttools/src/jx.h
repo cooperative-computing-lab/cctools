@@ -40,9 +40,8 @@ Will create the following output:
 #include <assert.h>
 
 /** JX atomic type.  */
-
 typedef enum {
-	JX_NULL,	/**< null value */
+	JX_NULL = 0,	/**< null value */
 	JX_BOOLEAN,	/**< true or false */
 	JX_INTEGER,	/**< integer value */
 	JX_DOUBLE,	/**< floating point value */
@@ -51,6 +50,8 @@ typedef enum {
 	JX_ARRAY,	/**< array containing values */
 	JX_OBJECT,	/**< object containing key-value pairs */
 	JX_OPERATOR,	/**< operator on multiple values. */
+	JX_FUNCTION,	/**< function to be applied to some values */
+	JX_ERROR,	/**< indicates failed evaluation */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
@@ -95,6 +96,20 @@ struct jx_operator {
 	struct jx *right;
 };
 
+typedef enum {
+	JX_FUNCTION_INVALID = 0,
+	JX_FUNCTION_RANGE,
+	JX_FUNCTION_STR,
+	JX_FUNCTION_FOREACH,
+	JX_FUNCTION_JOIN,
+	JX_FUNCTION_DBG,
+} jx_function_t;
+
+struct jx_function {
+	jx_function_t function;
+	struct jx *arguments;
+};
+
 /** JX value representing any expression type. */
 
 struct jx {
@@ -108,6 +123,8 @@ struct jx {
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
+		struct jx_function func; /**< function of @ref JX_FUNCTION */
+		struct jx *err;  /**< error value of @ref JX_ERROR */
 	} u;
 };
 
@@ -129,9 +146,15 @@ struct jx * jx_string( const char *string_value );
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
 
+/** Create a JX function on the given arguments. @param func The function to be applied. @param args The function arguments. */
+struct jx *jx_function( jx_function_t func, struct jx *args );
+
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );
+
+/** Create a JX_ERROR. @param err The associated data for the error. This object MUST have a string at the "source" key. @return A JX error value, or NULL if "source" is missing. */
+struct jx * jx_error( struct jx *err );
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );
@@ -154,9 +177,15 @@ struct jx_item * jx_item( struct jx *value, struct jx_item *next );
 /** Test an expression's type.  @param j An expression. @param type The desired type. @return True if the expression type matches, false otherwise. */
 int jx_istype( struct jx *j, jx_type_t type );
 
+/** Test an expression for the boolean value TRUE.  @param j An expression to test.  @return True if the expression is boolean and true. */
+int jx_istrue( struct jx *j );
+
 /** Test two expressions for equality. @param j A constant expression. @param k A constant expression. @return True if equal, false if not.
 */
 int jx_equals( struct jx *j, struct jx *k );
+
+/** Get the length of an array. Returns -1 if array is null or not an array. @param array The array to check. */
+int jx_array_length( struct jx *array );
 
 /** Duplicate an expression. @param j An expression. @return A copy of the expression, which must be deleted by @ref jx_delete
 */
@@ -215,6 +244,9 @@ void jx_array_append( struct jx *array, struct jx *value );
 
 /** Get the nth item in an array.  @param array The array to search.  @param nth The index of the desired value. @return The nth element, or NULL if the index is out of bounds. */
 struct jx * jx_array_index( struct jx *j, int nth );
+
+/** Concatenate the given arrays into a single array. The passed arrays are consumed. @param array An array to concatenate. The list of arrays must be terminated by NULL. */
+struct jx *jx_array_concat( struct jx *array, ...);
 
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
@@ -283,5 +315,11 @@ struct jx * jx_iterate_keys(struct jx *j, void **i);
 
 /** Merge an arbitrary number of JX_OBJECTs into a single new one. The constituent objects are not consumed. Objects are merged in the order given, i.e. a key can replace an identical key in a preceding object. The last argument must be NULL to mark the end of the list. @return A merged JX_OBJECT that must be deleted with jx_delete. */
 struct jx *jx_merge(struct jx *j, ...);
+
+/** Get a human-readable name from an error code. @param code The numeric error code to check. */
+const char *jx_error_name(int code);
+
+/** Check if the given JX object has all the required fields for an error. @param j The object to check. */
+int jx_error_valid(struct jx *j);
 
 #endif

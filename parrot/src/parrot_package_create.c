@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <sys/sendfile.h>
 #include <time.h>
+#include <limits.h>
 
 #include "copy_stream.h"
 #include "debug.h"
@@ -22,6 +23,8 @@
 const char *namelist;
 const char *packagepath;
 const char *envlist;
+const char *add_packagepath;
+const char *new_env;
 
 int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry, FILE *special_file);
 
@@ -29,14 +32,20 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 const char *special_path[] = {"var", "sys", "dev", "proc", "net", "misc", "selinux"};
 #define special_path_len (sizeof(special_path))/(sizeof(const char *))
 
+// special files of different runs can have different file sizes.
+const char *special_files[] = {".bash_history"};
+#define special_files_len (sizeof(special_files))/(sizeof(const char *))
+
 mode_t default_dirmode = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH;
 mode_t default_regmode = S_IRWXU | S_IRGRP;
 
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "Use: %s [options] ...\n", cmd);
-	fprintf(stdout, " %-34s The path of the namelist list.\n", "-n,--name-list=<listpath>");
+	fprintf(stdout, " %-34s The path of an existing package.\n", "-a,--add=<packagepath>");
 	fprintf(stdout, " %-34s The path of the environment variable file.\n", "-e,--env-list=<envlist>");
+	fprintf(stdout, " %-34s The relative path of the environment variable file under the package.\n", "   --new-env=<path>");
+	fprintf(stdout, " %-34s The path of the namelist list.\n", "-n,--name-list=<listpath>");
 	fprintf(stdout, " %-34s The path of the package.\n", "-p,--package-path=<packagepath>");
 	fprintf(stdout, " %-34s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	fprintf(stdout, " %-34s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
@@ -177,30 +186,86 @@ int mkpath(const char *path, mode_t mode, int fixed_mode, FILE *special_file) {
 
 
 /*
-preprocess: check whether the environment variable file exists; check whether the list namelist file exists; check whether the package path exists
-create the package directory.
+preprocess: check whether the environment variable file exists;
+check whether the list namelist file exists;
+If add_packagepath is set, check whether the package path exists.
+If packagepath is set, create the package directory.
 */
 int prepare_work()
 {
+	if((!packagepath || !*packagepath) && (!add_packagepath || !*add_packagepath)) {
+		fprintf(stderr, "One of the following two options must be specified: --add and --package-path!\n");
+		return -1;
+	}
+
+	if(packagepath && add_packagepath) {
+		fprintf(stderr, "--add and --package-path can not be used at the same time.\n");
+		fprintf(stderr, "If you want to create a new package, use --package-path.\n");
+		fprintf(stderr, "If you want to add new files into an existing package, use --add.\n");
+		return -1;
+	}
+
+	if(!envlist || !*envlist) {
+		fprintf(stderr, "The --envlist option must be specified and should not be empty!\n");
+		return -1;
+	}
+
 	if(access(envlist, F_OK) == -1) {
 		fprintf(stderr, "The environment variable file (`%s`) does not exist.\n", envlist);
 		return -1;
 	}
+
+	if(!namelist || !*namelist) {
+		fprintf(stderr, "The --namelist option must be specified and should not be empty!\n");
+		return -1;
+	}
+
 	if(access(namelist, F_OK) == -1) {
 		fprintf(stderr, "The namelist file (`%s`) does not exist.\n", namelist);
 		return -1;
 	}
-	if(access(packagepath, F_OK) != -1) {
-		fprintf(stderr, "The package path (`%s`) has already existed, please delete it first or refer to another package path.\n", packagepath);
-		return -1;
+
+	if(add_packagepath) {
+		struct stat st;
+		char p[PATH_MAX];
+		if(stat(add_packagepath, &st) == -1) {
+			if(errno == ENOENT) {
+				fprintf(stderr, "The package path (%s) does not exist!\n", add_packagepath);
+			} else {
+				fprintf(stderr, "stat(`%s`) failed: %s!\n", add_packagepath, strerror(errno));
+			}
+			return -1;
+		}
+		if(!S_ISDIR(st.st_mode)) {
+			fprintf(stderr, "The package path (%s) should be a directory!\n", add_packagepath);
+			return -1;
+		}
+
+		if(!new_env || !*new_env) {
+			fprintf(stderr, "The --new_env option must be specified and should not be empty!\n");
+			return -1;
+		}
+
+		snprintf(p, PATH_MAX, "%s/%s", add_packagepath, new_env);
+		if(access(p, F_OK) != -1) {
+			fprintf(stderr, "--new-env(%s) already exists under the package(%s)!\n", new_env, add_packagepath);
+			return -1;
+		}
 	}
-	char mkdir_cmd[PATH_MAX * 2];
-	if(snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", packagepath) >= 0) {
-		system(mkdir_cmd);
-	}
-	if(access(packagepath, F_OK) != 0) {
-		fprintf(stderr, "mkdir(`%s`) fails: %s\n", packagepath, strerror(errno));
-		return -1;
+
+	if(packagepath) {
+		if(access(packagepath, F_OK) != -1) {
+			fprintf(stderr, "The package path (`%s`) has already existed, please delete it first or refer to another package path.\n", packagepath);
+			return -1;
+		}
+		char mkdir_cmd[PATH_MAX * 2];
+		if(snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", packagepath) >= 0) {
+			system(mkdir_cmd);
+		}
+		if(access(packagepath, F_OK) != 0) {
+			fprintf(stderr, "mkdir(`%s`) fails: %s\n", packagepath, strerror(errno));
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -230,6 +295,25 @@ int is_special_path(const char *path)
 		return 2;
 	else
 		return 0;
+}
+
+int is_special_file(const char *path) {
+	char p[PATH_MAX];
+	char *b;
+	unsigned int i;
+	strcpy(p, path);
+	if(!(b = basename(p))) {
+		fprintf(stderr, "basename(`%s`) failed: %s\n", path, strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	for(i = 0; i < special_files_len; i++){
+		if(strcmp(special_files[i], b) == 0) {
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 /*
@@ -301,12 +385,16 @@ Currently only process DIR REG LINK, all the remaining files are ignored.
 */
 int line_process(const char *path, char *caller, int ignore_direntry, int is_direntry, FILE *special_file)
 {
+	int afs_item = 0;
+	int fullcopy, existance;
+	char new_path[PATH_MAX];
+	struct stat source_stat, target_stat;
+
 	debug(D_DEBUG, "line_process(`%s`) func\n", path);
 	if(strlen(path) == 0) {
 		debug(D_DEBUG, "line_process function: parameter path is null\n");
 		return -1;
 	}
-	int afs_item = 0;
 	switch(is_special_path(path)) {
 	case 1:
 		debug(D_DEBUG, "`%s`: Special path, ignore!\n", path);
@@ -318,9 +406,7 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 	default:
 		break;
 	}
-	int fullcopy, existance;
-	char new_path[PATH_MAX];
-	struct stat source_stat;
+
 	fullcopy = 0;
 	ignore_direntry = 1;
 	if(strcmp(caller,"metadatacopy") == 0) {
@@ -330,39 +416,52 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 		ignore_direntry = 0;
 	}
 
+	if(lstat(path, &source_stat) == -1) {
+		debug(D_DEBUG, "lstat(`%s`) failed: %s!\n", path, strerror(errno));
+		return -1;
+	}
+
 	strcpy(new_path, packagepath);
 	strcat(new_path, path);
 	/* existance: whether this item has existed in the target package. */
 	existance = 0;
 	/* if the item has existed in the target package and the copy degree is `metadatacopy`, it is done! */
 	if(access(new_path, F_OK) == 0) {
+		if(lstat(new_path, &target_stat)) {
+			fprintf(stderr, "lstat(`%s`) failed: %s!\n", new_path, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+
+		if((source_stat.st_mode & S_IFMT) != (target_stat.st_mode & S_IFMT)) {
+			fprintf(stderr, "the file type of %s and %s are different!\n", path, new_path);
+			exit(EXIT_FAILURE);
+		}
+
 		existance = 1;
+
 		if(fullcopy == 0) {
 			debug(D_DEBUG, "`%s`: metadata copy, already exist!\n", path);
 			return 0;
 		}
 	}
 
-	if(lstat(path, &source_stat) == -1) {
-		debug(D_DEBUG, "lstat(`%s`): %s\n", path, strerror(errno));
-		return -1;
-	}
-
 	if(S_ISREG(source_stat.st_mode)) {
 		debug(D_DEBUG, "`%s`: regular file\n", path);
-		if(existance) {
-			/* here, the copy degree must be fullcopy. */
-			struct stat target_stat;
-			if(stat(new_path, &target_stat) == -1) {
-				debug(D_DEBUG, "stat(%s) fails: %s\n", new_path, strerror(errno));
-				return -1;
-			}
+		if(existance) { // the copy degree hrere must be fullcopy.
 			/*
-			Firstly we tried to use use `truncate` system call to change the size of one empty file (`st_size`) and use `st_blocks` to check whether a file
-			is really empty. In normal linux filesystem, the `st_blocks` of one empty file is always 0 even if its size is set to non-zero by truncate.
-			However, we give up truncate finally. Because using truncate system call on an empty file on afs results in the `st_blocks` becomes non-zero.
+			Firstly we tried to use use `truncate` system call to change the size of one
+			empty file (`st_size`) and use `st_blocks` to check whether a file is really
+			empty. In normal linux filesystem, the `st_blocks` of one empty file is always
+			0 even if its size is set to non-zero by truncate.  However, we give up
+			truncate finally. Because using truncate system call on an empty file on afs
+			results in the `st_blocks` becomes non-zero.
 			*/
 			if(target_stat.st_size) {
+				if(!is_special_file(path) && source_stat.st_size != target_stat.st_size) {
+					fprintf(stderr, "the source size is %ld; the target size is %ld.\n", source_stat.st_size, target_stat.st_size);
+					fprintf(stderr, "%s and %s have different file sizes!\n", path, new_path);
+					exit(EXIT_FAILURE);
+				}
 				debug(D_DEBUG, "`%s`: fullcopy exist! pass!\n", path);
 			} else {
 				if(access(new_path, F_OK) == 0) {
@@ -447,6 +546,8 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 	} else if(S_ISLNK(source_stat.st_mode)) {
 		char buf[PATH_MAX], linked_path[PATH_MAX], pathcopy[PATH_MAX], dir_name[PATH_MAX], newbuf[PATH_MAX];
 		int len;
+
+
 		/* first use `readlink` to obtain the target of the symlink. */
 		if ((len = readlink(path, buf, sizeof(buf)-1)) != -1) {
 			buf[len] = '\0';
@@ -492,6 +593,31 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 			relative_path(newbuf, buf, path);
 			strcpy(buf, newbuf);
 		}
+
+		if(!access(new_path, F_OK)) {
+			struct stat st_host, st_pack;
+			if(stat(path, &st_host)) {
+				fprintf(stderr, "stat(`%s`) failed: %s!\n", path, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			if(stat(new_path, &st_pack)) {
+				fprintf(stderr, "stat(`%s`) failed: %s!\n", new_path, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+
+			if((st_host.st_mode & S_IFMT) != (st_pack.st_mode & S_IFMT)) {
+				fprintf(stderr, "the targets of %s and %s have different file types!\n", path, new_path);
+				exit(EXIT_FAILURE);
+			}
+
+			if(!is_special_file(path) && st_host.st_size != st_pack.st_size) {
+				fprintf(stderr, "the targets of %s and %s have different file sizes!\n", path, new_path);
+				exit(EXIT_FAILURE);
+			}
+			debug(D_DEBUG, "%s already links to the right target!\n", new_path);
+			return 0;
+		}
+
 		/* Create the symlink relationship */
 		if(symlink(buf, new_path) == -1) {
 			debug(D_DEBUG, "symlink from `%s` to `%s` create fail, %s\n", new_path, buf, strerror(errno));
@@ -526,29 +652,35 @@ int post_process( ) {
 		}
 	}
 
-	snprintf(new_envlist, PATH_MAX, "%s/%s", packagepath, "env_list");
+	if(!add_packagepath) {
+		snprintf(new_envlist, PATH_MAX, "%s/%s", packagepath, "env_list");
+	} else {
+		snprintf(new_envlist, PATH_MAX, "%s/%s", packagepath, new_env);
+	}
 	if(copy_file_to_file(envlist, new_envlist) == -1) {
 		debug(D_DEBUG, "copy_file_to_file(`%s`) fails.\n", envlist);
 		return -1;
 	}
 
-	snprintf(common_mountlist, PATH_MAX, "%s/%s", packagepath, "common-mountlist");
-	file = fopen(common_mountlist, "w");
-	if(!file) {
-		debug(D_DEBUG, "common-mountlist file `%s` can not be opened.\n", common_mountlist);
-		return -1;
+	if(!add_packagepath) {
+		snprintf(common_mountlist, PATH_MAX, "%s/%s", packagepath, "common-mountlist");
+		file = fopen(common_mountlist, "w");
+		if(!file) {
+			debug(D_DEBUG, "common-mountlist file `%s` can not be opened.\n", common_mountlist);
+			return -1;
+		}
+		if((fputs("/dev /dev\n", file) == EOF) ||
+			(fputs("/misc /misc\n", file) == EOF) ||
+			(fputs("/net /net\n", file) == EOF) ||
+			(fputs("/proc /proc\n", file) == EOF) ||
+			(fputs("/sys /sys\n", file) == EOF) ||
+			(fputs("/var /var\n", file) == EOF) ||
+			(fputs("/selinux /selinux\n", file) == EOF)) {
+				debug(D_DEBUG, "fputs fails: %s\n", strerror(errno));
+				exit(EXIT_FAILURE);
+		}
+		fclose(file);
 	}
-	if((fputs("/dev /dev\n", file) == EOF) ||
-		(fputs("/misc /misc\n", file) == EOF) ||
-		(fputs("/net /net\n", file) == EOF) ||
-		(fputs("/proc /proc\n", file) == EOF) ||
-		(fputs("/sys /sys\n", file) == EOF) ||
-		(fputs("/var /var\n", file) == EOF) ||
-		(fputs("/selinux /selinux\n", file) == EOF)) {
-			debug(D_DEBUG, "fputs fails: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-	}
-	fclose(file);
 
 	fprintf(stdout, "Package Path: %s\nPackage Size: ", packagepath);
 	snprintf(size_cmd, PATH_MAX, "du -hs %s", packagepath);
@@ -579,20 +711,32 @@ int main(int argc, char *argv[])
 
 	signal(SIGCHLD, wait_for_children);
 
+	enum {
+		LONG_OPT_NEW_ENV = UCHAR_MAX+1,
+	};
+
 	static const struct option long_options[] = {
 		{"help", no_argument, 0, 'h'},
+		{"add", required_argument, 0, 'a'},
 		{"name-list", required_argument, 0, 'n'},
 		{"env-list", required_argument, 0, 'e'},
+		{"new-env", required_argument, 0, LONG_OPT_NEW_ENV},
 		{"package-path", required_argument, 0, 'p'},
 		{"debug", required_argument, 0, 'd'},
 		{"debug-file", required_argument, 0, 'o'},
 		{0,0,0,0}
 	};
 
-	while((c=getopt_long(argc, argv, "+hd:o:e:n:p:", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc, argv, "+ha:d:o:e:n:p:", long_options, NULL)) > -1) {
 		switch(c) {
+		case 'a':
+			add_packagepath = optarg;
+			break;
 		case 'e':
 			envlist = optarg;
+			break;
+		case LONG_OPT_NEW_ENV:
+			new_env = optarg;
 			break;
 		case 'n':
 			namelist = optarg;
@@ -620,6 +764,8 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	if(add_packagepath) packagepath = add_packagepath;
+
 	fprintf(stdout, "The packaging process has began ...\nThe start time is: ");
 	print_time();
 
@@ -639,7 +785,7 @@ int main(int argc, char *argv[])
 
 	namelist_file = fdopen(fd, "r");
 	if(!namelist_file) {
-		debug(D_DEBUG, "`sort -u %s` execute fails. fdopen fails: %s\n", packagepath, strerror(errno));
+		debug(D_DEBUG, "`sort -u %s` execute fails. fdopen fails: %s\n", namelist, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 	count = 0;
@@ -654,8 +800,8 @@ int main(int argc, char *argv[])
 			path[path_len] = '\0';
 		} else {
 			caller = "open_object";
+			line[strlen(line) - 1] = '\0';
 			strcpy(path, line);
-			path[strlen(line) - 1] = '\0';
 			path_len = strlen(path);
 		}
 		remove_final_slashes(path);

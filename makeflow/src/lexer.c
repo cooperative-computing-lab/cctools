@@ -529,10 +529,16 @@ struct token *lexer_read_filename(struct lexer *lx)
 struct token *lexer_read_syntax_name(struct lexer *lx)
 {
 	int count;
+
+	char c = lexer_next_peek(lx);
+
 	count = lexer_read_until(lx, SYNTAX_LIMITS);
 
-	if(count < 1)
+	if(count < 1 && c != '.')
 		lexer_report_error(lx, "Expecting a keyword or a variable name.");
+
+	if(c == '.')
+		lexer_read_until(lx, LITERAL_LIMITS);
 
 	return lexer_pack_token(lx, TOKEN_LITERAL);
 }
@@ -1042,6 +1048,36 @@ int lexer_read_variable(struct lexer *lx, struct token *name)
 	return 1;
 }
 
+int lexer_read_directive(struct lexer *lx, struct token *name)
+{
+	lexer_discard_white_space(lx);
+
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_DIRECTIVE));
+	lexer_push_token(lx, name);
+
+	int c;
+
+	lexer_discard_white_space(lx);
+
+	while((c = lexer_next_peek(lx)) != '\n') {
+		if(c == '#') {
+			lexer_discard_comments(lx);
+			lexer_roll_back(lx, 1);	//Recover the newline
+			break;
+		}
+
+		lexer_read_literal(lx);
+		struct token *t = lexer_pack_token(lx, TOKEN_LITERAL);
+		lexer_push_token(lx, t);
+		lexer_discard_white_space(lx);
+	}
+
+	lexer_add_to_lexeme(lx, lexer_next_char(lx));	//Drop the newline
+	lexer_push_token(lx, lexer_pack_token(lx, TOKEN_NEWLINE));
+
+	return 1;
+}
+
 int lexer_read_variable_list(struct lexer * lx)
 {
 	int c;
@@ -1131,12 +1167,16 @@ int lexer_read_syntax_export(struct lexer *lx, struct token *name)
 int lexer_read_syntax_or_variable(struct lexer * lx)
 {
 	lexer_discard_white_space(lx);
+
+	char c = lexer_next_peek(lx);
 	struct token *name = lexer_read_syntax_name(lx);
 
 	if(strcmp("export", name->lexeme) == 0)
 		return lexer_read_syntax_export(lx, name);
 	else if(lexer_unquoted_look_ahead_count(lx, "=") > -1)
 		return lexer_read_variable(lx, name);
+	else if(c == '.')
+		return lexer_read_directive(lx, name);
 	else {
 		lexer_roll_back(lx, strlen(name->lexeme));
 		lexer_report_error(lx, "Unrecognized keyword: %s.", name->lexeme);
@@ -1203,7 +1243,7 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 
 	lx->line_number = line_number;
 	lx->column_number = column_number;
-	lx->column_numbers = list_create(0);
+	lx->column_numbers = list_create();
 
 	lx->stream = NULL;
 	lx->buffer = NULL;
@@ -1215,7 +1255,7 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 	lx->lexeme_size = 0;
 	lx->lexeme_max = BUFFER_CHUNK_SIZE;
 
-	lx->token_queue = list_create(0);
+	lx->token_queue = list_create();
 
 	lx->buffer = calloc(2 * BUFFER_CHUNK_SIZE, sizeof(char));
 	if(!lx->buffer)

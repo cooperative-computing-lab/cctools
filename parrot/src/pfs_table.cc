@@ -156,6 +156,13 @@ void pfs_table::setparrot(int fd, int rfd, struct stat *buf)
 {
 	if (!PARROT_FD(fd))
 		fatal("fd %d is not an open parrotfd", fd);
+
+	if(fd == rfd || (VALID_FD(rfd) && pointers[rfd] == NULL)) {
+		/* do nothing */
+	} else {
+		fatal("setparrot: fd %d rfd %d valid %d ptr %p",fd,rfd,VALID_FD(rfd),pointers[rfd]);
+	}
+
 	assert(fd == rfd || (VALID_FD(rfd) && pointers[rfd] == NULL));
 
 	/* It's possible for another thread to create a native fd which is equal to

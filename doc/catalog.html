@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
 <link rel="stylesheet" type="text/css" href="manual.css">
-<title>Catalog Servers</title>
+<title>Catalog Server User's Manual</title>
 <style type="text/css">
 .command {
     margin: 10px;
@@ -17,17 +17,29 @@
 <body>
 
 <div id="manual">
-<h1>Catalog Servers</h1>
+<h1>Catalog Server User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: 4 May 2016</b></p>
+<h2>Overview</h2>
 
-<p>Catalog servers function as connection points for tools that need to interact remotely. Tools can send free-form updates to a catalog server, and can query catalog servers to find other hosts matching some criteria. Catalog updates are sent via UDP, and the catalog server exposes a JSON interface to view status and make queries.</p>
+<p>
+Catalog servers function as connection points for tools that need to share information and interact remotely.
+Various services and tools send periodic updates to a catalog server to advertise their presence and vital details such as addresses, resources, and performance.
+Tools like <tt>chirp_status</tt> and <tt>work_queue_status</tt> query the server to displays servers that are currently running.
+Catalog updates are sent via UDP, and the catalog server exposes a JSON interface to view status and make queries.
+</p>
 
-<p>To check the status of servers that are available for use,
-consult <a href="http://catalog.cse.nd.edu:9097">Notre Dame's catalog server</a>.
-This web page lists details on all known servers and their locations.</p>
+<p>
+By default, the cctools software makes use of the central catalog server (and backup) at Notre Dame:
+</p>
 
-<p>The default view for a catalog server is a human-readable summary. Machine-readable query output is also available at <tt>http://catalog-server/query.json</tt>. Many parts of cctools make use of a catalog server internally. Chirp servers send regular catalog updates indicating the host system's load, available disk space, cctools version, etc. Work Queue masters also advertise their projects through the catalog. When a worker starts, it can query the catalog to automatically discover a master to contact.</p>
+<table>
+<tr><td>
+<a href=http://catalog.cse.nd.edu:9097>catalog.cse.nd.edu:9097</a>
+<tr><td>
+<a href=http://backup-catalog.cse.nd.edu:9097>backup-catalog.cse.nd.edu:9097</a>
+</table>
+
+<p>The default view for a catalog server is a human-readable HTML summary. Machine-readable data is also available as JSON, text, XML, or ClassAds. Many parts of cctools make use of a catalog server internally. Chirp servers send regular catalog updates indicating the host system's load, available disk space, cctools version, etc. Work Queue masters also advertise their projects through the catalog. When a worker starts, it can query the catalog to automatically discover a master to contact.</p>
 
 <h2 id="specifying">Specifying Catalog Servers<a class="sectionlink" href="#specifying" title="Link to this section.">&#x21d7;</a></h2>
 
@@ -37,14 +49,60 @@ This could be written more verbosely as
 <code>catalog.cse.nd.edu:9097,backup-catalog.cse.nd.edu:9097</code>
 assuming the catalog port was not set in the environment.</p>
 
-<h2 id="updates">Updates<a class="sectionlink" href="#updates" title="Link to this section.">&#x21d7;</a></h2>
+<h2 id="queries">Querying Catalog Servers<a class="sectionlink" href="#queries" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>There are several ways to query a catalog server.  If you are querying
+specifically for Chirp servers or Work Queue applications, then use
+the <tt>chirp_status</tt> or <tt>work_queue_status</tt> tools, which
+query the server and display fields specific for those uses.</p>
+
+<p>To view all kinds of records in raw JSON format, use the
+<tt>catalog_query</tt> tool.  This can be used to simply dump
+all records in JSON format:</p>
+
+<code>catalog_query</code>
+
+<p>Or, use the <tt>--where</tt> option to show only records matching an expression.  (The expression must be quoted to protect it from the shell.)</p>
+
+<p>For example, to show all records of catalog servers:</p>
+
+<code>catalog_query --where 'type=="catalog"'</code>
+
+<p>Or to show all chirp servers with more than 4 cpus:</p>
+
+<code>catalog_query --where 'type=="chirp" && cpus > 4'</code>
+
+<p>When any of these tools are configured with multiple servers, the program will try each in succession until receiving an answer. If no servers give valid responses, the query as a whole fails. The order in which servers are listed sets the initial query order. If a server fails to respond, it will be marked as down before trying the next server in the list. On subsequent queries, servers that were down will not be tried unless every other server is non-responsive. If in this scenario the previously down server answers the query, it will be marked as up again and used with normal priority in future queries.</p>
+
+<h2 id="updates">Updating Catalog Servers<a class="sectionlink" href="#updates" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>When any program is sending catalog updates, it will examine the environment and/or configuration options to get a list of catalog servers in use. Updates are then sent to every server listed. The program will consider it a success if at least one update can be sent successfully. If DNS resolution fails for every catalog server, for example, the program will report a failed update.</p>
 
-<h2 id="queries">Querying Catalog Servers<a class="sectionlink" href="#queries" title="Link to this section.">&#x21d7;</a></h2>
+<p>
+If you are constructing your own service, you can use the <tt>catalog_update</tt> program to construct a custom message and send it to the catalog server.
+To do so, create a file containing a valid JSON object with the desired properties, and then run <tt>catalog_update</tt>.  For example:
+</p>
 
-<p>When a program making catalog queries is configured with multiple servers, the program will try each in succession until receiving an answer. If no servers give valid responses, the query as a whole fails. The order in which servers are listed sets the initial query order. If a server fails to respond, it will be marked as down before trying the next server in the list. On subsequent queries, servers that were down will not be tried unless every other server is non-responsive. If in this scenario the previously down server answers the query, it will be marked as up again and used with normal priority in future queries.</p>
+<code><b>cat > update.json << EOF</b>
+{ "color" : "red", "active" : true, "size": 1200 }
+EOF
+<b>catalog_update --catalog catalog.cse.nd.edu --file update.json</b>
+</code>
 
+<p>
+The <tt>catalog_update</tt> will insert into the object some additional
+basic information about the node, such as the operating system, load average,
+and so forth.  When the update is received at the catalog server the
+name, address, and port of the sender will be automatically overwritten,
+so it is not possible to modify another machine's information.
+</p>
+
+<p>
+These updates must be repeated on a regular basis, typically every 5 minutes,
+in order to keep the catalog up to date.  If an update is not received after
+15 minutes, the entry is removed from the catalog.
+</p>
+ 
 <h2 id="running">Running a Catalog Server<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 <p>You may want to establish your own catalog server.  This can be
 useful for keeping your systems logically distinct from the main storage pool,

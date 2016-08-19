@@ -171,7 +171,7 @@ int dag_to_file_categories(const struct dag *d, FILE * dag_stream, char *(*renam
 		name = n->category->name;
 		ns = hash_table_lookup(nodes_of_category, name);
 		if(!ns) {
-			ns = list_create(0);
+			ns = list_create();
 			hash_table_insert(nodes_of_category, name, (void *) ns);
 		}
 		list_push_tail(ns, n);

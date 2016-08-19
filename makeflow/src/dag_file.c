@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "xxmalloc.h"
 #include "list.h"
+#include "macros.h"
 
 #include <stdlib.h>
 
@@ -18,8 +19,11 @@ struct dag_file * dag_file_create( const char *filename )
 	f->filename = xxstrdup(filename);
 	f->needed_by = list_create();
 	f->created_by = 0;
-	f->ref_count = 0;
+	f->actual_size = 0;
+	f->estimated_size = GIGABYTE;
+	f->reference_count = 0;
 	f->state = DAG_FILE_STATE_UNKNOWN;
+	f->type = DAG_FILE_TYPE_INTERMEDIATE;
 	return f;
 }
 
@@ -46,6 +50,7 @@ const char *dag_file_state_name(dag_file_state_t state)
 	}
 }
 
+/* Returns whether the file is created in the DAG or not */
 int dag_file_is_source( const struct dag_file *f )
 {
 	if(f->created_by)
@@ -54,6 +59,7 @@ int dag_file_is_source( const struct dag_file *f )
 		return 1;
 }
 
+/* Returns whether the file is used in any rule */
 int dag_file_is_sink( const struct dag_file *f )
 {
 	if(list_size(f->needed_by) > 0)
@@ -62,7 +68,7 @@ int dag_file_is_sink( const struct dag_file *f )
 		return 1;
 }
 
-/* Reports is a file is expeced to exist, does not guarantee existence
+/* Reports if a file is expeced to exist, does not guarantee existence
  * if files are altered outside of Makeflow */
 int dag_file_should_exist( const struct dag_file *f )
 {
@@ -74,6 +80,8 @@ int dag_file_should_exist( const struct dag_file *f )
 		return 0;
 }
 
+/* Reports if a file is in the process of being created, downloaded,
+ * or uploaded. As in file in transition */
 int dag_file_in_trans( const struct dag_file *f )
 {
 	if(f->state == DAG_FILE_STATE_EXPECT
@@ -82,6 +90,52 @@ int dag_file_in_trans( const struct dag_file *f )
 		return 1;
 	else
 		return 0;
+}
+
+/* If the file exists, return actual size, else return estimated
+ * size. In the default case that size is 1GB */
+uint64_t dag_file_size( const struct dag_file *f )
+{
+	if(dag_file_should_exist(f))
+		return f->actual_size;
+	return f->estimated_size;
+}
+
+/* Returns the sum of results for dag_file_size for each file
+ * in list. */
+uint64_t dag_file_list_size(struct list *s)
+{
+	struct dag_file *f;
+	uint64_t size = 0;
+	list_first_item(s);
+	while((f = list_next_item(s)))
+		size += dag_file_size(f);
+
+	return size;
+}
+
+/* Returns the sum of results for dag_file_size for each file
+ * in set. */
+uint64_t dag_file_set_size(struct set *s)
+{
+	struct dag_file *f;
+	uint64_t size = 0;
+	set_first_element(s);
+	while((f = set_next_element(s)))
+		size += dag_file_size(f);
+
+	return size;
+}
+
+int dag_file_coexist_files(struct set *s, struct dag_file *f)
+{
+	struct dag_node *n;
+	list_first_item(f->needed_by);
+	while((n = list_next_item(f->needed_by))){
+		if(set_lookup(s, n))
+			return 1;
+	}
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */

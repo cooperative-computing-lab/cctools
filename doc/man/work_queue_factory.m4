@@ -48,6 +48,7 @@ SUBSECTION(Batch Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
 OPTION_TRIPLET(-T,batch-type, type)Batch system type: unix, condor, sge, workqueue, xgrid. (default is unix)
+OPTION_TRIPLET(-B,batch-options, options)Add these options to all batch submit files.
 OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
 OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
 OPTION_PAIR(--workers-per-cycle,workers) Maximum number of new workers per 30 seconds.  ( less than 1 disables limit, default=5)

@@ -51,6 +51,7 @@ See the file COPYING for details.
 
 static int dag_parse(struct dag *d, FILE * dag_stream);
 static int dag_parse_variable(struct lexer *bk, struct dag_node *n);
+static int dag_parse_directive(struct lexer *bk, struct dag_node *n);
 static int dag_parse_node(struct lexer *bk);
 static int dag_parse_syntax(struct lexer *bk);
 static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n);
@@ -240,6 +241,9 @@ static int dag_parse(struct dag *d, FILE *stream)
 		case TOKEN_VARIABLE:
 			dag_parse_variable(bk, NULL);
 			break;
+		case TOKEN_DIRECTIVE:
+			dag_parse_directive(bk, NULL);
+			break;
 		default:
 			lexer_report_error(bk, "Unexpected token. Expected one of NEWLINE, SPACE, SYNTAX, FILES, or VARIABLE, but got: %s\n:", lexer_print_token(t));
 			break;
@@ -255,28 +259,35 @@ static int dag_parse(struct dag *d, FILE *stream)
 	return 1;
 }
 
+static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int nodeid, const char* value)
+{
+	/* If we have never seen this label, then create
+	 * a new category, otherwise retrieve the category. */
+	struct category *category = makeflow_category_lookup_or_create(bk->d, value);
+
+	/* If we are parsing inside a node, make category
+	 * the category of the node, but do not update
+	 * the global task_category. Else, update the
+	 * global task category. */
+	if(n) {
+		n->category = category;
+		debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
+	}
+	else {
+		/* set value of current category */
+		bk->category = category;
+		dag_variable_add_value("CATEGORY", bk->category->mf_variables, nodeid, value);
+	}
+}
+
 //return 1 if name was processed as special variable, 0 otherwise
 static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
 {
-	struct dag *d = bk->d;
 	int   special = 0;
 
 	if(strcmp("CATEGORY", name) == 0 || strcmp("SYMBOL", name) == 0) {
 		special = 1;
-		/* If we have never seen this label, then create
-		 * a new category, otherwise retrieve the category. */
-		struct category *category = makeflow_category_lookup_or_create(d, value);
-
-		/* If we are parsing inside a node, make category
-		 * the category of the node, but do not update
-		 * the global task_category. Else, update the
-		 * global task category. */
-		if(n) {
-			n->category = category;
-			debug(D_MAKEFLOW_PARSER, "Updating category '%s' for rule %d.\n", value, n->nodeid);
-		}
-		else
-			bk->category = category;
+		dag_parse_process_category(bk, n, nodeid, value);
 	}
 	/* else if some other special variable .... */
 	/* ... */
@@ -340,16 +351,12 @@ static int dag_parse_syntax(struct lexer *bk)
 	return 1;
 }
 
-static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
+static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char mode)
 {
 	struct token *t = lexer_next_token(bk);
-	char mode       = t->lexeme[0];            //=, or + (assign or append)
-	lexer_free_token(t);
-
-	t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
 	{
-		lexer_report_error(bk, "Literal variable name expected.");
+		lexer_report_error(bk, "Literal variable name expected. %s\n", lexer_print_token(t));
 	}
 
 	char *name = xxstrdup(t->lexeme);
@@ -397,6 +404,96 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 
 	free(name);
 	free(value);
+
+	return result;
+}
+
+static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
+{
+	struct token *t = lexer_next_token(bk);
+	char mode       = t->lexeme[0];            //=, or + (assign or append)
+	lexer_free_token(t);
+
+	return dag_parse_variable_wmode(bk, n, mode);
+}
+
+static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
+{
+	struct token *t = lexer_next_token(bk);
+	lexer_free_token(t);
+
+
+	t = lexer_next_token(bk);
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Literal directive expected.");
+	}
+
+	char *name = xxstrdup(t->lexeme);
+	lexer_free_token(t);
+
+	int result = 1;
+	if(!strcmp(".SIZE", name)){
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		char *filename = xxstrdup(t->lexeme);
+		lexer_free_token(t);
+
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		char *size = xxstrdup(t->lexeme);
+		lexer_free_token(t);
+
+		struct dag_file *f = NULL;
+		if(filename)
+			f = dag_file_lookup_or_create(bk->d, filename);
+		if(f)
+			f->estimated_size = string_metric_parse(size);
+
+		free(filename);
+		free(size);
+	} else if(!strcmp(".RESOURCE", name)){
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		struct token *t2 = lexer_next_token(bk);
+		if(t2->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
+		}
+
+		if((!strcmp("CORES", t->lexeme)) || (!strcmp("DISK", t->lexeme)) || (!strcmp("MEMORY", t->lexeme))){
+			if(!(string_metric_parse(t2->lexeme) >= 0))
+				lexer_report_error(bk, "Expected numeric value for %s, got: %s\n", t->lexeme, t2->lexeme);
+		} else if(!strcmp("CATEGORY", t->lexeme)){
+			if(!(t2->lexeme))
+				lexer_report_error(bk, "Expected name for CATEGORY");
+		} else {
+			lexer_report_error(bk, "Unsupported .RESOURCE type, got: %s\n", t->lexeme);
+			return 0;
+		}
+
+		lexer_preppend_token(bk, t2);
+		lexer_preppend_token(bk, t);
+
+		dag_parse_variable_wmode(bk, n, '=');
+	} else {
+		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
+		result = 0;
+	}
+
+	free(name);
 
 	return result;
 }
@@ -498,6 +595,9 @@ static int dag_parse_node(struct lexer *bk)
 		switch (t->type) {
 		case TOKEN_VARIABLE:
 			dag_parse_variable(bk, n);
+			break;
+		case TOKEN_DIRECTIVE:
+			dag_parse_directive(bk, n);
 			break;
 		default:
 			lexer_report_error(bk, "Expected COMMAND or VARIABLE, got: %s", lexer_print_token(t));

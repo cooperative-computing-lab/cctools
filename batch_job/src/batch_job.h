@@ -56,6 +56,7 @@ struct batch_job_info {
 	int exited_normally; /**< Non-zero if the job ran to completion, zero otherwise. */
 	int exit_code;       /**< The result code of the job, if it exited normally. */
 	int exit_signal;     /**< The signal by which the job was killed, if it exited abnormally. */
+	int disk_allocation_exhausted; /**< Non-zero if the job filled its loop device allocation to capacity, zero otherwise */
 };
 
 /** Create a new batch queue.

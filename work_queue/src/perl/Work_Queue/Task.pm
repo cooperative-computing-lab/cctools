@@ -37,14 +37,15 @@ sub DESTROY {
 sub _determine_file_flags {
 	my ($flags, $cache) = @_;
 
-	$flags //= $WORK_QUEUE_CACHE;
-	if($cache) {
-	$flags |= $WORK_QUEUE_CACHE;
-	} else {
-	$flags &= ~$WORK_QUEUE_CACHE;
-	}
+	# flags overrides cache, always.
+	# cache by default if both undefined.
+	return $flags if defined $flags;
 
-	return $flags;
+	return $WORK_QUEUE_CACHE unless defined $cache;
+
+	return $WORK_QUEUE_CACHE if $cache;
+
+	return $WORK_QUEUE_NOCACHE if $cache;
 }
 
 sub specify_tag {
@@ -110,7 +111,7 @@ sub specify_file_piece {
 	$args{end_byte}    //= 0;
 	$args{type}        //= $WORK_QUEUE_INPUT;
 	$args{cache}       //= 1;
-	$args{flags}         = _determine_file_flags($args{flags});
+	$args{flags}         = _determine_file_flags($args{flags}, $args{cache});
 
 	return work_queue_task_specify_file_piece($self->{_task},
 						  $args{local_name},

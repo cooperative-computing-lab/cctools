@@ -36,7 +36,7 @@ fi
 
 # `git archive` (man gitattributes(5)) fills this in, otherwise we do it manually...
 COMMIT='$Format:%H$'
-if [ "$(substr "$COMMIT" 1 1)" = '$' ]; then
+if [ "$(expr substr "$COMMIT" 1 1)" = '$' ]; then
 	if [ "$GIT" = y ]; then
 		COMMIT="$(git rev-parse HEAD)"
 	else
@@ -54,7 +54,7 @@ fi
 
 # The date is the commit date of the commit, or now if the working tree is dirty.
 DATE='$Format:%ci$'
-if [ "$(substr "$DATE" 1 1)" = '$' ]; then
+if [ "$(expr substr "$DATE" 1 1)" = '$' ]; then
 	if [ "$GIT" = y ]; then
 		DATE="$(git log -1 --pretty=format:%ci HEAD)"
 	else
@@ -72,7 +72,7 @@ elif [ -n "$CCTOOLS_BRANCH" ]; then
 	BRANCH="$CCTOOLS_BRANCH"
 else
 	BRANCH='$Format:%d$'
-	if [ "$(substr "$BRANCH" 1 1)" = '$' ]; then
+	if [ "$(expr substr "$BRANCH" 1 1)" = '$' ]; then
 		if [ "$GIT" = y ]; then
 			BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 		else
@@ -95,7 +95,7 @@ else
 	fi
 fi
 
-SOURCE="${BRANCH}:$(substr "$COMMIT" 1 8)${DIRTY}"
+SOURCE="${BRANCH}:$(expr substr "$COMMIT" 1 8)${DIRTY}"
 VERSION="$MAJOR.$MINOR.$MICRO [${SOURCE}]"
 
 # Bourne shell is tricky when you use backtick command substitution backslash
@@ -138,18 +138,18 @@ case "$BUILD_CPU" in
 	;;
 esac
 
-include_package_apps="apps"
-include_package_sand="sand"
 include_package_allpairs="allpairs"
-include_package_wavefront="wavefront"
-include_package_makeflow="makeflow"
-include_package_ftplite="ftp_lite"
+include_package_apps="apps"
 include_package_chirp="chirp"
-include_package_weaver="weaver"
-include_package_umbrella="umbrella"
-include_package_doc="doc"
-include_package_prune="prune"
 include_package_deltadb="deltadb"
+include_package_doc="doc"
+include_package_ftplite="ftp_lite"
+include_package_makeflow="makeflow"
+include_package_prune="prune"
+include_package_sand="sand"
+include_package_umbrella="umbrella"
+include_package_wavefront="wavefront"
+include_package_weaver="weaver"
 
 swig_bindings=""
 
@@ -181,22 +181,23 @@ fi
 
 install_path="$HOME/cctools"
 
-readline_path="/usr"
-globus_path="/usr"
+cvmfs_path="/usr"
 fuse_path="/usr"
+globus_path="/usr"
 irods_path="/usr"
 mysql_path="/usr"
+openssl_path="/usr"
 perl_path="/usr"
 python_path="/usr"
 python3_path="/usr"
-xrootd_path="/usr"
-cvmfs_path="/usr"
-uuid_path="/usr"
-zlib_path="/usr"
+readline_path="/usr"
 swig_path="/usr"
+uuid_path="/usr"
+xrootd_path="/usr"
+zlib_path="/usr"
 
-xrootd_arch=auto
 globus_flavor=auto
+xrootd_arch=auto
 
 ccompiler=gcc
 cxxcompiler=g++
@@ -204,19 +205,21 @@ cxxcompiler=g++
 ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
 c_only_flags="-std=c99"
 
-config_readline_path=auto
-config_globus_path=auto
+config_zlib_path=yes
+
 config_fuse_path=auto
 config_mysql_path=auto
 config_perl_path=auto
 config_python_path=auto
 config_python3_path=auto
-config_zlib_path=yes
+config_readline_path=auto
+config_swig_path=auto
 
+config_cvmfs_path=no
+config_globus_path=no
+config_openssl_path=no
 config_irods_path=no
 config_xrootd_path=no
-config_cvmfs_path=no
-config_swig_path=auto
 
 while [ $# -gt 0 ]
 do
@@ -263,59 +266,102 @@ do
 				sge_parameters="${sge_parameters}\n\#$ ${arg}"
 			fi
 			;;
-		--with-globus-path)
-			globus_path=${arg}
-			config_globus_path=yes
-			;;
-		--globus-flavor)
-			globus_flavor=${arg}
-			;;
-		--with-readline-path)
-			readline_path=${arg}
-			config_readline_path=yes
+		--with-cvmfs-path)
+			cvmfs_path=${arg}
+			config_cvmfs_path=yes
 			;;
 		--with-fuse-path)
 			fuse_path=${arg}
 			config_fuse_path=yes
 			;;
+		--with-globus-path)
+			globus_path=${arg}
+			if [ "$globus_path" = 'no' ];
+			then
+				config_globus_path=no
+			else
+				config_globus_path=yes
+			fi
+			;;
+		--globus-flavor)
+			globus_flavor=${arg}
+			;;
 		--with-irods-path)
 			irods_path=${arg}
-			config_irods_path=yes
+			if [ "$irods_path" = 'no' ];
+			then
+				config_irods_path=no
+			else
+				config_irods_path=yes
+			fi
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
-			config_mysql_path=yes
+			if [ "$mysql_path" = 'no' ];
+			then
+				config_mysql_path=no
+			else
+				config_mysql_path=yes
+			fi
+			;;
+		--with-openssl-path)
+			openssl_path=${arg}
+			if [ "$openssl_path" = 'no' ];
+			then
+				config_openssl_path=no
+			else
+				config_openssl_path=yes
+			fi
 			;;
 		--with-perl-path)
 			perl_path=${arg}
-			config_perl_path=yes
+			if [ "$perl_path" = 'no' ];
+			then
+				config_perl_path=no
+			else
+				config_perl_path=yes
+			fi
 			;;
 		--with-python-path)
 			python_path=${arg}
-			config_python_path=yes
+			if [ "$python_path" = 'no' ];
+			then
+				config_python_path=no
+			else
+				config_python_path=yes
+			fi
 			;;
 		--with-python3-path)
 			python3_path=${arg}
-			config_python3_path=yes
+			if [ "$python3_path" = 'no' ];
+			then
+				config_python3_path=no
+			else
+				config_python3_path=yes
+			fi
+			;;
+		--with-readline-path)
+			readline_path=${arg}
+			config_readline_path=yes
+			;;
+		--with-swig-path)
+			swig_path=${arg}
+			config_swig_path=yes
+			;;
+		--with-uuid-path)
+			uuid_path=${arg}
 			;;
 		--with-xrootd-path)
 			xrootd_path=${arg}
 			config_xrootd_path=yes
 			;;
-		--with-cvmfs-path)
-			cvmfs_path=${arg}
-			config_cvmfs_path=yes
-			;;
-		--with-uuid-path)
-			uuid_path=${arg}
-			;;
 		--with-zlib-path)
 			zlib_path=${arg}
-			config_zlib_path=yes
-			;;
-		--with-swig-path)
-			swig_path=${arg}
-			config_swig_path=yes
+			if [ "$zlib_path" = 'no' ];
+			then
+				echo "*** zlib is not optional"
+				exit 1
+			fi
 			;;
 		--without-system-sand)
 			include_package_sand=""
@@ -542,6 +588,7 @@ echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --glo
 
 if [ $config_globus_path != no ]
 then
+	config_openssl_path=yes
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
 		ccflags="${ccflags} -DHAS_GLOBUS_GSS"
@@ -685,6 +732,10 @@ then
 	then
 		ccflags="${ccflags} -DHAS_MYSQL_MYSQL_H"
 	fi
+
+	# When mysql is enabled, we also need ssl
+	config_openssl_path=auto
+
 else
 	if [ $config_mysql_path = yes ]
 	then
@@ -737,6 +788,8 @@ fi
 
 if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
 then
+	config_openssl_path=yes
+
 	ccflags="${ccflags} -DHAS_CVMFS"
 	cvmfs_ccflags="-I${cvmfs_path}/include"
 
@@ -1174,8 +1227,25 @@ library_search_standard()
 	fi
 }
 
-library_search_standard ssl /usr
-library_search_standard crypto /usr
+
+if [ $config_openssl_path != no ]
+then
+	if ! library_search_standard ssl $openssl_path
+	then
+		echo "*** Couldn't find libssl"
+		echo "*** Check --with-openssl-path and try again."
+		exit 1
+	fi
+
+	if ! library_search_standard crypto $openssl_path
+	then
+		echo "*** Couldn't find libcrypto"
+		echo "*** Check --with-openssl-path and try again."
+		exit 1
+	fi
+fi
+
+# from glibc:
 library_search_standard resolv /usr
 library_search_standard socket /usr
 library_search_standard nsl /usr
@@ -1453,6 +1523,7 @@ CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
 
 CCTOOLS_GLOBUS_LDFLAGS=${globus_ldflags}
 CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}
+
 export CCTOOLS_TEST_CCFLAGS=${test_ccflags}
 EOF
 

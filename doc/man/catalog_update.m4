@@ -17,13 +17,17 @@ SECTION(OPTIONS)
 
 OPTIONS_BEGIN
 OPTION_TRIPLET(-c, catalog, host)Send update to this catalog host.
+OPTION_TRIPLET(-f, file, json-file) Send additional JSON attributes in this file.
+OPTION_TRIPLET(-d, debug, flags) Enable debug flags.
+OPTION_TRIPLET(-o, debug-file, file) Send debug output to this file.
+OPTION_PAIR(-v,version) Show software version.
+OPTION_PAIR(-h, help) Show all options.
 
 PARA
-The CODE(catalog_update) tool also accepts a list of CODE(name)/CODE(value)
-pairs that will be sent to the catalog server as field entries.
-
-By default, the CODE(catalog_update) tool includes the following field entries
-in its update packet:
+The CODE(catalog_update) tool sends a custom message to the catalog
+server in the from of a JSON object with various properties describing
+the host.  By default, the CODE(catalog_update) tool includes the following
+fields in the update:
 
 LIST_BEGIN
 LIST_ITEM(CODE(BOLD(type)) This describes the node type (default is "node").)
@@ -55,12 +59,17 @@ SECTION(EXAMPLES)
 PARA
 
 The following example sends an update to the catalog server located at
-CODE(catalog.cse.nd.edu) with the fields CODE(type) set to "node", CODE(name) set
-to "testnode00", and CODE(has_java) set to "yes".  These fields can be queried
-from the catalog server by clients using CODE(chirp_status).
+CODE(catalog.cse.nd.edu) with three custom fields.
 
 LONGCODE_BEGIN
-catalog_update -c catalog.cse.nd.edu type=node name=testnode00 has_java=yes
+% cat > test.json << EOF
+{
+    "type" : "node",
+    "has_java" : true,
+    "mode" : 3
+}
+EOF
+% catalog_update -c catalog.cse.nd.edu -f test.json
 LONGCODE_END
 
 SECTION(COPYRIGHT)

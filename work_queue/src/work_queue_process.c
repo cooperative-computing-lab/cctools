@@ -68,13 +68,15 @@ struct work_queue_process *work_queue_process_create(struct work_queue_task *wq_
 	struct work_queue_process *p = malloc(sizeof(*p));
 	memset(p, 0, sizeof(*p));
 	p->task = wq_task;
+	p->task->disk_allocation_exhausted = 0;
 	//placeholder filesystem until permanent solution
 	char *fs = "ext2";
 
 	if(disk_allocation == 1) {
-	work_queue_process_compute_disk_needed(p);
-		if(p->disk > 0) {
-			int64_t size = (p->disk) * 1024;
+		work_queue_process_compute_disk_needed(p);
+		if(p->task->resources_requested->disk > 0) {
+			int64_t size = (p->task->resources_requested->disk) * 1024;
+			p->sandbox = string_format("t.%d", p->task->taskid);
 
 			if(disk_alloc_create(p->sandbox, fs, size) == 0) {
 				p->loop_mount = 1;
@@ -206,6 +208,14 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 	if(p->output_fd == -1) {
 		debug(D_WQ, "Could not open worker stdout: %s", strerror(errno));
 		return 0;
+	}
+
+	if(p->loop_mount) {
+		char *buf = malloc(PATH_MAX);
+		char *pwd = getcwd(buf, PATH_MAX);
+		char *filename = work_queue_generate_disk_alloc_full_filename(pwd, p->task->taskid);
+		p->task->command_line = string_format("export CCTOOLS_DISK_ALLOC=%s; %s", filename, p->task->command_line);
+		free(buf);
 	}
 
 	p->execution_start = timestamp_get();

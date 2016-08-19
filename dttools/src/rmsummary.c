@@ -275,6 +275,9 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->gpus;
 	}
 
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
+
 	return 0;
 }
 
@@ -294,6 +297,8 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 	if(strcmp(key, "task_id") == 0) {
 		return s->task_id;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return NULL;
 }
@@ -404,6 +409,8 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+
 	return 0;
 }
 
@@ -416,6 +423,8 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 		s->peak_times = json_to_rmsummary(value);
 		return 1;
 	}
+
+	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return 0;
 }
@@ -607,8 +616,14 @@ struct rmsummary *rmsummary_parse_file_single(const char *filename)
 		return NULL;
 	}
 
-	struct rmsummary *s = rmsummary_parse_next(stream);
+	struct jx *j = jx_parse_stream(stream);
 	fclose(stream);
+
+	if(!j)
+		return NULL;
+
+	struct rmsummary *s = json_to_rmsummary(j);
+	jx_delete(j);
 
 	return s;
 }
@@ -641,18 +656,28 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 		return NULL;
 	}
 
-	struct list      *lst = list_create(0);
+	struct jx_parser *p = jx_parser_create(0);
+	jx_parser_read_stream(p, stream);
+
+	struct list      *lst = list_create();
 	struct rmsummary *s;
 
 	do
 	{
-		s = rmsummary_parse_next(stream);
+		struct jx *j = jx_parser_yield(p);
+
+		if(!j)
+			break;
+
+		s = json_to_rmsummary(j);
+		jx_delete(j);
 
 		if(s)
 			list_push_tail(lst, s);
 	} while(s);
 
 	fclose(stream);
+	jx_parser_delete(p);
 
 	return lst;
 }
@@ -661,7 +686,6 @@ struct list *rmsummary_parse_file_multiple(const char *filename)
 struct rmsummary *rmsummary_parse_next(FILE *stream)
 {
 	struct jx *j = jx_parse_stream(stream);
-
 	if(!j)
 		return NULL;
 
@@ -826,6 +850,37 @@ void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *sr
 	}
 
 	rmsummary_bin_op(dest, src, override_field);
+}
+
+struct rmsummary *rmsummary_copy(const struct rmsummary *src)
+{
+	struct rmsummary *dest = rmsummary_create(-1);
+
+	if(src) {
+		memcpy(dest, src, sizeof(*dest));
+
+		if(src->command) {
+			dest->command = xxstrdup(src->command);
+		}
+
+		if(src->category) {
+			dest->category = xxstrdup(src->category);
+		}
+
+		if(src->task_id) {
+			dest->task_id = xxstrdup(src->task_id);
+		}
+
+		if(src->limits_exceeded) {
+			dest->limits_exceeded = rmsummary_copy(src->limits_exceeded);
+		}
+
+		if(src->peak_times) {
+			dest->peak_times = rmsummary_copy(src->peak_times);
+		}
+	}
+
+	return dest;
 }
 
 /* only update limit when new field value is larger than old, regardless of old

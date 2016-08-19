@@ -30,8 +30,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
 
-	n->source_files = list_create(0);
-	n->target_files = list_create(0);
+	n->source_files = list_create();
+	n->target_files = list_create();
 
 	n->remote_names = itable_create(0);
 	n->remote_names_inv = hash_table_create(0, 0);
@@ -200,7 +200,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 	/* register this file as a requirement of the node */
 	list_push_head(source->needed_by, n);
 
-	source->ref_count++;
+	source->reference_count++;
 }
 
 /* Adds the local name as a target of the node, and register the

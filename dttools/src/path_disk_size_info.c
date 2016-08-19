@@ -55,7 +55,7 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 
 		if((here->dir = opendir(path))) {
 			here->name = xxstrdup(path);
-			s->current_dirs = list_create(0);
+			s->current_dirs = list_create();
 			s->size_so_far  = 0;
 			s->count_so_far = 1;                     /* count the root directory */
 			list_push_tail(s->current_dirs, here);

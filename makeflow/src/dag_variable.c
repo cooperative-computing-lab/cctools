@@ -109,6 +109,8 @@ void dag_variable_add_value(const char *name, struct hash_table *current_table, 
 	{
 		var->count++;
 		var->values = realloc(var->values, var->count * sizeof(struct dag_variable_value *));
+	} else {
+		dag_variable_value_free(var->values[var->count-1]);
 	}
 
 	//possible memory leak...

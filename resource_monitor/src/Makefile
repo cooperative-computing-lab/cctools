@@ -5,8 +5,8 @@ include ../../rules.mk
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
-OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o rmon_tools.o rmonitor_helper.o
-PROGRAMS = resource_monitor resource_monitor_cluster resource_monitor_histograms piggybacker rmonitor_poll_example
+OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
+PROGRAMS = resource_monitor resource_monitor_histograms piggybacker rmonitor_poll_example
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 all: $(TARGETS)
@@ -20,10 +20,10 @@ rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
 resource_monitor.o resource_monitor_pb.o: rmonitor_piggyback.h
 resource_monitor: rmonitor_helper_comm.o
 
-resource_monitor_histograms.o resource_monitor_cluster.o rmon_tools.o: %.o: %.c
+resource_monitor_histograms.o resource_monitor_cluster.o resource_monitor_tools.o: %.o: %.c
 	$(CCTOOLS_CC) -fopenmp -g -O3 -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $<
 
-resource_monitor_histograms resource_monitor_cluster: %: rmon_tools.o %.o
+resource_monitor_histograms resource_monitor_cluster: %: resource_monitor_tools.o %.o
 	$(CCTOOLS_LD) -fopenmp -g -O3 -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 rmonitor_poll_example: rmonitor_poll_example.o
@@ -37,7 +37,7 @@ resource_monitor: resource_monitor_pb.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 clean:
-	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) resource_monitor_pb.* rmonitor_piggyback.h*
+	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) resource_monitor_pb.* rmonitor_piggyback.h* *.o
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin

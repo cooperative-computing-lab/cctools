@@ -66,7 +66,7 @@ install: all install-bindings
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 
 clean: clean-bindings
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) sge_submit_workers
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS) *.o sge_submit_workers
 
 test: all
 

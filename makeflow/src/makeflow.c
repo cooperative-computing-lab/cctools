@@ -313,7 +313,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		p = f1->created_by;
 		if(p) {
 			makeflow_node_force_rerun(rerun_table, d, p);
-			f1->ref_count += 1;
+			f1->reference_count += 1;
 		}
 	}
 
@@ -486,7 +486,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
-	command = makeflow_wrap_monitor(command, n, monitor);
+	command = makeflow_wrap_monitor(command, n, queue, monitor);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -607,6 +607,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 		else {
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
+			f->actual_size = buf.st_size;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
@@ -631,7 +632,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
 */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_job_info *info)
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job_info *info)
 {
 	struct dag_file *f;
 	int job_failed = 0;
@@ -642,7 +643,13 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
-		char *log_name_prefix = string_replace_percents(monitor->log_prefix, nodeid);
+		char *output_prefix = NULL;
+ 		if(batch_queue_supports_feature(queue, "output_directories") || n->local_job) {
+			output_prefix = xxstrdup(monitor->log_prefix);
+		} else {
+			output_prefix = xxstrdup(path_basename(monitor->log_prefix));
+		}
+		char *log_name_prefix = string_replace_percents(output_prefix, nodeid);
 		char *summary_name = string_format("%s.summary", log_name_prefix);
 
 		if(n->resources_measured)
@@ -651,6 +658,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 		category_accumulate_summary(n->category, n->resources_measured, NULL);
 
+		makeflow_monitor_move_output_if_needed(n, queue, monitor);
+
 		free(nodeid);
 		free(log_name_prefix);
 		free(summary_name);
@@ -658,7 +667,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor);
 
-	if(info->exited_normally && info->exit_code == 0) {
+
+	if(info->disk_allocation_exhausted) {
+		job_failed = 1;
+	}
+	else if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
 			if(!makeflow_node_check_file_was_created(n, f))
@@ -685,6 +698,25 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_clean_file(d, remote_queue, f, 1);
 			} else {
 				makeflow_clean_file(d, remote_queue, f, 0);
+			}
+		}
+
+		if(info->disk_allocation_exhausted) {
+			fprintf(stderr, "\nrule %d failed because it exceeded its loop device allocation capacity.\n", n->nodeid);
+			if(n->resources_measured)
+			{
+				rmsummary_print(stderr, n->resources_measured, /* pprint */ 0, /* extra fields */ NULL);
+				fprintf(stderr, "\n");
+			}
+
+			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
+
+			if(next != CATEGORY_ALLOCATION_ERROR) {
+				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
+				n->resource_request = next;
+				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
+				if(monitor) { monitor_retried = 1; }
 			}
 		}
 
@@ -724,12 +756,16 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_failed_flag = 1;
 			}
 		}
+		else
+		{
+			makeflow_failed_flag = 1;
+		}
 	} else {
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
-			f->ref_count+= -1;
-			if(f->ref_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
+			f->reference_count+= -1;
+			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
@@ -856,7 +892,7 @@ static void makeflow_run( struct dag *d )
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
 				if(n)
-					makeflow_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, remote_queue, &info);
 			}
 		}
 
@@ -875,7 +911,7 @@ static void makeflow_run( struct dag *d )
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
-					makeflow_node_complete(d, n, &info);
+					makeflow_node_complete(d, n, local_queue, &info);
 			}
 		}
 
@@ -971,7 +1007,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Change directory: chdir to enable executing the Makefile in other directory.\n", "-X,--change-directory");
 	printf(" %-30s Force failure on zero-length output files \n", "-z,--zero-length-error");
 	printf(" %-30s Select port at random and write it to this file.\n", "-Z,--port-file=<file>");
-	printf(" %-30s Disable Work Queue caching.				 (default is false)\n", "   --disable-wq-cache");
+	printf(" %-30s Disable batch system caching.				 (default is false)\n", "   --disable-cache");
 	printf(" %-30s Add node id symbol tags in the makeflow log.		(default is false)\n", "   --log-verbose");
 	printf(" %-30s Run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
@@ -1573,21 +1609,6 @@ int main(int argc, char *argv[])
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
 	}
 
-	if(monitor) {
-		if(!log_dir)
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
-
-		if(!log_format)
-			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
-
-		if(monitor->interval < 1)
-			fatal("Monitoring interval should be positive.");
-
-		makeflow_prepare_for_monitoring(monitor, remote_queue, log_dir, log_format);
-		free(log_dir);
-		free(log_format);
-	}
-
 	makeflow_parse_input_outputs(d);
 	makeflow_prepare_nested_jobs(d);
 
@@ -1608,6 +1629,21 @@ int main(int argc, char *argv[])
 	setlinebuf(stderr);
 
 	makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check );
+
+	if(monitor) {
+		if(!log_dir)
+			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
+
+		if(!log_format)
+			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
+
+		if(monitor->interval < 1)
+			fatal("Monitoring interval should be positive.");
+
+		makeflow_prepare_for_monitoring(d, monitor, remote_queue, log_dir, log_format);
+		free(log_dir);
+		free(log_format);
+	}
 
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
