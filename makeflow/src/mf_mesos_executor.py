@@ -6,11 +6,13 @@ import logging
 import threading
 import subprocess
 
+sys.path.insert(0, sys.argv[4])
+
 from mesos.native import MesosExecutorDriver
 from mesos.interface import Executor
 from mesos.interface import mesos_pb2
 
-logging.basicConfig(filename=('{}.log'.format(sys.argv[2])), level=logging.INFO)
+logging.basicConfig(filename=('{0}.log'.format(sys.argv[2])), level=logging.INFO)
 
 class MakeflowMesosExecutor(Executor):
 
@@ -20,16 +22,16 @@ class MakeflowMesosExecutor(Executor):
         self.framework_id = framework_id
 
     def registered(self, driver, executorInfo, frameworkInfo, slaveInfo):
-        driver.sendFrameworkMessage("[EXUT_STATE] {} registered {} {}".format(\
+        driver.sendFrameworkMessage("[EXUT_STATE] {0} registered {1} {2}".format(\
                 self.executor_id, slaveInfo.hostname, slaveInfo.port))
         self.hostname = slaveInfo.hostname
         self.port = slaveInfo.port
 
     def disconnected(self, driver):
-        driver.sendFrameworkMessage("[EXUT_STATE] {} {} disconnected".format(self.executor_id, self.task_id))
+        driver.sendFrameworkMessage("[EXUT_STATE] {0} {1} disconnected".format(self.executor_id, self.task_id))
 
     def get_sandbox_dir(self):
-        slave_state_uri = "http://{}:{}/state.json".format(self.hostname, self.port)
+        slave_state_uri = "http://{0}:{1}/state.json".format(self.hostname, self.port)
 
         slave_state = json.load(urllib2.urlopen(slave_state_uri))
         executors_data = slave_state['frameworks'][0]['executors']
@@ -49,8 +51,8 @@ class MakeflowMesosExecutor(Executor):
                     if task['id'] == self.task_id:
                         return executor_data['directory']
                 
-                logging.error("Task {} does not appear in the tasks list\
-                        of executor {}.".format(self.task_id, executor_id))
+                logging.error("Task {0} does not appear in the tasks list\
+                        of executor {1}.".format(self.task_id, executor_id))
 
                 return None
 
@@ -79,14 +81,14 @@ class MakeflowMesosExecutor(Executor):
 
             # send the sandbox URI to the scheduler
             sandbox_dir = self.get_sandbox_dir()
-            get_dir_addr = "[EXECUTOR_OUTPUT] http://{}:{}/files/download?path={}".format(self.hostname, self.port, sandbox_dir)
-            print "{}".format(get_dir_addr)
-            task_id_msg = "task_id {}".format(task.task_id.value)
-            message = "{} {}".format(get_dir_addr, task_id_msg) 
-            logging.info("Sending message: {}".format(message))
+            get_dir_addr = "[EXECUTOR_OUTPUT] http://{0}:{1}/files/download?path={2}".format(self.hostname, self.port, sandbox_dir)
+            print "{0}".format(get_dir_addr)
+            task_id_msg = "task_id {0}".format(task.task_id.value)
+            message = "{0} {1}".format(get_dir_addr, task_id_msg) 
+            logging.info("Sending message: {0}".format(message))
             driver.sendFrameworkMessage(message)
             print "Sent output file URI" 
-            driver.sendFrameworkMessage("[EXECUTOR_STATE] {} stopped".format(\
+            driver.sendFrameworkMessage("[EXECUTOR_STATE] {0} stopped".format(\
                     self.executor_id))
             driver.stop()
 
@@ -97,8 +99,8 @@ class MakeflowMesosExecutor(Executor):
     def frameworkMessage(self, driver, message):
         message_list = message.split()
         if message_list[1].strip(' \t\n\r') == "abort":
-            logging.info("task {} aborted".format(self.task_id))
-            driver.sendFrameworkMessage("[EXECUTOR_STATE] {} aborted {}".format(\
+            logging.info("task {0} aborted".format(self.task_id))
+            driver.sendFrameworkMessage("[EXECUTOR_STATE] {0} aborted {1}".format(\
                     self.executor_id, self.task_id))
             driver.stop()
             
