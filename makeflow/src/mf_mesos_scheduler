@@ -5,7 +5,10 @@ import time
 import urllib
 import logging
 import threading
-import mf_mesos_setting as mms
+import imp
+
+setting_module_path = os.path.join(os.getenv('CCTOOLS'), "bin", "mf_mesos_setting")
+mms = imp.load_source("mf_mesos_setting", setting_module_path)
 
 sys.path.insert(0,sys.argv[3])
 
@@ -37,7 +40,7 @@ class MakeflowScheduler(Scheduler):
         executor.framework_id.value = framework_id
         executor.executor_id.value = str(uuid.uuid4())
         cctools_path = os.getenv('CCTOOLS')
-        sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor.in')
+        sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor')
         executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
         executor.source = "python executor"
         executor.command.value = "{0} \"{1}\" {2} {3} {4}".format(sh_path, mf_task.cmd, 
