@@ -7,8 +7,9 @@ LOCAL_LINKAGE=$(CCTOOLS_GLOBUS_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../batch_job/src/libbatch_job.a ../../work_queue/src/libwork_queue.a ../../chirp/src/libchirp.a ../../dttools/src/libdttools.a
 OBJECTS = dag.o dag_node.o dag_file.o dag_variable.o dag_visitors.o dag_resources.o lexer.o parser.o parser_jx.o
-PROGRAMS = makeflow makeflow_viz makeflow_analyze makeflow_linker makeflow_status
-SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch makeflow_linker_perl_driver makeflow_linker_python_driver
+PROGRAMS = makeflow makeflow_viz makeflow_analyze makeflow_linker
+SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch makeflow_linker_perl_driver makeflow_linker_python_driver mf_mesos_scheduler.py \
+		  mf_mesos_executor.py mf_mesos_setting.py mf-mesos-executor.in
 TARGETS = $(PROGRAMS)
 
 all: $(TARGETS)

@@ -1924,8 +1924,12 @@ if (enforcer && wrapper_umbrella) {
 		char *mesos_cwd;
 		mesos_cwd = path_getcwd();
 
+		char *mesos_py = "/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/amd64_linux26/lib/python2.6/site-packages";
 		char *cctools_path = getenv("CCTOOLS");
 		char *exe_py_path = string_format("%s/bin/mf_mesos_scheduler.py", cctools_path);
+		char *envs[] = {"LD_PRELOAD=/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so", "CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", NULL};
+
+		printf("++++++++%s\n", exe_py_path);
 
 		if (mesos_PID > 0) {
 
@@ -1940,7 +1944,8 @@ if (enforcer && wrapper_umbrella) {
 
 			close(mesos_fd);
 
-			execlp("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, (char *) 0);
+			execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_py, (char *) 0, envs);
+
 			_exit(127);
 
 		} else {
