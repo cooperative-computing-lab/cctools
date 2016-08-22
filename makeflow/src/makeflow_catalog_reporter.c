@@ -68,8 +68,5 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type,
     free(host);
     free(text);
     
-    list_free(failed_tasks);
-    list_delete(failed_tasks);
-    
     return resp;//all good
 }
