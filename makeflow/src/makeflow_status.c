@@ -31,25 +31,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 
-/*static struct jx_table headers[] = {
-	{"type", "TYPE", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
-	{"name", "NAME", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -25},
-	{"port", "PORT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 5},
-	{"owner", "OWNER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
-        {"project", "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
-        {"total", "TOTAL", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"aborted", "ABORTED", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"completed", "COMPLETED", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"failed", "FAILED", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"time_started", "TIME_STARTED", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        {"batch_type", "BATCH_TYPE", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
-        
-	{0, 0, 0, 0, 0}
-};*/
-
 static void show_help(const char *cmd)
 {
 	fprintf(stdout, "makeflow_status [options]\n");
@@ -210,7 +191,6 @@ int main(int argc, char** argv) {
     qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
     
     //print them out
-    //printf("Owner      Project    total      running    waiting    aborted    completed  failed     time_started                batch_type   \n");
     printf("%-10s %-10s %-10s %-10s %-10s %-10s %-10s %-10s %-24s %-10s\n",
             "Owner", "Projct", "total", "running", "waiting", "aborted", "completed", "failed", "time_started", "batch_type");
     for(i=0; i<count; i++){
@@ -231,7 +211,6 @@ int main(int argc, char** argv) {
         printf("%-10s %-10s %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-24" PRId64 " %-10s\n",
                 jxowner, jxproject, jxtotal, jxrunning, jxwaiting, jxaborted, jxcompleted, jxfailed, jxtimestart, jxbatchtype);
         
-	//jx_print_stream(table[i],stdout);
     }
     printf("\n");//be polite
     
