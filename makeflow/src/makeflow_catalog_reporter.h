@@ -20,7 +20,7 @@ See the file COPYING for details.
  * @param name the name of the project
  * @return 1 if everything went well, 0 if not
  */
-int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type);
+int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type, timestamp_t start);
 
 
 #endif /* MAKEFLOW_CATALOG_REPORTER_H */
