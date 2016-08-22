@@ -565,7 +565,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Logs the creation of output files. */
 	makeflow_log_file_expectation(d, output_list);
-
+        
 	/* Now submit the actual job, retrying failures as needed. */
 	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
 
