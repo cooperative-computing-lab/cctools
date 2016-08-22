@@ -15,8 +15,9 @@ umbrella: umbrella.py
 	chmod 755 umbrella
 
 umbrella_helper.html: umbrella.py
-	if which pydoc2; then pydoc2 -w umbrella; else pydoc -w umbrella; fi
-	mv umbrella.html umbrella_helper.html
+	# pydoc2/pydoc creates a html file, umbrella.html.
+	if which pydoc2; then pydoc2 -w umbrella; elif which pydoc; then pydoc -w umbrella; fi
+	if [ -f umbrella.html ]; then mv umbrella.html umbrella_helper.html; fi
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
@@ -25,7 +26,7 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp umbrella_helper.html $(CCTOOLS_INSTALL_DIR)/doc/
+	if [ -f umbrella_helper.html ]; then cp umbrella_helper.html $(CCTOOLS_INSTALL_DIR)/doc/; fi
 
 test: all
 
