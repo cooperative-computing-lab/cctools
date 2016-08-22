@@ -3462,35 +3462,42 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 		mountpoint = '/'
 		action = 'unpack'
 
-		if spec_json["os"].has_key("source") or attr_check(item, meta_search(meta_json, item, os_id), "source", 1):
-			if spec_json["os"].has_key("source"):
-				sources = spec_json["os"]["source"]
-			else:
-				sources = meta_search(meta_json, item, os_id)["source"]
+		if not spec_json["os"].has_key("upload") or spec_json["os"]["upload"] == True:
+			if spec_json["os"].has_key("source") or attr_check(item, meta_search(meta_json, item, os_id), "source", 1):
+				if spec_json["os"].has_key("source"):
+					sources = spec_json["os"]["source"]
+				else:
+					sources = meta_search(meta_json, item, os_id)["source"]
 
-			if has_source(sources, target_info[0]):
-				logging.debug("The os section already has a url from %s!", target_info[0])
-				print "The os section already has a url from %s!" % target_info[0]
+				if has_source(sources, target_info[0]):
+					logging.debug("The os section already has a url from %s!", target_info[0])
+					print "The os section already has a url from %s!" % target_info[0]
+				else:
+					upload_count += 1
+					r3 = dependency_process(item, os_id, action, meta_json, sandbox_dir, osf_auth)
+					logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
+					mount_dict[mountpoint] = r3
+					if target_info[0] == "osf":
+						osf_url = osf_upload(target_info[1], target_info[2], target_info[3], os_image_dir + ".tar.gz")
+						spec_json["os"]["source"].append("osf+" + osf_url)
+					elif target_info[0] == "s3":
+						s3_url = s3_upload(s3_bucket, os_image_dir + ".tar.gz", target_info[1])
+						spec_json["os"]["source"].append("s3+" + s3_url)
 			else:
-				upload_count += 1
-				r3 = dependency_process(item, os_id, action, meta_json, sandbox_dir, osf_auth)
-				logging.debug("Add mountpoint (%s:%s) into mount_dict for /.", mountpoint, r3)
-				mount_dict[mountpoint] = r3
-				if target_info[0] == "osf":
-					osf_url = osf_upload(target_info[1], target_info[2], target_info[3], os_image_dir + ".tar.gz")
-					spec_json["os"]["source"].append("osf+" + osf_url)
-				elif target_info[0] == "s3":
-					s3_url = s3_upload(s3_bucket, os_image_dir + ".tar.gz", target_info[1])
-					spec_json["os"]["source"].append("s3+" + s3_url)
+				cleanup(tempfile_list, tempdir_list)
+				logging.critical("the os section does not has source attr!")
+				sys.exit("the os section does not has source attr!")
 		else:
-			cleanup(tempfile_list, tempdir_list)
-			logging.critical("the os section does not has source attr!")
-			sys.exit("the os section does not has source attr!")
+			logging.debug("the os section has its upload field set to false, ignore uploading it")
 
 	for sec_name in ["data"]:
 		if spec_json.has_key(sec_name) and spec_json[sec_name]:
 			sec = spec_json[sec_name]
 			for item in sec:
+				if sec[item].has_key("upload") and sec[item]["upload"] == False:
+					logging.debug("ignore upload %s becuase its upload field is set to false", item)
+					continue
+
 				if sec[item].has_key("source") or attr_check(item, meta_search(meta_json, item, id), "source", 1):
 					if sec[item].has_key("source"):
 						sources = sec[item]["source"]
@@ -3532,6 +3539,10 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 					break
 
 			for item in sec:
+				if sec[item].has_key("upload") and sec[item]["upload"] == False:
+					logging.debug("ignore upload %s becuase its upload field is set to false", item)
+					continue
+
 				if sec[item].has_key("source") or attr_check(item, meta_search(meta_json, item, id), "source", 1):
 					if sec[item].has_key("source"):
 						sources = sec[item]["source"]
