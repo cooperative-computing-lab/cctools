@@ -18,8 +18,8 @@ from mesos.interface import mesos_pb2
 
 logging.basicConfig(level=logging.INFO)
 
-FILE_TASK_INFO = "task_info"
-FILE_TASK_STATE = "task_state"
+FILE_TASK_INFO = "mesos_task_info"
+FILE_TASK_STATE = "mesos_task_state"
 MF_DONE_FILE = "makeflow_done"
 
 TASK_CPUS = 1
