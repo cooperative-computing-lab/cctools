@@ -3812,7 +3812,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="The path of directory used for all the cached data and all the sandboxes, the directory can be an existing dir.",)
 	parser.add_option("-o", "--output",
 					action="store",
-					help="The mappings of outputs in the format of <container_path>=<local_path>. Multiple mappings should be separated by comma.\ncontainer_path is a path inside the sandbox and should be exposed in the output section of an umbrella spec.\nlocal_path should be a non-existing path on your local filessytem where you want the output from container_path to be put into.",)
+					help="The mappings of outputs in the format of <container_path>=<local_path>[=<output_type>]. Multiple mappings should be separated by comma.\ncontainer_path is a path inside the sandbox and should be exposed in the output section of an umbrella spec.\nlocal_path should be a non-existing path on your local filessytem where you want the output from container_path to be put into.\noutput_type marks the output type, which can be 'f' for files, or 'd' for dirs.",)
 	parser.add_option("-s", "--sandbox_mode",
 					action="store",
 					choices=['parrot', 'destructive', 'docker', 'ec2',],
@@ -4096,13 +4096,33 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				for item in outputs:
 					index = item.find('=')
 					access_path = item[:index]
-					actual_path = item[(index+1):]
 					if access_path[0] != '/':
-						cleanup(tempfile_list, tempdir_list)
-						logging.critical("the path of an output should be absolute!")
-						sys.exit("the path of an output should be absolute!")
+						access_path = os.path.join(cwd_setting, access_path)
+
+					remain_path = item[(index+1):]
+
+					index = remain_path.find(':')
+					actual_path = ''
+					output_type = ''
+					if index == -1:
+						actual_path = remain_path
+					else:
+						actual_path = remain_path[:index]
+						output_type = remain_path[(index+1):]
+
 					actual_path = os.path.abspath(actual_path)
 					output_dict[access_path] = actual_path
+
+					if output_type == '':
+						pass
+					elif output_type == 'f':
+						output_f_dict[access_path] = actual_path
+					elif output_type == 'd':
+						output_d_dict[access_path] = actual_path
+					else:
+						cleanup(tempfile_list, tempdir_list)
+						logging.critical("the output type can only be 'f' or 'd'!")
+						sys.exit("the output type can only be 'f' or 'd'!")
 
 		if len(output_dict) > 0:
 			if spec_json.has_key("output"):
@@ -4119,10 +4139,6 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 						output_f_dict[key] = output_dict[key]
 					elif key in dirs:
 						output_d_dict[key] = output_dict[key]
-					else:
-						cleanup(tempfile_list, tempdir_list)
-						logging.critical("the output file (%s) is not specified in the spec file!", key)
-						sys.exit("the output file (%s) is not specified in the spec file!" % key)
 			else:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("the specification does not have a output section!")
