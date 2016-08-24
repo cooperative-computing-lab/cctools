@@ -75,6 +75,8 @@ struct dag_node {
 	int failure_count;                  /* How many times has this rule failed? (see -R and -r) */
 	time_t previous_completion;
 
+	const char *umbrella_spec;          /* the umbrella spec file for executing this job */
+
 	struct dag_node *next;              /* The next node in the list of nodes */
 };
 
@@ -99,5 +101,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
 struct jx * dag_node_env_create( struct dag *d, struct dag_node *n );
 
 const struct rmsummary *dag_node_dynamic_label(struct dag_node *n);
+
+void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec);
 
 #endif

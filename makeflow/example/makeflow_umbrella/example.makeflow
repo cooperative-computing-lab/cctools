@@ -1,0 +1,17 @@
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+	convert -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+
+capitol.90.jpg: capitol.jpg
+	convert -swirl 90 capitol.jpg capitol.90.jpg
+
+capitol.180.jpg: capitol.jpg
+	convert -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg
+	convert -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg
+	convert -swirl 360 capitol.jpg capitol.360.jpg
+
+capitol.jpg:
+	curl -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg

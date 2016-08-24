@@ -1,0 +1,14 @@
+This example illustrates how to running makeflow with the help of umbrella.
+
+The user can specify the umbrella binary through the `--umbrella-binary`
+option; and specify the umbrella spec through the `--umbrella-spec` option.
+
+To test makeflow with umbrella using local execution engine:
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+
+To test makeflow with umbrella using wq execution engine:
+$ makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+
+To test the case when `--wrapper` and `--umbrella-spec|binary` are used at the same time:
+$ makeflow --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+$ makeflow -T wq --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
