@@ -2005,13 +2005,13 @@ static int check_worker_fit(struct work_queue_worker *w, struct rmsummary *s) {
 	if(!s)
 		return w->resources->workers.total;
 
-	if(s->cores > w->resources->cores.total/w->resources->workers.total)
+	if(s->cores > w->resources->cores.largest)
 		return 0;
-	if(s->memory > w->resources->memory.total/w->resources->workers.total)
+	if(s->memory > w->resources->memory.largest)
 		return 0;
-	if(s->disk > w->resources->disk.total/w->resources->workers.total)
+	if(s->disk > w->resources->disk.largest)
 		return 0;
-	if(s->gpus > w->resources->gpus.total/w->resources->workers.total)
+	if(s->gpus > w->resources->gpus.largest)
 		return 0;
 
 	return w->resources->workers.total;
@@ -2891,11 +2891,11 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 	return SUCCESS;
 }
 
-/* if max defined, use minimum of max or worker avg
- * else if min is less than avg, chose avg, otherwise 'infinity' */
-#define task_worker_box_size_resource(w, min, max, avg, field)\
+/* if max defined, use minimum of max or largest worker
+ * else if min is less than largest, chose largest, otherwise 'infinity' */
+#define task_worker_box_size_resource(w, min, max, field)\
 	( max->field  >  -1 ? max->field :\
-	  min->field <= avg ? avg        : w->resources->field.total + 1 )
+	  min->field <= w->resources->field.largest ? w->resources->field.largest : w->resources->field.largest + 1 )
 
 static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
@@ -2906,13 +2906,10 @@ static struct rmsummary *task_worker_box_size(struct work_queue *q, struct work_
 
 	rmsummary_merge_override(limits, max);
 
-	limits->cores = task_worker_box_size_resource(w, min, max, w->resources->cores.total / w->resources->workers.total, cores);
-
-	limits->memory = task_worker_box_size_resource(w, min, max, w->resources->memory.total / w->resources->workers.total, memory);
-
-	limits->disk = task_worker_box_size_resource(w, min, max, w->resources->disk.total / w->resources->workers.total, disk);
-
-	limits->gpus = task_worker_box_size_resource(w, min, max, w->resources->gpus.total / w->resources->workers.total, gpus);
+	limits->cores  = task_worker_box_size_resource(w, min, max, cores);
+	limits->memory = task_worker_box_size_resource(w, min, max, memory);
+	limits->disk   = task_worker_box_size_resource(w, min, max, disk);
+	limits->gpus   = task_worker_box_size_resource(w, min, max, gpus);
 
 	return limits;
 }
@@ -3385,25 +3382,20 @@ static void update_max_worker(struct work_queue *q, struct work_queue_worker *w)
 		return;
 	}
 
-	int cores_avg = w->resources->cores.total  / w->resources->workers.total;
-	int mem_avg   = w->resources->memory.total / w->resources->workers.total;
-	int disk_avg  = w->resources->disk.total   / w->resources->workers.total;
-	int gpus_avg  = w->resources->gpus.total   / w->resources->workers.total;
-
-	if(q->current_max_worker->cores < cores_avg) {
-		q->current_max_worker->cores = cores_avg;
+	if(q->current_max_worker->cores < w->resources->cores.largest) {
+		q->current_max_worker->cores = w->resources->cores.largest;
 	}
 
-	if(q->current_max_worker->memory < mem_avg) {
-		q->current_max_worker->memory = mem_avg;
+	if(q->current_max_worker->memory < w->resources->memory.largest) {
+		q->current_max_worker->memory = w->resources->memory.largest;
 	}
 
-	if(q->current_max_worker->disk < disk_avg) {
-		q->current_max_worker->disk = disk_avg;
+	if(q->current_max_worker->disk < w->resources->memory.largest) {
+		q->current_max_worker->disk = w->resources->memory.largest;
 	}
 
-	if(q->current_max_worker->gpus < gpus_avg) {
-		q->current_max_worker->gpus = gpus_avg;
+	if(q->current_max_worker->gpus < w->resources->memory.largest) {
+		q->current_max_worker->gpus = w->resources->memory.largest;
 	}
 }
 
