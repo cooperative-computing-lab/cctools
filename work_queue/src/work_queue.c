@@ -6352,8 +6352,25 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 		}
 	}
 
-	if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
-		write_transaction_category(q, c);
+	/* accumulate resource summary to category only if task result makes it meaningful. */
+	switch(t->result) {
+		case WORK_QUEUE_RESULT_SUCCESS:
+		case WORK_QUEUE_RESULT_SIGNAL:
+		case WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION:
+		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
+		case WORK_QUEUE_RESULT_DISK_ALLOC_FULL:
+			if(category_accumulate_summary(c, t->resources_measured, q->current_max_worker)) {
+				write_transaction_category(q, c);
+			}
+			break;
+		case WORK_QUEUE_RESULT_INPUT_MISSING:
+		case WORK_QUEUE_RESULT_OUTPUT_MISSING:
+		case WORK_QUEUE_RESULT_TASK_TIMEOUT:
+		case WORK_QUEUE_RESULT_UNKNOWN:
+		case WORK_QUEUE_RESULT_FORSAKEN:
+		case WORK_QUEUE_RESULT_MAX_RETRIES:
+		default:
+			break;
 	}
 }
 
