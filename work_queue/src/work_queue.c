@@ -171,7 +171,6 @@ struct work_queue {
 	time_t catalog_last_update_time;
 	time_t resources_last_update_time;
 	int    busy_waiting_flag;
-	time_t last_outside_waiting;
 
 	category_mode_t allocation_default_mode;
 
@@ -4617,8 +4616,6 @@ struct work_queue *work_queue_create(int port)
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
 
-	q->last_outside_waiting = timestamp_get();
-
 	q->master_preferred_connection = xxstrdup("by_ip");
 
 	if( (envstring  = getenv("WORK_QUEUE_BANDWIDTH")) ) {
@@ -5337,6 +5334,8 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 /* return number of workers lost */
 static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
 {
+	BEGIN_ACCUM_TIME(q, time_polling);
+
 	int n = build_poll_table(q, foreman_uplink);
 
 	// We poll in at most small time segments (of a second). This lets
@@ -5346,15 +5345,17 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		msec = MIN(msec, (stoptime - time(0)) * 1000);
 	}
 
+	END_ACCUM_TIME(q, time_polling);
+
 	if(msec < 0) {
 		return 0;
 	}
 
-	// Poll all links for activity.
 	BEGIN_ACCUM_TIME(q, time_polling);
+
+	// Poll all links for activity.
 	link_poll(q->poll_table, n, msec);
 	q->link_poll_end = timestamp_get();
-	END_ACCUM_TIME(q, time_polling);
 
 	int i, j = 1;
 	// Consider the foreman_uplink passed into the function and disregard if inactive.
@@ -5367,9 +5368,12 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 		j++;
 	}
 
-	int workers_removed = 0;
+	END_ACCUM_TIME(q, time_polling);
+
 
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
+
+	int workers_removed = 0;
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
@@ -5389,6 +5393,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 			hash_table_firstkey(q->workers_with_available_results);
 		}
 	}
+
 	END_ACCUM_TIME(q, time_status_msgs);
 
 	return workers_removed;
@@ -5432,9 +5437,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 {
 	int events = 0;
 
-	if(q->last_outside_waiting != 0) {
-		q->stats->time_application += timestamp_get() - q->last_outside_waiting;
-	}
+	q->stats->time_application = (timestamp_get() - q->stats->time_when_started) - q->stats->time_send - q->stats->time_receive - q->stats->time_status_msgs - q->stats->time_internal - q->stats->time_polling;
 
 	print_password_warning(q);
 
@@ -5445,6 +5448,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	struct work_queue_task *t = NULL;
 	// time left?
 	while( (stoptime == 0) || (time(0) <= stoptime) ) {
+
+		BEGIN_ACCUM_TIME(q, time_internal);
 
 		// task completed?
 		t = task_state_any(q, WORK_QUEUE_TASK_RETRIEVED);
@@ -5460,10 +5465,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// away, and instead break out of the loop to correctly update the
 			// queue time statistics.
 			events++;
+			END_ACCUM_TIME(q, time_internal);
 			break;
 		}
 
-		BEGIN_ACCUM_TIME(q, time_internal);
 
 		 // update catalog if appropriate
 		if(q->name) {
@@ -5555,7 +5560,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 
 		// return if queue is empty.
-		if(!task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink))
+		BEGIN_ACCUM_TIME(q, time_internal);
+		int done = !task_state_any(q, WORK_QUEUE_TASK_RUNNING) && !task_state_any(q, WORK_QUEUE_TASK_READY) && !task_state_any(q, WORK_QUEUE_TASK_WAITING_RETRIEVAL) && !(foreman_uplink);
+		END_ACCUM_TIME(q, time_internal);
+
+		if(done)
 			break;
 
 		/* if we got here, no events were triggered. we set the busy_waiting
@@ -5572,7 +5581,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	if(events > 0) {
 		log_queue_stats(q);
 	}
-	q->last_outside_waiting = timestamp_get();
 	END_ACCUM_TIME(q, time_internal);
 
 	return t;
