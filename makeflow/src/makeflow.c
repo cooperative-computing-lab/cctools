@@ -88,6 +88,7 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+#define MAX_BUF_SIZE 4096
 #define MF_DONE_FILE "makeflow_done" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
@@ -1155,6 +1156,7 @@ int main(int argc, char *argv[])
 	char *log_format = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
+	char *mesos_path = NULL;
 
 
 	random_init();
@@ -1222,6 +1224,8 @@ int main(int argc, char *argv[])
         LONG_OPT_SINGULARITY,
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_MESOS_MASTER
+		LONG_OPT_MESOS_MASTER,
+		LONG_OPT_MESOS_PATH
 	};
 
 	static const struct option long_options_run[] = {
@@ -1295,6 +1299,7 @@ int main(int argc, char *argv[])
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{0, 0, 0, 0}
 	};
 
@@ -1577,6 +1582,9 @@ int main(int argc, char *argv[])
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
 			case LONG_OPT_MESOS_MASTER:
 				mesos_master = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MESOS_PATH:
+				mesos_path = xxstrdup(optarg);
 				break;
 			default:
 				show_help_run(argv[0]);
@@ -1910,7 +1918,6 @@ if (enforcer && wrapper_umbrella) {
 
 	makeflow_log_started_event(d);
 
-
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
@@ -1925,10 +1932,27 @@ if (enforcer && wrapper_umbrella) {
 		char *mesos_cwd;
 		mesos_cwd = path_getcwd();
 
-		char *mesos_py = "/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/amd64_linux26/lib/python2.6/site-packages";
-		char *cctools_path = getenv("CCTOOLS");
-		char *exe_py_path = string_format("%s/bin/mf_mesos_scheduler", cctools_path);
+		char *exe_path[MAX_BUF_SIZE];
+		if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
+			fatal("read \"proc/self/exe\" fail.");
+		}
+		char *exe_dir_path[MAX_BUF_SIZE];
+		path_dirname(exe_path, exe_dir_path);
+
+        char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
 		char *envs[] = {"LD_PRELOAD=/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so", "CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", NULL};
+
+		if (mesos_path == NULL) {
+			fatal("Please specify the mesos path by using --mesos-path option.");
+		}
+
+		char *mesos_py = NULL;
+		if (mesos_path[strlen(mesos_path)-1] == '/') {
+			mesos_py = string_combine(mesos_path, "lib/python2.6/site-packages");
+		} else {
+			mesos_py = string_combine(mesos_path, "/lib/python2.6/site-packages");
+		}
+		//char *mesos_py = string_combine("/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/amd64_linux26", "lib/python2.6/site-packages");
 
 		if (mesos_PID > 0) {
 
