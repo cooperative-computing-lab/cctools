@@ -88,6 +88,49 @@ int compare_entries(struct jx **a, struct jx **b)
 
 static struct jx *table[10000];
 
+int first_comma(char* in){
+    int i=0;
+    int max = strlen(in);
+    for(i=0; i<max; ++i){
+        if(in[i] == ',')
+            return i;
+    }
+    return -1;
+}
+char* add_port(char* in, int port){
+    char buffer[256];
+    int start = 0;
+    char* cpy = string_format("%s",in);
+    int com = first_comma(cpy);
+    char* retstr=NULL;
+    
+    //in the event there is no comma, and it's a single address
+    if(com == -1){
+        return string_format("%s:%i",in,port);
+    }
+    //in the event that there is a comma
+    while(com > 0){
+        //reset buffer
+        memset(buffer,0,256);
+        strncpy(buffer,in+start,com-start);
+        char* tmp;
+        if(retstr != NULL){
+            tmp=string_format("%s,%s:%i",retstr,buffer,port);
+            free(retstr);
+        }else{
+            tmp=string_format("%s:%i",buffer,port);
+        }
+        retstr = tmp;
+        
+        cpy[com]=' ';
+        start = com+1;
+        com = first_comma(cpy);
+    }
+    free(cpy);
+    return retstr;
+    
+}
+
 /*
  * Obtains information from the Catalog, format it, and make return it to user.
  */
@@ -145,13 +188,13 @@ int main(int argc, char** argv) {
     
     //setup address
     if(port != 0 && server!=NULL)
-        catalog_host = string_format("%s:%i",server,port);
+        catalog_host = add_port(server,port);
     else if(port == 0 && server != NULL)
-        catalog_host =string_format("%s:%i",server,CATALOG_PORT);
+        catalog_host =add_port(server,CATALOG_PORT);
     else if(port != 0 && server == NULL)
-        catalog_host = string_format("%s:%i",CATALOG_HOST,port);
+        catalog_host = add_port(CATALOG_HOST,port);
     else
-        catalog_host = string_format("%s:%i",CATALOG_HOST,CATALOG_PORT);
+        catalog_host = add_port(CATALOG_HOST,CATALOG_PORT);
     
     //make query string
     const char* query_expr = "type==\"makeflow\"";
