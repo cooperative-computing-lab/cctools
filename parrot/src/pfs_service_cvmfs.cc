@@ -691,6 +691,17 @@ static void cvmfs_read_config()
 
 	debug(D_CVMFS, "Using libcvmfs version: %d", LIBCVMFS_VERSION);
 
+#if LIBCVMFS_REVISION < 23
+	if (pfs_cvmfs_options) {
+		debug(D_CVMFS|D_NOTICE, "The installed libcvmfs version does not support passing options from the command line");
+		return;
+	}
+	if (strlen(pfs_cvmfs_option_file) > 0) {
+		debug(D_CVMFS|D_NOTICE, "The installed libcvmfs version does not support passing an option file");
+		return;
+	}
+#endif
+
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
 		pfs_cvmfs_repo_switching = true;
