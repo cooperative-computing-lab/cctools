@@ -129,6 +129,7 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	fprintf(file, "transfer_executable = true\n");
 	fprintf(file, "keep_claim_idle = 30\n");
 	fprintf(file, "log = %s\n", q->logfile);
+	fprintf(file, "+JobMaxSuspendTime = 0\n");
 
 	const char *c_req = batch_queue_get_option(q, "condor-requirements");
 	char *bexp = blacklisted_expression(q);
@@ -157,9 +158,6 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 		jx_export(envlist);
 	}
 
-	if(options)
-		fprintf(file, "%s\n", options);
-
 	/* set same deafults as condor_submit_workers */
 	int64_t cores  = 1;
 	int64_t memory = 1024;
@@ -184,6 +182,9 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 			fprintf(file, "request_memory = %" PRId64 "\n", memory);
 			fprintf(file, "request_disk = %" PRId64 "\n", disk);
 	}
+
+	if(options)
+		fprintf(file, "%s\n", options);
 
 	fprintf(file, "queue\n");
 	fclose(file);
