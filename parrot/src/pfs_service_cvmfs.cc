@@ -546,9 +546,12 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	char *proxy = getenv("HTTP_PROXY");
 #if LIBCVMFS_REVISION < 23
 	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
-	debug(D_CVMFS|D_NOTICE, "CVMFS requires an http proxy.  None has been configured!");
-	debug(D_CVMFS, "Ignoring configuration of CVMFS repository %s", fqrn);
-	return false;
+		if( !strstr(user_options,"proxies=") ) {
+			debug(D_CVMFS|D_NOTICE,"CVMFS requires an http proxy.  None has been configured!");
+			debug(D_CVMFS,"Ignoring configuration of CVMFS repository %s:%s",repo_name,user_options);
+			delete f;
+			return NULL;
+		}
 	}
 #endif
 
