@@ -649,7 +649,13 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 		{
 			debug(D_WQ,"evaluating foremen list...");
 			foremen_list    = work_queue_catalog_query(catalog_host,catalog_port,foremen_regex);
-			workers_needed += count_workers_needed(foremen_list, 1);
+
+			/* add workers on foremen. Also, subtract foremen from workers
+			 * connected, as they were not deployed by the pool. */
+
+			workers_needed    += count_workers_needed(foremen_list, 1);
+			workers_connected += MAX(count_workers_connected(foremen_list) - list_size(foremen_list), 0);
+
 			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
 		}
 
