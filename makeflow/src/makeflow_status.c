@@ -88,49 +88,6 @@ int compare_entries(struct jx **a, struct jx **b)
 
 static struct jx *table[10000];
 
-int first_comma(char* in){
-    int i=0;
-    int max = strlen(in);
-    for(i=0; i<max; ++i){
-        if(in[i] == ',')
-            return i;
-    }
-    return -1;
-}
-char* add_port(char* in, int port){
-    char buffer[256];
-    int start = 0;
-    char* cpy = string_format("%s",in);
-    int com = first_comma(cpy);
-    char* retstr=NULL;
-    
-    //in the event there is no comma, and it's a single address
-    if(com == -1){
-        return string_format("%s:%i",in,port);
-    }
-    //in the event that there is a comma
-    while(com > 0){
-        //reset buffer
-        memset(buffer,0,256);
-        strncpy(buffer,in+start,com-start);
-        char* tmp;
-        if(retstr != NULL){
-            tmp=string_format("%s,%s:%i",retstr,buffer,port);
-            free(retstr);
-        }else{
-            tmp=string_format("%s:%i",buffer,port);
-        }
-        retstr = tmp;
-        
-        cpy[com]=' ';
-        start = com+1;
-        com = first_comma(cpy);
-    }
-    free(cpy);
-    return retstr;
-    
-}
-
 /*
  * Obtains information from the Catalog, format it, and make return it to user.
  */
@@ -138,7 +95,6 @@ int main(int argc, char** argv) {
 
     static const struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
-        {"port", required_argument, 0, 'p'},
         {"project", required_argument, 0, 'N'},
         {"server", required_argument, 0, 's'},
         {"timeout", required_argument, 0, 't'},
@@ -160,7 +116,7 @@ int main(int argc, char** argv) {
     int port = 0;
     long long porthelp = 0;
     
-    while ((c = getopt_long(argc, argv, "N:t:u:w:p:s:h", long_options, NULL)) > -1) {
+    while ((c = getopt_long(argc, argv, "N:t:u:w:s:h", long_options, NULL)) > -1) {
         switch (c) {
             case 'N':
                 project = xxstrdup(optarg);
@@ -174,11 +130,6 @@ int main(int argc, char** argv) {
             case 's':
                 server = xxstrdup(optarg);
                 break;
-            case 'p':
-                if(string_is_integer(optarg, &porthelp)){
-                    port = (int)porthelp;
-                }
-                break;
             case 'h':
             default:
                 show_help(argv[0]);
@@ -187,14 +138,9 @@ int main(int argc, char** argv) {
     }
     
     //setup address
-    if(port != 0 && server!=NULL)
-        catalog_host = add_port(server,port);
-    else if(port == 0 && server != NULL)
-        catalog_host =add_port(server,CATALOG_PORT);
-    else if(port != 0 && server == NULL)
-        catalog_host = add_port(CATALOG_HOST,port);
-    else
-        catalog_host = add_port(CATALOG_HOST,CATALOG_PORT);
+    if(server==NULL){
+        catalog_host = CATALOG_HOST;
+    }
     
     //make query string
     const char* query_expr = "type==\"makeflow\"";
