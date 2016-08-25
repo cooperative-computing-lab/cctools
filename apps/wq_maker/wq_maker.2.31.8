@@ -353,8 +353,11 @@ sub submit_tasks {
 sub submit_task {
 	my($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs) = @_;
 
-	my $task_command .= "echo \"$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV)."\"; ";
-	$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; $mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
+	my $task_command = "";
+	if($augustus){
+		$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; ";
+	}
+	$task_command .= "$mpi_arg maker -g $genome_chunk -base $base_name ".join(' ', @ARGV);
 	
 	my $task = Work_Queue::Task->new($task_command); 
 	my $task_tag = substr($genome_chunk, rindex($genome_chunk, '_')+1, rindex($genome_chunk, '.')-(rindex($genome_chunk, '_')+1)); 
@@ -365,7 +368,9 @@ sub submit_task {
 	$task->specify_input_file("maker_bopts.ctl"); 
 	$task->specify_input_file("maker_exe.ctl"); 
 	submit_input_files($task, $common_input_files);
-	submit_augustus_files($task);
+	if($augustus){
+		submit_augustus_files($task);
+	}
 	my $contigs = $input_to_contigs->{$genome_chunk};
 	foreach my $contig (@$contigs) {
 		my $location = $output_dirs->{$contig};
