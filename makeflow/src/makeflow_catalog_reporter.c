@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "json_aux.h"
 #include "username.h"
 #include "batch_job.h"
+#include "jx_print.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,22 +52,38 @@ int makeflow_catalog_summary(struct dag* d, char* name, batch_queue_type_t type,
     }
     
     //transmit report here
-    //creates memory
-    char* host = string_format("%s:%i",CATALOG_HOST,CATALOG_PORT);
+    char* host = CATALOG_HOST;
     
     char username[USERNAME_MAX];
     username_get(username);
     
     const char* batch_type = batch_queue_type_to_string(type);
     
+    struct jx *j = jx_object(0);
+    
+    jx_insert_string(j,"type","makeflow");
+    jx_insert_integer(j,"total",itable_size(d->node_table));
+    jx_insert_integer(j,"running",tasks_running);
+    jx_insert_integer(j,"waiting",tasks_waiting);
+    jx_insert_integer(j,"aborted",tasks_aborted);
+    jx_insert_integer(j,"completed",tasks_completed);
+    jx_insert_integer(j,"failed",tasks_failed);
+    jx_insert_string(j,"project",name);
+    jx_insert_string(j,"owner",username);
+    char* timestring = string_format("%" PRIu64 "", start);
+    jx_insert_string(j,"time_started",timestring);
+    jx_insert_string(j,"batch_type",batch_type);
+    
+    
+    
     //creates memory
-    char* text = string_format("{\"type\":\"makeflow\",\"total\":%i,\"running\":%i,\"waiting\":%i,\"aborted\":%i,\"completed\":%i,\"failed\":%i,\"project\":\"%s\",\"owner\":\"%s\",\"time_started\":%" PRIu64 ",\"batch_type\":\"%s\"}",
-                         itable_size(d->node_table), tasks_running, tasks_waiting, tasks_aborted, tasks_completed, tasks_failed, name, username, start, batch_type);
+    char* text = jx_print_string(j);
     
     int resp = catalog_query_send_update(host, text);
     
-    free(host);
     free(text);
+    free(timestring);
+    jx_delete(j);
     
     return resp;//all good
 }
