@@ -619,17 +619,24 @@ char *strsep(char **stringp, const char *delim)
 char *string_combine(char *a, const char *b)
 {
 	char *r = NULL;
-	size_t a_len = strlen(a);
+	size_t a_len;
 
-	if(a && b) {
-		r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
+	if(!a) {
+		if(!b) {
+			return r;
+		} else {
+			return xxstrdup(b);
+		}
 	}
 
-	if(r)
-		strcat(r, b);
-	else
-		fatal("Cannot allocate memory for string concatenation.\n");
+	if(!b) return a;
 
+	a_len = strlen(a);
+	r = realloc(a, (a_len + strlen(b) + 1) * sizeof(char));
+	if(!r) {
+		fatal("Cannot allocate memory for string concatenation.\n");
+	}
+	strcat(r, b);
 
 	return r;
 }
