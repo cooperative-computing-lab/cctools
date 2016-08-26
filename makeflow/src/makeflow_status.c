@@ -113,8 +113,6 @@ int main(int argc, char** argv) {
     char* project = NULL;
     
     char* server = NULL;
-    int port = 0;
-    long long porthelp = 0;
     
     while ((c = getopt_long(argc, argv, "N:t:u:w:s:h", long_options, NULL)) > -1) {
         switch (c) {
