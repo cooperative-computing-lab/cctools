@@ -5,12 +5,6 @@
 #include "stringtools.h"
 #include "text_list.h"
 
-struct text_list {
-	char **items;
-	int alloc_length;
-	int used_length;
-};
-
 struct text_list *text_list_create()
 {
 	struct text_list *t = malloc(sizeof(*t));
@@ -37,6 +31,22 @@ struct text_list *text_list_load(const char *path)
 
 	fclose(file);
 
+	return t;
+}
+
+struct text_list *text_list_load_str(const char *inp_str)
+{
+	if (!inp_str) {
+		return NULL;
+	}
+
+	struct text_list *t = text_list_create();
+	char *pch = NULL;
+    pch = strtok(inp_str, ",");
+	while(pch != NULL) {
+		text_list_append(t, pch);
+		pch = strtok(NULL, ",");
+	}	
 	return t;
 }
 

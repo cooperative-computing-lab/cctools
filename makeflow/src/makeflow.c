@@ -44,6 +44,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -78,6 +79,8 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+#define MAX_BUF_SIZE 4096
+#define MF_DONE_FILE "makeflow_done" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -939,7 +942,7 @@ Signal handler to catch abort signals.  Note that permissible actions in signal 
 static void handle_abort(int sig)
 {
 	static int abort_count_to_exit = 5;
-
+	
 	abort_count_to_exit -= 1;
 	int fd = open("/dev/tty", O_WRONLY);
 	if (fd >= 0) {
@@ -948,9 +951,11 @@ static void handle_abort(int sig)
 		write(fd, buf, strlen(buf));
 		close(fd);
 	}
+
 	if (abort_count_to_exit == 1)
 		signal(sig, SIG_DFL);
 	makeflow_abort_flag = 1;
+
 }
 
 
@@ -1010,6 +1015,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
+	printf(" %-30s Indicate preferred mesos master.\n", "--mesos-master=<ip_adr:port>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1054,6 +1060,8 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
+	char *mesos_master = "127.0.0.1:5050/";
+	char *mesos_path = NULL;
 
 
 	random_init();
@@ -1110,7 +1118,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_JSON,
 		LONG_OPT_SKIP_FILE_CHECK,
-		LONG_OPT_ALLOCATION_MODE
+		LONG_OPT_ALLOCATION_MODE,
+		LONG_OPT_MESOS_MASTER,
+		LONG_OPT_MESOS_PATH
 	};
 
 	static const struct option long_options_run[] = {
@@ -1174,6 +1184,8 @@ int main(int argc, char *argv[])
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{0, 0, 0, 0}
 	};
 
@@ -1425,6 +1437,12 @@ int main(int argc, char *argv[])
 			case LONG_OPT_JSON:
 				json_input = 1;
 				break;
+			case LONG_OPT_MESOS_MASTER:
+				mesos_master = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MESOS_PATH:
+				mesos_path = xxstrdup(optarg);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1662,11 +1680,64 @@ int main(int argc, char *argv[])
 
 	makeflow_log_started_event(d);
 
-
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
+	}
+
+	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		pid_t mesos_PID;
+		mesos_PID = fork();			
+		char *mesos_cwd;
+		mesos_cwd = path_getcwd();
+
+		char *exe_path[MAX_BUF_SIZE];
+		if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
+			fatal("read \"proc/self/exe\" fail.");
+		}
+		char *exe_dir_path[MAX_BUF_SIZE];
+		path_dirname(exe_path, exe_dir_path);
+
+        char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
+		char *envs[] = {"LD_PRELOAD=/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so", "CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", NULL};
+
+		if (mesos_path == NULL) {
+			fatal("Please specify the mesos path by using --mesos-path option.");
+		}
+
+		char *mesos_py = NULL;
+		if (mesos_path[strlen(mesos_path)-1] == '/') {
+			mesos_py = string_combine(mesos_path, "lib/python2.6/site-packages");
+		} else {
+			mesos_py = string_combine(mesos_path, "/lib/python2.6/site-packages");
+		}
+		//char *mesos_py = string_combine("/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/amd64_linux26", "lib/python2.6/site-packages");
+
+		if (mesos_PID > 0) {
+
+			printf("start makeflow mesos scheduler.");
+
+		} else if (mesos_PID == 0) {
+
+			int mesos_fd = open("mesos_scheduler.log", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+
+		    dup2(mesos_fd, 1);
+		    dup2(mesos_fd, 2);
+
+			close(mesos_fd);
+
+			execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_py, (char *) 0, envs);
+
+			_exit(127);
+
+		} else {
+
+			debug(D_MAKEFLOW_RUN, "couldn't create new process: %s\n", strerror(errno));
+			exit(EXIT_FAILURE);
+
+		}
+
 	}
 
 	makeflow_run(d);
@@ -1687,6 +1758,21 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		FILE *fp;
+		fp = fopen(MF_DONE_FILE, "w");
+
+		if(makeflow_abort_flag) {
+			fputs("aborted", fp);
+		} else if(makeflow_failed_flag) {
+			fputs("failed", fp);
+		} else {
+			fputs("finished", fp);
+		}
+
+		fclose(fp);
+	}
+
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
@@ -1698,6 +1784,7 @@ int main(int argc, char *argv[])
 	} else {
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
+		
 		exit(EXIT_SUCCESS);
 	}
 
