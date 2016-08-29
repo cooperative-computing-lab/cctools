@@ -990,7 +990,7 @@ static int do_put( struct link *master, char *filename, int64_t length, int mode
 
 	int fd = open(cached_filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(fd < 0) {
-		debug(D_WQ, "Could not open %s for writing\n", filename);
+		debug(D_WQ, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
