@@ -22,6 +22,7 @@ extern "C" {
 #include "path.h"
 #include "stringtools.h"
 #include "create_dir.h"
+#include "jx.h"
 }
 
 #include <unistd.h>
@@ -47,6 +48,9 @@ extern bool pfs_cvmfs_repo_switching;
 extern char pfs_cvmfs_alien_cache_dir[];
 extern char pfs_cvmfs_locks_dir[];
 extern bool pfs_cvmfs_enable_alien;
+extern char pfs_cvmfs_option_file[];
+extern struct jx *pfs_cvmfs_options;
+
 
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
@@ -108,6 +112,10 @@ aFDsGXvjGy7dg43YzjSSYSFGUnONtl5Fe6y4bQZj1LEPbeInW334MAbMwYF4LKma\n\
 yQIDAQAB\n\
 -----END PUBLIC KEY-----\n\
 ";
+
+#if LIBCVMFS_REVISION >= 23
+static cvmfs_option_map *cvmfs_global_options_v2;
+#endif
 
 /*
 A cvmfs_filesystem structure represents an entire
@@ -483,12 +491,40 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 	if(rc != 0) {
 		return false;
 	}
-#else
+#elif LIBCVMFS_REVISION < 23
 	debug(D_CVMFS, "cvmfs_attach_repo(%s)", f->cvmfs_options.c_str());
 	f->cvmfs_ctx = cvmfs_attach_repo(f->cvmfs_options.c_str());
 	if (f->cvmfs_ctx == NULL) {
 		return false;
 	}
+#else
+	cvmfs_option_map *fs_options = cvmfs_options_clone_legacy(cvmfs_global_options_v2, f->cvmfs_options.c_str());
+	if (!fs_options) {
+		return false;
+	}
+	char *fqrn = cvmfs_options_get(fs_options, "CVMFS_FQRN");
+	if (!fqrn) {
+		return false;
+	}
+
+	char *proxy = cvmfs_options_get(fs_options, "CVMFS_HTTP_PROXY");
+	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
+		debug(D_CVMFS|D_NOTICE, "CVMFS requires an http proxy.  None has been configured!");
+		debug(D_CVMFS, "Ignoring configuration of CVMFS repository %s", fqrn);
+		free(proxy);
+		return false;
+	}
+	free(proxy);
+
+	char *repo_options_str = cvmfs_options_dump(fs_options);
+	debug(D_CVMFS, "cvmfs_attach_repo_v2(%s)", repo_options_str);
+	cvmfs_options_free(repo_options_str);
+	cvmfs_errors retval = cvmfs_attach_repo_v2(fqrn, fs_options, &f->cvmfs_ctx);
+	free(fqrn);
+	if (retval != LIBCVMFS_ERR_OK) {
+		return false;
+	}
+	cvmfs_adopt_options(f->cvmfs_ctx, fs_options);
 #endif
 
 	cvmfs_active_filesystem = f;
@@ -507,6 +543,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 #endif
 
 	char *proxy = getenv("HTTP_PROXY");
+#if LIBCVMFS_REVISION < 23
 	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
 		if( !strstr(user_options,"proxies=") ) {
 			debug(D_CVMFS|D_NOTICE,"CVMFS requires an http proxy.  None has been configured!");
@@ -515,6 +552,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 			return NULL;
 		}
 	}
+#endif
 
 	if( !user_options ) {
 		user_options = "";
@@ -655,6 +693,17 @@ static void cvmfs_read_config()
 
 	debug(D_CVMFS, "Using libcvmfs version: %d", LIBCVMFS_VERSION);
 
+#if LIBCVMFS_REVISION < 23
+	if (pfs_cvmfs_options) {
+		debug(D_CVMFS|D_NOTICE, "The installed libcvmfs version does not support passing options from the command line");
+		return;
+	}
+	if (strlen(pfs_cvmfs_option_file) > 0) {
+		debug(D_CVMFS|D_NOTICE, "The installed libcvmfs version does not support passing an option file");
+		return;
+	}
+#endif
+
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
 		pfs_cvmfs_repo_switching = true;
@@ -676,6 +725,7 @@ static void cvmfs_read_config()
 	if ( !cvmfs_global_options ) {
 		cvmfs_global_options = getenv("PARROT_CVMFS_CONFIG");
 	}
+#if LIBCVMFS_REVISION < 23
 	if ( !cvmfs_global_options ) {
 		cvmfs_global_options = string_format("cache_directory=%s%s%s%s%s",
 				pfs_cvmfs_alien_cache_dir,
@@ -697,6 +747,56 @@ static void cvmfs_read_config()
 		debug(D_CVMFS, "ERROR: failed to initialize cvmfs (%d)", init_retval);
 		return;
 	}
+#else
+	if (cvmfs_global_options) {
+		cvmfs_global_options_v2 = cvmfs_options_init_legacy(cvmfs_global_options);
+		assert(cvmfs_global_options_v2);
+	} else {
+		cvmfs_global_options_v2 = cvmfs_options_init_legacy(default_cvmfs_global_config);
+		assert(cvmfs_global_options_v2);
+		cvmfs_options_set(cvmfs_global_options_v2, "CVMFS_CACHE_DIR", pfs_cvmfs_alien_cache_dir);
+		if (pfs_cvmfs_enable_alien) {
+			cvmfs_options_set(cvmfs_global_options_v2, "CVMFS_WORKSPACE", pfs_cvmfs_locks_dir);
+			cvmfs_options_set(cvmfs_global_options_v2, "CVMFS_ALIEN_CACHE", pfs_cvmfs_alien_cache_dir);
+		}
+	}
+
+	if (strlen(pfs_cvmfs_option_file) > 0) {
+		if (!cvmfs_global_options_v2) {
+			cvmfs_global_options_v2 = cvmfs_options_init();
+		}
+		assert(cvmfs_global_options_v2);
+		int rc = cvmfs_options_parse(cvmfs_global_options_v2, pfs_cvmfs_option_file);
+		if (rc != 0) {
+			debug(D_CVMFS, "ERROR: failed to parse %s", pfs_cvmfs_option_file);
+			return;
+		}
+	}
+
+	if (!cvmfs_global_options_v2) {
+		debug(D_CVMFS|D_NOTICE, "No global CVMFS configuration found. To enable CVMFS access, you should use --cvmfs-option-file.");
+		return;
+	}
+
+	if (pfs_cvmfs_options) {
+		struct jx_pair *p;
+		for (p = pfs_cvmfs_options->u.pairs; p; p = p->next) {
+			if (jx_istype(p->key, JX_STRING) && jx_istype(p->value, JX_STRING)) {
+				cvmfs_options_set(cvmfs_global_options_v2, p->key->u.string_value, p->value->u.string_value);
+			}
+		}
+	}
+
+	char *global_options_str = cvmfs_options_dump(cvmfs_global_options_v2);
+	debug(D_CVMFS|D_DEBUG, "Using CVMFS global options: %s", global_options_str);
+	cvmfs_options_free(global_options_str);
+
+	cvmfs_errors retval = cvmfs_init_v2(cvmfs_global_options_v2);
+	if (retval != LIBCVMFS_ERR_OK) {
+		debug(D_CVMFS|D_DEBUG, "Unable to initialize libcvmfs");
+		return;
+	}
+#endif
 #endif
 
 	const char *cvmfs_options = pfs_cvmfs_repo_arg;
