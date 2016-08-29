@@ -1129,7 +1129,8 @@ unique identifier where no name is available.
 
 char *make_cached_name( const struct work_queue_task *t, const struct work_queue_file *f )
 {
-	static int buffer_count = 0;
+	static unsigned int file_count = 0;
+	file_count++;
 
 	/* Default of payload is remote name (needed only for directories) */
 	char *payload = f->payload ? f->payload : f->remote_name;
@@ -1145,32 +1146,31 @@ char *make_cached_name( const struct work_queue_task *t, const struct work_queue
 		url_encode(path_basename(payload), payload_enc, PATH_MAX);
 	}
 
-	/* 0 for cache files, taskid for non-cache files. With this, non-cache
+	/* 0 for cache files, file_count for non-cache files. With this, non-cache
 	 * files cannot be shared among tasks, and can be safely deleted once a
 	 * task finishes. */
-	int cache_task_id = 0;
-	if(t && !(f->flags | WORK_QUEUE_CACHE)) {
-		cache_task_id = t->taskid;
+	unsigned int cache_file_id = 0;
+	if(!(f->flags & WORK_QUEUE_CACHE)) {
+		cache_file_id = file_count;
 	}
 
 	switch(f->type) {
 		case WORK_QUEUE_FILE:
 		case WORK_QUEUE_DIRECTORY:
-			return string_format("file-%d-%s-%s", cache_task_id, md5_string(digest), payload_enc);
+			return string_format("file-%d-%s-%s", cache_file_id, md5_string(digest), payload_enc);
 			break;
 		case WORK_QUEUE_FILE_PIECE:
-			return string_format("piece-%d-%s-%s-%lld-%lld",cache_task_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
+			return string_format("piece-%d-%s-%s-%lld-%lld",cache_file_id, md5_string(digest),payload_enc,(long long)f->offset,(long long)f->piece_length);
 			break;
 		case WORK_QUEUE_REMOTECMD:
-			return string_format("cmd-%d-%s", cache_task_id, md5_string(digest));
+			return string_format("cmd-%d-%s", cache_file_id, md5_string(digest));
 			break;
 		case WORK_QUEUE_URL:
-			return string_format("url-%d-%s", cache_task_id, md5_string(digest));
+			return string_format("url-%d-%s", cache_file_id, md5_string(digest));
 			break;
 		case WORK_QUEUE_BUFFER:
 		default:
-			buffer_count++;
-			return string_format("buffer-%d-%d-%s", cache_task_id, buffer_count, md5_string(digest));
+			return string_format("buffer-%d-%s", cache_file_id, md5_string(digest));
 			break;
 	}
 }
