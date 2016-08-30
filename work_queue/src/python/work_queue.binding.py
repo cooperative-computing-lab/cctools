@@ -51,13 +51,13 @@ class Task(_object):
         # asked explicitely.
 
         if flags is None:
-            flags = WQ.WORK_QUEUE_NOCACHE;
+            flags = WORK_QUEUE_NOCACHE;
 
         if cache is not None:
             if cache:
-                flags = flags | WQ.WORK_QUEUE_CACHE;
+                flags = flags | WORK_QUEUE_CACHE;
             else:
-                flags = flags & ~(WQ.WORK_QUEUE_CACHE);
+                flags = flags & ~(WORK_QUEUE_CACHE);
 
         return flags
 
