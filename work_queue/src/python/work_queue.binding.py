@@ -47,15 +47,17 @@ class Task(_object):
 
     @staticmethod
     def _determine_file_flags(flags, cache):
-        # if flags is defined, use its value. Otherwise cache by default when
-        # both flags and cache are undefined.
+        # if flags is defined, use its value. Otherwise do not cache only if
+        # asked explicitely.
+
         if flags is None:
-            if cache is None:
-                flags = WORK_QUEUE_CACHE
-            elif cache:
-                flags = WORK_QUEUE_CACHE
+            flags = WORK_QUEUE_NOCACHE;
+
+        if cache is not None:
+            if cache:
+                flags = flags | WORK_QUEUE_CACHE;
             else:
-                flags = WORK_QUEUE_NOCACHE
+                flags = flags & ~(WORK_QUEUE_CACHE);
 
         return flags
 
@@ -121,16 +123,16 @@ class Task(_object):
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
-    #                       - @ref WORK_QUEUE_NOCACHE
+    #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
     #                       - @ref WORK_QUEUE_WATCH
-    # @param cache          Legacy parameter for setting file caching attribute. If both flags and cache are undefined, the file is cached.
+    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
     #
     # For example:
     # @code
     # # The following are equivalent
-    # >>> task.specify_file("/etc/hosts", type=WORK_QUEUE_INPUT, flags=WORK_QUEUE_NOCACHE)
-    # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT, cache=false)
+    # >>> task.specify_file("/etc/hosts", type=WORK_QUEUE_INPUT, flags=WORK_QUEUE_CACHE)
+    # >>> task.specify_file("/etc/hosts", "hosts", type=WORK_QUEUE_INPUT)
     # @endcode
     def specify_file(self, local_name, remote_name=None, type=None, flags=None, cache=None):
         if remote_name is None:
@@ -153,9 +155,9 @@ class Task(_object):
     # @param type           Must be one of the following values: @ref WORK_QUEUE_INPUT or @ref WORK_QUEUE_OUTPUT
     # @param flags          May be zero to indicate no special handling, or any
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
-    #                       - @ref WORK_QUEUE_NOCACHE
+    #                       - @ref WORK_QUEUE_NOCACHE (default)
     #                       - @ref WORK_QUEUE_CACHE
-    # @param cache          Legacy parameter for setting file caching attribute. If both flags and cache are undefined, the file is cached.
+    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
     def specify_file_piece(self, local_name, remote_name=None, start_byte=0, end_byte=0, type=None, flags=None, cache=None):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
@@ -190,10 +192,10 @@ class Task(_object):
     #                       of the @ref work_queue_file_flags_t or'd together The most common are:
     #                       - @ref WORK_QUEUE_NOCACHE
     #                       - @ref WORK_QUEUE_CACHE
-    # @param recursive      Indicates whether just the directory (0) or the directory and all of its contents (1) should be included.
-    # @param cache          Legacy parameter for setting file caching attribute. If both flags and cache are undefined, the file is cache.
+    # @param recursive      Indicates whether just the directory (False) or the directory and all of its contents (True) should be included.
+    # @param cache          Legacy parameter for setting file caching attribute. (True/False, deprecated, use the flags parameter.)
     # @return 1 if the task directory is successfully specified, 0 if either of @a local_name, or @a remote_name is null or @a remote_name is an absolute path.
-    def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=0, cache=None):
+    def specify_directory(self, local_name, remote_name=None, type=None, flags=None, recursive=False, cache=None):
         if remote_name is None:
             remote_name = os.path.basename(local_name)
 
@@ -210,7 +212,7 @@ class Task(_object):
     # @param buffer         The contents of the buffer to pass as input.
     # @param remote_name    The name of the remote file to create.
     # @param flags          May take the same values as @ref specify_file.
-    # @param cache          Legacy parameter for setting buffer caching attribute. If both flags and cache are undefined (i.e., None), the buffer is cached.
+    # @param cache          Legacy parameter for setting buffer caching attribute. (True/False, deprecated, use the flags parameter.)
     def specify_buffer(self, buffer, remote_name, flags=None, cache=None):
         flags = Task._determine_file_flags(flags, cache)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
