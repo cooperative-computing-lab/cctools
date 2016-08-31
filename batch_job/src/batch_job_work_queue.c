@@ -108,6 +108,10 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 		{
 			return -1;
 		}
+
+		char *transactions = string_format("%s.transactions", q->logfile);
+		work_queue_specify_transactions_log(q->data, transactions);
+		free(transactions);
 	}
 
 	if(stoptime == 0) {
