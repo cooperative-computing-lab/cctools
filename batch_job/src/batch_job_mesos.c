@@ -73,7 +73,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	// of the task to mesos_task_state. And the makeflow is keep monitoring this file and 
 	// collect all finished task. f each input file
 
-	if (extra_input_files != NULL) {
+	if (extra_input_files != NULL && strlen(extra_input_files) != 0) {
 
 		int j = 0;
 		int num_input_files = mt->task_input_files->used_length;
@@ -86,7 +86,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		fputs(",", task_info_fp);
 	}
     
-	if (extra_output_files != NULL) {
+	if (extra_output_files != NULL && strlen(extra_output_files) != 0) {
 		int j = 0;
 		int num_output_files = mt->task_output_files->used_length;
 		for (j = 0; j < (num_output_files-1); j++) {
@@ -226,6 +226,7 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 static int batch_queue_mesos_create (struct batch_queue *q)
 {
 	batch_queue_set_feature(q, "mesos_job_queue", NULL);
+	batch_queue_set_feature(q, "batch_log_name", "%s.mesoslog");
 	return 0;
 }
 

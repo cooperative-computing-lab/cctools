@@ -22,7 +22,7 @@ FILE_TASK_INFO = "mesos_task_info"
 FILE_TASK_STATE = "mesos_task_state"
 MF_DONE_FILE = "makeflow_done"
 
-TASK_CPUS = 0.1
+TASK_CPUS = 3
 TASK_MEM = 32
 
 # Makeflow mesos scheduler
@@ -132,8 +132,8 @@ class MakeflowScheduler(Scheduler):
         logging.info("Registered with framework id: {0}".format(framework_id))
 
     def resourceOffers(self, driver, offers):
-        logging.info("Recieved resource offers: {0}".format(\
-                [o.id.value for o in offers]))
+        logging.info("Recieved resource offers: {0} from {1}".format(\
+                [o.id.value for o in offers], [o.hostname for o in offers]))
        
         idle_task = False 
 
@@ -148,8 +148,8 @@ class MakeflowScheduler(Scheduler):
                 if resource.name == "mem":
                     offer_mem += resource.scalar.value
 
-            logging.info("Received resource offer {0} with cpus {1} and mem: {2}\
-                    ".format(offer.id.value, offer_cpus, offer_mem))
+            logging.info("Received resource offer {0} with cpus {1} and mem: {2} from {3}\
+                    ".format(offer.id.value, offer_cpus, offer_mem, offer.hostname))
 
             remaining_cpus = offer_cpus
             remaining_mem = offer_mem
@@ -345,8 +345,6 @@ class MakefowMonitor(threading.Thread):
         while(not os.path.isfile(MF_DONE_FILE)):
             mod_time = os.stat(FILE_TASK_INFO).st_mtime
             
-            logging.info("{0} is modified at {1}".format(\
-                    FILE_TASK_INFO, mod_time))
             self.last_mod_time = mod_time
             task_info_fp = open(FILE_TASK_INFO, "r")
             lines = task_info_fp.readlines()
@@ -376,7 +374,7 @@ class MakefowMonitor(threading.Thread):
 
                         self.abort_mesos_task(task_id)                
 
-            time.sleep(1)
+            time.sleep(2)
        
         self.stop_mesos_scheduler() 
 
