@@ -1720,7 +1720,9 @@ int main(int argc, char *argv[])
 
 		} else if (mesos_PID == 0) {
 
-			int mesos_fd = open("mesos_scheduler.log", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+			//int mesos_fd = open("mesos_scheduler.log", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+
+			int mesos_fd = open(batchlogfilename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 
 		    dup2(mesos_fd, 1);
 		    dup2(mesos_fd, 2);
