@@ -1300,7 +1300,7 @@ void write_outlier(FILE *stream, struct rmsummary *s, struct field *f, char *pre
 	}
 
 	fprintf(stream, "<td class=\"data\">\n");
-	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->task_id);
+	fprintf(stream, "<a href=%s%s/%s>(%s)</a>", prefix, OUTLIER_DIR, outlier_name, s->taskid);
 	fprintf(stream, "<br><br>\n");
 
 	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(f->name, value_of_field(s, f)));
@@ -1334,12 +1334,10 @@ void write_webpage_stats_header(FILE *stream, struct field_stats *h)
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max t.p<br> &#9663; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. min waste </td>");
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. ind.</td>");
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. 0.95</td>");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f.</td>");
-		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. m.t.</td>");
+		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f. m.t.</td>");
+		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f. m.w. </td>");
 	}
 
 	fprintf(stream, "<td class=\"datahdr\" >(&mu;+&sigma;)/&mu;</td>");

@@ -27,7 +27,7 @@ struct rmsummary
 {
 	char    *category;
 	char    *command;
-	char    *task_id;
+	char    *taskid;
 
 	int64_t  start;
 	int64_t  end;

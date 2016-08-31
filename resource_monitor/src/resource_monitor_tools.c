@@ -168,8 +168,8 @@ struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash
 	if(!so)
 		return NULL;
 
-	if(!so->task_id) {
-		so->task_id = get_rule_number(filename);
+	if(!so->taskid) {
+		so->taskid = get_rule_number(filename);
 	}
 
 	if(!so->category) {
