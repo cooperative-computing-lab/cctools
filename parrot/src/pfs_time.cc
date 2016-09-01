@@ -58,7 +58,7 @@ int pfs_emulate_clock_gettime( clockid_t clockid, struct timespec *ts )
 			break;
 		case PFS_TIME_MODE_WARP:
 			*ts = emulated_time;
-			emulated_time.tv_nsec += 100000000;
+			emulated_time.tv_nsec += 10000000;
 			if(emulated_time.tv_nsec >= 1000000000) {
 				emulated_time.tv_nsec -= 1000000000;
 				emulated_time.tv_sec++;
