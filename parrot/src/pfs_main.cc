@@ -250,6 +250,8 @@ static void show_help( const char *cmd )
 	printf( " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
 	printf( " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
 	printf( " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
+	printf( " %-30s Stop virtual time at midnight, Jan 1st, UTC.\n", "   --time-stop");
+	printf( " %-30s Warp virtual time starting from midnight, Jan 1st, UTC.\n","   --time-warp");
 	printf( " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	printf( " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
 	printf( " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
