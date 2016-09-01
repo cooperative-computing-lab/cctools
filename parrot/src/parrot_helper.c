@@ -13,15 +13,17 @@ then be used to fix a few problems that are more easy to solve
 from the user side.
 */
 
+#include <unistd.h>
+#include <sys/types.h>
+#include <syscall.h>
+#include <time.h>
+#include <sys/time.h>
+
 /*
 An ugly bug in Linux makes it impossible to ptrace across vfork
 reliably, so the helper library converts vforks into forks,
 which can be supported.  Other hacks may be added as necessary.
 */
-
-#include <unistd.h>
-#include <sys/types.h>
-#include <syscall.h>
 
 pid_t vfork()
 {
@@ -31,6 +33,36 @@ pid_t vfork()
 pid_t __vfork()
 {
 	return fork();
+}
+
+/*
+Linux has a special fast path for a few time related system calls.
+The standard library implementations of gettimeofday, time, and
+clock_gettime work by simply reading a word out of a segment (VDSO)
+specially mapped between the kernel and all processes.
+These three functions un-do this optimization and force the calls
+to be real system calls instead, which allows parrot to play games
+with time, as needed.
+
+Note that the helper is only activated in special cases (like time warp mode)
+so that not all programs will pay this performance penalty.
+*/
+
+int gettimeofday( struct timeval *tv, struct timezone *tz )
+{
+	return syscall(SYS_gettimeofday,tv,tz);
+}
+
+time_t time( time_t *t )
+{
+	time_t result = syscall(SYS_time);
+	if(t) *t = result;
+	return result;
+}
+
+int clock_gettime(clockid_t clk_id, struct timespec *tp)
+{
+	return syscall(SYS_clock_gettime,clk_id,tp);
 }
 
 /*
