@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "pfs_process.h"
 #include "pfs_service.h"
 #include "pfs_table.h"
+#include "pfs_time.h"
 #include "ptrace.h"
 
 extern "C" {
@@ -97,8 +98,6 @@ int set_foreground = 1;
 int pfs_syscall_disable_debug = 0;
 int pfs_allow_dynamic_mounts = 0;
 
-pfs_time_mode_t pfs_time_mode = PFS_TIME_MODE_NORMAL;
-
 char sys_temp_dir[PATH_MAX] = "/tmp";
 char pfs_temp_dir[PATH_MAX];
 char pfs_temp_per_instance_dir[PATH_MAX];
@@ -160,6 +159,8 @@ enum {
 	LONG_OPT_FAKE_SETUID,
 	LONG_OPT_DYNAMIC_MOUNTS,
 	LONG_OPT_IS_RUNNING,
+	LONG_OPT_TIME_STOP,
+	LONG_OPT_TIME_WARP
 };
 
 static void get_linux_version(const char *cmd)
@@ -1065,10 +1066,11 @@ int main( int argc, char *argv[] )
 		}
 		case LONG_OPT_TIME_STOP:
 			pfs_time_mode = PFS_TIME_MODE_STOP;
+			pfs_use_helper = 1;
 			break;
 		case LONG_OPT_TIME_WARP:
 			pfs_time_mode = PFS_TIME_MODE_WARP;
-			pfs_time_warp_start = time(0);
+			pfs_use_helper = 1;
 			break;
 		default:
 			show_help(argv[0]);

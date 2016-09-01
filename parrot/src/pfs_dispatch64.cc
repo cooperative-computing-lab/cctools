@@ -26,6 +26,7 @@ int pfs_dispatch64( struct pfs_process *p )
 #include "pfs_process.h"
 #include "pfs_service.h"
 #include "pfs_sys.h"
+#include "pfs_time.h"
 
 extern "C" {
 #include "buffer.h"
@@ -137,6 +138,9 @@ extern INT64_T pfs_write_count;
 
 extern int parrot_dir_fd;
 extern int *pfs_syscall_totals64;
+
+extern pfs_time_mode_t pfs_time_mode;
+extern time_t pfs_time_warp_start;
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
 int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
@@ -1024,7 +1028,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_capget:
 		case SYSCALL64_capset:
 		case SYSCALL64_clock_getres:
-		case SYSCALL64_clock_gettime:
 		case SYSCALL64_clock_nanosleep:
 		case SYSCALL64_clock_settime:
 		case SYSCALL64_create_module:
@@ -1047,7 +1050,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_getrusage:
 		case SYSCALL64_getsid:
 		case SYSCALL64_gettid:
-		case SYSCALL64_gettimeofday:
 		case SYSCALL64_init_module:
 		case SYSCALL64_ioperm:
 		case SYSCALL64_iopl:
@@ -1129,17 +1131,29 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_time:
 			if(entering) {
-				switch(pfs_time_mode) {
-					case PFS_TIME_MODE_STOP:
-						divert_to_dummy(p,0);
-						break;
-					case PFS_TIME_MODE_WARP:
-						divert_to_dummy(p,0);
-						break;
-					case PFS_TIME_MODE_NORMAL:
-						default:
-						break;
-				}
+				p->syscall_result = pfs_emulate_time(0);
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL64_gettimeofday:
+			if(entering) {
+				struct timeval tv;
+				struct timezone tz;
+				pfs_emulate_gettimeofday(&tv,&tz);
+				if(args[0]) tracer_copy_out(p->tracer,&tv,POINTER(args[0]),sizeof(tv),TRACER_O_ATOMIC);
+				if(args[1]) tracer_copy_out(p->tracer,&tz,POINTER(args[1]),sizeof(tz),TRACER_O_ATOMIC);
+				p->syscall_result = 0;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+		case SYSCALL64_clock_gettime:
+			if(entering) {
+				struct timespec ts;
+				pfs_emulate_clock_gettime(args[0],&ts);
+				if(args[1]) tracer_copy_out(p->tracer,&ts,POINTER(args[1]),sizeof(ts),TRACER_O_ATOMIC);
+				p->syscall_result = 0;
+				divert_to_dummy(p,p->syscall_result);
 			}
 			break;
 
