@@ -25,6 +25,12 @@ typedef INT64_T pfs_ssize_t;
 typedef INT64_T pfs_size_t;
 typedef INT64_T pfs_off_t;
 
+typedef enum {
+	PFS_TIME_MODE_NORMAL,
+	PFS_TIME_MODE_WARP
+	PFS_TIME_MODE_STOP,
+} pfs_time_mode_t;
+
 #define PFS_SIZE_FORMAT "lld"
 
 struct pfs_stat {

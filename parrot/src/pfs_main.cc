@@ -97,6 +97,8 @@ int set_foreground = 1;
 int pfs_syscall_disable_debug = 0;
 int pfs_allow_dynamic_mounts = 0;
 
+pfs_time_mode_t pfs_time_mode = PFS_TIME_MODE_NORMAL;
+
 char sys_temp_dir[PATH_MAX] = "/tmp";
 char pfs_temp_dir[PATH_MAX];
 char pfs_temp_per_instance_dir[PATH_MAX];
@@ -836,6 +838,8 @@ int main( int argc, char *argv[] )
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
 		{"work-dir", required_argument, 0, 'w'},
+		{"time-stop", no_argument, 0, LONG_OPT_TIME_STOP},
+		{"time-warp", no_argument, 0, LONG_OPT_TIME_WARP},
 		{0,0,0,0}
 	};
 
@@ -1059,6 +1063,13 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		}
+		case LONG_OPT_TIME_STOP:
+			pfs_time_mode = PFS_TIME_MODE_STOP;
+			break;
+		case LONG_OPT_TIME_WARP:
+			pfs_time_mode = PFS_TIME_MODE_WARP;
+			pfs_time_warp_start = time(0);
+			break;
 		default:
 			show_help(argv[0]);
 			break;

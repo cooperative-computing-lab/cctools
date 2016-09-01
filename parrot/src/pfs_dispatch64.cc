@@ -1115,7 +1115,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_sync:
 		case SYSCALL64_sysinfo:
 		case SYSCALL64_syslog:
-		case SYSCALL64_time:
 		case SYSCALL64_timer_create:
 		case SYSCALL64_timer_delete:
 		case SYSCALL64_timer_getoverrun:
@@ -1126,6 +1125,22 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_vhangup:
 		case SYSCALL64_wait4:
 		case SYSCALL64_waitid:
+			break;
+
+		case SYSCALL64_time:
+			if(entering) {
+				switch(pfs_time_mode) {
+					case PFS_TIME_MODE_STOP:
+						divert_to_dummy(p,0);
+						break;
+					case PFS_TIME_MODE_WARP:
+						divert_to_dummy(p,0);
+						break;
+					case PFS_TIME_MODE_NORMAL:
+						default:
+						break;
+				}
+			}
 			break;
 
 		case SYSCALL64_execve:
