@@ -24,6 +24,7 @@ MF_DONE_FILE = "makeflow_done"
 
 TASK_CPUS = 3
 TASK_MEM = 32
+RETRY_TIMES = 3
 
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
@@ -156,7 +157,7 @@ class MakeflowScheduler(Scheduler):
 
             with mms.lock:
                 for task_info in mms.tasks_info_dict.itervalues():
-                    if task_info.action == "submitted" \
+                    if (task_info.action == "submitted" or task_info.action == "resubmitted")\
                        and remaining_cpus >= TASK_CPUS \
                        and remaining_mem >= TASK_MEM:
 
@@ -197,14 +198,23 @@ class MakeflowScheduler(Scheduler):
                 oup_fn.write("{0},lost\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "lost"
                 logging.error("{0}".format(update.message))
+
             if update.state == mesos_pb2.TASK_ERROR:
-                oup_fn.write("{0},error\n".format(update.task_id.value))
-                mms.tasks_info_dict[update.task_id.value].action = "error"
+                if mms.tasks_info_dict[update.task_id.value].num_exe >= RETRY_TIMES:
+                    oup_fn.write("{0},error\n".format(update.task_id.value))
+                    mms.tasks_info_dict[update.task_id.value].action = "error"
+                else:
+                    mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
+                    mms.tasks_info_dict[update.task_id.value].num_exe += 1
+                    logging.info("{0} try to resubmit task {1}".format(update.message,\
+                     update.task_id.value))
                 logging.error("{0}".format(update.message))
+
             if update.state == mesos_pb2.TASK_FAILED:
                 oup_fn.write("{0},failed\n".format(update.task_id.value))
                 logging.info("Executor failed with reason code {0}.".format(update.reason))
                 mms.tasks_info_dict[update.task_id.value].action = "failed"
+
             if update.state == mesos_pb2.TASK_FINISHED:
                 oup_fn.write("{0},finished\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "finished"

@@ -40,6 +40,7 @@ class MfMesosTaskInfo:
         self.inp_fns = inp_fns
         self.oup_fns = oup_fns
         self.action = action
+        self.num_exe = 0
         self.executor_id = None
 
 # Makeflow Mesos executor info class
