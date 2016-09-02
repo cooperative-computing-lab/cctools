@@ -137,7 +137,7 @@ static struct makeflow_monitor *monitor = 0;
 
 /* is true only if the -N command is used. Useful for catalog reporting.
  */
-static int in_n_mode = 0;
+static int catalog_reporting_on = 0;
 
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
@@ -885,7 +885,7 @@ static void makeflow_run( struct dag *d )
         int first_report = 1;
 
         //reporting to catalog
-        if(in_n_mode){
+        if(catalog_reporting_on){
             makeflow_catalog_summary(d, project, batch_queue_type, start);
         }
 
@@ -928,7 +928,7 @@ static void makeflow_run( struct dag *d )
 
                 //report to catalog
                 timestamp_t now = timestamp_get();
-                if(in_n_mode && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
+                if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
                     makeflow_catalog_summary(d, project,batch_queue_type,start);
                     last_time = now;
                     first_report = 0;
@@ -945,7 +945,7 @@ static void makeflow_run( struct dag *d )
 	}
         
         //reporting to catalog
-        if(in_n_mode){
+        if(catalog_reporting_on){
             makeflow_catalog_summary(d, project,batch_queue_type,start);
         }
 
@@ -1332,7 +1332,7 @@ int main(int argc, char *argv[])
 				free(project);
 				project = xxstrdup(optarg);
 				work_queue_master_mode = "catalog";
-                                in_n_mode = 1; //set to true
+                                catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
 				debug_config_file(optarg);
