@@ -506,7 +506,6 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 			lexer_preppend_token(bk, t);
 
 			dag_parse_variable_wmode(bk, n, '=');
-		} else {
 		}
 	} else {
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
