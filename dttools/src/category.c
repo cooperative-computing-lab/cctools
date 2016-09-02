@@ -240,7 +240,7 @@ void category_inc_histogram_count_aux(struct histogram *h, double value, double 
 	}
 }
 
-#define category_inc_histogram_count(c, field, summary, bucket_size)\
+#define category_inc_histogram_count(c, field, summary)\
 {\
 	double value        = (summary)->field;\
 	double walltime     = (summary)->wall_time;\
@@ -253,35 +253,39 @@ void category_first_allocation_accum_times(struct histogram *h, double *keys, do
 	int n = histogram_size(h);
 
 	double *times_mean = malloc(n*sizeof(double));
+	double *counts     = malloc(n*sizeof(double));
 
 	// accumulate counts and compute mean times per bucket...
 	int i;
 	for(i = 0; i < n; i++) {
-		double previous    = i > 0 ? counts_cdp[i - 1] : 0;
 		int count          = histogram_count(h, keys[i]);
 		double *time_value = (double *) histogram_get_data(h, keys[i]);
-		counts_cdp[i]      = previous + count;
+		counts[i]          = count;
 		times_mean[i]      = (*time_value)/count;
 	}
-	//... and compute the cumulative probability distribution
+	//... and compute the probability distribution and cumulative
 	for(i = 0; i < n; i++) {
+		counts_cdp[i]  = (i > 0 ? counts_cdp[i-1] : 0) + counts[i];
+	}
+	for(i = 0; i < n; i++) {
+		counts[i]     /= counts_cdp[n-1];
 		counts_cdp[i] /= counts_cdp[n-1];
 	}
 
 	// compute proportion of mean time for buckets larger than i, for each i.
 	for(i = n-1; i >= 0; i--) {
-		times_accum[i] = times_accum[i] + (times_mean[i] * counts_cdp[i]);
+		// base case
+		if(i == n-1) {
+			times_accum[i] = 0;
+		} else {
+			times_accum[i] = times_accum[i+1] + (times_mean[i+1] * counts[i+1]);
+		}
 	}
 
 	// set overall mean time
-	*tau_mean = times_accum[0];
+	*tau_mean = times_accum[0] + (times_mean[0] * counts[0]);
 
-	// offset above computation, for strictly larger
-	for(i = 1; i < n; i++) {
-		times_accum[i-1] = times_accum[i];
-	}
-	times_accum[n-1] = 0;
-
+	free(counts);
 	free(times_mean);
 }
 
@@ -391,7 +395,6 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 		double denominator = tau_mean + times_accum[i];
 
 		double  Ta = numerator/denominator;
-
 
 		if(Ta > Ta_1) {
 			Ta_1 = Ta;
@@ -528,21 +531,21 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 
 	rmsummary_merge_max(c->max_resources_seen, rs);
 	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
-		category_inc_histogram_count(c, cores,          rs, 1);
-		category_inc_histogram_count(c, cpu_time,       rs, time_bucket_size);
-		category_inc_histogram_count(c, wall_time,      rs, time_bucket_size);
-		category_inc_histogram_count(c, virtual_memory, rs, memory_bucket_size);
-		category_inc_histogram_count(c, memory,         rs, memory_bucket_size);
-		category_inc_histogram_count(c, swap_memory,    rs, memory_bucket_size);
-		category_inc_histogram_count(c, bytes_read,     rs, bytes_bucket_size);
-		category_inc_histogram_count(c, bytes_written,  rs, bytes_bucket_size);
-		category_inc_histogram_count(c, bytes_sent,     rs, bytes_bucket_size);
-		category_inc_histogram_count(c, bytes_received, rs, bytes_bucket_size);
-		category_inc_histogram_count(c, bandwidth,      rs, bandwidth_bucket_size);
-		category_inc_histogram_count(c, total_files,    rs, 1);
-		category_inc_histogram_count(c, disk,           rs, disk_bucket_size);
-		category_inc_histogram_count(c, max_concurrent_processes, rs, 1);
-		category_inc_histogram_count(c, total_processes,rs, 1);
+		category_inc_histogram_count(c, cores,          rs);
+		category_inc_histogram_count(c, cpu_time,       rs);
+		category_inc_histogram_count(c, wall_time,      rs);
+		category_inc_histogram_count(c, virtual_memory, rs);
+		category_inc_histogram_count(c, memory,         rs);
+		category_inc_histogram_count(c, swap_memory,    rs);
+		category_inc_histogram_count(c, bytes_read,     rs);
+		category_inc_histogram_count(c, bytes_written,  rs);
+		category_inc_histogram_count(c, bytes_sent,     rs);
+		category_inc_histogram_count(c, bytes_received, rs);
+		category_inc_histogram_count(c, bandwidth,      rs);
+		category_inc_histogram_count(c, total_files,    rs);
+		category_inc_histogram_count(c, disk,           rs);
+		category_inc_histogram_count(c, max_concurrent_processes, rs);
+		category_inc_histogram_count(c, total_processes,rs);
 
 		c->completions_since_last_reset++;
 

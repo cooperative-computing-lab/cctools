@@ -4068,6 +4068,8 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			logging.debug("The inputs option: %s", input_files)
 			input_list_origin = input_files.split(',')
 			for item in input_list_origin:
+				if item == '':
+					continue
 				index = item.find('=')
 				access_path = item[:index]
 				actual_path = item[(index+1):]
@@ -4094,6 +4096,8 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.debug("the output option: %s", output_dir)
 				outputs = output_dir.split(',')
 				for item in outputs:
+					if item == '':
+						continue
 					index = item.find('=')
 					access_path = item[:index]
 					if access_path[0] != '/':

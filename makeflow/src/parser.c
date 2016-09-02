@@ -460,7 +460,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 
 		free(filename);
 		free(size);
-	} else if(!strcmp(".RESOURCE", name)){
+	} else if(!strcmp(".RESOURCE", name)) {
 		t = lexer_next_token(bk);
 		if(t->type != TOKEN_LITERAL)
 		{
@@ -473,21 +473,40 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
 		}
 
-		if((!strcmp("CORES", t->lexeme)) || (!strcmp("DISK", t->lexeme)) || (!strcmp("MEMORY", t->lexeme))){
+		int set_var = 1;
+
+		if((!strcmp("CORES", t->lexeme))
+				|| (!strcmp("DISK", t->lexeme))
+				|| (!strcmp("MEMORY", t->lexeme))) {
 			if(!(string_metric_parse(t2->lexeme) >= 0))
 				lexer_report_error(bk, "Expected numeric value for %s, got: %s\n", t->lexeme, t2->lexeme);
-		} else if(!strcmp("CATEGORY", t->lexeme)){
+		} else if(!strcmp("CATEGORY", t->lexeme)) {
 			if(!(t2->lexeme))
 				lexer_report_error(bk, "Expected name for CATEGORY");
+		} else if(!strcmp("MODE", t->lexeme)) {
+			set_var = 0;
+			if(!(t2->lexeme)) {
+				lexer_report_error(bk, "Expected category allocation mode.");
+			} else if(!strcmp("MAX_THROUGHPUT", t2->lexeme)) {
+				category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT);
+			} else if(!strcmp("MIN_WASTE", t2->lexeme)) {
+				category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_MIN_WASTE);
+			} else if(!strcmp("FIXED", t2->lexeme)) {
+				category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_FIXED);
+			} else {
+				lexer_report_error(bk, "Expected one of: MAX_THROUGHPUT, MIN_WASTE, FIXED.");
+			}
 		} else {
 			lexer_report_error(bk, "Unsupported .RESOURCE type, got: %s\n", t->lexeme);
 			return 0;
 		}
 
-		lexer_preppend_token(bk, t2);
-		lexer_preppend_token(bk, t);
+		if(set_var) {
+			lexer_preppend_token(bk, t2);
+			lexer_preppend_token(bk, t);
 
-		dag_parse_variable_wmode(bk, n, '=');
+			dag_parse_variable_wmode(bk, n, '=');
+		}
 	} else {
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
 		result = 0;
