@@ -70,7 +70,7 @@ char *get_rule_number(const char *filename);
 int field_is_active(const char *key);
 int field_is_cumulative(const char *key);
 
-void parse_fields_options(char *field_str);
+void parse_fields_options(const char *field_str);
 char *parse_executable_name(char *command);
 
 void parse_summary_from_filelist(struct rmsummary_set *dest, char *filename, struct hash_table *categories);

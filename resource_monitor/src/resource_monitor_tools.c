@@ -69,80 +69,67 @@ char *get_rule_number(const char *filename)
 	return xxstrdup(name);
 }
 
-void parse_fields_options(char *field_str)
+void parse_fields_options(const char *field_str)
 {
 	if(!active_fields) {
 		init_field_active();
 	}
 	hash_table_clear(active_fields);
 
-	char *c = field_str;
-	while( *c != '\0' )
-	{
-		switch(*c)
-		{
-			case 't':
-				hash_table_insert(active_fields, "wall_time", active_fields);
-				debug(D_RMON, "adding field: wall time\n");
-				break;
-			case 'p':
-				hash_table_insert(active_fields, "max_concurrent_processes", active_fields);
-				debug(D_RMON, "adding field: concurrent processes\n");
-				break;
-			case 'P':
-				hash_table_insert(active_fields, "total_processes", active_fields);
-				debug(D_RMON, "adding field: total processes\n");
-				break;
-			case 'c':
-				hash_table_insert(active_fields, "cpu_time", active_fields);
-				debug(D_RMON, "adding field: cpu time\n");
-				break;
-			case 'v':
-				hash_table_insert(active_fields, "virtual_memory", active_fields);
-				debug(D_RMON, "adding field: virtual memory\n");
-				break;
-			case 'm':
-				hash_table_insert(active_fields, "memory", active_fields);
-				debug(D_RMON, "adding field: resident memory\n");
-				break;
-			case 's':
-				hash_table_insert(active_fields, "swap_memory", active_fields);
-				debug(D_RMON, "adding field: swap memory\n");
-				break;
-			case 'r':
-				hash_table_insert(active_fields, "bytes_read", active_fields);
-				debug(D_RMON, "adding field: bytes read\n");
-				break;
-			case 'w':
-				hash_table_insert(active_fields, "bytes_written", active_fields);
-				debug(D_RMON, "adding field: bytes written\n");
-				break;
-			case 'R':
-				hash_table_insert(active_fields, "bytes_received", active_fields);
-				debug(D_RMON, "adding field: bytes received\n");
-				break;
-			case 'W':
-				hash_table_insert(active_fields, "bytes_sent", active_fields);
-				debug(D_RMON, "adding field: bytes sent\n");
-				break;
-			case 'n':
-				hash_table_insert(active_fields, "total_files", active_fields);
-				debug(D_RMON, "adding field: number of files\n");
-				break;
-			case 'z':
-				hash_table_insert(active_fields, "disk", active_fields);
-				debug(D_RMON, "adding field: disk\n");
-				break;
-			case 'C':
-				hash_table_insert(active_fields, "cores", active_fields);
-				debug(D_RMON, "adding field: cores\n");
-				break;
-			default:
-				fatal("'%c' is not a field option\n", *c);
-				break;
+	char *fields = xxstrdup(field_str);
+
+	char *token = strtok(fields, ",");
+	while(token) {
+		if(strcmp(token, "wall_time") == 0) {
+			hash_table_insert(active_fields, "wall_time", active_fields);
+			debug(D_RMON, "adding field: wall time\n");
+		} else if(strcmp(token, "max_concurrent_processes") == 0) {
+			hash_table_insert(active_fields, "max_concurrent_processes", active_fields);
+			debug(D_RMON, "adding field: concurrent processes\n");
+		} else if(strcmp(token, "total_processes") == 0) {
+			hash_table_insert(active_fields, "total_processes", active_fields);
+			debug(D_RMON, "adding field: total processes\n");
+		} else if(strcmp(token, "cpu_time") == 0) {
+			hash_table_insert(active_fields, "cpu_time", active_fields);
+			debug(D_RMON, "adding field: cpu time\n");
+		} else if(strcmp(token, "virtual_memory") == 0) {
+			hash_table_insert(active_fields, "virtual_memory", active_fields);
+			debug(D_RMON, "adding field: virtual memory\n");
+		} else if(strcmp(token, "memory") == 0) {
+			hash_table_insert(active_fields, "memory", active_fields);
+			debug(D_RMON, "adding field: resident memory\n");
+		} else if(strcmp(token, "swap_memory") == 0) {
+			hash_table_insert(active_fields, "swap_memory", active_fields);
+			debug(D_RMON, "adding field: swap memory\n");
+		} else if(strcmp(token, "bytes_read") == 0) {
+			hash_table_insert(active_fields, "bytes_read", active_fields);
+			debug(D_RMON, "adding field: bytes read\n");
+		} else if(strcmp(token, "bytes_written") == 0) {
+			hash_table_insert(active_fields, "bytes_written", active_fields);
+			debug(D_RMON, "adding field: bytes written\n");
+		} else if(strcmp(token, "bytes_received") == 0) {
+			hash_table_insert(active_fields, "bytes_received", active_fields);
+			debug(D_RMON, "adding field: bytes received\n");
+		} else if(strcmp(token, "bytes_sent") == 0) {
+			hash_table_insert(active_fields, "bytes_sent", active_fields);
+			debug(D_RMON, "adding field: bytes sent\n");
+		} else if(strcmp(token, "total_files") == 0) {
+			hash_table_insert(active_fields, "total_files", active_fields);
+			debug(D_RMON, "adding field: number of files\n");
+		} else if(strcmp(token, "disk") == 0) {
+			hash_table_insert(active_fields, "disk", active_fields);
+			debug(D_RMON, "adding field: disk\n");
+		} else if(strcmp(token, "cores") == 0) {
+			hash_table_insert(active_fields, "cores", active_fields);
+			debug(D_RMON, "adding field: cores\n");
+		} else {
+			fatal("'%s' is not a field option\n", token);
 		}
-		c++;
+
+		token = strtok(NULL, ",");
 	}
+
+	free(fields);
 }
 
 struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
