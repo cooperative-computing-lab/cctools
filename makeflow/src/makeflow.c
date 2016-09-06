@@ -30,6 +30,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "jx_eval.h"
+#include "create_dir.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -89,6 +90,7 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+#define REPLICATION_DEFAULT_DIRECTORY "/tmp/MakeflowCache/"
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -1124,6 +1126,8 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
+	printf(" %-30s Replicate results of makeflow in specified directory			   (default directory is %s)\n", "--replicate=<dir>", REPLICATION_DEFAULT_DIRECTORY);
+
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
@@ -1147,6 +1151,8 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
+	int dir_creation = 0;
+	int should_replicate = 0;
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
@@ -1166,6 +1172,7 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+	char *replicate_directory = REPLICATION_DEFAULT_DIRECTORY;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
 
@@ -1235,6 +1242,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
+		LONG_OPT_REPLICATION
 	};
 
 	static const struct option long_options_run[] = {
@@ -1309,6 +1317,7 @@ int main(int argc, char *argv[])
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+		{"replicate", optional_argument, 0, LONG_OPT_REPLICATION},
 		{0, 0, 0, 0}
 	};
 
@@ -1598,6 +1607,17 @@ int main(int argc, char *argv[])
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
 				break;
+			case LONG_OPT_REPLICATION:
+				should_replicate = 1;
+				if (optarg) {
+					replicate_directory = xxstrdup(optarg);
+				}
+				dir_creation = create_dir(replicate_directory, 0777);
+				if (!dir_creation) {
+					fatal("Could not create directory %s\n", replicate_directory);
+				}
+       	// not yet implemented
+        break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1951,6 +1971,10 @@ if (enforcer && wrapper_umbrella) {
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
             makeflow_wrapper_singularity_init(wrapper, container_image);
         }
+
+	if(should_replicate) {
+		// TODO: replicate data within cacheing directory
+	}
 
 	makeflow_run(d);
 	time_completed = timestamp_get();
