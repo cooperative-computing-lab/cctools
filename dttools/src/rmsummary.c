@@ -157,6 +157,16 @@ double rmsummary_to_external_unit(const char *field, int64_t n) {
 	return nd;
 }
 
+const char *rmsummary_unit_of(const char *key) {
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
+
+	if(!cf) {
+		return NULL;
+	}
+
+	return cf->external_unit;
+}
+
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
 		if(s->category)
@@ -179,10 +189,10 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 		return 1;
 	}
 
-	if(strcmp(key, "task_id") == 0) {
-		if(s->task_id)
-			free(s->task_id);
-		s->task_id = xxstrdup(value);
+	if(strcmp(key, "taskid") == 0) {
+		if(s->taskid)
+			free(s->taskid);
+		s->taskid = xxstrdup(value);
 		return 1;
 	}
 
@@ -294,8 +304,8 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 		return s->exit_type;
 	}
 
-	if(strcmp(key, "task_id") == 0) {
-		return s->task_id;
+	if(strcmp(key, "taskid") == 0) {
+		return s->taskid;
 	}
 
 	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
@@ -530,8 +540,8 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 		if(s->command)
 			jx_insert_string(output, "command",   s->command);
 
-		if(s->task_id)
-			jx_insert_string(output, "task_id",  s->task_id);
+		if(s->taskid)
+			jx_insert_string(output, "taskid",  s->taskid);
 
 		if(s->category)
 			jx_insert_string(output, "category",  s->category);
@@ -758,7 +768,7 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->command   = NULL;
 	s->category  = NULL;
 	s->exit_type = NULL;
-	s->task_id   = NULL;
+	s->taskid   = NULL;
 	s->limits_exceeded = NULL;
 	s->peak_times = NULL;
 
@@ -783,8 +793,8 @@ void rmsummary_delete(struct rmsummary *s)
 	if(s->exit_type)
 		free(s->exit_type);
 
-	if(s->task_id)
-		free(s->task_id);
+	if(s->taskid)
+		free(s->taskid);
 
 	if(s->limits_exceeded)
 		rmsummary_delete(s->limits_exceeded);
@@ -867,8 +877,8 @@ struct rmsummary *rmsummary_copy(const struct rmsummary *src)
 			dest->category = xxstrdup(src->category);
 		}
 
-		if(src->task_id) {
-			dest->task_id = xxstrdup(src->task_id);
+		if(src->taskid) {
+			dest->taskid = xxstrdup(src->taskid);
 		}
 
 		if(src->limits_exceeded) {
@@ -1050,5 +1060,81 @@ void rmsummary_debug_report(const struct rmsummary *s)
 	if(s->disk != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "disk", s->disk);
 }
+
+size_t rmsummary_field_offset(const char *key) {
+	if(!key) {
+		fatal("A field name was not given.");
+	}
+
+	if(!strcmp(key, "cores")) {
+		return offsetof(struct rmsummary, cores);
+	}
+
+	if(!strcmp(key, "disk")) {
+		return offsetof(struct rmsummary, disk);
+	}
+
+	if(!strcmp(key, "memory")) {
+		return offsetof(struct rmsummary, memory);
+	}
+
+	if(!strcmp(key, "virtual_memory")) {
+		return offsetof(struct rmsummary, virtual_memory);
+	}
+
+	if(!strcmp(key, "swap_memory")) {
+		return offsetof(struct rmsummary, swap_memory);
+	}
+
+	if(!strcmp(key, "wall_time")) {
+		return offsetof(struct rmsummary, wall_time);
+	}
+
+	if(!strcmp(key, "cpu_time")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_read")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_written")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_received")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_sent")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bandwidth")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "total_files")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "total_processes")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "max_concurrent_processes")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	fatal("Field '%s' was not found.");
+
+	return 0;
+}
+
+int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset) {
+	return (*((int64_t *) ((char *) s + offset)));
+}
+
+
 
 /* vim: set noexpandtab tabstop=4: */

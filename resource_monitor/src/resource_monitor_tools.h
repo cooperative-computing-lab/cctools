@@ -44,8 +44,6 @@ See the file COPYING for details.
 
 #define MAX_LINE 1024
 
-enum fields      { TASK_ID = 0, NUM_TASKS, WALL_TIME, CPU_TIME, MAX_PROCESSES, TOTAL_PROCESSES, VIRTUAL, RESIDENT, SWAP, B_READ, B_WRITTEN, B_RX, B_TX, BANDWIDTH, FILES, DISK, CORES, NUM_FIELDS};
-
 // Summaries in a set belong to the same category.
 // The *stats are divided per resource.
 struct rmsummary_set
@@ -60,42 +58,24 @@ struct rmsummary_set
 	uint64_t overhead_max_throughput_brute_force;
 
 	//per resource, address by field
-	struct itable *stats;
+	struct hash_table *stats;
+
 };
 
-struct field {
-	char  *abbrev;
-	char  *name;
-	char  *caption;
-	char  *units;
-	int    cummulative;
-	int    active;
-	size_t offset;
-};
 
-extern struct field fields[];
+char *sanitize_path_name(const char *name);
 
-#define value_of_field(s, f) (*((int64_t *) ((char *) s + (f)->offset)))
+char *get_rule_number(const char *filename);
 
-#define assign_to_field(s, f, v)\
-	*((double *) ((char *) s + (f)->offset)) = (double) v
+int field_is_active(const char *key);
+int field_is_cumulative(const char *key);
 
-char *sanitize_path_name(char *name);
-
-char *get_rule_number(char *filename);
-
-char *make_field_names_str(char *separator);
-
-
-
-void parse_fields_options(char *field_str);
+void parse_fields_options(const char *field_str);
 char *parse_executable_name(char *command);
 
 void parse_summary_from_filelist(struct rmsummary_set *dest, char *filename, struct hash_table *categories);
 void parse_summary_recursive(struct rmsummary_set *dest, char *dirname, struct hash_table *categories);
 
 struct rmsummary_set *make_new_set(char *category);
-
-char *field_str(struct field *f, double value);
 
 #endif

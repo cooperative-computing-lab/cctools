@@ -30,20 +30,25 @@ SUBSECTION(Output Options)
 OPTIONS_BEGIN
 OPTION_PAIR(` output_directory')The path in which to store the visualizations. See index.html for the root of the visualization.
 OPTION_ITEM(` workflow_name')Optional name to include to describe the workflow being visualized.
-OPTION_ITEM(` s')Generate histograms per task categories. Requires the summary files to have the field BOLD(category)
-OPTION_PAIR(-f,str)Select which fields for the histograms. Each field is represented by a single character. Default is: tcvmsrwhz. The available fields are:
+OPTION_PAIR(-f,str)Select which fields for the histograms. Default is "cores,memory,disk". Available fields are:
 OPTIONS_END
 
 LONGCODE_BEGIN
-t: wall time
-c: cpu time
-v: virtual memory
-m: resident memory
-s: swap memory
-r: read bytes
-w: written bytes
-n: num files
-z: footprint
+bandwidth
+bytes_read
+bytes_received
+bytes_send
+bytes_written
+cores
+cpu_time
+disk
+max_concurrent_processes
+memory
+swap_memory
+total_files
+total_processes
+virtual_memory
+wall_time
 LONGCODE_END
 
 SUBSECTION(Debugging Options)

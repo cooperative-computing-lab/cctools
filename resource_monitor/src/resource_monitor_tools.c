@@ -10,26 +10,45 @@ See the file COPYING for details.
 
 #include "jx_parse.h"
 
-struct field fields[NUM_FIELDS + 1] = {
-	[WALL_TIME] = {"t", "wall_time",      "wall time",       "s",        1, 1, offsetof(struct rmsummary, wall_time)},
-	[CPU_TIME]  = {"c", "cpu_time",       "cpu time",        "s",        1, 1, offsetof(struct rmsummary, cpu_time)},
-	[VIRTUAL  ] = {"v", "virtual_memory", "virtual memory",  "MB",       0, 1, offsetof(struct rmsummary, virtual_memory)},
-	[RESIDENT ] = {"m", "memory",         "resident memory", "MB",       0, 1, offsetof(struct rmsummary, memory)},
-	[SWAP     ] = {"s", "swap_memory",    "swap memory",     "MB",       0, 1, offsetof(struct rmsummary, swap_memory)},
-	[B_READ   ] = {"r", "bytes_read",     "read bytes",      "MB",       0, 1, offsetof(struct rmsummary, bytes_read)},
-	[B_WRITTEN] = {"w", "bytes_written",  "written bytes",   "MB",       0, 1, offsetof(struct rmsummary, bytes_written)},
-	[B_RX   ]   = {"R", "bytes_received", "received bytes",  "MB",       0, 1, offsetof(struct rmsummary, bytes_received)},
-	[B_TX]      = {"W", "bytes_sent",     "bytes_sent",      "MB",       0, 1, offsetof(struct rmsummary, bytes_sent)},
-	[BANDWIDTH] = {"B", "bandwidth",      "bandwidth",       "Mbps",     0, 1, offsetof(struct rmsummary, bandwidth)},
-	[FILES    ] = {"n", "total_files",    "num files",       "files",    0, 1, offsetof(struct rmsummary, total_files)},
-	[DISK]      = {"z", "disk",           "disk",            "MB",       0, 1, offsetof(struct rmsummary, disk)},
-	[CORES    ] = {"C", "cores",          "cores",           "cores",    0, 1, offsetof(struct rmsummary, cores)},
-	[MAX_PROCESSES]   = {"p", "max_concurrent_processes", "max processes",   "procs", 0, 0, offsetof(struct rmsummary, max_concurrent_processes)},
-	[TOTAL_PROCESSES] = {"P", "total_processes",          "total processes", "procs", 0, 0, offsetof(struct rmsummary, total_processes)},
-	[NUM_FIELDS] = {NULL, NULL, NULL, NULL, 0, 0, 0}
-};
+struct hash_table *active_fields      = NULL;
+struct hash_table *cummulative_fields = NULL;
 
-char *sanitize_path_name(char *name)
+void init_field_active() {
+	active_fields = hash_table_create(0,0);
+
+	hash_table_insert(active_fields, "cores",  active_fields);
+	hash_table_insert(active_fields, "disk",   active_fields);
+	hash_table_insert(active_fields, "memory", active_fields);
+}
+
+void init_field_cumulative() {
+
+	cummulative_fields = hash_table_create(0,0);
+
+	hash_table_insert(cummulative_fields, "wall_time", cummulative_fields);
+	hash_table_insert(cummulative_fields, "cpu_time",  cummulative_fields);
+}
+
+int field_is_active(const char *key) {
+
+	if(!active_fields) {
+		init_field_active();
+	}
+
+	return !!(hash_table_lookup(active_fields, key));
+}
+
+int field_is_cumulative(const char *key) {
+	if(!cummulative_fields) {
+		init_field_cumulative();
+	}
+
+	return !!(hash_table_lookup(cummulative_fields, key));
+}
+
+
+
+char *sanitize_path_name(const char *name)
 {
 	char *new = xxstrdup(name);
 
@@ -41,24 +60,7 @@ char *sanitize_path_name(char *name)
 	return new;
 }
 
-char *make_field_names_str(char *separator)
-{
-	char *str;
-	struct buffer b;
-	buffer_init(&b);
-
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-		if(f->active)
-			buffer_printf(&b, "%s: %s%s",  f->abbrev, f->name, separator);
-
-	buffer_dup(&b, &str);
-	buffer_free(&b);
-
-	return str;
-}
-
-char *get_rule_number(char *filename)
+char *get_rule_number(const char *filename)
 {
 	char  name[MAX_LINE];
 	const char *base =  path_basename(filename);
@@ -67,79 +69,67 @@ char *get_rule_number(char *filename)
 	return xxstrdup(name);
 }
 
-void parse_fields_options(char *field_str)
+void parse_fields_options(const char *field_str)
 {
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-		f->active = 0;
-
-	char *c = field_str;
-	while( *c != '\0' )
-	{
-		switch(*c)
-		{
-			case 't':
-				fields[WALL_TIME].active = 1;
-				debug(D_RMON, "adding field: wall time\n");
-				break;
-			case 'p':
-				fields[MAX_PROCESSES].active = 1;
-				debug(D_RMON, "adding field: concurrent processes\n");
-				break;
-			case 'P':
-				fields[TOTAL_PROCESSES].active = 1;
-				debug(D_RMON, "adding field: total processes\n");
-				break;
-			case 'c':
-				fields[CPU_TIME].active = 1;
-				debug(D_RMON, "adding field: cpu time\n");
-				break;
-			case 'v':
-				fields[VIRTUAL].active = 1;
-				debug(D_RMON, "adding field: virtual memory\n");
-				break;
-			case 'm':
-				fields[RESIDENT].active = 1;
-				debug(D_RMON, "adding field: resident memory\n");
-				break;
-			case 's':
-				fields[SWAP].active = 1;
-				debug(D_RMON, "adding field: swap memory\n");
-				break;
-			case 'r':
-				fields[B_READ].active = 1;
-				debug(D_RMON, "adding field: bytes read\n");
-				break;
-			case 'w':
-				fields[B_WRITTEN].active = 1;
-				debug(D_RMON, "adding field: bytes written\n");
-				break;
-			case 'R':
-				fields[B_RX].active = 1;
-				debug(D_RMON, "adding field: bytes received\n");
-				break;
-			case 'W':
-				fields[B_TX].active = 1;
-				debug(D_RMON, "adding field: bytes sent\n");
-				break;
-			case 'n':
-				fields[FILES].active = 1;
-				debug(D_RMON, "adding field: number of files\n");
-				break;
-			case 'z':
-				fields[DISK].active = 1;
-				debug(D_RMON, "adding field: footprint\n");
-				break;
-			case 'C':
-				fields[CORES].active = 1;
-				debug(D_RMON, "adding field: cores\n");
-				break;
-			default:
-				fatal("'%c' is not a field option\n", *c);
-				break;
-		}
-		c++;
+	if(!active_fields) {
+		init_field_active();
 	}
+	hash_table_clear(active_fields);
+
+	char *fields = xxstrdup(field_str);
+
+	char *token = strtok(fields, ",");
+	while(token) {
+		if(strcmp(token, "wall_time") == 0) {
+			hash_table_insert(active_fields, "wall_time", active_fields);
+			debug(D_RMON, "adding field: wall time\n");
+		} else if(strcmp(token, "max_concurrent_processes") == 0) {
+			hash_table_insert(active_fields, "max_concurrent_processes", active_fields);
+			debug(D_RMON, "adding field: concurrent processes\n");
+		} else if(strcmp(token, "total_processes") == 0) {
+			hash_table_insert(active_fields, "total_processes", active_fields);
+			debug(D_RMON, "adding field: total processes\n");
+		} else if(strcmp(token, "cpu_time") == 0) {
+			hash_table_insert(active_fields, "cpu_time", active_fields);
+			debug(D_RMON, "adding field: cpu time\n");
+		} else if(strcmp(token, "virtual_memory") == 0) {
+			hash_table_insert(active_fields, "virtual_memory", active_fields);
+			debug(D_RMON, "adding field: virtual memory\n");
+		} else if(strcmp(token, "memory") == 0) {
+			hash_table_insert(active_fields, "memory", active_fields);
+			debug(D_RMON, "adding field: resident memory\n");
+		} else if(strcmp(token, "swap_memory") == 0) {
+			hash_table_insert(active_fields, "swap_memory", active_fields);
+			debug(D_RMON, "adding field: swap memory\n");
+		} else if(strcmp(token, "bytes_read") == 0) {
+			hash_table_insert(active_fields, "bytes_read", active_fields);
+			debug(D_RMON, "adding field: bytes read\n");
+		} else if(strcmp(token, "bytes_written") == 0) {
+			hash_table_insert(active_fields, "bytes_written", active_fields);
+			debug(D_RMON, "adding field: bytes written\n");
+		} else if(strcmp(token, "bytes_received") == 0) {
+			hash_table_insert(active_fields, "bytes_received", active_fields);
+			debug(D_RMON, "adding field: bytes received\n");
+		} else if(strcmp(token, "bytes_sent") == 0) {
+			hash_table_insert(active_fields, "bytes_sent", active_fields);
+			debug(D_RMON, "adding field: bytes sent\n");
+		} else if(strcmp(token, "total_files") == 0) {
+			hash_table_insert(active_fields, "total_files", active_fields);
+			debug(D_RMON, "adding field: number of files\n");
+		} else if(strcmp(token, "disk") == 0) {
+			hash_table_insert(active_fields, "disk", active_fields);
+			debug(D_RMON, "adding field: disk\n");
+		} else if(strcmp(token, "cores") == 0) {
+			hash_table_insert(active_fields, "cores", active_fields);
+			debug(D_RMON, "adding field: cores\n");
+		} else {
+			fatal("'%s' is not a field option\n", token);
+		}
+
+		token = strtok(NULL, ",");
+	}
+
+	free(fields);
 }
 
 struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash_table *categories)
@@ -168,8 +158,8 @@ struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash
 	if(!so)
 		return NULL;
 
-	if(!so->task_id) {
-		so->task_id = get_rule_number(filename);
+	if(!so->taskid) {
+		so->taskid = get_rule_number(filename);
 	}
 
 	if(!so->category) {
@@ -178,16 +168,6 @@ struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash
 		} else {
 			so->category   = xxstrdup(DEFAULT_CATEGORY);
 			so->command    = xxstrdup(DEFAULT_CATEGORY);
-		}
-	}
-
-	// if a value is negative, set it to zero
-	struct field *f;
-	for(f = &fields[WALL_TIME]; f->name != NULL; f++)
-	{
-		if(value_of_field(so, f) < 0)
-		{
-			assign_to_field(so, f, 0);
 		}
 	}
 
@@ -299,7 +279,7 @@ struct rmsummary_set *make_new_set(char *category)
 	struct rmsummary_set *ss = malloc(sizeof(struct rmsummary_set));
 
 	ss->category_name = category;
-	ss->stats         = itable_create(0);
+	ss->stats         = hash_table_create(0,0);
 	ss->summaries     = list_create();
 
 	return ss;
