@@ -80,6 +80,8 @@ void rmsummary_print(FILE *stream, struct rmsummary *s, int pprint, struct jx *v
 void rmsummary_print_buffer(struct buffer *B, const struct rmsummary *s, int only_resources);
 char *rmsummary_print_string(const struct rmsummary *s, int only_resources);
 
+const char *rmsummary_unit_of(const char *key);
+
 int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t value);
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value);
 
@@ -113,5 +115,8 @@ void rmsummary_debug_report(const struct rmsummary *s);
 
 double rmsummary_to_external_unit(const char *field, int64_t n);
 int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit);
+
+size_t rmsummary_field_offset(const char *key);
+int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset);
 
 #endif

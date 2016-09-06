@@ -157,6 +157,16 @@ double rmsummary_to_external_unit(const char *field, int64_t n) {
 	return nd;
 }
 
+const char *rmsummary_unit_of(const char *key) {
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
+
+	if(!cf) {
+		return NULL;
+	}
+
+	return cf->external_unit;
+}
+
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
 		if(s->category)
@@ -1050,5 +1060,81 @@ void rmsummary_debug_report(const struct rmsummary *s)
 	if(s->disk != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "disk", s->disk);
 }
+
+size_t rmsummary_field_offset(const char *key) {
+	if(!key) {
+		fatal("A field name was not given.");
+	}
+
+	if(!strcmp(key, "cores")) {
+		return offsetof(struct rmsummary, cores);
+	}
+
+	if(!strcmp(key, "disk")) {
+		return offsetof(struct rmsummary, disk);
+	}
+
+	if(!strcmp(key, "memory")) {
+		return offsetof(struct rmsummary, memory);
+	}
+
+	if(!strcmp(key, "virtual_memory")) {
+		return offsetof(struct rmsummary, virtual_memory);
+	}
+
+	if(!strcmp(key, "swap_memory")) {
+		return offsetof(struct rmsummary, swap_memory);
+	}
+
+	if(!strcmp(key, "wall_time")) {
+		return offsetof(struct rmsummary, wall_time);
+	}
+
+	if(!strcmp(key, "cpu_time")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_read")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_written")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_received")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bytes_sent")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "bandwidth")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "total_files")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "total_processes")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	if(!strcmp(key, "max_concurrent_processes")) {
+		return offsetof(struct rmsummary, cpu_time);
+	}
+
+	fatal("Field '%s' was not found.");
+
+	return 0;
+}
+
+int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset) {
+	return (*((int64_t *) ((char *) s + offset)));
+}
+
+
 
 /* vim: set noexpandtab tabstop=4: */
