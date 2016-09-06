@@ -415,6 +415,7 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 	}
 
 	fprintf(stdout, "\n");
+	fflush(stdout);
 }
 
 void delete_projects_list(struct list *l)
