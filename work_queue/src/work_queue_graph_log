@@ -20,7 +20,7 @@ x_range       = None        # If unspecified, then plot all the valid range.
 log_entries   = None
 times         = None
 
-unit_labels   = {'s' : 'seconds', 'm' : 'minutes', 'h' : 'hours', 'd' : 'days', 'GB' : 'GB' }
+unit_labels   = {'s' : 'seconds', 'm' : 'minutes', 'h' : 'hours', 'd' : 'days', 'GB' : 'GB', 'i' : '' }
 unit_factors  = {'s' : 1, 'm' : 60, 'h' : 3600, 'd' : 86400, 'GB' : 1073741824}
 x_units       = 'm'          # Default is minutes.
 
@@ -39,7 +39,7 @@ def time_to_resolution(t):
     return (t - (t % (resolution * 1000000))) / 1000000
 
 def time_field_p(field):
-    return (field == 'timestamp' or re.search('^time_.*$', field))
+    return re.search('^time_.*$', field)
 
 def read_log_entries(file, fields):
     log_entries = {}
@@ -48,7 +48,7 @@ def read_log_entries(file, fields):
     epoch = None
     count_lines = 0
     prev_line = None
-    alpha = 0.1
+    alpha = 0.01
     capacity_total = []
     j = 0
 
@@ -57,7 +57,6 @@ def read_log_entries(file, fields):
         try:
             numbers = [float(x) for x in line.split()]
             record  = {}
-
 
             for (i, field) in pairs:
                 if time_field_p(field):
@@ -68,46 +67,35 @@ def read_log_entries(file, fields):
                     numbers[i] = numbers[i] - epoch
                 record[field] = numbers[i]
 
-            record['time_transfer'] = record['time_send'] + record['time_receive']
-            record['time_master']   = record['time_status_msgs'] + record['time_internal'] + record['time_polling'] + record['time_application']
+            record['time_master']   = record['time_status_msgs'] + record['time_internal'] + record['time_application'] + record['time_send'] + record['time_receive']
             record['bytes_sent'] /= unit_factors['GB']
             record['bytes_received'] /= unit_factors['GB']
             record['bytes_transfered'] = record['bytes_sent'] + record['bytes_received']
 
             try:
-                record['capacity_tasks'] = (record['time_execute'] + record['time_polling']) / (record['time_transfer'] + record['time_master'] - record['time_polling'])
+                record['capacity_tasks'] = (record['time_execute'] + record['time_polling']) / record['time_master']
             except ArithmeticError:
-                record['capacity_tasks'] = record['capacity_tasks']
+                record['capacity_tasks'] = 0
 
             if(prev_line is None):
+                record['time_master_weighted']  = record['time_master']
+                record['time_execute_weighted'] = record['time_execute_good'] + record['time_polling']
                 prev_line = record
-                prev_line['time_transfer_weighted'] = 0
-                prev_line['time_execute_weighted'] = 0
-                prev_line['capacity_weighted'] = 0
-                prev_line['capacity_tasks'] = 0
 
-            if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0): 
-                record['time_transfer_weighted'] = alpha * ((record['time_transfer']) - prev_line['time_transfer']) + ((1 - alpha) * prev_line['time_transfer_weighted'])
-                record['time_execute_weighted'] = alpha * (record['time_execute'] - prev_line['time_execute']) + ((1 - alpha) * prev_line['time_execute_weighted'])
-            else: 
-                record['time_transfer_weighted'] = prev_line['time_transfer_weighted']
-                record['time_execute_weighted'] = prev_line['time_execute_weighted']
+            record['time_master_weighted']   = (alpha * record['time_master'])                                  + ((1 - alpha) * prev_line['time_master_weighted'])
+            record['time_execute_weighted']  = (alpha * (record['time_execute_good'] + record['time_polling'])) + ((1 - alpha) * prev_line['time_execute_weighted'])
 
-            log_entries[record['timestamp']] = record
+            try:
+                record['capacity_weighted'] = record['time_execute_weighted'] / record['time_master_weighted']
+            except ArithmeticError:
+                record['capacity_weighted'] = record['capacity_tasks']
 
-            if(record['time_transfer_weighted'] > 0):
-                record['capacity_weighted'] = (int) (record['time_execute_weighted'] / record['time_transfer_weighted'])
-            else:
-                record['capacity_weighted'] = prev_line['capacity_weighted']
-            if(record['time_transfer'] > 0):
-                record['capacity_tasks'] = (int) (record['time_execute'] / record['time_transfer'])
             else:
                 record['capacity_tasks'] = prev_line['capacity_tasks']
             if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0):
                 prev_line = record
 
-            capacity_total.append(record['capacity_weighted'])
-            j += 1
+            prev_line = record
 
         except ValueError:
             sys.stderr.write('Line %d has an invalid value. Ignoring.\n' % (count_lines, ))
@@ -116,19 +104,6 @@ def read_log_entries(file, fields):
             sys.stderr.write('Line %d has less than %d fields. Aborting.\n' % (count_lines, len(fields)))
             sys.exit(1)
 
-    capacity_total = sorted(capacity_total, cmp=lambda x,y: cmp(x, y))
-    capacity_median = 0
-    if(j % 2 != 0):
-        capacity_median = ((int) (capacity_total[((int) (j / 2))] + capacity_total[(int) ((j / 2) + 1)]) / 2)
-    else:
-        capacity_median = capacity_total[(j / 2)]
-
-    capacity_mean = 0
-    for cap in capacity_total:
-        capacity_mean += cap
-        capacity_mean = (int) (capacity_mean / j)
-
-    print "Median capacity: ", capacity_median
     return log_entries
 
 def sort_time(log_entries):
