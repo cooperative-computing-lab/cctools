@@ -311,13 +311,13 @@ if __name__ == '__main__':
 
         plots['tasks'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous counts",
-                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks', 'capacity_weighted'],
-                labels = ['waiting', 'on workers', 'running', 'with results', 'capacity', 'weighted capacity'])
+                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results'],
+                labels = ['waiting', 'on workers', 'running', 'with results'])
 
-        plots['tasks-all-capacities'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
+        plots['tasks-capacities'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous capacities",
-                fields = ['tasks_waiting', 'tasks_on_workers', 'tasks_running', 'tasks_with_results', 'capacity_tasks', 'capacity_cores', 'capacity_memory', 'capacity_disk'],
-                labels = ['waiting', 'on workers', 'running', 'with results', 'task capacity', 'cores capacity', 'memory capacity', 'disk capacity'])
+                fields = ['tasks_running', 'capacity_tasks', 'capacity_weighted'],
+                labels = ['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
 
         plots['tasks-accum'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks cumulative counts",
@@ -326,8 +326,8 @@ if __name__ == '__main__':
 
         plots['time-master'] = WQPlot(x_units = x_units, ylabel = unit_labels[x_units], range = x_range,
             title = "cumulative times at the master",
-            fields = ['time_send', 'time_receive', 'time_transfer', 'time_polling', 'time_status_msgs', 'time_application', 'time_master'],
-            labels = ['send', 'receive', 'send+recv', 'master polling', 'master status msgs', 'master external', 'msgs+external+idle'])
+            fields = ['time_send', 'time_receive', 'time_polling', 'time_status_msgs', 'time_internal', 'time_application'],
+            labels = ['send', 'receive', 'master polling', 'master status msgs', 'master internal', 'master application'])
 
         plots['time-workers'] = WQPlot(x_units = x_units, y_units = 'h', ylabel = unit_labels['h'], range = x_range,
             title = "cumulative times at workers",
@@ -336,8 +336,8 @@ if __name__ == '__main__':
 
         plots['transfer'] = WQPlot(x_units = x_units, y_units = 'GB', ylabel = 'GB', range = x_range,
             title = "master data transfer",
-            fields = ['bytes_sent', 'bytes_received', 'bytes_transfered'],
-            labels = ['sent', 'received', 'transfered'])
+            fields = ['bytes_sent', 'bytes_received'],
+            labels = ['sent', 'received'])
 
         for name in plots.keys():
             plots[name].plot(prefix     + '.' + name + '.' + extension)
