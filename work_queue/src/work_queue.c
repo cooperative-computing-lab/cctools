@@ -148,6 +148,7 @@ struct work_queue {
 	struct work_queue_stats *stats;
 	struct work_queue_stats *stats_measure;
 	struct work_queue_stats *stats_disconnected_workers;
+	timestamp_t time_last_wait;
 
 	int worker_selection_algorithm;
 	int task_ordering;
@@ -4584,6 +4585,8 @@ struct work_queue *work_queue_create(int port)
 	q->stats->time_when_started = timestamp_get();
 	q->task_reports = list_create();
 
+	q->time_last_wait = 0;
+
 	q->catalog_hosts = 0;
 
 	q->keepalive_interval = WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL;
@@ -4620,6 +4623,8 @@ struct work_queue *work_queue_create(int port)
 	//Deprecated:
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
+
+	log_queue_stats(q);
 
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
@@ -5429,7 +5434,8 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 {
 	int events = 0;
 
-	q->stats->time_application = (timestamp_get() - q->stats->time_when_started) - q->stats->time_send - q->stats->time_receive - q->stats->time_status_msgs - q->stats->time_internal - q->stats->time_polling;
+	// account for time we spend outside work_queue_wait
+	q->stats->time_application = q->time_last_wait > 0 ? (timestamp_get() - q->time_last_wait) : 0;
 
 	print_password_warning(q);
 
@@ -5569,11 +5575,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		}
 	}
 
-	BEGIN_ACCUM_TIME(q, time_internal);
 	if(events > 0) {
 		log_queue_stats(q);
 	}
-	END_ACCUM_TIME(q, time_internal);
+
+	q->time_last_wait = timestamp_get();
 
 	return t;
 }
