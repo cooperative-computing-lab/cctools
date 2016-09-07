@@ -5871,7 +5871,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	struct work_queue_stats *qs;
 	qs = q->stats;
 
-	memset(s, 0, sizeof(*s));
+	memcpy(s, qs, sizeof(*s));
 
 	int known = known_workers(q);
 
@@ -5881,12 +5881,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	s->workers_busy      = workers_with_tasks(q);
 	s->workers_idle      = known - s->workers_busy;
 	// s->workers_able computed below.
-
-	s->workers_joined       = qs->workers_joined;
-	s->workers_removed      = qs->workers_removed;
-	s->workers_idled_out    = qs->workers_idled_out;
-	s->workers_fast_aborted = qs->workers_fast_aborted;
-	s->workers_lost         = qs->workers_lost;
 
 	//info about tasks
 	s->tasks_waiting      = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
@@ -5906,30 +5900,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		 * following line) */
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
-
-	s->tasks_submitted          = qs->tasks_submitted;
-	s->tasks_dispatched         = qs->tasks_dispatched;
-	s->tasks_done               = qs->tasks_done;
-	s->tasks_failed             = qs->tasks_failed;
-	s->tasks_cancelled          = qs->tasks_cancelled;
-	s->tasks_exhausted_attempts = qs->tasks_exhausted_attempts;
-
-	// Master time statistics:
-	s->time_when_started        = qs->time_when_started;
-	s->time_send         = qs->time_send;
-	s->time_receive      = qs->time_receive;
-	s->time_send_good    = qs->time_send_good;
-	s->time_receive_good = qs->time_receive_good;
-	s->time_application  = qs->time_application;
-	s->time_polling      = qs->time_polling;
-
-	// Workers time statistics:
-	s->time_workers_execute            = qs->time_workers_execute;
-	s->time_workers_execute_good       = qs->time_workers_execute_good;
-	s->time_workers_execute_exhaustion = qs->time_workers_execute_exhaustion;
-
-	s->bytes_sent     = qs->bytes_sent;
-	s->bytes_received = qs->bytes_received;
 
 	//s->capacity_ratio, s->capacity_cores, s->capacity_memory, s->capacity_disk:
 	compute_capacity(q, s);
