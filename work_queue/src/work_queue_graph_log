@@ -59,13 +59,20 @@ def read_log_entries(file, fields):
             record  = {}
 
             for (i, field) in pairs:
-                if time_field_p(field):
-                    numbers[i] = time_to_resolution(numbers[i])
                 if field == 'timestamp':
+                    record['time_step'] = time_to_resolution(numbers[i])
                     if not epoch:
-                        epoch = numbers[i]
-                    numbers[i] = numbers[i] - epoch
-                record[field] = numbers[i]
+                        epoch = numbers[i]/1000000
+                    record['timestamp'] = numbers[i]/1000000 - epoch
+                elif time_field_p(field):
+                    record[field] = numbers[i]/1000000
+                else:
+                    record[field] = numbers[i]
+
+            if prev_line and record['time_step'] == prev_line['time_step']:
+                continue
+
+            log_entries[record['timestamp']] = record
 
             record['time_master']   = record['time_status_msgs'] + record['time_internal'] + record['time_application'] + record['time_send'] + record['time_receive']
             record['bytes_sent'] /= unit_factors['GB']
@@ -90,10 +97,26 @@ def read_log_entries(file, fields):
             except ArithmeticError:
                 record['capacity_weighted'] = record['capacity_tasks']
 
+            delta = {}
+            for key in record.keys():
+                delta[key] = record[key] - prev_line[key];
+
+            if delta['timestamp'] > 0:
+                record['stack_time_status_msgs'] = 100 * (delta['time_status_msgs'] / delta['timestamp'])
+                record['stack_time_internal']    = 100 * (delta['time_internal']    / delta['timestamp']) + record['stack_time_status_msgs']
+                record['stack_time_polling']     = 100 * (delta['time_polling']     / delta['timestamp']) + record['stack_time_internal']
+                record['stack_time_send']        = 100 * (delta['time_send']        / delta['timestamp']) + record['stack_time_polling']
+                record['stack_time_receive']     = 100 * (delta['time_receive']     / delta['timestamp']) + record['stack_time_send']
+                record['stack_time_application'] = 100 * (delta['time_application'] / delta['timestamp']) + record['stack_time_receive']
+                record['stack_time_other']       = 100
             else:
-                record['capacity_tasks'] = prev_line['capacity_tasks']
-            if(record['time_execute'] - prev_line['time_execute'] > 0 and record['time_transfer'] - prev_line['time_transfer'] > 0):
-                prev_line = record
+                record['stack_time_status_msgs'] = 0
+                record['stack_time_internal']    = 0
+                record['stack_time_polling']     = 0
+                record['stack_time_send']        = 0
+                record['stack_time_receive']     = 0
+                record['stack_time_application'] = 0
+                record['stack_time_other']       = 100
 
             prev_line = record
 
@@ -118,7 +141,7 @@ def pout(file, str):
     file.write('\n')
 
 class WQPlot:
-    def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range):
+    def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range, stack = False):
         self.title   = title
         self.fields  = fields
         self.labels  = labels or self.fields
@@ -126,6 +149,7 @@ class WQPlot:
         self.y_units = y_units
         self.ylabel  = ylabel
         self.range   = range
+        self.stack   = stack
 
     def preamble(self, file):
         self.__preamble_common(file)
@@ -136,10 +160,15 @@ set term {fmt} butt linewidth 1
 set title  '{title}'
 set xlabel '{x_units}'
 set ylabel '{y_units}'
+set yrange [0:]
 set noborder
 set tics nomirror out
-set key left top
 """.format(fmt=format, title=self.title, x_units=unit_labels[self.x_units], y_units=self.ylabel))
+
+        if self.stack:
+            pout(file, "set key below\n")
+        else:
+            pout(file, "set key left top\n")
 
         intervals = [len(log_entries.keys())/x for x in [19,17,13,11,7,5,3]]
 
@@ -173,12 +202,18 @@ set style line 7 pt 1   lc rgb '#a6761d' pointinterval {6}
     def plot_line(self, label, place):
         return "'-' using 1:2 title '%s' with linespoints ls %d lw 3" % (label,place+1)
 
+    def plot_stack(self, label, place):
+        return "'-' using 1:2 title '%s' with fillsteps fs solid 1.0 noborder ls %d" % (label,place+1)
+
     def write_plot(self, file):
         self.preamble(file)
 
         plots = []
         for i in range(len(self.labels)):
-            plots.append(self.plot_line(self.labels[i], i))
+            if self.stack:
+                plots.append(self.plot_stack(self.labels[i], i))
+            else:
+                plots.append(self.plot_line(self.labels[i], i))
 
         pout(file, 'plot %s;' % (',\\\n'.join(plots),))
 
@@ -313,6 +348,11 @@ if __name__ == '__main__':
             title = "master data transfer",
             fields = ['bytes_sent', 'bytes_received'],
             labels = ['sent', 'received'])
+
+        plots['times-stacked'] = WQPlot(x_units = x_units, y_units = 's', ylabel = 'time %', range = x_range, stack = True,
+                title = 'master time proportions',
+                fields = ['stack_time_other', 'stack_time_application', 'stack_time_receive', 'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
+                labels = ['other', 'application', 'receive', 'send', 'polling', 'internal', 'status msgs'])
 
         for name in plots.keys():
             plots[name].plot(prefix     + '.' + name + '.' + extension)
