@@ -115,6 +115,7 @@ else:
 	import simplejson as json #json module is introduce in python 2.4.3
 
 #Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
+cctools_binary_source = "http://ccl.cse.nd.edu/research/data/hep-case-study/parrot"
 cctools_binary_version = "5.2.0"
 cctools_dest = ""
 
@@ -430,8 +431,8 @@ def cctools_download(sandbox_dir, hardware_platform, linux_distro, action):
 	Returns:
 		the path of the downloaded cctools in the umbrella local cache. For example: /tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64
 	"""
-	name = "cctools-%s-%s-%s" % (cctools_binary_version, hardware_platform, linux_distro)
-	source = "http://ccl.cse.nd.edu/software/files/%s.tar.gz" % name
+	name = "parrot-%s-%s-%s" % (cctools_binary_version, hardware_platform, linux_distro)
+	source = "%s/%s.tar.gz" % (cctools_binary_source, name)
 	global cctools_dest
 	cctools_dest = os.path.dirname(sandbox_dir) + "/cache/" + name
 	dependency_download(name, source, None, None, cctools_dest, "tgz", "unpack")
