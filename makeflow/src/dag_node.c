@@ -46,6 +46,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->resource_request = CATEGORY_ALLOCATION_FIRST;
 
+	n->umbrella_spec = NULL;
+
 	return n;
 }
 
@@ -97,6 +99,12 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename)
 	}
 
 	return name;
+}
+
+void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec)
+{
+	if(!n) return;
+	n->umbrella_spec = umbrella_spec;
 }
 
 /* Translate an absolute filename into a unique slash-less name to allow for the

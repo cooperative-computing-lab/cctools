@@ -44,4 +44,9 @@ Returns NULL if none is found.
 */
 char *path_which(const char *exec);
 
+/* path_join_two_strings joins two strings, and adds sep between them.
+ * The caller should free the space pointed by the returned pointer.
+ */
+char *path_join_two_strings(const char *s, const char *t, const char * sep);
+
 #endif

@@ -260,6 +260,31 @@ Makeflow will load the container into each execution node as needed.  This allow
 <tt>makeflow -T condor --docker debian</tt>, then Makeflow will distribute tasks via Condor, and
 then use Docker to invoke the task at each execution node.
 
+<h2 id="umbrella">Running Makeflow with Umbrella<a class="sectionlink" href="#umbrella" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>Makeflow allows the user to specify the execution environment for each rule
+via its <tt>--umbrella-spec</tt> and <tt>--umbrella-binary</tt> options.  The
+<tt>--umbrella-spec</tt> option allows the user to specify an Umbrella
+specification, the <tt>--umbrella-binary</tt> option allows the user to specify
+the path to an Umbrella binary.  Using this mode, each rule will be converted
+into an Umbrella job, and the specified Umbrella specification and binary will
+be added into the input file list of a job.  </p>
+
+To test makeflow with umbrella using local execution engine:
+<code>makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+</code>
+
+To test makeflow with umbrella using wq execution engine:
+<code>makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+</code>
+
+<p> To run each makeflow rule as an Umbrella job, the <tt>--umbrella-spec</tt>
+must be specified.  However, the <tt>--umbrella-binary</tt> option is optional:
+when it is specified, the specified umbrella binary will be sent to the
+execution node; when it is not specified, the execution node is expected to
+have an umbrella binary available through the <tt>$PATH</tt> environment
+variable. </p>
+
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>
