@@ -40,6 +40,8 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
+#include "makeflow_catalog_reporter.h"
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -132,6 +134,10 @@ static int log_verbose_mode = 0;
  *  * files. */
 static struct makeflow_wrapper *wrapper = 0;
 static struct makeflow_monitor *monitor = 0;
+
+/* is true only if the -N command is used. Useful for catalog reporting.
+ */
+static int catalog_reporting_on = 0;
 
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
@@ -874,7 +880,14 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
+        timestamp_t last_time = timestamp_get();
+        timestamp_t start = timestamp_get();
+        int first_report = 1;
 
+        //reporting to catalog
+        if(catalog_reporting_on){
+            makeflow_catalog_summary(d, project, batch_queue_type, start);
+        }
 
 	while(!makeflow_abort_flag) {
 		makeflow_dispatch_ready_jobs(d);
@@ -913,6 +926,14 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
+                //report to catalog
+                timestamp_t now = timestamp_get();
+                if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
+                    makeflow_catalog_summary(d, project,batch_queue_type,start);
+                    last_time = now;
+                    first_report = 0;
+                }
+                
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
@@ -922,6 +943,11 @@ static void makeflow_run( struct dag *d )
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
+        
+        //reporting to catalog
+        if(catalog_reporting_on){
+            makeflow_catalog_summary(d, project,batch_queue_type,start);
+        }
 
 	if(makeflow_abort_flag) {
 		makeflow_abort_all(d);
@@ -1306,6 +1332,7 @@ int main(int argc, char *argv[])
 				free(project);
 				project = xxstrdup(optarg);
 				work_queue_master_mode = "catalog";
+                                catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
 				debug_config_file(optarg);
