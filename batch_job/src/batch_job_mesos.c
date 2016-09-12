@@ -117,30 +117,38 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 		finished_tasks = itable_create(0);
 	}
 
+	printf("+++++++++++++++1\n");
 	while(access(FILE_TASK_STATE, F_OK) == -1) {}
+
+	task_state_fp = fopen(FILE_TASK_STATE, "r");
 
 	while(1) {
 
+		printf("+++++++++++++++2\n");
 		char *task_id_ch;
 		char *task_stat_str;
 		int task_id;
 				
-		task_state_fp = fopen(FILE_TASK_STATE, "r");
+		printf("+++++++++++++++3\n");
 		while((read_len = getline(&line, &len, task_state_fp)) != -1) {
 
+			printf("+++++++++++++++4\n");
 			// trim the newline character
 			if (line[read_len-1] == '\n') {
 				line[read_len-1] = '\0';
 				--read_len;
 			}
 
+			printf("+++++++++++++++5\n");
 			task_id_ch = strtok(line, ",");
 			task_id = atoi(task_id_ch);
 
+			printf("+++++++++++++++6\n");
 			// There is a new task finished
 			if(itable_lookup(finished_tasks, task_id) == NULL) {
 				struct batch_job_info *info = itable_remove(q->job_table, task_id);
 			    	
+				printf("+++++++++++++++7\n");
 				info->finished = time(0);
 				task_stat_str = strtok(NULL, ",");
 
@@ -150,10 +158,12 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 					info->exited_normally = 0;
 				}
 
+				printf("+++++++++++++++8\n");
 				memcpy(info_out, info, sizeof(*info));
 				free(info);
 				fclose(task_state_fp);
 
+				printf("+++++++++++++++9\n");
 				int itable_val = 1;
 				itable_insert(finished_tasks, task_id, &itable_val);
 
@@ -162,7 +172,9 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 		}
 		sleep(1);
 
+		printf("+++++++++++++++10\n");
 		if(stoptime != 0 && time(0) >= stoptime) {
+			fclose(task_state_fp);
 			return -1;
 		}
 	}

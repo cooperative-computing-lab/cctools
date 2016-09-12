@@ -3,6 +3,7 @@ import sys
 import uuid
 import time
 import urllib
+import tarfile
 import logging
 import threading
 import imp
@@ -22,9 +23,9 @@ FILE_TASK_INFO = "mesos_task_info"
 FILE_TASK_STATE = "mesos_task_state"
 MF_DONE_FILE = "makeflow_done"
 
-TASK_CPUS = 3
+TASK_CPUS = 1
 TASK_MEM = 32
-RETRY_TIMES = 3
+# RETRY_TIMES = 3
 
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
@@ -39,9 +40,21 @@ class MakeflowScheduler(Scheduler):
         executor.executor_id.value = str(uuid.uuid4())
         cctools_path = os.getenv('CCTOOLS')
         sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor')
+
+        task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
+        task_cmd_f = open(task_cmd_sh, "w+")
+        task_cmd_f.write(mf_task.cmd)
+        task_cmd_f.close()
+        os.chmod(task_cmd_sh, 0755)
+
+        uri = executor.command.uris.add()
+        uri.value = os.path.join(os.getcwd(), task_cmd_sh)
+        uri.executable = True
+        uri.extract = False
+
         executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
         executor.source = "python executor"
-        executor.command.value = "{0} \"{1}\" {2} {3} {4}".format(sh_path, mf_task.cmd, 
+        executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
                 executor.executor_id.value, executor.framework_id.value, sys.argv[3])
 
         cpus = executor.resources.add()
@@ -61,11 +74,26 @@ class MakeflowScheduler(Scheduler):
 
         # add input files list to the executor_info
         for fn in mf_task.inp_fns:
+
             uri = executor.command.uris.add()
+
+            # if input file is a directory, compress it
+            if os.path.isdir(fn):
+                logging.info("Input {0} of task {1} is a directory".format(fn, mf_task.task_id))
+                dir_name = os.path.dirname(fn)
+                base_fn = os.path.basename(fn)
+                compressed_fn = "{0}.tar.gz".format(base_fn)
+                tar = tarfile.open(compressed_fn, "w:gz")
+                tar.add(base_fn)
+                tar.close()
+                fn = os.path.join(dir_name, compressed_fn)
+                uri.extract = True
+            else:
+                uri.extract = False
+
             logging.info("input file is: {0}".format(fn.strip(' \t\n\r')))
             uri.value = fn.strip(' \t\n\r')
             uri.executable = False
-            uri.extract = False
 
         return executor
     
@@ -122,8 +150,8 @@ class MakeflowScheduler(Scheduler):
                 = mf_mesos_task_info 
         
         # create mesos task and launch it with offer 
-        logging.info("Launching task {0} using offer {1}.".format(\
-                        task_id, offer.id.value))
+        logging.info("Launching task {0} using offer {1} from {2}.".format(\
+                        task_id, offer.id.value, offer.hostname))
 
         # one task is corresponding to one executor
         tasks = [mesos_task]
@@ -133,7 +161,7 @@ class MakeflowScheduler(Scheduler):
         logging.info("Registered with framework id: {0}".format(framework_id))
 
     def resourceOffers(self, driver, offers):
-        logging.info("Recieved resource offers: {0} from {1}".format(\
+        logging.info("Received resource offers: {0} from {1}".format(\
                 [o.id.value for o in offers], [o.hostname for o in offers]))
        
         idle_task = False 
@@ -173,10 +201,16 @@ class MakeflowScheduler(Scheduler):
 
             if not idle_task:
                 driver.declineOffer(offer.id)
-                
+               
+    def mesos_clean(self, task_id): 
+        mf_task = mms.tasks_info_dict[task_id]
+        os.remove("task_{0}_cmd".format(task_id))
+        for fn in mf_task.inp_fns:
+            if os.path.isdir(fn):
+                compressed_fn = "{0}.tar.gz".format(fn)
+                os.remove(compressed_fn)
         
     def statusUpdate(self, driver, update):
-
         if os.path.isfile(FILE_TASK_STATE): 
             oup_fn = open(FILE_TASK_STATE, "a", 0)
         else:
@@ -190,34 +224,44 @@ class MakeflowScheduler(Scheduler):
                 logging.info("{0} is starting".format(update.task_id.value))
             if update.state == mesos_pb2.TASK_RUNNING:
                 logging.info("{0} is running".format(update.task_id.value))
+
             if update.state == mesos_pb2.TASK_KILLED:
                 oup_fn.write("{0},killed\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "killed"
                 logging.info("{0}".format(update.message))
+                self.mesos_clean(update.task_id.value)
+                os.remove("task_{0}_cmd".format(update.task_id.value))
+
             if update.state == mesos_pb2.TASK_LOST:
                 oup_fn.write("{0},lost\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "lost"
                 logging.error("{0}".format(update.message))
+                self.mesos_clean(update.task_id.value)
+                os.remove("task_{0}_cmd".format(update.task_id.value))
 
             if update.state == mesos_pb2.TASK_ERROR:
-                if mms.tasks_info_dict[update.task_id.value].num_exe >= RETRY_TIMES:
-                    oup_fn.write("{0},error\n".format(update.task_id.value))
-                    mms.tasks_info_dict[update.task_id.value].action = "error"
-                else:
-                    mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
-                    mms.tasks_info_dict[update.task_id.value].num_exe += 1
-                    logging.info("{0} try to resubmit task {1}".format(update.message,\
-                     update.task_id.value))
+                #if mms.tasks_info_dict[update.task_id.value].num_exe >= RETRY_TIMES:
+                #    oup_fn.write("{0},error\n".format(update.task_id.value))
+                #    mms.tasks_info_dict[update.task_id.value].action = "error"
+                #else:
+                mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
+                #    mms.tasks_info_dict[update.task_id.value].num_exe += 1
+                logging.info("{0} try to resubmit task {1}".format(update.message,\
+                    update.task_id.value))
                 logging.error("{0}".format(update.message))
 
             if update.state == mesos_pb2.TASK_FAILED:
                 oup_fn.write("{0},failed\n".format(update.task_id.value))
                 logging.info("Executor failed with reason code {0}.".format(update.reason))
                 mms.tasks_info_dict[update.task_id.value].action = "failed"
+                self.mesos_clean(update.task_id.value)
+                os.remove("task_{0}_cmd".format(update.task_id.value))
 
             if update.state == mesos_pb2.TASK_FINISHED:
                 oup_fn.write("{0},finished\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "finished"
+                self.mesos_clean(update.task_id.value)
+                os.remove("task_{0}_cmd".format(update.task_id.value))
         
         oup_fn.close()
 
@@ -253,6 +297,7 @@ class MakeflowScheduler(Scheduler):
                     file_task_state.write("{0},{1}\n".format(curr_task_id,\
                             curr_executor_state))
                     file_task_state.close()
+                    os.remove("task_{0}_cmd".format(curr_task_id))
 
 
 class MakefowMonitor(threading.Thread):
@@ -404,6 +449,9 @@ if __name__ == '__main__':
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
     framework.name = "Makeflow"
+    # framework.role = "ccl"
+    # framework.principal = "makeflow"
+
     driver = MesosSchedulerDriver(
         MakeflowScheduler(mms.mf_wk_dir),
         framework,
