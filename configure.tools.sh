@@ -62,6 +62,18 @@ check_file ()
 check_path ()
 {
 	echon "checking for $1..."
+
+	local check_path_var=$1
+	if [ "${check_path_var}" != "${check_path_var#/}" ]
+	then
+		if check_file $check_path_var
+		then
+			return 0
+		else
+			return 1
+		fi
+	fi
+
 	IFS=":"
 	for dir in $PATH
 	do
