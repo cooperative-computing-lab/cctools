@@ -13,7 +13,7 @@ See the file COPYING for details.
 
 #include <dirent.h>
 #include <pwd.h>
-#include <sys/fcntl.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 

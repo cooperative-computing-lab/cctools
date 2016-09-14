@@ -17,7 +17,7 @@ See the file COPYING for details.
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/file.h>
-#include <sys/poll.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -840,7 +840,7 @@ int link_fd(struct link *link)
 }
 
 #ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX)
+#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX) || defined(__MUSL__)
 #define SOCKLEN_T socklen_t
 #else
 #define SOCKLEN_T int
