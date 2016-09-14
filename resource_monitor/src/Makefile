@@ -14,7 +14,7 @@ ifeq ($(STATIC_BUILD),yes)
 	STATIC_FLAG=-static
 else
 	STATIC_FLAG=
-	CCTOOLS_DEPENDENCIES+=-lm
+	CCTOOLS_DEPENDENCIES+=$(CCTOOLS_EXTERNAL_LINKAGE)
 endif
 
 all: $(TARGETS)
@@ -31,7 +31,7 @@ rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
 resource_monitor_histograms: resource_monitor_histograms.o resource_monitor_tools.o
 	$(CCTOOLS_CC) $(STATIC_FLAG) -fopenmp -g -O3 -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES)
 
-$(PROGRAMS): $(CCTOOLS_DEPENDENCIES)
+$(PROGRAMS): ../../dttools/src/libdttools.a
 
 resource_monitor_pb.o: resource_monitor.c rmonitor_piggyback.h
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) -DCCTOOLS_USE_RMONITOR_HELPER_LIB $<
