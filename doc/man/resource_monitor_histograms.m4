@@ -5,7 +5,6 @@ SECTION(NAME)
 BOLD(resource_monitor_histograms) - create HTML pages and graphs of resource monitor data
 
 SECTION(SYNOPSIS)
-CODE(BOLD(resource_monitor_histograms [options] -D monitor_data_directory output_directory [workflow_name]))
 CODE(BOLD(resource_monitor_histograms [options] -L monitor_data_file_list output_directory [workflow_name]))
 CODE(BOLD(resource_monitor_histograms [options] output_directory < monitor_data_file_list  [workflow_name]))
 
@@ -13,8 +12,7 @@ SECTION(DESCRIPTION)
 
 BOLD(resource_monitor_histograms) is a tool to visualize resource usage as
 reported by BOLD(resource_monitor). BOLD(resource_monitor_histograms) expects
-its input to be a directory with resource summary files (with the -D option),
-or a file listing the paths of summary files (-L option or from standard
+a file listing the paths of summary files (-L option or from standard
 input). Results are written to BOLD(output_directory) in the form of several
 webpages showing histograms and statistics per resource.
 
@@ -22,7 +20,6 @@ SECTION(ARGUMENTS)
 
 SUBSECTION(Input Options)
 OPTIONS_BEGIN
-OPTION_PAIR(-D, monitor_data_directory)Directory with resource summaries. All files with a .summary extension are read. Subdirectories are read recursevely.
 OPTION_PAIR(-L, monitor_data_file_list)File with one summary file path per line.
 OPTIONS_END
 
@@ -64,14 +61,15 @@ SECTION(EXAMPLES)
 Most common usage:
 
 LONGCODE_BEGIN
-% resource_monitor_histograms -D my_summary_files_directory my_histograms my_workflow_name
+% find my_summary_files_directory -name "*.summary" > summary_list
+% resource_monitor_histograms -L summary_list my_histograms my_workflow_name
 % # open my_histograms/index.html
 LONGCODE_END
 
-Splitting on categories, generating only memory related histograms:
+Splitting on categories, generating only resident memory related histograms:
 
 LONGCODE_BEGIN
-% resource_monitor_histograms -s -fvms -D my_summary_files_directory my_histograms my_workflow_name
+% resource_monitor_histograms -f memory -L summary_list my_histograms my_workflow_name
 % # open my_histograms/index.html
 LONGCODE_END
 
