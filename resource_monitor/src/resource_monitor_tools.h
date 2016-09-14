@@ -21,7 +21,6 @@ See the file COPYING for details.
 #include <sys/wait.h>
 
 #include <sys/stat.h>
-#include <fts.h>
 #include <dirent.h>
 
 #include "debug.h"

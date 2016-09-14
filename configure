@@ -199,10 +199,10 @@ zlib_path="/usr"
 globus_flavor=auto
 xrootd_arch=auto
 
-ccompiler=gcc
-cxxcompiler=g++
+ccompiler=${CC:-gcc}
+cxxcompiler=${CXX:-g++}
 
-ccflags="-D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
+ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
 c_only_flags="-std=c99"
 
 config_zlib_path=yes
@@ -1217,7 +1217,7 @@ then
 	swig_bindings=""
 fi
 
-linker="gcc"
+linker="${LD:-${ccompiler}}"
 
 library_search_standard()
 {

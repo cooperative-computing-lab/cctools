@@ -30,11 +30,6 @@ See the file COPYING for details.
 #include <sys/statvfs.h>
 #endif
 
-#ifdef HAS_FTS_H
-#include <fts.h>
-#endif
-#include <ftw.h>
-
 #include "int_sizes.h"
 #include "rmonitor_types.h"
 #include "rmsummary.h"
