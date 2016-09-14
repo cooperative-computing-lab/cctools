@@ -31,6 +31,9 @@ See the file COPYING for details.
 #include "jx_parse.h"
 #include "jx_eval.h"
 #include "create_dir.h"
+#include "sha1.h"
+#include "string_array.h"
+#include "set.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -90,7 +93,6 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
-#define REPLICATION_DEFAULT_DIRECTORY "/tmp/MakeflowCache/"
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -489,7 +491,6 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 		file_str = string_combine(file_str,f);
 		free(f);
 	}
-
 	return file_str;
 }
 
@@ -705,6 +706,90 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 	return file_created;
 }
 
+/* Given a completed Node, calculate and store the cache_id in the dag node */
+static void makeflow_generate_node_cache_id(struct dag_node *n, struct list*inputs) {
+	struct dag_file *f;
+	char *cache_id = xxstrdup("");
+	unsigned char digest[SHA1_DIGEST_LENGTH];
+
+	// add checksum of the node's input files together
+	list_first_item(inputs);
+	while((f = list_next_item(inputs))) {
+		sha1_file(f->filename, digest);
+		cache_id = string_combine(cache_id, sha1_string(digest));
+	}
+
+	cache_id = string_combine(cache_id, n->command);
+	sha1_buffer(cache_id, strlen(cache_id), digest);
+	n -> cache_id = xxstrdup(sha1_string(digest));
+	free(cache_id);
+}
+
+/* Preserves the current node within the caching directory
+	 The source makeflow file, ancestor node cache_ids, and the output files are cached */
+static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct list *outputs) {
+	char *filename;
+	char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path;
+	char *ancestor_cache_id_string = xxstrdup("");
+	char *ancestor_cache_id_cmd = xxstrdup("");
+	struct jx *envlist = dag_node_env_create(d,n);
+	struct dag_node *ancestor;
+	struct batch_queue *queue;
+	struct dag_file *f;
+	int sucess;
+
+
+	if(n->local_job && local_queue) {
+		queue = local_queue;
+	} else {
+		queue = remote_queue;
+	}
+
+	caching_file_path = xxstrdup(d->caching_directory);
+	caching_file_path = string_combine_multi(caching_file_path, n->cache_id, "/outputs", 0);
+	sucess = batch_fs_mkdir(queue,caching_file_path, 0777, 1);
+	if (!sucess) {
+		fatal("Could not create caching directory %s\n", caching_file_path);
+	}
+
+	list_first_item(outputs);
+	while((f = list_next_item(outputs))) {
+		output_file_path = xxstrdup(d->caching_directory);
+		filename = f->filename;
+		output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , filename, 0);
+		sucess = batch_fs_putfile(queue, filename, output_file_path);
+		if (!sucess) {
+			fatal("Could not cache output file %s\n", output_file_path);
+		}
+	}
+
+	source_makeflow_file_path = xxstrdup(d->caching_directory);
+	source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, n->cache_id, "/source_makeflow", 0);
+	sucess = batch_fs_putfile(queue, d->filename, source_makeflow_file_path);
+	if (!sucess) {
+		fatal("Could not cache source makeflow file %s\n", source_makeflow_file_path);
+	}
+
+	set_first_element(n->ancestors);
+	while ((ancestor = set_next_element(n->ancestors))) {
+			ancestor_cache_id_string = string_combine_multi(ancestor_cache_id_string, ancestor->cache_id, "\n", 0);
+	}
+	ancestor_file_path= xxstrdup(d->caching_directory);
+	ancestor_file_path= string_combine_multi(ancestor_file_path, n->cache_id, "/ancestors", 0);
+	ancestor_cache_id_cmd = string_combine_multi(ancestor_cache_id_cmd, "echo \"", ancestor_cache_id_string, "\" > ", ancestor_file_path, 0);
+
+	makeflow_node_submit_retry(queue, ancestor_cache_id_cmd, NULL, NULL, envlist, dag_node_dynamic_label(n));
+
+	jx_delete(envlist);
+
+	free(caching_file_path);
+	free(output_file_path);
+	free(source_makeflow_file_path);
+	free(ancestor_file_path);
+	free(ancestor_cache_id_cmd);
+	free(ancestor_cache_id_string);
+
+}
 /*
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
 */
@@ -845,6 +930,12 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
+		/* Checksum input files into cache_id */
+		if (d->should_preserve) {
+			makeflow_generate_node_cache_id(n, inputs);
+			makeflow_populate_cache(d, n, outputs);
+		}
+
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 }
@@ -950,6 +1041,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 	}
 }
 
+
 /*
 Main loop for running a makeflow: submit jobs, wait for completion, keep going until everything done.
 */
@@ -978,6 +1070,7 @@ static void makeflow_run( struct dag *d )
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
+
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
@@ -1002,6 +1095,7 @@ static void makeflow_run( struct dag *d )
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
 					makeflow_node_complete(d, n, local_queue, &info);
+
 			}
 		}
 
@@ -1012,7 +1106,7 @@ static void makeflow_run( struct dag *d )
                     last_time = now;
                     first_report = 0;
                 }
-                
+
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
@@ -1022,7 +1116,7 @@ static void makeflow_run( struct dag *d )
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
-        
+
         //reporting to catalog
         if(catalog_reporting_on){
             makeflow_catalog_summary(d, project,batch_queue_type,start);
@@ -1126,7 +1220,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
-	printf(" %-30s Replicate results of makeflow in specified directory			   (default directory is %s)\n", "--replicate=<dir>", REPLICATION_DEFAULT_DIRECTORY);
+	printf(" %-30s Preserve results of makeflow in specified directory			   (default directory is %s)\n", "--preserve=<dir>", CACHING_DEFAULT_DIRECTORY);
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1151,8 +1245,7 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
-	int dir_creation = 0;
-	int should_replicate = 0;
+	int should_preserve = 0;
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
@@ -1172,7 +1265,8 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
-	char *replicate_directory = REPLICATION_DEFAULT_DIRECTORY;
+	char *caching_directory = CACHING_DEFAULT_DIRECTORY;
+
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
 
@@ -1242,7 +1336,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
-		LONG_OPT_REPLICATION
+		LONG_OPT_PRESERVATION
 	};
 
 	static const struct option long_options_run[] = {
@@ -1317,7 +1411,7 @@ int main(int argc, char *argv[])
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
-		{"replicate", optional_argument, 0, LONG_OPT_REPLICATION},
+		{"preserve", optional_argument, 0, LONG_OPT_PRESERVATION},
 		{0, 0, 0, 0}
 	};
 
@@ -1607,16 +1701,11 @@ int main(int argc, char *argv[])
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
 				break;
-			case LONG_OPT_REPLICATION:
-				should_replicate = 1;
+			case LONG_OPT_PRESERVATION:
+				should_preserve = 1;
 				if (optarg) {
-					replicate_directory = xxstrdup(optarg);
+					caching_directory = xxstrdup(optarg);
 				}
-				dir_creation = create_dir(replicate_directory, 0777);
-				if (!dir_creation) {
-					fatal("Could not create directory %s\n", replicate_directory);
-				}
-       	// not yet implemented
         break;
 			default:
 				show_help_run(argv[0]);
@@ -1972,8 +2061,10 @@ if (enforcer && wrapper_umbrella) {
             makeflow_wrapper_singularity_init(wrapper, container_image);
         }
 
-	if(should_replicate) {
-		// TODO: replicate data within cacheing directory
+	if(should_preserve) {
+		d->caching_directory = caching_directory;
+		d->should_preserve = 1;
+
 	}
 
 	makeflow_run(d);

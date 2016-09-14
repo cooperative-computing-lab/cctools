@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "jx.h"
+#include "string_array.h"
 
 #include <errno.h>
 #include <string.h>
@@ -48,6 +49,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->resource_request = CATEGORY_ALLOCATION_FIRST;
 
 	n->umbrella_spec = NULL;
+	
+	n->cache_id = NULL;
 
 	return n;
 }

@@ -76,6 +76,8 @@ struct dag_node {
 	time_t previous_completion;
 
 	const char *umbrella_spec;          /* the umbrella spec file for executing this job */
+	
+	char *cache_id;
 
 	struct dag_node *next;              /* The next node in the list of nodes */
 };

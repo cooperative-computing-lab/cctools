@@ -19,6 +19,8 @@ See the file COPYING for details.
 
 #include <stdio.h>
 
+#define CACHING_DEFAULT_DIRECTORY "/tmp/MakeflowCache/"
+
 struct dag {
 	/* Static properties of the DAG */
 	char *filename;                    /* Source makeflow file path. */
@@ -45,6 +47,9 @@ struct dag {
 	int deleted_files;                  /* Keeps a count of the files delete in GC. */
 
 	char *cache_dir;                    /* The dirname of the cache storing all the deps specified in the mountfile */
+	
+	char *caching_directory;
+	int should_preserve;
 };
 
 struct dag *dag_create();
