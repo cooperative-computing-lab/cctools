@@ -1707,6 +1707,12 @@ int main(int argc, char *argv[])
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
 
+	if(batch_queue_supports_feature(remote_queue, "batch_log_transactions")) {
+		const char *transactions = batch_queue_get_option(remote_queue, "batch_log_transactions_name");
+		f = dag_file_lookup_or_create(d, transactions);
+		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
+	}
+
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
 		makeflow_clean(d, remote_queue, clean_mode);
