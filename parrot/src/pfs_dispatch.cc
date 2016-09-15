@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "pfs_service.h"
 #include "pfs_sys.h"
 #include "pfs_sysdeps.h"
+#include "pfs_time.h"
 
 extern "C" {
 #include "catch.h"
@@ -128,6 +129,9 @@ extern INT64_T pfs_write_count;
 
 extern int parrot_dir_fd;
 extern int *pfs_syscall_totals32;
+
+extern pfs_time_mode_t pfs_time_mode;
+extern time_t pfs_time_warp_start;
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
 int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
@@ -1244,7 +1248,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_capget:
 		case SYSCALL32_capset:
 		case SYSCALL32_clock_getres:
-		case SYSCALL32_clock_gettime:
 		case SYSCALL32_clock_settime:
 		case SYSCALL32_create_module:
 		case SYSCALL32_delete_module:
@@ -1266,7 +1269,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getrusage:
 		case SYSCALL32_getsid:
 		case SYSCALL32_gettid:
-		case SYSCALL32_gettimeofday:
 		case SYSCALL32_idle:
 		case SYSCALL32_init_module:
 		case SYSCALL32_ioperm:
@@ -1339,7 +1341,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_sync:
 		case SYSCALL32_sysinfo:
 		case SYSCALL32_syslog:
-		case SYSCALL32_time:
 		case SYSCALL32_timer_create:
 		case SYSCALL32_timer_delete:
 		case SYSCALL32_timer_getoverrun:
@@ -1355,6 +1356,35 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_wait4:
 		case SYSCALL32_waitid:
 		case SYSCALL32_waitpid:
+			break;
+
+		case SYSCALL32_time:
+			if(entering) {
+				p->syscall_result = pfs_emulate_time(0);
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_gettimeofday:
+			if(entering) {
+				struct timeval tv;
+				struct timezone tz;
+				pfs_emulate_gettimeofday(&tv,&tz);
+				if(args[0]) tracer_copy_out(p->tracer,&tv,POINTER(args[0]),sizeof(tv),TRACER_O_ATOMIC);
+				if(args[1]) tracer_copy_out(p->tracer,&tz,POINTER(args[1]),sizeof(tz),TRACER_O_ATOMIC);
+				p->syscall_result = 0;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_clock_gettime:
+			if(entering) {
+				struct timespec ts;
+				pfs_emulate_clock_gettime(args[0],&ts);
+				if(args[1]) tracer_copy_out(p->tracer,&ts,POINTER(args[1]),sizeof(ts),TRACER_O_ATOMIC);
+				p->syscall_result = 0;
+				divert_to_dummy(p,p->syscall_result);
+			}
 			break;
 
 		case SYSCALL32_execve:
