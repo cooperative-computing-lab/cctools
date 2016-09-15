@@ -11,7 +11,7 @@ See the file COPYING for details.
 #include "path.h"
 
 #include <unistd.h>
-#include <sys/fcntl.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 

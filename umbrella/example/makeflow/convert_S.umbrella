@@ -1,0 +1,34 @@
+{
+    "comment": "Converting an image.",
+    "kernel": {
+        "version": ">=2.6.18",
+        "name": "linux"
+    },
+    "os": {
+       "name": "centos",
+        "format": "tgz",
+        "checksum": "d600c8653a59ea9698e9a9270a839d47",
+		"note": "this os image = `docker pull centos:6` + `yum install ImageMagick`. Using yum is becuase ImageMagick is not relocatable.",
+        "source": [
+            "http://ccl.cse.nd.edu/research/data/hep-case-study/d600c8653a59ea9698e9a9270a839d47/centos-6.8-x86_64.tar.gz"
+        ],
+        "version": "6.8",
+        "uncompressed_size": "309442560",
+        "id": "d600c8653a59ea9698e9a9270a839d47",
+        "size": "104707989"
+    },
+    "hardware": {
+        "cores": "1",
+        "disk": "2GB",
+        "arch": "x86_64",
+        "memory": "1GB"
+    },
+    "environ": {
+        "PWD": "/tmp"
+    },
+    "output": {
+       "dirs": [
+            "/tmp"
+        ]
+    }
+}

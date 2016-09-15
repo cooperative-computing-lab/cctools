@@ -91,6 +91,12 @@ OPTION_PAIR(--monitor-log-fmt, fmt)Format for monitor logs. (default resource-ru
 OPTION_PAIR(--allocation, waste,throughput)When monitoring is enabled, automatically assign resource allocations to tasks. Makeflow will try to minimize CODE(waste) or maximize CODE(throughput).
 OPTIONS_END
 
+SUBSECTION(Umbrella Options)
+OPTIONS_BEGIN
+OPTION_PAIR(--umbrella-binary, filepath)Umbrella binary for running every rule in a makeflow
+OPTION_PAIR(--umbrella-spec, filepath)Umbrella spec for running every rule in a makeflow.
+OPTIONS_END
+
 SUBSECTION(Docker Support)
 OPTIONS_BEGIN
 OPTION_PAIR(--docker,image) Run each task in the Docker container with this name.  The image will be obtained via "docker pull" if it is not already available.

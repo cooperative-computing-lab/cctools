@@ -185,8 +185,8 @@ on port 9567 by default, you can run the following command:</p>
 
 <h3 id="workqueue.projectnames">Project Names<a class="sectionlink" href="#workqueue.projectnames" title="Link to this section.">&#x21d7;</a></h3>
 
-<p>A simpler way to match workers to masters is to use the project name
-matching. You can give the master a project name with the -N option.</p>
+<p>The best and simplest way to match workers to masters is to use the project name
+matching. You can give the master a project name with the -N option. This works with any batch system type used.</p>
 
 <code>makeflow -T wq -N MyProj example.makeflow </code>
 
@@ -211,6 +211,12 @@ being stopped and given the different master's hostname and port. An example of
 specifying multiple projects:</p>
 
 <code>work_queue_worker -N proj1 -N proj2 -N proj3</code>
+
+<p>
+In addition to creating a project name using the -N option, this will also trigger automatic reporting to the 
+designated catalog server. The Port and Server address are taken from the environment variables <b>CATALOG_HOST</b> 
+and <b>CATALOG_PORT</b>. If either variable is not set, then the addresses "catalog.cse.nd.edu,backup-catalog.cse.nd.edu" and port 9097 will be used.
+</p>
 
 <h3 id="workqueue.password">Setting a Password<a class="sectionlink" href="#workqueue.password" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -253,6 +259,31 @@ Makeflow will load the container into each execution node as needed.  This allow
 <p>This capability <i>in addition</i> to the selection of a batch system.  For example, if you invoke
 <tt>makeflow -T condor --docker debian</tt>, then Makeflow will distribute tasks via Condor, and
 then use Docker to invoke the task at each execution node.
+
+<h2 id="umbrella">Running Makeflow with Umbrella<a class="sectionlink" href="#umbrella" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>Makeflow allows the user to specify the execution environment for each rule
+via its <tt>--umbrella-spec</tt> and <tt>--umbrella-binary</tt> options.  The
+<tt>--umbrella-spec</tt> option allows the user to specify an Umbrella
+specification, the <tt>--umbrella-binary</tt> option allows the user to specify
+the path to an Umbrella binary.  Using this mode, each rule will be converted
+into an Umbrella job, and the specified Umbrella specification and binary will
+be added into the input file list of a job.  </p>
+
+To test makeflow with umbrella using local execution engine:
+<code>makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+</code>
+
+To test makeflow with umbrella using wq execution engine:
+<code>makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+</code>
+
+<p> To run each makeflow rule as an Umbrella job, the <tt>--umbrella-spec</tt>
+must be specified.  However, the <tt>--umbrella-binary</tt> option is optional:
+when it is specified, the specified umbrella binary will be sent to the
+execution node; when it is not specified, the execution node is expected to
+have an umbrella binary available through the <tt>$PATH</tt> environment
+variable. </p>
 
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 

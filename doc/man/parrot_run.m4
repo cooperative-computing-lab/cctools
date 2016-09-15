@@ -16,52 +16,55 @@ For complete details with examples, see the LINK(Parrot User's Manual,http://ccl
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
-OPTION_ITEM('--check-driver <driver>') Check for the presence of a given driver (e.g. http, ftp, etc) and return success if it is currently enabled.
+OPTION_PAIR(--check-driver,driver) Check for the presence of a given driver (e.g. http, ftp, etc) and return success if it is currently enabled.
 OPTION_TRIPLET(-a,chirp-auth,unix|hostname|ticket|globus|kerberos)Use this Chirp authentication method.  May be invoked multiple times to indicate a preferred list, in order.
 OPTION_TRIPLET(-b, block-size, bytes)Set the I/O block size hint.
 OPTION_TRIPLET(-c, status-file, file)Print exit status information to file.
-OPTION_ITEM(`-C, channel-auth')Enable data channel authentication in GridFTP.
+OPTION_ITEM(-C, channel-auth)Enable data channel authentication in GridFTP.
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this sub-system.
-OPTION_ITEM(`-D, --no-optimize')Disable small file optimizations.
-OPTION_ITEM('    --dynamic-mounts') Enable the use of parot_mount in this session.
-OPTION_ITEM(`-F, --with-snapshots')Enable file snapshot caching for all protocols.
-OPTION_ITEM(`-f, --no-follow-symlinks')Disable following symlinks.
+OPTION_ITEM(-D, --no-optimize)Disable small file optimizations.
+OPTION_ITEM(--dynamic-mounts) Enable the use of parot_mount in this session.
+OPTION_ITEM(-F, --with-snapshots)Enable file snapshot caching for all protocols.
+OPTION_ITEM(-f, --no-follow-symlinks)Disable following symlinks.
 OPTION_TRIPLET(-G,gid,num)Fake this gid; Real gid stays the same.
-OPTION_ITEM(`-h, --help')Show this screen.
-OPTION_ITEM(`    --helper')Enable use of helper library.
+OPTION_ITEM(-h, --help)Show this screen.
+OPTION_ITEM(--helper)Enable use of helper library.
 OPTION_TRIPLET(-i, tickets, files)Comma-delimited list of tickets to use for authentication.
 OPTION_TRIPLET(-I, debug-level-irods, num)Set the iRODS driver internal debug level.
-OPTION_ITEM(`-K, --with-checksums')Checksum files where available.
-OPTION_ITEM(`-k, --no-checksums')Do not checksum files.
+OPTION_ITEM(-K, --with-checksums)Checksum files where available.
+OPTION_ITEM(-k, --no-checksums)Do not checksum files.
 OPTION_TRIPLET(-l, ld-path, path)Path to ld.so to use.
 OPTION_TRIPLET(-m, ftab-file, file)Use this file as a mountlist.
 OPTION_TRIPLET(-M, mount, /foo=/bar)Mount (redirect) /foo to /bar.
 OPTION_TRIPLET(-e, env-list, path)Record the environment variables.
 OPTION_TRIPLET(-n, name-list, path)Record all the file names.
-OPTION_ITEM(`    --no-set-foreground')Disable changing the foreground process group of the session.
+OPTION_ITEM(--no-set-foreground)Disable changing the foreground process group of the session.
 OPTION_TRIPLET(-N, hostname, name)Pretend that this is my hostname.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug files of this size.
 OPTION_TRIPLET(-p, proxy, host:port)Use this proxy server for HTTP requests.
-OPTION_ITEM(`-Q, --no-chirp-catalog')Inhibit catalog queries to list /chirp.
+OPTION_ITEM(-Q, --no-chirp-catalog)Inhibit catalog queries to list /chirp.
 OPTION_TRIPLET(-r, cvmfs-repos, repos)CVMFS repositories to enable (PARROT_CVMFS_REPO).
 OPTION_ITEM(--cvmfs-repo-switching) Allow repository switching with CVMFS.
 OPTION_TRIPLET(-R, root-checksum, cksum)Enforce this root filesystem checksum, where available.
-OPTION_ITEM(`-s, --stream-no-cache')Use streaming protocols without caching.
-OPTION_ITEM(`-S, --session-caching')Enable whole session caching for all protocols.
-OPTION_ITEM(`    --syscall-disable-debug')Disable tracee access to the Parrot debug syscall.
+OPTION_ITEM(-s, --stream-no-cache)Use streaming protocols without caching.
+OPTION_ITEM(-S, --session-caching)Enable whole session caching for all protocols.
+OPTION_ITEM(--syscall-disable-debug)Disable tracee access to the Parrot debug syscall.
 OPTION_TRIPLET(-t, tempdir, dir)Where to store temporary files.
 OPTION_TRIPLET(-T, timeout, time)Maximum amount of time to retry failures.
+time)Maximum amount of time to retry failures.
+OPTION_ITEM(--time-stop) Stop virtual time at midnight, Jan 1st, 2001 UTC.
+OPTION_ITEM(--time-warp) Warp virtual time starting from midnight, Jan 1st, 2001 UTC.
 OPTION_TRIPLET(-U, uid, num)Fake this unix uid; Real uid stays the same.
 OPTION_TRIPLET(-u, username, name)Use this extended username.
-OPTION_ITEM(`    --fake-setuid')Track changes from setuid and setgid.
-OPTION_ITEM(`    --valgrind')Enable valgrind support for Parrot.
-OPTION_ITEM(`-v, --version')Display version number.
-OPTION_ITEM(`    --is-running')Test is Parrot is already running.
+OPTION_ITEM(--fake-setuid)Track changes from setuid and setgid.
+OPTION_ITEM(--valgrind)Enable valgrind support for Parrot.
+OPTION_ITEM(-v, --version)Display version number.
+OPTION_ITEM(--is-running)Test is Parrot is already running.
 OPTION_TRIPLET(-w, work-dir, dir)Initial working directory.
-OPTION_ITEM(`-W, --syscall-table')Display table of system calls trapped.
-OPTION_ITEM(`-Y, --sync-write')Force synchronous disk writes.
-OPTION_ITEM(`-Z, --auto-decompress')Enable automatic decompression on .gz files.
+OPTION_ITEM(-W, --syscall-table)Display table of system calls trapped.
+OPTION_ITEM(-Y, --sync-write)Force synchronous disk writes.
+OPTION_ITEM(-Z, --auto-decompress)Enable automatic decompression on .gz files.
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

@@ -26,6 +26,7 @@ int pfs_dispatch64( struct pfs_process *p )
 #include "pfs_process.h"
 #include "pfs_service.h"
 #include "pfs_sys.h"
+#include "pfs_time.h"
 
 extern "C" {
 #include "buffer.h"
@@ -1024,7 +1025,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_capget:
 		case SYSCALL64_capset:
 		case SYSCALL64_clock_getres:
-		case SYSCALL64_clock_gettime:
 		case SYSCALL64_clock_nanosleep:
 		case SYSCALL64_clock_settime:
 		case SYSCALL64_create_module:
@@ -1047,7 +1047,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_getrusage:
 		case SYSCALL64_getsid:
 		case SYSCALL64_gettid:
-		case SYSCALL64_gettimeofday:
 		case SYSCALL64_init_module:
 		case SYSCALL64_ioperm:
 		case SYSCALL64_iopl:
@@ -1115,7 +1114,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_sync:
 		case SYSCALL64_sysinfo:
 		case SYSCALL64_syslog:
-		case SYSCALL64_time:
 		case SYSCALL64_timer_create:
 		case SYSCALL64_timer_delete:
 		case SYSCALL64_timer_getoverrun:
@@ -1126,6 +1124,34 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_vhangup:
 		case SYSCALL64_wait4:
 		case SYSCALL64_waitid:
+			break;
+
+		case SYSCALL64_time:
+			if(entering) {
+				p->syscall_result = pfs_emulate_time(0);
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL64_gettimeofday:
+			if(entering) {
+				struct timeval tv;
+				struct timezone tz;
+				pfs_emulate_gettimeofday(&tv,&tz);
+				if(args[0]) tracer_copy_out(p->tracer,&tv,POINTER(args[0]),sizeof(tv),TRACER_O_ATOMIC);
+				if(args[1]) tracer_copy_out(p->tracer,&tz,POINTER(args[1]),sizeof(tz),TRACER_O_ATOMIC);
+				p->syscall_result = 0;
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+		case SYSCALL64_clock_gettime:
+			if(entering) {
+				struct timespec ts;
+				pfs_emulate_clock_gettime(args[0],&ts);
+				if(args[1]) tracer_copy_out(p->tracer,&ts,POINTER(args[1]),sizeof(ts),TRACER_O_ATOMIC);
+				p->syscall_result = 0;
+				divert_to_dummy(p,p->syscall_result);
+			}
 			break;
 
 		case SYSCALL64_execve:

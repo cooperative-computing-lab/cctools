@@ -462,4 +462,12 @@ char *path_which(const char *exec) {
 	}
 }
 
+char *path_join_two_strings(const char *s, const char *t, const char * sep) {
+	char *r = NULL;
+	r = string_combine(r, s);
+	r = string_combine(r, sep);
+	r = string_combine(r, t);
+	return r;
+}
+
 /* vim: set noexpandtab tabstop=4: */

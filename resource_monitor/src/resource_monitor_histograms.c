@@ -1489,10 +1489,9 @@ void write_webpage(char *workflow_name)
 static void show_usage(const char *cmd)
 {
 	fprintf(stdout, "\nUse: %s [options] output_directory [workflow_name]\n\n", cmd);
-	fprintf(stdout, "\nIf no -D or -L are specified, read the summary file list from standard input.\n\n");
+	fprintf(stdout, "\nIf -L is specified, read the summary file list from standard input.\n\n");
 	fprintf(stdout, "%-20s Enable debugging for this subsystem.\n", "-d <subsystem>");
 	fprintf(stdout, "%-20s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o <file>");
-	fprintf(stdout, "%-20s Read summaries recursively from <dir> (filename of form '%s[0-9]+%s').\n", "-D <dir>", RULE_PREFIX, RULE_SUFFIX);
 	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
 	fprintf(stdout, "%-20s Split on task categories.\n", "-s");
 	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations. (slow)\n", "-b");
@@ -1504,7 +1503,6 @@ static void show_usage(const char *cmd)
 
 int main(int argc, char **argv)
 {
-	char *input_directory = NULL;
 	char *input_list      = NULL;
 	char *workflow_name   = NULL;
 
@@ -1515,9 +1513,6 @@ int main(int argc, char **argv)
 	{
 		switch(c)
 		{
-			case 'D':
-				input_directory = xxstrdup(optarg);
-				break;
 			case 'L':
 				input_list      = xxstrdup(optarg);
 				break;
@@ -1559,7 +1554,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if(!input_directory && !input_list)
+	if(!input_list)
 	{
 		input_list = "-";
 	}
@@ -1589,11 +1584,6 @@ int main(int argc, char **argv)
 	input_overhead = timestamp_get();
 
 	debug(D_RMON, "Reading summaries.");
-
-	if(input_directory)
-	{
-		parse_summary_recursive(all_summaries, input_directory, categories);
-	}
 
 	if(input_list)
 	{

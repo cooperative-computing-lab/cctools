@@ -222,41 +222,6 @@ void parse_summary_from_filelist(struct rmsummary_set *dest, char *filename, str
 	}
 }
 
-
-void parse_summary_recursive(struct rmsummary_set *dest, char *dirname, struct hash_table *categories)
-{
-
-	FTS *hierarchy;
-	FTSENT *entry;
-	char *argv[] = {dirname, NULL};
-
-	hierarchy = fts_open(argv, FTS_PHYSICAL, NULL);
-
-	if(!hierarchy)
-		fatal("fts_open error: %s\n", strerror(errno));
-
-	struct rmsummary *s;
-	while( (entry = fts_read(hierarchy)) )
-		if( S_ISREG(entry->fts_statp->st_mode) && strstr(entry->fts_name, RULE_SUFFIX) ) //bug: no links
-		{
-			FILE *stream;
-			stream = fopen(entry->fts_accpath, "r");
-			if(!stream)
-				fatal("Cannot open resources summary file: %s : %s\n", entry->fts_accpath, strerror(errno));
-
-			struct jx_parser *p = jx_parser_create(0);
-			jx_parser_read_stream(p, stream);
-
-			while((s = parse_summary(p, entry->fts_path, categories)))
-				list_push_tail(dest->summaries, s);
-
-			jx_parser_delete(p);
-			fclose(stream);
-		}
-
-	fts_close(hierarchy);
-}
-
 char *parse_executable_name(char *command)
 {
 	command = string_trim_spaces(command);

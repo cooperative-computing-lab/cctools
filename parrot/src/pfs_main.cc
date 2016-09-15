@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "pfs_process.h"
 #include "pfs_service.h"
 #include "pfs_table.h"
+#include "pfs_time.h"
 #include "ptrace.h"
 
 extern "C" {
@@ -158,6 +159,8 @@ enum {
 	LONG_OPT_FAKE_SETUID,
 	LONG_OPT_DYNAMIC_MOUNTS,
 	LONG_OPT_IS_RUNNING,
+	LONG_OPT_TIME_STOP,
+	LONG_OPT_TIME_WARP
 };
 
 static void get_linux_version(const char *cmd)
@@ -247,6 +250,8 @@ static void show_help( const char *cmd )
 	printf( " %-30s Disable changing the foreground process group of the session.\n","   --no-set-foreground");
 	printf( " %-30s Pretend that this is my hostname.          (PARROT_HOST_NAME)\n", "-N,--hostname=<name>");
 	printf( " %-30s Enable paranoid mode for identity boxing mode.\n", "-P,--paranoid");
+	printf( " %-30s Stop virtual time at midnight, Jan 1st, 2001 UTC.\n", "   --time-stop");
+	printf( " %-30s Warp virtual time starting from midnight, Jan 1st, 2001 UTC.\n","   --time-warp");
 	printf( " %-30s Fake this unix uid; Real uid stays the same.     (PARROT_UID)\n", "-U,--uid=<num>");
 	printf( " %-30s Use this extended username.                 (PARROT_USERNAME)\n", "-u,--username=<name>");
 	printf( " %-30s Enable valgrind support for Parrot.\n", "   --valgrind");
@@ -836,6 +841,8 @@ int main( int argc, char *argv[] )
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
 		{"work-dir", required_argument, 0, 'w'},
+		{"time-stop", no_argument, 0, LONG_OPT_TIME_STOP},
+		{"time-warp", no_argument, 0, LONG_OPT_TIME_WARP},
 		{0,0,0,0}
 	};
 
@@ -1059,6 +1066,14 @@ int main( int argc, char *argv[] )
 			}
 			break;
 		}
+		case LONG_OPT_TIME_STOP:
+			pfs_time_mode = PFS_TIME_MODE_STOP;
+			pfs_use_helper = 1;
+			break;
+		case LONG_OPT_TIME_WARP:
+			pfs_time_mode = PFS_TIME_MODE_WARP;
+			pfs_use_helper = 1;
+			break;
 		default:
 			show_help(argv[0]);
 			break;
