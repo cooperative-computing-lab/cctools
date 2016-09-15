@@ -109,9 +109,10 @@ static batch_job_id_t batch_job_wq_wait (struct batch_queue * q, struct batch_jo
 			return -1;
 		}
 
-		char *transactions = string_format("%s.transactions", q->logfile);
-		work_queue_specify_transactions_log(q->data, transactions);
-		free(transactions);
+		const char *transactions = batch_queue_get_option(q, "batch_log_transactions_name");
+		if(transactions) {
+			work_queue_specify_transactions_log(q->data, transactions);
+		}
 	}
 
 	if(stoptime == 0) {
@@ -183,6 +184,7 @@ static int batch_queue_wq_create (struct batch_queue *q)
 	batch_queue_set_feature(q, "absolute_path", NULL);
 	batch_queue_set_feature(q, "remote_rename", "%s=%s");
 	batch_queue_set_feature(q, "batch_log_name", "%s.wqlog");
+	batch_queue_set_feature(q, "batch_log_transactions", "%s.tr");
 	return 0;
 }
 

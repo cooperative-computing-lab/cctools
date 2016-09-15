@@ -140,6 +140,13 @@ void batch_queue_set_logfile(struct batch_queue *q, const char *logfile)
 	strncpy(q->logfile, logfile, sizeof(q->logfile));
 	q->logfile[sizeof(q->logfile)-1] = '\0';
 	debug(D_BATCH, "set logfile to `%s'", logfile);
+
+	const char *tr_pattern = batch_queue_supports_feature(q, "batch_log_transactions");
+	if(tr_pattern) {
+		char *tr_name = string_format(tr_pattern, q->logfile);
+		batch_queue_set_option(q, "batch_log_transactions_name", tr_name);
+		free(tr_name);
+	}
 }
 
 int batch_queue_port(struct batch_queue *q)
