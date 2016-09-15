@@ -53,8 +53,8 @@ OPTION_ITEM(--syscall-disable-debug)Disable tracee access to the Parrot debug sy
 OPTION_TRIPLET(-t, tempdir, dir)Where to store temporary files.
 OPTION_TRIPLET(-T, timeout, time)Maximum amount of time to retry failures.
 time)Maximum amount of time to retry failures.
-OPTION_ITEM(--time-stop) Stop virtual time at midnight, Jan 1st, UTC.
-OPTION_ITEM(--time-warp) Warp virtual time starting from midnight, Jan 1st, UTC.
+OPTION_ITEM(--time-stop) Stop virtual time at midnight, Jan 1st, 2001 UTC.
+OPTION_ITEM(--time-warp) Warp virtual time starting from midnight, Jan 1st, 2001 UTC.
 OPTION_TRIPLET(-U, uid, num)Fake this unix uid; Real uid stays the same.
 OPTION_TRIPLET(-u, username, name)Use this extended username.
 OPTION_ITEM(--fake-setuid)Track changes from setuid and setgid.
