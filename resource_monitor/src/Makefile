@@ -14,7 +14,7 @@ ifeq ($(STATIC_BUILD),yes)
 	STATIC_FLAG=-static
 else
 	STATIC_FLAG=
-	CCTOOLS_DEPENDENCIES+=$(CCTOOLS_EXTERNAL_LINKAGE)
+	CCTOOLS_DEPENDENCIES+=$(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 endif
 
 all: $(TARGETS)
@@ -37,7 +37,7 @@ resource_monitor_pb.o: resource_monitor.c rmonitor_piggyback.h
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) -DCCTOOLS_USE_RMONITOR_HELPER_LIB $<
 
 resource_monitor: resource_monitor_pb.o rmonitor_helper_comm.o
-	$(CCTOOLS_CC) $(STATIC_FLAG) $(CCTOOLS_INTERNAL_CCFLAGS) $(CCTOOLS_DEPENDENCIES) $^ -o $@
+	$(CCTOOLS_CC) $(STATIC_FLAG) -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES)
 
 rmonitor_poll_example: rmonitor_poll_example.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES)
