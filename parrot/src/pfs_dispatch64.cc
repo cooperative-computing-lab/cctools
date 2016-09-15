@@ -139,9 +139,6 @@ extern INT64_T pfs_write_count;
 extern int parrot_dir_fd;
 extern int *pfs_syscall_totals64;
 
-extern pfs_time_mode_t pfs_time_mode;
-extern time_t pfs_time_warp_start;
-
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name);
 int pfs_dispatch_isexe( const char *path, uid_t *uid, gid_t *gid );
 
