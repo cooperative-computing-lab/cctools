@@ -134,14 +134,14 @@ char *makeflow_wrap_umbrella(char *result, struct makeflow_wrapper_umbrella *w, 
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
-				--sandbox_mode parrot \
+				--sandbox_mode local \
 				run \'{}\'", w->spec, umbrella_input_opt, umbrella_output_opt);
 		} else {
 			umbrella_command = string_format("%s --spec %s \
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
-				--sandbox_mode parrot \
+				--sandbox_mode local \
 				run \'{}\'", w->binary, w->spec, umbrella_input_opt, umbrella_output_opt);
 		}
 	} else {
@@ -150,14 +150,14 @@ char *makeflow_wrap_umbrella(char *result, struct makeflow_wrapper_umbrella *w, 
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
-				--sandbox_mode parrot \
+				--sandbox_mode local \
 				run \'{}\'", path_basename(w->spec), umbrella_input_opt, umbrella_output_opt);
 		} else {
 			umbrella_command = string_format("./%s --spec %s \
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
-				--sandbox_mode parrot \
+				--sandbox_mode local \
 				run \'{}\'", path_basename(w->binary), path_basename(w->spec), umbrella_input_opt, umbrella_output_opt);
 		}
 	}
