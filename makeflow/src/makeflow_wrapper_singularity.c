@@ -71,3 +71,4 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
     free(filedata);
     free(file_sans_compress);
 }
+
