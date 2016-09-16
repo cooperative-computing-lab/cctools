@@ -278,7 +278,7 @@ static int auth_ticket_accept(struct link *link, char **subject, time_t stoptime
 		}
 	}
 
-	rc = 0;
+	rc = 1;
 	goto out;
 out:
 	if (tmpf[0])
