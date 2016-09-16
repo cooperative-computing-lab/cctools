@@ -3816,8 +3816,8 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="The mappings of outputs in the format of <container_path>=<local_path>[=<output_type>]. Multiple mappings should be separated by comma.\ncontainer_path is a path inside the sandbox and should be exposed in the output section of an umbrella spec.\nlocal_path should be a non-existing path on your local filessytem where you want the output from container_path to be put into.\noutput_type marks the output type, which can be 'f' for files, or 'd' for dirs.",)
 	parser.add_option("-s", "--sandbox_mode",
 					action="store",
-					choices=['parrot', 'destructive', 'docker', 'ec2',],
-					help="sandbox mode, which can be parrot, destructive, docker, ec2.",)
+					choices=['parrot', 'destructive', 'docker', 'ec2', 'local'],
+					help="sandbox mode, which can be parrot, destructive, docker, ec2, local.",)
 	parser.add_option("-i", "--inputs",
 					action="store",
 					help="The path of input files in the format of <container_path>=<local_path>. Multiple mappings should be separated by comma. Please refer to the --output option for the settings of local_path and container_path.",)
