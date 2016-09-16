@@ -1287,6 +1287,11 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 			mountfile.write(key + " " + mount_dict[key] + "\n")
 			mountfile.write(mount_dict[key] + " " + mount_dict[key] + "\n")
 
+		# sandbox_dir should be added before the mount entry for entries under it.
+		logging.debug("Add sandbox_dir(%s) into %s", sandbox_dir, mountfile_path)
+		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
+		mount_list.append(sandbox_dir)
+
 		for key in output_f_dict:
 			mountfile.write(key + " " + output_f_dict[key] + "\n")
 
@@ -1306,10 +1311,6 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 						mountfile.write(mount_str)
 					mount_list.append(tmplist[0])
 					mountfile.write(line)
-
-		logging.debug("Add sandbox_dir(%s) into %s", sandbox_dir, mountfile_path)
-		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
-		mount_list.append(sandbox_dir)
 
 		logging.debug("Add /etc/hosts and /etc/resolv.conf into %s", mountfile_path)
 		mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/etc')
@@ -4116,10 +4117,9 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 						output_type = remain_path[(index+1):]
 
 					actual_path = os.path.abspath(actual_path)
-					output_dict[access_path] = actual_path
 
 					if output_type == '':
-						pass
+						output_dict[access_path] = actual_path
 					elif output_type == 'f':
 						output_f_dict[access_path] = actual_path
 					elif output_type == 'd':
@@ -4144,10 +4144,6 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 						output_f_dict[key] = output_dict[key]
 					elif key in dirs:
 						output_d_dict[key] = output_dict[key]
-			else:
-				cleanup(tempfile_list, tempdir_list)
-				logging.critical("the specification does not have a output section!")
-				sys.exit("the specification does not have a output section!")
 
 		del output_dict
 
