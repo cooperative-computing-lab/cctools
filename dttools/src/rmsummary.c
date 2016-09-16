@@ -36,8 +36,8 @@
 #include "hash_table.h"
 
 static int units_initialized = 0;
-static struct hash_table *conversion_fields = NULL;
-static struct hash_table *multiplier_of     = NULL;
+struct hash_table *conversion_fields = NULL;
+struct hash_table *multiplier_of     = NULL;
 
 struct conversion_field {
 	char *name;
@@ -46,8 +46,69 @@ struct conversion_field {
 	int  float_flag;
 };
 
-void add_conversion_field(const char *name, const char *internal, const char *external, int float_flag) {
-	struct conversion_field *c = malloc(sizeof(struct conversion_field));
+void initialize_units() {
+	units_initialized = 1;
+
+	conversion_fields = hash_table_create(32, 0);
+	multiplier_of     = hash_table_create(32, 0);
+
+	rmsummary_add_conversion_field("wall_time",                "us",     "s",       1);
+	rmsummary_add_conversion_field("cpu_time",                 "us",     "s",       1);
+	rmsummary_add_conversion_field("start",                    "us",     "us",      0);
+	rmsummary_add_conversion_field("end",                      "us",     "us",      0);
+	rmsummary_add_conversion_field("memory",                   "MB",     "MB",      0);
+	rmsummary_add_conversion_field("virtual_memory",           "MB",     "MB",      0);
+	rmsummary_add_conversion_field("swap_memory",              "MB",     "MB",      0);
+	rmsummary_add_conversion_field("disk",                     "MB",     "MB",      0);
+	rmsummary_add_conversion_field("bytes_read",               "B",      "MB",      1);
+	rmsummary_add_conversion_field("bytes_written",            "B",      "MB",      1);
+	rmsummary_add_conversion_field("bytes_received",           "B",      "MB",      1);
+	rmsummary_add_conversion_field("bytes_sent",               "B",      "MB",      1);
+	rmsummary_add_conversion_field("bandwidth",                "bps",    "Mbps",    1);
+	rmsummary_add_conversion_field("cores",                    "cores",  "cores",   0);
+	rmsummary_add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
+	rmsummary_add_conversion_field("total_processes",          "procs",  "procs",   0);
+	rmsummary_add_conversion_field("total_files",              "files",  "files",   0);
+
+	/* to internal units */
+	rmsummary_add_multiplier("us",    1);
+	rmsummary_add_multiplier("B",     1);
+	rmsummary_add_multiplier("bps",   1);
+	rmsummary_add_multiplier("cores", 1);
+	rmsummary_add_multiplier("procs", 1);
+	rmsummary_add_multiplier("files", 1);
+
+	/* core units */
+	rmsummary_add_multiplier("mcores", 1);
+
+	/* size units */
+	rmsummary_add_multiplier("kB", KILOBYTE);
+	rmsummary_add_multiplier("MB", MEGABYTE);
+	rmsummary_add_multiplier("GB", GIGABYTE);
+
+	/* time units */
+	rmsummary_add_multiplier("s",  USECOND);
+	rmsummary_add_multiplier("ms", 1000);
+
+	/* rate units */
+	rmsummary_add_multiplier("Gbps",  1000000000);
+	rmsummary_add_multiplier("Mbps",  1000000);
+}
+
+void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, int float_flag) {
+
+	if(!units_initialized)
+		initialize_units();
+
+	struct conversion_field *c = hash_table_lookup(conversion_fields, name);
+	if(c) {
+		free(c->name);
+		free(c->internal_unit);
+		free(c->external_unit);
+	}
+	else {
+		c = malloc(sizeof(struct conversion_field));
+	}
 
 	c->name          = xxstrdup(name);
 	c->internal_unit = xxstrdup(internal);
@@ -57,51 +118,14 @@ void add_conversion_field(const char *name, const char *internal, const char *ex
 	hash_table_insert(conversion_fields, name, (void *) c);
 }
 
-void initialize_units() {
-	units_initialized = 1;
+void rmsummary_add_multiplier(const char *external_unit, uint64_t multiplier_to_internal) {
+	if(!units_initialized)
+		initialize_units();
 
-	conversion_fields = hash_table_create(32, 0);
-	multiplier_of     = hash_table_create(32, 0);
-
-	add_conversion_field("wall_time",                "us",     "s",       1);
-	add_conversion_field("cpu_time",                 "us",     "s",       1);
-	add_conversion_field("start",                    "us",     "us",      0);
-	add_conversion_field("end",                      "us",     "us",      0);
-	add_conversion_field("memory",                   "MB",     "MB",      0);
-	add_conversion_field("virtual_memory",           "MB",     "MB",      0);
-	add_conversion_field("swap_memory",              "MB",     "MB",      0);
-	add_conversion_field("disk",                     "MB",     "MB",      0);
-	add_conversion_field("bytes_read",               "B",      "MB",      1);
-	add_conversion_field("bytes_written",            "B",      "MB",      1);
-	add_conversion_field("bytes_received",           "B",      "MB",      1);
-	add_conversion_field("bytes_sent",               "B",      "MB",      1);
-	add_conversion_field("bandwidth",                "bps",    "Mbps",    1);
-	add_conversion_field("cores",                    "cores",  "cores",   0);
-	add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
-	add_conversion_field("total_processes",          "procs",  "procs",   0);
-	add_conversion_field("total_files",              "files",  "files",   0);
-
-	/* to internal units */
-	hash_table_insert(multiplier_of, "us",    (void **) 1);
-	hash_table_insert(multiplier_of, "B",     (void **) 1);
-	hash_table_insert(multiplier_of, "bps",   (void **) 1);
-	hash_table_insert(multiplier_of, "cores", (void **) 1);
-	hash_table_insert(multiplier_of, "procs", (void **) 1);
-	hash_table_insert(multiplier_of, "files", (void **) 1);
-
-	/* size units */
-	hash_table_insert(multiplier_of, "kB", (void **) KILOBYTE);
-	hash_table_insert(multiplier_of, "MB", (void **) MEGABYTE);
-	hash_table_insert(multiplier_of, "GB", (void **) GIGABYTE);
-
-	/* time units */
-	hash_table_insert(multiplier_of, "s",  (void **) USECOND);
-	hash_table_insert(multiplier_of, "ms", (void **) 1000);
-
-	/* rate units */
-	hash_table_insert(multiplier_of, "Gbps",  (void **) 1000000000);
-	hash_table_insert(multiplier_of, "Mbps",  (void **) 1000000);
+	hash_table_remove(multiplier_of, external_unit);
+	hash_table_insert(multiplier_of, external_unit, (void **) (uintptr_t) multiplier_to_internal);
 }
+
 
 int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit) {
 
@@ -166,6 +190,17 @@ const char *rmsummary_unit_of(const char *key) {
 
 	return cf->external_unit;
 }
+
+int rmsummary_field_is_float(const char *key) {
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
+
+	if(!cf) {
+		return 0;
+	}
+
+	return cf->float_flag;
+}
+
 
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {

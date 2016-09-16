@@ -119,4 +119,8 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 size_t rmsummary_field_offset(const char *key);
 int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset);
 
+void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, int float_flag);
+void rmsummary_add_multiplier(const char *external_unit, uint64_t multiplier_to_internal);
+int rmsummary_field_is_float(const char *key);
+
 #endif
