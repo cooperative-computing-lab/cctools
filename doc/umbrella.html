@@ -57,13 +57,13 @@
 			the mapping relationship between the dependency name referred in the
 			specification and the actual storage location within the remote archive.</p>
 
-			<p>Currently, Umbrella supports three execution engines: local,
-			condor, ec2.  Local execution engine can be further devided into three
-			categories: parrot, docker, chroot.  Parrot execution engine can be used
-			without any special authority on the host machine; Docker execution engine
+			<p>Currently, Umbrella supports the following execution engines: parrot,
+			destructive, docker, ec2, local, and condor.  Parrot execution engine can be
+			used without any special authority on the host machine; Docker execution engine
 			requires Docker is installed on the host machine and the user is given the
-			right authority to use Docker; chroot execution engine requires the user to be
-			the root user.</p>
+			right authority to use Docker; destructive execution engine requires the user
+			to be the root user.  Local execution engine first check whether Docker exists.
+			If yes, use docker execution engine; if not, use parrot execution engine.  </p>
 
             <p>To get started using Umbrella, please begin by <a
             href="http://ccl.cse.nd.edu/software/manuals/install.html">installing CCTools</a> on your system. When you
