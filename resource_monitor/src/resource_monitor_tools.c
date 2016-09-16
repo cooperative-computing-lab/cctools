@@ -171,6 +171,11 @@ struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash
 		}
 	}
 
+	// cores to mcores.
+	if(so->wall_time > 0 && so->cpu_time > 0) {
+		so->cores  = (1000*so->cpu_time)/so->wall_time;
+	}
+
 	struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);
 	category_accumulate_summary(c, so, NULL);
 

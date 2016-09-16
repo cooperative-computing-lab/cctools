@@ -330,7 +330,7 @@ void write_histogram_table(struct field_stats *h)
 	int i;
 	for(i = 0; i < histogram_size(h->histogram); i++) {
 		int count = histogram_count(h->histogram, buckets[i]);
-		fprintf(f, "%lf %d\n", buckets[i], count);
+		fprintf(f, "%lf %d\n", rmsummary_to_external_unit(h->field, buckets[i]), count);
 	}
 
 	fclose(f);
@@ -343,34 +343,34 @@ void write_variables_gnuplot(struct field_stats *h, struct field_stats *all)
 	free(fname);
 
 	fprintf(f, "%s = %d\n",  "current_buckets",    histogram_size(h->histogram));
-	fprintf(f, "%s = %lf\n", "current_minimum",    histogram_min_value(h->histogram));
-	fprintf(f, "%s = %lf\n", "current_maximum",    histogram_max_value(h->histogram));
-	fprintf(f, "%s = %lf\n", "current_mode",       histogram_mode(h->histogram));
+	fprintf(f, "%s = %lf\n", "current_minimum",    floor(rmsummary_to_external_unit(h->field, histogram_min_value(h->histogram))));
+	fprintf(f, "%s = %lf\n", "current_maximum",    ceil(rmsummary_to_external_unit(h->field, histogram_max_value(h->histogram))));
+	fprintf(f, "%s = %lf\n", "current_mode",       rmsummary_to_external_unit(h->field, histogram_mode(h->histogram)));
 	fprintf(f, "%s = %d\n",  "current_mode_count", histogram_count(h->histogram, histogram_mode(h->histogram)));
 	fprintf(f, "%s = %d\n",  "current_max_count",  histogram_count(h->histogram, histogram_max_value(h->histogram)));
 	fprintf(f, "%s = %d\n",  "current_min_count",  histogram_count(h->histogram, histogram_min_value(h->histogram)));
-	fprintf(f, "%s = %lf\n", "current_mean",         h->mean);
-	fprintf(f, "%s = %lf\n", "current_percentile75", value_of_p(h, 0.75));
-	fprintf(f, "%s = %lf\n", "current_percentile25", value_of_p(h, 0.25));
+	fprintf(f, "%s = %lf\n", "current_mean",       rmsummary_to_external_unit(h->field, h->mean));
+	fprintf(f, "%s = %lf\n", "current_percentile75", rmsummary_to_external_unit(h->field, value_of_p(h, 0.75)));
+	fprintf(f, "%s = %lf\n", "current_percentile25", rmsummary_to_external_unit(h->field, value_of_p(h, 0.25)));
 
-	fprintf(f, "%s = %" PRId64 "\n", "current_first_allocation", h->fa_max_throughput.first);
-	fprintf(f, "%s = %" PRId64 "\n", "current_first_allocation_min_waste", h->fa_min_waste_time_dependence.first);
+	fprintf(f, "%s = %lf\n", "current_first_allocation", rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(f, "%s = %lf\n", "current_first_allocation_min_waste", rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
 
-	fprintf(f, "%s = %lf\n",        "current_bin_size",   histogram_bucket_size(h->histogram));
+	fprintf(f, "%s = %lf\n", "current_bin_size",   rmsummary_to_external_unit(h->field, histogram_bucket_size(h->histogram)));
 
 	if(all) {
 
-		fprintf(f, "%s = %lf\n", "all_minimum",    histogram_min_value(all->histogram));
-		fprintf(f, "%s = %lf\n", "all_maximum",    histogram_max_value(all->histogram));
-		fprintf(f, "%s = %lf\n", "all_mode",       histogram_mode(all->histogram));
+		fprintf(f, "%s = %lf\n", "all_minimum",    floor(rmsummary_to_external_unit(h->field, histogram_min_value(all->histogram))));
+		fprintf(f, "%s = %lf\n", "all_maximum",    ceil(rmsummary_to_external_unit(h->field, histogram_max_value(all->histogram))));
+		fprintf(f, "%s = %lf\n", "all_mode",       rmsummary_to_external_unit(h->field, histogram_mode(all->histogram)));
 		fprintf(f, "%s = %d\n",  "all_mode_count", histogram_count(all->histogram, histogram_mode(all->histogram)));
-		fprintf(f, "%s = %lf\n", "all_mean",         all->mean);
-		fprintf(f, "%s = %lf\n", "all_percentile75", value_of_p(h, 0.75));
-		fprintf(f, "%s = %lf\n", "all_percentile25", value_of_p(h, 0.25));
+		fprintf(f, "%s = %lf\n", "all_mean",         rmsummary_to_external_unit(h->field, all->mean));
+		fprintf(f, "%s = %lf\n", "all_percentile75", rmsummary_to_external_unit(h->field, value_of_p(h, 0.75)));
+		fprintf(f, "%s = %lf\n", "all_percentile25", rmsummary_to_external_unit(h->field, value_of_p(h, 0.25)));
 
-		fprintf(f, "%s = %" PRId64 "\n", "all_first_allocation", all->fa_max_throughput.first);
+		fprintf(f, "%s = %lf\n", "all_first_allocation", rmsummary_to_external_unit(h->field, all->fa_max_throughput.first));
 
-		fprintf(f, "%s = %" PRId64 "\n", "all_first_allocation_min_waste", all->fa_min_waste_time_dependence.first);
+		fprintf(f, "%s = %lf\n", "all_first_allocation_min_waste", rmsummary_to_external_unit(h->field, all->fa_min_waste_time_dependence.first));
 	}
 
 	fclose(f);
@@ -413,11 +413,8 @@ void write_thumbnail_gnuplot(struct field_stats *h, struct field_stats *all)
 	/* down triangle for first allocation */
 	fprintf(f, "set label \"\" at current_first_allocation,graph -0.025 tc ls 1 center front point pt 10\n");
 
-	if(h == all)
-	{
-		fprintf(f, "set label sprintf(\"%%.0f\", all_minimum) at all_minimum,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n");
-		fprintf(f, "set label sprintf(\"%%.0f\", all_maximum) at all_maximum,graph -0.01 tc ls 1 left front nopoint offset character 1.0,character -0.25\n");
-	}
+	fprintf(f, "set label sprintf(\"%%.0f\", current_minimum) at current_minimum,graph -0.01 tc ls 1 right front nopoint offset character -1.0,character -0.25\n");
+	fprintf(f, "set label sprintf(\"%%.0f\", current_maximum) at current_maximum,graph -0.01 tc ls 1 left front nopoint offset character 1.0,character -0.25\n");
 
 	if( histogram_size(all->histogram) == 1 )
 	{
@@ -644,8 +641,17 @@ void write_histogram_stats_header(FILE *stream)
 	fprintf(stream, "p_25,p_50,p_75,p_99\n");
 }
 
-#define write_stats_row(file, alloc)\
-	fprintf(file, "%" PRId64 ",%.0lf,%lf,%d,%0.3lf,%0.3lf,", alloc.first, ceil(alloc.waste), alloc.throughput, alloc.retries, alloc.time_taken, alloc.tasks_done)
+void write_stats_row(FILE *file, const char *field, struct allocation *alloc) {
+
+	double value  = rmsummary_to_external_unit(field, alloc->first);
+	double ttaken = rmsummary_to_external_unit("wall_time", alloc->time_taken);
+
+	char *fmt = string_format("%%.%dlf,%%.0lf,%%lf,%%d,%%.3lf,%%.0lf,", (rmsummary_field_is_float(field) ? 3 : 0));
+
+	fprintf(file, fmt, value, ceil(alloc->waste), alloc->throughput, alloc->retries, ttaken, alloc->tasks_done);
+
+	free(fmt);
+}
 
 void write_histogram_stats(FILE *stream, struct field_stats *h)
 {
@@ -653,18 +659,18 @@ void write_histogram_stats(FILE *stream, struct field_stats *h)
 	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), sqrt(h->variance));
 	fprintf(stream, "%.0lf,%" PRId64 ",", histogram_min_value(h->histogram), h->usage);
 
-	write_stats_row(stream, h->fa_perfect);
-	write_stats_row(stream, h->fa_max);
-	write_stats_row(stream, h->fa_95);
+	write_stats_row(stream, h->field, &(h->fa_perfect));
+	write_stats_row(stream, h->field, &(h->fa_max));
+	write_stats_row(stream, h->field, &(h->fa_95));
 
 	if(brute_force) {
-		write_stats_row(stream, h->fa_min_waste_brute_force);
-		write_stats_row(stream, h->fa_max_throughput_brute_force);
+		write_stats_row(stream, h->field, &(h->fa_min_waste_brute_force));
+		write_stats_row(stream, h->field, &(h->fa_max_throughput_brute_force));
 	}
 
-	write_stats_row(stream, h->fa_min_waste_time_independence);
-	write_stats_row(stream, h->fa_min_waste_time_dependence);
-	write_stats_row(stream, h->fa_max_throughput);
+	write_stats_row(stream, h->field, &(h->fa_min_waste_time_independence));
+	write_stats_row(stream, h->field, &(h->fa_min_waste_time_dependence));
+	write_stats_row(stream, h->field, &(h->fa_max_throughput));
 
 	fprintf(stream, "%.2lf,%.2lf,%.2lf,%.2lf\n",
 			value_of_p(h, 0.25),
@@ -1312,12 +1318,14 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	}
 	fprintf(stream, "</td>");
 
+	const char *fmt = (rmsummary_field_is_float(h->field) ? "%.3lf\n" : "%.0lf\n");
+
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->field, histogram_mode(h->histogram)));
+	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, histogram_mode(h->histogram)));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->field, h->mean));
+	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->mean));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
@@ -1325,20 +1333,20 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
+	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
+		fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
 		fprintf(stream, "</td>\n");
 
 		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, "%6.0lf\n", rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
+		fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
 		fprintf(stream, "</td>\n");
 	}
 }
@@ -1409,7 +1417,7 @@ void write_front_page(char *workflow_name)
 	char *filename = string_format("%s/index.html", output_directory);
 	fo = fopen(filename, "w");
 
-	int columns = brute_force ? 12 : 10;
+	int columns = brute_force ? 8 : 6;
 
 	if(!fo)
 		fatal("Could not open file %s for writing: %s\n", strerror(errno));
@@ -1574,6 +1582,11 @@ int main(int argc, char **argv)
 	{
 		workflow_name = output_directory;
 	}
+
+	// add some resolution to the cores.
+	// we turn mcores into the internal unit, cores in the external
+	rmsummary_add_conversion_field("cores", "mcores", "cores", 1);
+	rmsummary_add_multiplier("cores", 1000);
 
 	categories = hash_table_create(0, 0);
 	all_sets = list_create();
