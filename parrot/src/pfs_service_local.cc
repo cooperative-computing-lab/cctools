@@ -433,7 +433,7 @@ public:
 #ifdef AT_SYMLINK_NOFOLLOW
 #  if _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
 		debug(D_LOCAL,"utimens %s %p",name->rest,times);
-		result = ::utimensat(AT_FDCWD,name->rest,times,0);
+		result = ::utimensat(AT_FDCWD,name->rest,times,AT_SYMLINK_NOFOLLOW);
 #  else
 		debug(D_LOCAL,"(fallback) utime %s %p",name->rest,times);
 		{
