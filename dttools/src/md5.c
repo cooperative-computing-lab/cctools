@@ -368,4 +368,21 @@ const char *md5_string(unsigned char digest[16])
 	return str;
 }
 
+char *md5_cal(const char *s) {
+	unsigned char digest[MD5_DIGEST_LENGTH_HEX];
+	md5_context_t context;
+	char *p = NULL;
+
+	p = malloc(sizeof(char) * (MD5_DIGEST_LENGTH_HEX+1));
+	if(!p) {
+		return NULL;
+	}
+
+	md5_init(&context);
+	md5_update(&context, (const unsigned char *)s, strlen(s));
+	md5_final(digest, &context);
+	sprintf(p, "%s", md5_string(digest));
+	return p;
+}
+
 /* vim: set noexpandtab tabstop=4: */

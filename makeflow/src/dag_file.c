@@ -24,6 +24,9 @@ struct dag_file * dag_file_create( const char *filename )
 	f->reference_count = 0;
 	f->state = DAG_FILE_STATE_UNKNOWN;
 	f->type = DAG_FILE_TYPE_INTERMEDIATE;
+	f->source = NULL;
+	f->cache_name = NULL;
+	f->source_type = DAG_FILE_SOURCE_LOCAL;
 	return f;
 }
 
@@ -136,6 +139,20 @@ int dag_file_coexist_files(struct set *s, struct dag_file *f)
 			return 1;
 	}
 	return 0;
+}
+
+void dag_file_mount_clean(struct dag_file *df) {
+	if(!df) return;
+
+	if(df->source) {
+		free(df->source);
+		df->source = NULL;
+	}
+
+	if(df->cache_name) {
+		free(df->cache_name);
+		df->cache_name = NULL;
+	}
 }
 
 /* vim: set noexpandtab tabstop=4: */

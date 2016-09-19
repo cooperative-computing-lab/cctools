@@ -1,0 +1,57 @@
+To test this feature, the following files should exist on your filesystem:
+/usr/bin/curl
+/usr/bin/convert
+
+Makeflow allows the user to specify the source and target of each input
+dependency for a makeflow through the --mounts mountfile option. Every line of
+a mountfile should be in the format of `target source`. For example:
+./mycurl /usr/bin/curl
+./myconvert /usr/bin/convert
+
+The target path of a mount entry should be the same with its usage in the
+prerequisite part of a rule in Makeflow makefiles. For example, to create a
+mount entry for the following rule, the target path must be exactly `./mycurl`,
+can not be `mycurl`.
+
+output_file: ./mycurl
+        command
+
+To run makeflow with a mount file specifying the sources of dependencies:
+$ makeflow --mounts example.mount example.mount.makeflow
+
+Makeflow will create a cache, .makeflow_cache.xjlWee, to store all the
+dependencies specified in example.mount, link the target of each specified
+dependency to the dependency inside the cache.
+
+The name of cache dir is randomly generated. Each dependency is named with its md5sum value.
+$ ls .makeflow_cache.xjlWee/
+e4e1baab8b1ce5fee31b53d3bd41423e*  e7210e1e6cbc14859dc6261b483665e0*
+
+The following item will be written into the makeflow log file:
+# CACHE 1474041398581632 .makeflow_cache.xjlWee
+# MOUNT 1474041398581942 ./myconvert /usr/bin/convert e7210e1e6cbc14859dc6261b483665e0 0
+# MOUNT 1474041398582197 ./mycurl /usr/bin/curl e4e1baab8b1ce5fee31b53d3bd41423e 0
+
+To clean up the makeflow, run either of the following two commands:
+$ makeflow -c example.mount.makeflow
+$ makeflow -call example.mount.makeflow
+$ makeflow --mounts example.mount -c example.mount.makeflow
+
+The reason the --mounts option can be omitted during cleanup is that the
+makeflow log already records the cache info and the target of each mount entry.
+
+To only clean up the cache and the target of each mount entry,
+$ makeflow -ccache example.mount.makeflow
+
+Note: there are two points worthy noting about the usage of `makeflow -ccache ...`:
+1) You should always run `makeflow -coutputs example.mount.makeflow`
+and `makeflow -cintermediates example.mount.makeflow` before running `makeflow
+-ccache example.mount.makeflow`.  Otherwise, makeflow will fail due to the
+lacking of the input dependencies.
+2) Even if you run `makeflow -coutputs ...`, `makeflow -cintermediates ...` and
+`makeflow -ccache ...` in the right order, eventually the makeflow log file is
+still left behind, which can only be removed manually.  A recommended way of
+cleaning up should be `makeflow -c ...`.
+
+To reuse an existing cache, run the following command:
+$ makeflow --mounts example.mount --cache .makeflow_cache.xjlWee example.mount.makeflow

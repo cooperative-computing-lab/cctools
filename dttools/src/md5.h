@@ -61,4 +61,11 @@ int md5_file(const char *filename, unsigned char digest[MD5_DIGEST_LENGTH]);
 
 const char *md5_string(unsigned char digest[MD5_DIGEST_LENGTH]);
 
+/* md5_cal calculates the md5 checksum of string s.
+ * @param s: a string pointer
+ * return the md5 checksum of s on success, return NULL on failure.
+ * The caller should free the returned string.
+ */
+char *md5_cal(const char *s);
+
 #endif
