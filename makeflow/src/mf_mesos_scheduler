@@ -56,6 +56,8 @@ class MakeflowScheduler(Scheduler):
         executor.source = "python executor"
         executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
                 executor.executor_id.value, executor.framework_id.value, sys.argv[3])
+        #executor.command.value = "{0} \"{1}\" {2} {3} {4}".format(sh_path, mf_task.cmd, 
+        #        executor.executor_id.value, executor.framework_id.value, sys.argv[3])
 
         cpus = executor.resources.add()
         cpus.name = "cpus"
@@ -77,6 +79,14 @@ class MakeflowScheduler(Scheduler):
 
             uri = executor.command.uris.add()
 
+            #while(1):
+            #    if os.path.exists(fn):
+            #        break 
+            #    else:
+            #        logging.info("Input {0} of task {1} is not ready".format(fn, mf_task.task_id))
+            #        time.sleep(1)
+                 
+
             # if input file is a directory, compress it
             if os.path.isdir(fn):
                 logging.info("Input {0} of task {1} is a directory".format(fn, mf_task.task_id))
@@ -94,6 +104,7 @@ class MakeflowScheduler(Scheduler):
             logging.info("input file is: {0}".format(fn.strip(' \t\n\r')))
             uri.value = fn.strip(' \t\n\r')
             uri.executable = False
+            # uri.cache = True
 
         return executor
     
@@ -202,13 +213,15 @@ class MakeflowScheduler(Scheduler):
             if not idle_task:
                 driver.declineOffer(offer.id)
                
-    def mesos_clean(self, task_id): 
+    def clean_mesos_file(self, task_id): 
         mf_task = mms.tasks_info_dict[task_id]
         os.remove("task_{0}_cmd".format(task_id))
         for fn in mf_task.inp_fns:
             if os.path.isdir(fn):
+                logging.info("{0} is a directory, remove the tar.gz file".format(fn))
                 compressed_fn = "{0}.tar.gz".format(fn)
-                os.remove(compressed_fn)
+                if os.path.isfile(compressed_fn):
+                    os.remove(compressed_fn)
         
     def statusUpdate(self, driver, update):
         if os.path.isfile(FILE_TASK_STATE): 
@@ -229,15 +242,13 @@ class MakeflowScheduler(Scheduler):
                 oup_fn.write("{0},killed\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "killed"
                 logging.info("{0}".format(update.message))
-                self.mesos_clean(update.task_id.value)
-                os.remove("task_{0}_cmd".format(update.task_id.value))
+                self.clean_mesos_file(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_LOST:
                 oup_fn.write("{0},lost\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "lost"
                 logging.error("{0}".format(update.message))
-                self.mesos_clean(update.task_id.value)
-                os.remove("task_{0}_cmd".format(update.task_id.value))
+                self.clean_mesos_file(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_ERROR:
                 #if mms.tasks_info_dict[update.task_id.value].num_exe >= RETRY_TIMES:
@@ -254,14 +265,12 @@ class MakeflowScheduler(Scheduler):
                 oup_fn.write("{0},failed\n".format(update.task_id.value))
                 logging.info("Executor failed with reason code {0}.".format(update.reason))
                 mms.tasks_info_dict[update.task_id.value].action = "failed"
-                self.mesos_clean(update.task_id.value)
-                os.remove("task_{0}_cmd".format(update.task_id.value))
+                self.clean_mesos_file(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_FINISHED:
                 oup_fn.write("{0},finished\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "finished"
-                self.mesos_clean(update.task_id.value)
-                os.remove("task_{0}_cmd".format(update.task_id.value))
+                self.clean_mesos_file(update.task_id.value)
         
         oup_fn.close()
 
