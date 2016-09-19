@@ -16,9 +16,10 @@ struct hash_table *cummulative_fields = NULL;
 void init_field_active() {
 	active_fields = hash_table_create(0,0);
 
-	hash_table_insert(active_fields, "cores",  active_fields);
-	hash_table_insert(active_fields, "disk",   active_fields);
-	hash_table_insert(active_fields, "memory", active_fields);
+	hash_table_insert(active_fields, "cores",     active_fields);
+	hash_table_insert(active_fields, "cores_avg", active_fields);
+	hash_table_insert(active_fields, "disk",      active_fields);
+	hash_table_insert(active_fields, "memory",    active_fields);
 }
 
 void init_field_cumulative() {
@@ -122,6 +123,9 @@ void parse_fields_options(const char *field_str)
 		} else if(strcmp(token, "cores") == 0) {
 			hash_table_insert(active_fields, "cores", active_fields);
 			debug(D_RMON, "adding field: cores\n");
+		} else if(strcmp(token, "cores_avg") == 0) {
+			hash_table_insert(active_fields, "cores_avg", active_fields);
+			debug(D_RMON, "adding field: cores_avg\n");
 		} else {
 			fatal("'%s' is not a field option\n", token);
 		}
@@ -169,11 +173,6 @@ struct rmsummary *parse_summary(struct jx_parser *p, char *filename, struct hash
 			so->category   = xxstrdup(DEFAULT_CATEGORY);
 			so->command    = xxstrdup(DEFAULT_CATEGORY);
 		}
-	}
-
-	// cores to mcores.
-	if(so->wall_time > 0 && so->cpu_time > 0) {
-		so->cores  = (1000*so->cpu_time)/so->wall_time;
 	}
 
 	struct category *c = category_lookup_or_create(categories, ALL_SUMMARIES_CATEGORY);

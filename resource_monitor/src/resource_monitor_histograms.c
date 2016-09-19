@@ -25,6 +25,7 @@ See the file COPYING for details.
 
 const char *field_order[] = {
 	"cores",
+	"cores_avg",
 	"disk",
 	"memory",
 	"virtual_memory",
@@ -1585,8 +1586,7 @@ int main(int argc, char **argv)
 
 	// add some resolution to the cores.
 	// we turn mcores into the internal unit, cores in the external
-	rmsummary_add_conversion_field("cores", "mcores", "cores", 1);
-	rmsummary_add_multiplier("cores", 1000);
+	rmsummary_add_conversion_field("cores", "mcores", "cores", 1000, 1);
 
 	categories = hash_table_create(0, 0);
 	all_sets = list_create();

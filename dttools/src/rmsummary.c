@@ -37,65 +37,45 @@
 
 static int units_initialized = 0;
 struct hash_table *conversion_fields = NULL;
-struct hash_table *multiplier_of     = NULL;
 
 struct conversion_field {
 	char *name;
-	char *internal_unit;
-	char *external_unit;
+	char  *internal_unit;
+	char  *external_unit;
+	double external_to_internal; // internal = external * this factor.
 	int  float_flag;
+};
+
+struct multiplier {
+	double val;
 };
 
 void initialize_units() {
 	units_initialized = 1;
 
 	conversion_fields = hash_table_create(32, 0);
-	multiplier_of     = hash_table_create(32, 0);
 
-	rmsummary_add_conversion_field("wall_time",                "us",     "s",       1);
-	rmsummary_add_conversion_field("cpu_time",                 "us",     "s",       1);
-	rmsummary_add_conversion_field("start",                    "us",     "us",      0);
-	rmsummary_add_conversion_field("end",                      "us",     "us",      0);
-	rmsummary_add_conversion_field("memory",                   "MB",     "MB",      0);
-	rmsummary_add_conversion_field("virtual_memory",           "MB",     "MB",      0);
-	rmsummary_add_conversion_field("swap_memory",              "MB",     "MB",      0);
-	rmsummary_add_conversion_field("disk",                     "MB",     "MB",      0);
-	rmsummary_add_conversion_field("bytes_read",               "B",      "MB",      1);
-	rmsummary_add_conversion_field("bytes_written",            "B",      "MB",      1);
-	rmsummary_add_conversion_field("bytes_received",           "B",      "MB",      1);
-	rmsummary_add_conversion_field("bytes_sent",               "B",      "MB",      1);
-	rmsummary_add_conversion_field("bandwidth",                "bps",    "Mbps",    1);
-	rmsummary_add_conversion_field("cores",                    "cores",  "cores",   0);
-	rmsummary_add_conversion_field("max_concurrent_processes", "procs",  "procs",   0);
-	rmsummary_add_conversion_field("total_processes",          "procs",  "procs",   0);
-	rmsummary_add_conversion_field("total_files",              "files",  "files",   0);
-
-	/* to internal units */
-	rmsummary_add_multiplier("us",    1);
-	rmsummary_add_multiplier("B",     1);
-	rmsummary_add_multiplier("bps",   1);
-	rmsummary_add_multiplier("cores", 1);
-	rmsummary_add_multiplier("procs", 1);
-	rmsummary_add_multiplier("files", 1);
-
-	/* core units */
-	rmsummary_add_multiplier("mcores", 1);
-
-	/* size units */
-	rmsummary_add_multiplier("kB", KILOBYTE);
-	rmsummary_add_multiplier("MB", MEGABYTE);
-	rmsummary_add_multiplier("GB", GIGABYTE);
-
-	/* time units */
-	rmsummary_add_multiplier("s",  USECOND);
-	rmsummary_add_multiplier("ms", 1000);
-
-	/* rate units */
-	rmsummary_add_multiplier("Gbps",  1000000000);
-	rmsummary_add_multiplier("Mbps",  1000000);
+	rmsummary_add_conversion_field("wall_time",                "us",      "s",      USECOND,  1);
+	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      USECOND,  1);
+	rmsummary_add_conversion_field("start",                    "us",      "us",     1,        0);
+	rmsummary_add_conversion_field("end",                      "us",      "us",     1,        0);
+	rmsummary_add_conversion_field("memory",                   "MB",      "MB",     1,        0);
+	rmsummary_add_conversion_field("virtual_memory",           "MB",      "MB",     1,        0);
+	rmsummary_add_conversion_field("swap_memory",              "MB",      "MB",     1,        0);
+	rmsummary_add_conversion_field("disk",                     "MB",      "MB",     1,        0);
+	rmsummary_add_conversion_field("bytes_read",               "B",       "MB",     MEGABYTE, 1);
+	rmsummary_add_conversion_field("bytes_written",            "B",       "MB",     MEGABYTE, 1);
+	rmsummary_add_conversion_field("bytes_received",           "B",       "MB",     MEGABYTE, 1);
+	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     MEGABYTE, 1);
+	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   1000,     1);
+	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  1,        0);
+	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  1000,     1);
+	rmsummary_add_conversion_field("max_concurrent_processes", "procs",   "procs",  1,        0);
+	rmsummary_add_conversion_field("total_processes",          "procs",   "procs",  1,        0);
+	rmsummary_add_conversion_field("total_files",              "files",   "files",  1,        0);
 }
 
-void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, int float_flag) {
+void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, double multiplier, int float_flag) {
 
 	if(!units_initialized)
 		initialize_units();
@@ -110,49 +90,35 @@ void rmsummary_add_conversion_field(const char *name, const char *internal, cons
 		c = malloc(sizeof(struct conversion_field));
 	}
 
-	c->name          = xxstrdup(name);
-	c->internal_unit = xxstrdup(internal);
-	c->external_unit = xxstrdup(external);
-	c->float_flag    = float_flag;
+	c->name                 = xxstrdup(name);
+	c->internal_unit        = xxstrdup(internal);
+	c->external_unit        = xxstrdup(external);
+	c->external_to_internal = multiplier;
+	c->float_flag           = float_flag;
 
 	hash_table_insert(conversion_fields, name, (void *) c);
 }
 
-void rmsummary_add_multiplier(const char *external_unit, uint64_t multiplier_to_internal) {
+int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *external_unit) {
 	if(!units_initialized)
 		initialize_units();
-
-	hash_table_remove(multiplier_of, external_unit);
-	hash_table_insert(multiplier_of, external_unit, (void **) (uintptr_t) multiplier_to_internal);
-}
-
-
-int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit) {
-
-	if(!units_initialized)
-		initialize_units();
-
-	uintptr_t multiplier = (uintptr_t) hash_table_lookup(multiplier_of, unit);
-
-	if(!multiplier) {
-		warn(D_DEBUG, "Unknown units: '%s'", unit);
-		return 0;
-	}
-
-	input_number *= multiplier;
 
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
 	if(!cf) {
-		warn(D_DEBUG, "Unknown field: '%s'", field);
-		return 0;
+		fatal("Unknown field: '%s'", field);
 	}
 
-	const char *to_unit = cf->internal_unit;
-	if(to_unit && strcmp("MB", to_unit) == 0) {
-		input_number /= MEGABYTE;
+	double factor;
+
+	if(strcmp(cf->internal_unit, external_unit) == 0) {
+		factor = 1;
+	} else if(strcmp(cf->external_unit, external_unit) == 0 || strcmp("external", external_unit) == 0) {
+		factor = cf->external_to_internal;
+	} else {
+		fatal("Expected units of '%s', but got '%s' for '%s'", cf->external_unit, external_unit, field);
 	}
 
-	*output_number = (int64_t) input_number;
+	*output_number = (int64_t) ceil(input_number * factor);
 
 	return 1;
 }
@@ -171,12 +137,7 @@ double rmsummary_to_external_unit(const char *field, int64_t n) {
 		return (double) n;
 	}
 
-	uintptr_t divider = (uintptr_t) hash_table_lookup(multiplier_of, to_unit);
-
-	if(!divider)
-		fatal("Unknown units: '%s'", to_unit);
-
-	double nd = ((double) n) / divider;
+	double nd = ((double) n) / cf->external_to_internal;
 
 	return nd;
 }
@@ -316,6 +277,10 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->cores;
 	}
 
+	if(strcmp(key, "cores_avg") == 0) {
+		return s->cores_avg;
+	}
+
 	if(strcmp(key, "gpus") == 0) {
 		return s->gpus;
 	}
@@ -449,6 +414,11 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	if(strcmp(key, "cores_avg") == 0) {
+		s->cores_avg = value;
+		return 1;
+	}
+
 	if(strcmp(key, "gpus") == 0) {
 		s->gpus = value;
 		return 1;
@@ -545,6 +515,7 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	field_to_json(output, s, total_processes);
 	field_to_json(output, s, max_concurrent_processes);
 	field_to_json(output, s, cores);
+	field_to_json(output, s, cores_avg);
 	field_to_json(output, s, cpu_time);
 	field_to_json(output, s, wall_time);
 	field_to_json(output, s, end);
@@ -585,19 +556,19 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	return output;
 }
 
-static int json_number_of_array(struct jx *array, char *field, int64_t *number) {
+static int json_number_of_array(struct jx *array, char *field, int64_t *result) {
 
 	struct jx_item *first = array->u.items;
 
 	if(!first)
 		return 0;
 
-	double result;
+	double number;
 
 	if(jx_istype(first->value, JX_DOUBLE)) {
-		result = first->value->u.double_value;
+		number = first->value->u.double_value;
 	} else if(jx_istype(first->value, JX_INTEGER)) {
-		result = (double) first->value->u.integer_value;
+		number = (double) first->value->u.integer_value;
 	} else {
 		return 0;
 	}
@@ -612,7 +583,7 @@ static int json_number_of_array(struct jx *array, char *field, int64_t *number) 
 
 	char *unit = second->value->u.string_value;
 
-	return rmsummary_to_internal_unit(field, result, number, unit);
+	return rmsummary_to_internal_unit(field, number, result, unit);
 }
 
 struct rmsummary *json_to_rmsummary(struct jx *j) {
@@ -632,7 +603,9 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 		if(jx_istype(value, JX_STRING)) {
 			rmsummary_assign_char_field(s, key, value->u.string_value);
 		} else if(jx_istype(value, JX_INTEGER)) {
-			rmsummary_assign_int_field(s, key, value->u.integer_value);
+			int64_t num;
+			rmsummary_to_internal_unit(key, value->u.integer_value, &num, "external");
+			rmsummary_assign_int_field(s, key, num);
 		} else if(jx_istype(value, JX_ARRAY)) {
 			int64_t number;
 			int status = json_number_of_array(value, key, &number);
@@ -644,6 +617,11 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 		}
 
 		head = head->next;
+	}
+
+	if(s->wall_time > 0 && s->cpu_time > 0) {
+		//in millicores
+		s->cores_avg = (s->cpu_time * 1000.0)/s->wall_time;
 	}
 
 	return s;
@@ -877,9 +855,11 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, bandwidth);
 	rmsummary_apply_op(dest, src, fn, total_files);
 	rmsummary_apply_op(dest, src, fn, disk);
+	rmsummary_apply_op(dest, src, fn, fs_nodes);
 
 	rmsummary_apply_op(dest, src, fn, cores);
-	rmsummary_apply_op(dest, src, fn, fs_nodes);
+	rmsummary_apply_op(dest, src, fn, cores_avg);
+
 }
 
 /* Copy the value for all the fields in src > -1 to dest */
@@ -966,6 +946,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 	merge_limit(dest, src, total_files);
 	merge_limit(dest, src, disk);
 	merge_limit(dest, src, cores);
+	merge_limit(dest, src, cores_avg);
 	merge_limit(dest, src, fs_nodes);
 
 }
@@ -1105,6 +1086,10 @@ size_t rmsummary_field_offset(const char *key) {
 		return offsetof(struct rmsummary, cores);
 	}
 
+	if(!strcmp(key, "cores_avg")) {
+		return offsetof(struct rmsummary, cores_avg);
+	}
+
 	if(!strcmp(key, "disk")) {
 		return offsetof(struct rmsummary, disk);
 	}
@@ -1130,35 +1115,35 @@ size_t rmsummary_field_offset(const char *key) {
 	}
 
 	if(!strcmp(key, "bytes_read")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, bytes_read);
 	}
 
 	if(!strcmp(key, "bytes_written")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, bytes_written);
 	}
 
 	if(!strcmp(key, "bytes_received")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, bytes_received);
 	}
 
 	if(!strcmp(key, "bytes_sent")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, bytes_sent);
 	}
 
 	if(!strcmp(key, "bandwidth")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, bandwidth);
 	}
 
 	if(!strcmp(key, "total_files")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, total_files);
 	}
 
 	if(!strcmp(key, "total_processes")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, total_processes);
 	}
 
 	if(!strcmp(key, "max_concurrent_processes")) {
-		return offsetof(struct rmsummary, cpu_time);
+		return offsetof(struct rmsummary, max_concurrent_processes);
 	}
 
 	fatal("Field '%s' was not found.");

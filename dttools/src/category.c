@@ -56,6 +56,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_resources_seen      = rmsummary_create(-1);
 
 	c->cores_histogram           = histogram_create(1);
+	c->cores_avg_histogram       = histogram_create(1);
 	c->wall_time_histogram       = histogram_create(time_bucket_size);
 	c->cpu_time_histogram        = histogram_create(time_bucket_size);
 	c->memory_histogram          = histogram_create(memory_bucket_size);
@@ -126,6 +127,7 @@ void category_specify_allocation_mode(struct category *c, int mode) {
 	r->total_files     = 0;
 	r->total_processes = 0;
 	r->max_concurrent_processes = 0;
+	r->cores_avg       = 0;
 
 	r->cores           = autolabel;
 	r->memory          = autolabel;
@@ -158,6 +160,7 @@ static void category_clear_histograms(struct category *c) {
 		return;
 
 	category_clear_histogram(c->cores_histogram);
+	category_clear_histogram(c->cores_avg_histogram);
 	category_clear_histogram(c->wall_time_histogram);
 	category_clear_histogram(c->cpu_time_histogram);
 	category_clear_histogram(c->max_concurrent_processes_histogram);
@@ -181,6 +184,7 @@ static void category_delete_histograms(struct category *c) {
 	category_clear_histograms(c);
 
 	histogram_delete(c->cores_histogram);
+	histogram_delete(c->cores_avg_histogram);
 	histogram_delete(c->wall_time_histogram);
 	histogram_delete(c->cpu_time_histogram);
 	histogram_delete(c->max_concurrent_processes_histogram);
@@ -454,6 +458,7 @@ int category_update_first_allocation(struct category *c, const struct rmsummary 
 	update_first_allocation_field(c, top, 1, cpu_time);
 	update_first_allocation_field(c, top, 1, wall_time);
 	update_first_allocation_field(c, top, c->time_peak_independece, cores);
+	update_first_allocation_field(c, top, c->time_peak_independece, cores_avg);
 	update_first_allocation_field(c, top, c->time_peak_independece, virtual_memory);
 	update_first_allocation_field(c, top, c->time_peak_independece, memory);
 	update_first_allocation_field(c, top, c->time_peak_independece, swap_memory);
@@ -521,6 +526,7 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	rmsummary_merge_max(c->max_resources_seen, rs);
 	if(rs && (!rs->exit_type || !strcmp(rs->exit_type, "normal"))) {
 		category_inc_histogram_count(c, cores,          rs);
+		category_inc_histogram_count(c, cores_avg,      rs);
 		category_inc_histogram_count(c, cpu_time,       rs);
 		category_inc_histogram_count(c, wall_time,      rs);
 		category_inc_histogram_count(c, virtual_memory, rs);
@@ -613,6 +619,7 @@ category_allocation_t category_next_label(struct category *c, category_allocatio
 		int over = 0;
 		if(measured) {
 			check_hard_limits(c->max_allocation, user, measured, cores,                    over);
+			check_hard_limits(c->max_allocation, user, measured, cores_avg,                over);
 			check_hard_limits(c->max_allocation, user, measured, cpu_time,                 over);
 			check_hard_limits(c->max_allocation, user, measured, wall_time,                over);
 			check_hard_limits(c->max_allocation, user, measured, virtual_memory,           over);
