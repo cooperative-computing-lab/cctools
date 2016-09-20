@@ -163,6 +163,12 @@ static int use_mountfile = 0;
 
 static struct list *shared_fs = NULL;
 
+static void makeflow_generate_node_cache_id(struct dag_node *n, char *command, struct list*inputs);
+static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct list *outputs);
+static int is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs);
+static int move_preserved_output_file(struct dag *d, struct dag_node *n, struct list *outputs);
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job_info *info);
+
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
  *   * replacement for monitor file names. */
@@ -587,27 +593,40 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Logs the creation of output files. */
 	makeflow_log_file_expectation(d, output_list);
- 
-	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
 
-	/* Restore old batch job options. */
-	if(previous_batch_options) {
-		batch_queue_set_option(queue, "batch-options", previous_batch_options);
-		free(previous_batch_options);
-	}
-
-	/* Update all of the necessary data structures. */
-	if(n->jobid >= 0) {
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
-		if(n->local_job && local_queue) {
-			itable_insert(d->local_job_table, n->jobid, n);
-		} else {
-			itable_insert(d->remote_job_table, n->jobid, n);
+	/* check caching directory to see if node has already been preserved */
+	if (d->should_preserve && is_preserved(d, n, command, input_list, output_list) == 1) {
+		struct dag_file *f;
+		struct batch_job_info info;
+		move_preserved_output_file(d, n, output_list);
+		n->state = DAG_NODE_STATE_RUNNING;
+		list_first_item(n->target_files);
+		while((f = list_next_item(n->target_files))) {
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 		}
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	} else {
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		makeflow_failed_flag = 1;
+		/* Now submit the actual job, retrying failures as needed. */
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
+
+		/* Restore old batch job options. */
+		if(previous_batch_options) {
+			batch_queue_set_option(queue, "batch-options", previous_batch_options);
+			free(previous_batch_options);
+		}
+
+		/* Update all of the necessary data structures. */
+		if(n->jobid >= 0) {
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+			if(n->local_job && local_queue) {
+				itable_insert(d->local_job_table, n->jobid, n);
+			} else {
+				itable_insert(d->remote_job_table, n->jobid, n);
+			}
+		} else {
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+			makeflow_failed_flag = 1;
+		}
 	}
 
 	free(command);
@@ -706,12 +725,18 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 	return file_created;
 }
 
-/* Given a completed Node, calculate and store the cache_id in the dag node */
-static void makeflow_generate_node_cache_id(struct dag_node *n, struct list*inputs) {
+/* Given a node, generate the cache_id from the input files and command */
+static void makeflow_generate_node_cache_id(struct dag_node *n, char *command, struct list*inputs) {
 	struct dag_file *f;
-	char *cache_id = xxstrdup("");
+	char *cache_id = NULL;
 	unsigned char digest[SHA1_DIGEST_LENGTH];
+	struct batch_queue *queue;
 
+	if(n->local_job && local_queue) {
+		queue = local_queue;
+	} else {
+		queue = remote_queue;
+	}
 	// add checksum of the node's input files together
 	list_first_item(inputs);
 	while((f = list_next_item(inputs))) {
@@ -719,9 +744,11 @@ static void makeflow_generate_node_cache_id(struct dag_node *n, struct list*inpu
 		cache_id = string_combine(cache_id, sha1_string(digest));
 	}
 
-	cache_id = string_combine(cache_id, n->command);
+	sha1_buffer(command, strlen(command), digest);
+	cache_id = string_combine(cache_id, sha1_string(digest));
 	sha1_buffer(cache_id, strlen(cache_id), digest);
 	n -> cache_id = xxstrdup(sha1_string(digest));
+
 	free(cache_id);
 }
 
@@ -729,15 +756,13 @@ static void makeflow_generate_node_cache_id(struct dag_node *n, struct list*inpu
 	 The source makeflow file, ancestor node cache_ids, and the output files are cached */
 static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct list *outputs) {
 	char *filename;
-	char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path;
-	char *ancestor_cache_id_string = xxstrdup("");
-	char *ancestor_cache_id_cmd = xxstrdup("");
-	struct jx *envlist = dag_node_env_create(d,n);
+	char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path; 
+	char *ancestor_cache_id_string = NULL;
 	struct dag_node *ancestor;
 	struct batch_queue *queue;
 	struct dag_file *f;
 	int sucess;
-
+	FILE *fp;
 
 	if(n->local_job && local_queue) {
 		queue = local_queue;
@@ -776,20 +801,76 @@ static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct li
 	}
 	ancestor_file_path= xxstrdup(d->caching_directory);
 	ancestor_file_path= string_combine_multi(ancestor_file_path, n->cache_id, "/ancestors", 0);
-	ancestor_cache_id_cmd = string_combine_multi(ancestor_cache_id_cmd, "echo \"", ancestor_cache_id_string, "\" > ", ancestor_file_path, 0);
 
-	makeflow_node_submit_retry(queue, ancestor_cache_id_cmd, NULL, NULL, envlist, dag_node_dynamic_label(n));
-
-	jx_delete(envlist);
-
+	fp = fopen(ancestor_file_path, "w");
+	if (fp == NULL) {
+		fatal("could not cache ancestor node cache ids");
+	} else {
+		fprintf(fp, "%s\n", ancestor_cache_id_string);
+	}
 	free(caching_file_path);
 	free(output_file_path);
 	free(source_makeflow_file_path);
 	free(ancestor_file_path);
-	free(ancestor_cache_id_cmd);
 	free(ancestor_cache_id_string);
-
+	fclose(fp);
 }
+
+static int is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs) {
+	struct batch_queue *queue;
+	char *filename;
+	struct dag_file *f;
+	struct stat buf;
+	int file_exists = -1;
+	makeflow_generate_node_cache_id(n, command, inputs);
+	if(n->local_job && local_queue) {
+		queue = local_queue;
+	} else {
+		queue = remote_queue;
+	}
+
+	list_first_item(outputs);
+	while ((f=list_next_item(outputs))) {
+		filename = xxstrdup(d->caching_directory);
+		filename = string_combine_multi(filename, n->cache_id, "/outputs/", f-> filename, 0);
+		file_exists = batch_fs_stat(queue, filename, &buf);
+		if (file_exists == -1) {
+			return 0;
+		}
+	}
+	free(filename);
+	return file_exists == -1 ? 0 : 1;
+}
+
+static int move_preserved_output_file(struct dag *d, struct dag_node *n, struct list *outputs) {
+	char * filename;
+	struct dag_file *f;
+	int sucess;
+	char *output_file_path;
+	struct batch_queue *queue;
+
+
+	if(n->local_job && local_queue) {
+		queue = local_queue;
+	} else {
+		queue = remote_queue;
+	}
+
+	list_first_item(outputs);
+	while((f = list_next_item(outputs))) {
+		output_file_path = xxstrdup(d->caching_directory);
+		filename = xxstrdup("./");
+		output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
+		filename = string_combine(filename, f->filename);
+		sucess = batch_fs_putfile(queue, output_file_path, filename);
+		if (!sucess) {
+			fatal("Could not reproduce output file %s\n", output_file_path);
+		}
+	}
+	free(output_file_path);
+	return 0;
+}
+
 /*
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
 */
@@ -932,14 +1013,12 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 		/* Checksum input files into cache_id */
 		if (d->should_preserve) {
-			makeflow_generate_node_cache_id(n, inputs);
 			makeflow_populate_cache(d, n, outputs);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 }
-
 /*
 Check the dag for consistency, and emit errors if input dependencies, etc are missing.
 */
