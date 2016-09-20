@@ -1584,10 +1584,6 @@ int main(int argc, char **argv)
 		workflow_name = output_directory;
 	}
 
-	// add some resolution to the cores.
-	// we turn mcores into the internal unit, cores in the external
-	rmsummary_add_conversion_field("cores", "mcores", "cores", 1000, 1);
-
 	categories = hash_table_create(0, 0);
 	all_sets = list_create();
 
