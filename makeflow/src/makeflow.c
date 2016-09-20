@@ -1567,6 +1567,10 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
+if (enforcer && wrapper_umbrella) {
+  fatal("enforcement and Umbrella are mutually exclusive\n");
+}
+
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
