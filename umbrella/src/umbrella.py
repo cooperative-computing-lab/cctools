@@ -2582,7 +2582,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 	else:
 		logging.debug("this spec does not have data section!")
 
-	workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "")
+	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "")
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
@@ -4294,16 +4294,23 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
 				logging.debug('docker exists, use docker execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+				if rc != 0:
+					sys.exit(rc)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
-				specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+				if rc != 0:
+					sys.exit(rc)
 		else:
 			if sandbox_mode == 'docker' and dependency_check('docker') != 0:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
-			specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+
+			rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+			if rc != 0:
+				sys.exit(rc)
 
 	if behavior in ["expand", "filter"]:
 		if len(args) != 2:
