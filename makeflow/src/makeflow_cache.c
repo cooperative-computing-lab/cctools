@@ -111,8 +111,18 @@ int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command
       return 0;
     }
   }
+
+  /* all output files exist, replicate preserved files and update state for node and dag_files */
+  makeflow_cache_copy_preserved_files(d, n, outputs, queue);
+  n->state = DAG_NODE_STATE_RUNNING;
+  list_first_item(n->target_files);
+  while((f = list_next_item(n->target_files))) {
+    makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+  }
+  makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+
   free(filename);
-  return file_exists == -1 ? 0 : 1;
+  return 1;
 }
 
 int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue) {

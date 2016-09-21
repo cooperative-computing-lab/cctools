@@ -595,15 +595,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* check caching directory to see if node has already been preserved */
-	if (d->should_preserve && makeflow_cache_is_preserved(d, n, command, input_list, output_list, queue) == 1) {
-		struct dag_file *f;
-		makeflow_cache_copy_preserved_files(d, n, output_list, queue);
-		n->state = DAG_NODE_STATE_RUNNING;
-		list_first_item(n->target_files);
-		while((f = list_next_item(n->target_files))) {
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
-		}
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+	if (d->should_preserve && makeflow_cache_is_preserved(d, n, command, input_list, output_list, queue)) {
+		/* do nothing, since makeflow_cache_is_preserved will replicate output files */
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
