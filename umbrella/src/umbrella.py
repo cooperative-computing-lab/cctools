@@ -3864,6 +3864,9 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					help="the OSF user id (required in two cases: uploading to osf; downloading private osf resources.)",)
 
 	(options, args) = parser.parse_args()
+
+	sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+
 	logfilename = options.log
 	if os.path.exists(logfilename) and not os.path.isfile(logfilename):
 		sys.exit("The --log option <%s> is not a file!" % logfilename)
