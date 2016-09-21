@@ -47,6 +47,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_singularity.h"
 #include "parser.h"
 #include "parser_jx.h"
+#include "makeflow_cache.h"
 
 #include "makeflow_catalog_reporter.h"
 
@@ -594,9 +595,9 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* check caching directory to see if node has already been preserved */
-	if (d->should_preserve && is_preserved(d, n, command, input_list, output_list) == 1) {
+	if (d->should_preserve && makeflow_cache_is_preserved(d, n, command, input_list, output_list, queue) == 1) {
 		struct dag_file *f;
-		move_preserved_output_file(d, n, output_list);
+		makeflow_cache_copy_preserved_files(d, n, output_list, queue);
 		n->state = DAG_NODE_STATE_RUNNING;
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
@@ -723,147 +724,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 	return file_created;
 }
 
-/* Given a node, generate the cache_id from the input files and command */
-static void makeflow_generate_node_cache_id(struct dag_node *n, char *command, struct list*inputs) {
-	struct dag_file *f;
-	char *cache_id = NULL;
-	unsigned char digest[SHA1_DIGEST_LENGTH];
 
-	// add checksum of the node's input files together
-	list_first_item(inputs);
-	while((f = list_next_item(inputs))) {
-		sha1_file(f->filename, digest);
-		cache_id = string_combine(cache_id, sha1_string(digest));
-	}
-
-
-	sha1_buffer(command, strlen(command), digest);
-	cache_id = string_combine(cache_id, sha1_string(digest));
-	sha1_buffer(cache_id, strlen(cache_id), digest);
-	n -> cache_id = xxstrdup(sha1_string(digest));
-
-	free(cache_id);
-}
-
-/* Preserves the current node within the caching directory
-	 The source makeflow file, ancestor node cache_ids, and the output files are cached */
-static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct list *outputs) {
-	char *filename;
-	char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path;
-	char *ancestor_cache_id_string = NULL;
-	struct dag_node *ancestor;
-	struct batch_queue *queue;
-	struct dag_file *f;
-	int sucess;
-	FILE *fp;
-
-	if(n->local_job && local_queue) {
-		queue = local_queue;
-	} else {
-		queue = remote_queue;
-	}
-
-	caching_file_path = xxstrdup(d->caching_directory);
-	caching_file_path = string_combine_multi(caching_file_path, n->cache_id, "/outputs", 0);
-	sucess = batch_fs_mkdir(queue,caching_file_path, 0777, 1);
-	if (!sucess) {
-		fatal("Could not create caching directory %s\n", caching_file_path);
-	}
-
-	list_first_item(outputs);
-	while((f = list_next_item(outputs))) {
-		output_file_path = xxstrdup(d->caching_directory);
-		filename = f->filename;
-		output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , filename, 0);
-		sucess = batch_fs_putfile(queue, filename, output_file_path);
-		if (!sucess) {
-			fatal("Could not cache output file %s\n", output_file_path);
-		}
-	}
-
-	source_makeflow_file_path = xxstrdup(d->caching_directory);
-	source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, n->cache_id, "/source_makeflow", 0);
-	sucess = batch_fs_putfile(queue, d->filename, source_makeflow_file_path);
-	if (!sucess) {
-		fatal("Could not cache source makeflow file %s\n", source_makeflow_file_path);
-	}
-
-	set_first_element(n->ancestors);
-	while ((ancestor = set_next_element(n->ancestors))) {
-			ancestor_cache_id_string = string_combine_multi(ancestor_cache_id_string, ancestor->cache_id, "\n", 0);
-	}
-	ancestor_file_path= xxstrdup(d->caching_directory);
-	ancestor_file_path= string_combine_multi(ancestor_file_path, n->cache_id, "/ancestors", 0);
-
-	fp = fopen(ancestor_file_path, "w");
-	if (fp == NULL) {
-		fatal("could not cache ancestor node cache ids");
-	} else {
-		fprintf(fp, "%s\n", ancestor_cache_id_string);
-	}
-	free(caching_file_path);
-	free(output_file_path);
-	free(source_makeflow_file_path);
-	free(ancestor_file_path);
-	free(ancestor_cache_id_string);
-	fclose(fp);
-}
-
-static int is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs) {
-	struct batch_queue *queue;
-	char *filename;
-	struct dag_file *f;
-	struct stat buf;
-	int file_exists = -1;
-
-	makeflow_generate_node_cache_id(n, command, inputs);
-
-	if(n->local_job && local_queue) {
-		queue = local_queue;
-	} else {
-		queue = remote_queue;
-	}
-
-	list_first_item(outputs);
-	while ((f=list_next_item(outputs))) {
-		filename = xxstrdup(d->caching_directory);
-		filename = string_combine_multi(filename, n->cache_id, "/outputs/", f-> filename, 0);
-		file_exists = batch_fs_stat(queue, filename, &buf);
-		if (file_exists == -1) {
-			return 0;
-		}
-	}
-	free(filename);
-	return file_exists == -1 ? 0 : 1;
-}
-
-static int move_preserved_output_file(struct dag *d, struct dag_node *n, struct list *outputs) {
-	char * filename;
-	struct dag_file *f;
-	int sucess;
-	char *output_file_path;
-	struct batch_queue *queue;
-
-	if(n->local_job && local_queue) {
-		queue = local_queue;
-	} else {
-		queue = remote_queue;
-	}
-
-	list_first_item(outputs);
-	while((f = list_next_item(outputs))) {
-		output_file_path = xxstrdup(d->caching_directory);
-		filename = xxstrdup("./");
-		output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
-		filename = string_combine(filename, f->filename);
-		sucess = batch_fs_putfile(queue, output_file_path, filename);
-		if (!sucess) {
-			fatal("Could not reproduce output file %s\n", output_file_path);
-		}
-	}
-	free(output_file_path);
-	return 0;
-}
 
 /*
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
@@ -1007,7 +868,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 		/* store node into caching directory  */
 		if (d->should_preserve) {
-			makeflow_populate_cache(d, n, outputs);
+			makeflow_cache_populate(d, n, outputs, queue);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
@@ -1167,7 +1028,6 @@ static void makeflow_run( struct dag *d )
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
 					makeflow_node_complete(d, n, local_queue, &info);
-
 			}
 		}
 
