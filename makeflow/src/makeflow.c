@@ -32,8 +32,6 @@ See the file COPYING for details.
 #include "jx_eval.h"
 #include "create_dir.h"
 #include "sha1.h"
-#include "string_array.h"
-#include "set.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -497,6 +495,7 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 		file_str = string_combine(file_str,f);
 		free(f);
 	}
+
 	return file_str;
 }
 
@@ -597,7 +596,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* check caching directory to see if node has already been preserved */
 	if (d->should_preserve && is_preserved(d, n, command, input_list, output_list) == 1) {
 		struct dag_file *f;
-		struct batch_job_info info;
 		move_preserved_output_file(d, n, output_list);
 		n->state = DAG_NODE_STATE_RUNNING;
 		list_first_item(n->target_files);
@@ -730,19 +728,14 @@ static void makeflow_generate_node_cache_id(struct dag_node *n, char *command, s
 	struct dag_file *f;
 	char *cache_id = NULL;
 	unsigned char digest[SHA1_DIGEST_LENGTH];
-	struct batch_queue *queue;
 
-	if(n->local_job && local_queue) {
-		queue = local_queue;
-	} else {
-		queue = remote_queue;
-	}
 	// add checksum of the node's input files together
 	list_first_item(inputs);
 	while((f = list_next_item(inputs))) {
 		sha1_file(f->filename, digest);
 		cache_id = string_combine(cache_id, sha1_string(digest));
 	}
+
 
 	sha1_buffer(command, strlen(command), digest);
 	cache_id = string_combine(cache_id, sha1_string(digest));
@@ -756,7 +749,7 @@ static void makeflow_generate_node_cache_id(struct dag_node *n, char *command, s
 	 The source makeflow file, ancestor node cache_ids, and the output files are cached */
 static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct list *outputs) {
 	char *filename;
-	char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path; 
+	char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path;
 	char *ancestor_cache_id_string = NULL;
 	struct dag_node *ancestor;
 	struct batch_queue *queue;
@@ -822,7 +815,9 @@ static int is_preserved(struct dag *d, struct dag_node *n, char *command, struct
 	struct dag_file *f;
 	struct stat buf;
 	int file_exists = -1;
+
 	makeflow_generate_node_cache_id(n, command, inputs);
+
 	if(n->local_job && local_queue) {
 		queue = local_queue;
 	} else {
@@ -848,7 +843,6 @@ static int move_preserved_output_file(struct dag *d, struct dag_node *n, struct 
 	int sucess;
 	char *output_file_path;
 	struct batch_queue *queue;
-
 
 	if(n->local_job && local_queue) {
 		queue = local_queue;
@@ -1011,7 +1005,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
-		/* Checksum input files into cache_id */
+		/* store node into caching directory  */
 		if (d->should_preserve) {
 			makeflow_populate_cache(d, n, outputs);
 		}
@@ -1019,6 +1013,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
 }
+
 /*
 Check the dag for consistency, and emit errors if input dependencies, etc are missing.
 */
@@ -1120,7 +1115,6 @@ static int makeflow_check_batch_consistency(struct dag *d)
 	}
 }
 
-
 /*
 Main loop for running a makeflow: submit jobs, wait for completion, keep going until everything done.
 */
@@ -1149,7 +1143,6 @@ static void makeflow_run( struct dag *d )
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
-
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
@@ -1345,7 +1338,6 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 	char *caching_directory = CACHING_DEFAULT_DIRECTORY;
-
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
 
@@ -1785,7 +1777,7 @@ int main(int argc, char *argv[])
 				if (optarg) {
 					caching_directory = xxstrdup(optarg);
 				}
-        break;
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
