@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "batch_job.h"
 #include "debug.h"
+#include "makeflow_log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +41,6 @@ void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*i
 }
 
 void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue) {
-  char *filename;
   char *caching_file_path, *output_file_path, *source_makeflow_file_path, *ancestor_file_path;
   char *ancestor_cache_id_string = NULL;
   struct dag_node *ancestor;
@@ -58,9 +58,8 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
     output_file_path = xxstrdup(d->caching_directory);
-    filename = f->filename;
-    output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , filename, 0);
-    sucess = batch_fs_putfile(queue, filename, output_file_path);
+    output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
+    sucess = batch_fs_putfile(queue, f->filename, output_file_path);
     if (!sucess) {
       fatal("Could not cache output file %s\n", output_file_path);
     }
@@ -94,6 +93,27 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   fclose(fp);
 }
 
+int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue) {
+  char * filename;
+  struct dag_file *f;
+  int sucess;
+  char *output_file_path;
+
+  list_first_item(outputs);
+  while((f = list_next_item(outputs))) {
+    output_file_path = xxstrdup(d->caching_directory);
+    filename = xxstrdup("./");
+    output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
+    filename = string_combine(filename, f->filename);
+    sucess = batch_fs_putfile(queue, output_file_path, filename);
+    if (!sucess) {
+      fatal("Could not reproduce output file %s\n", output_file_path);
+    }
+  }
+  free(output_file_path);
+  return 0;
+}
+
 int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_queue *queue) {
   char *filename;
   struct dag_file *f;
@@ -123,25 +143,4 @@ int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command
 
   free(filename);
   return 1;
-}
-
-int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue) {
-  char * filename;
-  struct dag_file *f;
-  int sucess;
-  char *output_file_path;
-
-  list_first_item(outputs);
-  while((f = list_next_item(outputs))) {
-    output_file_path = xxstrdup(d->caching_directory);
-    filename = xxstrdup("./");
-    output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
-    filename = string_combine(filename, f->filename);
-    sucess = batch_fs_putfile(queue, output_file_path, filename);
-    if (!sucess) {
-      fatal("Could not reproduce output file %s\n", output_file_path);
-    }
-  }
-  free(output_file_path);
-  return 0;
 }
