@@ -540,7 +540,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	char *command = strdup(n->command);
 	command = makeflow_wrap_wrapper(command, n, wrapper);
 	command = makeflow_wrap_enforcer(command, n, enforcer, input_list, output_list);
-	command = makeflow_wrap_umbrella(command, wrapper_umbrella, queue, input_files, output_files);
+	command = makeflow_wrap_umbrella(command, n, wrapper_umbrella, queue, input_files, output_files);
 	command = makeflow_wrap_monitor(command, n, queue, monitor);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
@@ -1078,6 +1078,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Work Queue keepalive timeout.			   (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	printf(" %-30s Work Queue keepalive interval.			  (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	printf(" %-30s Umbrella binary for running every rule in a makeflow.\n", "   --umbrella-binary=<file>");
+	printf(" %-30s Umbrella log file prefix for running every rule in a makeflow.\n", "   --umbrella-log-prefix=<string>");
 	printf(" %-30s Umbrella spec for running every rule in a makeflow.\n", "   --umbrella-spec=<file>");
 	printf(" %-30s Show version string\n", "-v,--version");
 	printf(" %-30s Work Queue scheduling algorithm.			(time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
@@ -1200,6 +1201,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_JSON,
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_UMBRELLA_BINARY,
+		LONG_OPT_UMBRELLA_LOG_PREFIX,
 		LONG_OPT_UMBRELLA_SPEC,
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
@@ -1253,6 +1255,7 @@ int main(int argc, char *argv[])
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
 		{"skip-file-check", no_argument, 0, LONG_OPT_SKIP_FILE_CHECK},
 		{"umbrella-binary", required_argument, 0, LONG_OPT_UMBRELLA_BINARY},
+		{"umbrella-log-prefix", required_argument, 0, LONG_OPT_UMBRELLA_LOG_PREFIX},
 		{"umbrella-spec", required_argument, 0, LONG_OPT_UMBRELLA_SPEC},
 		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
@@ -1537,6 +1540,10 @@ int main(int argc, char *argv[])
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_binary(wrapper_umbrella, (const char *)xxstrdup(optarg));
 				break;
+			case LONG_OPT_UMBRELLA_LOG_PREFIX:
+				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
+				makeflow_wrapper_umbrella_set_log_prefix(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				break;
 			case LONG_OPT_UMBRELLA_SPEC:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
@@ -1736,8 +1743,8 @@ if (enforcer && wrapper_umbrella) {
 			cur = cur->next;
 		}
 
-		debug(D_MAKEFLOW_RUN, "adding the umbrella spec and umbrella binary into wrapper_umbrella->wrapper->input_files...\n");
-		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, remote_queue);
+		debug(D_MAKEFLOW_RUN, "makeflow_wrapper_umbrella_preparation...\n");
+		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, remote_queue, d);
 	}
 
 	if(enforcer) {
