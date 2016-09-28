@@ -1078,7 +1078,8 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Work Queue keepalive timeout.			   (default is %ds)\n", "-t,--wq-keepalive-timeout=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_TIMEOUT);
 	printf(" %-30s Work Queue keepalive interval.			  (default is %ds)\n", "-u,--wq-keepalive-interval=<#>", WORK_QUEUE_DEFAULT_KEEPALIVE_INTERVAL);
 	printf(" %-30s Umbrella binary for running every rule in a makeflow.\n", "   --umbrella-binary=<file>");
-	printf(" %-30s Umbrella log file prefix for running every rule in a makeflow.\n", "   --umbrella-log-prefix=<string>");
+	printf(" %-30s Umbrella log file prefix for running every rule in a makeflow. (default is <makefilename>.umbrella.log)\n", "   --umbrella-log-prefix=<string>");
+	printf(" %-30s Umbrella execution mode for running every rule in a makeflow. (default is local)\n", "   --umbrella-mode=<mode>");
 	printf(" %-30s Umbrella spec for running every rule in a makeflow.\n", "   --umbrella-spec=<file>");
 	printf(" %-30s Show version string\n", "-v,--version");
 	printf(" %-30s Work Queue scheduling algorithm.			(time|files|fcfs)\n", "-W,--wq-schedule=<mode>");
@@ -1202,6 +1203,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
+		LONG_OPT_UMBRELLA_MODE,
 		LONG_OPT_UMBRELLA_SPEC,
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
@@ -1256,6 +1258,7 @@ int main(int argc, char *argv[])
 		{"skip-file-check", no_argument, 0, LONG_OPT_SKIP_FILE_CHECK},
 		{"umbrella-binary", required_argument, 0, LONG_OPT_UMBRELLA_BINARY},
 		{"umbrella-log-prefix", required_argument, 0, LONG_OPT_UMBRELLA_LOG_PREFIX},
+		{"umbrella-mode", required_argument, 0, LONG_OPT_UMBRELLA_MODE},
 		{"umbrella-spec", required_argument, 0, LONG_OPT_UMBRELLA_SPEC},
 		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
 		{"wq-estimate-capacity", no_argument, 0, 'E'},
@@ -1543,6 +1546,10 @@ int main(int argc, char *argv[])
 			case LONG_OPT_UMBRELLA_LOG_PREFIX:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_log_prefix(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				break;
+			case LONG_OPT_UMBRELLA_MODE:
+				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
+				makeflow_wrapper_umbrella_set_mode(wrapper_umbrella, (const char *)xxstrdup(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_SPEC:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
