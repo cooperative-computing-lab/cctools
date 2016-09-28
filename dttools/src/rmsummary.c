@@ -103,14 +103,11 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 	if(!units_initialized)
 		initialize_units();
 
-	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
-	if(!cf) {
-		fatal("Unknown field: '%s'", field);
-	}
-
 	double factor;
 
-	if(strcmp(cf->internal_unit, external_unit) == 0) {
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
+
+	if(!cf || strcmp(cf->internal_unit, external_unit) == 0) {
 		factor = 1;
 	} else if(strcmp(cf->external_unit, external_unit) == 0 || strcmp("external", external_unit) == 0) {
 		factor = cf->external_to_internal;
