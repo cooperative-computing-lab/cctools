@@ -1004,12 +1004,17 @@ int64_t min_waste_brute_force_field(struct field_stats *h) {
 	double   min_waste     = DBL_MAX;
 	uint64_t min_candidate = histogram_max_value(h->histogram);
 
+	uint64_t jump = 1;
+	if(field_is_cumulative(h->field)) {
+		jump = USECOND;
+	}
+
 	uint64_t prev = 0;
 	for(int i = 0; i < h->total_count; i++) {
 		uint64_t candidate = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
 
 		if( i > 0 ) {
-			if(candidate - prev < 1)
+			if(candidate - prev < jump)
 				continue;
 		}
 
@@ -1047,12 +1052,17 @@ int64_t max_throughput_brute_force_field(struct field_stats *h) {
 	double   best_throughput = 0;
 	uint64_t max_candidate  = histogram_max_value(h->histogram);
 
+	uint64_t jump = 1;
+	if(field_is_cumulative(h->field)) {
+		jump = USECOND;
+	}
+
 	uint64_t prev = 0;
 	for(int i = 0; i < h->total_count; i++) {
 		uint64_t candidate = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
 
 		if( i > 0 ) {
-			if(candidate - prev < 1)
+			if(candidate - prev < jump)
 				continue;
 		}
 
@@ -1484,9 +1494,9 @@ int main(int argc, char **argv)
 				break;
 			case 'm':
 				/* smaller bucket size */
-				category_tune_bucket_size("time",      60*USECOND);
-				category_tune_bucket_size("memory",     5);
-				category_tune_bucket_size("disk",       5);
+				category_tune_bucket_size("time",   USECOND);
+				category_tune_bucket_size("memory", 5);
+				category_tune_bucket_size("disk",   5);
 				break;
 			case 'j':
 				/* smaller bucket size */
