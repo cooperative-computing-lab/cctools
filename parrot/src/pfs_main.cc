@@ -684,10 +684,10 @@ int main( int argc, char *argv[] )
 	if(s) pfs_service_set_block_size(string_metric_parse(s));
 
 	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(s);
+	if(s) pfs_resolve_file_config(NULL, s);
 
 	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(s);
+	if(s) pfs_resolve_manual_config(NULL, s);
 
 	s = getenv("PARROT_FORCE_STREAM");
 	if(s) pfs_force_stream = 1;
@@ -913,10 +913,10 @@ int main( int argc, char *argv[] )
 			snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", optarg);
 			break;
 		case 'm':
-			pfs_resolve_file_config(optarg);
+			pfs_resolve_file_config(NULL, optarg);
 			break;
 		case 'M':
-			pfs_resolve_manual_config(optarg);
+			pfs_resolve_manual_config(NULL, optarg);
 			break;
 		case 'n':
 			if(access(optarg, F_OK) != -1) {

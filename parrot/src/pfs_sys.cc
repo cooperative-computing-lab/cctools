@@ -58,19 +58,19 @@ recently-signalled child process.
 	}\
 	return result;
 
-int pfs_open( const char *path, int flags, mode_t mode, char *native_path, size_t len )
+int pfs_open( struct pfs_mount_entry *ns, const char *path, int flags, mode_t mode, char *native_path, size_t len )
 {
 	BEGIN
 	debug(D_LIBCALL,"open %s %u %u",path,flags,mode);
-	result = pfs_current->table->open(path,flags,mode,pfs_force_cache,native_path,len);
+	result = pfs_current->table->open(ns,path,flags,mode,pfs_force_cache,native_path,len);
 	END
 }
 
-int pfs_open_cached( const char *path, int flags, mode_t mode, char *native_path, size_t len )
+int pfs_open_cached( struct pfs_mount_entry *ns, const char *path, int flags, mode_t mode, char *native_path, size_t len )
 {
 	BEGIN
 	debug(D_LIBCALL,"open %s %u %u",path,flags,mode);
-	result = pfs_current->table->open(path,flags,mode,1,native_path,len);
+	result = pfs_current->table->open(ns,path,flags,mode,1,native_path,len);
 	END
 }
 
@@ -217,11 +217,11 @@ int pfs_flock( int fd, int op )
 	END
 }
 
-int pfs_chdir( const char *path )
+int pfs_chdir( struct pfs_mount_entry *ns, const char *path )
 {
 	BEGIN
 	debug(D_LIBCALL,"chdir %s",path);
-	result = pfs_current->table->chdir(path);
+	result = pfs_current->table->chdir(ns,path);
 	END
 }
 
@@ -234,7 +234,7 @@ char * pfs_getcwd( char *path, pfs_size_t size )
 	return result;
 }
 
-int pfs_mount( const char *path, const char *device, const char *mode )
+int pfs_mount( struct pfs_mount_entry **ns, const char *path, const char *device, const char *mode )
 {
 	BEGIN
 	debug(D_LIBCALL,"mount %s %s %s",path,device,mode);
@@ -247,7 +247,7 @@ int pfs_mount( const char *path, const char *device, const char *mode )
 			result = -1;
 			errno = EINVAL;
 		} else {
-			pfs_resolve_add_entry(path,device,pfs_resolve_parse_mode(mode));
+			pfs_resolve_add_entry(ns,path,device,pfs_resolve_parse_mode(mode));
 			result = 0;
 		}
 	} else {
@@ -258,7 +258,7 @@ int pfs_mount( const char *path, const char *device, const char *mode )
 	END
 }
 
-int pfs_unmount( const char *path )
+int pfs_unmount( struct pfs_mount_entry **ns, const char *path )
 {
 	BEGIN
 	debug(D_LIBCALL,"unmount %s",path);
@@ -266,7 +266,7 @@ int pfs_unmount( const char *path )
 		if(path[0]!='/') {
 			result = -1;
 			errno = EINVAL;
-		} else if(pfs_resolve_remove_entry(path)) {
+		} else if(pfs_resolve_remove_entry(ns, path)) {
 			result = 0;
 		} else {
 			result = -1;
@@ -279,139 +279,139 @@ int pfs_unmount( const char *path )
 	END
 }
 
-int pfs_stat( const char *path, struct pfs_stat *buf )
+int pfs_stat( struct pfs_mount_entry *ns, const char *path, struct pfs_stat *buf )
 {
 	BEGIN
 	debug(D_LIBCALL,"stat %s %p",path,buf);
-	result = pfs_current->table->stat(path,buf);
+	result = pfs_current->table->stat(ns,path,buf);
 	END
 }
 
-int pfs_statfs( const char *path, struct pfs_statfs *buf )
+int pfs_statfs( struct pfs_mount_entry *ns, const char *path, struct pfs_statfs *buf )
 {
 	BEGIN
 	debug(D_LIBCALL,"statfs %s %p",path,buf);
-	result = pfs_current->table->statfs(path,buf);
+	result = pfs_current->table->statfs(ns,path,buf);
 	END
 }
 
-int pfs_lstat( const char *path, struct pfs_stat *buf )
+int pfs_lstat( struct pfs_mount_entry *ns, const char *path, struct pfs_stat *buf )
 {
 	BEGIN
 	debug(D_LIBCALL,"lstat %s %p",path,buf);
-	result = pfs_current->table->lstat(path,buf);
+	result = pfs_current->table->lstat(ns,path,buf);
 	END
 }
 
-int pfs_access( const char *path, mode_t mode )
+int pfs_access( struct pfs_mount_entry *ns, const char *path, mode_t mode )
 {
 	BEGIN
 	debug(D_LIBCALL,"access %s %d",path,mode);
-	result = pfs_current->table->access(path,mode);
+	result = pfs_current->table->access(ns,path,mode);
 	END
 }
 
-int pfs_chmod( const char *path, mode_t mode )
+int pfs_chmod( struct pfs_mount_entry *ns, const char *path, mode_t mode )
 {
 	BEGIN
 	debug(D_LIBCALL,"chmod %s %o",path,mode);
-	result = pfs_current->table->chmod(path,mode);
+	result = pfs_current->table->chmod(ns,path,mode);
 	END
 }
 
-int pfs_chown( const char *path, struct pfs_process *p, uid_t uid, gid_t gid )
+int pfs_chown( struct pfs_mount_entry *ns, const char *path, struct pfs_process *p, uid_t uid, gid_t gid )
 {
 	BEGIN
 	debug(D_LIBCALL,"chown %s %d %d",path,uid,gid);
-	result = pfs_current->table->chown(path,p,uid,gid);
+	result = pfs_current->table->chown(ns,path,p,uid,gid);
 	END
 }
 
-int pfs_lchown( const char *path, uid_t uid, gid_t gid )
+int pfs_lchown( struct pfs_mount_entry *ns, const char *path, uid_t uid, gid_t gid )
 {
 	BEGIN
 	debug(D_LIBCALL,"lchown %s %d %d",path,uid,gid);
-	result = pfs_current->table->lchown(path,uid,gid);
+	result = pfs_current->table->lchown(ns,path,uid,gid);
 	END
 }
 
-int pfs_truncate( const char *path, pfs_off_t length )
+int pfs_truncate( struct pfs_mount_entry *ns, const char *path, pfs_off_t length )
 {
 	BEGIN
 	debug(D_LIBCALL,"truncate %s %lld",path,(long long)length);
-	result = pfs_current->table->truncate(path,length);
+	result = pfs_current->table->truncate(ns,path,length);
 	END
 }
 
-int pfs_utime( const char *path, struct utimbuf *buf )
+int pfs_utime( struct pfs_mount_entry *ns, const char *path, struct utimbuf *buf )
 {
 	BEGIN
 	debug(D_LIBCALL,"utime %s %p",path,buf);
-	result = pfs_current->table->utime(path,buf);
+	result = pfs_current->table->utime(ns,path,buf);
 	END
 }
 
-int pfs_unlink( const char *path )
+int pfs_unlink( struct pfs_mount_entry *ns, const char *path )
 {
 	BEGIN
 	debug(D_LIBCALL,"unlink %s",path);
-	result = pfs_current->table->unlink(path);
+	result = pfs_current->table->unlink(ns,path);
 	END
 }
 
-int pfs_rename( const char *oldpath, const char *newpath )
+int pfs_rename( struct pfs_mount_entry *ns, const char *oldpath, const char *newpath )
 {
 	BEGIN
 	debug(D_LIBCALL,"rename %s %s",oldpath,newpath);
-	result = pfs_current->table->rename(oldpath,newpath);
+	result = pfs_current->table->rename(ns,oldpath,newpath);
 	END
 }
 
-int pfs_link( const char *oldpath, const char *newpath )
+int pfs_link( struct pfs_mount_entry *ns, const char *oldpath, const char *newpath )
 {
 	BEGIN
 	debug(D_LIBCALL,"link %s %s",oldpath,newpath);
-	result = pfs_current->table->link(oldpath,newpath);
+	result = pfs_current->table->link(ns,oldpath,newpath);
 	END
 }
 
-int pfs_symlink( const char *target, const char *path )
+int pfs_symlink( struct pfs_mount_entry *ns, const char *target, const char *path )
 {
 	BEGIN
 	debug(D_LIBCALL,"symlink %s %s",target,path);
-	result = pfs_current->table->symlink(target,path);
+	result = pfs_current->table->symlink(ns,target,path);
 	END
 }
 
-int pfs_readlink( const char *path, char *buf, pfs_size_t size )
+int pfs_readlink( struct pfs_mount_entry *ns, const char *path, char *buf, pfs_size_t size )
 {
 	BEGIN
 	  debug(D_LIBCALL,"readlink %s %p %lld",path,buf,(long long)size);
-	result = pfs_current->table->readlink(path,buf,size);
+	result = pfs_current->table->readlink(ns,path,buf,size);
 	END
 }
 
-int pfs_mknod( const char *path, mode_t mode, dev_t dev )
+int pfs_mknod( struct pfs_mount_entry *ns, const char *path, mode_t mode, dev_t dev )
 {
 	BEGIN
 	  debug(D_LIBCALL,"mknod %s %d %d",path,mode,(int)dev);
-	result = pfs_current->table->mknod(path,mode,dev);
+	result = pfs_current->table->mknod(ns,path,mode,dev);
 	END
 }
 
-int pfs_mkdir( const char *path, mode_t mode )
+int pfs_mkdir( struct pfs_mount_entry *ns, const char *path, mode_t mode )
 {
 	BEGIN
 	debug(D_LIBCALL,"mkdir %s %d",path,mode);
-	result = pfs_current->table->mkdir(path,mode);
+	result = pfs_current->table->mkdir(ns,path,mode);
 	END
 }
 
-int pfs_rmdir( const char *path )
+int pfs_rmdir( struct pfs_mount_entry *ns, const char *path )
 {
 	BEGIN
 	debug(D_LIBCALL,"rmdir %s",path);
-	result = pfs_current->table->rmdir(path);
+	result = pfs_current->table->rmdir(ns,path);
 	END
 }
 
@@ -436,67 +436,67 @@ int pfs_timeout( const char *str )
 	END
 }
 
-int pfs_mkalloc( const char *path, pfs_ssize_t size, mode_t mode )
+int pfs_mkalloc( struct pfs_mount_entry *ns, const char *path, pfs_ssize_t size, mode_t mode )
 {
 	BEGIN
 	  debug(D_LIBCALL,"mkalloc %s %lld %d",path,(long long)size,mode);
-	result = pfs_current->table->mkalloc(path,size,mode);
+	result = pfs_current->table->mkalloc(ns,path,size,mode);
 	END
 }
 
-int pfs_lsalloc( const char *path, char *alloc_path, pfs_ssize_t *total, pfs_ssize_t *inuse )
+int pfs_lsalloc( struct pfs_mount_entry *ns, const char *path, char *alloc_path, pfs_ssize_t *total, pfs_ssize_t *inuse )
 {
 	BEGIN
 	debug(D_LIBCALL,"lsalloc %s",path);
-	result = pfs_current->table->lsalloc(path,alloc_path,total,inuse);
+	result = pfs_current->table->lsalloc(ns,path,alloc_path,total,inuse);
 	END
 }
 
-int pfs_whoami( const char *path, char *buf, int size )
+int pfs_whoami( struct pfs_mount_entry *ns, const char *path, char *buf, int size )
 {
 	BEGIN
 	debug(D_LIBCALL,"whoami %s %p %d",path,buf,size);
-	result = pfs_current->table->whoami(path,buf,size);
+	result = pfs_current->table->whoami(ns,path,buf,size);
 	END
 }
 
-int pfs_search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i)
+int pfs_search( struct pfs_mount_entry *ns, const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i)
 {
 	BEGIN
 	debug(D_LIBCALL,"search %s %s %d %p %zu",paths,pattern,flags,buffer,buffer_length);
-	result = pfs_current->table->search(paths,pattern,flags,buffer,buffer_length, i);
+	result = pfs_current->table->search(ns,paths,pattern,flags,buffer,buffer_length, i);
 	END
 }
 
-int pfs_getacl( const char *path, char *buf, int size )
+int pfs_getacl( struct pfs_mount_entry *ns, const char *path, char *buf, int size )
 {
 	BEGIN
 	debug(D_LIBCALL,"getacl %s %p %d",path,buf,size);
-	result = pfs_current->table->getacl(path,buf,size);
+	result = pfs_current->table->getacl(ns,path,buf,size);
 	END
 }
 
-int pfs_setacl( const char *path, const char *subject, const char *rights )
+int pfs_setacl( struct pfs_mount_entry *ns, const char *path, const char *subject, const char *rights )
 {
 	BEGIN
 	debug(D_LIBCALL,"setacl %s %s %s",path,subject,rights);
-	result = pfs_current->table->setacl(path,subject,rights);
+	result = pfs_current->table->setacl(ns,path,subject,rights);
 	END
 }
 
-int pfs_locate( const char *path, char *buf, int size )
+int pfs_locate( struct pfs_mount_entry *ns, const char *path, char *buf, int size )
 {
 	BEGIN
 	debug(D_LIBCALL, "pfs_locate %s %p %d", path, buf, size);
-	result = pfs_current->table->locate(path,buf,size);
+	result = pfs_current->table->locate(ns,path,buf,size);
 	END
 }
 
-int pfs_copyfile( const char *source, const char *target )
+int pfs_copyfile( struct pfs_mount_entry *ns, const char *source, const char *target )
 {
 	BEGIN
 	debug(D_LIBCALL,"copyfile %s %s",source,target);
-	result = pfs_current->table->copyfile(source,target);
+	result = pfs_current->table->copyfile(ns,source,target);
 	END
 }
 
@@ -508,11 +508,11 @@ int pfs_fcopyfile( int srcfd, int dstfd )
 	END
 }
 
-int pfs_md5( const char *path, unsigned char *digest )
+int pfs_md5( struct pfs_mount_entry *ns, const char *path, unsigned char *digest )
 {
 	BEGIN
 	debug(D_LIBCALL,"md5 %s",path);
-	result = pfs_current->table->md5(path,digest);
+	result = pfs_current->table->md5(ns,path,digest);
 	END
 }
 
@@ -556,12 +556,12 @@ int	pfs_mmap_delete( uintptr_t logical_address, size_t length )
 	END
 }
 
-int pfs_get_local_name( const char *rpath, char *lpath, char *firstline, size_t length )
+int pfs_get_local_name( struct pfs_mount_entry *ns, const char *rpath, char *lpath, char *firstline, size_t length )
 {
 	int fd;
 	int result;
 
-	fd = pfs_open_cached(rpath,O_RDONLY,0,NULL,0);
+	fd = pfs_open_cached(ns,rpath,O_RDONLY,0,NULL,0);
 	if(fd>=0) {
 		if(firstline) {
 			int actual = pfs_read(fd,firstline,length-1);
@@ -596,40 +596,40 @@ Instead of propagating these new calls all the way down through Parrot,
 we reduce them to traditional calls at this interface.
 */
 
-int pfs_openat( int dirfd, const char *path, int flags, mode_t mode, char *native_path, size_t len )
+int pfs_openat( struct pfs_mount_entry *ns, int dirfd, const char *path, int flags, mode_t mode, char *native_path, size_t len )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
-	return pfs_open(newpath,flags,mode,native_path,len);
+	return pfs_open(ns,newpath,flags,mode,native_path,len);
 }
 
-int pfs_mkdirat( int dirfd, const char *path, mode_t mode)
+int pfs_mkdirat( struct pfs_mount_entry *ns, int dirfd, const char *path, mode_t mode)
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
-	return pfs_mkdir(newpath,mode);
+	return pfs_mkdir(ns,newpath,mode);
 }
 
-int pfs_mknodat( int dirfd, const char *path, mode_t mode, dev_t dev )
+int pfs_mknodat( struct pfs_mount_entry *ns, int dirfd, const char *path, mode_t mode, dev_t dev )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
-	return pfs_mknod(newpath,mode,dev);
+	return pfs_mknod(ns,newpath,mode,dev);
 }
 
-int pfs_fchownat( int dirfd, const char *path, struct pfs_process *p, uid_t owner, gid_t group, int flags )
+int pfs_fchownat( struct pfs_mount_entry *ns, int dirfd, const char *path, struct pfs_process *p, uid_t owner, gid_t group, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
 #ifdef AT_SYMLINK_NOFOLLOW
 	if(flags&AT_SYMLINK_NOFOLLOW) {
-		return pfs_lchown(newpath,owner,group);
+		return pfs_lchown(ns,newpath,owner,group);
 	}
 #endif
-	return pfs_chown(newpath,p,owner,group);
+	return pfs_chown(ns,newpath,p,owner,group);
 }
 
-int pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] )
+int pfs_futimesat( struct pfs_mount_entry *ns, int dirfd, const char *path, const struct timeval times[2] )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
@@ -641,26 +641,26 @@ int pfs_futimesat( int dirfd, const char *path, const struct timeval times[2] )
 	} else {
 		ut.actime = ut.modtime = time(0);
 	}
-	return pfs_utime(newpath,&ut);
+	return pfs_utime(ns,newpath,&ut);
 }
 
-static int pfs_utimens( const char *path, const struct timespec times[2] )
+static int pfs_utimens(struct pfs_mount_entry *ns,  const char *path, const struct timespec times[2] )
 {
 	BEGIN
 	debug(D_LIBCALL,"utimens `%s' %p",path,times);
-	result = pfs_current->table->utimens(path,times);
+	result = pfs_current->table->utimens(ns,path,times);
 	END
 }
 
-static int pfs_lutimens( const char *path, const struct timespec times[2] )
+static int pfs_lutimens(struct pfs_mount_entry *ns,  const char *path, const struct timespec times[2] )
 {
 	BEGIN
 	debug(D_LIBCALL,"lutimens `%s' %p",path,times);
-	result = pfs_current->table->lutimens(path,times);
+	result = pfs_current->table->lutimens(ns,path,times);
 	END
 }
 
-int pfs_utimensat( int dirfd, const char *path, const struct timespec times[2], int flags )
+int pfs_utimensat( struct pfs_mount_entry *ns, int dirfd, const char *path, const struct timespec times[2], int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
@@ -668,37 +668,37 @@ int pfs_utimensat( int dirfd, const char *path, const struct timespec times[2], 
 	debug(D_LIBCALL,"utimensat %d `%s' %p %d",dirfd,path,times,flags);
 #ifdef AT_SYMLINK_NOFOLLOW
 	if (flags == AT_SYMLINK_NOFOLLOW)
-		return pfs_lutimens(newpath,times);
+		return pfs_lutimens(ns,newpath,times);
 	else
 #endif
-	return pfs_utimens(newpath,times);
+	return pfs_utimens(ns,newpath,times);
 }
 
-int pfs_fstatat( int dirfd, const char *path, struct pfs_stat *buf, int flags )
+int pfs_fstatat( struct pfs_mount_entry *ns, int dirfd, const char *path, struct pfs_stat *buf, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
 #ifdef AT_SYMLINK_NOFOLLOW
 	if(flags&AT_SYMLINK_NOFOLLOW) {
-		return pfs_lstat(newpath,buf);
+		return pfs_lstat(ns,newpath,buf);
 	}
 #endif
-	return pfs_stat(newpath,buf);
+	return pfs_stat(ns,newpath,buf);
 }
 
-int pfs_unlinkat( int dirfd, const char *path, int flags )
+int pfs_unlinkat( struct pfs_mount_entry *ns, int dirfd, const char *path, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
 #ifdef AT_REMOVEDIR
 	if(flags&AT_REMOVEDIR) {
-		return pfs_rmdir(newpath);
+		return pfs_rmdir(ns,newpath);
 	}
 #endif
-	return pfs_unlink(newpath);
+	return pfs_unlink(ns,newpath);
 }
 
-int pfs_renameat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath )
+int pfs_renameat( struct pfs_mount_entry *ns, int olddirfd, const char *oldpath, int newdirfd, const char *newpath )
 {
 	char newoldpath[PFS_PATH_MAX];
 	char newnewpath[PFS_PATH_MAX];
@@ -706,10 +706,10 @@ int pfs_renameat( int olddirfd, const char *oldpath, int newdirfd, const char *n
 	if (pfs_current->table->complete_at_path(olddirfd,oldpath,newoldpath) == -1) return -1;
 	if (pfs_current->table->complete_at_path(newdirfd,newpath,newnewpath) == -1) return -1;
 
-	return pfs_rename(newoldpath,newnewpath);
+	return pfs_rename(ns,newoldpath,newnewpath);
 }
 
-int pfs_linkat( int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags )
+int pfs_linkat( struct pfs_mount_entry *ns, int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags )
 {
 	char newoldpath[PFS_PATH_MAX];
 	char newnewpath[PFS_PATH_MAX];
@@ -717,51 +717,51 @@ int pfs_linkat( int olddirfd, const char *oldpath, int newdirfd, const char *new
 	if (pfs_current->table->complete_at_path(olddirfd,oldpath,newoldpath) == -1) return -1;
 	if (pfs_current->table->complete_at_path(newdirfd,newpath,newnewpath) == -1) return -1;
 
-	return pfs_link(newoldpath,newnewpath);
+	return pfs_link(ns,newoldpath,newnewpath);
 }
 
 
-int pfs_symlinkat( const char *oldpath, int newdirfd, const char *newpath )
+int pfs_symlinkat( struct pfs_mount_entry *ns, const char *oldpath, int newdirfd, const char *newpath )
 {
 	char newnewpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(newdirfd,newpath,newnewpath) == -1) return -1;
-	return pfs_symlink(oldpath,newnewpath);
+	return pfs_symlink(ns,oldpath,newnewpath);
 }
 
-int pfs_readlinkat( int dirfd, const char *path, char *buf, size_t bufsiz )
+int pfs_readlinkat( struct pfs_mount_entry *ns, int dirfd, const char *path, char *buf, size_t bufsiz )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
-	return pfs_readlink(newpath,buf,bufsiz);
+	return pfs_readlink(ns,newpath,buf,bufsiz);
 }
 
-int pfs_fchmodat( int dirfd, const char *path, mode_t mode, int flags )
+int pfs_fchmodat( struct pfs_mount_entry *ns, int dirfd, const char *path, mode_t mode, int flags )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
-	return pfs_chmod(newpath,mode);
+	return pfs_chmod(ns,newpath,mode);
 }
 
-int pfs_faccessat( int dirfd, const char *path, mode_t mode )
+int pfs_faccessat( struct pfs_mount_entry *ns, int dirfd, const char *path, mode_t mode )
 {
 	char newpath[PFS_PATH_MAX];
 	if (pfs_current->table->complete_at_path(dirfd,path,newpath) == -1) return -1;
-	return pfs_access(newpath,mode);
+	return pfs_access(ns,newpath,mode);
 }
 
-ssize_t pfs_getxattr (const char *path, const char *name, void *value, size_t size)
+ssize_t pfs_getxattr (struct pfs_mount_entry *ns, const char *path, const char *name, void *value, size_t size)
 {
 	BEGIN
 	debug(D_LIBCALL,"getxattr %s %s",path,name);
-	result = pfs_current->table->getxattr(path,name,value,size);
+	result = pfs_current->table->getxattr(ns,path,name,value,size);
 	END
 }
 
-ssize_t pfs_lgetxattr (const char *path, const char *name, void *value, size_t size)
+ssize_t pfs_lgetxattr (struct pfs_mount_entry *ns, const char *path, const char *name, void *value, size_t size)
 {
 	BEGIN
 	debug(D_LIBCALL,"lgetxattr %s %s",path,name);
-	result = pfs_current->table->lgetxattr(path,name,value,size);
+	result = pfs_current->table->lgetxattr(ns,path,name,value,size);
 	END
 }
 
@@ -773,19 +773,19 @@ ssize_t pfs_fgetxattr (int fd, const char *name, void *value, size_t size)
 	END
 }
 
-ssize_t pfs_listxattr (const char *path, char *list, size_t size)
+ssize_t pfs_listxattr (struct pfs_mount_entry *ns, const char *path, char *list, size_t size)
 {
 	BEGIN
 	debug(D_LIBCALL,"listxattr %s",path);
-	result = pfs_current->table->listxattr(path,list,size);
+	result = pfs_current->table->listxattr(ns,path,list,size);
 	END
 }
 
-ssize_t pfs_llistxattr (const char *path, char *list, size_t size)
+ssize_t pfs_llistxattr (struct pfs_mount_entry *ns, const char *path, char *list, size_t size)
 {
 	BEGIN
 	debug(D_LIBCALL,"llistxattr %s",path);
-	result = pfs_current->table->llistxattr(path,list,size);
+	result = pfs_current->table->llistxattr(ns,path,list,size);
 	END
 }
 
@@ -797,19 +797,19 @@ ssize_t pfs_flistxattr (int fd, char *list, size_t size)
 	END
 }
 
-int pfs_setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+int pfs_setxattr (struct pfs_mount_entry *ns, const char *path, const char *name, const void *value, size_t size, int flags)
 {
 	BEGIN
 	debug(D_LIBCALL,"setxattr %s %s <> %zu %d",path,name,size,flags);
-	result = pfs_current->table->setxattr(path,name,value,size,flags);
+	result = pfs_current->table->setxattr(ns,path,name,value,size,flags);
 	END
 }
 
-int pfs_lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags)
+int pfs_lsetxattr (struct pfs_mount_entry *ns, const char *path, const char *name, const void *value, size_t size, int flags)
 {
 	BEGIN
 	debug(D_LIBCALL,"lsetxattr %s %s <> %zu %d",path,name,size,flags);
-	result = pfs_current->table->lsetxattr(path,name,value,size,flags);
+	result = pfs_current->table->lsetxattr(ns,path,name,value,size,flags);
 	END
 }
 
@@ -821,19 +821,19 @@ int pfs_fsetxattr (int fd, const char *name, const void *value, size_t size, int
 	END
 }
 
-int pfs_removexattr (const char *path, const char *name)
+int pfs_removexattr (struct pfs_mount_entry *ns, const char *path, const char *name)
 {
 	BEGIN
 	debug(D_LIBCALL,"removexattr %s %s",path,name);
-	result = pfs_current->table->removexattr(path,name);
+	result = pfs_current->table->removexattr(ns,path,name);
 	END
 }
 
-int pfs_lremovexattr (const char *path, const char *name)
+int pfs_lremovexattr (struct pfs_mount_entry *ns, const char *path, const char *name)
 {
 	BEGIN
 	debug(D_LIBCALL,"lremovexattr %s %s",path,name);
-	result = pfs_current->table->lremovexattr(path,name);
+	result = pfs_current->table->lremovexattr(ns,path,name);
 	END
 }
 

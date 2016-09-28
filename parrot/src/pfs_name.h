@@ -22,6 +22,7 @@ struct pfs_name {
 	int  port;
 	char rest[PFS_PATH_MAX];
 	int  is_local;
+	struct pfs_mount_entry *ns;
 };
 
 #endif

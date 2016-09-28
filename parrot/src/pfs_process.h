@@ -15,6 +15,7 @@ See the file COPYING for details.
 extern "C" {
 #include "int_sizes.h"
 #include "tracer.h"
+#include "pfs_resolve.h"
 }
 
 #include <sys/types.h>
@@ -50,6 +51,7 @@ struct pfs_process {
 	uint64_t nsyscalls;
 	pfs_table *table;
 	struct tracer *tracer;
+	struct pfs_mount_entry *ns;
 
 	size_t diverted_length;
 	pfs_size_t io_channel_offset;
