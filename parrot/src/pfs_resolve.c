@@ -6,11 +6,13 @@ See the file COPYING for details.
 */
 
 #include "pfs_resolve.h"
+
 #include "pfs_types.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
+#include "parrot_client.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -97,7 +99,7 @@ mode_t pfs_resolve_parse_mode( const char * options ) {
 	return mode;
 }
 
-void pfs_resolve_manual_config( struct pfs_mount_entry **ns, const char *str )
+void pfs_resolve_manual_config( struct pfs_mount_entry **ns, const char *str, int forward  )
 {
 	char *e;
 	str = xxstrdup(str);
@@ -105,10 +107,14 @@ void pfs_resolve_manual_config( struct pfs_mount_entry **ns, const char *str )
 	if(!e) fatal("badly formed mount string: %s",str);
 	*e = 0;
 	e++;
-	pfs_resolve_add_entry(ns,str,e,R_OK|W_OK|X_OK);
+	if (forward) {
+		if (parrot_mount(str, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
+	} else {
+		pfs_resolve_add_entry(ns,str,e,R_OK|W_OK|X_OK);
+	}
 }
 
-void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile )
+void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile, int forward )
 {
 	FILE *file;
 	char line[PFS_LINE_MAX];
@@ -144,16 +150,28 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 			mode = pfs_resolve_parse_mode(redirect);
 			if(mode < 0) {
 				mode = R_OK|W_OK|X_OK; /* default mode */
-				pfs_resolve_add_entry(ns,prefix,redirect,mode);
+				if (forward) {
+					if (parrot_mount(prefix, redirect, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
+				} else {
+					pfs_resolve_add_entry(ns,prefix,redirect,mode);
+				}
 			} else {
-				pfs_resolve_add_entry(ns,prefix,prefix,mode);
+				if (forward) {
+					if (parrot_mount(prefix, prefix, redirect) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
+				} else {
+					pfs_resolve_add_entry(ns,prefix,prefix,mode);
+				}
 			}
 		} else {
 			mode = pfs_resolve_parse_mode(options);
 			if(mode < 0) {
 				fatal("%s has invalid options on line %d\n",mountfile,linenum);
 			}
-			pfs_resolve_add_entry(ns,prefix,redirect,mode);
+			if (forward) {
+				if (parrot_mount(prefix, redirect, options) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
+			} else {
+				pfs_resolve_add_entry(ns,prefix,redirect,mode);
+			}
 		}
 	}
 

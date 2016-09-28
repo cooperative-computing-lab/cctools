@@ -26,8 +26,8 @@ struct pfs_mount_entry {
 	struct pfs_mount_entry *next;
 };
 
-void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile );
-void pfs_resolve_manual_config( struct pfs_mount_entry **ns, const char *string );
+void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile, int forward );
+void pfs_resolve_manual_config( struct pfs_mount_entry **ns, const char *string, int forward );
 
 void pfs_resolve_add_entry( struct pfs_mount_entry **ns, const char *path, const char *device, mode_t mode );
 int pfs_resolve_remove_entry( struct pfs_mount_entry **ns, const char *path );
