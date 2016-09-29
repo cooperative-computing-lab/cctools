@@ -256,7 +256,7 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 		child->sgid = parent->sgid;
 		child->ngroups = parent->ngroups;
 		memcpy(child->groups, parent->groups, child->ngroups * sizeof(gid_t));
-		child->ns = pfs_copy_namespace(parent->ns);
+		child->ns = pfs_resolve_copy_namespace(parent->ns);
 
 		child->flags |= parent->flags;
 		if(share_table) {
@@ -317,7 +317,7 @@ static void pfs_process_delete( struct pfs_process *p )
 	pfs_paranoia_delete_pid(p->pid);
 	tracer_detach(p->tracer);
 	itable_remove(pfs_process_table,p->pid);
-	pfs_free_namespace(p->ns);
+	pfs_resolve_free_namespace(p->ns);
 	free(p);
 }
 

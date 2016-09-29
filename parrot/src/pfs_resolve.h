@@ -36,7 +36,8 @@ mode_t pfs_resolve_parse_mode( const char *modestring );
 
 pfs_resolve_t pfs_resolve( struct pfs_mount_entry *ns, const char *logical_name, char *physical_name, mode_t mode, time_t stoptime );
 
-struct pfs_mount_entry *pfs_copy_namespace(struct pfs_mount_entry *ns);
-void pfs_free_namespace(struct pfs_mount_entry *ns);
+int pfs_resolve_dissociate( struct pfs_mount_entry **ns );
+struct pfs_mount_entry *pfs_resolve_copy_namespace(struct pfs_mount_entry *ns);
+void pfs_resolve_free_namespace(struct pfs_mount_entry *ns);
 
 #endif

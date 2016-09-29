@@ -130,6 +130,7 @@ extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
 extern int pfs_fake_setuid;
 extern int pfs_fake_setgid;
+extern int pfs_allow_dynamic_mounts;
 
 extern int wait_barrier;
 
@@ -3130,6 +3131,16 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					divert_to_dummy(p,p->syscall_result);
 				} else {
 					divert_to_dummy(p,0);
+				}
+			}
+			break;
+
+		case SYSCALL64_parrot_dissociate:
+			if (entering) {
+				if (pfs_allow_dynamic_mounts) {
+					divert_to_dummy(p,pfs_resolve_dissociate(&p->ns));
+				} else {
+					divert_to_dummy(p,-EACCES);
 				}
 			}
 			break;

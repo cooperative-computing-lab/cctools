@@ -385,17 +385,31 @@ pfs_resolve_t pfs_resolve( struct pfs_mount_entry *ns, const char *logical_name,
 	return result;
 }
 
-struct pfs_mount_entry *pfs_copy_namespace(struct pfs_mount_entry *ns) {
+int pfs_resolve_dissociate( struct pfs_mount_entry **ns ) {
+	if (*ns) return 0;
+	if (mount_list) {
+		*ns = pfs_resolve_copy_namespace(mount_list);
+	} else {
+		*ns = xxmalloc(sizeof(**ns));
+		strcpy((*ns)->prefix,"/");
+		strcpy((*ns)->redirect,"/");
+		(*ns)->mode = R_OK|W_OK|X_OK;
+		(*ns)->next = NULL;
+	}
+	return 1;
+}
+
+struct pfs_mount_entry *pfs_resolve_copy_namespace(struct pfs_mount_entry *ns) {
 	if (!ns) return NULL;
 	struct pfs_mount_entry *result = xxmalloc(sizeof(*result));
 	memcpy(result, ns, sizeof(*result));
-	result->next = pfs_copy_namespace(ns->next);
+	result->next = pfs_resolve_copy_namespace(ns->next);
 	return result;
 }
 
-void pfs_free_namespace(struct pfs_mount_entry *ns) {
+void pfs_resolve_free_namespace(struct pfs_mount_entry *ns) {
 	if (ns) {
-		pfs_free_namespace(ns->next);
+		pfs_resolve_free_namespace(ns->next);
 		free(ns);
 	}
 }
