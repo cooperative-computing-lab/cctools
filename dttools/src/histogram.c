@@ -92,7 +92,8 @@ double histogram_bucket_size(struct histogram *h) {
 
 uint64_t bucket_of(struct histogram *h, double value) {
 
-	uint64_t b = abs(floor(value/h->bucket_size));
+	uint64_t b = floor(value/h->bucket_size);
+    b = abs(b);
 
 	/*
 	 * times 2 so that we can intercalate negative and positive values. itable
@@ -142,11 +143,11 @@ int histogram_insert(struct histogram *h, double value) {
 
 	int mode_count = histogram_count(h, histogram_mode(h));
 
-	if(value > h->max_value || mode_count == 0) {
+	if(value > h->max_value || h->total_count < 1) {
 		h->max_value = value;
 	}
 
-	if(value < h->min_value || mode_count == 0) {
+	if(value < h->min_value || h->total_count < 1) {
 		h->min_value = value;
 	}
 
