@@ -189,6 +189,13 @@ int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *valu
 		return 1;
 	}
 
+	if(strcmp(key, "task_id") == 0) {
+		if(s->taskid)
+			free(s->taskid);
+		s->taskid = xxstrdup(value);
+		return 1;
+	}
+
 
 	return 0;
 }
