@@ -50,9 +50,20 @@ static void pfs_resolve_cache_flush()
 
 void pfs_resolve_add_entry( struct pfs_mount_entry **ns, const char *prefix, const char *redirect, mode_t mode )
 {
+	char real_redirect[PFS_PATH_MAX];
+
+	switch (pfs_resolve(*ns, redirect, real_redirect, mode, 0)) {
+	case PFS_RESOLVE_CHANGED:
+	case PFS_RESOLVE_UNCHANGED:
+		break;
+	default:
+		debug(D_RESOLVE,"couldn't resolve redirect %s",prefix);
+		return;
+	}
+
 	struct pfs_mount_entry *m = xxmalloc(sizeof(*m));
 	strcpy(m->prefix,prefix);
-	strcpy(m->redirect,redirect);
+	strcpy(m->redirect,real_redirect);
 	m->mode = mode;
 	m->next = *ns ? *ns : mount_list;
 	if (*ns) *ns = m;
