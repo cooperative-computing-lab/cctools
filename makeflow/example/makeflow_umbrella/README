@@ -12,3 +12,20 @@ $ makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec convert_S.u
 To test the case when `--wrapper` and `--umbrella-spec|binary` are used at the same time:
 $ makeflow --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
 $ makeflow -T wq --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+
+
+Usage of the `--umbrella-log-prefix` option of makeflow:
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella --umbrella-log-prefix myumbrella.log example.makeflow
+
+The default value of the `--umbrella-log-prefix` option is "<makefile-name>.umbrella.log".
+After the makeflow completes, the umbrella log file for each rule will be in the format of "<umbrella-log-prefix>.<ruleid>".
+
+
+Usage of the `--umbrella-mode` option of makeflow:
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella --umbrella-mode parrot example.makeflow
+
+Currently, the `--umbrella-mode` option can be set to the following three modes: local, parrot, and docker.
+
+The default value of the `--umbrella-mode` option is local, which first tries
+to utilize the docker mode, and tries to utilize the parrot mode if the docker
+mode is not available.

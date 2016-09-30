@@ -93,7 +93,9 @@ OPTIONS_END
 
 SUBSECTION(Umbrella Options)
 OPTIONS_BEGIN
-OPTION_PAIR(--umbrella-binary, filepath)Umbrella binary for running every rule in a makeflow
+OPTION_PAIR(--umbrella-binary, filepath)Umbrella binary for running every rule in a makeflow.
+OPTION_PAIR(--umbrella-log-prefix, filepath)Umbrella log file prefix for running every rule in a makeflow. (default is <makefilename>.umbrella.log)
+OPTION_PAIR(--umbrella-mode, mode)Umbrella execution mode for running every rule in a makeflow. (default is local)
 OPTION_PAIR(--umbrella-spec, filepath)Umbrella spec for running every rule in a makeflow.
 OPTIONS_END
 

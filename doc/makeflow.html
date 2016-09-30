@@ -285,6 +285,18 @@ execution node; when it is not specified, the execution node is expected to
 have an umbrella binary available through the <tt>$PATH</tt> environment
 variable. </p>
 
+<p> Makeflow also allows the user to specify the umbrella log file prefix via
+its <tt>--umbrella-log-prefix</tt> option. The umbrella log file is in the
+format of "<umbrella-log-prefix>.<rule_id>". The default value for the
+<tt>--umbrella-log-prefix</tt> option is "<makefile_path>.umbrella.log". </p>
+
+<p> Makeflow also allows the user to specify the umbrella execution mode via
+its <tt>--umbrella-mode</tt> option. Currently, this option can be set to the
+following three modes: local, parrot, and docker. The default value of the
+<tt>--umbrella-mode</tt> option is local, which first tries to utilize the
+docker mode, and tries to utilize the parrot mode if the docker mode is not
+available. </p>
+
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>

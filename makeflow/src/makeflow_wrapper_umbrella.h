@@ -11,6 +11,8 @@ struct makeflow_wrapper_umbrella {
 	struct makeflow_wrapper *wrapper;
 	const char *spec;
 	const char *binary;
+	const char *log_prefix;
+	const char *mode;
 };
 
 struct makeflow_wrapper_umbrella *makeflow_wrapper_umbrella_create();
@@ -19,8 +21,12 @@ void makeflow_wrapper_umbrella_set_spec(struct makeflow_wrapper_umbrella *w, con
 
 void makeflow_wrapper_umbrella_set_binary(struct makeflow_wrapper_umbrella *w, const char *binary);
 
-void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue);
+void makeflow_wrapper_umbrella_set_log_prefix(struct makeflow_wrapper_umbrella *w, const char *log_prefix);
 
-char *makeflow_wrap_umbrella(char *result, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, char *input_files, char *output_files);
+void makeflow_wrapper_umbrella_set_mode(struct makeflow_wrapper_umbrella *w, const char *mode);
+
+void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag *d);
+
+char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, char *input_files, char *output_files);
 
 #endif
