@@ -8,7 +8,7 @@ See the file COPYING for details.
 #ifndef MAKEFLOW_WRAPPER_DOCKER_H
 #define MAKEFLOW_WRAPPER_DOCKER_H
 
-#define CONTAINER_SH "docker.wrapper.sh"
+#define CONTAINER_DOCKER_SH "docker.wrapper.sh"
 
 /*
 This module implements garbage collection on the dag.

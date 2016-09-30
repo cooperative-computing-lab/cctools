@@ -22,7 +22,7 @@ void makeflow_wrapper_docker_init( struct makeflow_wrapper *w, char *container_i
 {
 	FILE *wrapper_fn;
 
-	wrapper_fn = fopen(CONTAINER_SH, "w");
+	wrapper_fn = fopen(CONTAINER_DOCKER_SH, "w");
 
 	if (image_tar == NULL) {
 
@@ -45,10 +45,10 @@ docker run --rm -m 1g -v $curr_dir:$default_dir -w $default_dir %s \"$@\"\n", im
 
 	fclose(wrapper_fn);
 
-	chmod(CONTAINER_SH, 0755);
+	chmod(CONTAINER_DOCKER_SH, 0755);
 
-	makeflow_wrapper_add_input_file(w, CONTAINER_SH);
+	makeflow_wrapper_add_input_file(w, CONTAINER_DOCKER_SH);
 
-	char *global_cmd = string_format("sh %s", CONTAINER_SH);
+	char *global_cmd = string_format("sh %s", CONTAINER_DOCKER_SH);
 	makeflow_wrapper_add_command(w, global_cmd);
 }

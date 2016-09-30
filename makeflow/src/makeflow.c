@@ -1889,12 +1889,8 @@ if (enforcer && wrapper_umbrella) {
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
             makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
-            d->wrapped_in_container = 1;
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
             makeflow_wrapper_singularity_init(wrapper, container_image);
-            d->wrapped_in_container = 1;
-        }else{
-            d->wrapped_in_container = 0;
         }
 
 	makeflow_run(d);
@@ -1910,13 +1906,9 @@ if (enforcer && wrapper_umbrella) {
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-            char *cmd = string_format("rm %s", CONTAINER_SH);
-            system(cmd);
-            free(cmd);
+            unlink(CONTAINER_DOCKER_SH);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-            char* cmd = string_format("rm %s",CONTAINER_SINGULARITY_SH);
-            system(cmd);
-            free(cmd);
+            unlink(CONTAINER_DOCKER_SH);
         }
 
 	if(makeflow_abort_flag) {
