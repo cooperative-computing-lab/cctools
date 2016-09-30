@@ -597,6 +597,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* check caching directory to see if node has already been preserved */
 	if (d->should_preserve && makeflow_cache_is_preserved(d, n, command, input_list, output_list, queue)) {
 		/* do nothing, since makeflow_cache_is_preserved will replicate output files */
+		printf("node %d already exists in cache, replicating output files\n", n->nodeid);
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
@@ -861,6 +862,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 		/* store node into caching directory  */
 		if (d->should_preserve) {
+			printf("preserving node within caching directory\n");
 			makeflow_cache_populate(d, n, outputs, queue);
 		}
 

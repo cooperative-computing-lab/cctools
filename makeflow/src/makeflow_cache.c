@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2014- The University of Notre Dame
+Copyright (C) 2016- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -16,9 +16,12 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "debug.h"
 #include "makeflow_log.h"
+#include "create_dir.h"
+#include "copy_stream.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*inputs) {
   struct dag_file *f;
@@ -50,7 +53,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
 
   caching_file_path = xxstrdup(d->caching_directory);
   caching_file_path = string_combine_multi(caching_file_path, n->cache_id, "/outputs", 0);
-  sucess = batch_fs_mkdir(queue,caching_file_path, 0777, 1);
+  sucess = create_dir(caching_file_path, 0777);
   if (!sucess) {
     fatal("Could not create caching directory %s\n", caching_file_path);
   }
@@ -59,7 +62,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   while((f = list_next_item(outputs))) {
     output_file_path = xxstrdup(d->caching_directory);
     output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
-    sucess = batch_fs_putfile(queue, f->filename, output_file_path);
+    sucess = copy_file_to_file(f->filename, output_file_path);
     if (!sucess) {
       fatal("Could not cache output file %s\n", output_file_path);
     }
@@ -67,7 +70,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
 
   source_makeflow_file_path = xxstrdup(d->caching_directory);
   source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, n->cache_id, "/source_makeflow", 0);
-  sucess = batch_fs_putfile(queue, d->filename, source_makeflow_file_path);
+  sucess = copy_file_to_file(d->filename, source_makeflow_file_path);
   if (!sucess) {
     fatal("Could not cache source makeflow file %s\n", source_makeflow_file_path);
   }
@@ -105,7 +108,7 @@ int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struc
     filename = xxstrdup("./");
     output_file_path = string_combine_multi(output_file_path, n->cache_id, "/outputs/" , f->filename, 0);
     filename = string_combine(filename, f->filename);
-    sucess = batch_fs_putfile(queue, output_file_path, filename);
+    sucess = copy_file_to_file(output_file_path, filename);
     if (!sucess) {
       fatal("Could not reproduce output file %s\n", output_file_path);
     }
@@ -126,7 +129,7 @@ int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command
   while ((f=list_next_item(outputs))) {
     filename = xxstrdup(d->caching_directory);
     filename = string_combine_multi(filename, n->cache_id, "/outputs/", f-> filename, 0);
-    file_exists = batch_fs_stat(queue, filename, &buf);
+    file_exists = stat(filename, &buf);
     if (file_exists == -1) {
       return 0;
     }
