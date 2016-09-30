@@ -32,8 +32,15 @@ Some things that could be cleaned up in this code:
 
 extern char pfs_temp_dir[PFS_PATH_MAX];
 
-static struct pfs_mount_entry *mount_list = NULL;
-static struct hash_table *resolve_cache = NULL;
+struct mount_entry {
+	char prefix[PFS_PATH_MAX];
+	char redirect[PFS_PATH_MAX];
+	mode_t mode;
+	struct mount_entry *next;
+};
+
+static struct mount_entry * mount_list = 0;
+static struct hash_table *resolve_cache = 0;
 
 static void pfs_resolve_cache_flush()
 {
@@ -65,22 +72,19 @@ void pfs_resolve_add_entry( struct pfs_mount_entry **ns, const char *prefix, con
 	strcpy(m->prefix,prefix);
 	strcpy(m->redirect,real_redirect);
 	m->mode = mode;
-	m->next = *ns ? *ns : mount_list;
-	if (*ns) *ns = m;
-	else mount_list = m;
+	m->next = mount_list;
+	mount_list = m;
 	pfs_resolve_cache_flush();
 }
 
-int pfs_resolve_remove_entry( struct pfs_mount_entry **ns, const char *prefix )
+int pfs_resolve_remove_entry( const char *prefix )
 {
-	struct pfs_mount_entry *m, *p=0;
-	if (*ns) m = *ns;
-	else m = mount_list;
+	struct mount_entry *m, *p=0;
 
-	for(;m;p=m,m=m->next) {
+	for(m=mount_list;m;p=m,m=m->next) {
 		if(!strcmp(m->prefix,prefix)) {
 			if(p) {
-				p->next = m->next;
+				p->next = m->next;			
 			} else {
 				mount_list = m->next;
 			}
@@ -136,8 +140,8 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 	int linenum=0;
 	int mode;
 
-	file = fopen(mountfile,"r");
-	if(!file) fatal("couldn't open mountfile %s: %s\n",mountfile,strerror(errno));
+	file = fopen(filename,"r");
+	if(!file) fatal("couldn't open mountfile %s: %s\n",filename,strerror(errno));
 
 	while(1) {
 		if(!fgets(line,sizeof(line),file)) {
@@ -156,7 +160,7 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 		if(fields==0) {
 			continue;
 		} else if(fields<2) {
-			fatal("%s has an error on line %d\n",mountfile,linenum);
+			fatal("%s has an error on line %d\n",filename,linenum);
 		} else if(fields==2) {
 			mode = pfs_resolve_parse_mode(redirect);
 			if(mode < 0) {
@@ -176,7 +180,7 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 		} else {
 			mode = pfs_resolve_parse_mode(options);
 			if(mode < 0) {
-				fatal("%s has invalid options on line %d\n",mountfile,linenum);
+				fatal("%s has invalid options on line %d\n",filename,linenum);
 			}
 			if (forward) {
 				if (parrot_mount(prefix, redirect, options) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
@@ -340,14 +344,14 @@ void clean_up_path( char *path )
 	}
 }
 
-pfs_resolve_t pfs_resolve( struct pfs_mount_entry *ns, const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
+pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
 {
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
-	struct pfs_mount_entry *e;
+	struct mount_entry *e;
 	const char *t;
 	char lookup_key[PFS_PATH_MAX + 3 * sizeof(int) + 1];
 
-	sprintf(lookup_key, "%o|%p|%s", mode, ns, logical_name);
+	sprintf(lookup_key, "%o|%s", mode, logical_name);
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
@@ -356,7 +360,7 @@ pfs_resolve_t pfs_resolve( struct pfs_mount_entry *ns, const char *logical_name,
 		strcpy(physical_name,t);
 		result = PFS_RESOLVE_CHANGED;
 	} else {
-		for(e=ns?ns:mount_list;e;e=e->next) {
+		for(e=mount_list;e;e=e->next) {
 			result = mount_entry_check(logical_name,e->prefix,e->redirect,physical_name);
 			if(result!=PFS_RESOLVE_UNCHANGED) {
 				if ((mode & e->mode) != mode) {

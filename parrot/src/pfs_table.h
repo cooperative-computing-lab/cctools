@@ -10,7 +10,6 @@ See the file COPYING for details.
 
 extern "C" {
 #include "buffer.h"
-#include "pfs_resolve.h"
 }
 
 #include "pfs_mmap.h"
@@ -40,7 +39,7 @@ public:
 	void sendfd( int fd, int errored );
 
 	/* file descriptor creation */
-	int open( struct pfs_mount_entry *ns, const char *path, int flags, mode_t mode, int force_cache, char *native_path, size_t len );
+	int open( const char *path, int flags, mode_t mode, int force_cache, char *native_path, size_t len );
 	void attach( int logical, int physical, int flags, mode_t mode, const char *name, struct stat *buf );
 	void setnative( int fd, int fdflags );
 	void setspecial( int fd );
@@ -65,10 +64,10 @@ public:
 	int		fchmod( int fd, mode_t mode );
 	int		fchown( int fd, struct pfs_process *p, uid_t uid, gid_t gid );
 	int		flock( int fd, int op );
-	int		bind( struct pfs_mount_entry *ns, int fd, char *lpath, size_t len );
+	int		bind( int fd, char *lpath, size_t len );
 
 	/* operations on the table itself */
-	int	chdir( struct pfs_mount_entry *ns, const char *path );
+	int	chdir( const char *path );
 	char *	getcwd( char *path, pfs_size_t size );
 	int	dup2( int old, int nfd, int flags );
 
@@ -77,57 +76,57 @@ public:
 	int	get_local_name( int fd, char *name );
 
 	/* operations on services */
-	int	stat( struct pfs_mount_entry *ns, const char *name, struct pfs_stat *buf );
-	int	statfs( struct pfs_mount_entry *ns, const char *path, struct pfs_statfs *buf );
-	int	lstat( struct pfs_mount_entry *ns, const char *name, struct pfs_stat *buf );
-	int	access( struct pfs_mount_entry *ns, const char *name, mode_t mode );
-	int	chmod( struct pfs_mount_entry *ns, const char *name, mode_t mode );
-	int	chown( struct pfs_mount_entry *ns, const char *name, struct pfs_process *p, uid_t uid, gid_t gid );
-	int	lchown( struct pfs_mount_entry *ns, const char *name, uid_t uid, gid_t gid );
-	int	truncate( struct pfs_mount_entry *ns, const char *path, pfs_off_t length );
-	int	utime( struct pfs_mount_entry *ns, const char *path, struct utimbuf *buf );
-	int	utimens( struct pfs_mount_entry *ns, const char *path, const struct timespec times[2] );
-	int	lutimens( struct pfs_mount_entry *ns, const char *path, const struct timespec times[2] );
-	int	unlink( struct pfs_mount_entry *ns, const char *name );
-	int	rename( struct pfs_mount_entry *ns, const char *old_name, const char *new_name );
-	int	link( struct pfs_mount_entry *ns, const char *oldpath, const char *newpath );
-	int	symlink( struct pfs_mount_entry *ns, const char *target, const char *path );
-	int	readlink( struct pfs_mount_entry *ns, const char *path, char *buf, pfs_size_t size );
-	int	mknod( struct pfs_mount_entry *ns, const char *path, mode_t mode, dev_t dev );
-	int	mkdir( struct pfs_mount_entry *ns, const char *path, mode_t mode );
-	int	rmdir( struct pfs_mount_entry *ns, const char *path );
+	int	stat( const char *name, struct pfs_stat *buf );
+	int	statfs( const char *path, struct pfs_statfs *buf );
+	int	lstat( const char *name, struct pfs_stat *buf );
+	int	access( const char *name, mode_t mode );
+	int	chmod( const char *name, mode_t mode );
+	int	chown( const char *name, struct pfs_process *p, uid_t uid, gid_t gid );
+	int	lchown( const char *name, uid_t uid, gid_t gid );
+	int	truncate( const char *path, pfs_off_t length );
+	int	utime( const char *path, struct utimbuf *buf );
+	int	utimens( const char *path, const struct timespec times[2] );
+	int	lutimens( const char *path, const struct timespec times[2] );
+	int	unlink( const char *name );
+	int	rename( const char *old_name, const char *new_name );
+	int	link( const char *oldpath, const char *newpath );
+	int	symlink( const char *target, const char *path );
+	int	readlink( const char *path, char *buf, pfs_size_t size );
+	int	mknod( const char *path, mode_t mode, dev_t dev );
+	int	mkdir( const char *path, mode_t mode );
+	int	rmdir( const char *path );
 	struct dirent * fdreaddir( int fd );
 
 	/* extended attributes */
-	ssize_t getxattr (struct pfs_mount_entry *ns, const char *path, const char *name, void *value, size_t size);
-	ssize_t lgetxattr (struct pfs_mount_entry *ns, const char *path, const char *name, void *value, size_t size);
+	ssize_t getxattr (const char *path, const char *name, void *value, size_t size);
+	ssize_t lgetxattr (const char *path, const char *name, void *value, size_t size);
 	ssize_t fgetxattr (int fd, const char *name, void *value, size_t size);
-	ssize_t listxattr (struct pfs_mount_entry *ns, const char *path, char *list, size_t size);
-	ssize_t llistxattr (struct pfs_mount_entry *ns, const char *path, char *list, size_t size);
+	ssize_t listxattr (const char *path, char *list, size_t size);
+	ssize_t llistxattr (const char *path, char *list, size_t size);
 	ssize_t flistxattr (int fd, char *list, size_t size);
-	int setxattr (struct pfs_mount_entry *ns, const char *path, const char *name, const void *value, size_t size, int flags);
-	int lsetxattr (struct pfs_mount_entry *ns, const char *path, const char *name, const void *value, size_t size, int flags);
+	int setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+	int lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
 	int fsetxattr (int fd, const char *name, const void *value, size_t size, int flags);
-	int removexattr (struct pfs_mount_entry *ns, const char *path, const char *name);
-	int lremovexattr (struct pfs_mount_entry *ns, const char *path, const char *name);
+	int removexattr (const char *path, const char *name);
+	int lremovexattr (const char *path, const char *name);
 	int fremovexattr (int fd, const char *name);
 
 	/* custom Parrot syscalls */
-	int	mkalloc( struct pfs_mount_entry *ns, const char *path, pfs_ssize_t size, mode_t mode );
-	int	lsalloc( struct pfs_mount_entry *ns, const char *path, char *alloc_path, pfs_ssize_t *total, pfs_ssize_t *inuse );
-	int	whoami( struct pfs_mount_entry *ns, const char *path, char *buf, int size );
-	int	getacl( struct pfs_mount_entry *ns, const char *path, char *buf, int size );
-	int	setacl( struct pfs_mount_entry *ns, const char *path, const char *subject, const char *rights );
-	int	locate( struct pfs_mount_entry *ns, const char *path, char *buf, int size );
-	pfs_ssize_t copyfile( struct pfs_mount_entry *ns, const char *source, const char *target );
+	int	mkalloc( const char *path, pfs_ssize_t size, mode_t mode );
+	int	lsalloc( const char *path, char *alloc_path, pfs_ssize_t *total, pfs_ssize_t *inuse );
+	int	whoami( const char *path, char *buf, int size );
+	int	getacl( const char *path, char *buf, int size );
+	int	setacl( const char *path, const char *subject, const char *rights );
+	int	locate( const char *path, char *buf, int size );
+	pfs_ssize_t copyfile( const char *source, const char *target );
 	pfs_ssize_t fcopyfile(int sourcefd, int targetfd);
 	pfs_ssize_t copyfile_slow( pfs_file *sourcefile, pfs_file *targetfile );
-	int	md5( struct pfs_mount_entry *ns, const char *path, unsigned char *digest );
-	int	md5_slow( struct pfs_mount_entry *ns, const char *path, unsigned char *digest );
-	int 	search( struct pfs_mount_entry *ns, const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
+	int	md5( const char *path, unsigned char *digest );
+	int	md5_slow( const char *path, unsigned char *digest );
+	int 	search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
 	void	follow_symlink( struct pfs_name *pname, mode_t amode, int depth = 0 );
-	int	resolve_name( struct pfs_mount_entry *ns, int is_special_syscall, const char *cname, pfs_name *pname, mode_t mode, bool do_follow_symlink = true, int depth = 0 );
+	int	resolve_name( int is_special_syscall, const char *cname, pfs_name *pname, mode_t mode, bool do_follow_symlink = true, int depth = 0 );
 
 	/* mmap operations */
 	pfs_size_t  mmap_create( int fd, pfs_size_t file_offset, size_t length, int prot, int flags );
@@ -136,7 +135,7 @@ public:
 	void        mmap_print();
 	static void mmap_proc(pid_t pid, buffer_t *B);
 
-	pfs_file * open_object( struct pfs_mount_entry *ns, const char *path, int flags, mode_t mode, int force_cache );
+	pfs_file * open_object( const char *path, int flags, mode_t mode, int force_cache );
 	pfs_dir * open_directory(pfs_name *pname, int flags);
 
 	int find_empty( int lowest );

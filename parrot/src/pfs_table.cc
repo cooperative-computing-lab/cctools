@@ -187,7 +187,7 @@ void pfs_table::setparrot(int fd, int rfd, struct stat *buf)
 	pointers[fd]->bind(buf->st_dev, buf->st_ino);
 }
 
-int pfs_table::bind( struct pfs_mount_entry *ns, int fd, char *lpath, size_t len )
+int pfs_table::bind( int fd, char *lpath, size_t len )
 {
 	if (!isnative(fd))
 		return (errno = EBADF, -1);
@@ -196,7 +196,7 @@ int pfs_table::bind( struct pfs_mount_entry *ns, int fd, char *lpath, size_t len
 
 	/* Resolve the path... */
 	struct pfs_name pname;
-	if (!resolve_name(ns, 1, lpath, &pname, F_OK))
+	if (!resolve_name(1, lpath, &pname, F_OK))
 		return -1;
 
 	if (!pname.is_local)
@@ -413,7 +413,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 				name_to_resolve = absolute_link_target;
 			}
 		}
-		if (resolve_name(pname->ns, 0, name_to_resolve, &new_pname, mode, true, depth + 1)) {
+		if (resolve_name(0, name_to_resolve, &new_pname, mode, true, depth + 1)) {
 			*pname = new_pname;
 		}
 	}
@@ -454,7 +454,7 @@ void namelist_table_insert(const char *content, int is_special_syscall) {
 	}
 }
 
-int pfs_table::resolve_name(struct pfs_mount_entry *ns, int is_special_syscall, const char *cname, struct pfs_name *pname, mode_t mode, bool do_follow_symlink, int depth ) {
+int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, mode_t mode, bool do_follow_symlink, int depth ) {
 	char full_logical_name[PFS_PATH_MAX];
 	pfs_resolve_t result;
 	size_t n;
@@ -467,7 +467,6 @@ int pfs_table::resolve_name(struct pfs_mount_entry *ns, int is_special_syscall, 
 
 	complete_path(cname,full_logical_name);
 	path_collapse(full_logical_name,pname->logical_name,1);
-	pname->ns = ns;
 
 	/* Check permissions to edit parent directory entry. */
 	if(mode & E_OK) {
@@ -475,7 +474,7 @@ int pfs_table::resolve_name(struct pfs_mount_entry *ns, int is_special_syscall, 
 		char tmp[PFS_PATH_MAX];
 		mode &= ~E_OK;
 		path_dirname(pname->logical_name, dirname);
-		result = pfs_resolve(ns,dirname,tmp,W_OK,time(0)+pfs_master_timeout);
+		result = pfs_resolve(dirname,tmp,W_OK,time(0)+pfs_master_timeout);
 		switch(result) {
 			case PFS_RESOLVE_DENIED:
 				return errno = EACCES, 0;
@@ -510,7 +509,7 @@ int pfs_table::resolve_name(struct pfs_mount_entry *ns, int is_special_syscall, 
 		pname->is_local = 1;
 		return 1;
 	} else {
-		result = pfs_resolve(ns,pname->logical_name,pname->path,mode,time(0)+pfs_master_timeout);
+		result = pfs_resolve(pname->logical_name,pname->path,mode,time(0)+pfs_master_timeout);
 	}
 
 	if(namelist_table) {
@@ -607,7 +606,7 @@ pfs_pointer *pfs_table::getopenfile( pid_t pid, int fd )
 	}
 }
 
-pfs_file * pfs_table::open_object( struct pfs_mount_entry *ns, const char *lname, int flags, mode_t mode, int force_cache )
+pfs_file * pfs_table::open_object( const char *lname, int flags, mode_t mode, int force_cache )
 {
 	pfs_name pname;
 	pfs_file *file=0;
@@ -644,7 +643,7 @@ pfs_file * pfs_table::open_object( struct pfs_mount_entry *ns, const char *lname
 	// If a file is opened with O_CREAT, we should check for write permissions
 	// on the parent directory. However, this seems to cause problems if
 	// system directories (or the filesystem root) are marked RO.
-	if(resolve_name(ns,1,lname,&pname,open_mode)) {
+	if(resolve_name(1,lname,&pname,open_mode)) {
 		if((flags&O_CREAT) && (flags&O_DIRECTORY)) {
 			// Linux ignores O_DIRECTORY in this combination
 			flags &= ~O_DIRECTORY;
@@ -743,7 +742,7 @@ pfs_file * pfs_table::open_object( struct pfs_mount_entry *ns, const char *lname
 	return file;
 }
 
-int pfs_table::open( struct pfs_mount_entry *ns, const char *lname, int flags, mode_t mode, int force_cache, char *path, size_t len )
+int pfs_table::open( const char *lname, int flags, mode_t mode, int force_cache, char *path, size_t len )
 {
 	int result = -1;
 	pfs_file *file=0;
@@ -764,7 +763,7 @@ int pfs_table::open( struct pfs_mount_entry *ns, const char *lname, int flags, m
 
 	result = find_empty(0);
 	if(result>=0) {
-		file = open_object(ns,lname,flags,mode,force_cache);
+		file = open_object(lname,flags,mode,force_cache);
 		if(file) {
 			if(path && file->canbenative(path, len)) {
 				file->close();
@@ -1023,7 +1022,7 @@ int pfs_table::fchdir( int fd )
 	CHECK_FD(fd);
 
 	pfs_name *pname = pointers[fd]->file->get_name();
-	result = this->chdir(pname->ns, pname->path);
+	result = this->chdir(pname->path);
 
 	return result;
 }
@@ -1205,7 +1204,7 @@ they must be cleaned up before they are recorded in the working
 directory.
 */
 
-int pfs_table::chdir( struct pfs_mount_entry *ns, const char *path )
+int pfs_table::chdir( const char *path )
 {
 	int result = -1;
 	char newpath[PFS_PATH_MAX];
@@ -1221,7 +1220,7 @@ int pfs_table::chdir( struct pfs_mount_entry *ns, const char *path )
 		return -1;
 	}
 
-	if(resolve_name(ns,0,path,&pname,X_OK)) {
+	if(resolve_name(0,path,&pname,X_OK)) {
 		result = pname.service->chdir(&pname,newpath);
 		if(result>=0) {
 			path_collapse(pname.logical_name,working_dir,1);
@@ -1245,36 +1244,36 @@ char *pfs_table::getcwd( char *path, pfs_size_t size )
 	return path;
 }
 
-int pfs_table::access( struct pfs_mount_entry *ns, const char *n, mode_t mode )
+int pfs_table::access( const char *n, mode_t mode )
 {
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(ns,0,n,&pname,X_OK | mode)) {
+	if(resolve_name(0,n,&pname,X_OK | mode)) {
 		result = pname.service->access(&pname,mode);
 	}
 
 	return result;
 }
 
-int pfs_table::chmod( struct pfs_mount_entry *ns, const char *n, mode_t mode )
+int pfs_table::chmod( const char *n, mode_t mode )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK)) {
 		result = pname.service->chmod(&pname,mode);
 	}
 
 	return result;
 }
 
-int pfs_table::chown( struct pfs_mount_entry *ns, const char *n, struct pfs_process *p, uid_t uid, gid_t gid )
+int pfs_table::chown( const char *n, struct pfs_process *p, uid_t uid, gid_t gid )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK)) {
 		result = pname.service->chown(&pname,uid,gid);
 	}
 
@@ -1290,48 +1289,48 @@ int pfs_table::chown( struct pfs_mount_entry *ns, const char *n, struct pfs_proc
 	return result;
 }
 
-int pfs_table::lchown( struct pfs_mount_entry *ns, const char *n, uid_t uid, gid_t gid )
+int pfs_table::lchown( const char *n, uid_t uid, gid_t gid )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK,false)) {
+	if(resolve_name(0,n,&pname,W_OK,false)) {
 		result = pname.service->lchown(&pname,uid,gid);
 	}
 
 	return result;
 }
 
-int pfs_table::truncate( struct pfs_mount_entry *ns, const char *n, pfs_off_t offset )
+int pfs_table::truncate( const char *n, pfs_off_t offset )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,1,n,&pname,W_OK)) {
+	if(resolve_name(1,n,&pname,W_OK)) {
 		result = pname.service->truncate(&pname,offset);
 	}
 
 	return result;
 }
 
-ssize_t pfs_table::getxattr (struct pfs_mount_entry *ns, const char *path, const char *name, void *value, size_t size)
+ssize_t pfs_table::getxattr (const char *path, const char *name, void *value, size_t size)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,R_OK)) {
+	if(resolve_name(0,path,&pname,R_OK)) {
 		result = pname.service->getxattr(&pname,name,value,size);
 	}
 
 	return result;
 }
 
-ssize_t pfs_table::lgetxattr (struct pfs_mount_entry *ns, const char *path, const char *name, void *value, size_t size)
+ssize_t pfs_table::lgetxattr (const char *path, const char *name, void *value, size_t size)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,R_OK,false)) {
+	if(resolve_name(0,path,&pname,R_OK,false)) {
 		result = pname.service->lgetxattr(&pname,name,value,size);
 	}
 
@@ -1345,24 +1344,24 @@ ssize_t pfs_table::fgetxattr (int fd, const char *name, void *value, size_t size
 	return pointers[fd]->file->fgetxattr(name,value,size);
 }
 
-ssize_t pfs_table::listxattr (struct pfs_mount_entry *ns, const char *path, char *list, size_t size)
+ssize_t pfs_table::listxattr (const char *path, char *list, size_t size)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,R_OK)) {
+	if(resolve_name(0,path,&pname,R_OK)) {
 		result = pname.service->listxattr(&pname,list,size);
 	}
 
 	return result;
 }
 
-ssize_t pfs_table::llistxattr (struct pfs_mount_entry *ns, const char *path, char *list, size_t size)
+ssize_t pfs_table::llistxattr (const char *path, char *list, size_t size)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,R_OK,false)) {
+	if(resolve_name(0,path,&pname,R_OK,false)) {
 		result = pname.service->llistxattr(&pname,list,size);
 	}
 
@@ -1376,24 +1375,24 @@ ssize_t pfs_table::flistxattr (int fd, char *list, size_t size)
 	return pointers[fd]->file->flistxattr(list,size);
 }
 
-int pfs_table::setxattr (struct pfs_mount_entry *ns, const char *path, const char *name, const void *value, size_t size, int flags)
+int pfs_table::setxattr (const char *path, const char *name, const void *value, size_t size, int flags)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,W_OK)) {
+	if(resolve_name(0,path,&pname,W_OK)) {
 		result = pname.service->setxattr(&pname,name,value,size,flags);
 	}
 
 	return result;
 }
 
-int pfs_table::lsetxattr (struct pfs_mount_entry *ns, const char *path, const char *name, const void *value, size_t size, int flags)
+int pfs_table::lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,W_OK,false)) {
+	if(resolve_name(0,path,&pname,W_OK,false)) {
 		result = pname.service->lsetxattr(&pname,name,value,size,flags);
 	}
 
@@ -1407,24 +1406,24 @@ int pfs_table::fsetxattr (int fd, const char *name, const void *value, size_t si
 	return pointers[fd]->file->fsetxattr(name,value,size,flags);
 }
 
-int pfs_table::removexattr (struct pfs_mount_entry *ns, const char *path, const char *name)
+int pfs_table::removexattr (const char *path, const char *name)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,W_OK)) {
+	if(resolve_name(0,path,&pname,W_OK)) {
 		result = pname.service->removexattr(&pname,name);
 	}
 
 	return result;
 }
 
-int pfs_table::lremovexattr (struct pfs_mount_entry *ns, const char *path, const char *name)
+int pfs_table::lremovexattr (const char *path, const char *name)
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,path,&pname,W_OK,false)) {
+	if(resolve_name(0,path,&pname,W_OK,false)) {
 		result = pname.service->lremovexattr(&pname,name);
 	}
 
@@ -1438,36 +1437,36 @@ int pfs_table::fremovexattr (int fd, const char *name)
 	return pointers[fd]->file->fremovexattr(name);
 }
 
-int pfs_table::utime( struct pfs_mount_entry *ns, const char *n, struct utimbuf *buf )
+int pfs_table::utime( const char *n, struct utimbuf *buf )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK)) {
 		result = pname.service->utime(&pname,buf);
 	}
 
 	return result;
 }
 
-int pfs_table::utimens( struct pfs_mount_entry *ns, const char *n, const struct timespec times[2] )
+int pfs_table::utimens( const char *n, const struct timespec times[2] )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK)) {
 		result = pname.service->utimens(&pname,times);
 	}
 
 	return result;
 }
 
-int pfs_table::lutimens( struct pfs_mount_entry *ns, const char *n, const struct timespec times[2] )
+int pfs_table::lutimens( const char *n, const struct timespec times[2] )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK,false)) {
+	if(resolve_name(0,n,&pname,W_OK,false)) {
 		result = pname.service->lutimens(&pname,times);
 	}
 
@@ -1475,12 +1474,12 @@ int pfs_table::lutimens( struct pfs_mount_entry *ns, const char *n, const struct
 }
 
 
-int pfs_table::unlink( struct pfs_mount_entry *ns, const char *n )
+int pfs_table::unlink( const char *n )
 {
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(ns,0,n,&pname,E_OK,false)) {
+	if(resolve_name(0,n,&pname,E_OK,false)) {
 		result = pname.service->unlink(&pname);
 		if(result==0) {
 			pfs_cache_invalidate(&pname);
@@ -1491,13 +1490,13 @@ int pfs_table::unlink( struct pfs_mount_entry *ns, const char *n )
 	return result;
 }
 
-int pfs_table::stat( struct pfs_mount_entry *ns, const char *n, struct pfs_stat *b )
+int pfs_table::stat( const char *n, struct pfs_stat *b )
 {
 	pfs_name pname;
 	int result = -1;
 
 	/* You don't need to have read permission on a file to stat it. */
-	if(resolve_name(ns,0,n,&pname,F_OK)) {
+	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->stat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1511,26 +1510,26 @@ int pfs_table::stat( struct pfs_mount_entry *ns, const char *n, struct pfs_stat 
 	return result;
 }
 
-int pfs_table::statfs( struct pfs_mount_entry *ns, const char *n, struct pfs_statfs *b )
+int pfs_table::statfs( const char *n, struct pfs_statfs *b )
 {
 	pfs_name pname;
 	int result = -1;
 
 	/* You don't need to have read permission on a file to stat it. */
-	if(resolve_name(ns,0,n,&pname,F_OK)) {
+	if(resolve_name(0,n,&pname,F_OK)) {
 		result = pname.service->statfs(&pname,b);
 	}
 
 	return result;
 }
 
-int pfs_table::lstat( struct pfs_mount_entry *ns, const char *n, struct pfs_stat *b )
+int pfs_table::lstat( const char *n, struct pfs_stat *b )
 {
 	pfs_name pname;
 	int result=-1;
 
 	/* You don't need to have read permission on a file to stat it. */
-	if(resolve_name(ns,0,n,&pname,F_OK,false)) {
+	if(resolve_name(0,n,&pname,F_OK,false)) {
 		result = pname.service->lstat(&pname,b);
 		if(result>=0) {
 			b->st_blksize = pname.service->get_block_size();
@@ -1544,12 +1543,12 @@ int pfs_table::lstat( struct pfs_mount_entry *ns, const char *n, struct pfs_stat
 	return result;
 }
 
-int pfs_table::rename( struct pfs_mount_entry *ns, const char *n1, const char *n2 )
+int pfs_table::rename( const char *n1, const char *n2 )
 {
 	pfs_name p1, p2;
 	int result = -1;
 
-	if(resolve_name(ns,0,n1,&p1,E_OK,false) && resolve_name(ns,0,n2,&p2,E_OK,false)) {
+	if(resolve_name(0,n1,&p1,E_OK,false) && resolve_name(0,n2,&p2,E_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->rename(&p1,&p2);
 			if(result==0) {
@@ -1565,14 +1564,14 @@ int pfs_table::rename( struct pfs_mount_entry *ns, const char *n1, const char *n
 	return result;
 }
 
-int pfs_table::link( struct pfs_mount_entry *ns, const char *n1, const char *n2 )
+int pfs_table::link( const char *n1, const char *n2 )
 {
 	pfs_name p1, p2;
 	int result = -1;
 
 	// Require write on the target to prevent linking into a RW directory
 	// and bypassing restrictions
-	if(resolve_name(ns,0,n1,&p1,W_OK,false) && resolve_name(ns,0,n2,&p2,E_OK,false)) {
+	if(resolve_name(0,n1,&p1,W_OK,false) && resolve_name(0,n2,&p2,E_OK,false)) {
 		if(p1.service==p2.service) {
 			result = p1.service->link(&p1,&p2);
 		} else {
@@ -1583,7 +1582,7 @@ int pfs_table::link( struct pfs_mount_entry *ns, const char *n1, const char *n2 
 	return result;
 }
 
-int pfs_table::symlink( struct pfs_mount_entry *ns, const char *target, const char *path )
+int pfs_table::symlink( const char *target, const char *path )
 {
 	pfs_name pname;
 	int result = -1;
@@ -1597,7 +1596,7 @@ int pfs_table::symlink( struct pfs_mount_entry *ns, const char *target, const ch
 	verbatim down to the needed driver.
 	*/
 
-	if(resolve_name(ns,0,path,&pname,E_OK,false)) {
+	if(resolve_name(0,path,&pname,E_OK,false)) {
 		result = pname.service->symlink(target,&pname);
 	}
 
@@ -1617,12 +1616,12 @@ is manually mapped to /proc/(pid), otherwise the path would
 refer to parrot itself.
 */
 
-int pfs_table::readlink( struct pfs_mount_entry *ns, const char *n, char *buf, pfs_size_t size )
+int pfs_table::readlink( const char *n, char *buf, pfs_size_t size )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,R_OK,false)) {
+	if(resolve_name(0,n,&pname,R_OK,false)) {
 		char *pid = NULL, *fd = NULL;
 		if(pattern_match(pname.path, "^/proc/(%d+)/fd/(%d+)$",&pid,&fd) >= 0) {
 			pfs_pointer *desc = getopenfile(atoi(pid), atoi(fd));
@@ -1659,36 +1658,36 @@ int pfs_table::readlink( struct pfs_mount_entry *ns, const char *n, char *buf, p
 	return result;
 }
 
-int pfs_table::mknod( struct pfs_mount_entry *ns, const char *n, mode_t mode, dev_t dev )
+int pfs_table::mknod( const char *n, mode_t mode, dev_t dev )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,E_OK)) {
+	if(resolve_name(0,n,&pname,E_OK)) {
 		result = pname.service->mknod(&pname,mode,dev);
 	}
 
 	return result;
 }
 
-int pfs_table::mkdir( struct pfs_mount_entry *ns, const char *n, mode_t mode )
+int pfs_table::mkdir( const char *n, mode_t mode )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,E_OK)) {
+	if(resolve_name(0,n,&pname,E_OK)) {
 		result = pname.service->mkdir(&pname,mode);
 	}
 
 	return result;
 }
 
-int pfs_table::rmdir( struct pfs_mount_entry *ns, const char *n )
+int pfs_table::rmdir( const char *n )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,E_OK,false)) {
+	if(resolve_name(0,n,&pname,E_OK,false)) {
 		result = pname.service->rmdir(&pname);
 	}
 
@@ -1709,24 +1708,24 @@ struct dirent * pfs_table::fdreaddir( int fd )
 	return result;
 }
 
-int pfs_table::mkalloc( struct pfs_mount_entry *ns, const char *n, pfs_ssize_t size, mode_t mode )
+int pfs_table::mkalloc( const char *n, pfs_ssize_t size, mode_t mode )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,0,n,&pname,E_OK)) {
+	if(resolve_name(0,n,&pname,E_OK)) {
 		result = pname.service->mkalloc(&pname,size,mode);
 	}
 
 	return result;
 }
 
-int pfs_table::lsalloc( struct pfs_mount_entry *ns, const char *n, char *a, pfs_ssize_t *total, pfs_ssize_t *avail )
+int pfs_table::lsalloc( const char *n, char *a, pfs_ssize_t *total, pfs_ssize_t *avail )
 {
 	pfs_name pname;
 	int result=-1;
 
-	if(resolve_name(ns,1,n,&pname,R_OK)) {
+	if(resolve_name(1,n,&pname,R_OK)) {
 		result = pname.service->lsalloc(&pname,a,total,avail);
 		if(result==0) {
 			strcpy(a,pname.path);
@@ -1736,12 +1735,12 @@ int pfs_table::lsalloc( struct pfs_mount_entry *ns, const char *n, char *a, pfs_
 	return result;
 }
 
-int pfs_table::whoami( struct pfs_mount_entry *ns, const char *n, char *buf, int length )
+int pfs_table::whoami( const char *n, char *buf, int length )
 {
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(ns, 1,n,&pname,F_OK)) {
+	if(resolve_name(1,n,&pname,F_OK)) {
 		result = pname.service->whoami(&pname,buf,length);
 	}
 
@@ -1890,7 +1889,7 @@ static int search_should_recurse(const char *base, const char *pattern)
 
 /* NOTICE: this function's logic should be kept in sync with function of same
  * name in chirp_fs_local.c. */
-static int search_directory(pfs_table *t, struct pfs_mount_entry *ns, const char * const base, char *fullpath, const char *pattern, int flags, char *buffer, size_t len, size_t *i)
+static int search_directory(pfs_table *t, const char * const base, char *fullpath, const char *pattern, int flags, char *buffer, size_t len, size_t *i)
 {
 	if(strlen(pattern) == 0)
 		return 0;
@@ -1902,7 +1901,7 @@ static int search_directory(pfs_table *t, struct pfs_mount_entry *ns, const char
 	int includeroot = flags & PFS_SEARCH_INCLUDEROOT;
 
 	int result = 0;
-	int fd = t->open(ns, fullpath, O_DIRECTORY|O_RDONLY, 0, 0, NULL, 0);
+	int fd = t->open(fullpath, O_DIRECTORY|O_RDONLY, 0, 0, NULL, 0);
 	char *current = fullpath + strlen(fullpath);	/* point to end to current directory */
 
 	if(fd >= 0) {
@@ -1917,13 +1916,13 @@ static int search_directory(pfs_table *t, struct pfs_mount_entry *ns, const char
 				continue;
 			sprintf(current, "/%s", name);
 
-			int stat_result = t->stat(ns,fullpath, &buf);
+			int stat_result = t->stat(fullpath, &buf);
 
 			if(search_match_file(pattern, base)) {
 				const char *matched = includeroot ? fullpath+1 : base; /* fullpath+1 because chirp_root_path is always "./" !! */
 
 				result += 1;
-				if(access_flags == F_OK || t->access(ns,fullpath, access_flags) == 0) {
+				if(access_flags == F_OK || t->access(fullpath, access_flags) == 0) {
 
 					if(metadata) {
 						if(stat_result) {
@@ -1955,7 +1954,7 @@ static int search_directory(pfs_table *t, struct pfs_mount_entry *ns, const char
 			}
 
 			if(stat_result == 0 && S_ISDIR(buf.st_mode) && search_should_recurse(base, pattern)) {
-				int n = search_directory(t, ns, base, fullpath, pattern, flags, buffer, len, i);
+				int n = search_directory(t, base, fullpath, pattern, flags, buffer, len, i);
 				if(n > 0) {
 					result += n;
 					if(stopatfirst)
@@ -2028,7 +2027,7 @@ static int is_pattern (const char *pattern)
 	return 0;
 }
 
-int pfs_table::search( struct pfs_mount_entry *ns, const char *paths, const char *patt, int flags, char *buffer, size_t buffer_length, size_t *i )
+int pfs_table::search( const char *paths, const char *patt, int flags, char *buffer, size_t buffer_length, size_t *i )
 {
 	pfs_name pname;
 	const char *start = paths;
@@ -2075,7 +2074,7 @@ int pfs_table::search( struct pfs_mount_entry *ns, const char *paths, const char
 
 			strcat(directory, pattern);
 
-			result = this->stat(ns,directory, &statbuf);
+			result = this->stat(directory, &statbuf);
 			if (result == 0) {
 				const char *matched;
 				if (flags & PFS_SEARCH_INCLUDEROOT)
@@ -2083,7 +2082,7 @@ int pfs_table::search( struct pfs_mount_entry *ns, const char *paths, const char
 				else
 					matched = base;
 
-				if (access_flags == F_OK || this->access(ns,directory, access_flags) == 0) {
+				if (access_flags == F_OK || this->access(directory, access_flags) == 0) {
 					size_t l = snprintf(buffer+*i, buffer_length-*i, "%s0|%s", *i==0 ? "" : "|", matched);
 
 					if (l >= buffer_length-*i) {
@@ -2113,11 +2112,11 @@ int pfs_table::search( struct pfs_mount_entry *ns, const char *paths, const char
 			}
 		} else {
 			/* Check to see if search is implemented in the service */
-			if(resolve_name(ns,0,path, &pname, X_OK)) {
+			if(resolve_name(0,path, &pname, X_OK)) {
 				debug(D_DEBUG, "attempting service `%s' search routine for path `%s'", pname.service_name, pname.path);
 				if ((result = pname.service->search(&pname, pattern, flags, buffer, buffer_length, i))==-1 && errno == ENOSYS) {
 					debug(D_DEBUG, "no service to search found: falling back to manual search `%s'", directory);
-					result = search_directory(this, ns, directory+strlen(directory), directory, pattern, flags, buffer, buffer_length, i);
+					result = search_directory(this, directory+strlen(directory), directory, pattern, flags, buffer, buffer_length, i);
 				}
 				debug(D_DEBUG, "= %d (`%s' search)", result, pname.service_name);
 			} else
@@ -2135,31 +2134,31 @@ int pfs_table::search( struct pfs_mount_entry *ns, const char *paths, const char
 	return found;
 }
 
-int pfs_table::getacl( struct pfs_mount_entry *ns, const char *n, char *buf, int length )
+int pfs_table::getacl( const char *n, char *buf, int length )
 {
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(ns,0,n,&pname,R_OK)) {
+	if(resolve_name(0,n,&pname,R_OK)) {
 		result = pname.service->getacl(&pname,buf,length);
 	}
 
 	return result;
 }
 
-int pfs_table::setacl( struct pfs_mount_entry *ns, const char *n, const char *subject, const char *rights )
+int pfs_table::setacl( const char *n, const char *subject, const char *rights )
 {
 	pfs_name pname;
 	int result = -1;
 
-	if(resolve_name(ns,0,n,&pname,W_OK)) {
+	if(resolve_name(0,n,&pname,W_OK)) {
 		result = pname.service->setacl(&pname,subject,rights);
 	}
 
 	return result;
 }
 
-int pfs_table::locate( struct pfs_mount_entry *ns, const char *n, char *buf, int length )
+int pfs_table::locate( const char *n, char *buf, int length )
 {
 	static pfs_location *loc = 0;
 	pfs_name pname;
@@ -2170,7 +2169,7 @@ int pfs_table::locate( struct pfs_mount_entry *ns, const char *n, char *buf, int
 		if(loc) delete(loc);
 		loc = 0;
 
-		if(resolve_name(ns,0, n, &pname, X_OK)) {
+		if(resolve_name(0, n, &pname, X_OK)) {
 			loc = pname.service->locate(&pname);
 		}
 	}
@@ -2191,7 +2190,7 @@ int pfs_table::locate( struct pfs_mount_entry *ns, const char *n, char *buf, int
 }
 
 
-pfs_ssize_t pfs_table::copyfile( struct pfs_mount_entry *ns, const char *source, const char *target )
+pfs_ssize_t pfs_table::copyfile( const char *source, const char *target )
 {
 	pfs_name psource, ptarget;
 	pfs_file *sourcefile;
@@ -2204,8 +2203,8 @@ pfs_ssize_t pfs_table::copyfile( struct pfs_mount_entry *ns, const char *source,
 		return -1;
 	}
 
-	if(resolve_name(ns,1,source,&psource,R_OK)<0) return -1;
-	if(resolve_name(ns,1,target,&ptarget,W_OK|E_OK)<0) return -1;
+	if(resolve_name(1,source,&psource,R_OK)<0) return -1;
+	if(resolve_name(1,target,&ptarget,W_OK|E_OK)<0) return -1;
 
 	if(psource.service == ptarget.service) {
 		result = ptarget.service->thirdput(&psource,&ptarget);
@@ -2219,7 +2218,7 @@ pfs_ssize_t pfs_table::copyfile( struct pfs_mount_entry *ns, const char *source,
 
 	if(result<0) {
 		if(errno==ENOSYS || psource.service==ptarget.service) {
-			sourcefile = open_object(ns,source,O_RDONLY,0,0);
+			sourcefile = open_object(source,O_RDONLY,0,0);
 			if(!sourcefile) return -1;
 
 			result = sourcefile->fstat(&info);
@@ -2236,7 +2235,7 @@ pfs_ssize_t pfs_table::copyfile( struct pfs_mount_entry *ns, const char *source,
 				return -1;
 			}
 
-			targetfile = open_object(ns,target,O_WRONLY|O_CREAT|O_TRUNC,0777,0);
+			targetfile = open_object(target,O_WRONLY|O_CREAT|O_TRUNC,0777,0);
 			if(!targetfile) {
 				sourcefile->close();
 				delete sourcefile;
@@ -2298,7 +2297,7 @@ pfs_ssize_t pfs_table::copyfile_slow( pfs_file *sourcefile, pfs_file *targetfile
 	}
 }
 
-int pfs_table::md5( struct pfs_mount_entry *ns, const char *path, unsigned char *digest )
+int pfs_table::md5( const char *path, unsigned char *digest )
 {
 	pfs_name pname;
 	int result;
@@ -2308,18 +2307,18 @@ int pfs_table::md5( struct pfs_mount_entry *ns, const char *path, unsigned char 
 		return -1;
 	}
 
-	if(resolve_name(ns,1,path,&pname,R_OK)<0) return -1;
+	if(resolve_name(1,path,&pname,R_OK)<0) return -1;
 
 	result = pname.service->md5(&pname,digest);
 
 	if(result<0 && errno==ENOSYS) {
-		result = md5_slow(ns,path,digest);
+		result = md5_slow(path,digest);
 	}
 
 	return result;
 }
 
-int pfs_table::md5_slow( struct pfs_mount_entry *ns, const char *path, unsigned char *digest )
+int pfs_table::md5_slow( const char *path, unsigned char *digest )
 {
 	md5_context_t context;
 	pfs_file *file;
@@ -2328,7 +2327,7 @@ int pfs_table::md5_slow( struct pfs_mount_entry *ns, const char *path, unsigned 
 	pfs_off_t total=0;
 	int result;
 
-	file = open_object(ns,path,O_RDONLY,0,0);
+	file = open_object(path,O_RDONLY,0,0);
 	if(!file) return -1;
 
 	buffer_size = file->get_block_size();

@@ -244,7 +244,6 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 	child->nsyscalls = 0;
 	child->completing_execve = 0;
 	child->exefd = -1;
-	child->ns = NULL;
 
 	if(parent) {
 		child->ppid = parent->pid;
