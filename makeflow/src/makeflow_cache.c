@@ -31,8 +31,11 @@ void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*i
   // add checksum of the node's input files together
   list_first_item(inputs);
   while((f = list_next_item(inputs))) {
-    sha1_file(f->filename, digest);
-    cache_id = string_combine(cache_id, sha1_string(digest));
+    if (f->cache_id == NULL) {
+      sha1_file(f->filename, digest);
+      f->cache_id = xxstrdup(sha1_string(digest));
+    }
+    cache_id = string_combine(cache_id, f->cache_id);
   }
 
   sha1_buffer(command, strlen(command), digest);
