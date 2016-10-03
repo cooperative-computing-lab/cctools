@@ -8,6 +8,7 @@ import threading
 # variables need to be synchronized between threads
 tasks_info_dict = {}
 executors_info_dict = {}
+tasks_failed_time = {}
 lock = threading.RLock()
 offers_queue = Queue.Queue()
 # default makeflow working directory
