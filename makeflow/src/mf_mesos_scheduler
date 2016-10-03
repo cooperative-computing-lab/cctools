@@ -24,8 +24,8 @@ FILE_TASK_STATE = "mesos_task_state"
 MF_DONE_FILE = "makeflow_done"
 
 TASK_CPUS = 1
-TASK_MEM = 32
-# RETRY_TIMES = 3
+TASK_MEM = 300
+MAX_FAILED = 3
 
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
@@ -41,23 +41,23 @@ class MakeflowScheduler(Scheduler):
         cctools_path = os.getenv('CCTOOLS')
         sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor')
 
-        task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
-        task_cmd_f = open(task_cmd_sh, "w+")
-        task_cmd_f.write(mf_task.cmd)
-        task_cmd_f.close()
-        os.chmod(task_cmd_sh, 0755)
+        #task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
+        #task_cmd_f = open(task_cmd_sh, "w+")
+        #task_cmd_f.write(mf_task.cmd)
+        #task_cmd_f.close()
+        #os.chmod(task_cmd_sh, 0755)
 
-        uri = executor.command.uris.add()
-        uri.value = os.path.join(os.getcwd(), task_cmd_sh)
-        uri.executable = True
-        uri.extract = False
+        #uri = executor.command.uris.add()
+        #uri.value = os.path.join(os.getcwd(), task_cmd_sh)
+        #uri.executable = True
+        #uri.extract = False
 
         executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
         executor.source = "python executor"
-        executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
-                executor.executor_id.value, executor.framework_id.value, sys.argv[3])
-        #executor.command.value = "{0} \"{1}\" {2} {3} {4}".format(sh_path, mf_task.cmd, 
+        #executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
         #        executor.executor_id.value, executor.framework_id.value, sys.argv[3])
+        executor.command.value = "{0} \"{1}\" {2} {3} {4}".format(sh_path, mf_task.cmd, 
+                executor.executor_id.value, executor.framework_id.value, sys.argv[3])
 
         cpus = executor.resources.add()
         cpus.name = "cpus"
@@ -77,15 +77,8 @@ class MakeflowScheduler(Scheduler):
         # add input files list to the executor_info
         for fn in mf_task.inp_fns:
 
+            logging.info("input file is: {0}".format(fn.strip(' \t\n\r')))
             uri = executor.command.uris.add()
-
-            #while(1):
-            #    if os.path.exists(fn):
-            #        break 
-            #    else:
-            #        logging.info("Input {0} of task {1} is not ready".format(fn, mf_task.task_id))
-            #        time.sleep(1)
-                 
 
             # if input file is a directory, compress it
             if os.path.isdir(fn):
@@ -93,18 +86,21 @@ class MakeflowScheduler(Scheduler):
                 dir_name = os.path.dirname(fn)
                 base_fn = os.path.basename(fn)
                 compressed_fn = "{0}.tar.gz".format(base_fn)
-                tar = tarfile.open(compressed_fn, "w:gz")
-                tar.add(base_fn)
-                tar.close()
+                if not os.path.exists(compressed_fn):
+                    logging.info("The compressed file for {0} is not exist".format(fn)) 
+                    tar = tarfile.open(compressed_fn, "w:gz")
+                    tar.add(base_fn)
+                    tar.close()
+                else:
+                    logging.info("The compressed file for {0} is exist".format(fn)) 
                 fn = os.path.join(dir_name, compressed_fn)
+                uri.value = fn.strip(' \t\n\r')
                 uri.extract = True
+                # uri.cache = True
             else:
+                uri.value = fn.strip(' \t\n\r')
                 uri.extract = False
-
-            logging.info("input file is: {0}".format(fn.strip(' \t\n\r')))
-            uri.value = fn.strip(' \t\n\r')
-            uri.executable = False
-            # uri.cache = True
+                uri.executable = True
 
         return executor
     
@@ -215,13 +211,15 @@ class MakeflowScheduler(Scheduler):
                
     def clean_mesos_file(self, task_id): 
         mf_task = mms.tasks_info_dict[task_id]
-        os.remove("task_{0}_cmd".format(task_id))
-        for fn in mf_task.inp_fns:
-            if os.path.isdir(fn):
-                logging.info("{0} is a directory, remove the tar.gz file".format(fn))
-                compressed_fn = "{0}.tar.gz".format(fn)
-                if os.path.isfile(compressed_fn):
-                    os.remove(compressed_fn)
+        #  TODO do not remove the file, if it is not exist
+        if os.path.isfile("task_{0}_cmd".format(task_id)):
+            os.remove("task_{0}_cmd".format(task_id))
+        #for fn in mf_task.inp_fns:
+        #    if os.path.isdir(fn):
+        #        logging.info("{0} is a directory, remove the tar.gz file".format(fn))
+        #        compressed_fn = "{0}.tar.gz".format(fn)
+        #        if os.path.isfile(compressed_fn):
+        #            os.remove(compressed_fn)
         
     def statusUpdate(self, driver, update):
         if os.path.isfile(FILE_TASK_STATE): 
@@ -233,10 +231,73 @@ class MakeflowScheduler(Scheduler):
         with mms.lock:
             if update.state == mesos_pb2.TASK_STAGING:
                 logging.info("{0} is running".format(update.task_id.value))
+
             if update.state == mesos_pb2.TASK_STARTING:
                 logging.info("{0} is starting".format(update.task_id.value))
+
             if update.state == mesos_pb2.TASK_RUNNING:
                 logging.info("{0} is running".format(update.task_id.value))
+
+            if update.state == mesos_pb2.TASK_FINISHED:
+                logging.info("Task {0} is finished by executor.".format(update.task_id.value))
+                message = update.message
+                logging.info("Receive message {0}".format(update.message))
+                message_list = message.split()
+
+                if message_list[0].strip(' \t\n\r') == "[EXECUTOR_OUTPUT]":
+
+                    if os.path.isfile(FILE_TASK_STATE): 
+                        oup_fn = open(FILE_TASK_STATE, "a", 0)
+                    else:
+                        logging.error("{0} is not created in advanced".format(FILE_TASK_STATE))
+                        exit(1)
+
+                    output_file_dir = message_list[1].strip(' \t\n\r')
+                    curr_task_id = message_list[3].strip(' \t\n\r')
+
+                    output_fns = mms.tasks_info_dict[curr_task_id].oup_fns
+
+                    for output_fn in output_fns:
+                        output_file_addr = "{0}/{1}".format(output_file_dir, output_fn)
+                        logging.info("The output file address is: {0}".format(\
+                                output_file_addr))
+                        urllib.urlretrieve(output_file_addr, output_fn)
+
+                        if os.path.exists(output_fn):
+                            logging.info("Task {0} get output file {1}".format(curr_task_id, \
+                            output_fn))
+                        else:
+                            logging.error("Task {0} is failed because it cannot get \
+                            output file {1}".format(curr_task_id, output_fn))
+                            oup_fn.write("{0},failed\n".format(curr_task_id))  
+                            mms.tasks_info_dict[update.task_id.value].action = "failed"
+                            self.clean_mesos_file(update.task_id.value)  
+                            return 
+
+                    oup_fn.write("{0},finished\n".format(curr_task_id))
+                    mms.tasks_info_dict[curr_task_id].action = "finished"
+                    self.clean_mesos_file(curr_task_id)
+
+                    oup_fn.close()
+
+            if update.state == mesos_pb2.TASK_FAILED:
+                failed_task_id = update.task_id.value
+                logging.info("Task {0} failed with reason code {1}.".format(failed_task_id, update.reason))
+                if failed_task_id in mms.tasks_failed_time:
+                    if mms.tasks_failed_time[failed_task_id] <= MAX_FAILED:
+                        mms.tasks_failed_time[failed_task_id] += 1
+                        mms.tasks_info_dict[failed_task_id].action = "resubmitted"
+                        logging.info("Task {0} has been failed {1} times". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
+                        logging.info("Try to resubmit failed task {0}".format(failed_task_id))
+                    else:
+                        oup_fn.write("{0},failed\n".format(failed_task_id))
+                        mms.tasks_info_dict[failed_task_id].action = "failed"
+                        self.clean_mesos_file(failed_task_id)
+                else:  
+                    mms.tasks_failed_time[failed_task_id] = 1
+                    mms.tasks_info_dict[failed_task_id].action = "resubmitted"
+                    logging.info("Task {0} has been failed 1 time". format(failed_task_id)) 
+                    logging.info("Try to resubmit failed task {0}".format(failed_task_id))
 
             if update.state == mesos_pb2.TASK_KILLED:
                 oup_fn.write("{0},killed\n".format(update.task_id.value))
@@ -247,49 +308,22 @@ class MakeflowScheduler(Scheduler):
             if update.state == mesos_pb2.TASK_LOST:
                 oup_fn.write("{0},lost\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "lost"
-                logging.error("{0}".format(update.message))
+                logging.error("Task {0} lost with error message: {1}".format(update.task_id.value,\
+                 update.message))
                 self.clean_mesos_file(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_ERROR:
-                #if mms.tasks_info_dict[update.task_id.value].num_exe >= RETRY_TIMES:
-                #    oup_fn.write("{0},error\n".format(update.task_id.value))
-                #    mms.tasks_info_dict[update.task_id.value].action = "error"
-                #else:
                 mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
-                #    mms.tasks_info_dict[update.task_id.value].num_exe += 1
                 logging.info("{0} try to resubmit task {1}".format(update.message,\
                     update.task_id.value))
-                logging.error("{0}".format(update.message))
-
-            if update.state == mesos_pb2.TASK_FAILED:
-                oup_fn.write("{0},failed\n".format(update.task_id.value))
-                logging.info("Executor failed with reason code {0}.".format(update.reason))
-                mms.tasks_info_dict[update.task_id.value].action = "failed"
-                self.clean_mesos_file(update.task_id.value)
-
-            if update.state == mesos_pb2.TASK_FINISHED:
-                oup_fn.write("{0},finished\n".format(update.task_id.value))
-                mms.tasks_info_dict[update.task_id.value].action = "finished"
-                self.clean_mesos_file(update.task_id.value)
+                logging.error("Task {0} fail with error message: {1}".format(update.task_id.value,\
+                 update.message))
         
         oup_fn.close()
 
     def frameworkMessage(self, driver, executorId, slaveId, message):
         logging.info("Receive message {0}".format(message))
         message_list = message.split()
-
-        if message_list[0].strip(' \t\n\r') == "[EXECUTOR_OUTPUT]":
-            output_file_dir = message_list[1].strip(' \t\n\r')
-            curr_task_id = message_list[3].strip(' \t\n\r')
-
-            with mms.lock:
-                output_fns = mms.tasks_info_dict[curr_task_id].oup_fns
-                for output_fn in output_fns:
-                    output_file_addr = "{0}/{1}".format(output_file_dir, output_fn)
-                    logging.info("The output file address is: {0}".format(\
-                            output_file_addr))
-                    urllib.urlretrieve(output_file_addr, output_fn)
-        
         if message_list[0].strip(' \t\n\r') == "[EXECUTOR_STATE]":
             curr_executor_id = message_list[1].strip(' \t\n\r')
             curr_executor_state = message_list[2].strip(' \t\n\r')
@@ -365,12 +399,12 @@ class MakefowMonitor(threading.Thread):
             fn_run_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_INFO)
             fn_finish_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_STATE)
 
-            if os.path.isfile(mf_done_fn_path):
-                os.remove(mf_done_fn_path)
-            if os.path.isfile(fn_run_tks_path):
-                os.remove(fn_run_tks_path)
-            if os.path.isfile(fn_finish_tks_path):
-                os.remove(fn_finish_tks_path)
+            #if os.path.isfile(mf_done_fn_path):
+            #    os.remove(mf_done_fn_path)
+            #if os.path.isfile(fn_run_tks_path):
+            #    os.remove(fn_run_tks_path)
+            #if os.path.isfile(fn_finish_tks_path):
+            #    os.remove(fn_finish_tks_path)
            
             while(not self.is_all_executor_stopped()):
                 pass
