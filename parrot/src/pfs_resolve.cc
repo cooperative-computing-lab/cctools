@@ -57,19 +57,22 @@ void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mod
 {
 	char real_redirect[PFS_PATH_MAX];
 
-	switch (pfs_resolve(redirect, real_redirect, mode, 0)) {
-	case PFS_RESOLVE_CHANGED:
-	case PFS_RESOLVE_UNCHANGED:
-		break;
-	default:
-		debug(D_RESOLVE,"couldn't resolve redirect %s",prefix);
-		return;
+	struct pfs_mount_entry **cur = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
+	if (cur != &mount_list) {
+		debug(D_RESOLVE,"mount ns is forked, resolving %s->%s",prefix,redirect);
+		switch (pfs_resolve(redirect, real_redirect, mode, 0)) {
+		case PFS_RESOLVE_CHANGED:
+		case PFS_RESOLVE_UNCHANGED:
+			break;
+		default:
+			debug(D_RESOLVE,"couldn't resolve redirect %s",prefix);
+			return;
+		}
 	}
 
-	struct pfs_mount_entry **cur = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
 	struct pfs_mount_entry *m = (struct pfs_mount_entry *) xxmalloc(sizeof(*m));
 	strcpy(m->prefix,prefix);
-	strcpy(m->redirect,real_redirect);
+	strcpy(m->redirect,cur == &mount_list ? redirect : real_redirect);
 	m->mode = mode;
 	m->next = *cur;
 	*cur = m;
@@ -347,11 +350,11 @@ void clean_up_path( char *path )
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
 {
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
-	struct pfs_mount_entry *e;
+	struct pfs_mount_entry *e = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
 	const char *t;
 	char lookup_key[PFS_PATH_MAX + 3 * sizeof(int) + 1];
 
-	sprintf(lookup_key, "%o|%s", mode, logical_name);
+	sprintf(lookup_key, "%o|%p|%s", mode, e, logical_name);
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
@@ -360,7 +363,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 		strcpy(physical_name,t);
 		result = PFS_RESOLVE_CHANGED;
 	} else {
-		for(e=mount_list;e;e=e->next) {
+		for(;e;e=e->next) {
 			result = mount_entry_check(logical_name,e->prefix,e->redirect,physical_name);
 			if(result!=PFS_RESOLVE_UNCHANGED) {
 				if ((mode & e->mode) != mode) {
