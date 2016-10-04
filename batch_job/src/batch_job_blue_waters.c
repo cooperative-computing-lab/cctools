@@ -14,11 +14,11 @@
 
 #include <sys/stat.h>
 
-static char * blue_waters_name = NULL;
-static char * blue_waters_submit_cmd = NULL;
-static char * blue_waters_remove_cmd = NULL;
-static char * blue_waters_options = NULL;
-static char * blue_waters_jobname_var = NULL;
+static char * cluster_name = NULL;
+static char * cluster_submit_cmd = NULL;
+static char * cluster_remove_cmd = NULL;
+static char * cluster_options = NULL;
+static char * cluster_jobname_var = NULL;
 
 /*
 Principle of operation:
@@ -32,7 +32,7 @@ support precise passing of command line arguments.
 
 The wrapper then writes a status file, which indicates the
 starting and ending time of the task to a known log file,
-which batch_job_blue_waters_wait then periodically polls to observe completion.
+which batch_job_cluster_wait then periodically polls to observe completion.
 While this is not particularly elegant, there is no widely
 portable API for querying the state of a batch job in PBS-like systems.
 This method is simple, cheap, and reasonably effective.
@@ -87,15 +87,15 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname, const
 	return 1;
 }
 
-static batch_job_id_t batch_job_blue_waters_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, struct rmsummary *resources )
+static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
 	struct batch_job_info *info;
 	const char *options = hash_table_lookup(q->options, "batch-options");
 	const char *task_num = hash_table_lookup(q->options, "task-id");
-	char *wrapper_name = string_format("%s.wrapper%s%s", blue_waters_name, task_num ? "." : "",	task_num ? task_num : "");
+	char *wrapper_name = string_format("%s.wrapper%s%s", cluster_name, task_num ? "." : "",	task_num ? task_num : "");
 
-	if(!setup_batch_wrapper(q, blue_waters_name, cmd, task_num)) {
+	if(!setup_batch_wrapper(q, cluster_name, cmd, task_num)) {
 		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
 		return 0;
 	}
@@ -126,9 +126,9 @@ static batch_job_id_t batch_job_blue_waters_submit (struct batch_queue * q, cons
 	*/
 
 	char *command = string_format("%s %s %s '%s' %s %s",
-		blue_waters_submit_cmd,
-		blue_waters_options,
-		blue_waters_jobname_var,
+		cluster_submit_cmd,
+		cluster_options,
+		cluster_jobname_var,
 		path_basename(name),
 		options ? options : "",
 		wrapper_name);
@@ -166,7 +166,7 @@ static batch_job_id_t batch_job_blue_waters_submit (struct batch_queue * q, cons
 	if(strlen(line)) {
 		debug(D_NOTICE, "job submission failed: %s", line);
 	} else {
-		debug(D_NOTICE, "job submission failed: no output from %s", blue_waters_name);
+		debug(D_NOTICE, "job submission failed: no output from %s", cluster_name);
 	}
 	pclose(file);
 	unlink(wrapper_name);
@@ -174,7 +174,7 @@ static batch_job_id_t batch_job_blue_waters_submit (struct batch_queue * q, cons
 	return -1;
 }
 
-static batch_job_id_t batch_job_blue_waters_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_job_id_t batch_job_cluster_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	struct batch_job_info *info;
 	batch_job_id_t jobid;
@@ -185,7 +185,7 @@ static batch_job_id_t batch_job_blue_waters_wait (struct batch_queue * q, struct
 		itable_firstkey(q->job_table);
 		while(itable_nextkey(q->job_table, &ujobid, (void **) &info)) {
 			jobid = ujobid;
-			char *statusfile = string_format("%s.status.%" PRIbjid, blue_waters_name, jobid);
+			char *statusfile = string_format("%s.status.%" PRIbjid, cluster_name, jobid);
 			FILE *file = fopen(statusfile, "r");
 			if(file) {
 				char line[BATCH_JOB_LINE_MAX];
@@ -233,7 +233,7 @@ static batch_job_id_t batch_job_blue_waters_wait (struct batch_queue * q, struct
 	return -1;
 }
 
-static int batch_job_blue_waters_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_cluster_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
 	struct batch_job_info *info;
 
@@ -248,59 +248,84 @@ static int batch_job_blue_waters_remove (struct batch_queue *q, batch_job_id_t j
 	info->exited_normally = 0;
 	info->exit_signal = 1;
 
-	char *command = string_format("%s %" PRIbjid, blue_waters_remove_cmd, jobid);
+	char *command = string_format("%s %" PRIbjid, cluster_remove_cmd, jobid);
 	system(command);
 	free(command);
 
 	return 1;
 }
 
-static int batch_queue_blue_waters_create (struct batch_queue *q)
+static int batch_queue_cluster_create (struct batch_queue *q)
 {
-	blue_waters_name = blue_waters_submit_cmd = blue_waters_remove_cmd = blue_waters_options = blue_waters_jobname_var = NULL;
+	if(cluster_name)
+		free(cluster_name);
+	if(cluster_submit_cmd)
+		free(cluster_submit_cmd);
+	if(cluster_remove_cmd)
+		free(cluster_remove_cmd);
+	if(cluster_options)
+		free(cluster_options);
+	if(cluster_jobname_var)
+		free(cluster_jobname_var);
 
-	blue_waters_name = strdup("blue_waters");
-	blue_waters_submit_cmd = strdup("qsub");
-	blue_waters_remove_cmd = strdup("qdel");
-	blue_waters_options = strdup("-o /dev/null -j oe");
-	blue_waters_jobname_var = strdup("-N");
+	cluster_name = cluster_submit_cmd = cluster_remove_cmd = cluster_options = cluster_jobname_var = NULL;
 
-	return 0;
+	cluster_name = strdup("blue_waters");
+	cluster_submit_cmd = strdup("qsub");
+	cluster_remove_cmd = strdup("qdel");
+	cluster_options = strdup("-l nodes=1:ppn=1 -o /dev/null -j oe");
+	cluster_jobname_var = strdup("-N");
+
+	if(cluster_name && cluster_submit_cmd && cluster_remove_cmd && cluster_options && cluster_jobname_var)
+		return 0;
+
+	if(!cluster_name)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_NAME unset\n");
+	if(!cluster_submit_cmd)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND unset\n");
+	if(!cluster_remove_cmd)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_REMOVE_COMMAND unset\n");
+	if(!cluster_options)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS unset\n");
+	if(!cluster_jobname_var)
+		debug(D_NOTICE, "Environment variable BATCH_QUEUE_CLUSTER_SUBMIT_JOBNAME_VAR unset\n");
+
+	return -1;
 }
 
-batch_queue_stub_free(blue_waters);
-batch_queue_stub_port(blue_waters);
-batch_queue_stub_option_update(blue_waters);
+batch_queue_stub_free(cluster);
+batch_queue_stub_port(cluster);
+batch_queue_stub_option_update(cluster);
 
-batch_fs_stub_chdir(blue_waters);
-batch_fs_stub_getcwd(blue_waters);
-batch_fs_stub_mkdir(blue_waters);
-batch_fs_stub_putfile(blue_waters);
-batch_fs_stub_stat(blue_waters);
-batch_fs_stub_unlink(blue_waters);
+batch_fs_stub_chdir(cluster);
+batch_fs_stub_getcwd(cluster);
+batch_fs_stub_mkdir(cluster);
+batch_fs_stub_putfile(cluster);
+batch_fs_stub_stat(cluster);
+batch_fs_stub_unlink(cluster);
 
 const struct batch_queue_module batch_queue_blue_waters = {
 	BATCH_QUEUE_TYPE_BLUE_WATERS,
 	"blue_waters",
 
-	batch_queue_blue_waters_create,
-	batch_queue_blue_waters_free,
-	batch_queue_blue_waters_port,
-	batch_queue_blue_waters_option_update,
+	batch_queue_cluster_create,
+	batch_queue_cluster_free,
+	batch_queue_cluster_port,
+	batch_queue_cluster_option_update,
 
 	{
-		batch_job_blue_waters_submit,
-		batch_job_blue_waters_wait,
-		batch_job_blue_waters_remove,
+		batch_job_cluster_submit,
+		batch_job_cluster_wait,
+		batch_job_cluster_remove,
 	},
 
 	{
-		batch_fs_blue_waters_chdir,
-		batch_fs_blue_waters_getcwd,
-		batch_fs_blue_waters_mkdir,
-		batch_fs_blue_waters_putfile,
-		batch_fs_blue_waters_stat,
-		batch_fs_blue_waters_unlink,
+		batch_fs_cluster_chdir,
+		batch_fs_cluster_getcwd,
+		batch_fs_cluster_mkdir,
+		batch_fs_cluster_putfile,
+		batch_fs_cluster_stat,
+		batch_fs_cluster_unlink,
 	},
 };
 
