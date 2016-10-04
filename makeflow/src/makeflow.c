@@ -521,6 +521,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		free(batch_options);
 	}
 
+	batch_queue_set_int_option(queue, "task-id", n->nodeid);
+
 	/* Generate the environment vars specific to this node. */
 	struct jx *envlist = dag_node_env_create(d,n);
 
