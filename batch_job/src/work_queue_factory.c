@@ -953,8 +953,18 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	/*
+	Careful here: most of the supported batch systems expect
+	that jobs are submitting from a single shared filesystem.
+	Changing to /tmp only works in the case of Condor.
+	*/
+
 	if(!scratch_dir) {
-		scratch_dir = string_format("/tmp/wq-pool-%d",getuid());
+		if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
+			scratch_dir = string_format("/tmp/wq-pool-%d",getuid());
+		} else {
+			scratch_dir = string_format("wq-pool-%d",getuid());
+		}
 	}
 
 	if(!create_dir(scratch_dir,0777)) {
