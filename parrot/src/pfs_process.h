@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "pfs_types.h"
 #include "pfs_table.h"
 #include "pfs_sysdeps.h"
+#include "pfs_resolve.h"
 
 extern "C" {
 #include "int_sizes.h"
@@ -45,6 +46,7 @@ struct pfs_process {
 	int ngroups;
 	mode_t umask;
 	int flags;
+	struct pfs_mount_entry *ns;
 
 	enum pfs_process_state state;
 	uint64_t nsyscalls;

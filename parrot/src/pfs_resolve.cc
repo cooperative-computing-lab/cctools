@@ -8,11 +8,15 @@ See the file COPYING for details.
 #include "pfs_resolve.h"
 
 #include "pfs_types.h"
+#include "pfs_process.h"
+
+extern "C" {
+#include "parrot_client.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
-#include "parrot_client.h"
+}
 
 #include <stdio.h>
 #include <unistd.h>
@@ -31,15 +35,9 @@ Some things that could be cleaned up in this code:
 */
 
 extern char pfs_temp_dir[PFS_PATH_MAX];
+extern struct pfs_process *pfs_current;
 
-struct mount_entry {
-	char prefix[PFS_PATH_MAX];
-	char redirect[PFS_PATH_MAX];
-	mode_t mode;
-	struct mount_entry *next;
-};
-
-static struct mount_entry * mount_list = 0;
+static struct pfs_mount_entry * mount_list = 0;
 static struct hash_table *resolve_cache = 0;
 
 static void pfs_resolve_cache_flush()
@@ -55,11 +53,11 @@ static void pfs_resolve_cache_flush()
 	}
 }
 
-void pfs_resolve_add_entry( struct pfs_mount_entry **ns, const char *prefix, const char *redirect, mode_t mode )
+void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	char real_redirect[PFS_PATH_MAX];
 
-	switch (pfs_resolve(*ns, redirect, real_redirect, mode, 0)) {
+	switch (pfs_resolve(redirect, real_redirect, mode, 0)) {
 	case PFS_RESOLVE_CHANGED:
 	case PFS_RESOLVE_UNCHANGED:
 		break;
@@ -68,25 +66,27 @@ void pfs_resolve_add_entry( struct pfs_mount_entry **ns, const char *prefix, con
 		return;
 	}
 
-	struct pfs_mount_entry *m = xxmalloc(sizeof(*m));
+	struct pfs_mount_entry **cur = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
+	struct pfs_mount_entry *m = (struct pfs_mount_entry *) xxmalloc(sizeof(*m));
 	strcpy(m->prefix,prefix);
 	strcpy(m->redirect,real_redirect);
 	m->mode = mode;
-	m->next = mount_list;
-	mount_list = m;
+	m->next = *cur;
+	*cur = m;
 	pfs_resolve_cache_flush();
 }
 
 int pfs_resolve_remove_entry( const char *prefix )
 {
-	struct mount_entry *m, *p=0;
+	struct pfs_mount_entry *m, *p=0;
+	struct pfs_mount_entry **cur = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
 
-	for(m=mount_list;m;p=m,m=m->next) {
+	for(m=*cur;m;p=m,m=m->next) {
 		if(!strcmp(m->prefix,prefix)) {
 			if(p) {
-				p->next = m->next;			
+				p->next = m->next;
 			} else {
-				mount_list = m->next;
+				*cur = m->next;
 			}
 			free(m);
 			pfs_resolve_cache_flush();
@@ -114,22 +114,22 @@ mode_t pfs_resolve_parse_mode( const char * options ) {
 	return mode;
 }
 
-void pfs_resolve_manual_config( struct pfs_mount_entry **ns, const char *str, int forward  )
+void pfs_resolve_manual_config( const char *str, int forward  )
 {
 	char *e;
 	str = xxstrdup(str);
-	e = strchr(str,'=');
+	e = strchr((char *) str,'=');
 	if(!e) fatal("badly formed mount string: %s",str);
 	*e = 0;
 	e++;
 	if (forward) {
 		if (parrot_mount(str, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
 	} else {
-		pfs_resolve_add_entry(ns,str,e,R_OK|W_OK|X_OK);
+		pfs_resolve_add_entry(str,e,R_OK|W_OK|X_OK);
 	}
 }
 
-void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile, int forward )
+void pfs_resolve_file_config( const char *mountfile, int forward )
 {
 	FILE *file;
 	char line[PFS_LINE_MAX];
@@ -140,8 +140,8 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 	int linenum=0;
 	int mode;
 
-	file = fopen(filename,"r");
-	if(!file) fatal("couldn't open mountfile %s: %s\n",filename,strerror(errno));
+	file = fopen(mountfile,"r");
+	if(!file) fatal("couldn't open mountfile %s: %s\n",mountfile,strerror(errno));
 
 	while(1) {
 		if(!fgets(line,sizeof(line),file)) {
@@ -160,7 +160,7 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 		if(fields==0) {
 			continue;
 		} else if(fields<2) {
-			fatal("%s has an error on line %d\n",filename,linenum);
+			fatal("%s has an error on line %d\n",mountfile,linenum);
 		} else if(fields==2) {
 			mode = pfs_resolve_parse_mode(redirect);
 			if(mode < 0) {
@@ -168,24 +168,24 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 				if (forward) {
 					if (parrot_mount(prefix, redirect, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
 				} else {
-					pfs_resolve_add_entry(ns,prefix,redirect,mode);
+					pfs_resolve_add_entry(prefix,redirect,mode);
 				}
 			} else {
 				if (forward) {
 					if (parrot_mount(prefix, prefix, redirect) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
 				} else {
-					pfs_resolve_add_entry(ns,prefix,prefix,mode);
+					pfs_resolve_add_entry(prefix,prefix,mode);
 				}
 			}
 		} else {
 			mode = pfs_resolve_parse_mode(options);
 			if(mode < 0) {
-				fatal("%s has invalid options on line %d\n",filename,linenum);
+				fatal("%s has invalid options on line %d\n",mountfile,linenum);
 			}
 			if (forward) {
 				if (parrot_mount(prefix, redirect, options) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
 			} else {
-				pfs_resolve_add_entry(ns,prefix,redirect,mode);
+				pfs_resolve_add_entry(prefix,redirect,mode);
 			}
 		}
 	}
@@ -193,7 +193,7 @@ void pfs_resolve_file_config( struct pfs_mount_entry **ns, const char *mountfile
 	fclose(file);
 }
 
-int pfs_resolve_external( const char *logical_name, const char *prefix, const char *redirect, char *physical_name )
+pfs_resolve_t pfs_resolve_external( const char *logical_name, const char *prefix, const char *redirect, char *physical_name )
 {
 	char cmd[PFS_PATH_MAX];
 	FILE *file;
@@ -347,7 +347,7 @@ void clean_up_path( char *path )
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
 {
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
-	struct mount_entry *e;
+	struct pfs_mount_entry *e;
 	const char *t;
 	char lookup_key[PFS_PATH_MAX + 3 * sizeof(int) + 1];
 
@@ -355,7 +355,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
-	t = hash_table_lookup(resolve_cache,lookup_key);
+	t = (const char *) hash_table_lookup(resolve_cache,lookup_key);
 	if(t) {
 		strcpy(physical_name,t);
 		result = PFS_RESOLVE_CHANGED;
@@ -405,7 +405,7 @@ int pfs_resolve_dissociate( struct pfs_mount_entry **ns ) {
 	if (mount_list) {
 		*ns = pfs_resolve_copy_namespace(mount_list);
 	} else {
-		*ns = xxmalloc(sizeof(**ns));
+		*ns = (struct pfs_mount_entry *) xxmalloc(sizeof(**ns));
 		strcpy((*ns)->prefix,"/");
 		strcpy((*ns)->redirect,"/");
 		(*ns)->mode = R_OK|W_OK|X_OK;
@@ -416,7 +416,7 @@ int pfs_resolve_dissociate( struct pfs_mount_entry **ns ) {
 
 struct pfs_mount_entry *pfs_resolve_copy_namespace(struct pfs_mount_entry *ns) {
 	if (!ns) return NULL;
-	struct pfs_mount_entry *result = xxmalloc(sizeof(*result));
+	struct pfs_mount_entry *result = (struct pfs_mount_entry *) xxmalloc(sizeof(*result));
 	memcpy(result, ns, sizeof(*result));
 	result->next = pfs_resolve_copy_namespace(ns->next);
 	return result;

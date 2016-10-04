@@ -24,6 +24,7 @@ int pfs_dispatch64( struct pfs_process *p )
 #include "pfs_dispatch.h"
 #include "pfs_pointer.h"
 #include "pfs_process.h"
+#include "pfs_resolve.h"
 #include "pfs_service.h"
 #include "pfs_sys.h"
 #include "pfs_time.h"

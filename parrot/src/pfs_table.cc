@@ -17,10 +17,10 @@ See the file COPYING for details.
 #include "pfs_mmap.h"
 #include "pfs_process.h"
 #include "pfs_file_cache.h"
+#include "pfs_resolve.h"
 
 extern "C" {
 #include "pfs_channel.h"
-#include "pfs_resolve.h"
 
 #include "buffer.h"
 #include "debug.h"

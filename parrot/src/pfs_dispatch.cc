@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "pfs_dispatch.h"
 #include "pfs_pointer.h"
 #include "pfs_process.h"
+#include "pfs_resolve.h"
 #include "pfs_service.h"
 #include "pfs_sys.h"
 #include "pfs_sysdeps.h"

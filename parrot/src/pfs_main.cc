@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
 #include "pfs_process.h"
+#include "pfs_resolve.h"
 #include "pfs_service.h"
 #include "pfs_table.h"
 #include "pfs_time.h"
@@ -40,7 +41,6 @@ extern "C" {
 #include "itable.h"
 #include "md5.h"
 #include "password_cache.h"
-#include "pfs_resolve.h"
 #include "random.h"
 #include "stringtools.h"
 #include "string_array.h"
@@ -696,10 +696,10 @@ int main( int argc, char *argv[] )
 	if(s) pfs_service_set_block_size(string_metric_parse(s));
 
 	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(NULL, s, parrot_in_parrot);
+	if(s) pfs_resolve_file_config(s, parrot_in_parrot);
 
 	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(NULL, s, parrot_in_parrot);
+	if(s) pfs_resolve_manual_config(s, parrot_in_parrot);
 
 	s = getenv("PARROT_FORCE_STREAM");
 	if(s) pfs_force_stream = 1;
@@ -925,10 +925,10 @@ int main( int argc, char *argv[] )
 			snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", optarg);
 			break;
 		case 'm':
-			pfs_resolve_file_config(NULL, optarg, parrot_in_parrot);
+			pfs_resolve_file_config(optarg, parrot_in_parrot);
 			break;
 		case 'M':
-			pfs_resolve_manual_config(NULL, optarg, parrot_in_parrot);
+			pfs_resolve_manual_config(optarg, parrot_in_parrot);
 			break;
 		case 'n':
 			if(access(optarg, F_OK) != -1) {

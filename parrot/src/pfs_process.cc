@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "pfs_channel.h"
 #include "pfs_paranoia.h"
 #include "pfs_process.h"
+#include "pfs_resolve.h"
 
 extern "C" {
 #include "debug.h"
@@ -244,6 +245,7 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 	child->nsyscalls = 0;
 	child->completing_execve = 0;
 	child->exefd = -1;
+	child->ns = NULL;
 
 	if(parent) {
 		child->ppid = parent->pid;
