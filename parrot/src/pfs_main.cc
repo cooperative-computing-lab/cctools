@@ -682,7 +682,6 @@ int main( int argc, char *argv[] )
 		char buf[4096];
 		if (parrot_version(buf, sizeof(buf)) >= 0) {
 			fprintf(stderr, "Warning: running Parrot inside itself.\n");
-			fprintf(stderr, "Most features are not available.\n");
 			parrot_in_parrot = 1;
 			if (parrot_fork_namespace() < 0) fatal("failed to dissociate from parent mount namespace");
 		}
@@ -859,6 +858,19 @@ int main( int argc, char *argv[] )
 	};
 
 	while((c=getopt_long(argc,argv,"+ha:b:B:c:Cd:DFfG:e:Hi:I:kKl:m:n:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
+		if (parrot_in_parrot) {
+			switch (c) {
+			case 'm':
+			case 'M':
+			case 'p':
+			case 'e':
+				break;
+			default:
+				fprintf(stderr, "warning: nested Parrot ignores non-mount options\n");
+				break;
+			}
+		}
+
 		switch(c) {
 		case 'a':
 			if(envauth) {
