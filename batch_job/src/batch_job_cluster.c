@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <sys/stat.h>
 
@@ -115,7 +116,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	if(end) *end = 0;
 		
 	char *submit_job_name = strdup(string_front(path_basename(firstword),15));
-	if(!isalpha(submit_job_name[0])) submit_job_name = 'X';
+	if(!isalpha(submit_job_name[0])) submit_job_name[0] = 'X';
 
 	free(firstword);
 
