@@ -259,12 +259,12 @@ ssize_t parrot_version ( char *buf, size_t len )
 #endif
 }
 
-int parrot_dissociate ( void )
+int parrot_fork_namespace ( void )
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_dissociate);
+	return syscall(SYSCALL32_parrot_fork_namespace);
 #else
-	return syscall(SYSCALL64_parrot_dissociate);
+	return syscall(SYSCALL64_parrot_fork_namespace);
 #endif
 }
 

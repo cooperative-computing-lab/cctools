@@ -684,7 +684,7 @@ int main( int argc, char *argv[] )
 			fprintf(stderr, "Warning: running Parrot inside itself.\n");
 			fprintf(stderr, "Most features are not available.\n");
 			parrot_in_parrot = 1;
-			if (parrot_dissociate() < 0) fatal("failed to dissociate from parent mount namespace");
+			if (parrot_fork_namespace() < 0) fatal("failed to dissociate from parent mount namespace");
 		}
 	}
 

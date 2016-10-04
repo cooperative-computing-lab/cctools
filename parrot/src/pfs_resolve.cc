@@ -400,7 +400,7 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 	return result;
 }
 
-int pfs_resolve_dissociate( struct pfs_mount_entry **ns ) {
+int pfs_resolve_fork_namespace( struct pfs_mount_entry **ns ) {
 	if (*ns) return 0;
 	if (mount_list) {
 		*ns = pfs_resolve_copy_namespace(mount_list);
