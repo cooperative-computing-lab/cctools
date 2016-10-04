@@ -103,14 +103,21 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		return 0;
 	}
 
-	/* Use the first word in the command line as a name for the job. */
+	/*
+	Use the basename of the first word in the command line as a name for the job.
+	Re the PBS qsub manpage, the -N name must start with a letter and be <= 15 characters long.
+	Unfortunately, work_queue_worker hits this limit.
+	*/
 
-	char *name = xxstrdup(cmd);
-	{
-		char *s = strchr(name, ' ');
-		if(s)
-			*s = 0;
-	}
+	char *firstword = strdup(cmd);
+
+	char *end = strchr(firstword, ' ');
+	if(end) *end = 0;
+		
+	char *submit_job_name = strdup(string_front(path_basename(firstword),15));
+	if(!isalpha(submit_job_name[0])) submit_job_name = 'X';
+
+	free(firstword);
 
 	/*
 	Experiment shows that passing environment variables
@@ -133,11 +140,11 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		cluster_submit_cmd,
 		cluster_options,
 		cluster_jobname_var,
-		path_basename(name),
+		submit_job_name,
 		options ? options : "",
 		cluster_name);
 
-	free(name);
+	free(submit_job_name);
 
 	debug(D_BATCH, "%s", command);
 
