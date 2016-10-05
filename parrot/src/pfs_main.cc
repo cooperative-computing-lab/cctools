@@ -134,8 +134,6 @@ int pfs_irods_debug_level = 0;
 int parrot_fd_max = -1;
 int parrot_fd_start = -1;
 
-static int parrot_in_parrot;
-
 /*
 This process at the very top of the traced tree
 and its final exit status, which we use to determine
@@ -678,15 +676,6 @@ int main( int argc, char *argv[] )
 	hash_table_insert(available_services, "cvmfs", pfs_service_cvmfs);
 #endif
 
-	{
-		char buf[4096];
-		if (parrot_version(buf, sizeof(buf)) >= 0) {
-			fprintf(stderr, "Warning: running Parrot inside itself.\n");
-			parrot_in_parrot = 1;
-			if (parrot_fork_namespace() < 0) fatal("failed to dissociate from parent mount namespace");
-		}
-	}
-
 	const char *s;
 	char *key;
 	char *value = NULL;
@@ -695,10 +684,10 @@ int main( int argc, char *argv[] )
 	if(s) pfs_service_set_block_size(string_metric_parse(s));
 
 	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(s, parrot_in_parrot);
+	if(s) pfs_resolve_file_config(s, 0);
 
 	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(s, parrot_in_parrot);
+	if(s) pfs_resolve_manual_config(s, 0);
 
 	s = getenv("PARROT_FORCE_STREAM");
 	if(s) pfs_force_stream = 1;
@@ -858,19 +847,6 @@ int main( int argc, char *argv[] )
 	};
 
 	while((c=getopt_long(argc,argv,"+ha:b:B:c:Cd:DFfG:e:Hi:I:kKl:m:n:M:N:o:O:p:PQr:R:sSt:T:U:u:vw:WY", long_options, NULL)) > -1) {
-		if (parrot_in_parrot) {
-			switch (c) {
-			case 'm':
-			case 'M':
-			case 'p':
-			case 'e':
-				break;
-			default:
-				fprintf(stderr, "warning: nested Parrot ignores non-mount options\n");
-				break;
-			}
-		}
-
 		switch(c) {
 		case 'a':
 			if(envauth) {
@@ -937,10 +913,10 @@ int main( int argc, char *argv[] )
 			snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", optarg);
 			break;
 		case 'm':
-			pfs_resolve_file_config(optarg, parrot_in_parrot);
+			pfs_resolve_file_config(optarg, 0);
 			break;
 		case 'M':
-			pfs_resolve_manual_config(optarg, parrot_in_parrot);
+			pfs_resolve_manual_config(optarg, 0);
 			break;
 		case 'n':
 			if(access(optarg, F_OK) != -1) {
@@ -1106,6 +1082,15 @@ int main( int argc, char *argv[] )
 
 	if(optind>=argc) show_help(argv[0]);
 
+	{
+		char buf[4096];
+		if (parrot_version(buf, sizeof(buf)) >= 0) {
+			fprintf(stderr, "sorry, parrot_run cannot be run inside of itself.\n");
+			fprintf(stderr, "version already running is %s.\n",buf);
+			exit(EXIT_FAILURE);
+		}
+	}
+
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
@@ -1146,11 +1131,6 @@ int main( int argc, char *argv[] )
 	if (http_proxy)
 		setenv("HTTP_PROXY", http_proxy, 1);
 	http_proxy = (char *)realloc(http_proxy, 0);
-
-	if (parrot_in_parrot) {
-		debug(D_DEBUG, "Parrot running inside Parrot");
-		if (execvp(argv[optind],&argv[optind]) < 0) fatal("failed to execute %s", argv[optind]);
-	}
 
 	if (!create_dir(pfs_temp_dir, S_IRWXU))
 		fatal("could not create directory '%s': %s", pfs_temp_dir, strerror(errno));
