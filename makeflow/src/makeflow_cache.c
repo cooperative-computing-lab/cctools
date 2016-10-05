@@ -70,12 +70,14 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
       fatal("Could not cache output file %s\n", output_file_path);
     }
   }
-
-  source_makeflow_file_path = xxstrdup(d->caching_directory);
-  source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, n->cache_id, "/source_makeflow", 0);
-  sucess = copy_file_to_file(d->filename, source_makeflow_file_path);
-  if (!sucess) {
-    fatal("Could not cache source makeflow file %s\n", source_makeflow_file_path);
+  /* only preserve Makeflow workflow instructions if node is a root node */
+  if (set_size(n->ancestors) == 0) {
+    source_makeflow_file_path = xxstrdup(d->caching_directory);
+    source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, n->cache_id, "/source_makeflow", 0);
+    sucess = copy_file_to_file(d->filename, source_makeflow_file_path);
+    if (!sucess) {
+      fatal("Could not cache source makeflow file %s\n", source_makeflow_file_path);
+    }
   }
 
   set_first_element(n->ancestors);
