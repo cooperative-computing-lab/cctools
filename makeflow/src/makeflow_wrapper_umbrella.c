@@ -82,8 +82,8 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 	}
 
 	if(!w->binary) {
-		debug(D_MAKEFLOW_RUN, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node.\n");
-		fprintf(stdout, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node.\n");
+		debug(D_MAKEFLOW_RUN, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node if umbrella is used to deliver the execution environment.\n");
+		fprintf(stdout, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node if umbrella is used to deliver the execution environment.\n");
 	}
 
 	// add umbrella_spec (if specified) and umbrella_binary (if specified) into the input file list of w->wrapper
@@ -116,10 +116,17 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 	cur = d->nodes;
 	while(cur) {
 		char *umbrella_logfile = NULL;
+
+		if(!cur->umbrella_spec) {
+			cur = cur->next;
+			continue;
+		}
+
 		umbrella_logfile = string_format("%s.%d", w->log_prefix, cur->nodeid);
 
 		if(!access(umbrella_logfile, F_OK)) {
 			fprintf(stderr, "the umbrella log file for rule %d (`%s`) already exists!\n", cur->nodeid, umbrella_logfile);
+			free(umbrella_logfile);
 			exit(EXIT_FAILURE);
 		}
 
@@ -179,7 +186,7 @@ char *create_umbrella_opt(bool remote_rename_support, char *files, bool is_outpu
 }
 
 char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, char *input_files, char *output_files) {
-	if(!w || !w->spec) return result;
+	if(!n->umbrella_spec) return result;
 
 	char *umbrella_command = NULL;
 	char *umbrella_input_opt = NULL;
@@ -204,39 +211,39 @@ char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_w
 	// construct umbrella_command
 	if(!remote_rename_support) {
 		if(!w->binary) {
-			umbrella_command = string_format("umbrella --spec %s \
+			umbrella_command = string_format("umbrella --spec \"%s\" \
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
 				--log \"%s\" \
-				run \'{}\'", w->spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
+				run \'{}\'", n->umbrella_spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
 		} else {
-			umbrella_command = string_format("%s --spec %s \
+			umbrella_command = string_format("%s --spec \"%s\" \
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
 				--log \"%s\" \
-				run \'{}\'", w->binary, w->spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
+				run \'{}\'", w->binary, n->umbrella_spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
 		}
 	} else {
 		if(!w->binary) {
-			umbrella_command = string_format("umbrella --spec %s \
+			umbrella_command = string_format("umbrella --spec \"%s\" \
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
 				--log \"%s\" \
-				run \'{}\'", path_basename(w->spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
+				run \'{}\'", path_basename(n->umbrella_spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
 		} else {
-			umbrella_command = string_format("./%s --spec %s \
+			umbrella_command = string_format("./%s --spec \"%s\" \
 				--localdir /tmp/umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
 				--log \"%s\" \
-				run \'{}\'", path_basename(w->binary), path_basename(w->spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
+				run \'{}\'", path_basename(w->binary), path_basename(n->umbrella_spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
 		}
 	}
 

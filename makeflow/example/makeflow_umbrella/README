@@ -1,7 +1,19 @@
 This example illustrates how to running makeflow with the help of umbrella.
 
 The user can specify the umbrella binary through the `--umbrella-binary`
-option; and specify the umbrella spec through the `--umbrella-spec` option.
+option; and specify the umbrella spec through the `--umbrella-spec` option,
+which will be the default umbrella specifcation for each rule. You can also
+specify an Umbrella specification for a group of rule(s) in the Makefile by
+putting the following directives before the rule(s) you want to apply the Umbrella
+spec to:
+.MAKEFLOW CATEGORY 1
+.UMBRELLA SPEC convert_S.umbrella
+
+In this case, the specified Umbrella spec will be applied to all the following
+rules until a new ".MAKEFLOW CATEGORY..." directive is declared. All the rules
+before the first ".MAKEFLOW CATEGORY ..." directive will use the Umbrella spec
+specified by the `--umbrella-spec` option. If the `--umbrella-spec` option is
+not specified, these rules will run without being wrapped by Umbrella.
 
 To test makeflow with umbrella using local execution engine:
 $ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
@@ -13,6 +25,11 @@ To test the case when `--wrapper` and `--umbrella-spec|binary` are used at the s
 $ makeflow --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
 $ makeflow -T wq --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
 
+To test makefile with umbrella (without a default umbrella spec):
+$ makeflow example_in_makefile.makeflow
+
+To test makefile with umbrella (with a default umbrella spec):
+$ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example_in_makefile.makeflow
 
 Usage of the `--umbrella-log-prefix` option of makeflow:
 $ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella --umbrella-log-prefix myumbrella.log example.makeflow

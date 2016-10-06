@@ -297,6 +297,23 @@ following three modes: local, parrot, and docker. The default value of the
 docker mode, and tries to utilize the parrot mode if the docker mode is not
 available. </p>
 
+<h2 id="umbrella_in_makefile">Specify Umbrella in Makefile<a class="sectionlink" href="#umbrella_in_makefile" title="Link to this section.">&#x21d7;</a></h2>
+
+<p> You can also specify an Umbrella specification for a group of rule(s) in the
+Makefile by putting the following directives before the rule(s) you want to apply
+the Umbrella spec to: </p>
+<code>
+.MAKEFLOW CATEGORY 1
+.UMBRELLA SPEC convert_S.umbrella
+</code>
+
+<p>In this case, the specified Umbrella spec will be applied to all the
+following rules until a new ".MAKEFLOW CATEGORY ..." directive is declared. All
+the rules before the first ".MAKEFLOW CATEGORY ..." directive will use the
+Umbrella spec specified by the <tt>--umbrella-spec</tt> option. If the
+<tt>--umbrella-spec</tt> option is not specified, these rules will run without being
+wrapped by Umbrella. </p>
+
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>
