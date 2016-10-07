@@ -50,7 +50,7 @@ void work_queue_resources_measure_locally( struct work_queue_resources *r, const
 	r->disk.largest = r->disk.smallest = r->disk.total;
 
 	host_memory_info_get(&avail,&total);
-	r->memory.total = (avail / (UINT64_T) MEGA) + r->memory.inuse; // Free + whatever we are using.
+	r->memory.total = (total / (UINT64_T) MEGA);
 	r->memory.largest = r->memory.smallest = r->memory.total;
 
 	if(!gpu_check)
