@@ -3137,7 +3137,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_parrot_fork_namespace:
 			if (entering) {
-				p->ns = pfs_resolve_fork_namespace(p->ns);
+				p->ns = pfs_resolve_fork_ns(p->ns);
 				divert_to_dummy(p,0);
 			}
 			break;

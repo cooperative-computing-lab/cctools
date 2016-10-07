@@ -20,12 +20,15 @@ typedef enum {
 } pfs_resolve_t;
 
 struct pfs_mount_entry {
+	unsigned refcount;
 	char prefix[PFS_PATH_MAX];
 	char redirect[PFS_PATH_MAX];
 	mode_t mode;
 	struct pfs_mount_entry *next;
 	struct pfs_mount_entry *parent;
 };
+
+void pfs_resolve_init(void);
 
 void pfs_resolve_file_config( const char *mountfile, int forward );
 void pfs_resolve_manual_config( const char *string, int forward );
@@ -37,8 +40,8 @@ mode_t pfs_resolve_parse_mode( const char *modestring );
 
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime );
 
-struct pfs_mount_entry *pfs_resolve_fork_namespace( struct pfs_mount_entry *ns );
-struct pfs_mount_entry *pfs_resolve_copy_namespace(struct pfs_mount_entry *ns);
-void pfs_resolve_free_namespace(struct pfs_mount_entry *ns);
+struct pfs_mount_entry *pfs_resolve_fork_ns( struct pfs_mount_entry *ns );
+struct pfs_mount_entry *pfs_resolve_share_ns(struct pfs_mount_entry *ns);
+void pfs_resolve_drop_ns(struct pfs_mount_entry *ns);
 
 #endif

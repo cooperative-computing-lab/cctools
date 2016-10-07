@@ -583,6 +583,7 @@ int main( int argc, char *argv[] )
 	int envauth = 0;
 
 	random_init();
+	pfs_resolve_init();
 
 	debug_config(argv[0]);
 	debug_config_file_size(0); /* do not rotate debug file by default */
