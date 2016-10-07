@@ -18,6 +18,7 @@ extern "C" {
 #include "hash_table.h"
 }
 
+#include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -40,6 +41,8 @@ extern struct pfs_process *pfs_current;
 static struct pfs_mount_entry * mount_list = 0;
 static struct hash_table *resolve_cache = 0;
 
+static pfs_resolve_t pfs_resolve_ns( struct pfs_mount_entry *ns, const char *logical_name, char *physical_name, mode_t mode, time_t stoptime );
+
 static void pfs_resolve_cache_flush()
 {
 	char *key, *value;
@@ -53,48 +56,61 @@ static void pfs_resolve_cache_flush()
 	}
 }
 
+static struct pfs_mount_entry *find_parent_ns(struct pfs_mount_entry *ns) {
+	while (ns && ns->next) {
+		assert(!ns->parent);
+		ns = ns->next;
+	}
+	while (ns && ns->parent) {
+		assert(!ns->next);
+		ns = ns->parent;
+	}
+	return ns;
+}
+
 void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	char real_redirect[PFS_PATH_MAX];
+	struct pfs_mount_entry **ns = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
 
-	struct pfs_mount_entry **cur = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
-	if (cur != &mount_list) {
-		debug(D_RESOLVE,"mount ns is forked, resolving %s->%s",prefix,redirect);
-		switch (pfs_resolve(redirect, real_redirect, mode, 0)) {
-		case PFS_RESOLVE_CHANGED:
-		case PFS_RESOLVE_UNCHANGED:
-			break;
-		default:
-			debug(D_RESOLVE,"couldn't resolve redirect %s",prefix);
-			return;
-		}
+	debug(D_RESOLVE,"resolving %s in parent ns",redirect);
+	switch (pfs_resolve_ns(find_parent_ns(*ns), redirect, real_redirect, mode, 0)) {
+	case PFS_RESOLVE_CHANGED:
+	case PFS_RESOLVE_UNCHANGED:
+		break;
+	default:
+		debug(D_NOTICE,"couldn't resolve redirect %s",prefix);
+		return;
 	}
 
 	struct pfs_mount_entry *m = (struct pfs_mount_entry *) xxmalloc(sizeof(*m));
-	strcpy(m->prefix,prefix);
-	strcpy(m->redirect,cur == &mount_list ? redirect : real_redirect);
+	strcpy(m->prefix, prefix);
+	strcpy(m->redirect, real_redirect);
+	m->parent = NULL;
 	m->mode = mode;
-	m->next = *cur;
-	*cur = m;
+	m->next = *ns;
+	*ns = m;
 	pfs_resolve_cache_flush();
 }
 
 int pfs_resolve_remove_entry( const char *prefix )
 {
-	struct pfs_mount_entry *m, *p=0;
-	struct pfs_mount_entry **cur = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
+	struct pfs_mount_entry **ns = pfs_current && pfs_current->ns ? &pfs_current->ns : &mount_list;
+	struct pfs_mount_entry *m = *ns, *p = NULL;
 
-	for(m=*cur;m;p=m,m=m->next) {
+	while (m) {
 		if(!strcmp(m->prefix,prefix)) {
 			if(p) {
 				p->next = m->next;
 			} else {
-				*cur = m->next;
+				*ns = m->next;
 			}
 			free(m);
 			pfs_resolve_cache_flush();
 			return 1;
 		}
+		p = m;
+		m = m->next;
 	}
 
 	return 0;
@@ -349,12 +365,17 @@ void clean_up_path( char *path )
 
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
 {
+	return pfs_resolve_ns(pfs_current && pfs_current->ns ? pfs_current->ns : mount_list,
+		logical_name, physical_name, mode, stoptime);
+}
+
+static pfs_resolve_t pfs_resolve_ns( struct pfs_mount_entry *ns, const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
+{
 	pfs_resolve_t result = PFS_RESOLVE_UNCHANGED;
-	struct pfs_mount_entry *e = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
 	const char *t;
 	char lookup_key[PFS_PATH_MAX + 3 * sizeof(int) + 1];
 
-	sprintf(lookup_key, "%o|%p|%s", mode, e, logical_name);
+	sprintf(lookup_key, "%o|%p|%s", mode, ns, logical_name);
 
 	if(!resolve_cache) resolve_cache = hash_table_create(0,0);
 
@@ -363,15 +384,21 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 		strcpy(physical_name,t);
 		result = PFS_RESOLVE_CHANGED;
 	} else {
-		for(;e;e=e->next) {
-			result = mount_entry_check(logical_name,e->prefix,e->redirect,physical_name);
+		while (ns) {
+			assert(!(ns->next && ns->parent));
+			if (ns->parent) {
+				ns = ns->parent;
+				continue;
+			}
+			result = mount_entry_check(logical_name,ns->prefix,ns->redirect,physical_name);
 			if(result!=PFS_RESOLVE_UNCHANGED) {
-				if ((mode & e->mode) != mode) {
+				if ((mode & ns->mode) != mode) {
 					result = PFS_RESOLVE_DENIED;
-					debug(D_RESOLVE,"%s denied, requesting mode %o on mount entry with %o",logical_name,mode,e->mode);
+					debug(D_RESOLVE,"%s denied, requesting mode %o on mount entry with %o",logical_name,mode,ns->mode);
 				}
 				break;
 			}
+			ns = ns->next;
 		}
 	}
 
@@ -403,31 +430,33 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 	return result;
 }
 
-int pfs_resolve_fork_namespace( struct pfs_mount_entry **ns ) {
-	if (*ns) return 0;
-	if (mount_list) {
-		*ns = pfs_resolve_copy_namespace(mount_list);
+struct pfs_mount_entry *pfs_resolve_fork_namespace(struct pfs_mount_entry *ns) {
+	struct pfs_mount_entry *result = (struct pfs_mount_entry *) xxmalloc(sizeof(*result));
+	memset(result, 0, sizeof(*result));
+	if (!result) return NULL;
+	if (ns) {
+		assert(!(ns->next && ns->parent));
+		result->parent = ns;
 	} else {
-		*ns = (struct pfs_mount_entry *) xxmalloc(sizeof(**ns));
-		strcpy((*ns)->prefix,"/");
-		strcpy((*ns)->redirect,"/");
-		(*ns)->mode = R_OK|W_OK|X_OK;
-		(*ns)->next = NULL;
+		result->parent = pfs_resolve_copy_namespace(mount_list);
 	}
-	return 1;
+	return result;
 }
 
 struct pfs_mount_entry *pfs_resolve_copy_namespace(struct pfs_mount_entry *ns) {
 	if (!ns) return NULL;
+	assert(!(ns->next && ns->parent));
+	struct pfs_mount_entry **next = ns->parent ? &ns->parent : &ns->next;
 	struct pfs_mount_entry *result = (struct pfs_mount_entry *) xxmalloc(sizeof(*result));
 	memcpy(result, ns, sizeof(*result));
-	result->next = pfs_resolve_copy_namespace(ns->next);
+	*next = pfs_resolve_copy_namespace(*next);
 	return result;
 }
 
 void pfs_resolve_free_namespace(struct pfs_mount_entry *ns) {
 	if (ns) {
 		pfs_resolve_free_namespace(ns->next);
+		pfs_resolve_free_namespace(ns->parent);
 		free(ns);
 	}
 }

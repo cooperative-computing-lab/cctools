@@ -3456,11 +3456,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_parrot_fork_namespace:
 			if (entering) {
-				if (pfs_allow_dynamic_mounts) {
-					divert_to_dummy(p,pfs_resolve_fork_namespace(&p->ns));
-				} else {
-					divert_to_dummy(p,-EACCES);
-				}
+				p->ns = pfs_resolve_fork_namespace(p->ns);
+				divert_to_dummy(p,0);
 			}
 			break;
 
