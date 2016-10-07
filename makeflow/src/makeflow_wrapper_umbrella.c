@@ -143,6 +143,8 @@ char *create_umbrella_opt(bool remote_rename_support, char *files, bool is_outpu
 	size_t size;
 	char *result = NULL;
 
+	if(!strcmp(s, "")) return s;
+
 	// construct the --output or --inputs option of umbrella based on files
 	while((size = strcspn(s, ",\0")) > 0) {
 		char *t;
