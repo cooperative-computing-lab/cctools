@@ -1764,7 +1764,8 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	if(task_status == WORK_QUEUE_RESULT_FORSAKEN) {
 		/* task will be resubmitted, so we do not update any of the execution stats */
-		change_task_state(q, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+
 		return SUCCESS;
 	}
 
