@@ -221,7 +221,7 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 	} else {
 		sprintf(cmd,"./%s -e \"%s\" A B %s%s",path_basename(allpairs_multicore_program), extra_arguments,use_external_program ? "./" : "",path_basename(allpairs_compare_program));
 	}
-	fprintf(stdout, "%s\n", cmd);
+
 	struct work_queue_task *task = work_queue_task_create(cmd);
 
 	if(use_external_program) {
@@ -280,6 +280,9 @@ struct work_queue_task * ap_task_create( struct text_list *seta, struct text_lis
 void task_complete( struct work_queue_task *t )
 {
 	FILE *output = stdout;
+
+	printf("task %d complete\n",t->taskid);
+
 	if(output_filename)
 	{
 		output = fopen(output_filename, "a");
