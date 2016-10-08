@@ -80,7 +80,7 @@ an example.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 #define MAX_BUF_SIZE 4096
-#define MF_DONE_FILE "makeflow_done" 
+#define MESOS_DONE_FILE "mesos_done" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -1555,6 +1555,7 @@ int main(int argc, char *argv[])
 	}
 
 	remote_queue = batch_queue_create(batch_queue_type);
+
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
@@ -1568,6 +1569,12 @@ int main(int argc, char *argv[])
 		} else {
 			batchlogfilename = string_format("%s.batchlog", dagfile);
 		}
+	}
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
+		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
+		batch_queue_set_feature(remote_queue, "batch_log_name", batchlogfilename);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
@@ -1685,69 +1692,19 @@ int main(int argc, char *argv[])
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
 	}
-
-	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		pid_t mesos_PID;
-		mesos_PID = fork();			
-		char *mesos_cwd;
-		mesos_cwd = path_getcwd();
-
-		char *exe_path[MAX_BUF_SIZE];
-		if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
-			fatal("read \"proc/self/exe\" fail.");
-		}
-		char *exe_dir_path[MAX_BUF_SIZE];
-		path_dirname(exe_path, exe_dir_path);
-
-        char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
-		char *envs[] = {"LD_PRELOAD=/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so", "CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", NULL};
-
-		if (mesos_path == NULL) {
-			fatal("Please specify the mesos path by using --mesos-path option.");
-		}
-
-		char *mesos_py = NULL;
-		if (mesos_path[strlen(mesos_path)-1] == '/') {
-			mesos_py = string_combine(mesos_path, "lib/python2.6/site-packages");
-		} else {
-			mesos_py = string_combine(mesos_path, "/lib/python2.6/site-packages");
-		}
-		//char *mesos_py = string_combine("/afs/nd.edu/user37/ccl/software/external/mesos-0.26.0/amd64_linux26", "lib/python2.6/site-packages");
-
-		if (mesos_PID > 0) {
-
-			printf("start makeflow mesos scheduler.");
-
-		} else if (mesos_PID == 0) {
-
-			//int mesos_fd = open("mesos_scheduler.log", O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-
-			int mesos_fd = open(batchlogfilename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-
-		    dup2(mesos_fd, 1);
-		    dup2(mesos_fd, 2);
-
-			close(mesos_fd);
-
-			execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_py, (char *) 0, envs);
-
-			_exit(127);
-
-		} else {
-
-			debug(D_MAKEFLOW_RUN, "couldn't create new process: %s\n", strerror(errno));
-			exit(EXIT_FAILURE);
-
-		}
-
-	}
-
+	
 	makeflow_run(d);
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
 	if(local_queue)
 		batch_queue_delete(local_queue);
+	
+	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		batch_queue_set_int_option(remote_queue, "batch-queue-abort-flag", (int)makeflow_abort_flag);
+		batch_queue_set_int_option(remote_queue, "batch-queue-failed-flag", (int)makeflow_failed_flag);
+	}
+
 	batch_queue_delete(remote_queue);
 
 	if(write_summary_to || email_summary_to)
@@ -1758,21 +1715,6 @@ int main(int argc, char *argv[])
 		char *cmd = string_format("rm %s", CONTAINER_SH);
 		system(cmd);
 		free(cmd);
-	}
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
-		FILE *fp;
-		fp = fopen(MF_DONE_FILE, "w");
-
-		if(makeflow_abort_flag) {
-			fputs("aborted", fp);
-		} else if(makeflow_failed_flag) {
-			fputs("failed", fp);
-		} else {
-			fputs("finished", fp);
-		}
-
-		fclose(fp);
 	}
 
 	if(makeflow_abort_flag) {
@@ -1786,7 +1728,6 @@ int main(int argc, char *argv[])
 	} else {
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
-		
 		exit(EXIT_SUCCESS);
 	}
 

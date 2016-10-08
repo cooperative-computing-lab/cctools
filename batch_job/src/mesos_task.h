@@ -3,6 +3,9 @@
 
 #include "stdlib.h"
 #include "text_list.h"
+#include "xxmalloc.h"
+#include "path.h"
+#include "stringtools.h"
 
 // mesos task struct
 struct mesos_task{

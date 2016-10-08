@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "work_queue_catalog.h"
-
 #include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"
@@ -43,6 +42,8 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
+#define MESOS_DONE_FILE "mesos_done"
+
 static const char *catalog_host = 0;
 static int catalog_port = 0;
 
@@ -77,6 +78,9 @@ static struct rmsummary *resources = NULL;
 static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
+
+static const char *mesos_master = NULL;
+static const char *mesos_path = NULL;
 
 static void handle_abort( int sig )
 {
@@ -752,11 +756,13 @@ static void show_help(const char *cmd)
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
+	printf(" %-30s Specify ip address to mesos master node (for use with -T mesos)\n", "--mesos-master");
+	printf(" %-30s Specify path to mesos python library(for use with -T mesos)\n", "--mesos-path");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE};
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_MESOS_MASTER, LONG_OPT_MESOS_PATH};
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
@@ -786,6 +792,8 @@ static const struct option long_options[] = {
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
+	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{0,0,0,0}
 };
 
@@ -902,6 +910,12 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				exit(EXIT_SUCCESS);
+			case LONG_OPT_MESOS_MASTER:
+				mesos_master = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MESOS_PATH:
+				mesos_path = xxstrdup(optarg);
+				break;
 			default:
 				show_help(argv[0]);
 				return EXIT_FAILURE;
@@ -1000,7 +1014,20 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		batch_queue_set_option(queue, "mesos-path", mesos_path);
+		batch_queue_set_option(queue, "mesos-master", mesos_master);
+		batch_queue_set_feature(queue, "batch_log_name", "work_queue_factory.mesoslog");
+	}
+
 	mainloop( queue, project_regex, foremen_regex );
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+
+		batch_queue_set_int_option(queue, "batch-queue-abort-flag", (int)abort_flag);
+		batch_queue_set_int_option(queue, "batch-queue-failed-flag", 0);
+
+	}
 
 	batch_queue_delete(queue);
 
