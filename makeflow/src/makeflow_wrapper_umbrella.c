@@ -15,6 +15,7 @@
 #include "batch_job.h"
 #include "debug.h"
 #include "dag.h"
+#include "xxmalloc.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_wrapper_umbrella.h"
 #include "path.h"
@@ -138,12 +139,15 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 	}
 }
 
+// the caller should free the result.
 char *create_umbrella_opt(bool remote_rename_support, char *files, bool is_output, const char *umbrella_logfile) {
 	char *s = files;
 	size_t size;
 	char *result = NULL;
 
-	if(!strcmp(s, "")) return s;
+	// the result will be freed by the caller, therefore returning a copy of s is needed.
+	// Returning the original copy and free the original copy may cuase memory corruption.
+	if(!strcmp(s, "")) return xxstrdup(s);
 
 	// construct the --output or --inputs option of umbrella based on files
 	while((size = strcspn(s, ",\0")) > 0) {
