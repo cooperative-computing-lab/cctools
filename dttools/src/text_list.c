@@ -42,11 +42,13 @@ struct text_list *text_list_load_str(const char *inp_str)
 
 	struct text_list *t = text_list_create();
 	char *pch = NULL;
-    pch = strtok(inp_str, ",");
+	char * tmp_str = strdup(inp_str);
+    pch = strtok(tmp_str, ",");
 	while(pch != NULL) {
 		text_list_append(t, pch);
 		pch = strtok(NULL, ",");
 	}	
+	free(tmp_str);
 	return t;
 }
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import sys
 import uuid
@@ -7,6 +9,7 @@ import tarfile
 import logging
 import threading
 import imp
+import re
 
 setting_module_path = os.path.join(os.getenv('CCTOOLS'), "bin", "mf_mesos_setting")
 mms = imp.load_source("mf_mesos_setting", setting_module_path)
@@ -21,11 +24,12 @@ logging.basicConfig(level=logging.INFO)
 
 FILE_TASK_INFO = "mesos_task_info"
 FILE_TASK_STATE = "mesos_task_state"
-MF_DONE_FILE = "makeflow_done"
+MESOS_DONE_FILE = "mesos_done"
 
 TASK_CPUS = 1
 TASK_MEM = 300
 MAX_FAILED = 3
+PARENT_PID = 0
 
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
@@ -40,23 +44,20 @@ class MakeflowScheduler(Scheduler):
         executor.executor_id.value = str(uuid.uuid4())
         cctools_path = os.getenv('CCTOOLS')
         sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor')
+        task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
+        task_cmd_f = open(task_cmd_sh, "w+")
+        task_cmd_f.write(mf_task.cmd)
+        task_cmd_f.close()
+        os.chmod(task_cmd_sh, 0755)
 
-        #task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
-        #task_cmd_f = open(task_cmd_sh, "w+")
-        #task_cmd_f.write(mf_task.cmd)
-        #task_cmd_f.close()
-        #os.chmod(task_cmd_sh, 0755)
-
-        #uri = executor.command.uris.add()
-        #uri.value = os.path.join(os.getcwd(), task_cmd_sh)
-        #uri.executable = True
-        #uri.extract = False
+        uri = executor.command.uris.add()
+        uri.value = os.path.join(os.getcwd(), task_cmd_sh)
+        uri.executable = True
+        uri.extract = False
 
         executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
         executor.source = "python executor"
-        #executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
-        #        executor.executor_id.value, executor.framework_id.value, sys.argv[3])
-        executor.command.value = "{0} \"{1}\" {2} {3} {4}".format(sh_path, mf_task.cmd, 
+        executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
                 executor.executor_id.value, executor.framework_id.value, sys.argv[3])
 
         cpus = executor.resources.add()
@@ -192,6 +193,7 @@ class MakeflowScheduler(Scheduler):
 
             with mms.lock:
                 for task_info in mms.tasks_info_dict.itervalues():
+
                     if (task_info.action == "submitted" or task_info.action == "resubmitted")\
                        and remaining_cpus >= TASK_CPUS \
                        and remaining_mem >= TASK_MEM:
@@ -213,7 +215,7 @@ class MakeflowScheduler(Scheduler):
         mf_task = mms.tasks_info_dict[task_id]
         #  TODO do not remove the file, if it is not exist
         if os.path.isfile("task_{0}_cmd".format(task_id)):
-            os.remove("task_{0}_cmd".format(task_id))
+           os.remove("task_{0}_cmd".format(task_id))
         #for fn in mf_task.inp_fns:
         #    if os.path.isdir(fn):
         #        logging.info("{0} is a directory, remove the tar.gz file".format(fn))
@@ -345,9 +347,8 @@ class MakeflowScheduler(Scheduler):
 
 class MakefowMonitor(threading.Thread):
   
-    def __init__(self, driver, created_time):
+    def __init__(self, driver):
         threading.Thread.__init__(self)
-        self.last_mod_time = created_time
         self.driver = driver
 
     # Check if all tasks done
@@ -367,7 +368,7 @@ class MakefowMonitor(threading.Thread):
     
         with mms.lock:
             for line in lines:
-                task_info_list = line.split(",")
+                task_info_list = re.split(''',(?=(?:[^'"]|'[^']*'|"[^"]*")*$)''', line)
                 task_id = task_info_list[0]
                 task_action = task_info_list[4]
                 if task_action == "aborting":
@@ -383,7 +384,7 @@ class MakefowMonitor(threading.Thread):
     def stop_mesos_scheduler(self):
 
         # If makeflow creat "makeflow_done" file, stop the scheduler
-        mf_done_fn_path = os.path.join(mms.mf_wk_dir, MF_DONE_FILE)
+        mf_done_fn_path = os.path.join(mms.mf_wk_dir, MESOS_DONE_FILE)
 
         if os.path.isfile(mf_done_fn_path):
             mf_done_fn = open(mf_done_fn_path, "r")
@@ -396,20 +397,25 @@ class MakefowMonitor(threading.Thread):
                 logging.info("Workflow aborted, stopping executors...")
                 self.stop_executors()
 
-            fn_run_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_INFO)
-            fn_finish_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_STATE)
+                    
+        else: 
+            
+            logging.info("batch job system exited unexpectedly")
 
-            #if os.path.isfile(mf_done_fn_path):
-            #    os.remove(mf_done_fn_path)
-            #if os.path.isfile(fn_run_tks_path):
-            #    os.remove(fn_run_tks_path)
-            #if os.path.isfile(fn_finish_tks_path):
-            #    os.remove(fn_finish_tks_path)
-           
-            while(not self.is_all_executor_stopped()):
-                pass
+        fn_run_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_INFO)
+        fn_finish_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_STATE)
 
-            self.driver.stop()  
+        #if os.path.isfile(mf_done_fn_path):
+        #    os.remove(mf_done_fn_path)
+        #if os.path.isfile(fn_run_tks_path):
+        #    os.remove(fn_run_tks_path)
+        #if os.path.isfile(fn_finish_tks_path):
+        #    os.remove(fn_finish_tks_path)
+        
+        while(not self.is_all_executor_stopped()):
+            pass
+
+        self.driver.stop()  
     
     
     def abort_mesos_task(self, task_id):
@@ -440,21 +446,29 @@ class MakefowMonitor(threading.Thread):
 
     def run(self):
 
-        while(not os.path.isfile(MF_DONE_FILE)):
-            mod_time = os.stat(FILE_TASK_INFO).st_mtime
-            
-            self.last_mod_time = mod_time
+        while(not os.path.isfile(MESOS_DONE_FILE)):
+
+            current_ppid = os.getppid()
+           
+            # The parent process (i.e. batch_job_mesos) has 
+            # been killed. Stop the scheduler
+
+            logging.info("The current parent pid is {0}".format(current_ppid))
+            if (current_ppid != PARENT_PID):
+                logging.info("The parent process exit unexpectedly")
+                break; 
+
             task_info_fp = open(FILE_TASK_INFO, "r")
             lines = task_info_fp.readlines()
 
             for line in lines:
-                task_info_list = line.split(",")
+                task_info_list = re.split(''',(?=(?:[^'"]|'[^']*'|"[^"]*")*$)''', line)
                 task_id = task_info_list[0].strip(" \t\n\r")
                 task_cmd = task_info_list[1].strip(" \t\n\r")
                 task_inp_fns = task_info_list[2].split()
                 task_oup_fns = task_info_list[3].split()
                 task_action = task_info_list[4].strip(" \t\n\r")
-               
+             
                 with mms.lock:
                     # find new tasks
                     if (task_id not in mms.tasks_info_dict):
@@ -472,11 +486,16 @@ class MakefowMonitor(threading.Thread):
 
                         self.abort_mesos_task(task_id)                
 
+            task_info_fp.close()
             time.sleep(2)
        
         self.stop_mesos_scheduler() 
 
 if __name__ == '__main__':
+
+    PARENT_PID = os.getppid()
+    logging.info("The parent pid is {0}".format(PARENT_PID))
+
     # make us a framework
     mms.mf_wk_dir = sys.argv[1]
     mesos_master_addr = sys.argv[2]
@@ -486,22 +505,20 @@ if __name__ == '__main__':
         open(FILE_TASK_STATE, 'w').close()
     if not os.path.isfile(FILE_TASK_INFO):
         open(FILE_TASK_INFO, 'w').close()
-    created_time = os.stat(FILE_TASK_INFO).st_mtime
 
     # initialize a framework instance
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
     framework.name = "Makeflow"
-    # framework.role = "ccl"
-    # framework.principal = "makeflow"
 
     driver = MesosSchedulerDriver(
         MakeflowScheduler(mms.mf_wk_dir),
         framework,
         mesos_master_addr  # assumes running on the master
     )
-  
-    mf_monitor = MakefowMonitor(driver, created_time)
+
+    # Start the monitor thread 
+    mf_monitor = MakefowMonitor(driver)
     mf_monitor.start()
 
     status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1

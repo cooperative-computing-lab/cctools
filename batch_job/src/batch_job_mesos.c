@@ -9,7 +9,6 @@
 #include "jx.h"
 #include "jx_print.h"
 #include "itable.h"
-#include "text_list.h"
 #include "mesos_task.h"
 
 #include <stdlib.h>
@@ -22,8 +21,10 @@
 #include <unistd.h>
 #include <time.h>
 
+#define MAX_BUF_SIZE 4096
 #define FILE_TASK_INFO "mesos_task_info"
 #define FILE_TASK_STATE "mesos_task_state"
+#define MESOS_DONE_FILE "mesos_done"
 
 /*
  * Principle of Operation:
@@ -40,11 +41,123 @@
 
 static int counter = 0;
 static struct itable *finished_tasks = NULL;
+static int is_mesos_py_path_known = 0;
+static int is_mesos_master_known = 0;
+static int is_scheduler_running = 0;
+static const char *mesos_py_path = NULL;
+static const char *mesos_master = NULL;
+static pid_t mesos_scheduler_pid = 0;
+
+static void start_mesos_scheduler(struct batch_queue *q)
+{
+
+	pid_t mesos_pid;
+	mesos_pid = fork();			
+	mesos_scheduler_pid = mesos_pid;
+	char *mesos_cwd;
+	mesos_cwd = path_getcwd();
+
+	char exe_path[MAX_BUF_SIZE];
+
+	if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
+		debug(D_ERROR, "read \"proc/self/exe\" fail\n");
+		exit(EXIT_FAILURE);
+	}
+
+	char exe_dir_path[MAX_BUF_SIZE];
+	path_dirname(exe_path, exe_dir_path);
+
+    char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
+	char *envs[] = {"LD_PRELOAD=/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so", "CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", NULL};
+
+	char *mesos_python_path = xxstrdup(mesos_py_path);
+
+	if (mesos_python_path == NULL) {
+		debug(D_ERROR, "Please specify the mesos python path\n");
+		exit(EXIT_FAILURE);
+	}
+
+	char *mesos_py = NULL;
+	if (mesos_py_path[strlen(mesos_py_path)-1] == '/') {
+		mesos_py = string_combine(mesos_python_path, "lib/python2.6/site-packages");
+	} else {
+		mesos_py = string_combine(mesos_python_path, "/lib/python2.6/site-packages");
+	}
+
+	if (mesos_pid > 0) {
+
+		debug(D_INFO, "Start makeflow mesos scheduler.");
+
+	} else if (mesos_pid == 0) {
+
+		const char *batch_log_name = batch_queue_supports_feature(q, "batch_log_name");
+
+		int mesos_fd = open(batch_log_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+		if (mesos_fd == -1) {
+	    	debug(D_ERROR, "Failed to open %s \n", batch_log_name);
+	    	exit(EXIT_FAILURE);
+	    }
+
+	    if (dup2(mesos_fd, 1) == -1) {
+	    	debug(D_ERROR, "%s\n", strerror(errno));
+	    	exit(EXIT_FAILURE);
+	   	}
+
+		if (dup2(mesos_fd, 2) == -1) {
+	    	debug(D_ERROR, "%s\n", strerror(errno));
+	    	exit(EXIT_FAILURE);
+	   	}
+
+	    close(mesos_fd);
+
+// 1. child keep polling who is the parent
+
+		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_py, (char *) 0, envs);
+
+		_exit(127);
+
+	} else {
+
+		debug(D_ERROR, "mesos batch system couldn't create new process: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+
+	}
+
+}
+
 
 static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, \
 		const char *extra_input_files, const char *extra_output_files, \
 		struct jx *envlist, const struct rmsummary *resources )
 {
+
+	if (is_mesos_py_path_known != 1) {
+		mesos_py_path = batch_queue_get_option(q, "mesos-path");
+		if (mesos_py_path == NULL) {
+			debug(D_ERROR, "Please set the path to mesos python library\n");
+			exit(EXIT_FAILURE);
+		} else {
+			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
+			is_mesos_py_path_known = 1;
+		}
+	}
+
+	if (is_mesos_master_known != 1) {
+		mesos_master = batch_queue_get_option(q, "mesos-master");
+		if (mesos_master == NULL) {
+			debug(D_ERROR, "Please specify the ip address of mesos master\n");
+			exit(EXIT_FAILURE);
+		} else {
+			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
+			is_mesos_master_known = 1;
+		}
+	}
+
+	if (is_mesos_py_path_known == 1 && is_mesos_master_known == 1 &&is_scheduler_running == 0) {
+		start_mesos_scheduler(q);
+		is_scheduler_running = 1;
+	}
+
 	int task_id = ++counter;
 
 	debug(D_BATCH, "task %d is ready", task_id);
@@ -106,7 +219,6 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 
 static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
-
 		
 	char *line = NULL;
 	size_t len = 0;
@@ -178,8 +290,7 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 	info->exited_normally = 0;
 	info->exit_signal = 0;
 	// append the new task state to the "mesos_task_info" file
-	char *cmd = string_format("awk -F \',\' \'{if($1==\"%" PRIbjid "\"){gsub(\"submitted\",\"aborting\",$5);print $1\",\"$2\",\"$3\",\"$4\",\"$5}}\' %s >> %s", \
-			jobid, FILE_TASK_INFO, FILE_TASK_INFO);
+	char *cmd = string_format("awk -F \',\' \'{$(NF--)=\"aborting\"; if($1==\"%" PRIbjid "\"){for(i=1;i<NF;i+=1){printf $i\",\"}; print $NF}}\' %s >> %s", jobid, FILE_TASK_INFO, FILE_TASK_INFO);
 	system(cmd);
 	free(cmd);
 
@@ -229,10 +340,35 @@ static int batch_queue_mesos_create (struct batch_queue *q)
 {
 	batch_queue_set_feature(q, "mesos_job_queue", NULL);
 	batch_queue_set_feature(q, "batch_log_name", "%s.mesoslog");
+
 	return 0;
 }
 
-batch_queue_stub_free(mesos);
+static int batch_queue_mesos_free(struct batch_queue *q)
+{
+	FILE *fp;
+	fp = fopen(MESOS_DONE_FILE, "w");
+
+	if(fp == NULL) {
+		debug(D_ERROR, "Fail to clean up batch queue. %s\n", strerror(errno)); 
+		return 1;
+	}
+
+	int batch_queue_abort_flag = atoi(batch_queue_get_option(q, "batch-queue-abort-flag"));
+	int batch_queue_failed_flag = atoi(batch_queue_get_option(q, "batch-queue-failed-flag"));
+
+	if(batch_queue_abort_flag) {
+		fputs("aborted", fp);
+	} else if(batch_queue_failed_flag) {
+		fputs("failed", fp);
+	} else {
+		fputs("finished", fp);
+	}
+
+	fclose(fp);
+	return 0;
+}
+
 batch_queue_stub_port(mesos);
 batch_queue_stub_option_update(mesos);
 
