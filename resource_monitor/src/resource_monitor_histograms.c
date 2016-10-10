@@ -1254,6 +1254,7 @@ void write_webpage_stats_header(FILE *stream, struct field_stats *h)
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >(&mu;+&sigma;)/&mu;</td>");
 
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max value<br> &#9663; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max through<br> &#9663; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. min waste </td>");
 
@@ -1274,7 +1275,9 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	}
 	fprintf(stream, "</td>");
 
-	const char *fmt = (rmsummary_field_is_float(h->field) ? "%.3lf\n" : "%.0lf\n");
+	const char *fmt       = (rmsummary_field_is_float(h->field) ? "%.3lf\n" : "%.0lf\n");
+	const char *fmt_alloc = (rmsummary_field_is_float(h->field) ? "alloc:&nbsp;%.3lf\n" : "alloc:&nbsp;%.0lf\n");
+	const char *fmt_stats = "throu:&nbsp;%.2lf waste:&nbsp;%.0lf%%\n";
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, histogram_mode(h->histogram)));
@@ -1288,21 +1291,35 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	fprintf(stream, "%6.2lf\n", h->mean > 0 ? (h->mean + sqrt(h->variance))/h->mean : -1);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(stream, "<td class=\"data\">\n");
+	fprintf(stream, fmt_stats, h->fa_max.throughput/h->fa_max.throughput, ((100.0*h->fa_max.waste)/(h->fa_max.waste + h->usage)));
+	fprintf(stream, "<br><br>\n");
+	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max.first));
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
+	fprintf(stream, "<td class=\"data\">\n");
+	fprintf(stream, fmt_stats, h->fa_max_throughput.throughput/h->fa_max.throughput, ((100.0*h->fa_max_throughput.waste)/(h->fa_max_throughput.waste + h->usage)));
+	fprintf(stream, "<br><br>\n");
+	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(stream, "</td>\n");
+
+	fprintf(stream, "<td class=\"data\">\n");
+	fprintf(stream, fmt_stats, h->fa_min_waste_time_dependence.throughput/h->fa_max.throughput, ((100.0*h->fa_min_waste_time_dependence.waste)/(h->fa_min_waste_time_dependence.waste + h->usage)));
+	fprintf(stream, "<br><br>\n");
+	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
+		fprintf(stream, "<td class=\"data\">\n");
+		fprintf(stream, fmt_stats, h->fa_max_throughput_brute_force.throughput/h->fa_max.throughput, ((100.0*h->fa_max_throughput_brute_force.waste)/(h->fa_max_throughput_brute_force.waste + h->usage)));
+		fprintf(stream, "<br><br>\n");
+		fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
 		fprintf(stream, "</td>\n");
 
-		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
+		fprintf(stream, "<td class=\"data\">\n");
+		fprintf(stream, fmt_stats, h->fa_min_waste_brute_force.throughput/h->fa_max.throughput, ((100.0*h->fa_min_waste_brute_force.waste)/(h->fa_min_waste_brute_force.waste + h->usage)));
+		fprintf(stream, "<br><br>\n");
+		fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
 		fprintf(stream, "</td>\n");
 	}
 }
@@ -1373,7 +1390,7 @@ void write_front_page(char *workflow_name)
 	char *filename = string_format("%s/index.html", output_directory);
 	fo = fopen(filename, "w");
 
-	int columns = brute_force ? 8 : 6;
+	int columns = brute_force ? 9 : 7;
 
 	if(!fo)
 		fatal("Could not open file %s for writing: %s\n", strerror(errno));
