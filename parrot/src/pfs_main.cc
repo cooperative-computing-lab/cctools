@@ -160,7 +160,8 @@ enum {
 	LONG_OPT_DYNAMIC_MOUNTS,
 	LONG_OPT_IS_RUNNING,
 	LONG_OPT_TIME_STOP,
-	LONG_OPT_TIME_WARP
+	LONG_OPT_TIME_WARP,
+	LONG_OPT_PARROT_PATH,
 };
 
 static void get_linux_version(const char *cmd)
@@ -822,6 +823,7 @@ int main( int argc, char *argv[] )
 		{"no-optimize", no_argument, 0, 'D'},
 		{"no-set-foreground", no_argument, 0, LONG_OPT_NO_SET_FOREGROUND},
 		{"paranoid", no_argument, 0, 'P'},
+		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 		{"proxy", required_argument, 0, 'p'},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"session-caching", no_argument, 0, 'S'},
@@ -1074,6 +1076,9 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_TIME_WARP:
 			pfs_time_mode = PFS_TIME_MODE_WARP;
 			pfs_use_helper = 1;
+			break;
+		case LONG_OPT_PARROT_PATH:
+			// compatibility option for parrot_namespace
 			break;
 		default:
 			show_help(argv[0]);

@@ -9,7 +9,7 @@ PROGRAMS = parrot_run $(UTILITIES)
 HEADERS_PUBLIC = parrot_client.h
 SCRIPTS = make_growfs parrot_identity_box parrot_run_hdfs parrot_package_run chroot_package_run
 TARGETS = $(PROGRAMS) $(LIBRARIES)
-UTILITIES = parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout parrot_search parrot_package_create parrot_debug parrot_mount 
+UTILITIES = parrot_lsalloc parrot_mkalloc parrot_getacl parrot_setacl parrot_whoami parrot_locate parrot_md5 parrot_cp parrot_timeout parrot_search parrot_package_create parrot_debug parrot_mount parrot_namespace
 
 ifeq ($(CCTOOLS_BUILD_LIB64PARROT_HELPER),yes)
  LIBRARIES += lib64/libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
