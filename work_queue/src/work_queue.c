@@ -813,7 +813,6 @@ static void cleanup_worker(struct work_queue *q, struct work_queue_worker *w)
 			update_task_result(t, WORK_QUEUE_RESULT_MAX_RETRIES);
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_RETRIEVED);
 		} else {
-			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
 			reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 		}
 
@@ -1764,7 +1763,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	if(task_status == WORK_QUEUE_RESULT_FORSAKEN) {
 		/* task will be resubmitted, so we do not update any of the execution stats */
-		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_WAITING_RESUBMISSION);
+		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 
 		return SUCCESS;
 	}
@@ -5067,6 +5066,7 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
+			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
@@ -5106,9 +5106,6 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 			break;
 		case WORK_QUEUE_TASK_CANCELED:
 			str = "CANCELED";
-			break;
-		case WORK_QUEUE_TASK_WAITING_RESUBMISSION:
-			str = "WAITING_RESUBMISSION";
 			break;
 		case WORK_QUEUE_TASK_UNKNOWN:
 		default:
@@ -6136,8 +6133,6 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 		buffer_printf(&B, " %s %s ", t->category, allocation);
 		rmsummary_print_buffer(&B, task_min_resources(q, t), 1);
 	} else if(state == WORK_QUEUE_TASK_CANCELED) {
-			/* do not add any info */
-	} else if(state == WORK_QUEUE_TASK_WAITING_RESUBMISSION) {
 			/* do not add any info */
 	} else if(state == WORK_QUEUE_TASK_DONE) {
 		buffer_printf(&B, " %s ", task_result_str(t->result));
