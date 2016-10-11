@@ -240,7 +240,7 @@ void pfs_resolve_file_config( const char *mountfile, int forward )
 	fclose(file);
 }
 
-pfs_resolve_t pfs_resolve_external( const char *logical_name, const char *prefix, const char *redirect, char *physical_name )
+static pfs_resolve_t pfs_resolve_external( const char *logical_name, const char *prefix, const char *redirect, char *physical_name )
 {
 	char cmd[PFS_PATH_MAX];
 	FILE *file;

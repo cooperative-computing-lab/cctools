@@ -121,7 +121,6 @@ extern struct pfs_process *pfs_current;
 extern char *pfs_false_uname;
 extern int pfs_fake_setuid;
 extern int pfs_fake_setgid;
-extern int pfs_allow_dynamic_mounts;
 
 extern int wait_barrier;
 
