@@ -513,4 +513,15 @@ void pfs_resolve_drop_ns(struct pfs_mount_entry *ns) {
 	}
 }
 
+void pfs_resolve_seal_ns(void) {
+	struct pfs_mount_entry *ns = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
+	assert(ns);
+
+	struct pfs_mount_entry *m = (struct pfs_mount_entry *) xxmalloc(sizeof(*m));
+	memcpy(m, ns, sizeof(*m));
+	memset(ns, 0, sizeof(*ns));
+	ns->parent = m;
+	ns->refcount = m->refcount;
+	m->refcount = 1;
+}
 /* vim: set noexpandtab tabstop=4: */

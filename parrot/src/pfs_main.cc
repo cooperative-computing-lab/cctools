@@ -1099,6 +1099,10 @@ int main( int argc, char *argv[] )
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
+	if (!pfs_allow_dynamic_mounts) {
+		pfs_resolve_seal_ns();
+	}
+
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 	{
 		extern char **environ;

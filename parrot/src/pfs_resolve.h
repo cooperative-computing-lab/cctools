@@ -43,5 +43,6 @@ pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t
 struct pfs_mount_entry *pfs_resolve_fork_ns( struct pfs_mount_entry *ns );
 struct pfs_mount_entry *pfs_resolve_share_ns(struct pfs_mount_entry *ns);
 void pfs_resolve_drop_ns(struct pfs_mount_entry *ns);
+void pfs_resolve_seal_ns(void);
 
 #endif
