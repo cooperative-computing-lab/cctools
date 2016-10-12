@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include "pfs_dispatch.h"
 #include "pfs_paranoia.h"
 #include "pfs_process.h"
-#include "pfs_resolve.h"
 #include "pfs_service.h"
 #include "pfs_table.h"
 #include "pfs_time.h"
@@ -19,6 +18,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "parrot_client.h"
+#include "pfs_resolve.h"
 }
 
 #ifndef PTRACE_EVENT_STOP

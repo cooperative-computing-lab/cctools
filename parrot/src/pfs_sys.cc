@@ -10,13 +10,13 @@ See the file COPYING for details.
 #include "pfs_sysdeps.h"
 #include "pfs_table.h"
 #include "pfs_process.h"
-#include "pfs_resolve.h"
 #include "pfs_service.h"
 
 extern "C" {
 #include "debug.h"
 #include "full_io.h"
 #include "file_cache.h"
+#include "pfs_resolve.h"
 #include "stringtools.h"
 }
 

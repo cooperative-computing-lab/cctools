@@ -8,13 +8,13 @@ See the file COPYING for details.
 #include "pfs_channel.h"
 #include "pfs_paranoia.h"
 #include "pfs_process.h"
-#include "pfs_resolve.h"
 
 extern "C" {
 #include "debug.h"
 #include "itable.h"
 #include "linux-version.h"
 #include "macros.h"
+#include "pfs_resolve.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 }
@@ -357,6 +357,10 @@ extern "C" char * pfs_process_name()
 	} else {
 		return (char *)"unknown";
 	}
+}
+
+extern "C" struct pfs_mount_entry *pfs_process_current_ns(void) {
+	return pfs_current && pfs_current->ns ? pfs_current->ns : NULL;
 }
 
 extern const char *pfs_username;

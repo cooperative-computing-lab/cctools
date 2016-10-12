@@ -11,10 +11,10 @@ See the file COPYING for details.
 #include "pfs_types.h"
 #include "pfs_table.h"
 #include "pfs_sysdeps.h"
-#include "pfs_resolve.h"
 
 extern "C" {
 #include "int_sizes.h"
+#include "pfs_resolve.h"
 #include "tracer.h"
 }
 
@@ -80,6 +80,7 @@ int  pfs_process_count();
 struct pfs_process * pfs_process_lookup( pid_t pid );
 int  pfs_process_cankill( pid_t pid );
 extern "C" char *pfs_process_name();
+extern "C" struct pfs_mount_entry *pfs_process_current_ns(void);
 
 extern "C" void pfs_process_killall();
 extern "C" void pfs_process_kill_everyone(int sig);

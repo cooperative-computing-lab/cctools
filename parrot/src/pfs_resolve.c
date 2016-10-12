@@ -8,15 +8,11 @@ See the file COPYING for details.
 #include "pfs_resolve.h"
 
 #include "pfs_types.h"
-#include "pfs_process.h"
-
-extern "C" {
 #include "parrot_client.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "hash_table.h"
-}
 
 #include <assert.h>
 #include <stdio.h>
@@ -30,6 +26,8 @@ extern "C" {
 #include <fcntl.h>
 #include <limits.h>
 
+struct pfs_mount_entry *pfs_process_current_ns(void);
+
 /*
 Some things that could be cleaned up in this code:
 - Use list.h instead of an embedded linked list.
@@ -37,7 +35,6 @@ Some things that could be cleaned up in this code:
 */
 
 extern char pfs_temp_dir[PFS_PATH_MAX];
-extern struct pfs_process *pfs_current;
 
 static struct pfs_mount_entry *mount_list = 0;
 static struct hash_table *resolve_cache = 0;
@@ -80,7 +77,8 @@ void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mod
 	assert(prefix);
 	assert(redirect);
 	char real_redirect[PFS_PATH_MAX];
-	struct pfs_mount_entry *ns = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
+	struct pfs_mount_entry *ns = pfs_process_current_ns();
+	if (!ns) ns = mount_list;
 	assert(ns);
 
 	debug(D_RESOLVE,"resolving %s in parent ns",redirect);
@@ -108,7 +106,8 @@ void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mod
 int pfs_resolve_remove_entry( const char *prefix )
 {
 	assert(prefix);
-	struct pfs_mount_entry *ns = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
+	struct pfs_mount_entry *ns = pfs_process_current_ns();
+	if (!ns) ns = mount_list;
 	assert(ns);
 	assert(!(ns->next && ns->parent));
 
@@ -405,7 +404,8 @@ void clean_up_path( char *path )
 
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime )
 {
-	struct pfs_mount_entry *ns = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
+	struct pfs_mount_entry *ns = pfs_process_current_ns();
+	if (!ns) ns = mount_list;
 	return pfs_resolve_ns(ns, logical_name, physical_name, mode, stoptime);
 }
 
@@ -514,7 +514,8 @@ void pfs_resolve_drop_ns(struct pfs_mount_entry *ns) {
 }
 
 void pfs_resolve_seal_ns(void) {
-	struct pfs_mount_entry *ns = pfs_current && pfs_current->ns ? pfs_current->ns : mount_list;
+	struct pfs_mount_entry *ns = pfs_process_current_ns();
+	if (!ns) ns = mount_list;
 	assert(ns);
 
 	struct pfs_mount_entry *m = (struct pfs_mount_entry *) xxmalloc(sizeof(*m));
@@ -524,4 +525,5 @@ void pfs_resolve_seal_ns(void) {
 	ns->refcount = m->refcount;
 	m->refcount = 1;
 }
+
 /* vim: set noexpandtab tabstop=4: */
