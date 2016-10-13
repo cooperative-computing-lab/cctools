@@ -464,6 +464,9 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_cores);
 	buffer_printf(&B, " %d", s.capacity_memory);
 	buffer_printf(&B, " %d", s.capacity_disk);
+	buffer_printf(&B, " %d", s.capacity_instantaneous);
+	buffer_printf(&B, " %d", s.capacity_weighted);
+	debug(D_WQ, "buffer_print of instantanteous capacity: %d and weighted capacity: %d\n", s.capacity_instantaneous, s.capacity_weighted);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -3131,8 +3134,15 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	bzero(&capacity, sizeof(capacity));
 
 	capacity.resources = rmsummary_create(0);
-
-
+	
+	struct work_queue_task_report *tr;
+	int weighted_capacity = 0;
+	double prev_capacity = 0;
+	double alpha = 0.05;
+	timestamp_t last_exec = 0;
+	timestamp_t last_transfer = 0;
+	timestamp_t delta_exec = 0;
+	timestamp_t delta_transfer = 0;
 	int count = list_size(q->task_reports);
 
 	// Compute the average task properties.
@@ -3152,11 +3162,28 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		while((tr = list_next_item(q->task_reports))) {
 			capacity.transfer_time += tr->transfer_time;
 			capacity.exec_time     += tr->exec_time;
+			delta_exec = tr->exec_time - last_exec;
+	
+			if(tr->exec_time != last_exec) {
+				last_exec = tr->exec_time;
+			}
+			if(tr->transfer_time != last_transfer) {
+				last_transfer = tr->transfer_time;
+			}
+			if(delta_exec < 0) {
+				delta_transfer += last_transfer;
+			}
 
 			if(tr->resources) {
 				capacity.resources->cores  += tr->resources ? tr->resources->cores  : 1;
 				capacity.resources->memory += tr->resources ? tr->resources->memory : 512;
 				capacity.resources->disk   += tr->resources ? tr->resources->disk   : 1024;
+			}
+
+			if(last_exec > 0 && last_transfer > 0) {
+				prev_capacity = weighted_capacity;
+				weighted_capacity = (int) ceil((alpha * (last_exec / last_transfer)) + ((1 - alpha) * weighted_capacity));
+				debug(D_WQ, "Weighted capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %f) = %d\nDelta transfer: %"PRId64"\n", alpha, last_exec, last_transfer, alpha, prev_capacity, weighted_capacity, delta_transfer);
 			}
 		}
 	}
@@ -3171,6 +3198,8 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	s->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
 	s->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
 	s->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
+	s->capacity_instantaneous = 0;
+	s->capacity_weighted = (int) ceil(weighted_capacity);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -6187,7 +6216,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
