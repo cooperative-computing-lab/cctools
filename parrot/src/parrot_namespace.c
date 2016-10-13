@@ -11,6 +11,8 @@ See the file COPYING for details.
 #include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "pfs_resolve.h"
+#include "pfs_mountfile.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -22,28 +24,16 @@ See the file COPYING for details.
 
 static void show_help()
 {
-	const char *optfmt = "%-3s %-24s %s\n";
+	const char *optfmt = "%2s %-20s %s%s\n";
 	printf("usage: parrot_namespace [options] <command>\n");
 	printf("\n");
 	printf("Where options are:\n");
-	printf(optfmt, "-M", "--mount /foo=/bar", "Mount (redirect) /foo to /bar.");
-	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run");
-	printf(optfmt, "-d", "--debug <flags>", " Enable debugging for this subsystem.");
-	printf(optfmt, "-v", "--version", "Show version number.");
-	printf(optfmt, "-h", "--help", "Help: Show these options.");
-}
-
-static void resolve_manual_config(const char *str, int forward) {
-	assert(str);
-	char *e;
-	str = xxstrdup(str);
-	e = strchr((char *) str,'=');
-	if(!e) fatal("badly formed mount string: %s",str);
-	*e = 0;
-	e++;
-	if (forward) {
-		if (parrot_mount(str, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
-	}
+	printf(optfmt, "-M", "--mount /foo=/bar", "Mount (redirect) /foo to /bar", " (PARROT_MOUNT_STRING)");
+	printf(optfmt, "-m", "--ftab-file <file>", "Use <file> as a mountlist", " (PARROT_MOUNT_FILE)");
+	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run", " (PARROT_PATH)");
+	printf(optfmt, "-d", "--debug <flags>", "Enable debugging for this subsystem", " (PARROT_DEBUG_FLAGS)");
+	printf(optfmt, "-v", "--version", "Show version number", "");
+	printf(optfmt, "-h", "--help", "Help: Show these options", "");
 }
 
 typedef enum {
@@ -80,20 +70,27 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+	s = getenv("PARROT_MOUNT_FILE");
+	if(s) pfs_mountfile_parse_file(s);
+
 	s = getenv("PARROT_MOUNT_STRING");
-	if(s) resolve_manual_config(s, parrot_in_parrot);
+	if(s) pfs_mountfile_parse_string(s);
+
+	s = getenv("PARROT_PATH");
+	if (s) snprintf(parrot_path, PATH_MAX, "%s", s);
 
 static const struct option long_options[] = {
 	{"help",  no_argument, 0, 'h'},
 	{"version", no_argument, 0, 'v'},
 	{"debug", required_argument, 0, 'd'},
 	{"mount", required_argument, 0, 'M'},
+	{"tab-file", required_argument, 0, 'm'},
 	{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 	{0,0,0,0}
 };
 
 	int c;
-	while((c=getopt_long(argc,argv,"d:vhM:", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc,argv,"d:vhM:m:", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'd':
 			debug_flags_set(optarg);
@@ -105,8 +102,11 @@ static const struct option long_options[] = {
 		case 'v':
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
+		case 'm':
+			pfs_mountfile_parse_file(optarg);
+			break;
 		case 'M':
-			resolve_manual_config(optarg, parrot_in_parrot);
+			pfs_mountfile_parse_string(optarg);
 			break;
 		case LONG_OPT_PARROT_PATH:
 			snprintf(parrot_path, PATH_MAX, "%s", optarg);

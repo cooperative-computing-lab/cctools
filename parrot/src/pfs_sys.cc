@@ -16,6 +16,7 @@ extern "C" {
 #include "debug.h"
 #include "full_io.h"
 #include "file_cache.h"
+#include "pfs_mountfile.h"
 #include "pfs_resolve.h"
 #include "stringtools.h"
 }
@@ -246,7 +247,7 @@ int pfs_mount( const char *path, const char *device, const char *mode )
 			result = -1;
 			errno = EINVAL;
 		} else {
-			pfs_resolve_add_entry(path,device,pfs_resolve_parse_mode(mode));
+			pfs_resolve_add_entry(path,device,pfs_mountfile_parse_mode(mode));
 			result = 0;
 		}
 	}

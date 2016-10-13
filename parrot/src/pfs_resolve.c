@@ -8,7 +8,7 @@ See the file COPYING for details.
 #include "pfs_resolve.h"
 
 #include "pfs_types.h"
-#include "parrot_client.h"
+#include "pfs_mountfile.h"
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -139,104 +139,11 @@ int pfs_resolve_remove_entry( const char *prefix )
 	return 0;
 }
 
-mode_t pfs_resolve_parse_mode( const char * options ) {
-	assert(options);
-	unsigned int i;
-	int mode = 0;
-	for(i = 0; i < strlen(options); i++) {
-		if(options[i] == 'r' || options[i] == 'R') {
-			mode |= R_OK;
-		} else if(options[i] == 'w' || options[i] == 'W') {
-			mode |= W_OK;
-		} else if (options[i] == 'x' || options[i] == 'X') {
-			mode |= X_OK;
-		} else {
-			return -1;
-		}
-	}
-	return mode;
-}
-
-void pfs_resolve_manual_config( const char *str, int forward  )
-{
-	assert(str);
-	char *e;
-	str = xxstrdup(str);
-	e = strchr((char *) str,'=');
-	if(!e) fatal("badly formed mount string: %s",str);
-	*e = 0;
-	e++;
-	if (forward) {
-		if (parrot_mount(str, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
-	} else {
-		pfs_resolve_add_entry(str,e,R_OK|W_OK|X_OK);
-	}
-}
-
-void pfs_resolve_file_config( const char *mountfile, int forward )
-{
-	FILE *file;
-	char line[PFS_LINE_MAX];
-	char prefix[PFS_LINE_MAX];
-	char redirect[PFS_LINE_MAX];
-	char options[PFS_LINE_MAX];
-	int fields;
-	int linenum=0;
-	int mode;
-
-	assert(mountfile);
-
-	file = fopen(mountfile,"r");
-	if(!file) fatal("couldn't open mountfile %s: %s\n",mountfile,strerror(errno));
-
-	while(1) {
-		if(!fgets(line,sizeof(line),file)) {
-			if(errno==EINTR) {
-				continue;
-			} else {
-				break;
-			}
-		}
-		linenum++;
-		if(line[0]=='#') continue;
-		string_chomp(line);
-		if(!line[0]) continue;
-		fields = sscanf(line,"%s %s %s",prefix,redirect,options);
-
-		if(fields==0) {
-			continue;
-		} else if(fields<2) {
-			fatal("%s has an error on line %d\n",mountfile,linenum);
-		} else if(fields==2) {
-			mode = pfs_resolve_parse_mode(redirect);
-			if(mode < 0) {
-				mode = R_OK|W_OK|X_OK; /* default mode */
-				if (forward) {
-					if (parrot_mount(prefix, redirect, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
-				} else {
-					pfs_resolve_add_entry(prefix,redirect,mode);
-				}
-			} else {
-				if (forward) {
-					if (parrot_mount(prefix, prefix, redirect) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
-				} else {
-					pfs_resolve_add_entry(prefix,prefix,mode);
-				}
-			}
-		} else {
-			mode = pfs_resolve_parse_mode(options);
-			if(mode < 0) {
-				fatal("%s has invalid options on line %d\n",mountfile,linenum);
-			}
-			if (forward) {
-				if (parrot_mount(prefix, redirect, options) < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
-			} else {
-				pfs_resolve_add_entry(prefix,redirect,mode);
-			}
-		}
-	}
-
-	fclose(file);
+int pfs_resolve_mount ( const char *path, const char *destination, const char *mode ) {
+	int m = pfs_mountfile_parse_mode(mode);
+	if (m < 0) return m;
+	pfs_resolve_add_entry(path, destination, m);
+	return 0;
 }
 
 static pfs_resolve_t pfs_resolve_external( const char *logical_name, const char *prefix, const char *redirect, char *physical_name )
