@@ -3137,12 +3137,12 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	
 	struct work_queue_task_report *tr;
 	int weighted_capacity = 0;
-	double prev_capacity = 0;
+	int prev_capacity = 0;
 	double alpha = 0.05;
 	timestamp_t last_exec = 0;
 	timestamp_t last_transfer = 0;
-	timestamp_t delta_exec = 0;
-	timestamp_t delta_transfer = 0;
+	int delta_exec = 0;
+	int delta_transfer = 0;
 	int count = list_size(q->task_reports);
 
 	// Compute the average task properties.
@@ -3163,6 +3163,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			capacity.transfer_time += tr->transfer_time;
 			capacity.exec_time     += tr->exec_time;
 			delta_exec = tr->exec_time - last_exec;
+			prev_capacity = weighted_capacity;
 	
 			if(tr->exec_time != last_exec) {
 				last_exec = tr->exec_time;
@@ -3170,8 +3171,12 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			if(tr->transfer_time != last_transfer) {
 				last_transfer = tr->transfer_time;
 			}
+
 			if(delta_exec < 0) {
 				delta_transfer += last_transfer;
+			}
+			else {
+				delta_transfer = last_transfer;
 			}
 
 			if(tr->resources) {
@@ -3181,9 +3186,8 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			}
 
 			if(last_exec > 0 && last_transfer > 0) {
-				prev_capacity = weighted_capacity;
-				weighted_capacity = (int) ceil((alpha * (last_exec / last_transfer)) + ((1 - alpha) * weighted_capacity));
-				debug(D_WQ, "Weighted capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %f) = %d\nDelta transfer: %"PRId64"\n", alpha, last_exec, last_transfer, alpha, prev_capacity, weighted_capacity, delta_transfer);
+				weighted_capacity = (int) ceil((alpha * (last_exec / (double) delta_transfer)) + ((1 - alpha) * prev_capacity));
+				debug(D_WQ, "\nWeighted capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\nDelta transfer: %d\n", alpha, last_exec, last_transfer, alpha, prev_capacity, weighted_capacity, delta_transfer);
 			}
 		}
 	}
