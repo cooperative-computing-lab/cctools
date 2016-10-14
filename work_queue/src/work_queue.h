@@ -244,6 +244,8 @@ struct work_queue_stats {
 	int capacity_disk;      /**< The estimated number of workers' MB of disk that this master can effectively support.*/
 	int capacity_instantaneous; /**< The estimated number of tasks that this master can support considering only the most recently completed task. */
 	int capacity_weighted; /**< The estimated number of tasks that this master can support placing greater weight on the most recently completed task. */
+	int previous_capacity_weighted; /**< The previous calculation for weighted capacity. */
+	double capacity_weight;			/**< The weight value placed on the capacity_weighted calculation. */
 
 	int64_t total_cores;      /**< Total number of cores aggregated across the connected workers. */
 	int64_t total_memory;     /**< Total memory in MB aggregated across the connected workers. */

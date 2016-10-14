@@ -3136,14 +3136,14 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	capacity.resources = rmsummary_create(0);
 	
 	struct work_queue_task_report *tr;
-	int weighted_capacity = 0;
-	int prev_capacity = 0;
 	double alpha = 0.05;
-	timestamp_t last_exec = 0;
-	timestamp_t last_transfer = 0;
-	int delta_exec = 0;
-	int delta_transfer = 0;
 	int count = list_size(q->task_reports);
+	if(!s->previous_capacity_weighted) {
+		s->previous_capacity_weighted = 0;
+	}
+	if(!s->capacity_weight) {
+		s->capacity_weight = alpha;
+	}
 
 	// Compute the average task properties.
 	if(count < 1) {
@@ -3162,22 +3162,6 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		while((tr = list_next_item(q->task_reports))) {
 			capacity.transfer_time += tr->transfer_time;
 			capacity.exec_time     += tr->exec_time;
-			delta_exec = tr->exec_time - last_exec;
-			prev_capacity = weighted_capacity;
-	
-			if(tr->exec_time != last_exec) {
-				last_exec = tr->exec_time;
-			}
-			if(tr->transfer_time != last_transfer) {
-				last_transfer = tr->transfer_time;
-			}
-
-			if(delta_exec < 0) {
-				delta_transfer += last_transfer;
-			}
-			else {
-				delta_transfer = last_transfer;
-			}
 
 			if(tr->resources) {
 				capacity.resources->cores  += tr->resources ? tr->resources->cores  : 1;
@@ -3185,10 +3169,12 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 				capacity.resources->disk   += tr->resources ? tr->resources->disk   : 1024;
 			}
 
-			if(last_exec > 0 && last_transfer > 0) {
-				weighted_capacity = (int) ceil((alpha * (last_exec / (double) delta_transfer)) + ((1 - alpha) * prev_capacity));
-				debug(D_WQ, "\nWeighted capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\nDelta transfer: %d\n", alpha, last_exec, last_transfer, alpha, prev_capacity, weighted_capacity, delta_transfer);
-			}
+		tr = list_peek_tail(q->task_reports);
+		if(tr->transfer_time > 0) {
+			s->capacity_weighted = (int) ceil((s->capacity_weight * (tr->exec_time / tr->transfer_time)) + ((1 - alpha) * s->previous_capacity_weighted));
+			s->capacity_instantaneous = tr->exec_time / tr->transfer_time;
+			s->previous_capacity_weighted = s->capacity_weighted;
+			debug(D_WQ, "\nWeighted capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\n", alpha, tr->exec_time, tr->transfer_time, alpha, s->previous_capacity_weighted, s->capacity_weighted);
 		}
 	}
 
@@ -5180,12 +5166,16 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
 
+	struct work_queue_stats *s = malloc(sizeof(struct work_queue_stats));
+	work_queue_get_stats(q, s);
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
 			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
 			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
+			compute_capacity(q, s);
+			break;
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
 			fill_deprecated_tasks_stats(t);
