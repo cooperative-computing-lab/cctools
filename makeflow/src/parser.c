@@ -460,7 +460,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 
 		free(filename);
 		free(size);
-	} else if(!strcmp(".RESOURCE", name)) {
+	} else if(!strcmp(".MAKEFLOW", name)) {
 		t = lexer_next_token(bk);
 		if(t->type != TOKEN_LITERAL)
 		{
@@ -497,7 +497,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 				lexer_report_error(bk, "Expected one of: MAX_THROUGHPUT, MIN_WASTE, FIXED.");
 			}
 		} else {
-			lexer_report_error(bk, "Unsupported .RESOURCE type, got: %s\n", t->lexeme);
+			lexer_report_error(bk, "Unsupported .MAKEFLOW directive, got: %s\n", t->lexeme);
 			return 0;
 		}
 

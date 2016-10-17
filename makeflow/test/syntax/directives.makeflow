@@ -19,7 +19,7 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 # Similar rules can be arbitrarily labeled to form sets, called categories. In
 # this example we define three categories: preprocess, analysis, and merge.
 # Rules belong to the category of the most recent CATEGORY statement.
-.RESOURCE CATEGORY merge
+.MAKEFLOW CATEGORY merge
 
 # To provide accurate assessment of the output size, estimated file sizes can
 # be specified via the .SIZE directive.
@@ -27,16 +27,16 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 # Resources needed for a single task in category may be included (optional).
 # MEMORY and DISK in MB.
-.RESOURCE CORES 1
-.RESOURCE MEMORY 50
-.RESOURCE DISK 100
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 50
+.MAKEFLOW DISK 100
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
-.RESOURCE CATEGORY analysis
-.RESOURCE CORES 1
-.RESOURCE MEMORY 10
-.RESOURCE DISK 20
+.MAKEFLOW CATEGORY analysis
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 10
+.MAKEFLOW DISK 20
 capitol.90.jpg: capitol.jpg
 	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
 
@@ -50,10 +50,10 @@ capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
 # If a rule is preceded by LOCAL, it executes at the local site.
-.RESOURCE CATEGORY preprocess
-.RESOURCE CORES 1
-.RESOURCE MEMORY 10
-.RESOURCE DISK 20
+.MAKEFLOW CATEGORY preprocess
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 10
+.MAKEFLOW DISK 20
 capitol.jpg:
 	LOCAL $CURL -o capitol.jpg $URL
 
