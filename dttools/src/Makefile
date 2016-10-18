@@ -123,6 +123,7 @@ HEADERS_PUBLIC = \
 	int_sizes.h \
 	jx.h \
 	jx_match.h \
+	histogram.h \
 	link.h \
 	md5.h \
 	rmonitor_poll.h \
