@@ -103,7 +103,7 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 	if(!units_initialized)
 		initialize_units();
 
-	double factor;
+	double factor = 1;
 
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
 
