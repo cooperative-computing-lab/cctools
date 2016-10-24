@@ -321,11 +321,6 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int assume_inde
 			continue;
 		}
 
-		if(a > top_resource) {
-			a_1 = top_resource;
-			break;
-		}
-
 		double Pa = 1 - counts_cdp[i];
 
 		if(assume_independence) {
@@ -381,11 +376,6 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 
 		if(a < 1) {
 			continue;
-		}
-
-		if(a > top_resource) {
-			a_1 = top_resource;
-			break;
 		}
 
 		double Pbef = counts_cdp[i];
