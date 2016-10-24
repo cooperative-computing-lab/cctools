@@ -221,9 +221,8 @@ void category_delete(struct hash_table *categories, const char *name) {
 	free(c);
 }
 
-void category_inc_histogram_count_aux(struct histogram *h, double value, double walltime) {
-
-	if(value >= 0 && walltime >= 0) {
+void category_inc_histogram_count_aux(struct histogram *h, double value, double wall_time) {
+	if(value >= 0 && wall_time >= 0) {
 
 		histogram_insert(h, value);
 		double *time_accum = (double *) histogram_get_data(h, value);
@@ -236,16 +235,16 @@ void category_inc_histogram_count_aux(struct histogram *h, double value, double 
 		}
 
 		// accumulate time (in seconds) for this bucket
-		*time_accum += walltime/USECOND;
+		*time_accum += wall_time/USECOND;
 	}
 }
 
 #define category_inc_histogram_count(c, field, summary)\
 {\
 	double value        = (summary)->field;\
-	double walltime     = (summary)->wall_time;\
+	double wall_time    = (summary)->wall_time;\
 	struct histogram *h = c->field##_histogram;\
-	category_inc_histogram_count_aux(h, value, walltime);\
+	category_inc_histogram_count_aux(h, value, wall_time);\
 }
 
 void category_first_allocation_accum_times(struct histogram *h, double *keys, double *tau_mean, double *counts_cdp, double *times_accum) {
@@ -321,11 +320,6 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int assume_inde
 			continue;
 		}
 
-		if(a > top_resource) {
-			a_1 = top_resource;
-			break;
-		}
-
 		double Pa = 1 - counts_cdp[i];
 
 		if(assume_independence) {
@@ -381,11 +375,6 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 
 		if(a < 1) {
 			continue;
-		}
-
-		if(a > top_resource) {
-			a_1 = top_resource;
-			break;
 		}
 
 		double Pbef = counts_cdp[i];

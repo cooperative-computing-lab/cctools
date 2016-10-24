@@ -90,9 +90,11 @@ double histogram_bucket_size(struct histogram *h) {
 }
 
 
+/* buckets are: (start, end], with end as the key. */
 uint64_t bucket_of(struct histogram *h, double value) {
 
-	uint64_t b = abs(floor(value/h->bucket_size));
+	uint64_t b = ceil(value/h->bucket_size);
+	b = abs(b);
 
 	/*
 	 * times 2 so that we can intercalate negative and positive values. itable
@@ -112,8 +114,8 @@ uint64_t bucket_of(struct histogram *h, double value) {
 	return b;
 }
 
-/* return the smallest value that would fall inside the bucket id */
-double start_of(struct histogram *h, uint64_t b) {
+/* return the largest value that would fall inside the bucket id */
+double end_of(struct histogram *h, uint64_t b) {
 
 	/* even b's correspond to negative values */
 	int is_negative = (b % 2 == 0);
@@ -151,7 +153,7 @@ int histogram_insert(struct histogram *h, double value) {
 	}
 
 	if(box->count > mode_count) {
-		h->mode       = start_of(h, bucket);
+		h->mode       = end_of(h, bucket);
 	}
 
 	return box->count;
@@ -200,7 +202,7 @@ double *histogram_buckets(struct histogram *h) {
 
 	itable_firstkey(h->buckets);
 	while(itable_nextkey(h->buckets, &key, (void **) &box)) {
-		values[i] = start_of(h, key);
+		values[i] = end_of(h, key);
 		i++;
 	}
 
