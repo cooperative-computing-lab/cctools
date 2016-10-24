@@ -22,6 +22,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*inputs) {
   struct dag_file *f;
@@ -50,6 +51,8 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   char *caching_file_path = NULL, *output_file_path = NULL, *source_makeflow_file_path = NULL, *ancestor_file_path = NULL;
   char *ancestor_cache_id_string = NULL;
   char caching_prefix[3] = "";
+  char *ancestor_output_file_path = NULL;
+  char *input_file = NULL;
   struct dag_node *ancestor;
   struct dag_file *f;
   int sucess;
@@ -61,6 +64,13 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   sucess = create_dir(caching_file_path, 0777);
   if (!sucess) {
     fatal("Could not create caching directory %s\n", caching_file_path);
+  }
+
+  caching_file_path = xxstrdup(d->caching_directory);
+  caching_file_path = string_combine_multi(caching_file_path, caching_prefix, "/", n->cache_id, "/input_files", 0);
+  sucess = create_dir(caching_file_path, 0777);
+  if (!sucess) {
+    fatal("Could not create input_files directory %s\n", source_makeflow_file_path);
   }
 
   list_first_item(outputs);
@@ -95,6 +105,37 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   } else {
     fprintf(fp, "%s\n", ancestor_cache_id_string);
   }
+
+  /* create links to input files */
+  list_first_item(n->source_files);
+  while ((f=list_next_item(n->source_files))) {
+    if (f->created_by == 0) {
+      strncpy(caching_prefix, n->cache_id, 2);
+      input_file= xxstrdup(d->caching_directory);
+      input_file= string_combine_multi(input_file, caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
+      sucess = copy_file_to_file(f->filename, input_file);
+      if (!sucess) {
+        fatal("Could not cache input file %s\n", source_makeflow_file_path);
+      }
+    } else {
+      ancestor = f->created_by;
+      strncpy(caching_prefix, ancestor->cache_id, 2);
+      ancestor_output_file_path= xxstrdup(d->caching_directory);
+      ancestor_output_file_path= string_combine_multi(ancestor_output_file_path, caching_prefix, "/", ancestor->cache_id, "/outputs/", f->filename, 0);
+
+      strncpy(caching_prefix, n->cache_id, 2);
+      input_file= xxstrdup(d->caching_directory);
+      input_file= string_combine_multi(input_file, caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
+
+      sucess = symlink(ancestor_output_file_path, input_file);
+      if (sucess == -1) {
+        fatal("Could not create input file symlink %s\n", input_file);
+      }
+    }
+  }
+
+  free(ancestor_output_file_path);
+  free(input_file);
   free(caching_file_path);
   free(output_file_path);
   free(source_makeflow_file_path);
@@ -128,7 +169,7 @@ int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struc
 }
 
 int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_queue *queue) {
-  char *filename;
+  char *filename = NULL;
   struct dag_file *f;
   struct stat buf;
   int file_exists = -1;
