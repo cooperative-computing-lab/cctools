@@ -1585,6 +1585,8 @@ int main(int argc, char **argv)
 
 	debug(D_RMON, "Reading summaries.");
 
+	category_tune_bucket_size("category-steady-n-tasks", 10000000000);
+
 	if(input_list)
 	{
 		parse_summary_from_filelist(all_summaries, input_list, categories);
