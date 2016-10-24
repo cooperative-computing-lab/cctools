@@ -137,7 +137,7 @@ OBJECTS = $(SOURCES:%.c=%.o)
 PROGRAMS = catalog_update catalog_server catalog_query watchdog disk_allocator
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test
 
 all: $(TARGETS)
 
