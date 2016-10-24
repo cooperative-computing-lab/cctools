@@ -144,11 +144,11 @@ int histogram_insert(struct histogram *h, double value) {
 
 	int mode_count = histogram_count(h, histogram_mode(h));
 
-	if(value > h->max_value || mode_count == 0) {
+	if(value > h->max_value || h->total_count < 1) {
 		h->max_value = value;
 	}
 
-	if(value < h->min_value || mode_count == 0) {
+	if(value < h->min_value || h->total_count < 1) {
 		h->min_value = value;
 	}
 

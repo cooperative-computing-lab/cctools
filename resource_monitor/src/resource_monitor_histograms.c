@@ -8,10 +8,13 @@ See the file COPYING for details.
 #include <omp.h>
 
 #include "resource_monitor_tools.h"
-#include "create_dir.h"
+
 #include "category_internal.h"
-#include "macros.h"
+#include "create_dir.h"
 #include "copy_stream.h"
+#include "jx.h"
+#include "jx_pretty_print.h"
+#include "macros.h"
 #include "timestamp.h"
 
 #define MAX_LINE 1024
@@ -25,6 +28,7 @@ See the file COPYING for details.
 
 const char *field_order[] = {
 	"cores",
+	"cores_avg",
 	"disk",
 	"memory",
 	"virtual_memory",
@@ -616,67 +620,53 @@ struct field_stats *histogram_of_field(struct rmsummary_set *source, const char 
 	return h;
 }
 
-#define write_stats_header_cols(file, name)\
-	fprintf(file, "fa_%s,waste,through,retries,time,done,", #name)
+struct jx *allocation_to_json(const char *field, struct allocation *alloc) {
 
-void write_histogram_stats_header(FILE *stream)
-{
-	fprintf(stream, "resource,units,");
-	fprintf(stream, "count,mean,std_dev,");
-	fprintf(stream, "min,usage,");
-
-	write_stats_header_cols(stream, perfect);
-	write_stats_header_cols(stream, max);
-	write_stats_header_cols(stream, 95);
-
-	if(brute_force) {
-		write_stats_header_cols(stream, min_waste_bf);
-		write_stats_header_cols(stream, max_throu_bf);
-	}
-
-	write_stats_header_cols(stream, min_waste_ti);
-	write_stats_header_cols(stream, min_waste_td);
-	write_stats_header_cols(stream, max_throu);
-
-	fprintf(stream, "p_25,p_50,p_75,p_99\n");
-}
-
-void write_stats_row(FILE *file, const char *field, struct allocation *alloc) {
+	struct jx *j = jx_object(NULL);
 
 	double value  = rmsummary_to_external_unit(field, alloc->first);
 	double ttaken = rmsummary_to_external_unit("wall_time", alloc->time_taken);
 
-	char *fmt = string_format("%%.%dlf,%%.0lf,%%lf,%%d,%%.3lf,%%.0lf,", (rmsummary_field_is_float(field) ? 3 : 0));
+	jx_insert_double(j, "allocation", value);
+	jx_insert_double(j, "waste",      alloc->waste);
+	jx_insert_double(j, "throughput", alloc->throughput);
+	jx_insert_double(j, "retries",    alloc->retries);
+	jx_insert_double(j, "time_taken", ttaken);
+	jx_insert_double(j, "tasks_done", alloc->tasks_done);
 
-	fprintf(file, fmt, value, ceil(alloc->waste), alloc->throughput, alloc->retries, ttaken, alloc->tasks_done);
-
-	free(fmt);
+	return j;
 }
 
-void write_histogram_stats(FILE *stream, struct field_stats *h)
+struct jx *field_to_json(struct field_stats *h)
 {
-	fprintf(stream, "%s,%s,", sanitize_path_name(h->field), rmsummary_unit_of(h->field));
-	fprintf(stream, "%d,%.0lf,%.2lf,", h->total_count, ceil(h->mean), sqrt(h->variance));
-	fprintf(stream, "%.0lf,%" PRId64 ",", histogram_min_value(h->histogram), h->usage);
+	struct jx *j = jx_object(NULL);
 
-	write_stats_row(stream, h->field, &(h->fa_perfect));
-	write_stats_row(stream, h->field, &(h->fa_max));
-	write_stats_row(stream, h->field, &(h->fa_95));
+	jx_insert_string(j, "units",    rmsummary_unit_of(h->field));
+
+	jx_insert_double(j,  "mean", h->mean);
+	jx_insert_double(j,  "std-dev", sqrt(h->variance));
+	jx_insert_double(j,  "min", histogram_min_value(h->histogram));
+
+	jx_insert_double(j, "usage", h->usage);
+
+	struct jx *policies = jx_object(NULL);
+
+	jx_insert(policies, jx_string("perfect"), allocation_to_json(h->field, &(h->fa_perfect)));
+	jx_insert(policies, jx_string("maximum"), allocation_to_json(h->field, &(h->fa_max)));
+	jx_insert(policies, jx_string("P95"),     allocation_to_json(h->field, &(h->fa_95)));
 
 	if(brute_force) {
-		write_stats_row(stream, h->field, &(h->fa_min_waste_brute_force));
-		write_stats_row(stream, h->field, &(h->fa_max_throughput_brute_force));
+		jx_insert(policies, jx_string("min_waste_brute_force"),      allocation_to_json(h->field, &(h->fa_min_waste_brute_force)));
+		jx_insert(policies, jx_string("max_throughput_brute_force"), allocation_to_json(h->field, &(h->fa_max_throughput_brute_force)));
 	}
 
-	write_stats_row(stream, h->field, &(h->fa_min_waste_time_independence));
-	write_stats_row(stream, h->field, &(h->fa_min_waste_time_dependence));
-	write_stats_row(stream, h->field, &(h->fa_max_throughput));
+	jx_insert(policies, jx_string("min_waste"),       allocation_to_json(h->field, &(h->fa_min_waste_time_dependence)));
+	jx_insert(policies, jx_string("min_waste_naive"), allocation_to_json(h->field, &(h->fa_min_waste_time_independence)));
+	jx_insert(policies, jx_string("max_throughput"),  allocation_to_json(h->field, &(h->fa_max_throughput)));
 
-	fprintf(stream, "%.2lf,%.2lf,%.2lf,%.2lf\n",
-			value_of_p(h, 0.25),
-			value_of_p(h, 0.50),
-			value_of_p(h, 0.75),
-			value_of_p(h, 0.99));
+	jx_insert(j, jx_string("policies"), policies);
+
+	return j;
 }
 
 #define LOOP_FIELD(field) {int ifc = 0; const char *field; for(field = field_order[ifc]; field; ifc++, field = field_order[ifc])
@@ -1014,12 +1004,17 @@ int64_t min_waste_brute_force_field(struct field_stats *h) {
 	double   min_waste     = DBL_MAX;
 	uint64_t min_candidate = histogram_max_value(h->histogram);
 
+	uint64_t jump = 1;
+	if(field_is_cumulative(h->field)) {
+		jump = USECOND;
+	}
+
 	uint64_t prev = 0;
 	for(int i = 0; i < h->total_count; i++) {
 		uint64_t candidate = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
 
 		if( i > 0 ) {
-			if(candidate - prev < 1)
+			if(candidate - prev < jump)
 				continue;
 		}
 
@@ -1057,12 +1052,17 @@ int64_t max_throughput_brute_force_field(struct field_stats *h) {
 	double   best_throughput = 0;
 	uint64_t max_candidate  = histogram_max_value(h->histogram);
 
+	uint64_t jump = 1;
+	if(field_is_cumulative(h->field)) {
+		jump = USECOND;
+	}
+
 	uint64_t prev = 0;
 	for(int i = 0; i < h->total_count; i++) {
 		uint64_t candidate = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
 
 		if( i > 0 ) {
-			if(candidate - prev < 1)
+			if(candidate - prev < jump)
 				continue;
 		}
 
@@ -1134,19 +1134,37 @@ void set_first_allocations_of_category(struct rmsummary_set *s, struct hash_tabl
 	set_fa_max(s, categories);
 }
 
-void write_stats_of_category(struct rmsummary_set *s)
+struct jx *overheads_to_json(struct rmsummary_set *s)
 {
-	char *name_raw   = sanitize_path_name(s->category_name);
-	char *filename      = string_format("%s/%s.stats", output_directory, name_raw);
+	debug(D_RMON, "Writing overheads for %s", s->category_name);
 
-	FILE *f_stats  = open_file(filename);
+	struct jx *j = jx_object(NULL);
 
-	free(name_raw);
-	free(filename);
+	jx_insert_double(j, "input", rmsummary_to_external_unit("wall_time", input_overhead));
+
+	if(brute_force) {
+		jx_insert_double(j, "min_waste_brute_force",      rmsummary_to_external_unit("wall_time", s->overhead_min_waste_brute_force));
+		jx_insert_double(j, "max_throughput_brute_force", rmsummary_to_external_unit("wall_time", s->overhead_max_throughput_brute_force));
+	}
+
+	jx_insert_double(j, "min_waste",       rmsummary_to_external_unit("wall_time", s->overhead_min_waste_time_independence));
+	jx_insert_double(j, "min_waste_naive", rmsummary_to_external_unit("wall_time", s->overhead_min_waste_time_dependence));
+	jx_insert_double(j, "max_throughput",  rmsummary_to_external_unit("wall_time", s->overhead_max_throughput));
+
+	return j;
+}
+
+
+
+struct jx *category_to_json(struct rmsummary_set *s)
+{
+	struct jx *j = jx_object(NULL);
 
 	debug(D_RMON, "Writing stats for %s", s->category_name);
 
-	write_histogram_stats_header(f_stats);
+	jx_insert_integer(j, "count", list_size(s->summaries));
+
+	struct jx *resources = jx_object(NULL);
 
 	LOOP_FIELD(field_name) {
 		if(!field_is_active(field_name)) {
@@ -1154,78 +1172,16 @@ void write_stats_of_category(struct rmsummary_set *s)
 		}
 
 		struct field_stats *h = hash_table_lookup(s->stats, field_name);
-		write_histogram_stats(f_stats, h);
+
+		jx_insert(resources, jx_string(field_name), field_to_json(h));
+
 	} LOOP_END
 
-	fclose(f_stats);
+	jx_insert(j, jx_string("resources"), resources);
+	jx_insert(j, jx_string("overheads"),  overheads_to_json(s));
+
+	return j;
 }
-
-void write_limits_of_category(struct rmsummary_set *s)
-{
-
-	char *name_raw   = sanitize_path_name(s->category_name);
-	char *filename      = string_format("%s/%s.limits", output_directory, name_raw);
-
-	FILE *f_limits      = open_file(filename);
-
-	free(filename);
-	free(name_raw);
-
-	debug(D_RMON, "Writing limits for %s", s->category_name);
-
-	LOOP_FIELD(field_name) {
-		if(!field_is_active(field_name)) {
-			continue;
-		}
-
-		struct field_stats *h = hash_table_lookup(s->stats, field_name);
-		fprintf(f_limits, "%s: %" PRId64 "\n", h->field, h->fa_max_throughput.first);
-	} LOOP_END
-
-	fclose(f_limits);
-}
-
-void write_overheads_of_category(struct rmsummary_set *s)
-{
-	char *name_raw   = sanitize_path_name(s->category_name);
-	char *filename   = string_format("%s/%s.overheads", output_directory, name_raw);
-
-	FILE *f_ovhs  = open_file(filename);
-
-	debug(D_RMON, "Writing overheads for %s", s->category_name);
-
-	free(name_raw);
-	free(filename);
-
-	fprintf(f_ovhs, "task_count,");
-	fprintf(f_ovhs, "input,");
-
-	if(brute_force) {
-		fprintf(f_ovhs, "min_waste_brute_force,");
-		fprintf(f_ovhs, "max_throughput_brute_force,");
-	}
-
-	fprintf(f_ovhs, "time_independence,");
-	fprintf(f_ovhs, "time_dependence,");
-	fprintf(f_ovhs, "max_throughput\n");
-
-
-	fprintf(f_ovhs, "%d,",  list_size(s->summaries));
-	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", input_overhead));
-
-	if(brute_force) {
-		fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_min_waste_brute_force));
-		fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_max_throughput_brute_force));
-	}
-
-	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_min_waste_time_independence));
-	fprintf(f_ovhs, "%lf,", rmsummary_to_external_unit("wall_time", s->overhead_min_waste_time_dependence));
-	fprintf(f_ovhs, "%lf\n", rmsummary_to_external_unit("wall_time", s->overhead_max_throughput));
-
-
-	fclose(f_ovhs);
-}
-
 
 char *copy_outlier(struct rmsummary *s) {
 	static int count = 0;
@@ -1298,6 +1254,7 @@ void write_webpage_stats_header(FILE *stream, struct field_stats *h)
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >(&mu;+&sigma;)/&mu;</td>");
 
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max value<br> &#9663; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max through<br> &#9663; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. min waste </td>");
 
@@ -1318,7 +1275,9 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	}
 	fprintf(stream, "</td>");
 
-	const char *fmt = (rmsummary_field_is_float(h->field) ? "%.3lf\n" : "%.0lf\n");
+	const char *fmt       = (rmsummary_field_is_float(h->field) ? "%.3lf\n" : "%.0lf\n");
+	const char *fmt_alloc = (rmsummary_field_is_float(h->field) ? "alloc:&nbsp;%.3lf\n" : "alloc:&nbsp;%.0lf\n");
+	const char *fmt_stats = "throu:&nbsp;%.2lf waste:&nbsp;%.0lf%%\n";
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
 	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, histogram_mode(h->histogram)));
@@ -1332,21 +1291,35 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	fprintf(stream, "%6.2lf\n", h->mean > 0 ? (h->mean + sqrt(h->variance))/h->mean : -1);
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(stream, "<td class=\"data\">\n");
+	fprintf(stream, fmt_stats, h->fa_max.throughput/h->fa_max.throughput, ((100.0*h->fa_max.waste)/(h->fa_max.waste + h->usage)));
+	fprintf(stream, "<br><br>\n");
+	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max.first));
 	fprintf(stream, "</td>\n");
 
-	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
+	fprintf(stream, "<td class=\"data\">\n");
+	fprintf(stream, fmt_stats, h->fa_max_throughput.throughput/h->fa_max.throughput, ((100.0*h->fa_max_throughput.waste)/(h->fa_max_throughput.waste + h->usage)));
+	fprintf(stream, "<br><br>\n");
+	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(stream, "</td>\n");
+
+	fprintf(stream, "<td class=\"data\">\n");
+	fprintf(stream, fmt_stats, h->fa_min_waste_time_dependence.throughput/h->fa_max.throughput, ((100.0*h->fa_min_waste_time_dependence.waste)/(h->fa_min_waste_time_dependence.waste + h->usage)));
+	fprintf(stream, "<br><br>\n");
+	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
-		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
+		fprintf(stream, "<td class=\"data\">\n");
+		fprintf(stream, fmt_stats, h->fa_max_throughput_brute_force.throughput/h->fa_max.throughput, ((100.0*h->fa_max_throughput_brute_force.waste)/(h->fa_max_throughput_brute_force.waste + h->usage)));
+		fprintf(stream, "<br><br>\n");
+		fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
 		fprintf(stream, "</td>\n");
 
-		fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-		fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
+		fprintf(stream, "<td class=\"data\">\n");
+		fprintf(stream, fmt_stats, h->fa_min_waste_brute_force.throughput/h->fa_max.throughput, ((100.0*h->fa_min_waste_brute_force.waste)/(h->fa_min_waste_brute_force.waste + h->usage)));
+		fprintf(stream, "<br><br>\n");
+		fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
 		fprintf(stream, "</td>\n");
 	}
 }
@@ -1417,7 +1390,7 @@ void write_front_page(char *workflow_name)
 	char *filename = string_format("%s/index.html", output_directory);
 	fo = fopen(filename, "w");
 
-	int columns = brute_force ? 8 : 6;
+	int columns = brute_force ? 9 : 7;
 
 	if(!fo)
 		fatal("Could not open file %s for writing: %s\n", strerror(errno));
@@ -1517,7 +1490,7 @@ int main(int argc, char **argv)
 	debug_config(argv[0]);
 
 	signed char c;
-	while( (c = getopt(argc, argv, "bD:d:f:hL:mno:")) > -1 )
+	while( (c = getopt(argc, argv, "bD:d:f:j:hL:mno:")) > -1 )
 	{
 		switch(c)
 		{
@@ -1537,10 +1510,14 @@ int main(int argc, char **argv)
 				brute_force = 1;
 				break;
 			case 'm':
-				/* brute force, small bucket size */
-				category_tune_bucket_size("time",   10*USECOND);
-				category_tune_bucket_size("memory", 1);
-				category_tune_bucket_size("disk",   1);
+				/* smaller bucket size */
+				category_tune_bucket_size("time",   USECOND);
+				category_tune_bucket_size("memory", 5);
+				category_tune_bucket_size("disk",   5);
+				break;
+			case 'j':
+				/* smaller bucket size */
+				omp_set_num_threads(atoi(optarg));
 				break;
 			case 'n':
 				webpage_mode = 0;
@@ -1583,11 +1560,6 @@ int main(int argc, char **argv)
 		workflow_name = output_directory;
 	}
 
-	// add some resolution to the cores.
-	// we turn mcores into the internal unit, cores in the external
-	rmsummary_add_conversion_field("cores", "mcores", "cores", 1);
-	rmsummary_add_multiplier("cores", 1000);
-
 	categories = hash_table_create(0, 0);
 	all_sets = list_create();
 
@@ -1613,6 +1585,7 @@ int main(int argc, char **argv)
 	input_overhead = timestamp_get() - input_overhead;
 
 
+	struct jx *report = jx_object(NULL);
 	if(list_size(all_summaries->summaries) > 0)
 	{
 		/* construct field_statss across all categories/resources. */
@@ -1625,9 +1598,7 @@ int main(int argc, char **argv)
 
 			set_usage(s);
 
-			write_stats_of_category(s);
-			write_limits_of_category(s);
-			write_overheads_of_category(s);
+			jx_insert(report, jx_string(s->category_name), category_to_json(s));
 
 			if(webpage_mode)
 			{
@@ -1635,6 +1606,12 @@ int main(int argc, char **argv)
 			}
 		}
 	}
+
+	char *output_file = string_format("%s/stats.json", output_directory);
+	FILE *f_stats  = open_file(output_file);
+	jx_pretty_print_stream(report, f_stats);
+	fclose(f_stats);
+	free(output_file);
 
 	if(webpage_mode)
 	{

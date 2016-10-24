@@ -16,6 +16,7 @@ format        = 'svg'
 extension     = format
 resolution    = 30          # this many seconds to one log entry. Default is 30 seconds.
 x_range       = None        # If unspecified, then plot all the valid range.
+geometry      = "600,480"   # width,height in pixels
 
 log_entries   = None
 times         = None
@@ -157,14 +158,14 @@ class WQPlot:
 
     def __preamble_common(self, file):
         pout(file, """
-set term {fmt} butt linewidth 1
+set term {fmt} size {geo} butt linewidth 1
 set title  '{title}'
 set xlabel 'master lifetime in {x_units}'
 set ylabel '{y_units}'
 set yrange [0:]
 set noborder
 set tics nomirror out
-""".format(fmt=format, title=self.title, x_units=unit_labels[self.x_units], y_units=self.ylabel))
+""".format(fmt=format, geo=geometry, title=self.title, x_units=unit_labels[self.x_units], y_units=self.ylabel))
 
         if self.stack:
             pout(file, "set key below\n")
@@ -247,24 +248,25 @@ class WQPlotLog(WQPlot):
         pout(file, '')
 
 def show_usage():
-    print '%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
+    print '\n%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
     print '\t-h\t\t\tThis message.'
     print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
     print '\t\t\t\tDefault is gnuplot.'
     print '\t-o <prefix-output>\tGenerate prefix-output.{workers,workers-accum,tasks,tasks-accum,time-master,time-workers,transfer,cores}.%s.' % (format,)
-    print '\t\t\t\tDefault is <work-queue-log>.'
-    print '\t-s <seconds>\t\tSample log every <seconds> (default is %f).\n' % (resolution,)
+    print '\t\t\t\tDefault is <work-queue-log>.\n'
     print '\t-r <range>\t\tRange of time to plot, in time units (see -u) from'
     print '\t\t\t\tthe start of execution. Of the form: min:max, min:, or :max.'
-    print '\t-T <output-format>\tSet output format. Default is png.'
-    print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
+    print '\t-s <seconds>\t\tSample log every <seconds> (default is %f).' % (resolution,)
     print '\t-u <time-unit>\t\tTime scale to output. One of s,m,h or d, for seconds,'
-    print '\t\t\t\tminutes (default), hours or days.'
+    print '\t\t\t\tminutes (default), hours or days.\n'
+    print '\t-T <output-format>\tSet output format. Default is %s.' % (format,)
+    print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
+    print '\t-g <width,height>\tSize of each plot. Default is %s.\n' % (geometry,)
 
 if __name__ == '__main__':
 
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], 'c:ho:r:s:T:u:')
+        optlist, args = getopt.getopt(sys.argv[1:], 'c:g:ho:r:s:T:u:')
     except getopt.GetoptError as e:
         sys.stderr.write(str(e) + '\n')
         show_usage()
@@ -289,6 +291,8 @@ if __name__ == '__main__':
             x_range = arg
         elif opt == '-s':
             resolution = float(arg)
+        elif opt == '-g':
+            geometry = arg
         elif opt == '-T':
             if arg == 'text':
                 gnuplot_cmd = 'cat'

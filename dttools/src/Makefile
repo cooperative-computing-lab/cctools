@@ -121,6 +121,7 @@ HEADERS_PUBLIC = \
 	copy_tree.h \
 	debug.h \
 	hash_table.h \
+	histogram.h \
 	http_query.h \
 	int_sizes.h \
 	jx.h \

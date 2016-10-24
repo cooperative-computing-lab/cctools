@@ -59,6 +59,7 @@ struct category {
 	struct rmsummary *autolabel_resource;
 
 	struct histogram *cores_histogram;
+	struct histogram *cores_avg_histogram;
 	struct histogram *wall_time_histogram;
 	struct histogram *cpu_time_histogram;
 	struct histogram *max_concurrent_processes_histogram;
