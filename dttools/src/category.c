@@ -247,28 +247,23 @@ void category_inc_histogram_count_aux(struct histogram *h, double value, double 
 	category_inc_histogram_count_aux(h, value, wall_time);\
 }
 
-void category_first_allocation_accum_times(struct histogram *h, double *keys, double *tau_mean, double *counts_cdp, double *times_accum) {
+void category_first_allocation_accum_times(struct histogram *h, double *keys, double *tau_mean, double *counts_accum, double *times_accum) {
 
 	int n = histogram_size(h);
 
-	double *times_mean = malloc(n*sizeof(double));
-	double *counts     = malloc(n*sizeof(double));
+	double *times_values = malloc(n*sizeof(double));
+	double *counts       = malloc(n*sizeof(double));
 
-	// accumulate counts and compute mean times per bucket...
+	// accumulate counts...
 	int i;
 	for(i = 0; i < n; i++) {
 		int count          = histogram_count(h, keys[i]);
 		double *time_value = (double *) histogram_get_data(h, keys[i]);
 		counts[i]          = count;
-		times_mean[i]      = (*time_value)/count;
-	}
-	//... and compute the probability distribution and cumulative
-	for(i = 0; i < n; i++) {
-		counts_cdp[i]  = (i > 0 ? counts_cdp[i-1] : 0) + counts[i];
+		times_values[i]    = *time_value;
 	}
 	for(i = 0; i < n; i++) {
-		counts[i]     /= counts_cdp[n-1];
-		counts_cdp[i] /= counts_cdp[n-1];
+		counts_accum[i]  = (i > 0 ? counts_accum[i-1] : 0) + counts[i];
 	}
 
 	// compute proportion of mean time for buckets larger than i, for each i.
@@ -277,15 +272,24 @@ void category_first_allocation_accum_times(struct histogram *h, double *keys, do
 		if(i == n-1) {
 			times_accum[i] = 0;
 		} else {
-			times_accum[i] = times_accum[i+1] + (times_mean[i+1] * counts[i+1]);
+
+			/* formula is:
+			 * times_accum[i] = times_accum[i+1] + (time_average[i+1] * p(keys[i+1])
+			 * with:
+			 * time_average[j] = times_accum[j] / counts[j]
+			 * p(keys[j])      = counts[j]/counts_accum[n-1]
+			 *
+			 * which simplifies to:
+			 */
+			times_accum[i] = times_accum[i+1] + (times_values[i+1] / counts_accum[n-1]);
 		}
 	}
 
 	// set overall mean time
-	*tau_mean = times_accum[0] + (times_mean[0] * counts[0]);
+	*tau_mean = times_accum[0] + (times_values[0] / counts_accum[n-1]);
 
 	free(counts);
-	free(times_mean);
+	free(times_values);
 }
 
 int64_t category_first_allocation_min_waste(struct histogram *h, int assume_independence, int64_t top_resource) {
@@ -301,10 +305,10 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int assume_inde
 
 	double *keys = histogram_buckets(h);
 	double tau_mean;
-	double *counts_cdp  = malloc(n*sizeof(double));
+	double *counts_accum  = malloc(n*sizeof(double));
 	double *times_accum = malloc(n*sizeof(double));
 
-	category_first_allocation_accum_times(h, keys, &tau_mean, counts_cdp, times_accum);
+	category_first_allocation_accum_times(h, keys, &tau_mean, counts_accum, times_accum);
 
 	int64_t a_1 = top_resource;
 	int64_t a_m = top_resource;
@@ -320,7 +324,7 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int assume_inde
 			continue;
 		}
 
-		double Pa = 1 - counts_cdp[i];
+		double Pa = 1 - (counts_accum[i]/counts_accum[n-1]);
 
 		if(assume_independence) {
 			Ea = a + a_m*Pa;
@@ -339,7 +343,7 @@ int64_t category_first_allocation_min_waste(struct histogram *h, int assume_inde
 		a_1 = top_resource;
 	}
 
-	free(counts_cdp);
+	free(counts_accum);
 	free(times_accum);
 	free(keys);
 
@@ -359,10 +363,10 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 
 	double *keys = histogram_buckets(h);
 	double tau_mean;
-	double *counts_cdp  = malloc(n*sizeof(double));
-	double *times_accum = malloc(n*sizeof(double));
+	double *counts_accum = malloc(n*sizeof(double));
+	double *times_accum  = malloc(n*sizeof(double));
 
-	category_first_allocation_accum_times(h, keys, &tau_mean, counts_cdp, times_accum);
+	category_first_allocation_accum_times(h, keys, &tau_mean, counts_accum, times_accum);
 
 	int64_t a_1 = top_resource;
 	int64_t a_m = top_resource;
@@ -377,8 +381,22 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 			continue;
 		}
 
-		double Pbef = counts_cdp[i];
-		double Paft = 1 - Pbef;
+		/*
+		 * Formula is:
+		 * numerator  = (a_m/a) * P(r \le a) + P(r \ge a)
+		 * denomintor = time_mean + Sum{r \ge a} time_mean(r) p(r)
+		 * argmax_{a_1} = numerator/denominator
+		 *
+		 * Multiplying by total_count (value of counts_accum[n-1]), the argmax
+		 * does not change, but we eliminate two divisons in the numerator:
+		 *
+		 * numerator  = (a_m/a) * counts_accum(r \le a) + counts_accum(r \ge a)
+		 *
+		 * which is what we compute below.
+		 */
+
+		double Pbef = counts_accum[i];
+		double Paft = counts_accum[n-1] - Pbef;
 
 		double numerator   = (Pbef*a_m)/a + Paft;
 		double denominator = tau_mean + times_accum[i];
@@ -395,7 +413,7 @@ int64_t category_first_allocation_max_throughput(struct histogram *h, int64_t to
 		a_1 = top_resource;
 	}
 
-	free(counts_cdp);
+	free(counts_accum);
 	free(times_accum);
 	free(keys);
 
