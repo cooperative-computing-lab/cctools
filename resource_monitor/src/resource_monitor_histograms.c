@@ -1476,7 +1476,6 @@ static void show_usage(const char *cmd)
 	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
 	fprintf(stdout, "%-20s Split on task categories.\n", "-s");
 	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations. (slow)\n", "-b");
-	fprintf(stdout, "%-20s Use smallest bucket sizes to compute proposed resource allocations. (slow)\n", "-m");
 	fprintf(stdout, "%-20s Do not plot histograms.\n", "-n");
 	fprintf(stdout, "%-20s Select these fields for the histograms.     (Default is: cores,memory,disk).\n\n", "-f <fields>");
 	fprintf(stdout, "%-20s Show this message.\n", "-h,--help");
@@ -1490,7 +1489,7 @@ int main(int argc, char **argv)
 	debug_config(argv[0]);
 
 	signed char c;
-	while( (c = getopt(argc, argv, "bD:d:f:j:hL:mno:")) > -1 )
+	while( (c = getopt(argc, argv, "bd:f:j:hL:no:")) > -1 )
 	{
 		switch(c)
 		{
@@ -1508,12 +1507,6 @@ int main(int argc, char **argv)
 				break;
 			case 'b':
 				brute_force = 1;
-				break;
-			case 'm':
-				/* smaller bucket size */
-				category_tune_bucket_size("time",   USECOND);
-				category_tune_bucket_size("memory", 5);
-				category_tune_bucket_size("disk",   5);
 				break;
 			case 'j':
 				/* smaller bucket size */
