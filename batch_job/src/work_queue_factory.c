@@ -52,7 +52,7 @@ static int workers_min = 5;
 static int workers_max = 100;
 static int workers_per_cycle = 5; // same as workers_min
 
-static double tasks_per_worker = -1;
+static int tasks_per_worker = -1;
 static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
@@ -203,7 +203,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 	}
 
 	if(tasks_per_worker > 0) {
-		needed_workers = (int) ceil(needed_workers / tasks_per_worker);
+		needed_workers = (int) ceil(needed_workers / (tasks_per_worker * 1.0));
 	}
 
 	return needed_workers;
@@ -479,7 +479,7 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_factory_timeout_option, factory_timeout, factory-timeout, int, JX_INTEGER, integer_value)
 
-	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_DOUBLE, double_value)
+	assign_new_value(new_tasks_per_worker, tasks_per_worker, tasks-per-worker, double, JX_INTEGER, integer_value)
 
 	assign_new_value(new_project_regex, project_regex, master-name, const char *, JX_STRING, string_value)
 	assign_new_value(new_foremen_regex, foremen_regex, foremen-name, const char *, JX_STRING, string_value)
@@ -563,7 +563,7 @@ int read_config_file(const char *config_file) {
 	fprintf(stdout, "min-workers: %d\n", workers_min);
 	fprintf(stdout, "workers-per-cycle: %d\n", workers_per_cycle);
 
-	fprintf(stdout, "tasks-per-worker: %3.3lf\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
+	fprintf(stdout, "tasks-per-worker: %" PRId64 "\n", tasks_per_worker > 0 ? tasks_per_worker : (resources->cores > 0 ? resources->cores : 1));
 	fprintf(stdout, "timeout: %d s\n", worker_timeout);
 	fprintf(stdout, "cores: %" PRId64 "\n", resources->cores > 0 ? resources->cores : 1);
 
