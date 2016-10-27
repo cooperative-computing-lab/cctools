@@ -158,11 +158,15 @@ See the file COPYING for details.
 #define DEFAULT_INTERVAL       5               /* in seconds */
 #define DEFAULT_LOG_NAME "resource-pid-%d"     /* %d is used for the value of getpid() */
 
+#define ACTIVATE_DEBUG_FILE ".cctools_resource_monitor_debug"
+
 uint64_t interval = DEFAULT_INTERVAL;
 
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
-FILE  *log_inotify  = NULL;      /* List of opened files is written to this file. */
+FILE  *log_inotify = NULL;      /* List of opened files is written to this file. */
+
+int debug_active = 0;           /* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
 
 struct jx *verbatim_summary_fields; /* fields added to the summary without change */
 
@@ -268,6 +272,34 @@ FILE *open_log_file(const char *log_path)
 	    return NULL;
 
     return log_file;
+}
+
+void activate_debug_log_if_file() {
+	static timestamp_t last_time = 0;
+
+	timestamp_t current = timestamp_get();
+
+	if((current - last_time) < 30*USECOND ) {
+		return;
+	}
+
+	struct stat s;
+	int status = stat(ACTIVATE_DEBUG_FILE, &s);
+
+	if(status == 0) {
+		if(!debug_active) {
+			debug_active = 1;
+			debug_flags_set("all");
+			debug_config_file(ACTIVATE_DEBUG_FILE ".log");
+			debug_config_file_size(0);
+		}
+	}
+	else if(debug_active) {
+		debug_active = 0;
+		debug_flags_set("clear");
+	}
+
+	last_time = current;
 }
 
 void parse_limit_string(struct rmsummary *limits, char *str)
@@ -1746,6 +1778,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 	while(itable_size(processes) > 0)
 	{
 		debug(D_RMON, "Round %" PRId64, round);
+		activate_debug_log_if_file();
 
 		resources_now->last_error = 0;
 
