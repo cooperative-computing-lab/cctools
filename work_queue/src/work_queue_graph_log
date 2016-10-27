@@ -168,7 +168,7 @@ set term {fmt} size {geo} butt linewidth 1
 set title  '{title}'
 set xlabel 'master lifetime in {x_units}'
 set ylabel '{y_units}'
-set yrange [0:2500]
+set yrange [0:]
 set noborder
 set tics nomirror out
 """.format(fmt=format, geo=geometry, title=self.title, x_units=unit_labels[self.x_units], y_units=self.ylabel))
