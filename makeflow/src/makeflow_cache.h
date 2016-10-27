@@ -18,12 +18,14 @@ void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*i
 
 /* Preserves the current node within the caching directory
    The source makeflow file, ancestor node cache_ids, and the output files are cached */
-void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue);
+void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *outputs);
 
 /* Returns true if a node has been preserved within the caching directory*/
-int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_queue *queue);
+int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs);
 
 /* */
-int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue);
+int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs);
+
+void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *cache_path);
 
 #endif

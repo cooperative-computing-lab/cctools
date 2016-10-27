@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "makeflow_log.h"
 #include "create_dir.h"
 #include "copy_stream.h"
+#include "timestamp.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,7 +48,7 @@ void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*i
   free(cache_id);
 }
 
-void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue) {
+void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *outputs) {
   char *caching_file_path = NULL, *output_file_path = NULL, *source_makeflow_file_path = NULL, *ancestor_file_path = NULL;
   char *ancestor_cache_id_string = NULL;
   char caching_prefix[3] = "";
@@ -72,7 +73,9 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   if (!sucess) {
     fatal("Could not create input_files directory %s\n", source_makeflow_file_path);
   }
-
+  caching_file_path = xxstrdup(d->caching_directory);
+  caching_file_path = string_combine_multi(caching_file_path, caching_prefix, "/", n->cache_id, 0);
+  makeflow_write_run_info(d, n, caching_file_path);
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
     output_file_path = xxstrdup(d->caching_directory);
@@ -144,7 +147,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   fclose(fp);
 }
 
-int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_queue *queue) {
+int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs) {
   char * filename;
   struct dag_file *f;
   int sucess;
@@ -168,7 +171,7 @@ int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struc
   return 0;
 }
 
-int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_queue *queue) {
+int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs) {
   char *filename = NULL;
   struct dag_file *f;
   struct stat buf;
@@ -189,7 +192,7 @@ int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command
   }
 
   /* all output files exist, replicate preserved files and update state for node and dag_files */
-  makeflow_cache_copy_preserved_files(d, n, outputs, queue);
+  makeflow_cache_copy_preserved_files(d, n, outputs);
   n->state = DAG_NODE_STATE_RUNNING;
   list_first_item(n->target_files);
   while((f = list_next_item(n->target_files))) {
@@ -199,4 +202,18 @@ int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command
 
   free(filename);
   return 1;
+}
+
+void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *cache_path) {
+  // write timestamp
+  char *run_info_path = NULL;
+  FILE *fp;
+  run_info_path = string_combine_multi(run_info_path, cache_path, "/run_info", 0);
+  fp = fopen(run_info_path, "w");
+  if (fp == NULL) {
+    fatal("could not cache ancestor node cache ids");
+  } else {
+    fprintf(fp, "%" PRIu64 "\n", timestamp_get());
+    fprintf(fp, "%s\n", n->cache_id);
+  }
 }
