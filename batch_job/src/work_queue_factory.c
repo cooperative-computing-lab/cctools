@@ -292,13 +292,28 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 
 	buffer_init(&b);
 
-	char *sep = "";
+	const char *sep = "";
 	list_first_item(masters_list);
 	while((j=list_next_item(masters_list))) {
-		const char *blacklisted = jx_lookup_string(j,"workers-blacklisted");
-		if(blacklisted) {
-			buffer_printf(&b, "%s%s", sep, blacklisted);
+		struct jx *blacklisted = jx_lookup(j,"workers-blacklisted");
+
+		if(!blacklisted) {
+			continue;
+		}
+
+		if(jx_istype(blacklisted, JX_STRING)) {
+			buffer_printf(&b, "%s%s", sep, blacklisted->u.string_value);
 			sep = " ";
+		}
+
+		if(jx_istype(blacklisted, JX_ARRAY)) {
+			struct jx *item;
+			for (void *i = NULL; (item = jx_iterate_array(blacklisted, &i));) {
+				if(jx_istype(item, JX_STRING)) {
+					buffer_printf(&b, "%s%s", sep, item->u.string_value);
+					sep = " ";
+				}
+			}
 		}
 	}
 
