@@ -232,7 +232,10 @@ static void handle_updates(struct datagram *update_port)
 
 		if(data[0]=='{') {
 			j = jx_parse_string(data);
-			if(!j) continue;
+			if(!j) {
+				debug(D_DEBUG,"warning: %s:%d sent invalid JSON data (ignoring it)\n%s\n",addr,port,data);
+				continue;
+			}
 		} else {
 			struct nvpair *nv = nvpair_create();
 			if(!nv) continue;
