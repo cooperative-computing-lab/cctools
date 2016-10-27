@@ -1930,31 +1930,24 @@ static int update_task_result(struct work_queue_task *t, work_queue_result_t new
 	return t->result;
 }
 
-static char *blacklisted_to_string( struct work_queue  *q ) {
+static struct jx *blacklisted_to_json( struct work_queue  *q ) {
 	if(hash_table_size(q->worker_blacklist) < 1) {
 		return NULL;
 	}
 
-	buffer_t b;
-	buffer_init(&b);
+	struct jx *j = jx_array(0);
 
 	char *hostname;
 	struct blacklist_host_info *info;
 
-	char *sep = "";
-
 	hash_table_firstkey(q->worker_blacklist);
 	while(hash_table_nextkey(q->worker_blacklist, &hostname, (void *) &info)) {
 		if(info->blacklisted) {
-			buffer_printf(&b, "%s%s", sep, hostname);
-			sep = " ";
+			jx_array_insert(j, jx_string(hostname));
 		}
 	}
 
-	char *result = xxstrdup(buffer_tostring(&b));
-	buffer_free(&b);
-
-	return result;
+	return j;
 }
 
 static struct rmsummary *largest_waiting_declared_resources(struct work_queue *q, const char *category) {
@@ -2187,10 +2180,9 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 	// Add the blacklisted workers
-	char *blacklist = blacklisted_to_string(q);
+	struct jx *blacklist = blacklisted_to_json(q);
 	if(blacklist) {
-		jx_insert_string(j,"workers-blacklisted", blacklist);
-		free(blacklist);
+		jx_insert(j,jx_string("workers-blacklisted"), blacklist);
 	}
 
 	// Add the resources computed from tributary workers.

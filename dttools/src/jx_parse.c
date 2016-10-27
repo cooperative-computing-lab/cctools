@@ -51,7 +51,7 @@ typedef enum {
 	JX_TOKEN_EOF,
 } jx_token_t;
 
-#define MAX_TOKEN_SIZE 4096
+#define MAX_TOKEN_SIZE 65536
 
 struct jx_parser {
 	char token[MAX_TOKEN_SIZE];
