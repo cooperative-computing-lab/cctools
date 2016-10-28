@@ -112,6 +112,8 @@ struct rmsummary *rmsummary_copy(const struct rmsummary *src);
 void rmsummary_merge_override(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src);
+void rmsummary_add(struct rmsummary *dest, const struct rmsummary *src);
+
 void rmsummary_debug_report(const struct rmsummary *s);
 
 double rmsummary_to_external_unit(const char *field, int64_t n);

@@ -295,7 +295,7 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 	const char *sep = "";
 	list_first_item(masters_list);
 	while((j=list_next_item(masters_list))) {
-		struct jx *blacklisted = jx_lookup(j,"workers-blacklisted");
+		struct jx *blacklisted = jx_lookup(j,"workers_blacklisted");
 
 		if(!blacklisted) {
 			continue;

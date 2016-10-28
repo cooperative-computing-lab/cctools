@@ -1970,6 +1970,38 @@ static struct rmsummary *largest_waiting_declared_resources(struct work_queue *q
 	return max_resources_waiting;
 }
 
+static struct rmsummary  *total_resources_needed(struct work_queue *q) {
+
+	struct work_queue_task *t;
+
+	struct rmsummary *total = rmsummary_create(0);
+
+	/* for waiting tasks, we use what they would request if dispatched right now. */
+	list_first_item(q->ready_list);
+	while((t = list_next_item(q->ready_list))) {
+		const struct rmsummary *s = task_min_resources(q, t);
+		rmsummary_add(total, s);
+	}
+
+	/* for running tasks, we use what they have been allocated already. */
+	char *key;
+	struct work_queue_worker *w;
+	hash_table_firstkey(q->worker_table);
+
+	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
+		if(w->resources->tag < 0) {
+			continue;
+		}
+
+		total->cores  += w->resources->cores.inuse;
+		total->memory += w->resources->memory.inuse;
+		total->disk   += w->resources->disk.inuse;
+		total->gpus   += w->resources->gpus.inuse;
+	}
+
+	return total;
+}
+
 static struct rmsummary *largest_waiting_measured_resources(struct work_queue *q, const char *category) {
 	struct rmsummary *max_resources_waiting = rmsummary_create(-1);
 	struct work_queue_task *t;
@@ -2029,24 +2061,34 @@ static int count_workers_for_waiting_tasks(struct work_queue *q, struct rmsummar
 sent to the catalog.
 */
 
-#define category_jx_insert_max(j, c, field)\
-	{\
-		struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);\
-		if(largest->field > -1){\
-			char *max_str = string_format("%" PRId64, largest->field);\
-			jx_insert_string(j, "max_" #field, max_str);\
-			free(max_str);\
-		} else if(!category_in_steady_state(c) && c->max_resources_seen->limits_exceeded && c->max_resources_seen->limits_exceeded->field > -1) {\
-			char *max_str = string_format(">%" PRId64, c->max_resources_seen->field - 1);\
-			jx_insert_string(j, "max_" #field, max_str);\
-			free(max_str);\
-		} else if(c->max_resources_seen->field > -1) {\
-			char *max_str = string_format("~%" PRId64, c->max_resources_seen->field);\
-			jx_insert_string(j, "max_" #field, max_str);\
-			free(max_str);\
-		}\
-		rmsummary_delete(largest);\
+void category_jx_insert_max(struct jx *j, struct category *c, const char *field, struct rmsummary *largest) {
+
+	int64_t l = rmsummary_get_int_field(largest, field);
+	int64_t m = rmsummary_get_int_field(c->max_resources_seen, field);
+	int64_t e = -1;
+
+	if(c->max_resources_seen->limits_exceeded) {
+		e = rmsummary_get_int_field(c->max_resources_seen->limits_exceeded, field);
 	}
+
+	char *field_str = string_format("max_%s", field);
+
+	if(l > -1){
+		char *max_str = string_format("%" PRId64, l);
+		jx_insert_string(j, field_str, max_str);
+		free(max_str);
+	} else if(!category_in_steady_state(c) && e > -1) {
+		char *max_str = string_format(">%" PRId64, m - 1);
+		jx_insert_string(j, field_str, max_str);
+		free(max_str);
+	} else if(m > -1) {
+		char *max_str = string_format("~%" PRId64, m);
+		jx_insert_string(j, field_str, max_str);
+		free(max_str);
+	}
+
+	free(field_str);
+}
 
 
 static struct jx * category_to_jx(struct work_queue *q, const char *category) {
@@ -2070,9 +2112,13 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
 	jx_insert_integer(j, "workers_able",     s.workers_able);
 
-	category_jx_insert_max(j, c, cores);
-	category_jx_insert_max(j, c, memory);
-	category_jx_insert_max(j, c, disk);
+	struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);
+
+	category_jx_insert_max(j, c, "cores",  largest);
+	category_jx_insert_max(j, c, "memory", largest);
+	category_jx_insert_max(j, c, "disk",   largest);
+
+	rmsummary_delete(largest);
 
 	if(c->first_allocation) {
 		if(c->first_allocation->cores > -1)
@@ -2182,7 +2228,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	// Add the blacklisted workers
 	struct jx *blacklist = blacklisted_to_json(q);
 	if(blacklist) {
-		jx_insert(j,jx_string("workers-blacklisted"), blacklist);
+		jx_insert(j,jx_string("workers_blacklisted"), blacklist);
 	}
 
 	// Add the resources computed from tributary workers.
@@ -2221,6 +2267,12 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	//add the stats per category
 	jx_insert(j, jx_string("categories"), categories_to_jx(q));
+
+	//add total resources used/needed by the queue
+	struct rmsummary *total = total_resources_needed(q);
+	jx_insert_integer(j,"tasks_total_cores",total->cores);
+	jx_insert_integer(j,"tasks_total_memory",total->memory);
+	jx_insert_integer(j,"tasks_total_disk",total->disk);
 
 	return j;
 }
