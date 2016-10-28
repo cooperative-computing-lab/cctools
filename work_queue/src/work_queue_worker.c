@@ -2504,6 +2504,13 @@ int main(int argc, char *argv[])
 	int backoff_interval = init_backoff_interval;
 	connect_stoptime = time(0) + connect_timeout;
 
+	measure_worker_resources();
+	printf("work_queue_worker: using %"PRId64 " cores, %"PRId64 " MB memory, %"PRId64 " MB disk, %"PRId64 " gpus\n",
+		total_resources->cores.total,
+		total_resources->memory.total,
+		total_resources->disk.total,
+		total_resources->gpus.total);
+
 	while(1) {
 		int result;
 
