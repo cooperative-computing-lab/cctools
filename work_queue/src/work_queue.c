@@ -1786,6 +1786,7 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	execution_time = atoll(items[3]);
 	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
+	debug(D_BJ, "Task %d time_workers_execute_last.\n", t->taskid);
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
 
