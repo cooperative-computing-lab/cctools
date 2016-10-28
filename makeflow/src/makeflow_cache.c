@@ -34,8 +34,7 @@ void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*i
   list_first_item(inputs);
   while((f = list_next_item(inputs))) {
     if (f->cache_id == NULL) {
-      sha1_file(f->filename, digest);
-      f->cache_id = xxstrdup(sha1_string(digest));
+      generate_file_cache_id(f);
     }
     cache_id = string_combine(cache_id, f->cache_id);
   }
@@ -79,7 +78,9 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
     output_file_path = xxstrdup(d->caching_directory);
-    output_file_path = string_combine_multi(output_file_path, caching_prefix, "/", n->cache_id, "/outputs/" , f->filename, 0);
+    output_file_path = string_combine_multi(output_file_path, caching_prefix, "/", n->cache_id, 0);
+    makeflow_write_file_checksum(d, f, output_file_path);
+    output_file_path = string_combine_multi(output_file_path, "/outputs/" , f->filename, 0);
     sucess = copy_file_to_file(f->filename, output_file_path);
     if (!sucess) {
       fatal("Could not cache output file %s\n", output_file_path);
@@ -216,4 +217,34 @@ void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *cache_path
     fprintf(fp, "%" PRIu64 "\n", timestamp_get());
     fprintf(fp, "%s\n", n->cache_id);
   }
+  free(run_info_path);
 }
+
+void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_cache_path) {
+  char *file_cache_path;
+  int success;
+  char caching_prefix[5] = "";
+
+  if (f->cache_id == NULL) {
+    generate_file_cache_id(f);
+  }
+
+  strncpy(caching_prefix, f->cache_id, 4);
+  file_cache_path = xxstrdup(d->caching_directory);
+  file_cache_path = string_combine_multi(file_cache_path, "file_checksums", "/", caching_prefix, 0);
+  success = create_dir(file_cache_path, 0777);
+  if (!success) {
+    fatal("Could not create file caching directory %s\n", file_cache_path);
+  }
+
+  file_cache_path = string_combine_multi(file_cache_path, "/", f->cache_id, 0);
+  success = symlink(job_cache_path, file_cache_path);
+
+  free(file_cache_path);
+}
+void generate_file_cache_id(struct dag_file *f) {
+  unsigned char digest[SHA1_DIGEST_LENGTH];
+  sha1_file(f->filename, digest);
+  f->cache_id = xxstrdup(sha1_string(digest));
+}
+

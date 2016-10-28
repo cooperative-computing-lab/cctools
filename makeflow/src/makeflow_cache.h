@@ -28,4 +28,8 @@ int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struc
 
 void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *cache_path);
 
+void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_cache_path);
+
+void generate_file_cache_id(struct dag_file *f);
+
 #endif
