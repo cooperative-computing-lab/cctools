@@ -18,8 +18,11 @@
 #include <string.h>
 #include <time.h>
 
+int random_initialized = 0;
+
 void random_init (void)
 {
+	if (random_initialized) return;
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
 		fd = open("/dev/random", O_RDONLY);
@@ -33,12 +36,14 @@ void random_init (void)
 	} else {
 		uint64_t seed;
 nasty_fallback:
+		fprintf(stderr, "warning: falling back to low-quality entropy");
 		seed = (uint64_t)getpid() ^ (uint64_t)time(NULL);
 		seed |= (((uint64_t)(uintptr_t)&seed) << 32); /* using ASLR */
 		srand(seed);
 		twister_init_genrand64(seed);
 	}
 	close(fd);
+	random_initialized = 1;
 	return;
 }
 
