@@ -3204,25 +3204,25 @@ static void compute_capacity_jr(const struct work_queue *q)
 	int capacity_weighted, capacity_cumulative, capacity_instantaneous;
 	int64_t total_exec = 0;
 	int64_t total_io = 0;
-	int i = 0;
 	if(!q->stats->previous_capacity_weighted) {
 		q->stats->previous_capacity_weighted = 0;
 	}
 
+	debug(D_BJ, "#   Execution     I/O        \n");
 	list_first_item(q->task_reports);
 	while((tr = list_next_item(q->task_reports))) {
 		total_io += tr->transfer_time;
 		total_exec += tr->exec_time;
-		i++;
+		debug(D_BJ, "# %11"PRId64" %11"PRId64"\n", tr->exec_time, tr->transfer_time);
 	}
 	// Sum up the task reports available.
 	tr = list_peek_tail(q->task_reports);
 	if(tr->transfer_time > 0) {
 		capacity_weighted = (int) ceil((alpha * (tr->exec_time / tr->transfer_time)) + ((1 - alpha) * q->stats->previous_capacity_weighted));
-		capacity_cumulative = (int) ceil((((float) total_exec) / i) / ((float) total_io / i));
+		capacity_cumulative = (int) ceil(((float) total_exec) / total_io);
 		capacity_instantaneous = (int) ceil(((float) tr->exec_time) / tr->transfer_time);
 		debug(D_BJ, "(Weighted Capacity = %f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\n", alpha, tr->exec_time, tr->transfer_time, alpha, q->stats->previous_capacity_weighted, capacity_weighted);
-		debug(D_BJ, "(Cumulative Capacity = ((%"PRId64" / %d) / (%"PRId64" / %d))) = %d\n", total_exec, i, total_io, i, capacity_cumulative);
+		debug(D_BJ, "(Cumulative Capacity = (%"PRId64" / %"PRId64") = %d\n", total_exec, total_io, capacity_cumulative);
 		debug(D_BJ, "(Instantaneous Capacity = (%"PRId64" / %"PRId64")) = %d\n", tr->exec_time, tr->transfer_time, capacity_instantaneous);
 		q->stats->previous_capacity_weighted = capacity_weighted;
 	}
