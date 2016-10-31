@@ -1,0 +1,25 @@
+# if the `--umbrella-spec` option is set, then these two rules will use it as their umbrella specs;
+# otherwise, they will run as it is without being wrapped by the umbrella wrapper.
+capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
+	convert -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+
+capitol.90.jpg: capitol.jpg
+	convert -swirl 90 capitol.jpg capitol.90.jpg
+
+# the following three rules will use umbrella_specs/convert_S_category1.umbrella as their umbrella specs
+.MAKEFLOW CATEGORY 1
+.UMBRELLA SPEC umbrella_specs/convert_S_category1.umbrella
+capitol.180.jpg: capitol.jpg
+	convert -swirl 180 capitol.jpg capitol.180.jpg
+
+capitol.270.jpg: capitol.jpg
+	convert -swirl 270 capitol.jpg capitol.270.jpg
+
+capitol.360.jpg: capitol.jpg
+	convert -swirl 360 capitol.jpg capitol.360.jpg
+
+# the following rule will use umbrella_specs/convert_S_category2.umbrella as its umbrella spec
+.MAKEFLOW CATEGORY 2
+.UMBRELLA SPEC umbrella_specs/convert_S_category2.umbrella
+capitol.jpg:
+	curl -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg

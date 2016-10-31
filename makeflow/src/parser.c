@@ -480,9 +480,6 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 				|| (!strcmp("MEMORY", t->lexeme))) {
 			if(!(string_metric_parse(t2->lexeme) >= 0))
 				lexer_report_error(bk, "Expected numeric value for %s, got: %s\n", t->lexeme, t2->lexeme);
-		} else if(!strcmp("CATEGORY", t->lexeme)) {
-			if(!(t2->lexeme))
-				lexer_report_error(bk, "Expected name for CATEGORY");
 		} else if(!strcmp("MODE", t->lexeme)) {
 			set_var = 0;
 			if(!(t2->lexeme)) {
@@ -498,6 +495,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 			}
 		} else {
 			lexer_report_error(bk, "Unsupported .RESOURCE type, got: %s\n", t->lexeme);
+			free(name);
 			return 0;
 		}
 
@@ -507,6 +505,56 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 
 			dag_parse_variable_wmode(bk, n, '=');
 		}
+	} else if(!strcmp(".UMBRELLA", name)) {
+		struct token *t2;
+
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		if(strcmp("SPEC", t->lexeme)) {
+			lexer_report_error(bk, "Unsupported .UMBRELLA type, got: %s\n", t->lexeme);
+			free(name);
+			return 0;
+		}
+
+		t2 = lexer_next_token(bk);
+		if(t2->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
+		}
+
+		lexer_preppend_token(bk, t2);
+		lexer_preppend_token(bk, t);
+		dag_parse_variable_wmode(bk, n, '=');
+	} else if(!strcmp(".MAKEFLOW", name)) {
+		struct token *t2;
+
+		t = lexer_next_token(bk);
+		if(t->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+		}
+
+		if(strcmp("CATEGORY", t->lexeme)) {
+			lexer_report_error(bk, "Unsupported .MAKEFLOW type, got: %s\n", t->lexeme);
+			free(name);
+			return 0;
+		}
+
+		t2 = lexer_next_token(bk);
+		if(t2->type != TOKEN_LITERAL)
+		{
+			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
+		}
+
+		if(!(t2->lexeme)) lexer_report_error(bk, "Expected name for CATEGORY");
+
+		lexer_preppend_token(bk, t2);
+		lexer_preppend_token(bk, t);
+		dag_parse_variable_wmode(bk, n, '=');
 	} else {
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
 		result = 0;

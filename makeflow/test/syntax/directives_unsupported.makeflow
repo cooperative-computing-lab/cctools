@@ -33,7 +33,7 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
-.RESOURCE CATEGORY analysis
+.MAKEFLOW CATEGORY analysis
 .RESOURCE CORES 1
 .RESOURCE MEMORY 10
 .RESOURCE DISK 20
@@ -50,7 +50,7 @@ capitol.360.jpg: capitol.jpg
 	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
 # If a rule is preceded by LOCAL, it executes at the local site.
-.RESOURCE CATEGORY preprocess
+.MAKEFLOW CATEGORY preprocess
 .RESOURCE CORES 1
 .RESOURCE MEMORY 10
 .RESOURCE DISK 20

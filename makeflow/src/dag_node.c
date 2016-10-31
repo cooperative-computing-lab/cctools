@@ -14,6 +14,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx.h"
 
+#include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -103,7 +104,17 @@ const char *dag_node_get_local_name(struct dag_node *n, const char *filename)
 
 void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec)
 {
+	struct stat st;
+
 	if(!n) return;
+
+	if(lstat(umbrella_spec, &st) == -1) {
+		fatal("lstat(`%s`) failed: %s\n", umbrella_spec, strerror(errno));
+	}
+	if((st.st_mode & S_IFMT) != S_IFREG) {
+		fatal("the umbrella spec (`%s`) should specify a regular file\n", umbrella_spec);
+	}
+
 	n->umbrella_spec = umbrella_spec;
 }
 

@@ -1741,18 +1741,30 @@ if (enforcer && wrapper_umbrella) {
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
 	}
 
-	if(wrapper_umbrella && wrapper_umbrella->spec) {
-		debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec...\n");
+	/* Set dag_node->umbrella_spec */
+	if(!clean_mode) {
 		struct dag_node *cur;
 		cur = d->nodes;
-		// the logic here will be changed accordingly when the new feature supporting
-		// specifying an umbrella spec for each rule inside a Makefile is added.
 		while(cur) {
-			dag_node_set_umbrella_spec(cur, wrapper_umbrella->spec);
+			struct dag_variable_lookup_set s = {d, cur->category, cur, NULL};
+			char *spec = NULL;
+			spec = dag_variable_lookup_string("SPEC", &s);
+			if(spec) {
+				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the makefile ...\n", cur->nodeid);
+				dag_node_set_umbrella_spec(cur, xxstrdup(spec));
+			} else if(wrapper_umbrella && wrapper_umbrella->spec) {
+				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the --umbrella_spec option ...\n", cur->nodeid);
+				dag_node_set_umbrella_spec(cur, wrapper_umbrella->spec);
+			}
+			free(spec);
 			cur = cur->next;
 		}
 
 		debug(D_MAKEFLOW_RUN, "makeflow_wrapper_umbrella_preparation...\n");
+		// When the user specifies umbrella specs in a makefile, but does not use any `--umbrella...` option,
+		// an umbrella wrapper was created to hold the default values for umbrella-related setttings such as
+		// log_prefix and default umbrella execution engine.
+		if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, remote_queue, d);
 	}
 
