@@ -2312,6 +2312,7 @@ int main(int argc, char *argv[])
 
 			pid = fork();
 			if(pid == 0) {
+				link_close(link);
 				close(config_pipe[0]);
 				config_pipe[0] = -1;
 				chirp_receive(l, chirp_url);
