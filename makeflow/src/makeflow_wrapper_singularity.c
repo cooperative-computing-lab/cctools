@@ -30,28 +30,27 @@ void makeflow_wrapper_singularity_init(struct makeflow_wrapper *w, char *contain
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
                                  "tar -xzf $s",
-                                "singularity --change-home `pwd` exec %s \"$@\"");
+                                "singularity exec --home `pwd` %s \"$@\"");
         file_sans_compress[strlen(container_image)-3] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".xz") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
                                  "tar -xf %s",
-                                 "singularity --change-home `pwd` exec %s \"$@\"");
+                                 "singularity exec --home `pwd` %s \"$@\"");
         file_sans_compress[strlen(container_image)-3] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else if(strstr(container_image,".bz2") != NULL){
         filedata = string_format("%s\n%s\n%s\n",
                                  "#!/bin/sh",
                                  "tar -xjf %s",
-                                 "singularity --change-home `pwd` exec %s \"$@\"");
+                                 "singularity exec --home `pwd` %s \"$@\"");
         file_sans_compress[strlen(container_image)-4] = '\0';
         fprintf(wrapper_fn, filedata, container_image, file_sans_compress);
     }else{
-        filedata = string_format("%s\n%s\n%s\n",
+        filedata = string_format("%s\n%s\n",
                                  "#!/bin/sh",
-                                 "echo $(hostname -f)",
-                                 "singularity --change-home `pwd` exec %s \"$@\"");
+                                 "singularity exec --home `pwd` %s \"$@\"");
         fprintf(wrapper_fn, filedata, container_image);
     }
     
