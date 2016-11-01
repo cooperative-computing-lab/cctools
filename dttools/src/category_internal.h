@@ -11,5 +11,6 @@ See the file COPYING for details.
 
 void category_first_allocation_accum_times(struct histogram *h, double *keys, double *tau_mean, double *counts_cdp, double *times_accum);
 void category_tune_bucket_size(const char *resource, uint64_t size);
+uint64_t category_get_bucket_size(const char *resource);
 
 #endif

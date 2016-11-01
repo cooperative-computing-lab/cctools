@@ -30,6 +30,7 @@ static uint64_t disk_bucket_size      = 50;          /* 50 MB */
 static uint64_t time_bucket_size      = 300000000;   /* 5 minutes */
 static uint64_t bytes_bucket_size     = 5*MEGABYTE;  /* 5 MB */
 static uint64_t bandwidth_bucket_size = 1000000;     /* 1 Mbit/s */
+static uint64_t cores_avg_bucket_size = 100;         /* 1/10 of a core */
 
 static uint64_t first_allocation_every_n_tasks = 25; /* tasks */
 
@@ -56,7 +57,7 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 	c->max_resources_seen      = rmsummary_create(-1);
 
 	c->cores_histogram           = histogram_create(1);
-	c->cores_avg_histogram       = histogram_create(1);
+	c->cores_avg_histogram       = histogram_create(cores_avg_bucket_size);
 	c->wall_time_histogram       = histogram_create(time_bucket_size);
 	c->cpu_time_histogram        = histogram_create(time_bucket_size);
 	c->memory_histogram          = histogram_create(memory_bucket_size);
@@ -728,6 +729,7 @@ int category_in_steady_state(struct category *c) {
 }
 
 void category_tune_bucket_size(const char *resource, uint64_t size) {
+
 	if(strcmp(resource, "memory") == 0) {
 		memory_bucket_size = size;
 	} else if(strcmp(resource, "disk") == 0) {
@@ -741,4 +743,27 @@ void category_tune_bucket_size(const char *resource, uint64_t size) {
 	} else if(strcmp(resource, "category-steady-n-tasks") == 0) {
 		first_allocation_every_n_tasks = size;
 	}
+}
+
+uint64_t category_get_bucket_size(const char *resource) {
+	if(string_suffix_is(resource, "memory")) {
+		return memory_bucket_size;
+	} else if(strcmp(resource, "cores") == 0) {
+		return 1;
+	} else if(strcmp(resource, "cores_avg") == 0) {
+		return cores_avg_bucket_size;
+	} else if(string_prefix_is(resource, "bytes")) {
+		return bytes_bucket_size;
+	} else if(string_suffix_is(resource, "time")) {
+		return time_bucket_size;
+	} else if(strcmp(resource, "disk") == 0) {
+		return disk_bucket_size;
+	} else if(strcmp(resource, "bandwidth") == 0) {
+		return bandwidth_bucket_size;
+	} else if(strcmp(resource, "category-steady-n-tasks") == 0) {
+		return first_allocation_every_n_tasks;
+	}
+
+	fatal("No such bucket: '%s'", resource);
+	return 0;
 }

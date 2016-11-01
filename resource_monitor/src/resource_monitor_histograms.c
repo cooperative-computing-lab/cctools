@@ -66,6 +66,7 @@ uint64_t input_overhead;
 struct allocation {
 	int64_t first;
 	double waste;
+	uint64_t committed;
 	double throughput;
 	double tasks_done;
 	double time_taken;
@@ -620,18 +621,17 @@ struct field_stats *histogram_of_field(struct rmsummary_set *source, const char 
 	return h;
 }
 
-struct jx *allocation_to_json(const char *field, struct allocation *alloc) {
+struct jx *allocation_to_json(struct field_stats *h, struct allocation *alloc) {
 
 	struct jx *j = jx_object(NULL);
 
-	double value  = rmsummary_to_external_unit(field, alloc->first);
-	double ttaken = rmsummary_to_external_unit("wall_time", alloc->time_taken);
-
-	jx_insert_double(j, "allocation", value);
+	jx_insert_double(j, "allocation", rmsummary_to_external_unit(h->field, alloc->first));
 	jx_insert_double(j, "waste",      alloc->waste);
 	jx_insert_double(j, "throughput", alloc->throughput);
 	jx_insert_double(j, "retries",    alloc->retries);
-	jx_insert_double(j, "time_taken", ttaken);
+	jx_insert_double(j, "time_taken", rmsummary_to_external_unit("wall_time", alloc->time_taken));
+	jx_insert_double(j, "committed",  alloc->committed);
+	jx_insert_double(j, "usage",      h->usage);
 	jx_insert_double(j, "tasks_done", alloc->tasks_done);
 
 	return j;
@@ -646,23 +646,22 @@ struct jx *field_to_json(struct field_stats *h)
 	jx_insert_double(j,  "mean", h->mean);
 	jx_insert_double(j,  "std-dev", sqrt(h->variance));
 	jx_insert_double(j,  "min", histogram_min_value(h->histogram));
-
 	jx_insert_double(j, "usage", h->usage);
 
 	struct jx *policies = jx_object(NULL);
 
-	jx_insert(policies, jx_string("perfect"), allocation_to_json(h->field, &(h->fa_perfect)));
-	jx_insert(policies, jx_string("maximum"), allocation_to_json(h->field, &(h->fa_max)));
-	jx_insert(policies, jx_string("P95"),     allocation_to_json(h->field, &(h->fa_95)));
+	jx_insert(policies, jx_string("perfect"), allocation_to_json(h, &(h->fa_perfect)));
+	jx_insert(policies, jx_string("maximum"), allocation_to_json(h, &(h->fa_max)));
+	jx_insert(policies, jx_string("P95"),     allocation_to_json(h, &(h->fa_95)));
 
 	if(brute_force) {
-		jx_insert(policies, jx_string("min_waste_brute_force"),      allocation_to_json(h->field, &(h->fa_min_waste_brute_force)));
-		jx_insert(policies, jx_string("max_throughput_brute_force"), allocation_to_json(h->field, &(h->fa_max_throughput_brute_force)));
+		jx_insert(policies, jx_string("min_waste_brute_force"),      allocation_to_json(h, &(h->fa_min_waste_brute_force)));
+		jx_insert(policies, jx_string("max_throughput_brute_force"), allocation_to_json(h, &(h->fa_max_throughput_brute_force)));
 	}
 
-	jx_insert(policies, jx_string("min_waste"),       allocation_to_json(h->field, &(h->fa_min_waste_time_dependence)));
-	jx_insert(policies, jx_string("min_waste_naive"), allocation_to_json(h->field, &(h->fa_min_waste_time_independence)));
-	jx_insert(policies, jx_string("max_throughput"),  allocation_to_json(h->field, &(h->fa_max_throughput)));
+	jx_insert(policies, jx_string("min_waste"),       allocation_to_json(h, &(h->fa_min_waste_time_dependence)));
+	jx_insert(policies, jx_string("min_waste_naive"), allocation_to_json(h, &(h->fa_min_waste_time_independence)));
+	jx_insert(policies, jx_string("max_throughput"),  allocation_to_json(h, &(h->fa_max_throughput)));
 
 	jx_insert(j, jx_string("policies"), policies);
 
@@ -718,8 +717,14 @@ void plots_of_category(struct rmsummary_set *s)
 }
 
 double total_waste(struct field_stats *h, double first_alloc) {
+
+	struct field_stats *all = hash_table_lookup(all_summaries->stats, h->field);
+	if(!all) {
+		all = h;
+	}
+
 	double waste   = 0;
-	double max_candidate = histogram_max_value(h->histogram);
+	double max_candidate = value_of_p(all, 1.0);
 
 	if(first_alloc < 0)
 		return 0;
@@ -748,7 +753,43 @@ double total_waste(struct field_stats *h, double first_alloc) {
 		waste += current_waste;
 	}
 
+	waste = rmsummary_to_external_unit("wall_time", waste);
+	waste = rmsummary_to_external_unit(h->field,   waste);
+
 	return waste;
+}
+
+double total_committed(struct field_stats *h, double first_alloc) {
+
+	struct field_stats *all = hash_table_lookup(all_summaries->stats, h->field);
+	if(!all) {
+		all = h;
+	}
+
+	double committed = 0;
+	double max_allocation = value_of_p(all, 1.0);
+
+	int i;
+#pragma omp parallel for private(i) reduction(+: committed)
+	for(i = 0; i < h->total_count; i+=1) {
+		double current   = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
+		double wall_time = h->summaries_sorted[i]->wall_time;
+
+		if(first_alloc > 0) {
+			committed += first_alloc * wall_time;
+			if(current > first_alloc) {
+				committed += max_allocation * wall_time;
+			}
+		} else {
+			/* for perfect case */
+			committed += current * wall_time;
+		}
+	}
+
+	committed = rmsummary_to_external_unit("wall_time", committed);
+	committed = rmsummary_to_external_unit(h->field,   committed);
+
+	return committed;
 }
 
 double total_usage(struct field_stats *h) {
@@ -769,6 +810,9 @@ double total_usage(struct field_stats *h) {
 
 		usage += current * wall_time;
 	}
+
+	usage = rmsummary_to_external_unit("wall_time", usage);
+	usage = rmsummary_to_external_unit(h->field,   usage);
 
 	return usage;
 }
@@ -803,40 +847,38 @@ double throughput(struct field_stats *h, double first_alloc, struct allocation *
 	if(!all) {
 		all = h;
 	}
-	double max_allocation  = histogram_max_value(all->histogram);
+	double max_allocation  = value_of_p(all, 1.0);
 
 	int i;
 #pragma omp parallel for private(i) reduction(+: wall_time_accum, tasks_accum)
 	for(i = 0; i < h->total_count; i+=1) {
-		double current_task;
 		double current = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
 
-		if(current < 1) {
+		if(current <= 0) {
 			continue;
 		}
 
-		/* for perfect throughput */
-		if(first_alloc < 0) {
-			current_task = max_allocation/current;
-		} else {
-			current_task = max_allocation/first_alloc;
-		}
-
 		double wall_time = h->summaries_sorted[i]->wall_time;
-
 		wall_time_accum += wall_time;
 
-		if(first_alloc > 0 && current > first_alloc) {
-			tasks_accum     += 1;
+		double current_task;
+
+		/* for perfect throughput */
+		if(first_alloc < 0) {
+			current_task = max_allocation / current;
+		} else if(current > first_alloc) {
+			current_task = 1;
 			wall_time_accum += wall_time;
 		} else {
-			tasks_accum     += current_task;
+			current_task = max_allocation / first_alloc;
 		}
+
+		tasks_accum += current_task;
 	}
 
 	double th;
 	if(wall_time_accum > 0) {
-		th = tasks_accum/wall_time_accum;
+		th = tasks_accum/rmsummary_to_external_unit("wall_time", wall_time_accum);
 	} else {
 		th = 0;
 		tasks_accum = 0;
@@ -888,9 +930,11 @@ void set_category_maximum(struct rmsummary_set *s, struct hash_table *categories
 
 void set_fa_values(struct field_stats *h, struct allocation *alloc, double first_allocation) {
 	alloc->first      = first_allocation;
+	alloc->committed  = total_committed(h, alloc->first);
 	alloc->waste      = total_waste(h, alloc->first);
 	alloc->throughput =  throughput(h, alloc->first, alloc);
 	alloc->retries    =     retries(h, alloc->first);
+
 }
 
 void set_fa_min_waste_time_dependence(struct rmsummary_set *s, struct hash_table *categories) {
@@ -979,7 +1023,7 @@ void set_fa_max(struct rmsummary_set *s, struct hash_table *categories) {
 		}
 
 		struct field_stats *h = hash_table_lookup(s->stats, field_name);
-		set_fa_values(h, &(h->fa_max), histogram_max_value(h->histogram));
+		set_fa_values(h, &(h->fa_max), value_of_p(h, 1.0));
 	} LOOP_END
 }
 
@@ -1001,31 +1045,20 @@ void set_fa_perfect(struct rmsummary_set *s, struct hash_table *categories) {
 }
 
 int64_t min_waste_brute_force_field(struct field_stats *h) {
-	double   min_waste     = DBL_MAX;
-	uint64_t min_candidate = histogram_max_value(h->histogram);
+	uint64_t max           = value_of_p(h, 1.0);
+	double   min_waste     = total_waste(h, max);
 
-	uint64_t jump = 1;
-	if(field_is_cumulative(h->field)) {
-		jump = USECOND;
-	}
+	uint64_t min_candidate = max;
 
-	uint64_t prev = 0;
-	for(int i = 0; i < h->total_count; i++) {
-		uint64_t candidate = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
+	uint64_t step = category_get_bucket_size(h->field);
 
-		if( i > 0 ) {
-			if(candidate - prev < jump)
-				continue;
-		}
-
-		double candidate_waste = total_waste(h, candidate);
+	for(uint64_t i = step; i < max; i+=step) {
+		double candidate_waste = total_waste(h, i);
 
 		if(candidate_waste < min_waste) {
-			min_candidate = candidate;
+			min_candidate = i;
 			min_waste     = candidate_waste;
 		}
-
-		prev = candidate;
 	}
 
 	debug(D_RMON, "first allocation '%s' brute force min waste: %" PRId64, h->field, min_candidate);
@@ -1049,31 +1082,21 @@ void set_fa_min_waste_brute_force(struct rmsummary_set *s, struct hash_table *ca
 }
 
 int64_t max_throughput_brute_force_field(struct field_stats *h) {
-	double   best_throughput = 0;
-	uint64_t max_candidate  = histogram_max_value(h->histogram);
+	uint64_t max = value_of_p(h, 1.0);
+	double   best_throughput = throughput(h, max, NULL);
 
-	uint64_t jump = 1;
-	if(field_is_cumulative(h->field)) {
-		jump = USECOND;
-	}
+	uint64_t max_candidate = max;
 
-	uint64_t prev = 0;
-	for(int i = 0; i < h->total_count; i++) {
-		uint64_t candidate = rmsummary_get_int_field_by_offset(h->summaries_sorted[i], h->offset);
+	uint64_t step = category_get_bucket_size(h->field);
 
-		if( i > 0 ) {
-			if(candidate - prev < jump)
-				continue;
-		}
+	for(uint64_t i = step; i < max; i+=step) {
 
-		double candidate_throughput = throughput(h, candidate, NULL);
+		double candidate_throughput = throughput(h, i, NULL);
 
 		if(candidate_throughput > best_throughput) {
-			max_candidate  = candidate;
+			max_candidate  = i;
 			best_throughput = candidate_throughput;
 		}
-
-		prev = candidate;
 	}
 
 	debug(D_RMON, "first allocation '%s' brute force throughput max: %" PRId64, h->field, max_candidate);
