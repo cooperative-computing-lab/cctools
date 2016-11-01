@@ -1192,7 +1192,7 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
-	char *caching_directory = CACHING_DEFAULT_DIRECTORY;
+	char *caching_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
 
@@ -1631,6 +1631,12 @@ int main(int argc, char *argv[])
 				should_preserve = 1;
 				if (optarg) {
 					caching_directory = xxstrdup(optarg);
+				} else {
+					char *uid = xxmalloc(10);
+					sprintf(uid, "%d",  getuid());
+					caching_directory = xxmalloc(sizeof(CACHING_DEFAULT_DIRECTORY) + 20 * sizeof(char));
+					sprintf(caching_directory, "%s%s", CACHING_DEFAULT_DIRECTORY, uid);
+					free(uid);
 				}
 				break;
 			default:
@@ -1990,7 +1996,6 @@ if (enforcer && wrapper_umbrella) {
 	if(should_preserve) {
 		d->caching_directory = caching_directory;
 		d->should_preserve = 1;
-
 	}
 
 	makeflow_run(d);
@@ -2024,6 +2029,8 @@ if (enforcer && wrapper_umbrella) {
 		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
+
+	free(caching_directory);
 
 	return 0;
 }

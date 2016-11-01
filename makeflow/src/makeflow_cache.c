@@ -60,25 +60,25 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   strncpy(caching_prefix, n->cache_id, 2);
 
   caching_file_path = xxstrdup(d->caching_directory);
-  caching_file_path = string_combine_multi(caching_file_path, caching_prefix, "/", n->cache_id, "/outputs", 0);
+  caching_file_path = string_combine_multi(caching_file_path, "/jobs/", caching_prefix, "/", n->cache_id, "/outputs", 0);
   sucess = create_dir(caching_file_path, 0777);
   if (!sucess) {
     fatal("Could not create caching directory %s\n", caching_file_path);
   }
 
   caching_file_path = xxstrdup(d->caching_directory);
-  caching_file_path = string_combine_multi(caching_file_path, caching_prefix, "/", n->cache_id, "/input_files", 0);
+  caching_file_path = string_combine_multi(caching_file_path, "/jobs/", caching_prefix, "/", n->cache_id, "/input_files", 0);
   sucess = create_dir(caching_file_path, 0777);
   if (!sucess) {
     fatal("Could not create input_files directory %s\n", source_makeflow_file_path);
   }
   caching_file_path = xxstrdup(d->caching_directory);
-  caching_file_path = string_combine_multi(caching_file_path, caching_prefix, "/", n->cache_id, 0);
+  caching_file_path = string_combine_multi(caching_file_path, "/jobs/", caching_prefix, "/", n->cache_id, 0);
   makeflow_write_run_info(d, n, caching_file_path);
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
     output_file_path = xxstrdup(d->caching_directory);
-    output_file_path = string_combine_multi(output_file_path, caching_prefix, "/", n->cache_id, 0);
+    output_file_path = string_combine_multi(output_file_path, "/jobs/", caching_prefix, "/", n->cache_id, 0);
     makeflow_write_file_checksum(d, f, output_file_path);
     output_file_path = string_combine_multi(output_file_path, "/outputs/" , f->filename, 0);
     sucess = copy_file_to_file(f->filename, output_file_path);
@@ -91,7 +91,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   /* only preserve Makeflow workflow instructions if node is a root node */
   if (set_size(n->ancestors) == 0) {
     source_makeflow_file_path = xxstrdup(d->caching_directory);
-    source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, caching_prefix, "/", n->cache_id, "/source_makeflow", 0);
+    source_makeflow_file_path = string_combine_multi(source_makeflow_file_path, "/jobs/", caching_prefix, "/", n->cache_id, "/source_makeflow", 0);
     sucess = copy_file_to_file(d->filename, source_makeflow_file_path);
     if (!sucess) {
       fatal("Could not cache source makeflow file %s\n", source_makeflow_file_path);
@@ -103,7 +103,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
       ancestor_cache_id_string = string_combine_multi(ancestor_cache_id_string, ancestor->cache_id, "\n", 0);
   }
   ancestor_file_path= xxstrdup(d->caching_directory);
-  ancestor_file_path= string_combine_multi(ancestor_file_path, caching_prefix, "/", n->cache_id, "/ancestors", 0);
+  ancestor_file_path= string_combine_multi(ancestor_file_path, "/jobs/", caching_prefix, "/", n->cache_id, "/ancestors", 0);
 
   fp = fopen(ancestor_file_path, "w");
   if (fp == NULL) {
@@ -118,7 +118,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
     if (f->created_by == 0 && f->cache_path == NULL) {
       strncpy(caching_prefix, n->cache_id, 2);
       input_file= xxstrdup(d->caching_directory);
-      input_file= string_combine_multi(input_file, caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
+      input_file= string_combine_multi(input_file, "/jobs/", caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
       sucess = copy_file_to_file(f->filename, input_file);
       f->cache_path = xxstrdup(input_file);
       if (!sucess) {
@@ -131,12 +131,12 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
         ancestor = f->created_by;
         strncpy(caching_prefix, ancestor->cache_id, 2);
         ancestor_output_file_path= xxstrdup(d->caching_directory);
-        ancestor_output_file_path= string_combine_multi(ancestor_output_file_path, caching_prefix, "/", ancestor->cache_id, "/outputs/", f->filename, 0);
+        ancestor_output_file_path= string_combine_multi(ancestor_output_file_path, "/jobs/", caching_prefix, "/", ancestor->cache_id, "/outputs/", f->filename, 0);
       }
 
       strncpy(caching_prefix, n->cache_id, 2);
       input_file= xxstrdup(d->caching_directory);
-      input_file= string_combine_multi(input_file, caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
+      input_file= string_combine_multi(input_file, "/jobs/", caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
 
       sucess = symlink(ancestor_output_file_path, input_file);
     }
@@ -164,7 +164,7 @@ int makeflow_cache_copy_preserved_files(struct dag *d, struct dag_node *n, struc
   while((f = list_next_item(outputs))) {
     output_file_path = xxstrdup(d->caching_directory);
     filename = xxstrdup("./");
-    output_file_path = string_combine_multi(output_file_path, caching_prefix, "/", n->cache_id, "/outputs/" , f->filename, 0);
+    output_file_path = string_combine_multi(output_file_path, "/jobs/", caching_prefix, "/", n->cache_id, "/outputs/" , f->filename, 0);
     filename = string_combine(filename, f->filename);
     sucess = copy_file_to_file(output_file_path, filename);
     if (!sucess) {
@@ -189,7 +189,7 @@ int makeflow_cache_is_preserved(struct dag *d, struct dag_node *n, char *command
   list_first_item(outputs);
   while ((f=list_next_item(outputs))) {
     filename = xxstrdup(d->caching_directory);
-    filename = string_combine_multi(filename, caching_prefix, "/", n->cache_id, "/outputs/", f-> filename, 0);
+    filename = string_combine_multi(filename, "/jobs/", caching_prefix, "/", n->cache_id, "/outputs/", f-> filename, 0);
     file_exists = stat(filename, &buf);
     if (file_exists == -1) {
       return 0;
@@ -235,7 +235,7 @@ void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_c
 
   strncpy(caching_prefix, f->cache_id, 4);
   file_cache_path = xxstrdup(d->caching_directory);
-  file_cache_path = string_combine_multi(file_cache_path, "file_checksums", "/", caching_prefix, 0);
+  file_cache_path = string_combine_multi(file_cache_path, "/files/", caching_prefix, 0);
   success = create_dir(file_cache_path, 0777);
   if (!success) {
     fatal("Could not create file caching directory %s\n", file_cache_path);
