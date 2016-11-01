@@ -1016,6 +1016,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
 	printf(" %-30s Indicate preferred mesos master.\n", "--mesos-master=<ip_adr:port>");
+	printf(" %-30s Indicate the path to mesos python2 site-packages.\n", "--mesos-path=</path/to/mesos/python/site-packages>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");

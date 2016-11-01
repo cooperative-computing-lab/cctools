@@ -5,9 +5,11 @@ import sys
 import uuid
 import time
 import urllib
+import urllib2
 import tarfile
 import logging
 import threading
+import json
 import imp
 import re
 
@@ -20,25 +22,49 @@ from mesos.interface import Scheduler
 from mesos.native import MesosSchedulerDriver
 from mesos.interface import mesos_pb2
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s %(message)s', datefmt='%Y/%m/%d %H:%M:%S')
 
 FILE_TASK_INFO = "mesos_task_info"
 FILE_TASK_STATE = "mesos_task_state"
+SLAVE_STDERR = "mesos_slave_stderr"
 MESOS_DONE_FILE = "mesos_done"
 
 TASK_CPUS = 1
 TASK_MEM = 300
-MAX_FAILED = 3
+MAX_FAILED = 10
 PARENT_PID = 0
+    
 
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
 
-    def __init__(self, mf_wk_dir):
+    def __init__(self, mf_wk_dir, master_addr):
         self.mf_wk_dir = mf_wk_dir
+        self.master_addr = master_addr
+
+    # Print out the dynamic static information of mesos cluster
+    def print_mesos_info(self, task_id):
+        metrics_snapshot_url = "http://{0}/metrics/snapshot".format(self.master_addr)
+
+        master_metrics = json.load(urllib2.urlopen(metrics_snapshot_url))
+
+        cpu_offered = master_metrics['master/cpus_total'] 
+        cpu_used = master_metrics['master/cpus_used']
+        mem_offered = master_metrics['master/mem_total']
+        mem_used = master_metrics['master/mem_used']
+        disk_offered = master_metrics['master/disk_total']
+        disk_used = master_metrics['master/disk_used'] 
+        tasks_running = master_metrics['master/tasks_running']
+        tasks_staging = master_metrics['master/tasks_staging']
+        tasks_starting = master_metrics['master/tasks_starting']
+
+        # treat running, staging and starting as running
+        num_running_tasks = tasks_running + tasks_staging + tasks_starting
+
+        logging.info("{0} cpu {1} used, {2} memory {3} used, {4} disk {5} used, {6} active tasks".format(cpu_offered, cpu_used, mem_offered, mem_used, disk_offered, disk_used, num_running_tasks))
 
     # Create a ExecutorInfo instance for mesos task
-    def new_mesos_executor(self, mf_task, framework_id, task_cpu, task_mem):
+    def new_mesos_executor(self, mf_task, framework_id, hostname, task_cpu, task_mem):
         executor = mesos_pb2.ExecutorInfo()
         executor.framework_id.value = framework_id
         executor.executor_id.value = str(uuid.uuid4())
@@ -57,8 +83,8 @@ class MakeflowScheduler(Scheduler):
 
         executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
         executor.source = "python executor"
-        executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
-                executor.executor_id.value, executor.framework_id.value, sys.argv[3])
+        executor.command.value = "{0} \"./{1}\" {2} {3} {4} {5}".format(sh_path, task_cmd_sh, 
+                executor.executor_id.value, executor.framework_id.value, sys.argv[3], hostname)
 
         cpus = executor.resources.add()
         cpus.name = "cpus"
@@ -134,6 +160,7 @@ class MakeflowScheduler(Scheduler):
         executor = self.new_mesos_executor(\
             mf_mesos_task_info, \
             offer.framework_id.value, \
+            offer.hostname, \
             TASK_CPUS, TASK_MEM)
 
         mesos_task.executor.MergeFrom(executor)
@@ -163,10 +190,8 @@ class MakeflowScheduler(Scheduler):
 
         # one task is corresponding to one executor
         tasks = [mesos_task]
-        driver.launchTasks(offer.id, tasks)
 
-    def registered(self, driver, framework_id, master_info):
-        logging.info("Registered with framework id: {0}".format(framework_id))
+        driver.launchTasks(offer.id, tasks)
 
     def resourceOffers(self, driver, offers):
         logging.info("Received resource offers: {0} from {1}".format(\
@@ -208,14 +233,14 @@ class MakeflowScheduler(Scheduler):
                         self.launch_mesos_task(driver, offer, task_id)
                         break 
 
-            if not idle_task:
-                driver.declineOffer(offer.id)
+            #if not idle_task:
+            #    driver.declineOffer(offer.id)
                
     def clean_mesos_file(self, task_id): 
         mf_task = mms.tasks_info_dict[task_id]
         #  TODO do not remove the file, if it is not exist
-        if os.path.isfile("task_{0}_cmd".format(task_id)):
-           os.remove("task_{0}_cmd".format(task_id))
+        # if os.path.isfile("task_{0}_cmd".format(task_id)):
+        #   os.remove("task_{0}_cmd".format(task_id))
         #for fn in mf_task.inp_fns:
         #    if os.path.isdir(fn):
         #        logging.info("{0} is a directory, remove the tar.gz file".format(fn))
@@ -232,16 +257,31 @@ class MakeflowScheduler(Scheduler):
 
         with mms.lock:
             if update.state == mesos_pb2.TASK_STAGING:
-                logging.info("{0} is running".format(update.task_id.value))
+                logging.info("{0} is staging".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_STARTING:
                 logging.info("{0} is starting".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_RUNNING:
                 logging.info("{0} is running".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_FINISHED:
-                logging.info("Task {0} is finished by executor.".format(update.task_id.value))
+                # get the resource usage snapshot
+                logging.info("{0} is finished by executor.".format(update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
+
+                stderr_msg = update.data
+
+                if os.path.isfile(SLAVE_STDERR):
+                    with open (SLAVE_STDERR, "a") as stderr_fd:
+                        stderr_fd.write(stderr_msg)
+                else:
+                    with open (SLAVE_STDERR, "w") as stderr_fd:
+                        stderr_fd.write(stderr_msg)
+
                 message = update.message
                 logging.info("Receive message {0}".format(update.message))
                 message_list = message.split()
@@ -263,11 +303,16 @@ class MakeflowScheduler(Scheduler):
                         output_file_addr = "{0}/{1}".format(output_file_dir, output_fn)
                         logging.info("The output file address is: {0}".format(\
                                 output_file_addr))
+                        urlretrieve_start = time.time()
                         urllib.urlretrieve(output_file_addr, output_fn)
+                        urlretrieve_end = time.time()
+                         
 
                         if os.path.exists(output_fn):
-                            logging.info("Task {0} get output file {1}".format(curr_task_id, \
-                            output_fn))
+                            output_fn_size = os.stat(output_fn).st_size 
+                            transfer_rate = ((output_fn_size/(urlretrieve_end - urlretrieve_start))/(1024*1024))
+                            logging.info("Task {0} get output file {1} with transfer rate {2} MB/s".format(curr_task_id, \
+                                output_fn, transfer_rate))
                         else:
                             logging.error("Task {0} is failed because it cannot get \
                             output file {1}".format(curr_task_id, output_fn))
@@ -275,7 +320,8 @@ class MakeflowScheduler(Scheduler):
                             mms.tasks_info_dict[update.task_id.value].action = "failed"
                             self.clean_mesos_file(update.task_id.value)  
                             return 
-
+                
+                    logging.info("{0} is done".format(update.task_id.value))
                     oup_fn.write("{0},finished\n".format(curr_task_id))
                     mms.tasks_info_dict[curr_task_id].action = "finished"
                     self.clean_mesos_file(curr_task_id)
@@ -285,6 +331,8 @@ class MakeflowScheduler(Scheduler):
             if update.state == mesos_pb2.TASK_FAILED:
                 failed_task_id = update.task_id.value
                 logging.info("Task {0} failed with reason code {1}.".format(failed_task_id, update.reason))
+                self.print_mesos_info(update.task_id.value)
+
                 if failed_task_id in mms.tasks_failed_time:
                     if mms.tasks_failed_time[failed_task_id] <= MAX_FAILED:
                         mms.tasks_failed_time[failed_task_id] += 1
@@ -306,23 +354,27 @@ class MakeflowScheduler(Scheduler):
                 mms.tasks_info_dict[update.task_id.value].action = "killed"
                 logging.info("{0}".format(update.message))
                 self.clean_mesos_file(update.task_id.value)
+                self.print_mesos_info(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_LOST:
                 oup_fn.write("{0},lost\n".format(update.task_id.value))
                 mms.tasks_info_dict[update.task_id.value].action = "lost"
                 logging.error("Task {0} lost with error message: {1}".format(update.task_id.value,\
                  update.message))
+                self.print_mesos_info(update.task_id.value)
                 self.clean_mesos_file(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_ERROR:
                 mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
                 logging.info("{0} try to resubmit task {1}".format(update.message,\
-                    update.task_id.value))
+                update.task_id.value))
+                self.print_mesos_info(update.task_id.value)
                 logging.error("Task {0} fail with error message: {1}".format(update.task_id.value,\
-                 update.message))
+                update.message))
         
         oup_fn.close()
 
+    # TODO deprecate the using of this method, since the message transmission is not reliable
     def frameworkMessage(self, driver, executorId, slaveId, message):
         logging.info("Receive message {0}".format(message))
         message_list = message.split()
@@ -334,8 +386,7 @@ class MakeflowScheduler(Scheduler):
                 mms.executors_info_dict[curr_executor_id].state = \
                         curr_executor_state
 
-                # if a executor is aborted, the corresponding task
-                # is aborted
+                # if a executor is aborted, the corresponding task is aborted
                 if curr_executor_state == "aborted":
                     curr_task_id = message_list[3].strip(' \t\n\r')
                     file_task_state = open(FILE_TASK_STATE, "a+")
@@ -512,7 +563,7 @@ if __name__ == '__main__':
     framework.name = "Makeflow"
 
     driver = MesosSchedulerDriver(
-        MakeflowScheduler(mms.mf_wk_dir),
+        MakeflowScheduler(mms.mf_wk_dir, mesos_master_addr),
         framework,
         mesos_master_addr  # assumes running on the master
     )
