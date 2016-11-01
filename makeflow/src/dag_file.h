@@ -57,6 +57,7 @@ struct dag_file {
 	char *cache_name;               /* the name of a file dependency in the cache, by default is NULL */
 	dag_file_source_t source_type;  /* the type of the source of a dependency */
 	char *cache_id;
+	char *cache_path;
 };
 
 /** Create dag file struct.

@@ -84,6 +84,8 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
     sucess = copy_file_to_file(f->filename, output_file_path);
     if (!sucess) {
       fatal("Could not cache output file %s\n", output_file_path);
+    } else {
+      f->cache_path = xxstrdup(output_file_path);
     }
   }
   /* only preserve Makeflow workflow instructions if node is a root node */
@@ -113,28 +115,30 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   /* create links to input files */
   list_first_item(n->source_files);
   while ((f=list_next_item(n->source_files))) {
-    if (f->created_by == 0) {
+    if (f->created_by == 0 && f->cache_path == NULL) {
       strncpy(caching_prefix, n->cache_id, 2);
       input_file= xxstrdup(d->caching_directory);
       input_file= string_combine_multi(input_file, caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
       sucess = copy_file_to_file(f->filename, input_file);
+      f->cache_path = xxstrdup(input_file);
       if (!sucess) {
         fatal("Could not cache input file %s\n", source_makeflow_file_path);
       }
     } else {
-      ancestor = f->created_by;
-      strncpy(caching_prefix, ancestor->cache_id, 2);
-      ancestor_output_file_path= xxstrdup(d->caching_directory);
-      ancestor_output_file_path= string_combine_multi(ancestor_output_file_path, caching_prefix, "/", ancestor->cache_id, "/outputs/", f->filename, 0);
+      if (f->cache_path != NULL) {
+        ancestor_output_file_path = xxstrdup(f->cache_path);
+      } else {
+        ancestor = f->created_by;
+        strncpy(caching_prefix, ancestor->cache_id, 2);
+        ancestor_output_file_path= xxstrdup(d->caching_directory);
+        ancestor_output_file_path= string_combine_multi(ancestor_output_file_path, caching_prefix, "/", ancestor->cache_id, "/outputs/", f->filename, 0);
+      }
 
       strncpy(caching_prefix, n->cache_id, 2);
       input_file= xxstrdup(d->caching_directory);
       input_file= string_combine_multi(input_file, caching_prefix, "/", n->cache_id, "/input_files/", f->filename, 0);
 
       sucess = symlink(ancestor_output_file_path, input_file);
-      if (sucess == -1) {
-        fatal("Could not create input file symlink %s\n", input_file);
-      }
     }
   }
 
