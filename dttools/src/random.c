@@ -18,10 +18,9 @@
 #include <string.h>
 #include <time.h>
 
-int random_initialized = 0;
-
 void random_init (void)
 {
+	static int random_initialized = 0;
 	if (random_initialized) return;
 	int fd = open("/dev/urandom", O_RDONLY);
 	if (fd == -1) {
