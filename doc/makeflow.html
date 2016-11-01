@@ -260,6 +260,21 @@ Makeflow will load the container into each execution node as needed.  This allow
 <tt>makeflow -T condor --docker debian</tt>, then Makeflow will distribute tasks via Condor, and
 then use Docker to invoke the task at each execution node.
 
+<h2 id="singularity">Running Makeflow with Singularity<a class="sectionlink" href="#docker" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>In Addition to Docker, Makeflow can also be used with Singularity to containerize work into a custom execution environment. 
+When using this mode, Singularity will take in an image, set up the container, and runs the command inside of the container.
+Any needed input files will be read in from Makeflow, and created files will be delivered by Makeflow.</p>
+
+<p> To use this mode, invoke Makeflow with the <tt>--singularity=&lt;img&gt;</tt> argument. Makeflow will ensure that the passed image
+will be sent to each worker. All of the comands will be ran through the container built with that image. Unlike Docker, Singularity 
+requires that users provide their own image.</p>
+
+<p>Similarly, this capability can be used <i>in addition</i> to the selection of a batch system. Thus, if you launch Makeflow as
+<tt>makeflow -T condor --singularity=mycontainer.img</tt>, then Makeflow will distribute tasks via Condor, and
+then use Singularity to execute the task at each worker.
+
+
 <h2 id="umbrella">Running Makeflow with Umbrella<a class="sectionlink" href="#umbrella" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>Makeflow allows the user to specify the execution environment for each rule

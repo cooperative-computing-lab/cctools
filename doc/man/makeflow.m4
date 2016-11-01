@@ -105,6 +105,13 @@ OPTION_PAIR(--docker,image) Run each task in the Docker container with this name
 OPTION_PAIR(--docker-tar,tar) Run each task in the Docker container given by this tar file.  The image will be uploaded via "docker load" on each execution site.
 OPTIONS_END
 
+SUBSECTION(Singularity Support)
+OPTIONS_BEGIN
+OPTION_PAIR(--singularity,image) Run each task in the Singularity container with this name.  The container will be created from the passed in image.
+OPTIONS_END
+
+
+
 SUBSECTION(Amazon Options)
 OPTIONS_BEGIN
 OPTION_PAIR(--amazon-credentials,path) Specify path to Amazon credentials file.
