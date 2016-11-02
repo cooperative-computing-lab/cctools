@@ -87,7 +87,7 @@ typedef enum {
 	JX_OP_OR,
 	JX_OP_NOT,
 	JX_OP_LOOKUP,
-	JX_OP_INVALID
+	JX_OP_INVALID,
 } jx_operator_t;
 
 struct jx_operator {
@@ -98,11 +98,12 @@ struct jx_operator {
 
 typedef enum {
 	JX_FUNCTION_INVALID = 0,
+	JX_FUNCTION_DBG,
 	JX_FUNCTION_RANGE,
 	JX_FUNCTION_STR,
 	JX_FUNCTION_FOREACH,
 	JX_FUNCTION_JOIN,
-	JX_FUNCTION_DBG,
+	JX_FUNCTION_LET,
 } jx_function_t;
 
 struct jx_function {

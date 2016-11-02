@@ -170,3 +170,5 @@ dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + db
 ;[1,2,[3,4]] == [1,2,[3,4]]
 
 Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+
+let({"f": 2.2, "g": 4.5}, f + y)

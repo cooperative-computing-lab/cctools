@@ -328,10 +328,10 @@ expression: join(["a","b",c])
 value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
 
 expression: join([1,2])
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","func":join([1,2]),"code":6}
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","function":join([1,2]),"code":6}
 
 expression: join(["a",2])
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","func":join(["a",2]),"code":6}
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","function":join(["a",2]),"code":6}
 
 expression: join([])
 value:      ""
@@ -383,4 +383,7 @@ value:      true
 
 expression: Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 value:      Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+
+expression: let({"f":2.2,"g":4.5},f+y)
+value:      22.2
 
