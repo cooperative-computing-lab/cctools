@@ -131,6 +131,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		struct jx *envlist, const struct rmsummary *resources )
 {
 
+	// Get the path to mesos python site-packages
 	if (is_mesos_py_path_known != 1) {
 		mesos_py_path = batch_queue_get_option(q, "mesos-path");
 		if (mesos_py_path == NULL) {
@@ -142,6 +143,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		}
 	}
 
+	// Get the mesos master address
 	if (is_mesos_master_known != 1) {
 		mesos_master = batch_queue_get_option(q, "mesos-master");
 		if (mesos_master == NULL) {
@@ -209,6 +211,19 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	} else {
 		fputs(",", task_info_fp);
 	}
+
+	int64_t cores = 2;
+	int64_t memory = 2048;
+	int64_t disk = 2048;
+
+	if (resources) {
+		cores  = resources->cores  > -1 ? resources->cores  : cores;
+		memory = resources->memory > -1 ? resources->memory : memory;
+		disk   = resources->disk   > -1 ? resources->disk   : disk;
+	}
+
+	fprintf(task_info_fp, "%" PRId64 ",%" PRId64 ",%" PRId64 ",", cores, memory, disk);
+
 	fputs("submitted\n", task_info_fp);
 
 	mesos_task_delete(mt);
