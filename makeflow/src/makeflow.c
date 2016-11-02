@@ -863,7 +863,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* store node into caching directory  */
 		if (d->should_preserve) {
 			printf("preserving node within caching directory\n");
-			makeflow_cache_populate(d, n, outputs);
+			makeflow_cache_populate(d, n, outputs, info);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
