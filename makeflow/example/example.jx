@@ -1,11 +1,10 @@
-{
+let({
+  "CURL":"/usr/bin/curl"
+}, {
   "comment":[
     "This is a sample Makeflow script that retrieves an image from the web",
     "creates four variations of it, and then combines them into an animation"
   ],
-  "variables":{
-    "CURL":"/usr/bin/curl"
-  },
   "environment":{
     "CONVERT":"/usr/bin/convert"
   },
@@ -35,15 +34,13 @@
       "outputs":["capitol.360.jpg"],
       "inputs":["capitol.jpg"]
     },
-    {
+    let({
+      "URL":"http://ccl.cse.nd.edu/images/capitol.jpg"
+    }, {
       "command":CURL + " -o capitol.jpg " + URL,
       "outputs":["capitol.jpg"],
-      "variables":{
-        "URL":"http://ccl.cse.nd.edu/images/capitol.jpg"
-      },
       "comment":"If a rule is specified with local_job, it executes at the local site",
       "local_job":true
-    }
+    })
   ]
-}
-
+})

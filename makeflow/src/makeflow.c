@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "jx_eval.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -1638,8 +1639,12 @@ if (enforcer && wrapper_umbrella) {
 	struct dag *d;
 	if (json_input) {
 		struct jx *j = jx_parse_file(dagfile);
-		d = dag_from_jx(j);
+		if (!j) fatal("couldn't parse %s\n", dagfile);
+		struct jx *k = jx_eval(j, NULL);
+		if (!k) fatal("couldn't evaluate %s\n", dagfile);
+		d = dag_from_jx(k);
 		jx_delete(j);
+		jx_delete(k);
 	} else {
 		d = dag_from_file(dagfile);
 	}
