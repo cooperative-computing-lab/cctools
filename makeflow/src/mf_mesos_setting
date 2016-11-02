@@ -35,11 +35,14 @@ def print_task_id_state():
 # Makeflow Mesos task info class
 class MfMesosTaskInfo:
 
-    def __init__(self, task_id, cmd, inp_fns, oup_fns, action):
+    def __init__(self, task_id, cmd, inp_fns, oup_fns, cores, mem, disk, action):
         self.task_id = task_id
         self.cmd = cmd
         self.inp_fns = inp_fns
         self.oup_fns = oup_fns
+        self.cores = cores
+        self.mem = mem
+        self.disk = disk
         self.action = action
         self.num_exe = 0
         self.executor_id = None
