@@ -15,6 +15,7 @@ struct jx *jx_function_range(struct jx_function *f, struct jx *context);
 struct jx *jx_function_foreach(struct jx_function *f, struct jx *context);
 struct jx *jx_function_str(struct jx_function *f, struct jx *context);
 struct jx *jx_function_join(struct jx_function *f, struct jx *context);
+struct jx *jx_function_let(struct jx_function *f, struct jx *context);
 struct jx *jx_function_dbg(struct jx_function *f, struct jx *context);
 
 #endif

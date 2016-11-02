@@ -354,6 +354,8 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 {
 	if(!f) return NULL;
 	switch(f->function) {
+		case JX_FUNCTION_DBG:
+			return jx_function_dbg(f, context);
 		case JX_FUNCTION_RANGE:
 			return jx_function_range(f, context);
 		case JX_FUNCTION_FOREACH:
@@ -362,8 +364,8 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 			return jx_function_str(f, context);
 		case JX_FUNCTION_JOIN:
 			return jx_function_join(f, context);
-		case JX_FUNCTION_DBG:
-			return jx_function_dbg(f, context);
+		case JX_FUNCTION_LET:
+			return jx_function_let(f, context);
 		case JX_FUNCTION_INVALID:
 			return NULL;
 	}

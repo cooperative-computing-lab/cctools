@@ -15,29 +15,32 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "stringtools.h"
 
+#define DBG "dbg"
 #define STR "str"
 #define RANGE "range"
 #define FOREACH "foreach"
 #define JOIN "join"
-#define DBG "dbg"
+#define LET "let"
 
 const char *jx_function_name_to_string(jx_function_t func) {
 	switch (func) {
+	case JX_FUNCTION_DBG: return DBG;
 	case JX_FUNCTION_STR: return STR;
 	case JX_FUNCTION_RANGE: return RANGE;
 	case JX_FUNCTION_FOREACH: return FOREACH;
 	case JX_FUNCTION_JOIN: return JOIN;
-	case JX_FUNCTION_DBG: return DBG;
+	case JX_FUNCTION_LET: return LET;
 	default: return "???";
 	}
 }
 
 jx_function_t jx_function_name_from_string(const char *name) {
-	if (!strcmp(name, STR)) return JX_FUNCTION_STR;
+	if (!strcmp(name, DBG)) return JX_FUNCTION_DBG;
+	else if (!strcmp(name, STR)) return JX_FUNCTION_STR;
 	else if (!strcmp(name, RANGE)) return JX_FUNCTION_RANGE;
 	else if (!strcmp(name, FOREACH)) return JX_FUNCTION_FOREACH;
 	else if (!strcmp(name, JOIN)) return JX_FUNCTION_JOIN;
-	else if (!strcmp(name, DBG)) return JX_FUNCTION_DBG;
+	else if (!strcmp(name, LET)) return JX_FUNCTION_LET;
 	else return JX_FUNCTION_INVALID;
 }
 
@@ -229,7 +232,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 		code = 6;
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
-		jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 		jx_insert_string(err, "message", "invalid arguments");
 		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
@@ -247,7 +250,7 @@ struct jx *jx_function_join(struct jx_function *f, struct jx *context) {
 			code = 6;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("func"), jx_function(f->function, jx_copy(f->arguments)));
+			jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
 			jx_insert_string(err, "message", "joined items must be strings");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -266,4 +269,51 @@ DONE:
 	jx_delete(array);
 	jx_delete(args);
 	return result;
+}
+
+struct jx *jx_function_let(struct jx_function *f, struct jx *context) {
+	int code;
+	struct jx *bindings = NULL;
+	struct jx *body = NULL;
+	struct jx *scratch = NULL;
+	struct jx *err = NULL;
+	struct jx *ctx = NULL;
+
+	if (jx_match_array(f->arguments, &bindings, JX_ANY, &body, JX_ANY, &scratch, JX_ANY, NULL) != 2) {
+		jx_delete(bindings);
+		jx_delete(body);
+		jx_delete(scratch);
+		code = 6;
+		err = jx_object(NULL);
+		jx_insert_integer(err, "code", code);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "let requires exactly two arguments");
+		jx_insert_string(err, "name", jx_error_name(code));
+		jx_insert_string(err, "source", "jx_eval");
+		return jx_error(err);
+	}
+
+	scratch = jx_eval(bindings, context);
+	jx_delete(bindings);
+	bindings = scratch;
+	scratch = NULL;
+	if (!jx_istype(bindings, JX_OBJECT)) {
+		jx_delete(bindings);
+		jx_delete(body);
+		code = 6;
+		err = jx_object(NULL);
+		jx_insert_integer(err, "code", code);
+		jx_insert(err, jx_string("function"), jx_function(f->function, jx_copy(f->arguments)));
+		jx_insert_string(err, "message", "bindings must be passed in an object");
+		jx_insert_string(err, "name", jx_error_name(code));
+		jx_insert_string(err, "source", "jx_eval");
+		return jx_error(err);
+	}
+
+	ctx = jx_merge(context, bindings, NULL);
+	jx_delete(bindings);
+	scratch = jx_eval(body, ctx);
+	jx_delete(ctx);
+	jx_delete(body);
+	return scratch;
 }
