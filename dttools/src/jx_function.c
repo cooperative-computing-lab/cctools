@@ -277,7 +277,6 @@ struct jx *jx_function_let(struct jx_function *f, struct jx *context) {
 	struct jx *body = NULL;
 	struct jx *scratch = NULL;
 	struct jx *err = NULL;
-	struct jx *ctx = NULL;
 
 	if (jx_match_array(f->arguments, &bindings, JX_ANY, &body, JX_ANY, &scratch, JX_ANY, NULL) != 2) {
 		jx_delete(bindings);
@@ -310,10 +309,14 @@ struct jx *jx_function_let(struct jx_function *f, struct jx *context) {
 		return jx_error(err);
 	}
 
-	ctx = jx_merge(context, bindings, NULL);
-	jx_delete(bindings);
-	scratch = jx_eval(body, ctx);
-	jx_delete(ctx);
+	if (context) {
+		context = jx_merge(context, bindings, NULL);
+		jx_delete(bindings);
+	} else {
+		context = bindings;
+	}
+	scratch = jx_eval(body, context);
+	jx_delete(context);
 	jx_delete(body);
 	return scratch;
 }
