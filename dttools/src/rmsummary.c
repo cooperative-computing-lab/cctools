@@ -1040,6 +1040,24 @@ void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
 	}
 }
 
+/* Add summaries together, ignoring negative numbers */
+static int64_t plus(int64_t d, int64_t s)
+{
+	if(d < 0 || s < 0) {
+		return MAX(0, MAX(s, d)); /* return at least 0 */
+	} else {
+		return s + d;
+	}
+}
+
+void rmsummary_add(struct rmsummary *dest, const struct rmsummary *src)
+{
+	if(!dest || !src)
+		return;
+
+	rmsummary_bin_op(dest, src, plus);
+}
+
 void rmsummary_debug_report(const struct rmsummary *s)
 {
 	if(!s)
