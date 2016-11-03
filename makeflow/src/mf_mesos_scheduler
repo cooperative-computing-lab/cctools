@@ -89,22 +89,7 @@ class MakeflowScheduler(Scheduler):
         executor.source = "python executor"
         executor.command.value = "{0} \"./{1}\" {2} {3} {4} {5}".format(sh_path, task_cmd_sh, 
                 executor.executor_id.value, executor.framework_id.value, sys.argv[3], hostname)
-
-        cpus = executor.resources.add()
-        cpus.name = "cpus"
-        cpus.type = mesos_pb2.Value.SCALAR
-        cpus.scalar.value = task_cpu
-
-        mem = executor.resources.add()
-        mem.name = "mem"
-        mem.type = mesos_pb2.Value.SCALAR
-        mem.scalar.value = task_mem
-
-        disk = executor.resources.add()
-        disk.name = "disk"
-        disk.type = mesos_pb2.Value.SCALAR
-        disk.scalar.value = task_disk
-
+        
         # add $CCTOOLS as the env variables for executor command
         cctools_env = executor.command.environment.variables.add()
         cctools_env.name = "CCTOOLS"
@@ -249,6 +234,9 @@ class MakeflowScheduler(Scheduler):
                         remaining_cpus -= task_info.cores
                         remaining_mem -= task_info.mem
                         remaining_disk -= task_info.disk
+                        
+                        logger.info("Task {0} will use {1} cores".format(task_id, task_info.cores))
+                        logger.info("Number of remaining cores are {0}".format(remaining_cpus))
 
                         self.launch_mesos_task(driver, offer, task_id, task_info.cores, task_info.mem, task_info.disk)
                         break 
