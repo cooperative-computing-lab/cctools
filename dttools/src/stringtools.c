@@ -567,6 +567,19 @@ int string_prefix_is(const char *string, const char *prefix) {
 	return 0;
 }
 
+int string_suffix_is(const char *string, const char *suffix) {
+	size_t n, m;
+
+	if(!string || !suffix) return 0;
+
+	if((n = strlen(suffix)) == 0) return 0;
+	if((m = strlen(string)) < n)  return 0;
+
+	if(strncmp((string + m - n), suffix, n) == 0) return 1;
+
+	return 0;
+}
+
 
 /* This definition taken directly from the GNU C library */
 
