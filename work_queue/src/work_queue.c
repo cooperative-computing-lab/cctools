@@ -228,9 +228,7 @@ struct work_queue_task_report {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
 
-	int64_t cores;
-	int64_t memory;
-	int64_t disk;
+	struct rmsummary *resources;
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -3020,10 +3018,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 		return;
 	}
 
-	tr->cores  = t->resources_allocated->cores;
-	tr->memory = t->resources_allocated->memory;
-	tr->disk   = t->resources_allocated->disk;
-
+	tr->resources = rmsummary_copy(t->resources_allocated);
 	list_push_tail(q->task_reports, tr);
 
 	// Trim the list, but never below its previous size.
@@ -3048,62 +3043,47 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report capacity;
 	bzero(&capacity, sizeof(capacity));
 
-	struct work_queue_task_report *tr;
+	capacity.resources = rmsummary_create(0);
+
 
 	int count = list_size(q->task_reports);
 
 	// Compute the average task properties.
 	if(count < 1) {
-		capacity.cores  = WORK_QUEUE_DEFAULT_CAPACITY_TASKS * 1;
-		capacity.memory = WORK_QUEUE_DEFAULT_CAPACITY_TASKS * 512;
-		capacity.disk   = WORK_QUEUE_DEFAULT_CAPACITY_TASKS * 1024;
+		capacity.resources->cores  = 1;
+		capacity.resources->memory = 512;
+		capacity.resources->disk   = 1024;
+
+		capacity.exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+		capacity.transfer_time = 1;
+
 		count = 1;
 	} else {
 		// Sum up the task reports available.
+		struct work_queue_task_report *tr;
 		list_first_item(q->task_reports);
 		while((tr = list_next_item(q->task_reports))) {
 			capacity.transfer_time += tr->transfer_time;
 			capacity.exec_time     += tr->exec_time;
 
-			capacity.cores  += tr->cores;
-			capacity.memory += tr->memory;
-			capacity.disk   += tr->disk;
+			if(tr->resources) {
+				capacity.resources->cores  += tr->resources ? tr->resources->cores  : 1;
+				capacity.resources->memory += tr->resources ? tr->resources->memory : 512;
+				capacity.resources->disk   += tr->resources ? tr->resources->disk   : 1024;
+			}
 		}
 	}
 
-	capacity.transfer_time = (int) ceil(((double) capacity.transfer_time) / count);
-	capacity.exec_time     = (int) ceil(((double) capacity.exec_time    ) / count);
-	capacity.cores         = (int) ceil(((double) capacity.cores        ) / count);
-	capacity.memory        = (int) ceil(((double) capacity.memory       ) / count);
-	capacity.disk          = (int) ceil(((double) capacity.disk         ) / count);
-
-	/*we stop using the defaults when at least 10 tasks have been completed.*/
-	if(q->stats->tasks_done > 10) {
-		capacity.transfer_time +=
-			(q->stats->time_status_msgs
-			 + q->stats->time_internal
-			 + q->stats->time_application)
-			/ q->stats->tasks_done;
-	} else {
-		capacity.transfer_time = 0;
-	}
-
-	// Capacity is the ratio of task execution time to time spent in the master
-	// doing other things.
-	double ratio;
-	if(capacity.transfer_time > 0) {
-		ratio = ((double) capacity.exec_time) / capacity.transfer_time;
-	} else {
-		ratio = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
-	}
+	capacity.transfer_time = MAX(1, capacity.transfer_time);
+	capacity.exec_time     = MAX(1, capacity.exec_time);
 
 	// Never go below the default capacity
-	ratio = MAX(ratio, WORK_QUEUE_DEFAULT_CAPACITY_TASKS);
+	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, capacity.exec_time / capacity.transfer_time);
 
-	s->capacity_tasks  = (int) ceil(ratio);
-	s->capacity_cores  = (int) ceil(capacity.cores  * ratio);
-	s->capacity_memory = (int) ceil(capacity.memory * ratio);
-	s->capacity_disk   = (int) ceil(capacity.disk   * ratio);
+	s->capacity_tasks  = ratio;
+	s->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
+	s->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
+	s->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
