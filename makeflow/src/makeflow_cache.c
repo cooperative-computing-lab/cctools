@@ -49,7 +49,7 @@ void makeflow_cache_generate_id(struct dag_node *n, char *command, struct list*i
 
 void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_job_info *info) {
   char *caching_file_path = NULL, *output_file_path = NULL, *source_makeflow_file_path = NULL, *ancestor_file_path = NULL;
-  char *ancestor_cache_id_string = NULL;
+  char *ancestor_cache_id_string = NULL, *ancestor_directory_path = NULL;
   char caching_prefix[3] = "";
   char *ancestor_output_file_path = NULL;
   char *input_file = NULL;
@@ -80,6 +80,12 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
     fatal("Could not create descendant directory %s\n", descendant_directory_path);
   }
 
+  ancestor_directory_path = xxstrdup(d->caching_directory);
+  ancestor_directory_path = string_combine_multi(ancestor_directory_path, "/jobs/", caching_prefix, "/", n->cache_id, "/ancestors", 0);
+  create_dir(ancestor_directory_path, 0777);
+  if (!sucess) {
+    fatal("Could not create ancestor directory %s\n", ancestor_directory_path);
+  }
 
   caching_file_path = xxstrdup(d->caching_directory);
   caching_file_path = string_combine_multi(caching_file_path, "/jobs/", caching_prefix, "/", n->cache_id, 0);
@@ -109,19 +115,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
 
   set_first_element(n->ancestors);
   while ((ancestor = set_next_element(n->ancestors))) {
-      ancestor_cache_id_string = string_combine_multi(ancestor_cache_id_string, ancestor->cache_id, "\n", 0);
-  }
-  ancestor_file_path= xxstrdup(d->caching_directory);
-  ancestor_file_path= string_combine_multi(ancestor_file_path, "/jobs/", caching_prefix, "/", n->cache_id, "/ancestors", 0);
-
-  if (ancestor_cache_id_string != NULL) {
-    fp = fopen(ancestor_file_path, "w");
-    if (fp == NULL) {
-      fatal("could not cache ancestor node cache ids");
-    } else {
-      fprintf(fp, "%s\n", ancestor_cache_id_string);
-    }
-    fclose(fp);
+      write_ancestor_links(d, n, ancestor);
   }
 
   /* create links to input files */
@@ -282,5 +276,20 @@ void write_descendant_link(struct dag *d, struct dag_node *current_node, struct 
   ancestor_link_path = string_combine_multi(ancestor_link_path, "/jobs/", ancestor_node_caching_prefix, "/", ancestor_node->cache_id, "/descendants/", current_node->cache_id, 0);
 
   symlink(descendant_job_path, ancestor_link_path);
+}
+
+void write_ancestor_links(struct dag *d, struct dag_node *current_node, struct dag_node *ancestor_node) {
+  char *ancestor_job_path = xxstrdup(d->caching_directory), *current_node_descendant_path = xxstrdup(d->caching_directory);
+  char current_node_caching_prefix[5] = "";
+  char ancestor_node_caching_prefix[5] = "";
+
+  strncpy(current_node_caching_prefix, current_node->cache_id, 2);
+  strncpy(ancestor_node_caching_prefix, ancestor_node->cache_id, 2);
+
+  ancestor_job_path = string_combine_multi(ancestor_job_path, "/jobs/", ancestor_node_caching_prefix, "/", ancestor_node->cache_id, 0);
+  current_node_descendant_path = string_combine_multi(current_node_descendant_path, "/jobs/", current_node_caching_prefix, "/", current_node->cache_id, "/ancestors/", ancestor_node->cache_id, 0);
+
+  symlink(ancestor_job_path, current_node_descendant_path);
+
 }
 

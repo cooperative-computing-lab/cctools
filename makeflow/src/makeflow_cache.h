@@ -33,4 +33,6 @@ void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_c
 void generate_file_cache_id(struct dag_file *f);
 
 void write_descendant_link(struct dag *d, struct dag_node *current_node, struct dag_node *ancestor_node);
+
+void write_ancestor_links(struct dag *d, struct dag_node *current_node, struct dag_node *ancestor_node);
 #endif
