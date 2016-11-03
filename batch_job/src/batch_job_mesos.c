@@ -212,7 +212,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		fputs(",", task_info_fp);
 	}
 
-	int64_t cores = 2;
+	int64_t cores = 1;
 	int64_t memory = 2048;
 	int64_t disk = 2048;
 
