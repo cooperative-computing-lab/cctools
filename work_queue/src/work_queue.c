@@ -4598,6 +4598,8 @@ struct work_queue *work_queue_create(int port)
 
 	log_queue_stats(q);
 
+	q->time_last_wait = timestamp_get();
+
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	return q;
 }
@@ -5405,7 +5407,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	int events = 0;
 
 	// account for time we spend outside work_queue_wait
-	q->stats->time_application = q->time_last_wait > 0 ? (timestamp_get() - q->time_last_wait) : 0;
+	q->stats->time_application += timestamp_get() - q->time_last_wait;
 
 	print_password_warning(q);
 
