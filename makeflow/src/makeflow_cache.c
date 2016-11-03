@@ -57,7 +57,7 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
   struct dag_node *ancestor;
   struct dag_file *f;
   int sucess;
-  FILE *fp;
+
   strncpy(caching_prefix, n->cache_id, 2);
 
   caching_file_path = xxstrdup(d->caching_directory);
