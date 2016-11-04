@@ -71,6 +71,9 @@ static char *amazon_ami = NULL;
 static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
 
+static char *wrapper_command = 0;
+static char *wrapper_input = 0;
+
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
@@ -251,31 +254,42 @@ static void set_worker_resources_options( struct batch_queue *queue )
 
 static int submit_worker( struct batch_queue *queue, const char *master_regex )
 {
-	char cmd[1024];
-	char extra_input_files[1024];
+	char *cmd = string_format(
+		"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		master_regex,
+		worker_timeout,
+		catalog_host,
+		catalog_port,
+		password_file ? "-P pwfile" : "",
+		resource_args ? resource_args : "",
+		extra_worker_args ? extra_worker_args : ""
+	);
 
-	sprintf(cmd,"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log ",master_regex,worker_timeout,catalog_host,catalog_port);
-	strcpy(extra_input_files,"work_queue_worker");
+	if(wrapper_command) {
+		// Note that we don't use string_wrap_command here,
+		// because the clever quoting interferes with the $$([Target.Memory]) substitution above.
+		char *newcmd = string_format("%s %s",wrapper_command,cmd);
+		free(cmd);
+		cmd = newcmd;
+	}
+
+	char *files = string_format("work_queue_worker");
 
 	if(password_file) {
-		strcat(cmd," -P pwfile");
-		strcat(extra_input_files,",pwfile");
+		char *newfiles = string_format("%s,pwfile",files);
+		free(files);
+		files = newfiles;
 	}
 
-	if(resource_args) {
-		strcat(cmd," ");
-		strcat(cmd,resource_args);
+	if(wrapper_input) {
+		char *newfiles = string_format("%s,%s",files,wrapper_input);
+		free(files);
+		files = newfiles;
 	}
-
-	if(extra_worker_args) {
-		strcat(cmd," ");
-		strcat(cmd,extra_worker_args);
-	}
-
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
-	return batch_job_submit(queue,cmd,extra_input_files,"output.log",0,resources);
+	return batch_job_submit(queue,cmd,files,"output.log",0,resources);
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
@@ -770,11 +784,13 @@ static void show_help(const char *cmd)
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
+	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
+	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE};
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_WRAPPER, LONG_OPT_WRAPPER_INPUT };
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
@@ -804,6 +820,8 @@ static const struct option long_options[] = {
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
+	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
+	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{0,0,0,0}
 };
 
@@ -894,6 +912,16 @@ int main(int argc, char *argv[])
 					free(tmp);
 				} else {
 					condor_requirements = string_format("(%s)", optarg);
+				}
+				break;
+			case LONG_OPT_WRAPPER:
+				wrapper_command = optarg;
+				break;
+			case LONG_OPT_WRAPPER_INPUT:
+				if(!wrapper_input) {
+					wrapper_input = strdup(optarg);
+				} else {
+					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
 				break;
 			case 'P':
