@@ -315,7 +315,7 @@ struct dag *dag_from_jx(struct jx *j) {
 	struct jx *rules = jx_lookup(j, "rules");
 	if (jx_istype(rules, JX_ARRAY)) {
 		struct jx *item;
-		void *i;
+		void *i = NULL;
 		while ((item = jx_iterate_array(rules, &i))) {
 			if (!rule_from_jx(d, item)) {
 				debug(D_MAKEFLOW_PARSER, "Failure parsing rule");

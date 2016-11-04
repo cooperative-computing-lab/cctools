@@ -628,6 +628,7 @@ const char *jx_error_name(int code) {
 	case 4: return "range error";
 	case 5: return "arithmetic error";
 	case 6: return "invalid arguments";
+	case 7: return "invalid context";
 	default: return "unknown error";
 	}
 }
