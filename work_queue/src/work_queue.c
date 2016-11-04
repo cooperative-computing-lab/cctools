@@ -5483,9 +5483,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
 				q->stats->tasks_failed++;
-			} else {
-				fprintf(stderr, "CAPACITY: %" PRIu64 " %" PRIu64 " %d %d\n", t->time_workers_execute_last, t->time_when_commit_end - t->time_when_commit_start + t->time_when_done - t->time_when_retrieval,
-						task_state_count(q, NULL, WORK_QUEUE_TASK_RUNNING) + task_state_count(q, NULL, WORK_QUEUE_TASK_WAITING_RETRIEVAL), hash_table_size(q->worker_table));
 			}
 
 			// return completed task (t) to the user. We do not return right
