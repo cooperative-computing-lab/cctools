@@ -117,7 +117,7 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static int json_input = 0;
+static int jx_input = 0;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
@@ -1053,7 +1053,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Load docker image from the tar file.\n", "--docker-tar=<tar file>");
 	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
-	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
+	printf(" %-30s Use JX format rather than Make-style format for the input file.\n", "--jx");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1152,7 +1152,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_JSON,
+		LONG_OPT_JX,
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_SPEC,
@@ -1221,7 +1221,7 @@ int main(int argc, char *argv[])
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
-		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"jx", no_argument, 0, LONG_OPT_JX},
 		{0, 0, 0, 0}
 	};
 
@@ -1471,8 +1471,8 @@ int main(int argc, char *argv[])
 				} else {
 					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
 				}
-			case LONG_OPT_JSON:
-				json_input = 1;
+			case LONG_OPT_JX:
+				jx_input = 1;
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
@@ -1542,14 +1542,14 @@ int main(int argc, char *argv[])
 
 	printf("parsing %s...\n",dagfile);
 	struct dag *d;
-	if (json_input) {
+	if (jx_input) {
 		struct jx *j = jx_parse_file(dagfile);
-		if (!j) fatal("couldn't parse %s\n", dagfile);
 		struct jx *k = jx_eval(j, NULL);
-		if (!k) fatal("couldn't evaluate %s\n", dagfile);
 		d = dag_from_jx(k);
 		jx_delete(j);
 		jx_delete(k);
+		// JX doesn't really use errno, so give something generic
+		errno = EINVAL;
 	} else {
 		d = dag_from_file(dagfile);
 	}
