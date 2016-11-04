@@ -118,6 +118,7 @@ static int skip_file_check = 0;
 static int cache_mode = 1;
 
 static int jx_input = 0;
+static char *jx_context = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
@@ -1054,6 +1055,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Indicate user trusts inputs exist.\n", "--skip-file-check");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
 	printf(" %-30s Use JX format rather than Make-style format for the input file.\n", "--jx");
+	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1153,6 +1155,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_JX,
+		LONG_OPT_JX_CONTEXT,
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_SPEC,
@@ -1222,6 +1225,7 @@ int main(int argc, char *argv[])
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"jx", no_argument, 0, LONG_OPT_JX},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_CONTEXT},
 		{0, 0, 0, 0}
 	};
 
@@ -1474,6 +1478,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_JX:
 				jx_input = 1;
 				break;
+			case LONG_OPT_JX_CONTEXT:
+				jx_context = xxstrdup(optarg);
+				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_binary(wrapper_umbrella, (const char *)xxstrdup(optarg));
@@ -1543,13 +1550,22 @@ int main(int argc, char *argv[])
 	printf("parsing %s...\n",dagfile);
 	struct dag *d;
 	if (jx_input) {
-		struct jx *j = jx_parse_file(dagfile);
-		struct jx *k = jx_eval(j, NULL);
-		d = dag_from_jx(k);
-		jx_delete(j);
-		jx_delete(k);
 		// JX doesn't really use errno, so give something generic
 		errno = EINVAL;
+		struct jx *t = NULL;
+		if (jx_context) {
+			printf("using JX context %s\n", jx_context);
+			t = jx_parse_file(jx_context);
+			if (!t) fatal("couldn't parse context: %s\n", strerror(errno));
+		}
+		struct jx *ctx = jx_eval(t, NULL);
+		jx_delete(t);
+		t = jx_parse_file(dagfile);
+		struct jx *dag = jx_eval(t, ctx);
+		jx_delete(t);
+		jx_delete(ctx);
+		d = dag_from_jx(dag);
+		jx_delete(dag);
 	} else {
 		d = dag_from_file(dagfile);
 	}
