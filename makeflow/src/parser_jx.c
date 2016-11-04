@@ -194,16 +194,15 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	d->nodes = n;
 	itable_insert(d->node_table, n->nodeid, n);
 
-	jx_match_boolean(jx_lookup(j, "local_job"), &n->local_job);
+	n->local_job = jx_lookup_boolean(j, "local_job");
 	if (n->local_job) {
 		debug(D_MAKEFLOW_PARSER, "Local job");
 	}
 
-	char *category;
-	if (jx_match_string(jx_lookup(j, "category"), &category)) {
+	const char *category = jx_lookup_string(j, "category");
+	if (category) {
 		debug(D_MAKEFLOW_PARSER, "Category %s", category);
 		n->category = makeflow_category_lookup_or_create(d, category);
-		free(category);
 	} else {
 		debug(D_MAKEFLOW_PARSER, "category malformed or missing, using default");
 		n->category = makeflow_category_lookup_or_create(d, "default");
@@ -214,8 +213,8 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 		return 0;
 	}
 
-	char *allocation;
-	if (jx_match_string(jx_lookup(j, "allocation"), &allocation)) {
+	const char *allocation = jx_lookup_string(j, "allocation");
+	if (allocation) {
 		if (!strcmp(allocation, "first")) {
 			debug(D_MAKEFLOW_PARSER, "first allocation");
 			n->resource_request = CATEGORY_ALLOCATION_FIRST;
@@ -227,10 +226,8 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 			n->resource_request = CATEGORY_ALLOCATION_ERROR;
 		} else {
 			debug(D_MAKEFLOW_PARSER, "Unknown allocation");
-			free(allocation);
 			return 0;
 		}
-		free(allocation);
 	} else {
 		debug(D_MAKEFLOW_PARSER, "Allocation malformed or missing");
 	}
