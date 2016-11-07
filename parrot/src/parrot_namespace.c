@@ -71,10 +71,10 @@ int main( int argc, char *argv[] )
 	}
 
 	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_mountfile_parse_file(s);
+	if(s && parrot_in_parrot) pfs_mountfile_parse_file(s);
 
 	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_mountfile_parse_string(s);
+	if(s && parrot_in_parrot) pfs_mountfile_parse_string(s);
 
 	s = getenv("PARROT_PATH");
 	if (s) snprintf(parrot_path, PATH_MAX, "%s", s);
@@ -103,10 +103,10 @@ static const struct option long_options[] = {
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
 		case 'm':
-			pfs_mountfile_parse_file(optarg);
+			if (parrot_in_parrot) pfs_mountfile_parse_file(optarg);
 			break;
 		case 'M':
-			pfs_mountfile_parse_string(optarg);
+			if (parrot_in_parrot) pfs_mountfile_parse_string(optarg);
 			break;
 		case LONG_OPT_PARROT_PATH:
 			snprintf(parrot_path, PATH_MAX, "%s", optarg);
