@@ -64,7 +64,8 @@ OPTION_PAIR(--factory-timeout, n)Exit after no master has been seen in <n> secon
 OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_PAIR(--factory-timeout, #)Set factory timeout to <#> seconds. (off by default) This will cause work queue to exit when their are no masters present after the given number of seconds.
-
+OPTION_PAIR(--wrapper,Wrap all commands with this prefix.)
+OPTION_PAIR(--wrapper-input,Add this file needed by the wrapper.)
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
 
