@@ -12,6 +12,9 @@ import threading
 import json
 import imp
 import re
+import SimpleHTTPServer
+import SocketServer
+import socket
 
 setting_module_path = os.path.join(os.getenv('CCTOOLS'), "bin", "mf_mesos_setting")
 mms = imp.load_source("mf_mesos_setting", setting_module_path)
@@ -39,13 +42,27 @@ MAX_FAILED = 10
 PARENT_PID = 0
     
 
+def get_open_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("",0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+def start_httpserver(httpd, port):
+    logger.info("Serving a http server at {0} for directory {1}\n".format(port, os.getcwd()))
+    httpd.serve_forever()
+
 # Makeflow mesos scheduler
 class MakeflowScheduler(Scheduler):
 
-    def __init__(self, mf_wk_dir, master_addr):
+    def __init__(self, mf_wk_dir, master_addr, mf_hostname, http_port):
         self.mf_wk_dir = mf_wk_dir
         self.master_addr = master_addr
-
+        self.mf_hostname = mf_hostname
+        self.http_port = http_port
+        self.finished_tasks = 0
+        
     # Print out the dynamic static information of mesos cluster
     def print_mesos_info(self, task_id):
         metrics_snapshot_url = "http://{0}/metrics/snapshot".format(self.master_addr)
@@ -58,14 +75,16 @@ class MakeflowScheduler(Scheduler):
         mem_used = master_metrics['master/mem_used']
         disk_offered = master_metrics['master/disk_total']
         disk_used = master_metrics['master/disk_used'] 
+        self.finished_tasks = 0
         tasks_running = master_metrics['master/tasks_running']
         tasks_staging = master_metrics['master/tasks_staging']
         tasks_starting = master_metrics['master/tasks_starting']
+        tasks_finished = master_metrics['master/tasks_finished']
 
         # treat running, staging and starting as running
         num_running_tasks = tasks_running + tasks_staging + tasks_starting
 
-        logger.info("{0} cpu {1} used, {2} memory {3} used, {4} disk {5} used, {6} active tasks".format(cpu_offered, cpu_used, mem_offered, mem_used, disk_offered, disk_used, num_running_tasks))
+        logger.info("{0} cpu {1} used, {2} memory {3} used, {4} disk {5} used, {6} active tasks, {7} finished tasks".format(cpu_offered, cpu_used, mem_offered, mem_used, disk_offered, disk_used, num_running_tasks, self.finished_tasks))
 
     # Create a ExecutorInfo instance for mesos task
     def new_mesos_executor(self, mf_task, framework_id, hostname, task_cpu, task_mem, task_disk):
@@ -81,7 +100,7 @@ class MakeflowScheduler(Scheduler):
         os.chmod(task_cmd_sh, 0755)
 
         uri = executor.command.uris.add()
-        uri.value = os.path.join(os.getcwd(), task_cmd_sh)
+        uri.value = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, task_cmd_sh)
         uri.executable = True
         uri.extract = False
 
@@ -114,12 +133,13 @@ class MakeflowScheduler(Scheduler):
                     tar.close()
                 else:
                     logger.info("The compressed file for {0} is exist".format(fn)) 
-                fn = os.path.join(dir_name, compressed_fn)
-                uri.value = fn.strip(' \t\n\r')
+                fn = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, compressed_fn)
+                uri.value = fn
                 uri.extract = True
-                # uri.cache = True
             else:
-                uri.value = fn.strip(' \t\n\r')
+                abs_path = fn.strip(' \t\n\r')
+                base_name = os.path.basename(abs_path)
+                uri.value = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, base_name)
                 uri.extract = False
                 uri.executable = True
 
@@ -335,6 +355,8 @@ class MakeflowScheduler(Scheduler):
                     self.clean_mesos_file(curr_task_id)
 
                     oup_fn.close()
+
+                self.finished_tasks += 1
 
             if update.state == mesos_pb2.TASK_FAILED:
                 failed_task_id = update.task_id.value
@@ -553,10 +575,17 @@ class MakefowMonitor(threading.Thread):
        
         self.stop_mesos_scheduler() 
 
+
 if __name__ == '__main__':
 
     PARENT_PID = os.getppid()
     logger.info("The parent pid is {0}".format(PARENT_PID))
+
+    # Start the httpserver in the working directory
+    port = get_open_port()
+    Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
+    httpd = SocketServer.TCPServer(("", port), Handler)
+    threading.Thread(target=start_httpserver, args=(httpd,port)).start()
 
     # make us a framework
     mms.mf_wk_dir = sys.argv[1]
@@ -572,9 +601,10 @@ if __name__ == '__main__':
     framework = mesos_pb2.FrameworkInfo()
     framework.user = ""  # Have Mesos fill in the current user.
     framework.name = "Makeflow"
+    mf_hostname = socket.getfqdn()
 
     driver = MesosSchedulerDriver(
-        MakeflowScheduler(mms.mf_wk_dir, mesos_master_addr),
+        MakeflowScheduler(mms.mf_wk_dir, mesos_master_addr, mf_hostname, port),
         framework,
         mesos_master_addr  # assumes running on the master
     )
@@ -585,4 +615,5 @@ if __name__ == '__main__':
 
     status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
 
+    httpd.shutdown()
     sys.exit(status)
