@@ -306,6 +306,56 @@ the data stored there:
 (see contents of /chirp/server.nd.edu/mix/1523.data)
 </code>
 
+<h2 id="namespaces">Mount Namespaces<a class="sectionlink" href="#namespaces" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>Mount entries in Parrot are organized into hierarchical, reference counted namespaces.
+A fresh instance of Parrot puts all process into a single, global namespace.
+This means that normally, all processes running under a Parrot instance see the same
+view of the filesystem. More concretely, all processes share the same mount list specified
+by the <tt>-m</tt> and <tt>-M</tt> options. The <tt>parrot_mount</tt> command allows programs to edit this
+mount list.</p>
+<p>Processes are also free to fork their mount namespaces with the Parrot-specific
+<tt>parrot_fork_namespace</tt> syscall. Whenever a process forks its namespace, its child
+will inherit a reference to its parent’s mount namespace. Mount namespace changes are
+visible to processes subject to the following rules. Given a process <em>P</em> in namespace <em>N</em>,</p>
+<ul>
+<li><em>P</em> may add/remove mount entries in <em>N</em>.</li>
+<li>any other process with a reference to <em>N</em>, will see changes by <em>P</em>.</li>
+<li>suppose another process <em>P’</em> forks <em>N</em>, so that <em>P’</em> is in namespace <em>N’</em>, then
+<ul>
+<li>any changes to <em>N’</em> <strong>are not</strong> visible in <em>N</em>.</li>
+<li>any changes to <em>N</em> <strong>are</strong> visible in <em>N’</em>.</li>
+</ul>
+</li>
+<li>when adding a mount entry to <em>N</em>, the redirect is resolved in the parent namespace of <em>N</em>.</li>
+</ul>
+<p>When Parrot starts, the global mount namespace has no parent, so mounts passed in are
+resolved in the host filesystem. Unless the <tt>--dynamic-mounts</tt> flag is passed,
+Parrot <strong>seals</strong> the global mount namespace before running the tracee by making a new
+child namespace. Thus all processes are, by default, locked into the namespace set up by
+the command line/environment variables. Any processes may add mount entries to its own
+mount namespace via <tt>parrot_mount</tt>, but may not remove mount entries defined in parent
+and sealed namespace(s). A process can make changes to its mount namespace, then seal it
+with <tt>parrot_mount --disable</tt> to prevent the process or its children from undoing those
+changes. If <tt>--dynamic-mounts</tt> is passed, the global namespace is left unsealed,
+so mounts/unmounts are resolved in the host filesystem. This allows a setup script
+to modify the command line mounts, then seal the global namespace so that it can no
+longer be modified. Likewise, a process can fork its namespace, add mount entries,
+then seal it so that all children will be locked into the current view of the system.</p>
+<p>The <tt>parrot_namespace</tt> utility gives a more convenient way to create new mount namespaces
+rather than using the <tt>parrot_fork_namespace</tt> syscall directly. This utility forks the
+current mount namespace and performs any mounts specified on the command line.
+<tt>parrot_namespace</tt> detects whether or not it is already running under Parrot and does
+the right thing. When running under Parrot, <tt>parrot_namespace</tt> uses Parrot-specific
+syscalls to make the mount changes in a newly-forked mount namespace. If not running
+under Parrot, <tt>parrot_namespace</tt> simply executes <tt>parrot_run</tt>.</p>
+<p>For applications that want to nest Parrot sessions and only need to make changes to
+mounts, <tt>parrot_namespace</tt> should work as a drop-in replacement for <tt>parrot_run</tt>.
+<tt>parrot_namespace</tt> only supports a limited subset of the options available for
+<tt>parrot_run</tt>. By always using <tt>parrot_namespace</tt>, the user need not be concerned
+with whether Parrot is already running.</p>
+
+
 <h2 id="accessedfiles">Record Accessed Files and Environment Variables<a class="sectionlink" href="#accessedfiles" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>To figure out the underlying file dependencies and execution environment, Parrot allows you to record the
