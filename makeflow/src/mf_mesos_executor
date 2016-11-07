@@ -65,6 +65,14 @@ class MakeflowMesosExecutor(Executor):
             update.state = mesos_pb2.TASK_RUNNING
             self.task_id = task.task_id.value
             driver.sendStatusUpdate(update)
+           
+            tmp_io = sys.stdout 
+            sys.stdout = sys.stderr
+            for uri in task.executor.command.uris:
+                inp_fn = os.path.basename(uri.value)
+                inp_fn_size = os.path.getsize(inp_fn)
+                print "task {0} input: {1} {2}".format(task.task_id.value, uri.value, inp_fn_size)
+            sys.stdout = tmp_io
 
             # Launch the makeflow task
             rec = subprocess.check_call(self.cmd, shell=True)
