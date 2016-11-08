@@ -226,6 +226,10 @@ struct work_queue_stats {
 	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
 	timestamp_t time_polling;      /**< Total time blocking waiting for worker communications (i.e., master idle waiting for a worker message). */
 	timestamp_t time_application;  /**< Total time spent outside work_queue_wait. */
+	timestamp_t prev_time_status_msgs; 
+	timestamp_t prev_time_internal;
+	timestamp_t prev_time_polling;
+	timestamp_t prev_time_application;
 
 	/* Workers time statistics: */
 	timestamp_t time_workers_execute;            /**< Total time workers spent executing done tasks. */

@@ -233,6 +233,7 @@ struct work_queue_worker {
 struct work_queue_task_report {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
+	timestamp_t master_time;
 
 	struct rmsummary *resources;
 };
@@ -3100,6 +3101,8 @@ Used for computing queue capacity below.
 static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct work_queue_task_report *tr;
+	struct work_queue_stats s;
+	work_queue_get_stats(q, &s);
 
 	// Create a new report object and add it to the list.
 	tr = calloc(1, sizeof(struct work_queue_task_report));
@@ -3108,7 +3111,8 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	debug(D_WQ, "tr->transfer_time %"PRId64" = (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64")\n", tr->transfer_time, t->time_when_commit_end, t->time_when_commit_start, t->time_when_done, t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
 	debug(D_WQ, "tr->exec_time = %"PRId64"\n", t->time_workers_execute_last);
-
+	tr->master_time = (s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal) + (s.time_polling - s.prev_time_polling);
+	debug(D_BJ, "tr->master_time = (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64") = %"PRId64"\n", s.time_status_msgs, s.prev_time_status_msgs, s.time_internal, s.prev_time_internal, s.time_polling, s.prev_time_polling, tr->master_time);
 	if(!t->resources_allocated) {
 		return;
 	}
@@ -3211,27 +3215,27 @@ static void compute_capacity_jr(const struct work_queue *q)
 	debug(D_BJ, "#   Execution     I/O        \n");
 	list_first_item(q->task_reports);
 	while((tr = list_next_item(q->task_reports))) {
-		total_io += tr->transfer_time;
+		total_io += tr->transfer_time + tr->master_time;
 		total_exec += tr->exec_time;
-		debug(D_BJ, "# %11"PRId64" %11"PRId64"\n", tr->exec_time, tr->transfer_time);
+		debug(D_BJ, "# %11"PRId64" %11"PRId64"\n", tr->exec_time, tr->transfer_time + tr->master_time);
 	}
 	// Sum up the task reports available.
 	tr = list_peek_tail(q->task_reports);
 	int64_t delta_exec = total_exec - tr->exec_time;
-	int64_t delta_io = total_io - tr->transfer_time;
-	debug(D_BJ, "delta_exec = %"PRId64" - %"PRId64" = %"PRId64"\tdelta_io = %"PRId64" - %"PRId64" = %"PRId64"\n", total_exec, tr->exec_time, delta_exec, total_io, tr->transfer_time, delta_io);
+	int64_t delta_io = total_io - (tr->transfer_time + tr->master_time);
+	debug(D_BJ, "delta_exec = %"PRId64" - %"PRId64" = %"PRId64"\tdelta_io = %"PRId64" - %"PRId64" = %"PRId64"\n", total_exec, tr->exec_time, delta_exec, total_io, tr->transfer_time + tr->master_time, delta_io);
 	if(tr->transfer_time > 0) {
-		capacity_weighted = (int) ceil((alpha * (tr->exec_time / tr->transfer_time)) + ((1 - alpha) * q->stats->previous_capacity_weighted));
+		capacity_weighted = (int) ceil((alpha * (tr->exec_time / tr->transfer_time + tr->master_time)) + ((1 - alpha) * q->stats->previous_capacity_weighted));
 		capacity_cumulative = (int) ceil(((float) total_exec) / total_io);
-		capacity_instantaneous = (int) ceil(((float) tr->exec_time) / tr->transfer_time);
+		capacity_instantaneous = (int) ceil(((float) tr->exec_time) / tr->transfer_time + tr->master_time);
 		if(delta_io > 0) {
-			capacity_test = (int) ceil((alpha * (tr->exec_time / tr->transfer_time)) + ((1 - alpha) * (((float) delta_exec) / delta_io)));
+			capacity_test = (int) ceil((alpha * (tr->exec_time / tr->transfer_time + tr->master_time)) + ((1 - alpha) * (((float) delta_exec) / delta_io)));
 		}
-		debug(D_BJ, "Weighted Capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\n", alpha, tr->exec_time, tr->transfer_time, alpha, q->stats->previous_capacity_weighted, capacity_weighted);
+		debug(D_BJ, "Weighted Capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\n", alpha, tr->exec_time, tr->transfer_time + tr->master_time, alpha, q->stats->previous_capacity_weighted, capacity_weighted);
 		debug(D_BJ, "Cumulative Capacity = (%"PRId64" / %"PRId64") = %d\n", total_exec, total_io, capacity_cumulative);
-		debug(D_BJ, "Instantaneous Capacity = (%"PRId64" / %"PRId64")) = %d\n", tr->exec_time, tr->transfer_time, capacity_instantaneous);
-		debug(D_BJ, "Weighted Capacity Revised = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * (%"PRId64" / %"PRId64")) = %d\n", alpha, tr->exec_time, tr->transfer_time, alpha, delta_exec, delta_io, capacity_test);
-		debug(D_BJ, "\nCAPACITY: %"PRId64" %"PRId64"\n", tr->exec_time, tr->transfer_time);
+		debug(D_BJ, "Instantaneous Capacity = (%"PRId64" / %"PRId64")) = %d\n", tr->exec_time, tr->transfer_time + tr->master_time, capacity_instantaneous);
+		debug(D_BJ, "Weighted Capacity Revised = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * (%"PRId64" / %"PRId64")) = %d\n", alpha, tr->exec_time, tr->transfer_time + tr->master_time, alpha, delta_exec, delta_io, capacity_test);
+		debug(D_BJ, "\nCAPACITY: %"PRId64" %"PRId64" %"PRId64"\n", tr->exec_time, tr->transfer_time, tr->master_time);
 		q->stats->previous_capacity_weighted = capacity_weighted;
 	}
 }
@@ -5539,7 +5543,6 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	END_ACCUM_TIME(q, time_polling);
 
-
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
 	int workers_removed = 0;
@@ -5606,6 +5609,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 {
 	int events = 0;
 
+	q->stats->prev_time_application = q->stats->time_application;
+	q->stats->prev_time_internal = q->stats->time_internal;
+	q->stats->prev_time_status_msgs = q->stats->time_status_msgs;
+	q->stats->prev_time_polling = q->stats->time_polling;
 	// account for time we spend outside work_queue_wait
 	q->stats->time_application += timestamp_get() - q->time_last_wait;
 
@@ -5617,6 +5624,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	int result;
 	struct work_queue_task *t = NULL;
 	// time left?
+
 	while( (stoptime == 0) || (time(0) <= stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
