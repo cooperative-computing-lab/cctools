@@ -32,6 +32,7 @@ static void show_help()
 	printf(optfmt, "-m", "--ftab-file <file>", "Use <file> as a mountlist", " (PARROT_MOUNT_FILE)");
 	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run", " (PARROT_PATH)");
 	printf(optfmt, "-d", "--debug <flags>", "Enable debugging for this subsystem", " (PARROT_DEBUG_FLAGS)");
+	printf(optfmt, "-o", "--debug-file <file>", "Send debugging to this file", " (PARROT_DEBUG_FILE)");
 	printf(optfmt, "-v", "--version", "Show version number", "");
 	printf(optfmt, "-h", "--help", "Help: Show these options", "");
 }
@@ -83,6 +84,7 @@ static const struct option long_options[] = {
 	{"help",  no_argument, 0, 'h'},
 	{"version", no_argument, 0, 'v'},
 	{"debug", required_argument, 0, 'd'},
+	{"debug-file", required_argument, 0, 'o'},
 	{"mount", required_argument, 0, 'M'},
 	{"tab-file", required_argument, 0, 'm'},
 	{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
@@ -90,10 +92,13 @@ static const struct option long_options[] = {
 };
 
 	int c;
-	while((c=getopt_long(argc,argv,"d:vhM:m:", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc,argv,"d:vhM:m:o:", long_options, NULL)) > -1) {
 		switch(c) {
 		case 'd':
 			debug_flags_set(optarg);
+			break;
+		case 'o':
+			debug_config_file(optarg);
 			break;
 		case 'h':
 			show_help();

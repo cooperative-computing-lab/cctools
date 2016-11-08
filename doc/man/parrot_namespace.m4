@@ -25,6 +25,7 @@ mountlist (CODE(PARROT_MOUNT_FILE))
 OPTION_ITEM(`--parrot-path')Path to CODE(parrot_run) (CODE(PARROT_PATH))
 OPTION_ITEM(`-d, --debug <flags>')Enable debugging for this
 subsystem (CODE(PARROT_DEBUG_FLAGS))
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
 OPTION_ITEM(`-v, --version')Show version number
 OPTION_ITEM(`-h, --help')Help: Show these options
 OPTIONS_END
