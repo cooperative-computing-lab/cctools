@@ -6,6 +6,7 @@ See the file COPYING for details.
 */
 
 #include "debug.h"
+#include "random.h"
 #include "stringtools.h"
 #include "timestamp.h"
 #include "xxmalloc.h"
@@ -472,9 +473,10 @@ char *string_pad_left(char *old, int length)
 void string_cookie(char *s, int length)
 {
 	int i;
+	random_init();
 
 	for(i = 0; i < length; i++) {
-		s[i] = rand() % 26 + 'a';
+		s[i] = random_int() % 26 + 'a';
 	}
 
 	s[length - 1] = 0;
