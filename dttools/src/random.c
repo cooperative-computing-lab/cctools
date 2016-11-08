@@ -7,6 +7,7 @@
 #include "full_io.h"
 #include "random.h"
 #include "twister.h"
+#include "debug.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -35,7 +36,7 @@ void random_init (void)
 	} else {
 		uint64_t seed;
 nasty_fallback:
-		fprintf(stderr, "warning: falling back to low-quality entropy");
+		debug(D_NOTICE, "warning: falling back to low-quality entropy");
 		seed = (uint64_t)getpid() ^ (uint64_t)time(NULL);
 		seed |= (((uint64_t)(uintptr_t)&seed) << 32); /* using ASLR */
 		srand(seed);
