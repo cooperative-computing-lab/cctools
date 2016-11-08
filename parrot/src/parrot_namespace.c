@@ -31,8 +31,6 @@ static void show_help()
 	printf(optfmt, "-M", "--mount /foo=/bar", "Mount (redirect) /foo to /bar", " (PARROT_MOUNT_STRING)");
 	printf(optfmt, "-m", "--ftab-file <file>", "Use <file> as a mountlist", " (PARROT_MOUNT_FILE)");
 	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run", " (PARROT_PATH)");
-	printf(optfmt, "-d", "--debug <flags>", "Enable debugging for this subsystem", " (PARROT_DEBUG_FLAGS)");
-	printf(optfmt, "-o", "--debug-file <file>", "Send debugging to this file", " (PARROT_DEBUG_FILE)");
 	printf(optfmt, "-v", "--version", "Show version number", "");
 	printf(optfmt, "-h", "--help", "Help: Show these options", "");
 }
@@ -48,20 +46,6 @@ int main( int argc, char *argv[] )
 	int parrot_in_parrot = 0;
 	strcpy(parrot_path, "parrot_run");
 
-	char *s;
-	s = getenv("PARROT_DEBUG_FLAGS");
-	if(s) {
-		char *x = xxstrdup(s);
-		int nargs;
-		char **args;
-		if(string_split(x,&nargs,&args)) {
-			for(int i=0;i<nargs;i++) {
-				debug_flags_set(args[i]);
-			}
-		}
-		free(x);
-	}
-
 	char buf[4096];
 	if (parrot_version(buf, sizeof(buf)) >= 0) {
 		debug(D_DEBUG, "running under parrot %s\n", buf);
@@ -71,7 +55,7 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	s = getenv("PARROT_MOUNT_FILE");
+	char *s = getenv("PARROT_MOUNT_FILE");
 	if(s && parrot_in_parrot) pfs_mountfile_parse_file(s);
 
 	s = getenv("PARROT_MOUNT_STRING");
@@ -83,8 +67,6 @@ int main( int argc, char *argv[] )
 static const struct option long_options[] = {
 	{"help",  no_argument, 0, 'h'},
 	{"version", no_argument, 0, 'v'},
-	{"debug", required_argument, 0, 'd'},
-	{"debug-file", required_argument, 0, 'o'},
 	{"mount", required_argument, 0, 'M'},
 	{"tab-file", required_argument, 0, 'm'},
 	{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
@@ -92,14 +74,8 @@ static const struct option long_options[] = {
 };
 
 	int c;
-	while((c=getopt_long(argc,argv,"d:vhM:m:o:", long_options, NULL)) > -1) {
+	while((c=getopt_long(argc,argv,"vhM:m:", long_options, NULL)) > -1) {
 		switch(c) {
-		case 'd':
-			debug_flags_set(optarg);
-			break;
-		case 'o':
-			debug_config_file(optarg);
-			break;
 		case 'h':
 			show_help();
 			return 0;
