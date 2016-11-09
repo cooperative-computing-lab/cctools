@@ -103,7 +103,7 @@ LONGCODE_END
 If running on condor, you may manually specify condor requirements:
 
 LONGCODE_BEGIN
-work_queue_factory -T condor -M barney --condor_requirements 'MachineGroup == "disc"' --condor_requirements 'has_matlab == true'
+work_queue_factory -T condor -M barney --condor-requirements 'MachineGroup == "disc"' --condor-requirements 'has_matlab == true'
 LONGCODE_END
 
 Repeated uses of CODE(condor-requirements) are and-ed together. The previous example will produce a statement equivalent to:
