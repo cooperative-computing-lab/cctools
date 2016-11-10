@@ -149,6 +149,8 @@ void makeflow_cache_populate(struct dag *d, struct dag_node *n, struct list *out
     }
   }
 
+  free(ancestor_directory_path);
+  free(descendant_directory_path);
   free(ancestor_output_file_path);
   free(input_file);
   free(caching_file_path);
@@ -275,6 +277,8 @@ void write_descendant_link(struct dag *d, struct dag_node *current_node, struct 
   ancestor_link_path = string_combine_multi(ancestor_link_path, "/jobs/", ancestor_node_caching_prefix, "/", ancestor_node->cache_id + 2, "/descendants/", current_node->cache_id, 0);
 
   symlink(descendant_job_path, ancestor_link_path);
+  free(descendant_job_path);
+  free(ancestor_link_path);
 
 }
 
@@ -290,6 +294,8 @@ void write_ancestor_links(struct dag *d, struct dag_node *current_node, struct d
   current_node_descendant_path = string_combine_multi(current_node_descendant_path, "/jobs/", current_node_caching_prefix, "/", current_node->cache_id + 2, "/ancestors/", ancestor_node->cache_id, 0);
 
   symlink(ancestor_job_path, current_node_descendant_path);
+  free(ancestor_job_path);
+  free(current_node_descendant_path);
 
 }
 
