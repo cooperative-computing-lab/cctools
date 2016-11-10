@@ -72,6 +72,31 @@ static struct pfs_mount_entry *find_parent_ns(struct pfs_mount_entry *ns) {
 	return ns;
 }
 
+const char *pfs_resolve_get_ldso(void) {
+	struct pfs_mount_entry *ns = pfs_process_current_ns();
+	if (!ns) ns = mount_list;
+	assert(ns);
+	while (ns->next) {
+		assert(!ns->parent);
+		ns = ns->next;
+	}
+
+	return ns->ldso;
+}
+
+void pfs_resolve_set_ldso(const char *ldso) {
+	struct pfs_mount_entry *ns = pfs_process_current_ns();
+	if (!ns) ns = mount_list;
+	assert(ns);
+	while (ns->next) {
+		assert(!ns->parent);
+		ns = ns->next;
+	}
+
+	free(ns->ldso);
+	ns->ldso = strndup(ldso, PATH_MAX);
+}
+
 void pfs_resolve_add_entry( const char *prefix, const char *redirect, mode_t mode )
 {
 	assert(prefix);
@@ -385,10 +410,11 @@ static pfs_resolve_t pfs_resolve_ns( struct pfs_mount_entry *ns, const char *log
 	return result;
 }
 
-struct pfs_mount_entry *pfs_resolve_fork_ns(struct pfs_mount_entry *ns) {
+struct pfs_mount_entry *pfs_resolve_fork_ns(struct pfs_mount_entry *ns, const char *ldso) {
 	struct pfs_mount_entry *result = (struct pfs_mount_entry *) xxmalloc(sizeof(*result));
 	memset(result, 0, sizeof(*result));
 	result->refcount = 1;
+	if (ldso) result->ldso = strndup(ldso, PATH_MAX);
 	if (ns) {
 		assert(!(ns->next && ns->parent));
 		result->parent = pfs_resolve_share_ns(ns);
@@ -416,6 +442,7 @@ void pfs_resolve_drop_ns(struct pfs_mount_entry *ns) {
 	if (ns->refcount == 0) {
 		pfs_resolve_drop_ns(ns->next);
 		pfs_resolve_drop_ns(ns->parent);
+		free(ns->ldso);
 		free(ns);
 	}
 }
@@ -428,6 +455,7 @@ void pfs_resolve_seal_ns(void) {
 	struct pfs_mount_entry *m = (struct pfs_mount_entry *) xxmalloc(sizeof(*m));
 	memcpy(m, ns, sizeof(*m));
 	memset(ns, 0, sizeof(*ns));
+	if (m->ldso) ns->ldso = strndup(m->ldso, PATH_MAX);
 	ns->parent = m;
 	ns->refcount = m->refcount;
 	m->refcount = 1;

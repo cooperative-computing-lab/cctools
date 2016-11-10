@@ -360,7 +360,7 @@ extern "C" char * pfs_process_name()
 }
 
 extern "C" struct pfs_mount_entry *pfs_process_current_ns(void) {
-	return pfs_current && pfs_current->ns ? pfs_current->ns : NULL;
+	return pfs_current ? pfs_current->ns : NULL;
 }
 
 extern const char *pfs_username;

@@ -30,6 +30,7 @@ static void show_help()
 	printf("Where options are:\n");
 	printf(optfmt, "-M", "--mount /foo=/bar", "Mount (redirect) /foo to /bar", " (PARROT_MOUNT_STRING)");
 	printf(optfmt, "-m", "--ftab-file <file>", "Use <file> as a mountlist", " (PARROT_MOUNT_FILE)");
+	printf(optfmt, "-l", "--ld-path=<path>", "Path to ld.so to use", " (PARROT_LDSO_PATH)");
 	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run", " (PARROT_PATH)");
 	printf(optfmt, "-v", "--version", "Show version number", "");
 	printf(optfmt, "-h", "--help", "Help: Show these options", "");
@@ -40,62 +41,85 @@ typedef enum {
 
 } long_options_t;
 
-int main( int argc, char *argv[] )
-{
-	char parrot_path[PATH_MAX];
-	int parrot_in_parrot = 0;
-	strcpy(parrot_path, "parrot_run");
-
-	char buf[4096];
-	if (parrot_version(buf, sizeof(buf)) >= 0) {
-		debug(D_DEBUG, "running under parrot %s\n", buf);
-		parrot_in_parrot = 1;
-		if (parrot_fork_namespace() < 0) {
-			fatal("cannot dissociate from parent namespace");
-		}
-	}
-
-	char *s = getenv("PARROT_MOUNT_FILE");
-	if(s && parrot_in_parrot) pfs_mountfile_parse_file(s);
-
-	s = getenv("PARROT_MOUNT_STRING");
-	if(s && parrot_in_parrot) pfs_mountfile_parse_string(s);
-
-	s = getenv("PARROT_PATH");
-	if (s) snprintf(parrot_path, PATH_MAX, "%s", s);
-
 static const struct option long_options[] = {
 	{"help",  no_argument, 0, 'h'},
 	{"version", no_argument, 0, 'v'},
 	{"mount", required_argument, 0, 'M'},
 	{"tab-file", required_argument, 0, 'm'},
+	{"ld-path", required_argument, 0, 'l'},
 	{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 	{0,0,0,0}
 };
 
+int main( int argc, char *argv[] )
+{
+	char parrot_path[PATH_MAX];
+	char ldso[PATH_MAX];
+	strcpy(parrot_path, "parrot_run");
+	strcpy(ldso, "");
+
+	char *s = getenv("PARROT_PATH");
+	if (s) snprintf(parrot_path, PATH_MAX, "%s", s);
+
+	s = getenv("PARROT_LDSO_PATH");
+	if (s) snprintf(ldso, PATH_MAX, "%s", s);
+
 	int c;
-	while((c=getopt_long(argc,argv,"vhM:m:", long_options, NULL)) > -1) {
+	const char *optstring = "vhM:m:l:";
+	while((c=getopt_long(argc, argv, optstring, long_options, NULL)) > -1) {
 		switch(c) {
 		case 'h':
 			show_help();
 			return 0;
-			break;
 		case 'v':
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
-		case 'm':
-			if (parrot_in_parrot) pfs_mountfile_parse_file(optarg);
-			break;
-		case 'M':
-			if (parrot_in_parrot) pfs_mountfile_parse_string(optarg);
+		case 'l':
+			snprintf(ldso, PATH_MAX, "%s", optarg);
 			break;
 		case LONG_OPT_PARROT_PATH:
 			snprintf(parrot_path, PATH_MAX, "%s", optarg);
 			break;
 		default:
+			break;
+		}
+	}
+
+	char buf[4096];
+	if (parrot_version(buf, sizeof(buf)) >= 0) {
+		debug(D_DEBUG, "running under parrot %s\n", buf);
+		if (parrot_fork_namespace(ldso) < 0) {
+			fatal("cannot dissociate from parent namespace");
+		}
+	} else {
+		if (execvp(parrot_path, argv) < 0) {
+			fatal("failed to exec %s: %s\n", parrot_path, strerror(errno));
+		}
+	}
+
+	s = getenv("PARROT_MOUNT_FILE");
+	if (s) pfs_mountfile_parse_file(s);
+
+	s = getenv("PARROT_MOUNT_STRING");
+	if (s) pfs_mountfile_parse_string(s);
+
+	optind = 1;
+	while((c=getopt_long(argc, argv, optstring, long_options, NULL)) > -1) {
+		switch(c) {
+		case 'm':
+			pfs_mountfile_parse_file(optarg);
+			break;
+		case 'M':
+			pfs_mountfile_parse_string(optarg);
+			break;
+		case 'h':
+		case 'v':
+		case 'l':
+		case LONG_OPT_PARROT_PATH:
+			break;
+		default:
 			show_help();
 			return 1;
-			break;
 		}
 	}
 
@@ -104,14 +128,8 @@ static const struct option long_options[] = {
 		return 1;
 	}
 
-	if (parrot_in_parrot) {
-		if (execvp(argv[optind], &argv[optind]) < 0) {
-			fatal("failed to exec %s: %s\n", argv[optind], strerror(errno));
-		}
-	} else {
-		if (execvp(parrot_path, argv) < 0) {
-			fatal("failed to exec %s: %s\n", parrot_path, strerror(errno));
-		}
+	if (execvp(argv[optind], &argv[optind]) < 0) {
+		fatal("failed to exec %s: %s\n", argv[optind], strerror(errno));
 	}
 }
 

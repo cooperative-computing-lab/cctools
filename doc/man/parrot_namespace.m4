@@ -22,6 +22,7 @@ OPTION_ITEM(`-M, --mount /foo=/bar')Mount (redirect) CODE(/foo)
 to CODE(/bar) (CODE(PARROT_MOUNT_STRING))
 OPTION_ITEM(`-m, --ftab-file <path>')Use CODE(<file>) as a
 mountlist (CODE(PARROT_MOUNT_FILE))
+OPTION_TRIPLET(-l, ld-path, path)Path to ld.so to use.
 OPTION_ITEM(`--parrot-path')Path to CODE(parrot_run) (CODE(PARROT_PATH))
 OPTION_ITEM(`-v, --version')Show version number
 OPTION_ITEM(`-h, --help')Help: Show these options

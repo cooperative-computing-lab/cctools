@@ -1172,6 +1172,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
+	char ldso[PFS_PATH_MAX];
 	void *value = NULL;
 
 	/* SYSCALL_execve has a different value in 32 and 64 bit modes. When an
@@ -3455,7 +3456,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_parrot_fork_namespace:
 			if (entering) {
-				p->ns = pfs_resolve_fork_ns(p->ns);
+				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,ldso,POINTER(args[0]),sizeof(ldso),0));
+				p->ns = pfs_resolve_fork_ns(p->ns, strlen(ldso) == 0 ? NULL : ldso);
 				divert_to_dummy(p,0);
 			}
 			break;
@@ -3650,12 +3652,11 @@ void pfs_dispatch( struct pfs_process *p )
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name)
 {
-	extern char pfs_ldso_path[PFS_PATH_MAX];
-
 	int rc;
 	int phyfd = -1;
 	int exefd = -1;
 	int tmpfd = -1;
+	const char *ldso = pfs_resolve_get_ldso();
 	char ldso_physical_name[PATH_MAX] = "";
 
 	strcpy(exe, "");
@@ -3664,9 +3665,9 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 
 	CATCHUNIX(phyfd = open(physical_name, O_RDONLY));
 
-	if (pfs_ldso_path[0]) {
-		debug(D_PROCESS, "%s: forcing use of loader %s", __func__, pfs_ldso_path);
-		CATCHUNIX(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0));
+	if (ldso) {
+		debug(D_PROCESS, "%s: forcing use of loader %s", __func__, ldso);
+		CATCHUNIX(pfs_get_local_name(ldso, ldso_physical_name, 0, 0));
 	} else {
 		char path[PATH_MAX] = "";
 		rc = elf_get_interp(phyfd, path);

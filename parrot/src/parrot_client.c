@@ -260,12 +260,12 @@ ssize_t parrot_version ( char *buf, size_t len )
 #endif
 }
 
-int parrot_fork_namespace ( void )
+int parrot_fork_namespace ( const char *ldso )
 {
 #ifdef CCTOOLS_CPU_I386
-	return syscall(SYSCALL32_parrot_fork_namespace);
+	return syscall(SYSCALL32_parrot_fork_namespace, ldso);
 #else
-	return syscall(SYSCALL64_parrot_fork_namespace);
+	return syscall(SYSCALL64_parrot_fork_namespace, ldso);
 #endif
 }
 
