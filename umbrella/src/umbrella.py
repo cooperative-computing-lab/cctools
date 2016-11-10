@@ -1,5 +1,4 @@
-#!/usr/bin/env cctools_python
-# CCTOOLS_PYTHON_VERSION 2.7 2.6
+#!/usr/bin/python2
 
 # All the vanilla python package dependencies of Umbrella can be satisfied by Python 2.6.
 """
@@ -73,6 +72,9 @@ import urllib
 import gzip
 import imp
 
+if sys.version_info < (2,6,) or sys.version_info >= (3,):
+	sys.exit("Umbrella depends on [python2.6, python3).")
+
 found_requests = None
 try:
 	imp.find_module('requests')
@@ -102,17 +104,9 @@ except ImportError:
 
 s3_url = 'https://s3.amazonaws.com'
 
-if sys.version_info >= (3,):
-	import urllib.request as urllib2
-	import urllib.parse as urlparse
-else:
-	import urllib2
-	import urlparse
-
-if sys.version_info > (2,6,):
-	import json
-else:
-	import simplejson as json #json module is introduce in python 2.4.3
+import urllib2
+import urlparse
+import json
 
 #Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
 cctools_binary_source = "http://ccl.cse.nd.edu/research/data/hep-case-study/parrot"
