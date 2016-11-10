@@ -1,6 +1,7 @@
 import hashlib
 import os
 import sys
+import getopt
 
 
 paths_to_jobs = {}
@@ -41,7 +42,7 @@ class SimpleDagJob(object):
     output_file_paths = [os.path.join(output_file_dir, f_path) for f_path in os.listdir(output_file_dir)]
 
     for o_path in output_file_paths:
-        self.add_output_file(o_path)
+      self.add_output_file(o_path)
 
     for i_path in input_file_paths:
       self.add_input_file(i_path)
@@ -85,18 +86,45 @@ class SimpleDagJob(object):
       self.batch_job_info['exited_normally'] = int(f.readline().rstrip())
       self.batch_job_info['exit_code'] = int(f.readline().rstrip())
       self.batch_job_info['exit_signal'] = int(f.readline().rstrip())
+  def print_immediate_inputs(self):
+    for f in self.input_files:
+      print f.file_path
+    print ''
 
+  def print_all_inputs(self):
+    queue= [(self, 0)]
+    while len(queue) > 0:
+      node, distance = queue.pop()
+      print distance
+      node.print_immediate_inputs()
+      for child in node.ancestors:
+        queue.append((child, distance + 1))
 
+  def print_immediate_outputs(self):
+    for f in self.output_files:
+      print f.file_path
+    print ''
+
+  def print_all_outputs(self):
+    visted = {}
+    queue= [(self, 0)]
+    visted[self.cached_path] = 1
+    while len(queue) > 0:
+      node, distance = queue.pop()
+      print distance
+      node.print_immediate_outputs()
+      for child in node.descendants:
+        if child.cached_path not in visted:
+          queue.append((child, distance + 1))
+          visted[child.cached_path] = 1
 
   def print_job(self):
-    print "file: ", self.local_path
-    print "Created by job cached at path = ", self.cached_path
-    print "Command used to create this file = ", self.command
-    print "input files for this job: "
-    for i_file in self.input_files:
-      print "\tfile: ", i_file.file_name
-    print "makeflow file cached at path = ", get_makeflow_path(self)
-    print ""
+    print "file:{}".format(self.local_path)
+    print "Created by job cached at path:{}".format(self.cached_path)
+    print "Command used to create this file:{}".format(self.command)
+    print "makeflow file cached at path:{}".format(get_makeflow_path(self))
+    print "Inputs:"
+    self.print_immediate_inputs()
 
 class SimpleDagFile(object):
   def __init__(self, file_path, command = ""):
@@ -120,7 +148,7 @@ def get_dag_roots(dag_node):
   nodes_seen = {}
   root_nodes = []
   search(dag_node, nodes_seen, root_nodes)
-  return root_nodes[0].path
+  return root_nodes
 
 
 def search(dag_node, nodes_seen, root_nodes):
@@ -135,27 +163,83 @@ def search(dag_node, nodes_seen, root_nodes):
       search(node, nodes_seen, root_nodes)
 
 
-if __name__ == "__main__":
-  arguments = sys.argv[1:]
-  if len(arguments) != 1:
-    raise Exception("suitable arguments not found")
+def usage():
+  print """usage: makeflow_recover [options] <file>
+  options:
+    --info                   print out basic info about the specified file and the associated job
+    -i, --inputs             list immediate input files required to create file
+    --inputs-all             list both immediate input files and all other files that the specified file relied on directly or indirectly
+    -h, --help               print this message
+    -o, --outputs            list sibling output files
+    --outputs-all            list both sibling output files and all other files that relied directly or indirectly on the specified file
+    --path=<path_to_cache>   path to search for the makeflow cache (use if when preserving the makeflow you specified a cache path)
 
-  file_name = arguments[0]
+  """
+  sys.exit(1)
+
+def parse_args():
+  arg_map = {'inputs': False, 'outputs': False, "file": None, "inputs-all": False,
+            "outputs-all": False, "info": False, "path": "/tmp/makeflow.cache.{}".format(os.geteuid())}
+  try:
+    opts, args = getopt.getopt(sys.argv[1:], ":hio", ['help', 'inputs', 'outputs', 'inputs-all', 'outputs-all', 'info', 'path='])
+  except getopt.GetoptError as err:
+    print str(err)
+    usage()
+  for o, a in opts:
+    if o in ("-h", '--help'):
+      usage()
+    elif o in ("-o", "--outputs"):
+      arg_map['outputs'] = True
+    elif o in ("-i", "--inputs"):
+      arg_map['inputs'] = True
+    elif o in ("--outputs-all"):
+      arg_map['outputs-all'] = True
+    elif o in ("--inputs-all"):
+      arg_map['inputs-all'] = True
+    elif o in ("--info"):
+      arg_map['info'] = True
+    elif o in ("--path"):
+      arg_map['path'] = a
+    else:
+      assert False, "unhandled option"
+  if len(opts) == 0 or (len(opts) == 1 and opts[0][0] == '--path'):
+    arg_map['info'] = True
+  arg_map['file'] = args[0]
+  if not arg_map['file'] or not os.path.isfile(arg_map['file']):
+    print "Cannot find file {}".format(arg_map['file'])
+    usage()
+  return arg_map
+
+
+if __name__ == "__main__":
+  arguments = parse_args()
+
   sha1_hash = hashlib.sha1()
+  file_name = arguments['file']
   with open(file_name, "r") as f:
     line = f.readline()
     while line:
       sha1_hash.update(line)
       line = f.readline()
   hex_digest = sha1_hash.hexdigest()
-
-  file_path = "/tmp/makeflow.cache.{}/files/{}/{}".format(os.geteuid(), hex_digest[0:4], hex_digest)
+  file_path = os.path.join(arguments['path'], "files", hex_digest[0:2], hex_digest[2:])
   if os.path.islink(file_path):
-    print "Recovering file {}".format(file_name)
-    # new_dag = SimpleDag()
     resolved_job_path = os.path.realpath(file_path)
     node = recreate_job(resolved_job_path, file_name)
-    node.print_job()
+    if arguments['inputs']:
+      print "Inputs"
+      node.print_immediate_inputs()
+    if arguments['outputs']:
+      print "Outputs"
+      node.print_immediate_outputs()
+    if arguments['inputs-all']:
+      print "Inputs-all"
+      node.print_all_inputs()
+    if arguments['outputs-all']:
+      print "Outputs-all"
+      node.print_all_outputs()
+    if arguments['info']:
+      node.print_job()
   else:
     print "File has not been cached"
 
