@@ -1305,6 +1305,16 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 						mountfile.write(mount_str)
 					mount_list.append(tmplist[0])
 					mountfile.write(line)
+		else:
+			common_mounts = ["/proc", "/dev", "/sys", "/net", "/var", "/misc", "/selinux"]
+			for mount in common_mounts:
+				line = "%s %s\n" % (mount, mount)
+				mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(mount)))
+				if mount_str:
+					logging.debug("Adding fake mount items (%s) into %s", mount_str, mountfile_path)
+					mountfile.write(mount_str)
+				mount_list.append(mount)
+				mountfile.write(line)
 
 		logging.debug("Add /etc/hosts and /etc/resolv.conf into %s", mountfile_path)
 		mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, '/etc')
