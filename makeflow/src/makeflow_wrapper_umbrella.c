@@ -73,6 +73,42 @@ void makeflow_wrapper_umbrella_set_mode(struct makeflow_wrapper_umbrella *w, con
 	}
 }
 
+void makeflow_wrapper_umbrella_set_input_files(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag_node *n) {
+	bool remote_rename_support = false;
+
+	if(!w) return;
+
+	// every rule may have its own umbrella spec file.
+	// to avoid w->wrapper->input_files accumulating umbrella spec files for different rules, first delete it and then recreate it.
+	list_delete(w->wrapper->input_files);
+	w->wrapper->input_files = list_create();
+
+	if(!n->umbrella_spec)  return;
+
+	if (batch_queue_supports_feature(queue, "remote_rename")) {
+		remote_rename_support = true;
+	}
+
+	// add umbrella_spec (if specified) and umbrella_binary (if specified) into the input file list of w->wrapper
+	if (!remote_rename_support) {
+		makeflow_wrapper_add_input_file(w->wrapper, n->umbrella_spec);
+		if(w->binary) makeflow_wrapper_add_input_file(w->wrapper, w->binary);
+	} else {
+		{
+			char *s = string_format("%s=%s", n->umbrella_spec, path_basename(n->umbrella_spec));
+			if(!s) fatal("string_format for umbrella spec failed: %s.\n", strerror(errno));
+			makeflow_wrapper_add_input_file(w->wrapper, s);
+			free(s);
+		}
+		if(w->binary) {
+			char *s = string_format("%s=%s", w->binary, path_basename(w->binary));
+			if(!s) fatal("string_format for umbrella binary failed: %s.\n", strerror(errno));
+			makeflow_wrapper_add_input_file(w->wrapper, s);
+			free(s);
+		}
+	}
+}
+
 void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag *d) {
 	struct dag_node *cur;
 	bool remote_rename_support = false;
@@ -84,25 +120,6 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 	if(!w->binary) {
 		debug(D_MAKEFLOW_RUN, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node if umbrella is used to deliver the execution environment.\n");
 		fprintf(stdout, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node if umbrella is used to deliver the execution environment.\n");
-	}
-
-	// add umbrella_spec (if specified) and umbrella_binary (if specified) into the input file list of w->wrapper
-	if (!remote_rename_support) {
-		if(w->spec) makeflow_wrapper_add_input_file(w->wrapper, w->spec);
-		if(w->binary) makeflow_wrapper_add_input_file(w->wrapper, w->binary);
-	} else {
-		if(w->spec) {
-			char *s = string_format("%s=%s", w->spec, path_basename(w->spec));
-			if(!s) fatal("string_format for umbrella spec failed: %s.\n", strerror(errno));
-			makeflow_wrapper_add_input_file(w->wrapper, s);
-			free(s);
-		}
-		if(w->binary) {
-			char *s = string_format("%s=%s", w->binary, path_basename(w->binary));
-			if(!s) fatal("string_format for umbrella binary failed: %s.\n", strerror(errno));
-			makeflow_wrapper_add_input_file(w->wrapper, s);
-			free(s);
-		}
 	}
 
 	// set wrapper_umbrella->log_prefix to the default value

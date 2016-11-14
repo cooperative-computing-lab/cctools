@@ -530,6 +530,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
+	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
+
 	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 	struct list *output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
 
