@@ -110,7 +110,7 @@ import json
 
 #Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
 cctools_binary_source = "http://ccl.cse.nd.edu/research/data/hep-case-study/parrot"
-cctools_binary_version = "6.0.2"
+cctools_binary_version = "6.0.10"
 cctools_dest = ""
 
 #set cms_siteconf_url to be the url for the siteconf your application depends
@@ -425,7 +425,7 @@ def cctools_download(sandbox_dir, hardware_platform, linux_distro, action):
 	Returns:
 		the path of the downloaded cctools in the umbrella local cache. For example: /tmp/umbrella_test/cache/d19376d92daa129ff736f75247b79ec8/cctools-4.9.0-redhat6-x86_64
 	"""
-	name = "parrot-%s-%s-%s" % (cctools_binary_version, hardware_platform, linux_distro)
+	name = "cctools-%s-%s-%s" % (cctools_binary_version, hardware_platform, linux_distro)
 	source = "%s/%s.tar.gz" % (cctools_binary_source, name)
 	global cctools_dest
 	cctools_dest = os.path.dirname(sandbox_dir) + "/cache/" + name
@@ -915,16 +915,17 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
 	Returns:
 		None
 	"""
+	# if parrot_namespace is used here, `--no-set-foreground` should be removed.
 	parrot_options = ""
 	if parrot_ldso_path == '':
-		parrot_options = "-m %s" % parrot_mount_file
+		parrot_options = "-m %s --no-set-foreground" % parrot_mount_file
 	else:
-		parrot_options = "-m %s -l %s" % (parrot_mount_file, parrot_ldso_path)
+		parrot_options = "-m %s -l %s --no-set-foreground" % (parrot_mount_file, parrot_ldso_path)
 
 	if cvmfs_http_proxy:
-		user_cmd[0] = "export HTTP_PROXY=%s; %s/bin/parrot_namespace %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, cctools_dest, parrot_options, cwd_setting, user_cmd[0])
+		user_cmd[0] = "export HTTP_PROXY=%s; %s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, cctools_dest, parrot_options, cwd_setting, user_cmd[0])
 	else:
-		user_cmd[0] = "%s/bin/parrot_namespace %s -- /bin/sh -c 'cd  %s; %s'" % (cctools_dest, parrot_options, cwd_setting, user_cmd[0])
+		user_cmd[0] = "%s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cctools_dest, parrot_options, cwd_setting, user_cmd[0])
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
 
 def chrootize_user_cmd(user_cmd, cwd_setting):
