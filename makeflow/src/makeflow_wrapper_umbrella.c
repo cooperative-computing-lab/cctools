@@ -212,7 +212,7 @@ char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_w
 	if(!remote_rename_support) {
 		if(!w->binary) {
 			umbrella_command = string_format("umbrella --spec \"%s\" \
-				--localdir /tmp/umbrella_test \
+				--localdir ./umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
@@ -220,7 +220,7 @@ char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_w
 				run \'{}\'", n->umbrella_spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
 		} else {
 			umbrella_command = string_format("%s --spec \"%s\" \
-				--localdir /tmp/umbrella_test \
+				--localdir ./umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
@@ -230,7 +230,7 @@ char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_w
 	} else {
 		if(!w->binary) {
 			umbrella_command = string_format("umbrella --spec \"%s\" \
-				--localdir /tmp/umbrella_test \
+				--localdir ./umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
@@ -238,7 +238,7 @@ char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_w
 				run \'{}\'", path_basename(n->umbrella_spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
 		} else {
 			umbrella_command = string_format("./%s --spec \"%s\" \
-				--localdir /tmp/umbrella_test \
+				--localdir ./umbrella_test \
 				--inputs \"%s\" \
 				--output \"%s\" \
 				--sandbox_mode \"%s\" \
