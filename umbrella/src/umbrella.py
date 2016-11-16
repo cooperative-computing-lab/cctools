@@ -1886,6 +1886,9 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PWD'] = cwd_setting
 			logging.debug("Construct mounfile ....")
 			parrot_mount_file = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint)
+			with open(parrot_mount_file, 'r') as f:
+				logging.debug("the parrot mountlist is:\n%s\n", f.read())
+
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -1922,6 +1925,9 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		else:
 			env_dict = os.environ
 			parrot_mount_file = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
+			with open(parrot_mount_file, 'r') as f:
+				logging.debug("the parrot mountlist is:\n%s\n", f.read())
+
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
