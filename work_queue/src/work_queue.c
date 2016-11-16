@@ -3111,7 +3111,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	debug(D_WQ, "tr->transfer_time %"PRId64" = (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64")\n", tr->transfer_time, t->time_when_commit_end, t->time_when_commit_start, t->time_when_done, t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
 	debug(D_WQ, "tr->exec_time = %"PRId64"\n", t->time_workers_execute_last);
-	tr->master_time = (s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal) + (s.time_polling - s.prev_time_polling);
+	tr->master_time = (s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal);
 	debug(D_BJ, "tr->master_time = (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64") = %"PRId64"\n", s.time_status_msgs, s.prev_time_status_msgs, s.time_internal, s.prev_time_internal, s.time_polling, s.prev_time_polling, tr->master_time);
 	if(!t->resources_allocated) {
 		return;
