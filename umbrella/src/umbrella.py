@@ -71,6 +71,7 @@ import tempfile
 import urllib
 import gzip
 import imp
+import socket
 
 if sys.version_info < (2,6,) or sys.version_info >= (3,):
 	sys.exit("Umbrella depends on [python2.6, python3).")
@@ -3934,6 +3935,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		print help_info[behavior]
 		sys.exit(0)
 
+	logging.debug("the FQDN of the node: %s", socket.getfqdn())
 	if behavior in ["run", "upload"]:
 		#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.
 		#to allow the reuse the local cache, the localdir can be a dir which already exists.
