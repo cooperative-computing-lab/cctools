@@ -71,6 +71,7 @@ import tempfile
 import urllib
 import gzip
 import imp
+import socket
 
 if sys.version_info < (2,6,) or sys.version_info >= (3,):
 	sys.exit("Umbrella depends on [python2.6, python3).")
@@ -1307,7 +1308,7 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 					mount_list.append(tmplist[0])
 					mountfile.write(line)
 		else:
-			common_mounts = ["/proc", "/dev", "/sys", "/net", "/var", "/misc", "/selinux"]
+			common_mounts = ["/proc", "/dev", "/sys", "/net", "/misc", "/selinux"]
 			for mount in common_mounts:
 				line = "%s %s\n" % (mount, mount)
 				mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(mount)))
@@ -1886,6 +1887,9 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PWD'] = cwd_setting
 			logging.debug("Construct mounfile ....")
 			parrot_mount_file = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint)
+			with open(parrot_mount_file, 'r') as f:
+				logging.debug("the parrot mountlist is:\n%s\n", f.read())
+
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -1922,6 +1926,9 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		else:
 			env_dict = os.environ
 			parrot_mount_file = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
+			with open(parrot_mount_file, 'r') as f:
+				logging.debug("the parrot mountlist is:\n%s\n", f.read())
+
 			for key in env_para_dict:
 				env_dict[key] = env_para_dict[key]
 
@@ -3928,6 +3935,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		print help_info[behavior]
 		sys.exit(0)
 
+	logging.debug("the FQDN of the node: %s", socket.getfqdn())
 	if behavior in ["run", "upload"]:
 		#get the absolute path of the localdir directory, which will cache all the data, and store all the sandboxes.
 		#to allow the reuse the local cache, the localdir can be a dir which already exists.
