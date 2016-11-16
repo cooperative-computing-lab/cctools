@@ -1308,7 +1308,7 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 					mount_list.append(tmplist[0])
 					mountfile.write(line)
 		else:
-			common_mounts = ["/proc", "/dev", "/sys", "/net", "/var", "/misc", "/selinux"]
+			common_mounts = ["/proc", "/dev", "/sys", "/net", "/misc", "/selinux"]
 			for mount in common_mounts:
 				line = "%s %s\n" % (mount, mount)
 				mount_str = create_fake_mount(os_image_dir, sandbox_dir, mount_list, remove_trailing_slashes(os.path.dirname(mount)))
