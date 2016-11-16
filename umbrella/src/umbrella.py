@@ -1008,7 +1008,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 					mount_dict[mountpoint] = mount_value
 
 
-def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, name=None):
+def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting, name=None):
 	"""Process data section of the specification.
 	At the beginning of the function, mount_dict only includes items for software and os dependencies. After this function is done, all the items for data dependencies will be added into mount_dict.
 
@@ -1019,6 +1019,7 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		env_para_dict: the environment variables which need to be set for the execution of the user's command.
 		osf_auth: the osf authentication info including osf_username and osf_password.
+		cwd_setting: the current working directory for the execution of the user's command.
 		name: if name is specified, then only the specified item will be installed. All the other items in the software section will be ignored.
 
 	Returns:
@@ -1034,6 +1035,8 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
 		mountpoint = ''
 		if data_spec[item].has_key('mountpoint'):
 			mountpoint = data_spec[item]['mountpoint']
+			if len(mountpoint) > 0 and mountpoint[0] != '/':
+				mountpoint = cwd_setting + '/' + mountpoint
 		mount_env = ''
 		if data_spec[item].has_key('mount_env'):
 			mount_env = data_spec[item]['mount_env']
@@ -1270,6 +1273,11 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 		mountfile.write("%s %s\n" % (os.path.dirname(sandbox_dir), os.path.dirname(sandbox_dir)))
 		mount_list.append(os.path.dirname(sandbox_dir))
 
+		# sandbox_dir should be added before the mount entry for entries under it.
+		logging.debug("Add sandbox_dir(%s) into %s", sandbox_dir, mountfile_path)
+		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
+		mount_list.append(sandbox_dir)
+
 		logging.debug("Adding items from mount_dict into %s", mountfile_path)
 		for key in mount_dict:
 			#os.path.dirname('/a/b/') is '/a/b'. Therefore, before and after calling dirname, use remove_trailing_slashes to remove the trailing slashes.
@@ -1282,11 +1290,6 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 			mount_list.append(mount_dict[key])
 			mountfile.write(key + " " + mount_dict[key] + "\n")
 			mountfile.write(mount_dict[key] + " " + mount_dict[key] + "\n")
-
-		# sandbox_dir should be added before the mount entry for entries under it.
-		logging.debug("Add sandbox_dir(%s) into %s", sandbox_dir, mountfile_path)
-		mountfile.write(sandbox_dir + ' ' + sandbox_dir + '\n')
-		mount_list.append(sandbox_dir)
 
 		for key in output_f_dict:
 			mountfile.write(key + " " + output_f_dict[key] + "\n")
@@ -2599,7 +2602,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 	sw_mount_dict = dict(mount_dict) #sw_mount_dict will be used later to config the $PATH
 	if spec_json.has_key("data") and spec_json["data"]:
-		data_install(spec_json["data"], meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth)
+		data_install(spec_json["data"], meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting)
 	else:
 		logging.debug("this spec does not have data section!")
 
@@ -3449,7 +3452,7 @@ def has_source(sources, target):
 			return True
 	return False
 
-def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s3_bucket=None):
+def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf_auth=None, s3_bucket=None):
 	"""Upload each dependency in an umbrella spec to the target (OSF or s3), and add the new target download url into the umbrella spec.
 
 	The source of the dependencies can be anywhere supported by umbrella: http
@@ -3461,6 +3464,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 		meta_json: the json object including all the metadata of dependencies.
 		target_info: the info necessary to communicate with the remote target (i.e., OSF, s3)
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
+		cwd_setting: the current working directory for the execution of the user's command.
 		osf_auth: the osf authentication info including osf_username and osf_password.
 		s3_bucket: an S3.Bucket instance
 
@@ -3537,7 +3541,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, osf_auth=None, s
 					sys.exit("%s does not has the source attr!" % item)
 
 				upload_count += 1
-				data_install(sec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, item)
+				data_install(sec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting, item)
 
 				if sec[item]["format"] == "tgz":
 					source_url = mount_dict[sec[item]["mountpoint"]] + ".tar.gz"
@@ -4400,7 +4404,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			osf_info += [options.osf_user, options.osf_pass]
 			osf_proj_id = osf_create(options.osf_user, options.osf_pass, options.osf_userid, args[2], args[3] == "public")
 			osf_info.append(osf_proj_id)
-			spec_upload(spec_json, meta_json, osf_info, sandbox_dir, osf_auth)
+			spec_upload(spec_json, meta_json, osf_info, sandbox_dir, cwd_setting, osf_auth)
 			if upload_count > 0:
 				json2file(target_specpath, spec_json)
 				osf_upload(options.osf_user, options.osf_pass, osf_proj_id, target_specpath)
@@ -4432,7 +4436,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			s3_info.append("s3")
 			s3_info.append(args[3])
 			bucket = s3_create(args[2], args[3])
-			spec_upload(spec_json, meta_json, s3_info, sandbox_dir, s3_bucket=bucket)
+			spec_upload(spec_json, meta_json, s3_info, sandbox_dir, cwd_setting, s3_bucket=bucket)
 			if upload_count > 0:
 				json2file(target_specpath, spec_json)
 				s3_upload(bucket, target_specpath, args[3])
