@@ -128,8 +128,6 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 		debug(D_MAKEFLOW_RUN, "setting wrapper_umbrella->log_prefix to %s\n", w->log_prefix);
 	}
 
-	// check whether the umbrella log files already exist
-	debug(D_MAKEFLOW_RUN, "checking whether the umbrella log files already exist...\n");
 	cur = d->nodes;
 	while(cur) {
 		char *umbrella_logfile = NULL;
@@ -141,11 +139,10 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 
 		umbrella_logfile = string_format("%s.%d", w->log_prefix, cur->nodeid);
 
-		if(!access(umbrella_logfile, F_OK)) {
-			fprintf(stderr, "the umbrella log file for rule %d (`%s`) already exists!\n", cur->nodeid, umbrella_logfile);
-			free(umbrella_logfile);
-			exit(EXIT_FAILURE);
-		}
+		// A makeflow run may fail if some jobs failed on some bad workers, and the user may want to
+		// retrying the makeflow to rerun these failed jobs.
+		// Checking the existence of umbrella_logfile would cause makeflow retries fail.
+		// Therefore, we stop check the existence of umbrella_logfile here.
 
 		// add umbrella_logfile into the target files of a dag_node
 		if(remote_rename_support) {
