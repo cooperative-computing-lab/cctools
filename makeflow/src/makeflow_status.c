@@ -178,26 +178,20 @@ int main(int argc, char** argv) {
     qsort(table, count, sizeof(*table), (int (*)(const void *, const void *)) compare_entries);
     
     //print them out
-    printf("%-10s %-10s %-10s %-10s %-10s %-10s %-10s %-10s %-24s %-10s\n",
-            "Owner", "Projct", "total", "running", "waiting", "aborted", "completed", "failed", "time_started", "batch_type");
+    printf("%-10s %-18s %6s %6s %6s %6s %6s %6s %6s\n",
+	   "OWNER", "PROJECT", "JOBS", "RUN", "WAIT", "ABRT", "COMP", "FAIL", "TYPE");
     for(i=0; i<count; i++){
-        const char *jxowner, *jxproject, *jxbatchtype;
-        int64_t  jxtotal, jxrunning, jxwaiting, jxaborted, jxcompleted, jxfailed, jxtimestart;
-
-	jxowner = jx_lookup_string(table[i], "owner");
-        jxproject = jx_lookup_string(table[i], "project");
-        jxtotal = jx_lookup_integer(table[i], "total");
-        jxrunning = jx_lookup_integer(table[i], "running");
-        jxwaiting = jx_lookup_integer(table[i], "waiting");
-        jxaborted = jx_lookup_integer(table[i], "aborted");
-        jxcompleted = jx_lookup_integer(table[i], "completed");
-        jxfailed = jx_lookup_integer(table[i], "failed");
-        jxtimestart = jx_lookup_integer(table[i], "time_started");
-        jxbatchtype = jx_lookup_string(table[i], "batch_type");
-        
-        printf("%-10s %-10s %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-10" PRId64 " %-24" PRId64 " %-10s\n",
-                jxowner, jxproject, jxtotal, jxrunning, jxwaiting, jxaborted, jxcompleted, jxfailed, jxtimestart, jxbatchtype);
-        
+        printf("%-10s %-18s %6" PRId64 " %6" PRId64 " %6" PRId64 " %6" PRId64 " %6" PRId64 " %6" PRId64 " %6s\n",
+		jx_lookup_string(table[i], "owner"),
+		jx_lookup_string(table[i], "project"),
+		jx_lookup_integer(table[i], "total"),
+		jx_lookup_integer(table[i], "running"),
+		jx_lookup_integer(table[i], "waiting"),
+		jx_lookup_integer(table[i], "aborted"),
+		jx_lookup_integer(table[i], "completed"),
+		jx_lookup_integer(table[i], "failed"),
+		jx_lookup_string(table[i], "batch_type")
+	);
     }
     printf("\n");//be polite
     
