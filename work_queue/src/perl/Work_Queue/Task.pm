@@ -1013,13 +1013,13 @@ Must be called only after the task completes execution.
 
 		$t->resources_measured{bandwidth};
 
-		workdir_num_files:         total maximum number of files and directories of all the working directories in the tree
-
-		$t->resources_measured{disk};
-
-		workdir_footprint:         size in MB of all working directories in the tree
+		total_files:         total maximum number of files and directories of all the working directories in the tree
 
 		$t->resources_measured{total_files};
+
+		disk:                      size in MB of all working directories in the tree
+
+		$t->resources_measured{disk};
 
 =head3 C<resources_requested>
 
