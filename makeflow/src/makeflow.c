@@ -413,7 +413,6 @@ and making substitutions according to the node.
 
 static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *s, struct makeflow_wrapper_umbrella *u )
 {
-	if (!list_iterate(shared_fs, on_sharedfs, f->filename)) return NULL;
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
 	if(!remotename && w) remotename = makeflow_wrapper_get_remote_name(w, n->d, f->filename);
 	if(!remotename && s) remotename = makeflow_wrapper_get_remote_name(s, n->d, f->filename);
@@ -478,6 +477,7 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
+		if (!list_iterate(shared_fs, on_sharedfs, file->filename)) continue;
 		char *f = makeflow_file_format(node,file,queue,w,m,s,u);
 		file_str = string_combine(file_str,f);
 		free(f);
