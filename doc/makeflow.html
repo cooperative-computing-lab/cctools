@@ -466,6 +466,9 @@ did not need to rename the file <tt>b.out</tt>. Without remote file renaming,
 we would have to create either a symbolic link, or a copy of the files with the
 expected correct names.</p>
 
+<h3 id="details.sharedfs">Shared Filesystems<a class="sectionlink" href="#details.sharedfs" title="Link to this section.">&#x21d7;</a></h3>
+<p>Makeflow does not assume that a shared filesystem such as HDFS is available, and by default copies all necessary dependencies for each job. Specifying dependencies on a shared filesystem can be problematic given large files that are already accessible on every worker. To avoid unnecessary copying, use <code>makeflow --shared_fs /foo example.makeflow</code> This flag can be specified multiple times. Any files on one of the given shared filesystems will be managed at the DAG level, so Makeflow will check existence and age to decide if other targets need to be built. Any such dependencies, however, will not be passed down to the batch system to be copied to workers; shared files must be available by some other means at all execution and submission sites.</p>
+
 <h3 id="details.renaming">Nested Makeflows<a class="sectionlink" href="#details.nested" title="Link to this section.">&#x21d7;</a></h3>
 
 One Makeflow can be nested inside of another by writing a rule
