@@ -142,7 +142,7 @@ class MakeflowScheduler(Scheduler):
                 uri.value = "http://{0}:{1}/{2}".format(self.mf_hostname, self.http_port, base_name)
                 uri.extract = False
                 uri.executable = True
-
+            uri.cache = True
         return executor
     
     # Create a TaskInfo instance
