@@ -29,31 +29,31 @@ struct rmsummary
 	char    *command;
 	char    *taskid;
 
-	int64_t  start;
-	int64_t  end;
+	int64_t  start;                          /* usecs */
+	int64_t  end;                            /* usecs */
 
 	char    *exit_type;
 	int64_t  signal;
 	int64_t  exit_status;
 	int64_t  last_error;
 
-	int64_t  wall_time;
+	int64_t  wall_time;                      /* usecs */
 	int64_t  total_processes;
 	int64_t  max_concurrent_processes;
-	int64_t  cpu_time;
-	int64_t  virtual_memory;
-	int64_t  memory;                     /* a.k.a. resident memory */
-	int64_t  swap_memory;
+	int64_t  cpu_time;                       /* usecs */
+	int64_t  virtual_memory;                 /* MB */
+	int64_t  memory;                         /* MB. a.k.a. resident memory */
+	int64_t  swap_memory;                    /* MB */
 
-	int64_t  bytes_read;
-	int64_t  bytes_written;
+	int64_t  bytes_read;                     /* B */
+	int64_t  bytes_written;                  /* B */
 
-	int64_t  bytes_sent;
-	int64_t  bytes_received;
-	int64_t  bandwidth;
+	int64_t  bytes_sent;                     /* B */
+	int64_t  bytes_received;                 /* B */
+	int64_t  bandwidth;                      /* bps */
 
 	int64_t  total_files;
-	int64_t  disk;
+	int64_t  disk;                           /* MB */
 
 	int64_t  cores;                      /* peak usage in a small time window */
 	int64_t  cores_avg;
