@@ -788,22 +788,15 @@ static void show_help(const char *cmd)
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
 	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
-<<<<<<< HEAD
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-=======
 	printf(" %-30s Specify ip address to mesos master node (for use with -T mesos)\n", "--mesos-master");
 	printf(" %-30s Specify path to mesos python library(for use with -T mesos)\n", "--mesos-path");
->>>>>>> 1. Start mesos scheduler from batch_job_mesos.c
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-<<<<<<< HEAD
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_WRAPPER, LONG_OPT_WRAPPER_INPUT };
-=======
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_MESOS_MASTER, LONG_OPT_MESOS_PATH};
->>>>>>> 1. Start mesos scheduler from batch_job_mesos.c
+enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_WRAPPER, LONG_OPT_WRAPPER_INPUT, LONG_OPT_MESOS_MASTER, LONG_OPT_MESOS_PATH};
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
@@ -833,13 +826,10 @@ static const struct option long_options[] = {
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
-<<<<<<< HEAD
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
-=======
 	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
->>>>>>> 1. Start mesos scheduler from batch_job_mesos.c
 	{0,0,0,0}
 };
 
