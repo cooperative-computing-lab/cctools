@@ -4896,9 +4896,14 @@ void work_queue_disable_monitoring(struct work_queue *q) {
 
 		FILE *final = fdopen(final_fd, "w");
 
+		const char *user_name = getlogin();
+		if(!user_name) {
+			user_name = "unknown";
+		}
+
 		struct jx *extra = jx_object(
 				jx_pair(jx_string("type"), jx_string("work_queue"),
-					jx_pair(jx_string("user"), jx_string(getlogin()),
+					jx_pair(jx_string("user"), jx_string(user_name),
 						NULL)));
 
 		if(q->name) {
