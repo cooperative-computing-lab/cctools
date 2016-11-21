@@ -27,8 +27,8 @@ struct dag_file * dag_file_create( const char *filename )
 	f->source = NULL;
 	f->cache_name = NULL;
 	f->source_type = DAG_FILE_SOURCE_LOCAL;
-	f->cache_id = NULL;
-	f->cache_path = NULL;
+	f->archive_id = NULL;
+	f->archive_path = NULL;
 	return f;
 }
 

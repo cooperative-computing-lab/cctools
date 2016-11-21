@@ -19,7 +19,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 
-#define CACHING_DEFAULT_DIRECTORY "/tmp/makeflow.cache."
+#define ARCHIVING_DEFAULT_DIRECTORY "/tmp/makeflow.archive."
 
 struct dag {
 	/* Static properties of the DAG */
@@ -48,8 +48,8 @@ struct dag {
 
 
 	char *cache_dir;                    /* The dirname of the cache storing all the deps specified in the mountfile */
-	char *caching_directory;						/* The name of the caching directory to preserve and reproduce a node */
-	int should_preserve;								/* Keeps track of whether a dag should preserve itself within the caching directory */
+	char *archive_directory;						/* The name of the archiving directory to preserve and reproduce a node */
+	int should_archive;								/* Keeps track of whether a dag should preserve itself within the archiving directory */
 
 };
 

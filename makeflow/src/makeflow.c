@@ -47,7 +47,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_singularity.h"
 #include "parser.h"
 #include "parser_jx.h"
-#include "makeflow_cache.h"
+#include "makeflow_archive.h"
 
 #include "makeflow_catalog_reporter.h"
 
@@ -594,10 +594,10 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	/* Logs the creation of output files. */
 	makeflow_log_file_expectation(d, output_list);
 
-	/* check caching directory to see if node has already been preserved */
-	if (d->should_preserve && makeflow_cache_is_preserved(d, n, command, input_list, output_list)) {
+	/* check archiving directory to see if node has already been preserved */
+	if (d->should_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
 		/* do nothing, since makeflow_cache_is_preserved will replicate output files */
-		printf("node %d already exists in cache, replicating output files\n", n->nodeid);
+		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
@@ -860,10 +860,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
-		/* store node into caching directory  */
-		if (d->should_preserve) {
-			printf("preserving node within caching directory\n");
-			makeflow_cache_populate(d, n, outputs, info);
+		/* store node into archiving directory  */
+		if (d->should_archive) {
+			printf("archiving node within archiving directory\n");
+			makeflow_archive_populate(d, n, outputs, info);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
@@ -1147,7 +1147,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
-	printf(" %-30s Preserve results of makeflow in specified directory			   (default directory is %s)\n", "--preserve=<dir>", CACHING_DEFAULT_DIRECTORY);
+	printf(" %-30s Archive results of makeflow in specified directory			   (default directory is %s)\n", "--archive=<dir>", ARCHIVING_DEFAULT_DIRECTORY);
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1172,7 +1172,7 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
-	int should_preserve = 0;
+	int should_archive = 0;
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
@@ -1192,7 +1192,7 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
-	char *caching_directory = NULL;
+	char *archive_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
 
@@ -1262,7 +1262,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
-		LONG_OPT_PRESERVATION
+		LONG_OPT_ARCHIVE
 	};
 
 	static const struct option long_options_run[] = {
@@ -1337,7 +1337,7 @@ int main(int argc, char *argv[])
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
-		{"preserve", optional_argument, 0, LONG_OPT_PRESERVATION},
+		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
 		{0, 0, 0, 0}
 	};
 
@@ -1627,15 +1627,15 @@ int main(int argc, char *argv[])
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
 				break;
-			case LONG_OPT_PRESERVATION:
-				should_preserve = 1;
+			case LONG_OPT_ARCHIVE:
+				should_archive = 1;
 				if (optarg) {
-					caching_directory = xxstrdup(optarg);
+					archive_directory = xxstrdup(optarg);
 				} else {
 					char *uid = xxmalloc(10);
 					sprintf(uid, "%d",  getuid());
-					caching_directory = xxmalloc(sizeof(CACHING_DEFAULT_DIRECTORY) + 20 * sizeof(char));
-					sprintf(caching_directory, "%s%s", CACHING_DEFAULT_DIRECTORY, uid);
+					archive_directory = xxmalloc(sizeof(ARCHIVING_DEFAULT_DIRECTORY) + 20 * sizeof(char));
+					sprintf(archive_directory, "%s%s", ARCHIVING_DEFAULT_DIRECTORY, uid);
 					free(uid);
 				}
 				break;
@@ -1993,9 +1993,9 @@ if (enforcer && wrapper_umbrella) {
             makeflow_wrapper_singularity_init(wrapper, container_image);
         }
 
-	if(should_preserve) {
-		d->caching_directory = caching_directory;
-		d->should_preserve = 1;
+	if(should_archive) {
+		d->archive_directory = archive_directory;
+		d->should_archive = 1;
 	}
 
 	makeflow_run(d);
@@ -2030,7 +2030,7 @@ if (enforcer && wrapper_umbrella) {
 		exit(EXIT_SUCCESS);
 	}
 
-	free(caching_directory);
+	free(archive_directory);
 
 	return 0;
 }

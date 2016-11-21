@@ -51,8 +51,8 @@ struct dag *dag_create()
 	d->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	d->cache_dir = NULL;
 
-	d->caching_directory = CACHING_DEFAULT_DIRECTORY;
-	d->should_preserve = 0;
+	d->archive_directory = ARCHIVING_DEFAULT_DIRECTORY;
+	d->should_archive = 0;
 
 	/* Add GC_*_LIST to variables table to ensure it is in
 	 * global DAG scope. /

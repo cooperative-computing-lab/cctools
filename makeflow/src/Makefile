@@ -17,7 +17,7 @@ makeflow makeflow_viz makeflow_analyze makeflow_status: $(OBJECTS)
 
 makeflow_status: makeflow_status.o
 
-makeflow: makeflow_summary.o makeflow_gc.o makeflow_log.o makeflow_wrapper.o makeflow_wrapper_monitor.o makeflow_wrapper_docker.o makeflow_wrapper_enforcement.o makeflow_catalog_reporter.o makeflow_wrapper_umbrella.o makeflow_mounts.o makeflow_wrapper_singularity.o makeflow_cache.o
+makeflow: makeflow_summary.o makeflow_gc.o makeflow_log.o makeflow_wrapper.o makeflow_wrapper_monitor.o makeflow_wrapper_docker.o makeflow_wrapper_enforcement.o makeflow_catalog_reporter.o makeflow_wrapper_umbrella.o makeflow_mounts.o makeflow_wrapper_singularity.o makeflow_archive.o
 
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
 
