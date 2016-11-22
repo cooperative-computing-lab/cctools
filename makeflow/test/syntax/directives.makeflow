@@ -27,16 +27,16 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 # Resources needed for a single task in category may be included (optional).
 # MEMORY and DISK in MB.
-.RESOURCE CORES 1
-.RESOURCE MEMORY 50
-.RESOURCE DISK 100
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 50
+.MAKEFLOW DISK 100
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
 	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
 .MAKEFLOW CATEGORY analysis
-.RESOURCE CORES 1
-.RESOURCE MEMORY 10
-.RESOURCE DISK 20
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 10
+.MAKEFLOW DISK 20
 capitol.90.jpg: capitol.jpg
 	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
 
@@ -51,9 +51,9 @@ capitol.360.jpg: capitol.jpg
 
 # If a rule is preceded by LOCAL, it executes at the local site.
 .MAKEFLOW CATEGORY preprocess
-.RESOURCE CORES 1
-.RESOURCE MEMORY 10
-.RESOURCE DISK 20
+.MAKEFLOW CORES 1
+.MAKEFLOW MEMORY 10
+.MAKEFLOW DISK 20
 capitol.jpg:
 	LOCAL $CURL -o capitol.jpg $URL
 
