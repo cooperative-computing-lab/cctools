@@ -27,7 +27,7 @@ int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *comma
 int makeflow_archive_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs);
 
 /* writes the run_info files that is stored within each archived node */
-void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_path, struct batch_job_info *info);
+void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_path, struct batch_job_info *info, char *command);
 
 /* writes the file symlink that links to the archived job that created it */
 void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_archive_path);

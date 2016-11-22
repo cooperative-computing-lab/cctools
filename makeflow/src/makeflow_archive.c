@@ -92,7 +92,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   }
 
   archiving_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
-  makeflow_write_run_info(d, n, archiving_file_path, info);
+  makeflow_write_run_info(d, n, archiving_file_path, info, command);
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
     output_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
@@ -220,7 +220,7 @@ int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *comma
   return 1;
 }
 
-void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_path, struct batch_job_info *info) {
+void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_path, struct batch_job_info *info, char *command) {
   char *run_info_path = NULL;
   FILE *fp;
   run_info_path = string_combine_multi(run_info_path, archive_path, "/run_info", 0);
@@ -228,7 +228,8 @@ void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_pa
   if (fp == NULL) {
     fatal("could not archive ancestor node archive ids");
   } else {
-    fprintf(fp, "%s\n", n->command);
+    fprintf(fp, "%s\n", n->command); // unwrapped command
+    fprintf(fp, "%s\n", command); // wrapped command
     fprintf(fp, "%d\n", (int) info->submitted);
     fprintf(fp, "%d\n", (int) info->started);
     fprintf(fp, "%d\n", (int) info->finished);
