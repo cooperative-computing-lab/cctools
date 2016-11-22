@@ -42,6 +42,7 @@ struct deltadb {
 	struct list * reduce_exprs;
 	time_t display_every;
 	time_t last_display;
+	time_t deferred_time;
 };
 
 enum { MODE_STREAM, MODE_OBJECT, MODE_REDUCE } display_mode = MODE_REDUCE;
@@ -231,12 +232,27 @@ static void display_output_exprs( struct deltadb *db, time_t current )
 	}
 }
 
+/*
+To eliminate unnecessary T record on the output in streaming mode,
+we store incoming T records as "deferred time" and then only
+output if another record type intervenes.
+*/
+
+static void display_deferred_time( struct deltadb *db )
+{
+	if(db->deferred_time) {
+		printf("T %ld\n",db->deferred_time);
+		db->deferred_time = 0;
+	}
+}
+
 int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
 {
 	if(!deltadb_boolean_expr(db->filter_expr,jobject)) return 1;
 	hash_table_insert(db->table,key,jobject);
 
 	if(display_mode==MODE_STREAM) {
+		display_deferred_time(db);
 		printf("C %s ",key);
 		jx_print_stream(jobject,stdout);
 		printf("\n");
@@ -252,6 +268,7 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 		jx_delete(jobject);
 
 		if(display_mode==MODE_STREAM) {
+			display_deferred_time(db);
 			printf("D %s\n",key);
 		}
 	}
@@ -268,6 +285,7 @@ int deltadb_update_event( struct deltadb *db, const char *key, const char *name,
 	jx_insert(jobject,jname,jvalue);
 
 	if(display_mode==MODE_STREAM) {
+		display_deferred_time(db);
 		char *str = jx_print_string(jvalue);
 		printf("U %s %s %s\n",key,name,str);
 		free(str);
@@ -286,6 +304,7 @@ int deltadb_remove_event( struct deltadb *db, const char *key, const char *name 
 	jx_delete(jname);
 
 	if(display_mode==MODE_STREAM) {
+		display_deferred_time(db);
 		printf("R %s %s\n",key,name);
 		return 1;
 	}
@@ -302,7 +321,7 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 	db->last_display = current;
 
 	if(display_mode==MODE_STREAM) {
-		printf("T %lld\n",(long long) current);
+		db->deferred_time = current;
 		return 1;
 	} else if(display_mode==MODE_OBJECT) {
 		display_output_exprs(db,current);
