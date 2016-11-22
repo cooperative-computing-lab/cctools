@@ -599,7 +599,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
 		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
 
-		/* all output files exist, copy preserved files to working directory and update state for node and dag_files */
+		/* copy archived files to working directory and update state for node and dag_files */
 		makeflow_archive_copy_preserved_files(d, n, output_list);
 		n->state = DAG_NODE_STATE_RUNNING;
 		list_first_item(n->target_files);
