@@ -412,6 +412,25 @@ join(["a", "b", "c"], ", ")
 =&gt; "a, b, c"
 </code></pre>
 
+<h3 id="let">let<a class="sectionlink" href="#let" title="Link to this section.">&#x21d7;</a></h3>
+
+<blockquote>
+<pre><code>let(A, B) -&gt; C
+</code></pre>
+
+<p>where A = Object</p>
+</blockquote>
+
+<p>Evaluates an expression with local name bindings. The first argument is an object whose keys will be bound variable names when evaluating the second argument.
+Names specified in a local scope may shadow names in the enclosing scope.</p>
+
+<pre><code>let({"x": 10}, 1 + x)
+=&gt; 11
+
+let({"x": 10, "y": 20}, let({"x": 1}, x + y))
+=&gt; 21
+</code></pre>
+
 <h3 id="dbg">dbg<a class="sectionlink" href="#dbg" title="Link to this section.">&#x21d7;</a></h3>
 
 <blockquote>
