@@ -48,8 +48,11 @@ struct dag {
 
 
 	char *cache_dir;                    /* The dirname of the cache storing all the deps specified in the mountfile */
-	char *archive_directory;						/* The name of the archiving directory to preserve and reproduce a node */
-	int should_archive;								/* Keeps track of whether a dag should preserve itself within the archiving directory */
+
+	char *archive_directory;            /* The name of the archiving directory to preserve and reproduce a node */
+	int should_read_archive;            /* Keeps track of whether a dag should read the archiving directory and use cached jobs */
+	int should_write_to_archive;        /* Keeps track of whether a dag should write results of workflow to the archive directory */
+
 
 };
 

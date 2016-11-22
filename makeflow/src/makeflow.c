@@ -547,6 +547,7 @@ wrappers and options.
 static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
+	struct dag_file *f;
 
 	if(n->local_job && local_queue) {
 		queue = local_queue;
@@ -595,9 +596,17 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	makeflow_log_file_expectation(d, output_list);
 
 	/* check archiving directory to see if node has already been preserved */
-	if (d->should_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
-		/* do nothing, since makeflow_cache_is_preserved will replicate output files */
+	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
 		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
+
+		/* all output files exist, copy preserved files to working directory and update state for node and dag_files */
+		makeflow_archive_copy_preserved_files(d, n, output_list);
+		n->state = DAG_NODE_STATE_RUNNING;
+		list_first_item(n->target_files);
+		while((f = list_next_item(n->target_files))) {
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+		}
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
@@ -861,9 +870,23 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		}
 
 		/* store node into archiving directory  */
-		if (d->should_archive) {
+		if (d->should_write_to_archive) {
 			printf("archiving node within archiving directory\n");
-			makeflow_archive_populate(d, n, outputs, info);
+			makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
+
+			struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+
+			/* Create strings for all the files mentioned by this node. */
+			char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
+			char *output_files = makeflow_file_list_format(n, 0, outputs, queue, wrapper, monitor, enforcer, wrapper_umbrella);
+
+			/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
+			char *command = strdup(n->command);
+			command = makeflow_wrap_wrapper(command, n, wrapper);
+			command = makeflow_wrap_enforcer(command, n, enforcer, input_list, outputs);
+			command = makeflow_wrap_umbrella(command, n, wrapper_umbrella, queue, input_files, output_files);
+			command = makeflow_wrap_monitor(command, n, queue, monitor);
+			makeflow_archive_populate(d, n, command, input_list, outputs, info);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
@@ -1148,6 +1171,8 @@ static void show_help_run(const char *cmd)
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
 	printf(" %-30s Archive results of makeflow in specified directory			   (default directory is %s)\n", "--archive=<dir>", ARCHIVING_DEFAULT_DIRECTORY);
+	printf(" %-30s Read/Use archived results of makeflow in specified directory, will not write to archive			   (default directory is %s)\n", "--archive-read=<dir>", ARCHIVING_DEFAULT_DIRECTORY);
+	printf(" %-30s Write archived results of makeflow in specified directory, will not read/use archived data			 (default directory is %s)\n", "--archive-write=<dir>", ARCHIVING_DEFAULT_DIRECTORY);
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1172,7 +1197,8 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
-	int should_archive = 0;
+	int should_read_archive = 0;
+	int should_write_to_archive = 0;
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
@@ -1262,7 +1288,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
-		LONG_OPT_ARCHIVE
+		LONG_OPT_ARCHIVE,
+		LONG_OPT_ARCHIVE_READ_ONLY,
+		LONG_OPT_ARCHIVE_WRITE_ONLY
 	};
 
 	static const struct option long_options_run[] = {
@@ -1338,6 +1366,8 @@ int main(int argc, char *argv[])
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
+		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
+		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
 		{0, 0, 0, 0}
 	};
 
@@ -1628,7 +1658,44 @@ int main(int argc, char *argv[])
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
 				break;
 			case LONG_OPT_ARCHIVE:
-				should_archive = 1;
+				should_read_archive = 1;
+				should_write_to_archive = 1;
+				if (archive_directory != NULL) {
+					// need to free archive directory to avoid memory leak since it has already been set once
+					free(archive_directory);
+				}
+				if (optarg) {
+					archive_directory = xxstrdup(optarg);
+				} else {
+					char *uid = xxmalloc(10);
+					sprintf(uid, "%d",  getuid());
+					archive_directory = xxmalloc(sizeof(ARCHIVING_DEFAULT_DIRECTORY) + 20 * sizeof(char));
+					sprintf(archive_directory, "%s%s", ARCHIVING_DEFAULT_DIRECTORY, uid);
+					free(uid);
+				}
+				break;
+			case LONG_OPT_ARCHIVE_READ_ONLY:
+				should_read_archive = 1;
+				if (archive_directory != NULL) {
+					// need to free archive directory to avoid memory leak since it has already been set once
+					free(archive_directory);
+				}
+				if (optarg) {
+					archive_directory = xxstrdup(optarg);
+				} else {
+					char *uid = xxmalloc(10);
+					sprintf(uid, "%d",  getuid());
+					archive_directory = xxmalloc(sizeof(ARCHIVING_DEFAULT_DIRECTORY) + 20 * sizeof(char));
+					sprintf(archive_directory, "%s%s", ARCHIVING_DEFAULT_DIRECTORY, uid);
+					free(uid);
+				}
+				break;
+			case LONG_OPT_ARCHIVE_WRITE_ONLY:
+				should_write_to_archive = 1;
+				if (archive_directory != NULL) {
+					// need to free archive directory to avoid memory leak since it has already been set once
+					free(archive_directory);
+				}
 				if (optarg) {
 					archive_directory = xxstrdup(optarg);
 				} else {
@@ -1993,10 +2060,9 @@ if (enforcer && wrapper_umbrella) {
             makeflow_wrapper_singularity_init(wrapper, container_image);
         }
 
-	if(should_archive) {
-		d->archive_directory = archive_directory;
-		d->should_archive = 1;
-	}
+	d->archive_directory = archive_directory;
+	d->should_read_archive = should_read_archive;
+	d->should_write_to_archive = should_write_to_archive;
 
 	makeflow_run(d);
 	time_completed = timestamp_get();

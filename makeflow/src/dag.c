@@ -52,7 +52,8 @@ struct dag *dag_create()
 	d->cache_dir = NULL;
 
 	d->archive_directory = ARCHIVING_DEFAULT_DIRECTORY;
-	d->should_archive = 0;
+	d->should_read_archive = 0;
+	d->should_write_to_archive = 0;
 
 	/* Add GC_*_LIST to variables table to ensure it is in
 	 * global DAG scope. /

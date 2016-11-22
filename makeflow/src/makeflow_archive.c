@@ -26,6 +26,9 @@ See the file COPYING for details.
 #include <errno.h>
 
 void makeflow_archive_generate_id(struct dag_node *n, char *command, struct list*inputs) {
+  if (n->archive_id != NULL) {
+    return;
+  }
   struct dag_file *f;
   char *archive_id = NULL;
   unsigned char digest[SHA1_DIGEST_LENGTH];
@@ -47,7 +50,7 @@ void makeflow_archive_generate_id(struct dag_node *n, char *command, struct list
   free(archive_id);
 }
 
-void makeflow_archive_populate(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_job_info *info) {
+void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_job_info *info) {
   char *caching_file_path = NULL, *output_file_path = NULL, *source_makeflow_file_path = NULL, *ancestor_file_path = NULL;
   char *output_directory_path = NULL, *input_directory_path = NULL;
   char *ancestor_archive_id_string = NULL, *ancestor_directory_path = NULL;
@@ -59,6 +62,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, struct list *o
   struct dag_file *f;
   int success;
 
+  makeflow_archive_generate_id(n, command, inputs);
   strncpy(caching_prefix, n->archive_id, 2);
 
   output_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", caching_prefix, "/", n->archive_id + 2, "/outputs", 0);
@@ -140,7 +144,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, struct list *o
       input_file= string_combine_multi(NULL, d->archive_directory, "/jobs/", caching_prefix, "/", n->archive_id + 2, "/input_files/", f->filename, 0);
 
       success = symlink(ancestor_output_file_path, input_file);
-      if (success != 0) {
+      if (success != 0 && errno != 17) {
         fatal("Could not create symlink %s pointing to %s\n", input_file, ancestor_output_file_path);
       }
 
@@ -201,14 +205,6 @@ int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *comma
     }
   }
 
-  /* all output files exist, replicate preserved files and update state for node and dag_files */
-  makeflow_archive_copy_preserved_files(d, n, outputs);
-  n->state = DAG_NODE_STATE_RUNNING;
-  list_first_item(n->target_files);
-  while((f = list_next_item(n->target_files))) {
-    makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
-  }
-  makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 
   return 1;
 }
@@ -250,7 +246,7 @@ void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_a
 
   file_archive_path = string_combine_multi(file_archive_path, "/", f->archive_id + 2, 0);
   success = symlink(job_archive_path, file_archive_path);
-  if (success != 0) {
+  if (success != 0 && errno != 17) {
     fatal("Could not create symlink %s pointing to %s\n", file_archive_path, job_archive_path);
   }
   free(file_archive_path);
@@ -275,7 +271,7 @@ void write_descendant_link(struct dag *d, struct dag_node *current_node, struct 
   ancestor_link_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", ancestor_node_caching_prefix, "/", ancestor_node->archive_id + 2, "/descendants/", current_node->archive_id, 0);
 
   success = symlink(descendant_job_path, ancestor_link_path);
-  if (success != 0) {
+  if (success != 0 && errno != 17) {
     fatal("Could not create symlink %s pointing to %s\n", ancestor_link_path, descendant_job_path);
   }
   free(descendant_job_path);
@@ -296,11 +292,10 @@ void write_ancestor_links(struct dag *d, struct dag_node *current_node, struct d
   current_node_descendant_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", current_node_caching_prefix, "/", current_node->archive_id + 2, "/ancestors/", ancestor_node->archive_id, 0);
 
   success = symlink(ancestor_job_path, current_node_descendant_path);
-  if (success != 0) {
+  if (success != 0 && errno != 17) {
     fatal("Could not create symlink %s pointing to %s\n", current_node_descendant_path, ancestor_job_path);
   }
   free(ancestor_job_path);
   free(current_node_descendant_path);
 
 }
-

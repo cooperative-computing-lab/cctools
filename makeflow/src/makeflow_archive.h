@@ -18,7 +18,7 @@ void makeflow_archive_generate_id(struct dag_node *n, char *command, struct list
 
 /* Preserves the current node within the caching directory
    The source makeflow file, ancestor node archive_ids, and the output files are archived */
-void makeflow_archive_populate(struct dag *d, struct dag_node *n, struct list *outputs, struct batch_job_info *info);
+void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_job_info *info);
 
 /* Returns true if a node has been preserved within the caching directory*/
 int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs);
