@@ -914,6 +914,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 		if(!batch_queue_supports_feature(remote_queue, "absolute_path") && !n->local_job){
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)) && !error) {
+				if (!list_iterate(shared_fs, on_sharedfs, f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
@@ -924,6 +925,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 			list_first_item(n->target_files);
 			while((f = list_next_item(n->target_files)) && !error) {
+				if (!list_iterate(shared_fs, on_sharedfs, f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
