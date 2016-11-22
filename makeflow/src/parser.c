@@ -460,7 +460,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 
 		free(filename);
 		free(size);
-	} else if(!strcmp(".RESOURCE", name)) {
+	} else if(!strcmp(".MAKEFLOW", name)) {
 		t = lexer_next_token(bk);
 		if(t->type != TOKEN_LITERAL)
 		{
@@ -475,7 +475,11 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 
 		int set_var = 1;
 
-		if((!strcmp("CORES", t->lexeme))
+		if(!strcmp("CATEGORY", t->lexeme)) {
+			if(!(t2->lexeme)) {
+				lexer_report_error(bk, "Expected name for CATEGORY");
+			}
+		} else if((!strcmp("CORES", t->lexeme))
 				|| (!strcmp("DISK", t->lexeme))
 				|| (!strcmp("MEMORY", t->lexeme))) {
 			if(!(string_metric_parse(t2->lexeme) >= 0))
@@ -494,7 +498,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 				lexer_report_error(bk, "Expected one of: MAX_THROUGHPUT, MIN_WASTE, FIXED.");
 			}
 		} else {
-			lexer_report_error(bk, "Unsupported .RESOURCE type, got: %s\n", t->lexeme);
+			lexer_report_error(bk, "Unsupported .MAKEFLOW type, got: %s\n", t->lexeme);
 			free(name);
 			return 0;
 		}
@@ -525,32 +529,6 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 		{
 			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
 		}
-
-		lexer_preppend_token(bk, t2);
-		lexer_preppend_token(bk, t);
-		dag_parse_variable_wmode(bk, n, '=');
-	} else if(!strcmp(".MAKEFLOW", name)) {
-		struct token *t2;
-
-		t = lexer_next_token(bk);
-		if(t->type != TOKEN_LITERAL)
-		{
-			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
-		}
-
-		if(strcmp("CATEGORY", t->lexeme)) {
-			lexer_report_error(bk, "Unsupported .MAKEFLOW type, got: %s\n", t->lexeme);
-			free(name);
-			return 0;
-		}
-
-		t2 = lexer_next_token(bk);
-		if(t2->type != TOKEN_LITERAL)
-		{
-			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
-		}
-
-		if(!(t2->lexeme)) lexer_report_error(bk, "Expected name for CATEGORY");
 
 		lexer_preppend_token(bk, t2);
 		lexer_preppend_token(bk, t);
