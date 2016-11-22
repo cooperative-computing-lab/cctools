@@ -29,6 +29,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "jx_eval.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -121,7 +122,8 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static int json_input = 0;
+static int jx_input = 0;
+static char *jx_context = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
@@ -1103,7 +1105,8 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Use Parrot to restrict access to the given inputs/outputs.\n", "--enforcement");
 	printf(" %-30s Path to parrot_run (defaults to current directory).\n", "--parrot-path=<path>");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
-	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
+	printf(" %-30s Use JX format rather than Make-style format for the input file.\n", "--jx");
+	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 
 	printf("\n*Monitor Options:\n\n");
@@ -1205,7 +1208,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_JSON,
+		LONG_OPT_JX,
+		LONG_OPT_JX_CONTEXT,
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
@@ -1283,7 +1287,8 @@ int main(int argc, char *argv[])
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
-		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"jx", no_argument, 0, LONG_OPT_JX},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_CONTEXT},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
@@ -1549,8 +1554,11 @@ int main(int argc, char *argv[])
 				} else {
 					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
 				}
-			case LONG_OPT_JSON:
-				json_input = 1;
+			case LONG_OPT_JX:
+				jx_input = 1;
+				break;
+			case LONG_OPT_JX_CONTEXT:
+				jx_context = xxstrdup(optarg);
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
@@ -1638,10 +1646,23 @@ if (enforcer && wrapper_umbrella) {
 
 	printf("parsing %s...\n",dagfile);
 	struct dag *d;
-	if (json_input) {
-		struct jx *j = jx_parse_file(dagfile);
-		d = dag_from_jx(j);
-		jx_delete(j);
+	if (jx_input) {
+		// JX doesn't really use errno, so give something generic
+		errno = EINVAL;
+		struct jx *t = NULL;
+		if (jx_context) {
+			printf("using JX context %s\n", jx_context);
+			t = jx_parse_file(jx_context);
+			if (!t) fatal("couldn't parse context: %s\n", strerror(errno));
+		}
+		struct jx *ctx = jx_eval(t, NULL);
+		jx_delete(t);
+		t = jx_parse_file(dagfile);
+		struct jx *dag = jx_eval(t, ctx);
+		jx_delete(t);
+		jx_delete(ctx);
+		d = dag_from_jx(dag);
+		jx_delete(dag);
 	} else {
 		d = dag_from_file(dagfile);
 	}

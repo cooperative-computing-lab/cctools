@@ -354,6 +354,8 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 {
 	if(!f) return NULL;
 	switch(f->function) {
+		case JX_FUNCTION_DBG:
+			return jx_function_dbg(f, context);
 		case JX_FUNCTION_RANGE:
 			return jx_function_range(f, context);
 		case JX_FUNCTION_FOREACH:
@@ -362,8 +364,8 @@ static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
 			return jx_function_str(f, context);
 		case JX_FUNCTION_JOIN:
 			return jx_function_join(f, context);
-		case JX_FUNCTION_DBG:
-			return jx_function_dbg(f, context);
+		case JX_FUNCTION_LET:
+			return jx_function_let(f, context);
 		case JX_FUNCTION_INVALID:
 			return NULL;
 	}
@@ -524,6 +526,17 @@ static struct jx *jx_check_errors(struct jx *j)
 struct jx * jx_eval( struct jx *j, struct jx *context )
 {
 	if(!j) return 0;
+
+	if (context && !jx_istype(context, JX_OBJECT)) {
+		struct jx *err = jx_object(NULL);
+		int code = 7;
+		jx_insert_integer(err, "code", code);
+		jx_insert(err, jx_string("context"), jx_copy(context));
+		jx_insert_string(err, "message", "context must be an object");
+		jx_insert_string(err, "name", jx_error_name(code));
+		jx_insert_string(err, "source", "jx_eval");
+		return jx_error(err);
+	}
 
 	switch(j->type) {
 		case JX_SYMBOL:
