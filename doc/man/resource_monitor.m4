@@ -61,7 +61,7 @@ total_processes:           [count of all of the processes created,              
 wall_time:                 [microseconds spent during execution, end - start,        int]
 cpu_time:                  [user + system time of the execution, in microseconds,    int]
 virtual_memory:            [maximum virtual memory across all processes, in MB,      int]
-resident_memory:           [maximum resident size across all processes, in MB,       int]
+memory:                    [maximum resident size across all processes, in MB,       int]
 swap_memory:               [maximum swap usage across all processes, in MB,          int]
 bytes_read:                [amount of data read from disk, in MB,                    int]
 bytes_written:             [amount of data written to disk, in MB,                   int]
