@@ -236,6 +236,11 @@ static void handle_updates(struct datagram *update_port)
 				debug(D_DEBUG,"warning: %s:%d sent invalid JSON data (ignoring it)\n%s\n",addr,port,data);
 				continue;
 			}
+			if(!jx_is_constant(j)) {
+				debug(D_DEBUG,"warning: %s:%d sent non-constant JX data (ignoring it)\n%s\n",addr,port,data);
+				jx_delete(j);
+				continue;
+			}
 		} else {
 			struct nvpair *nv = nvpair_create();
 			if(!nv) continue;
