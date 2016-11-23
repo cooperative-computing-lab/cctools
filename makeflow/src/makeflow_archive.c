@@ -33,7 +33,7 @@ void makeflow_archive_node_generate_id(struct dag_node *n, char *command, struct
   char *archive_id = NULL;
   unsigned char digest[SHA1_DIGEST_LENGTH];
 
-  // add checksum of the node's input files together
+  /* add checksum of the node's input files together */
   list_first_item(inputs);
   while((f = list_next_item(inputs))) {
     if (f->archive_id == NULL) {
@@ -41,10 +41,11 @@ void makeflow_archive_node_generate_id(struct dag_node *n, char *command, struct
     }
     archive_id = string_combine(archive_id, f->archive_id);
   }
-
   sha1_buffer(command, strlen(command), digest);
+
   archive_id = string_combine(archive_id, sha1_string(digest));
   sha1_buffer(archive_id, strlen(archive_id), digest);
+
   n -> archive_id = xxstrdup(sha1_string(digest));
 
   free(archive_id);
@@ -93,6 +94,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
 
   archiving_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
   makeflow_write_run_info(d, n, archiving_file_path, info, command);
+
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
     output_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
@@ -116,11 +118,10 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
     }
     free(source_makeflow_file_path);
   }
-
-  set_first_element(n->ancestors);
   /* Here we write both the ancestor link for the current node and the descendant link for the ancestor node.
      Note that we are only writing 'upwards', that is we create the links only between the current node and ancestor
      Thus we will not mistakenly write an ancestor link for a root node or a descendant link for a leaf */
+  set_first_element(n->ancestors);
   while ((ancestor = set_next_element(n->ancestors))) {
       write_ancestor_links(d, n, ancestor);
       write_descendant_link(d, n, ancestor);
@@ -157,7 +158,6 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
       if (success != 0 && errno != 17) {
         fatal("Could not create symlink %s pointing to %s\n", input_file, ancestor_output_file_path);
       }
-
       free(ancestor_output_file_path);
     }
     free(input_file);
@@ -192,11 +192,11 @@ int makeflow_archive_copy_preserved_files(struct dag *d, struct dag_node *n, str
     free(filename);
     free(output_file_path);
   }
+
   return 0;
 }
 
 int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs) {
-
   char *filename = NULL;
   struct dag_file *f;
   struct stat buf;
@@ -215,7 +215,6 @@ int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *comma
       return 0;
     }
   }
-
 
   return 1;
 }
