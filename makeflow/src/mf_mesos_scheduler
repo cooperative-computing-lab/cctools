@@ -15,6 +15,7 @@ import re
 import SimpleHTTPServer
 import SocketServer
 import socket
+from Queue import Queue
 
 setting_module_path = os.path.join(os.getenv('CCTOOLS'), "bin", "mf_mesos_setting")
 mms = imp.load_source("mf_mesos_setting", setting_module_path)
@@ -39,8 +40,55 @@ SLAVE_STDERR = "mesos_slave_stderr"
 MESOS_DONE_FILE = "mesos_done"
 
 MAX_FAILED = 10
+MAX_LOST = 10
 PARENT_PID = 0
+   
+class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
+    '''
+    use a thread pool instead of a new thread on every request
+    we also cache the requests
+    '''
+    queue_size = 128
+    numThreads = 30
+    allow_reuse_address = True 
+
+    def serve_forever(self):
+        '''
+        Handle one request at a time until doomsday.
+        '''
+        # set up the threadpool
+        self.requests = Queue(self.queue_size)
+
+        for x in range(self.numThreads):
+            t = threading.Thread(target = self.process_request_thread)
+            t.setDaemon(1)
+            t.start()
+
+        # server main loop
+        while True:
+            self.handle_request()
+            
+        self.server_close()
+
     
+    def process_request_thread(self):
+        '''
+        obtain request from queue instead of directly from server socket
+        '''
+        while True:
+            SocketServer.ThreadingMixIn.process_request_thread(self, *self.requests.get())
+
+    
+    def handle_request(self):
+        '''
+        simply collect requests and put them on the queue for the workers.
+        '''
+        try:
+            request, client_address = self.get_request()
+        except socket.error:
+            return
+        if self.verify_request(request, client_address):
+            self.requests.put((request, client_address)) 
 
 def get_open_port():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -215,55 +263,50 @@ class MakeflowScheduler(Scheduler):
     def resourceOffers(self, driver, offers):
         logger.info("Received resource offers: {0} from {1}".format(\
                 [o.id.value for o in offers], [o.hostname for o in offers]))
-       
-        idle_task = False 
+      
+        num_ready_task = 0
+
+        with mms.lock:
+            for task_info in mms.tasks_info_dict.itervalues():
+                if (task_info.action == "submitted" or task_info.action == "resubmitted"):
+                    num_ready_task += 1
 
         for offer in offers:
-          
-            offer_cpus = 0
-            offer_mem = 0
-            offer_disk = 0
+            if num_ready_task == 0:
+                driver.declineOffer(offer.id)    
+            else:
+                offer_cpus = 0
+                offer_mem = 0
+                offer_disk = 0
 
-            for resource in offer.resources:
-                if resource.name == "cpus":
-                    offer_cpus += resource.scalar.value
-                if resource.name == "mem":
-                    offer_mem += resource.scalar.value
-                if resource.name == "disk":
-                    offer_disk += resource.scalar.value
+                for resource in offer.resources:
+                    if resource.name == "cpus":
+                        offer_cpus += resource.scalar.value
+                    if resource.name == "mem":
+                        offer_mem += resource.scalar.value
+                    if resource.name == "disk":
+                        offer_disk += resource.scalar.value
 
-            logger.info("Received resource offer {0} with cpus {1}, mem: {2} and disk {3} from {4}\
+                logger.info("Received resource offer {0} with cpus {1}, mem: {2} and disk {3} from {4}\
                     ".format(offer.id.value, offer_cpus, offer_mem, offer_disk, offer.hostname))
 
-            remaining_cpus = offer_cpus
-            remaining_mem = offer_mem
-            remaining_disk = offer_disk
+                with mms.lock:
+                    for task_info in mms.tasks_info_dict.itervalues():
 
-            with mms.lock:
-                for task_info in mms.tasks_info_dict.itervalues():
+                        if (task_info.action == "submitted" or task_info.action == "resubmitted") \
+                            and offer_cpus >= task_info.cores \
+                            and offer_mem >= task_info.mem \
+                            and offer_disk >= task_info.disk:
+                            
+                                task_id = task_info.task_id
+                                mms.tasks_info_dict[task_id].action = "running"
 
-                    if (task_info.action == "submitted" or task_info.action == "resubmitted")\
-                       and remaining_cpus >= task_info.cores \
-                       and remaining_mem >= task_info.mem \
-                       and remaining_disk >= task_info.disk:
+                                logger.info("Task {0} will use {1} cores {2} mem {3} disk".format(task_id, task_info.cores, task_info.mem, task_info.disk))
+                                
+                                self.launch_mesos_task(driver, offer, task_id, task_info.cores, task_info.mem, task_info.disk)
+                                num_ready_task -= 1
+                                break;
 
-                        idle_task = True
-                        task_id = task_info.task_id
-                        mms.tasks_info_dict[task_id].action = "running"
-
-                        remaining_cpus -= task_info.cores
-                        remaining_mem -= task_info.mem
-                        remaining_disk -= task_info.disk
-                        
-                        logger.info("Task {0} will use {1} cores".format(task_id, task_info.cores))
-                        logger.info("Number of remaining cores are {0}".format(remaining_cpus))
-
-                        self.launch_mesos_task(driver, offer, task_id, task_info.cores, task_info.mem, task_info.disk)
-                        break 
-
-            #if not idle_task:
-            #    driver.declineOffer(offer.id)
-               
     def clean_mesos_file(self, task_id): 
         mf_task = mms.tasks_info_dict[task_id]
         #  TODO do not remove the file, if it is not exist
@@ -387,13 +430,26 @@ class MakeflowScheduler(Scheduler):
                 self.print_mesos_info(update.task_id.value)
 
             if update.state == mesos_pb2.TASK_LOST:
-                oup_fn.write("{0},lost\n".format(update.task_id.value))
-                mms.tasks_info_dict[update.task_id.value].action = "lost"
+                lost_task_id = update.task_id.value
                 logger.error("Task {0} lost with error message: {1}".format(update.task_id.value,\
-                 update.message))
+                    update.message))
                 self.print_mesos_info(update.task_id.value)
-                self.clean_mesos_file(update.task_id.value)
-
+                if lost_task_id in mms.tasks_lost_time:
+                    if mms.tasks_lost_time[lost_task_id] <= MAX_LOST:
+                        mms.tasks_lost_time[lost_task_id] += 1
+                        mms.tasks_info_dict[lost_task_id].action = "resubmitted"
+                        logger.info("Task {0} has been lost {1} time".format(lost_task_id, mms.tasks_lost_time[lost_task_id]))
+                        logger.info("Try to resubmit lost task {0}".format(lost_task_id))
+                    else:
+                        oup_fn.write("{0},lost\n".format(update.task_id.value))
+                        mms.tasks_info_dict[update.task_id.value].action = "lost"
+                        self.clean_mesos_file(update.task_id.value)
+                else:
+                    mms.tasks_lost_time[lost_task_id] = 1
+                    mms.tasks_info_dict[lost_task_id].action = "resubmitted"
+                    logger.info("Task {0} has been lost 1 time". format(lost_task_id))
+                    logger.info("Try to resubmit lost task {0}".format(lost_task_id))
+                
             if update.state == mesos_pb2.TASK_ERROR:
                 mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
                 logger.info("{0} try to resubmit task {1}".format(update.message,\
@@ -477,7 +533,6 @@ class MakefowMonitor(threading.Thread):
             if mf_state == "aborted":
                 logger.info("Workflow aborted, stopping executors...")
                 self.stop_executors()
-
                     
         else: 
             
@@ -529,6 +584,7 @@ class MakefowMonitor(threading.Thread):
 
         while(not os.path.isfile(MESOS_DONE_FILE)):
 
+            self.driver.reviveOffers()
             current_ppid = os.getppid()
            
             # The parent process (i.e. batch_job_mesos) has 
@@ -555,7 +611,7 @@ class MakefowMonitor(threading.Thread):
                 with mms.lock:
                     # find new tasks
                     if (task_id not in mms.tasks_info_dict):
-
+                        logger.info("Put task {0} into queue".format(task_id))
                         mf_mesos_task_info = mms.MfMesosTaskInfo(\
                                 task_id, task_cmd, task_inp_fns, task_oup_fns, \
                                 task_cores, task_mem, task_disk, \
@@ -581,10 +637,13 @@ if __name__ == '__main__':
     PARENT_PID = os.getppid()
     logger.info("The parent pid is {0}".format(PARENT_PID))
 
+    class ThreadedServer(ThreadPoolMixIn, SocketServer.TCPServer):
+        pass
+
     # Start the httpserver in the working directory
     port = get_open_port()
     Handler = SimpleHTTPServer.SimpleHTTPRequestHandler
-    httpd = SocketServer.TCPServer(("", port), Handler)
+    httpd = ThreadedServer(("", port), Handler)
     threading.Thread(target=start_httpserver, args=(httpd,port)).start()
 
     # make us a framework

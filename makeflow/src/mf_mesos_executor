@@ -75,12 +75,14 @@ class MakeflowMesosExecutor(Executor):
             sys.stdout = tmp_io
 
             # Launch the makeflow task
-            rec = subprocess.check_call(self.cmd, shell=True)
 
             print "Sending status update..."
             update = mesos_pb2.TaskStatus()
             update.task_id.value = task.task_id.value
-            if rec == 0:
+            
+
+            try:  
+                subprocess.check_call(self.cmd, shell=True)
                 
                 with open ("stderr", "r") as stderr_fd:
                     stderr_msg = stderr_fd.read()   
@@ -98,8 +100,12 @@ class MakeflowMesosExecutor(Executor):
                 print "Sent output file URI" 
                 update.state = mesos_pb2.TASK_FINISHED
                 update.message = message
-            else:
+
+            except subprocess.CalledProcessError as e:
+                returncode = e.returncode
                 update.state = mesos_pb2.TASK_FAILED
+                if returncode == 2:
+                    update.message = "task {0} run out of resource".format(task.task_id.value)
 
             driver.sendStatusUpdate(update)
             print "Sent status update"

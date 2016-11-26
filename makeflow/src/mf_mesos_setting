@@ -9,6 +9,7 @@ import threading
 tasks_info_dict = {}
 executors_info_dict = {}
 tasks_failed_time = {}
+tasks_lost_time = {}
 lock = threading.RLock()
 offers_queue = Queue.Queue()
 # default makeflow working directory
