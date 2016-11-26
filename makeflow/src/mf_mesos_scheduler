@@ -450,6 +450,7 @@ class MakeflowScheduler(Scheduler):
                     logger.info("Task {0} has been lost 1 time". format(lost_task_id))
                     logger.info("Try to resubmit lost task {0}".format(lost_task_id))
                 
+
             if update.state == mesos_pb2.TASK_ERROR:
                 mms.tasks_info_dict[update.task_id.value].action = "resubmitted"
                 logger.info("{0} try to resubmit task {1}".format(update.message,\
@@ -533,7 +534,6 @@ class MakefowMonitor(threading.Thread):
             if mf_state == "aborted":
                 logger.info("Workflow aborted, stopping executors...")
                 self.stop_executors()
-                    
         else: 
             
             logger.info("batch job system exited unexpectedly")

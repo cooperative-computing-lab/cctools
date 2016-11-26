@@ -79,7 +79,6 @@ class MakeflowMesosExecutor(Executor):
             print "Sending status update..."
             update = mesos_pb2.TaskStatus()
             update.task_id.value = task.task_id.value
-            
 
             try:  
                 subprocess.check_call(self.cmd, shell=True)
