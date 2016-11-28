@@ -145,7 +145,11 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 		// Therefore, we stop check the existence of umbrella_logfile here.
 
 		// add umbrella_logfile into the target files of a dag_node
-		dag_node_add_target_file(cur, umbrella_logfile, NULL);
+		if(remote_rename_support) {
+			dag_node_add_target_file(cur, umbrella_logfile, umbrella_logfile);
+		} else {
+			dag_node_add_target_file(cur, umbrella_logfile, NULL);
+		}
 		free(umbrella_logfile);
 		cur = cur->next;
 	}
