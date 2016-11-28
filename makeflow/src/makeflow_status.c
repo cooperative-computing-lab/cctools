@@ -179,16 +179,16 @@ int main(int argc, char** argv) {
     
     //print them out
     printf("%-10s %-18s %6s %6s %6s %6s %6s %6s %6s\n",
-	   "OWNER", "PROJECT", "JOBS", "RUN", "WAIT", "ABRT", "COMP", "FAIL", "TYPE");
+	   "OWNER", "PROJECT", "JOBS", "WAIT", "RUN", "COMP", "ABRT", "FAIL", "TYPE");
     for(i=0; i<count; i++){
         printf("%-10s %-18s %6" PRId64 " %6" PRId64 " %6" PRId64 " %6" PRId64 " %6" PRId64 " %6" PRId64 " %6s\n",
 		jx_lookup_string(table[i], "owner"),
 		jx_lookup_string(table[i], "project"),
 		jx_lookup_integer(table[i], "total"),
-		jx_lookup_integer(table[i], "running"),
 		jx_lookup_integer(table[i], "waiting"),
-		jx_lookup_integer(table[i], "aborted"),
+		jx_lookup_integer(table[i], "running"),
 		jx_lookup_integer(table[i], "completed"),
+		jx_lookup_integer(table[i], "aborted"),
 		jx_lookup_integer(table[i], "failed"),
 		jx_lookup_string(table[i], "batch_type")
 	);
