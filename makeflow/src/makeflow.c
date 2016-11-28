@@ -1797,7 +1797,7 @@ if (enforcer && wrapper_umbrella) {
 		// an umbrella wrapper was created to hold the default values for umbrella-related setttings such as
 		// log_prefix and default umbrella execution engine.
 		if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
-		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, remote_queue, d);
+		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, d);
 	}
 
 	if(enforcer) {
