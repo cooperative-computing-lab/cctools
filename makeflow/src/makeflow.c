@@ -1158,7 +1158,6 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
-	char *t;
 	char *log_dir = NULL;
 	char *log_format = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
@@ -1540,11 +1539,7 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_SHARED_FS:
 				assert(shared_fs);
-				s = string_combine(xxstrdup(optarg), "/");
-				t = realpath(s, NULL);
-				free(s);
-				if (!t) fatal("can't access shared filesystem %s: %s", optarg, strerror(errno));
-				list_push_head(shared_fs, string_combine(t, "/"));
+				list_push_head(shared_fs, xxstrdup(optarg));
 				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
