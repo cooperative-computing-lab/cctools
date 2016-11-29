@@ -80,6 +80,7 @@ int mount_check_http(const char *url) {
 		fprintf(stderr, "http_query(%s, \"HEAD\", ...) failed!\n", url);
 		return -1;
 	}
+	link_close(link);
 	return 0;
 }
 
