@@ -39,6 +39,7 @@ typedef enum {
 typedef enum {
 	DAG_FILE_SOURCE_LOCAL,
 	DAG_FILE_SOURCE_HTTP,
+	DAG_FILE_SOURCE_HTTPS,
 	DAG_FILE_SOURCE_UNSUPPORTED
 } dag_file_source_t;
 
