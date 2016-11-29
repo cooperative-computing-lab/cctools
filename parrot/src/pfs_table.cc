@@ -341,19 +341,20 @@ int pfs_table::find_empty( int lowest )
 
 /*
 If short_path is an absolute path, copy it to full path.
-Otherwise, tack the current directory on to the front
+Otherwise, tack the current or symlink directory on to the front
 of short_path, and copy it to full_path.
 */
 
-void pfs_table::complete_path( const char *short_path, char *full_path )
+void pfs_table::complete_path( const char *short_path, const char *parent_dir, char *full_path )
 {
 	if( short_path[0]=='/' ) {
 		strcpy(full_path,short_path);
 	} else {
-		strcpy(full_path,working_dir);
+		strcpy(full_path,parent_dir?parent_dir:working_dir);
 		strcat(full_path,"/");
 		strcat(full_path,short_path);
 	}
+	assert(full_path[0] == '/');
 }
 
 /*
@@ -393,27 +394,18 @@ int pfs_table::complete_at_path( int dirfd, const char *path, char *full_path )
 void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 {
 	char link_target[PFS_PATH_MAX];
-	char absolute_link_target[PFS_PATH_MAX];
-	char *name_to_resolve = link_target;
+	char link_parent[PFS_PATH_MAX];
 	struct pfs_name new_pname = *pname;
 
 	int rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
 	if (rlres > 0) {
 		/* readlink does not NULL-terminate */
 		link_target[rlres] = '\000';
-		/* Is link target relative ? */
-		if (link_target[0] != '/') {
-			 const char *basename_start = path_basename(pname->path);
-			 if (basename_start) {
-				int dirname_len = basename_start - pname->path;
-				snprintf(absolute_link_target,
-					PFS_PATH_MAX, "%*.*s%s",
-					dirname_len, dirname_len, pname->path,
-					link_target);
-				name_to_resolve = absolute_link_target;
-			}
-		}
-		if (resolve_name(0, name_to_resolve, &new_pname, mode, true, depth + 1)) {
+		const char *basename_start = path_basename(pname->logical_name);
+		size_t dirname_len = basename_start - pname->logical_name;
+		strncpy(link_parent, pname->logical_name, dirname_len);
+		link_parent[dirname_len] = '\0';
+		if (resolve_name(0, link_target, &new_pname, mode, true, depth + 1, link_parent)) {
 			*pname = new_pname;
 		}
 	}
@@ -454,7 +446,7 @@ void namelist_table_insert(const char *content, int is_special_syscall) {
 	}
 }
 
-int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, mode_t mode, bool do_follow_symlink, int depth ) {
+int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pfs_name *pname, mode_t mode, bool do_follow_symlink, int depth, const char *parent_dir ) {
 	char full_logical_name[PFS_PATH_MAX];
 	pfs_resolve_t result;
 	size_t n;
@@ -465,7 +457,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 	if(strlen(cname) == 0)
 		return errno = ENOENT, 0;
 
-	complete_path(cname,full_logical_name);
+	complete_path(cname,parent_dir,full_logical_name);
 	path_collapse(full_logical_name,pname->logical_name,1);
 
 	/* Check permissions to edit parent directory entry. */
