@@ -27,7 +27,7 @@ void makeflow_wrapper_umbrella_set_mode(struct makeflow_wrapper_umbrella *w, con
 
 void makeflow_wrapper_umbrella_set_input_files(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag_node *n);
 
-void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag *d);
+void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct dag *d);
 
 char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, char *input_files, char *output_files);
 

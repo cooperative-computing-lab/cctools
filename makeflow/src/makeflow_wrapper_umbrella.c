@@ -109,13 +109,8 @@ void makeflow_wrapper_umbrella_set_input_files(struct makeflow_wrapper_umbrella 
 	}
 }
 
-void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag *d) {
+void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct dag *d) {
 	struct dag_node *cur;
-	bool remote_rename_support = false;
-
-	if (batch_queue_supports_feature(queue, "remote_rename")) {
-		remote_rename_support = true;
-	}
 
 	if(!w->binary) {
 		debug(D_MAKEFLOW_RUN, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node if umbrella is used to deliver the execution environment.\n");
@@ -145,11 +140,7 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 		// Therefore, we stop check the existence of umbrella_logfile here.
 
 		// add umbrella_logfile into the target files of a dag_node
-		if(remote_rename_support) {
-			dag_node_add_target_file(cur, umbrella_logfile, umbrella_logfile);
-		} else {
-			dag_node_add_target_file(cur, umbrella_logfile, NULL);
-		}
+		dag_node_add_target_file(cur, umbrella_logfile, NULL);
 		free(umbrella_logfile);
 		cur = cur->next;
 	}
