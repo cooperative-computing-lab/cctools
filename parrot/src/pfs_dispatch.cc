@@ -1918,7 +1918,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 				}
 				addr.sun_path[sizeof(addr.sun_path)-1] = '\0';
 
-				if (addr.sun_family == AF_UNIX) {
+				/* If addr.sun_path is an abstract AF_UNIX socket name, it will be prefixed with a null byte.
+				 * Since abstract sockets don't have any connection to the filesystem, we don't care about them.
+				 */
+				if (addr.sun_family == AF_UNIX && addr.sun_path[0] != '\0') {
 					assert(sizeof(p->tmp) >= sizeof(addr));
 					memcpy(p->tmp, &addr, sizeof(addr)); /* save a copy of original addr structure */
 
