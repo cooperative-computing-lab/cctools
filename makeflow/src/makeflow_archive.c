@@ -27,6 +27,7 @@ See the file COPYING for details.
 
 void makeflow_archive_node_generate_id(struct dag_node *n, char *command, struct list*inputs) {
   if (n->archive_id != NULL) {
+    /* node archive id already exists */
     return;
   }
   struct dag_file *f;
@@ -46,7 +47,7 @@ void makeflow_archive_node_generate_id(struct dag_node *n, char *command, struct
   archive_id = string_combine(archive_id, sha1_string(digest));
   sha1_buffer(archive_id, strlen(archive_id), digest);
 
-  n -> archive_id = xxstrdup(sha1_string(digest));
+  n->archive_id = xxstrdup(sha1_string(digest));
 
   free(archive_id);
 }
@@ -54,11 +55,12 @@ void makeflow_archive_node_generate_id(struct dag_node *n, char *command, struct
 void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_job_info *info) {
   char *archiving_file_path = NULL, *output_file_path = NULL, *source_makeflow_file_path = NULL, *ancestor_file_path = NULL;
   char *output_directory_path = NULL, *input_directory_path = NULL;
-  char *ancestor_archive_id_string = NULL, *ancestor_directory_path = NULL;
+  char *ancestor_directory_path = NULL;
   char archiving_prefix[3] = "";
   char *ancestor_output_file_path = NULL;
   char *input_file = NULL;
   char *descendant_directory_path = NULL;
+  char *archive_directory_path = NULL;
   struct dag_node *ancestor;
   struct dag_file *f;
   int success;
@@ -67,40 +69,40 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   makeflow_archive_node_generate_id(n, command, inputs);
   strncpy(archiving_prefix, n->archive_id, 2);
 
+  archive_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
+
   /* We create all the sub directories upfront for convenience */
-  output_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/outputs", 0);
+  output_directory_path = string_combine_multi(NULL, archive_directory_path, "/outputs", 0);
   success = create_dir(output_directory_path, 0777);
   if (!success) {
     fatal("Could not create archiving directory %s\n", output_directory_path);
   }
 
-  input_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/input_files", 0);
+  input_directory_path = string_combine_multi(NULL, archive_directory_path, "/input_files", 0);
   success = create_dir(input_directory_path, 0777);
   if (!success) {
     fatal("Could not create input_files directory %s\n", source_makeflow_file_path);
   }
 
-  descendant_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/descendants", 0);
+  descendant_directory_path = string_combine_multi(NULL, archive_directory_path, "/descendants", 0);
   create_dir(descendant_directory_path, 0777);
   if (!success) {
     fatal("Could not create descendant directory %s\n", descendant_directory_path);
   }
 
-  ancestor_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/ancestors", 0);
+  ancestor_directory_path = string_combine_multi(NULL, archive_directory_path, "/ancestors", 0);
   create_dir(ancestor_directory_path, 0777);
   if (!success) {
     fatal("Could not create ancestor directory %s\n", ancestor_directory_path);
   }
 
-  archiving_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
-  makeflow_write_run_info(d, n, archiving_file_path, info, command);
+  makeflow_write_run_info(d, n, archive_directory_path, info, command);
 
   list_first_item(outputs);
   while((f = list_next_item(outputs))) {
-    output_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
-    /* Convenient to write the file to job symlink here, when we have part of the output file path */
-    makeflow_write_file_checksum(d, f, output_file_path);
-    output_file_path = string_combine_multi(output_file_path, "/outputs/" , f->filename, 0);
+    /* Convenient to write the file to job symlink here */
+    makeflow_write_file_checksum(d, f, archive_directory_path);
+    output_file_path = string_combine_multi(NULL, archive_directory_path, "/outputs/" , f->filename, 0);
     success = copy_file_to_file(f->filename, output_file_path);
     if (!success) {
       fatal("Could not archive output file %s\n", output_file_path);
@@ -111,7 +113,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   }
   /* only preserve Makeflow workflow instructions if node is a root node */
   if (set_size(n->ancestors) == 0) {
-    source_makeflow_file_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/source_makeflow", 0);
+    source_makeflow_file_path = string_combine_multi(NULL, archive_directory_path, "/source_makeflow", 0);
     success = copy_file_to_file(d->filename, source_makeflow_file_path);
     if (!success) {
       fatal("Could not archive source makeflow file %s\n", source_makeflow_file_path);
@@ -135,7 +137,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
          Archive the file and then store it's output path. If any other nodes use this file,
          a link will be created pointing towards the archive path set here */
       strncpy(archiving_prefix, n->archive_id, 2);
-      input_file= string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/input_files/", f->filename, 0);
+      input_file= string_combine_multi(NULL, archive_directory_path, "/input_files/", f->filename, 0);
       success = copy_file_to_file(f->filename, input_file);
       f->archive_path = xxstrdup(input_file);
       if (!success) {
@@ -152,7 +154,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
       }
 
       strncpy(archiving_prefix, n->archive_id, 2);
-      input_file= string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/input_files/", f->filename, 0);
+      input_file= string_combine_multi(NULL, archive_directory_path, "/input_files/", f->filename, 0);
 
       success = symlink(ancestor_output_file_path, input_file);
       if (success != 0 && errno != 17) {
@@ -169,7 +171,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   free(descendant_directory_path);
   free(archiving_file_path);
   free(ancestor_file_path);
-  free(ancestor_archive_id_string);
+  free(archive_directory_path);
 }
 
 int makeflow_archive_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs) {
@@ -208,7 +210,7 @@ int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *comma
 
   list_first_item(outputs);
   while ((f=list_next_item(outputs))) {
-    filename = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/outputs/", f-> filename, 0);
+    filename = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, "/outputs/", f->filename, 0);
     file_exists = stat(filename, &buf);
     free(filename);
     if (file_exists == -1) {
@@ -237,6 +239,7 @@ void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_pa
     fprintf(fp, "%d\n", info->exit_signal);
   }
   free(run_info_path);
+  fclose(fp);
 }
 
 void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_archive_path) {

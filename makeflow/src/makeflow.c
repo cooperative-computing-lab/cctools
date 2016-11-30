@@ -887,6 +887,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			command = makeflow_wrap_umbrella(command, n, wrapper_umbrella, queue, input_files, output_files);
 			command = makeflow_wrap_monitor(command, n, queue, monitor);
 			makeflow_archive_populate(d, n, command, input_list, outputs, info);
+
+			free(command);
+			free(input_list);
+			free(input_files);
+			free(output_files);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
