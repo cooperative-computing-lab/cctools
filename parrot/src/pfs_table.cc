@@ -191,8 +191,7 @@ int pfs_table::bind( int fd, char *lpath, size_t len )
 {
 	if (!isnative(fd))
 		return (errno = EBADF, -1);
-	if (strlen(lpath) == 0)
-		return (errno = ENOENT, -1);
+	assert(strlen(lpath) > 0);
 
 	/* Resolve the path... */
 	struct pfs_name pname;
