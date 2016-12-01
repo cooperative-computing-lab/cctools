@@ -63,7 +63,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   char *archive_directory_path = NULL;
   struct dag_node *ancestor;
   struct dag_file *f;
-  int success;
+  int success, symlink_failure;
 
   /* in --archive-write mode, we haven't yet generated a node's archive_id, so need to generate it here */
   makeflow_archive_node_generate_id(n, command, inputs);
@@ -85,13 +85,13 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   }
 
   descendant_directory_path = string_combine_multi(NULL, archive_directory_path, "/descendants", 0);
-  create_dir(descendant_directory_path, 0777);
+  success = create_dir(descendant_directory_path, 0777);
   if (!success) {
     fatal("Could not create descendant directory %s\n", descendant_directory_path);
   }
 
   ancestor_directory_path = string_combine_multi(NULL, archive_directory_path, "/ancestors", 0);
-  create_dir(ancestor_directory_path, 0777);
+  success = create_dir(ancestor_directory_path, 0777);
   if (!success) {
     fatal("Could not create ancestor directory %s\n", ancestor_directory_path);
   }
@@ -156,8 +156,8 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
       strncpy(archiving_prefix, n->archive_id, 2);
       input_file= string_combine_multi(NULL, archive_directory_path, "/input_files/", f->filename, 0);
 
-      success = symlink(ancestor_output_file_path, input_file);
-      if (success != 0 && errno != 17) {
+      symlink_failure = symlink(ancestor_output_file_path, input_file);
+      if (symlink_failure && errno != EEXIST) {
         fatal("Could not create symlink %s pointing to %s\n", input_file, ancestor_output_file_path);
       }
       free(ancestor_output_file_path);
@@ -244,7 +244,7 @@ void makeflow_write_run_info(struct dag *d, struct dag_node *n, char *archive_pa
 
 void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_archive_path) {
   char *file_archive_path;
-  int success;
+  int success, symlink_failure;
   char archiving_prefix[3] = "";
 
   if (f->archive_id == NULL) {
@@ -259,8 +259,8 @@ void makeflow_write_file_checksum(struct dag *d, struct dag_file *f, char *job_a
   }
 
   file_archive_path = string_combine_multi(file_archive_path, "/", f->archive_id + 2, 0);
-  success = symlink(job_archive_path, file_archive_path);
-  if (success != 0 && errno != 17) {
+  symlink_failure = symlink(job_archive_path, file_archive_path);
+  if (symlink_failure && errno != EEXIST) {
     fatal("Could not create symlink %s pointing to %s\n", file_archive_path, job_archive_path);
   }
   free(file_archive_path);
@@ -276,7 +276,7 @@ void write_descendant_link(struct dag *d, struct dag_node *current_node, struct 
   char *descendant_job_path = NULL, *ancestor_link_path = NULL;
   char current_node_archiving_prefix[3] = "";
   char ancestor_node_archiving_prefix[3] = "";
-  int success;
+  int symlink_failure;
 
   strncpy(current_node_archiving_prefix, current_node->archive_id, 2);
   strncpy(ancestor_node_archiving_prefix, ancestor_node->archive_id, 2);
@@ -284,8 +284,8 @@ void write_descendant_link(struct dag *d, struct dag_node *current_node, struct 
   descendant_job_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", current_node_archiving_prefix, "/", current_node->archive_id + 2, 0);
   ancestor_link_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", ancestor_node_archiving_prefix, "/", ancestor_node->archive_id + 2, "/descendants/", current_node->archive_id, 0);
 
-  success = symlink(descendant_job_path, ancestor_link_path);
-  if (success != 0 && errno != 17) {
+  symlink_failure = symlink(descendant_job_path, ancestor_link_path);
+  if (symlink_failure && errno != EEXIST) {
     fatal("Could not create symlink %s pointing to %s\n", ancestor_link_path, descendant_job_path);
   }
   free(descendant_job_path);
@@ -297,7 +297,7 @@ void write_ancestor_links(struct dag *d, struct dag_node *current_node, struct d
   char *ancestor_job_path = NULL, *current_node_descendant_path = NULL;
   char current_node_archiving_prefix[3] = "";
   char ancestor_node_archiving_prefix[3] = "";
-  int success;
+  int symlink_failure;
 
   strncpy(current_node_archiving_prefix, current_node->archive_id, 2);
   strncpy(ancestor_node_archiving_prefix, ancestor_node->archive_id, 2);
@@ -305,8 +305,8 @@ void write_ancestor_links(struct dag *d, struct dag_node *current_node, struct d
   ancestor_job_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", ancestor_node_archiving_prefix, "/", ancestor_node->archive_id + 2, 0);
   current_node_descendant_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", current_node_archiving_prefix, "/", current_node->archive_id + 2, "/ancestors/", ancestor_node->archive_id, 0);
 
-  success = symlink(ancestor_job_path, current_node_descendant_path);
-  if (success != 0 && errno != 17) {
+  symlink_failure = symlink(ancestor_job_path, current_node_descendant_path);
+  if (symlink_failure && errno != EEXIST) {
     fatal("Could not create symlink %s pointing to %s\n", current_node_descendant_path, ancestor_job_path);
   }
   free(ancestor_job_path);
