@@ -477,7 +477,10 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
-		if (!list_iterate(shared_fs, on_sharedfs, file->filename)) continue;
+		if (!list_iterate(shared_fs, on_sharedfs, file->filename)) {
+			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n", file->filename);
+			continue;
+		}
 		char *f = makeflow_file_format(node,file,queue,w,m,s,u);
 		file_str = string_combine(file_str,f);
 		free(f);
