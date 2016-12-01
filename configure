@@ -5,14 +5,14 @@
 
 MAJOR=6
 MINOR=0
-MICRO=12
+MICRO=13
 
 # Optionally set the source/tag for this code (e.g. RC1 or FINAL). Normally
 # configure will obtain the branch this source code comes from automatically,
 # so you do not need to set this. Setting this variable is instead useful for
 # statically naming the source when it will not match the branch name (like RC1
 # or FINAL).
-RELEASE=FINAL
+RELEASE=RC1
 
 # *** You should not need to change anything below this line. ***
 ###########################
