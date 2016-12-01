@@ -13,9 +13,9 @@ class SimpleDag(object):
 
 class SimpleDagJob(object):
   def __init__(self, path, local_path = ""):
-    self.cached_path = path
+    self.archived_path = path
     self.local_path = local_path
-    paths_to_jobs[self.cached_path] = self
+    paths_to_jobs[self.archived_path] = self
     self.command = ""
     self.batch_job_info = {}
     self.input_files= []
@@ -35,10 +35,10 @@ class SimpleDagJob(object):
 
 
   def create_input_output_files(self):
-    input_file_directories = os.path.join(self.cached_path, "input_files")
+    input_file_directories = os.path.join(self.archived_path, "input_files")
     input_file_paths = [os.path.realpath(os.path.join(input_file_directories, f_path)) for f_path in os.listdir(input_file_directories)]
 
-    output_file_dir = os.path.join(self.cached_path, "outputs")
+    output_file_dir = os.path.join(self.archived_path, "outputs")
     output_file_paths = [os.path.join(output_file_dir, f_path) for f_path in os.listdir(output_file_dir)]
 
     for o_path in output_file_paths:
@@ -48,13 +48,13 @@ class SimpleDagJob(object):
       self.add_input_file(i_path)
 
   def recover_ancestors(self):
-    path = os.path.join(self.cached_path, "ancestors")
+    path = os.path.join(self.archived_path, "ancestors")
     try:
       with open(path, "r") as f:
         line = f.readline().rstrip()
         while line:
-          cache_prefix = line[0:2]
-          ancestor_path = os.path.realpath(os.path.join(self.cached_path, "../../", cache_prefix, line))
+          archive_prefix = line[0:2]
+          ancestor_path = os.path.realpath(os.path.join(self.archived_path, "../../", archive_prefix, line))
           if ancestor_path in paths_to_jobs:
             self.ancestors.append(paths_to_jobs[ancestor_path])
           else:
@@ -66,8 +66,8 @@ class SimpleDagJob(object):
       pass
 
   def recover_descendants(self):
-    descendant_dir = os.path.join(self.cached_path, "descendants")
-    descendant_job_paths = [os.path.realpath(os.path.join(self.cached_path,"descendants", path)) for path in os.listdir(descendant_dir)]
+    descendant_dir = os.path.join(self.archived_path, "descendants")
+    descendant_job_paths = [os.path.realpath(os.path.join(self.archived_path,"descendants", path)) for path in os.listdir(descendant_dir)]
     for descendant_path in descendant_job_paths:
       if descendant_path in paths_to_jobs:
         self.descendants.append(paths_to_jobs[descendant_path])
@@ -77,9 +77,10 @@ class SimpleDagJob(object):
         paths_to_jobs[descendant_path] = new_dag_job
 
   def recover_run_info(self):
-    run_info_path = os.path.join(self.cached_path, "run_info")
+    run_info_path = os.path.join(self.archived_path, "run_info")
     with open(run_info_path, "r") as f:
       self.command = f.readline().rstrip()
+      self.wrapped_command = f.readline().rstrip()
       self.batch_job_info['submitted'] = int(f.readline().rstrip())
       self.batch_job_info['started'] = int(f.readline().rstrip())
       self.batch_job_info['finished'] = int(f.readline().rstrip())
@@ -108,21 +109,21 @@ class SimpleDagJob(object):
   def print_all_outputs(self):
     visted = {}
     queue= [(self, 0)]
-    visted[self.cached_path] = 1
+    visted[self.archived_path] = 1
     while len(queue) > 0:
       node, distance = queue.pop()
       print distance
       node.print_immediate_outputs()
       for child in node.descendants:
-        if child.cached_path not in visted:
+        if child.archived_path not in visted:
           queue.append((child, distance + 1))
-          visted[child.cached_path] = 1
+          visted[child.archived_path] = 1
 
   def print_job(self):
     print "file:{}".format(self.local_path)
-    print "Created by job cached at path:{}".format(self.cached_path)
-    print "Command used to create this file:{}".format(self.command)
-    print "makeflow file cached at path:{}".format(get_makeflow_path(self))
+    print "Created by job archived at path:{}".format(self.archived_path)
+    print "Command used to create this file:{}".format(self.wrapped_command)
+    print "makeflow file archived at path:{}".format(get_makeflow_path(self))
     print "Inputs:"
     self.print_immediate_inputs()
 
@@ -142,7 +143,7 @@ def recreate_job(job_path, local_):
 def get_makeflow_path(node):
   while len(node.ancestors) != 0:
     node = node.ancestors[0]
-  return os.path.join(node.cached_path, "source_makeflow")
+  return os.path.join(node.archived_path, "source_makeflow")
 
 def get_dag_roots(dag_node):
   nodes_seen = {}
@@ -172,14 +173,14 @@ def usage():
     -h, --help               print this message
     -o, --outputs            list sibling output files
     --outputs-all            list both sibling output files and all other files that relied directly or indirectly on the specified file
-    --path=<path_to_cache>   path to search for the makeflow cache (use if when preserving the makeflow you specified a cache path)
+    --path=<path_to_archive>   path to search for the makeflow archive (use if when preserving the makeflow you specified a archive path)
 
   """
   sys.exit(1)
 
 def parse_args():
   arg_map = {'inputs': False, 'outputs': False, "file": None, "inputs-all": False,
-            "outputs-all": False, "info": False, "path": "/tmp/makeflow.cache.{}".format(os.geteuid())}
+            "outputs-all": False, "info": False, "path": "/tmp/makeflow.archive.{}".format(os.geteuid())}
   try:
     opts, args = getopt.getopt(sys.argv[1:], ":hio", ['help', 'inputs', 'outputs', 'inputs-all', 'outputs-all', 'info', 'path='])
   except getopt.GetoptError as err:
@@ -223,6 +224,7 @@ if __name__ == "__main__":
       line = f.readline()
   hex_digest = sha1_hash.hexdigest()
   file_path = os.path.join(arguments['path'], "files", hex_digest[0:2], hex_digest[2:])
+  print file_path
   if os.path.islink(file_path):
     resolved_job_path = os.path.realpath(file_path)
     node = recreate_job(resolved_job_path, file_name)
@@ -241,5 +243,5 @@ if __name__ == "__main__":
     if arguments['info']:
       node.print_job()
   else:
-    print "File has not been cached"
+    print "File has not been archived"
 
