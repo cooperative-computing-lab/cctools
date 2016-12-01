@@ -1539,6 +1539,7 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_SHARED_FS:
 				assert(shared_fs);
+				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
 				list_push_head(shared_fs, xxstrdup(optarg));
 				break;
 			case LONG_OPT_DOCKER:
