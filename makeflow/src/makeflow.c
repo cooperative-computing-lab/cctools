@@ -162,11 +162,8 @@ static int use_mountfile = 0;
 
 static struct list *shared_fs = NULL;
 
-static void makeflow_generate_node_cache_id(struct dag_node *n, char *command, struct list*inputs);
-static void makeflow_populate_cache(struct dag *d, struct dag_node *n, struct list *outputs);
-static int is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs);
-static int move_preserved_output_file(struct dag *d, struct dag_node *n, struct list *outputs);
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job_info *info);
+static int did_find_archived_job = 0;
+
 
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
@@ -607,6 +604,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 		}
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+		did_find_archived_job = 1;
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
@@ -1018,9 +1016,10 @@ static void makeflow_run( struct dag *d )
         }
 
 	while(!makeflow_abort_flag) {
+		did_find_archived_job = 0;
 		makeflow_dispatch_ready_jobs(d);
 
-		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 )
+		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 && did_find_archived_job == 0 )
 			break;
 
 		if(dag_remote_jobs_running(d)) {
