@@ -27,6 +27,8 @@ See the file COPYING for details.
 #include "mkdir_recursive.h"
 #include "makeflow_mounts.h"
 #include "path.h"
+#include "shell.h"
+#include "stringtools.h"
 #include "unlink_recursive.h"
 #include "xxmalloc.h"
 
@@ -48,15 +50,23 @@ int create_link(const char *link_target, const char *link_name) {
 }
 
 /* mount_install_http downloads a dependency from source to cache_path.
- * @param source: a http url.
+ * @param source: a http or https url.
  * @param cache_path: a file path in the cache dir.
  * return 0 on success; return -1 on failure.
  */
 int mount_install_http(const char *source, const char *cache_path) {
-	if(http_fetch_to_file(source, cache_path, time(NULL) + HTTP_TIMEOUT) < 0) {
-		debug(D_DEBUG, "http_fetch_to_file(%s, %s, ...) failed!\n", source, cache_path);
+	char *command = string_format("wget -O %s %s", cache_path, source);
+
+	int status;
+	int rc = shellcode(command, NULL, NULL, 0, NULL, NULL, &status);
+
+	if(rc) {
+		debug(D_DEBUG, "`%s` failed!\n", command);
+		free(command);
 		return -1;
 	}
+
+	free(command);
 	return 0;
 }
 
@@ -70,6 +80,7 @@ int mount_check_http(const char *url) {
 		fprintf(stderr, "http_query(%s, \"HEAD\", ...) failed!\n", url);
 		return -1;
 	}
+	link_close(link);
 	return 0;
 }
 
@@ -142,7 +153,8 @@ int mount_check(const char *source, const char *target, file_type *s_type) {
 
 	if(!strncmp(source, "http://", 7)) {
 		return mount_check_http(source);
-	} else {
+	} else if(strncmp(source, "https://", 8)) {
+		/* check source when it is not http or https */
 		/* Check whether source already exists. */
 		if(access(source, F_OK)) {
 			debug(D_DEBUG, "the source (%s) does not exist!\n", source);
@@ -253,8 +265,10 @@ int mount_install(const char *source, const char *target, const char *cache_dir,
 		return -1;
 	}
 
-	/* set up the type of the source: http or local */
-	if(!strncmp(source, "http://", 7)) {
+	/* set up the type of the source: https, http or local */
+	if(!strncmp(source, "https://", 8)) {
+		*type = DAG_FILE_SOURCE_HTTPS;
+	} else if(!strncmp(source, "http://", 7)) {
 		*type = DAG_FILE_SOURCE_HTTP;
 	} else {
 		*type = DAG_FILE_SOURCE_LOCAL;
@@ -276,7 +290,7 @@ int mount_install(const char *source, const char *target, const char *cache_dir,
 	/* if cache_path does not exist, copy it from source to cache_path. */
 	if(access(cache_path, F_OK)) {
 		int r = 0;
-		if(*type == DAG_FILE_SOURCE_HTTP) {
+		if(*type == DAG_FILE_SOURCE_HTTPS || *type == DAG_FILE_SOURCE_HTTP) {
 			r = mount_install_http(source, cache_path);
 		} else {
 			r = mount_install_local(source, target, cache_path, s_type);
@@ -632,7 +646,7 @@ int makeflow_mount_check_target(struct dag *d) {
 		if(!df->source)
 			continue;
 
-		cache_name = md5_cal_source(df->source, strncmp(df->source, "http://", 7));
+		cache_name = md5_cal_source(df->source, (strncmp(df->source, "http://", 7) && strncmp(df->source, "https://", 8)));
 		if(!cache_name) {
 			return -1;
 		}

@@ -32,3 +32,9 @@ capitol.360.jpg: capitol.jpg $(CONVERT)
 capitol.jpg: $(CURL)
 	LOCAL $(CURL) -o capitol.jpg $URL
 
+: povray.umbrella
+	stat povray.umbrella
+
+: 1.html
+	file 1.html
+
