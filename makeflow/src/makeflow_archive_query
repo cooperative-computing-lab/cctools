@@ -1,3 +1,5 @@
+#! /usr/bin/python
+
 import hashlib
 import os
 import sys
@@ -120,10 +122,10 @@ class SimpleDagJob(object):
           visted[child.archived_path] = 1
 
   def print_job(self):
-    print "file:{}".format(self.local_path)
-    print "Created by job archived at path:{}".format(self.archived_path)
-    print "Command used to create this file:{}".format(self.wrapped_command)
-    print "makeflow file archived at path:{}".format(get_makeflow_path(self))
+    print "file:%s" %(self.local_path)
+    print "Created by job archived at path:%s" %(self.archived_path)
+    print "Command used to create this file:%s" %(self.wrapped_command)
+    print "makeflow file archived at path:%s" %(get_makeflow_path(self))
     print "Inputs:"
     self.print_immediate_inputs()
 
@@ -180,7 +182,7 @@ def usage():
 
 def parse_args():
   arg_map = {'inputs': False, 'outputs': False, "file": None, "inputs-all": False,
-            "outputs-all": False, "info": False, "path": "/tmp/makeflow.archive.{}".format(os.geteuid())}
+            "outputs-all": False, "info": False, "path": "/tmp/makeflow.archive.%s" %(os.geteuid())}
   try:
     opts, args = getopt.getopt(sys.argv[1:], ":hio", ['help', 'inputs', 'outputs', 'inputs-all', 'outputs-all', 'info', 'path='])
   except getopt.GetoptError as err:
@@ -207,7 +209,7 @@ def parse_args():
     arg_map['info'] = True
   arg_map['file'] = args[0]
   if not arg_map['file'] or not os.path.isfile(arg_map['file']):
-    print "Cannot find file {}".format(arg_map['file'])
+    print "Cannot find file %s" %(arg_map['file'])
     usage()
   return arg_map
 
