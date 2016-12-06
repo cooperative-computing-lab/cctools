@@ -37,9 +37,10 @@
 #include "timestamp.h"
 #include "itable.h"
 
-#include "debug.h"
-//#define debug fprintf
-//#define D_RMON stderr
+#define CCTOOLS_HELPER_DEBUG_MESSAGES 1
+
+#define D_RMON stderr
+#define debug if(CCTOOLS_HELPER_DEBUG_MESSAGES) fprintf
 
 #include "rmonitor_helper_comm.h"
 
