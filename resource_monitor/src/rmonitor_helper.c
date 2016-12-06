@@ -552,8 +552,8 @@ void exit_wrapper_preamble(int status)
 	if(blocking_signals) {
 		debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
 		sigtimedwait(&all_signals, NULL, &timeout);
-		signal(SIGCONT, old_handler);
 		sigprocmask(SIG_SETMASK, &old_signals, NULL);
+		signal(SIGCONT, old_handler);
 	} else {
 		signal(SIGCONT, old_handler);
 	}
