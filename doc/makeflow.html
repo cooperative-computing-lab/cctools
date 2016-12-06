@@ -46,6 +46,7 @@ workflows from existing applications.</p>
 <tr><td>pbs      <td> <a href=http://www.arc.ox.ac.uk/content/pbs>Portable Batch Scheduler</a>
 <tr><td>torque   <td> <a href=http://www.adaptivecomputing.com/products/open-source/torque>Torque Resource Manager</a>
 <tr><td>slurm    <td> <a href=http://slurm.schedmd.com>Slurm Workload Manager</a>
+<tr><td>lambda   <td> <a href=https://aws.amazon.com/lambda/>AWS Lambda</a> servless code execution platform
 <tr><td>moab     <td> <a href="http://www.adaptivecomputing.com/resources/docs/mwm/6-0/index.php">Moab Workload Manager</a></li>
 <tr><td>cluster  <td> Custom-defined batch submission commands, see <a href=#custom.drivers>custom drivers</a> below for details.
 <tr><td>chirp    <td> Active storage jobs on the <a href=http://ccl.cse.nd.edu/software/chirp>Chirp filesystem</a>.
@@ -274,6 +275,21 @@ requires that users provide their own image.</p>
 <tt>makeflow -T condor --singularity=mycontainer.img</tt>, then Makeflow will distribute tasks via Condor, and
 then use Singularity to execute the task at each worker.
 
+<h2 id="lambda">Running Makeflow with AWS Lambda<a class="sectionlink" href="#lambda" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>To use this batch system, one must have an Amazon Web Services <a href="http://docs.aws.amazon.com/lambda/latest/dg/setting-up.html">account</a> and
+	an <a href="http://docs.aws.amazon.com/cli/latest/userguide/installing.html">installation</a> of the AWS-CLI. Make sure it is <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html">set up</a> and <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html">configured</a> correctly.</p>
+
+<p>An execution environment must be set up among the necessary AWS
+	services: a permissions role, a Lambda function, and an S3
+	bucket. The <tt>batch_job_lambda_setup.sh</tt> script and its associated flags will do this and output a configuration file for passing to makeflow.</p>
+
+<p>Having configured the environment, one may invoke makeflow with <tt>-T lambda</tt> and <tt>--lambda-config</tt> to
+	specify the configuration file produced earlier.</p>
+
+<p>Once you are finished with an execution environment it can be
+	destroyed: deleting the permissions role, the Lambda function, and the
+	S3 bucket and its contents. The <tt>batch_job_lambda_teardown.sh</tt> script and its associated flags will do this.</p>
 
 <h2 id="umbrella">Running Makeflow with Umbrella<a class="sectionlink" href="#umbrella" title="Link to this section.">&#x21d7;</a></h2>
 
