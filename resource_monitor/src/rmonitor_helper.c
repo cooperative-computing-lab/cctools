@@ -13,22 +13,24 @@
 #define _GNU_SOURCE // Aaaaaah!!
 #endif
 
+#include <assert.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <dlfcn.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/socket.h>
-#include <limits.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #ifdef __linux__
 #include <sched.h>
@@ -37,9 +39,10 @@
 #include "timestamp.h"
 #include "itable.h"
 
-#include "debug.h"
-//#define debug fprintf
-//#define D_RMON stderr
+#define CCTOOLS_HELPER_DEBUG_MESSAGES 0
+
+#define D_RMON stderr
+#define debug if(CCTOOLS_HELPER_DEBUG_MESSAGES) fprintf
 
 #include "rmonitor_helper_comm.h"
 
@@ -62,10 +65,72 @@
 
 static struct itable *family_of_fd = NULL;
 
+#define declare_original_dlsym(name) __typeof__(name) *original_ ## name;
+#define define_original_dlsym(name) original_ ## name = dlsym(RTLD_NEXT, #name);
+
+declare_original_dlsym(fork);
+declare_original_dlsym(chdir);
+declare_original_dlsym(fchdir);
+declare_original_dlsym(close);
+declare_original_dlsym(open);
+declare_original_dlsym(socket);
+declare_original_dlsym(write);
+declare_original_dlsym(read);
+declare_original_dlsym(recv);
+declare_original_dlsym(recvfrom);
+declare_original_dlsym(send);
+declare_original_dlsym(sendmsg);
+declare_original_dlsym(recvmsg);
+declare_original_dlsym(exit);
+declare_original_dlsym(_exit);
+declare_original_dlsym(waitpid);
+
+#if defined(__linux__) && defined(__USE_LARGEFILE64)
+declare_original_dlsym(open64);
+#endif
+
+static int initializing_helper = 0;
+
+void rmonitor_helper_initialize() {
+
+	if(initializing_helper)
+		return;
+
+	initializing_helper = 1;
+
+	define_original_dlsym(fork);
+	define_original_dlsym(chdir);
+	define_original_dlsym(fchdir);
+	define_original_dlsym(close);
+	define_original_dlsym(open);
+	define_original_dlsym(socket);
+	define_original_dlsym(write);
+	define_original_dlsym(read);
+	define_original_dlsym(recv);
+	define_original_dlsym(recvfrom);
+	define_original_dlsym(send);
+	define_original_dlsym(sendmsg);
+	define_original_dlsym(recvmsg);
+	define_original_dlsym(exit);
+	define_original_dlsym(_exit);
+	define_original_dlsym(waitpid);
+
+#if defined(__linux__) && defined(__USE_LARGEFILE64)
+	define_original_dlsym(open64);
+#endif
+
+	initializing_helper = 0;
+}
+
+
 pid_t fork()
 {
 	pid_t pid;
-	__typeof__(fork) *original_fork = dlsym(RTLD_NEXT, "fork");
+
+	if(!original_fork) {
+		rmonitor_helper_initialize();
+		assert(original_fork);
+	}
 
 	debug(D_RMON, "fork from %d.\n", getpid());
 	pid = original_fork();
@@ -105,7 +170,10 @@ pid_t __vfork()
 int chdir(const char *path)
 {
 	int   status;
-	__typeof__(chdir) *original_chdir = dlsym(RTLD_NEXT, "chdir");
+
+	if(!original_chdir) {
+		return syscall(SYS_chdir, path);
+	}
 
 	debug(D_RMON, "chdir from %d.\n", getpid());
 	status = original_chdir(path);
@@ -132,7 +200,9 @@ int chdir(const char *path)
 int fchdir(int fd)
 {
 	int   status;
-	__typeof__(fchdir) *original_fchdir = dlsym(RTLD_NEXT, "fchdir");
+	if(!original_fchdir) {
+		return syscall(SYS_fchdir, fd);
+	}
 
 	debug(D_RMON, "fchdir from %d.\n", getpid());
 	status = original_fchdir(fd);
@@ -158,7 +228,9 @@ int fchdir(int fd)
 
 int close(int fd)
 {
-	__typeof__(close) *original_close = dlsym(RTLD_NEXT, "close");
+	if(!original_close) {
+		return syscall(SYS_close, fd);
+	}
 
 	if(family_of_fd)
 		itable_remove(family_of_fd, fd);
@@ -182,38 +254,6 @@ static int open_for_writing(int fd) {
 	return (access_mode != O_RDONLY);
 }
 
-FILE *fopen(const char *path, const char *mode)
-{
-	struct rmonitor_msg msg;
-
-	FILE *file;
-	__typeof__(fopen) *original_fopen = dlsym(RTLD_NEXT, "fopen");
-
-	debug(D_RMON, "fopen %s mode %s from %d.\n", path, mode, getpid());
-
-	START(msg)
-		file = original_fopen(path, mode);
-	END(msg)
-
-	/* With ENOENT we do not send a message, simply to reduce spam. */
-	if(msg.error == ENOENT)
-		return file;
-
-	/* Consider file as input by default. */
-	msg.type   = OPEN_INPUT;
-
-	if(file && open_for_writing(fileno(file))) {
-		msg.type   = OPEN_OUTPUT;
-	}
-
-	msg.origin = getpid();
-	strcpy(msg.data.s, path);
-
-	send_monitor_msg(&msg);
-
-	return file;
-}
-
 int open(const char *path, int flags, ...)
 {
 	struct rmonitor_msg msg;
@@ -222,11 +262,13 @@ int open(const char *path, int flags, ...)
 	int     fd;
 	int     mode;
 
-	__typeof__(open) *original_open = dlsym(RTLD_NEXT, "open");
-
 	va_start(ap, flags);
 	mode = va_arg(ap, int);
 	va_end(ap);
+
+	if(!original_open) {
+		return syscall(SYS_open, path, flags, mode);
+	}
 
 	debug(D_RMON, "open %s from %d.\n", path, getpid());
 
@@ -254,37 +296,6 @@ int open(const char *path, int flags, ...)
 }
 
 #if defined(__linux__) && defined(__USE_LARGEFILE64)
-FILE *fopen64(const char *path, const char *mode)
-{
-	struct rmonitor_msg msg;
-
-	FILE *file;
-	__typeof__(fopen64) *original_fopen64 = dlsym(RTLD_NEXT, "fopen64");
-
-	debug(D_RMON, "fopen64 %s mode %s from %d.\n", path, mode, getpid());
-
-	START(msg)
-		file = original_fopen64(path, mode);
-	END(msg)
-
-	/* With ENOENT we do not send a message, simply to reduce spam. */
-	if(msg.error == ENOENT)
-		return file;
-
-	/* Consider file as input by default. */
-	msg.type   = OPEN_INPUT;
-
-	if(file && open_for_writing(fileno(file))) {
-		msg.type   = OPEN_OUTPUT;
-	}
-
-	msg.origin = getpid();
-	strcpy(msg.data.s, path);
-
-	send_monitor_msg(&msg);
-
-	return file;
-}
 
 int open64(const char *path, int flags, ...)
 {
@@ -294,11 +305,13 @@ int open64(const char *path, int flags, ...)
 	int     fd;
 	int     mode;
 
-	__typeof__(open64) *original_open64 = dlsym(RTLD_NEXT, "open64");
-
 	va_start(ap, flags);
 	mode = va_arg(ap, int);
 	va_end(ap);
+
+	if(!original_open64) {
+		return syscall(SYS_open, path, flags | O_LARGEFILE, mode);
+	}
 
 	debug(D_RMON, "open64 %s from %d.\n", path, getpid());
 
@@ -330,10 +343,14 @@ int socket(int domain, int type, int protocol)
 {
 	int fd;
 
+	if(!original_socket) {
+		rmonitor_helper_initialize();
+		assert(original_socket);
+	}
+
 	if(!family_of_fd)
 		family_of_fd = itable_create(8);
 
-	__typeof__(socket) *original_socket = dlsym(RTLD_NEXT, "socket");
 	fd = original_socket(domain, type, protocol);
 
 	if(fd > -1 && (domain != AF_LOCAL || domain != AF_NETLINK)) {
@@ -348,6 +365,11 @@ int socket(int domain, int type, int protocol)
 ssize_t write(int fd, const void *buf, size_t count)
 {
 	struct rmonitor_msg msg;
+
+	if(!original_write) {
+		return syscall(SYS_write, fd, buf, count);
+	}
+
 	msg.origin = getpid();
 
 	if(family_of_fd && itable_lookup(family_of_fd, fd)) {
@@ -357,7 +379,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 	}
 
 
-	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
+	if(!original_write) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -373,6 +395,11 @@ ssize_t write(int fd, const void *buf, size_t count)
 ssize_t read(int fd, void *buf, size_t count)
 {
 	struct rmonitor_msg msg;
+
+	if(!original_read) {
+		return syscall(SYS_read, fd, buf, count);
+	}
+
 	msg.origin = getpid();
 
 	if(family_of_fd && itable_lookup(family_of_fd, fd)) {
@@ -381,7 +408,7 @@ ssize_t read(int fd, void *buf, size_t count)
 		msg.type   = READ;
 	}
 
-	__typeof__(read) *original_read = dlsym(RTLD_NEXT, "read");
+	if(!original_read) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -397,10 +424,14 @@ ssize_t read(int fd, void *buf, size_t count)
 ssize_t recv(int fd, void *buf, size_t count, int flags)
 {
 	struct rmonitor_msg msg;
+
+	if(!original_recv) {
+		rmonitor_helper_initialize();
+		assert(original_recv);
+	}
+
 	msg.type   = RX;
 	msg.origin = getpid();
-
-	__typeof__(recv) *original_recv = dlsym(RTLD_NEXT, "recv");
 
 	ssize_t real_count;
 	START(msg)
@@ -416,10 +447,16 @@ ssize_t recv(int fd, void *buf, size_t count, int flags)
 ssize_t recvfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *src, socklen_t *addrlen)
 {
 	struct rmonitor_msg msg;
+
+	if(!original_recvfrom) {
+		rmonitor_helper_initialize();
+		assert(original_recvfrom);
+	}
+
 	msg.type   = RX;
 	msg.origin = getpid();
 
-	__typeof__(recvfrom) *original_recvfrom = dlsym(RTLD_NEXT, "recvfrom");
+	if(!original_recvfrom) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -436,10 +473,15 @@ ssize_t send(int fd, const void *buf, size_t count, int flags)
 {
 	struct rmonitor_msg msg;
 
+	if(!original_send) {
+		rmonitor_helper_initialize();
+		assert(original_send);
+	}
+
 	msg.type   = TX;
 	msg.origin = getpid();
 
-	__typeof__(send) *original_send = dlsym(RTLD_NEXT, "send");
+	if(!original_send) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -452,32 +494,19 @@ ssize_t send(int fd, const void *buf, size_t count, int flags)
 	return real_count;
 }
 
-ssize_t sendfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *src, socklen_t *addrlen)
-{
-	struct rmonitor_msg msg;
-	msg.type   = TX;
-	msg.origin = getpid();
-
-	__typeof__(sendfrom) *original_sendfrom = dlsym(RTLD_NEXT, "sendfrom");
-
-	ssize_t real_count;
-	START(msg)
-		real_count = original_sendfrom(fd, buf, count, flags, src, addrlen);
-	END(msg)
-
-	msg.data.n = real_count;
-	send_monitor_msg(&msg);
-
-	return real_count;
-}
-
 ssize_t sendmsg(int fd, const struct msghdr *mg, int flags)
 {
 	struct rmonitor_msg msg;
+
+	if(!original_sendmsg) {
+		rmonitor_helper_initialize();
+		assert(original_sendmsg);
+	}
+
 	msg.type   = TX;
 	msg.origin = getpid();
 
-	__typeof__(sendmsg) *original_sendmsg = dlsym(RTLD_NEXT, "sendmsg");
+	if(!original_sendmsg) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -494,10 +523,16 @@ ssize_t sendmsg(int fd, const struct msghdr *mg, int flags)
 ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
 {
 	struct rmonitor_msg msg;
+
+	if(!original_recvmsg) {
+		rmonitor_helper_initialize();
+		assert(original_recvmsg);
+	}
+
 	msg.type   = RX;
 	msg.origin = getpid();
 
-	__typeof__(recvmsg) *original_recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+	if(!original_recvmsg) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -551,8 +586,8 @@ void exit_wrapper_preamble(int status)
 	if(blocking_signals) {
 		debug(D_RMON, "Waiting for monitoring: %d.\n", getpid());
 		sigtimedwait(&all_signals, NULL, &timeout);
-		signal(SIGCONT, old_handler);
 		sigprocmask(SIG_SETMASK, &old_signals, NULL);
+		signal(SIGCONT, old_handler);
 	} else {
 		signal(SIGCONT, old_handler);
 	}
@@ -577,12 +612,15 @@ void end_wrapper_epilogue(void)
 
 void exit(int status)
 {
+	if(!original_exit){
+		syscall(SYS_exit, status);
+	}
+
 	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();
 
 	debug(D_RMON, "%d about to call exit()\n", getpid());
 
-	__typeof__(exit) *original_exit = dlsym(RTLD_NEXT, "exit");
 	original_exit(status);
 
 	/* we exited in the above line. The next line is to make the compiler
@@ -598,12 +636,15 @@ void _exit(int status)
 	   will be ignored as the processes would no longer in the
 	   monitoring tables. */
 
+	if(!original_exit){
+		syscall(SYS_exit, status);
+	}
+
 	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();
 
 	debug(D_RMON, "%d about to call _exit()\n", getpid());
 
-	__typeof__(_exit) *original_exit = dlsym(RTLD_NEXT, "_exit");
 	original_exit(status);
 
 	/* we exit in the above line. The next line is to make the compiler
@@ -616,7 +657,11 @@ pid_t waitpid(pid_t pid, int *status, int options)
 {
 	int status_; //status might be NULL, thus we use status_ to retrive the state.
 	pid_t pidb;
-	__typeof__(waitpid) *original_waitpid = dlsym(RTLD_NEXT, "waitpid");
+
+	if(!original_waitpid) {
+		rmonitor_helper_initialize();
+		assert(original_waitpid);
+	}
 
 	debug(D_RMON, "waiting from %d for %d.\n", getpid(), pid);
 	pidb = original_waitpid(pid, &status_, options);
@@ -643,12 +688,17 @@ pid_t wait(int *status)
 	return waitpid(-1, status, 0);
 }
 
+#if defined(__clang__) || defined(__GNUC__)
+
+void __attribute__((constructor)) init() {
+	/* find the dlsym values when loading the library. */
+	rmonitor_helper_initialize();
+	assert(original_fork);
+}
 
 /* wrap main ensures exit_wrapper_preamble runs, and thus monitoring
 is done at least once */
-
-#if defined(__clang__) || defined(__GNUC__)
-void __attribute__((destructor)) init() {
+void __attribute__((destructor)) fini() {
 	/* we use default status of 0, since if command did not call exit
 	 * explicitely, that is the default. */
 	exit_wrapper_preamble(0);
