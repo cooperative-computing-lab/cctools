@@ -98,6 +98,10 @@ static char *batch_submit_options = NULL;
 static char *wrapper_command = 0;
 static char *wrapper_input = 0;
 static char *worker_command = 0;
+int time_execute_previous = 0;
+int time_transfer_previous = 0;
+int capacity_weighted_previous = 0;
+double alpha = 0.1;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -248,6 +252,78 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 
+		int capacity_tasks = jx_lookup_integer(j, "capacity_tasks");
+		int capacity_cores = jx_lookup_integer(j, "capacity_cores");
+		int capacity_memory = jx_lookup_integer(j, "capacity_memory");
+		int capacity_disk = jx_lookup_integer(j, "capacity_disk");
+		int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
+		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
+		int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
+		int time_execute = jx_lookup_integer(j, "time_workers_execute");
+		const int time_master = jx_lookup_integer(j, "time_master");
+		fprintf(stderr, "Inst: %d\nCap: %d\n", capacity_instantaneous, capacity_weighted);
+		const int cores = resources->cores;
+		const int memory = resources->memory;
+		const int disk = resources->disk;
+
+		int execute_delta = time_execute - time_execute_previous;
+		int transfer_delta = time_transfer - time_transfer_previous;
+		fprintf(stderr, "time_execute - time_execute_previous = %d - %d = %d\n", time_execute, time_execute_previous, execute_delta); 
+		//double time_execute_weighted;
+		//double time_transfer_weighted;
+		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
+
+		if(!positive_deltas) {
+			time_execute = time_execute_previous;
+			time_transfer = time_transfer_previous;
+		}
+
+		capacity_weighted = capacity_weighted_previous;
+		if(transfer_delta > 0) {
+			if(capacity_weighted_previous == 0) {
+				capacity_weighted = (int) (alpha * ((double) execute_delta / (double) (transfer_delta + time_master)));
+			}
+			else {
+				capacity_weighted = (int) (alpha * ((double) execute_delta / (double) (transfer_delta + time_master)) + ((1.0 - alpha) * capacity_weighted_previous));
+			}
+		}
+
+		if(positive_deltas) {
+			capacity_weighted_previous = capacity_weighted;
+			time_execute_previous = time_execute;
+			time_transfer_previous = time_transfer;
+			fprintf(stderr, "New previous values set.\n");
+		}
+
+		const int temp_capacity_tasks = capacity_tasks;
+		if(tasks_per_worker > 0) {
+			capacity_tasks = capacity_tasks / tasks_per_worker;
+		}
+		if(capacity_tasks <= 0) {
+			capacity_tasks = temp_capacity_tasks;
+		}
+		if(cores > 0) {
+			capacity_cores = capacity_cores / cores;
+		}
+		if(capacity_cores <= 0) {
+			capacity_cores = capacity_tasks;
+		}
+		if(memory > 0) {
+			capacity_memory = capacity_memory / memory;
+		}
+		if(capacity_memory <= 0) {
+			capacity_memory = capacity_tasks;
+		}
+		if(disk > 0) {
+			capacity_disk = capacity_disk / disk;
+		}
+		if(capacity_disk <= 0) {
+			capacity_disk = capacity_tasks;
+		}
+	
+		int capacity = MIN(capacity_weighted, MIN(capacity_tasks, MIN(capacity_cores, MIN(capacity_memory, capacity_disk))));
+		fprintf(stderr, "Execute: %d\nI/O: %d\nCapacity: %d\nMIN: %d\n", execute_delta, transfer_delta, capacity_weighted, capacity);
+>>>>>>> Modifies interaction between master and factory to get communication working
 		int tasks = tr+tw+tl;
 
 		// first assume one task per worker

@@ -2233,6 +2233,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"time_internal",info.time_internal);
 	jx_insert_integer(j,"time_polling",info.time_polling);
 	jx_insert_integer(j,"time_application",info.time_application);
+	jx_insert_integer(j, "time_master", ((info.time_status_msgs - info.prev_time_status_msgs) + (info.time_internal - info.prev_time_internal)));
 
 	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
 	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
@@ -2245,6 +2246,9 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
+	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
+	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
+	debug(D_BJ, "FLAGGED: %d\t%d\n", info.capacity_instantaneous, info.capacity_weighted);
 
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
@@ -3180,7 +3184,16 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
-			s->capacity_weighted = (int) ceil((s->capacity_weight * (tr->exec_time / tr->transfer_time)) + ((1 - s->capacity_weight) * s->previous_capacity_weighted));
+			int capacity_instantaneous = (int) ceil(((float) tr->exec_time) / tr->transfer_time + tr->master_time);
+			if(s->previous_capacity_weighted == 0) {
+				s->capacity_weighted = capacity_instantaneous;
+			}
+			else {
+				s->capacity_weighted = (int) ceil((s->capacity_weight * capacity_instantaneous) + ((1 - s->capacity_weight) * s->previous_capacity_weighted));
+			}
+			time_t ts;
+			time(&ts);
+			debug(D_BJ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d\n", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, s->tasks_running, s->workers_connected);
 			s->previous_capacity_weighted = s->capacity_weighted;
 			//q->stats->previous_capacity_weighted = s->capacity_weighted;
 		}
@@ -3199,7 +3212,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	s->capacity_instantaneous = 0;
 	s->capacity_weighted = (int) ceil(weighted_capacity);
 }
-
+/*
 static void compute_capacity_jr(const struct work_queue *q)
 {
 
@@ -3212,34 +3225,32 @@ static void compute_capacity_jr(const struct work_queue *q)
 		q->stats->previous_capacity_weighted = 0;
 	}
 
-	debug(D_BJ, "#   Execution     I/O        \n");
 	list_first_item(q->task_reports);
 	while((tr = list_next_item(q->task_reports))) {
 		total_io += tr->transfer_time + tr->master_time;
 		total_exec += tr->exec_time;
-		debug(D_BJ, "# %11"PRId64" %11"PRId64"\n", tr->exec_time, tr->transfer_time + tr->master_time);
 	}
 	// Sum up the task reports available.
 	tr = list_peek_tail(q->task_reports);
-	int64_t delta_exec = total_exec - tr->exec_time;
-	int64_t delta_io = total_io - (tr->transfer_time + tr->master_time);
-	debug(D_BJ, "delta_exec = %"PRId64" - %"PRId64" = %"PRId64"\tdelta_io = %"PRId64" - %"PRId64" = %"PRId64"\n", total_exec, tr->exec_time, delta_exec, total_io, tr->transfer_time + tr->master_time, delta_io);
 	if(tr->transfer_time > 0) {
-		capacity_weighted = (int) ceil((alpha * (tr->exec_time / tr->transfer_time + tr->master_time)) + ((1 - alpha) * q->stats->previous_capacity_weighted));
-		capacity_cumulative = (int) ceil(((float) total_exec) / total_io);
 		capacity_instantaneous = (int) ceil(((float) tr->exec_time) / tr->transfer_time + tr->master_time);
-		if(delta_io > 0) {
-			capacity_test = (int) ceil((alpha * (tr->exec_time / tr->transfer_time + tr->master_time)) + ((1 - alpha) * (((float) delta_exec) / delta_io)));
+		if(q->stats->previous_capacity_weighted == 0) {
+			capacity_weighted = capacity_instantaneous;
 		}
+		else {
+			capacity_weighted = (int) ceil((alpha * capacity_instantaneous) + ((1 - alpha) * q->stats->previous_capacity_weighted));
+		}
+		capacity_cumulative = (int) ceil(((float) total_exec) / total_io);
 		debug(D_BJ, "Weighted Capacity = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * %d) = %d\n", alpha, tr->exec_time, tr->transfer_time + tr->master_time, alpha, q->stats->previous_capacity_weighted, capacity_weighted);
 		debug(D_BJ, "Cumulative Capacity = (%"PRId64" / %"PRId64") = %d\n", total_exec, total_io, capacity_cumulative);
 		debug(D_BJ, "Instantaneous Capacity = (%"PRId64" / %"PRId64")) = %d\n", tr->exec_time, tr->transfer_time + tr->master_time, capacity_instantaneous);
-		debug(D_BJ, "Weighted Capacity Revised = (%f * (%"PRId64" / %"PRId64")) + ((1 - %f) * (%"PRId64" / %"PRId64")) = %d\n", alpha, tr->exec_time, tr->transfer_time + tr->master_time, alpha, delta_exec, delta_io, capacity_test);
-		debug(D_BJ, "\nCAPACITY: %"PRId64" %"PRId64" %"PRId64"\n", tr->exec_time, tr->transfer_time, tr->master_time);
+		time_t ts;
+		time(&ts);
+		debug(D_BJ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d\n", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, q->stats->tasks_running, q->stats->workers_connected);
 		q->stats->previous_capacity_weighted = capacity_weighted;
 	}
 }
-
+*/
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
 	/* worker has no reported any resources yet */
@@ -4758,6 +4769,9 @@ struct work_queue *work_queue_create(int port)
 	q->time_last_wait = timestamp_get();
 
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
+	time_t ts;
+	time(&ts);
+	debug(D_BJ, "\nENGAGE: %lld\n", (long long) ts);
 	return q;
 }
 
@@ -5216,8 +5230,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 	// insert to corresponding table
 	debug(D_WQ, "Task %d state change: %s (%d) to %s (%d)\n", t->taskid, task_state_str(old_state), old_state, task_state_str(new_state), new_state);
 
-	//struct work_queue_stats *s = malloc(sizeof(struct work_queue_stats));
-	//work_queue_get_stats(q, s);
 	switch(new_state) {
 		case WORK_QUEUE_TASK_READY:
 			update_task_result(t, WORK_QUEUE_RESULT_UNKNOWN);
@@ -5225,7 +5237,9 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			break;
 		case WORK_QUEUE_TASK_DONE:
 			if(t->result == WORK_QUEUE_RESULT_SUCCESS) {
-				compute_capacity_jr(q);
+				struct work_queue_stats *s = malloc(sizeof(struct work_queue_stats));
+				work_queue_get_stats(q, s);
+				compute_capacity(q, s);
 			}
 			//work_queue_get_stats(q, s);
 			//log_queue_stats(q);
@@ -6090,7 +6104,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	}
 
 	//s->capacity_ratio, s->capacity_cores, s->capacity_memory, s->capacity_disk:
-	compute_capacity(q, s);
+	//compute_capacity(q, s);
 
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);
