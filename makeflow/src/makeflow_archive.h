@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include "sha1.h"
 #include "list.h"
 
+#define MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY "/tmp/makeflow.archive."
+
 /* Given a node, generate the archive_id from the input files and command */
 void makeflow_archive_node_generate_id(struct dag_node *n, char *command, struct list*inputs);
 

@@ -19,8 +19,6 @@ See the file COPYING for details.
 
 #include <stdio.h>
 
-#define ARCHIVING_DEFAULT_DIRECTORY "/tmp/makeflow.archive."
-
 struct dag {
 	/* Static properties of the DAG */
 	char *filename;                    /* Source makeflow file path. */
