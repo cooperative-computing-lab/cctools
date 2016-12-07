@@ -51,7 +51,7 @@ struct dag *dag_create()
 	d->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	d->cache_dir = NULL;
 
-	d->archive_directory = ARCHIVING_DEFAULT_DIRECTORY;
+	d->archive_directory = NULL;
 	d->should_read_archive = 0;
 	d->should_write_to_archive = 0;
 
