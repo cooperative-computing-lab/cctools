@@ -641,8 +641,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	}
 
 	free(command);
-	free(input_list);
-	free(output_list);
+	list_delete(input_list);
+	list_delete(output_list);
 	free(input_files);
 	free(output_files);
 	jx_delete(envlist);
@@ -889,14 +889,14 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			makeflow_archive_populate(d, n, command, input_list, outputs, info);
 
 			free(command);
-			free(input_list);
 			free(input_files);
-			free(outputs);
 			free(output_files);
+			list_delete(input_list);
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
+	list_delete(outputs);
 }
 
 /*
