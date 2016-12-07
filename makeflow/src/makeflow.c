@@ -535,6 +535,29 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
+/* Apply wrappers to command and input/output lists */
+static  void makeflow_apply_wrapper(struct dag_node *n, struct batch_queue *queue, struct list **input_list, struct list **output_list, char **input_files, char **output_files, char **command) {
+	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
+
+	if (*input_list == NULL) {
+		*input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	}
+
+	if (*output_list == NULL) {
+		*output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	}
+
+	/* Create strings for all the files mentioned by this node. */
+	*input_files  = makeflow_file_list_format(n, 0, *input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
+	*output_files = makeflow_file_list_format(n, 0, *output_list, queue, wrapper, monitor, enforcer, wrapper_umbrella);
+
+	*command = strdup(n->command);
+	*command = makeflow_wrap_wrapper(*command, n, wrapper);
+	*command = makeflow_wrap_enforcer(*command, n, enforcer, *input_list, *output_list);
+	*command = makeflow_wrap_umbrella(*command, n, wrapper_umbrella, queue, *input_files, *output_files);
+	*command = makeflow_wrap_monitor(*command, n, queue, monitor);
+}
+
 /*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
@@ -545,6 +568,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
 	struct dag_file *f;
+	struct list *input_list = NULL, *output_list = NULL;
+	char *input_files = NULL, *output_files = NULL, *command = NULL;
 
 	if(n->local_job && local_queue) {
 		queue = local_queue;
@@ -552,21 +577,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
-
-	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
-	struct list *output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
-
-	/* Create strings for all the files mentioned by this node. */
-	char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
-	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor, enforcer, wrapper_umbrella);
-
-	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	char *command = strdup(n->command);
-	command = makeflow_wrap_wrapper(command, n, wrapper);
-	command = makeflow_wrap_enforcer(command, n, enforcer, input_list, output_list);
-	command = makeflow_wrap_umbrella(command, n, wrapper_umbrella, queue, input_files, output_files);
-	command = makeflow_wrap_monitor(command, n, queue, monitor);
+	makeflow_apply_wrapper(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -870,25 +881,17 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* store node into archiving directory  */
 		if (d->should_write_to_archive) {
 			printf("archiving node within archiving directory\n");
-			makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
+			struct list *input_list = NULL;
+			char *input_files = NULL, *output_files = NULL, *command = NULL;
 
-			struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+			makeflow_apply_wrapper(n, queue, &input_list, &outputs, &input_files, &output_files, &command);
 
-			/* Create strings for all the files mentioned by this node. */
-			char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
-			char *output_files = makeflow_file_list_format(n, 0, outputs, queue, wrapper, monitor, enforcer, wrapper_umbrella);
-
-			/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-			char *command = strdup(n->command);
-			command = makeflow_wrap_wrapper(command, n, wrapper);
-			command = makeflow_wrap_enforcer(command, n, enforcer, input_list, outputs);
-			command = makeflow_wrap_umbrella(command, n, wrapper_umbrella, queue, input_files, output_files);
-			command = makeflow_wrap_monitor(command, n, queue, monitor);
 			makeflow_archive_populate(d, n, command, input_list, outputs, info);
 
 			free(command);
 			free(input_list);
 			free(input_files);
+			free(outputs);
 			free(output_files);
 		}
 
