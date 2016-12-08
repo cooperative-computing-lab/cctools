@@ -45,6 +45,14 @@ See the file COPYING for details.
 #define TCP_HIGH_PORT_DEFAULT 32767
 #endif
 
+#ifndef SOCKLEN_T
+#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX) || defined(__MUSL__)
+#define SOCKLEN_T socklen_t
+#else
+#define SOCKLEN_T int
+#endif
+#endif
+
 enum link_type {
 	LINK_TYPE_STANDARD,
 	LINK_TYPE_FILE,
@@ -333,30 +341,36 @@ struct link *link_attach_to_fd(int fd)
 	return l;
 }
 
-static int string_to_sockaddr( const char *str, int port, struct sockaddr_storage *addr )
+static int string_to_sockaddr( const char *str, int port, struct sockaddr_storage *addr, SOCKLEN_T *length )
 {
+	memset(addr,0,sizeof(*addr));
 
 	struct sockaddr_in *ipv4 = (struct sockaddr_in *)addr;
 	struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)addr;
 
-	memset(ipv6,0,sizeof(*ipv6));
-
 	if(!str) {
-		// XXX need to check for default address mode
-		ipv4->sin_addr.s_addr = htonl(INADDR_ANY);
-		ipv4->sin_port = htons(port);
+		// When the address is unspecified, we are
+		// attempting to bind a listening socket to
+		// any avaialble address.  IN6ADDR_ANY accepts
+		// both ipv4 and ipv6 binds.
+		*length = sizeof(*ipv6);
+		ipv6->sin6_family = AF_INET6;
+		ipv6->sin6_addr = in6addr_any;
+		ipv6->sin6_port = htons(port);
 #if defined(CCTOOLS_OPSYS_DARWIN)
-		ipv4->sin_len = sizeof(*ipv4);
+		ipv6->sin6_len = sizeof(*ipv6);
 #endif
-		return AF_INET;
-	} else if(inet_pton(AF_INET,str,&ipv4->sin_addr)) {
+		return AF_INET6;
+	} else if(inet_pton(AF_INET,str,&ipv4->sin_addr)==1) {
+		*length = sizeof(*ipv4);
 		ipv4->sin_family = AF_INET;
 		ipv4->sin_port = htons(port);
 #if defined(CCTOOLS_OPSYS_DARWIN)
 		ipv4->sin_len = sizeof(*ipv4);
 #endif
 		return AF_INET;
-	} else if(inet_pton(AF_INET6,str,&ipv6->sin6_addr)) {
+	} else if(inet_pton(AF_INET6,str,&ipv6->sin6_addr)==1) {
+		*length = sizeof(*ipv6);
 		ipv6->sin6_family = AF_INET6;
 		ipv6->sin6_port = htons(port);
 		ipv6->sin6_len = sizeof(*ipv6);
@@ -388,10 +402,11 @@ struct link *link_serve_address(const char *addr, int port)
 {
 	struct link *link = 0;
 	struct sockaddr_storage address;
+	SOCKLEN_T address_length;
 	int success;
 	int value;
 
-	if(!string_to_sockaddr(addr,port,&address)) {
+	if(!string_to_sockaddr(addr,port,&address,&address_length)) {
 		goto failure;
 	}
 
@@ -433,7 +448,7 @@ struct link *link_serve_address(const char *addr, int port)
 
 	for (port = low; port <= high; port++) {
 		sockaddr_set_port(&address,port);
-		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
+		success = bind(link->fd, (struct sockaddr *) &address, address_length );
 		if(success == -1) {
 			if(errno == EADDRINUSE) {
 				//If a port is specified, fail!
@@ -503,11 +518,12 @@ struct link *link_accept(struct link *master, time_t stoptime)
 struct link *link_connect(const char *addr, int port, time_t stoptime)
 {
 	struct sockaddr_storage address;
+	SOCKLEN_T address_length;
 	struct link *link = 0;
 	int result;
 	int save_errno;
 
-	if(!string_to_sockaddr(addr,port,&address)) goto failure;
+	if(!string_to_sockaddr(addr,port,&address,&address_length)) goto failure;
 
 	link = link_create();
 	if(!link)
@@ -534,7 +550,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	while(1) {
 		// First attempt a non-blocking connect
-		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
+		result = connect(link->fd, (struct sockaddr *) &address, address_length);
 
 		// On many platforms, non-blocking connect sets errno in unexpected ways:
 
@@ -869,19 +885,14 @@ int link_fd(struct link *link)
 	return link->fd;
 }
 
-#ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX) || defined(__MUSL__)
-#define SOCKLEN_T socklen_t
-#else
-#define SOCKLEN_T int
-#endif
-#endif
-
 int link_address_local(struct link *link, char *addr, int *port)
 {
-	struct sockaddr_in iaddr;
-	SOCKLEN_T length;
-	int result;
+        struct sockaddr_storage iaddr;
+        SOCKLEN_T length;
+        int result;
+        SOCKLEN_T addr_length = LINK_ADDRESS_MAX;
+        char port_string[16];
+        SOCKLEN_T port_string_length = 16;
 
 	if(link->type == LINK_TYPE_FILE) {
 		return 0;
@@ -892,17 +903,25 @@ int link_address_local(struct link *link, char *addr, int *port)
 	if(result != 0)
 		return 0;
 
-	*port = ntohs(iaddr.sin_port);
-	string_from_ip_address((unsigned char *) &iaddr.sin_addr, addr);
+        result = getnameinfo((struct sockaddr *)&iaddr,length,addr,addr_length,port_string,port_string_length,NI_NUMERICHOST|NI_NUMERICSERV);
+        if(result==0) {
+                *port = atoi(port_string);
+                return 1;
+        } else {
+                return 0;
+        }
 
 	return 1;
 }
 
 int link_address_remote(struct link *link, char *addr, int *port)
 {
-	struct sockaddr_in iaddr;
+	struct sockaddr_storage iaddr;
 	SOCKLEN_T length;
 	int result;
+	SOCKLEN_T addr_length = LINK_ADDRESS_MAX;
+	char port_string[16];
+	SOCKLEN_T port_string_length = 16;
 
 	if(link->type == LINK_TYPE_FILE) {
 		return 0;
@@ -913,10 +932,13 @@ int link_address_remote(struct link *link, char *addr, int *port)
 	if(result != 0)
 		return 0;
 
-	*port = ntohs(iaddr.sin_port);
-	string_from_ip_address((unsigned char *) &iaddr.sin_addr, addr);
-
-	return 1;
+	result = getnameinfo((struct sockaddr *)&iaddr,length,addr,addr_length,port_string,port_string_length,NI_NUMERICHOST|NI_NUMERICSERV);
+	if(result==0) {
+		*port = atoi(port_string);
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 ssize_t link_stream_to_buffer(struct link * link, char **buffer, time_t stoptime)
