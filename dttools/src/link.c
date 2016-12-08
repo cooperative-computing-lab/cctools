@@ -333,6 +333,52 @@ struct link *link_attach_to_fd(int fd)
 	return l;
 }
 
+static int string_to_sockaddr( const char *str, int port, struct sockaddr_storage *addr )
+{
+
+	struct sockaddr_in *ipv4 = (struct sockaddr_in *)addr;
+	struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)addr;
+
+	memset(ipv6,0,sizeof(*ipv6));
+
+	if(!str) {
+		// XXX need to check for default address mode
+		ipv4->sin_addr.s_addr = htonl(INADDR_ANY);
+		ipv4->sin_port = htons(port);
+#if defined(CCTOOLS_OPSYS_DARWIN)
+		ipv4->sin_len = sizeof(*ipv4);
+#endif
+		return AF_INET;
+	} else if(inet_pton(AF_INET,str,&ipv4->sin_addr)) {
+		ipv4->sin_family = AF_INET;
+		ipv4->sin_port = htons(port);
+#if defined(CCTOOLS_OPSYS_DARWIN)
+		ipv4->sin_len = sizeof(*ipv4);
+#endif
+		return AF_INET;
+	} else if(inet_pton(AF_INET6,str,&ipv6->sin6_addr)) {
+		ipv6->sin6_family = AF_INET6;
+		ipv6->sin6_port = htons(port);
+		ipv6->sin6_len = sizeof(*ipv6);
+		return AF_INET6;
+	} else {
+		return 0;
+	}
+}
+
+void sockaddr_set_port( struct sockaddr_storage *addr, int port )
+{
+        if(addr->ss_family==AF_INET) {
+                struct sockaddr_in *s = (struct sockaddr_in *)addr;
+                s->sin_port = htons(port);
+        } else if(addr->ss_family==AF_INET6) {
+                struct sockaddr_in6 *s = (struct sockaddr_in6 *)addr;
+                s->sin6_port = htons(port);
+        } else {
+                fatal("sockaddr_set_port: unexpected address family %d\n",addr);
+        }
+}               
+
 struct link *link_serve(int port)
 {
 	return link_serve_address(0, port);
@@ -341,15 +387,19 @@ struct link *link_serve(int port)
 struct link *link_serve_address(const char *addr, int port)
 {
 	struct link *link = 0;
-	struct sockaddr_in address;
+	struct sockaddr_storage address;
 	int success;
 	int value;
+
+	if(!string_to_sockaddr(addr,port,&address)) {
+		goto failure;
+	}
 
 	link = link_create();
 	if(!link)
 		goto failure;
 
-	link->fd = socket(AF_INET, SOCK_STREAM, 0);
+	link->fd = socket(address.ss_family, SOCK_STREAM, 0);
 	if(link->fd < 0)
 		goto failure;
 
@@ -364,18 +414,6 @@ struct link *link_serve_address(const char *addr, int port)
 	setsockopt(link->fd, SOL_SOCKET, SO_REUSEADDR, (void *) &value, sizeof(value));
 
 	link_window_configure(link);
-
-	memset(&address, 0, sizeof(address));
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	address.sin_family = AF_INET;
-
-	if(addr) {
-		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
-	} else {
-		address.sin_addr.s_addr = htonl(INADDR_ANY);
-	}
 
 	int low = TCP_LOW_PORT_DEFAULT;
 	int high = TCP_HIGH_PORT_DEFAULT;
@@ -394,7 +432,7 @@ struct link *link_serve_address(const char *addr, int port)
 		fatal("high port %d is less than low port %d in range", high, low);
 
 	for (port = low; port <= high; port++) {
-		address.sin_port = htons(port);
+		sockaddr_set_port(&address,port);
 		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
 		if(success == -1) {
 			if(errno == EADDRINUSE) {
@@ -462,52 +500,14 @@ struct link *link_accept(struct link *master, time_t stoptime)
 	return 0;
 }
 
-static int string_to_sockaddr( const char *str, int port, struct sockaddr *addr )
-{
-
-	struct sockaddr_in *ipv4 = (struct sockaddr_in *)addr;
-	struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)addr;
-
-	memset(ipv6,0,sizeof(*ipv6));
-
-	if(inet_pton(AF_INET,str,&ipv4->sin_addr)) {
-		ipv4->sin_family = AF_INET;
-		ipv4->sin_port = htons(port);
-#if defined(CCTOOLS_OPSYS_DARWIN)
-		ipv4->sin_len = sizeof(*ipv4);
-#endif
-		return AF_INET;
-	} else if(inet_pton(AF_INET6,str,&ipv6->sin6_addr)) {
-		ipv6->sin6_family = AF_INET6;
-		ipv6->sin6_port = htons(port);
-		ipv6->sin6_len = sizeof(*ipv6);
-		return AF_INET6;
-	} else {
-		return 0;
-	}
-}
-
 struct link *link_connect(const char *addr, int port, time_t stoptime)
 {
-	struct sockaddr_in6 ipv6addr;
-	struct sockaddr *address = (struct sockaddr *)&ipv6addr;
-	int address_size;
+	struct sockaddr_storage address;
 	struct link *link = 0;
 	int result;
 	int save_errno;
 
-	if(!string_to_sockaddr(addr,port,address)) goto failure;
-
-	switch(address->sa_family) {
-	case AF_INET:
-		address_size = sizeof(struct sockaddr_in);
-		break;
-	case AF_INET6:
-		address_size = sizeof(struct sockaddr_in6);
-		break;
-	default:
-		goto failure;
-	}
+	if(!string_to_sockaddr(addr,port,&address)) goto failure;
 
 	link = link_create();
 	if(!link)
@@ -515,7 +515,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	link_squelch();
 
-	link->fd = socket(address->sa_family, SOCK_STREAM, 0);
+	link->fd = socket(address.ss_family, SOCK_STREAM, 0);
 	if(link->fd < 0)
 		goto failure;
 
@@ -534,7 +534,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	while(1) {
 		// First attempt a non-blocking connect
-		result = connect(link->fd, (struct sockaddr *) &address, address_size);
+		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
 
 		// On many platforms, non-blocking connect sets errno in unexpected ways:
 
