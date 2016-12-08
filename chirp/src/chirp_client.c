@@ -341,6 +341,59 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 	return client;
 }
 
+static int strcount( const char *s, char c )
+{
+	int count=0;
+	while(*s) {
+		if(*s++==c) count++;
+	}
+	return count;
+}
+
+/*
+The hostport parameter may have an optional port number
+separated from the host by a colon.  The meaning of this
+was clear in the IPV4 days, because the possible formats
+were this:
+
+domain.name
+domain.name:1234
+100.200.300.400
+100.200.300.400:1234
+
+Now that IPV6 is a possibility, parsing is complicated b/c
+the address itself can contain colons.  The custom is to
+surround the address with brackets when a port is given.
+So, we must also catch these formats:
+
+100:200:300::400:500
+[100:200:300::400:500]:1234
+*/
+
+static int parse_hostport( const char *hostport, char *host, int * port )
+{
+	*port = CHIRP_PORT;
+
+	int c = strcount(hostport,':');
+	if(c==0) {
+		strcpy(host,hostport);
+		return 1;
+	} else if(c==1) {
+		if(sscanf(hostport,"%[^:]:%d",host,port)==2) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} else {
+		if(sscanf(hostport,"[%[^]]]:%d",host,port)==2) {
+			return 1;
+		} else {
+			strcpy(host,hostport);
+			return 1;
+		}
+	}
+}
+
 struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_auth, time_t stoptime)
 {
 	struct chirp_client *c;
@@ -349,11 +402,9 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 	int save_errno;
 	int port;
 
-	if(sscanf(hostport, "%[^:]:%d", host, &port) == 2) {
-		/* use the split host and port */
-	} else {
-		strcpy(host, hostport);
-		port = CHIRP_PORT;
+	if(!parse_hostport(hostport,host,&port)) {
+		errno = EINVAL;
+		return 0;
 	}
 
 	if(!domain_name_cache_lookup(host, addr)) {
