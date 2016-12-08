@@ -1,6 +1,6 @@
 #!/bin/sh
 
-EXTERNAL="/afs/crc.nd.edu/group/ccl/software/cctools-dependencies"
+EXTERNAL="/afs/crc.nd.edu/group/ccl/software"
 
 # Our external packages are installed in $EXTERNAL/$SYS/$SUBTYPE/packagename
 # Where $SYS is the output of `uname -m` usually something like x86_64 or i686,
@@ -27,7 +27,7 @@ detect_packages()
 	PACKAGES_CONFIG=""
 	for package in fuse irods mysql python perl globus swig xrootd cvmfs uuid
 	do
-	packagepath=$EXTERNAL/${SYS}/$subtype/$package
+	packagepath=$EXTERNAL/${SYS}/$subtype/$package/cctools-dep
 
 	if [ -d $packagepath ]
 		then
