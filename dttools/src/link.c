@@ -295,7 +295,7 @@ struct link *link_attach(int fd)
 	l->fd = fd;
 
 	if(link_address_remote(l, l->raddr, &l->rport)) {
-		debug(D_TCP, "attached to %s:%d", l->raddr, l->rport);
+		debug(D_TCP, "attached to %s port %d", l->raddr, l->rport);
 		return l;
 	} else {
 		l->fd = -1;
@@ -452,7 +452,7 @@ struct link *link_accept(struct link *master, time_t stoptime)
 		goto failure;
 	link_squelch();
 
-	debug(D_TCP, "got connection from %s:%d", link->raddr, link->rport);
+	debug(D_TCP, "got connection from %s port %d", link->raddr, link->rport);
 
 	return link;
 
@@ -462,12 +462,52 @@ struct link *link_accept(struct link *master, time_t stoptime)
 	return 0;
 }
 
+static int string_to_sockaddr( const char *str, int port, struct sockaddr *addr )
+{
+
+	struct sockaddr_in *ipv4 = (struct sockaddr_in *)addr;
+	struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)addr;
+
+	memset(ipv6,0,sizeof(*ipv6));
+
+	if(inet_pton(AF_INET,str,&ipv4->sin_addr)) {
+		ipv4->sin_family = AF_INET;
+		ipv4->sin_port = htons(port);
+#if defined(CCTOOLS_OPSYS_DARWIN)
+		ipv4->sin_len = sizeof(*ipv4);
+#endif
+		return AF_INET;
+	} else if(inet_pton(AF_INET6,str,&ipv6->sin6_addr)) {
+		ipv6->sin6_family = AF_INET6;
+		ipv6->sin6_port = htons(port);
+		ipv6->sin6_len = sizeof(*ipv6);
+		return AF_INET6;
+	} else {
+		return 0;
+	}
+}
+
 struct link *link_connect(const char *addr, int port, time_t stoptime)
 {
-	struct sockaddr_in address;
+	struct sockaddr_in6 ipv6addr;
+	struct sockaddr *address = (struct sockaddr *)&ipv6addr;
+	int address_size;
 	struct link *link = 0;
 	int result;
 	int save_errno;
+
+	if(!string_to_sockaddr(addr,port,address)) goto failure;
+
+	switch(address->sa_family) {
+	case AF_INET:
+		address_size = sizeof(struct sockaddr_in);
+		break;
+	case AF_INET6:
+		address_size = sizeof(struct sockaddr_in6);
+		break;
+	default:
+		goto failure;
+	}
 
 	link = link_create();
 	if(!link)
@@ -475,17 +515,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	link_squelch();
 
-	memset(&address, 0, sizeof(address));
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	address.sin_family = AF_INET;
-	address.sin_port = htons(port);
-
-	if(!string_to_ip_address(addr, (unsigned char *) &address.sin_addr))
-		goto failure;
-
-	link->fd = socket(AF_INET, SOCK_STREAM, 0);
+	link->fd = socket(address->sa_family, SOCK_STREAM, 0);
 	if(link->fd < 0)
 		goto failure;
 
@@ -500,11 +530,11 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		goto failure;
 #endif
 
-	debug(D_TCP, "connecting to %s:%d", addr, port);
+	debug(D_TCP, "connecting to %s port %d", addr, port);
 
 	while(1) {
 		// First attempt a non-blocking connect
-		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
+		result = connect(link->fd, (struct sockaddr *) &address, address_size);
 
 		// On many platforms, non-blocking connect sets errno in unexpected ways:
 
@@ -520,7 +550,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 		// If the remote address is valid, we are connected no matter what.
 		if(link_address_remote(link, link->raddr, &link->rport)) {
-			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
+			debug(D_TCP, "made connection to %s port %d", link->raddr, link->rport);
 #ifdef CCTOOLS_OPSYS_CYGWIN
 			link_nonblocking(link, 1);
 #endif
@@ -541,7 +571,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 	}
 
 
-	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
+	debug(D_TCP, "connection to %s port %d failed (%s)", addr, port, strerror(errno));
 
 failure:
 	save_errno = errno;
@@ -822,7 +852,7 @@ void link_close(struct link *link)
 		if(link->fd >= 0)
 			close(link->fd);
 		if(link->rport)
-			debug(D_TCP, "disconnected from %s:%d", link->raddr, link->rport);
+			debug(D_TCP, "disconnected from %s port %d", link->raddr, link->rport);
 		free(link);
 	}
 }
