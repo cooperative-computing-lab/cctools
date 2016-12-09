@@ -1,6 +1,7 @@
 #include "address.h"
 #include <string.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 
 int address_to_sockaddr( const char *str, int port, struct sockaddr_storage *addr, SOCKLEN_T *length )
 {
@@ -42,4 +43,58 @@ int address_to_sockaddr( const char *str, int port, struct sockaddr_storage *add
 		return 0;
 	}
 }
+
+static int strcount( const char *s, char c )
+{
+	int count=0;
+	while(*s) {
+		if(*s++==c) count++;
+	}
+	return count;
+}
+
+/*
+The hostport parameter may have an optional port number
+separated from the host by a colon.  The meaning of this
+was clear in the IPV4 days, because the possible formats
+were this:
+
+domain.name
+domain.name:1234
+100.200.300.400
+100.200.300.400:1234
+
+Now that IPV6 is a possibility, parsing is complicated b/c
+the address itself can contain colons.  The custom is to
+surround the address with brackets when a port is given.
+So, we must also catch these formats:
+
+100:200:300::400:500
+[100:200:300::400:500]:1234
+*/
+
+int address_parse_hostport( const char *hostport, char *host, int *port, int default_port )
+{
+	*port = default_port;
+
+	int c = strcount(hostport,':');
+	if(c==0) {
+		strcpy(host,hostport);
+		return 1;
+	} else if(c==1) {
+		if(sscanf(hostport,"%[^:]:%d",host,port)==2) {
+			return 1;
+		} else {
+			return 0;
+		}
+	} else {
+		if(sscanf(hostport,"[%[^]]]:%d",host,port)==2) {
+			return 1;
+		} else {
+			strcpy(host,hostport);
+			return 1;
+		}
+	}
+}
+
 

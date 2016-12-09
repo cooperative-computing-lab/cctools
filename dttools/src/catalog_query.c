@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "domain_name.h"
 #include "set.h"
 #include "list.h"
+#include "address.h"
 
 struct catalog_query {
 	struct jx *data;
@@ -41,16 +42,9 @@ static struct set *down_hosts = NULL;
 const char *parse_hostlist(const char *hosts, char *host, int *port)
 {
 	const char *next = strchr(hosts, ',');
-	switch (sscanf(hosts, "%[^:,]:%d", host, port)) {
-	case 1:
-		*port = CATALOG_PORT;
-		break;
-	case 2:
-		break;
-	default:
+	if(!address_parse_hostport(hosts,host,port,CATALOG_PORT)) {
 		debug(D_DEBUG, "bad host specification: %s", hosts);
 		return NULL;
-		break;
 	}
 	return next ? next + 1 : NULL;
 }

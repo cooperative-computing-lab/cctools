@@ -14,4 +14,6 @@
 
 int address_to_sockaddr( const char *addr, int port, struct sockaddr_storage *s, SOCKLEN_T *length );
 
+int address_parse_hostport( const char *hostport, char *host, int *port, int default_port );
+
 #endif
