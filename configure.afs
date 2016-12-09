@@ -1,33 +1,30 @@
-#!/bin/sh
-
+#!/bin/sh -e
 EXTERNAL="/afs/crc.nd.edu/group/ccl/software"
 
-# Our external packages are installed in $EXTERNAL/$SYS/$SUBTYPE/packagename
-# Where $SYS is the output of `uname -m` usually something like x86_64 or i686,
-# and $SUBTYPE is something like redhat5 or redhat6.
+if [ ! -d "${EXTERNAL}" ]
+then
+    cat <<EOF
+This configure script is tailored to compile CCTools at Notre Dame with all of
+the optional packages enabled. It may be of little use outside Notre Dame.
+EOF
+fi
 
-SYS=`uname -m`
+# Our external packages are installed in $EXTERNAL/PLATFORM/packagename/cctools-dep
+PLATFORM=$(${EXTERNAL}/cclplatform.sh)
+echo "platform is ${PLATFORM}"
 
 detect_packages()
 {
+        # cleanup GLOBUS_LOCATION
 	unset GLOBUS_LOCATION
 	export GLOBUS_LOCATION
-
-	echo "platform is ${SYS}"
-
-	if [ -f /etc/redhat-release ]
-	then
-		major=`cat /etc/redhat-release | awk '{print $7'} | awk -F. '{print $1}'`
-	subtype=redhat$major
-	echo "subtype is $subtype"
-	fi
 
 	echo "$0: Detecting packages ..."
 
 	PACKAGES_CONFIG=""
 	for package in fuse irods mysql python perl globus swig xrootd cvmfs uuid
 	do
-	packagepath=$EXTERNAL/${SYS}/$subtype/$package/cctools-dep
+	packagepath=$EXTERNAL/${PLATFORM}/$package/cctools-dep
 
 	if [ -d $packagepath ]
 		then
