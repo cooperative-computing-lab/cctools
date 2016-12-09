@@ -7,11 +7,12 @@ then
 This configure script is tailored to compile CCTools at Notre Dame with all of
 the optional packages enabled. It may be of little use outside Notre Dame.
 EOF
+    PLATFORM=nosuchplatform
+else
+    # Our external packages are installed in $EXTERNAL/PLATFORM/packagename/cctools-dep
+    PLATFORM=$(${EXTERNAL}/cclplatform.sh)
+    echo "platform is ${PLATFORM}"
 fi
-
-# Our external packages are installed in $EXTERNAL/PLATFORM/packagename/cctools-dep
-PLATFORM=$(${EXTERNAL}/cclplatform.sh)
-echo "platform is ${PLATFORM}"
 
 detect_packages()
 {
