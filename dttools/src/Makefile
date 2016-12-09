@@ -2,6 +2,7 @@ include ../../config.mk
 include ../../rules.mk
 
 SOURCES = \
+	address.c \
 	auth.c \
 	auth_address.c \
 	auth_all.c \

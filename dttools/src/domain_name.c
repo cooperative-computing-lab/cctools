@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "address.h"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -32,26 +33,21 @@ See the file COPYING for details.
 
 int domain_name_lookup_reverse(const char *addr, char *name)
 {
-	struct in_addr iaddr;
 	int err;
-
-	struct sockaddr_in saddr; //replace with sockaddr_in6 for ipv6
-	char host[DOMAIN_NAME_MAX];
+	struct sockaddr_storage saddr;
+	SOCKLEN_T saddr_length;
 
 	debug(D_DNS, "looking up addr %s", addr);
 
-	if(!string_to_ip_address(addr, (unsigned char *) &iaddr)) {
+	if(!address_to_sockaddr(addr,0,&saddr,&saddr_length)) {
 		debug(D_DNS, "%s is not a valid addr", addr);
 		return 0;
 	}
-	saddr.sin_addr = iaddr;
-	saddr.sin_family = AF_INET;
 
-	if ((err = getnameinfo((struct sockaddr *) &saddr, sizeof(saddr), host, sizeof(host), NULL, 0, 0)) != 0){
+	if ((err = getnameinfo((struct sockaddr *) &saddr, sizeof(saddr), name, DOMAIN_NAME_MAX,0,0,0)) !=0 ) {
 		debug(D_DNS, "couldn't look up %s: %s", addr, gai_strerror(err));
 		return 0;
 	}
-	strcpy(name, host);
 	debug(D_DNS, "%s is %s", addr, name);
 
 	return 1;
