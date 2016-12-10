@@ -44,6 +44,23 @@ int address_to_sockaddr( const char *str, int port, struct sockaddr_storage *add
 	}
 }
 
+int address_from_sockaddr( char *str, struct sockaddr *saddr )
+{
+	if(saddr->sa_family==AF_INET) {
+		struct sockaddr_in *sin = (struct sockaddr_in *)saddr;
+		struct in_addr *ipaddr = &(sin->sin_addr);
+		inet_ntop(saddr->sa_family, ipaddr, str, IP_ADDRESS_MAX);
+		return 1;
+	} else if(saddr->sa_family==AF_INET6) {
+		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)saddr;
+		struct in6_addr *ipaddr = &(sin->sin6_addr);
+		inet_ntop(saddr->sa_family, ipaddr, str, IP_ADDRESS_MAX);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 static int strcount( const char *s, char c )
 {
 	int count=0;
