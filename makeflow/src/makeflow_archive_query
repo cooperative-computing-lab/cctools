@@ -207,7 +207,10 @@ def parse_args():
       assert False, "unhandled option"
   if len(opts) == 0 or (len(opts) == 1 and opts[0][0] == '--path'):
     arg_map['info'] = True
-  arg_map['file'] = args[0]
+  try:
+    arg_map['file'] = args[0]
+  except IndexError:
+    usage()
   if not arg_map['file'] or not os.path.isfile(arg_map['file']):
     print "Cannot find file %s" %(arg_map['file'])
     usage()
