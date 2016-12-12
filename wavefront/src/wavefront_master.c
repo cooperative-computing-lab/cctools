@@ -142,8 +142,9 @@ static void display_progress( struct work_queue *q )
 
 	printf("%2.02lf%% %6d %6ds %4d %4d %4d %4d %4d %4d %.02lf\n",100.0*cells_complete/cells_total,cells_complete,(int)(time(0)-start_time),info.workers_init,info.workers_ready,info.workers_busy,info.tasks_waiting,info.tasks_running,info.tasks_complete,speedup);
 
-	if(bmap)
-		bitmap_save_bmp(bmap,progress_bitmap_file);
+		if(bmap) {
+			bitmap_save_bmp(bmap,progress_bitmap_file);
+		}
 
 	last_display_time = current;
 }
