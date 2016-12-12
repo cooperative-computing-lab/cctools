@@ -246,6 +246,8 @@ struct blacklist_host_info {
 	time_t release_at;
 };
 
+int master_capacity_weighted = 0;
+
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason);
@@ -2247,8 +2249,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
-	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
-	debug(D_BJ, "FLAGGED: %d\t%d\n", info.capacity_instantaneous, info.capacity_weighted);
+	jx_insert_integer(j,"capacity_weighted",master_capacity_weighted);
+	debug(D_BJ, "FLAGGED: %d\t%d\n", info.capacity_instantaneous, master_capacity_weighted);
 
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
@@ -3151,9 +3153,6 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
-	if(!s->previous_capacity_weighted) {
-		s->previous_capacity_weighted = 0;
-	}
 	if(!s->capacity_weight) {
 		s->capacity_weight = alpha;
 	}
@@ -3184,17 +3183,20 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
-			int capacity_instantaneous = (int) ceil(((float) tr->exec_time) / tr->transfer_time + tr->master_time);
-			if(s->previous_capacity_weighted == 0) {
+			int capacity_instantaneous = (int) ceil(((float) tr->exec_time) / (tr->transfer_time + tr->master_time));
+			if(master_capacity_weighted == 0) {
 				s->capacity_weighted = capacity_instantaneous;
+				debug(D_BJ, "INITIAL: %d\n", s->capacity_weighted);
 			}
 			else {
-				s->capacity_weighted = (int) ceil((s->capacity_weight * capacity_instantaneous) + ((1 - s->capacity_weight) * s->previous_capacity_weighted));
+				s->capacity_weighted = (int) ceil((s->capacity_weight * capacity_instantaneous) + ((1 - s->capacity_weight) * master_capacity_weighted));
+				debug(D_BJ, "CALCULATED: %d\n", s->capacity_weighted);
 			}
 			time_t ts;
 			time(&ts);
 			debug(D_BJ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d\n", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, s->tasks_running, s->workers_connected);
-			s->previous_capacity_weighted = s->capacity_weighted;
+			master_capacity_weighted = s->capacity_weighted;
+			debug(D_BJ, "MASTER: %d\n", master_capacity_weighted);
 			//q->stats->previous_capacity_weighted = s->capacity_weighted;
 		}
 	}

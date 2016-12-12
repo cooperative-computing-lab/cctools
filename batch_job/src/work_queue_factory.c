@@ -256,22 +256,20 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		int capacity_cores = jx_lookup_integer(j, "capacity_cores");
 		int capacity_memory = jx_lookup_integer(j, "capacity_memory");
 		int capacity_disk = jx_lookup_integer(j, "capacity_disk");
-		int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
+		//int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
 		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 		int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
 		int time_execute = jx_lookup_integer(j, "time_workers_execute");
-		const int time_master = jx_lookup_integer(j, "time_master");
-		fprintf(stderr, "Inst: %d\nCap: %d\n", capacity_instantaneous, capacity_weighted);
+		//const int time_master = jx_lookup_integer(j, "time_master");
 		const int cores = resources->cores;
 		const int memory = resources->memory;
 		const int disk = resources->disk;
 
 		int execute_delta = time_execute - time_execute_previous;
 		int transfer_delta = time_transfer - time_transfer_previous;
-		fprintf(stderr, "time_execute - time_execute_previous = %d - %d = %d\n", time_execute, time_execute_previous, execute_delta); 
 		//double time_execute_weighted;
 		//double time_transfer_weighted;
-		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
+/*		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
 
 		if(!positive_deltas) {
 			time_execute = time_execute_previous;
@@ -294,7 +292,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			time_transfer_previous = time_transfer;
 			fprintf(stderr, "New previous values set.\n");
 		}
-
+*/
 		const int temp_capacity_tasks = capacity_tasks;
 		if(tasks_per_worker > 0) {
 			capacity_tasks = capacity_tasks / tasks_per_worker;
