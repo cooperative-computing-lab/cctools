@@ -65,14 +65,16 @@ int domain_name_lookup(const char *name, char *addr)
 	hints.ai_socktype = SOCK_STREAM;
 
 	const char *mode_str = getenv("CCTOOLS_IP_MODE");
-	if(!mode_str || !strcmp(mode_str,"ANY")) {
+	if(!mode_str) mode_str = "IPV4";
+
+	if(!strcmp(mode_str,"AUTO")) {
 		hints.ai_family = AF_UNSPEC;
 	} else if(!strcmp(mode_str,"IPV4")) {
 		hints.ai_family = AF_INET;
 	} else if(!strcmp(mode_str,"IPV6")) {
 		hints.ai_family = AF_INET6;
 	} else {
-		debug(D_NOTICE,"CCTOOLS_IP_MODE has invalid value (%s).  Choices are IPV4, IPV6, or ANY",mode_str);
+		debug(D_NOTICE,"CCTOOLS_IP_MODE has invalid value (%s).  Choices are IPV4, IPV6, or AUTO",mode_str);
 		hints.ai_family = AF_UNSPEC;
 	}
 
