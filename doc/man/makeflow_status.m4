@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(chirp)
+HEADER(makeflow_status)
 
 SECTION(NAME)
 BOLD(makeflow_status) - command line tool retrieving the status of makeflow programs.
