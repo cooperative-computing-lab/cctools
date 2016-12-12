@@ -645,7 +645,15 @@ then
 			ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
 			ldflags="${ldflags} -rdynamic"
 
-			echo "*** warning: irods 4.x requires plugins installed in /var/lib, or for the irods_plugins_home variable to be set."
+			irods_ldflags="${library_search_result}"
+
+			# needed for 4.2:
+			if library_search irods_client_api "${irods_path}/lib"
+			then
+				echo "detected irods >4.1 installation"
+				irods_ldflags="${irods_ldflags} ${library_search_result}"
+				ccflags="${ccflags} -DIRODS_USES_ERROR_HPP"
+			fi
 
 			for d in ${irods_path}/include/irods
 			do
