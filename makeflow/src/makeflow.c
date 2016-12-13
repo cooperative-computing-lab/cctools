@@ -1114,6 +1114,21 @@ static void handle_abort(int sig)
 }
 
 
+static void set_archive_directory_string(char **archive_directory, char *option_arg) {
+	if (*archive_directory != NULL) {
+		// need to free archive directory to avoid memory leak since it has already been set once
+		free(*archive_directory);
+	}
+	if (option_arg) {
+		*archive_directory = xxstrdup(option_arg);
+	} else {
+		char *uid = xxmalloc(10);
+		sprintf(uid, "%d",  getuid());
+		*archive_directory = xxmalloc(sizeof(MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY) + 20 * sizeof(char));
+		sprintf(*archive_directory, "%s%s", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, uid);
+		free(uid);
+	}
+}
 
 
 
@@ -1671,51 +1686,15 @@ int main(int argc, char *argv[])
 			case LONG_OPT_ARCHIVE:
 				should_read_archive = 1;
 				should_write_to_archive = 1;
-				if (archive_directory != NULL) {
-					// need to free archive directory to avoid memory leak since it has already been set once
-					free(archive_directory);
-				}
-				if (optarg) {
-					archive_directory = xxstrdup(optarg);
-				} else {
-					char *uid = xxmalloc(10);
-					sprintf(uid, "%d",  getuid());
-					archive_directory = xxmalloc(sizeof(MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY) + 20 * sizeof(char));
-					sprintf(archive_directory, "%s%s", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, uid);
-					free(uid);
-				}
+				set_archive_directory_string(&archive_directory, optarg);
 				break;
 			case LONG_OPT_ARCHIVE_READ_ONLY:
 				should_read_archive = 1;
-				if (archive_directory != NULL) {
-					// need to free archive directory to avoid memory leak since it has already been set once
-					free(archive_directory);
-				}
-				if (optarg) {
-					archive_directory = xxstrdup(optarg);
-				} else {
-					char *uid = xxmalloc(10);
-					sprintf(uid, "%d",  getuid());
-					archive_directory = xxmalloc(sizeof(MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY) + 20 * sizeof(char));
-					sprintf(archive_directory, "%s%s", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, uid);
-					free(uid);
-				}
+				set_archive_directory_string(&archive_directory, optarg);
 				break;
 			case LONG_OPT_ARCHIVE_WRITE_ONLY:
 				should_write_to_archive = 1;
-				if (archive_directory != NULL) {
-					// need to free archive directory to avoid memory leak since it has already been set once
-					free(archive_directory);
-				}
-				if (optarg) {
-					archive_directory = xxstrdup(optarg);
-				} else {
-					char *uid = xxmalloc(10);
-					sprintf(uid, "%d",  getuid());
-					archive_directory = xxmalloc(sizeof(MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY) + 20 * sizeof(char));
-					sprintf(archive_directory, "%s%s", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, uid);
-					free(uid);
-				}
+				set_archive_directory_string(&archive_directory, optarg);
 				break;
 			default:
 				show_help_run(argv[0]);
