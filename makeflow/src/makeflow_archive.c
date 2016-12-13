@@ -152,7 +152,7 @@ static void write_ancestor_links(struct dag *d, struct dag_node *current_node, s
 }
 
 void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs, struct batch_job_info *info) {
-  char *archiving_file_path = NULL, *output_file_path = NULL, *source_makeflow_file_path = NULL, *ancestor_file_path = NULL;
+  char *output_file_path = NULL, *source_makeflow_file_path = NULL;
   char *output_directory_path = NULL, *input_directory_path = NULL;
   char *ancestor_directory_path = NULL;
   char archiving_prefix[3] = "";
@@ -180,7 +180,7 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   input_directory_path = string_combine_multi(NULL, archive_directory_path, "/input_files", 0);
   success = create_dir(input_directory_path, 0777);
   if (!success) {
-    fatal("Could not create input_files directory %s\n", source_makeflow_file_path);
+    fatal("Could not create input_files directory %s\n", input_directory_path);
   }
 
   descendant_directory_path = string_combine_multi(NULL, archive_directory_path, "/descendants", 0);
@@ -268,17 +268,14 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   free(input_directory_path);
   free(ancestor_directory_path);
   free(descendant_directory_path);
-  free(archiving_file_path);
-  free(ancestor_file_path);
   free(archive_directory_path);
 }
 
 int makeflow_archive_copy_preserved_files(struct dag *d, struct dag_node *n, struct list *outputs) {
-  char * filename;
+  char *filename, *output_file_path;
+  char archiving_prefix[3] = "";
   struct dag_file *f;
   int success;
-  char *output_file_path;
-  char archiving_prefix[3] = "";
 
   strncpy(archiving_prefix, n->archive_id, 2);
 
@@ -299,10 +296,10 @@ int makeflow_archive_copy_preserved_files(struct dag *d, struct dag_node *n, str
 
 int makeflow_archive_is_preserved(struct dag *d, struct dag_node *n, char *command, struct list *inputs, struct list *outputs) {
   char *filename = NULL;
+  char archiving_prefix[3] = "";
   struct dag_file *f;
   struct stat buf;
   int file_exists = -1;
-  char archiving_prefix[3] = "";
 
   generate_node_archive_id(n, command, inputs);
   strncpy(archiving_prefix, n->archive_id, 2);
