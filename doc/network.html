@@ -17,7 +17,7 @@ used to shape the network behavior of
 Makeflow, Work Queue, Parrot, Chirp, and other tools,
 so as to work correctly in these environments.
 
-<h2>IPV6 Support</h2>
+<h2><a name=ipv6>IPV6 Support</a></h2>
 
 IPV6 is supported by all of the CCTools components, however it is not turned
 on by default because IPV6 is not reliably deployed at all sites.  You can
@@ -48,7 +48,7 @@ But an IPV6 combination looks like this:
 [1234::abcd]:9094
 </pre>
 
-<h2>Firewall Port Ranges</h2>
+<h2><a name=tcp_port_ranges>TCP Port Ranges</a></h2>
 
 When creating a listening TCP port, the CCTools will, by default, pick any
 port available on the machine.  However, some computing sites set up firewall
@@ -63,7 +63,21 @@ export TCP_LOW_PORT=8000
 export TCP_HIGH_PORT=9000
 </pre>
 
-<h2>HTTP Proxies</h2>
+<h2><a name=tcp_window_size>TCP Window Size</a></h2>
+
+The performance of TCP connections over wide area links can be significantly
+affected by the "window size" used within the kernel.  Ideally, the window size
+is set to the product of the network bandwidth and latency, and is managed
+automatically by the kernel.  In certain cases, you may wish to set it manually
+with the <tt>TCP_WINDOW_SIZE</tt> environment variable, which gives the window
+size in bytes.
+<p>
+For example, to se the window size to 1MB:
+<pre>
+export TCP_WINDOW_SIZE=1048576
+</pre>
+
+<h2><a name=http_proxies>HTTP Proxies</a></h2>
 
 if your computing site requires all HTTP requests to be routed through a proxy,
 specify that proxy with the <tt>HTTP_PROXY</tt> environment variable.
