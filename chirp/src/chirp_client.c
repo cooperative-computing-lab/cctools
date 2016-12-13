@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "string_array.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
+#include "address.h"
 
 #if defined(HAS_ATTR_XATTR_H)
 #	include <attr/xattr.h>
@@ -349,11 +350,9 @@ struct chirp_client *chirp_client_connect(const char *hostport, int negotiate_au
 	int save_errno;
 	int port;
 
-	if(sscanf(hostport, "%[^:]:%d", host, &port) == 2) {
-		/* use the split host and port */
-	} else {
-		strcpy(host, hostport);
-		port = CHIRP_PORT;
+	if(!address_parse_hostport(hostport,host,&port,CHIRP_PORT)) {
+		errno = EINVAL;
+		return 0;
 	}
 
 	if(!domain_name_cache_lookup(host, addr)) {

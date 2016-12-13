@@ -50,7 +50,7 @@ link_close(link);
 #include <stdio.h>
 #include <time.h>
 
-/** Maximum number of characters in the text representation of a link address.  This must be large enough to accomodate ipv6 in the future. */
+/** Maximum number of characters in the text representation of a link address, whether ipv4 or ipv6. */
 #define LINK_ADDRESS_MAX 48
 
 /** Value to usewhen any listen port is acceptable */

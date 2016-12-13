@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "address.h"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -32,26 +33,21 @@ See the file COPYING for details.
 
 int domain_name_lookup_reverse(const char *addr, char *name)
 {
-	struct in_addr iaddr;
 	int err;
-
-	struct sockaddr_in saddr; //replace with sockaddr_in6 for ipv6
-	char host[DOMAIN_NAME_MAX];
+	struct sockaddr_storage saddr;
+	SOCKLEN_T saddr_length;
 
 	debug(D_DNS, "looking up addr %s", addr);
 
-	if(!string_to_ip_address(addr, (unsigned char *) &iaddr)) {
+	if(!address_to_sockaddr(addr,0,&saddr,&saddr_length)) {
 		debug(D_DNS, "%s is not a valid addr", addr);
 		return 0;
 	}
-	saddr.sin_addr = iaddr;
-	saddr.sin_family = AF_INET;
 
-	if ((err = getnameinfo((struct sockaddr *) &saddr, sizeof(saddr), host, sizeof(host), NULL, 0, 0)) != 0){
+	if ((err = getnameinfo((struct sockaddr *) &saddr, sizeof(saddr), name, DOMAIN_NAME_MAX,0,0,0)) !=0 ) {
 		debug(D_DNS, "couldn't look up %s: %s", addr, gai_strerror(err));
 		return 0;
 	}
-	strcpy(name, host);
 	debug(D_DNS, "%s is %s", addr, name);
 
 	return 1;
@@ -60,39 +56,44 @@ int domain_name_lookup_reverse(const char *addr, char *name)
 int domain_name_lookup(const char *name, char *addr)
 {
 	struct addrinfo hints;
-	struct addrinfo *result, *resultptr;
-	char ipstr[LINK_ADDRESS_MAX];
+	struct addrinfo *result;
 	int err;
 
 	debug(D_DNS, "looking up name %s", name);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+
+	const char *mode_str = getenv("CCTOOLS_IP_MODE");
+	if(!mode_str) mode_str = "IPV4";
+
+	if(!strcmp(mode_str,"AUTO")) {
+		hints.ai_family = AF_UNSPEC;
+	} else if(!strcmp(mode_str,"IPV4")) {
+		hints.ai_family = AF_INET;
+	} else if(!strcmp(mode_str,"IPV6")) {
+		hints.ai_family = AF_INET6;
+	} else {
+		debug(D_NOTICE,"CCTOOLS_IP_MODE has invalid value (%s).  Choices are IPV4, IPV6, or AUTO",mode_str);
+		hints.ai_family = AF_UNSPEC;
+	}
 
 	if ((err = getaddrinfo(name, NULL, &hints, &result)) != 0) {
 		debug(D_DNS, "couldn't look up %s: %s", name, gai_strerror(err));
 		return 0;
 	}
 
-	for (resultptr = result; resultptr != NULL; resultptr = resultptr->ai_next) {
-		void *ipaddr;
+	int r = address_from_sockaddr(addr,result->ai_addr);
 
-		/* For ipv4 use struct sockaddr_in and sin_addr field;
-		   for ipv6 use struct sockaddr_in6 and sin6_addr field. */
-		// But right now, only find ipv4 address.
-		if (resultptr->ai_family == AF_INET) {
-			struct sockaddr_in *addr_ipv4 = (struct sockaddr_in *)resultptr->ai_addr;
-			ipaddr = &(addr_ipv4->sin_addr);
-			inet_ntop(resultptr->ai_family, ipaddr, ipstr, sizeof(ipstr));
-			debug(D_DNS, "%s is %s", name, ipstr);
-			break;
-		}
+	if(r) {
+		debug(D_DNS, "%s is %s", name, addr);
+	} else {
+		debug(D_DNS, "unable to translate result from getaddrinfo");
 	}
-	strcpy(addr, ipstr);
+
 	freeaddrinfo(result);
 
-	return 1;
+	return r;
 }
 
 /* vim: set noexpandtab tabstop=4: */

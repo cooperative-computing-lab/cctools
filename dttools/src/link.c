@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "link.h"
 #include "macros.h"
 #include "stringtools.h"
+#include "address.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -295,7 +296,7 @@ struct link *link_attach(int fd)
 	l->fd = fd;
 
 	if(link_address_remote(l, l->raddr, &l->rport)) {
-		debug(D_TCP, "attached to %s:%d", l->raddr, l->rport);
+		debug(D_TCP, "attached to %s port %d", l->raddr, l->rport);
 		return l;
 	} else {
 		l->fd = -1;
@@ -333,6 +334,19 @@ struct link *link_attach_to_fd(int fd)
 	return l;
 }
 
+void sockaddr_set_port( struct sockaddr_storage *addr, int port )
+{
+        if(addr->ss_family==AF_INET) {
+                struct sockaddr_in *s = (struct sockaddr_in *)addr;
+                s->sin_port = htons(port);
+        } else if(addr->ss_family==AF_INET6) {
+                struct sockaddr_in6 *s = (struct sockaddr_in6 *)addr;
+                s->sin6_port = htons(port);
+        } else {
+                fatal("sockaddr_set_port: unexpected address family %d\n",addr);
+        }
+}               
+
 struct link *link_serve(int port)
 {
 	return link_serve_address(0, port);
@@ -341,15 +355,20 @@ struct link *link_serve(int port)
 struct link *link_serve_address(const char *addr, int port)
 {
 	struct link *link = 0;
-	struct sockaddr_in address;
+	struct sockaddr_storage address;
+	SOCKLEN_T address_length;
 	int success;
 	int value;
+
+	if(!address_to_sockaddr(addr,port,&address,&address_length)) {
+		goto failure;
+	}
 
 	link = link_create();
 	if(!link)
 		goto failure;
 
-	link->fd = socket(AF_INET, SOCK_STREAM, 0);
+	link->fd = socket(address.ss_family, SOCK_STREAM, 0);
 	if(link->fd < 0)
 		goto failure;
 
@@ -364,18 +383,6 @@ struct link *link_serve_address(const char *addr, int port)
 	setsockopt(link->fd, SOL_SOCKET, SO_REUSEADDR, (void *) &value, sizeof(value));
 
 	link_window_configure(link);
-
-	memset(&address, 0, sizeof(address));
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	address.sin_family = AF_INET;
-
-	if(addr) {
-		string_to_ip_address(addr, (unsigned char *) &address.sin_addr.s_addr);
-	} else {
-		address.sin_addr.s_addr = htonl(INADDR_ANY);
-	}
 
 	int low = TCP_LOW_PORT_DEFAULT;
 	int high = TCP_HIGH_PORT_DEFAULT;
@@ -394,8 +401,8 @@ struct link *link_serve_address(const char *addr, int port)
 		fatal("high port %d is less than low port %d in range", high, low);
 
 	for (port = low; port <= high; port++) {
-		address.sin_port = htons(port);
-		success = bind(link->fd, (struct sockaddr *) &address, sizeof(address));
+		sockaddr_set_port(&address,port);
+		success = bind(link->fd, (struct sockaddr *) &address, address_length );
 		if(success == -1) {
 			if(errno == EADDRINUSE) {
 				//If a port is specified, fail!
@@ -452,7 +459,7 @@ struct link *link_accept(struct link *master, time_t stoptime)
 		goto failure;
 	link_squelch();
 
-	debug(D_TCP, "got connection from %s:%d", link->raddr, link->rport);
+	debug(D_TCP, "got connection from %s port %d", link->raddr, link->rport);
 
 	return link;
 
@@ -464,10 +471,13 @@ struct link *link_accept(struct link *master, time_t stoptime)
 
 struct link *link_connect(const char *addr, int port, time_t stoptime)
 {
-	struct sockaddr_in address;
+	struct sockaddr_storage address;
+	SOCKLEN_T address_length;
 	struct link *link = 0;
 	int result;
 	int save_errno;
+
+	if(!address_to_sockaddr(addr,port,&address,&address_length)) goto failure;
 
 	link = link_create();
 	if(!link)
@@ -475,17 +485,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	link_squelch();
 
-	memset(&address, 0, sizeof(address));
-#if defined(CCTOOLS_OPSYS_DARWIN)
-	address.sin_len = sizeof(address);
-#endif
-	address.sin_family = AF_INET;
-	address.sin_port = htons(port);
-
-	if(!string_to_ip_address(addr, (unsigned char *) &address.sin_addr))
-		goto failure;
-
-	link->fd = socket(AF_INET, SOCK_STREAM, 0);
+	link->fd = socket(address.ss_family, SOCK_STREAM, 0);
 	if(link->fd < 0)
 		goto failure;
 
@@ -500,11 +500,11 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		goto failure;
 #endif
 
-	debug(D_TCP, "connecting to %s:%d", addr, port);
+	debug(D_TCP, "connecting to %s port %d", addr, port);
 
 	while(1) {
 		// First attempt a non-blocking connect
-		result = connect(link->fd, (struct sockaddr *) &address, sizeof(address));
+		result = connect(link->fd, (struct sockaddr *) &address, address_length);
 
 		// On many platforms, non-blocking connect sets errno in unexpected ways:
 
@@ -520,7 +520,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 		// If the remote address is valid, we are connected no matter what.
 		if(link_address_remote(link, link->raddr, &link->rport)) {
-			debug(D_TCP, "made connection to %s:%d", link->raddr, link->rport);
+			debug(D_TCP, "made connection to %s port %d", link->raddr, link->rport);
 #ifdef CCTOOLS_OPSYS_CYGWIN
 			link_nonblocking(link, 1);
 #endif
@@ -541,7 +541,7 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 	}
 
 
-	debug(D_TCP, "connection to %s:%d failed (%s)", addr, port, strerror(errno));
+	debug(D_TCP, "connection to %s port %d failed (%s)", addr, port, strerror(errno));
 
 failure:
 	save_errno = errno;
@@ -822,7 +822,7 @@ void link_close(struct link *link)
 		if(link->fd >= 0)
 			close(link->fd);
 		if(link->rport)
-			debug(D_TCP, "disconnected from %s:%d", link->raddr, link->rport);
+			debug(D_TCP, "disconnected from %s port %d", link->raddr, link->rport);
 		free(link);
 	}
 }
@@ -839,19 +839,14 @@ int link_fd(struct link *link)
 	return link->fd;
 }
 
-#ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX) || defined(__MUSL__)
-#define SOCKLEN_T socklen_t
-#else
-#define SOCKLEN_T int
-#endif
-#endif
-
 int link_address_local(struct link *link, char *addr, int *port)
 {
-	struct sockaddr_in iaddr;
-	SOCKLEN_T length;
-	int result;
+        struct sockaddr_storage iaddr;
+        SOCKLEN_T length;
+        int result;
+        SOCKLEN_T addr_length = LINK_ADDRESS_MAX;
+        char port_string[16];
+        SOCKLEN_T port_string_length = 16;
 
 	if(link->type == LINK_TYPE_FILE) {
 		return 0;
@@ -862,17 +857,25 @@ int link_address_local(struct link *link, char *addr, int *port)
 	if(result != 0)
 		return 0;
 
-	*port = ntohs(iaddr.sin_port);
-	string_from_ip_address((unsigned char *) &iaddr.sin_addr, addr);
+        result = getnameinfo((struct sockaddr *)&iaddr,length,addr,addr_length,port_string,port_string_length,NI_NUMERICHOST|NI_NUMERICSERV);
+        if(result==0) {
+                *port = atoi(port_string);
+                return 1;
+        } else {
+                return 0;
+        }
 
 	return 1;
 }
 
 int link_address_remote(struct link *link, char *addr, int *port)
 {
-	struct sockaddr_in iaddr;
+	struct sockaddr_storage iaddr;
 	SOCKLEN_T length;
 	int result;
+	SOCKLEN_T addr_length = LINK_ADDRESS_MAX;
+	char port_string[16];
+	SOCKLEN_T port_string_length = 16;
 
 	if(link->type == LINK_TYPE_FILE) {
 		return 0;
@@ -883,10 +886,13 @@ int link_address_remote(struct link *link, char *addr, int *port)
 	if(result != 0)
 		return 0;
 
-	*port = ntohs(iaddr.sin_port);
-	string_from_ip_address((unsigned char *) &iaddr.sin_addr, addr);
-
-	return 1;
+	result = getnameinfo((struct sockaddr *)&iaddr,length,addr,addr_length,port_string,port_string_length,NI_NUMERICHOST|NI_NUMERICSERV);
+	if(result==0) {
+		*port = atoi(port_string);
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 ssize_t link_stream_to_buffer(struct link * link, char **buffer, time_t stoptime)

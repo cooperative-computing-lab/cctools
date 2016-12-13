@@ -94,51 +94,6 @@ char *string_escape_condor( const char *str )
 	return result;
 }
 
-void string_from_ip_address(const unsigned char *bytes, char *str)
-{
-	sprintf(str, "%u.%u.%u.%u", (unsigned) bytes[0], (unsigned) bytes[1], (unsigned) bytes[2], (unsigned) bytes[3]);
-}
-
-int string_to_ip_address(const char *str, unsigned char *bytes)
-{
-	unsigned a, b, c, d;
-	int fields;
-
-	fields = sscanf(str, "%u.%u.%u.%u", &a, &b, &c, &d);
-	if(fields != 4)
-		return 0;
-
-	if(a > 255 || b > 255 || c > 255 || d > 255)
-		return 0;
-
-	bytes[0] = a;
-	bytes[1] = b;
-	bytes[2] = c;
-	bytes[3] = d;
-
-	return 1;
-}
-
-int string_ip_subnet(const char *addr, char *subnet)
-{
-	unsigned bytes[4];
-	int fields;
-
-	fields = sscanf(addr, "%u.%u.%u.%u", &bytes[0], &bytes[1], &bytes[2], &bytes[3]);
-	if(fields != 4)
-		return 0;
-
-	if(bytes[0] < 128) {
-		sprintf(subnet, "%u", bytes[0]);
-	} else if(bytes[0] < 192) {
-		sprintf(subnet, "%u.%u", bytes[0], bytes[1]);
-	} else {
-		sprintf(subnet, "%u.%u.%u", bytes[0], bytes[1], bytes[2]);
-	}
-
-	return 1;
-}
-
 void string_chomp(char *start)
 {
 	char *s = start;
