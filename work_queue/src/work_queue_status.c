@@ -35,7 +35,8 @@ typedef enum {
 	QUERY_TASKS,
 	QUERY_WORKERS,
 	QUERY_ABLE_WORKERS,
-	QUERY_MASTER_RESOURCES
+	QUERY_MASTER_RESOURCES,
+	QUERY_CAPACITIES
 } query_t;
 
 #define CATALOG_SIZE 50 //size of the array of jx pointers
@@ -99,6 +100,15 @@ static struct jx_table master_resource_headers[] = {
 {NULL,NULL,0,0,0}
 };
 
+static struct jx_table capacity_headers[] = {
+{"project",     "MASTER", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 30},
+{"capacity_tasks", "TASKS",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"capacity_cores", "CORES",  JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 10},
+{"capacity_memory","MEMORY", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 15},
+{"capacity_disk",  "DISK",   JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 20},
+{NULL,NULL,0,0,0}
+};
+
 static void show_help(const char *progname)
 {
 	fprintf(stdout, "usage: %s [master] [port]\n", progname);
@@ -111,6 +121,7 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s List tasks of the given master.\n", "-T,--tasks");
 	fprintf(stdout, " %-30s List categories of the given master, size of largest task, and workers that can run it.\n", "-A,--able-workers");
 	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
+	fprintf(stdout, " %-30s Shows resource capacities of all masters.\n", "--capacity");
 	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
@@ -120,7 +131,8 @@ static void show_help(const char *progname)
 }
 
 enum {
-	LONG_OPT_WHERE=1000
+	LONG_OPT_WHERE=1000,
+	LONG_OPT_CAPACITY
 };
 
 static void work_queue_status_parse_command_line_arguments(int argc, char *argv[], const char **master_host, int *master_port, const char **project_name)
@@ -133,6 +145,7 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"tasks", no_argument, 0, 'T'},
 		{"verbose", no_argument, 0, 'l'},
 		{"resources", no_argument, 0, 'R'},
+		{"capacity", no_argument, 0, LONG_OPT_CAPACITY},
 		{"catalog", required_argument, 0, 'C'},
 		{"debug", required_argument, 0, 'd'},
 		{"timeout", required_argument, 0, 't'},
@@ -196,6 +209,11 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		case 'R':
 			query_mode = QUERY_MASTER_RESOURCES;
+			break;
+		case LONG_OPT_CAPACITY:
+			if(query_mode != NO_QUERY)
+				fatal("Options -A, -Q, -T, and -W, are mutually exclusive, and can be specified only once.");
+			query_mode = QUERY_CAPACITIES;
 			break;
 		case 'v':
 			cctools_version_print(stdout, argv[0]);
@@ -491,7 +509,10 @@ int main(int argc, char *argv[])
 		struct jx_table *h;
 		if(query_mode==QUERY_MASTER_RESOURCES) {
 			h = master_resource_headers;
-		} else {
+		} else if(query_mode==QUERY_CAPACITIES) {
+			h = capacity_headers;
+		}
+		else {
 			h = queue_headers;
 		}
 		return do_catalog_query(project_name,h,stoptime);

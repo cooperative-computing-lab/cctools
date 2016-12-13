@@ -32,6 +32,7 @@ OPTION_ITEM(`-W, --workers')Show details of all workers connected to the master.
 OPTION_ITEM(`-T, --tasks')Show details of all tasks in the queue.
 OPTION_ITEM(`-A, --able-workers')List categories of the given master, size of largest task, and workers that can run it.
 OPTION_ITEM(`-R, --resources')Show available resources for each master.
+OPTION_ITEM(`--capacity')Show resource capacities for each master.
 OPTION_ITEM(`-l, --verbose')Long output.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
@@ -59,6 +60,16 @@ $ work_queue_status -R
 MASTER                         CORES      MEMORY          DISK
 shrimp                         228        279300          932512
 crustacea                      4200       4136784         9049985
+LONGCODE_END
+
+With the CODE(--capacity) option, a summary of the resource capacities for each master is shown:
+
+LONGCODE_BEGIN
+$ work_queue_status --capacity
+MASTER                         TASKS      CORES      MEMORY          DISK
+refine                         ???        ???        ???             ???
+shrimp                         99120      99120      781362960       1307691584
+crustacea                      318911     318911     326564864       326564864
 LONGCODE_END
 
 Use the CODE(-W) option to list the workers connected to a particular master.
