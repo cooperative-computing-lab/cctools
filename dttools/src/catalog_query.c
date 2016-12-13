@@ -41,11 +41,20 @@ static struct set *down_hosts = NULL;
 */
 const char *parse_hostlist(const char *hosts, char *host, int *port)
 {
+	char hostport[DOMAIN_NAME_MAX];
+
 	const char *next = strchr(hosts, ',');
-	if(!address_parse_hostport(hosts,host,port,CATALOG_PORT)) {
-		debug(D_DEBUG, "bad host specification: %s", hosts);
+
+	int length = next ? next-hosts+1 : (int) strlen(hosts)+1;
+
+	strncpy(hostport,hosts,length);
+	hostport[length-1] = 0;
+
+	if(!address_parse_hostport(hostport,host,port,CATALOG_PORT)) {
+		debug(D_DEBUG, "bad host specification: %s",hostport);
 		return NULL;
 	}
+
 	return next ? next + 1 : NULL;
 }
 
