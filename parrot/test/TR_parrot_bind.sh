@@ -26,7 +26,7 @@ prepare()
 		if ((expr) == -1) {\\
 			fprintf(stderr, "[%s:%d] ", __FILE__, __LINE__);\\
 			perror(#expr);\\
-			unlink("foo");\\
+			unlink(argv[1]);\\
 			exit(EXIT_FAILURE);\\
 		}\\
 	} while (0)
@@ -35,7 +35,11 @@ int main (int argc, char *argv[])
 {
 	struct sockaddr_un addr;
 	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, "foo");
+	if (argc != 2) {
+		fprintf(stderr, "specify a socket path\n");
+		return 1;
+	}
+	strcpy(addr.sun_path, argv[1]);
 	pid_t child = fork();
 	if (child == 0) {
 		CATCHUNIX(alarm(2));
@@ -53,7 +57,7 @@ int main (int argc, char *argv[])
 		CATCHUNIX(n);
 		CATCHUNIX(close(client));
 		CATCHUNIX(close(master));
-		CATCHUNIX(unlink("foo"));
+		CATCHUNIX(unlink(argv[1]));
 		exit(EXIT_SUCCESS);
 	} else if (child > 0) {
 		CATCHUNIX(alarm(2));
@@ -82,14 +86,14 @@ EOF
 run()
 {
 	set -e
-	parrot -- "$(pwd)/$exe"
-	parrot --work-dir=/http -- "$(pwd)/$exe" && return 1
+	parrot -- "$(pwd)/$exe" /tmp/foo
+	parrot -- "$(pwd)/$exe" /http/foo && return 1
 	return 0
 }
 
 clean()
 {
-	rm -f "$exe" foo
+	rm -f "$exe" /tmp/foo
 	return 0
 }
 
