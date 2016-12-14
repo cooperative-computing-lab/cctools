@@ -126,7 +126,6 @@ static void write_descendant_link(struct dag *d, struct dag_node *current_node, 
   }
   free(descendant_job_path);
   free(ancestor_link_path);
-
 }
 
 /* writes a link from a the current node to an ancestor node */
@@ -148,7 +147,6 @@ static void write_ancestor_links(struct dag *d, struct dag_node *current_node, s
   }
   free(ancestor_job_path);
   free(current_node_descendant_path);
-
 }
 
 static void write_output_files(struct dag *d, struct dag_node *n, struct list *outputs, char *archive_directory_path) {
@@ -178,7 +176,6 @@ static void write_input_files(struct dag *d, struct dag_node *n, char *input_dir
   struct dag_node *ancestor;
   struct dag_file *f;
   int success, symlink_failure;
-
 
   /* create links to input files */
   list_first_item(n->source_files);
@@ -230,7 +227,6 @@ void makeflow_archive_populate(struct dag *d, struct dag_node *n, char *command,
   /* in --archive-write mode, we haven't yet generated a node's archive_id, so need to generate it here */
   generate_node_archive_id(n, command, inputs);
   strncpy(archiving_prefix, n->archive_id, 2);
-
   archive_directory_path = string_combine_multi(NULL, d->archive_directory, "/jobs/", archiving_prefix, "/", n->archive_id + 2, 0);
 
   /* We create all the sub directories upfront for convenience */

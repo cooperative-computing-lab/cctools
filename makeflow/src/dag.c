@@ -23,7 +23,6 @@ See the file COPYING for details.
 #include "dag.h"
 #include "dag_resources.h"
 
-
 struct dag_variable *dag_variable_create(const char *name, const char *initial_value);
 
 struct dag *dag_create()

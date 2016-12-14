@@ -736,8 +736,6 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 	return file_created;
 }
 
-
-
 /*
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
 */
