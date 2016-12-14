@@ -883,7 +883,7 @@ static void decode_mmap( struct pfs_process *p, int entering, const INT64_T *arg
 	pfs_size_t source_offset = args[5];
 
 	if (entering)
-		debug(D_SYSCALL,"mmap addr=0x%" PRIx64" len=0x%" PRIx64 " prot=0x%" PRIx64 " flags=0x%" PRIx64 " fd=%d offset=0x%" PRIx64,addr,length,prot,flags,fd,source_offset);
+		debug(D_SYSCALL,"mmap addr=0x%" PRIx64 " len=0x%" PRIx64 " prot=0x%" PRIx64 " flags=0x%" PRIx64 " fd=%d offset=0x%" PRIx64,addr,length,prot,flags,fd,source_offset);
 
 	if(p->table->isnative(fd)) {
 		if (entering)
