@@ -422,7 +422,10 @@ int read_config_file(const char *config_file) {
 	resources->disk   = new_num_disk_option;
 
 	if(new_project_regex != project_regex) {
-		if(project_regex) free(project_regex); project_regex = xxstrdup(new_project_regex);
+		if(project_regex) {
+			free(project_regex);
+		}
+		project_regex = xxstrdup(new_project_regex);
 	}
 
 	if(new_foremen_regex != foremen_regex) {

@@ -381,7 +381,7 @@ static void decode_write( struct pfs_process *p, int entering, INT64_T syscall, 
 			}
 
 			if(p->syscall_result!=actual) {
-				debug(D_SYSCALL,"write returned %"PRId64" instead of %"PRId64,p->syscall_result, actual);
+				debug(D_SYSCALL,"write returned %" PRId64 " instead of %" PRId64,p->syscall_result, actual);
 			}
 
 			if(p->syscall_result>=0)
@@ -1100,8 +1100,8 @@ void decode_mmap( struct pfs_process *p, int entering, const INT64_T *args )
 		nargs[4] = pfs_channel_fd();
 		nargs[5] = channel_offset+source_offset;
 
-		debug(D_SYSCALL,"channel_offset=0x%" PRIx64 " source_offset=0x%" PRIx64,(int64_t)channel_offset,(int64_t)source_offset);
-		debug(D_SYSCALL,"mmap changed: flags=0x%"PRIx32" fd=%"PRId32" offset=0x%"PRIx32,nargs[3],nargs[4],nargs[5]);
+		debug(D_SYSCALL,"channel_offset=0x%" PRIx64 " source_offset=0x%" PRIx64, (int64_t)channel_offset,(int64_t)source_offset);
+		debug(D_SYSCALL,"mmap changed: flags=0x%" PRIx32" fd=%" PRId32" offset=0x%" PRIx32,nargs[3],nargs[4],nargs[5]);
 
 		if(p->syscall==SYSCALL32_mmap) {
 			tracer_copy_out(p->tracer,nargs,POINTER(args[0]),sizeof(nargs),0);

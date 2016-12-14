@@ -717,6 +717,9 @@ then
 		echo "*** Sorry, I couldn't find IRODS in $irods_path"
 		echo "*** Check --with-irods-path and try again."
 		exit 1
+	else
+		# When irods is enabled, we also need ssl
+		config_openssl_path=yes
 	fi
 else
 	echo "*** skipping irods support"
@@ -748,7 +751,7 @@ then
 	fi
 
 	# When mysql is enabled, we also need ssl
-	config_openssl_path=auto
+	config_openssl_path=yes
 
 else
 	if [ $config_mysql_path = yes ]
