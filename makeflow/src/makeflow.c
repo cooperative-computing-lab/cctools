@@ -53,6 +53,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <libgen.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -155,6 +156,8 @@ static int catalog_reporting_on = 0;
 static char *mountfile = NULL;
 static char *mount_cache = NULL;
 static int use_mountfile = 0;
+
+static struct list *shared_fs = NULL;
 
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
@@ -398,6 +401,12 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 	}
 }
 
+static int on_sharedfs(void *item, const void *arg) {
+	assert(item);
+	assert(arg);
+	return strncmp(item, arg, strlen(item));
+}
+
 /*
 Given a file, return the string that identifies it appropriately
 for the given batch system, combining the local and remote name
@@ -470,6 +479,10 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
+		if (!list_iterate(shared_fs, on_sharedfs, file->filename)) {
+			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n", file->filename);
+			continue;
+		}
 		char *f = makeflow_file_format(node,file,queue,w,m,s,u);
 		file_str = string_combine(file_str,f);
 		free(f);
@@ -906,6 +919,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 		if(!batch_queue_supports_feature(remote_queue, "absolute_path") && !n->local_job){
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)) && !error) {
+				if (!list_iterate(shared_fs, on_sharedfs, f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
@@ -916,6 +930,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 			list_first_item(n->target_files);
 			while((f = list_next_item(n->target_files)) && !error) {
+				if (!list_iterate(shared_fs, on_sharedfs, f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
@@ -1108,7 +1123,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Use JX format rather than Make-style format for the input file.\n", "--jx");
 	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
-
+	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
@@ -1152,7 +1167,7 @@ int main(int argc, char *argv[])
 	char *log_dir = NULL;
 	char *log_format = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
-
+	shared_fs = list_create();
 
 	random_init();
 	debug_config(argv[0]);
@@ -1219,6 +1234,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
+		LONG_OPT_SHARED_FS,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1259,6 +1275,7 @@ int main(int argc, char *argv[])
 		{"project-name", required_argument, 0, 'N'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
+		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
@@ -1527,6 +1544,11 @@ int main(int argc, char *argv[])
 			case LONG_OPT_WRAPPER_OUTPUT:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
 				makeflow_wrapper_add_output_file(wrapper, optarg);
+				break;
+			case LONG_OPT_SHARED_FS:
+				assert(shared_fs);
+				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
+				list_push_head(shared_fs, xxstrdup(optarg));
 				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
