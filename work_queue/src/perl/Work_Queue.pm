@@ -221,6 +221,11 @@ sub blacklist {
 	return work_queue_blacklist_add($self->{_work_queue}, $host);
 }
 
+sub blacklist_with_timeout {
+	my ($self, $host, $timeout) = @_;
+	return work_queue_blacklist_add_with_timeout($self->{_work_queue}, $host, $timeout);
+}
+
 sub blacklist_clear {
 	my ($self, $host) = @_;
 
@@ -788,6 +793,22 @@ Blacklist workers running on host.
 =item host
 
 The hostname the host running the workers.
+
+=back
+
+=head3 C<blacklist_with_timeout>
+
+Blacklist workers running on host.
+
+=over 12
+
+=item host
+
+The hostname the host running the workers.
+
+=item timeout
+
+The duration of this blacklist entry.
 
 =back
 
