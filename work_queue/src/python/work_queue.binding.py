@@ -1148,6 +1148,15 @@ class WorkQueue(_object):
         return work_queue_blacklist_add(self._work_queue, host)
 
     ##
+    # Blacklist workers running on host for the duration of the given timeout.
+    #
+    # @param self    Reference to the current work queue object.
+    # @param host    The hostname the host running the workers.
+    # @param timeout How long this blacklist entry lasts (in seconds). If less than 1, blacklist indefinitely.
+    def blacklist_with_timeout(self, host, timeout):
+        return work_queue_blacklist_add_with_timeout(self._work_queue, host, timeout)
+
+    ##
     # Remove host from blacklist. Clear all blacklist if host not provided.
     #
     # @param self   Reference to the current work queue object.
