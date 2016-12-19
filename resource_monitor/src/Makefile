@@ -8,6 +8,10 @@ CCTOOLS_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
 PROGRAMS = resource_monitor resource_monitor_histograms piggybacker rmonitor_poll_example
+
+# currently only python bindings have been implemented
+CCTOOLS_SWIG_BINDINGS := $(findstring python, $(CCTOOLS_SWIG_BINDINGS))
+
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
 ifeq ($(STATIC_BUILD),yes)
@@ -17,7 +21,7 @@ else
 	CCTOOLS_DEPENDENCIES+=$(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 endif
 
-all: $(TARGETS)
+all: $(TARGETS) bindings
 
 librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o
 	$(CCTOOLS_LD) -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_DEPENDENCIES)
@@ -42,10 +46,26 @@ resource_monitor: resource_monitor_pb.o rmonitor_helper_comm.o
 rmonitor_poll_example: rmonitor_poll_example.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES)
 
-clean:
+
+.PHONY: $(CCTOOLS_SWIG_BINDINGS)
+bindings: $(CCTOOLS_SWIG_BINDINGS)
+$(CCTOOLS_SWIG_BINDINGS):
+	@$(MAKE) -C $@
+
+CCTOOLS_SWIG_BINDINGS_INSTALL = $(CCTOOLS_SWIG_BINDINGS:%=install-%)
+install-bindings: $(CCTOOLS_SWIG_BINDINGS_INSTALL)
+$(CCTOOLS_SWIG_BINDINGS_INSTALL): $(CCTOOLS_SWIG_BINDINGS)
+	@$(MAKE) -C $(@:install-%=%) install
+
+CCTOOLS_SWIG_BINDINGS_CLEAN = $(CCTOOLS_SWIG_BINDINGS:%=clean-%)
+clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
+$(CCTOOLS_SWIG_BINDINGS_CLEAN):
+	@$(MAKE) -C $(@:clean-%=%) clean
+
+clean: clean-bindings
 	rm -f $(OBJECTS) $(TARGETS) $(PROGRAMS) resource_monitor_pb.* rmonitor_piggyback.h* *.o
 
-install: all
+install: all install-bindings
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
