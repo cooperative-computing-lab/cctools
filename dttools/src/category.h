@@ -75,13 +75,13 @@ struct category {
 	struct histogram *total_files_histogram;
 	struct histogram *disk_histogram;
 
-	uint64_t total_tasks;
+	int64_t total_tasks;
 
 	/* assume that peak usage is independent of wall time */
 	int time_peak_independece;
 
 	/* completions since last time first-allocation was updated. */
-	uint64_t completions_since_last_reset;
+	int64_t completions_since_last_reset;
 
 
 	/* category is somewhat confident of the maximum seen value. */
@@ -104,6 +104,7 @@ int category_enable_auto_resource(struct category *c, const char *resource_name,
 void category_specify_max_allocation(struct category *c, const struct rmsummary *s);
 void category_specify_first_allocation_guess(struct category *c, const struct rmsummary *s);
 
+struct category *category_create(const char *name);
 struct category *category_lookup_or_create(struct hash_table *categories, const char *name);
 void category_delete(struct hash_table *categories, const char *name);
 void categories_initialize(struct hash_table *categories, struct rmsummary *top, const char *summaries_file);

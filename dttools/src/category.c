@@ -25,25 +25,20 @@ struct peak_count_time {
 	double  times;
 };
 
-static uint64_t memory_bucket_size    = 50;          /* 50 MB */
-static uint64_t disk_bucket_size      = 50;          /* 50 MB */
-static uint64_t time_bucket_size      = 300000000;   /* 5 minutes */
-static uint64_t bytes_bucket_size     = 5*MEGABYTE;  /* 5 MB */
-static uint64_t bandwidth_bucket_size = 1000000;     /* 1 Mbit/s */
-static uint64_t cores_avg_bucket_size = 100;         /* 1/10 of a core */
+static int64_t memory_bucket_size    = 50;          /* 50 MB */
+static int64_t disk_bucket_size      = 50;          /* 50 MB */
+static int64_t time_bucket_size      = 300000000;   /* 5 minutes */
+static int64_t bytes_bucket_size     = 5*MEGABYTE;  /* 5 MB */
+static int64_t bandwidth_bucket_size = 1000000;     /* 1 Mbit/s */
+static int64_t cores_avg_bucket_size = 100;         /* 1/10 of a core */
 
-static uint64_t first_allocation_every_n_tasks = 25; /* tasks */
+static int64_t first_allocation_every_n_tasks = 25; /* tasks */
 
-struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
-	struct category *c;
+struct category *category_create(const char *name) {
+    if(!name)
+        name = "default";
 
-	if(!name)
-		name = "default";
-
-	c = hash_table_lookup(categories, name);
-	if(c) return c;
-
-	c = calloc(1, sizeof(struct category));
+	struct category *c = calloc(1, sizeof(struct category));
 
 	c->name       = xxstrdup(name);
 	c->fast_abort = -1;
@@ -80,6 +75,19 @@ struct category *category_lookup_or_create(struct hash_table *categories, const 
 
 	c->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 
+    return c;
+}
+
+struct category *category_lookup_or_create(struct hash_table *categories, const char *name) {
+	struct category *c;
+
+	if(!name)
+		name = "default";
+
+	c = hash_table_lookup(categories, name);
+	if(c) return c;
+
+    c = category_create(name);
 	hash_table_insert(categories, name, c);
 
 	return c;
@@ -563,9 +571,11 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 
 		c->completions_since_last_reset++;
 
-		if(new_maximum || c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
-			update |= category_update_first_allocation(c, max_worker);
-		}
+        if(first_allocation_every_n_tasks > 0) {
+            if(new_maximum || c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
+                update |= category_update_first_allocation(c, max_worker);
+            }
+        }
 
 		/* a task completed using a new maximum, so we consider that the new steady_state. */
 		if(new_maximum) {
@@ -728,7 +738,7 @@ int category_in_steady_state(struct category *c) {
 	return c->first_allocation != NULL;
 }
 
-void category_tune_bucket_size(const char *resource, uint64_t size) {
+void category_tune_bucket_size(const char *resource, int64_t size) {
 
 	if(strcmp(resource, "memory") == 0) {
 		memory_bucket_size = size;
@@ -745,7 +755,7 @@ void category_tune_bucket_size(const char *resource, uint64_t size) {
 	}
 }
 
-uint64_t category_get_bucket_size(const char *resource) {
+int64_t category_get_bucket_size(const char *resource) {
 	if(string_suffix_is(resource, "memory")) {
 		return memory_bucket_size;
 	} else if(strcmp(resource, "cores") == 0) {
