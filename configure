@@ -197,6 +197,7 @@ xrootd_path="/usr"
 zlib_path="/usr"
 
 globus_flavor=auto
+irods_flavor=auto
 xrootd_arch=auto
 
 ccompiler=${CC:-gcc}
@@ -294,6 +295,9 @@ do
 			else
 				config_irods_path=yes
 			fi
+			;;
+		--irods-flavor)
+			irods_flavor=${arg}
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
@@ -430,6 +434,7 @@ Where options are:
   --sanitize
   --sge-parameter      <parameter>
   --globus-flavor      <flavor>
+  --irods-flavor       3 | 4
   --xrootd-arch        <arch>
   --tcp-low-port       <port>
   --tcp-high-port      <port>
@@ -628,86 +633,108 @@ else
 fi
 
 # irods 4.0 moved all its source to the iRODS subdirectory
+# if auto, we try in this order: 4.2 (4.0,4.1) 3
+
+# irods 4.x uses .so plugins which are found in /var/lib/irods.
+# These require the parrot is linked with -rdynamic so that
+# the plugins can refer to symbols in libRodsAPI.a in parrot.
+
+# irods 4.x changed the API from C to C++, so we must look
+# for .hpp files instead of .h files.
 
 if [ $config_irods_path != no ]
 then
-	if library_search RodsAPIs "${irods_path}/lib/core/obj"
+	if [ "$irods_flavor" = auto -o "$irods_flavor" = 4 ]
 	then
-		echo "detected irods 3.x installation"
-
-		ccflags="${ccflags} -DHAS_IRODS"
-
-		for d in ${irods_path}/lib/*/include ${irods_path}/server/*/include
-		do
-			irods_ccflags="${irods_ccflags} -I$d"
-		done
-
-		irods_ldflags="${library_search_result}"
-
-	elif library_search RodsAPIs "${irods_path}/lib"
-	then
-		echo "detected irods 4.x installation"
-
-		# irods 4.x uses .so plugins which are found in /var/lib/irods.
-		# These require the parrot is linked with -rdynamic so that
-		# the plugins can refer to symbols in libRodsAPI.a in parrot.
-
-		# irods 4.x changed the API from C to C++, so we must look
-		# for .hpp files instead of .h files.
-
-		ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
-		ldflags="${ldflags} -rdynamic"
-
-		echo "*** warning: irods 4.x requires plugins installed in /var/lib, or for the irods_plugins_home variable to be set."
-
-		for d in ${irods_path}/include/irods
-		do
-			irods_ccflags="${irods_ccflags} -I$d"
-		done
-
-		irods_ldflags="${library_search_result}"
-
-		# irods 4.x depends on a specific version of boost:
-
-		boost_path=`ls -d ${irods_path}/lib/irods/externals`
-		if [ ! -d ${boost_path} ]
+		irods_flavor=auto
+		if library_search RodsAPIs "${irods_path}/lib"
 		then
-			echo "*** Could not find irods boost in ${irods_path}/external !"
-			exit 1
-		fi
+			echo "detected irods 4.x installation"
+			echo "*** warning: irods 4.x requires plugins installed in /var/lib, or for the irods_plugins_home variable to be set."
 
-		echo "found irods boost in $boost_path"
-		for subtype in system thread chrono filesystem regex
-		do
-			lib=${boost_path}/libboost_${subtype}.a
-			if [ -f $lib ]
+			ccflags="${ccflags} -DHAS_IRODS -DIRODS_USES_PLUGINS -DIRODS_USES_HPP"
+			ldflags="${ldflags} -rdynamic"
+
+			irods_ldflags="${library_search_result}"
+
+			# needed for 4.2:
+			if library_search irods_client_api "${irods_path}/lib"
 			then
-				echo "found $lib"
-				irods_ldflags="${irods_ldflags} $lib"
+				echo "detected irods >4.1 installation"
+				irods_ldflags="${irods_ldflags} ${library_search_result}"
+				ccflags="${ccflags} -DIRODS_USES_ERROR_HPP"
 			fi
-		done
 
-		jansson_path=`ls -d ${irods_path}/lib/irods/externals`
-		if [ ! -d ${jansson_path} ]
-		then
-			echo "*** Could not find irods jansson in ${irods_path}/external !"
-			exit 1
+			for d in ${irods_path}/include/irods
+			do
+				irods_ccflags="${irods_ccflags} -I$d"
+			done
+
+			# irods 4.x depends on a specific version of boost:
+			boost_path=`ls -d ${irods_path}/lib/irods/externals`
+			if [ ! -d ${boost_path} ]
+			then
+				echo "*** Could not find irods boost in ${irods_path}/external !"
+				exit 1
+			fi
+
+			echo "found irods boost in $boost_path"
+			for subtype in system thread chrono filesystem regex
+			do
+				lib=${boost_path}/libboost_${subtype}.a
+				if [ -f $lib ]
+				then
+					echo "found $lib"
+					irods_ldflags="${irods_ldflags} $lib"
+				fi
+			done
+
+			jansson_path=`ls -d ${irods_path}/lib/irods/externals`
+			if [ ! -d ${jansson_path} ]
+			then
+				echo "*** Could not find irods jansson in ${irods_path}/external !"
+				exit 1
+			fi
+
+			echo "found irods jansson in $jansson_path"
+			irods_ldflags="${irods_ldflags} ${jansson_path}/libjansson.a"
+
+			irods_flavor=4
 		fi
+	fi
 
-		echo "found irods jansson in $jansson_path"
-		irods_ldflags="${irods_ldflags} ${jansson_path}/libjansson.a"
+	if [ "$irods_flavor" = auto -o "$irods_flavor" = 3 ]
+	then
+		irods_flavor=auto
+		if library_search RodsAPIs "${irods_path}/lib/core/obj"
+		then
+			echo "detected irods 3.x installation"
 
-	elif [ $config_irods_path = yes ]
+			ccflags="${ccflags} -DHAS_IRODS"
+
+			for d in ${irods_path}/lib/*/include ${irods_path}/server/*/include
+			do
+				irods_ccflags="${irods_ccflags} -I$d"
+			done
+
+			irods_ldflags="${library_search_result}"
+			irods_flavor=3
+		fi
+	fi
+
+	if [ "$irods_flavor" = auto ]
 	then
 		echo "*** Sorry, I couldn't find IRODS in $irods_path"
 		echo "*** Check --with-irods-path and try again."
 		exit 1
 	else
-		echo "*** skipping irods support"
+		# When irods is enabled, we also need ssl
+		config_openssl_path=yes
 	fi
 else
 	echo "*** skipping irods support"
 fi
+
 
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
 then
@@ -734,7 +761,7 @@ then
 	fi
 
 	# When mysql is enabled, we also need ssl
-	config_openssl_path=auto
+	config_openssl_path=yes
 
 else
 	if [ $config_mysql_path = yes ]

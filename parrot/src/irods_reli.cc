@@ -11,6 +11,9 @@ See the file COPYING for details.
 #include "rodsClient.hpp"
 #include "rodsPath.hpp"
 #include "miscUtil.hpp"
+#ifdef IRODS_USES_ERROR_HPP
+#include "rodsErrorTable.h"
+#endif
 #ifdef IRODS_USES_PLUGINS
 #include "irods_plugin_home_directory.hpp"
 #endif
