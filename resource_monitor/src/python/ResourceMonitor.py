@@ -16,6 +16,8 @@
 
 from cResourceMonitor import *
 
+import math
+
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -40,7 +42,7 @@ class Categories:
     # @param self                Reference to the current object.
     # @param default_mode        First allocation optimization mode: 'througput', 'waste', 'fixed'
     # @param all_categories_name Name of the general category that holds all of the summaries.
-    def __init__(self, default_mode = 'througput', all_categories_name = '(all)'):
+    def __init__(self, default_mode = 'throughput', all_categories_name = '(all)'):
         self.categories          = {}
         self.default_mode        = default_mode
         self.all_categories_name = all_categories_name
@@ -71,7 +73,6 @@ class Categories:
     #
     # @param self                Reference to the current object.
     # @param name                Name of the category
-    # @param maximum_node        Size of the maximum computational node. If missing, use maximum values from accumulated tasks.
     #
     # @code
     # cs = Categories()
@@ -80,9 +81,9 @@ class Categories:
     # print fa.memory
     # print fa.disk
     # @endcode
-    def first_allocation(self, name, maximum_node = None):
+    def first_allocation(self, name):
         c = self._category(name)
-        return c.first_allocation(maximum_node)
+        return c.first_allocation()
 
     ##
     # Return the maximum resource values so far seen for the given category.
@@ -123,6 +124,64 @@ class Categories:
         c = self._category(self.all_categories_name)
         c.accumulate_summary(summary)
 
+    ##
+    # Return the waste (unit x time) that would be produced if the accumulated
+    # summaries were run under the given allocation.
+    #
+    # @param self                Reference to the current object.
+    # @param name                Name of the category
+    # @param field               Name of the resource (e.g., cores, memory, or disk)
+    #
+    def waste(self, name, field, allocation):
+        c = self._category(name)
+        return c.waste(field, allocation)
+
+    ##
+    # Return the percentage of wasted resources that would be produced if the accumulated
+    # summaries were run under the given allocation.
+    #
+    # @param self                Reference to the current object.
+    # @param name                Name of the category
+    # @param field               Name of the resource (e.g., cores, memory, or disk)
+    #
+    def wastepercentage(self, name, field, allocation):
+        c = self._category(name)
+        return c.wastepercentage(field, allocation)
+
+    ##
+    # Return the throughput that would be obtained if the accumulated
+    # summaries were run under the given allocation.
+    #
+    # @param self                Reference to the current object.
+    # @param name                Name of the category
+    # @param field               Name of the resource (e.g., cores, memory, or disk)
+    #
+    def throughput(self, name, field, allocation):
+        c = self._category(name)
+        return c.throughput(field, allocation)
+
+    ##
+    # Return the number of tasks that would be retried if the accumulated
+    # summaries were run under the given allocation.
+    #
+    # @param self                Reference to the current object.
+    # @param name                Name of the category
+    # @param field               Name of the resource (e.g., cores, memory, or disk)
+    #
+    def retries(self, name, field, allocation):
+        c = self._category(name)
+        return c.retries(field, allocation)
+
+    ##
+    # Return the number of summaries in a particular category.
+    #
+    # @param self                Reference to the current object.
+    # @param name                Name of the category
+    #
+    def count(self, name):
+        c = self._category(name)
+        return c.count()
+
     def _category(self, name):
         try:
             return self.categories[name]
@@ -141,6 +200,7 @@ class Category:
         self.name = name
         self._cat = category_create(name)
         self.allocation_mode(mode)
+        self.summaries = []
 
 
     def allocation_mode(self, mode):
@@ -148,30 +208,127 @@ class Category:
             category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_FIXED)
         elif mode == 'waste':
             category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_MIN_WASTE)
-        elif mode == 'througput':
+        elif mode == 'throughput':
             category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
         else:
-            raise 'No such mode'
+            raise ValueError('No such mode')
         self.mode = mode
 
     def accumulate_summary(self, summary):
         r = self._dict_to_rmsummary(summary)
+        self.summaries.append(self._rmsummary_to_dict(r))
         category_accumulate_summary(self._cat, r, None)
 
-    def first_allocation(self, name, maximum_node = None):
-        rmax = None
-        if(maximum_node):
-            rmax = self._dict_to_rmsummary(maximum_node)
-        category_update_first_allocation(self._cat, rmax)
+    def retries(self, field, allocation):
+        retries = 0
+        for r in self.summaries:
+            if allocation < r[field]:
+                retries += 1
+        return retries
 
-        return self._cat.first_allocation
+    def count(self):
+        return len(self.summaries)
+
+    def usage(self, field):
+        usage = 0
+        for r in self.summaries:
+            resource  = r[field]
+            wall_time = r['wall_time']
+            usage    += wall_time * resource
+        return usage
+
+    def waste(self, field, allocation):
+        maximum = self.maximum_seen()[field]
+
+        waste = 0
+        for r in self.summaries:
+            resource  = r[field]
+            wall_time = r['wall_time']
+            if resource > allocation:
+                waste += wall_time * (allocation + maximum - resource)
+            else:
+                waste += wall_time * (allocation - resource)
+        return waste
+
+    def wastepercentage(self, field, allocation):
+        waste = self.waste(field, allocation)
+        usage = self.usage(field)
+
+        return (100.0 * waste)/(waste + usage)
+
+    def throughput(self, field, allocation):
+        maximum = self.maximum_seen()[field]
+        maximum = float(maximum)
+
+        tasks      = 0
+        total_time = 0
+        for r in self.summaries:
+            resource  = r[field]
+            wall_time = r['wall_time']
+
+            if resource > allocation:
+                tasks      += 1
+                total_time += 2*wall_time
+            else:
+                tasks      += maximum/allocation
+                total_time += wall_time
+        return tasks/total_time
+
+    def first_allocation(self):
+        category_update_first_allocation(self._cat, None)
+        return self._rmsummary_to_dict(self._cat.first_allocation)
 
     def maximum_seen(self):
-        return self._cat.max_resources_seen
+        return self._rmsummary_to_dict(self._cat.max_resources_seen)
 
     def _dict_to_rmsummary(self, pairs):
         rm = rmsummary_create(-1)
         for k, v in pairs.iteritems():
+            if k in ['category', 'command', 'taskid']:
+                pass                          # keep it as string
+            elif k in ['start', 'end', 'wall_time', 'cpu_time', 'bandwidth', 'bytes_read', 'bytes_written', 'bytes_sent', 'bytes_received']:
+                v = int(float(v) * 1000000)             # to s->miliseconds, Mb->bytes, Mbs->bps
+            elif k in ['cores_avg']:
+                v = int(float(v) * 1000)                # to milicores, int
+            else:
+                v = int(math.ceil(float(v)))  # to int
             setattr(rm, k, v)
         return rm
+
+    def _rmsummary_to_dict(self, rm):
+        if not rm:
+            return None
+
+        d = {}
+
+        for k in ['category', 'command', 'taskid', 'exit_type']:
+            v = getattr(rm, k)
+            if v:
+                d[k] = v
+
+        for k in ['signal', 'exit_status', 'last_error']:
+            v = getattr(rm, k)
+            if v != 0:
+                d[k] = v
+
+        for k in ['total_processes', 'max_concurrent_processes',
+                'virtual_memory', 'memory', 'swap_memory', 
+                'total_files',
+                'cores', 'gpus']:
+            v = getattr(rm, k)
+            if v > -1:
+                d[k] = v
+
+        for  k in ['start', 'end', 'cpu_time', 'wall_time',
+                'bandwidth', 'bytes_read', 'bytes_written', 'bytes_received', 'bytes_sent']:
+            v = getattr(rm, k)
+            if v > -1:
+                d[k] = v/1000000.0         # to s, Mbs, MB.
+
+        for k in ['cores_avg']:
+            v = getattr(rm, k)
+            if v > -1:
+                d[k] = v/1000.0            # to cores
+
+        return d
 
