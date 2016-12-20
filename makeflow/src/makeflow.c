@@ -535,8 +535,15 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
-/* Apply wrappers to command and input/output lists */
-static  void makeflow_apply_wrapper(struct dag_node *n, struct batch_queue *queue, struct list **input_list, struct list **output_list, char **input_files, char **output_files, char **command) {
+/*
+Expand a dag_node into a text list of input files,
+output files, and a command, by applying all wrappers
+and settings.  Used at both job submission and completion
+to obtain identical strings.
+*/
+
+static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct list **input_list, struct list **output_list, char **input_files, char **output_files, char **command )
+{
 	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
 
 	if (*input_list == NULL) {
@@ -577,7 +584,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	makeflow_apply_wrapper(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
+	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -882,7 +889,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			struct list *input_list = NULL;
 			char *input_files = NULL, *output_files = NULL, *command = NULL;
 
-			makeflow_apply_wrapper(n, queue, &input_list, &outputs, &input_files, &output_files, &command);
+			makeflow_node_expand(n, queue, &input_list, &outputs, &input_files, &output_files, &command);
 
 			makeflow_archive_populate(d, n, command, input_list, outputs, info);
 
