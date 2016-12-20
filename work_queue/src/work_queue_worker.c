@@ -2009,7 +2009,7 @@ static void read_resources_env_vars() {
 
 static void show_help(const char *cmd)
 {
-	printf( "Use: %s [options] <masterhost> <port>\n", cmd);
+	printf( "Use: %s [options] <masterhost> <port>\nor\n     %s [options] -M projectname\n", cmd, cmd);
 	printf( "where options are:\n");
 	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>");
 	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);

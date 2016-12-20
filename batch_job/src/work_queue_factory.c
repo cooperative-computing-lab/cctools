@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "copy_stream.h"
 #include "debug.h"
+#include "domain_name_cache.h"
 #include "envtools.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -19,6 +20,7 @@ See the file COPYING for details.
 #include "delete_dir.h"
 #include "macros.h"
 #include "catalog_query.h"
+#include "link.h"
 #include "list.h"
 #include "get_line.h"
 #include "getopt.h"
@@ -28,6 +30,7 @@ See the file COPYING for details.
 
 #include "jx.h"
 #include "jx_parse.h"
+#include "jx_print.h"
 #include "jx_table.h"
 
 #include <errno.h>
@@ -42,6 +45,24 @@ See the file COPYING for details.
 #include <sys/time.h>
 #include <unistd.h>
 #include <signal.h>
+
+typedef enum {
+	FORMAT_TABLE,
+	FORMAT_LONG
+} format_t;
+
+static struct jx_table queue_headers[] = {
+{"project",       "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -18},
+{"name",          "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -21},
+{"port",          "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
+{"tasks_waiting", "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_running", "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{"tasks_complete","COMPLETE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
+{"workers",       "WORKERS", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
+{NULL,NULL,0,0,0}
+};
+
+static int work_queue_status_timeout = 30;
 
 static const char *catalog_host = 0;
 static int catalog_port = 0;
@@ -58,7 +79,12 @@ static int worker_timeout = 300;
 static int consider_capacity = 0;
 
 static char *project_regex = 0;
+static char *submission_regex = 0;
 static char *foremen_regex = 0;
+
+char *master_host = 0;
+int master_port = 0;
+int using_catalog = 0;
 
 static char *extra_worker_args=0;
 static const char *resource_args=0;
@@ -89,6 +115,7 @@ static void handle_abort( int sig )
 static void ignore_signal( int sig )
 {
 }
+
 
 int master_workers_capacity(struct jx *j) {
 	int capacity_tasks   = jx_lookup_integer(j, "capacity_tasks");
@@ -148,6 +175,44 @@ int master_workers_needed_by_resource(struct jx *j) {
 	}
 
 	return needed;
+}
+
+struct list* do_direct_query( const char *master_host, int master_port )
+{
+	const char * query_string = "queue";
+
+	struct link *l;
+
+	char master_addr[LINK_ADDRESS_MAX];
+
+	time_t stoptime = time(0) + work_queue_status_timeout;
+
+	if(!domain_name_cache_lookup(master_host,master_addr)) {
+		fprintf(stderr,"couldn't find address of %s\n",master_host);
+		return 0;
+	}
+
+	l = link_connect(master_addr,master_port,stoptime);
+	if(!l) {
+		fprintf(stderr,"couldn't connect to %s port %d: %s\n",master_host,master_port,strerror(errno));
+		return 0;
+	}
+
+	link_putfstring(l,"%s_status\n",stoptime,query_string);
+
+	struct jx *jarray = jx_parse_link(l,stoptime);
+	struct jx *j = jarray->u.items->value;
+	link_close(l);
+
+	if(!j) {
+		fprintf(stderr,"couldn't read from %s port %d: %s\n",master_host,master_port,strerror(errno));
+		return 0;
+	}
+	j->type = JX_OBJECT;
+	
+	struct list* master_list = list_create();
+	list_push_head(master_list, j);
+	return master_list;
 }
 
 /*
@@ -252,18 +317,35 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	buffer_free(&b);
 }
 
-static int submit_worker( struct batch_queue *queue, const char *master_regex )
+static int submit_worker( struct batch_queue *queue )
 {
-	char *cmd = string_format(
+	char *cmd;
+
+	if(using_catalog) {
+		cmd = string_format(
 		"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
-		master_regex,
+		submission_regex,
 		worker_timeout,
 		catalog_host,
 		catalog_port,
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		extra_worker_args ? extra_worker_args : ""
-	);
+		);
+	}
+	else {
+		cmd = string_format(
+		"./work_queue_worker %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		master_host,
+		master_port,
+		worker_timeout,
+		catalog_host,
+		catalog_port,
+		password_file ? "-P pwfile" : "",
+		resource_args ? resource_args : "",
+		extra_worker_args ? extra_worker_args : ""
+		);
+	}
 
 	if(wrapper_command) {
 		// Note that we don't use string_wrap_command here,
@@ -336,11 +418,11 @@ static void update_blacklisted_workers( struct batch_queue *queue, struct list *
 	buffer_free(&b);
 }
 
-static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count, const char *master_regex )
+static int submit_workers( struct batch_queue *queue, struct itable *job_table, int count )
 {
 	int i;
 	for(i=0;i<count;i++) {
-		int jobid = submit_worker(queue, master_regex);
+		int jobid = submit_worker(queue);
 		if(jobid>0) {
 			debug(D_WQ,"worker job %d submitted",jobid);
 			itable_insert(job_table,jobid,(void*)1);
@@ -366,17 +448,6 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 	debug(D_WQ,"%d workers removed.",count);
 
 }
-
-static struct jx_table queue_headers[] = {
-{"project",           "PROJECT", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -18},
-{"name",              "HOST",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, -21},
-{"port",              "PORT",    JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 5},
-{"tasks_waiting",     "WAITING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
-{"tasks_running",     "RUNNING", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
-{"tasks_done",        "COMPLETE",JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 8},
-{"workers_connected", "WORKERS", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 7},
-{NULL,NULL,0,0,0}
-};
 
 void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected)
 {
@@ -418,11 +489,12 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 	struct jx *j;
 	if(masters && list_size(masters) > 0)
 	{
-		fprintf(stdout, "masters:\n");
-
 		list_first_item(masters);
 		while((j = list_next_item(masters)))
 		{
+			if(!using_catalog) {
+				jx_insert_string(j, "name", master_host);
+			}
 			jx_table_print(queue_headers, j, stdout, columns);
 		}
 	}
@@ -625,7 +697,7 @@ current list of masters, compare it to the number actually submitted, then
 submit more until the desired state is reached.
 */
 
-static void mainloop( struct batch_queue *queue, const char *project_regex, const char *foremen_regex )
+static void mainloop( struct batch_queue *queue )
 {
 	int workers_submitted = 0;
 	struct itable *job_table = itable_create(0);
@@ -644,9 +716,14 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 			batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 		}
 
-		const char *submission_regex = foremen_regex ? foremen_regex : project_regex;
+		submission_regex = foremen_regex ? foremen_regex : project_regex;
 
-		masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
+		if(using_catalog) {
+			masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
+		}
+		else {
+			masters_list = do_direct_query(master_host,master_port);
+		}
 
 		if(masters_list && list_size(masters_list) > 0)
 		{
@@ -719,7 +796,7 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
-			workers_submitted += submit_workers(queue,job_table,new_workers_needed,submission_regex);
+			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
 		} else if(new_workers_needed<0) {
 			debug(D_WQ,"too many workers, will wait for some to exit");
 		} else {
@@ -758,9 +835,9 @@ static void mainloop( struct batch_queue *queue, const char *project_regex, cons
 
 static void show_help(const char *cmd)
 {
-	printf("Use: work_queue_factory [options]\n");
+	printf("Use: work_queue_factory [options] <masterhost> <port>\nor\n     work_queue_factory [options] -M projectname\n");
 	printf("where options are:\n");
-	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,--master-name=<project>");
+	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,-N,--master-name=<project>");\
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
 	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
@@ -954,6 +1031,20 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if(project_regex) {
+		using_catalog = 1;
+	}
+	else if((argc - optind) == 2) {
+		master_host = argv[optind];
+		master_port = atoi(argv[optind+1]);
+	}
+	else {
+		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or master-name option with a configuration file, or give the master's host and port.\n");
+		show_help(argv[0]);
+		exit(1);
+	}
+	
+
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
@@ -980,12 +1071,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr,"work_queue_factory: There were errors in the configuration file: %s\n", config_file);
 			return 1;
 		}
-	}
-
-	if(!project_regex) {
-		fprintf(stderr,"work_queue_factory: You must give a project name with the -M option, or the master-name option with a configuration file.\n");
-		return 1;
-	}
+	}	
 
 	if(workers_min>workers_max) {
 		fprintf(stderr,"work_queue_factory: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
@@ -1056,7 +1142,7 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
-	mainloop( queue, project_regex, foremen_regex );
+	mainloop( queue );
 
 	batch_queue_delete(queue);
 
