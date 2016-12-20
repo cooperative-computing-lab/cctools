@@ -131,6 +131,13 @@ OPTION_PAIR(--mounts, mountfile)Use this file as a mountlist. Every line of a mo
 OPTION_PAIR(--cache, cache_dir)Use this dir as the cache for file dependencies.
 OPTIONS_END
 
+SUBSECTION(Archiving Options)
+OPTIONS_BEGIN
+OPTION_PAIR(--archive,path)Archive results of workflow at the specified path (by default /tmp/makeflow.archive.$UID) and use outputs of any archived jobs instead of re-executing job
+OPTION_PAIR(--archive-read,path)Only check to see if jobs have been cached and use outputs if it has been
+OPTION_PAIR(--archive-write,path)Write only results of each job to the archiving directory at the specified path
+OPTIONS_END
+
 SUBSECTION(Other Options)
 OPTIONS_BEGIN
 OPTION_ITEM(`-A, --disable-afs-check')Disable the check for AFS. (experts only)

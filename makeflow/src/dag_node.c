@@ -49,6 +49,8 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->umbrella_spec = NULL;
 
+	n->archive_id = NULL;
+
 	return n;
 }
 

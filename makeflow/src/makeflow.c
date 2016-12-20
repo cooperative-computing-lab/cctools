@@ -30,6 +30,8 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "jx_eval.h"
+#include "create_dir.h"
+#include "sha1.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -45,6 +47,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_singularity.h"
 #include "parser.h"
 #include "parser_jx.h"
+#include "makeflow_archive.h"
 
 #include "makeflow_catalog_reporter.h"
 
@@ -158,6 +161,9 @@ static char *mount_cache = NULL;
 static int use_mountfile = 0;
 
 static struct list *shared_fs = NULL;
+
+static int did_find_archived_job = 0;
+
 
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
@@ -530,6 +536,36 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 }
 
 /*
+Expand a dag_node into a text list of input files,
+output files, and a command, by applying all wrappers
+and settings.  Used at both job submission and completion
+to obtain identical strings.
+*/
+
+static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct list **input_list, struct list **output_list, char **input_files, char **output_files, char **command )
+{
+	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
+
+	if (*input_list == NULL) {
+		*input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	}
+
+	if (*output_list == NULL) {
+		*output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	}
+
+	/* Create strings for all the files mentioned by this node. */
+	*input_files  = makeflow_file_list_format(n, 0, *input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
+	*output_files = makeflow_file_list_format(n, 0, *output_list, queue, wrapper, monitor, enforcer, wrapper_umbrella);
+
+	*command = strdup(n->command);
+	*command = makeflow_wrap_wrapper(*command, n, wrapper);
+	*command = makeflow_wrap_enforcer(*command, n, enforcer, *input_list, *output_list);
+	*command = makeflow_wrap_umbrella(*command, n, wrapper_umbrella, queue, *input_files, *output_files);
+	*command = makeflow_wrap_monitor(*command, n, queue, monitor);
+}
+
+/*
 Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all
 wrappers and options.
@@ -538,6 +574,9 @@ wrappers and options.
 static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 {
 	struct batch_queue *queue;
+	struct dag_file *f;
+	struct list *input_list = NULL, *output_list = NULL;
+	char *input_files = NULL, *output_files = NULL, *command = NULL;
 
 	if(n->local_job && local_queue) {
 		queue = local_queue;
@@ -545,21 +584,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		queue = remote_queue;
 	}
 
-	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
-
-	struct list *input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
-	struct list *output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
-
-	/* Create strings for all the files mentioned by this node. */
-	char *input_files  = makeflow_file_list_format(n, 0, input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
-	char *output_files = makeflow_file_list_format(n, 0, output_list, queue, wrapper, monitor, enforcer, wrapper_umbrella);
-
-	/* Apply the wrapper(s) to the command, if it is (they are) enabled. */
-	char *command = strdup(n->command);
-	command = makeflow_wrap_wrapper(command, n, wrapper);
-	command = makeflow_wrap_enforcer(command, n, enforcer, input_list, output_list);
-	command = makeflow_wrap_umbrella(command, n, wrapper_umbrella, queue, input_files, output_files);
-	command = makeflow_wrap_monitor(command, n, queue, monitor);
+	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
@@ -584,32 +609,47 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 
 	/* Logs the creation of output files. */
 	makeflow_log_file_expectation(d, output_list);
- 
-	/* Now submit the actual job, retrying failures as needed. */
-	n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
 
-	/* Restore old batch job options. */
-	if(previous_batch_options) {
-		batch_queue_set_option(queue, "batch-options", previous_batch_options);
-		free(previous_batch_options);
-	}
+	/* check archiving directory to see if node has already been preserved */
+	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
+		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
 
-	/* Update all of the necessary data structures. */
-	if(n->jobid >= 0) {
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
-		if(n->local_job && local_queue) {
-			itable_insert(d->local_job_table, n->jobid, n);
-		} else {
-			itable_insert(d->remote_job_table, n->jobid, n);
+		/* copy archived files to working directory and update state for node and dag_files */
+		makeflow_archive_copy_preserved_files(d, n, output_list);
+		n->state = DAG_NODE_STATE_RUNNING;
+		list_first_item(n->target_files);
+		while((f = list_next_item(n->target_files))) {
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 		}
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
+		did_find_archived_job = 1;
 	} else {
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		makeflow_failed_flag = 1;
+		/* Now submit the actual job, retrying failures as needed. */
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
+
+		/* Restore old batch job options. */
+		if(previous_batch_options) {
+			batch_queue_set_option(queue, "batch-options", previous_batch_options);
+			free(previous_batch_options);
+		}
+
+		/* Update all of the necessary data structures. */
+		if(n->jobid >= 0) {
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+			if(n->local_job && local_queue) {
+				itable_insert(d->local_job_table, n->jobid, n);
+			} else {
+				itable_insert(d->remote_job_table, n->jobid, n);
+			}
+		} else {
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+			makeflow_failed_flag = 1;
+		}
 	}
 
 	free(command);
-	free(input_list);
-	free(output_list);
+	list_delete(input_list);
+	list_delete(output_list);
 	free(input_files);
 	free(output_files);
 	jx_delete(envlist);
@@ -843,8 +883,25 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 		}
 
+		/* store node into archiving directory  */
+		if (d->should_write_to_archive) {
+			printf("archiving node within archiving directory\n");
+			struct list *input_list = NULL;
+			char *input_files = NULL, *output_files = NULL, *command = NULL;
+
+			makeflow_node_expand(n, queue, &input_list, &outputs, &input_files, &output_files, &command);
+
+			makeflow_archive_populate(d, n, command, input_list, outputs, info);
+
+			free(command);
+			free(input_files);
+			free(output_files);
+			list_delete(input_list);
+		}
+
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
+	list_delete(outputs);
 }
 
 /*
@@ -967,9 +1024,14 @@ static void makeflow_run( struct dag *d )
         }
 
 	while(!makeflow_abort_flag) {
+		did_find_archived_job = 0;
 		makeflow_dispatch_ready_jobs(d);
-
-		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 )
+		/*
+ 		Due to the fact that archived jobs are never "run", no local or remote jobs are added
+ 		to the remote or local job table if all ready jobs were found within the archive.
+ 		Thus makeflow_dispatch_ready_jobs must run at least once more if an archived job was found.
+ 		*/
+		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 && did_find_archived_job == 0 )
 			break;
 
 		if(dag_remote_jobs_running(d)) {
@@ -1010,7 +1072,7 @@ static void makeflow_run( struct dag *d )
                     last_time = now;
                     first_report = 0;
                 }
-                
+
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
@@ -1020,7 +1082,7 @@ static void makeflow_run( struct dag *d )
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
-        
+
         //reporting to catalog
         if(catalog_reporting_on){
             makeflow_catalog_summary(d, project,batch_queue_type,start);
@@ -1057,6 +1119,21 @@ static void handle_abort(int sig)
 }
 
 
+static void set_archive_directory_string(char **archive_directory, char *option_arg) {
+	if (*archive_directory != NULL) {
+		// need to free archive directory to avoid memory leak since it has already been set once
+		free(*archive_directory);
+	}
+	if (option_arg) {
+		*archive_directory = xxstrdup(option_arg);
+	} else {
+		char *uid = xxmalloc(10);
+		sprintf(uid, "%d",  getuid());
+		*archive_directory = xxmalloc(sizeof(MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY) + 20 * sizeof(char));
+		sprintf(*archive_directory, "%s%s", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, uid);
+		free(uid);
+	}
+}
 
 
 
@@ -1124,6 +1201,10 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
+	printf(" %-30s Archive results of makeflow in specified directory			   (default directory is %s)\n", "--archive=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
+	printf(" %-30s Read/Use archived results of makeflow in specified directory, will not write to archive			   (default directory is %s)\n", "--archive-read=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
+	printf(" %-30s Write archived results of makeflow in specified directory, will not read/use archived data			 (default directory is %s)\n", "--archive-write=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
+
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
@@ -1147,6 +1228,8 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 	timestamp_t runtime = 0;
 	int skip_afs_check = 0;
+	int should_read_archive = 0;
+	int should_write_to_archive = 0;
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
@@ -1166,6 +1249,7 @@ int main(int argc, char *argv[])
 	char *s;
 	char *log_dir = NULL;
 	char *log_format = NULL;
+	char *archive_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
 
@@ -1235,6 +1319,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
+		LONG_OPT_ARCHIVE,
+		LONG_OPT_ARCHIVE_READ_ONLY,
+		LONG_OPT_ARCHIVE_WRITE_ONLY
 	};
 
 	static const struct option long_options_run[] = {
@@ -1309,6 +1396,9 @@ int main(int argc, char *argv[])
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
+		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
+		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
 		{0, 0, 0, 0}
 	};
 
@@ -1597,6 +1687,19 @@ int main(int argc, char *argv[])
 			case LONG_OPT_UMBRELLA_SPEC:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				break;
+			case LONG_OPT_ARCHIVE:
+				should_read_archive = 1;
+				should_write_to_archive = 1;
+				set_archive_directory_string(&archive_directory, optarg);
+				break;
+			case LONG_OPT_ARCHIVE_READ_ONLY:
+				should_read_archive = 1;
+				set_archive_directory_string(&archive_directory, optarg);
+				break;
+			case LONG_OPT_ARCHIVE_WRITE_ONLY:
+				should_write_to_archive = 1;
+				set_archive_directory_string(&archive_directory, optarg);
 				break;
 			default:
 				show_help_run(argv[0]);
@@ -1952,6 +2055,10 @@ if (enforcer && wrapper_umbrella) {
             makeflow_wrapper_singularity_init(wrapper, container_image);
         }
 
+	d->archive_directory = archive_directory;
+	d->should_read_archive = should_read_archive;
+	d->should_write_to_archive = should_write_to_archive;
+
 	makeflow_run(d);
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
@@ -1983,6 +2090,8 @@ if (enforcer && wrapper_umbrella) {
 		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
+
+	free(archive_directory);
 
 	return 0;
 }

@@ -50,6 +50,10 @@ struct dag *dag_create()
 	d->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	d->cache_dir = NULL;
 
+	d->archive_directory = NULL;
+	d->should_read_archive = 0;
+	d->should_write_to_archive = 0;
+
 	/* Add GC_*_LIST to variables table to ensure it is in
 	 * global DAG scope. /
 	hash_table_insert(d->variables,"GC_PRESERVE_LIST"   , dag_variable_create(NULL, ""));
