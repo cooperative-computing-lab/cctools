@@ -318,7 +318,7 @@ class Category:
 
         for k in ['total_processes', 'max_concurrent_processes',
                 'virtual_memory', 'memory', 'swap_memory', 
-                'total_files',
+                'disk', 'total_files',
                 'cores', 'gpus']:
             v = getattr(rm, k)
             if v > -1:

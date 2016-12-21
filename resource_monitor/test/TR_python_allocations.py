@@ -26,7 +26,7 @@ run()
 	output=$(${CCTOOLS_PYTHON2} ../src/python/rmonitor_allocations_example.py)
 	alloc=$(echo $output | sed -ne '/(all)/s/.*:[^0123456789]*\([0123456789]*\)/\1/p')
 
-	if [ "$alloc" = "450" ]
+	if [ "$alloc" = "4950" ]
 	then
 		exit 0
 	else

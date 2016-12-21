@@ -8,8 +8,15 @@ import random
 def beta(start, end, alpha = 2, beta = 5):
     return int((end - start) * random.betavariate(alpha, beta)) + start
 
-if __name__ == '__main__':
+# Generate syntetic resource samples according to exp(1.25)
+def exponential(start, end, lambd = 1.25):
+    return int((end - start) * random.expovariate(lambd)) + start
 
+# Generate syntetic resource samples according to triangular(0.1)
+def triangular(start, end, mode = 0.1):
+    return int(random.triangular(start, end, start + mode*(end - start)))
+
+if __name__ == '__main__':
     # set seed so that we can compare runs.
     random.seed(42)
 
@@ -20,12 +27,9 @@ if __name__ == '__main__':
     memory_min  = 50
 
     # max memory, in MB
-    memory_max  = 1000
+    memory_max  = 10000
 
-    # memory size of node
-    memory_node = 2000
-
-    # number of samples to compute
+    # number of samples to compute per category
     number_of_tasks = 10000
 
     # create an empty set of categories
@@ -33,11 +37,19 @@ if __name__ == '__main__':
 
     # generate number_of_tasks memory samples of the category 'example'
     for i in range(number_of_tasks):
-        resources = { 'category': 'example', 'memory': beta(memory_min, memory_max), 'wall_time': wall_time} 
+        resources = { 'category': 'beta',        'memory': beta(memory_min, memory_max),        'wall_time': wall_time} 
+        categories.accumulate_summary(resources)
+
+    for i in range(number_of_tasks):
+        resources = { 'category': 'exponential', 'memory': exponential(memory_min, memory_max), 'wall_time': wall_time} 
+        categories.accumulate_summary(resources)
+
+    for i in range(number_of_tasks):
+        resources = { 'category': 'triangular',  'memory': triangular(memory_min, memory_max),  'wall_time': wall_time} 
         categories.accumulate_summary(resources)
 
     # print the first allocations found
     for name in categories.category_names():
         fa = categories.first_allocation(mode = 'throughput', category = name)
-        print '%-10s: %5d' % (name, fa['memory'])
+        print '%-15s: %5d' % (name, fa['memory'])
 
