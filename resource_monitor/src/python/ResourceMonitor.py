@@ -31,32 +31,29 @@ cctools_debug_config('ResourceMonitorPython')
 # @code
 # cs = Categories()
 # cs.accumulate_summary( { 'category': 'some_category', 'wall_time': 60, 'cores': 1, ... } )
-# print cs.first_allocation('some_category')
+# print cs.first_allocation(mode = 'throughput', category = 'some_category')
 # @endcode
 #
 
 class Categories:
-
     ##
     # Create an empty set of categories.
     # @param self                Reference to the current object.
-    # @param default_mode        First allocation optimization mode: 'througput', 'waste', 'fixed'
     # @param all_categories_name Name of the general category that holds all of the summaries.
-    def __init__(self, default_mode = 'throughput', all_categories_name = '(all)'):
+    def __init__(self, all_categories_name = '(all)'):
         self.categories          = {}
-        self.default_mode        = default_mode
         self.all_categories_name = all_categories_name
         category_tune_bucket_size('category-steady-n-tasks', -1)
 
     ##
-    # Returns a lists of the category names.  List sorted lexicographicaly,
+    # Returns a lists of the category categorys.  List sorted lexicographicaly,
     # with the exception of @ref self.all_categories_name, which it is always
     # the last entry.
     # @param self                Reference to the current object.
     def category_names(self):
-        names = self.categories.keys()
-        names.sort( self._cmp_names )
-        return names
+        categorys = self.categories.keys()
+        categorys.sort( self._cmp_names )
+        return categorys
 
     def _cmp_names(self, a, b):
         # like cmp, but send all_categories_name to the last position
@@ -72,34 +69,35 @@ class Categories:
     # considered in this optimization.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param mode                Optimization mode. One of 'throughput', 'waste', or 'fixed'.
+    # @param category            Name of the category
     #
     # @code
     # cs = Categories()
-    # fa = cs.first_allocation('some_category')
-    # print fa.cores
-    # print fa.memory
-    # print fa.disk
+    # fa = cs.first_allocation(mode = 'throughput, category = 'some_category')
+    # print fa['cores']
+    # print fa['memory']
+    # print fa['disk']
     # @endcode
-    def first_allocation(self, name):
-        c = self._category(name)
-        return c.first_allocation()
+    def first_allocation(self, mode, category):
+        c = self._category(category)
+        return c.first_allocation(mode)
 
     ##
     # Return the maximum resource values so far seen for the given category.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param category            Name of the category
     #
     # @code
     # cs = Categories()
     # fa = cs.maximum_seen('some_category')
-    # print fa.cores
-    # print fa.memory
-    # print fa.disk
+    # print fa['cores']
+    # print fa['memory']
+    # print fa['disk']
     # @endcode
-    def maximum_seen(self, name):
-        c = self._category(name)
+    def maximum_seen(self, category):
+        c = self._category(category)
         return c.maximum_seen()
 
     ##
@@ -112,13 +110,13 @@ class Categories:
     # @endcode
     #
     def accumulate_summary(self, summary):
-        name      = summary['category']
+        category      = summary['category']
         wall_time = summary['wall_time']
 
-        if name == self.all_categories_name:
+        if category == self.all_categories_name:
             raise ValueError("category '" + self.all_categories_name + "' used for individual category.")
 
-        c = self._category(name)
+        c = self._category(category)
         c.accumulate_summary(summary)
 
         c = self._category(self.all_categories_name)
@@ -129,11 +127,12 @@ class Categories:
     # summaries were run under the given allocation.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param category            Name of the category
     # @param field               Name of the resource (e.g., cores, memory, or disk)
+    # @param allocation          Value of allocation to test.
     #
-    def waste(self, name, field, allocation):
-        c = self._category(name)
+    def waste(self, category, field, allocation):
+        c = self._category(category)
         return c.waste(field, allocation)
 
     ##
@@ -141,11 +140,12 @@ class Categories:
     # summaries were run under the given allocation.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param category                Name of the category
     # @param field               Name of the resource (e.g., cores, memory, or disk)
+    # @param allocation          Value of allocation to test.
     #
-    def wastepercentage(self, name, field, allocation):
-        c = self._category(name)
+    def wastepercentage(self, category, field, allocation):
+        c = self._category(category)
         return c.wastepercentage(field, allocation)
 
     ##
@@ -153,11 +153,12 @@ class Categories:
     # summaries were run under the given allocation.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param category                Name of the category
     # @param field               Name of the resource (e.g., cores, memory, or disk)
+    # @param allocation          Value of allocation to test.
     #
-    def throughput(self, name, field, allocation):
-        c = self._category(name)
+    def throughput(self, category, field, allocation):
+        c = self._category(category)
         return c.throughput(field, allocation)
 
     ##
@@ -165,29 +166,30 @@ class Categories:
     # summaries were run under the given allocation.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param category                Name of the category
     # @param field               Name of the resource (e.g., cores, memory, or disk)
+    # @param allocation          Value of allocation to test.
     #
-    def retries(self, name, field, allocation):
-        c = self._category(name)
+    def retries(self, category, field, allocation):
+        c = self._category(category)
         return c.retries(field, allocation)
 
     ##
     # Return the number of summaries in a particular category.
     #
     # @param self                Reference to the current object.
-    # @param name                Name of the category
+    # @param category                Name of the category
     #
-    def count(self, name):
-        c = self._category(name)
+    def count(self, category):
+        c = self._category(category)
         return c.count()
 
-    def _category(self, name):
+    def _category(self, category):
         try:
-            return self.categories[name]
+            return self.categories[category]
         except KeyError:
-            cat = Category(name, self.default_mode)
-            self.categories[name] = cat
+            cat = Category(category)
+            self.categories[category] = cat
             return cat
 
 
@@ -196,10 +198,9 @@ class Categories:
 #
 # Internal class.
 class Category:
-    def __init__(self, name, mode):
-        self.name = name
-        self._cat = category_create(name)
-        self.allocation_mode(mode)
+    def __init__(self, category):
+        self.category = category
+        self._cat = category_create(category)
         self.summaries = []
 
 
@@ -212,7 +213,6 @@ class Category:
             category_specify_allocation_mode(self._cat, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT)
         else:
             raise ValueError('No such mode')
-        self.mode = mode
 
     def accumulate_summary(self, summary):
         r = self._dict_to_rmsummary(summary)
@@ -274,9 +274,14 @@ class Category:
                 total_time += wall_time
         return tasks/total_time
 
-    def first_allocation(self):
-        category_update_first_allocation(self._cat, None)
-        return self._rmsummary_to_dict(self._cat.first_allocation)
+    def first_allocation(self, mode):
+        self.allocation_mode(mode)
+
+        if mode == 'fixed':
+            return self.maximum_seen()
+        else:
+            category_update_first_allocation(self._cat, None)
+            return self._rmsummary_to_dict(self._cat.first_allocation)
 
     def maximum_seen(self):
         return self._rmsummary_to_dict(self._cat.max_resources_seen)
