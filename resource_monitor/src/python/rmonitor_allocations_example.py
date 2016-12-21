@@ -38,6 +38,6 @@ if __name__ == '__main__':
 
     # print the first allocations found
     for name in categories.category_names():
-        fa = categories.first_allocation(name):
+        fa = categories.first_allocation(name)
         print '%-10s: %5d' % (name, fa['memory'])
 
