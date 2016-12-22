@@ -50,6 +50,7 @@ char *string_pad_left(char *str, int length);
 void string_cookie(char *str, int length);
 char *string_subst(char *value, string_subst_lookup_t lookup, void *arg);
 int string_prefix_is(const char *string, const char *prefix);
+int string_suffix_is(const char *string, const char *suffix);
 
 /** Appends second to first, both null terminated strings. Returns the new
   formed string. First argument is reallocated with realloc.
