@@ -204,10 +204,12 @@ sub main {
 	`maker -dsindex -g $genome -base $base_name`;
 
 	print "\n".localtime()." :: File $base_name annotated :: ".scalar (keys %$input_to_contigs)." in total \n";
-	print localtime()." :: Failed to annotate :: \n";
-	foreach my $task (keys %task_failures){
-		if($task_failures{$task} > $tolerable_task_failures){
-			print "\t$task\n";
+	if($wq->stats->{total_tasks_failed} > 0){
+		print localtime()." :: Failed to annotate :: \n";
+		foreach my $task (keys %task_failures){
+			if($task_failures{$task} > $tolerable_task_failures){
+				print "\t$task\n";
+			}
 		}
 	}
 	$workers_used = 0;	
@@ -226,8 +228,7 @@ sub main {
 	print $wq->stats->{total_workers_lost}."\n";
 	print "-----------------------------------------------------------------\n";
 	print "\n";
-	my $wall_time = (time - ($wq->stats->{start_time}/1000000));
-	print $wall_time."\n";
+	my $wall_time = ((time*1000000) - ($wq->stats->{start_time}));
 	print "Work Queue Wall Time:\t";
 	print_time($wall_time);
 	print "Cumulative Task Wall Time:\t";
@@ -255,21 +256,21 @@ sub main {
 
 sub print_time {
 	my ($time_val) = @_;
+
+	my $sub_sec = $time_val%1000000;
+	$time_val = $time_val/1000000;
+
 	my $days = $time_val/86400;
 	$time_val = $time_val%86400;
-	if(int($days) > 0){
-		print int($days)."d ";
-	}
 
 	my $hours = $time_val/3600;
 	$time_val = $time_val%3600;
-	print int($hours).":";
 
 	my $min = $time_val/60;
 	$time_val = $time_val%60;
-	print int($min).":";
 
-	print int($time_val)."\n";
+	printf '%dd %d:%2d:%2d.%6d', int($days), int($hours), int($min), int($time_val), int($sub_sec);
+	print "\n";
 }
 
 sub setup_workqueue {
