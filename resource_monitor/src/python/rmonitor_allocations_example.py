@@ -36,20 +36,32 @@ if __name__ == '__main__':
     categories = Categories();
 
     # generate number_of_tasks memory samples of the category 'example'
-    for i in range(number_of_tasks):
-        resources = { 'category': 'beta',        'memory': beta(memory_min, memory_max),        'wall_time': wall_time} 
-        categories.accumulate_summary(resources)
+    try:
+        for i in range(number_of_tasks):
+            resources = { 'category': 'beta',        'memory': beta(memory_min, memory_max),        'wall_time': wall_time} 
+            categories.accumulate_summary(resources)
+    except AttributeError:
+        print 'beta distribution not available.'
 
-    for i in range(number_of_tasks):
-        resources = { 'category': 'exponential', 'memory': exponential(memory_min, memory_max), 'wall_time': wall_time} 
-        categories.accumulate_summary(resources)
+    try:
+        for i in range(number_of_tasks):
+            resources = { 'category': 'exponential', 'memory': exponential(memory_min, memory_max), 'wall_time': wall_time} 
+            categories.accumulate_summary(resources)
+    except AttributeError:
+        print 'exponential distribution not available.'
 
-    for i in range(number_of_tasks):
-        resources = { 'category': 'triangular',  'memory': triangular(memory_min, memory_max),  'wall_time': wall_time} 
-        categories.accumulate_summary(resources)
+    try:
+        for i in range(number_of_tasks):
+            resources = { 'category': 'triangular',  'memory': triangular(memory_min, memory_max),  'wall_time': wall_time} 
+            categories.accumulate_summary(resources)
+    except AttributeError:
+        print 'triangular distribution not available.'
 
     # print the first allocations found
     for name in categories.category_names():
-        fa = categories.first_allocation(mode = 'throughput', category = name)
-        print '%-15s: %5d' % (name, fa['memory'])
+        try:
+            fa = categories.first_allocation(mode = 'throughput', category = name)
+            print '%-15s: %5d' % (name, fa['memory'])
+        except TypeError:
+            print name + ' distribution not available.'
 

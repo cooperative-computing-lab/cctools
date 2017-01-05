@@ -9,7 +9,7 @@ LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../../dttools/src/libdttools.a
 RMPYTHONSO = _cResourceMonitor.$(CCTOOLS_DYNAMIC_SUFFIX)
-LIBRARIES = $(RMPYTHONSO) cResourceMonitor.py ResourceMonitor.py
+LIBRARIES = $(RMPYTHONSO) cResourceMonitor.py
 OBJECTS = rmonitor_wrap.o
 TARGETS = $(LIBRARIES)
 
@@ -32,7 +32,7 @@ test:
 install: all
 	mkdir -p $(CCTOOLS_PYTHON_PATH)
 	chmod 755 ResourceMonitor.py
-	cp $(TARGETS) $(CCTOOLS_PYTHON_PATH)/
+	cp ResourceMonitor.py $(TARGETS) $(CCTOOLS_PYTHON_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	cp rmonitor_allocations_example.py $(CCTOOLS_INSTALL_DIR)/doc/
 

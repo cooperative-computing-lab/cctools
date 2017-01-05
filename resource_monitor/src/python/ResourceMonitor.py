@@ -294,7 +294,7 @@ class Category:
             elif k in ['start', 'end', 'wall_time', 'cpu_time', 'bandwidth', 'bytes_read', 'bytes_written', 'bytes_sent', 'bytes_received']:
                 v = int(float(v) * 1000000)             # to s->miliseconds, Mb->bytes, Mbs->bps
             elif k in ['cores_avg']:
-                v = int(float(v) * 1000)                # to milicores, int
+                pass                                    # not yet implemented
             else:
                 v = int(math.ceil(float(v)))  # to int
             setattr(rm, k, v)
@@ -329,11 +329,6 @@ class Category:
             v = getattr(rm, k)
             if v > -1:
                 d[k] = v/1000000.0         # to s, Mbs, MB.
-
-        for k in ['cores_avg']:
-            v = getattr(rm, k)
-            if v > -1:
-                d[k] = v/1000.0            # to cores
 
         return d
 
