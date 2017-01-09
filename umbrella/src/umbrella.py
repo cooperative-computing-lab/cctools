@@ -1006,6 +1006,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 							subprocess_error(cmd, rc, stdout, stderr)
 				else:
 					mount_dict[mountpoint] = mount_value
+					os.chmod(mount_value, 0755)
 
 
 def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting, name=None):
