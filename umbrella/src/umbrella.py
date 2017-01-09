@@ -1007,6 +1007,10 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 				else:
 					mount_dict[mountpoint] = mount_value
 
+				if software_spec[item].has_key('mode'):
+					mode = int(software_spec[item]['mode'], 8)
+					os.chmod(mount_value, mode)
+					logging.debug("Change the file mode of `%s` to `%s`", mount_value, oct(mode))
 
 def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting, name=None):
 	"""Process data section of the specification.
@@ -1053,6 +1057,11 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
 			mount_dict[mountpoint] = mount_value
 			if mount_env and mountpoint:
 				env_para_dict[mount_env] = mountpoint
+
+			if data_spec[item].has_key('mode'):
+				mode = int(data_spec[item]['mode'], 8)
+				os.chmod(mount_value, mode)
+				logging.debug("Change the file mode of `%s` to `%s`", mount_value, oct(mode))
 
 def get_linker_path(hardware_platform, os_image_dir):
 	"""Return the path of ld-linux.so within the downloaded os image dependency
