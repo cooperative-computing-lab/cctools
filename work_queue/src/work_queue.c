@@ -267,6 +267,8 @@ static int task_state_is( struct work_queue *q, uint64_t taskid, work_queue_task
 static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_task_state_t state);
 /* number of tasks with state */
 static int task_state_count( struct work_queue *q, const char *category, work_queue_task_state_t state);
+/* number of tasks with the resource allocation request */
+static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request);
 
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
@@ -2125,7 +2127,14 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 			jx_insert_integer(j, "first_memory", c->first_allocation->memory);
 		if(c->first_allocation->disk > -1)
 			jx_insert_integer(j, "first_disk", c->first_allocation->disk);
+
+		jx_insert_integer(j, "first_allocation_count", task_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
+		jx_insert_integer(j, "max_allocation_count",   task_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
+	} else {
+		jx_insert_integer(j, "first_allocation_count", 0);
+		jx_insert_integer(j, "max_allocation_count", s.tasks_waiting + s.tasks_running + s.tasks_dispatched);
 	}
+
 
 	return j;
 }
@@ -5217,6 +5226,24 @@ static int task_state_count(struct work_queue *q, const char *category, work_que
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
 		if( task_state_is(q, taskid, state) ) {
+			if(!category || strcmp(category, t->category) == 0) {
+				count++;
+			}
+		}
+	}
+
+	return count;
+}
+
+static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request) {
+	struct work_queue_task *t;
+	uint64_t taskid;
+
+	int count = 0;
+
+	itable_firstkey(q->tasks);
+	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
+		if(t->resource_request == request) {
 			if(!category || strcmp(category, t->category) == 0) {
 				count++;
 			}
