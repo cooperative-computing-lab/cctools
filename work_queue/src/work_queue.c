@@ -268,7 +268,7 @@ static struct work_queue_task *task_state_any(struct work_queue *q, work_queue_t
 /* number of tasks with state */
 static int task_state_count( struct work_queue *q, const char *category, work_queue_task_state_t state);
 /* number of tasks with the resource allocation request */
-static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request);
+static int task_waiting_request_count( struct work_queue *q, const char *category, category_allocation_t request);
 
 static work_queue_result_code_t get_result(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_result_code_t get_available_results(struct work_queue *q, struct work_queue_worker *w);
@@ -2061,8 +2061,7 @@ static int count_workers_for_waiting_tasks(struct work_queue *q, struct rmsummar
 sent to the catalog.
 */
 
-void category_jx_insert_max(struct jx *j, struct category *c, const char *field, struct rmsummary *largest) {
-
+void category_jx_find_max(struct category *c, const char *field, struct rmsummary *largest, int64_t *max, char *indicator) {
 	int64_t l = rmsummary_get_int_field(largest, field);
 	int64_t m = rmsummary_get_int_field(c->max_resources_seen, field);
 	int64_t e = -1;
@@ -2071,25 +2070,85 @@ void category_jx_insert_max(struct jx *j, struct category *c, const char *field,
 		e = rmsummary_get_int_field(c->max_resources_seen->limits_exceeded, field);
 	}
 
-	char *field_str = string_format("max_%s", field);
-
 	if(l > -1){
-		char *max_str = string_format("%" PRId64, l);
-		jx_insert_string(j, field_str, max_str);
-		free(max_str);
+		/* = Means that the allocation is fixed. We know for sure the value, as
+		 * it was specified by the user. */
+		indicator[0] = '=';
+		*max         = l;
 	} else if(!category_in_steady_state(c) && e > -1) {
-		char *max_str = string_format(">%" PRId64, m - 1);
-		jx_insert_string(j, field_str, max_str);
-		free(max_str);
+		/* > Means that some task exhausted that many resources. We do not know
+		 * the maximum, but we know is larger than this value. */
+		indicator[0] = '>';
+		*max         = l;
 	} else if(m > -1) {
-		char *max_str = string_format("~%" PRId64, m);
-		jx_insert_string(j, field_str, max_str);
-		free(max_str);
+		/* ~ Means that all tasks have run using at most this allocation.
+		 * However, we are not sure if a bigger allocation will be needed in
+		 * the future. */
+		indicator[0] = '~';
+		*max         = m;
+	} else {
+		/* ? Means that no information is available regarding the allocation. */
+		indicator[0] = '?';
+		*max         = 0;
 	}
 
-	free(field_str);
+	indicator[1] = '\0';
 }
 
+/* Per resource, we add number of tasks waiting for a certail allocation,
+ * together with the allocation. */
+void category_jx_insert_resource_task_report(struct work_queue *q, struct work_queue_stats *s, struct jx *j, struct jx *rs, struct category *c, const char *field, struct rmsummary *largest) {
+	struct jx *r = jx_object(0);
+
+	int64_t max_waiting;
+	char indicator[2];
+	category_jx_find_max(c, field, largest, &max_waiting, indicator);
+
+	/* We add to the root json document max_FIELD: [?>=~]VALUE. This is a
+	 * little annoying, as it repeats info from the json array below, but it
+	 * makes things much easier when printing information from
+	 * work_queue_status. */
+	char *max_for_status_key = string_format("max_%s", field);
+	char *max_for_status_val = string_format("%s%" PRId64, indicator, max_waiting);
+	jx_insert_string(j, max_for_status_key, max_for_status_val);
+	free(max_for_status_key);
+	free(max_for_status_val);
+
+	category_jx_find_max(c, field, largest, &max_waiting, indicator);
+
+	/* Add an array of json objects. Each object has: tasks_count (tasks
+	 * waiting at particular allocation), allocation (the size of the
+	 * allocation), indicator (whether the allocation is fixed, guessed, etc.),
+	 * and a label (such as maximum, first, etc.) */
+	struct jx *counts = jx_array(0);
+	int64_t first;
+	if(c->first_allocation && (first = rmsummary_get_int_field(c->first_allocation, field)) > -1) {
+
+		struct jx *entry = jx_object(0);
+		jx_insert_integer(entry, "task_count", task_waiting_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
+		jx_insert_integer(entry, "allocation", max_waiting);
+		jx_insert_string(entry,  "indicator",  indicator);
+		jx_insert_string(entry,  "label",      "maximum_allocation");
+		jx_array_insert(counts,  entry);
+
+		entry = jx_object(0);
+		jx_insert_integer(entry, "task_count", task_waiting_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
+		jx_insert_integer(entry, "allocation", max_waiting);
+		jx_insert_string(entry,  "indicator",  "=");
+		jx_insert_string(entry,  "label",      "first_allocation");
+		jx_array_insert(counts,  entry);
+	} else {
+		struct jx *entry = jx_object(0);
+		jx_insert_integer(entry, "task_count", s->tasks_waiting);
+		jx_insert_integer(entry, "allocation", max_waiting);
+		jx_insert_string(entry,  "indicator",  indicator);
+		jx_insert_string(entry,  "label",      "maximum_allocation");
+		jx_array_insert(counts,  entry);
+	}
+
+	jx_insert(r, jx_string("waiting"), counts);
+	jx_insert(rs, jx_string(field), r);
+}
 
 static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
@@ -2112,29 +2171,18 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
 	jx_insert_integer(j, "workers_able",     s.workers_able);
 
-	struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);
 
-	category_jx_insert_max(j, c, "cores",  largest);
-	category_jx_insert_max(j, c, "memory", largest);
-	category_jx_insert_max(j, c, "disk",   largest);
+	struct jx *rs = jx_object(0);
+	if(rs) {
+		struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);
 
-	rmsummary_delete(largest);
+		category_jx_insert_resource_task_report(q, &s, j, rs, c, "cores",  largest);
+		category_jx_insert_resource_task_report(q, &s, j, rs, c, "memory", largest);
+		category_jx_insert_resource_task_report(q, &s, j, rs, c, "disk",   largest);
 
-	if(c->first_allocation) {
-		if(c->first_allocation->cores > -1)
-			jx_insert_integer(j, "first_cores", c->first_allocation->cores);
-		if(c->first_allocation->memory > -1)
-			jx_insert_integer(j, "first_memory", c->first_allocation->memory);
-		if(c->first_allocation->disk > -1)
-			jx_insert_integer(j, "first_disk", c->first_allocation->disk);
-
-		jx_insert_integer(j, "first_allocation_count", task_request_count(q, c->name, CATEGORY_ALLOCATION_FIRST));
-		jx_insert_integer(j, "max_allocation_count",   task_request_count(q, c->name, CATEGORY_ALLOCATION_MAX));
-	} else {
-		jx_insert_integer(j, "first_allocation_count", 0);
-		jx_insert_integer(j, "max_allocation_count", s.tasks_waiting + s.tasks_running + s.tasks_dispatched);
+		rmsummary_delete(largest);
+		jx_insert(j, jx_string("resources"), rs);
 	}
-
 
 	return j;
 }
@@ -5235,7 +5283,7 @@ static int task_state_count(struct work_queue *q, const char *category, work_que
 	return count;
 }
 
-static int task_request_count( struct work_queue *q, const char *category, category_allocation_t request) {
+static int task_waiting_request_count( struct work_queue *q, const char *category, category_allocation_t request) {
 	struct work_queue_task *t;
 	uint64_t taskid;
 
@@ -5244,8 +5292,10 @@ static int task_request_count( struct work_queue *q, const char *category, categ
 	itable_firstkey(q->tasks);
 	while( itable_nextkey(q->tasks, &taskid, (void **) &t) ) {
 		if(t->resource_request == request) {
-			if(!category || strcmp(category, t->category) == 0) {
-				count++;
+			if( task_state_is(q, taskid, WORK_QUEUE_TASK_READY) ) {
+				if(!category || strcmp(category, t->category) == 0) {
+					count++;
+				}
 			}
 		}
 	}
