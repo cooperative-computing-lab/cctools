@@ -487,29 +487,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		}
 	}
 
-	if(pattern_match(full_logical_name, "^/proc/self/?()", &n) >= 0) {
-		snprintf(pname->path, sizeof pname->path, "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
-		strcpy(pname->logical_name, pname->path);
-		strcpy(pname->rest, pname->path);
-		pname->service = pfs_service_lookup_default();
-		strcpy(pname->service_name,"local");
-		strcpy(pname->host,"localhost");
-		strcpy(pname->hostport,"localhost");
-		pname->is_local = 1;
-		return 1;
-	} else if (pattern_match(full_logical_name, "^/dev/fd/?()", &n) >= 0) {
-		snprintf(pname->path, sizeof pname->path, "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
-		strcpy(pname->logical_name, pname->path);
-		strcpy(pname->rest, pname->path);
-		pname->service = pfs_service_lookup_default();
-		strcpy(pname->service_name,"local");
-		strcpy(pname->host,"localhost");
-		strcpy(pname->hostport,"localhost");
-		pname->is_local = 1;
-		return 1;
-	} else {
-		result = pfs_resolve(pname->logical_name,pname->path,mode,time(0)+pfs_master_timeout);
-	}
+	result = pfs_resolve(pname->logical_name,pname->path,mode,time(0)+pfs_master_timeout);
 
 	if(namelist_table) {
 		namelist_table_insert(pname->path, is_special_syscall);
@@ -568,6 +546,29 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		if (do_follow_symlink && pfs_follow_symlinks) {
 			follow_symlink(pname, mode, depth + 1);
 		}
+
+	if(pattern_match(pname->path, "^/proc/self/?()", &n) >= 0) {
+		strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
+		snprintf(pname->path, sizeof(pname->path), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
+		strcpy(pname->logical_name, pname->path);
+		strcpy(pname->rest, pname->path);
+		pname->service = pfs_service_lookup_default();
+		strcpy(pname->service_name,"local");
+		strcpy(pname->host,"localhost");
+		strcpy(pname->hostport,"localhost");
+		pname->is_local = 1;
+	} else if (pattern_match(pname->path, "^/dev/fd/?()", &n) >= 0) {
+		strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
+		snprintf(pname->path, sizeof(pname->path), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
+		strcpy(pname->logical_name, pname->path);
+		strcpy(pname->rest, pname->path);
+		pname->service = pfs_service_lookup_default();
+		strcpy(pname->service_name,"local");
+		strcpy(pname->host,"localhost");
+		strcpy(pname->hostport,"localhost");
+		pname->is_local = 1;
+	}
+
 		return 1;
 	}
 }
