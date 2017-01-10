@@ -396,6 +396,15 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 	char *name_to_resolve = link_target;
 	struct pfs_name new_pname = *pname;
 
+	if (string_prefix_is(pname->path, "/proc/self/ns/") || string_match_regex(pname->path, "^/proc/[0-9]+/ns/")) {
+		/*
+		 * Depending on kernel version, these might be magical dangling symlinks that can
+		 * nonetheless be opened as usual. If Parrot tries to follow them, it will return
+		 * erroneous ENOENT.
+		 */
+		return;
+	}
+
 	int rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
 	if (rlres > 0) {
 		/* readlink does not NULL-terminate */
