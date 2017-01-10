@@ -185,7 +185,7 @@ int whole_string_match_regex(const char *text, const char *pattern)
 }
 
 
-int string_match_regex(const char *text, char *pattern)
+int string_match_regex(const char *text, const char *pattern)
 {
 	int ret = 0;
 	regex_t re;
