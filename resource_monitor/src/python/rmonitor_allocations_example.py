@@ -3,6 +3,7 @@
 
 from ResourceMonitor import *
 import random
+import sys
 
 # Generate syntetic resource samples according to beta(2, 5)
 def beta(start, end, alpha = 2, beta = 5):
@@ -30,7 +31,7 @@ if __name__ == '__main__':
     memory_max  = 10000
 
     # number of samples to compute per category
-    number_of_tasks = 10000
+    number_of_tasks = 10
 
     # create an empty set of categories
     categories = Categories();
@@ -64,4 +65,6 @@ if __name__ == '__main__':
             print '%-15s: %5d' % (name, fa['memory'])
         except TypeError:
             print name + ' distribution not available.'
+
+    sys.exit(0)
 
