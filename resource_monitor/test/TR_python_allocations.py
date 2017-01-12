@@ -23,15 +23,7 @@ prepare()
 run()
 {
 	export PYTHONPATH=$(pwd)/../src/python
-	output=$(${CCTOOLS_PYTHON2} ../src/python/rmonitor_allocations_example.py)
-    alloc=$(echo $output | sed -ne 's/.*exponential[^:]:[^0123456789]*\([0123456789]*\).*/\1/p')
-
-	if [ "$alloc" = "800" ]
-	then
-		exit 0
-	else
-		exit 1
-	fi
+	${CCTOOLS_PYTHON2} ../src/python/rmonitor_allocations_example.py
 }
 
 clean()
