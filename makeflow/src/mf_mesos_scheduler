@@ -275,6 +275,7 @@ class MakeflowScheduler(Scheduler):
             if num_ready_task == 0:
                 driver.declineOffer(offer.id)    
             else:
+                offer_used = False
                 offer_cpus = 0
                 offer_mem = 0
                 offer_disk = 0
@@ -289,7 +290,8 @@ class MakeflowScheduler(Scheduler):
 
                 logger.info("Received resource offer {0} with cpus {1}, mem: {2} and disk {3} from {4}\
                     ".format(offer.id.value, offer_cpus, offer_mem, offer_disk, offer.hostname))
-
+                
+                
                 with mms.lock:
                     for task_info in mms.tasks_info_dict.itervalues():
 
@@ -304,8 +306,13 @@ class MakeflowScheduler(Scheduler):
                                 logger.info("Task {0} will use {1} cores {2} mem {3} disk".format(task_id, task_info.cores, task_info.mem, task_info.disk))
                                 
                                 self.launch_mesos_task(driver, offer, task_id, task_info.cores, task_info.mem, task_info.disk)
+                                offer_used = True
                                 num_ready_task -= 1
                                 break;
+
+                    if offer_used == False: 
+                        logger.info("Resource offer {0} with {1} cpu {2} mem {3} disk is unused.".format(offer.id, offer_cpus, offer_mem, offer_disk))
+                        driver.declineOffer(offer.id)
 
     def clean_mesos_file(self, task_id): 
         mf_task = mms.tasks_info_dict[task_id]
@@ -410,7 +417,13 @@ class MakeflowScheduler(Scheduler):
                     if mms.tasks_failed_time[failed_task_id] <= MAX_FAILED:
                         mms.tasks_failed_time[failed_task_id] += 1
                         mms.tasks_info_dict[failed_task_id].action = "resubmitted"
-                        logger.info("Task {0} has been failed {1} times". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
+                        if update.message == "run out of resource":
+                            logger.info("Task {0} has been failed {1} times because running out memory". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
+                            mms.tasks_info_dict[failed_task_id].cores = 4 
+                            mms.tasks_info_dict[failed_task_id].mem = 5120 
+                            mms.tasks_info_dict[failed_task_id].disk = 5120 
+                        else:
+                            logger.info("Task {0} has been failed {1} times". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
                         logger.info("Try to resubmit failed task {0}".format(failed_task_id))
                     else:
                         oup_fn.write("{0},failed\n".format(failed_task_id))
@@ -420,6 +433,11 @@ class MakeflowScheduler(Scheduler):
                     mms.tasks_failed_time[failed_task_id] = 1
                     mms.tasks_info_dict[failed_task_id].action = "resubmitted"
                     logger.info("Task {0} has been failed 1 time". format(failed_task_id)) 
+                    if update.message == "run out of resource":
+                        logger.info("Task {0} has been failed {1} times because running out memory". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
+                        mms.tasks_info_dict[failed_task_id].cores = 4
+                        mms.tasks_info_dict[failed_task_id].mem = 5120
+                        mms.tasks_info_dict[failed_task_id].disk = 5120 
                     logger.info("Try to resubmit failed task {0}".format(failed_task_id))
 
             if update.state == mesos_pb2.TASK_KILLED:
@@ -584,7 +602,6 @@ class MakefowMonitor(threading.Thread):
 
         while(not os.path.isfile(MESOS_DONE_FILE)):
 
-            self.driver.reviveOffers()
             current_ppid = os.getppid()
            
             # The parent process (i.e. batch_job_mesos) has 
@@ -619,12 +636,10 @@ class MakefowMonitor(threading.Thread):
 
                         mms.tasks_info_dict[task_id] \
                                 = mf_mesos_task_info
-
-                    # makeflow trying to abort an exist task
-                    if (task_id in mms.tasks_info_dict) and\
-                            (task_action == "aborting"):
-
-                        self.abort_mesos_task(task_id)                
+                    else:
+                        
+                        if task_action == "aborting":
+                            self.abort_mesos_task(task_id) 
 
             task_info_fp.close()
             time.sleep(2)

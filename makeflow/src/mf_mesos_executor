@@ -104,7 +104,9 @@ class MakeflowMesosExecutor(Executor):
                 returncode = e.returncode
                 update.state = mesos_pb2.TASK_FAILED
                 if returncode == 2:
-                    update.message = "task {0} run out of resource".format(task.task_id.value)
+                    update.message = "run out of resource"
+                else:
+                    update.message = "task {0} failed not because of lacking of resource".format(task.task_id.value)
 
             driver.sendStatusUpdate(update)
             print "Sent status update"
