@@ -403,6 +403,7 @@ System                  2                   2
             ],
             "mountpoint": "/tmp/4_cubes.pov",
             "id": "c65266cd2b672854b821ed93028a877a",
+            "mode": "0644",
             "size": "1757"
         },
         "WRC_RubiksCube.inc": {
@@ -413,6 +414,7 @@ System                  2                   2
             ],
             "mountpoint": "/tmp/WRC_RubiksCube.inc",
             "id": "2f8afdd09fc3a6177c6f1977bb3bdae7",
+            "mode": "0755",
             "size": "28499"
         }
     },
@@ -509,6 +511,8 @@ System                  2                   2
 				dedendency as it is. <tt>unpack</tt> uncompresses the dependency. Default: unpack. Not case
 				sensitive.</li>
 
+				<li><b>mode</b> (optional): the file mode set as a string, such as <tt>"0644"</tt>. </li>
+
 				<li><b>mountpoint</b> (optional): the mountpoint of the software. Case
 				sensitive.</li>
 
@@ -554,6 +558,8 @@ System                  2                   2
 				Options: <tt>none</tt>, <tt>unpack</tt>. <tt>none</tt> leaves the downloaded
 				dedendency as it is. <tt>unpack</tt> uncompresses the dependency. Default: unpack. Not case
 				sensitive.</li>
+
+				<li><b>mode</b> (optional): the file mode set as a string, such as <tt>"0644"</tt>. </li>
 
 				<li><b>mountpoint</b> (optional): the mountpoint of the data dependency. The same as
 				the mountpoint attribute of the software section. Case sensitive.</li>
