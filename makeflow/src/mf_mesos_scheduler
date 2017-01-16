@@ -41,7 +41,6 @@ MESOS_DONE_FILE = "mesos_done"
 
 MAX_FAILED = 10
 MAX_LOST = 10
-PARENT_PID = 0
    
 class ThreadPoolMixIn(SocketServer.ThreadingMixIn):
     '''
@@ -602,14 +601,8 @@ class MakefowMonitor(threading.Thread):
 
         while(not os.path.isfile(MESOS_DONE_FILE)):
 
-            current_ppid = os.getppid()
-           
             # The parent process (i.e. batch_job_mesos) has 
             # been killed. Stop the scheduler
-
-            if (current_ppid != PARENT_PID):
-                logger.info("The parent process exit unexpectedly")
-                break; 
 
             task_info_fp = open(FILE_TASK_INFO, "r")
             lines = task_info_fp.readlines()
@@ -648,9 +641,6 @@ class MakefowMonitor(threading.Thread):
 
 
 if __name__ == '__main__':
-
-    PARENT_PID = os.getppid()
-    logger.info("The parent pid is {0}".format(PARENT_PID))
 
     class ThreadedServer(ThreadPoolMixIn, SocketServer.TCPServer):
         pass
