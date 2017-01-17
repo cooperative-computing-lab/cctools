@@ -290,8 +290,13 @@ int main(int argc, char *argv[])
 
 		char output_makeflow[PATH_MAX];
 		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
-		if(strcmp(bundle_directory, "*"))
-			dag_to_file(d, output_makeflow, bundler_rename);
+		if(strcmp(bundle_directory, "*")) {
+			if(create_dir(expanded_path, 0755)) {
+				dag_to_file(d, output_makeflow, bundler_rename);
+			} else {
+				fatal("Could not create directory '%s'.", bundler_rename);
+			}
+		}
 		free(bundle_directory);
 		exit(0);
 	}
