@@ -57,6 +57,7 @@ See the file COPYING for details.
 #include <libgen.h>
 
 #include <assert.h>
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -92,6 +93,8 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+#define MAX_BUF_SIZE 4096
+#define MESOS_DONE_FILE "mesos_done" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
@@ -1104,7 +1107,7 @@ Signal handler to catch abort signals.  Note that permissible actions in signal 
 static void handle_abort(int sig)
 {
 	static int abort_count_to_exit = 5;
-
+	
 	abort_count_to_exit -= 1;
 	int fd = open("/dev/tty", O_WRONLY);
 	if (fd >= 0) {
@@ -1113,9 +1116,11 @@ static void handle_abort(int sig)
 		write(fd, buf, strlen(buf));
 		close(fd);
 	}
+
 	if (abort_count_to_exit == 1)
 		signal(sig, SIG_DFL);
 	makeflow_abort_flag = 1;
+
 }
 
 
@@ -1204,6 +1209,8 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Archive results of makeflow in specified directory			   (default directory is %s)\n", "--archive=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
 	printf(" %-30s Read/Use archived results of makeflow in specified directory, will not write to archive			   (default directory is %s)\n", "--archive-read=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
 	printf(" %-30s Write archived results of makeflow in specified directory, will not read/use archived data			 (default directory is %s)\n", "--archive-write=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
+	printf(" %-30s Indicate preferred mesos master.\n", "--mesos-master=<ip_adr:port>");
+	printf(" %-30s Indicate the path to mesos python2 site-packages.\n", "--mesos-path=</path/to/mesos/python/site-packages>");
 
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
@@ -1252,6 +1259,10 @@ int main(int argc, char *argv[])
 	char *archive_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs = list_create();
+	char *mesos_master = "127.0.0.1:5050/";
+	char *mesos_path = NULL;
+
+>>>>>>> f698133... This is the initial version of makeflow mesos mode. By enabling this mesos mode, makeflow can run on top of mesos clusters.
 
 	random_init();
 	debug_config(argv[0]);
@@ -1314,7 +1325,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
 		LONG_OPT_UMBRELLA_MODE,
 		LONG_OPT_UMBRELLA_SPEC,
-		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
@@ -1322,6 +1332,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_READ_ONLY,
 		LONG_OPT_ARCHIVE_WRITE_ONLY
+		LONG_OPT_ALLOCATION_MODE,
+		LONG_OPT_MESOS_MASTER,
+		LONG_OPT_MESOS_PATH
 	};
 
 	static const struct option long_options_run[] = {
@@ -1399,6 +1412,8 @@ int main(int argc, char *argv[])
 		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
 		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
 		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
+		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{0, 0, 0, 0}
 	};
 
@@ -1687,6 +1702,11 @@ int main(int argc, char *argv[])
 			case LONG_OPT_UMBRELLA_SPEC:
 				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
+			case LONG_OPT_MESOS_MASTER:
+				mesos_master = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MESOS_PATH:
+				mesos_path = xxstrdup(optarg);
 				break;
 			case LONG_OPT_ARCHIVE:
 				should_read_archive = 1;
@@ -1836,6 +1856,7 @@ if (enforcer && wrapper_umbrella) {
 	}
 
 	remote_queue = batch_queue_create(batch_queue_type);
+
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
@@ -1849,6 +1870,12 @@ if (enforcer && wrapper_umbrella) {
 		} else {
 			batchlogfilename = string_format("%s.batchlog", dagfile);
 		}
+	}
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
+		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
+		batch_queue_set_feature(remote_queue, "batch_log_name", batchlogfilename);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
@@ -2046,14 +2073,13 @@ if (enforcer && wrapper_umbrella) {
 
 	makeflow_log_started_event(d);
 
-
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-            makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
+    	makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-            makeflow_wrapper_singularity_init(wrapper, container_image);
-        }
+    	makeflow_wrapper_singularity_init(wrapper, container_image);
+    }
 
 	d->archive_directory = archive_directory;
 	d->should_read_archive = should_read_archive;
@@ -2065,6 +2091,12 @@ if (enforcer && wrapper_umbrella) {
 
 	if(local_queue)
 		batch_queue_delete(local_queue);
+	
+	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		batch_queue_set_int_option(remote_queue, "batch-queue-abort-flag", (int)makeflow_abort_flag);
+		batch_queue_set_int_option(remote_queue, "batch-queue-failed-flag", (int)makeflow_failed_flag);
+	}
+
 	batch_queue_delete(remote_queue);
 
 	if(write_summary_to || email_summary_to)
