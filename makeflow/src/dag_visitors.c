@@ -74,7 +74,7 @@ int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *pref
 	set_first_element(vars);
 	for(name = set_next_element(vars); name; name = set_next_element(vars))
 	{
-		v = hash_table_lookup(d->default_category->mf_variables, name);
+		v = dag_variable_get_value(name, d->default_category->mf_variables, 0);
 		if(v)
 		{
 			fprintf(dag_stream, "%s%s=", prefix, name);

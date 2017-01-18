@@ -276,12 +276,11 @@ static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int
 	else {
 		/* set value of current category */
 		bk->category = category;
-		dag_variable_add_value("CATEGORY", bk->category->mf_variables, nodeid, value);
 	}
 }
 
 //return 1 if name was processed as special variable, 0 otherwise
-static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
+static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, const char *name, const char *value)
 {
 	int   special = 0;
 
@@ -351,9 +350,54 @@ static int dag_parse_syntax(struct lexer *bk)
 	return 1;
 }
 
-static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char mode)
+static int dag_parse_set_variable(struct lexer *bk, struct dag_node *n, char mode, const char *name, const char *value)
+{
+	struct hash_table *current_table;
+	int nodeid;
+	if(n)
+	{
+		current_table = n->variables;
+		nodeid        = n->nodeid;
+	}
+	else if(strcmp(name, "CATEGORY") == 0)
+	{
+		current_table = bk->d->default_category->mf_variables;
+		nodeid        = bk->d->nodeid_counter;
+	}
+	else
+	{
+		current_table = bk->category->mf_variables;
+		nodeid        = bk->d->nodeid_counter;
+	}
+
+	int result = 1;
+	switch(mode)
+	{
+	case '=':
+		dag_variable_add_value(name, current_table, nodeid, value);
+		debug(D_MAKEFLOW_PARSER, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		break;
+	case '+':
+		dag_parse_append_variable(bk, nodeid, n, name, value);
+		debug(D_MAKEFLOW_PARSER, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		break;
+	default:
+		lexer_report_error(bk, "Unknown variable operator.");
+		result = 0;
+	}
+
+	dag_parse_process_special_variable(bk, n, nodeid, name, value);
+
+	return result;
+}
+
+static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t = lexer_next_token(bk);
+	char mode       = t->lexeme[0];            //=, or + (assign or append)
+	lexer_free_token(t);
+
+	t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
 	{
 		lexer_report_error(bk, "Literal variable name expected. %s\n", lexer_print_token(t));
@@ -371,36 +415,7 @@ static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char m
 	char *value = xxstrdup(t->lexeme);
 	lexer_free_token(t);
 
-	struct hash_table *current_table;
-	int nodeid;
-	if(n)
-	{
-		current_table = n->variables;
-		nodeid        = n->nodeid;
-	}
-	else
-	{
-		current_table = bk->category->mf_variables;
-		nodeid        = bk->d->nodeid_counter;
-	}
-
-	int result = 1;
-	switch(mode)
-	{
-	case '=':
-		dag_variable_add_value(name, current_table, nodeid, value);
-		debug(D_MAKEFLOW_PARSER, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
-		break;
-	case '+':
-		dag_parse_append_variable(bk, nodeid, n, name, value);
-		debug(D_MAKEFLOW_PARSER, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
-		break;
-	default:
-		lexer_report_error(bk, "Unknown variable operator.");
-		result = 0;
-	}
-
-	dag_parse_process_special_variable(bk, n, nodeid, name, value);
+	int result = dag_parse_set_variable(bk, n, mode, name, value);
 
 	free(name);
 	free(value);
@@ -408,20 +423,166 @@ static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char m
 	return result;
 }
 
-static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
-{
+static int dag_parse_directive_SIZE(struct lexer *bk, struct dag_node *n) {
+
+	int result = 0;
 	struct token *t = lexer_next_token(bk);
-	char mode       = t->lexeme[0];            //=, or + (assign or append)
+
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token (a filename), got: %s\n", lexer_print_token(t));
+		return 0;
+	}
+
+	char *filename = xxstrdup(t->lexeme);
 	lexer_free_token(t);
 
-	return dag_parse_variable_wmode(bk, n, mode);
+	t = lexer_next_token(bk);
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token (a file size), got: %s\n", lexer_print_token(t));
+		return 0;
+	}
+
+	char *size = xxstrdup(t->lexeme);
+	lexer_free_token(t);
+
+	struct dag_file *f = NULL;
+	if(filename) {
+		f = dag_file_lookup_or_create(bk->d, filename);
+
+		if(f) {
+			f->estimated_size = string_metric_parse(size);
+			result = 1;
+		}
+	}
+
+	free(filename);
+	free(size);
+
+	return result;
 }
+
+static int dag_parse_directive_MAKEFLOW(struct lexer *bk, struct dag_node *n) {
+
+	int result = 0;
+	int set_var = 1;
+
+	struct token *t = lexer_next_token(bk);
+
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token (CATEGORY|MODE|CORES|DISK|MEMORY|SIZE), got: %s\n", lexer_print_token(t));
+	}
+
+	struct token *t2 = lexer_next_token(bk);
+	if(t2->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
+	}
+
+	if(!strcmp("CATEGORY", t->lexeme))
+	{
+		if(!(t2->lexeme))
+		{
+			lexer_report_error(bk, "Expected name for CATEGORY");
+		}
+
+		result = 1;
+	}
+	else if((   !strcmp("CORES",  t->lexeme))
+			|| (!strcmp("DISK",   t->lexeme))
+			|| (!strcmp("MEMORY", t->lexeme)))
+	{
+		if(!(string_metric_parse(t2->lexeme) >= 0))
+		{
+			lexer_report_error(bk, "Expected numeric value for %s, got: %s\n", t->lexeme, lexer_print_token(t2));
+		}
+
+		result = 1;
+	}
+	else if(!strcmp("MODE", t->lexeme))
+	{
+		set_var = 0;
+
+		if(!(t2->lexeme))
+		{
+			lexer_report_error(bk, "Expected category allocation mode.");
+		}
+		else if(!strcmp("MAX_THROUGHPUT", t2->lexeme))
+		{
+			category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT);
+			result = 1;
+		}
+		else if(!strcmp("MIN_WASTE", t2->lexeme))
+		{
+			category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_MIN_WASTE);
+			result = 1;
+		}
+		else if(!strcmp("FIXED", t2->lexeme))
+		{
+			category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_FIXED);
+			result = 1;
+		}
+		else
+		{
+			lexer_report_error(bk, "Expected one of: MAX_THROUGHPUT, MIN_WASTE, FIXED.");
+		}
+	}
+	else
+	{
+		lexer_report_error(bk, "Unsupported .MAKEFLOW directive, expected (CATEGORY|MODE|CORES|DISK|MEMORY|SIZE), got: %s\n", t->lexeme);
+	}
+
+	if(set_var) {
+		dag_parse_set_variable(bk, n, '=', /* name */ t->lexeme, /* value */ t2->lexeme);
+	}
+
+	lexer_free_token(t);
+	lexer_free_token(t2);
+
+	return result;
+}
+
+
+static int dag_parse_directive_UMBRELA(struct lexer *bk, struct dag_node *n) {
+
+	int result = 0;
+
+	struct token *t = lexer_next_token(bk);
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+	}
+
+	struct token *t2 = lexer_next_token(bk);
+	if(t2->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
+	}
+
+	if(!strcmp("SPEC", t->lexeme))
+	{
+		dag_parse_set_variable(bk, n, '=', /* name */ t->lexeme, /* value */ t2->lexeme);
+		result = 1;
+	}
+	else {
+		lexer_report_error(bk, "Unsupported .UMBRELLA type, got: %s\n", t->lexeme);
+	}
+
+	return result;
+}
+
 
 static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 {
+	// Eat TOKEN_DIRECTIVE
 	struct token *t = lexer_next_token(bk);
+	if(t->type != TOKEN_DIRECTIVE)
+	{
+		lexer_report_error(bk, "Literal directive expected.");
+	}
 	lexer_free_token(t);
-
 
 	t = lexer_next_token(bk);
 	if(t->type != TOKEN_LITERAL)
@@ -432,90 +593,29 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 	char *name = xxstrdup(t->lexeme);
 	lexer_free_token(t);
 
-	int result = 1;
-	if(!strcmp(".SIZE", name)){
-		t = lexer_next_token(bk);
-		if(t->type != TOKEN_LITERAL)
-		{
-			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
-		}
-
-		char *filename = xxstrdup(t->lexeme);
-		lexer_free_token(t);
-
-		t = lexer_next_token(bk);
-		if(t->type != TOKEN_LITERAL)
-		{
-			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
-		}
-
-		char *size = xxstrdup(t->lexeme);
-		lexer_free_token(t);
-
-		struct dag_file *f = NULL;
-		if(filename)
-			f = dag_file_lookup_or_create(bk->d, filename);
-		if(f)
-			f->estimated_size = string_metric_parse(size);
-
-		free(filename);
-		free(size);
-	} else if(!strcmp(".MAKEFLOW", name)) {
-		t = lexer_next_token(bk);
-		if(t->type != TOKEN_LITERAL)
-		{
-			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
-		}
-
-		struct token *t2 = lexer_next_token(bk);
-		if(t2->type != TOKEN_LITERAL)
-		{
-			lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
-		}
-
-		int set_var = 1;
-
-		if((!strcmp("CORES", t->lexeme))
-				|| (!strcmp("DISK", t->lexeme))
-				|| (!strcmp("MEMORY", t->lexeme))) {
-			if(!(string_metric_parse(t2->lexeme) >= 0))
-				lexer_report_error(bk, "Expected numeric value for %s, got: %s\n", t->lexeme, t2->lexeme);
-		} else if(!strcmp("CATEGORY", t->lexeme)) {
-			if(!(t2->lexeme))
-				lexer_report_error(bk, "Expected name for CATEGORY");
-		} else if(!strcmp("MODE", t->lexeme)) {
-			set_var = 0;
-			if(!(t2->lexeme)) {
-				lexer_report_error(bk, "Expected category allocation mode.");
-			} else if(!strcmp("MAX_THROUGHPUT", t2->lexeme)) {
-				category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT);
-			} else if(!strcmp("MIN_WASTE", t2->lexeme)) {
-				category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_MIN_WASTE);
-			} else if(!strcmp("FIXED", t2->lexeme)) {
-				category_specify_allocation_mode(bk->category, CATEGORY_ALLOCATION_MODE_FIXED);
-			} else {
-				lexer_report_error(bk, "Expected one of: MAX_THROUGHPUT, MIN_WASTE, FIXED.");
-			}
-		} else {
-			lexer_report_error(bk, "Unsupported .MAKEFLOW directive, got: %s\n", t->lexeme);
-			return 0;
-		}
-
-		if(set_var) {
-			lexer_preppend_token(bk, t2);
-			lexer_preppend_token(bk, t);
-
-			dag_parse_variable_wmode(bk, n, '=');
-		}
-	} else {
+	int result = 0;
+	if(!strcmp(".MAKEFLOW", name))
+	{
+		result = dag_parse_directive_MAKEFLOW(bk, n);
+	}
+	else if(!strcmp(".SIZE", name))
+	{
+		result = dag_parse_directive_SIZE(bk, n);
+	}
+	else if(!strcmp(".UMBRELA", name))
+	{
+		result = dag_parse_directive_UMBRELA(bk, n);
+	}
+	else
+	{
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
-		result = 0;
 	}
 
 	free(name);
 
 	return result;
 }
+
 
 
 static int dag_parse_node_filelist(struct lexer *bk, struct dag_node *n)
