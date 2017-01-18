@@ -276,7 +276,6 @@ static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int
 	else {
 		/* set value of current category */
 		bk->category = category;
-		dag_variable_add_value("CATEGORY", bk->category->mf_variables, nodeid, value);
 	}
 }
 
