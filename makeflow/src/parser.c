@@ -388,11 +388,11 @@ static int dag_parse_variable_wmode(struct lexer *bk, struct dag_node *n, char m
 	{
 	case '=':
 		dag_variable_add_value(name, current_table, nodeid, value);
-		debug(D_MAKEFLOW_PARSER, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		debug(D_MAKEFLOW_PARSER, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 		break;
 	case '+':
 		dag_parse_append_variable(bk, nodeid, n, name, value);
-		debug(D_MAKEFLOW_PARSER, "%s variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
+		debug(D_MAKEFLOW_PARSER, "%s appending to variable name=%s, value=%s", (n ? "node" : "dag"), name, value);
 		break;
 	default:
 		lexer_report_error(bk, "Unknown variable operator.");
