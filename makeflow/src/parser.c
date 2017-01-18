@@ -280,7 +280,7 @@ static void dag_parse_process_category(struct lexer *bk, struct dag_node *n, int
 }
 
 //return 1 if name was processed as special variable, 0 otherwise
-static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, char *name, const char *value)
+static int dag_parse_process_special_variable(struct lexer *bk, struct dag_node *n, int nodeid, const char *name, const char *value)
 {
 	int   special = 0;
 
@@ -350,32 +350,19 @@ static int dag_parse_syntax(struct lexer *bk)
 	return 1;
 }
 
-static int dag_parse_variable_with_mode(struct lexer *bk, struct dag_node *n, char mode)
+static int dag_parse_set_variable(struct lexer *bk, struct dag_node *n, char mode, const char *name, const char *value)
 {
-	struct token *t = lexer_next_token(bk);
-	if(t->type != TOKEN_LITERAL)
-	{
-		lexer_report_error(bk, "Literal variable name expected. %s\n", lexer_print_token(t));
-	}
-
-	char *name = xxstrdup(t->lexeme);
-	lexer_free_token(t);
-
-	t = lexer_next_token(bk);
-	if(t->type != TOKEN_LITERAL)
-	{
-		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
-	}
-
-	char *value = xxstrdup(t->lexeme);
-	lexer_free_token(t);
-
 	struct hash_table *current_table;
 	int nodeid;
 	if(n)
 	{
 		current_table = n->variables;
 		nodeid        = n->nodeid;
+	}
+	else if(strcmp(name, "CATEGORY") == 0)
+	{
+		current_table = bk->d->default_category->mf_variables;
+		nodeid        = bk->d->nodeid_counter;
 	}
 	else
 	{
@@ -401,9 +388,6 @@ static int dag_parse_variable_with_mode(struct lexer *bk, struct dag_node *n, ch
 
 	dag_parse_process_special_variable(bk, n, nodeid, name, value);
 
-	free(name);
-	free(value);
-
 	return result;
 }
 
@@ -413,7 +397,30 @@ static int dag_parse_variable(struct lexer *bk, struct dag_node *n)
 	char mode       = t->lexeme[0];            //=, or + (assign or append)
 	lexer_free_token(t);
 
-	return dag_parse_variable_with_mode(bk, n, mode);
+	t = lexer_next_token(bk);
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Literal variable name expected. %s\n", lexer_print_token(t));
+	}
+
+	char *name = xxstrdup(t->lexeme);
+	lexer_free_token(t);
+
+	t = lexer_next_token(bk);
+	if(t->type != TOKEN_LITERAL)
+	{
+		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t));
+	}
+
+	char *value = xxstrdup(t->lexeme);
+	lexer_free_token(t);
+
+	int result = dag_parse_set_variable(bk, n, mode, name, value);
+
+	free(name);
+	free(value);
+
+	return result;
 }
 
 static int dag_parse_directive_SIZE(struct lexer *bk, struct dag_node *n) {
@@ -474,7 +481,6 @@ static int dag_parse_directive_MAKEFLOW(struct lexer *bk, struct dag_node *n) {
 		lexer_report_error(bk, "Expected LITERAL token, got: %s\n", lexer_print_token(t2));
 	}
 
-
 	if(!strcmp("CATEGORY", t->lexeme))
 	{
 		if(!(t2->lexeme))
@@ -529,10 +535,7 @@ static int dag_parse_directive_MAKEFLOW(struct lexer *bk, struct dag_node *n) {
 	}
 
 	if(set_var) {
-		lexer_preppend_token(bk, t2);
-		lexer_preppend_token(bk, t);
-
-		dag_parse_variable_with_mode(bk, n, '=');
+		dag_parse_set_variable(bk, n, '=', /* name */ t->lexeme, /* value */ t2->lexeme);
 	}
 
 	lexer_free_token(t);
@@ -560,10 +563,7 @@ static int dag_parse_directive_UMBRELA(struct lexer *bk, struct dag_node *n) {
 
 	if(!strcmp("SPEC", t->lexeme))
 	{
-		lexer_preppend_token(bk, t2);
-		lexer_preppend_token(bk, t);
-		dag_parse_variable_with_mode(bk, n, '=');
-
+		dag_parse_set_variable(bk, n, '=', /* name */ t->lexeme, /* value */ t2->lexeme);
 		result = 1;
 	}
 	else {
@@ -576,7 +576,12 @@ static int dag_parse_directive_UMBRELA(struct lexer *bk, struct dag_node *n) {
 
 static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 {
+	// Eat TOKEN_DIRECTIVE
 	struct token *t = lexer_next_token(bk);
+	if(t->type != TOKEN_DIRECTIVE)
+	{
+		lexer_report_error(bk, "Literal directive expected.");
+	}
 	lexer_free_token(t);
 
 	t = lexer_next_token(bk);
@@ -588,7 +593,7 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 	char *name = xxstrdup(t->lexeme);
 	lexer_free_token(t);
 
-	int result = 1;
+	int result = 0;
 	if(!strcmp(".MAKEFLOW", name))
 	{
 		result = dag_parse_directive_MAKEFLOW(bk, n);
@@ -604,7 +609,6 @@ static int dag_parse_directive(struct lexer *bk, struct dag_node *n)
 	else
 	{
 		lexer_report_error(bk, "Unknown DIRECTIVE type, got: %s\n", name);
-		result = 0;
 	}
 
 	free(name);
