@@ -39,8 +39,56 @@ detect_packages()
 	echo ""
 }
 
-detect_packages
 
-./configure --strict --tcp-low-port 9000 --sge-parameter '-pe smp $cores' $PACKAGES_CONFIG "$@"
+BRANCH="$CCTOOLS_BRANCH"
+SOURCE="from source"
+
+GIT_DIR="$(dirname "$0")/.git"
+export GIT_DIR
+if [ -d "$GIT_DIR" ] && which git > /dev/null 2> /dev/null; then
+	# `git archive` (man gitattributes(5)) fills this in, otherwise we do it manually...
+	COMMIT='$Format:%H$'
+	if [ "$(expr substr "$COMMIT" 1 1)" = '$' ]; then
+		COMMIT="$(git rev-parse HEAD)"
+	fi
+
+	DATE='$Format:%ci$'
+	if [ "${DATE:0:1}" = '$' ]; then
+		DATE="$(git log -1 --pretty=format:%ci HEAD)"
+	fi
+
+	DIRTY=
+	if [ -n "$(git status --porcelain)" ]; then
+		echo "Working copy dirty..." >&2
+		DIRTY='-DIRTY'
+	fi
+
+	if [ -z "$BRANCH" ]; then
+		BRANCH='$Format:%d$'
+		if [ "$(expr substr "$BRANCH" 1 1)" = '$' ]; then
+			BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+		else
+			# example BRANCH:
+			#     "(HEAD, origin/heads/master, ccl/heads/master, master, refs/backup/master)"
+			# or on newer Git:
+			#     "(HEAD -> version-commit, tag: history/version-commit-006, afs/tags/history/version-commit-006, afs/backup/version-commit)"
+
+			# find the first instance of a (lowercase) branch name
+			echo "This commit is referenced by: $BRANCH" >&2
+			BRANCH="$(echo " ${BRANCH}," | tr -d '\n()' | perl -pe 's|.*? ([^ A-Z/]+),.*|\1|')"
+			if [ -z "$BRANCH" ]; then
+				echo "Could not interpret branch name." >&2
+				BRANCH=HEAD
+			fi
+		fi
+	fi
+
+	SOURCE="[${BRANCH}:$(expr substr "$COMMIT" 1 8)${DIRTY}]"
+fi
+
+
+detect_packages
+./configure --strict --build-label "${SOURCE}" --build-date "${DATE}" --tcp-low-port 9000 --sge-parameter '-pe smp $cores' $PACKAGES_CONFIG "$@"
+
 
 # vim: set sts=4 sw=4 ts=8 expandtab ft=sh:

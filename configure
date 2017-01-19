@@ -7,13 +7,12 @@ MAJOR=6
 MINOR=0
 MICRO=0
 
-# Optionally set the source/tag for this code (e.g. RC1 or FINAL). Normally
-# configure will obtain the branch this source code comes from automatically,
-# so you do not need to set this. Setting this variable is instead useful for
-# statically naming the source when it will not match the branch name (like RC1
-# or FINAL).
+# Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
+# this variable is instead useful for statically naming the source when it will
+# not match the branch name (like RC1 or FINAL).
 RELEASE=
 
+###########################
 # *** You should not need to change anything below this line. ***
 ###########################
 
@@ -27,76 +26,6 @@ if [ -z "$USER" ]; then
 fi
 
 save_arguments "$0" "$@"
-
-GIT_DIR="$(dirname "$0")/.git"
-export GIT_DIR
-if [ -d "$GIT_DIR" ] && which git > /dev/null 2> /dev/null; then
-	GIT=y
-fi
-
-# `git archive` (man gitattributes(5)) fills this in, otherwise we do it manually...
-COMMIT='$Format:%H$'
-if [ "$(expr substr "$COMMIT" 1 1)" = '$' ]; then
-	if [ "$GIT" = y ]; then
-		COMMIT="$(git rev-parse HEAD)"
-	else
-		COMMIT="UNKNOWN"
-	fi
-fi
-
-DIRTY=
-if [ "$GIT" = y ]; then
-	if [ -n "$(git status --porcelain)" ]; then
-		echo "Working copy dirty..." >&2
-		DIRTY='-DIRTY'
-	fi
-fi
-
-# The date is the commit date of the commit, or now if the working tree is dirty.
-DATE='$Format:%ci$'
-if [ "$(expr substr "$DATE" 1 1)" = '$' ]; then
-	if [ "$GIT" = y ]; then
-		DATE="$(git log -1 --pretty=format:%ci HEAD)"
-	else
-		echo "Source commit date unavailable, using current time." >&2
-		DATE="$NOW"
-	fi
-fi
-if [ -n "$DIRTY" ]; then
-	DATE="$NOW"
-fi
-
-if [ -n "$RELEASE" ]; then
-	BRANCH="$RELEASE"
-elif [ -n "$CCTOOLS_BRANCH" ]; then
-	BRANCH="$CCTOOLS_BRANCH"
-else
-	BRANCH='$Format:%d$'
-	if [ "$(expr substr "$BRANCH" 1 1)" = '$' ]; then
-		if [ "$GIT" = y ]; then
-			BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-		else
-			echo "Building from unknown branch!" >&2
-			BRANCH=UNKNOWN
-		fi
-	else
-		# example BRANCH:
-		#     "(HEAD, origin/heads/master, ccl/heads/master, master, refs/backup/master)"
-		# or on newer Git:
-		#     "(HEAD -> version-commit, tag: history/version-commit-006, afs/tags/history/version-commit-006, afs/backup/version-commit)"
-
-		# find the first instance of a (lowercase) branch name
-		echo "This commit is referenced by: $BRANCH" >&2
-		BRANCH="$(echo " ${BRANCH}," | tr -d '\n()' | perl -pe 's|.*? ([^ A-Z/]+),.*|\1|')"
-		if [ -z "$BRANCH" ]; then
-			echo "Could not interpret branch name." >&2
-			BRANCH=HEAD
-		fi
-	fi
-fi
-
-SOURCE="${BRANCH}:$(expr substr "$COMMIT" 1 8)${DIRTY}"
-VERSION="$MAJOR.$MINOR.$MICRO [${SOURCE}]"
 
 # Bourne shell is tricky when you use backtick command substitution backslash
 # has special meaning even when surrounded by single-quotes. It is necessary to
@@ -181,6 +110,9 @@ fi
 
 install_path="$HOME/cctools"
 
+build_label=
+build_date=
+
 cvmfs_path="/usr"
 fuse_path="/usr"
 globus_path="/usr"
@@ -258,6 +190,12 @@ do
 			;;
 		--sanitize)
 			optsanitize=1
+			;;
+		--build-label)
+			build_label=${arg}
+			;;
+		--build-date)
+			build_date=${arg}
 			;;
 		--sge-parameter)
 			if [ -z "$sge_parameters" ]
@@ -430,6 +368,7 @@ Where options are:
   --help
   --prefix             <path>
   --debug
+  --build-label        <label>
   --strict
   --sanitize
   --sge-parameter      <parameter>
@@ -476,6 +415,18 @@ EOF
 			;;
 	esac
 done
+
+SOURCE=$RELEASE
+if [ -n "$build_label" ]; then
+	SOURCE="$SOURCE $build_label"
+fi
+
+DATE=$NOW
+if [ -n "$build_date" ]; then
+	DATE=$build_date
+fi
+
+VERSION="$MAJOR.$MINOR.$MICRO $SOURCE"
 
 if [ "$optstrict" = 1 ]; then
 	ccflags="${ccflags} -Werror"
