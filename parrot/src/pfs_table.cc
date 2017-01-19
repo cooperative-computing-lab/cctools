@@ -825,6 +825,12 @@ or the file itself might be in use by several opens.
 
 int pfs_table::close( int fd )
 {
+	/* FIXME: if a previously mmaped file is written to, we ought to clean up
+	 * the channel cache on close. Otherwise, subsequent mmaps might return
+	 * stale data. Related:
+	 * https://github.com/cooperative-computing-lab/cctools/issues/1584
+	 */
+
 	if (isnative(fd)) {
 		debug(D_DEBUG, "marking closed native fd %d", fd);
 		pointers[fd] = NULL;
