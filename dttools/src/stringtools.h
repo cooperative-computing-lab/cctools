@@ -33,7 +33,7 @@ char *string_escape_shell (const char *str);
 char *string_escape_condor( const char *str);
 void string_chomp(char *str);
 int whole_string_match_regex(const char *text, const char *pattern);
-int string_match_regex(const char *text, char *pattern);
+int string_match_regex(const char *text, const char *pattern);
 int string_match(const char *pattern, const char *text);
 char *string_front(const char *str, int max);
 const char *string_back(const char *str, int max);
