@@ -97,6 +97,9 @@ char *lexer_print_token(struct token *t)
 	case TOKEN_IO_REDIRECT:
 		snprintf(str, n, "IO_REDIRECT: %s\n", t->lexeme);
 		break;
+	case TOKEN_DIRECTIVE:
+		snprintf(str, n, "DIRECTIVE\n");
+		break;
 	default:
 		snprintf(str, n, "unknown: %s\n", t->lexeme);
 		break;
