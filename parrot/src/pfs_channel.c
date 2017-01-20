@@ -235,6 +235,20 @@ int pfs_channel_update_name( const char *oldname, const char *newname )
 {
 	struct entry *e = head;
 	debug(D_CHANNEL,"updating channel for file '%s' to '%s'",oldname,newname);
+	/* If the channel already has an entry with the new name, make it
+	 * anonymous so we don't see stale entries later.
+	 */
+	if (newname) {
+		do {
+			if(e->name && !strcmp(e->name, newname)) {
+				debug(D_CHANNEL, "invalidating existing channel name");
+				free(e->name);
+				e->name = NULL;
+			}
+			e = e->next;
+		} while(e != head);
+	}
+
 	do {
 		if(e->name && !strcmp(e->name,oldname)) {
 			free(e->name);
