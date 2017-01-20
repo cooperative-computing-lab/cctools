@@ -13,7 +13,7 @@ If CODE(parrot_run) is used to repeat one experiment, one mountlist must be crea
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_ITEM(`-p, --package-path')The path of the package.
-OPTION_ITEM(`-e, --env-list')The path of the environment file. (Default: package-path/env_list)
+OPTION_ITEM(`-e, --env-list')The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)
 OPTION_ITEM(`-h, --help')Show this help message.
 OPTIONS_END
 

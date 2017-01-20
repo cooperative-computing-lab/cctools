@@ -12,7 +12,7 @@ show_help()
 	echo ''
 	echo "Options:"
 	echo "-p, --package-path         The path of the package."
-	echo "-e, --env-list             The path of the environment file. (Default: package-path/env_list)"
+	echo "-e, --env-list             The path of the environment file, each line is in the format of <key>=<value>. (Default: package-path/env_list)"
 	echo "-h, --help                 Show this help message."
 	exit 1
 }
@@ -48,8 +48,17 @@ do
 	shift
 done
 
+if [ -n "${env_path}" ] && [ ! -f "${env_path}" ]; then
+	echo "The --env-list option specified (${env_path}) is not a file!"
+	exit 1
+fi
+
 if [ -z "${env_path}" ]; then
 	env_path="${package_path}/env_list"
+	if [ ! -f "${env_path}" ]; then
+		echo "Warning: you are going to use the environment variable settings from your current shell to run your package."
+		echo "         You can specify an environment variable list file with the --env-list option."
+	fi
 fi
 
 if [ -z "${package_path}" ]; then
@@ -73,9 +82,17 @@ fi
 
 echo "/ ${package_path}" >> "${mountlist}"
 echo "${package_path} ${package_path}" >> "${mountlist}"
-cat "${package_path}/common-mountlist" >> "${mountlist}"
 
-cat "${package_path}/special_files" >> "${mountlist}"
+if [ -f "${package_path}/common-mountlist" ]; then
+	cat "${package_path}/common-mountlist" >> "${mountlist}"
+else
+	echo "/proc /proc" >> "${mountlist}"
+	echo "/dev /dev" >> "${mountlist}"
+fi
+
+if [ -f "${package_path}/common-mountlist" ]; then
+	cat "${package_path}/special_files" >> "${mountlist}"
+fi
 
 cmd_parrot_run=$(which parrot_run)
 
@@ -84,14 +101,17 @@ if [ -z "${cmd_parrot_run}" ]; then
 	exit 1
 fi
 
-#import environment varibales
+#import environment variables
 export_env() {
 	while read -r -d '' line
 	do
 		export "${line}"
 	done < "${env_path}"
 }
-export_env
+
+if [ -f "${env_path}" ]; then
+	export_env
+fi
 
 ldso_file="$(echo "$(pwd)/$(ldd ${cmd_parrot_run} | grep ld-linux | cut -d' ' -f1)" | sed -e 's/[ \t]//g')"
 
