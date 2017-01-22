@@ -9,8 +9,8 @@
 
 // mesos task struct
 struct mesos_task{
-	int task_id;
-	char *task_cmd;
+    int task_id;
+    char *task_cmd;
     struct text_list *task_input_files;
     struct text_list *task_output_files;
 };
@@ -21,3 +21,5 @@ struct mesos_task *mesos_task_create(int task_id, const char *cmd, \
 void mesos_task_delete(struct mesos_task *mt);
 
 #endif
+
+/* vim: set noexpandtab tabstop=4: */

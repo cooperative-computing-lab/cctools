@@ -865,7 +865,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Specify ip address to mesos master node (for use with -T mesos)\n", "--mesos-master");
+	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos)\n", "--mesos-master");
 	printf(" %-30s Specify path to mesos python library(for use with -T mesos)\n", "--mesos-path");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");

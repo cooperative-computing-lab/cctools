@@ -10,13 +10,13 @@ struct mesos_task *mesos_task_create(int task_id, const char *cmd, \
 	if (extra_input_files != NULL) {
 	    mt->task_input_files = text_list_load_str(extra_input_files);
 		int i = 0;
-        int num_input_files = mt->task_input_files->used_length;
+        int num_input_files = text_list_size(mt->task_input_files);
 		for(i = 0; i < num_input_files; i++) {
-			if ((mt->task_input_files->items)[i][0] != '/') {
+			if (text_list_get(mt->task_input_files, i)[0] != '/') {
 				char *path_buf = path_getcwd();
 				string_combine(path_buf, "/");
-				string_combine(path_buf, (mt->task_input_files->items)[i]);
-				(mt->task_input_files->items)[i] = path_buf;
+				string_combine(path_buf, text_list_get(mt->task_input_files, i));
+				text_list_set(mt->task_input_files, path_buf, i);
 			}
 		}	
 	} else {
@@ -39,3 +39,5 @@ void mesos_task_delete(struct mesos_task *mt)
 	free(mt->task_output_files);
 	free(mt);
 }
+
+/* vim: set noexpandtab tabstop=4: */

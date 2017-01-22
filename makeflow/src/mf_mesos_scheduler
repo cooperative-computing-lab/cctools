@@ -1,5 +1,26 @@
 #!/usr/bin/env python
 
+# Copyright (c) 2016- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details. 
+
+# This script defined the MesosScheduler and MakeflowMonitor class.
+#  
+# Three threads are started when batch_job_mesos.c first try to submit tasks 
+# to Mesos. They are,
+# 
+# 1. A simple httpserver, which is responsible for handle file transfer request from  
+# 	 Mesos master.
+# 2. A workflow state monitor(i.e. MakefowMonitor), which will monitor the two files
+#    (i.e. mesos_task_info and mesos_task_state) and synchronize the workflow states
+#    of Makeflow and Mesos. 
+# 3. A Makeflow Mesos Scheduler, which submits ready tasks to Mesos master, resubmits 
+#    failed tasks and write complete tasks' states to mesos_task_state.
+#  
+# In current version, each time when scheduler submit a new task to master a new 
+# executor will be created and binded to the task. The scheduler will be terminated 
+# when the mesos_done_file is created.
+
 import os
 import sys
 import uuid
@@ -139,6 +160,7 @@ class MakeflowScheduler(Scheduler):
         executor.framework_id.value = framework_id
         executor.executor_id.value = str(uuid.uuid4())
         cctools_path = os.getenv('CCTOOLS')
+        ld_preload = os.getenv('LD_PRELOAD')
         sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor')
         task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
         task_cmd_f = open(task_cmd_sh, "w+")
@@ -160,6 +182,11 @@ class MakeflowScheduler(Scheduler):
         cctools_env = executor.command.environment.variables.add()
         cctools_env.name = "CCTOOLS"
         cctools_env.value = cctools_path
+
+        # add $LD_PRELOAD as the env variables for executor command
+        ld_preload_env = executor.command.environment.variables.add()
+        ld_preload_env.name = "LD_PRELOAD"
+        ld_preload_env.value = ld_preload
 
         # add input files list to the executor_info
         for fn in mf_task.inp_fns:
@@ -315,9 +342,9 @@ class MakeflowScheduler(Scheduler):
 
     def clean_mesos_file(self, task_id): 
         mf_task = mms.tasks_info_dict[task_id]
-        #  TODO do not remove the file, if it is not exist
-        # if os.path.isfile("task_{0}_cmd".format(task_id)):
-        #   os.remove("task_{0}_cmd".format(task_id))
+        # TODO do not remove the file, if it is not exist
+        if os.path.isfile("task_{0}_cmd".format(task_id)):
+           os.remove("task_{0}_cmd".format(task_id))
         #for fn in mf_task.inp_fns:
         #    if os.path.isdir(fn):
         #        logger.info("{0} is a directory, remove the tar.gz file".format(fn))
@@ -557,13 +584,16 @@ class MakefowMonitor(threading.Thread):
 
         fn_run_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_INFO)
         fn_finish_tks_path = os.path.join(mms.mf_wk_dir, FILE_TASK_STATE)
+        fn_slave_stderr = os.path.join(mms.mf_wk_dir, SLAVE_STDERR)
 
-        #if os.path.isfile(mf_done_fn_path):
-        #    os.remove(mf_done_fn_path)
-        #if os.path.isfile(fn_run_tks_path):
-        #    os.remove(fn_run_tks_path)
-        #if os.path.isfile(fn_finish_tks_path):
-        #    os.remove(fn_finish_tks_path)
+        if os.path.isfile(mf_done_fn_path):
+            os.remove(mf_done_fn_path)
+        if os.path.isfile(fn_run_tks_path):
+            os.remove(fn_run_tks_path)
+        if os.path.isfile(fn_finish_tks_path):
+            os.remove(fn_finish_tks_path)
+        if os.path.isfile(fn_slave_stderr):
+            os.remove(fn_slave_stderr)
         
         while(not self.is_all_executor_stopped()):
             pass
@@ -681,3 +711,5 @@ if __name__ == '__main__':
 
     httpd.shutdown()
     sys.exit(status)
+
+# vim: set noexpandtab tabstop=4:

@@ -1,5 +1,12 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2016- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details. 
+
 # This module defined global variables and classes 
-# used by mf_mesos_scheduler.py
+# shared by httpserver, MakeflowMonitor MesosScheduler, which 
+# defined in mf_mesos_scheduler
 
 import os
 import Queue
@@ -57,3 +64,5 @@ class MfMesosExecutorInfo:
         self.hostname = hostname
         self.state = "init"
         self.tasks = []
+
+# vim: set noexpandtab tabstop=4:

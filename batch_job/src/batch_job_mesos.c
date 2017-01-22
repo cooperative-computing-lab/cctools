@@ -1,3 +1,22 @@
+/*
+  Copyright (c) 2016- The University of Notre Dame.
+  This software is distributed under the GNU General Public License.
+  See the file COPYING for details. 
+*/
+
+/*
+ * Principle of Operation:
+ * 
+ * Each time when makeflow submit a task, the information of the task is written into 
+ * mesos_task_info file. Meanwhile, the makeflow mesos scheduler (makeflow/src/mf_mesos_scheduler) 
+ * keep polling mesos_task_info, try to find if there are new tasks ready to launch on mesos. 
+ * 
+ * After the task is complete, the makeflow mesos scheduler writes the final state
+ * of the task to mesos_task_state. And the makeflow is keep monitoring this file and 
+ * collect all finished tasks.   
+ *
+ */
+
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
@@ -10,6 +29,7 @@
 #include "jx_print.h"
 #include "itable.h"
 #include "mesos_task.h"
+#include "text_list.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,19 +46,6 @@
 #define FILE_TASK_STATE "mesos_task_state"
 #define MESOS_DONE_FILE "mesos_done"
 
-/*
- * Principle of Operation:
- * 
- * Each time when makeflow submit a task, the information of the task is written into 
- * mesos_task_info file. Meanwhile, the makeflow mesos scheduler keep polling 
- * mesos_task_info, try to find if there is new task is ready to launch on mesos. 
- * 
- * After the task is complete on, the makeflow mesos scheduler writes the final state
- * of the task to mesos_task_state. And the makeflow is keep monitoring this file and 
- * collect all finished tasks.   
- *
- */
-
 static int counter = 0;
 static struct itable *finished_tasks = NULL;
 static int is_mesos_py_path_known = 0;
@@ -46,6 +53,7 @@ static int is_mesos_master_known = 0;
 static int is_scheduler_running = 0;
 static const char *mesos_py_path = NULL;
 static const char *mesos_master = NULL;
+static const char *mesos_preload = NULL;
 static pid_t mesos_scheduler_pid = 0;
 
 static void start_mesos_scheduler(struct batch_queue *q)
@@ -68,20 +76,19 @@ static void start_mesos_scheduler(struct batch_queue *q)
 	path_dirname(exe_path, exe_dir_path);
 
     char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
-	char *envs[] = {"LD_PRELOAD=/afs/nd.edu/user37/ccl/software/external/gcc-4.9.3/amd64_linux26/lib64/libstdc++.so.6:/afs/nd.edu/user37/ccl/software/external/svn-1.9.4/amd64_linux26/lib/libsvn_delta-1.so", "CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", NULL};
+	char *ld_preload_str = NULL;
+
+	if(mesos_preload != NULL) {
+		ld_preload_str = string_format("LD_PRELOAD=%s", mesos_preload);
+	} 
+	// TODO: Environment variables set for launching Mesos, this would not work outside ND. Ask user to specify the environments?
+	char *envs[] = {"CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", ld_preload_str, NULL};
 
 	char *mesos_python_path = xxstrdup(mesos_py_path);
 
 	if (mesos_python_path == NULL) {
 		debug(D_ERROR, "Please specify the mesos python path\n");
 		exit(EXIT_FAILURE);
-	}
-
-	char *mesos_py = NULL;
-	if (mesos_py_path[strlen(mesos_py_path)-1] == '/') {
-		mesos_py = string_combine(mesos_python_path, "lib/python2.6/site-packages");
-	} else {
-		mesos_py = string_combine(mesos_python_path, "/lib/python2.6/site-packages");
 	}
 
 	if (mesos_pid > 0) {
@@ -110,9 +117,7 @@ static void start_mesos_scheduler(struct batch_queue *q)
 
 	    close(mesos_fd);
 
-// 1. child keep polling who is the parent
-
-		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_py, (char *) 0, envs);
+		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_python_path, (char *) 0, envs);
 
 		_exit(127);
 
@@ -147,7 +152,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	if (is_mesos_master_known != 1) {
 		mesos_master = batch_queue_get_option(q, "mesos-master");
 		if (mesos_master == NULL) {
-			debug(D_ERROR, "Please specify the ip address of mesos master\n");
+			debug(D_ERROR, "Please specify the ip address or domain name of mesos master\n");
 			exit(EXIT_FAILURE);
 		} else {
 			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
@@ -155,7 +160,12 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		}
 	}
 
-	if (is_mesos_py_path_known == 1 && is_mesos_master_known == 1 &&is_scheduler_running == 0) {
+	mesos_preload = batch_queue_get_option(q, "mesos-preload");
+
+	if (is_mesos_py_path_known == 1 && \
+		is_mesos_master_known == 1 && \
+		is_scheduler_running == 0) {
+		// start mesos scheduler if it is not running
 		start_mesos_scheduler(q);
 		is_scheduler_running = 1;
 	}
@@ -181,21 +191,14 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 
 	fprintf(task_info_fp, "%d,%s,", mt->task_id, mt->task_cmd);
 
-	// Get the absolut path o Meanwhile, the makeflow mesos scheduler keep polling 
-	// mesos_task_info, try to find if there is new task is ready to launch on mesos,. 
-	// 
-	// After the task is complete on, the makeflow mesos scheduler writes the final state
-	// of the task to mesos_task_state. And the makeflow is keep monitoring this file and 
-	// collect all finished task. f each input file
-
 	if (extra_input_files != NULL && strlen(extra_input_files) != 0) {
 
 		int j = 0;
-		int num_input_files = mt->task_input_files->used_length;
+		int num_input_files = text_list_size(mt->task_input_files);
 		for (j = 0; j < (num_input_files-1); j++) {
-			fprintf(task_info_fp, "%s ", (mt->task_input_files->items)[j]);
+			fprintf(task_info_fp, "%s ", text_list_get(mt->task_input_files, j));
 		}
-		fprintf(task_info_fp, "%s,", (mt->task_input_files->items)[num_input_files-1]);
+		fprintf(task_info_fp, "%s,", text_list_get(mt->task_input_files, num_input_files-1));
 
 	} else {
 		fputs(",", task_info_fp);
@@ -203,18 +206,18 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
     
 	if (extra_output_files != NULL && strlen(extra_output_files) != 0) {
 		int j = 0;
-		int num_output_files = mt->task_output_files->used_length;
+		int num_output_files = text_list_size(mt->task_output_files);
 		for (j = 0; j < (num_output_files-1); j++) {
-			fprintf(task_info_fp, "%s ", (mt->task_output_files->items)[j]);
+			fprintf(task_info_fp, "%s ", text_list_get(mt->task_output_files, j));
 		}
-		fprintf(task_info_fp, "%s,", (mt->task_output_files->items)[num_output_files-1]);
+		fprintf(task_info_fp, "%s,",text_list_get(mt->task_output_files, num_output_files-1));
 	} else {
 		fputs(",", task_info_fp);
 	}
 
-	int64_t cores = 4;
-	int64_t memory = 5120;
-	int64_t disk = 5120;
+	int64_t cores = 1;
+	int64_t memory = 1024;
+	int64_t disk = 1024;
 
 	if (resources) {
 		cores  = resources->cores  > -1 ? resources->cores  : cores;
