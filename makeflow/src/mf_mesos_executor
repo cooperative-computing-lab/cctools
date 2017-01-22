@@ -1,3 +1,13 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2016- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details. 
+
+# This script defined a customized mesos executor. Compare to the default executor, 
+# it can send the url of sandbox directory of each executor to the scheduler. And
+# then the Mesos scheduler is able to retrieve the outputs. 
+
 import os
 import sys
 import json
@@ -135,3 +145,4 @@ if __name__ == '__main__':
 
     sys.exit(status)
 
+# vim: set noexpandtab tabstop=4:

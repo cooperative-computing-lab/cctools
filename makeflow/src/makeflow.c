@@ -1086,10 +1086,10 @@ static void makeflow_run( struct dag *d )
 		}
 	}
 
-        //reporting to catalog
-        if(catalog_reporting_on){
-            makeflow_catalog_summary(d, project,batch_queue_type,start);
-        }
+	//reporting to catalog
+	if(catalog_reporting_on){
+		makeflow_catalog_summary(d, project,batch_queue_type,start);
+	}
 
 	if(makeflow_abort_flag) {
 		makeflow_abort_all(d);
@@ -1209,9 +1209,9 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Archive results of makeflow in specified directory			   (default directory is %s)\n", "--archive=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
 	printf(" %-30s Read/Use archived results of makeflow in specified directory, will not write to archive			   (default directory is %s)\n", "--archive-read=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
 	printf(" %-30s Write archived results of makeflow in specified directory, will not read/use archived data			 (default directory is %s)\n", "--archive-write=<dir>", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY);
-	printf(" %-30s Indicate preferred mesos master.\n", "--mesos-master=<ip_adr:port>");
-	printf(" %-30s Indicate the path to mesos python2 site-packages.\n", "--mesos-path=</path/to/mesos/python/site-packages>");
-
+	printf(" %-30s Indicate the host name of preferred mesos master.\n", "--mesos-master=<hostname:port>");
+	printf(" %-30s Indicate the path to mesos python2 site-packages.\n", "--mesos-path=<path>");
+	printf(" %-30s Indicate the linking libraries for running mesos.\n", "--mesos-preload=<path>");
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
@@ -1261,8 +1261,7 @@ int main(int argc, char *argv[])
 	shared_fs = list_create();
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
-
->>>>>>> f698133... This is the initial version of makeflow mesos mode. By enabling this mesos mode, makeflow can run on top of mesos clusters.
+	char *mesos_preload = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1325,16 +1324,17 @@ int main(int argc, char *argv[])
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
 		LONG_OPT_UMBRELLA_MODE,
 		LONG_OPT_UMBRELLA_SPEC,
+		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
         LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_READ_ONLY,
-		LONG_OPT_ARCHIVE_WRITE_ONLY
-		LONG_OPT_ALLOCATION_MODE,
+		LONG_OPT_ARCHIVE_WRITE_ONLY,
 		LONG_OPT_MESOS_MASTER,
-		LONG_OPT_MESOS_PATH
+		LONG_OPT_MESOS_PATH,
+		LONG_OPT_MESOS_PRELOAD
 	};
 
 	static const struct option long_options_run[] = {
@@ -1414,6 +1414,7 @@ int main(int argc, char *argv[])
 		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
 		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
+		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{0, 0, 0, 0}
 	};
 
@@ -1708,6 +1709,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MESOS_PATH:
 				mesos_path = xxstrdup(optarg);
 				break;
+			case LONG_OPT_MESOS_PRELOAD:
+				mesos_preload = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ARCHIVE:
 				should_read_archive = 1;
 				should_write_to_archive = 1;
@@ -1875,6 +1879,7 @@ if (enforcer && wrapper_umbrella) {
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
 		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
+		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
 		batch_queue_set_feature(remote_queue, "batch_log_name", batchlogfilename);
 	}
 
@@ -2091,7 +2096,16 @@ if (enforcer && wrapper_umbrella) {
 
 	if(local_queue)
 		batch_queue_delete(local_queue);
-	
+
+	/*
+	 * Set the abort and failed flag for batch_job_mesos mode.
+	 * Since batch_queue_delete(struct batch_queue *q) will call
+	 * batch_queue_mesos_free(struct batch_queue *q), which is defined 
+	 * in batch_job/src/batch_job_mesos.c. Then this function will check 
+	 * the abort and failed status of the batch_queue and inform 
+	 * the makeflow mesos scheduler. 
+	 */
+
 	if (batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
 		batch_queue_set_int_option(remote_queue, "batch-queue-abort-flag", (int)makeflow_abort_flag);
 		batch_queue_set_int_option(remote_queue, "batch-queue-failed-flag", (int)makeflow_failed_flag);

@@ -5,6 +5,12 @@
 #include "stringtools.h"
 #include "text_list.h"
 
+struct text_list {
+	char **items;
+	int alloc_length;
+	int used_length;
+};
+
 struct text_list *text_list_create()
 {
 	struct text_list *t = malloc(sizeof(*t));
@@ -85,6 +91,13 @@ void text_list_delete(struct text_list *t)
 	}
 	free(t->items);
 	free(t);
+}
+
+void text_list_set(struct text_list *t, const char *str, int i)
+{
+	char *tmp_str = strdup(str);
+	free(t->items[i]);
+	t->items[i] = tmp_str;
 }
 
 /* vim: set noexpandtab tabstop=4: */
