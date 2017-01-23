@@ -82,7 +82,8 @@ static void start_mesos_scheduler(struct batch_queue *q)
 		ld_preload_str = string_format("LD_PRELOAD=%s", mesos_preload);
 	} 
 	// TODO: Environment variables set for launching Mesos, this would not work outside ND. Ask user to specify the environments?
-	char *envs[] = {"CCTOOLS=/afs/crc.nd.edu/user/c/czheng2/cctools", ld_preload_str, NULL};
+	char *cctools_path = string_format("CCTOOLS=%s", getenv("CCTOOLS"));
+	char *envs[] = {cctools_path, ld_preload_str, NULL};
 
 	char *mesos_python_path = xxstrdup(mesos_py_path);
 
@@ -308,9 +309,10 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 	info->exited_normally = 0;
 	info->exit_signal = 0;
 	// append the new task state to the "mesos_task_info" file
-	char *cmd = string_format("awk -F \',\' \'{$(NF--)=\"aborting\"; if($1==\"%" PRIbjid "\"){for(i=1;i<NF;i+=1){printf $i\",\"}; print $NF}}\' %s >> %s", jobid, FILE_TASK_INFO, FILE_TASK_INFO);
-	system(cmd);
-	free(cmd);
+	FILE *task_info_fp;	
+	task_info_fp = fopen(FILE_TASK_INFO, "a+");
+	fprintf(task_info_fp, "%" PRIbjid ",,,,,,,aborting\n", jobid);
+	fclose(task_info_fp);
 
 	char *line = NULL;
 	size_t len = 0;
