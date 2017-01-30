@@ -1264,8 +1264,17 @@ int main( int argc, char *argv[] )
 
 	root_pid = pid;
 	debug(D_PROCESS,"attaching to pid %d",pid);
-	if (tracer_attach(pid) == -1)
+	if (tracer_attach(pid) == -1) {
+		if (errno == EPERM) {
+			fprintf(stderr,
+				"The `ptrace` system call appears to be disabled.\n"
+				"Some possible causes:\n"
+				" - Syscall filtering (e.g. seccomp) is in place. Some versions of Docker do\n   this inside containers.\n"
+				" - The program that launched Parrot used `PR_SET_DUMPABLE` to disable debugging\n   for this process.\n"
+				" - Your system's security framework (SELinux, Yama, etc.) disables ptrace.\n");
+		}
 		fatal("could not trace child");
+	}
 	kill(pid, SIGUSR1);
 	p = pfs_process_create(pid,NULL,0,0);
 	if(!p) {
