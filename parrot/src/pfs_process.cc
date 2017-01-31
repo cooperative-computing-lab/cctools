@@ -30,6 +30,10 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 
+pfs_pid_mode_t pfs_pid_mode = PFS_PID_MODE_NORMAL;
+
+int emulated_pid = 12345;
+
 struct pfs_process *pfs_current=0;
 int parrot_dir_fd = -1;
 
@@ -38,6 +42,7 @@ static int nprocs = 0;
 
 extern uid_t pfs_uid;
 extern gid_t pfs_gid;
+
 
 struct pfs_process * pfs_process_lookup( pid_t pid )
 {
@@ -339,11 +344,25 @@ int pfs_process_count()
 
 extern "C" int pfs_process_getpid()
 {
-	if(pfs_current) {
-		return pfs_current->pid;
-	} else {
-		return getpid();
+	switch(pfs_pid_mode) {
+		case PFS_PID_MODE_NORMAL:
+			if(pfs_current) {
+				return pfs_current->pid;
+			} else {
+				return getpid();
+			}
+			break;
+		case PFS_PID_MODE_FIXED:
+			return emulated_pid;
+			break;
+		case PFS_PID_MODE_WARP:
+			emulated_pid += 1;
+			return emulated_pid;
+			break;
 	}
+
+	errno = ENOSYS;
+	return -1;
 }
 
 extern "C" char * pfs_process_name()
