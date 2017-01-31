@@ -160,7 +160,9 @@ enum {
 	LONG_OPT_DYNAMIC_MOUNTS,
 	LONG_OPT_IS_RUNNING,
 	LONG_OPT_TIME_STOP,
-	LONG_OPT_TIME_WARP
+	LONG_OPT_TIME_WARP,
+	LONG_OPT_PID_WARP,
+	LONG_OPT_PID_FIXED
 };
 
 static void get_linux_version(const char *cmd)
@@ -843,6 +845,8 @@ int main( int argc, char *argv[] )
 		{"work-dir", required_argument, 0, 'w'},
 		{"time-stop", no_argument, 0, LONG_OPT_TIME_STOP},
 		{"time-warp", no_argument, 0, LONG_OPT_TIME_WARP},
+		{"pid-fixed", no_argument, 0, LONG_OPT_PID_FIXED},
+		{"pid-warp", no_argument, 0, LONG_OPT_PID_WARP},
 		{0,0,0,0}
 	};
 
@@ -1072,6 +1076,14 @@ int main( int argc, char *argv[] )
 			break;
 		case LONG_OPT_TIME_WARP:
 			pfs_time_mode = PFS_TIME_MODE_WARP;
+			pfs_use_helper = 1;
+			break;
+		case LONG_OPT_PID_FIXED:
+			pfs_pid_mode = PFS_PID_MODE_FIXED;
+			pfs_use_helper = 1;
+			break;
+		case LONG_OPT_PID_WARP:
+			pfs_pid_mode = PFS_PID_MODE_WARP;
 			pfs_use_helper = 1;
 			break;
 		default:

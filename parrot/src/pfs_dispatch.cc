@@ -1258,8 +1258,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_getitimer:
 		case SYSCALL32_getpgid:
 		case SYSCALL32_getpgrp:
-		case SYSCALL32_getpid:
-		case SYSCALL32_getppid:
 		case SYSCALL32_getpriority:
 		case SYSCALL32_getrandom:
 		case SYSCALL32_getrlimit:
@@ -1443,6 +1441,16 @@ static void decode_syscall( struct pfs_process *p, int entering )
 			/* We need to track the umask ourselves and use it in open. */
 			if(entering)
 				pfs_current->umask = args[0] & 0777;
+			break;
+
+		case SYSCALL32_getpid:
+			if(entering) {
+				p->syscall_result = pfs_process_getpid();
+				divert_to_dummy(p,p->syscall_result);
+			}
+			break;
+
+		case SYSCALL32_getppid:
 			break;
 
 		case SYSCALL32_getuid32:
