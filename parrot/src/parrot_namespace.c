@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "pfs_resolve.h"
 #include "pfs_mountfile.h"
+#include "list.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -53,21 +54,27 @@ static const struct option long_options[] = {
 
 int main( int argc, char *argv[] )
 {
-	char parrot_path[PATH_MAX];
-	char ldso[PATH_MAX];
-	strcpy(parrot_path, "parrot_run");
-	strcpy(ldso, "");
+	struct list *mountfiles = list_create();
+	struct list *mountstrings = list_create();
 
-	char *s = getenv("PARROT_PATH");
-	if (s) snprintf(parrot_path, PATH_MAX, "%s", s);
+	char *parrot_path = "parrot_run";
+	char *ldso_path = "";
 
-	s = getenv("PARROT_LDSO_PATH");
-	if (s) snprintf(ldso, PATH_MAX, "%s", s);
+	if (getenv("PARROT_PATH")) parrot_path = getenv("PARROT_PATH");
+	if (getenv("PARROT_LDSO_PATH")) ldso_path = getenv("PARROT_LDSO_PATH");
+
+	if (getenv("PARROT_MOUNT_FILE")) list_push_head(mountfiles, getenv("PARROT_MOUNT_FILE"));
+	if (getenv("PARROT_MOUNT_STRING")) list_push_head(mountstrings, getenv("PARROT_MOUNT_STRING"));
 
 	int c;
-	const char *optstring = "vhM:m:l:";
-	while((c=getopt_long(argc, argv, optstring, long_options, NULL)) > -1) {
+	while((c=getopt_long(argc, argv, "vhM:m:l:", long_options, NULL)) > -1) {
 		switch(c) {
+		case 'm':
+			list_push_head(mountstrings, xxstrdup(optarg));
+			break;
+		case 'M':
+			list_push_head(mountfiles, xxstrdup(optarg));
+			break;
 		case 'h':
 			show_help();
 			return 0;
@@ -75,20 +82,21 @@ int main( int argc, char *argv[] )
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
 		case 'l':
-			snprintf(ldso, PATH_MAX, "%s", optarg);
+			ldso_path = xxstrdup(optarg);
 			break;
 		case LONG_OPT_PARROT_PATH:
-			snprintf(parrot_path, PATH_MAX, "%s", optarg);
+			parrot_path = xxstrdup(optarg);
 			break;
 		default:
-			break;
+			show_help();
+			return 1;
 		}
 	}
 
 	char buf[4096];
 	if (parrot_version(buf, sizeof(buf)) >= 0) {
 		debug(D_DEBUG, "running under parrot %s\n", buf);
-		if (parrot_fork_namespace(ldso) < 0) {
+		if (parrot_fork_namespace(ldso_path) < 0) {
 			fatal("cannot dissociate from parent namespace");
 		}
 	} else {
@@ -97,36 +105,12 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	s = getenv("PARROT_MOUNT_FILE");
-	if (s) pfs_mountfile_parse_file(s);
+	char *s;
+	list_first_item(mountfiles);
+	while ((s = list_next_item(mountfiles))) pfs_mountfile_parse_file(s);
 
-	s = getenv("PARROT_MOUNT_STRING");
-	if (s) pfs_mountfile_parse_string(s);
-
-	optind = 1;
-	while((c=getopt_long(argc, argv, optstring, long_options, NULL)) > -1) {
-		switch(c) {
-		case 'm':
-			pfs_mountfile_parse_file(optarg);
-			break;
-		case 'M':
-			pfs_mountfile_parse_string(optarg);
-			break;
-		case 'h':
-		case 'v':
-		case 'l':
-		case LONG_OPT_PARROT_PATH:
-			break;
-		default:
-			show_help();
-			return 1;
-		}
-	}
-
-	if(optind >= argc) {
-		show_help();
-		return 1;
-	}
+	list_first_item(mountstrings);
+	while ((s = list_next_item(mountstrings))) pfs_mountfile_parse_string(s);
 
 	if (execvp(argv[optind], &argv[optind]) < 0) {
 		fatal("failed to exec %s: %s\n", argv[optind], strerror(errno));
