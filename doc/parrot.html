@@ -329,7 +329,11 @@ visible to processes subject to the following rules. Given a process <em>P</em> 
 </li>
 <li>when adding a mount entry to <em>N</em>, the redirect is resolved in the parent namespace of <em>N</em>.</li>
 </ul>
-<p>When Parrot starts, the global mount namespace has no parent, so mounts passed in are
+<p>A process' mount namespace forms
+a closure over the set of visible mount entries. Forking another namespace will capture all
+visible mount entries, and allow the process to make local changes independently from the
+parent namespace. Names are lexically scoped, i.e. a new mount is resolved in its enclosing
+scope. When Parrot starts, the global mount namespace has no parent, so mounts passed in are
 resolved in the host filesystem. Unless the <tt>--dynamic-mounts</tt> flag is passed,
 Parrot <strong>seals</strong> the global mount namespace before running the tracee by making a new
 child namespace. Thus all processes are, by default, locked into the namespace set up by
@@ -345,8 +349,8 @@ then seal it so that all children will be locked into the current view of the sy
 <p>The <tt>parrot_namespace</tt> utility gives a more convenient way to create new mount namespaces
 rather than using the <tt>parrot_fork_namespace</tt> syscall directly. This utility forks the
 current mount namespace and performs any mounts specified on the command line.
-<tt>parrot_namespace</tt> detects whether or not it is already running under Parrot and does
-the right thing. When running under Parrot, <tt>parrot_namespace</tt> uses Parrot-specific
+<tt>parrot_namespace</tt> detects whether or not it is already running under Parrot.
+If so, <tt>parrot_namespace</tt> uses Parrot-specific
 syscalls to make the mount changes in a newly-forked mount namespace. If not running
 under Parrot, <tt>parrot_namespace</tt> simply executes <tt>parrot_run</tt>.</p>
 <p>For applications that want to nest Parrot sessions and only need to make changes to
