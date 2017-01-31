@@ -41,11 +41,12 @@ void pfs_mountfile_parse_string(const char *str) {
 	assert(str);
 	char *e;
 	str = xxstrdup(str);
-	e = strchr((char *) str,'=');
-	if(!e) fatal("badly formed mount string: %s",str);
+	e = strchr(str, '=');
+	if(!e) fatal("badly formed mount string: %s", str);
 	*e = 0;
 	e++;
 	if (pfs_resolve_mount(str, e, "rwx") < 0) fatal("call to parrot_mount failed: %s", strerror(errno));
+	free((char *) str);
 }
 
 void pfs_mountfile_parse_file(const char *mountfile) {
