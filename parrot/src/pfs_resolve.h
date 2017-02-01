@@ -19,14 +19,31 @@ typedef enum {
 	PFS_RESOLVE_FAILED
 } pfs_resolve_t;
 
-void pfs_resolve_file_config( const char *mountfile );
-void pfs_resolve_manual_config( const char *string );
+struct pfs_mount_entry {
+	unsigned refcount;
+	char prefix[PFS_PATH_MAX];
+	char redirect[PFS_PATH_MAX];
+	char *ldso;
+	mode_t mode;
+	struct pfs_mount_entry *next;
+	struct pfs_mount_entry *parent;
+};
+
+void pfs_resolve_init(void);
+
+const char *pfs_resolve_get_ldso(void);
+void pfs_resolve_set_ldso(const char *ldso);
 
 void pfs_resolve_add_entry( const char *path, const char *device, mode_t mode );
 int pfs_resolve_remove_entry( const char *path );
 
-mode_t pfs_resolve_parse_mode( const char *modestring );
+int pfs_resolve_mount ( const char *path, const char *destination, const char *mode );
 
 pfs_resolve_t pfs_resolve( const char *logical_name, char *physical_name, mode_t mode, time_t stoptime );
+
+struct pfs_mount_entry *pfs_resolve_fork_ns( struct pfs_mount_entry *ns, const char *ldso);
+struct pfs_mount_entry *pfs_resolve_share_ns(struct pfs_mount_entry *ns);
+void pfs_resolve_drop_ns(struct pfs_mount_entry *ns);
+void pfs_resolve_seal_ns(void);
 
 #endif

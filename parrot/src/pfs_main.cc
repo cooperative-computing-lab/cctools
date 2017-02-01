@@ -18,6 +18,8 @@ See the file COPYING for details.
 
 extern "C" {
 #include "parrot_client.h"
+#include "pfs_resolve.h"
+#include "pfs_mountfile.h"
 }
 
 #ifndef PTRACE_EVENT_STOP
@@ -40,7 +42,6 @@ extern "C" {
 #include "itable.h"
 #include "md5.h"
 #include "password_cache.h"
-#include "pfs_resolve.h"
 #include "random.h"
 #include "stringtools.h"
 #include "string_array.h"
@@ -109,7 +110,6 @@ const char *pfs_root_checksum=0;
 const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
-char pfs_ldso_path[PATH_MAX];
 uid_t pfs_uid = 0;
 gid_t pfs_gid = 0;
 const char * pfs_username = 0;
@@ -160,7 +160,8 @@ enum {
 	LONG_OPT_DYNAMIC_MOUNTS,
 	LONG_OPT_IS_RUNNING,
 	LONG_OPT_TIME_STOP,
-	LONG_OPT_TIME_WARP
+	LONG_OPT_TIME_WARP,
+	LONG_OPT_PARROT_PATH,
 };
 
 static void get_linux_version(const char *cmd)
@@ -583,6 +584,7 @@ int main( int argc, char *argv[] )
 	int envauth = 0;
 
 	random_init();
+	pfs_resolve_init();
 
 	debug_config(argv[0]);
 	debug_config_file_size(0); /* do not rotate debug file by default */
@@ -684,10 +686,10 @@ int main( int argc, char *argv[] )
 	if(s) pfs_service_set_block_size(string_metric_parse(s));
 
 	s = getenv("PARROT_MOUNT_FILE");
-	if(s) pfs_resolve_file_config(s);
+	if(s) pfs_mountfile_parse_file(s);
 
 	s = getenv("PARROT_MOUNT_STRING");
-	if(s) pfs_resolve_manual_config(s);
+	if(s) pfs_mountfile_parse_string(s);
 
 	s = getenv("PARROT_FORCE_STREAM");
 	if(s) pfs_force_stream = 1;
@@ -717,7 +719,7 @@ int main( int argc, char *argv[] )
 	if(s) pfs_force_sync = 1;
 
 	s = getenv("PARROT_LDSO_PATH");
-	if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
+	if(s) pfs_resolve_set_ldso(s);
 
 	s = getenv("PARROT_DEBUG_FLAGS");
 	if(s) {
@@ -821,6 +823,7 @@ int main( int argc, char *argv[] )
 		{"no-optimize", no_argument, 0, 'D'},
 		{"no-set-foreground", no_argument, 0, LONG_OPT_NO_SET_FOREGROUND},
 		{"paranoid", no_argument, 0, 'P'},
+		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 		{"proxy", required_argument, 0, 'p'},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"session-caching", no_argument, 0, 'S'},
@@ -910,13 +913,13 @@ int main( int argc, char *argv[] )
 			pfs_checksum_files = 1;
 			break;
 		case 'l':
-			snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", optarg);
+			pfs_resolve_set_ldso(optarg);
 			break;
 		case 'm':
-			pfs_resolve_file_config(optarg);
+			pfs_mountfile_parse_file(optarg);
 			break;
 		case 'M':
-			pfs_resolve_manual_config(optarg);
+			pfs_mountfile_parse_string(optarg);
 			break;
 		case 'n':
 			if(access(optarg, F_OK) != -1) {
@@ -1074,6 +1077,9 @@ int main( int argc, char *argv[] )
 			pfs_time_mode = PFS_TIME_MODE_WARP;
 			pfs_use_helper = 1;
 			break;
+		case LONG_OPT_PARROT_PATH:
+			// compatibility option for parrot_namespace
+			break;
 		default:
 			show_help(argv[0]);
 			break;
@@ -1092,6 +1098,10 @@ int main( int argc, char *argv[] )
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if (!pfs_allow_dynamic_mounts) {
+		pfs_resolve_seal_ns();
+	}
 
 	debug(D_PROCESS, "I am process %d in group %d in session %d",(int)getpid(),(int)getpgrp(),(int)getsid(0));
 	{

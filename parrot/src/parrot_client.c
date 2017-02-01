@@ -4,18 +4,19 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "parrot_client.h"
-
-#include "tracer.table.h"
-#include "tracer.table64.h"
-
-#include <unistd.h>
-
 #include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#include "parrot_client.h"
+
+#include "tracer.table.h"
+#include "tracer.table64.h"
+
+
 
 int parrot_whoami( const char *path, char *buf, int size )
 {
@@ -259,5 +260,13 @@ ssize_t parrot_version ( char *buf, size_t len )
 #endif
 }
 
+int parrot_fork_namespace ( const char *ldso )
+{
+#ifdef CCTOOLS_CPU_I386
+	return syscall(SYSCALL32_parrot_fork_namespace, ldso);
+#else
+	return syscall(SYSCALL64_parrot_fork_namespace, ldso);
+#endif
+}
 
 /* vim: set noexpandtab tabstop=4: */

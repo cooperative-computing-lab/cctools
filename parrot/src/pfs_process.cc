@@ -14,6 +14,7 @@ extern "C" {
 #include "itable.h"
 #include "linux-version.h"
 #include "macros.h"
+#include "pfs_resolve.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 }
@@ -244,6 +245,7 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 	child->nsyscalls = 0;
 	child->completing_execve = 0;
 	child->exefd = -1;
+	child->ns = NULL;
 
 	if(parent) {
 		child->ppid = parent->pid;
@@ -255,6 +257,7 @@ struct pfs_process * pfs_process_create( pid_t pid, struct pfs_process *parent, 
 		child->sgid = parent->sgid;
 		child->ngroups = parent->ngroups;
 		memcpy(child->groups, parent->groups, child->ngroups * sizeof(gid_t));
+		child->ns = pfs_resolve_share_ns(parent->ns);
 
 		child->flags |= parent->flags;
 		if(share_table) {
@@ -315,6 +318,7 @@ static void pfs_process_delete( struct pfs_process *p )
 	pfs_paranoia_delete_pid(p->pid);
 	tracer_detach(p->tracer);
 	itable_remove(pfs_process_table,p->pid);
+	pfs_resolve_drop_ns(p->ns);
 	free(p);
 }
 
@@ -353,6 +357,10 @@ extern "C" char * pfs_process_name()
 	} else {
 		return (char *)"unknown";
 	}
+}
+
+extern "C" struct pfs_mount_entry *pfs_process_current_ns(void) {
+	return pfs_current ? pfs_current->ns : NULL;
 }
 
 extern const char *pfs_username;

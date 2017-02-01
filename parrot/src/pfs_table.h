@@ -126,7 +126,7 @@ public:
 	int 	search( const char *paths, const char *pattern, int flags, char *buffer, size_t buffer_length, size_t *i);
 
 	void	follow_symlink( struct pfs_name *pname, mode_t amode, int depth = 0 );
-	int	resolve_name( int is_special_syscall, const char *cname, pfs_name *pname, mode_t mode, bool do_follow_symlink = true, int depth = 0 );
+	int	resolve_name( int is_special_syscall, const char *cname, pfs_name *pname, mode_t mode, bool do_follow_symlink = true, int depth = 0, const char *parent_dir = NULL );
 
 	/* mmap operations */
 	pfs_size_t  mmap_create( int fd, pfs_size_t file_offset, size_t length, int prot, int flags );
@@ -145,7 +145,7 @@ private:
 	int count_file_uses( pfs_file *f );
 	static pfs_pointer *getopenfile( pid_t pid, int fd );
 
-	void complete_path( const char *short_path, char *long_path );
+	void complete_path( const char *short_path, const char *parent_dir, char *long_path );
 
 	pfs_size_t mmap_create_object( pfs_file *file, pfs_size_t channel_offset, pfs_size_t map_length, pfs_size_t file_offset, int prot, int flags );
 

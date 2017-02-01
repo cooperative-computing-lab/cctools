@@ -16,8 +16,9 @@ extern "C" {
 #include "debug.h"
 #include "full_io.h"
 #include "file_cache.h"
-#include "stringtools.h"
+#include "pfs_mountfile.h"
 #include "pfs_resolve.h"
+#include "stringtools.h"
 }
 
 #include <errno.h>
@@ -30,7 +31,6 @@ extern "C" {
 
 extern struct file_cache *pfs_file_cache;
 extern int pfs_force_cache;
-extern int pfs_allow_dynamic_mounts;
 
 /*
 Notice that we make the check for EINTR in here,
@@ -240,19 +240,16 @@ int pfs_mount( const char *path, const char *device, const char *mode )
 	debug(D_LIBCALL,"mount %s %s %s",path,device,mode);
 
 	if(!path && !device) {
-		pfs_allow_dynamic_mounts = 0;
+		pfs_resolve_seal_ns();
 		result = 0;
-	} else if(pfs_allow_dynamic_mounts) {
+	} else {
 		if(path[0]!='/') {
 			result = -1;
 			errno = EINVAL;
 		} else {
-			pfs_resolve_add_entry(path,device,pfs_resolve_parse_mode(mode));
+			pfs_resolve_add_entry(path,device,pfs_mountfile_parse_mode(mode));
 			result = 0;
 		}
-	} else {
-		result = -1;
-		errno = EPERM;
 	}
 
 	END
@@ -262,19 +259,14 @@ int pfs_unmount( const char *path )
 {
 	BEGIN
 	debug(D_LIBCALL,"unmount %s",path);
-	if(pfs_allow_dynamic_mounts) {
-		if(path[0]!='/') {
-			result = -1;
-			errno = EINVAL;
-		} else if(pfs_resolve_remove_entry(path)) {
-			result = 0;
-		} else {
-			result = -1;
-			errno = EINVAL;
-		}
+	if(path[0]!='/') {
+		result = -1;
+		errno = EINVAL;
+	} else if(pfs_resolve_remove_entry(path)) {
+		result = 0;
 	} else {
 		result = -1;
-		errno = EPERM;
+		errno = EINVAL;
 	}
 	END
 }

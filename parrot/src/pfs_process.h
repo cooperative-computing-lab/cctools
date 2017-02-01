@@ -14,6 +14,7 @@ See the file COPYING for details.
 
 extern "C" {
 #include "int_sizes.h"
+#include "pfs_resolve.h"
 #include "tracer.h"
 }
 
@@ -45,6 +46,7 @@ struct pfs_process {
 	int ngroups;
 	mode_t umask;
 	int flags;
+	struct pfs_mount_entry *ns;
 
 	enum pfs_process_state state;
 	uint64_t nsyscalls;
@@ -78,6 +80,7 @@ int  pfs_process_count();
 struct pfs_process * pfs_process_lookup( pid_t pid );
 int  pfs_process_cankill( pid_t pid );
 extern "C" char *pfs_process_name();
+extern "C" struct pfs_mount_entry *pfs_process_current_ns(void);
 
 extern "C" void pfs_process_killall();
 extern "C" void pfs_process_kill_everyone(int sig);

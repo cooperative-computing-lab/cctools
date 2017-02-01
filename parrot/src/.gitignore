@@ -7,6 +7,7 @@ parrot_lsalloc
 parrot_md5
 parrot_mkalloc
 parrot_mount
+parrot_namespace
 parrot_pack
 parrot_package_create
 parrot_run
