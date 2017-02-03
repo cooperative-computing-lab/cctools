@@ -121,6 +121,12 @@ sub enable_monitoring_full {
 	return work_queue_enable_monitoring_full($self->{_work_queue}, $dir_name);
 }
 
+
+sub enable_monitoring_snapshots {
+	my ($self, $filename) = @_;
+	return work_queue_enable_monitoring_snapshots($self->{_work_queue}, $filename);
+}
+
 sub activate_fast_abort {
 	my ($self, $multiplier) = @_;
 	return work_queue_activate_fast_abort($self->{_work_queue}, $multiplier);
@@ -500,6 +506,24 @@ Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
 =item dirname    Directory name for the monitor output.
 
 =back
+
+=head3 C<enable_monitoring_snapshots($filename)>
+
+When monitoring, indicates a file that when present, directs the resource
+monitor to take a snapshot of the resources. Snapshots appear in the JSON
+summary file of the task, under the key "snapshots". The file is removed after
+the snapshot, so that a new snapshot can be taken when it is recreated by a
+task. Optionaly, the first line of the file can be used to give an identifying
+label to the snapshot.
+
+=over 12
+
+=item self 	Reference to the current work queue object.
+
+item signal_file Name of the file which presence directs the resource monitor to take a snapshot. After the snapshot, THIS FILE IS REMOVED.
+
+=back
+
 
 =head3 C<activate_fast_abort>
 
