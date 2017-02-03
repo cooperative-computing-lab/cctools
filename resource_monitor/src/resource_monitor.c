@@ -135,6 +135,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "itable.h"
 #include "jx.h"
+#include "jx_print.h"
 #include "list.h"
 #include "macros.h"
 #include "path.h"
@@ -165,6 +166,8 @@ uint64_t interval = DEFAULT_INTERVAL;
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
 FILE  *log_inotify = NULL;      /* List of opened files is written to this file. */
+
+char *template_path = NULL;     /* Prefix of all output files names */
 
 int debug_active = 0;           /* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
 
@@ -213,6 +216,17 @@ int64_t total_bytes_rx;   /* total bytes received */
 int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
+
+const char *snapshot_signal_file = NULL;    /* name of the file that, if
+											   exists, makes the monitor record
+											   an snapshot of the current
+											   usage. The first line of the
+											   file labels the snapshot. The
+											   file is removed when the
+											   snapshot is recorded, so that
+											   multiple snapshots can be
+											   created. */
+struct list *snapshots = NULL;              /* list of snapshots, as json objects. */
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -375,6 +389,22 @@ void add_verbatim_field(const char *str) {
 	debug(D_RMON, "%s", pair);
 
 	free(pair);
+}
+
+void add_snapshots() {
+	if(!snapshots) {
+		return;
+	}
+
+	struct jx *a = jx_array(0);
+
+	struct jx *j;
+	list_first_item(snapshots);
+	while((j = list_next_item(snapshots))) {
+		jx_array_insert(a, j);
+	}
+
+	jx_insert(verbatim_summary_fields, jx_string("snapshots"), a);
 }
 
 
@@ -941,6 +971,57 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 }
 
+void record_snapshot(struct rmsummary *tr) {
+	char label[1024];
+
+	if(!snapshot_signal_file) {
+		return;
+	}
+
+	FILE *snap_f = fopen(snapshot_signal_file, "r");
+	if(!snap_f) {
+		/* signal is unavailable, so no snapshot is taken. */
+		return;
+	}
+
+	if(!snapshots) {
+		snapshots = list_create(0);
+	}
+
+	label[0]='\0';
+	fgets(label, 1024, snap_f);
+	fclose(snap_f);
+	unlink(snapshot_signal_file);
+
+	string_chomp(label);
+
+	if(label[0] == '\0') {
+		snprintf(label, 1024, "snapshot %d", list_size(snapshots) + 1);
+	}
+
+	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
+
+	jx_insert_string(j, "snapshot", label);
+
+	if(!j) {
+		return;
+	}
+
+	list_push_tail(snapshots, j);
+
+	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
+	snap_f = fopen(output_file, "w");
+	free(output_file);
+
+	if(!snap_f) {
+		return;
+	}
+
+	jx_print_stream(j, snap_f);
+
+	fclose(snap_f);
+}
+
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
 {
 	/* update from any END_WAIT message received. */
@@ -1070,6 +1151,10 @@ int rmonitor_final_summary()
 	if(strlen(hostname) > 0) {
 		host_info = string_format("host:%s", hostname);
 		add_verbatim_field(host_info);
+	}
+
+	if(snapshots && list_size(snapshots) > 0) {
+		add_snapshots();
 	}
 
 	if(log_inotify)
@@ -1760,6 +1845,10 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s If <file> exists at the end of a measurement interval, take a snapshot of\n", "--snapshot-file=<file>");
+    fprintf(stdout, "%-30s current resources, and delete <file>. If <file> has a non-empty first\n", "");
+    fprintf(stdout, "%-30s line, it is used as a label for the snapshot.\n", "");
 }
 
 
@@ -1807,6 +1896,10 @@ int rmonitor_resources(long int interval /*in seconds */)
 		release_waiting_processes();
 
 		cleanup_zombies();
+
+		//process snapshot
+		record_snapshot(resources_now);
+
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
 			break;
@@ -1835,7 +1928,6 @@ int main(int argc, char **argv) {
     char *executable;
     int64_t c;
 
-    char *template_path = NULL;
     char *summary_path = NULL;
     char *series_path  = NULL;
     char *opened_path  = NULL;
@@ -1883,7 +1975,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_WORKING_DIRECTORY,
 		LONG_OPT_FOLLOW_CHDIR,
 		LONG_OPT_MEASURE_DIR,
-		LONG_OPT_NO_PPRINT
+		LONG_OPT_NO_PPRINT,
+		LONG_OPT_SNAPSHOT_FILE
 	};
 
     static const struct option long_options[] =
@@ -1908,6 +2001,8 @@ int main(int argc, char **argv) {
 		    {"with-time-series",       no_argument, 0, LONG_OPT_TIME_SERIES},
 		    {"with-inotify",           no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
+
+		    {"snapshot-file", required_argument, 0, LONG_OPT_SNAPSHOT_FILE},
 
 		    {0, 0, 0, 0}
 	    };
@@ -1984,6 +2079,9 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_NO_PPRINT:
 				pprint_summaries = 0;
+				break;
+			case LONG_OPT_SNAPSHOT_FILE:
+				snapshot_signal_file = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);

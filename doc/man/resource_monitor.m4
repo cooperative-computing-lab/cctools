@@ -104,6 +104,7 @@ OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. If not specified, foll
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
+OPTION_ITEM(--snapshot-file=<file>) If <file> exists at the end of a measurement interval, take a snapshot of current resources, and delete <file>. If <file> has a non-empty first line, it is used as a label for the snapshot.
 OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
 OPTIONS_END
