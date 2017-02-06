@@ -9,7 +9,7 @@
 
 PYTHON=$(/usr/bin/env python)
 
-SCRIPT=${CCTOOLS}/bin/mf_mesos_executor
+SCRIPT=${CCTOOLS_BIN}/mf_mesos_executor
 
 LD_PRELOAD="${LD_PRELOAD}" \
 exec ${PYTHON} ${SCRIPT} "${@}"

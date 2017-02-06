@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import urllib2
+import shutil
 import logging
 import threading
 import subprocess
@@ -109,6 +110,7 @@ class MakeflowMesosExecutor(Executor):
                 print "Sent output file URI" 
                 update.state = mesos_pb2.TASK_FINISHED
                 update.message = message
+                update.executor_id.value = self.executor_id
 
             except subprocess.CalledProcessError as e:
                 returncode = e.returncode
@@ -123,18 +125,24 @@ class MakeflowMesosExecutor(Executor):
             
             driver.sendFrameworkMessage("[EXECUTOR_STATE] {0} stopped".format(\
                     self.executor_id))
-            driver.stop()
+            # driver.stop()
 
         thread = threading.Thread(target=run_task)
         thread.start()
         thread.join()
 
     def frameworkMessage(self, driver, message):
+        print "receive message {0}".format(message)
         message_list = message.split()
         if message_list[1].strip(' \t\n\r') == "abort":
             logging.info("task {0} aborted".format(self.task_id))
             driver.sendFrameworkMessage("[EXECUTOR_STATE] {0} aborted {1}".format(\
                     self.executor_id, self.task_id))
+            driver.stop()
+        if message_list[1].strip(' \t\n\r') == "retrieve":
+            print "The output of task {0} has been retrieved by master".format(self.task_id)
+            print "Removing the sandbox directory....."
+            shutil.rmtree(self.get_sandbox_dir(self.hostname))
             driver.stop()
             
 if __name__ == '__main__':

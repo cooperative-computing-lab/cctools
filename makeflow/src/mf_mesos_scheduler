@@ -38,7 +38,7 @@ import SocketServer
 import socket
 from Queue import Queue
 
-setting_module_path = os.path.join(os.getenv('CCTOOLS'), "bin", "mf_mesos_setting")
+setting_module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "mf_mesos_setting")
 mms = imp.load_source("mf_mesos_setting", setting_module_path)
 
 sys.path.insert(0,sys.argv[3])
@@ -159,9 +159,9 @@ class MakeflowScheduler(Scheduler):
         executor = mesos_pb2.ExecutorInfo()
         executor.framework_id.value = framework_id
         executor.executor_id.value = str(uuid.uuid4())
-        cctools_path = os.getenv('CCTOOLS')
+        cctools_bin_path = os.path.dirname(os.path.realpath(__file__))
         ld_preload = os.getenv('LD_PRELOAD')
-        sh_path = os.path.join(cctools_path, 'bin', 'mf-mesos-executor')
+        sh_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mf-mesos-executor')
         task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
         task_cmd_f = open(task_cmd_sh, "w+")
         task_cmd_f.write(mf_task.cmd)
@@ -180,8 +180,8 @@ class MakeflowScheduler(Scheduler):
         
         # add $CCTOOLS as the env variables for executor command
         cctools_env = executor.command.environment.variables.add()
-        cctools_env.name = "CCTOOLS"
-        cctools_env.value = cctools_path
+        cctools_env.name = "CCTOOLS_BIN"
+        cctools_env.value = os.path.dirname(os.path.realpath(__file__))
 
         # add $LD_PRELOAD as the env variables for executor command
         ld_preload_env = executor.command.environment.variables.add()
@@ -263,7 +263,7 @@ class MakeflowScheduler(Scheduler):
         mf_mesos_executor_info = \
                 mms.MfMesosExecutorInfo(\
                 executor.executor_id, \
-                offer.slave_id.value, offer.hostname)
+                offer.slave_id, offer.hostname)
 
         mf_mesos_executor_info.tasks.append(task_id)
 
@@ -424,7 +424,11 @@ class MakeflowScheduler(Scheduler):
                             mms.tasks_info_dict[update.task_id.value].action = "failed"
                             self.clean_mesos_file(update.task_id.value)  
                             return 
-                
+               
+			  		# send message to executor to deleting the sandbox directory 
+                    logger.info("sending {0} to {1} at {2}".format("[SCHEDULER_STATE] retrieve done",update.executor_id.value, mms.executors_info_dict[update.executor_id.value].slave_id.value ))
+                    driver.sendFrameworkMessage(update.executor_id, mms.executors_info_dict[update.executor_id.value].slave_id, "[SCHEDULER_STATE] retrieve done")	
+			    
                     logger.info("{0} is done".format(update.task_id.value))
                     oup_fn.write("{0},finished\n".format(curr_task_id))
                     mms.tasks_info_dict[curr_task_id].action = "finished"
@@ -556,10 +560,7 @@ class MakefowMonitor(threading.Thread):
                 if task_action == "aborting":
                     mf_task = mms.tasks_info_dict[task_id]
 
-                    self.driver.sendFrameworkMessage(self, \
-                            mf_task.executor_id, \
-                            mms.executors_info_dict[mf_task.executor_id].slave_id, \
-                            "[SCHEDULER_REQUEST] abort")
+                    self.driver.sendFrameworkMessage( mf_task.executor_id, mms.executors_info_dict[mf_task.executor_id].slave_id, "[SCHEDULER_REQUEST] abort")
     
         task_action_fn.close()
 
