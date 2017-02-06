@@ -99,6 +99,7 @@ static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
 static char *wrapper_input = 0;
+static char *worker_prog = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -316,14 +317,32 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	resource_args = xxstrdup(buffer_tostring(&b));
 	buffer_free(&b);
 }
-
+static char* fetch_end_of_path(char* path){
+	size_t len= strlen(path);
+	size_t slash_pos = 0;
+	size_t i=0;
+	for(i=len-1; i > -1; i-- ){
+		if(path[i] == '/'){
+			slash_pos = i;
+			break;
+		}
+	}
+	char* new_str = malloc(sizeof(char)*(len-slash_pos)+1);
+	for(i=0; i< (len-slash_pos); i++){
+		new_str[i] = path[slash_pos + i];
+	}
+	new_str[len-slash_pos] = '\0';
+	return new_str;
+}
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
+	char *worker = (worker_prog != NULL) ? fetch_end_of_path(worker_prog) : string_format("./work_queue_worker");
 
 	if(using_catalog) {
 		cmd = string_format(
-		"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"%s -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
@@ -335,7 +354,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	else {
 		cmd = string_format(
-		"./work_queue_worker %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"./%s %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		worker,
 		master_host,
 		master_port,
 		worker_timeout,
@@ -355,7 +375,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = string_format("work_queue_worker");
+	char *files = (worker != NULL) ? string_format("%s",worker_prog) : string_format("work_queue_worker");
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -370,6 +390,7 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
+	free(worker);
 
 	return batch_job_submit(queue,cmd,files,"output.log",0,resources);
 }
@@ -867,7 +888,22 @@ static void show_help(const char *cmd)
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_WRAPPER, LONG_OPT_WRAPPER_INPUT };
+enum{   LONG_OPT_CORES = 255,
+		LONG_OPT_MEMORY, 
+		LONG_OPT_DISK, 
+		LONG_OPT_GPUS, 
+		LONG_OPT_TASKS_PER_WORKER, 
+		LONG_OPT_CONF_FILE, 
+		LONG_OPT_AMAZON_CREDENTIALS, 
+		LONG_OPT_AMAZON_AMI, 
+		LONG_OPT_FACTORY_TIMEOUT, 
+		LONG_OPT_AUTOSIZE, 
+		LONG_OPT_CONDOR_REQUIREMENTS, 
+		LONG_OPT_WORKERS_PER_CYCLE, 
+		LONG_OPT_WRAPPER, 
+		LONG_OPT_WRAPPER_INPUT,
+		LONG_OPT_CUSTOM_WORKER
+	};
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
@@ -899,6 +935,7 @@ static const struct option long_options[] = {
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
+	{"custom-worker", required_argument, 0, LONG_OPT_CUSTOM_WORKER},
 	{0,0,0,0}
 };
 
@@ -1000,6 +1037,9 @@ int main(int argc, char *argv[])
 				} else {
 					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
+				break;
+			case LONG_OPT_CUSTOM_WORKER:
+				worker_prog = strdup(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
