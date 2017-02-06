@@ -1,29 +1,68 @@
 #include "address.h"
+#include "debug.h"
+#include <assert.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+int address_check_mode( struct addrinfo *info ) {
+	assert(info);
+
+	const char *mode_str = getenv("CCTOOLS_IP_MODE");
+	if(!mode_str) mode_str = "IPV4";
+
+	if(!strcmp(mode_str,"AUTO")) {
+		info->ai_family = AF_UNSPEC;
+		return 1;
+	} else if(!strcmp(mode_str,"IPV4")) {
+		info->ai_family = AF_INET;
+		return 1;
+	} else if(!strcmp(mode_str,"IPV6")) {
+		info->ai_family = AF_INET6;
+		return 1;
+	} else {
+		debug(D_NOTICE,"CCTOOLS_IP_MODE has invalid value (%s).  Choices are IPV4, IPV6, or AUTO",mode_str);
+		info->ai_family = AF_UNSPEC;
+		return 0;
+	}
+}
 
 int address_to_sockaddr( const char *str, int port, struct sockaddr_storage *addr, SOCKLEN_T *length )
 {
+	struct addrinfo info;
+	memset(&info, 0, sizeof(struct addrinfo));
 	memset(addr,0,sizeof(*addr));
 
 	struct sockaddr_in *ipv4 = (struct sockaddr_in *)addr;
 	struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)addr;
 
+	address_check_mode(&info);
 	if(!str) {
-		// When the address is unspecified, we are
-		// attempting to bind a listening socket to
-		// any avaialble address.  IN6ADDR_ANY accepts
-		// both ipv4 and ipv6 binds.
-		*length = sizeof(*ipv6);
-		ipv6->sin6_family = AF_INET6;
-		ipv6->sin6_addr = in6addr_any;
-		ipv6->sin6_port = htons(port);
+		if (info.ai_family == AF_UNSPEC || info.ai_family == AF_INET6) {
+			// When the address is unspecified, we are
+			// attempting to bind a listening socket to
+			// any avaialble address.  IN6ADDR_ANY accepts
+			// both ipv4 and ipv6 binds.
+			*length = sizeof(*ipv6);
+			ipv6->sin6_family = AF_INET6;
+			ipv6->sin6_addr = in6addr_any;
+			ipv6->sin6_port = htons(port);
 #if defined(CCTOOLS_OPSYS_DARWIN)
-		ipv6->sin6_len = sizeof(*ipv6);
+			ipv6->sin6_len = sizeof(*ipv6);
 #endif
-		return AF_INET6;
-	} else if(inet_pton(AF_INET,str,&ipv4->sin_addr)==1) {
+			return AF_INET6;
+		} else {
+			ipv4->sin_addr.s_addr = INADDR_ANY;
+			*length = sizeof(*ipv4);
+			ipv4->sin_family = AF_INET;
+			ipv4->sin_port = htons(port);
+#if defined(CCTOOLS_OPSYS_DARWIN)
+			ipv4->sin_len = sizeof(*ipv4);
+#endif
+			return AF_INET;
+		}
+	} else if ((info.ai_family == AF_UNSPEC || info.ai_family == AF_INET) && inet_pton(AF_INET, str, &ipv4->sin_addr) == 1) {
 		*length = sizeof(*ipv4);
 		ipv4->sin_family = AF_INET;
 		ipv4->sin_port = htons(port);
@@ -31,7 +70,7 @@ int address_to_sockaddr( const char *str, int port, struct sockaddr_storage *add
 		ipv4->sin_len = sizeof(*ipv4);
 #endif
 		return AF_INET;
-	} else if(inet_pton(AF_INET6,str,&ipv6->sin6_addr)==1) {
+	} else if ((info.ai_family == AF_UNSPEC || info.ai_family == AF_INET6) && inet_pton(AF_INET6, str, &ipv6->sin6_addr) == 1) {
 		*length = sizeof(*ipv6);
 		ipv6->sin6_family = AF_INET6;
 		ipv6->sin6_port = htons(port);
