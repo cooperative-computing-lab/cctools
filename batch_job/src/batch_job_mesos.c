@@ -81,9 +81,7 @@ static void start_mesos_scheduler(struct batch_queue *q)
 	if(mesos_preload != NULL) {
 		ld_preload_str = string_format("LD_PRELOAD=%s", mesos_preload);
 	} 
-	// TODO: Environment variables set for launching Mesos, this would not work outside ND. Ask user to specify the environments?
-	char *cctools_path = string_format("CCTOOLS=%s", getenv("CCTOOLS"));
-	char *envs[] = {cctools_path, ld_preload_str, NULL};
+	char *envs[] = {ld_preload_str, NULL};
 
 	char *mesos_python_path = xxstrdup(mesos_py_path);
 
