@@ -1123,13 +1123,11 @@ int main(int argc, char *argv[])
 
 	char cmd[1024];
 	if(worker_command != NULL){
-		fprintf(stderr,"We are going to copy the work_queue_worker!\n");
 		sprintf(cmd,"cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
 			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
-		fprintf(stderr,"We did copy successfully! Here's the command we used: \"%s\"\n",cmd);
 	}else{
 		sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
 		if (system(cmd)) {
