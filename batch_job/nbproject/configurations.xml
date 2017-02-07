@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="97">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <df root="." name="0">
+      <df name="src">
+        <in>batch_job.c</in>
+        <in>batch_job_amazon.c</in>
+        <in>batch_job_blue_waters.c</in>
+        <in>batch_job_chirp.c</in>
+        <in>batch_job_cluster.c</in>
+        <in>batch_job_condor.c</in>
+        <in>batch_job_dryrun.c</in>
+        <in>batch_job_local.c</in>
+        <in>batch_job_work_queue.c</in>
+        <in>work_queue_factory.c</in>
+      </df>
+    </df>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+      <itemPath>nbproject/private/launcher.properties</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceFolderFilter>^(nbproject)$</sourceFolderFilter>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>false</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <flagsDictionary>
+        <element flagsID="0" commonFlags="-fPIC -g -std=c99"/>
+      </flagsDictionary>
+      <codeAssistance>
+      </codeAssistance>
+      <makefileType>
+        <makeTool>
+          <buildCommandWorkingDir>.</buildCommandWorkingDir>
+          <buildCommand>${MAKE} -f Makefile</buildCommand>
+          <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
+          <executablePath></executablePath>
+          <cTool>
+            <incDir>
+              <pElem>../dttools/src</pElem>
+              <pElem>src</pElem>
+              <pElem>../makeflow/src</pElem>
+              <pElem>../work_queue/src</pElem>
+              <pElem>../sand/src</pElem>
+              <pElem>../allpairs/src</pElem>
+              <pElem>../wavefront/src</pElem>
+              <pElem>../ftp_lite/src</pElem>
+              <pElem>../parrot/src</pElem>
+              <pElem>../resource_monitor/src</pElem>
+              <pElem>../chirp/src</pElem>
+              <pElem>../weaver/src</pElem>
+              <pElem>../umbrella/src</pElem>
+              <pElem>../deltadb/src</pElem>
+              <pElem>../prune/src</pElem>
+            </incDir>
+            <preprocessorList>
+              <Elem>BUILD_DATE="2017-02-06 12:55:16 -0500"</Elem>
+              <Elem>BUILD_HOST="cclws07"</Elem>
+              <Elem>BUILD_USER="ksweene3"</Elem>
+              <Elem>CCTOOLS_COMMIT=""</Elem>
+              <Elem>CCTOOLS_CONFIGURE_ARGUMENTS=""</Elem>
+              <Elem>CCTOOLS_CPU_X86_64</Elem>
+              <Elem>CCTOOLS_CVMFS_BUILD_FLAGS=" "</Elem>
+              <Elem>CCTOOLS_OPSYS_LINUX</Elem>
+              <Elem>CCTOOLS_RELEASE_DATE="2017-02-06 12:55:16 -0500"</Elem>
+              <Elem>CCTOOLS_SOURCE=""</Elem>
+              <Elem>CCTOOLS_SYSTEM_INFORMATION="Linux cclws07 2.6.32-431.17.1.el6.x86_64 #1 SMP Fri Apr 11 17:27:00 EDT 2014 x86_64 x86_64 x86_64 GNU/Linux"</Elem>
+              <Elem>CCTOOLS_VERSION="6.0.0 "</Elem>
+              <Elem>CCTOOLS_VERSION_MAJOR=6</Elem>
+              <Elem>CCTOOLS_VERSION_MICRO=0</Elem>
+              <Elem>CCTOOLS_VERSION_MINOR=0</Elem>
+              <Elem>HAS_ATTR_XATTR_H</Elem>
+              <Elem>HAS_BXGRID</Elem>
+              <Elem>HAS_FTS_H</Elem>
+              <Elem>HAS_FUSE</Elem>
+              <Elem>HAS_INTTYPES_H</Elem>
+              <Elem>HAS_ISNAN</Elem>
+              <Elem>HAS_LIBREADLINE</Elem>
+              <Elem>HAS_MYSQL</Elem>
+              <Elem>HAS_MYSQL_MYSQL_H</Elem>
+              <Elem>HAS_OPENAT</Elem>
+              <Elem>HAS_PREAD</Elem>
+              <Elem>HAS_PWRITE</Elem>
+              <Elem>HAS_STDINT_H</Elem>
+              <Elem>HAS_STRSIGNAL</Elem>
+              <Elem>HAS_SYSLOG_H</Elem>
+              <Elem>HAS_SYS_STATFS_H</Elem>
+              <Elem>HAS_SYS_STATVFS_H</Elem>
+              <Elem>HAS_SYS_XATTR_H</Elem>
+              <Elem>HAS_USLEEP</Elem>
+              <Elem>HAS_UTIME</Elem>
+              <Elem>HAS_UTIMENSAT</Elem>
+              <Elem>HAVE_FDATASYNC</Elem>
+              <Elem>HAVE_GMTIME_R</Elem>
+              <Elem>HAVE_INTTYPES_H</Elem>
+              <Elem>HAVE_ISNAN</Elem>
+              <Elem>HAVE_LOCALTIME_R</Elem>
+              <Elem>HAVE_STDINT_H</Elem>
+              <Elem>HAVE_STRCHRNUL</Elem>
+              <Elem>HAVE_USLEEP</Elem>
+              <Elem>HAVE_UTIME</Elem>
+              <Elem>INSTALL_PATH="/afs/nd.edu/user3/ksweene3/cctools"</Elem>
+              <Elem>SQLITE_HAVE_ISNAN</Elem>
+              <Elem>USE_PREAD</Elem>
+              <Elem>USE_PREAD64</Elem>
+              <Elem>USE_PWRITE</Elem>
+              <Elem>USE_PWRITE64</Elem>
+              <Elem>_GNU_SOURCE</Elem>
+              <Elem>_LARGEFILE64_SOURCE</Elem>
+              <Elem>_REENTRANT</Elem>
+              <Elem>__EXTENSIONS__</Elem>
+              <Elem>__LARGE64_FILES</Elem>
+            </preprocessorList>
+          </cTool>
+        </makeTool>
+        <preBuild>
+          <preBuildCommandWorkingDir>.</preBuildCommandWorkingDir>
+          <preBuildCommand></preBuildCommand>
+        </preBuild>
+      </makefileType>
+      <item path="src/batch_job.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_amazon.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_blue_waters.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_chirp.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_cluster.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_condor.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_dryrun.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_local.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/batch_job_work_queue.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+      <item path="src/work_queue_factory.c" ex="false" tool="0" flavor2="3">
+        <cTool flags="0">
+        </cTool>
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>

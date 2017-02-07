@@ -1,0 +1,633 @@
+gmake[1]: Entering directory `/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src'
+COMPILE batch_job.o
+chmod 755 convert_script_to_code.pl
+./convert_script_to_code.pl < batch_job_amazon_script.sh > batch_job_amazon_script.c
+COMPILE batch_job_amazon.o
+COMPILE batch_job_dryrun.o
+COMPILE batch_job_chirp.o
+COMPILE batch_job_cluster.o
+COMPILE batch_job_blue_waters.o
+COMPILE batch_job_condor.o
+COMPILE batch_job_local.o
+COMPILE batch_job_work_queue.o
+ar rv libbatch_job.a batch_job.o batch_job_amazon.o batch_job_dryrun.o batch_job_chirp.o batch_job_cluster.o batch_job_blue_waters.o batch_job_condor.o batch_job_local.o batch_job_work_queue.o
+ar: creating libbatch_job.a
+a - batch_job.o
+a - batch_job_amazon.o
+a - batch_job_dryrun.o
+a - batch_job_chirp.o
+a - batch_job_cluster.o
+a - batch_job_blue_waters.o
+a - batch_job_condor.o
+a - batch_job_local.o
+a - batch_job_work_queue.o
+ranlib libbatch_job.a
+COMPILE work_queue_factory.o
+ar rv ../../work_queue/src/libwork_queue.a 
+ar: creating ../../work_queue/src/libwork_queue.a
+ranlib ../../work_queue/src/libwork_queue.a
+ar rv ../../chirp/src/libchirp.a 
+ar: creating ../../chirp/src/libchirp.a
+ranlib ../../chirp/src/libchirp.a
+ar rv ../../dttools/src/libdttools.a 
+ar: creating ../../dttools/src/libdttools.a
+ranlib ../../dttools/src/libdttools.a
+LINK work_queue_factory
+work_queue_factory.o: In function `master_workers_capacity':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:121: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:122: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:123: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:124: undefined reference to `jx_lookup_integer'
+work_queue_factory.o: In function `master_workers_needed_by_resource':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:155: undefined reference to `jx_lookup_integer'
+work_queue_factory.o:/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:156: more undefined references to `jx_lookup_integer' follow
+work_queue_factory.o: In function `do_direct_query':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:190: undefined reference to `domain_name_cache_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:195: undefined reference to `link_connect'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:201: undefined reference to `link_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:203: undefined reference to `jx_parse_link'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:205: undefined reference to `link_close'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:213: undefined reference to `cctools_list_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:214: undefined reference to `cctools_list_push_head'
+work_queue_factory.o: In function `count_workers_needed':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:233: undefined reference to `cctools_list_first_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:236: undefined reference to `jx_lookup_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:237: undefined reference to `jx_lookup_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:238: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:239: undefined reference to `jx_lookup_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:240: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:241: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:242: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:267: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:234: undefined reference to `cctools_list_next_item'
+work_queue_factory.o: In function `count_workers_connected':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:285: undefined reference to `cctools_list_first_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:287: undefined reference to `jx_lookup_integer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:286: undefined reference to `cctools_list_next_item'
+work_queue_factory.o: In function `set_worker_resources_options':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:298: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:301: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:304: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:308: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:312: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:316: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:316: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:317: undefined reference to `buffer_free'
+work_queue_factory.o: In function `submit_worker':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:325: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:337: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:353: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:358: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:361: undefined reference to `string_format'
+work_queue_factory.o:/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:367: more undefined references to `string_format' follow
+work_queue_factory.o: In function `submit_worker':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:372: undefined reference to `cctools_debug'
+work_queue_factory.o: In function `update_blacklisted_workers':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:379: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:385: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:388: undefined reference to `cctools_list_first_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:390: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:396: undefined reference to `jx_istype'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:397: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:401: undefined reference to `jx_istype'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:404: undefined reference to `jx_istype'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:405: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:403: undefined reference to `jx_iterate_array'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:389: undefined reference to `cctools_list_next_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:412: undefined reference to `buffer_pos'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:413: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:418: undefined reference to `buffer_free'
+work_queue_factory.o: In function `submit_workers':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:427: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:428: undefined reference to `itable_insert'
+work_queue_factory.o: In function `remove_all_workers':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:441: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:442: undefined reference to `itable_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:443: undefined reference to `itable_firstkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:445: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:444: undefined reference to `itable_nextkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:448: undefined reference to `cctools_debug'
+work_queue_factory.o: In function `print_stats':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:471: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:472: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:487: undefined reference to `jx_table_print_header'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:490: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:492: undefined reference to `cctools_list_first_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:496: undefined reference to `jx_insert_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:498: undefined reference to `jx_table_print'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:493: undefined reference to `cctools_list_next_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:502: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:506: undefined reference to `cctools_list_first_item'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:509: undefined reference to `jx_table_print'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:507: undefined reference to `cctools_list_next_item'
+work_queue_factory.o: In function `delete_projects_list':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:523: undefined reference to `jx_delete'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:522: undefined reference to `cctools_list_pop_head'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:525: undefined reference to `cctools_list_delete'
+work_queue_factory.o: In function `read_config_file':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:548: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:559: undefined reference to `jx_parse_file'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:562: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:566: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:566: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:567: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:567: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:568: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:568: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:569: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:569: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:571: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:571: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:572: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:572: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:573: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:573: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:575: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:575: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:577: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:577: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:579: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:579: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:581: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:581: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:582: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:582: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:583: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:583: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:585: undefined reference to `jx_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:585: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:588: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:593: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:598: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:603: undefined reference to `cctools_debug'
+work_queue_factory.o:/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:608: more undefined references to `cctools_debug' follow
+work_queue_factory.o: In function `read_config_file':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:634: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:639: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:644: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:649: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:690: undefined reference to `jx_delete'
+work_queue_factory.o: In function `mainloop':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:703: undefined reference to `itable_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:713: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:722: undefined reference to `work_queue_catalog_query'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:728: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:743: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:749: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:747: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:753: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:754: undefined reference to `work_queue_catalog_query'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:760: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:760: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:762: undefined reference to `cctools_list_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:762: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:765: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:768: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:773: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:780: undefined reference to `cctools_debug'
+work_queue_factory.o:/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:785: more undefined references to `cctools_debug' follow
+work_queue_factory.o: In function `mainloop':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:814: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:815: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:816: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:833: undefined reference to `itable_delete'
+work_queue_factory.o: In function `main':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:915: undefined reference to `cctools_debug_config'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:917: undefined reference to `rmsummary_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:924: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:927: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:930: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:934: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:959: undefined reference to `xxstrdup'
+work_queue_factory.o:/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:965: more undefined references to `xxstrdup' follow
+work_queue_factory.o: In function `main':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:988: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:991: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1001: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1014: undefined reference to `cctools_debug_flags_set'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1017: undefined reference to `cctools_debug_config_file'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1020: undefined reference to `string_metric_parse'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1020: undefined reference to `cctools_debug_config_file_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1023: undefined reference to `cctools_version_print'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1048: undefined reference to `cctools_version_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1068: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1089: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1091: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1095: undefined reference to `create_dir'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/work_queue_factory.c:1140: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job.o): In function `batch_queue_create':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:69: undefined reference to `xxmalloc'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:72: undefined reference to `hash_table_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:73: undefined reference to `hash_table_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:74: undefined reference to `itable_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:75: undefined reference to `itable_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:98: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job.o): In function `batch_queue_delete':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:109: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:113: undefined reference to `hash_table_firstkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:113: undefined reference to `hash_table_nextkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:115: undefined reference to `hash_table_delete'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:116: undefined reference to `hash_table_firstkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:116: undefined reference to `hash_table_nextkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:118: undefined reference to `hash_table_delete'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:119: undefined reference to `itable_delete'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:120: undefined reference to `itable_delete'
+libbatch_job.a(batch_job.o): In function `batch_queue_get_option':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:127: undefined reference to `hash_table_lookup'
+libbatch_job.a(batch_job.o): In function `batch_queue_supports_feature':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:132: undefined reference to `hash_table_lookup'
+libbatch_job.a(batch_job.o): In function `batch_queue_set_logfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:144: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:148: undefined reference to `string_format'
+libbatch_job.a(batch_job.o): In function `batch_queue_set_option':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:161: undefined reference to `hash_table_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:163: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:163: undefined reference to `hash_table_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:164: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:166: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job.o): In function `batch_queue_set_feature':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:174: undefined reference to `hash_table_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:176: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:176: undefined reference to `hash_table_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:177: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:179: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job.o): In function `batch_queue_set_int_option':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job.c:185: undefined reference to `string_format'
+libbatch_job.a(batch_job_amazon.o): In function `batch_job_amazon_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:29: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:33: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:36: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:39: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:41: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:44: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:47: undefined reference to `jx_parse_file'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:49: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:52: undefined reference to `jx_lookup_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:53: undefined reference to `jx_lookup_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:56: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:58: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:62: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:71: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:80: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:87: undefined reference to `itable_insert'
+libbatch_job.a(batch_job_amazon.o): In function `batch_job_amazon_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:102: undefined reference to `process_wait'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:104: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:106: undefined reference to `process_putback'
+libbatch_job.a(batch_job_amazon.o): In function `batch_job_amazon_remove':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:131: undefined reference to `itable_lookup'
+libbatch_job.a(batch_job_amazon.o): In function `batch_fs_amazon_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:147: undefined reference to `create_dir'
+libbatch_job.a(batch_job_amazon.o): In function `batch_fs_amazon_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:148: undefined reference to `copy_file_to_file'
+libbatch_job.a(batch_job_amazon.o): In function `batch_fs_amazon_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_amazon.c:150: undefined reference to `unlink_recursive'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_job_dryrun_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:27: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:36: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:38: undefined reference to `jx_istype'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:43: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:44: undefined reference to `string_escape_shell'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:52: undefined reference to `string_escape_shell'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_job_dryrun_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:67: undefined reference to `itable_firstkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:68: undefined reference to `itable_nextkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:69: undefined reference to `itable_remove'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_queue_dryrun_create':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:88: undefined reference to `path_getcwd'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_fs_dryrun_stat':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:101: undefined reference to `string_escape_shell'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_fs_dryrun_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:121: undefined reference to `string_escape_shell'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_fs_dryrun_chdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:139: undefined reference to `string_escape_shell'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:140: undefined reference to `xxstrdup'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_fs_dryrun_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:168: undefined reference to `string_escape_shell'
+libbatch_job.a(batch_job_dryrun.o): In function `batch_fs_dryrun_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:182: undefined reference to `string_escape_shell'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_dryrun.c:183: undefined reference to `string_escape_shell'
+libbatch_job.a(batch_job_chirp.o): In function `gethost':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:39: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:41: undefined reference to `cctools_fatal'
+libbatch_job.a(batch_job_chirp.o): In function `getroot':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:48: undefined reference to `hash_table_lookup'
+libbatch_job.a(batch_job_chirp.o): In function `addfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:58: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:59: undefined reference to `jsonA_escapestring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:60: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:61: undefined reference to `jsonA_escapestring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:62: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:63: undefined reference to `jsonA_escapestring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:64: undefined reference to `buffer_putfstring'
+libbatch_job.a(batch_job_chirp.o): In function `batch_job_chirp_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:72: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:74: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:75: undefined reference to `buffer_abortonfailure'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:77: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:79: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:81: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:82: undefined reference to `jsonA_escapestring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:83: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:86: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:87: undefined reference to `jx_print_buffer'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:90: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:94: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:103: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:113: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:115: undefined reference to `buffer_rewind'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:117: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:119: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:119: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:121: undefined reference to `buffer_putlstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:124: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:124: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:125: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:125: undefined reference to `chirp_reli_job_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:127: undefined reference to `buffer_rewind'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:128: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:129: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:129: undefined reference to `chirp_reli_job_commit'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:130: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:131: undefined reference to `buffer_free'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:134: undefined reference to `buffer_free'
+libbatch_job.a(batch_job_chirp.o): In function `batch_job_chirp_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:146: undefined reference to `chirp_reli_job_wait'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:151: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:153: undefined reference to `json_parse'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:159: undefined reference to `jsonA_getname'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:161: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:165: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:167: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:168: undefined reference to `buffer_abortonfailure'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:169: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:170: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:170: undefined reference to `chirp_reli_job_reap'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:171: undefined reference to `buffer_free'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:174: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:176: undefined reference to `jsonA_getname'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:179: undefined reference to `jsonA_getname'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:183: undefined reference to `jsonA_getname'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:188: undefined reference to `jsonA_getname'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:190: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:192: undefined reference to `sigdefint'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:195: undefined reference to `jsonA_getname'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:197: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:199: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:203: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:204: undefined reference to `json_value_free'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:207: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:211: undefined reference to `json_value_free'
+libbatch_job.a(batch_job_chirp.o): In function `batch_job_chirp_remove':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:220: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:224: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:225: undefined reference to `buffer_abortonfailure'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:226: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:228: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:230: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:230: undefined reference to `chirp_reli_job_kill'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:232: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:234: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:234: undefined reference to `chirp_reli_job_reap'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:236: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:239: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:241: undefined reference to `buffer_free'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:243: undefined reference to `itable_remove'
+libbatch_job.a(batch_job_chirp.o): In function `batch_queue_chirp_create':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:251: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:251: undefined reference to `buffer_max'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:251: undefined reference to `buffer_ubuf'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:254: undefined reference to `random_hex'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:255: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:256: undefined reference to `buffer_tolstring'
+libbatch_job.a(batch_job_chirp.o): In function `batch_queue_chirp_option_update':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:268: undefined reference to `string_prefix_is'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:269: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:275: undefined reference to `chirp_reli_mkdir_recursive'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:282: undefined reference to `cctools_fatal'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:286: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:286: undefined reference to `buffer_max'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:286: undefined reference to `buffer_ubuf'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:288: undefined reference to `random_hex'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:289: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:290: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:293: undefined reference to `cctools_fatal'
+libbatch_job.a(batch_job_chirp.o): In function `batch_fs_chirp_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:315: undefined reference to `chirp_reli_mkdir_recursive'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:317: undefined reference to `chirp_reli_mkdir'
+libbatch_job.a(batch_job_chirp.o): In function `batch_fs_chirp_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:327: undefined reference to `chirp_reli_putfile'
+libbatch_job.a(batch_job_chirp.o): In function `batch_fs_chirp_stat':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:354: undefined reference to `chirp_reli_stat'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:358: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_chirp.o): In function `batch_fs_chirp_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_chirp.c:366: undefined reference to `chirp_reli_rmall'
+libbatch_job.a(batch_job_cluster.o): In function `batch_job_cluster_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:100: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:103: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:118: undefined reference to `path_basename'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:118: undefined reference to `string_front'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:132: undefined reference to `jx_export'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:140: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:150: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:155: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:164: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:169: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:175: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:177: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_cluster.o): In function `batch_job_cluster_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:191: undefined reference to `itable_firstkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:194: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:202: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:214: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:221: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:192: undefined reference to `itable_nextkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:227: undefined reference to `itable_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:233: undefined reference to `process_pending'
+libbatch_job.a(batch_job_cluster.o): In function `batch_job_cluster_remove':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:246: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:257: undefined reference to `string_format'
+libbatch_job.a(batch_job_cluster.o): In function `batch_queue_cluster_create':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:323: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:331: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:333: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:335: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:337: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_cluster.o):/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:339: more undefined references to `cctools_debug' follow
+libbatch_job.a(batch_job_cluster.o): In function `batch_fs_cluster_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:350: undefined reference to `create_dir'
+libbatch_job.a(batch_job_cluster.o): In function `batch_fs_cluster_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:351: undefined reference to `copy_file_to_file'
+libbatch_job.a(batch_job_cluster.o): In function `batch_fs_cluster_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_cluster.c:353: undefined reference to `unlink_recursive'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_job_cluster_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:94: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:95: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:96: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:99: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:105: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:121: undefined reference to `jx_export'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:128: undefined reference to `path_basename'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:128: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:138: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:143: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:154: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:159: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:167: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:169: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_job_cluster_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:185: undefined reference to `itable_firstkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:188: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:196: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:208: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:215: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:186: undefined reference to `itable_nextkey'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:221: undefined reference to `itable_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:227: undefined reference to `process_pending'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_job_cluster_remove':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:240: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:251: undefined reference to `string_format'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_queue_cluster_create':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:283: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:285: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:287: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:289: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:291: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_fs_cluster_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:302: undefined reference to `create_dir'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_fs_cluster_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:303: undefined reference to `copy_file_to_file'
+libbatch_job.a(batch_job_blue_waters.o): In function `batch_fs_cluster_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_blue_waters.c:305: undefined reference to `unlink_recursive'
+libbatch_job.a(batch_job_condor.o): In function `blacklisted_expression':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:39: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:47: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:51: undefined reference to `buffer_init'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:53: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:62: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:64: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:68: undefined reference to `buffer_putfstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:70: undefined reference to `buffer_tolstring'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:70: undefined reference to `xxstrdup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:73: undefined reference to `buffer_free'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:79: undefined reference to `xxstrdup'
+libbatch_job.a(batch_job_condor.o): In function `batch_job_condor_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:90: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:93: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:97: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:97: undefined reference to `string_istrue'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:98: undefined reference to `path_getcwd'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:100: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:101: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:102: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:103: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:112: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:118: undefined reference to `string_escape_condor'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:158: undefined reference to `jx_export'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:200: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:205: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:211: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_condor.o): In function `batch_job_condor_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:222: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:252: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:256: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:259: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:265: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:267: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:273: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:279: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:285: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:289: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:293: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:306: undefined reference to `itable_size'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:312: undefined reference to `process_pending'
+libbatch_job.a(batch_job_condor.o): In function `batch_job_condor_remove':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:323: undefined reference to `string_format'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:325: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:329: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_condor.o): In function `batch_fs_condor_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:356: undefined reference to `create_dir'
+libbatch_job.a(batch_job_condor.o): In function `batch_fs_condor_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:357: undefined reference to `copy_file_to_file'
+libbatch_job.a(batch_job_condor.o): In function `batch_fs_condor_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_condor.c:359: undefined reference to `unlink_recursive'
+libbatch_job.a(batch_job_local.o): In function `batch_job_local_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:21: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:26: undefined reference to `itable_insert'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:29: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:41: undefined reference to `jx_export'
+libbatch_job.a(batch_job_local.o): In function `batch_job_local_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:72: undefined reference to `process_wait'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:74: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:76: undefined reference to `process_putback'
+libbatch_job.a(batch_job_local.o): In function `batch_job_local_remove':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:110: undefined reference to `itable_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:111: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:114: undefined reference to `cctools_debug'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:119: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_local.o): In function `batch_fs_local_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:137: undefined reference to `create_dir'
+libbatch_job.a(batch_job_local.o): In function `batch_fs_local_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:138: undefined reference to `copy_file_to_file'
+libbatch_job.a(batch_job_local.o): In function `batch_fs_local_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_local.c:140: undefined reference to `unlink_recursive'
+libbatch_job.a(batch_job_work_queue.o): In function `specify_files':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:27: undefined reference to `work_queue_task_specify_file'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:30: undefined reference to `work_queue_task_specify_file'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:44: undefined reference to `work_queue_task_specify_file'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:47: undefined reference to `work_queue_task_specify_file'
+libbatch_job.a(batch_job_work_queue.o): In function `specify_envlist':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:60: undefined reference to `work_queue_task_specify_enviroment_variable'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_job_wq_submit':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:71: undefined reference to `hash_table_lookup'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:71: undefined reference to `string_istrue'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:77: undefined reference to `work_queue_task_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:83: undefined reference to `jx_lookup_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:85: undefined reference to `work_queue_task_specify_category'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:91: undefined reference to `work_queue_task_specify_resources'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:94: undefined reference to `work_queue_submit'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_job_wq_wait':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:107: undefined reference to `work_queue_specify_log'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:114: undefined reference to `work_queue_specify_transactions_log'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:124: undefined reference to `work_queue_wait'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:143: undefined reference to `string_chomp'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:148: undefined reference to `itable_remove'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:159: undefined reference to `work_queue_task_delete'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:166: undefined reference to `work_queue_empty'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_queue_wq_create':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:181: undefined reference to `work_queue_create'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:183: undefined reference to `work_queue_enable_process_module'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_queue_wq_free':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:194: undefined reference to `work_queue_delete'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_queue_wq_port':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:202: undefined reference to `work_queue_port'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_queue_wq_option_update':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:209: undefined reference to `work_queue_specify_password'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:212: undefined reference to `work_queue_specify_master_mode'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:214: undefined reference to `work_queue_specify_master_mode'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:217: undefined reference to `work_queue_specify_name'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:220: undefined reference to `work_queue_specify_priority'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:222: undefined reference to `work_queue_specify_priority'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:225: undefined reference to `work_queue_activate_fast_abort'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:227: undefined reference to `string_istrue'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:227: undefined reference to `work_queue_specify_estimate_capacity_on'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:230: undefined reference to `work_queue_specify_keepalive_interval'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:232: undefined reference to `work_queue_specify_keepalive_interval'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:235: undefined reference to `work_queue_specify_keepalive_timeout'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:237: undefined reference to `work_queue_specify_keepalive_timeout'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:240: undefined reference to `work_queue_master_preferred_connection'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:242: undefined reference to `work_queue_master_preferred_connection'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:244: undefined reference to `rmsummary_parse_string'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:246: undefined reference to `work_queue_specify_category_max_resources'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:247: undefined reference to `rmsummary_delete'
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:249: undefined reference to `cctools_debug'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_fs_wq_mkdir':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:256: undefined reference to `create_dir'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_fs_wq_putfile':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:257: undefined reference to `copy_file_to_file'
+libbatch_job.a(batch_job_work_queue.o): In function `batch_fs_wq_unlink':
+/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src/batch_job_work_queue.c:259: undefined reference to `unlink_recursive'
+collect2: ld returned 1 exit status
+gmake[1]: *** [work_queue_factory] Error 1
+gmake[1]: Leaving directory `/afs/nd.edu/user3/ksweene3/NetBeansProjects/cctools/batch_job/src'
+gmake: *** [src] Error 2
