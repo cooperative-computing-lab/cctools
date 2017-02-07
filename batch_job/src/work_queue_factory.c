@@ -886,6 +886,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--custom-worker=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
