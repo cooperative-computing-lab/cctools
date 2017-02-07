@@ -321,7 +321,7 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	const char *worker = (worker_command != NULL) ? path_basename(worker_command) : "./work_queue_worker";
+	const char *worker = "./work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -359,7 +359,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	const char *files = (worker_command != NULL) ? string_format("%s",worker_command) : string_format("work_queue_worker");
+	char *files = string_format("work_queue_worker");
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -1122,10 +1122,20 @@ int main(int argc, char *argv[])
 	}
 
 	char cmd[1024];
-	sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
-	if (system(cmd)) {
-		fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
-		exit(EXIT_FAILURE);
+	if(worker_command != NULL){
+		fprintf(stderr,"We are going to copy the work_queue_worker!\n");
+		sprintf(cmd,"cp '%s' '%s'",worker_command,scratch_dir);
+		if(system(cmd)){
+			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
+			exit(EXIT_FAILURE);
+		}
+		fprintf(stderr,"We did copy successfully! Here's the command we used: \"%s\"\n",cmd);
+	}else{
+		sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
+		if (system(cmd)) {
+			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if(password_file) {
