@@ -338,8 +338,8 @@ static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
 	char *tmp = fetch_end_of_path(worker_prog);
-	char *worker = (worker_prog != NULL) ? fetch_end_of_path(worker_prog) : string_format("./work_queue_worker");
-	printf("%s",tmp);
+	char *worker = (worker_prog != NULL) ? tmp : string_format("./work_queue_worker");
+
 	if(using_catalog) {
 		cmd = string_format(
 		"%s -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
