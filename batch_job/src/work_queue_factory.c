@@ -99,7 +99,7 @@ static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
 static char *wrapper_input = 0;
-static char *worker_prog = 0;
+static char *worker_command = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -317,28 +317,11 @@ static void set_worker_resources_options( struct batch_queue *queue )
 	resource_args = xxstrdup(buffer_tostring(&b));
 	buffer_free(&b);
 }
-static char* fetch_end_of_path(char* path){
-	size_t len= strlen(path);
-	size_t slash_pos = 0;
-	size_t i=0;
-	for(i=len-1; i > -1; i-- ){
-		if(path[i] == '/'){
-			slash_pos = i;
-			break;
-		}
-	}
-	char* new_str = malloc(sizeof(char)*(len-slash_pos)+1);
-	for(i=0; i< (len-slash_pos); i++){
-		new_str[i] = path[slash_pos + i];
-	}
-	new_str[len-slash_pos] = '\0';
-	return new_str;
-}
+
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	char *tmp = fetch_end_of_path(worker_prog);
-	char *worker = (worker_prog != NULL) ? tmp : string_format("./work_queue_worker");
+	const char *worker = (worker_command != NULL) ? path_basename(worker_command) : "./work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -376,7 +359,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = (worker_prog != NULL) ? string_format("%s",worker_prog) : string_format("work_queue_worker");
+	const char *files = (worker_command != NULL) ? string_format("%s",worker_command) : string_format("work_queue_worker");
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -391,7 +374,6 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
-	free(worker);
 
 	return batch_job_submit(queue,cmd,files,"output.log",0,resources);
 }
@@ -886,7 +868,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
-	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--custom-worker=<file>");
+	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--worker-binary=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
@@ -904,7 +886,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WORKERS_PER_CYCLE, 
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
-		LONG_OPT_CUSTOM_WORKER
+		LONG_OPT_WORKER_BINARY
 	};
 
 static const struct option long_options[] = {
@@ -937,7 +919,7 @@ static const struct option long_options[] = {
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
-	{"custom-worker", required_argument, 0, LONG_OPT_CUSTOM_WORKER},
+	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
 	{0,0,0,0}
 };
 
@@ -1040,8 +1022,8 @@ int main(int argc, char *argv[])
 					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
 				break;
-			case LONG_OPT_CUSTOM_WORKER:
-				worker_prog = strdup(optarg);
+			case LONG_OPT_WORKER_BINARY:
+				worker_command = strdup(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
