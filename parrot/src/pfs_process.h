@@ -26,6 +26,14 @@ extern "C" {
 
 #define PFS_NGROUPS_MAX 128
 
+typedef enum {
+	PFS_PID_MODE_NORMAL,
+	PFS_PID_MODE_FIXED,
+	PFS_PID_MODE_WARP
+} pfs_pid_mode_t;
+
+extern pfs_pid_mode_t pfs_pid_mode;
+
 enum {
 	PFS_PROCESS_FLAGS_STARTUP = (1<<0),
 	PFS_PROCESS_FLAGS_ASYNC   = (1<<1)
