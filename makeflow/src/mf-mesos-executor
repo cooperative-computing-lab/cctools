@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2016- The University of Notre Dame.
+# This software is distributed under the GNU General Public License.
+# See the file COPYING for details. 
+
+# This script is used to setup the system environments for 
+# mf_mesos_executor. 
+
+PYTHON=$(/usr/bin/env python)
+
+SCRIPT=${CCTOOLS_BIN}/mf_mesos_executor
+
+LD_PRELOAD="${LD_PRELOAD}" \
+exec ${PYTHON} ${SCRIPT} "${@}"
+
+# vim: set noexpandtab tabstop=4:
