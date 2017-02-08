@@ -17,6 +17,7 @@
 #include <time.h>
 #include <limits.h>
 
+
 #include "copy_stream.h"
 #include "debug.h"
 
@@ -448,21 +449,13 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 	if(S_ISREG(source_stat.st_mode)) {
 		debug(D_DEBUG, "`%s`: regular file\n", path);
 		if(existance) { // the copy degree hrere must be fullcopy.
-			/*
-			Firstly we tried to use use `truncate` system call to change the size of one
-			empty file (`st_size`) and use `st_blocks` to check whether a file is really
-			empty. In normal linux filesystem, the `st_blocks` of one empty file is always
-			0 even if its size is set to non-zero by truncate.  However, we give up
-			truncate finally. Because using truncate system call on an empty file on afs
-			results in the `st_blocks` becomes non-zero.
-			*/
-			if(target_stat.st_size) {
-				if(!is_special_file(path) && source_stat.st_size != target_stat.st_size) {
-					fprintf(stderr, "the source size is %ld; the target size is %ld.\n", source_stat.st_size, target_stat.st_size);
-					fprintf(stderr, "%s and %s have different file sizes!\n", path, new_path);
-					exit(EXIT_FAILURE);
-				}
+			/* here we use `st_blocks` to check whether a file is really empty. */
+			if(target_stat.st_size && target_stat.st_blocks != 0) {
 				debug(D_DEBUG, "`%s`: fullcopy exist! pass!\n", path);
+			} else if(target_stat.st_size && !is_special_file(path) && source_stat.st_size != target_stat.st_size) {
+				fprintf(stderr, "the source size is %ld; the target size is %ld.\n", source_stat.st_size, target_stat.st_size);
+				fprintf(stderr, "%s and %s have different file sizes!\n", path, new_path);
+				exit(EXIT_FAILURE);
 			} else {
 				if(access(new_path, F_OK) == 0) {
 					if(remove(new_path) == -1) {
@@ -507,7 +500,24 @@ int line_process(const char *path, char *caller, int ignore_direntry, int is_dir
 				debug(D_DEBUG, "`%s`: metadatacopy not exist! create metadatacopy ...\n", path);
 			}
 		}
+
 		/* copy the metadata info of the file */
+
+		/* truncate the file size */
+		/* `truncate` syscall changes the st_ctime and st_mtime fields, so it should be called before `utime` syscall. */
+		/*
+			Note: In normal linux filesystem, the `st_blocks` of one empty file
+			is always 0 even if its size is set to non-zero by `truncate`.
+			However, using `truncate` system call on an empty file on AFS
+			results in the `st_blocks` field becomes non-zero.  So this tool
+			may behave wierdly on some programs involving AFS accesses.
+		*/
+		if(truncate(new_path, source_stat.st_size) == -1) {
+			debug(D_DEBUG, "trucate(`%s`) fails: %s\n", new_path, strerror(errno));
+			return -1;
+		}
+
+		/* copy the file modification time and access time */
 		struct utimbuf time_buf;
 		time_buf.modtime = source_stat.st_mtime;
 		time_buf.actime = source_stat.st_atime;
