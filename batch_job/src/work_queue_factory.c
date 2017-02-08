@@ -99,6 +99,7 @@ static char *batch_submit_options = NULL;
 
 static char *wrapper_command = 0;
 static char *wrapper_input = 0;
+static char *worker_command = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -320,10 +321,12 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
+	const char *worker = "./work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
-		"./work_queue_worker -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"%s -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
@@ -335,7 +338,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	else {
 		cmd = string_format(
-		"./work_queue_worker %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"./%s %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		worker,
 		master_host,
 		master_port,
 		worker_timeout,
@@ -864,10 +868,26 @@ static void show_help(const char *cmd)
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--worker-binary=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
-enum { LONG_OPT_CORES = 255, LONG_OPT_MEMORY, LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_TASKS_PER_WORKER, LONG_OPT_CONF_FILE, LONG_OPT_AMAZON_CREDENTIALS, LONG_OPT_AMAZON_AMI, LONG_OPT_FACTORY_TIMEOUT, LONG_OPT_AUTOSIZE, LONG_OPT_CONDOR_REQUIREMENTS, LONG_OPT_WORKERS_PER_CYCLE, LONG_OPT_WRAPPER, LONG_OPT_WRAPPER_INPUT };
+enum{   LONG_OPT_CORES = 255,
+		LONG_OPT_MEMORY, 
+		LONG_OPT_DISK, 
+		LONG_OPT_GPUS, 
+		LONG_OPT_TASKS_PER_WORKER, 
+		LONG_OPT_CONF_FILE, 
+		LONG_OPT_AMAZON_CREDENTIALS, 
+		LONG_OPT_AMAZON_AMI, 
+		LONG_OPT_FACTORY_TIMEOUT, 
+		LONG_OPT_AUTOSIZE, 
+		LONG_OPT_CONDOR_REQUIREMENTS, 
+		LONG_OPT_WORKERS_PER_CYCLE, 
+		LONG_OPT_WRAPPER, 
+		LONG_OPT_WRAPPER_INPUT,
+		LONG_OPT_WORKER_BINARY
+	};
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
@@ -899,6 +919,7 @@ static const struct option long_options[] = {
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
+	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
 	{0,0,0,0}
 };
 
@@ -1001,6 +1022,9 @@ int main(int argc, char *argv[])
 					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
 				break;
+			case LONG_OPT_WORKER_BINARY:
+				worker_command = strdup(optarg);
+				break;
 			case 'P':
 				password_file = optarg;
 				break;
@@ -1098,10 +1122,18 @@ int main(int argc, char *argv[])
 	}
 
 	char cmd[1024];
-	sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
-	if (system(cmd)) {
-		fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
-		exit(EXIT_FAILURE);
+	if(worker_command != NULL){
+		sprintf(cmd,"cp '%s' '%s'",worker_command,scratch_dir);
+		if(system(cmd)){
+			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
+			exit(EXIT_FAILURE);
+		}
+	}else{
+		sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
+		if (system(cmd)) {
+			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if(password_file) {
