@@ -5644,19 +5644,17 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 
 int work_queue_hungry(struct work_queue *q)
 {
+	int ready = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
 	if(q->stats->tasks_dispatched < 100)
-		return (100 - q->stats->tasks_dispatched);
+		return MAX(100 - ready, 0);
 
 	//BUG: fix this so that it actually looks at the number of cores available.
 
-	int i, j;
-
 	//i = 1.1 * number of current workers
-	//j = # of queued tasks.
-	//i-j = # of tasks to queue to re-reach the status quo.
-	i = (1.1 * hash_table_size(q->worker_table));
-	j = task_state_count(q, NULL, WORK_QUEUE_TASK_READY);
-	return MAX(i - j, 0);
+	//i-ready = # of tasks to queue to re-reach the status quo.
+	int i = (1.1 * hash_table_size(q->worker_table));
+
+	return MAX(i - ready, 0);
 }
 
 int work_queue_shut_down_workers(struct work_queue *q, int n)
