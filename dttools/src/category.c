@@ -35,8 +35,8 @@ static int64_t cores_avg_bucket_size = 100;         /* 1/10 of a core */
 static int64_t first_allocation_every_n_tasks = 25; /* tasks */
 
 struct category *category_create(const char *name) {
-    if(!name)
-        name = "default";
+	if(!name)
+		name = "default";
 
 	struct category *c = calloc(1, sizeof(struct category));
 
