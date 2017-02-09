@@ -98,7 +98,7 @@ try{
 	       "N=s" => \$OPT{project},
 	       "d=s" => \$OPT{debug},
 	       "o=s" => \$OPT{debug_file},
-	       "debug_size_limit=i" => \$OPT{debug_size},
+	       "debug-size-limit=i" => \$OPT{debug_size},
  	       "cores=i" => \$OPT{cores},
  	       "disk=i" => \$OPT{disk},
  	       "memory=i" => \$OPT{memory},
@@ -540,9 +540,8 @@ sub call_wq_wait {
 		print task_outfile "$output\n";
 		print task_outfile "=================================\n\n";
 		close (task_outfile);
-		
-		my $retStatus = $t->return_status;
-		if($retStatus == 0 || $retStatus == 1) {
+
+		if($output =~ "Maker is now finished!!!"){
 			my $task_result = $t->result; 	
 			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
 		} else { #tier resubmission on failure 
