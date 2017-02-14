@@ -396,9 +396,9 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 	char link_parent[PFS_PATH_MAX];
 	struct pfs_name new_pname = *pname;
 
-	if (string_prefix_is(pname->path, "/proc/self/") || string_match_regex(pname->path, "^/proc/[0-9]+/ns/")) {
+	if (string_match_regex(pname->path, "^/proc/self(/|$)|^/proc/[0-9]+/ns/")) {
 		/*
-		 * We need to handle /proc/self/ in resolve_name, and eagerly following it here would
+		 * We need to handle /proc/self in resolve_name, and eagerly following it here would
 		 * give Parrot's PID. Return for now, and let resolve name call us again after it
 		 * rewrites the path to /proc/[pid]/.
 		 *
