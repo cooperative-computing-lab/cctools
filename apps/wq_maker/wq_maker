@@ -229,6 +229,11 @@ sub main {
 	print "-----------------------------------------------------------------\n";
 	print "\n";
 	my $wall_time = ((time*1000000) - ($wq->stats->{start_time}));
+	my $wq_total_time = time - $wq_start_time;
+	my $total_time = time - $start_time;
+
+	print "WQ-MAKER Wall Time:\t";
+	print_time($total_time);
 	print "Work Queue Wall Time:\t";
 	print_time($wall_time);
 	print "Cumulative Task Wall Time:\t";
@@ -248,8 +253,6 @@ sub main {
 	print "-----------------------------------------------------------------\n";
 	
 
-	my $wq_total_time = time - $wq_start_time;
-	my $total_time = time - $start_time;
 	
 	exit(0);
 }
