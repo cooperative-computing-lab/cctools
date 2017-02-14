@@ -396,9 +396,13 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 	char link_parent[PFS_PATH_MAX];
 	struct pfs_name new_pname = *pname;
 
-	if (string_prefix_is(pname->path, "/proc/self/ns/") || string_match_regex(pname->path, "^/proc/[0-9]+/ns/")) {
+	if (string_prefix_is(pname->path, "/proc/self/") || string_match_regex(pname->path, "^/proc/[0-9]+/ns/")) {
 		/*
-		 * Depending on kernel version, these might be magical dangling symlinks that can
+		 * We need to handle /proc/self/ in resolve_name, and eagerly following it here would
+		 * give Parrot's PID. Return for now, and let resolve name call us again after it
+		 * rewrites the path to /proc/[pid]/.
+		 *
+		 * Depending on kernel version, /proc/[pid]/ns/ might contain magical dangling symlinks that can
 		 * nonetheless be opened as usual. If Parrot tries to follow them, it will return
 		 * erroneous ENOENT.
 		 */
@@ -568,6 +572,11 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			strcpy(pname->host,"localhost");
 			strcpy(pname->hostport,"localhost");
 			pname->is_local = 1;
+		}
+
+		/* Follow again in case we replaced /proc/self */
+		if (do_follow_symlink && pfs_follow_symlinks) {
+			follow_symlink(pname, mode, depth + 1);
 		}
 
 		return 1;
