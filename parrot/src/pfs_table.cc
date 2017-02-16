@@ -528,14 +528,21 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 				pname->rest[0] = 0;
 				return 1;
 			}
-			char *c = strrchr(pname->host,':');
-			if(c) {
-				*c = 0;
-				pname->port = atoi(c+1);
+
+			if (!strcmp(pname->service_name, "grow") && !strcmp(pname->host, "local")) {
+				pname->host[0] = 0;
+				pname->port = 0;
+				strcpy(pname->hostport, "local");
 			} else {
-				pname->port = pname->service->get_default_port();
+				char *c = strrchr(pname->host, ':');
+				if(c) {
+					*c = 0;
+					pname->port = atoi(c+1);
+				} else {
+					pname->port = pname->service->get_default_port();
+				}
+				sprintf(pname->hostport,"%s:%d",pname->host,pname->port);
 			}
-			sprintf(pname->hostport,"%s:%d",pname->host,pname->port);
 
 			if(!strcmp(pname->service_name,"multi")) {
 				strcpy(tmp,pname->rest);
