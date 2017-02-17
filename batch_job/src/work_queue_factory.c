@@ -102,6 +102,7 @@ int time_execute_previous = 0;
 int time_transfer_previous = 0;
 int capacity_weighted_previous = 0;
 double alpha = 0.1;
+int total_workers_requested = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -650,6 +651,7 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_workers_max, workers_max, max-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_workers_per_cycle, workers_per_cycle, workers-per-cycle, int, JX_INTEGER, integer_value)
+	assign_new_value(new_consider_capacity, consider_capacity, capacity, int, JX_INTEGER, integer_value)
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
@@ -704,6 +706,7 @@ int read_config_file(const char *config_file) {
 	tasks_per_worker = new_tasks_per_worker;
 	autosize         = new_autosize_option;
 	factory_timeout  = new_factory_timeout_option;
+	consider_capacity = new_consider_capacity;
 
 	resources->cores  = new_num_cores_option;
 	resources->memory = new_num_memory_option;
@@ -874,6 +877,9 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
+		total_workers_requested += new_workers_needed;
+		debug(D_BJ, "TOTAL WORKERS REQUESTED, WORKERS CONNECTED: %d %d", total_workers_requested, workers_connected);
+		
 		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
 		update_blacklisted_workers(queue, masters_list);
