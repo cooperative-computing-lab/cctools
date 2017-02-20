@@ -209,7 +209,8 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
                                    */
 
-struct rmsummary *summary;
+struct rmsummary *summary;          /* final summary */
+struct rmsummary *snapshot;         /* current snapshot */
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
 
@@ -1000,17 +1001,17 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 }
 
-void record_snapshot(struct rmsummary *tr) {
+int record_snapshot(struct rmsummary *tr) {
 	char label[1024];
 
 	if(!snapshot_signal_file) {
-		return;
+		return 0;
 	}
 
 	FILE *snap_f = fopen(snapshot_signal_file, "r");
 	if(!snap_f) {
 		/* signal is unavailable, so no snapshot is taken. */
-		return;
+		return 0;
 	}
 
 	if(!snapshots) {
@@ -1028,27 +1029,31 @@ void record_snapshot(struct rmsummary *tr) {
 		snprintf(label, 1024, "snapshot %d", list_size(snapshots) + 1);
 	}
 
+	snapshot->end       = usecs_since_epoch();
+	snapshot->wall_time = snapshot->end - snapshot->start;
+
 	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
 
 	jx_insert_string(j, "snapshot", label);
 
 	if(!j) {
-		return;
+		return 0;
 	}
-
-	list_push_tail(snapshots, j);
 
 	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
 	snap_f = fopen(output_file, "w");
 	free(output_file);
 
 	if(!snap_f) {
-		return;
+		return 0;
 	}
 
 	jx_print_stream(j, snap_f);
-
 	fclose(snap_f);
+
+	list_push_tail(snapshots, j);
+
+	return 1;
 }
 
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
@@ -1928,7 +1933,8 @@ int rmonitor_resources(long int interval /*in seconds */)
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
 		rmonitor_collate_tree(resources_now, p_acc, m_acc, d_acc, f_acc);
-		rmonitor_find_max_tree(summary, resources_now);
+		rmonitor_find_max_tree(summary,  resources_now);
+		rmonitor_find_max_tree(snapshot, resources_now);
 		rmonitor_log_row(resources_now);
 
 		if(!rmonitor_check_limits(summary))
@@ -1939,7 +1945,11 @@ int rmonitor_resources(long int interval /*in seconds */)
 		cleanup_zombies();
 
 		//process snapshot
-		record_snapshot(resources_now);
+		if(record_snapshot(snapshot)) {
+			rmsummary_delete(snapshot);
+			snapshot = calloc(1, sizeof(*snapshot));
+			snapshot->start = usecs_since_epoch();
+		}
 
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
@@ -1986,7 +1996,9 @@ int main(int argc, char **argv) {
     signal(SIGQUIT, rmonitor_final_cleanup);
     signal(SIGTERM, rmonitor_final_cleanup);
 
-    summary          = calloc(1, sizeof(struct rmsummary));
+    summary  = calloc(1, sizeof(struct rmsummary));
+    snapshot = calloc(1, sizeof(struct rmsummary));
+
     summary->peak_times = rmsummary_create(-1);
     resources_limits = rmsummary_create(-1);
     resources_flags  = rmsummary_create(0);
@@ -2132,8 +2144,6 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	warn(D_DEBUG, "%s", snapshot_signal_file);
-
 	if( follow_chdir && hash_table_size(wdirs) > 0) {
 		debug(D_FATAL, "Options --follow-chdir and --measure-dir as mutually exclusive.");
 		exit(RM_MONITOR_ERROR);
@@ -2208,7 +2218,7 @@ int main(int argc, char **argv) {
 
     summary->command = xxstrdup(command_line);
     summary->start   = usecs_since_epoch();
-
+    snapshot->start  = summary->start;
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
     if(log_inotify || snapshot_signal_file)
