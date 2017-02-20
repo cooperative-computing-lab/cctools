@@ -196,6 +196,8 @@ static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
 
+static int inotify_flags = IN_CLOSE | IN_ACCESS;
+
 struct itable *wdirs_rc;        /* Counts how many rmonitor_process_info use a rmonitor_wdir_info. */
 struct itable *filesys_rc;      /* Counts how many rmonitor_wdir_info use a rmonitor_filesys_info. */
 
@@ -217,15 +219,15 @@ int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
 
-const char *snapshot_signal_file = NULL;    /* name of the file that, if
-											   exists, makes the monitor record
-											   an snapshot of the current
-											   usage. The first line of the
-											   file labels the snapshot. The
-											   file is removed when the
-											   snapshot is recorded, so that
-											   multiple snapshots can be
-											   created. */
+char *snapshot_signal_file = NULL;    /* name of the file that, if
+										 exists, makes the monitor record
+										 an snapshot of the current
+										 usage. The first line of the
+										 file labels the snapshot. The
+										 file is removed when the
+										 snapshot is recorded, so that
+										 multiple snapshots can be
+										 created. */
 struct list *snapshots = NULL;              /* list of snapshots, as json objects. */
 
 /***
@@ -642,7 +644,7 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 		char **new_inotify_watches;
 		int iwd;
 
-		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, inotify_flags)) < 0)
 		{
 			debug(D_RMON, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -671,8 +673,10 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 #endif
 }
 
-void rmonitor_handle_inotify(void)
+int rmonitor_handle_inotify(void)
 {
+	int urgent = 0;
+
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
 	struct rmonitor_file_info *finfo;
@@ -684,30 +688,46 @@ void rmonitor_handle_inotify(void)
 	{
 		if (ioctl(rmonitor_inotify_fd, FIONREAD, &nbytes) >= 0)
 		{
-
 			evdata = (struct inotify_event *) malloc(nbytes);
-			if (evdata == NULL) return;
+			if (evdata == NULL) return urgent;
 			if (read(rmonitor_inotify_fd, evdata, nbytes) != nbytes)
 			{
 				free(evdata);
-				return;
+				return urgent;
 			}
 
 			evc = nbytes/sizeof(*evdata);
 			for(i = 0; i < evc; i++)
 			{
-				if (evdata[i].wd >= alloced_inotify_watches) continue;
-				if ((fname = inotify_watches[evdata[i].wd]) == NULL) continue;
+				if (evdata[i].wd >= alloced_inotify_watches) {
+					continue;
+				}
+
+				if ((fname = inotify_watches[evdata[i].wd]) == NULL) {
+					continue;
+				}
+
+				if (evdata[i].mask & IN_CREATE) {
+					if(snapshot_signal_file && strcmp(snapshot_signal_file, evdata[i].name) == 0) {
+							rmonitor_add_file_watch(snapshot_signal_file, 0);
+							urgent = 1;
+					}
+					continue;
+				}
+
+				if (finfo == NULL) {
+					continue;
+				}
 				finfo = hash_table_lookup(files, fname);
-				if (finfo == NULL) continue;
 				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
 				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((evdata[i].mask & IN_CLOSE_WRITE) || (evdata[i].mask & IN_CLOSE_NOWRITE)) {
+				if (evdata[i].mask & IN_CLOSE) {
 					(finfo->n_closes)++;
 					if (stat(fname, &fst) >= 0)
 					{
 						finfo->size_on_close = fst.st_size;
 					}
+
 					/* Decrease reference count and remove watch of zero */
 					(finfo->n_references)--;
 					if (finfo->n_references == 0)
@@ -717,12 +737,21 @@ void rmonitor_handle_inotify(void)
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
 					}
+
+					if(snapshot_signal_file && strcmp(fname, snapshot_signal_file) == 0) {
+						urgent = 1;
+					}
+
+					warn(D_DEBUG, "close: %s", evdata[i].name);
+
 				}
 			}
 		}
 		free(evdata);
 	}
 #endif
+
+	return urgent;
 }
 
 void append_network_bw(struct rmonitor_msg *msg) {
@@ -1179,7 +1208,9 @@ int rmonitor_final_summary()
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
 			if(count > 0)
-				if (FD_ISSET(rmonitor_inotify_fd, &rset)) rmonitor_handle_inotify();
+				if (FD_ISSET(rmonitor_inotify_fd, &rset)) {
+					rmonitor_handle_inotify();
+				}
 		} while(count > 0);
 
 		rmonitor_file_io_summaries();
@@ -1679,25 +1710,35 @@ int wait_for_messages(int interval)
 	{
 
 		/* Figure out the number of file descriptors to pass to select */
-		int nfds = rmonitor_queue_fd + 1;
+		int nfds = 1 + MAX(rmonitor_queue_fd, rmonitor_inotify_fd);
 		fd_set rset;
 
-		int count = 0;
+		int urgent = 0;
+		int count  = 0;
 		do
 		{
 			FD_ZERO(&rset);
-			if (rmonitor_queue_fd > 0)   FD_SET(rmonitor_queue_fd,   &rset);
+			if (rmonitor_queue_fd > 0) {
+				FD_SET(rmonitor_queue_fd,   &rset);
+			}
+
+			if (rmonitor_inotify_fd > 0) {
+				FD_SET(rmonitor_inotify_fd, &rset);
+			}
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
-			if(count > 0) {
-				if (FD_ISSET(rmonitor_queue_fd, &rset)) {
-					int urgent = rmonitor_dispatch_msg();
-					if(urgent) {
-						timeout.tv_sec  = 0;
-						timeout.tv_usec = 0;
-					}
-				}
+			if (FD_ISSET(rmonitor_queue_fd, &rset)) {
+				urgent = rmonitor_dispatch_msg();
+			}
+
+			if (FD_ISSET(rmonitor_inotify_fd, &rset)) {
+				urgent = rmonitor_handle_inotify();
+			}
+
+			if(urgent) {
+				timeout.tv_sec  = 0;
+				timeout.tv_usec = 0;
 			}
 		} while(count > 0);
 	}
@@ -2063,6 +2104,7 @@ int main(int argc, char **argv) {
 				break;
 			case  LONG_OPT_OPENED_FILES:
 				use_inotify = 1;
+				inotify_flags |= IN_MODIFY;
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->disk = 0;
@@ -2089,6 +2131,8 @@ int main(int argc, char **argv) {
 				break;
 		}
 	}
+
+	warn(D_DEBUG, "%s", snapshot_signal_file);
 
 	if( follow_chdir && hash_table_size(wdirs) > 0) {
 		debug(D_FATAL, "Options --follow-chdir and --measure-dir as mutually exclusive.");
@@ -2167,12 +2211,32 @@ int main(int argc, char **argv) {
 
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
-    if(log_inotify)
+    if(log_inotify || snapshot_signal_file)
     {
-	    rmonitor_inotify_fd = inotify_init();
+	    rmonitor_inotify_fd     = inotify_init();
 	    alloced_inotify_watches = 100;
-	    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
-	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
+	    inotify_watches         = (char **) calloc(alloced_inotify_watches, sizeof(char *));
+	}
+
+	if(snapshot_signal_file) {
+		char *full_path = malloc(PATH_MAX);
+
+		path_absolute(snapshot_signal_file, full_path, 0);
+
+		char *dir  = malloc(PATH_MAX);
+		path_dirname(full_path, dir);
+
+		free(snapshot_signal_file);
+		snapshot_signal_file = xxstrdup(path_basename(full_path));
+
+	    if (inotify_watches == NULL) {
+			alloced_inotify_watches = 0;
+		} else {
+			int iwd = inotify_add_watch(rmonitor_inotify_fd, dir, IN_CREATE);
+			inotify_watches[iwd] = dir;
+		}
+
+		free(full_path);
     }
 #endif
 
