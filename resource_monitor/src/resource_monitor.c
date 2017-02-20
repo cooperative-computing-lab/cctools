@@ -742,9 +742,6 @@ int rmonitor_handle_inotify(void)
 					if(snapshot_signal_file && strcmp(fname, snapshot_signal_file) == 0) {
 						urgent = 1;
 					}
-
-					warn(D_DEBUG, "close: %s", evdata[i].name);
-
 				}
 			}
 		}
@@ -1051,7 +1048,8 @@ int record_snapshot(struct rmsummary *tr) {
 	jx_print_stream(j, snap_f);
 	fclose(snap_f);
 
-	list_push_tail(snapshots, j);
+	/* push to the front, since snapshots are writen in reverse order. */
+	list_push_head(snapshots, j);
 
 	return 1;
 }
