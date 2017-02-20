@@ -433,6 +433,36 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 	return 0;
 }
 
+void rmsummary_add_snapshots(struct rmsummary *s, struct jx *array) {
+
+	if(!array) {
+		return;
+	}
+
+	int n = jx_array_length(array);
+
+	if(n < 1) {
+		return;
+	}
+
+	s->snapshots_count = n;
+	s->snapshots       = calloc(n + 1, sizeof(struct rmsummary *));
+	s->snapshots[n]    = NULL; /* terminate in NULL for convenience */
+
+	int count = 0;
+	struct jx *snapshot;
+	for(void *i = NULL; (snapshot = jx_iterate_array(array, &i)); /* nothing */) {
+		struct rmsummary *snap = json_to_rmsummary(snapshot);
+
+		if(!snap) {
+			fatal("malformed resource summary snapshot.");
+		}
+
+		s->snapshots[count] = snap;
+		count++;
+	}
+}
+
 int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *value) {
 
 	if(strcmp(key, "limits_exceeded") == 0) {
@@ -615,6 +645,9 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 			int status = json_number_of_array(value, key, &number);
 			if(status) {
 				rmsummary_assign_int_field(s, key, number);
+			}
+			if(strcmp(key, "snapshots") == 0) {
+				rmsummary_add_snapshots(s, value);
 			}
 		} else if(jx_istype(value, JX_OBJECT)) {
 			rmsummary_assign_summary_field(s, key, value);
@@ -813,12 +846,15 @@ void rmsummary_delete(struct rmsummary *s)
 	if(s->taskid)
 		free(s->taskid);
 
-	if(s->limits_exceeded)
-		rmsummary_delete(s->limits_exceeded);
+	rmsummary_delete(s->limits_exceeded);
+	rmsummary_delete(s->peak_times);
 
-	if(s->peak_times)
-		rmsummary_delete(s->peak_times);
+	int i;
+	for(i = 0; i < s->snapshots_count; i++) {
+		rmsummary_delete(s->snapshots[i]);
+	}
 
+	free(s->snapshots);
 	free(s);
 }
 

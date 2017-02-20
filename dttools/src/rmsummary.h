@@ -55,12 +55,15 @@ struct rmsummary
 	int64_t  total_files;
 	int64_t  disk;                           /* MB */
 
-	int64_t  cores;                      /* peak usage in a small time window */
+	int64_t  cores;                          /* peak usage in a small time window */
 	int64_t  cores_avg;
 	int64_t  gpus;
 
 	struct rmsummary *limits_exceeded;
-	struct rmsummary *peak_times;        /* from start, in usecs */
+	struct rmsummary *peak_times;           /* from start, in usecs */
+
+	int    snapshots_count;                 /* number of intermediate measurements, if any. */
+	struct rmsummary **snapshots;           /* snapshots_count sized array of snapshots. */
 
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
