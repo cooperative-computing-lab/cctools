@@ -47,4 +47,14 @@ void *xxrealloc(void *ptr, size_t nsize)
 	return result;
 }
 
+void *xxcalloc(size_t nmemb, size_t size) {
+	void *result = calloc(nmemb, size);
+	if (result) {
+		return result;
+	} else {
+		fatal("out of memory");
+		return NULL;
+	}
+}
+
 /* vim: set noexpandtab tabstop=4: */
