@@ -958,6 +958,16 @@ class WorkQueue(_object):
         return work_queue_specify_name(self._work_queue, name)
 
     ##
+    # Set the preference for using hostname over IP address to connect.
+    # 'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the
+    # hostname at the master.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
+    def specify_master_preferred_connection(self, mode):
+        return work_queue_master_preferred_connection(self._work_queue, mode)
+
+    ##
     # Set the minimum taskid of future submitted tasks.
     #
     # Further submitted tasks are guaranteed to have a taskid larger or equal

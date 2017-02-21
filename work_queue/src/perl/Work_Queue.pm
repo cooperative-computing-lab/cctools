@@ -156,6 +156,11 @@ sub specify_name {
 	return work_queue_specify_name($self->{_work_queue}, $name);
 }
 
+sub specify_master_preferred_connection {
+	my ($self, $mode) = @_;
+	return work_queue_master_preferred_connection($self->{_work_queue}, $mode);
+}
+
 sub specify_min_taskid {
 	my ($self, $minid) = @_;
 	return work_queue_specify_min_taskid($self->{_work_queue}, $minid);
