@@ -867,9 +867,9 @@ void work_queue_specify_keepalive_interval(struct work_queue *q, int interval);
 void work_queue_specify_keepalive_timeout(struct work_queue *q, int timeout);
 
 /** Set the preference for using hostname over IP address to connect.
-IP uses IP address (standard behavior), HOSTNAME uses hostname provided by master
+'by_ip' uses IP address (standard behavior), or 'by_hostname' to use the hostname at the master.
 @param q A work queue object.
-@param preferred_connection An string to indicate using IP or HOSTNAME.
+@param preferred_connection An string to indicate using 'by_ip' or a 'by_hostname'.
 */
 void work_queue_master_preferred_connection(struct work_queue *q, const char *preferred_connection);
 
