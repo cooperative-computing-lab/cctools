@@ -1253,3 +1253,15 @@ class WorkQueue(_object):
             del(self._task_table[task_pointer.taskid])
             return task
         return None
+
+def rmsummary_snapshots(self):
+    if self.snapshots_count < 1:
+        return NULL
+
+    snapshots = []
+    for i in range(0, self.snapshots_count):
+        snapshot = self.get_snapshot(i)
+        snapshots.append(snapshot)
+    return snapshots
+
+rmsummary.snapshots = property(rmsummary_snapshots)

@@ -826,6 +826,9 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->exit_status = 0;
 	s->signal = 0;
 
+	s->snapshots_count = 0;
+	s->snapshots       = NULL;
+
 	return s;
 }
 

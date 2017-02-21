@@ -28,3 +28,19 @@
 %include "work_queue.h"
 %include "rmsummary.h"
 %include "category.h"
+
+
+%extend rmsummary {
+	struct rmsummary *get_snapshot(int i) {
+		if(i < 0 || i > $self->snapshots_count) {
+			return NULL;
+		}
+
+		return $self->snapshots[i];
+	}
+
+	/* rename, so that we can use 'snapshots' inside python and perl. */
+	struct rmsummary **_snapshots() {
+		return $self->snapshots;
+	}
+};

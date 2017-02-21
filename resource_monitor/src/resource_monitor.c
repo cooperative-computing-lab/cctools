@@ -196,8 +196,6 @@ static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
 
-static int inotify_flags = IN_CLOSE | IN_ACCESS;
-
 struct itable *wdirs_rc;        /* Counts how many rmonitor_process_info use a rmonitor_wdir_info. */
 struct itable *filesys_rc;      /* Counts how many rmonitor_wdir_info use a rmonitor_filesys_info. */
 
@@ -609,7 +607,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
     return inventory;
 }
 
-void rmonitor_add_file_watch(const char *filename, int is_output)
+void rmonitor_add_file_watch(const char *filename, int is_output, int override_flags)
 {
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
@@ -645,7 +643,12 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 		char **new_inotify_watches;
 		int iwd;
 
-		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, inotify_flags)) < 0)
+		int inotify_flags = IN_CLOSE | IN_ACCESS | IN_MODIFY;
+		if(override_flags) {
+			inotify_flags = override_flags;
+		}
+
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, override_flags)) < 0)
 		{
 			debug(D_RMON, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -663,7 +666,7 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 			}
 			if (iwd < alloced_inotify_watches)
 			{
-				inotify_watches[iwd] = strdup(filename);
+				inotify_watches[iwd] = xxstrdup(filename);
 				if (finfo != NULL) finfo->n_references = 1;
 			} else {
 				debug(D_RMON, "Out of memory: Removing inotify watch for %s", filename);
@@ -677,6 +680,8 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 int rmonitor_handle_inotify(void)
 {
 	int urgent = 0;
+
+	debug(D_RMON, "uno");
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
@@ -710,7 +715,8 @@ int rmonitor_handle_inotify(void)
 
 				if (evdata[i].mask & IN_CREATE) {
 					if(snapshot_signal_file && strcmp(snapshot_signal_file, evdata[i].name) == 0) {
-							rmonitor_add_file_watch(snapshot_signal_file, 0);
+							debug(D_RMON, "found snapshot file '%s'", fname);
+							rmonitor_add_file_watch(snapshot_signal_file, 0, IN_MODIFY | IN_OPEN | IN_CLOSE);
 							urgent = 1;
 					}
 					continue;
@@ -1031,7 +1037,7 @@ int record_snapshot(struct rmsummary *tr) {
 
 	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
 
-	jx_insert_string(j, "snapshot", label);
+	jx_insert_string(j, "taskid", label);
 
 	if(!j) {
 		return 0;
@@ -1050,6 +1056,8 @@ int record_snapshot(struct rmsummary *tr) {
 
 	/* push to the front, since snapshots are writen in reverse order. */
 	list_push_head(snapshots, j);
+
+	debug(D_RMON, "Recoded snapshot: '%s'", label);
 
 	return 1;
 }
@@ -1637,7 +1645,9 @@ int rmonitor_dispatch_msg(void)
 			switch(msg.error) {
 				case 0:
 					debug(D_RMON, "File %s has been opened.\n", msg.data.s);
-					rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT);
+					if(log_inotify) {
+						rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT, 0);
+					}
 					break;
 				case EMFILE:
 					/* Eventually report that we ran out of file descriptors. */
@@ -1834,7 +1844,7 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 
 		char *executable_path = path_which(executable);
 		if(executable_path) {
-			rmonitor_add_file_watch(executable_path, /* is output? */ 0);
+			rmonitor_add_file_watch(executable_path, /* is output? */ 0, 0);
 			free(executable_path);
 		}
     }
@@ -2114,7 +2124,6 @@ int main(int argc, char **argv) {
 				break;
 			case  LONG_OPT_OPENED_FILES:
 				use_inotify = 1;
-				inotify_flags |= IN_MODIFY;
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->disk = 0;
@@ -2237,12 +2246,7 @@ int main(int argc, char **argv) {
 		free(snapshot_signal_file);
 		snapshot_signal_file = xxstrdup(path_basename(full_path));
 
-	    if (inotify_watches == NULL) {
-			alloced_inotify_watches = 0;
-		} else {
-			int iwd = inotify_add_watch(rmonitor_inotify_fd, dir, IN_CREATE);
-			inotify_watches[iwd] = dir;
-		}
+		rmonitor_add_file_watch(dir, 0, IN_CREATE);
 
 		free(full_path);
     }
