@@ -648,7 +648,7 @@ void rmonitor_add_file_watch(const char *filename, int is_output, int override_f
 			inotify_flags = override_flags;
 		}
 
-		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, override_flags)) < 0)
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, inotify_flags)) < 0)
 		{
 			debug(D_RMON, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
