@@ -62,6 +62,7 @@ struct rmsummary
 	struct rmsummary *limits_exceeded;
 	struct rmsummary *peak_times;           /* from start, in usecs */
 
+	char  *snapshot_name;                   /* NULL for main summary, otherwise label of the snapshot. */
 	int    snapshots_count;                 /* number of intermediate measurements, if any. */
 	struct rmsummary **snapshots;           /* snapshots_count sized array of snapshots. */
 

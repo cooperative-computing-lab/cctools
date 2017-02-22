@@ -1037,7 +1037,7 @@ int record_snapshot(struct rmsummary *tr) {
 
 	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
 
-	jx_insert_string(j, "taskid", label);
+	jx_insert_string(j, "snapshot_name", label);
 
 	if(!j) {
 		return 0;

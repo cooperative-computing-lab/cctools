@@ -162,40 +162,40 @@ int rmsummary_field_is_float(const char *key) {
 
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
-		if(s->category)
-			free(s->category);
+		free(s->category);
 		s->category = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "command") == 0) {
-		if(s->command)
-			free(s->command);
+		free(s->command);
 		s->command = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "exit_type") == 0) {
-		if(s->exit_type)
-			free(s->exit_type);
+		free(s->exit_type);
 		s->exit_type = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "taskid") == 0) {
-		if(s->taskid)
-			free(s->taskid);
+		free(s->taskid);
 		s->taskid = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "task_id") == 0) {
-		if(s->taskid)
-			free(s->taskid);
+		free(s->taskid);
 		s->taskid = xxstrdup(value);
 		return 1;
 	}
 
+	if(strcmp(key, "snapshot_name") == 0) {
+		free(s->snapshot_name);
+		s->snapshot_name = xxstrdup(value);
+		return 1;
+	}
 
 	return 0;
 }
@@ -289,6 +289,10 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->gpus;
 	}
 
+	if(strcmp(key, "snapshots_count") == 0) {
+		return s->snapshots_count;
+	}
+
 	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 
@@ -309,6 +313,10 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 	}
 
 	if(strcmp(key, "taskid") == 0) {
+		return s->taskid;
+	}
+
+	if(strcmp(key, "snapshot_name") == 0) {
 		return s->taskid;
 	}
 
@@ -425,6 +433,11 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 
 	if(strcmp(key, "gpus") == 0) {
 		s->gpus = value;
+		return 1;
+	}
+
+	if(strcmp(key, "snapshots_count") == 0) {
+		s->snapshots_count = value;
 		return 1;
 	}
 
@@ -826,6 +839,7 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->exit_status = 0;
 	s->signal = 0;
 
+	s->snapshot_name   = NULL;
 	s->snapshots_count = 0;
 	s->snapshots       = NULL;
 
