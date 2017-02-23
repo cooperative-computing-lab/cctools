@@ -945,29 +945,29 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		p->set_gid = p->egid;
 
 		tracer_copy_in_string(p->tracer,logical_name,POINTER(args[0]),sizeof(logical_name),0);
+		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 
 		{
 			char buf[PATH_MAX] = "";
 			if(pfs_readlink(logical_name, buf, sizeof buf - 1) > 0) {
 				if (buf[0] == '/') {
-					snprintf(logical_name, sizeof logical_name, "%s", buf);
+					snprintf(p->new_logical_name, sizeof p->new_logical_name, "%s", buf);
 				} else {
-					char *sep = strrchr(logical_name, '/');
+					char *sep = strrchr(p->new_logical_name, '/');
 					if (!sep) {
-						sep = logical_name;
+						sep = p->new_logical_name;
 					}
-					snprintf(sep, sizeof logical_name - (size_t)(sep-logical_name), "/%s", buf);
+					snprintf(sep, sizeof p->new_logical_name - (size_t)(sep - p->new_logical_name), "/%s", buf);
 				}
 			}
 		}
 
-		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 		p->exefd = -1;
 
-		if(!pfs_dispatch_isexe(logical_name, &p->set_uid, &p->set_gid))
+		if(!pfs_dispatch_isexe(p->new_logical_name, &p->set_uid, &p->set_gid))
 			goto failure;
 
-		if (pfs_get_local_name(logical_name,physical_name,firstline,sizeof(firstline))<0)
+		if (pfs_get_local_name(p->new_logical_name, physical_name, firstline, sizeof(firstline)) < 0)
 			goto failure;
 
 		/* force to single line: */
