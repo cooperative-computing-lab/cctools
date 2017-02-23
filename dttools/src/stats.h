@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <stdint.h>
-#include "buffer.h"
+#include "jx.h"
 
 /** Collect statistics for the current program.
  */
@@ -44,19 +44,10 @@ void stats_inc (const char *name, int64_t offset);
  */
 void stats_log (const char *name, uint64_t value);
 
-/** Write a human-readable representation of the program statistics to a buffer.
- * @param buf The initialized buffer to use.
+/** Get the current statistics in JSON format.
+ * The returned object is a mapping of key names to values. For simple
+ * counters, the value is a number. A histogram is represented as an
+ * array of counts.
  */
-void stats_print_buffer (buffer_t *b);
-
-/** Write a human-readable representation of the program statistics to a stream.
- * @param file The stdio stream to write to.
- */
-void stats_print_stream (FILE *file);
-
-/** Write a human-readable representation of the program statistics to a string.
- * The caller is responsible for freeing the returned string.
- */
-char *stats_print_string ();
-
+struct jx *stats_get ();
 #endif

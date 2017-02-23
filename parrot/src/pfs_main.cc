@@ -49,6 +49,7 @@ extern "C" {
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "jx.h"
+#include "jx_pretty_print.h"
 #include "stats.h"
 }
 
@@ -1407,7 +1408,8 @@ int main( int argc, char *argv[] )
 	}
 
 	if (stats_file) {
-		stats_print_stream(stats_out);
+		jx_pretty_print_stream(stats_get(), stats_out);
+		fprintf(stats_out, "\n");
 		fclose(stats_out);
 	}
 

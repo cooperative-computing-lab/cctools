@@ -82,46 +82,29 @@ void stats_log (const char *name, uint64_t value) {
 	++s->v.buckets[log2b(value)];
 }
 
-void stats_print_buffer (buffer_t *b) {
-	if (!stats_enabled) return;
-	assert(b);
+struct jx *stats_get () {
+	if (!stats_enabled) return jx_null();
 	char *k;
 	stats_t *s;
+	struct jx *out = jx_object(NULL);
+	struct jx *log;
 	stats_init();
 	hash_table_firstkey(stats);
 	while (hash_table_nextkey(stats, &k, (void **) &s)) {
 		switch (s->type) {
 		case STATS_INT:
-			buffer_printf(b, "%s\t%" PRIi64 "\n", k, s->v.value);
+			jx_insert_integer(out, k, s->v.value);
 			break;
 		case STATS_LOG:
-			buffer_putstring(b, k);
+			log = jx_array(NULL);
 			for (size_t i = 0; i < 64; i++) {
-				buffer_printf(b, "\t%u", s->v.buckets[i]);
+				jx_array_append(log, jx_integer(s->v.buckets[i]));
 			}
-			buffer_putstring(b, "\n");
+			jx_insert(out, jx_string(k), log);
 			break;
 		}
 	}
-}
-
-void stats_print_stream (FILE *file) {
-	assert(file);
-	buffer_t buffer;
-	buffer_init(&buffer);
-	stats_print_buffer(&buffer);
-	fprintf(file, "%s", buffer_tostring(&buffer));
-	buffer_free(&buffer);
-}
-
-char *stats_print_string () {
-	buffer_t buffer;
-	char *str;
-	buffer_init(&buffer);
-	stats_print_buffer(&buffer);
-	buffer_dup(&buffer,&str);
-	buffer_free(&buffer);
-	return str;
+	return out;
 }
 
 /* vim: set noexpandtab tabstop=4: */
