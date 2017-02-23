@@ -13,7 +13,7 @@ See the file COPYING for details.
 
 /** Collect statistics for the current program.
  */
-void stats_enable ();
+void stats_enable (void);
 
 /** Clear a statistic.
  * @param name The key to clear.
@@ -49,6 +49,6 @@ void stats_bin (const char *name, uint64_t value);
  * counters, the value is a number. A histogram is represented as an
  * array of counts.
  */
-struct jx *stats_get ();
+struct jx *stats_get (void);
 
 #endif

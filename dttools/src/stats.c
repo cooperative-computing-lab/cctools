@@ -26,7 +26,7 @@ typedef struct {
 	} v;
 } stats_t;
 
-static void stats_init () {
+static void stats_init (void) {
 	if (!stats) {
 		stats = hash_table_create(0, 0);
 	}
@@ -82,7 +82,7 @@ void stats_bin (const char *name, uint64_t value) {
 	++s->v.buckets[log2b(value)];
 }
 
-struct jx *stats_get () {
+struct jx *stats_get (void) {
 	if (!stats_enabled) return jx_null();
 	char *k;
 	stats_t *s;
