@@ -61,6 +61,7 @@ extern "C" {
 #include "macros.h"
 #include "sha1.h"
 #include "sleeptools.h"
+#include "stats.h"
 }
 
 #include <assert.h>
@@ -605,6 +606,7 @@ public:
 	}
 
 	virtual int close() {
+		stats_inc("parrot.grow.close", 1);
 		if (link)
 			link_close(link);
 		else
@@ -637,16 +639,21 @@ public:
 	}
 
 	virtual pfs_ssize_t read( void *d, pfs_size_t length, pfs_off_t offset ) {
+		stats_inc("parrot.grow.read", 1);
+		stats_bin("parrot.grow.read.requested", length);
+
 		pfs_ssize_t actual;
 		if (link)
 			actual = link_read(link,(char*)d,length,LINK_FOREVER);
 		else
 			actual = ::read(local_fd, d, length);
 		if(pfs_checksum_files && actual>0) sha1_update(&context,(unsigned char *)d,actual);
+		if (actual >= 0) stats_bin("parrot.grow.read.actual", actual);
 		return actual;
 	}
 
 	virtual int fstat( struct pfs_stat *i ) {
+		stats_inc("parrot.grow.fstat", 1);
 		*i = info;
 		return 0;
 	}
@@ -657,6 +664,7 @@ public:
 	This simply satisfies some programs that insist upon it.
 	*/
 	virtual int flock( int op ) {
+		stats_inc("parrot.grow.flock", 1);
 		return 0;
 	}
 
@@ -673,6 +681,8 @@ public:
 	}
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
+		stats_inc("parrot.grow.open", 1);
+
 		struct grow_dirent *d;
 		char url[PFS_PATH_MAX];
 		int local_index = !strcmp(name->hostport, "local");
@@ -707,20 +717,26 @@ public:
 	}
 
 	pfs_dir * getdir( pfs_name *name ) {
+		stats_inc("parrot.grow.getdir", 1);
+
 		/*
 		If the root of the GROW filesystem is requested,
 		generate it interally using the list of known filesystems.
 		*/
 
+		size_t dirsize = 0;
 		if(!name->rest[0]) {
 			pfs_dir *dir = new pfs_dir(name);
 			dir->append(".");
 			dir->append("..");
+			dirsize += 2;
 			struct grow_filesystem *f = grow_filesystem_list;
 			while(f) {
 				dir->append(f->hostport);
+				++dirsize;
 				f = f->next;
 			}
+			stats_bin("parrot.grow.getdir.size", dirsize);
 			return dir;
 		}
 
@@ -738,16 +754,24 @@ public:
 		pfs_dir *dir = new pfs_dir(name);
 
 		dir->append(".");
-		if(d->parent) dir->append("..");
+		++dirsize;
+		if(d->parent) {
+			dir->append("..");
+			++dirsize;
+		}
 
 		for(d=d->children;d;d=d->next) {
 			dir->append(d->name);
+			++dirsize;
 		}
 
+		stats_bin("parrot.grow.getdir.size", dirsize);
 		return dir;
 	}
 
 	virtual int lstat( pfs_name *name, struct pfs_stat *info ) {
+		stats_inc("parrot.grow.lstat", 1);
+
 		/* If we get stat("/grow") then construct a dummy entry. */
 
 		if(!name->rest[0]) {
@@ -767,6 +791,8 @@ public:
 	}
 
 	virtual int stat( pfs_name *name, struct pfs_stat *info ) {
+		stats_inc("parrot.grow.stat", 1);
+
 		/* If we get stat("/grow") then construct a dummy entry. */
 
 		if(!name->rest[0]) {
@@ -786,11 +812,14 @@ public:
 	}
 
 	virtual int unlink( pfs_name *name ) {
+		stats_inc("parrot.grow.unlink", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int access( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.grow.access", 1);
+
 		struct pfs_stat info;
 		if(this->stat(name,&info)==0) {
 			if(mode&W_OK) {
@@ -805,36 +834,44 @@ public:
 	}
 
 	virtual int chmod( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.grow.chmod", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int chown( pfs_name *name, uid_t uid, gid_t gid ) {
+		stats_inc("parrot.grow.chown", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int lchown( pfs_name *name, uid_t uid, gid_t gid ) {
+		stats_inc("parrot.grow.lchown", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
+		stats_inc("parrot.grow.truncate", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int utime( pfs_name *name, struct utimbuf *buf ) {
+		stats_inc("parrot.grow.utime", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int rename( pfs_name *oldname, pfs_name *newname ) {
+		stats_inc("parrot.grow.rename", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int chdir( pfs_name *name, char *newpath ) {
+		stats_inc("parrot.grow.chdir", 1);
+
 		struct pfs_stat info;
 		if(this->stat(name,&info)==0) {
 			if(S_ISDIR(info.st_mode)) {
@@ -849,16 +886,20 @@ public:
 	}
 
 	virtual int link( pfs_name *oldname, pfs_name *newname ) {
+		stats_inc("parrot.grow.link", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int symlink( const char *linkname, pfs_name *newname ) {
+		stats_inc("parrot.grow.symlink", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t bufsiz ) {
+		stats_inc("parrot.grow.readlink", 1);
+
 		struct grow_dirent *d;
 
 		d = grow_dirent_lookup(name,0);
@@ -869,6 +910,7 @@ public:
 			strncpy(buf,d->linkname,bufsiz);
 			length = MIN((unsigned)bufsiz,strlen(d->linkname));
 			buf[length] = 0;
+			stats_bin("parrot.grow.readlink.size", length);
 			return length;
 		} else {
 			errno = EINVAL;
@@ -877,11 +919,13 @@ public:
 	}
 
 	virtual int mkdir( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.grow.mkdir", 1);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int rmdir( pfs_name *name ) {
+		stats_inc("parrot.grow.rmdir", 1);
 		errno = EROFS;
 		return -1;
 	}
