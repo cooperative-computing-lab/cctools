@@ -35,14 +35,14 @@ void stats_set (const char *name, int64_t value);
  */
 void stats_inc (const char *name, int64_t offset);
 
-/** Record an event by value
+/** Record an event, binned by value
  * For frequent events like read()s, it would be expensive to record the size
  * of each and every one. Instead, this function records a histogram with
  * logarithmic bins, to give an idea of the distribution of event values.
  * @param name The key to log.
  * @param value The value log.
  */
-void stats_log (const char *name, uint64_t value);
+void stats_bin (const char *name, uint64_t value);
 
 /** Get the current statistics in JSON format.
  * The returned object is a mapping of key names to values. For simple
@@ -50,4 +50,5 @@ void stats_log (const char *name, uint64_t value);
  * array of counts.
  */
 struct jx *stats_get ();
+
 #endif

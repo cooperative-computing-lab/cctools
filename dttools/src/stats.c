@@ -15,7 +15,7 @@ static int stats_enabled = 0;
 
 typedef enum {
 	STATS_INT,
-	STATS_LOG,
+	STATS_BIN,
 } stats_type_t;
 
 typedef struct {
@@ -76,9 +76,9 @@ void stats_inc (const char *name, int64_t offset) {
 	s->v.value += offset;
 }
 
-void stats_log (const char *name, uint64_t value) {
+void stats_bin (const char *name, uint64_t value) {
 	if (!stats_enabled) return;
-	stats_t *s = stats_touch(name, STATS_LOG);
+	stats_t *s = stats_touch(name, STATS_BIN);
 	++s->v.buckets[log2b(value)];
 }
 
@@ -95,7 +95,7 @@ struct jx *stats_get () {
 		case STATS_INT:
 			jx_insert_integer(out, k, s->v.value);
 			break;
-		case STATS_LOG:
+		case STATS_BIN:
 			log = jx_array(NULL);
 			for (size_t i = 0; i < 64; i++) {
 				jx_array_append(log, jx_integer(s->v.buckets[i]));
