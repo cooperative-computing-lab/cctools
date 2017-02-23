@@ -396,9 +396,13 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 	char link_parent[PFS_PATH_MAX];
 	struct pfs_name new_pname = *pname;
 
-	if (string_prefix_is(pname->path, "/proc/self/ns/") || string_match_regex(pname->path, "^/proc/[0-9]+/ns/")) {
+	if (string_match_regex(pname->path, "^/proc/self(/|$)|^/proc/[0-9]+/ns/")) {
 		/*
-		 * Depending on kernel version, these might be magical dangling symlinks that can
+		 * We need to handle /proc/self in resolve_name, and eagerly following it here would
+		 * give Parrot's PID. Return for now, and let resolve name call us again after it
+		 * rewrites the path to /proc/[pid]/.
+		 *
+		 * Depending on kernel version, /proc/[pid]/ns/ might contain magical dangling symlinks that can
 		 * nonetheless be opened as usual. If Parrot tries to follow them, it will return
 		 * erroneous ENOENT.
 		 */
@@ -548,27 +552,32 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			follow_symlink(pname, mode, depth + 1);
 		}
 
-	if(pattern_match(pname->path, "^/proc/self/?()", &n) >= 0) {
-		strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
-		snprintf(pname->path, sizeof(pname->path), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
-		strcpy(pname->logical_name, pname->path);
-		strcpy(pname->rest, pname->path);
-		pname->service = pfs_service_lookup_default();
-		strcpy(pname->service_name,"local");
-		strcpy(pname->host,"localhost");
-		strcpy(pname->hostport,"localhost");
-		pname->is_local = 1;
-	} else if (pattern_match(pname->path, "^/dev/fd/?()", &n) >= 0) {
-		strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
-		snprintf(pname->path, sizeof(pname->path), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
-		strcpy(pname->logical_name, pname->path);
-		strcpy(pname->rest, pname->path);
-		pname->service = pfs_service_lookup_default();
-		strcpy(pname->service_name,"local");
-		strcpy(pname->host,"localhost");
-		strcpy(pname->hostport,"localhost");
-		pname->is_local = 1;
-	}
+		if(pattern_match(pname->path, "^/proc/self/?()", &n) >= 0) {
+			strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
+			snprintf(pname->path, sizeof(pname->path), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
+			strcpy(pname->logical_name, pname->path);
+			strcpy(pname->rest, pname->path);
+			pname->service = pfs_service_lookup_default();
+			strcpy(pname->service_name,"local");
+			strcpy(pname->host,"localhost");
+			strcpy(pname->hostport,"localhost");
+			pname->is_local = 1;
+		} else if (pattern_match(pname->path, "^/dev/fd/?()", &n) >= 0) {
+			strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
+			snprintf(pname->path, sizeof(pname->path), "/proc/%d/fd/%s", pfs_process_getpid(), &full_logical_name[n]);
+			strcpy(pname->logical_name, pname->path);
+			strcpy(pname->rest, pname->path);
+			pname->service = pfs_service_lookup_default();
+			strcpy(pname->service_name,"local");
+			strcpy(pname->host,"localhost");
+			strcpy(pname->hostport,"localhost");
+			pname->is_local = 1;
+		}
+
+		/* Follow again in case we replaced /proc/self */
+		if (do_follow_symlink && pfs_follow_symlinks) {
+			follow_symlink(pname, mode, depth + 1);
+		}
 
 		return 1;
 	}
