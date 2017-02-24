@@ -214,9 +214,10 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		fputs(",", task_info_fp);
 	}
 
-	int64_t cores = 1;
-	int64_t memory = 1024;
-	int64_t disk = 1024;
+	// The default resource requirements for each task
+	int64_t cores = -1;
+	int64_t memory = -1;
+	int64_t disk = -1;
 
 	if (resources) {
 		cores  = resources->cores  > -1 ? resources->cores  : cores;
@@ -252,8 +253,9 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 
 	while(1) {
 
-		char *task_id_ch;
+		char *task_id_str;
 		char *task_stat_str;
+		const char *task_exit_code;
 		int task_id;
 				
 		while((read_len = getline(&line, &len, task_state_fp)) != -1) {
@@ -264,11 +266,12 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 				--read_len;
 			}
 
-			task_id_ch = strtok(line, ",");
-			task_id = atoi(task_id_ch);
+			task_id_str = strtok(line, ",");
+			task_id = atoi(task_id_str);
 
 			// There is a new task finished
 			if(itable_lookup(finished_tasks, task_id) == NULL) {
+
 				struct batch_job_info *info = itable_remove(q->job_table, task_id);
 			    	
 				info->finished = time(0);
@@ -276,6 +279,14 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 
 				if (strcmp(task_stat_str, "finished") == 0) {
 					info->exited_normally = 1;
+				} else if (strcmp(task_stat_str, "failed") == 0) {
+					info->exited_normally = 0;
+					task_exit_code = strtok(NULL, ",");
+					if(atoi(task_exit_code) == 444) {
+						info->exit_code = 444;
+						debug(D_BATCH, "Task %s failed to retrieve the output.", task_id_str);
+					}
+					info->exit_code = atoi(task_exit_code);
 				} else {
 					info->exited_normally = 0;
 				}
@@ -316,7 +327,7 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 	size_t len = 0;
 	ssize_t read_len;
 	FILE *task_state_fp;
-	char *task_id_ch;
+	char *task_id_str;
 	char *task_stat_str;
 	int task_id;
 	// TODO what is the proper timeout?
@@ -331,8 +342,8 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 				--read_len;
 			}
 
-			task_id_ch = strtok(line, ",");
-			task_id = atoi(task_id_ch);
+			task_id_str = strtok(line, ",");
+			task_id = atoi(task_id_str);
 			task_stat_str = strtok(NULL, ",");
 
 			if (task_id == (int)jobid && \
@@ -358,6 +369,7 @@ static int batch_queue_mesos_create (struct batch_queue *q)
 {
 	batch_queue_set_feature(q, "mesos_job_queue", NULL);
 	batch_queue_set_feature(q, "batch_log_name", "%s.mesoslog");
+	batch_queue_set_feature(q, "autosize", "yes");
 
 	return 0;
 }

@@ -328,7 +328,12 @@ class MakeflowScheduler(Scheduler):
                             
                                 task_id = task_info.task_id
                                 mms.tasks_info_dict[task_id].action = "running"
-
+                               
+                                if task_info.cores == -1 and task_info.mem == -1 and task_info.disk == -1:
+                                    task_info.cores = offer_cpus
+                                    task_info.mem = offer_mem
+                                    task_info.disk = offer_disk 
+                                    logger.info("User did not specify resource requirement, Task {0} will use all available resources".format(task_id))
                                 logger.info("Task {0} will use {1} cores {2} mem {3} disk".format(task_id, task_info.cores, task_info.mem, task_info.disk))
                                 
                                 self.launch_mesos_task(driver, offer, task_id, task_info.cores, task_info.mem, task_info.disk)
@@ -410,7 +415,6 @@ class MakeflowScheduler(Scheduler):
                         urlretrieve_start = time.time()
                         urllib.urlretrieve(output_file_addr, output_fn)
                         urlretrieve_end = time.time()
-                         
 
                         if os.path.exists(output_fn):
                             output_fn_size = os.stat(output_fn).st_size 
@@ -420,7 +424,7 @@ class MakeflowScheduler(Scheduler):
                         else:
                             logger.error("Task {0} is failed because it cannot get \
                             output file {1}".format(curr_task_id, output_fn))
-                            oup_fn.write("{0},failed\n".format(curr_task_id))  
+                            oup_fn.write("{0},failed,444\n".format(curr_task_id))  
                             mms.tasks_info_dict[update.task_id.value].action = "failed"
                             self.clean_mesos_file(update.task_id.value)  
                             return 
@@ -440,35 +444,10 @@ class MakeflowScheduler(Scheduler):
 
             if update.state == mesos_pb2.TASK_FAILED:
                 failed_task_id = update.task_id.value
-                logger.info("Task {0} failed with reason code {1}.".format(failed_task_id, update.reason))
+                logger.info("Task {0} failed with reason code {1} and exit code {2}.".format(failed_task_id, update.reason, update.message))
                 self.print_mesos_info(update.task_id.value)
-
-                if failed_task_id in mms.tasks_failed_time:
-                    if mms.tasks_failed_time[failed_task_id] <= MAX_FAILED:
-                        mms.tasks_failed_time[failed_task_id] += 1
-                        mms.tasks_info_dict[failed_task_id].action = "resubmitted"
-                        if update.message == "run out of resource":
-                            logger.info("Task {0} has been failed {1} times because running out memory". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
-                            mms.tasks_info_dict[failed_task_id].cores = 4 
-                            mms.tasks_info_dict[failed_task_id].mem = 5120 
-                            mms.tasks_info_dict[failed_task_id].disk = 5120 
-                        else:
-                            logger.info("Task {0} has been failed {1} times". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
-                        logger.info("Try to resubmit failed task {0}".format(failed_task_id))
-                    else:
-                        oup_fn.write("{0},failed\n".format(failed_task_id))
-                        mms.tasks_info_dict[failed_task_id].action = "failed"
-                        self.clean_mesos_file(failed_task_id)
-                else:  
-                    mms.tasks_failed_time[failed_task_id] = 1
-                    mms.tasks_info_dict[failed_task_id].action = "resubmitted"
-                    logger.info("Task {0} has been failed 1 time". format(failed_task_id)) 
-                    if update.message == "run out of resource":
-                        logger.info("Task {0} has been failed {1} times because running out memory". format(failed_task_id, mms.tasks_failed_time[failed_task_id])) 
-                        mms.tasks_info_dict[failed_task_id].cores = 4
-                        mms.tasks_info_dict[failed_task_id].mem = 5120
-                        mms.tasks_info_dict[failed_task_id].disk = 5120 
-                    logger.info("Try to resubmit failed task {0}".format(failed_task_id))
+                mms.tasks_info_dict[failed_task_id].action = "failed"
+                oup_fn.write("{0},failed,{1}\n".format(failed_task_id, update.message))
 
             if update.state == mesos_pb2.TASK_KILLED:
                 oup_fn.write("{0},killed\n".format(update.task_id.value))
