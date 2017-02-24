@@ -47,12 +47,12 @@ SECTION(OPTIONS)
 SUBSECTION(Batch Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
-OPTION_TRIPLET(-T,batch-type, type)Batch system type: local, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, amazon. (default is local)
+OPTION_TRIPLET(-T,batch-type, type)Batch system type: local, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, amazon, mesos. (default is local)
 OPTION_TRIPLET(-B,batch-options, options)Add these options to all batch submit files.
 OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
 OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
 OPTION_PAIR(--workers-per-cycle,workers) Maximum number of new workers per 30 seconds.  ( less than 1 disables limit, default=5)
-OPTION_ITEM(`--autosize')Automatically size a worker to an available slot (Condor only).
+OPTION_ITEM(`--autosize')Automatically size a worker to an available slot (Condor and Mesos).
 OPTION_ITEM(-c --capacity) Use worker capacity reported by masters.
 OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to master.
 OPTION_TRIPLET(-t,timeout,time)Abort after this amount of idle time.
@@ -66,6 +66,9 @@ OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By defaul
 OPTION_PAIR(--factory-timeout, #)Set factory timeout to <#> seconds. (off by default) This will cause work queue to exit when their are no masters present after the given number of seconds.
 OPTION_PAIR(--wrapper,Wrap all commands with this prefix.)
 OPTION_PAIR(--wrapper-input,Add this file needed by the wrapper.)
+OPTION_PAIR(--mesos-master, hostname) Specify the host name to mesos master node (for use with -T mesos)
+OPTION_PAIR(--mesos-path, filepath) Specify path to mesos python library (for use with -T mesos)
+OPTION_PAIR(--mesos-preload, library) Specify the linking libraries for running mesos(for use with -T mesos)
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
 

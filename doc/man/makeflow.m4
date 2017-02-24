@@ -56,7 +56,7 @@ OPTION_ITEM(`-R, --retry')Automatically retry failed batch jobs up to 100 times.
 OPTION_TRIPLET(-r, retry-count, n)Automatically retry failed batch jobs up to n times.
 OPTION_PAIR(--wait-for-files-upto, #)Wait for output files to be created upto this many seconds (e.g., to deal with NFS semantics).
 OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
-OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, dryrun, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, wq, amazon. (default is local)
+OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, dryrun, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, wq, amazon, mesos. (default is local)
 OPTIONS_END
 
 SUBSECTION(Debugging Options)
@@ -123,6 +123,13 @@ LONGCODE_BEGIN
 }
 LONGCODE_END
 OPTION_PAIR(--amazon-ami, image-id) Specify an amazon machine image.
+OPTIONS_END
+
+SUBSECTION(Mesos Options)
+OPTIONS_BEGIN
+OPTION_PAIR(--mesos-master, hostname) Indicate the host name of preferred mesos master.
+OPTION_PAIR(--mesos-path, filepath) Indicate the path to mesos python2 site-packages.
+OPTION_PAIR(--mesos-preload, library) Indicate the linking libraries for running mesos..
 OPTIONS_END
 
 SUBSECTION(Mountfile Support)
