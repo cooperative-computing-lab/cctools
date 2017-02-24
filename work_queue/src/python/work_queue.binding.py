@@ -1256,7 +1256,7 @@ class WorkQueue(_object):
 
 def rmsummary_snapshots(self):
     if self.snapshots_count < 1:
-        return NULL
+        return None
 
     snapshots = []
     for i in range(0, self.snapshots_count):
