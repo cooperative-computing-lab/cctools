@@ -1260,7 +1260,7 @@ def rmsummary_snapshots(self):
 
     snapshots = []
     for i in range(0, self.snapshots_count):
-        snapshot = self.get_snapshot(i)
+        snapshot = rmsummary_get_snapshot(self, i);
         snapshots.append(snapshot)
     return snapshots
 

@@ -129,4 +129,6 @@ int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offs
 void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, double multiplier, int float_flag);
 int rmsummary_field_is_float(const char *key);
 
+struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i);
+
 #endif

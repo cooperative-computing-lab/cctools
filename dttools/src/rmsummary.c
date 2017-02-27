@@ -1230,6 +1230,14 @@ int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offs
 	return (*((int64_t *) ((char *) s + offset)));
 }
 
+struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i) {
+	if(!s || i < 0 || i > s->snapshots_count) {
+		return NULL;
+	}
+
+	return s->snapshots[i];
+}
+
 
 
 /* vim: set noexpandtab tabstop=4: */
