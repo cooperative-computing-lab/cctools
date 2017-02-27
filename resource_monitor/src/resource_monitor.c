@@ -135,6 +135,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "itable.h"
 #include "jx.h"
+#include "jx_print.h"
 #include "list.h"
 #include "macros.h"
 #include "path.h"
@@ -165,6 +166,8 @@ uint64_t interval = DEFAULT_INTERVAL;
 FILE  *log_summary = NULL;      /* Final statistics are written to this file. */
 FILE  *log_series  = NULL;      /* Resource events and samples are written to this file. */
 FILE  *log_inotify = NULL;      /* List of opened files is written to this file. */
+
+char *template_path = NULL;     /* Prefix of all output files names */
 
 int debug_active = 0;           /* 1 if ACTIVATE_DEBUG_FILE exists. If 1, debug info goes to ACTIVATE_DEBUG_FILE ".log" */
 
@@ -204,7 +207,8 @@ int lib_helper_extracted;       /* Boolean flag to indicate whether the bundled
                                    helper library was automatically extracted
                                    */
 
-struct rmsummary *summary;
+struct rmsummary *summary;          /* final summary */
+struct rmsummary *snapshot;         /* current snapshot */
 struct rmsummary *resources_limits;
 struct rmsummary *resources_flags;
 
@@ -213,6 +217,17 @@ int64_t total_bytes_rx;   /* total bytes received */
 int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
+
+char *snapshot_signal_file = NULL;    /* name of the file that, if
+										 exists, makes the monitor record
+										 an snapshot of the current
+										 usage. The first line of the
+										 file labels the snapshot. The
+										 file is removed when the
+										 snapshot is recorded, so that
+										 multiple snapshots can be
+										 created. */
+struct list *snapshots = NULL;              /* list of snapshots, as json objects. */
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -375,6 +390,22 @@ void add_verbatim_field(const char *str) {
 	debug(D_RMON, "%s", pair);
 
 	free(pair);
+}
+
+void add_snapshots() {
+	if(!snapshots) {
+		return;
+	}
+
+	struct jx *a = jx_array(0);
+
+	struct jx *j;
+	list_first_item(snapshots);
+	while((j = list_next_item(snapshots))) {
+		jx_array_insert(a, j);
+	}
+
+	jx_insert(verbatim_summary_fields, jx_string("snapshots"), a);
 }
 
 
@@ -576,7 +607,7 @@ struct rmonitor_wdir_info *lookup_or_create_wd(struct rmonitor_wdir_info *previo
     return inventory;
 }
 
-void rmonitor_add_file_watch(const char *filename, int is_output)
+void rmonitor_add_file_watch(const char *filename, int is_output, int override_flags)
 {
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
@@ -612,7 +643,12 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 		char **new_inotify_watches;
 		int iwd;
 
-		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, IN_CLOSE_WRITE|IN_CLOSE_NOWRITE|IN_ACCESS|IN_MODIFY)) < 0)
+		int inotify_flags = IN_CLOSE | IN_ACCESS | IN_MODIFY;
+		if(override_flags) {
+			inotify_flags = override_flags;
+		}
+
+		if ((iwd = inotify_add_watch(rmonitor_inotify_fd, filename, inotify_flags)) < 0)
 		{
 			debug(D_RMON, "inotify_add_watch for file %s fails: %s", filename, strerror(errno));
 		} else {
@@ -630,7 +666,7 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 			}
 			if (iwd < alloced_inotify_watches)
 			{
-				inotify_watches[iwd] = strdup(filename);
+				inotify_watches[iwd] = xxstrdup(filename);
 				if (finfo != NULL) finfo->n_references = 1;
 			} else {
 				debug(D_RMON, "Out of memory: Removing inotify watch for %s", filename);
@@ -641,8 +677,12 @@ void rmonitor_add_file_watch(const char *filename, int is_output)
 #endif
 }
 
-void rmonitor_handle_inotify(void)
+int rmonitor_handle_inotify(void)
 {
+	int urgent = 0;
+
+	debug(D_RMON, "uno");
+
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
 	struct rmonitor_file_info *finfo;
@@ -654,30 +694,47 @@ void rmonitor_handle_inotify(void)
 	{
 		if (ioctl(rmonitor_inotify_fd, FIONREAD, &nbytes) >= 0)
 		{
-
 			evdata = (struct inotify_event *) malloc(nbytes);
-			if (evdata == NULL) return;
+			if (evdata == NULL) return urgent;
 			if (read(rmonitor_inotify_fd, evdata, nbytes) != nbytes)
 			{
 				free(evdata);
-				return;
+				return urgent;
 			}
 
 			evc = nbytes/sizeof(*evdata);
 			for(i = 0; i < evc; i++)
 			{
-				if (evdata[i].wd >= alloced_inotify_watches) continue;
-				if ((fname = inotify_watches[evdata[i].wd]) == NULL) continue;
+				if (evdata[i].wd >= alloced_inotify_watches) {
+					continue;
+				}
+
+				if ((fname = inotify_watches[evdata[i].wd]) == NULL) {
+					continue;
+				}
+
+				if (evdata[i].mask & IN_CREATE) {
+					if(snapshot_signal_file && strcmp(snapshot_signal_file, evdata[i].name) == 0) {
+							debug(D_RMON, "found snapshot file '%s'", fname);
+							rmonitor_add_file_watch(snapshot_signal_file, 0, IN_MODIFY | IN_OPEN | IN_CLOSE);
+							urgent = 1;
+					}
+					continue;
+				}
+
+				if (finfo == NULL) {
+					continue;
+				}
 				finfo = hash_table_lookup(files, fname);
-				if (finfo == NULL) continue;
 				if (evdata[i].mask & IN_ACCESS) (finfo->n_reads)++;
 				if (evdata[i].mask & IN_MODIFY) (finfo->n_writes)++;
-				if ((evdata[i].mask & IN_CLOSE_WRITE) || (evdata[i].mask & IN_CLOSE_NOWRITE)) {
+				if (evdata[i].mask & IN_CLOSE) {
 					(finfo->n_closes)++;
 					if (stat(fname, &fst) >= 0)
 					{
 						finfo->size_on_close = fst.st_size;
 					}
+
 					/* Decrease reference count and remove watch of zero */
 					(finfo->n_references)--;
 					if (finfo->n_references == 0)
@@ -687,12 +744,18 @@ void rmonitor_handle_inotify(void)
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
 					}
+
+					if(snapshot_signal_file && strcmp(fname, snapshot_signal_file) == 0) {
+						urgent = 1;
+					}
 				}
 			}
 		}
 		free(evdata);
 	}
 #endif
+
+	return urgent;
 }
 
 void append_network_bw(struct rmonitor_msg *msg) {
@@ -941,6 +1004,64 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 }
 
+int record_snapshot(struct rmsummary *tr) {
+	char label[1024];
+
+	if(!snapshot_signal_file) {
+		return 0;
+	}
+
+	FILE *snap_f = fopen(snapshot_signal_file, "r");
+	if(!snap_f) {
+		/* signal is unavailable, so no snapshot is taken. */
+		return 0;
+	}
+
+	if(!snapshots) {
+		snapshots = list_create(0);
+	}
+
+	label[0]='\0';
+	fgets(label, 1024, snap_f);
+	fclose(snap_f);
+	unlink(snapshot_signal_file);
+
+	string_chomp(label);
+
+	if(label[0] == '\0') {
+		snprintf(label, 1024, "snapshot %d", list_size(snapshots) + 1);
+	}
+
+	snapshot->end       = usecs_since_epoch();
+	snapshot->wall_time = snapshot->end - snapshot->start;
+
+	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
+
+	jx_insert_string(j, "snapshot_name", label);
+
+	if(!j) {
+		return 0;
+	}
+
+	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
+	snap_f = fopen(output_file, "w");
+	free(output_file);
+
+	if(!snap_f) {
+		return 0;
+	}
+
+	jx_print_stream(j, snap_f);
+	fclose(snap_f);
+
+	/* push to the front, since snapshots are writen in reverse order. */
+	list_push_head(snapshots, j);
+
+	debug(D_RMON, "Recoded snapshot: '%s'", label);
+
+	return 1;
+}
+
 void decode_zombie_status(struct rmsummary *summary, int wait_status)
 {
 	/* update from any END_WAIT message received. */
@@ -1072,6 +1193,10 @@ int rmonitor_final_summary()
 		add_verbatim_field(host_info);
 	}
 
+	if(snapshots && list_size(snapshots) > 0) {
+		add_snapshots();
+	}
+
 	if(log_inotify)
 	{
 		rmonitor_find_files_final_sizes();
@@ -1094,7 +1219,9 @@ int rmonitor_final_summary()
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
 			if(count > 0)
-				if (FD_ISSET(rmonitor_inotify_fd, &rset)) rmonitor_handle_inotify();
+				if (FD_ISSET(rmonitor_inotify_fd, &rset)) {
+					rmonitor_handle_inotify();
+				}
 		} while(count > 0);
 
 		rmonitor_file_io_summaries();
@@ -1518,7 +1645,9 @@ int rmonitor_dispatch_msg(void)
 			switch(msg.error) {
 				case 0:
 					debug(D_RMON, "File %s has been opened.\n", msg.data.s);
-					rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT);
+					if(log_inotify) {
+						rmonitor_add_file_watch(msg.data.s, msg.type == OPEN_OUTPUT, 0);
+					}
 					break;
 				case EMFILE:
 					/* Eventually report that we ran out of file descriptors. */
@@ -1594,25 +1723,35 @@ int wait_for_messages(int interval)
 	{
 
 		/* Figure out the number of file descriptors to pass to select */
-		int nfds = rmonitor_queue_fd + 1;
+		int nfds = 1 + MAX(rmonitor_queue_fd, rmonitor_inotify_fd);
 		fd_set rset;
 
-		int count = 0;
+		int urgent = 0;
+		int count  = 0;
 		do
 		{
 			FD_ZERO(&rset);
-			if (rmonitor_queue_fd > 0)   FD_SET(rmonitor_queue_fd,   &rset);
+			if (rmonitor_queue_fd > 0) {
+				FD_SET(rmonitor_queue_fd,   &rset);
+			}
+
+			if (rmonitor_inotify_fd > 0) {
+				FD_SET(rmonitor_inotify_fd, &rset);
+			}
 
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
-			if(count > 0) {
-				if (FD_ISSET(rmonitor_queue_fd, &rset)) {
-					int urgent = rmonitor_dispatch_msg();
-					if(urgent) {
-						timeout.tv_sec  = 0;
-						timeout.tv_usec = 0;
-					}
-				}
+			if (FD_ISSET(rmonitor_queue_fd, &rset)) {
+				urgent = rmonitor_dispatch_msg();
+			}
+
+			if (FD_ISSET(rmonitor_inotify_fd, &rset)) {
+				urgent = rmonitor_handle_inotify();
+			}
+
+			if(urgent) {
+				timeout.tv_sec  = 0;
+				timeout.tv_usec = 0;
 			}
 		} while(count > 0);
 	}
@@ -1705,7 +1844,7 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 
 		char *executable_path = path_which(executable);
 		if(executable_path) {
-			rmonitor_add_file_watch(executable_path, /* is output? */ 0);
+			rmonitor_add_file_watch(executable_path, /* is output? */ 0, 0);
 			free(executable_path);
 		}
     }
@@ -1760,6 +1899,10 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s If <file> exists at the end of a measurement interval, take a snapshot of\n", "--snapshot-file=<file>");
+    fprintf(stdout, "%-30s current resources, and delete <file>. If <file> has a non-empty first\n", "");
+    fprintf(stdout, "%-30s line, it is used as a label for the snapshot.\n", "");
 }
 
 
@@ -1798,7 +1941,8 @@ int rmonitor_resources(long int interval /*in seconds */)
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
 		rmonitor_collate_tree(resources_now, p_acc, m_acc, d_acc, f_acc);
-		rmonitor_find_max_tree(summary, resources_now);
+		rmonitor_find_max_tree(summary,  resources_now);
+		rmonitor_find_max_tree(snapshot, resources_now);
 		rmonitor_log_row(resources_now);
 
 		if(!rmonitor_check_limits(summary))
@@ -1807,6 +1951,14 @@ int rmonitor_resources(long int interval /*in seconds */)
 		release_waiting_processes();
 
 		cleanup_zombies();
+
+		//process snapshot
+		if(record_snapshot(snapshot)) {
+			rmsummary_delete(snapshot);
+			snapshot = calloc(1, sizeof(*snapshot));
+			snapshot->start = usecs_since_epoch();
+		}
+
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
 			break;
@@ -1835,7 +1987,6 @@ int main(int argc, char **argv) {
     char *executable;
     int64_t c;
 
-    char *template_path = NULL;
     char *summary_path = NULL;
     char *series_path  = NULL;
     char *opened_path  = NULL;
@@ -1853,7 +2004,9 @@ int main(int argc, char **argv) {
     signal(SIGQUIT, rmonitor_final_cleanup);
     signal(SIGTERM, rmonitor_final_cleanup);
 
-    summary          = calloc(1, sizeof(struct rmsummary));
+    summary  = calloc(1, sizeof(struct rmsummary));
+    snapshot = calloc(1, sizeof(struct rmsummary));
+
     summary->peak_times = rmsummary_create(-1);
     resources_limits = rmsummary_create(-1);
     resources_flags  = rmsummary_create(0);
@@ -1883,7 +2036,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_WORKING_DIRECTORY,
 		LONG_OPT_FOLLOW_CHDIR,
 		LONG_OPT_MEASURE_DIR,
-		LONG_OPT_NO_PPRINT
+		LONG_OPT_NO_PPRINT,
+		LONG_OPT_SNAPSHOT_FILE
 	};
 
     static const struct option long_options[] =
@@ -1908,6 +2062,8 @@ int main(int argc, char **argv) {
 		    {"with-time-series",       no_argument, 0, LONG_OPT_TIME_SERIES},
 		    {"with-inotify",           no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
+
+		    {"snapshot-file", required_argument, 0, LONG_OPT_SNAPSHOT_FILE},
 
 		    {0, 0, 0, 0}
 	    };
@@ -1984,6 +2140,9 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_NO_PPRINT:
 				pprint_summaries = 0;
+				break;
+			case LONG_OPT_SNAPSHOT_FILE:
+				snapshot_signal_file = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
@@ -2066,15 +2225,30 @@ int main(int argc, char **argv) {
 
     summary->command = xxstrdup(command_line);
     summary->start   = usecs_since_epoch();
-
+    snapshot->start  = summary->start;
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
-    if(log_inotify)
+    if(log_inotify || snapshot_signal_file)
     {
-	    rmonitor_inotify_fd = inotify_init();
+	    rmonitor_inotify_fd     = inotify_init();
 	    alloced_inotify_watches = 100;
-	    inotify_watches = (char **)(calloc(alloced_inotify_watches, sizeof(char *)));
-	    if (inotify_watches == NULL) alloced_inotify_watches = 0;
+	    inotify_watches         = (char **) calloc(alloced_inotify_watches, sizeof(char *));
+	}
+
+	if(snapshot_signal_file) {
+		char *full_path = malloc(PATH_MAX);
+
+		path_absolute(snapshot_signal_file, full_path, 0);
+
+		char *dir  = malloc(PATH_MAX);
+		path_dirname(full_path, dir);
+
+		free(snapshot_signal_file);
+		snapshot_signal_file = xxstrdup(path_basename(full_path));
+
+		rmonitor_add_file_watch(dir, 0, IN_CREATE);
+
+		free(full_path);
     }
 #endif
 

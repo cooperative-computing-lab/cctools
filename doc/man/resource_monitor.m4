@@ -2,7 +2,7 @@ include(manual.h)dnl
 HEADER(resource_monitor)
 
 SECTION(NAME)
-BOLD(resource_monitor, resource_monitorv) - monitors the cpu, memory, io, and disk usage of a tree of processes.
+BOLD(resource_monitor) - monitors the cpu, memory, io, and disk usage of a tree of processes.
 
 SECTION(SYNOPSIS)
 CODE(BOLD(resource_monitor [options] -- command [command-options]))
@@ -29,9 +29,6 @@ respective limits.
 
 In systems that support it, BOLD(resource_monitor) wraps some
 libc functions to obtain a better estimate of the resources used.
-In contrast, BOLD(resource_monitorv) disables this wrapping,
-which means, among others, that it can only monitor the root
-process, but not its descendants.
 
 Currently, the monitor does not support interactive applications. That
 is, if a process issues a read call from standard input, and standard
@@ -104,6 +101,7 @@ OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. If not specified, foll
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
+OPTION_ITEM(--snapshot-file=<file>) If <file> exists at the end of a measurement interval, take a snapshot of current resources, and delete <file>. If <file> has a non-empty first line, it is used as a label for the snapshot.
 OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
 OPTIONS_END
@@ -178,7 +176,6 @@ SECTION(BUGS)
 
 LIST_BEGIN
 LIST_ITEM(The monitor cannot track the children of statically linked executables.)
-LIST_ITEM(One would expect to be able to generate the information of the summary from the time-series, however they use different mechanisms, and the summary tends to be more accurate.)
 LIST_END
 
 SECTION(COPYRIGHT)

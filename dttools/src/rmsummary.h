@@ -55,12 +55,16 @@ struct rmsummary
 	int64_t  total_files;
 	int64_t  disk;                           /* MB */
 
-	int64_t  cores;                      /* peak usage in a small time window */
+	int64_t  cores;                          /* peak usage in a small time window */
 	int64_t  cores_avg;
 	int64_t  gpus;
 
 	struct rmsummary *limits_exceeded;
-	struct rmsummary *peak_times;        /* from start, in usecs */
+	struct rmsummary *peak_times;           /* from start, in usecs */
+
+	char  *snapshot_name;                   /* NULL for main summary, otherwise label of the snapshot. */
+	int    snapshots_count;                 /* number of intermediate measurements, if any. */
+	struct rmsummary **snapshots;           /* snapshots_count sized array of snapshots. */
 
 	/* these fields are not used when reading/printing summaries */
 	int64_t  fs_nodes;
@@ -124,5 +128,7 @@ int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offs
 
 void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, double multiplier, int float_flag);
 int rmsummary_field_is_float(const char *key);
+
+struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i);
 
 #endif

@@ -188,6 +188,7 @@ struct work_queue {
 
 	char *monitor_output_directory;
 	char *monitor_summary_filename;
+	char *monitor_snapshot_file;           // Filename the monitor checks to produce snapshots.
 
 	char *monitor_exe;
 	struct rmsummary *measured_local_resources;
@@ -4719,6 +4720,13 @@ int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output
 	return status;
 }
 
+void work_queue_enable_monitoring_snapshots(struct work_queue *q, const char *monitor_snapshot_file) {
+	assert(monitor_snapshot_file);
+
+	free(q->monitor_snapshot_file);
+	q->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
+}
+
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
@@ -4914,6 +4922,8 @@ void work_queue_delete(struct work_queue *q)
 		if(q->current_max_worker)
 			rmsummary_delete(q->current_max_worker);
 
+		free(q->monitor_snapshot_file);
+
 		free(q);
 	}
 }
@@ -5012,11 +5022,18 @@ void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits)
 {
-	char *extra_options;
+	char *extra_options = string_format("-V 'task_id: %d'", t->taskid);
+
 	if(t->category) {
-		extra_options = string_format("-V 'task_id: %d' -V 'category: %s'", t->taskid, t->category);
-	} else {
-		extra_options = string_format("-V 'task_id: %d'", t->taskid);
+		char *tmp = extra_options;
+		extra_options = string_format("%s -V 'category: %s'", extra_options, t->category);
+		free(tmp);
+	}
+
+	if(q->monitor_snapshot_file) {
+		char *tmp = extra_options;
+		extra_options = string_format("%s --snapshot-file %s", tmp, q->monitor_snapshot_file);
+		free(tmp);
 	}
 
 	int extra_files = (q->monitor_mode == MON_FULL);

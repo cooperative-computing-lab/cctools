@@ -386,6 +386,24 @@ sub resources_allocated {
 
 1;
 
+package work_queue::rmsummary;
+
+sub rmsummary_snapshots_get {
+	my $self = shift;
+
+	my $snapshots = [];
+
+	my $n = work_queuec::rmsummary_snapshots_count_get($self);
+
+	for my $i (0..($n-1)) {
+		push @{$snapshots}, work_queuec::rmsummary_get_snapshot($self, $i);
+	}
+
+	return $snapshots;
+}
+
+*swig_snapshots_get = *rmsummary_snapshots_get;
+
 __END__
 
 =head1 NAME

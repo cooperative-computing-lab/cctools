@@ -162,40 +162,40 @@ int rmsummary_field_is_float(const char *key) {
 
 int rmsummary_assign_char_field(struct rmsummary *s, const char *key, char *value) {
 	if(strcmp(key, "category") == 0) {
-		if(s->category)
-			free(s->category);
+		free(s->category);
 		s->category = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "command") == 0) {
-		if(s->command)
-			free(s->command);
+		free(s->command);
 		s->command = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "exit_type") == 0) {
-		if(s->exit_type)
-			free(s->exit_type);
+		free(s->exit_type);
 		s->exit_type = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "taskid") == 0) {
-		if(s->taskid)
-			free(s->taskid);
+		free(s->taskid);
 		s->taskid = xxstrdup(value);
 		return 1;
 	}
 
 	if(strcmp(key, "task_id") == 0) {
-		if(s->taskid)
-			free(s->taskid);
+		free(s->taskid);
 		s->taskid = xxstrdup(value);
 		return 1;
 	}
 
+	if(strcmp(key, "snapshot_name") == 0) {
+		free(s->snapshot_name);
+		s->snapshot_name = xxstrdup(value);
+		return 1;
+	}
 
 	return 0;
 }
@@ -289,6 +289,10 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->gpus;
 	}
 
+	if(strcmp(key, "snapshots_count") == 0) {
+		return s->snapshots_count;
+	}
+
 	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 
@@ -309,6 +313,10 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 	}
 
 	if(strcmp(key, "taskid") == 0) {
+		return s->taskid;
+	}
+
+	if(strcmp(key, "snapshot_name") == 0) {
 		return s->taskid;
 	}
 
@@ -428,9 +436,44 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	if(strcmp(key, "snapshots_count") == 0) {
+		s->snapshots_count = value;
+		return 1;
+	}
+
 	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
 
 	return 0;
+}
+
+void rmsummary_add_snapshots(struct rmsummary *s, struct jx *array) {
+
+	if(!array) {
+		return;
+	}
+
+	int n = jx_array_length(array);
+
+	if(n < 1) {
+		return;
+	}
+
+	s->snapshots_count = n;
+	s->snapshots       = calloc(n + 1, sizeof(struct rmsummary *));
+	s->snapshots[n]    = NULL; /* terminate in NULL for convenience */
+
+	int count = 0;
+	struct jx *snapshot;
+	for(void *i = NULL; (snapshot = jx_iterate_array(array, &i)); /* nothing */) {
+		struct rmsummary *snap = json_to_rmsummary(snapshot);
+
+		if(!snap) {
+			fatal("malformed resource summary snapshot.");
+		}
+
+		s->snapshots[count] = snap;
+		count++;
+	}
 }
 
 int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *value) {
@@ -616,6 +659,9 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 			if(status) {
 				rmsummary_assign_int_field(s, key, number);
 			}
+			if(strcmp(key, "snapshots") == 0) {
+				rmsummary_add_snapshots(s, value);
+			}
 		} else if(jx_istype(value, JX_OBJECT)) {
 			rmsummary_assign_summary_field(s, key, value);
 		}
@@ -793,6 +839,10 @@ struct rmsummary *rmsummary_create(signed char default_value)
 	s->exit_status = 0;
 	s->signal = 0;
 
+	s->snapshot_name   = NULL;
+	s->snapshots_count = 0;
+	s->snapshots       = NULL;
+
 	return s;
 }
 
@@ -813,12 +863,15 @@ void rmsummary_delete(struct rmsummary *s)
 	if(s->taskid)
 		free(s->taskid);
 
-	if(s->limits_exceeded)
-		rmsummary_delete(s->limits_exceeded);
+	rmsummary_delete(s->limits_exceeded);
+	rmsummary_delete(s->peak_times);
 
-	if(s->peak_times)
-		rmsummary_delete(s->peak_times);
+	int i;
+	for(i = 0; i < s->snapshots_count; i++) {
+		rmsummary_delete(s->snapshots[i]);
+	}
 
+	free(s->snapshots);
 	free(s);
 }
 
@@ -1175,6 +1228,14 @@ size_t rmsummary_field_offset(const char *key) {
 
 int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset) {
 	return (*((int64_t *) ((char *) s + offset)));
+}
+
+struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i) {
+	if(!s || i < 0 || i > s->snapshots_count) {
+		return NULL;
+	}
+
+	return s->snapshots[i];
 }
 
 

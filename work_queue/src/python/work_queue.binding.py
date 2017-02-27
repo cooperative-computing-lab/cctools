@@ -891,6 +891,20 @@ class WorkQueue(_object):
     def enable_monitoring_full(self, dirname):
         return work_queue_enable_monitoring_full(self._work_queue, dirname)
 
+    ## When monitoring, indicates a file that when present, directs the resource
+    # monitor to take a snapshot of the resources. Snapshots appear in the JSON
+    # summary file of the task, under the key "snapshots". The file
+    # is removed after the snapshot, so that a new snapshot can be taken when it is
+    # recreated by a task. Optionaly, the first line of the file can be used to give
+    # an identifying label to the snapshot.
+
+    # @param self 	Reference to the current work queue object.
+    # @param signal_file Name of the file which presence directs the resource
+    # monitor to take a snapshot. After the snapshot, THIS FILE IS REMOVED.
+    def enable_monitoring_snapshots(self, filename):
+        return work_queue_enable_monitoring_snapshots(self._work_queue, filename)
+
+
     ##
     # Turn on or off fast abort functionality for a given queue for tasks in
     # the "default" category, and for task which category does not set an
@@ -1249,3 +1263,15 @@ class WorkQueue(_object):
             del(self._task_table[task_pointer.taskid])
             return task
         return None
+
+def rmsummary_snapshots(self):
+    if self.snapshots_count < 1:
+        return None
+
+    snapshots = []
+    for i in range(0, self.snapshots_count):
+        snapshot = rmsummary_get_snapshot(self, i);
+        snapshots.append(snapshot)
+    return snapshots
+
+rmsummary.snapshots = property(rmsummary_snapshots)
