@@ -1829,8 +1829,10 @@ static void decode_syscall( struct pfs_process *p, int entering )
 					} else {
 						divert_to_dummy(p,-ENOTTY);
 					}
-				} else if (!p->table->isnative(fd)) {
+				} else if (!p->table->isvalid(fd)) {
 					divert_to_dummy(p,-EBADF);
+				} else if (!p->table->isnative(fd)) {
+					divert_to_dummy(p,-ENOTTY);
 				}
 			}
 			break;
