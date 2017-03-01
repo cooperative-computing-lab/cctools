@@ -74,39 +74,15 @@ include_package_deltadb="deltadb"
 include_package_doc="doc"
 include_package_ftplite="ftp_lite"
 include_package_makeflow="makeflow"
+include_package_parrot="parrot"
 include_package_prune="prune"
+include_package_resource_monitor="resource_monitor"
 include_package_sand="sand"
 include_package_umbrella="umbrella"
 include_package_wavefront="wavefront"
 include_package_weaver="weaver"
 
 swig_bindings=""
-
-echo "checking for package compatibility..."
-
-if [ -d parrot -a $BUILD_SYS = LINUX ]
-then
-	if [ $BUILD_CPU = I386 -o $BUILD_CPU = X86_64 ]
-	then
-		echo "parrot IS supported on ${BUILD_SYS} ${BUILD_CPU}"
-		include_package_parrot="parrot"
-	else
-		echo "parrot is NOT supported on ${BUILD_SYS} ${BUILD_CPU}"
-		include_package_parrot=""
-	fi
-else
-	echo "parrot is NOT supported on ${BUILD_SYS} for any cpu type"
-	include_package_parrot=""
-fi
-
-if [ -d resource_monitor -a $BUILD_SYS = LINUX ]
-then
-	echo "resource_monitor IS supported on ${BUILD_SYS}"
-	include_package_resource_monitor="resource_monitor"
-else
-	echo "resource_monitor is NOT supported on ${BUILD_SYS}"
-	include_package_resource_monitor=""
-fi
 
 install_path="$HOME/cctools"
 
@@ -134,6 +110,7 @@ xrootd_arch=auto
 
 ccompiler=${CC:-gcc}
 cxxcompiler=${CXX:-g++}
+linker="${LD:-${ccompiler}}"
 
 ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
 c_only_flags="-std=c99"
@@ -167,7 +144,7 @@ do
 			opt=${opt%%=*}
 			;;
 			# empty arg only for these options
-		--debug|--strict|--sanitize|--without-*|--help)
+		--debug|--strict|--sanitize|--static|--without-*|--help)
 			arg=''
 			;;
 		--*)
@@ -191,6 +168,9 @@ do
 		--sanitize)
 			optsanitize=1
 			;;
+		--static)
+			optstatic=1
+			;;
 		--build-label)
 			build_label=${arg}
 			;;
@@ -207,95 +187,64 @@ do
 			;;
 		--with-cvmfs-path)
 			cvmfs_path=${arg}
-			config_cvmfs_path=yes
+			config_cvmfs_path=$(config_X_path ${arg})
 			;;
 		--with-fuse-path)
 			fuse_path=${arg}
-			config_fuse_path=yes
+			config_fuse_path=$(config_X_path ${arg})
 			;;
 		--with-globus-path)
 			globus_path=${arg}
-			if [ "$globus_path" = 'no' ];
-			then
-				config_globus_path=no
-			else
-				config_globus_path=yes
-			fi
+			config_globus_path=$(config_X_path ${arg})
 			;;
 		--globus-flavor)
 			globus_flavor=${arg}
 			;;
 		--with-irods-path)
 			irods_path=${arg}
-			if [ "$irods_path" = 'no' ];
-			then
-				config_irods_path=no
-			else
-				config_irods_path=yes
-			fi
+			config_irods_path=$(config_X_path ${arg})
 			;;
 		--irods-flavor)
 			irods_flavor=${arg}
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
-			if [ "$mysql_path" = 'no' ];
-			then
-				config_mysql_path=no
-			else
-				config_mysql_path=yes
-			fi
+			config_mysql_path=$(config_X_path ${arg})
 			;;
 		--with-openssl-path)
 			openssl_path=${arg}
-			if [ "$openssl_path" = 'no' ];
-			then
-				config_openssl_path=no
-			else
-				config_openssl_path=yes
-			fi
+			config_openssl_path=$(config_X_path ${arg})
 			;;
 		--with-perl-path)
 			perl_path=${arg}
-			if [ "$perl_path" = 'no' ];
-			then
-				config_perl_path=no
-			else
-				config_perl_path=yes
-			fi
+			config_perl_path=$(config_X_path ${arg})
 			;;
 		--with-python-path)
 			python_path=${arg}
-			if [ "$python_path" = 'no' ];
-			then
-				config_python_path=no
-			else
-				config_python_path=yes
-			fi
+			config_python_path=$(config_X_path ${arg})
 			;;
 		--with-python3-path)
 			python3_path=${arg}
-			if [ "$python3_path" = 'no' ];
-			then
-				config_python3_path=no
-			else
-				config_python3_path=yes
-			fi
+			config_python3_path=$(config_X_path ${arg})
 			;;
 		--with-readline-path)
 			readline_path=${arg}
-			config_readline_path=yes
+			config_readline_path=$(config_X_path ${arg})
 			;;
 		--with-swig-path)
 			swig_path=${arg}
-			config_swig_path=yes
+			config_swig_path=$(config_X_path ${arg})
 			;;
 		--with-uuid-path)
 			uuid_path=${arg}
+			config_uuid_path=$(config_X_path ${arg})
 			;;
 		--with-xrootd-path)
 			xrootd_path=${arg}
-			config_xrootd_path=yes
+			config_xrootd_path=$(config_X_path ${arg})
+			;;
+		--xrootd-arch)
+			xrootd_arch=${arg}
 			;;
 		--with-zlib-path)
 			zlib_path=${arg}
@@ -348,9 +297,6 @@ do
 			;;
 		--without-system-prune)
 			include_package_prune=""
-			;;
-		--xrootd-arch)
-			xrootd_arch=${arg}
 			;;
 		--with-*-path)
 			echo "ignoring unknown package ${arg}"
@@ -432,8 +378,6 @@ if [ "$optstrict" = 1 ]; then
 	ccflags="${ccflags} -Werror"
 fi
 
-potential_packages="dttools batch_job grow ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
-
 export HOST_MULTIARCH=$(check_multiarch)
 
 if [ -f config.mk ]; then
@@ -446,21 +390,6 @@ if [ -f config.mk ]; then
 fi
 
 rm -f config.mk
-echo "checking for all the things I know how to build..."
-for p in $potential_packages
-do
-	if [ -d $p ]
-	then
-		echo "package $p found"
-		packages="${packages} $p"
-		if [ -d `pwd`/$p/src ]
-		then
-			internal_ccflags="${internal_ccflags} -I $(pwd)/$p/src"
-		fi
-	else
-		echo "package $p not found (that's ok)"
-	fi
-done
 
 require_path ${ccompiler}
 require_path ${cxxcompiler}
@@ -938,48 +867,49 @@ then
 
 	if [ $perl = 0 ]
 	then
-				if [ $config_perl_path = yes ]
-				then
-						echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
-						echo "*** Check --with-perl-path and try again."
-						exit 1
-				else
-						echo "*** skipping perl support"
-				fi
+		if [ $config_perl_path = yes ]
+		then
+			echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
+			echo "*** Check --with-perl-path and try again."
+			exit 1
+		else
+			echo "*** skipping perl support"
+		fi
 	fi
 fi
 
+python=0    #to be set to the python path
 if [ $config_python_path != no ]
 then
 	if [ -n "$PYTHON" ] && check_file ${PYTHON}
-	then
-		python=${PYTHON}
-	elif check_file ${python_path}/bin/python2
-	then
-		python=${python_path}/bin/python2
-	elif check_file ${python_path}/bin/python
-	then
-		python=${python_path}/bin/python
-	else
-		python=0
-	fi
+then
+	python=${PYTHON}
+elif check_file ${python_path}/bin/python2
+then
+	python=${python_path}/bin/python2
+elif check_file ${python_path}/bin/python
+then
+	python=${python_path}/bin/python
+else
+	python=0
+fi
 
-	if [ $python != 0 ]
+if [ $python != 0 ]
+then
+	python_version=`${python} -V 2>&1 | cut -d " " -f 2`
+	echo "python version is ${python_version}"
+	python_major_version=`echo ${python_version} | cut -d . -f 1`
+	python_minor_version=`echo ${python_version} | cut -d . -f 2 | cut -d . -f 1,2`
+	if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
 	then
-		python_version=`${python} -V 2>&1 | cut -d " " -f 2`
-		echo "python version is ${python_version}"
-		python_major_version=`echo ${python_version} | cut -d . -f 1`
-		python_minor_version=`echo ${python_version} | cut -d . -f 2 | cut -d . -f 1,2`
-		if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
+		if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 		then
-			if check_file ${python_path}/include/python2.$python_minor_version/Python.h
-			then
-				echo "found python development libraries"
-				python_ccflags_file=`mktemp tmp.XXXXXX`
-				python_ldflags_file=`mktemp tmp.XXXXXX`
-				python_dev=yes
+			echo "found python development libraries"
+			python_ccflags_file=`mktemp tmp.XXXXXX`
+			python_ldflags_file=`mktemp tmp.XXXXXX`
+			python_dev=yes
 
-				env HOME=/var/empty ${python} > $python_ccflags_file <<EOF
+			env HOME=/var/empty ${python} > $python_ccflags_file <<EOF
 from distutils import sysconfig
 flags = ['-I' + sysconfig.get_python_inc(),
 	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
@@ -988,57 +918,58 @@ if not syscfgflags is None:
 	flags.extend(syscfgflags.split())
 print ' '.join(flags)
 EOF
-				env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
+			env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
 from distutils import sysconfig
 libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
 if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
 	libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
 print ' '.join(libs)
 EOF
-				python_ccflags=`cat $python_ccflags_file`
-				python_ldflags=`cat $python_ldflags_file`
-				rm $python_ccflags_file
-				rm $python_ldflags_file
 
-				# On OSX, the ExtUtils::Embed options contain options
-				# to generate triple-fat binaries, which fails when
-				# we attempt to bring in our thin binaries.
+			python_ccflags=`cat $python_ccflags_file`
+			python_ldflags=`cat $python_ldflags_file`
+			rm $python_ccflags_file
+			rm $python_ldflags_file
 
-				# To avoid this problem, remove all of the -arch XXX
-				# arguments, so that the compiler produces the default,
-				# which will be compatible with the other objects we compile.
+# On OSX, the ExtUtils::Embed options contain options
+# to generate triple-fat binaries, which fails when
+# we attempt to bring in our thin binaries.
 
-							if [ ${BUILD_SYS} = DARWIN ]
-				then
-					python_ccflags=`echo ${python_ccflags} | sed 's/-arch [^ ]* *//g'`
-					python_ldflags=`echo ${python_ldflags} | sed 's/-arch [^ ]* *//g'`
-				fi
+# To avoid this problem, remove all of the -arch XXX
+# arguments, so that the compiler produces the default,
+# which will be compatible with the other objects we compile.
 
-				if [ $BUILD_SYS = DARWIN ]
-				then
-					python_ldflags="$python_ldflags -undefined dynamic_lookup"
-				fi
-
-				swig_bindings="$swig_bindings python"
-			else
-				python_dev=no
+			if [ ${BUILD_SYS} = DARWIN ]
+			then
+				python_ccflags=`echo ${python_ccflags} | sed 's/-arch [^ ]* *//g'`
+				python_ldflags=`echo ${python_ldflags} | sed 's/-arch [^ ]* *//g'`
 			fi
-		else
-			echo "*** Sorry, we require Python >= 2.4"
-			python=0
-		fi
-	fi
 
-	if [ $python_dev = no ]
+			if [ $BUILD_SYS = DARWIN ]
+			then
+				python_ldflags="$python_ldflags -undefined dynamic_lookup"
+			fi
+
+			swig_bindings="$swig_bindings python"
+		else
+			python_dev=no
+		fi
+	else
+		echo "*** Sorry, we require Python >= 2.4"
+		python=0
+	fi
+fi
+fi
+
+if [ $python_dev = no ]
+then
+	if [ $config_python_path = yes ]
 	then
-				if [ $config_python_path = yes ]
-				then
-						echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
-						echo "*** Check --with-python-path and try again."
-						exit 1
-				else
-						echo "*** skipping python bindings support"
-				fi
+		echo "*** Sorry, I couldn't find the Python >= 2.4 libraries in $python_path"
+		echo "*** Check --with-python-path and try again."
+		exit 1
+	else
+		echo "*** skipping python bindings support"
 	fi
 fi
 if [ $fuse_avail != yes ]; then
@@ -1047,7 +978,7 @@ fi
 
 # If python is not found, then leave out weaver.
 
-if [ $python != 0 -a $python_major_version = 2 -a $python_minor_version -ge 6 ]
+if [ "$python_major_version" = 2 -a "$python_minor_version" -ge 6 ]
 then
 	echo "python version is suitable for umbrella"
 	echo "python version is suitable for prune"
@@ -1143,54 +1074,59 @@ fi
 found_swig=no
 if [ $config_swig_path != no ]
 then
-	swig=""
-	if check_file ${swig_path}/bin/swig
+	if [ "$optstatic" = 1 ]
 	then
-		swig=${swig_path}/bin/swig
+		echo "*** buildin statically, skipping swig support"
 	else
-		if check_path swig
+		swig=""
+		if check_file ${swig_path}/bin/swig
 		then
-			swig=`which swig`
+			swig=${swig_path}/bin/swig
 		else
-			echo "*** skipping swig bindings for work queue"
+			if check_path swig
+			then
+				swig=`which swig`
+			else
+				echo "*** skipping swig bindings for work queue"
+			fi
 		fi
-	fi
 
-	if [ -n "$swig" ]
-	then
-		swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
-		if [ ! \( "$python_major_version" -eq 2 -a "$python_minor_version" -eq 4 \) -a `format_version $swig_version` -eq `format_version 1.3.29` ]
+		if [ -n "$swig" ]
 		then
-			echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
-			echo "*** skipping swig bindings for work queue and chirp"
-		elif [ "$python_dev" = no ]
-		then
-			echo "*** Sorry, Swig needs the develovement files for python (e.g., python-devel, or python-dev)."
-			echo "*** skipping swig bindings for work queue and chirp"
-		elif [ "$python3" != 0 -a `format_version $swig_version` -lt `format_version 2.0.4` ]
-		then
-			# Python 3 requires Swig version >= 2.0.4; cf.
-			# http://sourceforge.net/p/swig/bugs/1104/ and
-			# http://sourceforge.net/p/swig/news/?page=1
-			echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
-			echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
-			echo "*** skipping swig bindings for work queue and chirp"
-		elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
-		then
-			found_swig=yes
+			swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
+			if [ ! \( "$python_major_version" -eq 2 -a "$python_minor_version" -eq 4 \) -a `format_version $swig_version` -eq `format_version 1.3.29` ]
+			then
+				echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
+				echo "*** skipping swig bindings for work queue and chirp"
+			elif [ "$python_dev" = no ]
+			then
+				echo "*** Sorry, Swig needs the develovement files for python (e.g., python-devel, or python-dev)."
+				echo "*** skipping swig bindings for work queue and chirp"
+			elif [ "$python3" != 0 -a `format_version $swig_version` -lt `format_version 2.0.4` ]
+			then
+				# Python 3 requires Swig version >= 2.0.4; cf.
+				# http://sourceforge.net/p/swig/bugs/1104/ and
+				# http://sourceforge.net/p/swig/news/?page=1
+				echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
+				echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
+				echo "*** skipping swig bindings for work queue and chirp"
+			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
+			then
+				found_swig=yes
+			else
+				echo "*** Sorry, I need swig >= 1.3.29"
+				echo "*** skipping swig bindings for work queue and chirp"
+			fi
 		else
-			echo "*** Sorry, I need swig >= 1.3.29"
-			echo "*** skipping swig bindings for work queue and chirp"
+			if [ $config_swig_path = yes ]
+			then
+				echo "*** Sorry, I couldn't find swig in $swig_path"
+				echo "*** Check --with=swig-path and try again."
+				exit 1
+			else
+				echo "*** skipping swig bindings for work queue"
+			fi
 		fi
-	fi
-else
-	if [ $config_swig_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find swig in $swig_path"
-		echo "*** Check --with=swig-path and try again."
-		exit 1
-	else
-		echo "*** skipping swig bindings for work queue"
 	fi
 fi
 
@@ -1198,8 +1134,6 @@ if [ $found_swig != yes ]
 then
 	swig_bindings=""
 fi
-
-linker="${LD:-${ccompiler}}"
 
 library_search_standard()
 {
@@ -1292,14 +1226,18 @@ optional_function utime /usr/include/utime.h HAS_UTIME HAVE_UTIME
 optional_function utimensat /usr/include/sys/stat.h HAS_UTIMENSAT
 
 # sqlite3 uses define "HAVE_*"
-optional_include attr/xattr.h  HAS_ATTR_XATTR_H
-optional_include fts.h         HAS_FTS_H
+
+if [ "$include_package_chirp" = chirp ]
+then
+	optional_include attr/xattr.h HAS_ATTR_XATTR_H
+	optional_include sys/xattr.h  HAS_SYS_XATTR_H
+fi
+
 optional_include ifaddrs.h     HAS_IFADDRS
-optional_include inttypes.h    HAS_INTTYPES_H   HAVE_INTTYPES_H
-optional_include stdint.h      HAS_STDINT_H     HAVE_STDINT_H
+optional_include inttypes.h    HAS_INTTYPES_H HAVE_INTTYPES_H
+optional_include stdint.h      HAS_STDINT_H HAVE_STDINT_H
 optional_include sys/statfs.h  HAS_SYS_STATFS_H
 optional_include sys/statvfs.h HAS_SYS_STATVFS_H
-optional_include sys/xattr.h   HAS_SYS_XATTR_H
 optional_include syslog.h      HAS_SYSLOG_H
 
 #if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
@@ -1307,7 +1245,6 @@ optional_include syslog.h      HAS_SYSLOG_H
 #fi
 
 cctools_doctargets=
-
 if check_path doxygen
 then
 	cctools_doctargets="${cctools_doctargets} apipages"
@@ -1327,6 +1264,79 @@ then
 else
 	echo "*** not building html or man pages"
 fi
+
+# Check which packages we can build, according to the results above
+echo "checking for package compatibility..."
+if [ "$include_package_parrot" = parrot ]
+then
+	if [ -d parrot -a $BUILD_SYS = LINUX ]
+	then
+		if [ $BUILD_CPU = I386 -o $BUILD_CPU = X86_64 ]
+		then
+			:
+		else
+			echo "parrot is NOT supported on ${BUILD_SYS} ${BUILD_CPU}"
+			include_package_parrot=""
+		fi
+	else
+		echo "parrot is NOT supported on ${BUILD_SYS} for any cpu type"
+		include_package_parrot=""
+	fi
+fi
+
+if [ "$include_package_resource_monitor" = resource_monitor ]
+then
+	if [ -d resource_monitor -a $BUILD_SYS = LINUX ]
+	then
+		echo "resource_monitor IS supported on ${BUILD_SYS}"
+		include_package_resource_monitor="resource_monitor"
+	else
+		echo "resource_monitor is NOT supported on ${BUILD_SYS}"
+		include_package_resource_monitor=""
+	fi
+fi
+
+if [ "$optstatic" = 1 ]
+then
+	if [ "${include_package_chirp}" = chirp ]
+	then
+		echo "chirp cannot currently be build statically".
+		include_package_chirp=""
+	else
+		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP"
+	fi
+
+	if [ "${include_package_ftplite}" = ftp_lite ]
+	then
+		echo "ftp_lite cannot currently be build statically".
+		include_package_ftplite=""
+	fi
+
+	if [ "${include_package_parrot}" = parrot ]
+	then
+		echo "parrot cannot be build statically."
+		include_package_parrot=""
+	fi
+fi
+
+potential_packages="dttools batch_job grow ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
+
+echo "checking for all the things I know how to build..."
+for p in $potential_packages
+do
+	if [ -d $p ]
+	then
+		echo "package $p found"
+		packages="${packages} $p"
+		if [ -d `pwd`/$p/src ]
+		then
+			internal_ccflags="${internal_ccflags} -I $(pwd)/$p/src"
+		fi
+	else
+		echo "package $p not found (that's ok)"
+	fi
+done
+
 
 # We always compile with debugging enabled,
 # however on Solaris, the -g option results in a different
@@ -1437,6 +1447,8 @@ CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
 CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
 
+CCTOOLS_STATIC=${optstatic}
+
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
 CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
 
@@ -1448,6 +1460,8 @@ CXX=\$(CCTOOLS_CXX)
 CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 
 CCTOOLS_AR=ar
+
+CCTOOLS_CHIRP=${include_package_chirp}
 
 CCTOOLS_SWIG=${swig}
 

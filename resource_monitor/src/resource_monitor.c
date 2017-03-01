@@ -2209,10 +2209,8 @@ int main(int argc, char **argv) {
         fatal("error executing %s: %s\n", command_line, strerror(errno));
     }
 
-#ifdef CCTOOLS_USE_RMONITOR_HELPER_LIB
     write_helper_lib();
     rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
-#endif
 
 	summary_path = default_summary_name(template_path);
 

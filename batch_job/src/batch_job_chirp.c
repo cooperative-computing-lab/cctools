@@ -4,6 +4,8 @@
  * See the file COPYING for details.
 */
 
+#ifdef CCTOOLS_WITH_CHIRP
+
 #include "batch_job.h"
 #include "batch_job_internal.h"
 
@@ -390,5 +392,7 @@ const struct batch_queue_module batch_queue_chirp = {
 		batch_fs_chirp_unlink,
 	},
 };
+
+#endif
 
 /* vim: set noexpandtab tabstop=4: */

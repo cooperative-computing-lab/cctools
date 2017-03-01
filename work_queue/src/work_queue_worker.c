@@ -53,10 +53,11 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#include <poll.h>
+#include <signal.h>
+
 #include <sys/mman.h>
-#include <sys/poll.h>
 #include <sys/resource.h>
-#include <sys/signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/utsname.h>

@@ -138,25 +138,32 @@ HEADERS_PUBLIC = \
 LIBRARIES = libdttools.a
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
 OBJECTS = $(SOURCES:%.c=%.o)
-PROGRAMS = catalog_update catalog_server catalog_query watchdog disk_allocator
+
+#separate, because catalog_query has a slightly different order of linking.
+MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator
+PROGRAMS = $(MOST_PROGRAMS) catalog_query
+
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
 TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test
 
-all: $(TARGETS)
+all: $(TARGETS) catalog_query
 
 libdttools.a: $(OBJECTS)
 
-$(PROGRAMS) $(TEST_PROGRAMS): libdttools.a
+$(MOST_PROGRAMS) $(TEST_PROGRAMS): libdttools.a
+
+catalog_query: catalog_query.o catalog_query_tool.o libdttools.a
 
 auth_globus.o: auth_globus.c
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_GLOBUS_CCFLAGS) $<
 
 auth_test: auth_test.o libdttools.a
+ifeq ($(CCTOOLS_STATIC),1)
+	@echo "auth_test currently cannot be build statically."
+else
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
-
-catalog_query: catalog_query_tool.o
-	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+endif
 
 libforce_halt_enospc.so: libforce_halt_enospc.o
 	$(CCTOOLS_CC) -shared -fPIC $^ -o $@ -ldl

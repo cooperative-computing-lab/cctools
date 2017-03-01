@@ -46,7 +46,9 @@ static struct batch_queue_module batch_queue_unknown = {
 
 const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_amazon,
+#ifdef CCTOOLS_WITH_CHIRP
 	&batch_queue_chirp,
+#endif
 	&batch_queue_cluster,
 	&batch_queue_condor,
 	&batch_queue_local,

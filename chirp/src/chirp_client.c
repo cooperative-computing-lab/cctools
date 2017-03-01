@@ -38,7 +38,7 @@ See the file COPYING for details.
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/socket.h>
