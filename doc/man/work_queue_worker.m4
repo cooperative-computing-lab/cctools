@@ -8,6 +8,12 @@ dispatched through Work Queue
 SECTION(SYNOPSIS)
 CODE(BOLD(work_queue_worker [options] PARAM(masterhost) PARAM(port)))
 
+CODE(BOLD(work_queue_worker [options] PARAM(masterhost:port])))
+
+CODE(BOLD(work_queue_worker [options] "PARAM(masterhost:port;[masterhost:port;masterhost:port;...])))"
+
+CODE(BOLD(work_queue_worker [options] -M PARAM(projectname)))
+
 SECTION(DESCRIPTION)
 
 BOLD(work_queue_worker) is the worker process for executing tasks dispatched
@@ -16,9 +22,14 @@ connects to the master application, accepts, runs, and returns tasks dispatched 
 
 PARA
 
-The BOLD(masterhost) and BOLD(port) arguments specify the hostname and port number
-of the master application for work_queue_worker to connect. These two arguments
-become optional when the auto mode option is specified.
+The BOLD(masterhost) and BOLD(port) arguments specify the hostname and port
+number of the master application for work_queue_worker to connect. Several
+masterhosts and ports may be specified, separated with a semicolon (;), with the
+worker connecting to any of the masters specified (When specifying multiple
+masters, remember to escape the ; from shell interpretation, for example, using
+quotes.)
+
+Alternatevely, the master may be specified by name, using the BOLD(-M) option.
 
 PARA
 
