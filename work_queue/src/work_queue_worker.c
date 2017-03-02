@@ -136,9 +136,14 @@ static int worker_mode = WORKER_MODE_WORKER;
 static int container_mode = NONE;
 static int load_from_tar = 0;
 
-static const char *master_host = 0;
-static char master_addr[LINK_ADDRESS_MAX];
-static int master_port;
+struct master_address {
+	const char *host;
+	int port;
+	char addr[LINK_ADDRESS_MAX];
+};
+struct list *master_addresses;
+struct master_address *current_master_address;
+
 static char *workspace;
 static char *os_name = NULL;
 static char *arch_name = NULL;
@@ -1344,14 +1349,14 @@ static void enforce_processes_max_running_time() {
 
 
 static int do_release() {
-	debug(D_WQ, "released by master %s:%d.\n", master_addr, master_port);
+	debug(D_WQ, "released by master %s:%d.\n", current_master_address->addr, current_master_address->port);
 	released_by_master = 1;
 	return 0;
 }
 
 static void disconnect_master(struct link *master) {
 
-	debug(D_WQ, "disconnecting from master %s:%d",master_addr,master_port);
+	debug(D_WQ, "disconnecting from master %s:%d", current_master_address->addr, current_master_address->port);
 	link_close(master);
 
 	debug(D_WQ, "killing all outstanding tasks");
@@ -1555,7 +1560,7 @@ static int enforce_worker_promises(struct link *master) {
 static void work_for_master(struct link *master) {
 	sigset_t mask;
 
-	debug(D_WQ, "working for master at %s:%d.\n", master_addr, master_port);
+	debug(D_WQ, "working for master at %s:%d.\n", current_master_address->addr, current_master_address->port);
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGCHLD);
@@ -1572,7 +1577,7 @@ static void work_for_master(struct link *master) {
 	while(!abort_flag) {
 
 		if(time(0) > idle_stoptime) {
-			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", master_addr,master_port,idle_timeout);
+			debug(D_NOTICE, "disconnecting from %s:%d because I did not receive any task in %d seconds (--idle-timeout).\n", current_master_address->addr,current_master_address->port,idle_timeout);
 			send_master_message(master, "info idle-disconnecting %lld\n", (long long) idle_timeout);
 			break;
 		}
@@ -1685,7 +1690,7 @@ static void foreman_for_master(struct link *master) {
 		return;
 	}
 
-	debug(D_WQ, "working for master at %s:%d as foreman.\n", master_addr, master_port);
+	debug(D_WQ, "working for master at %s:%d as foreman.\n", current_master_address->addr, current_master_address->port);
 
 	reset_idle_timer();
 
@@ -1832,7 +1837,7 @@ static void workspace_delete()
 
 static int serve_master_by_hostport( const char *host, int port, const char *verify_project )
 {
-	if(!domain_name_cache_lookup(host,master_addr)) {
+	if(!domain_name_cache_lookup(host,current_master_address->addr)) {
 		fprintf(stderr,"couldn't resolve hostname %s",host);
 		return 0;
 	}
@@ -1849,9 +1854,9 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	reset_idle_timer();
 
-	struct link *master = link_connect(master_addr,port,idle_stoptime);
+	struct link *master = link_connect(current_master_address->addr,port,idle_stoptime);
 	if(!master) {
-		fprintf(stderr,"couldn't connect to %s:%d: %s\n",master_addr,port,strerror(errno));
+		fprintf(stderr,"couldn't connect to %s:%d: %s\n",current_master_address->addr,port,strerror(errno));
 		return 0;
 	}
 	link_tune(master,LINK_TUNE_INTERACTIVE);
@@ -2007,9 +2012,47 @@ static void read_resources_env_vars() {
 	read_resources_env_var("GPUS",   &manual_gpus_option);
 }
 
+struct list *parse_master_addresses(const char *specs, int default_port) {
+	struct list *masters = list_create(0);
+
+	char *masters_args = xxstrdup(specs);
+
+	char *next_master = strtok(masters_args, ";");
+	while(next_master) {
+		int port = default_port;
+
+		char *port_str = strchr(next_master, ':');
+		if(port_str) {
+			*port_str = '\0';
+			port = atoi(port_str+1);
+		}
+
+		if(port < 1) {
+			fatal("Invalid port for master '%s'", next_master);
+		}
+
+		struct master_address *m = calloc(1, sizeof(*m));
+		m->host = xxstrdup(next_master);
+		m->port = port;
+
+		if(port_str) {
+			*port_str = ':';
+		}
+
+		list_push_tail(masters, m);
+		next_master = strtok(NULL, ";");
+	}
+	free(masters_args);
+
+	return(masters);
+}
+
 static void show_help(const char *cmd)
 {
-	printf( "Use: %s [options] <masterhost> <port>\nor\n     %s [options] -M projectname\n", cmd, cmd);
+	printf( "Use: %s [options] <masterhost> <port> \n"
+			"or\n     %s [options] \"masterhost:port[;masterhost:port;masterhost:port;...]\"\n"
+			"or\n     %s [options] -M projectname\n",
+			cmd, cmd, cmd);
 	printf( "where options are:\n");
 	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>");
 	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
@@ -2373,14 +2416,18 @@ int main(int argc, char *argv[])
 	}
 
 	if(!project_regex) {
-		if((argc - optind) != 2) {
+		if((argc - optind) < 1 || (argc - optind) > 2) {
 			show_help(argv[0]);
 			exit(1);
 		}
 
-		master_host = argv[optind];
-		master_port = atoi(argv[optind+1]);
+		int default_master_port = (argc - optind) == 2 ? atoi(argv[optind+1]) : 0;
+		master_addresses = parse_master_addresses(argv[optind], default_master_port);
 
+		if(list_size(master_addresses) < 1) {
+			show_help(argv[0]);
+			fatal("No master has been specified");
+		}
 	}
 
 	signal(SIGTERM, handle_abort);
@@ -2512,7 +2559,7 @@ int main(int argc, char *argv[])
 		total_resources->gpus.total);
 
 	while(1) {
-		int result;
+		int result = 0;
 
 		measure_worker_resources();
 		if(!enforce_worker_promises(NULL)) {
@@ -2523,7 +2570,18 @@ int main(int argc, char *argv[])
 		if(project_regex) {
 			result = serve_master_by_name(catalog_hosts, project_regex);
 		} else {
-			result = serve_master_by_hostport(master_host,master_port,0);
+			int masters_tried = 0;
+
+			/* keep trying masters in the list, until all masters are tried, or a succesful connection was done */
+			while(masters_tried < list_size(master_addresses) && !result) {
+				masters_tried++;
+
+				/* cycle masters in the list */
+				current_master_address = list_pop_head(master_addresses);
+				list_push_tail(master_addresses, current_master_address);
+
+				result = serve_master_by_hostport(current_master_address->host,current_master_address->port,0);
+			}
 		}
 
 		/*
