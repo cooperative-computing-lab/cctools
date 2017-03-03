@@ -55,6 +55,7 @@ SOURCES = \
 	host_disk_info.c \
 	host_memory_info.c \
 	http_query.c \
+	interfaces_address.c \
 	itable.c \
 	json.c \
 	json_aux.c \
