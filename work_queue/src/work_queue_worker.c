@@ -1940,11 +1940,31 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 
 	while(1) {
 		struct jx *jx = list_peek_head(masters_list);
+
 		const char *project = jx_lookup_string(jx,"project");
 		const char *name = jx_lookup_string(jx,"name");
 		const char *addr = jx_lookup_string(jx,"address");
 		const char *pref = jx_lookup_string(jx,"master_preferred_connection");
+		struct jx *ifas  = jx_lookup(jx,"network_interfaces");
 		int port = jx_lookup_integer(jx,"port");
+
+		int found_cannonical_addr = 0;
+		if(ifas) {
+			struct jx *ifa;
+			for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
+				const char *ifa_addr = jx_lookup_string(ifa, "host");
+				if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
+					found_cannonical_addr = 1;
+					break;
+				}
+			}
+		} else {
+			found_cannonical_addr = 1;
+		}
+
+		if(!found_cannonical_addr) {
+			warn(D_NOTICE, "Did not find the master address '%s' in the list of interfaces.");
+		}
 
 		/* Do not connect to the same master after idle disconnection. */
 		if(last_addr) {
