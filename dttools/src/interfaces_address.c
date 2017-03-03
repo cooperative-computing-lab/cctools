@@ -16,36 +16,35 @@ struct jx *interfaces_of_host() {
 
 #include <errno.h>
 #include <ifaddrs.h>
-#include <netdb.h>
 #include <string.h>
 
-#include <sys/socket.h>
 #include <sys/types.h>
 
 #include "debug.h"
-#include "link.h"
+#include "address.h"
 #include "stringtools.h"
 
 struct jx *interfaces_of_host() {
 	struct ifaddrs *ifa, *head_if;
 
-	char host[NI_MAXHOST];
+	char host[IP_ADDRESS_MAX];
 
 	if(getifaddrs(&head_if) == -1 ) {
 		warn(D_NOTICE, "Could not get network interfaces information: %s", strerror(errno));
 		return NULL;
 	}
 
-	struct jx *interfaces = NULL;
+	struct addrinfo hints;
+	address_check_mode(&hints);
 
+	struct jx *interfaces = NULL;
 	for(ifa = head_if; ifa != NULL; ifa = ifa->ifa_next) {
 		if(ifa->ifa_addr == NULL) {
 			continue;
 		}
 
 		int family = ifa->ifa_addr->sa_family;
-
-		if(family != AF_INET && family != AF_INET6) {
+		if(hints.ai_family != AF_UNSPEC && hints.ai_family != family) {
 			continue;
 		}
 
@@ -53,10 +52,8 @@ struct jx *interfaces_of_host() {
 			continue;
 		}
 
-		int size   = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
-		int result = getnameinfo(ifa->ifa_addr, size, host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-		if(result) {
+		int result = address_from_sockaddr(host, ifa->ifa_addr);
+		if(!result) {
 			warn(D_NOTICE, "Could not determine address of interface '%s': %s", ifa->ifa_name, gai_strerror(result));
 			continue;
 		}
