@@ -137,7 +137,7 @@ static int container_mode = NONE;
 static int load_from_tar = 0;
 
 struct master_address {
-	const char *host;
+	char host[LINK_ADDRESS_MAX];
 	int port;
 	char addr[LINK_ADDRESS_MAX];
 };
@@ -1920,11 +1920,63 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	return 1;
 }
 
+int serve_master_by_hostport_list(struct list *master_addresses) {
+	int result = 0;
+
+	/* keep trying masters in the list, until all master addresses
+	 * are tried, or a succesful connection was done */
+	list_first_item(master_addresses);
+	while((current_master_address = list_next_item(master_addresses))) {
+		result = serve_master_by_hostport(current_master_address->host,current_master_address->port,0);
+
+		if(result) {
+			break;
+		}
+	}
+
+	return result;
+}
+
+static struct list *interfaces_to_list(const char *addr, int port, struct jx *ifas) {
+
+	struct list *l = list_create(0);
+	struct jx *ifa;
+
+	int found_canonical = 0;
+
+	for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
+		const char *ifa_addr = jx_lookup_string(ifa, "host");
+
+		if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
+			found_canonical = 1;
+		}
+
+		struct master_address *m = calloc(1, sizeof(*m));
+		strncpy(m->host, ifa_addr, LINK_ADDRESS_MAX);
+		m->port = port;
+
+		list_push_tail(l, m);
+	}
+
+	if(ifas && !found_canonical) {
+		warn(D_NOTICE, "Did not find the master address '%s' in the list of interfaces.", addr);
+	}
+
+	if(!found_canonical) {
+		/* We get here if no interfaces were defined, or if addr was not found in the interfaces. */
+
+		struct master_address *m = calloc(1, sizeof(*m));
+		strncpy(m->host, addr, LINK_ADDRESS_MAX);
+		m->port = port;
+
+		list_push_tail(l, m);
+	}
+
+	return l;
+}
+
 static int serve_master_by_name( const char *catalog_hosts, const char *project_regex )
 {
-	static char *last_addr = NULL;
-	static int   last_port = -1;
-
 	struct list *masters_list = work_queue_catalog_query_cached(catalog_hosts,-1,project_regex);
 
 	debug(D_WQ,"project name %s matches %d masters",project_regex,list_size(masters_list));
@@ -1938,6 +1990,8 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 		list_push_tail(masters_list,list_pop_head(masters_list));
 	}
 
+	static struct master_address *last_addr = NULL;
+
 	while(1) {
 		struct jx *jx = list_peek_head(masters_list);
 
@@ -1948,27 +2002,9 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 		struct jx *ifas  = jx_lookup(jx,"network_interfaces");
 		int port = jx_lookup_integer(jx,"port");
 
-		int found_cannonical_addr = 0;
-		if(ifas) {
-			struct jx *ifa;
-			for (void *i = NULL; (ifa = jx_iterate_array(ifas, &i));) {
-				const char *ifa_addr = jx_lookup_string(ifa, "host");
-				if(ifa_addr && strcmp(addr, ifa_addr) == 0) {
-					found_cannonical_addr = 1;
-					break;
-				}
-			}
-		} else {
-			found_cannonical_addr = 1;
-		}
 
-		if(!found_cannonical_addr) {
-			warn(D_NOTICE, "Did not find the master address '%s' in the list of interfaces.");
-		}
-
-		/* Do not connect to the same master after idle disconnection. */
 		if(last_addr) {
-			if( time(0) > idle_stoptime && strcmp(addr, last_addr) == 0 && port == last_port) {
+			if(time(0) > idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
 				if(list_size(masters_list) < 2) {
 					free(last_addr);
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
@@ -1982,15 +2018,34 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 			}
 
 			free(last_addr);
+			last_addr = NULL;
 		}
 
-		last_addr = xxstrdup(addr);
-		last_port = port;
+		int result;
 
-		debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
-		if(pref && strcmp(pref, "by_hostname") == 0)
-			return serve_master_by_hostport(name,port,project);
-		return serve_master_by_hostport(addr,port,project);
+		if(pref && strcmp(pref, "by_hostname") == 0) {
+			debug(D_WQ,"selected master with project=%s name=%s addr=%s port=%d",project,name,addr,port);
+			result = serve_master_by_hostport(name,port,project);
+		} else {
+			master_addresses = interfaces_to_list(addr, port, ifas);
+
+			result = serve_master_by_hostport_list(master_addresses);
+
+			struct master_address *m;
+			while((m = list_pop_head(master_addresses))) {
+				free(m);
+			}
+			list_delete(master_addresses);
+			master_addresses = NULL;
+		}
+
+		if(result) {
+			last_addr = calloc(1,sizeof(*last_addr));
+			strncpy(last_addr->host, addr, DOMAIN_NAME_MAX);
+			last_addr->port = port;
+		}
+
+		return result;
 	}
 }
 
@@ -2052,7 +2107,7 @@ struct list *parse_master_addresses(const char *specs, int default_port) {
 		}
 
 		struct master_address *m = calloc(1, sizeof(*m));
-		m->host = xxstrdup(next_master);
+		strncpy(m->host, next_master, LINK_ADDRESS_MAX);
 		m->port = port;
 
 		if(port_str) {
@@ -2590,18 +2645,7 @@ int main(int argc, char *argv[])
 		if(project_regex) {
 			result = serve_master_by_name(catalog_hosts, project_regex);
 		} else {
-			int masters_tried = 0;
-
-			/* keep trying masters in the list, until all masters are tried, or a succesful connection was done */
-			while(masters_tried < list_size(master_addresses) && !result) {
-				masters_tried++;
-
-				/* cycle masters in the list */
-				current_master_address = list_pop_head(master_addresses);
-				list_push_tail(master_addresses, current_master_address);
-
-				result = serve_master_by_hostport(current_master_address->host,current_master_address->port,0);
-			}
+			result = serve_master_by_hostport_list(master_addresses);
 		}
 
 		/*
