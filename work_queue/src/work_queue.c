@@ -25,6 +25,7 @@ The following major problems must be fixed:
 #include "datagram.h"
 #include "domain_name_cache.h"
 #include "hash_table.h"
+#include "interfaces_address.h"
 #include "itable.h"
 #include "list.h"
 #include "macros.h"
@@ -2254,6 +2255,11 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_string(j,"working_dir",q->workingdir);
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
+
+	struct jx *interfaces = interfaces_of_host();
+	if(interfaces) {
+		jx_insert(j,jx_string("network_interfaces"),interfaces);
+	}
 
 	// If this is a foreman, add the master address and the disk resources
 	if(foreman_uplink) {

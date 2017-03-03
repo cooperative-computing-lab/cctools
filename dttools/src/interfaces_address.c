@@ -1,5 +1,10 @@
+/*
+Copyright (C) 2017- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
-#include  "jx.h"
+#include "interfaces_address.h"
 
 #ifndef HAS_IFADDRS
 
@@ -44,15 +49,15 @@ struct jx *interfaces_of_host() {
 			continue;
 		}
 
-		if(string_prefix_is(ifa->ifa_name, "lo") == 0) {
+		if(string_prefix_is(ifa->ifa_name, "lo")) {
 			continue;
 		}
 
 		int size   = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 		int result = getnameinfo(ifa->ifa_addr, size, host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 
-		if(!result) {
-			warn(D_NOTICE, "Could not determine address of interface '%s': %s", ifa->ifa_name, gai_strerror(errno));
+		if(result) {
+			warn(D_NOTICE, "Could not determine address of interface '%s': %s", ifa->ifa_name, gai_strerror(result));
 			continue;
 		}
 
