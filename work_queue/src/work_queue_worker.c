@@ -2023,8 +2023,11 @@ struct list *parse_master_addresses(const char *specs, int default_port) {
 
 		char *port_str = strchr(next_master, ':');
 		if(port_str) {
-			*port_str = '\0';
-			port = atoi(port_str+1);
+			int no_ipv4 = strchr(port_str+1, ':'); /* if another ':', then this is not ipv4. */
+			if(!no_ipv4) {
+				*port_str = '\0';
+				port = atoi(port_str+1);
+			}
 		}
 
 		if(port < 1) {
