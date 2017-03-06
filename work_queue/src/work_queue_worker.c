@@ -2007,18 +2007,18 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 			if(time(0) > idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
 				if(list_size(masters_list) < 2) {
 					free(last_addr);
+					last_addr = NULL;
+
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
 					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+
 					return 0;
 				} else {
 					list_push_tail(masters_list,list_pop_head(masters_list));
 					continue;
 				}
 			}
-
-			free(last_addr);
-			last_addr = NULL;
 		}
 
 		int result;
@@ -2040,6 +2040,7 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 		}
 
 		if(result) {
+			free(last_addr);
 			last_addr = calloc(1,sizeof(*last_addr));
 			strncpy(last_addr->host, addr, DOMAIN_NAME_MAX);
 			last_addr->port = port;
