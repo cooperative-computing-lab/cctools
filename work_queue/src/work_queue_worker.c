@@ -651,7 +651,10 @@ static int handle_tasks(struct link *master)
 					fclose(loop_full_check);
 					unlink(disk_alloc_filename);
 				}
+
 				free(buf);
+				free(disk_alloc_filename);
+
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 			}
 
@@ -2058,6 +2061,8 @@ void set_worker_id() {
 
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
 	worker_id = string_format("worker-%s", md5_string(digest));
+
+	free(salt_and_pepper);
 }
 
 static void handle_abort(int sig)

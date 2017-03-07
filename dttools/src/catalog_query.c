@@ -173,7 +173,7 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 		free(h->url);
 		free(h);
 	}
-	free(sorted_hosts);
+	list_delete(sorted_hosts);
 	return q;
 }
 

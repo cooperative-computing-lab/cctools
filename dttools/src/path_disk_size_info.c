@@ -65,6 +65,8 @@ int path_disk_size_info_get_r(const char *path, int64_t max_secs, struct path_di
 			s->count_so_far = -1;
 			s->complete_measurement = 1;
 			result       = -1;
+
+			free(here);
 			goto timeout;
 		}
 	}
