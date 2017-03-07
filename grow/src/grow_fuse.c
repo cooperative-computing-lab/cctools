@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "stats.h"
 #include "macros.h"
+#include "copy_stream.h"
 
 #ifndef O_PATH
 #define O_PATH O_RDONLY
@@ -54,7 +55,53 @@ static const struct fuse_opt option_spec[] = {
 struct fuse_root {
 	struct grow_dirent *metadata;
 	int fd;
+	int cache;
 };
+
+static int cache_open(struct fuse_root *root, const char *path, int flags) {
+	unsigned retries = 0;
+	char cachepath[PATH_MAX];
+	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	if (!e) return -errno;
+	if (flags&O_WRONLY || flags&O_RDWR) return -EROFS;
+
+retry:
+	if (retries > 10) return -ELOOP;
+	snprintf(cachepath, sizeof(cachepath), "%c%c/%s", e->checksum[0], e->checksum[1], &e->checksum[2]);
+	int fd = openat(root->cache, cachepath, flags);
+	if (fd < 0 && errno == ENOENT) {
+		while (path[0] == '/') ++path;
+		fd = openat(root->fd, path, flags);
+		if (fd < 0) return -errno;
+		char tmppath[] = "/tmp/.growcache.XXXXXX";
+		int tmpfd = mkstemp(tmppath);
+		if (tmpfd < 0) {
+			int saved_errno = errno;
+			close(fd);
+			return -saved_errno;
+		}
+		if (copy_fd_to_fd(fd, tmpfd) < 0) {
+			int saved_errno = errno;
+			close(fd);
+			close(tmpfd);
+			unlink(tmppath);
+			return -saved_errno;
+		}
+		close(fd);
+		close(tmpfd);
+		if (renameat(AT_FDCWD, tmppath, root->cache, cachepath) < 0) {
+			int saved_errno = errno;
+			unlink(tmppath);
+			return -saved_errno;
+		}
+		++retries;
+		goto retry;
+	} else if (fd < 0) {
+		return -errno;
+	} else {
+		return fd;
+	}
+}
 
 static int deny_write(const char *path) {
 	stats_inc("grow.fuse.deny_write", 1);
@@ -207,17 +254,22 @@ static int grow_fuse_utimens(const char *path, const struct timespec ts[2]) {
 }
 #endif
 
+static int grow_fuse_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+	stats_inc("grow.fuse.open", 1);
+	GETROOT
+	int fd = cache_open(root, path, fi->flags);
+	if (fd == -ENOENT) return -EROFS;
+	if (fd < 0) return -errno;
+	fi->fh = fd;
+	return 0;
+}
+
 static int grow_fuse_open(const char *path, struct fuse_file_info *fi) {
 	stats_inc("grow.fuse.open", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
-	if (!e && errno==ENOENT && fi->flags&O_CREAT) return -EROFS;
-	if (!e) return -errno;
-	if (fi->flags&O_WRONLY || fi->flags&O_RDWR) return -EROFS;
-	while (path[0] == '/') ++path;
-	int rc = openat(root->fd, path, fi->flags);
-	if (rc < 0) return -errno;
-	fi->fh = rc;
+	int fd = cache_open(root, path, fi->flags);
+	if (fd < 0) return -errno;
+	fi->fh = fd;
 	return 0;
 }
 
@@ -274,6 +326,7 @@ struct fuse_operations grow_fuse_ops = {
 	.utimens	= grow_fuse_utimens,
 #endif
 	.open		= grow_fuse_open,
+	.create		= grow_fuse_create,
 	.read		= grow_fuse_read,
 	.write		= grow_fuse_write,
 	.release	= grow_fuse_release,
@@ -307,12 +360,30 @@ int main(int argc, char *argv[]) {
 		show_help(argv[0]);
 		exit(EXIT_FAILURE);
 	} else {
+		char path[PATH_MAX];
+		char *tmpdir = getenv("TMPDIR");
+		if (!tmpdir) tmpdir = "/tmp";
+		snprintf(path, sizeof(path), "%s/.growcache", tmpdir);
+		if (mkdir(path, 0755) < 0 && errno != EEXIST) {
+			fatal("failed to make cache dir %s: %s", path, strerror(errno));
+		}
+		root.cache = open(path, O_PATH|O_DIRECTORY);
+		if (root.cache < 0) {
+			fatal("failed to open cache dir %s: %s", path, strerror(errno));
+		}
+		for (unsigned i = 0; i < 256; i++) {
+			sprintf(path, "%x", i);
+			if (mkdirat(root.cache, path, 0755) < 0 && errno != EEXIST) {
+				fatal("failed to make cache subdir %s: path", path, strerror(errno));
+			}
+		}
+
 		root.fd = open(options.basedir, O_PATH);
-		if (root.fd == -1) {
+		if (root.fd < 0) {
 			fatal("failed to open base dir: %s", strerror(errno));
 		}
 		int index = openat(root.fd, ".growfsdir", O_RDONLY);
-		if (index == -1) {
+		if (index < 0) {
 			fatal("failed to open GROW-FS index: %s", strerror(errno));
 		}
 		FILE *metadata = fdopen(index, "r");
