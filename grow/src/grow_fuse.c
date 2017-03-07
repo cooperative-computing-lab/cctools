@@ -23,6 +23,7 @@
 #include "stats.h"
 #include "macros.h"
 #include "copy_stream.h"
+#include "jx_pretty_print.h"
 
 #ifndef O_PATH
 #define O_PATH O_RDONLY
@@ -40,13 +41,17 @@
 	GETCONTEXT \
 	struct fuse_root *root = ctx->private_data;
 
+static FILE *stats_out = NULL;
+
 static struct options {
 	int show_help;
 	const char *basedir;
+	const char *stats_file;
 } options;
 
 static const struct fuse_opt option_spec[] = {
 	OPTION("--basedir %s", basedir),
+	OPTION("--stats-file %s", stats_file),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	FUSE_OPT_END
@@ -123,6 +128,14 @@ static int deny_create(const char *path) {
 static void *grow_fuse_init(struct fuse_conn_info *conn) {
 	GETCONTEXT
 	return ctx->private_data;
+}
+
+static void grow_fuse_destroy(void *x) {
+	if (stats_out) {
+		jx_pretty_print_stream(stats_get(), stats_out);
+		fprintf(stats_out, "\n");
+		fclose(stats_out);
+	}
 }
 
 static int grow_fuse_getattr(const char *path, struct stat *stbuf) {
@@ -307,6 +320,7 @@ static int grow_fuse_fsync(const char *path, int isdatasync, struct fuse_file_in
 
 struct fuse_operations grow_fuse_ops = {
 	.init           = grow_fuse_init,
+	.destroy	= grow_fuse_destroy,
 	.getattr	= grow_fuse_getattr,
 	.access		= grow_fuse_access,
 	.readlink	= grow_fuse_readlink,
@@ -360,6 +374,14 @@ int main(int argc, char *argv[]) {
 		show_help(argv[0]);
 		exit(EXIT_FAILURE);
 	} else {
+		if (options.stats_file) {
+			stats_enable();
+			stats_out = fopen(options.stats_file, "w");
+			if (!stats_out) {
+				fatal("could not open stats file %s: %s", options.stats_file, strerror(errno));
+			}
+		}
+
 		char path[PATH_MAX];
 		char *tmpdir = getenv("TMPDIR");
 		if (!tmpdir) tmpdir = "/tmp";
