@@ -372,7 +372,7 @@ int main(int argc, char *argv[]) {
 			fatal("failed to open cache dir %s: %s", path, strerror(errno));
 		}
 		for (unsigned i = 0; i < 256; i++) {
-			sprintf(path, "%x", i);
+			sprintf(path, "%02x", i);
 			if (mkdirat(root.cache, path, 0755) < 0 && errno != EEXIST) {
 				fatal("failed to make cache subdir %s: path", path, strerror(errno));
 			}
