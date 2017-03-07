@@ -864,7 +864,7 @@ struct peak_cores_sample {
 int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete */
+	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete measurement round */
 
 	if(!samples) {
 		samples = list_create();
@@ -882,9 +882,9 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 
 	struct peak_cores_sample *head;
 
-	/* Drop entries older than max_separation, unless we only have two samples. */
+	/* Drop entries older than max_separation, unless we only have three samples. */
 	while((head = list_peek_head(samples))) {
-		if(list_size(samples) < 2) {
+		if(list_size(samples) < 3) {
 			break;
 		}
 		else if( head->wall_time + max_separation*USECOND < tail->wall_time) {
@@ -904,7 +904,7 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	 * for more than 60s, the average cpu/wall serves as a fallback in the
 	 * final summary. */
 
-	if(diff_wall < 60) {
+	if(diff_wall < 60 * USECOND) {
 		return 1;
 	} else {
 		return (int64_t) MAX(1, ceil( ((double) diff_cpu)/diff_wall));
