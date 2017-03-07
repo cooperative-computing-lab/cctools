@@ -75,6 +75,7 @@ retry:
 	snprintf(cachepath, sizeof(cachepath), "%c%c/%s", e->checksum[0], e->checksum[1], &e->checksum[2]);
 	int fd = openat(root->cache, cachepath, flags);
 	if (fd < 0 && errno == ENOENT) {
+		stats_inc("grow.fuse.cache.miss", 1);
 		while (path[0] == '/') ++path;
 		fd = openat(root->fd, path, flags);
 		if (fd < 0) return -errno;
@@ -102,8 +103,10 @@ retry:
 		++retries;
 		goto retry;
 	} else if (fd < 0) {
+		stats_inc("grow.fuse.cache.error", 1);
 		return -errno;
 	} else {
+		stats_inc("grow.fuse.cache.hit", 1);
 		return fd;
 	}
 }
