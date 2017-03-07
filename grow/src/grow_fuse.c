@@ -42,12 +42,10 @@
 static struct options {
 	int show_help;
 	const char *basedir;
-	const char *debug;
 } options;
 
 static const struct fuse_opt option_spec[] = {
 	OPTION("--basedir %s", basedir),
-	OPTION("--cctools-debug %s", debug),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	FUSE_OPT_END
@@ -101,11 +99,11 @@ static int grow_fuse_access(const char *path, int mask) {
 static int grow_fuse_readlink(const char *path, char *buf, size_t size) {
 	stats_inc("grow.fuse.readlink", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 0);
 	if (!e) return -errno;
 	if (!S_ISLNK(e->mode)) return -EINVAL;
-	strncpy(buf, e->linkname, size);
-	return MIN(size, strlen(e->linkname));
+	snprintf(buf, size, "%s", e->linkname);
+	return 0;
 }
 
 static int grow_fuse_opendir(const char *path, struct fuse_file_info *fi) {
@@ -183,7 +181,7 @@ static int grow_fuse_link(const char *from, const char *to) {
 	stats_inc("grow.fuse.link", 1);
 	int from_err = deny_write(from);
 	int to_err = deny_create(to);
-	return from_err == EROFS ? to_err : from_err;
+	return from_err == -EROFS ? to_err : from_err;
 }
 
 static int grow_fuse_chmod(const char *path, mode_t mode) {
@@ -286,7 +284,6 @@ static void show_help(const char *argv) {
 	fprintf(stderr, "usage: %s --basedir SRCDIR MOUNTPOINT\n", argv);
 	fprintf(stderr, "options:\n");
 	fprintf(stderr, "-h, --help\n");
-	fprintf(stderr, "    --cctools-debug LEVEL\n");
 	fprintf(stderr, "    --basedir SRCDIR\n");
 }
 
@@ -295,7 +292,6 @@ int main(int argc, char *argv[]) {
 
 	umask(0);
 
-	debug(D_GROW, "initializing FUSE plugin");
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
 	memset(&options, 0, sizeof(options));
@@ -303,10 +299,6 @@ int main(int argc, char *argv[]) {
 		exit(EXIT_FAILURE);
 	}
 
-	if (options.debug && !debug_flags_set(options.debug)) {
-		show_help(argv[0]);
-		exit(EXIT_FAILURE);
-	}
 	if (options.show_help) {
 		show_help(argv[0]);
 		assert(fuse_opt_add_arg(&args, "--help") == 0);
