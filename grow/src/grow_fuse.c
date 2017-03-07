@@ -23,6 +23,10 @@
 #include "stats.h"
 #include "macros.h"
 
+#ifndef O_PATH
+#define O_PATH O_RDONLY
+#endif
+
 #define OPTION(t, p) \
 	{ t, offsetof(struct options, p), 1 }
 
@@ -197,11 +201,13 @@ static int grow_fuse_truncate(const char *path, off_t size) {
 	return deny_write(path);
 }
 
+#ifndef HAS_UTIMENSAT
 static int grow_fuse_utimens(const char *path, const struct timespec ts[2]) {
 	stats_inc("grow.fuse.utimens", 1);
 	// probably shouldn't follow symlinks
 	return deny_write(path);
 }
+#endif
 
 static int grow_fuse_open(const char *path, struct fuse_file_info *fi) {
 	stats_inc("grow.fuse.open", 1);
@@ -249,11 +255,6 @@ static int grow_fuse_fsync(const char *path, int isdatasync, struct fuse_file_in
 	return 0;
 }
 
-static int grow_fuse_fallocate(const char *path, int mode, off_t offset, off_t length, struct fuse_file_info *fi) {
-	stats_inc("grow.fuse.fallocate", 1);
-	return deny_write(path);
-}
-
 struct fuse_operations grow_fuse_ops = {
 	.init           = grow_fuse_init,
 	.getattr	= grow_fuse_getattr,
@@ -271,13 +272,14 @@ struct fuse_operations grow_fuse_ops = {
 	.chmod		= grow_fuse_chmod,
 	.chown		= grow_fuse_chown,
 	.truncate	= grow_fuse_truncate,
+#ifndef HAS_UTIMENSAT
 	.utimens	= grow_fuse_utimens,
+#endif
 	.open		= grow_fuse_open,
 	.read		= grow_fuse_read,
 	.write		= grow_fuse_write,
 	.release	= grow_fuse_release,
 	.fsync		= grow_fuse_fsync,
-	.fallocate	= grow_fuse_fallocate,
 };
 
 static void show_help(const char *argv) {
