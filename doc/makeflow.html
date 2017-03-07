@@ -330,6 +330,25 @@ Umbrella spec specified by the <tt>--umbrella-spec</tt> option. If the
 <tt>--umbrella-spec</tt> option is not specified, these rules will run without being
 wrapped by Umbrella. </p>
 
+<h2 id="mesos">Running Makeflow with Mesos<a class="sectionlink" href="#mesos" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>Makeflow can be used with Apache Mesos. To run Makeflow with Mesos, user need to 
+specify the batch mode via <tt> -T mesos </tt> option and pass the hostname and 
+port number of Mesos master to Makeflow through <tt> --mesos-master </tt> option.
+Since the Makeflow-Mesos Scheduler is based on Mesos Python2 API, the path to Mesos 
+Python2 library should be included in the <tt>$PATH</tt>, or one can specify a 
+preferrd Mesos Python2 API via <tt> --mesos-path </tt> option. To successfully 
+import the Python library, user may need to indicate dependencies through 
+<tt> --mesos-preload </tt> option. </p>
+
+<p>Following is the command to run Makeflow on a Mesos cluster that has the master listen 
+on port 5050 of localhost, with a user specified python library that dependents on an 
+explicit version of GCC library.</p>
+<code>makeflow -T mesos --mesos-master localhost:5050 
+               --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages 
+               --mesos-preload /path/to/gcc-4.9.3/lib64/libstdc++.so.6 example.makeflow 
+</code>
+
 <h2 id="details">More Language Details<a class="sectionlink" href="#details" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>The Makeflow language is very similar to Make, but it does have a few important differences that you should be aware of.</p>
