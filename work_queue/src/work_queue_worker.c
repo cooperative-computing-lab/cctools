@@ -137,9 +137,9 @@ static int container_mode = NONE;
 static int load_from_tar = 0;
 
 struct master_address {
-	char host[LINK_ADDRESS_MAX];
+	char host[DOMAIN_NAME_MAX];
 	int port;
-	char addr[LINK_ADDRESS_MAX];
+	char addr[DOMAIN_NAME_MAX];
 };
 struct list *master_addresses;
 struct master_address *current_master_address;
@@ -651,7 +651,10 @@ static int handle_tasks(struct link *master)
 					fclose(loop_full_check);
 					unlink(disk_alloc_filename);
 				}
+
 				free(buf);
+				free(disk_alloc_filename);
+
 				debug(D_WQ, "task %d (pid %d) exited normally with exit code %d",p->task->taskid,p->pid,p->exit_status);
 			}
 
@@ -2007,18 +2010,18 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 			if(time(0) > idle_stoptime && strcmp(addr, last_addr->host) == 0 && port == last_addr->port) {
 				if(list_size(masters_list) < 2) {
 					free(last_addr);
+					last_addr = NULL;
+
 					/* convert idle_stoptime into connect_stoptime (e.g., time already served). */
 					connect_stoptime = idle_stoptime;
 					debug(D_WQ,"Previous idle disconnection from only master available project=%s name=%s addr=%s port=%d",project,name,addr,port);
+
 					return 0;
 				} else {
 					list_push_tail(masters_list,list_pop_head(masters_list));
 					continue;
 				}
 			}
-
-			free(last_addr);
-			last_addr = NULL;
 		}
 
 		int result;
@@ -2040,6 +2043,7 @@ static int serve_master_by_name( const char *catalog_hosts, const char *project_
 		}
 
 		if(result) {
+			free(last_addr);
 			last_addr = calloc(1,sizeof(*last_addr));
 			strncpy(last_addr->host, addr, DOMAIN_NAME_MAX);
 			last_addr->port = port;
@@ -2057,6 +2061,8 @@ void set_worker_id() {
 
 	md5_buffer(salt_and_pepper, strlen(salt_and_pepper), digest);
 	worker_id = string_format("worker-%s", md5_string(digest));
+
+	free(salt_and_pepper);
 }
 
 static void handle_abort(int sig)
