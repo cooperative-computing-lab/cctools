@@ -137,9 +137,9 @@ static int container_mode = NONE;
 static int load_from_tar = 0;
 
 struct master_address {
-	char host[LINK_ADDRESS_MAX];
+	char host[DOMAIN_NAME_MAX];
 	int port;
-	char addr[LINK_ADDRESS_MAX];
+	char addr[DOMAIN_NAME_MAX];
 };
 struct list *master_addresses;
 struct master_address *current_master_address;
