@@ -377,6 +377,9 @@ int main(int argc, char *argv[]) {
 		show_help(argv[0]);
 		exit(EXIT_FAILURE);
 	} else {
+		assert(fuse_opt_add_arg(&args, "-ononempty") == 0);
+		assert(fuse_opt_add_arg(&args, "-okernel_cache") == 0);
+
 		if (options.stats_file) {
 			stats_enable();
 			stats_out = fopen(options.stats_file, "w");
