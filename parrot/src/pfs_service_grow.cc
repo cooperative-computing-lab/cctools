@@ -61,8 +61,10 @@ extern "C" {
 #include "macros.h"
 #include "sha1.h"
 #include "sleeptools.h"
+#include "stats.h"
 }
 
+#include <assert.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
@@ -379,62 +381,81 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 	struct link *link;
 	int sleep_time = 1;
 	time_t stoptime = time(0)+pfs_master_timeout;
+	int local_index = !strcmp(hostport, "local");
 
 	retry:
 
-	sprintf(url,"http://%s%s/.growfschecksum",hostport,path);
+	if (local_index) {
+		snprintf(filename, sizeof(filename), "%s/.growfschecksum", path);
+		debug(D_GROW, "opening checksum: %s", filename);
 
-	debug(D_GROW,"searching for filesystem at %s",url);
+		file = fopen(filename, "r");
+		if (!file) {
+			debug(D_GROW, "couldn't get checksum at %s: %s", filename, strerror(errno));
+			return NULL;
+		}
+		if (!fscanf(file, "%s", checksum)) {
+			debug(D_GROW, "checksum is malformed");
+			fclose(file);
+			return NULL;
+		}
+		fclose(file);
+	} else {
+		sprintf(url, "http://%s%s/.growfschecksum", hostport, path);
+		debug(D_GROW, "fetching checksum: %s", url);
 
-	debug(D_GROW,"fetching checksum: %s",url);
-
-	link = http_query_no_cache(url,"GET",stoptime);
-	if(link) {
-		if(link_readline(link,line,sizeof(line),stoptime)) {
-			if(sscanf(line,"%s",checksum)) {
-				/* ok to continue */
+		link = http_query_no_cache(url, "GET", stoptime);
+		if (link) {
+			if(link_readline(link, line, sizeof(line), stoptime)) {
+				if (sscanf(line,"%s", checksum)) {
+					/* ok to continue */
+				} else {
+					debug(D_GROW, "checksum is malformed!");
+					goto sleep_retry;
+				}
 			} else {
-				debug(D_GROW,"checksum is malformed!");
+				debug(D_GROW, "lost connection while fetching checksum!");
 				goto sleep_retry;
 			}
 		} else {
-			debug(D_GROW,"lost connection while fetching checksum!");
+			return 0;
+		}
+	}
+
+	debug(D_GROW,"checksum is %s",checksum);
+
+	if (local_index) {
+		snprintf(filename, sizeof(filename), "%s/.growfsdir", path);
+	} else {
+		sprintf(url, "http://%s%s/.growfsdir", hostport, path);
+
+		if (file_cache_contains(pfs_file_cache, url, filename) != 0) {
+
+			debug(D_GROW, "fetching directory: %s", url);
+
+			int fd = file_cache_begin(pfs_file_cache, url, txn);
+			if (fd >= 0) {
+				INT64_T size;
+				struct link *link = http_query_size(url, "GET", &size, stoptime, 1);
+				if (link) {
+					if (link_stream_to_fd(link, fd, size, stoptime) >= 0) {
+						file_cache_commit(pfs_file_cache, url, txn);
+					} else {
+						file_cache_abort(pfs_file_cache, url, txn);
+					}
+					link_close(link);
+				} else {
+					file_cache_abort(pfs_file_cache, url, txn);
+				}
+				close(fd);
+			}
+		} else {
+			debug(D_GROW, "directory is already cached");
+		}
+
+		if (file_cache_contains(pfs_file_cache, url, filename) != 0) {
 			goto sleep_retry;
 		}
-	} else {
-		return 0;
-	}
-
-	debug(D_GROW,"remote checksum is %s",checksum);
-
-	sprintf(url,"http://%s%s/.growfsdir",hostport,path);
-
-	if(file_cache_contains(pfs_file_cache,url,filename)!=0) {
-
-		debug(D_GROW,"fetching directory: %s",url);
-
-		int fd = file_cache_begin(pfs_file_cache,url,txn);
-		if(fd>=0) {
-			INT64_T size;
-			struct link *link = http_query_size(url,"GET",&size,stoptime,1);
-			if(link) {
-				if(link_stream_to_fd(link,fd,size,stoptime)>=0) {
-					file_cache_commit(pfs_file_cache,url,txn);
-				} else {
-					file_cache_abort(pfs_file_cache,url,txn);
-				}
-				link_close(link);
-			} else {
-				file_cache_abort(pfs_file_cache,url,txn);
-			}
-			close(fd);
-		}
-	} else {
-		debug(D_GROW,"directory is already cached");
-	}
-
-	if(file_cache_contains(pfs_file_cache,url,filename)!=0) {
-		goto sleep_retry;
 	}
 
 	debug(D_GROW,"checksumming %s",filename);
@@ -448,7 +469,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 
 	if(strcmp((char*)checksum,sha1_string(digest))) {
 		debug(D_GROW,"checksum does not match, reloading...");
-		file_cache_delete(pfs_file_cache,url);
+		if (!local_index) file_cache_delete(pfs_file_cache, url);
 		goto sleep_retry;
 	}
 
@@ -462,7 +483,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 	if(!d) {
 		debug(D_GROW,"%s is corrupted",filename);
 		fclose(file);
-		file_cache_delete(pfs_file_cache,url);
+		if (!local_index) file_cache_delete(pfs_file_cache, url);
 		goto sleep_retry;
 	}
 
@@ -569,12 +590,15 @@ class pfs_file_grow : public pfs_file
 {
 private:
 	struct link *link;
+	int local_fd;
 	pfs_stat info;
 	sha1_context_t context;
 
 public:
-	pfs_file_grow( pfs_name *n, struct link *l, struct grow_dirent *d ) : pfs_file(n) {
+	pfs_file_grow( pfs_name *n, struct link *l, int fd, struct grow_dirent *d ) : pfs_file(n) {
+		assert(!(l && (fd < 0)));
 		link = l;
+		local_fd = fd;
 		grow_dirent_to_stat(d,&info);
 		if(pfs_checksum_files) {
 			sha1_init(&context);
@@ -582,7 +606,14 @@ public:
 	}
 
 	virtual int close() {
-		link_close(link);
+		stats_inc("parrot.grow.close", 1);
+		if (link) {
+			debug(D_GROW, "close %p", link);
+			link_close(link);
+		} else {
+			debug(D_GROW, "close %d", local_fd);
+			::close(local_fd);
+		}
 
 		struct grow_dirent *d;
 		d = grow_dirent_lookup(&name,1);
@@ -611,13 +642,29 @@ public:
 	}
 
 	virtual pfs_ssize_t read( void *d, pfs_size_t length, pfs_off_t offset ) {
+		stats_inc("parrot.grow.read", 1);
+		stats_bin("parrot.grow.read.requested", length);
+
 		pfs_ssize_t actual;
-		actual = link_read(link,(char*)d,length,LINK_FOREVER);
+		if (link) {
+			debug(D_GROW, "read %p %p %lld %lld", link, d, (long long) length, (long long) offset);
+			actual = link_read(link,(char*)d,length,LINK_FOREVER);
+		} else {
+			debug(D_GROW, "read %d %p %lld %lld", local_fd, d, (long long) length, (long long) offset);
+			actual = ::read(local_fd, d, length);
+		}
 		if(pfs_checksum_files && actual>0) sha1_update(&context,(unsigned char *)d,actual);
+		if (actual >= 0) stats_bin("parrot.grow.read.actual", actual);
 		return actual;
 	}
 
 	virtual int fstat( struct pfs_stat *i ) {
+		stats_inc("parrot.grow.fstat", 1);
+		if (link) {
+			debug(D_GROW, "fstat %p %p", link, i);
+		} else {
+			debug(D_GROW, "flock %d %p", local_fd, i);
+		}
 		*i = info;
 		return 0;
 	}
@@ -628,6 +675,12 @@ public:
 	This simply satisfies some programs that insist upon it.
 	*/
 	virtual int flock( int op ) {
+		stats_inc("parrot.grow.flock", 1);
+		if (link) {
+			debug(D_GROW, "flock %p %d", link, op);
+		} else {
+			debug(D_GROW, "flock %d %d", local_fd, op);
+		}
 		return 0;
 	}
 
@@ -644,8 +697,12 @@ public:
 	}
 
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
+		stats_inc("parrot.grow.open", 1);
+		debug(D_GROW, "open %s %d %d", name->rest, flags, (flags&O_CREAT) ? mode : 0);
+
 		struct grow_dirent *d;
 		char url[PFS_PATH_MAX];
+		int local_index = !strcmp(name->hostport, "local");
 
 		d = grow_dirent_lookup(name,1);
 		if(!d) return 0;
@@ -655,33 +712,50 @@ public:
 			return 0;
 		}
 
-		sprintf(url,"http://%s%s",name->hostport,name->rest);
-
-		struct link *link = http_query_no_cache(url,"GET",time(0)+pfs_master_timeout);
-		if(link) {
-			debug(D_GROW,"open %s",url);
-			return new pfs_file_grow(name,link,d);
+		if (local_index) {
+			int fd = ::open(name->rest, O_RDONLY);
+			if (fd < 0) {
+				debug(D_GROW, "failed to open %s: %s", name->rest, strerror(errno));
+				return NULL;
+			}
+			debug(D_GROW, "open local %s=%d", name->rest, fd);
+			return new pfs_file_grow(name, NULL, fd, d);
 		} else {
-			debug(D_GROW,"failed to open %s",url);
-			return 0;
+			sprintf(url, "http://%s%s", name->hostport, name->rest);
+
+			struct link *link = http_query_no_cache(url, "GET", time(0) + pfs_master_timeout);
+			if(link) {
+				debug(D_GROW, "open remote %s=%p", url, link);
+				return new pfs_file_grow(name, link, -1, d);
+			} else {
+				debug(D_GROW, "failed to open %s", url);
+				return 0;
+			}
 		}
 	}
 
 	pfs_dir * getdir( pfs_name *name ) {
+		stats_inc("parrot.grow.getdir", 1);
+		debug(D_GROW, "getdir %s", name->rest);
+
 		/*
 		If the root of the GROW filesystem is requested,
 		generate it interally using the list of known filesystems.
 		*/
 
-		if(!name->host[0]) {
+		size_t dirsize = 0;
+		if(!name->rest[0]) {
 			pfs_dir *dir = new pfs_dir(name);
 			dir->append(".");
 			dir->append("..");
+			dirsize += 2;
 			struct grow_filesystem *f = grow_filesystem_list;
 			while(f) {
 				dir->append(f->hostport);
+				++dirsize;
 				f = f->next;
 			}
+			stats_bin("parrot.grow.getdir.size", dirsize);
 			return dir;
 		}
 
@@ -699,19 +773,28 @@ public:
 		pfs_dir *dir = new pfs_dir(name);
 
 		dir->append(".");
-		if(d->parent) dir->append("..");
+		++dirsize;
+		if(d->parent) {
+			dir->append("..");
+			++dirsize;
+		}
 
 		for(d=d->children;d;d=d->next) {
 			dir->append(d->name);
+			++dirsize;
 		}
 
+		stats_bin("parrot.grow.getdir.size", dirsize);
 		return dir;
 	}
 
 	virtual int lstat( pfs_name *name, struct pfs_stat *info ) {
+		stats_inc("parrot.grow.lstat", 1);
+		debug(D_GROW, "lstat %s %p", name->rest, info);
+
 		/* If we get stat("/grow") then construct a dummy entry. */
 
-		if(!name->host[0]) {
+		if(!name->rest[0]) {
 						pfs_service_emulate_stat(name,info);
 						info->st_mode = S_IFDIR | 0555;
 			return 0;
@@ -728,9 +811,12 @@ public:
 	}
 
 	virtual int stat( pfs_name *name, struct pfs_stat *info ) {
+		stats_inc("parrot.grow.stat", 1);
+		debug(D_GROW, "stat %s %p", name->rest, info);
+
 		/* If we get stat("/grow") then construct a dummy entry. */
 
-		if(!name->host[0]) {
+		if(!name->rest[0]) {
 						pfs_service_emulate_stat(name,info);
 						info->st_mode = S_IFDIR | 0555;
 			return 0;
@@ -747,11 +833,16 @@ public:
 	}
 
 	virtual int unlink( pfs_name *name ) {
+		stats_inc("parrot.grow.unlink", 1);
+		debug(D_GROW, "unlink %s", name->rest);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int access( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.grow.access", 1);
+		debug(D_GROW, "access %s %d", name->rest, mode);
+
 		struct pfs_stat info;
 		if(this->stat(name,&info)==0) {
 			if(mode&W_OK) {
@@ -766,36 +857,51 @@ public:
 	}
 
 	virtual int chmod( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.grow.chmod", 1);
+		debug(D_GROW, "chmod %s %d", name->rest, mode);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int chown( pfs_name *name, uid_t uid, gid_t gid ) {
+		stats_inc("parrot.grow.chown", 1);
+		debug(D_GROW, "chown %s %d %d", name->rest, uid, gid);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int lchown( pfs_name *name, uid_t uid, gid_t gid ) {
+		stats_inc("parrot.grow.lchown", 1);
+		debug(D_GROW, "lchown %s %d %d", name->rest, uid, gid);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
+		stats_inc("parrot.grow.truncate", 1);
+		debug(D_GROW, "truncate %s %lld", name->rest, (long long)length);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int utime( pfs_name *name, struct utimbuf *buf ) {
+		stats_inc("parrot.grow.utime", 1);
+		debug(D_GROW, "utime %s %p", name->rest, buf);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int rename( pfs_name *oldname, pfs_name *newname ) {
+		stats_inc("parrot.grow.rename", 1);
+		debug(D_GROW, "! rename %s %s", oldname->rest, newname->rest);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int chdir( pfs_name *name, char *newpath ) {
+		stats_inc("parrot.grow.chdir", 1);
+		debug(D_GROW, "chdir %s", name->rest);
+
 		struct pfs_stat info;
 		if(this->stat(name,&info)==0) {
 			if(S_ISDIR(info.st_mode)) {
@@ -810,16 +916,23 @@ public:
 	}
 
 	virtual int link( pfs_name *oldname, pfs_name *newname ) {
+		stats_inc("parrot.grow.link", 1);
+		debug(D_GROW, "! link %s %s", oldname->rest, newname->rest);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int symlink( const char *linkname, pfs_name *newname ) {
+		stats_inc("parrot.grow.symlink", 1);
+		debug(D_GROW, "! symlink %s %s", linkname, newname->rest);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t bufsiz ) {
+		stats_inc("parrot.grow.readlink", 1);
+		debug(D_GROW, "readlink %s %p %d", name->rest, buf, (int) bufsiz);
+
 		struct grow_dirent *d;
 
 		d = grow_dirent_lookup(name,0);
@@ -830,6 +943,7 @@ public:
 			strncpy(buf,d->linkname,bufsiz);
 			length = MIN((unsigned)bufsiz,strlen(d->linkname));
 			buf[length] = 0;
+			stats_bin("parrot.grow.readlink.size", length);
 			return length;
 		} else {
 			errno = EINVAL;
@@ -838,11 +952,15 @@ public:
 	}
 
 	virtual int mkdir( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.grow.mkdir", 1);
+		debug(D_GROW, "! mkdir %s %d", name->rest, mode);
 		errno = EROFS;
 		return -1;
 	}
 
 	virtual int rmdir( pfs_name *name ) {
+		stats_inc("parrot.grow.rmdir", 1);
+		debug(D_GROW, "! rmdir %s", name->rest);
 		errno = EROFS;
 		return -1;
 	}

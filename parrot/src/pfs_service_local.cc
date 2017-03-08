@@ -12,6 +12,7 @@ extern "C" {
 #include "get_canonical_path.h"
 #include "username.h"
 #include "ibox_acl.h"
+#include "stats.h"
 }
 
 #include <assert.h>
@@ -110,6 +111,7 @@ public:
 	}
 
 	virtual int close() {
+		stats_inc("parrot.local.close", 1);
 		int result;
 		debug(D_LOCAL,"close %d",fd);
 		result = ::close(fd);
@@ -117,6 +119,9 @@ public:
 	}
 
 	virtual pfs_ssize_t read( void *data, pfs_size_t length, pfs_off_t offset ) {
+		stats_inc("parrot.local.read", 1);
+		stats_bin("parrot.local.read.requested", length);
+
 		pfs_ssize_t result;
 
 		debug(D_LOCAL,"read %d %p %lld %lld",fd,data,(long long)length,(long long)offset);
@@ -124,20 +129,26 @@ public:
 		if(offset!=last_offset) ::lseek64(fd,offset,SEEK_SET);
 		result = ::read(fd,data,length);
 		if(result>0) last_offset = offset+result;
+		if (result >= 0) stats_bin("parrot.local.read.actual", result);
 
 		END
 	}
 
 	virtual pfs_ssize_t write( const void *data, pfs_size_t length, pfs_off_t offset ) {
+		stats_inc("parrot.local.write", 1);
+		stats_bin("parrot.local.write.requested", length);
+
 		pfs_ssize_t result;
 		debug(D_LOCAL,"write %d %p %lld %lld",fd,data,(long long)length,(long long)offset);
 		if(offset!=last_offset) ::lseek64(fd,offset,SEEK_SET);
 		result = ::write(fd,data,length);
 		if(result>0) last_offset = offset+result;
+		if (result >= 0) stats_bin("parrot.local.write.actual", result);
 		END
 	}
 
 	virtual int fstat( struct pfs_stat *buf ) {
+		stats_inc("parrot.local.fstat", 1);
 		int result;
 		struct stat64 lbuf;
 		debug(D_LOCAL,"fstat %d %p",fd,buf);
@@ -147,6 +158,7 @@ public:
 	}
 
 	virtual int fstatfs( struct pfs_statfs *buf ) {
+		stats_inc("parrot.local.fstatfs", 1);
 		int result;
 		struct statfs64 lbuf;
 		debug(D_LOCAL,"fstatfs %d %p",fd,buf);
@@ -156,6 +168,7 @@ public:
 	}
 
 	virtual int ftruncate( pfs_size_t length ) {
+		stats_inc("parrot.local.ftruncate", 1);
 		int result;
 		debug(D_LOCAL,"truncate %d %lld",fd,(long long)length);
 		result = ::ftruncate64(fd,length);
@@ -163,6 +176,7 @@ public:
 	}
 
 	virtual int fsync() {
+		stats_inc("parrot.local.fsync", 1);
 		int result;
 		debug(D_LOCAL,"fsync %d",fd);
 		result = ::fsync(fd);
@@ -170,6 +184,7 @@ public:
 	}
 
 	virtual int fcntl( int cmd, void *arg ) {
+		stats_inc("parrot.local.fcntl", 1);
 		int result;
 		debug(D_LOCAL,"fcntl %d %d %p",fd,cmd,arg);
 		if(cmd==F_SETFL) arg = (void*)(((PTRINT_T)arg)|O_NONBLOCK);
@@ -183,6 +198,7 @@ public:
 	}
 
 	virtual int fchmod( mode_t mode ) {
+		stats_inc("parrot.local.fchmod", 1);
 		int result;
 		debug(D_LOCAL,"fchmod %d %d",fd,mode);
 		result = ::fchmod(fd,mode);
@@ -190,6 +206,7 @@ public:
 	}
 
 	virtual int fchown( uid_t uid, gid_t gid ) {
+		stats_inc("parrot.local.fchown", 1);
 		int result;
 		debug(D_LOCAL,"fchown %d %d %d",fd,uid,gid);
 		result = ::fchown(fd,uid,gid);
@@ -198,6 +215,7 @@ public:
 
 #if defined(HAS_SYS_XATTR_H) || defined(HAS_ATTR_XATTR_H)
 	virtual ssize_t fgetxattr( const char *name, void *data, size_t size ) {
+		stats_inc("parrot.local.fgetxattr", 1);
 		ssize_t result;
 		debug(D_LOCAL,"fgetxattr %d %s",fd,name);
 #ifdef CCTOOLS_OPSYS_DARWIN
@@ -209,6 +227,7 @@ public:
 	}
 
 	virtual ssize_t flistxattr( char *list, size_t size ) {
+		stats_inc("parrot.local.flistxattr", 1);
 		ssize_t result;
 		debug(D_LOCAL,"flistxattr %d",fd);
 #ifdef CCTOOLS_OPSYS_DARWIN
@@ -220,6 +239,7 @@ public:
 	}
 
 	virtual int fsetxattr( const char *name, const void *data, size_t size, int flags ) {
+		stats_inc("parrot.local.fsetxattr", 1);
 		int result;
 		debug(D_LOCAL,"fsetxattr %d %s <> %d",fd,name,flags);
 #ifdef CCTOOLS_OPSYS_DARWIN
@@ -231,6 +251,7 @@ public:
 	}
 
 	virtual int fremovexattr( const char *name ) {
+		stats_inc("parrot.local.fremovexattr", 1);
 		int result;
 		debug(D_LOCAL,"fremovexattr %d %s",fd,name);
 #ifdef CCTOOLS_OPSYS_DARWIN
@@ -244,6 +265,7 @@ public:
 #endif
 
 	virtual int flock( int op ) {
+		stats_inc("parrot.local.flock", 1);
 		int result;
 		debug(D_LOCAL,"flock %d %d",fd,op);
 		result = ::flock(fd,op);
@@ -251,6 +273,7 @@ public:
 	}
 
 	virtual void * mmap( void *start, pfs_size_t length, int prot, int flags, off_t offset ) {
+		stats_inc("parrot.local.mmap", 1);
 		void *result;
 		result = ::mmap((caddr_t)start,length,prot,flags,fd,offset);
 		debug(D_LOCAL,"= %p %s",result,(((PTRINT_T)result>=0) ? "" : strerror(errno)) );
@@ -286,6 +309,8 @@ public:
 class pfs_service_local : public pfs_service {
 public:
 	virtual pfs_file * open( pfs_name *name, int flags, mode_t mode ) {
+		stats_inc("parrot.local.open", 1);
+
 		pfs_file *result;
 
 		if(!pfs_acl_check(name,ibox_acl_from_open_flags(flags))) return 0;
@@ -313,12 +338,15 @@ public:
 	}
 
 	virtual pfs_dir * getdir( pfs_name *name ) {
+		stats_inc("parrot.local.getdir", 1);
+
 		struct dirent *d;
 		DIR *dir;
 		pfs_dir *result = 0;
 
 		if(!pfs_acl_check_dir(name,IBOX_ACL_LIST)) return 0;
 
+		size_t dirsize = 0;
 		debug(D_LOCAL,"getdir %s",name->rest);
 		dir = ::opendir(name->rest);
 		if(dir) {
@@ -326,19 +354,23 @@ public:
 			while((d=::readdir(dir))) {
 				if(!strcmp(d->d_name,IBOX_ACL_BASE_NAME)) continue;
 				result->append(d);
+				++dirsize;
 			}
 			closedir(dir);
 		} else {
 			result = 0;
 		}
-		if (result)
+		if (result) {
+			stats_bin("parrot.local.getdir.size", dirsize);
 			debug(D_LOCAL, "= 0 [%s]",__func__);
-		else
+		} else {
 			debug(D_LOCAL, "= %d %s [%s]",errno,strerror(errno),__func__);
+		}
 		return result;
 	}
 
 	virtual int stat( pfs_name *name, struct pfs_stat *buf ) {
+		stats_inc("parrot.local.stat", 1);
 		int result;
 		struct stat64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
@@ -348,6 +380,7 @@ public:
 		END
 	}
 	virtual int statfs( pfs_name *name, struct pfs_statfs *buf ) {
+		stats_inc("parrot.local.statfs", 1);
 		int result;
 		struct statfs64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
@@ -357,6 +390,7 @@ public:
 		END
 	}
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
+		stats_inc("parrot.local.lstat", 1);
 		int result;
 		struct stat64 lbuf;
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
@@ -366,6 +400,7 @@ public:
 		END
 	}
 	virtual int access( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.local.access", 1);
 		int result;
 		if(!pfs_acl_check(name,ibox_acl_from_access_flags(mode))) return -1;
 		debug(D_LOCAL,"access %s %d",name->rest,mode);
@@ -373,6 +408,7 @@ public:
 		END
 	}
 	virtual int chmod( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.local.chmod", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"chmod %s %d",name->rest,mode);
@@ -380,6 +416,7 @@ public:
 		END
 	}
 	virtual int chown( pfs_name *name, uid_t uid, gid_t gid ) {
+		stats_inc("parrot.local.chown", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"chown %s %d %d",name->rest,uid,gid);
@@ -387,6 +424,7 @@ public:
 		END
 	}
 	virtual int lchown( pfs_name *name, uid_t uid, gid_t gid ) {
+		stats_inc("parrot.local.lchown", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lchown %s %d %d",name->rest,uid,gid);
@@ -394,6 +432,7 @@ public:
 		END
 	}
 	virtual int truncate( pfs_name *name, pfs_off_t length ) {
+		stats_inc("parrot.local.truncate", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"truncate %s %lld",name->rest,(long long)length);
@@ -401,6 +440,7 @@ public:
 		END
 	}
 	virtual int utime( pfs_name *name, struct utimbuf *buf ) {
+		stats_inc("parrot.local.utime", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"utime %s %p",name->rest,buf);
@@ -408,6 +448,7 @@ public:
 		END
 	}
 	virtual int utimens( pfs_name *name, const struct timespec times[2] ) {
+		stats_inc("parrot.local.utimens", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		assert(*name->rest == '/');
@@ -426,6 +467,7 @@ public:
 		END
 	}
 	virtual int lutimens( pfs_name *name, const struct timespec times[2] ) {
+		stats_inc("parrot.local.lutimens", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lutimens %s %p",name->rest,times);
@@ -450,6 +492,7 @@ public:
 		END
 	}
 	virtual int unlink( pfs_name *name ) {
+		stats_inc("parrot.local.unlink", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"unlink %s",name->rest);
@@ -457,6 +500,7 @@ public:
 		END
 	}
 	virtual int rename( pfs_name *oldname, pfs_name *newname ) {
+		stats_inc("parrot.local.rename", 1);
 		int result;
 		if(!pfs_acl_check(oldname,IBOX_ACL_READ)) return -1;
 		if(!pfs_acl_check(newname,IBOX_ACL_WRITE)) return -1;
@@ -468,6 +512,7 @@ public:
 
 	virtual ssize_t getxattr ( pfs_name *name, const char *attrname, void *data, size_t size )
 	{
+		stats_inc("parrot.local.getxattr", 1);
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"getxattr %s %s",name->rest,attrname);
@@ -481,6 +526,7 @@ public:
 
 	virtual ssize_t lgetxattr ( pfs_name *name, const char *attrname, void *data, size_t size )
 	{
+		stats_inc("parrot.local.lgetxattr", 1);
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"lgetxattr %s %s",name->rest,attrname);
@@ -494,6 +540,7 @@ public:
 
 	virtual ssize_t listxattr ( pfs_name *name, char *list, size_t size )
 	{
+		stats_inc("parrot.local.listxattr", 1);
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"listxattr %s",name->rest);
@@ -507,6 +554,7 @@ public:
 
 	virtual ssize_t llistxattr ( pfs_name *name, char *list, size_t size )
 	{
+		stats_inc("parrot.local.llistxattr", 1);
 		ssize_t result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"llistxattr %s",name->rest);
@@ -520,6 +568,7 @@ public:
 
 	virtual int setxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
+		stats_inc("parrot.local.setxattr", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"setxattr %s %s <> %d",name->rest,attrname,flags);
@@ -533,6 +582,7 @@ public:
 
 	virtual int lsetxattr ( pfs_name *name, const char *attrname, const void *data, size_t size, int flags )
 	{
+		stats_inc("parrot.local.lsetxattr", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lsetxattr %s %s <> %d",name->rest,attrname,flags);
@@ -546,6 +596,7 @@ public:
 
 	virtual int removexattr ( pfs_name *name, const char *attrname )
 	{
+		stats_inc("parrot.local.removexattr", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"removexattr %s %s",name->rest,attrname);
@@ -559,6 +610,7 @@ public:
 
 	virtual int lremovexattr ( pfs_name *name, const char *attrname )
 	{
+		stats_inc("parrot.local.lremovexattr", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"lremovexattr %s %s",name->rest,attrname);
@@ -580,6 +632,7 @@ public:
 	back fails?
 	*/
 	virtual int chdir( pfs_name *name, char *newpath ) {
+		stats_inc("parrot.local.chdir", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"canonicalize %s",name->rest);
@@ -588,6 +641,7 @@ public:
 	}
 
 	virtual int link( pfs_name *oldname, pfs_name *newname ) {
+		stats_inc("parrot.local.link", 1);
 		int result;
 		if(!pfs_acl_check(oldname,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"link %s %s",oldname->rest,newname->rest);
@@ -595,6 +649,7 @@ public:
 		END
 	}
 	virtual int symlink( const char *linkname, pfs_name *newname ) {
+		stats_inc("parrot.local.symlink", 1);
 		int result;
 		if(!pfs_acl_check(newname,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"symlink %s %s",linkname,newname->rest);
@@ -602,13 +657,16 @@ public:
 		END
 	}
 	virtual int readlink( pfs_name *name, char *buf, pfs_size_t size ) {
+		stats_inc("parrot.local.readlink", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_READ)) return -1;
 		debug(D_LOCAL,"readlink %s %p %d",name->rest,buf,(int)size);
 		result = ::readlink(name->rest,buf,size);
+		if (result >= 0) stats_bin("parrot.local.readlink.size", result);
 		END
 	}
 	virtual int mknod( pfs_name *name, mode_t mode, dev_t dev ) {
+		stats_inc("parrot.local.mknod", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"mknod %s %d %d",name->rest,(int)mode,(int)dev);
@@ -616,6 +674,7 @@ public:
 		END
 	}
 	virtual int mkdir( pfs_name *name, mode_t mode ) {
+		stats_inc("parrot.local.mkdir", 1);
 		int result;
 		if(!pfs_acl_check(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"mkdir %s %d",name->rest,mode);
@@ -624,6 +683,7 @@ public:
 		END
 	}
 	virtual int rmdir( pfs_name *name ) {
+		stats_inc("parrot.local.rmdir", 1);
 		int result;
 		if(!pfs_acl_check_dir(name,IBOX_ACL_WRITE)) return -1;
 		debug(D_LOCAL,"rmdir %s",name->rest);
@@ -637,6 +697,7 @@ public:
 	}
 
 	virtual int whoami( pfs_name *name, char *buf, int size ) {
+		stats_inc("parrot.local.whoami", 1);
 		int result;
 		debug(D_LOCAL,"whoami %s",name->rest);
 		if (pfs_username) {
@@ -650,6 +711,7 @@ public:
 	}
 
 	virtual pfs_location* locate( pfs_name *name ) {
+		stats_inc("parrot.local.locate", 1);
 		int result;
 		struct pfs_stat buf;
 		char path[PFS_PATH_MAX];

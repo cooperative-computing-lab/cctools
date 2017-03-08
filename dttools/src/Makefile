@@ -96,6 +96,7 @@ SOURCES = \
 	sigdef.c \
 	sleeptools.c \
 	sort_dir.c \
+	stats.c \
 	string_array.c \
 	stringtools.c \
 	text_array.c \

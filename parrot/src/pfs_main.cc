@@ -49,6 +49,8 @@ extern "C" {
 #include "xxmalloc.h"
 #include "hash_table.h"
 #include "jx.h"
+#include "jx_pretty_print.h"
+#include "stats.h"
 }
 
 #include <fcntl.h>
@@ -130,6 +132,7 @@ char pfs_cvmfs_option_file[PATH_MAX];
 struct jx *pfs_cvmfs_options = NULL;
 
 int pfs_irods_debug_level = 0;
+char *stats_file = NULL;
 
 int parrot_fd_max = -1;
 int parrot_fd_start = -1;
@@ -163,7 +166,8 @@ enum {
 	LONG_OPT_TIME_WARP,
 	LONG_OPT_PARROT_PATH,
 	LONG_OPT_PID_WARP,
-	LONG_OPT_PID_FIXED
+	LONG_OPT_PID_FIXED,
+	LONG_OPT_STATS_FILE,
 };
 
 static void get_linux_version(const char *cmd)
@@ -238,6 +242,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s     (default 10M, 0 disables)\n","");
 	printf( " %-30s Display version number.\n", "-v,--version");
 	printf( " %-30s Test if Parrot is already running.\n", "   --is-running");
+	printf( " %-30s Save runtime statistics to a file.\n", "   --stats-file");
 	printf( " %-30s Show most commonly used options.\n", "-h,--help");
 	printf("\n");
 	printf("Virtualization options:\n");
@@ -829,6 +834,7 @@ int main( int argc, char *argv[] )
 		{"proxy", required_argument, 0, 'p'},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"session-caching", no_argument, 0, 'S'},
+		{"stats-file", required_argument, 0, LONG_OPT_STATS_FILE},
 		{"status-file", required_argument, 0, 'c'},
 		{"stream-no-cache", no_argument, 0, 's'},
 		{"sync-write", no_argument, 0, 'Y'},
@@ -1092,6 +1098,10 @@ int main( int argc, char *argv[] )
 			pfs_pid_mode = PFS_PID_MODE_WARP;
 			pfs_use_helper = 1;
 			break;
+		case LONG_OPT_STATS_FILE:
+			free(stats_file);
+			stats_file = xxstrdup(optarg);
+			break;
 		default:
 			show_help(argv[0]);
 			break;
@@ -1099,6 +1109,14 @@ int main( int argc, char *argv[] )
 	}
 
 	if(optind>=argc) show_help(argv[0]);
+
+	FILE *stats_out;
+	if (stats_file) {
+		stats_enable();
+		stats_out = fopen(stats_file, "w");
+		if (!stats_out)
+			fatal("could not open stats file %s: %s", stats_file, strerror(errno));
+	}
 
 	{
 		char buf[4096];
@@ -1387,6 +1405,12 @@ int main( int argc, char *argv[] )
 		}
 		hash_table_delete(namelist_table);
 		fclose(namelist_file);
+	}
+
+	if (stats_file) {
+		jx_pretty_print_stream(stats_get(), stats_out);
+		fprintf(stats_out, "\n");
+		fclose(stats_out);
 	}
 
 	if(WIFEXITED(root_exitstatus)) {
