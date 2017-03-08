@@ -3194,7 +3194,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 			}
 			time_t ts;
 			time(&ts);
-			debug(D_BJ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d\n", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, s->tasks_running, s->workers_connected);
+			debug(D_BJ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d\n", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, s->tasks_running, s->tasks_waiting, s->workers_connected);
 			master_capacity_weighted = s->capacity_weighted;
 			debug(D_BJ, "MASTER: %d\n", master_capacity_weighted);
 			//q->stats->previous_capacity_weighted = s->capacity_weighted;

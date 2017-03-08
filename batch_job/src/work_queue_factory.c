@@ -259,15 +259,15 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		int capacity_disk = jx_lookup_integer(j, "capacity_disk");
 		//int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
 		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
-		int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
-		int time_execute = jx_lookup_integer(j, "time_workers_execute");
+		//int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
+		//int time_execute = jx_lookup_integer(j, "time_workers_execute");
 		//const int time_master = jx_lookup_integer(j, "time_master");
 		const int cores = resources->cores;
 		const int memory = resources->memory;
 		const int disk = resources->disk;
 
-		int execute_delta = time_execute - time_execute_previous;
-		int transfer_delta = time_transfer - time_transfer_previous;
+		//int execute_delta = time_execute - time_execute_previous;
+		//int transfer_delta = time_transfer - time_transfer_previous;
 		//double time_execute_weighted;
 		//double time_transfer_weighted;
 /*		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
@@ -294,35 +294,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			fprintf(stderr, "New previous values set.\n");
 		}
 */
-		const int temp_capacity_tasks = capacity_tasks;
-		if(tasks_per_worker > 0) {
-			capacity_tasks = capacity_tasks / tasks_per_worker;
-		}
-		if(capacity_tasks <= 0) {
-			capacity_tasks = temp_capacity_tasks;
-		}
-		if(cores > 0) {
-			capacity_cores = capacity_cores / cores;
-		}
-		if(capacity_cores <= 0) {
-			capacity_cores = capacity_tasks;
-		}
-		if(memory > 0) {
-			capacity_memory = capacity_memory / memory;
-		}
-		if(capacity_memory <= 0) {
-			capacity_memory = capacity_tasks;
-		}
-		if(disk > 0) {
-			capacity_disk = capacity_disk / disk;
-		}
-		if(capacity_disk <= 0) {
-			capacity_disk = capacity_tasks;
-		}
-	
-		int capacity = MIN(capacity_weighted, MIN(capacity_tasks, MIN(capacity_cores, MIN(capacity_memory, capacity_disk))));
-		fprintf(stderr, "Execute: %d\nI/O: %d\nCapacity: %d\nMIN: %d\n", execute_delta, transfer_delta, capacity_weighted, capacity);
->>>>>>> Modifies interaction between master and factory to get communication working
+		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
 
 		// first assume one task per worker
@@ -341,7 +313,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		// consider if tasks declared resources...
 		need = MAX(need, master_workers_needed_by_resource(j));
 
-		int capacity = master_workers_capacity(j);
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
 		}
