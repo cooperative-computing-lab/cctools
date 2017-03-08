@@ -13,9 +13,10 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include "sha1.h"
-#include "pfs_types.h"
 
 /*
 A grow_dirent is a node in a tree representing the
@@ -28,8 +29,8 @@ struct grow_dirent {
 	char *name;
 	char *linkname;
 	unsigned mode;
-	UINT64_T size;
-	UINT64_T inode;
+	uint64_t size;
+	uint64_t inode;
 	time_t   mtime;
 	char checksum[SHA1_DIGEST_ASCII_LENGTH];
 	struct grow_dirent *children;
@@ -37,13 +38,9 @@ struct grow_dirent {
 	struct grow_dirent *next;
 };
 
-void grow_dirent_delete( struct grow_dirent *d );
-int compare_path_element( const char *a, const char *b );
-const char * compare_path_prefix( const char *a, const char *b );
-struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_dirent *parent );
-void grow_dirent_delete( struct grow_dirent *d );
-void grow_dirent_to_pfs_stat( struct grow_dirent *d, struct pfs_stat *s );
-void grow_dirent_to_stat( struct grow_dirent *d, struct stat *s );
-struct grow_dirent * grow_dirent_lookup_recursive( const char *path, struct grow_dirent *root, int link_count );
+void grow_delete(struct grow_dirent *d);
+struct grow_dirent *grow_from_file(FILE *file);
+void grow_dirent_to_stat(struct grow_dirent *d, struct stat *s);
+struct grow_dirent *grow_lookup(const char *path, struct grow_dirent *root, int link_count);
 
 #endif

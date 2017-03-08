@@ -66,7 +66,7 @@ struct fuse_root {
 static int cache_open(struct fuse_root *root, const char *path, int flags) {
 	unsigned retries = 0;
 	char cachepath[PATH_MAX];
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	if (flags&O_WRONLY || flags&O_RDWR) return -EROFS;
 
@@ -114,7 +114,7 @@ retry:
 static int deny_write(const char *path) {
 	stats_inc("grow.fuse.deny_write", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	return -EROFS;
 }
@@ -122,7 +122,7 @@ static int deny_write(const char *path) {
 static int deny_create(const char *path) {
 	stats_inc("grow.fuse.deny_create", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(basename(path), root->metadata, 1);
+	struct grow_dirent *e = grow_lookup(basename(path), root->metadata, 1);
 	if (!e) return -errno;
 	if (!S_ISDIR(e->mode)) return -ENOTDIR;
 	return -EROFS;
@@ -144,7 +144,7 @@ static void grow_fuse_destroy(void *x) {
 static int grow_fuse_getattr(const char *path, struct stat *stbuf) {
 	stats_inc("grow.fuse.getattr", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 0);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 0);
 	if (!e) return -errno;
 	grow_dirent_to_stat(e, stbuf);
 	return 0;
@@ -153,7 +153,7 @@ static int grow_fuse_getattr(const char *path, struct stat *stbuf) {
 static int grow_fuse_access(const char *path, int mask) {
 	stats_inc("grow.fuse.access", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	if (mask&W_OK) return -EROFS;
 	return 0;
@@ -162,7 +162,7 @@ static int grow_fuse_access(const char *path, int mask) {
 static int grow_fuse_readlink(const char *path, char *buf, size_t size) {
 	stats_inc("grow.fuse.readlink", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 0);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 0);
 	if (!e) return -errno;
 	if (!S_ISLNK(e->mode)) return -EINVAL;
 	snprintf(buf, size, "%s", e->linkname);
@@ -172,7 +172,7 @@ static int grow_fuse_readlink(const char *path, char *buf, size_t size) {
 static int grow_fuse_opendir(const char *path, struct fuse_file_info *fi) {
 	stats_inc("grow.fuse.opendir", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	if (!S_ISDIR(e->mode)) return -ENOTDIR;
 	return 0;
@@ -181,7 +181,7 @@ static int grow_fuse_opendir(const char *path, struct fuse_file_info *fi) {
 static int grow_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi) {
 	stats_inc("grow.fuse.readdir", 1);
 	GETROOT
-	struct grow_dirent *e = grow_dirent_lookup_recursive(path, root->metadata, 1);
+	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	if (!S_ISDIR(e->mode)) return -ENOTDIR;
 	for (struct grow_dirent *c = e->children; c; c = c->next) {
@@ -219,9 +219,9 @@ static int grow_fuse_rename(const char *from, const char *to) {
 	stats_inc("grow.fuse.rename", 1);
 	GETROOT
 	// this isn't exactly correct, but rename has an annoying number of cases
-	struct grow_dirent *from_ent = grow_dirent_lookup_recursive(from, root->metadata, 1);
+	struct grow_dirent *from_ent = grow_lookup(from, root->metadata, 1);
 	if (!from_ent) return -errno;
-	struct grow_dirent *to_ent = grow_dirent_lookup_recursive(to, root->metadata, 0);
+	struct grow_dirent *to_ent = grow_lookup(to, root->metadata, 0);
 	if (to_ent) {
 		// should check if to is empty for -ENOTEMPTY
 		if (S_ISDIR(from_ent->mode) && S_ISDIR(to_ent->mode)) return -EROFS;
@@ -230,7 +230,7 @@ static int grow_fuse_rename(const char *from, const char *to) {
 		return -EROFS;
 
 	}
-	struct grow_dirent *parent_ent = grow_dirent_lookup_recursive(basename(to), root->metadata, 1);
+	struct grow_dirent *parent_ent = grow_lookup(basename(to), root->metadata, 1);
 	if (parent_ent && S_ISDIR(parent_ent->mode)) {
 		return -EROFS;
 	} else if (parent_ent) {
@@ -418,7 +418,7 @@ int main(int argc, char *argv[]) {
 		if (!metadata) {
 			fatal("failed to get index FILE: %s", strerror(errno));
 		}
-		root.metadata = grow_dirent_create_from_file(metadata, NULL);
+		root.metadata = grow_from_file(metadata);
 		if (!root.metadata) {
 			fatal("failed to load GROW-FS index");
 		}

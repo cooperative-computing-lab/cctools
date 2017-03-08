@@ -19,8 +19,7 @@ For example, "foo" matches "foo/bar/baz".
 Return one if they match, zero otherwise.
 */
 
-int compare_path_element( const char *a, const char *b )
-{
+static int compare_path_element( const char *a, const char *b ) {
 	while(*a==*b) {
 		if(!*a) return 1;
 		if(*a=='/') return 1;
@@ -34,42 +33,7 @@ int compare_path_element( const char *a, const char *b )
 	return 0;
 }
 
-/*
-Compare two entire path strings to see if a is a prefix of b.
-Return the remainder of b not matched by a.
-For example, compare_path_prefix("foo/baz","foo/baz/bar") returns "/bar".
-Return null if a is not a prefix of b.
-*/
-
-const char * compare_path_prefix( const char *a, const char *b )
-{
-	while(1) {
-		if(*a=='/' && *b=='/') {
-			while(*a=='/') a++;
-			while(*b=='/') b++;
-		}
-
-		if(!*a) return b;
-		if(!*b) return 0;
-
-		if(*a==*b) {
-			a++;
-			b++;
-			continue;
-		} else {
-			return 0;
-		}
-	}
-}
-
-/*
-Recursively create a grow directory structure by reading
-descriptor lines from a stored file.
-*/
-
-
-struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_dirent *parent )
-{
+static struct grow_dirent *grow_dirent_create_from_file( FILE *file, struct grow_dirent *parent ) {
 	struct grow_dirent *d;
 	struct grow_dirent *list=0;
 	char line[GROW_LINE_MAX];
@@ -132,7 +96,7 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 		} else {
 			debug(D_GROW,"directory listing is corrupted!");
 			free(d);
-			grow_dirent_delete(list);
+			grow_delete(list);
 			return 0;
 		}
 	}
@@ -141,40 +105,31 @@ struct grow_dirent * grow_dirent_create_from_file( FILE *file, struct grow_diren
 }
 
 /*
+Recursively create a grow directory structure by reading
+descriptor lines from a stored file.
+*/
+struct grow_dirent *grow_from_file(FILE *file) {
+	return grow_dirent_create_from_file(file, NULL);
+}
+
+/*
 Recursively destroy a directory structure.
 */
 
-void grow_dirent_delete( struct grow_dirent *d )
-{
+void grow_delete(struct grow_dirent *d) {
 	struct grow_dirent *n;
 
 	while(d) {
 		if(d->name) free(d->name);
 		if(d->linkname) free(d->linkname);
-		grow_dirent_delete(d->children);
+		grow_delete(d->children);
 		n = d->next;
 		free(d);
 		d = n;
 	}
 }
 
-void grow_dirent_to_stat( struct grow_dirent *d, struct stat *s ) {
-	s->st_dev = 1;
-	s->st_ino = d->inode;
-	s->st_mode = d->mode;
-	s->st_nlink = 1;
-	s->st_uid = 0;
-	s->st_gid = 0;
-	s->st_rdev = 1;
-	s->st_size = d->size;
-	s->st_blksize = 65536;
-	s->st_blocks = 1+d->size/512;
-	s->st_atime = d->mtime;
-	s->st_mtime = d->mtime;
-	s->st_ctime = d->mtime;
-}
-
-void grow_dirent_to_pfs_stat( struct grow_dirent *d, struct pfs_stat *s ) {
+void grow_dirent_to_stat(struct grow_dirent *d, struct stat *s) {
 	s->st_dev = 1;
 	s->st_ino = d->inode;
 	s->st_mode = d->mode;
@@ -198,8 +153,7 @@ link_count reaches 100, ELOOP is returned.
 */
 
 
-struct grow_dirent * grow_dirent_lookup_recursive( const char *path, struct grow_dirent *root, int link_count )
-{
+struct grow_dirent * grow_lookup(const char *path, struct grow_dirent *root, int link_count) {
 	struct grow_dirent *d;
 
 	if(!path) path = "\0";
@@ -221,7 +175,7 @@ struct grow_dirent * grow_dirent_lookup_recursive( const char *path, struct grow
 			root = root->parent;
 		}
 
-		root = grow_dirent_lookup_recursive(linkname,root,link_count+1);
+		root = grow_lookup(linkname, root, link_count + 1);
 		if(!root) {
 			errno = ENOENT;
 			return 0;
@@ -239,12 +193,12 @@ struct grow_dirent * grow_dirent_lookup_recursive( const char *path, struct grow
 	if(!subpath) subpath = "\0";
 
 	if(compare_path_element(".",path)) {
-		return grow_dirent_lookup_recursive(subpath,root,link_count);
+		return grow_lookup(subpath, root, link_count);
 	}
 
 	if(compare_path_element("..",path)) {
 		if(root->parent) {
-			return grow_dirent_lookup_recursive(subpath,root->parent,link_count);
+			return grow_lookup(subpath, root->parent, link_count);
 		} else {
 			errno = ENOENT;
 			return 0;
@@ -253,7 +207,7 @@ struct grow_dirent * grow_dirent_lookup_recursive( const char *path, struct grow
 
 	for(d=root->children;d;d=d->next) {
 		if(compare_path_element(d->name,path)) {
-			return grow_dirent_lookup_recursive(subpath,d,link_count);
+			return grow_lookup(subpath, d, link_count);
 		}
 	}
 

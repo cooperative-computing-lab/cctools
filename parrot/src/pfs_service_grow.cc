@@ -88,6 +88,22 @@ extern int pfs_cache_invalidate( pfs_name *name );
 
 static struct grow_filesystem * grow_filesystem_list = 0;
 
+static void grow_dirent_to_pfs_stat( struct grow_dirent *d, struct pfs_stat *s ) {
+	s->st_dev = 1;
+	s->st_ino = d->inode;
+	s->st_mode = d->mode;
+	s->st_nlink = 1;
+	s->st_uid = 0;
+	s->st_gid = 0;
+	s->st_rdev = 1;
+	s->st_size = d->size;
+	s->st_blksize = 65536;
+	s->st_blocks = 1+d->size/512;
+	s->st_atime = d->mtime;
+	s->st_mtime = d->mtime;
+	s->st_ctime = d->mtime;
+}
+
 /*
 A grow_filesystem structure represents an entire
 filesystem rooted at a given host and path.
@@ -101,6 +117,33 @@ struct grow_filesystem {
 	struct grow_dirent *root;
 	struct grow_filesystem *next;
 };
+
+/*
+Compare two entire path strings to see if a is a prefix of b.
+Return the remainder of b not matched by a.
+For example, compare_path_prefix("foo/baz","foo/baz/bar") returns "/bar".
+Return null if a is not a prefix of b.
+*/
+
+static const char *compare_path_prefix( const char *a, const char *b ) {
+	while(1) {
+		if(*a=='/' && *b=='/') {
+			while(*a=='/') a++;
+			while(*b=='/') b++;
+		}
+
+		if(!*a) return b;
+		if(!*b) return 0;
+
+		if(*a==*b) {
+			a++;
+			b++;
+			continue;
+		} else {
+			return 0;
+		}
+	}
+}
 
 /*
 Search for a grow filesystem rooted at the given host and path.
@@ -222,7 +265,7 @@ struct grow_filesystem * grow_filesystem_create( const char *hostport, const cha
 		goto sleep_retry;
 	}
 
-	d = grow_dirent_create_from_file(file,0);
+	d = grow_from_file(file);
 	if(!d) {
 		debug(D_GROW,"%s is corrupted",filename);
 		fclose(file);
@@ -261,7 +304,7 @@ Recursively destroy a grow filesystem.
 void grow_filesystem_delete( struct grow_filesystem *f )
 {
 	if(!f) return;
-	grow_dirent_delete(f->root);
+	grow_delete(f->root);
 	grow_filesystem_delete(f->next);
 	free(f);
 }
@@ -304,7 +347,7 @@ struct grow_dirent * grow_dirent_lookup( pfs_name *name, int follow_links )
 					continue;
 				}
 			}
-			return grow_dirent_lookup_recursive(subpath,f->root,follow_links);
+			return grow_lookup(subpath,f->root,follow_links);
 		}
 	}
 
@@ -315,7 +358,7 @@ struct grow_dirent * grow_dirent_lookup( pfs_name *name, int follow_links )
 			f->next = grow_filesystem_list;
 			grow_filesystem_list = f;
 			subpath = compare_path_prefix(f->path,name->rest);
-			return grow_dirent_lookup_recursive(subpath,f->root,follow_links);
+			return grow_lookup(subpath,f->root,follow_links);
 		}
 		s = strrchr(path,'/');
 		if(s) {
