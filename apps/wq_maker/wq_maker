@@ -451,7 +451,7 @@ sub submit_tasks {
 sub submit_task {
 	my($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs) = @_;
 
-	my $task_command = "";
+	my $task_command = "maker -EXE; ";
 	if($augustus){
 		$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; ";
 	}
@@ -478,10 +478,10 @@ sub submit_task {
 
 	$task->specify_cores($cores);
 	if($disk){
-		$task->specify_cores($disk);
+		$task->specify_disk($disk);
 	}
 	if($memory){
-		$task->specify_cores($memory);
+		$task->specify_memory($memory);
 	}
 
 	my $taskid = $wq->submit($task);
