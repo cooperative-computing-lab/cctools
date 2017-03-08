@@ -18,13 +18,12 @@ See the file COPYING for details.
 
 #include "sha1.h"
 
-/*
-A grow_dirent is a node in a tree representing the
-entire directory structure of a grow_filesystem.
-Each node describes its name, metadata, checksum,
-and children (if a directory)
+/**
+ * A grow_dirent is a node in a tree representing the
+ * entire directory structure of a grow_filesystem.
+ * Each node describes its name, metadata, checksum,
+ * and children (if a directory)
 */
-
 struct grow_dirent {
 	char *name;
 	char *linkname;
@@ -38,9 +37,32 @@ struct grow_dirent {
 	struct grow_dirent *next;
 };
 
-void grow_delete(struct grow_dirent *d);
+/**
+ * Parse the given file to generate an in-memory directory tree.
+ * @param FILE A file stream open for reading.
+ * @returns A pointer to the root of the directory tree, or NULL on error.
+ */
 struct grow_dirent *grow_from_file(FILE *file);
-void grow_dirent_to_stat(struct grow_dirent *d, struct stat *s);
+
+/**
+ * Recursively free a directory tree.
+ */
+void grow_delete(struct grow_dirent *d);
+
+/**
+ * Resolve a path relative to a root directory.
+ * @param path The slash-delimited path to resolve.
+ * @param root The root from which to resolve.
+ * @param link_count Set to 1 to follow symlinks, 0 otherwise.
+ * @returns A pointer to the dirent referred to by the path, or NULL with errno set.
+ */
 struct grow_dirent *grow_lookup(const char *path, struct grow_dirent *root, int link_count);
+
+/**
+ * Given a dirent, fill in a stat buffer.
+ * @param d The GROW dirent to read.
+ * @param s The stat buffer to write to.
+ */
+void grow_dirent_to_stat(struct grow_dirent *d, struct stat *s);
 
 #endif
