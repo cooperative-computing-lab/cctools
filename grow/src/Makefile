@@ -5,7 +5,7 @@ LOCAL_CCFLAGS = -D_FILE_OFFSET_BITS=64 -fstack-protector-all
 LOCAL_LDFLAGS = -L/lib64
 LOCAL_LINKAGE = ../../dttools/src/libdttools.a
 
-TARGETS = grow_fuse
+TARGETS =
 OBJECTS = grow_fuse.o grow.o
 SOURCES = grow_fuse.c grow.c
 SCRIPTS = make_growfs
@@ -13,6 +13,7 @@ SCRIPTS = make_growfs
 all: grow.o
 ifeq ($(CCTOOLS_FUSE_AVAILABLE), yes)
 all: grow_fuse
+TARGETS += grow_fuse
 endif
 
 grow_fuse.c grow.c: grow.h
