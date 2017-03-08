@@ -8,6 +8,7 @@ LOCAL_LINKAGE = ../../dttools/src/libdttools.a
 TARGETS = grow_fuse
 OBJECTS = grow_fuse.o grow.o
 SOURCES = grow_fuse.c grow.c
+SCRIPTS = make_growfs
 
 all: grow.o
 ifeq ($(CCTOOLS_FUSE_AVAILABLE), yes)
@@ -27,7 +28,8 @@ clean:
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	cp $(TARGETS) $(CCTOOLS_INSTALL_DIR)/bin/
+	chmod 755 $(SCRIPTS)
+	cp $(TARGETS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin/
 
 test: all
 
