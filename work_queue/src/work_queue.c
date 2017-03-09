@@ -605,7 +605,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-
+	debug(D_WQ, "ENTERED recv_worker_msg\n");
 	//If foreman, then we wait until foreman gives the master some attention.
 	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
@@ -635,6 +635,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
 	} else if (string_prefix_is(line, "feature")) {
+		debug(D_WQ, "FEATURE PROCESSED.\n");
 		result = process_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
@@ -2634,6 +2635,8 @@ static work_queue_msg_code_t process_feature( struct work_queue *q, struct work_
 
 	url_decode(feature, fdec, WORK_QUEUE_LINE_MAX);
 
+	debug(D_WQ, "FEATURE FOUND: %s\n", fdec);
+
 	hash_table_insert(w->features, fdec, (void **) 1);
 
 	return MSG_PROCESSED;
@@ -3367,7 +3370,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	rmsummary_delete(limits);
 
-	if(t->user_resources)
+	if(t->user_resources) {
 		if(!w->features)
 			return 0;
 
@@ -3377,7 +3380,10 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
+	}
 
+	return ok;
+/*
 	if(w->foreman)
 	{
 		return check_foreman_against_task(q, w, t);
@@ -3393,6 +3399,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 			return check_worker_against_task(q, w, t);
 		}
 	}
+*/
 }
 
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)

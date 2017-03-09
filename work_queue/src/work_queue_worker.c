@@ -346,6 +346,7 @@ static void send_features(struct link *master) {
 	while(hash_table_nextkey(features, &f, &dummy)) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
 		send_master_message(master, "feature %s\n", fenc);
+		fprintf(stderr, "Worker Feature Found: %s\n", f);
 	}
 }
 
@@ -2267,7 +2268,7 @@ static const struct option long_options[] = {
 	{"docker",              required_argument,  0,  LONG_OPT_RUN_DOCKER},
 	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
 	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
-	{"provides",            required_argument,  0,  LONG_OPT_FEATURE},
+	{"feature",            required_argument,  0,  LONG_OPT_FEATURE},
 	{0,0,0,0}
 };
 
@@ -2498,6 +2499,7 @@ int main(int argc, char *argv[])
 			}
 			disk_allocation = 1;
 			break;
+		}
 		case LONG_OPT_FEATURE:
 			if(!features)
 				features = hash_table_create(4, 0);

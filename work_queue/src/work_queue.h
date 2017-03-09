@@ -150,6 +150,7 @@ struct work_queue_task {
 	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref work_queue_enable_monitoring */
 
 	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
+	struct list *user_resources;                           /**< User-defined features this task requires. (See work_queue_worker's --feature option.) */
 
 	/* deprecated fields */
 	//int total_submissions;                                 /**< @deprecated Use try_count. */
@@ -178,8 +179,6 @@ struct work_queue_task {
 	int64_t total_bytes_received;                          /**< @deprecated Use bytes_received instead. */
 	int64_t total_bytes_sent;                              /**< @deprecated Use bytes_sent instead. */
 	int64_t total_bytes_transferred;                       /**< @deprecated Use bytes_transferred instead. */
-
-	struct list *user_resources;                        /**< User-defined features this task requires. (See work_queue_worker's --provide option.) */
 
 	timestamp_t time_app_delay;                            /**< @deprecated The time spent in upper-level application (outside of work_queue_wait). */
 };
