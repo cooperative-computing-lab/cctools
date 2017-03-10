@@ -605,7 +605,6 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-	debug(D_WQ, "ENTERED recv_worker_msg\n");
 	//If foreman, then we wait until foreman gives the master some attention.
 	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
@@ -635,7 +634,6 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
 	} else if (string_prefix_is(line, "feature")) {
-		debug(D_WQ, "FEATURE PROCESSED.\n");
 		result = process_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);

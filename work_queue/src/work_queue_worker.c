@@ -346,7 +346,6 @@ static void send_features(struct link *master) {
 	while(hash_table_nextkey(features, &f, &dummy)) {
 		url_encode(f, fenc, WORK_QUEUE_LINE_MAX);
 		send_master_message(master, "feature %s\n", fenc);
-		fprintf(stderr, "Worker Feature Found: %s\n", f);
 	}
 }
 
