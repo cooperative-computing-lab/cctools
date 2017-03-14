@@ -143,15 +143,22 @@ def subprocess_error(cmd, rc, stdout, stderr):
 	cleanup(tempfile_list, tempdir_list)
 	sys.exit("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s\n" % (cmd, rc, stdout, stderr))
 
-def func_call(cmd):
+def func_call(cmd, utils_list=None):
 	""" Execute a command and return the return code, stdout, stderr.
 
 	Args:
 		cmd: the command needs to execute using the subprocess module.
+		utils_list: a list of executables used in the cmd
 
 	Returns:
 		a tuple including the return code, stdout, stderr.
 	"""
+
+	# first check whether all the executables in utils_list exist or not
+	if dependency_check_list(utils_list) == -1:
+		cleanup(tempfile_list, tempdir_list)
+		sys.exit(-1)
+
 	logging.debug("Start to execute command: %s", cmd)
 	p = subprocess.Popen(cmd, stdout = subprocess.PIPE, shell = True)
 	(stdout, stderr) = p.communicate()
@@ -159,16 +166,23 @@ def func_call(cmd):
 	logging.debug("returncode: %d\nstdout: %s\nstderr: %s", rc, stdout, stderr)
 	return (rc, stdout, stderr)
 
-def func_call_withenv(cmd, env_dict):
+def func_call_withenv(cmd, env_dict, utils_list=None):
 	""" Execute a command with a special setting of the environment variables and return the return code, stdout, stderr.
 
 	Args:
 		cmd: the command needs to execute using the subprocess module.
 		env_dict: the environment setting.
+		utils_list: a list of executables used in the cmd
 
 	Returns:
 		a tuple including the return code, stdout, stderr.
 	"""
+
+	# first check whether all the executables in utils_list exist or not
+	if dependency_check_list(utils_list) == -1:
+		cleanup(tempfile_list, tempdir_list)
+		sys.exit(-1)
+
 	logging.debug("Start to execute command: %s", cmd)
 	logging.debug("The environment variables for executing the command is:")
 	logging.debug(env_dict)
@@ -496,24 +510,21 @@ def git_dependency_download(repo_url, dest, git_branch, git_commit):
 			os.makedirs(dir)
 		os.chdir(dir)
 
-		if dependency_check('git') == -1:
-			cleanup(tempfile_list, tempdir_list)
-			sys.exit("Git is not found!")
 		cmd = "git clone %s" % repo_url
-		rc, stdout, stderr = func_call(cmd)
+		rc, stdout, stderr = func_call(cmd, ["git"])
 		if rc != 0:
 			subprocess_error(cmd, rc, stdout, stderr)
 
 	os.chdir(dest)
 	if git_branch:
 		cmd = "git checkout %s" % git_branch
-		rc, stdout, stderr = func_call(cmd)
+		rc, stdout, stderr = func_call(cmd, ["git"])
 		if rc != 0:
 			subprocess_error(cmd, rc, stdout, stderr)
 
 	if git_commit:
 		cmd = "git checkout %s" % git_commit
-		rc, stdout, stderr = func_call(cmd)
+		rc, stdout, stderr = func_call(cmd, ["git"])
 		if rc != 0:
 			subprocess_error(cmd, rc, stdout, stderr)
 	return dest
@@ -610,7 +621,7 @@ def check_cvmfs_repo(repo_name):
 	"""
 	logging.debug("Check whether a cvmfs repo is installed on the host or not")
 	cmd = "df -h|grep '^cvmfs'|grep "+ "'" + repo_name + "'" + "|rev| cut -d' '  -f1|rev"
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["df", "grep", "rev", "cut"])
 	if rc == 0:
 		return stdout
 	else:
@@ -858,7 +869,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	memory_size = float(memory_size[:-2])
 
 	cmd = "free -tg|grep Total|sed 's/\s\+/ /g'|cut -d' ' -f2"
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["free", "grep", "sed", "cut"])
 	if rc != 0:
 		logging.critical("The return code is %d, memory check fail!", rc)
 	else:
@@ -1006,7 +1017,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
 
 					if not os.path.exists(mountpoint):
 						cmd = "mv -f %s %s/" % (mount_value, parent_dir)
-						rc, stdout, stderr = func_call(cmd)
+						rc, stdout, stderr = func_call(cmd, ["mv"])
 						if rc != 0:
 							subprocess_error(cmd, rc, stdout, stderr)
 				else:
@@ -1536,7 +1547,7 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 	location = os.path.dirname(sandbox_dir) + '/cache/' + tag + '/' + name
 	#docker container runs as root user, so use the owner option of tar command to set the owner of the docker image
 	cmd = 'cd ' + location + '; tar --owner=root -c .|docker import - ' + name + ":" + tag + '; cd -'
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["cd", "tar", "docker"])
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1646,7 +1657,7 @@ def chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, ha
 			if not os.path.exists(jaildir):
 				os.makedirs(jaildir)
 			cmd = 'mount --bind -o ro %s %s' % (hostdir, jaildir)
-			rc, stdout, stderr = func_call(cmd)
+			rc, stdout, stderr = func_call(cmd, ["mount"])
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1661,7 +1672,7 @@ def chroot_mount_bind(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, ha
 				with open(jailfile, 'w+') as f:
 					pass
 			cmd = 'mount --bind -o ro %s %s' % (hostfile, jailfile)
-			rc, stdout, stderr = func_call(cmd)
+			rc, stdout, stderr = func_call(cmd, ["mount"])
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1696,7 +1707,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 		if jailfile != hostfile:
 			if os.path.exists(jailfile):
 				cmd = 'umount -f %s' % (jailfile)
-				rc, stdout, stderr = func_call(cmd)
+				rc, stdout, stderr = func_call(cmd, ["umount"])
 				if rc != 0:
 					subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1706,7 +1717,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 		if jaildir != hostdir:
 			if os.path.exists(jaildir):
 				cmd = 'umount -f %s' % (jaildir)
-				rc, stdout, stderr = func_call(cmd)
+				rc, stdout, stderr = func_call(cmd, ["umount"])
 				if rc != 0:
 					subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1789,13 +1800,13 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 			if not os.path.exists(key):
 				cmd = "mv -f %s %s/" % (mount_dict[key], parent_dir)
-				rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+				rc, stdout, stderr = func_call_withenv(cmd, env_dict, ["mv"])
 				if rc != 0:
 					subprocess_error(cmd, rc, stdout, stderr)
 
 		print "Start executing the user's task: %s" % user_cmd[0]
 		cmd = "cd %s; %s" % (cwd_setting, user_cmd[0])
-		rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+		rc, stdout, stderr = func_call_withenv(cmd, env_dict, ["cd"])
 		if rc != 0:
 			subprocess_error(cmd, rc, stdout, stderr)
 		return_code = rc
@@ -1804,13 +1815,13 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		print "Moving the outputs to the expected locations ..."
 		for key in output_f_dict:
 			cmd = "mv -f %s %s" % (key, output_f_dict[key])
-			rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+			rc, stdout, stderr = func_call_withenv(cmd, env_dict, ["mv"])
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 
 		for key in output_d_dict:
 			cmd = "mv -f %s %s" % (key, output_d_dict[key])
-			rc, stdout, stderr = func_call_withenv(cmd, env_dict)
+			rc, stdout, stderr = func_call_withenv(cmd, env_dict, ["mv"])
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1858,7 +1869,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			#to allow the exit code of user_cmd to be transferred back, seperate the user_cmd and the chown command.
 			cmd = 'docker run --name %s %s %s -e "PATH=%s" %s %s:%s /bin/sh -c "cd %s; %s"' % (container_name, volume_output, volume_parameters, path_env, other_envs, docker_image_name, os_image_id, cwd_setting, user_cmd[0])
 			print "Start executing the user's task: %s" % cmd
-			return_code, stdout, stderr = func_call(cmd)
+			return_code, stdout, stderr = func_call(cmd, ["docker", "sh", "cd"])
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -1873,17 +1884,17 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				os_tar = new_os_image_dir + ".tar"
 
 				cmd = "docker export %s > %s" % (container_name, os_tar)
-				rc, stdout, stderr = func_call(cmd)
+				rc, stdout, stderr = func_call(cmd, ["docker"])
 				if rc != 0:
 					subprocess_error(cmd, rc, stdout, stderr)
 
 				#uncompress the tarball
 				cmd = "tar xf %s -C %s" % (os_tar, new_os_image_dir)
-				extract_tar(os_tar, new_os_image_dir, "tar")
+				extract_tar(os_tar, new_os_image_dir, ["tar"])
 
 			#docker rm container_name
 			cmd = "docker rm %s" % (container_name)
-			rc, stdout, stderr = func_call(cmd)
+			rc, stdout, stderr = func_call(cmd, ["docker"])
 			if rc != 0:
 				subprocess_error(cmd, rc, stdout, stderr)
 
@@ -1932,7 +1943,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
-			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -1964,7 +1975,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '')
 
 			print "Start executing the user's task: %s" % user_cmd[0]
-			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict)
+			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -2044,7 +2055,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
 
 	#find cctools_python
 	cmd = 'which cctools_python'
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["which"])
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 	cctools_python_path = stdout[:-1]
@@ -2082,14 +2093,14 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
 	#submit condor job
 	print "Submitting the Condor job ..."
 	cmd = 'condor_submit ' + condor_submit_path
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["condor_submit"])
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 	#keep tracking whether condor job is done
 	print "Waiting for the job is done ..."
 	logging.debug("Waiting for the job is done ...")
 	cmd = 'condor_wait %s' % condor_log_path
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["condor_wait"])
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
@@ -2229,7 +2240,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 	while rc != 0:
 		#without `-t` option of ssh, if the username is not root, `ssh + sudo` will get the following error: sudo: sorry, you must have a tty to run sudo.
 		cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo yum -y install wget\'' % (ssh_key, user_name, public_ip)
-		rc, stdout, stderr = func_call(cmd)
+		rc, stdout, stderr = func_call(cmd, ["ssh"])
 		if rc != 0:
 			logging.debug("`%s` fails with the return code of %d, \nstdout: %s, \nstderr: %s" % (cmd, rc, stdout, stderr))
 			time.sleep(5)
@@ -2242,7 +2253,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 	scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
 	python_url_filename = os.path.basename(path)
 	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo wget %s && sudo tar zxvf %s\'' % (ssh_key, user_name, public_ip, python_url, python_url_filename)
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["ssh"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -2271,7 +2282,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 		meta_option = ""
 		cmd = 'scp -i %s %s %s %s %s@%s:' % (ssh_key, umbrella_fullpath, spec_path, input_file_string, user_name, public_ip)
 
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["scp"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -2294,7 +2305,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 
 	#find cctools_python
 	cmd = 'which cctools_python'
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["which"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -2317,7 +2328,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 		env_option = ''
 
 	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s "sudo %s/bin/python ~%s/umbrella %s -s destructive --spec ~%s/%s %s --log ~%s/ec2_umbrella.log -l ec2_umbrella %s %s %s run \'%s\'"' % (ssh_key, user_name, public_ip, python_name, user_name, cvmfs_http_proxy_option, user_name, os.path.basename(spec_path), meta_option, user_name, ec2_output_option, new_input_options, env_option, user_cmd[0])
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["ssh"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -2334,27 +2345,27 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 
 	output = '%s %s' % (' '.join(output_f_dict.values()), ' '.join(output_d_dict.values()))
 	cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo tar cvzf ~%s/output.tar.gz %s && sudo chown %s:%s ~%s/output.tar.gz ~%s/ec2_umbrella.log\'' % (ssh_key, user_name, public_ip, user_name, output, user_name, user_name, user_name, user_name)
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["ssh"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the output.tar.gz to the local machine.")
 	cmd = 'scp -i %s %s@%s:output.tar.gz %s/' % (ssh_key, user_name, public_ip, sandbox_dir)
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["scp"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	logging.debug("The instance returns the remote umbrella log file to the local machine.")
 	cmd = 'scp -i %s %s@%s:ec2_umbrella.log %s' % (ssh_key, user_name, public_ip, ec2log_path)
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["scp"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
 
 	cmd = 'tar zxvf %s/output.tar.gz -C /' % (sandbox_dir)
-	rc, stdout, stderr = func_call(cmd)
+	rc, stdout, stderr = func_call(cmd, ["tar"])
 	if rc != 0:
 		terminate_instance(instance)
 		subprocess_error(cmd, rc, stdout, stderr)
@@ -2632,7 +2643,7 @@ def dependency_check(item):
 		If the executable can be found through $PATH, return 0;
 		Otherwise, return -1.
 	"""
-	print "dependency check -- ", item, " "
+	logging.debug("dependency check -- %s", item)
 	result = which_exec(item)
 	if result == None:
 		logging.debug("Failed to find the executable `%s` through $PATH.", item)
@@ -2640,8 +2651,22 @@ def dependency_check(item):
 		return -1
 	else:
 		logging.debug("Find the executable `%s` through $PATH.", item)
-		print "Find the executable `%s` through $PATH." % item
 		return 0
+
+def dependency_check_list(item_list):
+	"""Check whether any executable in the item_list does not exist.
+
+	Args:
+		item_list: a list of executables.
+
+	Returns:
+		If all the executables in the item_list can be found through $PATH, return 0;
+		Otherwise, return -1.
+	"""
+	for item in item_list:
+		if dependency_check(item) == -1:
+			return -1
+	return 0
 
 def launch_ec2_instance(image_id, region, instance_type, ec2_key_pair, ec2_security_group):
 	""" Start one VM instance through Amazon EC2 command line interface and return the instance id.
