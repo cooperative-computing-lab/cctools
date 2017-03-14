@@ -834,6 +834,11 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	uname_list = platform.uname() #format of uname_list: (system,node,release,version,machine,processor)
 
+	if uname_list[0].lower() != "linux":
+		cleanup(tempfile_list, tempdir_list)
+		logging.critical("Umbrella only works on Linux machines!")
+		sys.exit("Umbrella only works on Linux machines!\n")
+
 	logging.debug("Hardware platform checking ...")
 	if hardware_platform != uname_list[4].lower():
 		cleanup(tempfile_list, tempdir_list)
