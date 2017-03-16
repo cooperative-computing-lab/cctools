@@ -1931,6 +1931,33 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 
 	measure_worker_resources();
 
+	//Check GPU name if we can
+	char *gpu_name;	
+	int fd = open("/bin/nvidia-smi", O_RDONLY);
+	if(fd < 0) {
+		fprintf(stderr, "/bin/nvidia-smi not available on this machine.");
+		fd = close(fd);
+	}
+	else {
+		fprintf(stderr, "/bin/nvidia-smi is available on this machine.");
+		if(!features) {
+			features = hash_table_create(4, 0);
+		}
+		fd = close(fd);
+		system("nvidia-smi --query-gpu=gpu_name --format=csv,noheader > ./gpu_info.txt");
+		FILE *f = fopen("./gpu_info.txt", "r");
+		char *line = NULL;
+		size_t len = 0;
+    	ssize_t read;
+		if((read = getline(&line, &len, f)) != -1) {
+			gpu_name = string_format("%s", line);
+			hash_table_insert(features, gpu_name, (void **) 1);
+			free(line);
+			free(gpu_name);
+		}
+		fclose(f);
+	}
+
 	report_worker_ready(master);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
