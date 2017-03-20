@@ -623,7 +623,7 @@ def check_cvmfs_repo(repo_name):
 	cmd = "df -h|grep '^cvmfs'|grep "+ "'" + repo_name + "'" + "|rev| cut -d' '  -f1|rev"
 	rc, stdout, stderr = func_call(cmd, ["df", "grep", "rev", "cut"])
 	if rc == 0:
-		return stdout
+		return stdout[:-1]
 	else:
 		return ''
 
