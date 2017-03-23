@@ -168,6 +168,7 @@ enum {
 	LONG_OPT_PID_WARP,
 	LONG_OPT_PID_FIXED,
 	LONG_OPT_STATS_FILE,
+	LONG_OPT_DISABLE_SERVICE,
 };
 
 static void get_linux_version(const char *cmd)
@@ -275,6 +276,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Enable whole session caching for all protocols.\n", "-S,--session-caching");
 	printf( " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
 	printf( " %-30s Enable automatic decompression on .gz files.\n", "-Z,--auto-decompress");
+	printf( " %-30s Disable the given service.\n", "--disable-service");
 	printf("\n");
 	printf("FTP / GridFTP options:\n");
 	printf( " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
@@ -856,6 +858,7 @@ int main( int argc, char *argv[] )
 		{"time-warp", no_argument, 0, LONG_OPT_TIME_WARP},
 		{"pid-fixed", no_argument, 0, LONG_OPT_PID_FIXED},
 		{"pid-warp", no_argument, 0, LONG_OPT_PID_WARP},
+		{"disable-service", required_argument, 0, LONG_OPT_DISABLE_SERVICE},
 		{0,0,0,0}
 	};
 
@@ -1101,6 +1104,11 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_STATS_FILE:
 			free(stats_file);
 			stats_file = xxstrdup(optarg);
+			break;
+		case LONG_OPT_DISABLE_SERVICE:
+			if (!hash_table_remove(available_services, optarg)) {
+				fprintf(stderr, "warning: unknown service %s\n", optarg);
+			}
 			break;
 		default:
 			show_help(argv[0]);
