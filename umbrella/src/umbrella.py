@@ -4221,6 +4221,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				d = os.path.dirname(f)
 				if not os.path.exists(d):
 					os.makedirs(d)
+					tempdir_list.append(d)
 				elif not os.path.isdir(d):
 					cleanup(tempfile_list, tempdir_list)
 					logging.critical("the parent path of the output file (%s) is not a directory!", f)
@@ -4229,6 +4230,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					pass
 				new_file = open(f, 'a')
 				new_file.close()
+				tempfile_list.append(f)
 			elif len(f) != 0:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("the output file (%s) already exists!", f)
@@ -4240,6 +4242,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			if not os.path.exists(d):
 				logging.debug("create the output dir: %s", d)
 				os.makedirs(d)
+				tempdir_list.append(d)
 			elif len(d) != 0:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("the output dir (%s) already exists!", d)
@@ -4364,12 +4367,14 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.debug('docker exists, use docker execution engine')
 				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
 				if rc != 0:
-					sys.exit(rc)
+					cleanup(tempfile_list, tempdir_list)
+					sys.exit("The return code of the task is: %d" % rc)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
 				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
 				if rc != 0:
-					sys.exit(rc)
+					cleanup(tempfile_list, tempdir_list)
+					sys.exit("The return code of the task is: %d" % rc)
 		else:
 			if sandbox_mode == 'docker' and dependency_check('docker') != 0:
 				cleanup(tempfile_list, tempdir_list)
@@ -4378,7 +4383,8 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
 			rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
 			if rc != 0:
-				sys.exit(rc)
+				cleanup(tempfile_list, tempdir_list)
+				sys.exit("The return code of the task is: %d" % rc)
 
 	if behavior in ["expand", "filter"]:
 		if len(args) != 2:
