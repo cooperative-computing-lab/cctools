@@ -65,6 +65,7 @@ OPTION_TRIPLET(-w, work-dir, dir)Initial working directory.
 OPTION_ITEM(-W, --syscall-table)Display table of system calls trapped.
 OPTION_ITEM(-Y, --sync-write)Force synchronous disk writes.
 OPTION_ITEM(-Z, --auto-decompress)Enable automatic decompression on .gz files.
+OPTION_PAIR(--disable-service,service) Disable a compiled-in service (e.g. http, cvmfs, etc.)
 OPTIONS_END
 
 SECTION(ENVIRONMENT VARIABLES)

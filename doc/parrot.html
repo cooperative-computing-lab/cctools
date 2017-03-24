@@ -144,6 +144,16 @@ The following protocols have been supported in the past, but are not currently i
 </table>
 <hr>
 <p>
+
+If a remote service is interfering with your system,
+e.g. you already have CVMFS mounted at /cvmfs,
+you can run Parrot as
+<code>% parrot_run --disable-service cvmfs sh</code>
+to disable Parrot's handling.
+This option can be specified multiple times.
+</p>
+
+<p>
 You will notice quite quickly that not all remote I/O systems
 provide all of the functionality common to an ordinary file system.
 For example, HTTP is incapable of listing files.
