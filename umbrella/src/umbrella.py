@@ -920,7 +920,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	return host_linux_distro
 
-def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs):
+def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs, parrot_log):
 	"""Modify the user's command into `parrot_run + the user's command`.
 	The cases when this function should be called: (1) sandbox_mode == parrot; (2) sandbox_mode != parrot and cvmfs is needed to deliver some dependencies not installed on the execution node.
 
@@ -931,6 +931,7 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
 		parrot_mount_file: the path of the mountfile for parrot
 		parrot_ldso_path: the path of the ld.so file for parrot
 		use_local_cvmfs: use the cvmfs on the host machine instead of using parrot_run to deliver cvmfs
+		parrot_log: the path of the parrot debugging log
 
 	Returns:
 		None
@@ -944,6 +945,9 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
 
 	if use_local_cvmfs:
 		parrot_options = "%s --disable-service cvmfs" % parrot_options
+
+	if parrot_log:
+		parrot_options = "%s -d all -o %s" % (parrot_options, parrot_log)
 
 	if cvmfs_http_proxy and not use_local_cvmfs:
 		user_cmd[0] = "export HTTP_PROXY=%s; %s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, cctools_dest, parrot_options, cwd_setting, user_cmd[0])
@@ -1277,7 +1281,7 @@ def remove_trailing_slashes(path):
 		path = path[:-1]
 	return path
 
-def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint):
+def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint, parrot_log):
 	"""Create the mountfile if parrot is used to create a sandbox for the application and a separate rootfs is needed.
 	The trick here is the adding sequence does matter. The latter-added items will be checked first during the execution.
 
@@ -1287,6 +1291,7 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 		mount_dict: all the mount items extracted from the specification file and possible implicit dependencies like cctools.
 		input_dict: the setting of input files specified by the --inputs option
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		parrot_log: the path of the parrot debugging log
 
 	Returns:
 		the path of the mountfile.
@@ -1431,14 +1436,20 @@ def construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, 
 			mountfile.write('/cvmfs /cvmfs\n')
 			mountfile.write(cvmfs_cms_siteconf_mountpoint + '\n')
 			logging.debug('cvmfs_cms_siteconf_mountpoint is not null: %s', cvmfs_cms_siteconf_mountpoint)
+
+		if parrot_log:
+			mountfile.write('%s %s\n' % (parrot_log, parrot_log))
+			mount_list.append(parrot_log)
+
 	return mountfile_path
 
-def construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint):
+def construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mountpoint, parrot_log):
 	""" Create the mountfile if chroot and docker is used to execute a CMS application and the host machine does not have cvmfs installed.
 
 	Args:
 		sandbox_dir: the sandbox dir for temporary files like Parrot mountlist file.
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
+		parrot_log: the path of the parrot debugging log
 
 	Returns:
 		the path of the mountfile.
@@ -1447,6 +1458,10 @@ def construct_mountfile_cvmfs_cms_siteconf(sandbox_dir, cvmfs_cms_siteconf_mount
 	with open(mountfile_path, "wb") as f:
 		f.write(cvmfs_cms_siteconf_mountpoint + '\n')
 		logging.debug('cvmfs_cms_siteconf_mountpoint is not null: %s', cvmfs_cms_siteconf_mountpoint)
+
+		if parrot_log:
+			mountfile.write('%s %s\n' % (parrot_log, parrot_log))
+			mount_list.append(parrot_log)
 
 	return mountfile_path
 
@@ -1735,7 +1750,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 						os.rmdir(parent_dir)
 						parent_dir = os.path.dirname(parent_dir)
 
-def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs):
+def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log):
 	"""Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 
 	Args:
@@ -1762,6 +1777,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		cvmfs_http_proxy: HTTP_PROXY environment variable used to access CVMFS by Parrot
 		needs_parrotize_user_cmd: whether the user cmd needs to be wrapped inside parrot.
 		use_local_cvmfs: use the cvmfs on the host machine instead of using parrot_run to deliver cvmfs
+		parrot_log: the path of the parrot debugging log
 
 	Returns:
 		return_code: the return code of executing the user command
@@ -1921,7 +1937,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict = construct_env(sandbox_dir, os_image_dir)
 			env_dict['PWD'] = cwd_setting
 			logging.debug("Construct mounfile ....")
-			parrot_mount_file = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint)
+			parrot_mount_file = construct_mountfile_full(sandbox_dir, os_image_dir, mount_dict, input_dict, output_f_dict, output_d_dict, cvmfs_cms_siteconf_mountpoint, parrot_log)
 			with open(parrot_mount_file, 'r') as f:
 				logging.debug("the parrot mountlist is:\n%s\n", f.read())
 
@@ -1947,7 +1963,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			if needs_parrotize_user_cmd:
-				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs)
+				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs, parrot_log)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
@@ -1960,7 +1976,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 
 		else:
 			env_dict = os.environ
-			parrot_mount_file = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint)
+			parrot_mount_file = construct_mountfile_easy(sandbox_dir, input_dict, output_f_dict, output_d_dict, mount_dict, cvmfs_cms_siteconf_mountpoint, parrot_log)
 			with open(parrot_mount_file, 'r') as f:
 				logging.debug("the parrot mountlist is:\n%s\n", f.read())
 
@@ -1979,7 +1995,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			if needs_parrotize_user_cmd:
-				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '', use_local_cvmfs)
+				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '', use_local_cvmfs, parrot_log)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
@@ -2437,7 +2453,7 @@ def cal_new_os_id(sec, old_os_id, pac_list):
 	md5_value = md5.hexdigest()
 	return (md5_value, install_cmd)
 
-def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, use_local_cvmfs):
+def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, use_local_cvmfs, parrot_log):
 	""" Create the execution environment specified in the specification file and run the task on it.
 
 	Args:
@@ -2455,6 +2471,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 		osf_auth: the osf authentication info including osf_username and osf_password.
 		use_local_cvmfs: use the cvmfs on the host machine instead of using parrot_run to deliver cvmfs
+		parrot_log: the path of the parrot debugging log
 
 	Returns:
 		None.
@@ -2617,7 +2634,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 					#install dependencies through package managers
 					logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
 					print "Create an intermediate OS image with all the dependencies from package managers ready!"
-					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs) != 0:
+					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log) != 0:
 						logging.critical("Fails to construct the intermediate OS image!")
 						sys.exit("Fails to construct the intermediate OS image!")
 					logging.debug("Finishing creating the intermediate OS image!")
@@ -2639,7 +2656,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 	else:
 		logging.debug("this spec does not have data section!")
 
-	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "", cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs)
+	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "", cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log)
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
@@ -3953,6 +3970,9 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 					action="store_true",
 					default=False,
 					help="Use the cvmfs on the host machine.",)
+	parser.add_option("--parrot_log",
+					action="store",
+					help="the path of the parrot debugging log",)
 
 	(options, args) = parser.parse_args()
 
@@ -3961,6 +3981,12 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 	logfilename = options.log
 	if os.path.exists(logfilename) and not os.path.isfile(logfilename):
 		sys.exit("The --log option <%s> is not a file!" % logfilename)
+
+	parrot_log = None
+	if options.parrot_log:
+		if os.path.exists(options.parrot_log) and not os.path.isfile(options.parrot_log):
+			sys.exit("the --parrot_log option <%s> is not a file!" % options.parrot_log)
+		parrot_log = os.path.abspath(options.parrot_log)
 
 	global tempfile_list
 	global tempdir_list
@@ -4397,13 +4423,13 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
 				logging.debug('docker exists, use docker execution engine')
-				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs)
+				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs, parrot_log)
 				if rc != 0:
 					cleanup(tempfile_list, tempdir_list)
 					sys.exit("The return code of the task is: %d" % rc)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
-				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs)
+				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs, parrot_log)
 				if rc != 0:
 					cleanup(tempfile_list, tempdir_list)
 					sys.exit("The return code of the task is: %d" % rc)
@@ -4413,7 +4439,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
 
-			rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs)
+			rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs, parrot_log)
 			if rc != 0:
 				cleanup(tempfile_list, tempdir_list)
 				sys.exit("The return code of the task is: %d" % rc)
