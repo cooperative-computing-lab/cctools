@@ -920,7 +920,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 
 	return host_linux_distro
 
-def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path):
+def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs):
 	"""Modify the user's command into `parrot_run + the user's command`.
 	The cases when this function should be called: (1) sandbox_mode == parrot; (2) sandbox_mode != parrot and cvmfs is needed to deliver some dependencies not installed on the execution node.
 
@@ -930,6 +930,8 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
 		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 		parrot_mount_file: the path of the mountfile for parrot
 		parrot_ldso_path: the path of the ld.so file for parrot
+		use_local_cvmfs: use the cvmfs on the host machine instead of using parrot_run to deliver cvmfs
+
 	Returns:
 		None
 	"""
@@ -940,7 +942,10 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
 	else:
 		parrot_options = "-m %s -l %s --no-set-foreground" % (parrot_mount_file, parrot_ldso_path)
 
-	if cvmfs_http_proxy:
+	if use_local_cvmfs:
+		parrot_options = "%s --disable-service cvmfs" % parrot_options
+
+	if cvmfs_http_proxy and not use_local_cvmfs:
 		user_cmd[0] = "export HTTP_PROXY=%s; %s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, cctools_dest, parrot_options, cwd_setting, user_cmd[0])
 	else:
 		user_cmd[0] = "%s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cctools_dest, parrot_options, cwd_setting, user_cmd[0])
@@ -1730,7 +1735,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 						os.rmdir(parent_dir)
 						parent_dir = os.path.dirname(parent_dir)
 
-def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd):
+def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs):
 	"""Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 
 	Args:
@@ -1756,6 +1761,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		new_os_image_dir: the path of the newly created OS image with all the packages installed by package manager.
 		cvmfs_http_proxy: HTTP_PROXY environment variable used to access CVMFS by Parrot
 		needs_parrotize_user_cmd: whether the user cmd needs to be wrapped inside parrot.
+		use_local_cvmfs: use the cvmfs on the host machine instead of using parrot_run to deliver cvmfs
 
 	Returns:
 		return_code: the return code of executing the user command
@@ -1941,7 +1947,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			if needs_parrotize_user_cmd:
-				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path)
+				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
@@ -1973,7 +1979,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			if needs_parrotize_user_cmd:
-				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '')
+				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '', use_local_cvmfs)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
 			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
@@ -2431,7 +2437,7 @@ def cal_new_os_id(sec, old_os_id, pac_list):
 	md5_value = md5.hexdigest()
 	return (md5_value, install_cmd)
 
-def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth):
+def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, use_local_cvmfs):
 	""" Create the execution environment specified in the specification file and run the task on it.
 
 	Args:
@@ -2448,6 +2454,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 		cwd_setting: the current working directory for the execution of the user's command.
 		cvmfs_http_proxy: HTTP_PROXY environmetn variable used to access CVMFS by Parrot
 		osf_auth: the osf authentication info including osf_username and osf_password.
+		use_local_cvmfs: use the cvmfs on the host machine instead of using parrot_run to deliver cvmfs
 
 	Returns:
 		None.
@@ -2610,7 +2617,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 					#install dependencies through package managers
 					logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
 					print "Create an intermediate OS image with all the dependencies from package managers ready!"
-					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd) != 0:
+					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs) != 0:
 						logging.critical("Fails to construct the intermediate OS image!")
 						sys.exit("Fails to construct the intermediate OS image!")
 					logging.debug("Finishing creating the intermediate OS image!")
@@ -2632,7 +2639,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 	else:
 		logging.debug("this spec does not have data section!")
 
-	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "", cvmfs_http_proxy, needs_parrotize_user_cmd)
+	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "", cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs)
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
@@ -3942,6 +3949,10 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 	parser.add_option("--osf_userid",
 					action="store",
 					help="the OSF user id (required in two cases: uploading to osf; downloading private osf resources.)",)
+	parser.add_option("--use_local_cvmfs",
+					action="store_true",
+					default=False,
+					help="Use the cvmfs on the host machine.",)
 
 	(options, args) = parser.parse_args()
 
@@ -4386,13 +4397,13 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			#first check whether Docker exists, if yes, use docker execution engine; if not, use parrot execution engine.
 			if dependency_check('docker') == 0:
 				logging.debug('docker exists, use docker execution engine')
-				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'docker', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs)
 				if rc != 0:
 					cleanup(tempfile_list, tempdir_list)
 					sys.exit("The return code of the task is: %d" % rc)
 			else:
 				logging.debug('docker does not exist, use parrot execution engine')
-				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+				rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, 'parrot', output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs)
 				if rc != 0:
 					cleanup(tempfile_list, tempdir_list)
 					sys.exit("The return code of the task is: %d" % rc)
@@ -4402,7 +4413,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.critical('Docker is not installed on the host machine, please try other execution engines!')
 				sys.exit('Docker is not installed on the host machine, please try other execution engines!')
 
-			rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth)
+			rc = specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, cwd_setting, cvmfs_http_proxy, osf_auth, options.use_local_cvmfs)
 			if rc != 0:
 				cleanup(tempfile_list, tempdir_list)
 				sys.exit("The return code of the task is: %d" % rc)
