@@ -110,8 +110,9 @@ import urlparse
 import json
 
 #Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
+# cctools binary is hosted at: /afs/crc.nd.edu/group/ccl/web/hep-case-study/parrot
 cctools_binary_source = "http://ccl.cse.nd.edu/research/data/hep-case-study/parrot"
-cctools_binary_version = "6.0.10"
+cctools_binary_version = "14fb31b2"
 cctools_dest = ""
 
 #set cms_siteconf_url to be the url for the siteconf your application depends
