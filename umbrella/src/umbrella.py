@@ -3736,6 +3736,21 @@ def spec_build(spec_json):
 				count += dep_build(sec[item], item)
 	return count
 
+def trim_list(origin, s):
+	"""Trim the strings in the set s from the origin list.
+
+	Args:
+		origin: a list of string
+		s: a set of string
+
+	Returns:
+		final: a new list of string
+	"""
+	final = []
+	for a in origin:
+		if a not in s:
+			final.append(a)
+	return final
 
 help_info = {
 "build": '''Build up the metadata info of dependencies inside an umbrella spec, and write the built-up version into a new file.
@@ -4110,6 +4125,8 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 			json2file(args[1], spec_json)
 		sys.exit(0)
 
+	output_fileset = set()
+	output_dirset = set()
 	if behavior in ["run"]:
 		if not meta_path:
 			print "Trying to build the metadata info for local dependencies ..."
@@ -4223,6 +4240,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				if not os.path.exists(d):
 					os.makedirs(d)
 					tempdir_list.append(d)
+					output_dirset.add(d)
 				elif not os.path.isdir(d):
 					cleanup(tempfile_list, tempdir_list)
 					logging.critical("the parent path of the output file (%s) is not a directory!", f)
@@ -4232,6 +4250,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				new_file = open(f, 'a')
 				new_file.close()
 				tempfile_list.append(f)
+				output_fileset.add(f)
 			elif len(f) != 0:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("the output file (%s) already exists!", f)
@@ -4244,6 +4263,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.debug("create the output dir: %s", d)
 				os.makedirs(d)
 				tempdir_list.append(d)
+				output_dirset.add(d)
 			elif len(d) != 0:
 				cleanup(tempfile_list, tempdir_list)
 				logging.critical("the output dir (%s) already exists!", d)
@@ -4490,7 +4510,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				logging.debug("All the dependencies has been already inside S3!")
 				print "All the dependencies has been already inside S3!"
 
-	cleanup(tempfile_list, tempdir_list)
+	cleanup(trim_list(tempfile_list, output_fileset), trim_list(tempdir_list, output_dirset))
 	end = datetime.datetime.now()
 	diff = end - start
 	logging.debug("End time: %s", end)
