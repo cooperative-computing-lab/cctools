@@ -22,15 +22,15 @@ use warnings;
 
 use Cwd;
 use Cwd qw(abs_path);
-use Error qw(:try);
-use Error::Simple;
+#use Error qw(:try);
+#use Error::Simple;
 use Getopt::Long qw(:config no_ignore_case);
 Getopt::Long::Configure("pass_through");
 use Time::HiRes qw(gettimeofday); 
 use Work_Queue;
 
 #Record starting time.
-my $start_time = time; 
+my $start_time = time*1000000; 
 
 $| = 1; #turn on autoflush.
 
@@ -86,7 +86,7 @@ Work Queue Options:
 
 #---Process options on the command line 
 my %OPT;
-try{
+#try{
     GetOptions("CTL" => sub { `maker -CTL`; exit(0);},
                "OPTS" => sub { `maker -OPTS`; exit(0);},
                "BOPTS" => sub { `maker -BOPTS`; exit(0);},
@@ -111,11 +111,11 @@ try{
 	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
-} catch Error::Simple with{
-    my $E = shift;
-    print STDERR $E->{-text};
-    die "Failed to parse command line options.\n";
-};
+#} catch Error::Simple with{
+#    my $E = shift;
+#    print STDERR $E->{-text};
+#    die "Failed to parse command line options.\n";
+#};
 
 if(!defined($OPT{"genome"})) {
 	print "Genome file not specified. Using the specification in the CTL files.\n";
@@ -123,7 +123,7 @@ if(!defined($OPT{"genome"})) {
 	$genome = $OPT{"genome"};
 }
 
-try{
+#try{
     #get arguments off the command line
     if (not (-e "maker_opts.ctl" && -e "maker_bopts.ctl" && -e "maker_exe.ctl")) {
         print STDERR "Maker control files not found\n";
@@ -136,13 +136,13 @@ try{
     #---set up blast databases and indexes for analyisis
     print STDERR "STATUS: Processing and indexing input FASTA files...\n";
     
-} catch Error::Simple with{
-    my $E = shift;
-    print STDERR $E->{-text};
-    my $code = 2;
-    $code = $E->{-value} if (defined($E->{-value}));
-    exit($code);
-};
+#} catch Error::Simple with{
+#    my $E = shift;
+#    print STDERR $E->{-text};
+#    my $code = 2;
+#    $code = $E->{-value} if (defined($E->{-value}));
+#    exit($code);
+#};
 
 if(defined($OPT{"cores"})) {
 	$cores = $OPT{"cores"}; 
@@ -228,11 +228,16 @@ sub main {
 	print $wq->stats->{total_workers_lost}."\n";
 	print "-----------------------------------------------------------------\n";
 	print "\n";
-	my $wall_time = ((time*1000000) - ($wq->stats->{start_time}));
-	my $wq_total_time = time - $wq_start_time;
-	my $total_time = time - $start_time;
+	my $end_time = time*1000000;
+	my $wall_time = ($end_time - ($wq->stats->{start_time}));
+	my $wq_total_time = $end_time - $wq_start_time;
+	my $total_time = $end_time - $start_time;
 
-	print "WQ-MAKER Wall Time:\t";
+	print "WQ-MAKER Start_time:\t";
+	print $start_time."\n";
+	print "WQ-MAKER End_time:\t";
+	print $end_time."\n";
+	print "WQ-MAKER Elapsed:\t";
 	print_time($total_time);
 	print "Work Queue Wall Time:\t";
 	print_time($wall_time);
@@ -272,7 +277,7 @@ sub print_time {
 	my $min = $time_val/60;
 	$time_val = $time_val%60;
 
-	printf '%dd %d:%2d:%2d.%6d', int($days), int($hours), int($min), int($time_val), int($sub_sec);
+	printf '%dd %d:%02d:%02d.%06d', int($days), int($hours), int($min), int($time_val), int($sub_sec);
 	print "\n";
 }
 
