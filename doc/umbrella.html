@@ -287,7 +287,17 @@ cmsDriver.py Hadronizer_MgmMatchTuneZ2star_8TeV_madgraph_cff.py -s GEN \
 
 			The analysis code will create a directory called <tt>sim_job</tt> and put the CMSSW software dependencies under it.
 
-			<p><b>The umbrella command for Parrot execution engine:</b></p>
+			<p><b>The umbrella command for Parrot execution engine when the local machine has cvmfs installed:</b></p>
+			<code>umbrella \
+	--sandbox_mode parrot \
+	--log umbrella.log \
+	--spec cms_complex.umbrella \
+	--localdir /tmp/umbrella_test/ \
+	--output "/tmp/sim_job=/tmp/umbrella_test/parrot_cms_complex_output" \
+	--use_local_cvmfs \
+	run</code>
+
+			<p><b>The umbrella command for Parrot execution engine when the local machine does not have cvmfs installed:</b></p>
 			<code>umbrella \
 	--sandbox_mode parrot \
 	--log umbrella.log \
