@@ -1,6 +1,12 @@
 The documentation illustrates how to use different execution engines of Umbrella to execute
 a complex CMS application.
 
+When the parrot sandbox mode is used, there exists two options to deliver
+cvmfs. First, if the local machine has cvmfs intalled by FUSE, the
+--use_local_cvmfs option can be used. Second, if the local machine does not
+have cvmfs installed, the --cvmfs_http_proxy option can be used to specified a
+http proxy, and parrot will be used to deliver cvmfs.
+
 #parrot execution engine test command.
 umbrella \
 --spec cms_complex.umbrella \
