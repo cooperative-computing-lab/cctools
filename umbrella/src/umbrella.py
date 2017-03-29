@@ -848,6 +848,8 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 		sys.exit("Currently local execution engine only support three sandbox techniques: docker, chroot or parrot!\n")
 
 	uname_list = platform.uname() #format of uname_list: (system,node,release,version,machine,processor)
+	logging.debug("The platform information of the local machine:")
+	logging.debug(uname_list)
 
 	if uname_list[0].lower() != "linux":
 		cleanup(tempfile_list, tempdir_list)
@@ -921,7 +923,30 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 				host_linux_distro = 'redhat' + dist_version
 	logging.debug("The OS distribution information of the local machine: %s", host_linux_distro)
 
+	if sandbox_mode == "parrot" and not parrot_path:
+		check_parrot_binary_support(host_linux_distro)
+
 	return host_linux_distro
+
+def check_parrot_binary_support(host_linux_distro):
+	"""Check whether a parrot binary for the host machine is provided by cctools.
+	Currently, cctools only provided the parrot binary for redhat5-7 and centos5-7.
+	If the user the host machine is not any of these, then the user should build their cctools themselves.
+
+	Args:
+		host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
+
+	Returns:
+		None
+	"""
+	if len(host_linux_distro) == 7 and host_linux_distro[:6] in ["redhat", "centos"] and host_linux_distro[6] in ['5', '6', '7']:
+		logging.debug("cctools provides the parrot binary needed for the host machine!")
+	else:
+		cleanup(tempfile_list, tempdir_list)
+		sys.exit("""cctools only provides the parrot binary for redhat[5-7] and centos[5-7]!
+	To use the parrot execution mode on your machine, you need to install cctools:
+		https://github.com/cooperative-computing-lab/cctools
+	After installing cctools, run umbrella again with the --parrot_path option to specify the parrot path.""")
 
 def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs, parrot_log):
 	"""Modify the user's command into `parrot_run + the user's command`.
@@ -2515,10 +2540,9 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 	needs_parrotize_user_cmd = False
 	if sandbox_mode in ["parrot"]:
-		logging.debug("To use parrot sandbox mode, cctools binary is needed")
-		cctools_download(sandbox_dir, hardware_platform, host_linux_distro, 'unpack')
-		logging.debug("Add mountpoint (%s:%s) into mount_dict", parrot_path, parrot_path)
-		mount_dict[parrot_path] = parrot_path
+		if not parrot_path:
+			logging.debug("To use parrot sandbox mode, cctools binary is needed")
+			cctools_download(sandbox_dir, hardware_platform, host_linux_distro, 'unpack')
 		needs_parrotize_user_cmd = True
 
 	item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
@@ -2580,11 +2604,14 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 						mount_dict[list1[0]] = list1[1]
 
 					if sandbox_mode != "parrot":
-						logging.debug("To use parrot to access cvmfs, cctools binary is needed")
-						cctools_download(sandbox_dir, hardware_platform, linux_distro, 'unpack')
-						logging.debug("Add mountpoint (%s:%s) into mount_dict", parrot_path, parrot_path)
-						mount_dict[parrot_path] = parrot_path
+						if not parrot_path:
+							logging.debug("To use parrot to access cvmfs, cctools binary is needed")
+							cctools_download(sandbox_dir, hardware_platform, linux_distro, 'unpack')
 						needs_parrotize_user_cmd = True
+
+	if parrot_path:
+		logging.debug("Add mountpoint (%s:%s) into mount_dict", parrot_path, parrot_path)
+		mount_dict[parrot_path] = parrot_path
 
 	if need_separate_rootfs:
 		new_os_image_dir = ""
@@ -3965,6 +3992,9 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 	parser.add_option("--parrot_log",
 					action="store",
 					help="the path of the parrot debugging log",)
+	parser.add_option("--parrot_path",
+					action="store",
+					help="the path of parrot_run on the host machine",)
 
 	(options, args) = parser.parse_args()
 
@@ -4375,6 +4405,18 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 				validate_spec(spec_json, meta_json)
 
 	if behavior in ["run"]:
+		# set parrot_path
+		global parrot_path
+		parrot_path = options.parrot_path
+		if parrot_path:
+			if not os.path.exists(parrot_path):
+				cleanup(tempfile_list, tempdir_list)
+				sys.exit("parrot_path <%s> does not exist!" % parrot_path)
+			elif not os.path.isfile(parrot_path):
+				cleanup(tempfile_list, tempdir_list)
+				sys.exit("parrot_path <%s> should be a file!" % parrot_path)
+			parrot_path = os.path.abspath(parrot_path)
+
 #		user_name = 'root' #username who can access the VM instances from Amazon EC2
 #		ssh_key = 'hmeng_key_1018.pem' #the pem key file used to access the VM instances from Amazon EC2
 		if sandbox_mode == "ec2":
