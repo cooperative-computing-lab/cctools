@@ -109,11 +109,13 @@ import urllib2
 import urlparse
 import json
 
-#Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
 # cctools binary is hosted at: /afs/crc.nd.edu/group/ccl/web/hep-case-study/parrot
 cctools_binary_source = "http://ccl.cse.nd.edu/research/data/hep-case-study/parrot"
+
+#Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
 cctools_binary_version = "14fb31b2"
-cctools_dest = ""
+
+parrot_path = ""
 
 #set cms_siteconf_url to be the url for the siteconf your application depends
 #the url and format settings here should be consistent with the function set_cvmfs_cms_siteconf
@@ -443,10 +445,11 @@ def cctools_download(sandbox_dir, hardware_platform, linux_distro, action):
 	"""
 	name = "cctools-%s-%s-%s" % (cctools_binary_version, hardware_platform, linux_distro)
 	source = "%s/%s.tar.gz" % (cctools_binary_source, name)
-	global cctools_dest
+	global parrot_path
 	cctools_dest = os.path.dirname(sandbox_dir) + "/cache/" + name
 	dependency_download(name, source, None, None, cctools_dest, "tgz", "unpack")
-	return cctools_dest
+	parrot_path = cctools_dest + "/bin/parrot_run"
+	return parrot_path
 
 def set_cvmfs_cms_siteconf(sandbox_dir):
 	"""Download cvmfs SITEINFO and set its mountpoint.
@@ -950,9 +953,9 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
 		parrot_options = "%s -d all -o %s" % (parrot_options, parrot_log)
 
 	if cvmfs_http_proxy and not use_local_cvmfs:
-		user_cmd[0] = "export HTTP_PROXY=%s; %s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, cctools_dest, parrot_options, cwd_setting, user_cmd[0])
+		user_cmd[0] = "export HTTP_PROXY=%s; %s %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, parrot_path, parrot_options, cwd_setting, user_cmd[0])
 	else:
-		user_cmd[0] = "%s/bin/parrot_run %s -- /bin/sh -c 'cd  %s; %s'" % (cctools_dest, parrot_options, cwd_setting, user_cmd[0])
+		user_cmd[0] = "%s %s -- /bin/sh -c 'cd  %s; %s'" % (parrot_path, parrot_options, cwd_setting, user_cmd[0])
 	logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
 
 def chrootize_user_cmd(user_cmd, cwd_setting):
@@ -1179,23 +1182,20 @@ def transfer_env_para_docker(env_para_dict):
 			env_options = env_options + ' -e "' + key + '=' + env_para_dict[key] + '" '
 	return env_options
 
-def collect_software_bin(host_cctools_path, sw_mount_dict):
+def collect_software_bin(sw_mount_dict):
 	"""Construct the path environment from the mountpoints of software dependencies.
 	Each softare meta has a bin subdir containing all its executables.
 
 	Args:
-		host_cctools_path: the path of cctools under the umbrella local cache.
 		sw_mount_dict: a dict only including all the software mounting items.
 
 	Returns:
-		extra_path: the paths which are extracted from sw_mount_dict and host_cctools_path, and needed to be added into PATH.
+		extra_path: the paths which are extracted from sw_mount_dict and needed to be added into PATH.
 	"""
 	extra_path = ""
 	for key in sw_mount_dict:
 		if key != '/':
 			extra_path += '%s/bin:' % key
-	if host_cctools_path:
-		extra_path += '%s/bin:' % host_cctools_path
 	return extra_path
 
 def in_local_passwd():
@@ -1572,7 +1572,7 @@ def create_docker_image(sandbox_dir, hardware_platform, distro_name, distro_vers
 	if rc != 0:
 		subprocess_error(cmd, rc, stdout, stderr)
 
-def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, mount_dict, host_cctools_path):
+def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separate_rootfs, os_image_dir, mount_dict):
 	"""Construct directory mount list and file mount list for chroot. chroot requires the target mountpoint must be created within the chroot jail.
 
 	Args:
@@ -1583,7 +1583,6 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
 		os_image_dir: the path of the OS image inside the umbrella local cache.
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
-		host_cctools_path: the path of cctools under the umbrella local cache.
 
 	Returns:
 		a tuple includes the directory mount list and the file mount list
@@ -1607,10 +1606,6 @@ def construct_chroot_mount_dict(sandbox_dir, output_dir, input_dict, need_separa
 				item = line[:index]
 				if os.path.exists(item):
 					file_dict[item] = item
-
-	if host_cctools_path:
-		logging.debug("Add cctools binary (%s) into dir_dict of chroot", host_cctools_path)
-		dir_dict[host_cctools_path] = host_cctools_path
 
 	logging.debug("Add sandbox_dir and output_dir into dir_dict of chroot")
 	dir_dict[sandbox_dir] = sandbox_dir
@@ -1750,7 +1745,7 @@ def chroot_post_process(dir_dict, file_dict, sandbox_dir, need_separate_rootfs, 
 						os.rmdir(parent_dir)
 						parent_dir = os.path.dirname(parent_dir)
 
-def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log):
+def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_image_id, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log):
 	"""Run user's task with the help of the sandbox techniques, which currently inculde chroot, parrot, docker.
 
 	Args:
@@ -1768,7 +1763,6 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 		need_separate_rootfs: whether a separate rootfs is needed to execute the user's command.
 		os_image_dir: the path of the OS image inside the umbrella local cache.
 		os_image_id: the id of the OS image.
-		host_cctools_path: the path of cctools under the umbrella local cache.
 		cvmfs_cms_siteconf_mountpoint: a string in the format of '/cvmfs/cms.cern.ch/SITECONF/local <SITEINFO dir in the umbrella local cache>/local'
 		mount_dict: a dict including each mounting item in the specification, whose key is the access path used by the user's task; whose value is the actual storage path.
 		sw_mount_dict: a dict only including all the software mounting items.
@@ -1806,7 +1800,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			env_dict[key] = env_para_dict[key]
 
 		logging.debug("Add software binary into PATH")
-		extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
+		extra_path = collect_software_bin(sw_mount_dict)
 		if "PATH" not in env_dict:
 			env_dict['PATH'] = ""
 		env_dict['PATH'] = '%s:%s' % (env_dict['PATH'], extra_path[:-1])
@@ -1957,7 +1951,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 			#env_dict['HOME'] = sandbox_dir + '/' + getpass.getuser()
 
 			logging.debug("Add software binary into PATH")
-			extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
+			extra_path = collect_software_bin(sw_mount_dict)
 			if "PATH" not in env_dict:
 				env_dict['PATH'] = '.:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin'
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
@@ -1966,7 +1960,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs, parrot_log)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
-			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
+			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["sh"])
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -1991,14 +1985,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
 				logging.debug("Forcely add '.' into PATH")
 
 			logging.debug("Add software binary into PATH")
-			extra_path = collect_software_bin(host_cctools_path, sw_mount_dict)
+			extra_path = collect_software_bin(sw_mount_dict)
 			env_dict['PATH'] = '%s%s' % (extra_path, env_dict['PATH'])
 
 			if needs_parrotize_user_cmd:
 				parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '', use_local_cvmfs, parrot_log)
 
 			print "Start executing the user's task: %s" % user_cmd[0]
-			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["parrot_run", "sh"])
+			return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["sh"])
 
 			print "\n********** STDOUT of the command **********"
 			print stdout
@@ -2518,14 +2512,13 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 	mount_dict = {}
 	cvmfs_cms_siteconf_mountpoint = ''
-	host_cctools_path = '' #the path of the cctools binary which is compatible with the host machine under the umbrella cache
 
 	needs_parrotize_user_cmd = False
 	if sandbox_mode in ["parrot"]:
 		logging.debug("To use parrot sandbox mode, cctools binary is needed")
-		host_cctools_path = cctools_download(sandbox_dir, hardware_platform, host_linux_distro, 'unpack')
-		logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
-		mount_dict[host_cctools_path] = host_cctools_path
+		cctools_download(sandbox_dir, hardware_platform, host_linux_distro, 'unpack')
+		logging.debug("Add mountpoint (%s:%s) into mount_dict", parrot_path, parrot_path)
+		mount_dict[parrot_path] = parrot_path
 		needs_parrotize_user_cmd = True
 
 	item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
@@ -2588,9 +2581,9 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
 					if sandbox_mode != "parrot":
 						logging.debug("To use parrot to access cvmfs, cctools binary is needed")
-						host_cctools_path = cctools_download(sandbox_dir, hardware_platform, linux_distro, 'unpack')
-						logging.debug("Add mountpoint (%s:%s) into mount_dict", host_cctools_path, host_cctools_path)
-						mount_dict[host_cctools_path] = host_cctools_path
+						cctools_download(sandbox_dir, hardware_platform, linux_distro, 'unpack')
+						logging.debug("Add mountpoint (%s:%s) into mount_dict", parrot_path, parrot_path)
+						mount_dict[parrot_path] = parrot_path
 						needs_parrotize_user_cmd = True
 
 	if need_separate_rootfs:
@@ -2631,7 +2624,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 					#install dependencies through package managers
 					logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
 					print "Create an intermediate OS image with all the dependencies from package managers ready!"
-					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log) != 0:
+					if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log) != 0:
 						logging.critical("Fails to construct the intermediate OS image!")
 						sys.exit("Fails to construct the intermediate OS image!")
 					logging.debug("Finishing creating the intermediate OS image!")
@@ -2648,12 +2641,14 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 		software_install(mount_dict, env_para_dict, "", meta_json, sandbox_dir, 0, osf_auth)
 
 	sw_mount_dict = dict(mount_dict) #sw_mount_dict will be used later to config the $PATH
+	del sw_mount_dict[parrot_path]
+
 	if spec_json.has_key("data") and spec_json["data"]:
 		data_install(spec_json["data"], meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting)
 	else:
 		logging.debug("this spec does not have data section!")
 
-	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, host_cctools_path, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "", cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log)
+	return workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, user_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, cvmfs_cms_siteconf_mountpoint, mount_dict, sw_mount_dict, meta_json, "", cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log)
 
 def dependency_check(item):
 	"""Check whether an executable exists or not.
