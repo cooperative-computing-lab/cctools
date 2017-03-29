@@ -2561,16 +2561,13 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 				print "The os image has /cvmfs/cms.cern.ch!"
 
 		if not cvmfs_ready:
-			local_cvmfs = ""
-			local_cvmfs = check_cvmfs_repo(cvmfs_path[7:])
-			if len(local_cvmfs) > 0:
-				mount_dict[cvmfs_mountpoint] = local_cvmfs
-				logging.debug("The cvmfs is installed on the local host, and its mountpoint is: %s", local_cvmfs)
-				print "The cvmfs is installed on the local host, and its mountpoint is: %s" % local_cvmfs
-
+			if use_local_cvmfs:
+				logging.debug("Use the cvmfs intalled on the local host")
+				print "Use the cvmfs intalled on the local host"
+				mount_dict[cvmfs_mountpoint] = cvmfs_mountpoint
 			else:
-				logging.debug("The cvmfs is not installed on the local host.")
-				print "The cvmfs is not installed on the local host."
+				logging.debug("Parrot will be used to deliver cvmfs")
+				print "Parrot will be used to deliver cvmfs"
 
 				if cvmfs_path.find("cms.cern.ch") != -1:
 					is_cms_cvmfs_app = 1 #cvmfs is needed to deliver cms.cern.ch repo, and the local host has no cvmfs installed.
