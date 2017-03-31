@@ -124,6 +124,7 @@ extern int pfs_fake_setgid;
 
 extern int wait_barrier;
 
+extern int pfs_master_timeout;
 extern INT64_T pfs_syscall_count;
 extern INT64_T pfs_read_count;
 extern INT64_T pfs_write_count;
@@ -3670,6 +3671,7 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 	int exefd = -1;
 	int tmpfd = -1;
 	char ldso_physical_name[PATH_MAX] = "";
+	char ldso_resolved_path[PATH_MAX];
 
 	strcpy(exe, "");
 	if (strlen(physical_name) >= PATH_MAX)
@@ -3688,14 +3690,38 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 		CATCHUNIX(rc);
 		assert(path[0]);
 		debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
-		/* XXX This access skips mounts and other PFS redirections. */
-		if (access(path, R_OK|X_OK) == 0) {
-			/* The kernel can find it, we're done. */
-			debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
-			exefd = phyfd;
-			phyfd = -1;
-			goto success;
+		pfs_resolve_t res = pfs_resolve(path, ldso_resolved_path, R_OK|X_OK, time(0) + pfs_master_timeout);
+		switch (res) {
+		case PFS_RESOLVE_DENIED:
+			debug(D_DEBUG, "%s: interpreter %s resolve denied", __func__, path);
+			rc = EACCES;
+			goto out;
+		case PFS_RESOLVE_ENOENT:
+			debug(D_DEBUG, "%s: interpreter %s resolve ENOENT", __func__, path);
+			rc = ENOENT;
+			goto out;
+		case PFS_RESOLVE_FAILED:
+			debug(D_DEBUG, "%s: interpreter %s resolve failed", __func__, path);
+			rc = EIO;
+			goto out;
+		case PFS_RESOLVE_CHANGED:
+			debug(D_DEBUG, "%s: interpreter %s resolve changed to %s", __func__, path, ldso_resolved_path);
+			break;
+		case PFS_RESOLVE_UNCHANGED:
+			debug(D_DEBUG, "%s: interpreter %s resolve unchanged", __func__, path);
+			/* XXX This access skips mounts and other PFS redirections. */
+			if (access(ldso_resolved_path, R_OK|X_OK) == 0) {
+				/* The kernel can find it, we're done. */
+				debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
+				exefd = phyfd;
+				phyfd = -1;
+				goto success;
+			}
+			debug(D_DEBUG, "%s: couldn't access interpreter", __func__);
+			rc = EACCES;
+			goto out;
 		}
+
 		debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
 		CATCHUNIX(pfs_get_local_name(path, ldso_physical_name, 0, 0));
 	}
