@@ -58,10 +58,8 @@ int main( int argc, char *argv[] )
 	struct list *mountstrings = list_create();
 
 	char *parrot_path = "parrot_run";
-	char *ldso_path = "";
 
 	if (getenv("PARROT_PATH")) parrot_path = getenv("PARROT_PATH");
-	if (getenv("PARROT_LDSO_PATH")) ldso_path = getenv("PARROT_LDSO_PATH");
 
 	if (getenv("PARROT_MOUNT_FILE")) list_push_head(mountfiles, getenv("PARROT_MOUNT_FILE"));
 	if (getenv("PARROT_MOUNT_STRING")) list_push_head(mountstrings, getenv("PARROT_MOUNT_STRING"));
@@ -82,7 +80,7 @@ int main( int argc, char *argv[] )
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
 		case 'l':
-			ldso_path = xxstrdup(optarg);
+			// compatibility option
 			break;
 		case LONG_OPT_PARROT_PATH:
 			parrot_path = xxstrdup(optarg);
@@ -96,7 +94,7 @@ int main( int argc, char *argv[] )
 	char buf[4096];
 	if (parrot_version(buf, sizeof(buf)) >= 0) {
 		debug(D_DEBUG, "running under parrot %s\n", buf);
-		if (parrot_fork_namespace(ldso_path) < 0) {
+		if (parrot_fork_namespace() < 0) {
 			fatal("cannot dissociate from parent namespace");
 		}
 	} else {

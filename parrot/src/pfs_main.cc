@@ -112,6 +112,7 @@ const char *pfs_root_checksum=0;
 const char *pfs_initial_working_directory=0;
 
 char *pfs_false_uname = 0;
+char pfs_ldso_path[PATH_MAX];
 uid_t pfs_uid = 0;
 gid_t pfs_gid = 0;
 const char * pfs_username = 0;
@@ -728,7 +729,7 @@ int main( int argc, char *argv[] )
 	if(s) pfs_force_sync = 1;
 
 	s = getenv("PARROT_LDSO_PATH");
-	if(s) pfs_resolve_set_ldso(s);
+	if(s) snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", s);
 
 	s = getenv("PARROT_DEBUG_FLAGS");
 	if(s) {
@@ -926,7 +927,7 @@ int main( int argc, char *argv[] )
 			pfs_checksum_files = 1;
 			break;
 		case 'l':
-			pfs_resolve_set_ldso(optarg);
+			snprintf(pfs_ldso_path, sizeof(pfs_ldso_path), "%s", optarg);
 			break;
 		case 'm':
 			pfs_mountfile_parse_file(optarg);

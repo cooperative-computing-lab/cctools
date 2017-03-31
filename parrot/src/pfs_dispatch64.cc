@@ -952,7 +952,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
-	char ldso[PFS_PATH_MAX];
 	void *value = NULL;
 
 	/* SYSCALL_execve has a different value in 32 and 64 bit modes. When an
@@ -3150,8 +3149,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_parrot_fork_namespace:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,ldso,POINTER(args[0]),sizeof(ldso),0));
-				p->ns = pfs_resolve_fork_ns(p->ns, strlen(ldso) == 0 ? NULL : ldso);
+				p->ns = pfs_resolve_fork_ns(p->ns);
 				divert_to_dummy(p,0);
 			}
 			break;
