@@ -3717,9 +3717,7 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 				phyfd = -1;
 				goto success;
 			}
-			debug(D_DEBUG, "%s: couldn't access interpreter", __func__);
-			rc = EACCES;
-			goto out;
+			break;
 		}
 
 		debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
