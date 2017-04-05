@@ -31,7 +31,6 @@ static void show_help()
 	printf("Where options are:\n");
 	printf(optfmt, "-M", "--mount /foo=/bar", "Mount (redirect) /foo to /bar", " (PARROT_MOUNT_STRING)");
 	printf(optfmt, "-m", "--ftab-file <file>", "Use <file> as a mountlist", " (PARROT_MOUNT_FILE)");
-	printf(optfmt, "-l", "--ld-path=<path>", "Path to ld.so to use", " (PARROT_LDSO_PATH)");
 	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run", " (PARROT_PATH)");
 	printf(optfmt, "-v", "--version", "Show version number", "");
 	printf(optfmt, "-h", "--help", "Help: Show these options", "");
@@ -47,7 +46,6 @@ static const struct option long_options[] = {
 	{"version", no_argument, 0, 'v'},
 	{"mount", required_argument, 0, 'M'},
 	{"tab-file", required_argument, 0, 'm'},
-	{"ld-path", required_argument, 0, 'l'},
 	{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 	{0,0,0,0}
 };
@@ -79,9 +77,6 @@ int main( int argc, char *argv[] )
 		case 'v':
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
-		case 'l':
-			// compatibility option
-			break;
 		case LONG_OPT_PARROT_PATH:
 			parrot_path = xxstrdup(optarg);
 			break;
