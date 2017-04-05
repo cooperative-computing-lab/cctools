@@ -36,13 +36,14 @@ typedef enum {
 } work_queue_file_type_t;
 
 typedef enum {
-	WORK_QUEUE_NOCACHE  = 0, /**< Do not cache file at execution site. */
-	WORK_QUEUE_CACHE    = 1, /**< Cache file at execution site for later use. */
-	WORK_QUEUE_SYMLINK  = 2, /**< Create a symlink to the file rather than copying it, if possible. */
-	WORK_QUEUE_PREEXIST = 4, /**< If the filename already exists on the host, use it in place. */
-	WORK_QUEUE_THIRDGET = 8, /**< Access the file on the client from a shared filesystem */
-	WORK_QUEUE_THIRDPUT = 8, /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
-	WORK_QUEUE_WATCH    = 16 /**< Watch the output file and send back changes as the task runs. */
+	WORK_QUEUE_NOCACHE  = 0,  /**< Do not cache file at execution site. */
+	WORK_QUEUE_CACHE    = 1,  /**< Cache file at execution site for later use. */
+	WORK_QUEUE_SYMLINK  = 2,  /**< Create a symlink to the file rather than copying it, if possible. */
+	WORK_QUEUE_PREEXIST = 4,  /**< If the filename already exists on the host, use it in place. */
+	WORK_QUEUE_THIRDGET = 8,  /**< Access the file on the client from a shared filesystem */
+	WORK_QUEUE_THIRDPUT = 8,  /**< Access the file on the client from a shared filesystem (same as WORK_QUEUE_THIRDGET, included for readability) */
+	WORK_QUEUE_WATCH    = 16, /**< Watch the output file and send back changes as the task runs. */
+	WORK_QUEUE_REMOTE   = 32  /**< Fetch the file from another worker **/
 } work_queue_file_flags_t;
 
 typedef enum {
@@ -77,7 +78,7 @@ typedef enum {
 	WORK_QUEUE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
 	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
-	WORK_QUEUE_TASK_CANCELED,           /**< Task was canceled before completion **/
+	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
 } work_queue_task_state_t;
 
 typedef enum {

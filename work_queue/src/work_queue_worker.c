@@ -150,6 +150,8 @@ static char *arch_name = NULL;
 static char *user_specified_workdir = NULL;
 static time_t worker_start_time = 0;
 
+static int worker_port = -1;
+
 static struct work_queue_watcher * watcher = 0;
 
 static struct work_queue_resources * local_resources = 0;
@@ -206,6 +208,12 @@ static int total_tasks_executed = 0;
 
 static const char *project_regex = 0;
 static int released_by_master = 0;
+
+static struct link *worker_link = NULL;
+static struct link *fetch_link = NULL;
+
+static int provide(struct link *master, char *filename, char *remote_host, int mode, int flags);
+static int fetch(struct link *master, char *filename, int flags);
 
 __attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
@@ -923,6 +931,13 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 				work_queue_task_specify_enviroment_variable(task,env,value);
 			}
 			free(env);
+		} else if(sscanf(line,"remote_infile %s %s %d", filename, taskname_encoded, &flags)) {
+			if (flags & WORK_QUEUE_REMOTE) {
+				fetch(master, filename, flags);
+			}
+			sprintf(localname, "cache/%s", filename);
+			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
+			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
 			return 0;
@@ -1223,6 +1238,107 @@ static int do_kill(int taskid)
 	return 1;
 }
 
+static struct link *create_worker_link(int port) {
+	struct link *worker_link = NULL;
+	worker_link = link_serve(port);
+	return worker_link;
+}
+
+static struct link *connect_to_worker(struct link *master, char *host, int port) {
+	char worker_addr[LINK_ADDRESS_MAX];
+	if(!domain_name_cache_lookup(host,worker_addr)) {
+		return NULL;
+	}
+	reset_idle_timer();
+	struct link *fetch_worker = link_connect(worker_addr,port,idle_stoptime);
+	if(!fetch_worker) {
+		return NULL;
+	}
+	return fetch_worker;
+
+}
+
+static struct link *accept_worker(struct link *master) {
+	int port;
+	char addr[LINK_ADDRESS_MAX];
+	struct link *link = link_accept(worker_link, time(0) + 5);
+	if (!link) {
+		return NULL;
+	}
+	link_keepalive(link, 1);
+	if(!link_address_remote(link, addr, &port)) {
+		link_close(link);
+		return NULL;
+	}
+	return link;
+
+}
+
+static int wait_for_worker_provide(struct link *master, struct link *Link,  char *filename) {
+	char line[WORK_QUEUE_LINE_MAX];
+	int64_t length;
+	int mode, r = 1;
+	int flags;
+
+	while (1) {
+		if (recv_master_message(Link, line, sizeof(line), time(0) + active_timeout)) {
+			if(sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) {
+				if(path_within_dir(filename, workspace)) {
+					r = do_put(Link, filename, length, mode);
+					send_master_message(master, "fetch_success\n");
+					reset_idle_timer();
+				} else {
+					send_master_message(master, "fetch_failure\n");
+					r = 0;
+				}
+				break;
+			}
+		}
+	}
+	return r;
+}
+
+static int prepare_fetch(struct link *master, char *filename, char *remote_host, int port) {
+	if (fetch_link) {
+		return 1;
+	}
+	fetch_link = connect_to_worker(master, remote_host, port);
+	if (!fetch_link) {
+		// change to fetch_failure
+		send_master_message(master, "fetch_failure failed connection\n");
+	}
+	return 1;
+}
+
+static int fetch(struct link *master, char *filename, int flags) {
+	if (fetch_link) {
+		wait_for_worker_provide(master, fetch_link, filename);
+	}
+	return 1;
+}
+static int provide(struct link *master, char *filename, char *remote_host, int mode, int flags) {
+	struct link *Link = accept_worker(master);
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	sprintf(cached_filename, "cache/%s", filename);
+	if (Link) {
+		struct stat local_info;
+		if(stat(cached_filename, &local_info) < 0) {
+			return 0;
+		}
+		int fd = open(cached_filename, O_RDONLY, 0);
+		if (fd < 0) {
+			return 0;
+		}
+		send_master_message(Link, "put %s %"PRId64" %o %d\n",filename, local_info.st_size, mode, flags);
+		int actual = link_stream_from_fd(Link, fd, local_info.st_size, time(0) + active_timeout);
+		if (actual != local_info.st_size) {
+			return 0;
+		}
+		return 1;
+	}
+	return 0;
+}
+
 /*
 Kill off all known tasks by iterating over the complete
 procs_table and calling do_kill.  This should result in
@@ -1389,6 +1505,10 @@ static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
+	char remote_host[WORK_QUEUE_LINE_MAX];
+	char remote_worker_host[WORK_QUEUE_LINE_MAX];
+	int remote_worker_port;
+
 	int64_t length;
 	int64_t taskid = 0;
 	int flags = WORK_QUEUE_NOCACHE;
@@ -1444,6 +1564,14 @@ static int handle_master(struct link *master) {
 			r = 0;
 		} else if(sscanf(line, "send_results %d", &n) == 1) {
 			report_tasks_complete(master);
+			r = 1;
+		} else if (sscanf(line, "fetch %s from %s at %d\n", filename, remote_worker_host, &remote_worker_port)) {
+			prepare_fetch(master, filename, remote_worker_host, remote_worker_port);
+			r = 1;
+		} else if(sscanf(line, "provide %s to %s %o %d\n", filename, remote_host, &mode, &flags)) {
+			if (!provide(master, filename, remote_host, mode, flags)) {
+				send_master_message(master, "fetch_failure\n");
+			}
 			r = 1;
 		} else {
 			debug(D_WQ, "Unrecognized master message: %s.\n", line);
@@ -1897,6 +2025,18 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 		}
 	}
 
+	int count = 0, port_num = 9000;
+	worker_link = create_worker_link(port_num);
+	while (!worker_link && count < 50) {
+		count++;
+		worker_link = create_worker_link(++port_num);
+	}
+	if (worker_link) {
+		send_master_message(master, "worker_port = %d\n", port_num);
+		worker_port = port_num;
+	} else {
+		send_master_message(master, "worker_port = -1\n");
+	}
 	workspace_prepare();
 
 	measure_worker_resources();
@@ -1920,6 +2060,9 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	disconnect_master(master);
 	printf("disconnected from master %s:%d\n", host, port );
 
+	if (worker_link) {
+		link_close(worker_link);
+	}
 	return 1;
 }
 

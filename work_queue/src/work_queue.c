@@ -197,6 +197,8 @@ struct work_queue {
 
 	char *password;
 	double bandwidth;
+
+	struct list *ongoing_fetches;
 };
 
 struct work_queue_worker {
@@ -209,6 +211,11 @@ struct work_queue_worker {
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+
+	int worker_link_port;
+
+  int is_fetching;
+  struct fetch *ongoing_fetch;
 
 	char *workerid;
 
@@ -231,6 +238,13 @@ struct work_queue_task_report {
 	timestamp_t exec_time;
 
 	struct rmsummary *resources;
+};
+
+struct fetch {
+	struct work_queue_worker *from_worker;
+	struct work_queue_worker *to_worker;
+	int taskid;
+	char * filename;
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -314,6 +328,11 @@ static struct list *work_queue_task_file_list_clone(struct list *list);
 /** Write master's resources to resource summary file and close the file **/
 void work_queue_disable_monitoring(struct work_queue *q);
 
+
+static struct work_queue_worker *find_worker_by_random(struct work_queue *q, struct work_queue_task *t);
+
+static struct work_queue_worker *find_worker_to_fetch_from(struct work_queue *q, const char *filename, struct work_queue_worker *wk, int taskid);
+static int remove_fetch(struct work_queue *q, struct work_queue_worker *w);
 /******************************************************/
 /********** work_queue internal functions *************/
 /******************************************************/
@@ -603,7 +622,6 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		stoptime = time(0) + q->short_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
-
 	if (result <= 0) {
 		return MSG_FAILURE;
 	}
@@ -634,6 +652,16 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
 		result = process_info(q, w, line);
+	} else if (string_prefix_is(line, "worker_port")) {
+		char portnum[WORK_QUEUE_LINE_MAX];
+		sscanf(line, "worker_port = %s\n", portnum);
+		w->worker_link_port = atoi(portnum);
+		result = MSG_PROCESSED;
+	} else if (string_prefix_is(line, "fetch_success")) {
+		remove_fetch(q, w);
+	} else if (string_prefix_is(line, "fetch_failure")) {
+		remove_fetch(q, w);
+		handle_worker_failure(q, w);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = MSG_NOT_PROCESSED;
@@ -907,6 +935,20 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 	return 1;
 }
 
+static int remove_fetch(struct work_queue *q, struct work_queue_worker *w) {
+	struct fetch *f;
+	list_first_item(q->ongoing_fetches);
+	while ((f=list_next_item(q->ongoing_fetches))) {
+		if (w == f->to_worker || w== f->from_worker) {
+			f->to_worker->ongoing_fetch = NULL;
+			f->from_worker->ongoing_fetch = NULL;
+			list_remove(q->ongoing_fetches, f);
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void add_worker(struct work_queue *q)
 {
 	struct link *link;
@@ -916,7 +958,6 @@ static void add_worker(struct work_queue *q)
 
 	link = link_accept(q->master_link, time(0) + q->short_timeout);
 	if(!link) return;
-
 	link_keepalive(link, 1);
 	link_tune(link, LINK_TUNE_INTERACTIVE);
 
@@ -955,12 +996,17 @@ static void add_worker(struct work_queue *q)
 	w->current_tasks_boxes = itable_create(0);
 	w->finished_tasks = 0;
 	w->start_time = timestamp_get();
-
+	
+	w->worker_link_port = -1;
+	
 	w->last_update_msg_time = w->start_time;
 
 	w->resources = work_queue_resources_create();
 
 	w->workerid = NULL;
+
+	w->is_fetching = 0;
+	w->ongoing_fetch = NULL;
 
 	w->stats     = calloc(1, sizeof(struct work_queue_stats));
 	link_to_hash_key(link, w->hashkey);
@@ -2599,7 +2645,16 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	if(!length) {
 		length = local_info.st_size;
 	}
-
+	if (flags & WORK_QUEUE_REMOTE && w->ongoing_fetch == NULL) {
+		struct work_queue_worker *worker;
+		worker = find_worker_to_fetch_from(q, remotename, w, t->taskid);
+		if (worker) {
+			printf("sending fetch %s from %s to %s at port %d\n", remotename, worker->hostname, w->hostname, worker->worker_link_port);
+			send_worker_msg(q, w, "fetch %s from %s at %d\n", remotename, worker->hostname, worker->worker_link_port);
+			send_worker_msg(q, worker, "provide %s to %s 0%o %d\n", remotename, w->hostname, local_info.st_mode, flags);
+			return SUCCESS;
+		}
+	}
 	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
@@ -2713,6 +2768,7 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 	}
 	else if(!remote_info) {
 		/* If not on the worker, send it. */
+		
 		if(S_ISDIR(local_info.st_mode)) {
 			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		} else {
@@ -3035,7 +3091,12 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 			} else {
 				char remote_name_encoded[PATH_MAX];
 				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
-				send_worker_msg(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+
+				if (tf->flags & WORK_QUEUE_REMOTE && w->ongoing_fetch != NULL && w->ongoing_fetch->taskid == t->taskid) {
+					send_worker_msg(q,w, "remote_infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+				} else {
+					send_worker_msg(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
+				}
 			}
 		}
 	}
@@ -3054,7 +3115,6 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
 	int result_msg = send_worker_msg(q,w, "end\n");
-
 	if(result_msg > -1)
 	{
 		debug(D_WQ, "%s (%s) busy on '%s'", w->hostname, w->addrport, t->command_line);
@@ -3269,6 +3329,49 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 	list_delete(valid_workers);
 	return w;
 }
+
+int is_valid_fetch(struct work_queue *q, struct fetch *Fetch) {
+  struct fetch *f;
+  list_first_item(q->ongoing_fetches);
+  while((f=list_next_item(q->ongoing_fetches))) {
+    if (f->from_worker == Fetch->from_worker &&
+        (f->to_worker != Fetch->to_worker || strcmp(f->filename, Fetch->filename) != 0)) {
+        return 0;
+      }
+    }
+  return 1;
+}
+
+
+
+static struct work_queue_worker *find_worker_to_fetch_from(struct work_queue *q, const char *filename, struct work_queue_worker *wk, int taskid) {
+	char *key;
+	struct work_queue_worker *w;
+	struct stat *remote_info;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
+		remote_info = hash_table_lookup(w->current_files, filename);
+		struct fetch *potential_fetch = malloc(sizeof(struct fetch));
+		potential_fetch->from_worker = w;
+		potential_fetch->to_worker = wk;
+		potential_fetch->filename = malloc(strlen(filename) + 1);
+		potential_fetch->taskid = taskid;
+		strncpy(potential_fetch->filename,filename, strlen(filename));
+		potential_fetch->filename[strlen(filename)] = '\0';
+		if (remote_info && strcmp(wk->hostname, w->hostname) && is_valid_fetch(q,potential_fetch)) {
+			wk->ongoing_fetch = potential_fetch;
+			w->ongoing_fetch = potential_fetch;
+			list_push_tail(q->ongoing_fetches, potential_fetch);
+			return w;
+		} else {
+			free(potential_fetch->filename);
+			free(potential_fetch);
+		}
+  }
+  return NULL;
+}
+
 
 // 1 if a < b, 0 if a >= b
 static int compare_worst_fit(struct work_queue_resources *a, struct work_queue_resources *b)
@@ -4029,7 +4132,6 @@ struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, 
 	}
 
 	f->cached_name = make_cached_name(t, f);
-
 	return f;
 }
 
@@ -4659,7 +4761,8 @@ struct work_queue *work_queue_create(int port)
 			q->bandwidth = 0;
 		}
 	}
-
+	
+	q->ongoing_fetches = list_create();
 	//Deprecated:
 	q->task_ordering = WORK_QUEUE_TASK_ORDER_FIFO;
 	//
