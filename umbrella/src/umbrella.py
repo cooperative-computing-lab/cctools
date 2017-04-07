@@ -902,25 +902,27 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
 	host_kernel_version = uname_list[2][:index]
 	verify_kernel(host_kernel_name, host_kernel_version, kernel_name, kernel_version)
 
-	dist_list = platform.dist()
+	#set host_linux_distro. Examples: redhat6, centos6.
+	#potential problem: maybe in the future, we need a finer control about the host_linux_distro, like redhat6.5, centos6.5.
+	host_linux_distro = None
+
+	dist_list = platform.linux_distribution() # platform.dist() is obsolete.
 	logging.debug("The hardware information of the local machine:")
 	logging.debug(dist_list)
 
-	#set host_linux_distro. Examples: redhat6, centos6.
-	#potential problem: maybe in the future, we need a finer control about the host_linux_distro, like redhat6.5, centos6.5.
-	arch_index = uname_list[2].find('ARCH')
-	host_linux_distro = None
-	if arch_index != -1:
-		host_linux_distro = 'arch'
+	if not dist_list[0] or not dist_list[1]:
+		host_linux_distro = uname_list[2]
 	else:
-		redhat_index = uname_list[2].find('el')
-		centos_index = uname_list[2].find('centos')
-		if redhat_index != -1:
-			dist_version = uname_list[2][redhat_index + 2]
-			if centos_index != -1 or dist_list[0].lower() == 'centos':
-				host_linux_distro = 'centos' + dist_version
-			else:
-				host_linux_distro = 'redhat' + dist_version
+		dist_name = dist_list[0]
+		dist_version = dist_list[1][:dist_list[1].find('.')]
+		if dist_list[0] == 'CentOS Linux':
+			dist_name = 'centos'
+		elif dist_list[0] == 'Red Hat Enterprise Linux Server':
+			dist_name = 'redhat'
+		elif len(dist_list[0]) >= 16 and dist_list[0][:16] == 'Scientific Linux':
+			dist_name = 'redhat'
+		host_linux_distro = dist_name + dist_version
+
 	logging.debug("The OS distribution information of the local machine: %s", host_linux_distro)
 
 	if sandbox_mode == "parrot" and not parrot_path:
