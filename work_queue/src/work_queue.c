@@ -244,7 +244,7 @@ struct fetch {
 	struct work_queue_worker *from_worker;
 	struct work_queue_worker *to_worker;
 	int taskid;
-	char * filename;
+	char *filename;
 };
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
@@ -3092,7 +3092,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 				char remote_name_encoded[PATH_MAX];
 				url_encode(tf->remote_name, remote_name_encoded, PATH_MAX);
 
-				if (tf->flags & WORK_QUEUE_REMOTE && w->ongoing_fetch != NULL && w->ongoing_fetch->taskid == t->taskid) {
+				if (tf->flags & WORK_QUEUE_REMOTE && w->ongoing_fetch != NULL) {
 					send_worker_msg(q,w, "remote_infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);
 				} else {
 					send_worker_msg(q,w, "infile %s %s %d\n", tf->cached_name, remote_name_encoded, tf->flags);

@@ -1279,19 +1279,16 @@ static int wait_for_worker_provide(struct link *master, struct link *Link,  char
 	int64_t length;
 	int mode, r = 1;
 	int flags;
-
-	while (1) {
-		if (recv_master_message(Link, line, sizeof(line), time(0) + active_timeout)) {
-			if(sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) {
-				if(path_within_dir(filename, workspace)) {
-					r = do_put(Link, filename, length, mode);
-					send_master_message(master, "fetch_success\n");
-					reset_idle_timer();
-				} else {
-					send_master_message(master, "fetch_failure\n");
-					r = 0;
-				}
-				break;
+	// need to determine appropriate time to wait for put message from peer worker
+	if (recv_master_message(Link, line, sizeof(line), time(0) + active_timeout)) {
+		if(sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) {
+			if(path_within_dir(filename, workspace)) {
+				r = do_put(Link, filename, length, mode);
+				send_master_message(master, "fetch_success\n");
+				reset_idle_timer();
+			} else {
+				send_master_message(master, "fetch_failure\n");
+				r = 0;
 			}
 		}
 	}
@@ -1304,17 +1301,22 @@ static int prepare_fetch(struct link *master, char *filename, char *remote_host,
 	}
 	fetch_link = connect_to_worker(master, remote_host, port);
 	if (!fetch_link) {
-		// change to fetch_failure
 		send_master_message(master, "fetch_failure failed connection\n");
 	}
 	return 1;
 }
 
 static int fetch(struct link *master, char *filename, int flags) {
-	if (fetch_link) {
-		wait_for_worker_provide(master, fetch_link, filename);
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	sprintf(cached_filename, "cache/%s", filename);
+	struct stat local_info;
+	if (stat(cached_filename, &local_info) == 0) {
+		send_master_message(master, "fetch_info stat success\n");
+		return 1;
+	} else if (fetch_link) {
+		return wait_for_worker_provide(master, fetch_link, filename);
 	}
-	return 1;
+	return 0;
 }
 static int provide(struct link *master, char *filename, char *remote_host, int mode, int flags) {
 	struct link *Link = accept_worker(master);
@@ -1329,7 +1331,7 @@ static int provide(struct link *master, char *filename, char *remote_host, int m
 		if (fd < 0) {
 			return 0;
 		}
-		send_master_message(Link, "put %s %"PRId64" %o %d\n",filename, local_info.st_size, mode, flags);
+		send_master_message(Link, "put %s %"PRId64" %o %d\n",filename, (int64_t) local_info.st_size, mode, flags);
 		int actual = link_stream_from_fd(Link, fd, local_info.st_size, time(0) + active_timeout);
 		if (actual != local_info.st_size) {
 			return 0;

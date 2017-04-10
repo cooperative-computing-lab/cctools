@@ -78,7 +78,7 @@ typedef enum {
 	WORK_QUEUE_TASK_WAITING_RETRIEVAL, /**< Task results are available at the worker **/
 	WORK_QUEUE_TASK_RETRIEVED,         /**< Task results are available at the master **/
 	WORK_QUEUE_TASK_DONE,              /**< Task is done, and returned through work_queue_wait >**/
-	WORK_QUEUE_TASK_CANCELED           /**< Task was canceled before completion **/
+	WORK_QUEUE_TASK_CANCELED,          /**< Task was canceled before completion **/
 } work_queue_task_state_t;
 
 typedef enum {
