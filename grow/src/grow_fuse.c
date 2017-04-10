@@ -100,13 +100,14 @@ retry:
 			unlink(tmppath);
 			return -saved_errno;
 		}
+		stats_inc("grow.fuse.cache.commit", 1);
 		++retries;
 		goto retry;
 	} else if (fd < 0) {
 		stats_inc("grow.fuse.cache.error", 1);
 		return -errno;
 	} else {
-		stats_inc("grow.fuse.cache.hit", 1);
+		if (retries == 0) stats_inc("grow.fuse.cache.hit", 1);
 		return fd;
 	}
 }
