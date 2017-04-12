@@ -113,7 +113,7 @@ import json
 cctools_binary_source = "http://ccl.cse.nd.edu/research/data/hep-case-study/parrot"
 
 #Replace the version of cctools inside umbrella is easy: set cctools_binary_version.
-cctools_binary_version = "14fb31b2"
+cctools_binary_version = "d68f960d"
 
 parrot_path = ""
 
