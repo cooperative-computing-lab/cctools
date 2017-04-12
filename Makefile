@@ -15,8 +15,8 @@ config.mk:
 
 makeflow wavefront: batch_job
 batch_job parrot: chirp
-allpairs batch_job chirp deltadb ftp_lite makeflow makeflow_linker parrot resource_monitor sand wavefront work_queue: dttools
-parrot: ftp_lite
+allpairs batch_job chirp deltadb ftp_lite makeflow makeflow_linker parrot resource_monitor sand wavefront work_queue grow: dttools
+parrot: ftp_lite grow
 allpairs: sand
 allpairs batch_job makeflow sand wavefront: work_queue
 

@@ -432,7 +432,7 @@ if [ "$optstrict" = 1 ]; then
 	ccflags="${ccflags} -Werror"
 fi
 
-potential_packages="dttools batch_job ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
+potential_packages="dttools batch_job grow ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
 
 export HOST_MULTIARCH=$(check_multiarch)
 
@@ -812,6 +812,7 @@ then
 				fi
 				ccflags="${ccflags} -DHAS_FUSE"
 				fuse_ldflags="${library_search_result}"
+				fuse_avail=yes
 		else
 				if [ $config_fuse_path = yes ]
 				then
@@ -1039,6 +1040,9 @@ EOF
 						echo "*** skipping python bindings support"
 				fi
 	fi
+fi
+if [ $fuse_avail != yes ]; then
+	echo "grow_fuse requires FUSE"
 fi
 
 # If python is not found, then leave out weaver.
@@ -1497,6 +1501,7 @@ CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
 CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
 CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 
+CCTOOLS_FUSE_AVAILABLE=${fuse_avail}
 CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
 CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
 
