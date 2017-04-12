@@ -124,6 +124,7 @@ extern int pfs_fake_setgid;
 
 extern int wait_barrier;
 
+extern int pfs_master_timeout;
 extern INT64_T pfs_syscall_count;
 extern INT64_T pfs_read_count;
 extern INT64_T pfs_write_count;
@@ -1172,7 +1173,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 	char path[PFS_PATH_MAX];
 	char path2[PFS_PATH_MAX];
-	char ldso[PFS_PATH_MAX];
 	void *value = NULL;
 
 	/* SYSCALL_execve has a different value in 32 and 64 bit modes. When an
@@ -3469,8 +3469,7 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_parrot_fork_namespace:
 			if (entering) {
-				TRACER_MEM_OP(tracer_copy_in_string(p->tracer,ldso,POINTER(args[0]),sizeof(ldso),0));
-				p->ns = pfs_resolve_fork_ns(p->ns, strlen(ldso) == 0 ? NULL : ldso);
+				p->ns = pfs_resolve_fork_ns(p->ns);
 				divert_to_dummy(p,0);
 			}
 			break;
@@ -3665,12 +3664,14 @@ void pfs_dispatch( struct pfs_process *p )
 
 int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char *physical_name)
 {
+	extern char pfs_ldso_path[PFS_PATH_MAX];
+
 	int rc;
 	int phyfd = -1;
 	int exefd = -1;
 	int tmpfd = -1;
-	const char *ldso = pfs_resolve_get_ldso();
 	char ldso_physical_name[PATH_MAX] = "";
+	char ldso_resolved_path[PATH_MAX];
 
 	strcpy(exe, "");
 	if (strlen(physical_name) >= PATH_MAX)
@@ -3678,9 +3679,9 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 
 	CATCHUNIX(phyfd = open(physical_name, O_RDONLY));
 
-	if (ldso) {
-		debug(D_PROCESS, "%s: forcing use of loader %s", __func__, ldso);
-		CATCHUNIX(pfs_get_local_name(ldso, ldso_physical_name, 0, 0));
+	if (pfs_ldso_path[0]) {
+		debug(D_PROCESS, "%s: forcing use of loader %s", __func__, pfs_ldso_path);
+		CATCHUNIX(pfs_get_local_name(pfs_ldso_path, ldso_physical_name, 0, 0));
 	} else {
 		char path[PATH_MAX] = "";
 		rc = elf_get_interp(phyfd, path);
@@ -3689,14 +3690,36 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 		CATCHUNIX(rc);
 		assert(path[0]);
 		debug(D_DEBUG, "%s: %s PT_INTERP is %s", __func__, physical_name, path);
-		/* XXX This access skips mounts and other PFS redirections. */
-		if (access(path, R_OK|X_OK) == 0) {
-			/* The kernel can find it, we're done. */
-			debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
-			exefd = phyfd;
-			phyfd = -1;
-			goto success;
+		pfs_resolve_t res = pfs_resolve(path, ldso_resolved_path, R_OK|X_OK, time(0) + pfs_master_timeout);
+		switch (res) {
+		case PFS_RESOLVE_DENIED:
+			debug(D_DEBUG, "%s: interpreter %s resolve denied", __func__, path);
+			rc = EACCES;
+			goto out;
+		case PFS_RESOLVE_ENOENT:
+			debug(D_DEBUG, "%s: interpreter %s resolve ENOENT", __func__, path);
+			rc = ENOENT;
+			goto out;
+		case PFS_RESOLVE_FAILED:
+			debug(D_DEBUG, "%s: interpreter %s resolve failed", __func__, path);
+			rc = EIO;
+			goto out;
+		case PFS_RESOLVE_CHANGED:
+			debug(D_DEBUG, "%s: interpreter %s resolve changed to %s", __func__, path, ldso_resolved_path);
+			break;
+		case PFS_RESOLVE_UNCHANGED:
+			debug(D_DEBUG, "%s: interpreter %s resolve unchanged", __func__, path);
+			/* XXX This access skips mounts and other PFS redirections. */
+			if (access(ldso_resolved_path, R_OK|X_OK) == 0) {
+				/* The kernel can find it, we're done. */
+				debug(D_DEBUG, "%s: interpreter is local, no redirection required", __func__);
+				exefd = phyfd;
+				phyfd = -1;
+				goto success;
+			}
+			break;
 		}
+
 		debug(D_PROCESS, "%s: getting physical name of loader %s", __func__, path);
 		CATCHUNIX(pfs_get_local_name(path, ldso_physical_name, 0, 0));
 	}

@@ -31,7 +31,6 @@ static void show_help()
 	printf("Where options are:\n");
 	printf(optfmt, "-M", "--mount /foo=/bar", "Mount (redirect) /foo to /bar", " (PARROT_MOUNT_STRING)");
 	printf(optfmt, "-m", "--ftab-file <file>", "Use <file> as a mountlist", " (PARROT_MOUNT_FILE)");
-	printf(optfmt, "-l", "--ld-path=<path>", "Path to ld.so to use", " (PARROT_LDSO_PATH)");
 	printf(optfmt, "", "--parrot-path <path>", "Path to parrot_run", " (PARROT_PATH)");
 	printf(optfmt, "-v", "--version", "Show version number", "");
 	printf(optfmt, "-h", "--help", "Help: Show these options", "");
@@ -47,7 +46,6 @@ static const struct option long_options[] = {
 	{"version", no_argument, 0, 'v'},
 	{"mount", required_argument, 0, 'M'},
 	{"tab-file", required_argument, 0, 'm'},
-	{"ld-path", required_argument, 0, 'l'},
 	{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 	{0,0,0,0}
 };
@@ -58,10 +56,8 @@ int main( int argc, char *argv[] )
 	struct list *mountstrings = list_create();
 
 	char *parrot_path = "parrot_run";
-	char *ldso_path = "";
 
 	if (getenv("PARROT_PATH")) parrot_path = getenv("PARROT_PATH");
-	if (getenv("PARROT_LDSO_PATH")) ldso_path = getenv("PARROT_LDSO_PATH");
 
 	if (getenv("PARROT_MOUNT_FILE")) list_push_head(mountfiles, getenv("PARROT_MOUNT_FILE"));
 	if (getenv("PARROT_MOUNT_STRING")) list_push_head(mountstrings, getenv("PARROT_MOUNT_STRING"));
@@ -81,9 +77,6 @@ int main( int argc, char *argv[] )
 		case 'v':
 			cctools_version_print(stdout,"parrot_mount");
 			return 0;
-		case 'l':
-			ldso_path = xxstrdup(optarg);
-			break;
 		case LONG_OPT_PARROT_PATH:
 			parrot_path = xxstrdup(optarg);
 			break;
@@ -96,7 +89,7 @@ int main( int argc, char *argv[] )
 	char buf[4096];
 	if (parrot_version(buf, sizeof(buf)) >= 0) {
 		debug(D_DEBUG, "running under parrot %s\n", buf);
-		if (parrot_fork_namespace(ldso_path) < 0) {
+		if (parrot_fork_namespace() < 0) {
 			fatal("cannot dissociate from parent namespace");
 		}
 	} else {
