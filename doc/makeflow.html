@@ -337,12 +337,12 @@ specify the batch mode via <tt> -T mesos </tt> option and pass the hostname and
 port number of Mesos master to Makeflow through <tt> --mesos-master </tt> option.
 Since the Makeflow-Mesos Scheduler is based on Mesos Python2 API, the path to Mesos 
 Python2 library should be included in the <tt>$PATH</tt>, or one can specify a 
-preferrd Mesos Python2 API via <tt> --mesos-path </tt> option. To successfully 
+preferred Mesos Python2 API via <tt> --mesos-path </tt> option. To successfully 
 import the Python library, user may need to indicate dependencies through 
 <tt> --mesos-preload </tt> option. </p>
 
 <p>Following is the command to run Makeflow on a Mesos cluster that has the master listen 
-on port 5050 of localhost, with a user specified python library that dependents on an 
+on port 5050 of localhost, with a user specified python library that depends on an 
 explicit version of GCC library.</p>
 <code>makeflow -T mesos --mesos-master localhost:5050 
                --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages 

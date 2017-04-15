@@ -1,7 +1,7 @@
 #include "mesos_task.h"
 
-struct mesos_task *mesos_task_create(int task_id, const char *cmd, \
-        const char *extra_input_files, const char *extra_output_files)
+struct mesos_task *mesos_task_create(int task_id, const char *cmd, 
+		const char *extra_input_files, const char *extra_output_files)
 {
 	struct mesos_task *mt = malloc(sizeof(*mt));
 	mt->task_id = task_id;

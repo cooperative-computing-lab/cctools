@@ -54,41 +54,12 @@ static int is_scheduler_running = 0;
 static const char *mesos_py_path = NULL;
 static const char *mesos_master = NULL;
 static const char *mesos_preload = NULL;
-static pid_t mesos_scheduler_pid = 0;
 
 static void start_mesos_scheduler(struct batch_queue *q)
 {
 
 	pid_t mesos_pid;
 	mesos_pid = fork();			
-	mesos_scheduler_pid = mesos_pid;
-	char *mesos_cwd;
-	mesos_cwd = path_getcwd();
-
-	char exe_path[MAX_BUF_SIZE];
-
-	if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
-		debug(D_ERROR, "read \"proc/self/exe\" fail\n");
-		exit(EXIT_FAILURE);
-	}
-
-	char exe_dir_path[MAX_BUF_SIZE];
-	path_dirname(exe_path, exe_dir_path);
-
-    char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
-	char *ld_preload_str = NULL;
-
-	if(mesos_preload != NULL) {
-		ld_preload_str = string_format("LD_PRELOAD=%s", mesos_preload);
-	} 
-	char *envs[] = {ld_preload_str, NULL};
-
-	char *mesos_python_path = xxstrdup(mesos_py_path);
-
-	if (mesos_python_path == NULL) {
-		debug(D_ERROR, "Please specify the mesos python path\n");
-		exit(EXIT_FAILURE);
-	}
 
 	if (mesos_pid > 0) {
 
@@ -96,51 +67,69 @@ static void start_mesos_scheduler(struct batch_queue *q)
 
 	} else if (mesos_pid == 0) {
 
+		char *mesos_cwd;
+		mesos_cwd = path_getcwd();
+	
+		char exe_path[MAX_BUF_SIZE];
+	
+		if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
+			fatal("read \"proc/self/exe\" fail\n");
+		}
+	
+		char exe_dir_path[MAX_BUF_SIZE];
+		path_dirname(exe_path, exe_dir_path);
+	
+	    char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
+		char *ld_preload_str = NULL;
+	
+		if(mesos_preload) {
+			ld_preload_str = string_format("LD_PRELOAD=%s", mesos_preload);
+		} 
+		char *envs[] = {ld_preload_str, NULL};
+	
+		char *mesos_python_path = xxstrdup(mesos_py_path);
+
 		const char *batch_log_name = batch_queue_supports_feature(q, "batch_log_name");
 
 		int mesos_fd = open(batch_log_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 		if (mesos_fd == -1) {
-	    	debug(D_ERROR, "Failed to open %s \n", batch_log_name);
-	    	exit(EXIT_FAILURE);
+			fatal("Failed to open %s \n", batch_log_name);
 	    }
 
 	    if (dup2(mesos_fd, 1) == -1) {
-	    	debug(D_ERROR, "%s\n", strerror(errno));
-	    	exit(EXIT_FAILURE);
+			fatal("Failed to duplicate file descriptor: %s\n", strerror(errno));
 	   	}
 
 		if (dup2(mesos_fd, 2) == -1) {
-	    	debug(D_ERROR, "%s\n", strerror(errno));
-	    	exit(EXIT_FAILURE);
+			fatal("Failed to duplicate file descriptor: %s\n", strerror(errno));
 	   	}
 
 	    close(mesos_fd);
 
-		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, mesos_master, mesos_python_path, (char *) 0, envs);
+		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, 
+			mesos_master, mesos_python_path, (char *) 0, envs);
 
-		_exit(127);
+		exit(errno);
 
 	} else {
 
-		debug(D_ERROR, "mesos batch system couldn't create new process: %s\n", strerror(errno));
-		exit(EXIT_FAILURE);
+		fatal("mesos batch system couldn't create new process: %s\n", strerror(errno));
 
 	}
 
 }
 
 
-static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, \
-		const char *extra_input_files, const char *extra_output_files, \
-		struct jx *envlist, const struct rmsummary *resources )
+static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char *cmd, 
+	const char *extra_input_files, const char *extra_output_files, 
+	struct jx *envlist, const struct rmsummary *resources )
 {
 
 	// Get the path to mesos python site-packages
-	if (is_mesos_py_path_known != 1) {
+	if (!is_mesos_py_path_known) {
 		mesos_py_path = batch_queue_get_option(q, "mesos-path");
 		if (mesos_py_path == NULL) {
-			debug(D_ERROR, "Please set the path to mesos python library\n");
-			exit(EXIT_FAILURE);
+			fatal("Please specify the mesos python path by using --mesos-path");
 		} else {
 			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
 			is_mesos_py_path_known = 1;
@@ -148,11 +137,10 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	}
 
 	// Get the mesos master address
-	if (is_mesos_master_known != 1) {
+	if (!is_mesos_master_known) {
 		mesos_master = batch_queue_get_option(q, "mesos-master");
 		if (mesos_master == NULL) {
-			debug(D_ERROR, "Please specify the ip address or domain name of mesos master\n");
-			exit(EXIT_FAILURE);
+			fatal("Please specify the hostname of mesos master by using --mesos-master");
 		} else {
 			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
 			is_mesos_master_known = 1;
@@ -161,9 +149,9 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 
 	mesos_preload = batch_queue_get_option(q, "mesos-preload");
 
-	if (is_mesos_py_path_known == 1 && \
-		is_mesos_master_known == 1 && \
-		is_scheduler_running == 0) {
+	if (is_mesos_py_path_known && 
+		is_mesos_master_known && 
+		!is_scheduler_running ) {
 		// start mesos scheduler if it is not running
 		start_mesos_scheduler(q);
 		is_scheduler_running = 1;
@@ -172,10 +160,9 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	int task_id = ++counter;
 
 	debug(D_BATCH, "task %d is ready", task_id);
-	struct batch_job_info *info = malloc(sizeof(*info));
-	memset(info, 0, sizeof(*info));
-	info->submitted = time(0);
+	struct batch_job_info *info = calloc(1, sizeof(*info));
 	info->started = time(0);
+	info->submitted = time(0);
 	itable_insert(q->job_table, task_id, info);
 
 	FILE *task_info_fp;
@@ -200,7 +187,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		fprintf(task_info_fp, "%s,", text_list_get(mt->task_input_files, num_input_files-1));
 
 	} else {
-		fputs(",", task_info_fp);
+		fprintf(task_info_fp, ",");
 	}
     
 	if (extra_output_files != NULL && strlen(extra_output_files) != 0) {
@@ -211,7 +198,7 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 		}
 		fprintf(task_info_fp, "%s,",text_list_get(mt->task_output_files, num_output_files-1));
 	} else {
-		fputs(",", task_info_fp);
+		fprintf(task_info_fp, ",");	
 	}
 
 	// The default resource requirements for each task
@@ -243,7 +230,7 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 	ssize_t read_len;
 	FILE *task_state_fp;
 
-	if(finished_tasks == NULL) {
+	if(!finished_tasks) {
 		finished_tasks = itable_create(0);
 	}
 
@@ -388,11 +375,11 @@ static int batch_queue_mesos_free(struct batch_queue *q)
 	int batch_queue_failed_flag = atoi(batch_queue_get_option(q, "batch-queue-failed-flag"));
 
 	if(batch_queue_abort_flag) {
-		fputs("aborted", fp);
+		fprintf(fp, "aborted");
 	} else if(batch_queue_failed_flag) {
-		fputs("failed", fp);
+		fprintf(fp, "failed");
 	} else {
-		fputs("finished", fp);
+		fprintf(fp, "finished");
 	}
 
 	fclose(fp);

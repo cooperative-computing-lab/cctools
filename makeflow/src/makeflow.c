@@ -1880,7 +1880,6 @@ if (enforcer && wrapper_umbrella) {
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
 		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
-		batch_queue_set_feature(remote_queue, "batch_log_name", batchlogfilename);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
@@ -2081,9 +2080,9 @@ if (enforcer && wrapper_umbrella) {
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-    	makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
+		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-    	makeflow_wrapper_singularity_init(wrapper, container_image);
+		makeflow_wrapper_singularity_init(wrapper, container_image);
     }
 
 	d->archive_directory = archive_directory;
