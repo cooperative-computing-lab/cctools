@@ -307,49 +307,12 @@ static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 	// append the new task state to the "mesos_task_info" file
 	FILE *task_info_fp;	
 	task_info_fp = fopen(FILE_TASK_INFO, "a+");
+	if(task_info_fp == NULL) {
+		fatal("can not open \"mesos_task_info\n ");
+	}
 	fprintf(task_info_fp, "%" PRIbjid ",,,,,,,aborting\n", jobid);
 	fclose(task_info_fp);
-
-	char *line = NULL;
-	size_t len = 0;
-	ssize_t read_len;
-	FILE *task_state_fp;
-	char *task_id_str;
-	char *task_stat_str;
-	int task_id;
-	// TODO what is the proper timeout?
-	int timeout = 40;
-
-	task_state_fp = fopen(FILE_TASK_STATE, "r");
-	while(1) {
-		while((read_len = getline(&line, &len, task_state_fp)) != -1) {
-			// trim the newline character
-			if (line[read_len-1] == '\n') {
-				line[read_len-1] = '\0';
-				--read_len;
-			}
-
-			task_id_str = strtok(line, ",");
-			task_id = atoi(task_id_str);
-			task_stat_str = strtok(NULL, ",");
-
-			if (task_id == (int)jobid && \
-					(strcmp(task_stat_str, "finished") == 0 || \
-					 strcmp(task_stat_str, "failed") == 0 || \
-					 strcmp(task_stat_str, "aborted") == 0)) {
-
-				fclose(task_state_fp);
-				return 0;
-
-			}
-		}
-		sleep(1);
-
-		if(timeout != 0 && time(0) >= timeout) {
-			fclose(task_state_fp);
-			return 1;
-		}
-	}
+	return 0;
 }
 
 static int batch_queue_mesos_create (struct batch_queue *q)

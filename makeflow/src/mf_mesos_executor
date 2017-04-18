@@ -40,7 +40,7 @@ class MakeflowMesosExecutor(Executor):
         self.framework_id = framework_id
 
     def disconnected(self, driver):
-        driver.sendFrameworkMessage("[EXUT_STATE] {0} {1} disconnected".format(self.executor_id, self.task_id))
+        driver.sendFrameworkMessage("[EXECUTOR_STATE] {0} {1} disconnected".format(self.executor_id, self.task_id))
 
     def get_sandbox_dir(self, hostname):
         slave_state_uri = "http://{0}:{1}/state.json".format(hostname, self.port)

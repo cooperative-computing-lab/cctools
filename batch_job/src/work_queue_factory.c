@@ -107,9 +107,6 @@ static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
 
-static const char *mesos_master = NULL;
-static const char *mesos_path = NULL;
-static const char *mesos_preload = NULL;
 
 static void handle_abort( int sig )
 {
@@ -938,6 +935,10 @@ static const struct option long_options[] = {
 
 int main(int argc, char *argv[])
 {
+	char *mesos_master = NULL;
+	char *mesos_path = NULL;
+	char *mesos_preload = NULL;
+
 	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
 	catalog_host = CATALOG_HOST;
