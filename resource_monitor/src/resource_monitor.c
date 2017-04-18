@@ -1824,6 +1824,7 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 
         if (child_in_foreground)
         {
+			signal(SIGTTOU, SIG_IGN);
             int fdtty, retc;
             fdtty = open("/dev/tty", O_RDWR);
             if (fdtty >= 0)
@@ -1854,6 +1855,8 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 	}
     else //child
     {
+        setpgid(0, 0);
+
         debug(D_RMON, "executing: %s\n", executable);
 
 		errno = 0;
