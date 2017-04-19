@@ -89,7 +89,7 @@ static void start_mesos_scheduler(struct batch_queue *q)
 	
 		char *mesos_python_path = xxstrdup(mesos_py_path);
 
-		const char *batch_log_name = batch_queue_supports_feature(q, "batch_log_name");
+		const char *batch_log_name = q->logfile;  
 
 		int mesos_fd = open(batch_log_name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 		if (mesos_fd == -1) {
@@ -164,6 +164,11 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	info->started = time(0);
 	info->submitted = time(0);
 	itable_insert(q->job_table, task_id, info);
+
+	// write the ready task information as  
+	// "task_id, task_cmd, inputs, outputs" to 
+	// mesos_task_info, which will be scanned by 
+	// mf_mesos_scheduler later. 
 
 	FILE *task_info_fp;
 
@@ -319,6 +324,7 @@ static int batch_queue_mesos_create (struct batch_queue *q)
 {
 	batch_queue_set_feature(q, "mesos_job_queue", NULL);
 	batch_queue_set_feature(q, "batch_log_name", "%s.mesoslog");
+	batch_queue_set_feature(q, "batch_log_transactions", "%s.tr");
 	batch_queue_set_feature(q, "autosize", "yes");
 
 	return 0;
