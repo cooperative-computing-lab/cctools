@@ -1200,7 +1200,7 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "mesos-path", mesos_path);
 		batch_queue_set_option(queue, "mesos-master", mesos_master);
 		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
-		batch_queue_set_feature(queue, "batch_log_name", "work_queue_factory.mesoslog");
+		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
 	}
 
 	mainloop( queue );
