@@ -260,6 +260,13 @@ struct work_queue_stats {
 	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
 
+	/* Fetch statistics */
+	int bytes_fetched;						/**< Total number of bytes fetched by a worker from its peers */
+	int bytes_provided; 					/**< Total number of bytes provided by a worker to its peers 	*/
+	int num_fetch_fails; 					/**< Total number of fetch failures across workers */
+	int total_fetches;						/**< Total number of fetches across all workeers */
+	int total_time_spent_fetching;	/**< Total amount of time spent fetching across all workers */
+
 	/**< deprecated fields: */
 	int total_workers_connected;    /**< @deprecated Use workers_connected instead. */
 	int total_workers_joined;       /**< @deprecated Use workers_joined instead. */

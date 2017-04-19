@@ -209,8 +209,8 @@ static int total_tasks_executed = 0;
 static const char *project_regex = 0;
 static int released_by_master = 0;
 
-static struct link *worker_link = NULL;
-static struct link *fetch_link = NULL;
+static struct link *worker_serve_files_link = NULL;
+static struct link *worker_fetch_files_link = NULL;
 
 static int provide(struct link *master, char *filename, char *remote_host, int mode, int flags);
 static int fetch(struct link *master, char *filename, int flags);
@@ -1238,13 +1238,13 @@ static int do_kill(int taskid)
 	return 1;
 }
 
-static struct link *create_worker_link(int port) {
-	struct link *worker_link = NULL;
-	worker_link = link_serve(port);
-	return worker_link;
+static struct link *create_worker_serve_files_link(int port) {
+	struct link *l = NULL;
+	l = link_serve(port);
+	return l;
 }
 
-static struct link *connect_to_worker(struct link *master, char *host, int port) {
+static struct link *connect_to_worker(char *host, int port) {
 	char worker_addr[LINK_ADDRESS_MAX];
 	if(!domain_name_cache_lookup(host,worker_addr)) {
 		return NULL;
@@ -1258,10 +1258,10 @@ static struct link *connect_to_worker(struct link *master, char *host, int port)
 
 }
 
-static struct link *accept_worker(struct link *master) {
+static struct link *accept_worker() {
 	int port;
 	char addr[LINK_ADDRESS_MAX];
-	struct link *link = link_accept(worker_link, time(0) + 5);
+	struct link *link = link_accept(worker_serve_files_link, time(0) + 5);
 	if (!link) {
 		return NULL;
 	}
@@ -1296,11 +1296,11 @@ static int wait_for_worker_provide(struct link *master, struct link *Link,  char
 }
 
 static int prepare_fetch(struct link *master, char *filename, char *remote_host, int port) {
-	if (fetch_link) {
+	if (worker_fetch_files_link) {
 		return 1;
 	}
-	fetch_link = connect_to_worker(master, remote_host, port);
-	if (!fetch_link) {
+	worker_fetch_files_link = connect_to_worker(remote_host, port);
+	if (!worker_fetch_files_link) {
 		send_master_message(master, "fetch_failure failed connection\n");
 	}
 	return 1;
@@ -1311,15 +1311,15 @@ static int fetch(struct link *master, char *filename, int flags) {
 	sprintf(cached_filename, "cache/%s", filename);
 	struct stat local_info;
 	if (stat(cached_filename, &local_info) == 0) {
-		send_master_message(master, "fetch_info stat success\n");
+		send_master_message(master, "fetch_success\n");
 		return 1;
-	} else if (fetch_link) {
-		return wait_for_worker_provide(master, fetch_link, filename);
+	} else if (worker_fetch_files_link) {
+		return wait_for_worker_provide(master, worker_fetch_files_link, filename);
 	}
 	return 0;
 }
 static int provide(struct link *master, char *filename, char *remote_host, int mode, int flags) {
-	struct link *Link = accept_worker(master);
+	struct link *Link = accept_worker();
 	char cached_filename[WORK_QUEUE_LINE_MAX];
 	sprintf(cached_filename, "cache/%s", filename);
 	if (Link) {
@@ -1336,6 +1336,7 @@ static int provide(struct link *master, char *filename, char *remote_host, int m
 		if (actual != local_info.st_size) {
 			return 0;
 		}
+		link_close(Link);
 		return 1;
 	}
 	return 0;
@@ -2028,12 +2029,12 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	}
 
 	int count = 0, port_num = 9000;
-	worker_link = create_worker_link(port_num);
-	while (!worker_link && count < 50) {
+	worker_serve_files_link = create_worker_serve_files_link(port_num);
+	while (!worker_serve_files_link && count < 50) {
 		count++;
-		worker_link = create_worker_link(++port_num);
+		worker_serve_files_link = create_worker_serve_files_link(++port_num);
 	}
-	if (worker_link) {
+	if (worker_serve_files_link) {
 		send_master_message(master, "worker_port = %d\n", port_num);
 		worker_port = port_num;
 	} else {
@@ -2062,8 +2063,8 @@ static int serve_master_by_hostport( const char *host, int port, const char *ver
 	disconnect_master(master);
 	printf("disconnected from master %s:%d\n", host, port );
 
-	if (worker_link) {
-		link_close(worker_link);
+	if (worker_serve_files_link) {
+		link_close(worker_serve_files_link);
 	}
 	return 1;
 }
