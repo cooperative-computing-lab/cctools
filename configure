@@ -73,6 +73,7 @@ include_package_chirp="chirp"
 include_package_deltadb="deltadb"
 include_package_doc="doc"
 include_package_ftplite="ftp_lite"
+include_package_grow="grow"
 include_package_makeflow="makeflow"
 include_package_parrot="parrot"
 include_package_prune="prune"
@@ -169,6 +170,7 @@ do
 			optsanitize=1
 			;;
 		--static)
+			# example: CFLAGS=-D__MUSL__ CC=musl-gcc ./configure --without-system-{doc,apps} --with-readline-path=no --static
 			optstatic=1
 			;;
 		--build-label)
@@ -279,6 +281,9 @@ do
 			;;
 		--without-system-chirp)
 			include_package_chirp=""
+			;;
+		--without-system-grow)
+			include_package_grow=""
 			;;
 		--without-system-umbrella)
 			include_package_umbrella=""
@@ -1296,30 +1301,46 @@ then
 	fi
 fi
 
-if [ "$optstatic" = 1 ]
+if [ "${include_package_chirp}" = chirp ]
 then
-	if [ "${include_package_chirp}" = chirp ]
+	if [ "$optstatic" = 1 ]
 	then
 		echo "chirp cannot currently be build statically".
 		include_package_chirp=""
 	else
 		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP"
 	fi
+fi
 
-	if [ "${include_package_ftplite}" = ftp_lite ]
+if [ "${include_package_ftplite}" = ftplite ]
+then
+	if [ "$optstatic" = 1 ]
 	then
-		echo "ftp_lite cannot currently be build statically".
+		echo "ftplite cannot currently be build statically".
 		include_package_ftplite=""
 	fi
+fi
 
-	if [ "${include_package_parrot}" = parrot ]
+if [ "${include_package_parrot}" = parrot ]
+then
+	if [ "$optstatic" = 1 ]
 	then
-		echo "parrot cannot be build statically."
+		echo "parrot cannot currently be build statically".
 		include_package_parrot=""
 	fi
 fi
 
-potential_packages="dttools batch_job grow ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
+if [ "${include_package_grow}" = grow ]
+then
+	if [ "$optstatic" = 1 ]
+	then
+		echo "grow cannot currently be build statically".
+		include_package_grow=""
+	fi
+fi
+
+
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
