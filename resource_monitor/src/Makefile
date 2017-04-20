@@ -5,7 +5,12 @@ include ../../rules.mk
 
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
-PROGRAMS = resource_monitor resource_monitor_histograms piggybacker rmonitor_poll_example
+
+PROGRAMS = resource_monitor piggybacker rmonitor_poll_example
+
+ifneq ($(CCTOOLS_STATIC),1)
+PROGRAMS += resource_monitor_histograms
+endif
 
 # currently only python bindings have been implemented
 CCTOOLS_SWIG_BINDINGS := $(findstring python, $(CCTOOLS_SWIG_BINDINGS))
