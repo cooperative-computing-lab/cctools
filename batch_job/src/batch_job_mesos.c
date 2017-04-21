@@ -274,6 +274,9 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 				} else if (strcmp(task_stat_str, "failed") == 0) {
 					info->exited_normally = 0;
 					task_exit_code = strtok(NULL, ",");
+
+					// 444 is an arbitrary exit code set in mf_mesos_scheduler, 
+					// which means the task failed to retrieve the outpus 
 					if(atoi(task_exit_code) == 444) {
 						info->exit_code = 444;
 						debug(D_BATCH, "Task %s failed to retrieve the output.", task_id_str);
@@ -303,6 +306,12 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 
 }
 
+/*
+ * To remove a batch job, we mark the task state as "aborting", and return. Then 
+ * the mesos scheduler will try to terminate the corresponding executors. This 
+ * method does not guarantee the termination of executors, but all executors would be
+ * terminated before the mesos scheduler stop.
+ */
 static int batch_job_mesos_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
 	struct batch_job_info *info = itable_lookup(q->job_table, jobid);
