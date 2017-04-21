@@ -105,7 +105,9 @@ char *rmonitor_helper_locate(char *default_path)
 
 int recv_monitor_msg(int fd, struct rmonitor_msg *msg)
 {
-	return recv(fd, msg, sizeof(struct rmonitor_msg), 0);
+	int status = recv(fd, msg, sizeof(struct rmonitor_msg), 0);
+
+	return status;
 }
 
 int find_localhost_addr(int port, struct addrinfo **addr)
@@ -208,6 +210,9 @@ int rmonitor_client_open_socket(int *fd, struct addrinfo **addr) {
 		freeaddrinfo(res);
 		return -1;
 	}
+
+	struct timeval read_timeout = { .tv_sec = 10, .tv_usec = 0 };
+	setsockopt(*fd, SOL_SOCKET, SO_RCVTIMEO, (const void *) &read_timeout, sizeof(read_timeout));
 
 	*addr = res;
 
