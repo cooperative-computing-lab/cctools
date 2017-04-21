@@ -1594,7 +1594,12 @@ int rmonitor_dispatch_msg(void)
 	struct rmonitor_msg msg;
 	struct rmonitor_process_info *p;
 
-	recv_monitor_msg(rmonitor_queue_fd, &msg);
+	int recv_status = recv_monitor_msg(rmonitor_queue_fd, &msg);
+
+	if(recv_status < 0 || ((unsigned int) recv_status) < sizeof(msg)) {
+		debug(D_RMON, "Malformed message from monitored processes. Ignoring.");
+		return 1;
+	}
 
 	//Next line commented: Useful for detailed debugging, but too spammy for regular operations.
 	//debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
