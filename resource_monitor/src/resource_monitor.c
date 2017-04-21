@@ -681,8 +681,6 @@ int rmonitor_handle_inotify(void)
 {
 	int urgent = 0;
 
-	debug(D_RMON, "uno");
-
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
 	struct rmonitor_file_info *finfo;
@@ -864,7 +862,7 @@ struct peak_cores_sample {
 int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete */
+	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
