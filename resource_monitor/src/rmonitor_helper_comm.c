@@ -105,8 +105,7 @@ char *rmonitor_helper_locate(char *default_path)
 
 int recv_monitor_msg(int fd, struct rmonitor_msg *msg)
 {
-	int status = recv(fd, msg, sizeof(struct rmonitor_msg), 0);
-
+	int status = recv(fd, msg, sizeof(struct rmonitor_msg), MSG_DONTWAIT);
 	return status;
 }
 
