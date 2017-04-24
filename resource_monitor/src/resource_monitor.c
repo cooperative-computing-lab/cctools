@@ -681,8 +681,6 @@ int rmonitor_handle_inotify(void)
 {
 	int urgent = 0;
 
-	debug(D_RMON, "uno");
-
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 	struct inotify_event *evdata;
 	struct rmonitor_file_info *finfo;
@@ -864,7 +862,7 @@ struct peak_cores_sample {
 int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete */
+	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
@@ -1596,7 +1594,12 @@ int rmonitor_dispatch_msg(void)
 	struct rmonitor_msg msg;
 	struct rmonitor_process_info *p;
 
-	recv_monitor_msg(rmonitor_queue_fd, &msg);
+	int recv_status = recv_monitor_msg(rmonitor_queue_fd, &msg);
+
+	if(recv_status < 0 || ((unsigned int) recv_status) < sizeof(msg)) {
+		debug(D_RMON, "Malformed message from monitored processes. Ignoring.");
+		return 1;
+	}
 
 	//Next line commented: Useful for detailed debugging, but too spammy for regular operations.
 	//debug(D_RMON,"message '%s' (%d) from %d with status '%s' (%d)\n", str_msgtype(msg.type), msg.type, msg.origin, strerror(msg.error), msg.error);
