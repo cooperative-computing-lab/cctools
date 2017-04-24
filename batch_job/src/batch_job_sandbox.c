@@ -4,12 +4,22 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+/*
+The batch_job_sandbox module is very similar to the batch_job_local
+module, except that it creates a subdirectory and links/renames files
+in and out of the directory, to ensure a clean namespace.
+Eventually, this module will supersede "local" as the default.
+*/
+
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
 #include "process.h"
 #include "macros.h"
 #include "stringtools.h"
+#include "sandbox.h"
+#include "itable.h"
+#include "jx.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -17,9 +27,17 @@ See the file COPYING for details.
 #include <errno.h>
 #include <signal.h>
 
-static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+static struct itable * sandbox_table = 0;
+
+static batch_job_id_t batch_job_sandbox_submit (struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
+
+	struct sandbox *s = sandbox_create(".",extra_input_files,extra_output_files);
+	if(!s) {
+		debug(D_BATCH,"couldn't create sandbox for %s\n",cmd);
+		return -1;
+	}
 
 	/* Always flush buffers just before fork, to avoid double output. */
 	fflush(NULL);
@@ -35,10 +53,14 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
 
+		if(!sandbox_table) sandbox_table = itable_create(0);
+		itable_insert(sandbox_table,jobid, s);
+		
 		return jobid;
 	} else if(jobid < 0) {
 		/* Fork failed, child process does not exist. */
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
+		sandbox_delete(s);
 		return -1;
 	} else {
 		/*
@@ -53,6 +75,9 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		*/
 
 		/* Move to the sandbox directory. */
+		if(chdir(s->sandbox_path)<0) {
+			_exit(127);
+		}
 
 		/* Set up the environment specific to the child. */
 		if(envlist) {
@@ -76,7 +101,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 	return -1;
 }
 
-static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
+static batch_job_id_t batch_job_sandbox_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	while(1) {
 		int timeout;
@@ -109,6 +134,10 @@ static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch
 			int jobid = p->pid;
 			free(p);
 			free(info);
+
+			struct sandbox *s = itable_lookup(sandbox_table,jobid);
+			if(s) sandbox_cleanup(s);
+
 			return jobid;
 
 		} else if(errno == ESRCH || errno == ECHILD) {
@@ -120,17 +149,22 @@ static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch
 	}
 }
 
-static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_sandbox_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
 	int status;
 
 	if(kill(jobid, SIGTERM) == 0) {
+
 		if(!itable_lookup(q->job_table, jobid)) {
 			debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
 			return 0;
 		} else {
 			debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
 			waitpid(jobid, &status, 0);
+
+			struct sandbox *s = itable_lookup(sandbox_table,jobid);
+			if(s) sandbox_cleanup(s);
+
 			return 1;
 		}
 	} else {
@@ -140,12 +174,7 @@ static int batch_job_local_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 }
 
-static int batch_queue_local_create (struct batch_queue *q)
-{
-	batch_queue_set_feature(q, "local_job_queue", NULL);
-	return 0;
-}
-
+batch_queue_stub_create(local);
 batch_queue_stub_free(local);
 batch_queue_stub_port(local);
 batch_queue_stub_option_update(local);
@@ -157,9 +186,9 @@ batch_fs_stub_putfile(local);
 batch_fs_stub_stat(local);
 batch_fs_stub_unlink(local);
 
-const struct batch_queue_module batch_queue_local = {
-	BATCH_QUEUE_TYPE_LOCAL,
-	"local",
+const struct batch_queue_module batch_queue_sandbox = {
+	BATCH_QUEUE_TYPE_SANDBOX,
+	"sandbox",
 
 	batch_queue_local_create,
 	batch_queue_local_free,
@@ -167,9 +196,9 @@ const struct batch_queue_module batch_queue_local = {
 	batch_queue_local_option_update,
 
 	{
-		batch_job_local_submit,
-		batch_job_local_wait,
-		batch_job_local_remove,
+		batch_job_sandbox_submit,
+		batch_job_sandbox_wait,
+		batch_job_sandbox_remove,
 	},
 
 	{

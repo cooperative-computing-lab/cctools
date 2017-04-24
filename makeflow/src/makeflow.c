@@ -430,6 +430,7 @@ static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, stru
 
 	switch (batch_queue_get_type(queue)) {
 		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+		case BATCH_QUEUE_TYPE_SANDBOX:
 			return string_format("%s=%s,", f->filename, remotename);
 		default:
 			return string_format("%s,", f->filename);

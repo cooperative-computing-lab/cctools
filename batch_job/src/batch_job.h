@@ -32,7 +32,8 @@ typedef int64_t batch_job_id_t;
 /** Indicates which type of batch submission to use. */
 /* Must be kept in sync with batch_job_subsystems. */
 typedef enum {
-	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes. */
+	BATCH_QUEUE_TYPE_LOCAL,	              /**< Batch jobs will run as local processes in the current working directory.  */
+	BATCH_QUEUE_TYPE_SANDBOX,	      /**< Batch jobs will run as local processes in a sandbox directory. */
 	BATCH_QUEUE_TYPE_CONDOR,              /**< Batch jobs will be sent to Condor pool. */
 	BATCH_QUEUE_TYPE_AMAZON,              /**< Batch jobs will be sent spun up Amazon ec2 instances */
 	BATCH_QUEUE_TYPE_SGE,	              /**< Batch jobs will be sent to Sun Grid Engine. */
@@ -202,9 +203,10 @@ void batch_queue_delete(struct batch_queue *q);
 
 /** Returns the list of queue types supported by this module.
 Useful for including in help-option outputs.
-@return A static string listing the types of queues supported.
+@return A string listing the types of queues supported.
+Must be freed after use.
 */
-const char *batch_queue_type_string();
+char *batch_queue_type_string();
 
 /** Returns the port number of the batch queue.
 @param q The batch queue of interest.
