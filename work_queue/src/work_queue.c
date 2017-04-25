@@ -92,13 +92,15 @@ extern int setenv(const char *name, const char *value, int overwrite);
 
 #define MAX_NEW_WORKERS 10
 
+#define MAX_WORKER_FETCH_FAILURES 1
+#define MAX_QUEUE_FETCH_FAILURES 3
+
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	SUCCESS = 0,
 	FETCH_SENT,
 	WORKER_FAILURE, 
-	APP_FAILURE,
-	FETCH_FAILURE
+	APP_FAILURE
 } work_queue_result_code_t;
 
 
@@ -241,9 +243,9 @@ struct work_queue_task_report {
 };
 
 struct work_queue_workers_fetch {
-	struct work_queue_worker *from_worker;
-	struct work_queue_worker *to_worker;
-	int taskid;
+	struct work_queue_worker *providing_worker;
+	struct work_queue_worker *fetching_worker;
+	struct work_queue_task *task;
 	char *remote_name;
 	char *local_name;
 };
@@ -258,7 +260,7 @@ struct blacklist_host_info {
 
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
-// static void handle_fetch_failure(struct work_queue *q, struct work_queue_worker *w);
+static void handle_fetch_failure(struct work_queue *q, struct work_queue_worker *w);
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w);
 
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
@@ -330,7 +332,7 @@ static struct list *work_queue_task_file_list_clone(struct list *list);
 /** Write master's resources to resource summary file and close the file **/
 void work_queue_disable_monitoring(struct work_queue *q);
 
-static struct work_queue_worker *find_worker_to_fetch_file_from(struct work_queue *q, const char *local_name, const char *remote_name, struct work_queue_worker *wk, int taskid);
+static struct work_queue_worker *find_worker_to_fetch_file_from(struct work_queue *q, const char *local_name, const char *remote_name, struct work_queue_worker *wk, struct work_queue_task *t);
 static int remove_fetch(struct work_queue *q, struct work_queue_worker *w);
 /******************************************************/
 /********** work_queue internal functions *************/
@@ -562,6 +564,26 @@ work_queue_msg_code_t process_provide_port(struct work_queue_worker *w, char *li
 	return MSG_PROCESSED;
 }
 
+work_queue_msg_code_t process_fetch_success(struct work_queue *q, struct work_queue_worker *w, char *line) {
+	struct stat local_info;
+	struct work_queue_workers_fetch *Fetch = w->ongoing_fetch;
+	if (stat(Fetch->local_name,&local_info) == 0) {
+		struct stat *remote_info = malloc(sizeof(struct stat));
+		if (!remote_info) {
+			debug(D_NOTICE, "Cannot allocate memory for cache entry for output file %s at %s (%s)", Fetch->local_name, w->hostname, w->addrport);
+		} else {
+			memcpy(remote_info, &local_info, sizeof(local_info));
+			hash_table_insert(w->current_files, Fetch->remote_name, remote_info);
+		}
+	} else {
+		debug(D_NOTICE, "Cannot stat file %s: %s", Fetch->local_name, strerror(errno));
+	}
+	q->stats->bytes_fetched += local_info.st_size;
+	w->stats->bytes_fetched += local_info.st_size;
+	remove_fetch(q, w);
+	return MSG_PROCESSED;
+}
+
 work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	debug(D_WQ, "Sending project name to worker (%s)", w->addrport);
@@ -632,6 +654,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		stoptime = time(0) + q->short_timeout;
 
 	int result = link_readline(w->link, line, length, stoptime);
+
 	if (result <= 0) {
 		return MSG_FAILURE;
 	}
@@ -665,19 +688,9 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 	} else if (string_prefix_is(line, "worker_port")) {
 		result = process_provide_port(w, line);
 	} else if (string_prefix_is(line, "fetch_success")) {
-		struct stat local_info;
-		struct work_queue_workers_fetch *Fetch = w->ongoing_fetch;
-		if (stat(Fetch->local_name,&local_info) == 0) {
-			struct stat *remote_info = malloc(sizeof(struct stat));
-			memcpy(remote_info, &local_info, sizeof(local_info));
-			hash_table_insert(w->current_files, Fetch->remote_name, remote_info);
-		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", Fetch->local_name, strerror(errno));
-		}
-		remove_fetch(q, w);
+		result = process_fetch_success(q, w, line);
 	} else if (string_prefix_is(line, "fetch_failure")) {
-		remove_fetch(q, w);
-		handle_worker_failure(q, w);
+		handle_fetch_failure(q, w);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = MSG_NOT_PROCESSED;
@@ -955,9 +968,9 @@ static int remove_fetch(struct work_queue *q, struct work_queue_worker *w) {
 	struct work_queue_workers_fetch *f;
 	list_first_item(q->ongoing_fetches);
 	while ((f=list_next_item(q->ongoing_fetches))) {
-		if (w == f->to_worker || w== f->from_worker) {
-			f->to_worker->ongoing_fetch = NULL;
-			f->from_worker->ongoing_fetch = NULL;
+		if (w == f->fetching_worker || w == f->providing_worker) {
+			f->fetching_worker->ongoing_fetch = NULL;
+			f->providing_worker->ongoing_fetch = NULL;
 			list_remove(q->ongoing_fetches, f);
 			free(f->local_name);
 			free(f->remote_name);
@@ -1672,9 +1685,13 @@ static void handle_worker_failure(struct work_queue *q, struct work_queue_worker
 	return;
 }
 
-/* static void handle_fetch_failure(struct work_queue *q, struct work_queue_worker *w) {
-			TODO: Implement handle_fetch_failrue
-} */
+static void handle_fetch_failure(struct work_queue *q, struct work_queue_worker *w) {
+	struct work_queue_task *t = w->ongoing_fetch->task;
+	q->stats->fetches_failed++;
+	w->stats->fetches_failed++;
+	remove_fetch(q, w);
+	handle_app_failure(q, w, t);
+}
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type)
 {
@@ -2669,9 +2686,9 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	}
 	if (flags & WORK_QUEUE_REMOTE && !w->ongoing_fetch) {
 		struct work_queue_worker *worker;
-		worker = find_worker_to_fetch_file_from(q, localname, remotename, w, t->taskid);
+		worker = find_worker_to_fetch_file_from(q, localname, remotename, w, t);
 		if (worker) {
-			if (worker->ongoing_fetch->taskid == t->taskid) {
+			if (worker->ongoing_fetch->task == t) {
 				debug(D_WQ, "sending fetch %s from %s to %s at port %d\n", remotename, worker->hostname, w->hostname, worker->worker_fetch_file_port);
 				send_worker_msg(q, w, "fetch %s from %s at %d\n", remotename, worker->hostname, worker->worker_fetch_file_port);
 				send_worker_msg(q, worker, "provide %s to %s 0%o %d\n", remotename, w->hostname, local_info.st_mode, flags);
@@ -2792,12 +2809,12 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 	}
 	else if(!remote_info) {
 		/* If not on the worker, send it. */
-		
 		if(S_ISDIR(local_info.st_mode)) {
 			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		} else {
 			result = send_file(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 		}
+
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = malloc(sizeof(*remote_info));
 			if(remote_info) {
@@ -2976,6 +2993,8 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		}
 	} else if (result == FETCH_SENT) {
 		// TODO: increment fetch stats
+		q->stats->total_fetches++;
+		w->stats->total_fetches++;
 	} else {
 		debug(D_WQ, "%s (%s) failed to send %s (%" PRId64 " bytes sent).",
 			w->hostname,
@@ -3355,43 +3374,76 @@ static struct work_queue_worker *find_worker_by_random(struct work_queue *q, str
 }
 
 int is_valid_fetch(struct work_queue *q, struct work_queue_workers_fetch *fetch) {
-  struct work_queue_workers_fetch *f;
-  list_first_item(q->ongoing_fetches);
-  while((f=list_next_item(q->ongoing_fetches))) {
-    if (f->from_worker == fetch->from_worker &&
-        (f->to_worker != fetch->to_worker || strcmp(f->local_name, fetch->local_name) != 0)) {
-        return 0;
-      }
-    }
-  return 1;
+	struct work_queue_workers_fetch *f;
+	struct work_queue_worker *providing_worker = fetch->providing_worker;
+	struct work_queue_worker *fetching_worker = fetch->fetching_worker;
+	struct stat *remote_info;
+
+	remote_info = hash_table_lookup(providing_worker->current_files, fetch->remote_name);
+	if (!remote_info ||  providing_worker == fetching_worker ||
+		hash_table_lookup(q->workers_with_available_results, providing_worker->hashkey)) {
+		return 0;
+	}
+
+	if (providing_worker->stats->fetches_failed >= MAX_WORKER_FETCH_FAILURES ||
+		fetching_worker->stats->fetches_failed >= MAX_WORKER_FETCH_FAILURES) {
+		return 0;
+	}
+
+
+	list_first_item(q->ongoing_fetches);
+	while((f=list_next_item(q->ongoing_fetches))) {
+		if (f->providing_worker == providing_worker &&
+				(f->fetching_worker != fetching_worker || strcmp(f->local_name, fetch->local_name) != 0)) {
+				return 0;
+			}
+		}
+	return 1;
 }
 
 
 
-static struct work_queue_worker *find_worker_to_fetch_file_from(struct work_queue *q, const char *local_name, const char *remote_name, struct work_queue_worker *wk, int taskid) {
+static struct work_queue_worker *find_worker_to_fetch_file_from(struct work_queue *q, const char *local_name, const char *remote_name, struct work_queue_worker *wk, struct work_queue_task *t) {
 	char *key;
 	struct work_queue_worker *w;
-	struct stat *remote_info;
 	struct work_queue_workers_fetch *fetch = wk->ongoing_fetch;
 
 	if (fetch) {
-		return strcmp(fetch->remote_name, remote_name) == 0 ? fetch->from_worker : NULL;
+		return strcmp(fetch->remote_name, remote_name) == 0 ? fetch->providing_worker : NULL;
+	}
+
+	if (q->stats->fetches_failed >= MAX_QUEUE_FETCH_FAILURES) {
+		return NULL;
 	}
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void**)&w)) {
-		remote_info = hash_table_lookup(w->current_files, remote_name);
 		struct work_queue_workers_fetch *potential_fetch = malloc(sizeof(struct work_queue_workers_fetch));
-		potential_fetch->from_worker = w;
-		potential_fetch->to_worker = wk;
+		if (!potential_fetch) {
+			debug(D_NOTICE, "Cannot allocate memory for potential fetch for input file %s for task %d at %s (%s)", local_name, t->taskid, wk->hostname, wk->addrport);
+			return NULL;
+		}
+
+		potential_fetch->providing_worker = w;
+		potential_fetch->fetching_worker = wk;
+		potential_fetch->task = t;
+
 		potential_fetch->remote_name = malloc(strlen(remote_name) + 1);
+		if (!potential_fetch->remote_name) {
+			debug(D_NOTICE, "Cannot allocate memory for remote_name of potential fetch for input file %s for task %d at %s (%s)", local_name, t->taskid, wk->hostname, wk->addrport);
+			return NULL;
+		}
 		potential_fetch->local_name = malloc(strlen(local_name) + 1);
-		potential_fetch->taskid = taskid;
+		if (!potential_fetch->local_name) {
+			debug(D_NOTICE, "Cannot allocate memory for local_name of potential fetch for input file %s for task %d at %s (%s)", local_name, t->taskid, wk->hostname, wk->addrport);
+			return NULL;
+		}
 		strncpy(potential_fetch->remote_name,remote_name, strlen(remote_name));
 		strncpy(potential_fetch->local_name, local_name, strlen(local_name));
 		potential_fetch->remote_name[strlen(remote_name)] = '\0';
 		potential_fetch->local_name[strlen(local_name)] = '\0';
-		if (remote_info && strcmp(wk->hostname, w->hostname) && is_valid_fetch(q,potential_fetch) && !hash_table_lookup(q->workers_with_available_results, w->hashkey)) {
+
+		if (is_valid_fetch(q, potential_fetch)) {
 			wk->ongoing_fetch = potential_fetch;
 			w->ongoing_fetch = potential_fetch;
 			list_push_tail(q->ongoing_fetches, potential_fetch);

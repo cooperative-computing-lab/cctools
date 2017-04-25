@@ -262,8 +262,7 @@ struct work_queue_stats {
 
 	/* Fetch statistics */
 	int bytes_fetched;						/**< Total number of bytes fetched by a worker from its peers */
-	int bytes_provided; 					/**< Total number of bytes provided by a worker to its peers 	*/
-	int num_fetch_fails; 					/**< Total number of fetch failures across workers */
+	int fetches_failed; 					/**< Total number of fetch failures  */
 	int total_fetches;						/**< Total number of fetches across all workeers */
 	int total_time_spent_fetching;	/**< Total amount of time spent fetching across all workers */
 

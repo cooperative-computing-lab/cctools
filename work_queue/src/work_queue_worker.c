@@ -1284,7 +1284,7 @@ static int wait_for_worker_provide(struct link *master, struct link *Link,  char
 		if(sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) {
 			if(path_within_dir(filename, workspace)) {
 				r = do_put(Link, filename, length, mode);
-				send_master_message(master, "fetch_success\n");
+				send_master_message(master, "fetch_success %" PRId64 "\n", length);
 				reset_idle_timer();
 			} else {
 				send_master_message(master, "fetch_failure\n");
@@ -1301,7 +1301,7 @@ static int prepare_fetch(struct link *master, char *filename, char *remote_host,
 	}
 	worker_fetch_files_link = connect_to_worker(remote_host, port);
 	if (!worker_fetch_files_link) {
-		send_master_message(master, "fetch_failure failed connection\n");
+		send_master_message(master, "fetch_failure\n");
 	}
 	return 1;
 }
@@ -1311,7 +1311,7 @@ static int fetch(struct link *master, char *filename, int flags) {
 	sprintf(cached_filename, "cache/%s", filename);
 	struct stat local_info;
 	if (stat(cached_filename, &local_info) == 0) {
-		send_master_message(master, "fetch_success\n");
+		send_master_message(master, "fetch_success %jd\n", local_info.st_size);
 		return 1;
 	} else if (worker_fetch_files_link) {
 		return wait_for_worker_provide(master, worker_fetch_files_link, filename);
