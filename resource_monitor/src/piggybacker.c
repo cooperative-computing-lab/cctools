@@ -13,7 +13,7 @@ See the file COPYING for details.
 #include "copy_stream.h"
 #include "int_sizes.h"
 
-uint64_t write_h_file(char *path_h, char *str_var, char *path_lib)
+uint64_t write_h_file(char *path_h, char *path_lib)
 {
 	FILE *fh, *fl;
 	struct stat buf;
@@ -36,8 +36,6 @@ uint64_t write_h_file(char *path_h, char *str_var, char *path_lib)
 			fclose(fl);
 		return -1;
 	}
-
-	fprintf(fh, "#ifdef %s\n", str_var);
 
 	if(empty)
 	{
@@ -63,10 +61,6 @@ uint64_t write_h_file(char *path_h, char *str_var, char *path_lib)
 		free(lib_data);
 	}
 
-	fprintf(fh, "#else\n");
-	fprintf(fh, "static char *lib_helper_data;\n");
-	fprintf(fh, "#endif\n");
-
 	return n;
 }
 
@@ -74,10 +68,10 @@ int main(int argc, char **argv)
 {
 	/* name.h define_macro libname */
 
-	if(argc == 3)
-		write_h_file(argv[1], argv[2], NULL);
-	else if(argc == 4)
-		write_h_file(argv[1], argv[2], argv[3]);
+	if(argc == 2)
+		write_h_file(argv[1], NULL);
+	else if(argc == 3)
+		write_h_file(argv[1], argv[2]);
 	else
 		return 1;
 

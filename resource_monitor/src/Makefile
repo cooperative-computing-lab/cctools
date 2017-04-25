@@ -3,49 +3,49 @@ UNAME := $(shell uname)
 include ../../config.mk
 include ../../rules.mk
 
-STATIC_BUILD=$(STATIC)
-CCTOOLS_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
-PROGRAMS = resource_monitor resource_monitor_histograms piggybacker rmonitor_poll_example
+
+PROGRAMS = resource_monitor piggybacker rmonitor_poll_example
+
+ifneq ($(CCTOOLS_STATIC),1)
+PROGRAMS += resource_monitor_histograms
+endif
 
 # currently only python bindings have been implemented
 CCTOOLS_SWIG_BINDINGS := $(findstring python, $(CCTOOLS_SWIG_BINDINGS))
 
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
-ifeq ($(STATIC_BUILD),yes)
-	STATIC_FLAG=-static
-else
-	STATIC_FLAG=
-	CCTOOLS_DEPENDENCIES+=$(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
-endif
-
 all: $(TARGETS) bindings
 
+# Note below: we use gcc on static builds so that the library gets to use the system linker.
 librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o
-	$(CCTOOLS_LD) -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_DEPENDENCIES)
+ifeq ($(CCTOOLS_STATIC),1)
+	gcc           -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_LINKAGE) ../../dttools/src/libdttools.a $(CCTOOLS_EXTERNAL_LINKAGE)
+else
+	$(CCTOOLS_LD) -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_LDFLAGS) ../../dttools/src/libdttools.a $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+endif
 
-piggybacker: piggybacker.c
-	$(CCTOOLS_CC) $(STATIC_FLAG) $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES) -o $@
+piggybacker: piggybacker.o
 
 rmonitor_piggyback.h: librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) piggybacker
-	./piggybacker rmonitor_piggyback.h CCTOOLS_USE_RMONITOR_HELPER_LIB librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
+	./piggybacker rmonitor_piggyback.h librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 
-resource_monitor_histograms: resource_monitor_histograms.c resource_monitor_tools.o
-	$(CCTOOLS_CC) $(STATIC_FLAG) $^ -fopenmp -g -O3 -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $(CCTOOLS_DEPENDENCIES)
+resource_monitor_histograms: resource_monitor_histograms.o resource_monitor_tools.o
+ifeq ($(CCTOOLS_STATIC),1)
+	@echo "resource_monitor_histograms cannot be built statically"
+else
+	$(CCTOOLS_LD) -O3 -fopenmp -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+endif
 
 $(PROGRAMS): ../../dttools/src/libdttools.a
 
-resource_monitor_pb.o: resource_monitor.c rmonitor_piggyback.h
-	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) -DCCTOOLS_USE_RMONITOR_HELPER_LIB $<
+resource_monitor.o: resource_monitor.c rmonitor_piggyback.h
 
-resource_monitor: resource_monitor_pb.o rmonitor_helper_comm.o
-	$(CCTOOLS_CC) $(STATIC_FLAG) -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES)
+resource_monitor: resource_monitor.o rmonitor_helper_comm.o
 
 rmonitor_poll_example: rmonitor_poll_example.o
-	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_CCFLAGS) $^ $(CCTOOLS_DEPENDENCIES)
-
 
 .PHONY: $(CCTOOLS_SWIG_BINDINGS)
 bindings: $(CCTOOLS_SWIG_BINDINGS)

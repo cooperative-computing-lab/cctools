@@ -609,4 +609,14 @@ format_version()
 	echo "$@" | awk -F. '{printf("%d%03d%03d%03d", $1, $2, $3, $4); }'
 }
 
+config_X_path()
+{
+	if [ "$1" = no ]
+	then
+		echo no
+	else
+		echo yes
+	fi
+}
+
 # vim: set noexpandtab tabstop=4:
