@@ -22,8 +22,8 @@ use warnings;
 
 use Cwd;
 use Cwd qw(abs_path);
-#use Error qw(:try);
-#use Error::Simple;
+use Error qw(:try);
+use Error::Simple;
 use Getopt::Long qw(:config no_ignore_case);
 Getopt::Long::Configure("pass_through");
 use Time::HiRes qw(gettimeofday); 
@@ -86,7 +86,7 @@ Work Queue Options:
 
 #---Process options on the command line 
 my %OPT;
-#try{
+try{
     GetOptions("CTL" => sub { `maker -CTL`; exit(0);},
                "OPTS" => sub { `maker -OPTS`; exit(0);},
                "BOPTS" => sub { `maker -BOPTS`; exit(0);},
@@ -111,11 +111,11 @@ my %OPT;
 	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
-#} catch Error::Simple with{
-#    my $E = shift;
-#    print STDERR $E->{-text};
-#    die "Failed to parse command line options.\n";
-#};
+} catch Error::Simple with {
+    my $E = shift;
+    print STDERR $E->{-text};
+    die "Failed to parse command line options.\n";
+};
 
 if(!defined($OPT{"genome"})) {
 	print "Genome file not specified. Using the specification in the CTL files.\n";
@@ -123,7 +123,7 @@ if(!defined($OPT{"genome"})) {
 	$genome = $OPT{"genome"};
 }
 
-#try{
+try{
     #get arguments off the command line
     if (not (-e "maker_opts.ctl" && -e "maker_bopts.ctl" && -e "maker_exe.ctl")) {
         print STDERR "Maker control files not found\n";
@@ -136,13 +136,13 @@ if(!defined($OPT{"genome"})) {
     #---set up blast databases and indexes for analyisis
     print STDERR "STATUS: Processing and indexing input FASTA files...\n";
     
-#} catch Error::Simple with{
-#    my $E = shift;
-#    print STDERR $E->{-text};
-#    my $code = 2;
-#    $code = $E->{-value} if (defined($E->{-value}));
-#    exit($code);
-#};
+} catch Error::Simple with {
+    my $E = shift;
+    print STDERR $E->{-text};
+    my $code = 2;
+    $code = $E->{-value} if (defined($E->{-value}));
+    exit($code);
+};
 
 if(defined($OPT{"cores"})) {
 	$cores = $OPT{"cores"}; 
