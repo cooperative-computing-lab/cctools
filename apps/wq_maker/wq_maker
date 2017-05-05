@@ -30,7 +30,7 @@ use Time::HiRes qw(gettimeofday);
 use Work_Queue;
 
 #Record starting time.
-my $start_time = time; 
+my $start_time = time*1000000; 
 
 $| = 1; #turn on autoflush.
 
@@ -55,6 +55,7 @@ my $disk   = 0;
 my $memory = 0;
 my $tolerable_task_failures = 2;
 my %task_failures;
+my $debug = 0;
 
 my $usage = "$maker_help
 Work Queue Options:
@@ -73,8 +74,14 @@ Work Queue Options:
      
      -d <level>               Sets the debug flag for Work Queue. For all debugging output, try 'all'.
      -o <debug file>          Sets the debug file for Work Queue.
+     -debug-size-limit <size> Sets the byte wrap around on the debug file. 0 signifies it is never wrapped. Default it 1M.
 	 
      -MPI                     Specifies that each task should utilize mpiexec to execute.
+
+     -monitor <dir>           Enables monitoring and specifies the directory each tasks resource monitoring is placed.
+     -monitor-full            Enables full monitoring that creates a time series of tasks, may be extremely large.
+
+     -stats <file>            Specifies the file were Work Queue master stats are written.
 ";
 
 #---Process options on the command line 
@@ -91,16 +98,20 @@ try{
 	       "N=s" => \$OPT{project},
 	       "d=s" => \$OPT{debug},
 	       "o=s" => \$OPT{debug_file},
+	       "debug-size-limit=i" => \$OPT{debug_size},
  	       "cores=i" => \$OPT{cores},
  	       "disk=i" => \$OPT{disk},
  	       "memory=i" => \$OPT{memory},
 	       "contigs-per-split=i" => \$OPT{contigs_per_split},
  	       "bw=i" => \$OPT{bw},
            "MPI" => sub {$mpi_arg = "mpiexec -n ";},
+           "monitor=s" => \$OPT{"monitor"},
+           "monitor-full" => \$OPT{"monitor-full"},
+           "stats=s" => \$OPT{"stats"},
 	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
-} catch Error::Simple with{
+} catch Error::Simple with {
     my $E = shift;
     print STDERR $E->{-text};
     die "Failed to parse command line options.\n";
@@ -125,7 +136,7 @@ try{
     #---set up blast databases and indexes for analyisis
     print STDERR "STATUS: Processing and indexing input FASTA files...\n";
     
-} catch Error::Simple with{
+} catch Error::Simple with {
     my $E = shift;
     print STDERR $E->{-text};
     my $code = 2;
@@ -193,18 +204,94 @@ sub main {
 	`maker -dsindex -g $genome -base $base_name`;
 
 	print "\n".localtime()." :: File $base_name annotated :: ".scalar (keys %$input_to_contigs)." in total \n";
+	if($wq->stats->{total_tasks_failed} > 0){
+		print localtime()." :: Failed to annotate :: \n";
+		foreach my $task (keys %task_failures){
+			if($task_failures{$task} > $tolerable_task_failures){
+				print "\t$task\n";
+			}
+		}
+	}
+	$workers_used = 0;	
+	print "-----------------------------------------------------------------\n";
+	print "Type\tSuccess\tFailure\tAbandon\tTotal\n";
+	print "Tasks\t".$wq->stats->{total_tasks_complete}."\t";
+	print $wq->stats->{total_tasks_failed}."\t";
+	print $wq->stats->{total_tasks_cancelled}."\t";
+	print $wq->stats->{total_tasks_dispatched}."\n";
+	print "-----------------------------------------------------------------\n";
+	print "Workers:\tJoined\tRemoved\tIdled-Out\tLost\n";
+	print $wq->stats->{total_workers_connected}."\t\t";
+	print $wq->stats->{total_workers_joined}."\t";
+	print $wq->stats->{total_workers_removed}."\t";
+	print $wq->stats->{total_workers_idled_out}."\t\t";
+	print $wq->stats->{total_workers_lost}."\n";
+	print "-----------------------------------------------------------------\n";
+	print "\n";
+	my $end_time = time*1000000;
+	my $wall_time = ($end_time - ($wq->stats->{start_time}));
+	my $wq_total_time = $end_time - $wq_start_time;
+	my $total_time = $end_time - $start_time;
 
-	my $wq_total_time = time - $wq_start_time;
-	my $total_time = time - $start_time;
+	print "WQ-MAKER Start_time:\t";
+	print $start_time."\n";
+	print "WQ-MAKER End_time:\t";
+	print $end_time."\n";
+	print "WQ-MAKER Elapsed:\t";
+	print_time($total_time);
+	print "Work Queue Wall Time:\t";
+	print_time($wall_time);
+	print "Cumulative Task Wall Time:\t";
+	print_time($wq->stats->{total_execute_time});
+	print "Cumulative Task Good Execute Time:\t";
+	print_time($wq->stats->{total_good_execute_time});
+	print "Work Queue Send Time:\t";
+	print_time($wq->stats->{total_send_time});
+	print "Work Queue Receive Time:\t";
+	print_time($wq->stats->{total_receive_time});
+	print "-----------------------------------------------------------------\n";
+	if(defined($mpi_arg)){
+		print "".localtime()." :: MPI used :: Cores ".$cores." :: Memory ".$memory." :: Disk ".$disk." \n";
+	} else {
+		print "".localtime()." :: MPI not used\n";
+	}
+	print "-----------------------------------------------------------------\n";
+	
+
 	
 	exit(0);
 }
 
+sub print_time {
+	my ($time_val) = @_;
+
+	my $sub_sec = $time_val%1000000;
+	$time_val = $time_val/1000000;
+
+	my $days = $time_val/86400;
+	$time_val = $time_val%86400;
+
+	my $hours = $time_val/3600;
+	$time_val = $time_val%3600;
+
+	my $min = $time_val/60;
+	$time_val = $time_val%60;
+
+	printf '%dd %d:%02d:%02d.%06d', int($days), int($hours), int($min), int($time_val), int($sub_sec);
+	print "\n";
+}
+
 sub setup_workqueue {
 	if(defined($OPT{"debug"})){
+		if($OPT{"debug"} eq "maker" or $OPT{"debug"} eq "all"){
+			$debug = 1;
+		}
 		Work_Queue::cctools_debug_flags_set($OPT{"debug"}); 
 		if(defined($OPT{"debug_file"})){
 			Work_Queue::cctools_debug_config_file($OPT{"debug_file"}); 
+			if(defined($OPT{"debug_file"})){
+				Work_Queue::cctools_debug_config_file_size($OPT{"debug_size"});
+			}
 		}
 		print localtime()." :: Work Queue debug flags set :: ".$OPT{"debug"}.".\n";
 	}
@@ -213,6 +300,7 @@ sub setup_workqueue {
 	if(defined($OPT{"port"})) {
 		$port = $OPT{"port"}; 
 	} 
+
 	my $wq = Work_Queue->new($port);
 	if(defined($wq)) {
 		print localtime()." :: Work Queue listening on port $port.\n";
@@ -229,8 +317,20 @@ sub setup_workqueue {
 		$wq->specify_name($OPT{"project"});
 		print localtime()." :: Work Queue project name set to ".$OPT{"project"}.".\n";
 	}
+
+	if(defined($OPT{"monitor"})) {
+		if(defined($OPT{"monitor-full"})){
+			$wq->enable_monitoring_full($OPT{"monitor"});
+		} else{
+			$wq->enable_monitoring($OPT{"monitor"});
+		}
+	}
 	
-	$wq->specify_log("maker_wq.stats");
+	if(defined($OPT{"stats"})){
+		$wq->specify_log($OPT{"stats"});
+	} else {
+		$wq->specify_log("maker_wq.stats");
+	}
 
 	return $wq;
 }
@@ -303,7 +403,7 @@ sub parse_genome_file {
 			if($contigs_currently == $contigs_per_split) {
 				$contigs_currently = 0;
 				$splits_currently += 1;
-				printf("%d : ", ($contigs_per_split*$splits_currently));
+				if ($debug) { printf("%d : ", ($contigs_per_split*$splits_currently)); }
 				close($genome_output);
 				$output = sprintf("$genome\_%06d", $splits_currently);
 				open $genome_output, '>', "$output" or die "Could not open output Genome $output $!\n";
@@ -330,7 +430,9 @@ sub parse_contig_dirs {
 	my $output_dirs = {};
 	open my $output_db, '<', "$base_name.maker.output/$base_name\_master_datastore_index.log" or die "Could not open $base_name\_master_datastore_index.log $!\n";
 	while (my $line = <$output_db>) {
-		print $line;
+		if ($debug) { 
+			print $line;
+		}
 		if( (my $contig, my $location) = $line =~ m/^(\w*)\s*(.*)\/.*\/\s*STARTED/ ) {
 			#print "Contig found : $contig at $location \n";
 			$output_dirs->{$contig} = $location;
@@ -344,8 +446,9 @@ sub submit_tasks {
 	my($wq, $common_input_files, $output_dirs, $input_to_contigs) = @_;
 	
 	foreach my $genome_chunk (keys %$input_to_contigs) {
-		print localtime()." :: Submitting file $genome_chunk for processing.\n";
-		
+		if ($debug) { 
+			print localtime()." :: Submitting file $genome_chunk for processing.\n";
+		}	
 		submit_task($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs);
 	}
 }
@@ -353,7 +456,7 @@ sub submit_tasks {
 sub submit_task {
 	my($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs) = @_;
 
-	my $task_command = "";
+	my $task_command = "maker -EXE; ";
 	if($augustus){
 		$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; ";
 	}
@@ -380,14 +483,16 @@ sub submit_task {
 
 	$task->specify_cores($cores);
 	if($disk){
-		$task->specify_cores($disk);
+		$task->specify_disk($disk);
 	}
 	if($memory){
-		$task->specify_cores($memory);
+		$task->specify_memory($memory);
 	}
 
 	my $taskid = $wq->submit($task);
-	print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
+	if ($debug) { 
+		print localtime()." :: Submitted task $taskid for annotating $genome_chunk with command: $task_command\n";
+	}
 
 	return 1;
 }
@@ -443,9 +548,8 @@ sub call_wq_wait {
 		print task_outfile "$output\n";
 		print task_outfile "=================================\n\n";
 		close (task_outfile);
-		
-		my $retStatus = $t->return_status;
-		if($retStatus == 0 || $retStatus == 1) {
+
+		if($output =~ "Maker is now finished!!!"){
 			my $task_result = $t->result; 	
 			print localtime()." :: Finished WQ task for tiers $tasktag with result $task_result.\n";
 		} else { #tier resubmission on failure 
