@@ -40,6 +40,24 @@ struct text_list *text_list_load(const char *path)
 	return t;
 }
 
+struct text_list *text_list_load_str(const char *inp_str)
+{
+	if (!inp_str) {
+		return NULL;
+	}
+
+	struct text_list *t = text_list_create();
+	char *pch = NULL;
+	char * tmp_str = strdup(inp_str);
+	pch = strtok(tmp_str, ",");
+	while(pch != NULL) {
+		text_list_append(t, pch);
+		pch = strtok(NULL, ",");
+	}	
+	free(tmp_str);
+	return t;
+}
+
 char *text_list_get(struct text_list *t, int i)
 {
 	if(i >= 0 && i < t->used_length) {
@@ -73,6 +91,13 @@ void text_list_delete(struct text_list *t)
 	}
 	free(t->items);
 	free(t);
+}
+
+void text_list_set(struct text_list *t, const char *str, int i)
+{
+	char *tmp_str = strdup(str);
+	free(t->items[i]);
+	t->items[i] = tmp_str;
 }
 
 /* vim: set noexpandtab tabstop=4: */

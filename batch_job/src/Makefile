@@ -21,7 +21,9 @@ SOURCES = \
 	batch_job_blue_waters.c \
 	batch_job_condor.c \
 	batch_job_local.c \
-	batch_job_work_queue.c
+	batch_job_work_queue.c\
+	batch_job_mesos.c \
+	mesos_task.c
 
 PUBLIC_HEADERS = batch_job.h
 

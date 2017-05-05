@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "work_queue_catalog.h"
-
 #include "cctools.h"
 #include "batch_job.h"
 #include "hash_table.h"
@@ -107,6 +106,7 @@ static struct rmsummary *resources = NULL;
 static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
+
 
 static void handle_abort( int sig )
 {
@@ -857,7 +857,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
-	printf(" %-30s Automatically size a worker to an available slot (Condor only).\n", "--autosize");
+	printf(" %-30s Automatically size a worker to an available slot (Condor and Mesos).\n", "--autosize");
 	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
@@ -867,6 +867,9 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
+	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos)\n", "--mesos-master");
+	printf(" %-30s Specify path to mesos python library (for use with -T mesos)\n", "--mesos-path");
+	printf(" %-30s Specify the linking libraries for running mesos(for use with -T mesos)\n", "--mesos-preload");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--worker-binary=<file>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
@@ -886,7 +889,10 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WORKERS_PER_CYCLE, 
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
-		LONG_OPT_WORKER_BINARY
+		LONG_OPT_WORKER_BINARY,
+		LONG_OPT_MESOS_MASTER, 
+		LONG_OPT_MESOS_PATH,
+		LONG_OPT_MESOS_PRELOAD
 	};
 
 static const struct option long_options[] = {
@@ -920,12 +926,19 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
+	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
+	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{0,0,0,0}
 };
 
 
 int main(int argc, char *argv[])
 {
+	char *mesos_master = NULL;
+	char *mesos_path = NULL;
+	char *mesos_preload = NULL;
+
 	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
 	catalog_host = CATALOG_HOST;
@@ -1049,6 +1062,15 @@ int main(int argc, char *argv[])
 			case 'h':
 				show_help(argv[0]);
 				exit(EXIT_SUCCESS);
+			case LONG_OPT_MESOS_MASTER:
+				mesos_master = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MESOS_PATH:
+				mesos_path = xxstrdup(optarg);
+				break;
+			case LONG_OPT_MESOS_PRELOAD:
+				mesos_preload = xxstrdup(optarg);
+				break;
 			default:
 				show_help(argv[0]);
 				return EXIT_FAILURE;
@@ -1174,7 +1196,21 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "condor-requirements", condor_requirements);
 	}
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+		batch_queue_set_option(queue, "mesos-path", mesos_path);
+		batch_queue_set_option(queue, "mesos-master", mesos_master);
+		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
+		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
+	}
+
 	mainloop( queue );
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_MESOS) {
+
+		batch_queue_set_int_option(queue, "batch-queue-abort-flag", (int)abort_flag);
+		batch_queue_set_int_option(queue, "batch-queue-failed-flag", 0);
+
+	}
 
 	batch_queue_delete(queue);
 
