@@ -230,10 +230,11 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 		
-	char *line = NULL;
-	size_t len = 0;
-	ssize_t read_len;
+	char line[MAX_BUF_SIZE];
 	FILE *task_state_fp;
+	int last_pos = 0;
+	int curr_pos = 0;
+	int read_len = 0;
 
 	if(!finished_tasks) {
 		finished_tasks = itable_create(0);
@@ -250,7 +251,11 @@ static batch_job_id_t batch_job_mesos_wait (struct batch_queue * q, struct batch
 		const char *task_exit_code;
 		int task_id;
 				
-		while((read_len = getline(&line, &len, task_state_fp)) != -1) {
+		while(fgets(line, MAX_BUF_SIZE, task_state_fp) != NULL) {
+			
+			curr_pos = ftell(task_state_fp);
+			read_len = curr_pos - last_pos;
+			last_pos = curr_pos;
 
 			// trim the newline character
 			if (line[read_len-1] == '\n') {
@@ -345,8 +350,7 @@ static int batch_queue_mesos_free(struct batch_queue *q)
 	fp = fopen(MESOS_DONE_FILE, "w");
 
 	if(fp == NULL) {
-		debug(D_ERROR, "Fail to clean up batch queue. %s\n", strerror(errno)); 
-		return 1;
+		fatal("Fail to clean up batch queue. %s\n", strerror(errno));
 	}
 
 	int batch_queue_abort_flag = atoi(batch_queue_get_option(q, "batch-queue-abort-flag"));
