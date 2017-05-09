@@ -409,20 +409,35 @@ nodes of the cluster.</p>
 
 <a name=workqueue><h2>Using Work Queue</h2></a>
 
-<p>You will notice that a workflow can run very slowly if you submit each task
-in the usual way, because it typically takes 30 seconds or so to start each
-batch job running.  To get around this limitation, we provide the Work Queue
-system.  This allows Makeflow to function as a master process that quickly
-dispatches work to remote worker processes.</p>
+<p>As described so far, Makeflow translates each job in the workflow
+into a single submission to the target batch system.  This works well
+as long as each job is relatively long running and doesn't perform
+a large amount of I/O.
+However, if each job is relatively short, the workflow may run very
+slowly, because it can take 30 seconds or more for the batch system to
+start an individual job.  If common files are needed by each job,
+they may end up being transferred to the same node multiple times.
+</p>
 
-<p>To begin, let's assume that you are logged into a machine named
-<tt>barney.nd.edu</tt>. start your Makeflow like this:</p>
+<p>To get around these limitations, we provide the
+<a href=http://ccl.cse.nd.edu/software/workqueue</a>Work Queue</a> system.
+The basic idea is to submit a number of persistent "worker" processes
+to an existing batch system.  Makeflow communicates directly with the
+workers to quickly dispatch jobs and cache data, rather than interacting
+with the underlying batch system.  This accelerates short jobs and
+exploits common data dependencies between jobs.
+</p>
+
+<p>To begin, let's assume that you are logged into the head node
+of your cluster, called <tt>head.cluster.edu</tt>
+Run Makeflow in Work Queue mode like this:
+</p>
 
 <code>makeflow -T wq example.makeflow</code>
 
 <p>Then, submit 10 worker processes to Condor like this:</p>
 
-<code>condor_submit_workers barney.nd.edu 9123 10
+<code>condor_submit_workers head.cluster.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
@@ -430,11 +445,11 @@ Logging submit event(s)..........
 
 <p>Or, submit 10 worker processes to SGE like this:</p>
 
-<code>sge_submit_workers barney.nd.edu 9123 10</code>
+<code>sge_submit_workers head.cluster.edu 9123 10</code>
 
 <p>Or, you can start workers manually on any other machine you can log into:</p>
 
-<code>work_queue_worker barney.nd.edu 9123</code>
+<code>work_queue_worker head.cluster.edu 9123</code>
 
 <p>Once the workers begin running, Makeflow will dispatch multiple tasks to
 each one very quickly.  If a worker should fail, Makeflow will retry the work
