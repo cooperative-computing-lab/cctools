@@ -1,39 +1,41 @@
 body {
   background: gray;
-  font: normal normal normal 18px Times, serif;
+  font: normal normal normal 14pt Times, serif;
 }
+
 #manual {
   background: white;
   border: 2px solid #000000;
   padding: 20px;
   margin: 20px auto 20px auto;
 }
+
 h1 {
   border-top: 3px solid #000000;
   border-bottom: 3px solid #000000;
+  font-family: arial;
   font-weight: bold;
   text-align: center;
 }
+
 h2 {
+  border-top: 2px solid #000000;
   border-bottom: 2px solid #000000;
-  border-left: 5px solid #000000;
+  font-family: arial;
   font-weight: bold;
-  padding-left: 10px;
 }
+
 h3 {
-  border-bottom: 2px solid #000000;
-  border-left: 5px double #000000;
+  font-family: arial;
   font-weight: bold;
-  padding-left: 10px;
-  margin-left: 20px;
+  text-decoration: underline;
 }
+
 h4 {
-  border-bottom: 1px solid #000000;
-  border-left: 5px inset #000000;
   font-weight: bold;
-  padding-left: 10px;
-  margin-left: 30px;
+  text-decoration: underline;
 }
+
 hr {
   border: 0;
   width: 80%;
@@ -69,7 +71,8 @@ code {
   border: 1px dashed #000000;
   color: #000000;
   display: block;
-  font: normal normal normal 18px "Courier New", Courier, monospace;
+  font: normal normal normal 14pt "Courier New", Courier, monospace;
+  font-size: 16px;
   margin: 10px 0 10px 20px;
   max-width: 65em; /* a little more than .75*80 */
   /* FIXME always takes up max WIDTH!!! :( */
@@ -94,17 +97,12 @@ code .prompt {
 h1:hover .sectionlink, h2:hover .sectionlink, h3:hover .sectionlink, h4:hover .sectionlink, h5:hover .sectionlink, h6:hover .sectionlink {
   display: block;
 }
-:target {
-  background-color: #ededed;
-  border: dashed black 2px;
-  border-radius: 8px;
-  font-weight: bold;
-  padding: 10px;
-}
+
 .man {
 	font-weight: bold;
 	font-family: monospace;
 }
+
 img.center {
 	display: block;
 	margin-left: auto;
