@@ -202,13 +202,14 @@ struct list* do_direct_query( const char *master_host, int master_port )
 	link_putfstring(l,"%s_status\n",stoptime,query_string);
 
 	struct jx *jarray = jx_parse_link(l,stoptime);
-	struct jx *j = jarray->u.items->value;
 	link_close(l);
 
-	if(!j) {
-		fprintf(stderr,"couldn't read from %s port %d: %s\n",master_host,master_port,strerror(errno));
+	if(!jarray || jarray->type!=JX_ARRAY || !jarray->u.items ) {
+		fprintf(stderr,"couldn't read %s status from %s port %d\n",query_string,master_host,master_port);
 		return 0;
 	}
+
+	struct jx *j = jarray->u.items->value;
 	j->type = JX_OBJECT;
 	
 	struct list* master_list = list_create();
