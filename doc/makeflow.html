@@ -31,7 +31,7 @@
 <ul>
 <li><a href=#local>Local</a>
 <li><a href=#htcondor>HTCondor</a>
-<li><a href=#sge>Univa Grid Engine</a>
+<li><a href=#sge>SGE/OGE/UGE</a>
 <li><a href=#pbs>PBS</a>
 <li><a href=#torque>Torque</a>
 <li><a href=#slurm>SLURM</a>
@@ -43,10 +43,10 @@
 
 <li><a href=#workqueue>Using Work Queue</a>
 <ul>
+<li><a href=#wqoverview>Overview</a>
 <li><a href=#ports>Port Numbers</a>
 <li><a href=#names>Project Names</a>
 <li><a href=#password>Setting a Password</a>
-<li><a href=#catalog>Catalog Server</a>
 </ul>
 
 <li><a href=#container>Container Environments</a>
@@ -409,20 +409,37 @@ nodes of the cluster.</p>
 
 <a name=workqueue><h2>Using Work Queue</h2></a>
 
-<p>You will notice that a workflow can run very slowly if you submit each task
-in the usual way, because it typically takes 30 seconds or so to start each
-batch job running.  To get around this limitation, we provide the Work Queue
-system.  This allows Makeflow to function as a master process that quickly
-dispatches work to remote worker processes.</p>
+<a name=wqoverview><h3>Overview</h3></a>
 
-<p>To begin, let's assume that you are logged into a machine named
-<tt>barney.nd.edu</tt>. start your Makeflow like this:</p>
+<p>As described so far, Makeflow translates each job in the workflow
+into a single submission to the target batch system.  This works well
+as long as each job is relatively long running and doesn't perform
+a large amount of I/O.
+However, if each job is relatively short, the workflow may run very
+slowly, because it can take 30 seconds or more for the batch system to
+start an individual job.  If common files are needed by each job,
+they may end up being transferred to the same node multiple times.
+</p>
+
+<p>To get around these limitations, we provide the
+<a href=http://ccl.cse.nd.edu/software/workqueue</a>Work Queue</a> system.
+The basic idea is to submit a number of persistent "worker" processes
+to an existing batch system.  Makeflow communicates directly with the
+workers to quickly dispatch jobs and cache data, rather than interacting
+with the underlying batch system.  This accelerates short jobs and
+exploits common data dependencies between jobs.
+</p>
+
+<p>To begin, let's assume that you are logged into the head node
+of your cluster, called <tt>head.cluster.edu</tt>
+Run Makeflow in Work Queue mode like this:
+</p>
 
 <code>makeflow -T wq example.makeflow</code>
 
 <p>Then, submit 10 worker processes to Condor like this:</p>
 
-<code>condor_submit_workers barney.nd.edu 9123 10
+<code>condor_submit_workers head.cluster.edu 9123 10
 Submitting job(s)..........
 Logging submit event(s)..........
 10 job(s) submitted to cluster 298.
@@ -430,11 +447,11 @@ Logging submit event(s)..........
 
 <p>Or, submit 10 worker processes to SGE like this:</p>
 
-<code>sge_submit_workers barney.nd.edu 9123 10</code>
+<code>sge_submit_workers head.cluster.edu 9123 10</code>
 
 <p>Or, you can start workers manually on any other machine you can log into:</p>
 
-<code>work_queue_worker barney.nd.edu 9123</code>
+<code>work_queue_worker head.cluster.edu 9123</code>
 
 <p>Once the workers begin running, Makeflow will dispatch multiple tasks to
 each one very quickly.  If a worker should fail, Makeflow will retry the work
@@ -460,23 +477,20 @@ on port 9567 by default, you can run the following command:</p>
 
 <a name=names><h3>Project Names</h3></a>
 
-<p>The best and simplest way to match workers to masters is to use the project name
-matching. You can give the master a project name with the -N option. This works with any batch system type used.</p>
+<p>If you don't like using port numbers, an easier way to match workers to masters is to use a project name.  You can give each master a project name with the -N option.</p>
 
-<code>makeflow -T wq -N MyProj example.makeflow </code>
+<code>makeflow -T wq -N MyProject example.makeflow </code>
 
-<p>The -N option gives the master a project name called 'MyProj',
+<p>The -N option gives the master a project name called 'MyProject',
 and will cause it to advertise its information
-such as the project name, running status, hostname and port number, to a catalog server.
+such as the project name, running status, hostname and port number, to a <A href=catalog.html>catalog server</a>.
 Then a worker can simply identify the workload by its project name.
-By default, makeflow will use the global catalog server at <a href=http://catalog.cse.nd.edu>catalog.cse.nd.edu</a>
-but this can be changed, as described below.
 </p>
 
-<p>To start a worker that automatically finds MyProj's master via the default
-Notre Dame catalog server:</p>
+<p>To start a worker that automatically finds MyProject's master via the default
+catalog server:</p>
 
-<code>work_queue_worker -N MyProj </code>
+<code>work_queue_worker -N MyProject</code>
 
 <p>You can also give multiple -N options to a worker. The worker will find out
 which ones of the specified projects are running from the catalog server and
@@ -492,28 +506,20 @@ In addition to creating a project name using the -N option, this will also trigg
 designated catalog server. The Port and Server address are taken from the environment variables <b>CATALOG_HOST</b> 
 and <b>CATALOG_PORT</b>. If either variable is not set, then the addresses "catalog.cse.nd.edu,backup-catalog.cse.nd.edu" and port 9097 will be used.
 </p>
+<p>
+It is also easy to run your own catalog server, if you prefer.
+For more details, see the <a href=catalog.html>Catalog Server Manual</a>.
+</p>
 
 <a name=password><h3>Setting a Password</h3></a>
 
-<p>We recommend that any workflow that uses a project name also set a password.
+<p>We recommend that anyone using the catalog server also set a password.
 To do this, select any password and write it to a file called
 <tt>mypwfile</tt>.  Then, run Makeflow and each worker with the
 <tt>--password</tt> option to indicate the password file:</p>
 
 <code>makeflow <b>--password</b> mypwfile ...
 work_queue_worker <b>--password</b> mypwfile ...
-</code>
-
-<a name=catalog><h3>Catalog Server</h3></a>
-
-<p>It is also possible to run your own catalog server. See <a href="catalog.html">Catalog Servers</a> for details.</p>
-
-<p>Suppose you have a catalog server listening at catalog.somewhere.edu:9097. To
-make your masters and workers contact this catalog server, simply add the
-<tt>-C hostname:port</tt> option to both of your master and worker:</p>
-
-<code>makeflow -T wq -C catalog.somewhere.edu:9097 -N MyProj example.makeflow
-work_queue_worker -C catalog.somewhere.edu:9097 -a -N MyProj
 </code>
 
 <a name=container><h2>Container Environments</h2></a>

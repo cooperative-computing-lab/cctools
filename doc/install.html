@@ -12,8 +12,6 @@
 <div id="manual">
 <h1>Installing the Cooperative Computing Tools</h1>
 
-<p style="text-align: right;"><b>Last edited: November 2014</b></p>
-
 <p>
 The Cooperative Computing Tools are Copyright (C) 2003-2004 Douglas Thain<br>
 and Copyright (C) 2005- The University of Notre Dame.<br>
@@ -22,66 +20,56 @@ This software is distributed under the GNU General Public License.<br>
 See the file COPYING for details.
 </p>
 
-<h2 id="overview">Overview<a class="sectionlink" href="#overview" title="Link to this section.">&#x21d7;</a></h2>
+<h2>Overview</h2>
 
+<p>
 The Cooperative Computing Tools (cctools) are a collection of programs
 that enable large scale distributed computing on systems such as
 clusters, clouds, and grids.  These tools are commonly used in fields
 of science and engineering that rely on large amounts of computing.
+</p>
+
+<h2>Install from Binary Tarball</h2>
+
 <p>
-The components of the cctools are:
-
-<dir>
-<li> <a href=parrot.html>Parrot</a> - A personal virtual file system.
-<li> <a href=chirp.html>Chirp</a> - A distributed file and storage system.
-<li> <a href=makeflow.html>Makeflow</a> - A workflow engine similar to Make.
-<li> <a href=workqueue.html>Work Queue</a> - A flexible master-worker library.
-<li> <a href=sand.html>SAND</a> - A scalable genome assembly framework.
-<li> <a href=allpairs.html>All-Pairs</a> - A computational abstraction.
-<li> <a href=wavefront.html>Wavefront</a> - A computational abstraction.
-</dir>
-
-<h3 id="installing.frombinaryunix">Installing From a Binary Package<a class="sectionlink" href="#installing.frombinaryunix" title="Link to this section.">&#x21d7;</a></h3>
-
 Binary packages are available for several operating systems at the
 <a href="http://ccl.cse.nd.edu/software/download.shtml">download page</a>
 Simply unpack the tarball in any directory that you like,
 and then add the <tt>bin</tt> directory to your path.
-For example, to install cctools 4.2.2 for RHEL6 in your home directory:
+For example, to install cctools 6.0.15 for RHEL7 in your home directory:
+</p>
 
 <code>cd $HOME
-wget http://ccl.cse.nd.edu/software/files/cctools-4.2.2-x86_64-redhat6.tar.gz
-gunzip cctools-4.2.2-x86_64-redhat6.tar.gz
-tar xvf cctools-4.2.2-x86_64-redhat6.tar
-export PATH=$HOME/cctools-4.2.2-x86_64-redhat6/bin:$PATH
+wget http://ccl.cse.nd.edu/software/files/cctools-6.0.15-x86_64-redhat7.tar.gz
+gunzip cctools-6.0.15-x86_64-redhat7.tar.gz
+tar xvf cctools-6.0.15-x86_64-redhat7.tar
+export PATH=$HOME/cctools-6.0.15-x86_64-redhat7/bin:$PATH
 </code>
 
-On Windows, the procedure is similar:
+<h2>Install From Source Tarball</h2>
 
-<code>cd %UserProfile%
-winzip32 -e cctools-4.2.1-i686-windows.zip
-set PATH=%UserProfile%\cctools\bin;%PATH%
-</code>
-
-<h3 id="installing.fromsource">Installing From Source<a class="sectionlink" href="#installing.fromsource" title="Link to this section.">&#x21d7;</a></h3>
-
+<p>
 Download a source package from the <a href="http://ccl.cse.nd.edu/software/download.shtml">download page</a>.
 And follow this recipe while logged in as any ordinary user:
+</p>
 
-<code>wget http://ccl.cse.nd.edu/software/files/cctools-4.2.2-source.tar.gz
-gunzip cctools-4.2.2-source.tar.gz
-tar xvf cctools-4.2.2-source.tar
-cd cctools-4.2.2-source
+<code>wget http://ccl.cse.nd.edu/software/files/cctools-6.0.15-source.tar.gz
+gunzip cctools-6.0.15-source.tar.gz
+tar xvf cctools-6.0.15-source.tar
+cd cctools-6.0.15-source
 ./configure
 make
 make install
 export PATH=${HOME}/cctools/bin:$PATH
 </code>
 
-Or, you can directly build the latest version from our git repository:
+<h2>Install From Git Repository</h2>
 
-<code>
-git clone https://github.com/cooperative-computing-lab/cctools cctools-source
+<p>
+Or, you can directly build the latest version from our git repository:
+</p>
+
+<code>git clone https://github.com/cooperative-computing-lab/cctools cctools-source
 cd cctools-source
 ./configure
 make
@@ -89,10 +77,14 @@ make install
 export PATH=${HOME}/cctools/bin:$PATH
 </code>
 
+<h2>Special Cases</h2>
+
+<p>
 The software will happily build and run without installing
 any external packages.  Optionally, the cctools will interoperate
 with a variety of external packages for security and data access.
 To use these, you must download and install them separately:
+</p>
 
 <dir>
 <li> <a href="http://www.irods.org">iRODS</a> (version 4.0.3)
@@ -102,9 +94,11 @@ To use these, you must download and install them separately:
 <li> <a href="http://xrootd.slac.stanford.edu">xRootD</a>
 </dir>
 
+<p>
 Once the desired packages are correctly installed, unpack the cctools and
 then issue a configure command that points to all of the other
 installations.  Then, make and install as before.  For example:
+</p>
 
 <code>./configure --with-globus-path /usr/local/globus ...
 make
@@ -112,13 +106,12 @@ make install
 export PATH=${HOME}/cctools/bin:$PATH
 </code>
 
-<h2 id="irods">Build Instructions for iRODS<a class="sectionlink" href="#irods" title="Link to this section.">&#x21d7;</a></h2>
-
+<p>
 Building Parrot with support for the iRODS service requires
 some custom build instructions, since Parrot requires access
 to some internals of iRODS that are not usually available.
 To do this, first make a source build of iRODS in your home directory:
-<p>
+</p>
 
 <code>cd $HOME
 git clone https://github.com/irods/irods-source
@@ -127,7 +120,9 @@ git checkout 4.0.3
 packaging/build.sh --run-in-place icommands
 </code>
 
+<p>
 Then, configure and build cctools relative to that installation:
+</p>
 
 <code>git clone https://github.com/cooperative-computing-lab/cctools cctools-source
 cd cctools-source
@@ -136,16 +131,18 @@ make
 make install
 </code>
 
-<h2 id="macos">Build Instructions for Mac OS X<a class="sectionlink" href="#macos" title="Link to this section.">&#x21d7;</a></h2>
+<h2>Build on Mac OSX</h2>
 
+<p>
 In order to build CCTools on Mac OS X
 you must first have the Xcode Command Line Tools installed.
 For OS X 10.9 and later this can be done using the following command:
-<p>
+</p>
 
 <code>xcode-select --install
 </code>
 
+<p>
 Then, click "Install" in the window that appears on the screen.
 If the command line tools are already installed,
 you will get an error and can proceed
@@ -154,8 +151,7 @@ with the instructions in the
 For OS X versions before 10.9,
 you will need to first install Xcode.
 Xcode can be found in the App Store or on the installation disk.
-
-<li> <a href="index.html">Cooperative Computing Tools Documentation Index</a>
+</p>
 
 </div>
 </body>
