@@ -23,7 +23,8 @@ SOURCES = \
 	batch_job_local.c \
 	batch_job_work_queue.c\
 	batch_job_mesos.c \
-	mesos_task.c
+	mesos_task.c\
+	batch_job_k8s.c
 
 PUBLIC_HEADERS = batch_job.h
 
@@ -52,6 +53,7 @@ install:
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
+	cp batch_job_k8s_script.sh $(CCTOOLS_INSTALL_DIR)/bin
 
 clean:
 	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_job_amazon_script.c *.o

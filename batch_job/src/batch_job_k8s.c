@@ -5,12 +5,15 @@
 #include "macros.h"
 #include "stringtools.h"
 #include "uuid.h"
+#include "path.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+
+#define MAX_BUF_SIZE 4096
 
 static cctools_uuid_t *mf_uuid = NULL;
 static int count = 0;
@@ -42,7 +45,10 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 {
 	
 	if(mf_uuid == NULL) {
+		mf_uuid = malloc(sizeof(*mf_uuid));
 		cctools_uuid_create (mf_uuid);
+		// The pod id cannot include upper case
+		string_tolower(mf_uuid->str);
 	}
 
 	int job_id;
@@ -50,10 +56,11 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 	
 	job_id = count ++;
 	pid = fork();
+
 	if(pid > 0) {
 
 		debug(D_BATCH, "started process %d: %s", job_id, cmd);
-		struct batch_job_info *info = calloc(sizeof(*info));
+		struct batch_job_info *info = calloc(1, sizeof(*info));
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, job_id, info);
@@ -81,17 +88,25 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		FILE *fd = fopen(k8s_config_fn, "w+");
 		fprintf(fd, k8s_config_tmpl, pod_id, pod_id, job_id, pod_id);
 		fclose(fd);
-		
-		char *cmd = string_format("batch_job_k8s_script.sh %s %d %s %s %s", 
-			pod_id, job_id, extra_input_files, cmd, extra_output_files)	
+	
+		char exe_path[MAX_BUF_SIZE];
+	
+		if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
+			fatal("read \"proc/self/exe\" fail\n");
+		}
+	
+		char exe_dir_path[MAX_BUF_SIZE];
+		path_dirname(exe_path, exe_dir_path);
 
-		execlp("/bin/bash", "bash", "-c", cmd, (char *) 0);
-		_exit(errno);	// Failed to execute the cmd.
+		char *sh_cmd = string_format("%s/batch_job_k8s_script.sh %s %d %s %s %s", exe_dir_path, pod_id, job_id, extra_input_files, cmd, extra_output_files);
+
+		execlp("/bin/bash", "bash", "-c", sh_cmd, (char *) 0);
+		_exit(errno);	// Failed to execute the sh_cmd.
 	}
+
 	return -1;
 }
 
-// TODO
 static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime)
 {
 	
@@ -103,62 +118,96 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q, struct batch_j
      * 4. oups_transferred
 	 * 5. job_done 
 	 */
-	
 	while(1) {
-		int timeout;
+		
+		uint64_t curr_job_id;
+		void *curr_job_info;
+		
+		itable_firstkey(q->job_table);	
+		while(itable_nextkey(q->job_table, &curr_job_id, (void **) &curr_job_info)) {
 
-		if(stoptime > 0) {
-			timeout = MAX(0, stoptime - time(0));
-		} else {
-			timeout = 5;
-		}
+			pid_t pid = fork();
+			int status;
+			int link[2];
+			char child_stdout[MAX_BUF_SIZE];
 
-		struct process_info *p = process_wait(timeout);
-		if(p) {
-			struct batch_job_info *info = itable_remove(q->job_table, p->pid);
-			if(!info) {
-				process_putback(p);
-				return -1;
-			}
+			if(pid > 0) {
+				// parent process
+				close(link[1]);
+				read(link[0], child_stdout, sizeof(child_stdout));
 
-			info->finished = time(0);
-			if(WIFEXITED(p->status)) {
-				info->exited_normally = 1;
-				info->exit_code = WEXITSTATUS(p->status);
+				wait(&status);
+				if(WIFEXITED(status)) {
+					if(WEXITSTATUS(status) == 1) {
+						fatal("failed to wait task %d with exit code %d and stdout %s", 
+								(int)curr_job_id, WEXITSTATUS(status), child_stdout);
+					}
+				}
+				
+				struct batch_job_info *info;
+				char *job_id, *task_state;
+				job_id = strtok(child_stdout, ",");
+				task_state = strtok(NULL, ",");
+
+				if(strcmp(task_state, "job_done") == 1) {
+				
+					info = itable_remove(q->job_table, atoi(job_id));
+					info->exited_normally = 1;
+					memcpy(info_out, info, sizeof(*info));
+					free(info);
+					return atoi(job_id);
+
+				} else if (strcmp(task_state, "exec_failed") == 1) {
+
+					info = itable_remove(q->job_table, atoi(job_id));
+					info->exited_normally = 0;
+					info->exit_code = WEXITSTATUS(status);
+					debug(D_BATCH, "%s is failed to execute.", job_id);
+					memcpy(info_out, info, sizeof(*info));
+					free(info);
+					return atoi(job_id);
+
+				} else {
+					debug(D_BATCH, "%s is still running with state %s.", job_id, task_state);
+				}
+				
+			} else if (pid < 0) {
+
+				fatal("couldn't create new process: %s\n", strerror(errno));
+
 			} else {
-				info->exited_normally = 0;
-				info->exit_signal = WTERMSIG(p->status);
+				// child process
+				
+				dup2(link[1], STDOUT_FILENO);
+				close(link[0]);
+				close(link[1]);
+				char *pod_id = string_format("%s-%d", mf_uuid->str, (int)curr_job_id);
+				char *cmd = string_format("kubectl exec %s -- tail -1 %s.log", pod_id, pod_id);
+				free(pod_id);
+				execl("/bin/bash", "bash", "-c", cmd, (char *) 0);
+				_exit(errno);
+
 			}
-
-			memcpy(info_out, info, sizeof(*info));
-
-			int jobid = p->pid;
-			free(p);
-			free(info);
-			return jobid;
-
-		} else if(errno == ESRCH || errno == ECHILD) {
-			return 0;
 		}
 
 		if(stoptime != 0 && time(0) >= stoptime)
 			return -1;
+
 	}
 }
 
 static int batch_job_k8s_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-	int status;
 	
 	pid_t pid = fork();
-	char *pod_id = string_format("%s-%d", mf_uuid, (int)jobid);
+	char *pod_id = string_format("%s-%d", mf_uuid->str, (int)jobid);
 
     if(pid > 0) {
 
     	int status;
 
     	debug(D_BATCH, "Trying to remove task %d by deleting pods %s.", 
-			jobid, pod_id);
+			(int)jobid, pod_id);
 
 		// wait child process to complete
 
