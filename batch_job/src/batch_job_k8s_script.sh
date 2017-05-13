@@ -9,7 +9,7 @@ oups=$5
 # update the log file from inside the container
 update_log()
 {
-    kubectl exec $pod_id -- ${job_id}_update_log.sh $1
+    kubectl exec $pod_id -- bash ${job_id}_update_log.sh $1
 }
 
 create_pod()
@@ -17,8 +17,16 @@ create_pod()
     kubectl create -f $pod_id.json
 
 	# generate script for updating the log from inside the pod 
-    echo -e "echo \"\$1\" > $pod_id.log " > ${job_id}_update_log.sh
+    echo -e "echo \"\$1\" >> $pod_id.log " > ${job_id}_update_log.sh
     chmod +x ${job_id}_update_log.sh
+	status=$(kubectl get pods $pod_id | awk '{if (NR != 1) {print $3}}')
+	while [ "Running" != "$status" ]	
+	do
+		echo "The status of container is $status"
+		sleep 1	
+		status=$(kubectl get pods $pod_id | awk '{if (NR != 1) {print $3}}')
+	done
+
     kubectl cp ${job_id}_update_log.sh $pod_id:/
     rm ${job_id}_update_log.sh
 
@@ -37,12 +45,13 @@ transfer_inps()
 
 exec_cmd()
 {
+	echo "Execut $cmd in $pod_id"
     echo "$cmd" > ${job_id}_cmd.sh 
     chmod +x ${job_id}_cmd.sh
     kubectl cp ${job_id}_cmd.sh $pod_id:/
     rm ${job_id}_cmd.sh
 
-    kubectl exec $pod_id -- sh -c ${job_id}_cmd.sh
+    kubectl exec $pod_id -- sh -c "./${job_id}_cmd.sh"
 
     if [ $? -eq 0 ]
     then 
@@ -63,7 +72,6 @@ transfer_oups()
 
 main()
 {
-    
     create_pod
     transfer_inps
     exec_cmd

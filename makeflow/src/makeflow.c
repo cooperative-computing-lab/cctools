@@ -1212,6 +1212,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Indicate the host name of preferred mesos master.\n", "--mesos-master=<hostname:port>");
 	printf(" %-30s Indicate the path to mesos python2 site-packages.\n", "--mesos-path=<path>");
 	printf(" %-30s Indicate the linking libraries for running mesos.\n", "--mesos-preload=<path>");
+	printf(" %-30s Indicate the container image for running kubernetes pod.\n", "--k8s-image=<path>");
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
@@ -1262,6 +1263,7 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	char *k8s_image = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1334,7 +1336,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_WRITE_ONLY,
 		LONG_OPT_MESOS_MASTER,
 		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD
+		LONG_OPT_MESOS_PRELOAD,
+		LONG_OPT_K8S_IMG
 	};
 
 	static const struct option long_options_run[] = {
@@ -1415,6 +1418,7 @@ int main(int argc, char *argv[])
 		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
+		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{0, 0, 0, 0}
 	};
 
@@ -1712,6 +1716,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MESOS_PRELOAD:
 				mesos_preload = xxstrdup(optarg);
 				break;
+			case LONG_OPT_K8S_IMG:
+				k8s_image = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ARCHIVE:
 				should_read_archive = 1;
 				should_write_to_archive = 1;
@@ -1880,6 +1887,10 @@ if (enforcer && wrapper_umbrella) {
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
 		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
+	}
+	
+	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
+		batch_queue_set_option(remote_queue, "k8s-image", k8s_image);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
@@ -2100,7 +2111,7 @@ if (enforcer && wrapper_umbrella) {
 	 * Set the abort and failed flag for batch_job_mesos mode.
 	 * Since batch_queue_delete(struct batch_queue *q) will call
 	 * batch_queue_mesos_free(struct batch_queue *q), which is defined 
-	 * in batch_job/src/batch_job_mesos.c. Then this function will check 
+	 * in batch_job/src/batch_job_mesos.c. This function will check 
 	 * the abort and failed status of the batch_queue and inform 
 	 * the makeflow mesos scheduler. 
 	 */
