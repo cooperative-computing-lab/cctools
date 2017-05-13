@@ -33,6 +33,7 @@ static const char *k8s_config_tmpl = "\
         \"containers\": [{\n\
             \"name\": \"%s\",\n\
             \"image\": \"centos\",\n\
+            \"imagePullPolicy\": \"IfNotPresent\",\n\
             \"command\": [\"/bin/bash\", \"-c\"],\n\
             \"args\": [\"echo \\\"%d start_container\\\" > %s.log ; tail -f /dev/null \"]\n\
         }],\n\
@@ -98,7 +99,7 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		char exe_dir_path[MAX_BUF_SIZE];
 		path_dirname(exe_path, exe_dir_path);
 
-		char *sh_cmd = string_format("%s/batch_job_k8s_script.sh %s %d %s %s %s", exe_dir_path, pod_id, job_id, extra_input_files, cmd, extra_output_files);
+		char *sh_cmd = string_format("%s/batch_job_k8s_script.sh %s %d \"%s\" \"%s\" \"%s\"", exe_dir_path, pod_id, job_id, extra_input_files, cmd, extra_output_files);
 
 		execlp("/bin/bash", "bash", "-c", sh_cmd, (char *) 0);
 		_exit(errno);	// Failed to execute the sh_cmd.
