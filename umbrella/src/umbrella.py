@@ -3997,6 +3997,9 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 	parser.add_option("--parrot_path",
 					action="store",
 					help="the path of parrot_run on the host machine",)
+	parser.add_option("--cms_siteconf",
+					action="store",
+					help="a tar.gz local file path (e.g., /tmp/1.tar.gz) or url path (e.g., http://.../1.tar.gz) pointing to the site configuration files for cms applications, the SITECONF dir should be organized following the suggestions at https://twiki.cern.ch/twiki/bin/view/CMSPublic/SiteConfInGitlab",)
 
 	(options, args) = parser.parse_args()
 
@@ -4011,6 +4014,10 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 		if os.path.exists(options.parrot_log) and not os.path.isfile(options.parrot_log):
 			sys.exit("the --parrot_log option <%s> is not a file!" % options.parrot_log)
 		parrot_log = os.path.abspath(options.parrot_log)
+
+	if options.cms_siteconf:
+		global cms_siteconf_url
+		cms_siteconf_url = options.cms_siteconf
 
 	global tempfile_list
 	global tempdir_list
