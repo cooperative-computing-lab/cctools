@@ -4,13 +4,13 @@
 # *** Set for releases. ***
 
 MAJOR=6
-MINOR=0
+MINOR=1
 MICRO=0
 
 # Optionally set the source/tag for this code (e.g. RC1 or FINAL).  Setting
 # this variable is instead useful for statically naming the source when it will
 # not match the branch name (like RC1 or FINAL).
-RELEASE=
+RELEASE=FINAL
 
 ###########################
 # *** You should not need to change anything below this line. ***
