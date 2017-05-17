@@ -1078,29 +1078,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(project_regex) {
-		using_catalog = 1;
-	}
-	else if((argc - optind) == 2) {
-		master_host = argv[optind];
-		master_port = atoi(argv[optind+1]);
-	}
-	else {
-		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or master-name option with a configuration file, or give the master's host and port.\n");
-		show_help(argv[0]);
-		exit(1);
-	}
-	
-
-	cctools_version_debug(D_DEBUG, argv[0]);
-
-	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
-		fprintf(stderr,"work_queue_factory: You must specify a batch type with the -T option.\n");
-		fprintf(stderr, "valid options:\n");
-		fprintf(stderr, "%s\n", batch_queue_type_string());
-		return 1;
-	}
-
 	if(config_file) {
 		char abs_path_name[PATH_MAX];
 
@@ -1113,12 +1090,37 @@ int main(int argc, char *argv[])
 
 		/* From now on, read config_file from absolute path */
 		config_file = xxstrdup(abs_path_name);
+	}
 
+	if(project_regex) {
+		using_catalog = 1;
+	} else if(config_file) {
+		using_catalog = 1;
 		if(!read_config_file(config_file)) {
 			fprintf(stderr,"work_queue_factory: There were errors in the configuration file: %s\n", config_file);
 			return 1;
 		}
-	}	
+	}
+	else if((argc - optind) == 2) {
+		using_catalog = 0;
+		master_host = argv[optind];
+		master_port = atoi(argv[optind+1]);
+	}
+	else {
+		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or master-name option with a configuration file, or give the master's host and port.\n");
+		show_help(argv[0]);
+		exit(1);
+	}
+	
+	cctools_version_debug(D_DEBUG, argv[0]);
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {
+		fprintf(stderr,"work_queue_factory: You must specify a batch type with the -T option.\n");
+		fprintf(stderr, "valid options:\n");
+		fprintf(stderr, "%s\n", batch_queue_type_string());
+		return 1;
+	}
+
 
 	if(workers_min>workers_max) {
 		fprintf(stderr,"work_queue_factory: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
