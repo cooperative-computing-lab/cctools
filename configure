@@ -3,7 +3,7 @@
 ###########################
 # *** Set for releases. ***
 
-MAJOR=6
+MAJOR=7
 MINOR=0
 MICRO=0
 
