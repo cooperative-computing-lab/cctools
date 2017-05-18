@@ -17,12 +17,6 @@ typedef enum {
     // CONTAINER_MODE_ROCKET etc
 } container_mode_t;
 
-/*
-This module implements garbage collection on the dag.
-Files that are no longer needed as inputs to any rules
-may be removed, according to a variety of criteria.
- */
-
 struct makeflow_wrapper {
     const char *command;
     struct list *input_files;

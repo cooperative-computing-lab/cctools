@@ -110,7 +110,7 @@ int text_array_save_range(struct text_array *t, const char *filename, int x, int
 	if(!file)
 		return 0;
 
-	for(j = y; y < (y + h); j++) {
+	for(j = y; j < (y + h); j++) {
 		for(i = x; i < (x + w); i++) {
 			const char *v = text_array_get(t, i, j);
 			if(v) {
