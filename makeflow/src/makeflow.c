@@ -35,6 +35,9 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "dag_visitors.h"
+#include "parser.h"
+#include "parser_jx.h"
+
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
@@ -45,10 +48,7 @@ See the file COPYING for details.
 #include "makeflow_mounts.h"
 #include "makeflow_wrapper_enforcement.h"
 #include "makeflow_wrapper_singularity.h"
-#include "parser.h"
-#include "parser_jx.h"
 #include "makeflow_archive.h"
-
 #include "makeflow_catalog_reporter.h"
 
 #include <fcntl.h>
