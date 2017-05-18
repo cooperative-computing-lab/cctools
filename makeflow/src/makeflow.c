@@ -194,6 +194,27 @@ static struct list *makeflow_generate_output_files( struct dag_node *n )
 }
 
 /*
+Abort one job in a given batch queue.
+*/
+
+static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_queue *q, UINT64_T jobid, const char *name )
+{
+	printf("aborting %s job %" PRIu64 "\n", name, jobid);
+
+	batch_job_remove(q, jobid);
+	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
+
+	struct list *outputs = makeflow_generate_output_files(n);
+	struct dag_file *f;
+	list_first_item(outputs);
+
+	while((f = list_next_item(outputs)))
+		makeflow_clean_file(d, q, f, 0);
+
+	makeflow_clean_node(d, q, n, 1);
+}
+
+/*
 Abort the dag by removing all batch jobs from all queues.
 */
 
@@ -201,34 +222,20 @@ static void makeflow_abort_all(struct dag *d)
 {
 	UINT64_T jobid;
 	struct dag_node *n;
-	struct dag_file *f;
 
 	printf("got abort signal...\n");
 
 	itable_firstkey(d->local_job_table);
 	while(itable_nextkey(d->local_job_table, &jobid, (void **) &n)) {
-		printf("aborting local job %" PRIu64 "\n", jobid);
-		batch_job_remove(local_queue, jobid);
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-		struct list *outputs = makeflow_generate_output_files(n);
-		list_first_item(outputs);
-		while((f = list_next_item(outputs)))
-			makeflow_clean_file(d, local_queue, f, 0);
-		makeflow_clean_node(d, local_queue, n, 1);
+		makeflow_abort_job(d,n,local_queue,jobid,"local");
 	}
 
 	itable_firstkey(d->remote_job_table);
 	while(itable_nextkey(d->remote_job_table, &jobid, (void **) &n)) {
-		printf("aborting remote job %" PRIu64 "\n", jobid);
-		batch_job_remove(remote_queue, jobid);
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-		struct list *outputs = makeflow_generate_output_files(n);
-		list_first_item(outputs);
-		while((f = list_next_item(outputs)))
-			makeflow_clean_file(d, remote_queue, f, 0);
-		makeflow_clean_node(d, remote_queue, n, 1);
+		makeflow_abort_job(d,n,remote_queue,jobid,"remote");
 	}
 }
+
 static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 
 /*
