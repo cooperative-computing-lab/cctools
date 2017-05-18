@@ -442,40 +442,6 @@ static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, stru
 }
 
 /*
-Given a list of files, set theses files' states to EXPECT.
-*/
-
-void makeflow_log_file_expectation( struct dag *d, struct list *file_list )
-{
-	struct dag_file *f;
-
-	if(!file_list) return ;
-
-	list_first_item(file_list);
-	while((f=list_next_item(file_list))) {
-		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
-	}
-}
-
-/*
-Given a list of files, set theses files' states to EXISTS.
-*/
-
-void makeflow_log_file_existence( struct dag *d, struct list *file_list )
-{
-	struct dag_file *f;
-
-	if(!file_list) return ;
-
-	list_first_item(file_list);
-	while((f=list_next_item(file_list))) {
-		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
-	}
-}
-
-
-
-/*
 Given a list of files, add the files to the given string.
 Returns the original string, realloced if necessary
 */
@@ -614,7 +580,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	struct jx *envlist = dag_node_env_create(d,n);
 
 	/* Logs the creation of output files. */
-	makeflow_log_file_expectation(d, output_list);
+	makeflow_log_file_list_state_change(d,output_list,DAG_FILE_STATE_EXPECT);
 
 	/* check archiving directory to see if node has already been preserved */
 	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {

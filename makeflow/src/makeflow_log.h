@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "dag.h"
 #include "makeflow_gc.h"
 #include "timestamp.h"
+#include "list.h"
 
 /*
 Each dag is associated with a log file that records each operation that
@@ -24,6 +25,7 @@ void makeflow_log_failed_event( struct dag *d );
 void makeflow_log_completed_event( struct dag *d );
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate );
 void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int newstate );
+void makeflow_log_file_list_state_change( struct dag *d, struct list *fl, int newstate );
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected );
 
 /* return 0 on success, return non-zero on failure. */
