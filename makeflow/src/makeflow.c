@@ -98,7 +98,7 @@ static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
 static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
-static int makeflow_retry_max = MAX_REMOTE_JOBS_DEFAULT;
+static int makeflow_retry_max = 5;
 
 /* makeflow_gc_method indicates the type of garbage collection
  * indicated by the user. Refer to makeflow_gc.h for specifics */
