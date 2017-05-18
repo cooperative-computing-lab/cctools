@@ -132,7 +132,7 @@ static char *jx_context = NULL;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
-static char *image_tar = NULL;
+static char *container_image_tar = NULL;
 
 static char *parrot_path = "./parrot_run";
 
@@ -1663,7 +1663,7 @@ int main(int argc, char *argv[])
 				skip_file_check = 1;
 				break;
 			case LONG_OPT_DOCKER_TAR:
-				image_tar = xxstrdup(optarg);
+				container_image_tar = xxstrdup(optarg);
 				break;
                         case LONG_OPT_SINGULARITY:
                                 if(!wrapper) wrapper = makeflow_wrapper_create();
@@ -2078,7 +2078,7 @@ if (enforcer && wrapper_umbrella) {
 	runtime = timestamp_get();
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-		makeflow_wrapper_docker_init(wrapper, container_image, image_tar);
+		makeflow_wrapper_docker_init(wrapper, container_image, container_image_tar);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
 		makeflow_wrapper_singularity_init(wrapper, container_image);
     }
