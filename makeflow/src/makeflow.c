@@ -614,12 +614,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		/* Now submit the actual job, retrying failures as needed. */
 		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
 
-		/* Restore old batch job options. */
-		if(previous_batch_options) {
-			batch_queue_set_option(queue, "batch-options", previous_batch_options);
-			free(previous_batch_options);
-		}
-
 		/* Update all of the necessary data structures. */
 		if(n->jobid >= 0) {
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
@@ -632,6 +626,12 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 			makeflow_failed_flag = 1;
 		}
+	}
+
+	/* Restore old batch job options. */
+	if(previous_batch_options) {
+		batch_queue_set_option(queue, "batch-options", previous_batch_options);
+		free(previous_batch_options);
 	}
 
 	free(command);
