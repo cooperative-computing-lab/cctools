@@ -151,7 +151,7 @@ static int log_verbose_mode = 0;
 static struct makeflow_wrapper *wrapper = 0;
 static struct makeflow_monitor *monitor = 0;
 static struct makeflow_wrapper *enforcer = 0;
-static struct makeflow_wrapper_umbrella *wrapper_umbrella = 0;
+static struct makeflow_wrapper_umbrella *umbrella = 0;
 
 /* is true only if the -N command is used. Useful for catalog reporting.
  */
@@ -169,48 +169,26 @@ static int did_find_archived_job = 0;
 /* Generates file list for node based on node files, wrapper
  *  * input files, and monitor input files. Relies on %% nodeid
  *   * replacement for monitor file names. */
-static struct list *makeflow_generate_input_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *e, struct makeflow_wrapper_umbrella *u )
+static struct list *makeflow_generate_input_files( struct dag_node *n )
 {
 	struct list *result = list_duplicate(n->source_files);
 
-	if(w){
-		result = makeflow_wrapper_generate_files(result, w->input_files, n, w);
-	}
-
-	if(e){
-		result = makeflow_wrapper_generate_files(result, e->input_files, n, e);
-	}
-
-	if(u){
-		result = makeflow_wrapper_generate_files(result, u->wrapper->input_files, n, u->wrapper);
-	}
-
-	if(m){
-		result = makeflow_wrapper_generate_files(result, m->wrapper->input_files, n, m->wrapper);
-	}
+	if(wrapper)  result = makeflow_wrapper_generate_files(result, wrapper->input_files, n, wrapper);
+	if(enforcer) result = makeflow_wrapper_generate_files(result, enforcer->input_files, n, enforcer);
+	if(umbrella) result = makeflow_wrapper_generate_files(result, umbrella->wrapper->input_files, n, umbrella->wrapper);
+	if(monitor)  result = makeflow_wrapper_generate_files(result, monitor->wrapper->input_files, n, monitor->wrapper);
 
 	return result;
 }
 
-static struct list *makeflow_generate_output_files( struct dag_node *n, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *e, struct makeflow_wrapper_umbrella *u )
+static struct list *makeflow_generate_output_files( struct dag_node *n )
 {
 	struct list *result = list_duplicate(n->target_files);
 
-	if(w){
-		result = makeflow_wrapper_generate_files(result, w->output_files, n, w);
-	}
-
-	if(e){
-		result = makeflow_wrapper_generate_files(result, e->output_files, n, e);
-	}
-
-	if(u){
-		result = makeflow_wrapper_generate_files(result, u->wrapper->output_files, n, u->wrapper);
-	}
-
-	if(m){
-		result = makeflow_wrapper_generate_files(result, m->wrapper->output_files, n, m->wrapper);
-	}
+	if(wrapper)  result = makeflow_wrapper_generate_files(result, wrapper->output_files, n, wrapper);
+	if(enforcer) result = makeflow_wrapper_generate_files(result, enforcer->output_files, n, enforcer);
+	if(umbrella) result = makeflow_wrapper_generate_files(result, umbrella->wrapper->output_files, n, umbrella->wrapper);
+	if(monitor)  result = makeflow_wrapper_generate_files(result, monitor->wrapper->output_files, n, monitor->wrapper);
 
 	return result;
 }
@@ -232,7 +210,7 @@ static void makeflow_abort_all(struct dag *d)
 		printf("aborting local job %" PRIu64 "\n", jobid);
 		batch_job_remove(local_queue, jobid);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+		struct list *outputs = makeflow_generate_output_files(n);
 		list_first_item(outputs);
 		while((f = list_next_item(outputs)))
 			makeflow_clean_file(d, local_queue, f, 0);
@@ -244,7 +222,7 @@ static void makeflow_abort_all(struct dag *d)
 		printf("aborting remote job %" PRIu64 "\n", jobid);
 		batch_job_remove(remote_queue, jobid);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-		struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+		struct list *outputs = makeflow_generate_output_files(n);
 		list_first_item(outputs);
 		while((f = list_next_item(outputs)))
 			makeflow_clean_file(d, remote_queue, f, 0);
@@ -344,7 +322,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		}
 	}
 	// Clean up things associated with this node
-	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	struct list *outputs = makeflow_generate_output_files(n);
 	list_first_item(outputs);
 	while((f1 = list_next_item(outputs)))
 		makeflow_clean_file(d, remote_queue, f1, 0);
@@ -420,13 +398,13 @@ for the given batch system, combining the local and remote name
 and making substitutions according to the node.
 */
 
-static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *s, struct makeflow_wrapper_umbrella *u )
+static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
 {
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
-	if(!remotename && w) remotename = makeflow_wrapper_get_remote_name(w, n->d, f->filename);
-	if(!remotename && s) remotename = makeflow_wrapper_get_remote_name(s, n->d, f->filename);
-	if(!remotename && m) remotename = makeflow_wrapper_get_remote_name(m->wrapper, n->d, f->filename);
-	if(!remotename && u) remotename = makeflow_wrapper_get_remote_name(u->wrapper, n->d, f->filename);
+	if(!remotename && wrapper) remotename = makeflow_wrapper_get_remote_name(wrapper, n->d, f->filename);
+	if(!remotename && enforcer) remotename = makeflow_wrapper_get_remote_name(enforcer, n->d, f->filename);
+	if(!remotename && monitor) remotename = makeflow_wrapper_get_remote_name(monitor->wrapper, n->d, f->filename);
+	if(!remotename && umbrella) remotename = makeflow_wrapper_get_remote_name(umbrella->wrapper, n->d, f->filename);
 	if(!remotename) remotename = f->filename;
 
 	switch (batch_queue_get_type(queue)) {
@@ -476,7 +454,7 @@ Given a list of files, add the files to the given string.
 Returns the original string, realloced if necessary
 */
 
-static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue, struct makeflow_wrapper *w, struct makeflow_monitor *m, struct makeflow_wrapper *s, struct makeflow_wrapper_umbrella *u )
+static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
 {
 	struct dag_file *file;
 
@@ -490,7 +468,7 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n", file->filename);
 			continue;
 		}
-		char *f = makeflow_file_format(node,file,queue,w,m,s,u);
+		char *f = makeflow_file_format(node,file,queue);
 		file_str = string_combine(file_str,f);
 		free(f);
 	}
@@ -545,24 +523,25 @@ to obtain identical strings.
 
 static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct list **input_list, struct list **output_list, char **input_files, char **output_files, char **command )
 {
-	makeflow_wrapper_umbrella_set_input_files(wrapper_umbrella, queue, n);
+	makeflow_wrapper_umbrella_set_input_files(umbrella, queue, n);
 
 	if (*input_list == NULL) {
-		*input_list  = makeflow_generate_input_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+		*input_list  = makeflow_generate_input_files(n);
 	}
 
 	if (*output_list == NULL) {
-		*output_list = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+		*output_list = makeflow_generate_output_files(n);
 	}
 
 	/* Create strings for all the files mentioned by this node. */
-	*input_files  = makeflow_file_list_format(n, 0, *input_list,  queue, wrapper, monitor, enforcer, wrapper_umbrella);
-	*output_files = makeflow_file_list_format(n, 0, *output_list, queue, wrapper, monitor, enforcer, wrapper_umbrella);
+	*input_files  = makeflow_file_list_format(n, 0, *input_list,  queue);
+	*output_files = makeflow_file_list_format(n, 0, *output_list, queue);
 
+	/* Expand the command according to each of the wrappers */
 	*command = strdup(n->command);
 	*command = makeflow_wrap_wrapper(*command, n, wrapper);
 	*command = makeflow_wrap_enforcer(*command, n, enforcer, *input_list, *output_list);
-	*command = makeflow_wrap_umbrella(*command, n, wrapper_umbrella, queue, *input_files, *output_files);
+	*command = makeflow_wrap_umbrella(*command, n, umbrella, queue, *input_files, *output_files);
 	*command = makeflow_wrap_monitor(*command, n, queue, monitor);
 }
 
@@ -781,7 +760,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		free(summary_name);
 	}
 
-	struct list *outputs = makeflow_generate_output_files(n, wrapper, monitor, enforcer, wrapper_umbrella);
+	struct list *outputs = makeflow_generate_output_files(n);
 
 	if(info->disk_allocation_exhausted) {
 		job_failed = 1;
@@ -1687,20 +1666,20 @@ int main(int argc, char *argv[])
 				jx_context = xxstrdup(optarg);
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
-				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_binary(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
+				makeflow_wrapper_umbrella_set_binary(umbrella, (const char *)xxstrdup(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_LOG_PREFIX:
-				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_log_prefix(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
+				makeflow_wrapper_umbrella_set_log_prefix(umbrella, (const char *)xxstrdup(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_MODE:
-				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_mode(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
+				makeflow_wrapper_umbrella_set_mode(umbrella, (const char *)xxstrdup(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_SPEC:
-				if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_spec(wrapper_umbrella, (const char *)xxstrdup(optarg));
+				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
+				makeflow_wrapper_umbrella_set_spec(umbrella, (const char *)xxstrdup(optarg));
 			case LONG_OPT_MESOS_MASTER:
 				mesos_master = xxstrdup(optarg);
 				break;
@@ -1749,7 +1728,7 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
-if (enforcer && wrapper_umbrella) {
+if (enforcer && umbrella) {
   fatal("enforcement and Umbrella are mutually exclusive\n");
 }
 
@@ -1938,9 +1917,9 @@ if (enforcer && wrapper_umbrella) {
 			if(spec) {
 				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the makefile ...\n", cur->nodeid);
 				dag_node_set_umbrella_spec(cur, xxstrdup(spec));
-			} else if(wrapper_umbrella && wrapper_umbrella->spec) {
+			} else if(umbrella && umbrella->spec) {
 				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the --umbrella_spec option ...\n", cur->nodeid);
-				dag_node_set_umbrella_spec(cur, wrapper_umbrella->spec);
+				dag_node_set_umbrella_spec(cur, umbrella->spec);
 			}
 			free(spec);
 			cur = cur->next;
@@ -1950,8 +1929,8 @@ if (enforcer && wrapper_umbrella) {
 		// When the user specifies umbrella specs in a makefile, but does not use any `--umbrella...` option,
 		// an umbrella wrapper was created to hold the default values for umbrella-related setttings such as
 		// log_prefix and default umbrella execution engine.
-		if(!wrapper_umbrella) wrapper_umbrella = makeflow_wrapper_umbrella_create();
-		makeflow_wrapper_umbrella_preparation(wrapper_umbrella, d);
+		if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
+		makeflow_wrapper_umbrella_preparation(umbrella, d);
 	}
 
 	if(enforcer) {
