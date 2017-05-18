@@ -109,8 +109,7 @@ static uint64_t makeflow_gc_size   = 0;
 static int makeflow_gc_count  = -1;
 /* Iterations of wait loop prior ot GC check */
 static int makeflow_gc_barrier = 1;
-/* Determines next gc_barrier to make checks less frequent with
- * large number of tasks */
+/* Determines next gc_barrier to make checks less frequent with large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
 
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
@@ -136,25 +135,25 @@ static char *container_image_tar = NULL;
 
 static char *parrot_path = "./parrot_run";
 
-/* wait upto this many seconds for an output file of a succesfull task
- * to appear on the local filesystem (e.g, to deal with NFS
- * semantics. . */
+/*
+Wait upto this many seconds for an output file of a succesfull task
+to appear on the local filesystem (e.g, to deal with NFS
+semantics.
+*/
 static int file_creation_patience_wait_time = 0;
 
-/* Write a verbose transaction log with SYMBOL tags.
- * SYMBOLs are category labels (SYMBOLs should be deprecated
- * once weaver/pbui tools are updated.) */
+/*
+Write a verbose transaction log with SYMBOL tags.
+SYMBOLs are category labels (SYMBOLs should be deprecated
+once weaver/pbui tools are updated.)
+*/
 static int log_verbose_mode = 0;
 
-/* Wrapper control functions for wrapping command and adding input/output
- *  * files. */
 static struct makeflow_wrapper *wrapper = 0;
 static struct makeflow_monitor *monitor = 0;
 static struct makeflow_wrapper *enforcer = 0;
 static struct makeflow_wrapper_umbrella *umbrella = 0;
 
-/* is true only if the -N command is used. Useful for catalog reporting.
- */
 static int catalog_reporting_on = 0;
 
 static char *mountfile = NULL;
@@ -165,10 +164,12 @@ static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
 
+/*
+Generates file list for node based on node files, wrapper
+input files, and monitor input files. Relies on %% nodeid
+replacement for monitor file names.
+*/
 
-/* Generates file list for node based on node files, wrapper
- *  * input files, and monitor input files. Relies on %% nodeid
- *   * replacement for monitor file names. */
 static struct list *makeflow_generate_input_files( struct dag_node *n )
 {
 	struct list *result = list_duplicate(n->source_files);
@@ -369,10 +370,13 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 }
 
+/*
+Update nested jobs with appropriate number of local jobs
+(total local jobs max / maximum number of concurrent nests).
+*/
+
 static void makeflow_prepare_nested_jobs(struct dag *d)
 {
-	/* Update nested jobs with appropriate number of local jobs (total
-	 * local jobs max / maximum number of concurrent nests). */
 	int dag_nested_width = dag_width(d, 1);
 	int update_dag_nests = 1;
 	char *s = getenv("MAKEFLOW_UPDATE_NESTED_JOBS");
@@ -693,9 +697,9 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 	struct dag_node *n;
 
 	for(n = d->nodes; n; n = n->next) {
-
-		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max)
+		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max) {
 			break;
+		}
 
 		if(makeflow_node_ready(d, n)) {
 			makeflow_node_submit(d, n);
@@ -1067,12 +1071,12 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
-                //report to catalog
+		/* Make periodic report to catalog. */
                 timestamp_t now = timestamp_get();
                 if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
-                    makeflow_catalog_summary(d, project,batch_queue_type,start);
-                    last_time = now;
-                    first_report = 0;
+			makeflow_catalog_summary(d, project,batch_queue_type,start);
+			last_time = now;
+			first_report = 0;
                 }
 
 		/* Rather than try to garbage collect after each time in this
@@ -1085,7 +1089,8 @@ static void makeflow_run( struct dag *d )
 		}
 	}
 
-	//reporting to catalog
+	/* Always make final report to catalog when workflow ends. */
+
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project,batch_queue_type,start);
 	}
@@ -1122,8 +1127,8 @@ static void handle_abort(int sig)
 
 }
 
-
-static void set_archive_directory_string(char **archive_directory, char *option_arg) {
+static void set_archive_directory_string(char **archive_directory, char *option_arg)
+{
 	if (*archive_directory != NULL) {
 		// need to free archive directory to avoid memory leak since it has already been set once
 		free(*archive_directory);
@@ -1138,9 +1143,6 @@ static void set_archive_directory_string(char **archive_directory, char *option_
 		free(uid);
 	}
 }
-
-
-
 
 static void show_help_run(const char *cmd)
 {
@@ -1750,9 +1752,9 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
-if (enforcer && umbrella) {
-  fatal("enforcement and Umbrella are mutually exclusive\n");
-}
+	if (enforcer && umbrella) {
+		fatal("enforcement and Umbrella are mutually exclusive\n");
+	}
 
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
