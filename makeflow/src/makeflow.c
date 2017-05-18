@@ -93,8 +93,6 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
-#define MAX_BUF_SIZE 4096
-#define MESOS_DONE_FILE "mesos_done" 
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 0;
