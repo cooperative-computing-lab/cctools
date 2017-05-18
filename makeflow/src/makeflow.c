@@ -118,7 +118,7 @@ static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
 static int local_jobs_max = 1;
-static int remote_jobs_max = 100;
+static int remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 
 static char *project = NULL;
 static int port = 0;
