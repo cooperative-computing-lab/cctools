@@ -161,7 +161,7 @@ static char *mountfile = NULL;
 static char *mount_cache = NULL;
 static int use_mountfile = 0;
 
-static struct list *shared_fs = NULL;
+static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
 
@@ -393,10 +393,25 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 	}
 }
 
-static int on_sharedfs(void *item, const void *arg) {
-	assert(item);
-	assert(arg);
-	return strncmp(item, arg, strlen(item));
+/*
+Match a filename (/home/fred) to a path stem (/home).
+Returns 0 on match, non-zero otherwise.
+*/
+
+static int prefix_match(void *stem, const void *filename) {
+	assert(stem);
+	assert(filename);
+	return strncmp(stem, filename, strlen(stem));
+}
+
+/*
+Returns true if the given filename is located in
+a shared filesystem, as given by the shared_fs_list.
+*/
+
+static int makeflow_file_on_sharedfs( const char *filename )
+{
+	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
 
 /*
@@ -471,7 +486,7 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
-		if (!list_iterate(shared_fs, on_sharedfs, file->filename)) {
+		if (makeflow_file_on_sharedfs(file->filename)) {
 			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n", file->filename);
 			continue;
 		}
@@ -963,7 +978,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 		if(!batch_queue_supports_feature(remote_queue, "absolute_path") && !n->local_job){
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)) && !error) {
-				if (!list_iterate(shared_fs, on_sharedfs, f->filename)) continue;
+				if(makeflow_file_on_sharedfs(f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
@@ -974,7 +989,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 			list_first_item(n->target_files);
 			while((f = list_next_item(n->target_files)) && !error) {
-				if (!list_iterate(shared_fs, on_sharedfs, f->filename)) continue;
+				if(makeflow_file_on_sharedfs(f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
@@ -1242,7 +1257,7 @@ int main(int argc, char *argv[])
 	char *log_format = NULL;
 	char *archive_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
-	shared_fs = list_create();
+	shared_fs_list = list_create();
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
@@ -1636,9 +1651,9 @@ int main(int argc, char *argv[])
 				makeflow_wrapper_add_output_file(wrapper, optarg);
 				break;
 			case LONG_OPT_SHARED_FS:
-				assert(shared_fs);
+				assert(shared_fs_list);
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
-				list_push_head(shared_fs, xxstrdup(optarg));
+				list_push_head(shared_fs_list, xxstrdup(optarg));
 				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
