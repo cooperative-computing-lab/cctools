@@ -105,18 +105,18 @@ static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 		free(path);
 		return 1;
 	} else if (jx_istype(j, JX_OBJECT)) {
-		const char *name = jx_lookup_string(j, "name");
-		const char *source = jx_lookup_string(j, "source");
-		if (!name) {
-			debug(D_MAKEFLOW_PARSER, "File lacks a name");
+		const char *path = jx_lookup_string(j, "path");
+		const char *remote = jx_lookup_string(j, "remote_name");
+		if (!path) {
+			debug(D_MAKEFLOW_PARSER, "File lacks a path");
 			return 0;
 		}
 		if (input) {
-			debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", name, source ? source : "NULL");
-			dag_node_add_source_file(n, name, source);
+			debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", path, remote ? remote : "NULL");
+			dag_node_add_source_file(n, path, remote);
 		} else {
-			debug(D_MAKEFLOW_PARSER, "Output %s, remote name %s", name, source ? source : "NULL");
-			dag_node_add_target_file(n, name, source);
+			debug(D_MAKEFLOW_PARSER, "Output %s, remote name %s", path, remote ? remote : "NULL");
+			dag_node_add_target_file(n, path, remote);
 		}
 		return 1;
 	} else {
