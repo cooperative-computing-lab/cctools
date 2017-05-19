@@ -244,7 +244,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 
 static int category_from_jx(struct dag *d, const char *name, struct jx *j) {
 	struct category *c = makeflow_category_lookup_or_create(d, name);
-	if (!resources_from_jx(c->mf_variables, j)) {
+	if (!resources_from_jx(c->mf_variables, jx_lookup(j, "resources"))) {
 		debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
 		return 0;
 	}
