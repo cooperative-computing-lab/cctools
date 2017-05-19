@@ -1038,6 +1038,7 @@ static void makeflow_run( struct dag *d )
 			break;
 
 		if(dag_remote_jobs_running(d)) {
+
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
@@ -1050,10 +1051,13 @@ static void makeflow_run( struct dag *d )
 		}
 
 		if(dag_local_jobs_running(d)) {
+			debug(D_MAKEFLOW_RUN, "==========local job running================");
 			time_t stoptime;
 			int tmp_timeout = 5;
 
 			if(dag_remote_jobs_running(d)) {
+
+				debug(D_MAKEFLOW_RUN, "**********remote running****************");
 				stoptime = time(0);
 			} else {
 				stoptime = time(0) + tmp_timeout;
@@ -1068,13 +1072,13 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
-                //report to catalog
-                timestamp_t now = timestamp_get();
-                if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
-                    makeflow_catalog_summary(d, project,batch_queue_type,start);
-                    last_time = now;
-                    first_report = 0;
-                }
+		//report to catalog
+		timestamp_t now = timestamp_get();
+		if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
+			makeflow_catalog_summary(d, project,batch_queue_type,start);
+			last_time = now;
+			first_report = 0;
+		}
 
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional

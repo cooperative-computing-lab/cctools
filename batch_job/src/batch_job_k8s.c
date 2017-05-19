@@ -6,6 +6,7 @@
 #include "stringtools.h"
 #include "uuid.h"
 #include "path.h"
+#include "list.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,7 +17,8 @@
 #define MAX_BUF_SIZE 4096
 
 static cctools_uuid_t *mf_uuid = NULL;
-static int count = 0;
+static const char *k8s_image = NULL;
+static int count = 1;
 
 static const char *k8s_config_tmpl = "\
 {\n\
@@ -32,10 +34,10 @@ static const char *k8s_config_tmpl = "\
     \"spec\": {\n\
         \"containers\": [{\n\
             \"name\": \"%s\",\n\
-            \"image\": \"centos\",\n\
+            \"image\": \"%s\",\n\
             \"imagePullPolicy\": \"IfNotPresent\",\n\
             \"command\": [\"/bin/bash\", \"-c\"],\n\
-            \"args\": [\"echo \\\"%d start_container\\\" > %s.log ; tail -f /dev/null \"]\n\
+            \"args\": [\"echo \\\"%d,start_container\\\" > %s.log ; tail -f /dev/null \"]\n\
         }],\n\
         \"restartPolicy\": \"Never\"\n\
     }\n\
@@ -52,6 +54,12 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		string_tolower(mf_uuid->str);
 	}
 
+	if(k8s_image == NULL) {
+		if((k8s_image = batch_queue_get_option(q, "k8s-image")) == NULL) {
+			fatal("Please specify the container image by using \"--k8s-image\"");
+		}
+	}
+
 	int job_id;
 	pid_t pid;
 	
@@ -60,7 +68,7 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 
 	if(pid > 0) {
 
-		debug(D_BATCH, "started process %d: %s", job_id, cmd);
+		debug(D_BATCH, "started process %d: %s", (int)pid, cmd);
 		struct batch_job_info *info = calloc(1, sizeof(*info));
 		info->submitted = time(0);
 		info->started = time(0);
@@ -87,7 +95,7 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		char *k8s_config_fn = string_format("%s.json", pod_id);
 
 		FILE *fd = fopen(k8s_config_fn, "w+");
-		fprintf(fd, k8s_config_tmpl, pod_id, pod_id, job_id, pod_id);
+		fprintf(fd, k8s_config_tmpl, pod_id, pod_id, k8s_image, job_id, pod_id);
 		fclose(fd);
 	
 		char exe_path[MAX_BUF_SIZE];
@@ -119,76 +127,105 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q, struct batch_j
      * 4. oups_transferred
 	 * 5. job_done 
 	 */
+	struct list *running_pod_lst = NULL;
 	while(1) {
-		
+	
 		uint64_t curr_job_id;
 		void *curr_job_info;
+		if(running_pod_lst != NULL) {
+			list_free(running_pod_lst);	
+			list_delete(running_pod_lst);
+		}
 		
+		running_pod_lst = list_create();	
+
+		debug(D_BATCH, "--------- 1 test----------");
+		// generate the list of running pod	
 		itable_firstkey(q->job_table);	
+
+		debug(D_BATCH, "--------- 1 %d ----------", itable_size(q->job_table));
 		while(itable_nextkey(q->job_table, &curr_job_id, (void **) &curr_job_info)) {
+			char *pod_id = string_format("%s-%d", mf_uuid->str, (int)curr_job_id);
+			char *cmd = string_format("kubectl get pods %s | awk \'{if (NR != 1) {print $3}}\' 2>&1 ", pod_id);
+			FILE *cmd_fp;
+			char pod_state[64];
+			cmd_fp = popen(cmd, "r");
+			fgets(pod_state, sizeof(pod_state)-1, cmd_fp);
+			pclose(cmd_fp);
 
-			pid_t pid = fork();
-			int status;
-			int link[2];
-			char child_stdout[MAX_BUF_SIZE];
+			int i = 0;
+			while(pod_state[i] != '\n' && pod_state[i] != EOF)
+				i ++;
+			if(pod_state[i] == '\n' || pod_state[i] == EOF) 
+				pod_state[i] = '\0';
 
-			if(pid > 0) {
-				// parent process
-				close(link[1]);
-				read(link[0], child_stdout, sizeof(child_stdout));
+			free(cmd);
+			free(pod_id);
+			
+			debug(D_BATCH, "++++++++ 5 %s ++++++++", pod_state);		
+			if(strcmp(pod_state, "Running") == 0) {
+				debug(D_BATCH, "++++++++ 6 ++++++++");		
+				uint64_t *job_id_dup = malloc(sizeof(uint64_t));
+				*job_id_dup = curr_job_id;
+				list_push_tail(running_pod_lst,	(void *)job_id_dup);
+			}
+			debug(D_BATCH, "---------%d----------", list_size(running_pod_lst));
+		}
 
-				wait(&status);
-				if(WIFEXITED(status)) {
-					if(WEXITSTATUS(status) == 1) {
-						fatal("failed to wait task %d with exit code %d and stdout %s", 
-								(int)curr_job_id, WEXITSTATUS(status), child_stdout);
-					}
-				}
+		// iterate the running pods
+		int *job_id;
+		list_first_item(running_pod_lst);	
+		while((job_id = (int *)list_next_item(running_pod_lst))) {
+			
+			int size = list_size(running_pod_lst);	
+			debug(D_BATCH, "++++++++ 2 %d ++++++++", size);		
+			char *get_log_cmd = string_format("kubectl exec %s-%d -- tail -1 %s-%d.log", 
+					mf_uuid->str, *job_id, mf_uuid->str, *job_id);
+			FILE *cmd_fp;
+			char log_tail_content[64];
+			cmd_fp = popen(get_log_cmd, "r");
+			fgets(log_tail_content, sizeof(log_tail_content)-1, cmd_fp);
+			pclose(cmd_fp);	
+
+			int i = 0;
+			while(log_tail_content[i] != '\n' && log_tail_content[i] != EOF)
+				i ++;
+			if(log_tail_content[i] == '\n' || log_tail_content[i] == EOF) 
+				log_tail_content[i] = '\0';
+
+			free(get_log_cmd);
+
+			struct batch_job_info *info;
+			char *task_state;
+			strtok(log_tail_content, ",");
+			task_state = strtok(NULL, ",");
+
+			if(strcmp(task_state, "job_done") == 0) {
 				
-				struct batch_job_info *info;
-				char *job_id, *task_state;
-				job_id = strtok(child_stdout, ",");
-				task_state = strtok(NULL, ",");
+				debug(D_BATCH, "++++++++ %d is done", *job_id);		
+				info = itable_remove(q->job_table, *job_id);
+				info->exited_normally = 1;
+				memcpy(info_out, info, sizeof(*info));
+				free(info);
+				return *job_id;
 
-				if(strcmp(task_state, "job_done") == 1) {
-				
-					info = itable_remove(q->job_table, atoi(job_id));
-					info->exited_normally = 1;
-					memcpy(info_out, info, sizeof(*info));
-					free(info);
-					return atoi(job_id);
+			} else if (strcmp(task_state, "exec_failed") == 0) {
 
-				} else if (strcmp(task_state, "exec_failed") == 1) {
-
-					info = itable_remove(q->job_table, atoi(job_id));
-					info->exited_normally = 0;
-					info->exit_code = WEXITSTATUS(status);
-					debug(D_BATCH, "%s is failed to execute.", job_id);
-					memcpy(info_out, info, sizeof(*info));
-					free(info);
-					return atoi(job_id);
-
-				} else {
-					debug(D_BATCH, "%s is still running with state %s.", job_id, task_state);
-				}
-				
-			} else if (pid < 0) {
-
-				fatal("couldn't create new process: %s\n", strerror(errno));
+				info = itable_remove(q->job_table, *job_id);
+				info->exited_normally = 0;
+				// TODO get exact exit_code
+				info->exit_code = 1;
+				debug(D_BATCH, "%d is failed to execute.", *job_id);
+				memcpy(info_out, info, sizeof(*info));
+				free(info);
+				return *job_id;
 
 			} else {
-				// child process
-				
-				dup2(link[1], STDOUT_FILENO);
-				close(link[0]);
-				close(link[1]);
-				char *pod_id = string_format("%s-%d", mf_uuid->str, (int)curr_job_id);
-				char *cmd = string_format("kubectl exec %s -- tail -1 %s.log", pod_id, pod_id);
-				free(pod_id);
-				execl("/bin/bash", "bash", "-c", cmd, (char *) 0);
-				_exit(errno);
+
+				debug(D_BATCH, "%d is still running with state %s.", *job_id, task_state);
 
 			}
+				
 		}
 
 		if(stoptime != 0 && time(0) >= stoptime)
