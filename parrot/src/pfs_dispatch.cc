@@ -1507,78 +1507,54 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_setresuid32:
 		case SYSCALL32_setresuid:
 			if (entering) {
-				if (pfs_fake_setuid && pfs_process_setresuid(p, args[0], args[1], args[2])) {
-					divert_to_dummy(p,0);
-				} else {
-					divert_to_dummy(p,-EPERM);
-				}
+				divert_to_dummy(p, pfs_process_setresuid(p, args[0], args[1], args[2]));
 			}
 			break;
 
 		case SYSCALL32_setreuid32:
 		case SYSCALL32_setreuid:
 			if (entering) {
-				if (pfs_fake_setuid && pfs_process_setreuid(p, args[0], args[1])) {
-					divert_to_dummy(p,0);
-				} else {
-					divert_to_dummy(p,-EPERM);
-				}
+				divert_to_dummy(p, pfs_process_setreuid(p, args[0], args[1]));
 			}
 			break;
 
 		case SYSCALL32_setuid32:
 		case SYSCALL32_setuid:
 			if (entering) {
-				if (pfs_fake_setuid && pfs_process_setuid(p, args[0])) {
-					divert_to_dummy(p,0);
-				} else {
-					divert_to_dummy(p,-EPERM);
-				}
+				divert_to_dummy(p, pfs_process_setuid(p, args[0]));
 			}
 			break;
 
 		case SYSCALL32_setresgid32:
 		case SYSCALL32_setresgid:
 			if (entering) {
-				if (pfs_fake_setgid && pfs_process_setresgid(p, args[0], args[1], args[2])) {
-					divert_to_dummy(p,0);
-				} else {
-					divert_to_dummy(p,-EPERM);
-				}
+				divert_to_dummy(p, pfs_process_setresgid(p, args[0], args[1], args[2]));
 			}
 			break;
 
 		case SYSCALL32_setregid32:
 		case SYSCALL32_setregid:
 			if (entering) {
-				if (pfs_fake_setgid && pfs_process_setregid(p, args[0], args[1])) {
-					divert_to_dummy(p,0);
-				} else {
-					divert_to_dummy(p,-EPERM);
-				}
+				divert_to_dummy(p, pfs_process_setregid(p, args[0], args[1]));
 			}
 			break;
 
 		case SYSCALL32_setgid32:
 		case SYSCALL32_setgid:
 			if (entering) {
-				if (pfs_fake_setgid && pfs_process_setgid(p, args[0])) {
-					divert_to_dummy(p,0);
-				} else {
-					divert_to_dummy(p,-EPERM);
-				}
+				divert_to_dummy(p, pfs_process_setgid(p, args[0]));
 			}
 			break;
 
 		case SYSCALL32_getgroups32:
 		case SYSCALL32_getgroups:
-			if (entering && pfs_fake_setgid) {
+			if (entering) {
 				gid_t groups[PFS_NGROUPS_MAX];
 				int ngroups = pfs_process_getgroups(p, args[0], groups);
 				if ((args[0] > 0) && (ngroups > 0)) {
 					TRACER_MEM_OP(tracer_copy_out(p->tracer,groups,POINTER(args[1]),ngroups * sizeof(gid_t),TRACER_O_ATOMIC));
 				}
-				divert_to_dummy(p,p->ngroups);
+				divert_to_dummy(p, ngroups);
 			}
 			break;
 
@@ -1586,19 +1562,11 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_setgroups:
 			if (entering) {
 				gid_t groups[PFS_NGROUPS_MAX];
-				if (pfs_fake_setuid) {
-					if (args[0] <= PFS_NGROUPS_MAX) {
-						TRACER_MEM_OP(tracer_copy_in(p->tracer, groups, POINTER(args[1]), args[0] * sizeof(gid_t),TRACER_O_ATOMIC));
-						if (pfs_process_setgroups(p, args[0], groups)) {
-							divert_to_dummy(p,0);
-						} else {
-							divert_to_dummy(p,-EPERM);
-						}
-					} else {
-						divert_to_dummy(p,-EINVAL);
-					}
+				if (args[0] <= PFS_NGROUPS_MAX) {
+					TRACER_MEM_OP(tracer_copy_in(p->tracer, groups, POINTER(args[1]), args[0] * sizeof(gid_t),TRACER_O_ATOMIC));
+					divert_to_dummy(p, pfs_process_setgroups(p, args[0], groups));
 				} else {
-					divert_to_dummy(p,-EPERM);
+					divert_to_dummy(p,-EINVAL);
 				}
 			}
 			break;
