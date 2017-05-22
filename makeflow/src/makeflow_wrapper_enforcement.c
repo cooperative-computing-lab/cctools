@@ -13,6 +13,7 @@
 #include "dag.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_wrapper_enforcement.h"
+#include "makeflow_log.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -25,9 +26,6 @@
 #define mountlist_pattern "mount_"
 #define tmp_pattern "tmp_"
 #define local_parrot_path "parrot_run"
-
-void makeflow_log_file_expectation( struct dag *d, struct list *file_list );
-void makeflow_log_file_existence( struct dag *d, struct list *file_list );
 
 void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_path) {
 	struct stat stat_buf;
@@ -70,7 +68,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 
 	enforcer_paths = list_create();
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
-	makeflow_log_file_expectation(n->d, enforcer_paths);
+	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXPECT);
 
 	/* make an invalid mountfile to send */
 	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
@@ -80,12 +78,12 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	write(mountlist_fd, "mountlist\n", 10);
 	close(mountlist_fd);
 
-	makeflow_log_file_existence(n->d, enforcer_paths);
+	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXISTS);
 	list_delete(enforcer_paths);
 
 	enforcer_paths = list_create();
 	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, enforcer_path));
-	makeflow_log_file_expectation(n->d, enforcer_paths);
+	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXPECT);
 
 	/* and generate a wrapper script with the current nodeid */
 	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT, S_IRWXU);
@@ -127,7 +125,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "exit $RC\n");
 	fclose(enforcer);
 
-	makeflow_log_file_existence(n->d, enforcer_paths);
+	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXISTS);
 	list_delete(enforcer_paths);
 
 	free(enforcer_path);

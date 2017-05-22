@@ -187,6 +187,18 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 	makeflow_log_sync(d,0);
 }
 
+void makeflow_log_file_list_state_change( struct dag *d, struct list *file_list, int newstate )
+{
+	struct dag_file *f;
+
+	if(!d || !file_list) return;
+
+	list_first_item(file_list);
+	while((f=list_next_item(file_list))) {
+		makeflow_log_file_state_change(d,f,newstate);
+	}
+}
+
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
 	fprintf(d->logfile, "# GC %" PRIu64 " %d %" PRIu64 " %d\n", timestamp_get(), collected, elapsed, total_collected);
