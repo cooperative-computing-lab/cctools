@@ -450,27 +450,47 @@ void pfs_process_scratch_restore( struct pfs_process *p )
 	/* do nothing */
 }
 
-int allowed_uid(struct pfs_process *p, uid_t n) {
+static int allowed_uid(struct pfs_process *p, uid_t n) {
 	return (n == (uid_t) -1) || (n == p->ruid) || (n == p->euid) || (n == p->suid);
 }
 
-int privileged_uid(struct pfs_process *p) {
+static int privileged_uid(struct pfs_process *p) {
 	return (p->ruid == 0) || (p->euid == 0) || (p->suid == 0);
 }
 
-int allowed_gid(struct pfs_process *p, gid_t n) {
+static int check_setuid(struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid) {
+	if (privileged_uid(p)) return 1;
+	if (!allowed_uid(p, ruid)) return 0;
+	if (!allowed_uid(p, euid)) return 0;
+	if (!allowed_uid(p, suid)) return 0;
+	return 1;
+}
+
+static int allowed_gid(struct pfs_process *p, gid_t n) {
 	return (n == (gid_t) -1) || (n == p->rgid) || (n == p->egid) || (n == p->sgid);
 }
 
-int privileged_gid(struct pfs_process *p) {
+static int privileged_gid(struct pfs_process *p) {
 	return (p->rgid == 0) || (p->egid == 0) || (p->sgid == 0);
 }
 
-int pfs_process_setresuid( struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid ) {
+static int check_setgid(struct pfs_process *p, gid_t rgid, gid_t egid, gid_t sgid) {
+	if (privileged_gid(p)) return 1;
+	if (!allowed_gid(p, rgid)) return 0;
+	if (!allowed_gid(p, egid)) return 0;
+	if (!allowed_gid(p, sgid)) return 0;
+	return 1;
+}
+
+/* These checks end up being slightly more lax than the actual ones.
+ * The various flavors of set*[ug]id require different combinations of
+ * real, effective, and saved to match. Here, we just pretend they all
+ * act like setres[ug]id.
+ */
+
+int pfs_process_setresuid(struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid) {
 	if (!pfs_fake_setuid) return -EPERM;
-	if (!(privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid) &&  allowed_uid(p, suid)))) {
-		return -EPERM;
-	}
+	if (!check_setuid(p, ruid, euid, suid)) return -EPERM;
 
 	if (ruid != (uid_t) -1) {
 		p->ruid = ruid;
@@ -484,11 +504,9 @@ int pfs_process_setresuid( struct pfs_process *p, uid_t ruid, uid_t euid, uid_t 
 	return 0;
 }
 
-int pfs_process_setreuid( struct pfs_process *p, uid_t ruid, uid_t euid ) {
+int pfs_process_setreuid(struct pfs_process *p, uid_t ruid, uid_t euid) {
 	if (!pfs_fake_setuid) return -EPERM;
-	if (!(privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid)))) {
-		return -EPERM;
-	}
+	if (!check_setuid(p, ruid, euid, -1)) return -EPERM;
 
 	if (euid != (uid_t) -1) {
 		p->euid = euid;
@@ -503,11 +521,9 @@ int pfs_process_setreuid( struct pfs_process *p, uid_t ruid, uid_t euid ) {
 	return 0;
 }
 
-int pfs_process_setuid( struct pfs_process *p, uid_t uid ) {
+int pfs_process_setuid(struct pfs_process *p, uid_t uid) {
 	if (!pfs_fake_setuid) return -EPERM;
-	if (!(privileged_uid(p) || allowed_uid(p, uid))) {
-		return -EPERM;
-	}
+	if (!check_setuid(p, -1, uid, -1)) return -EPERM;
 
 	if (privileged_uid(p)) {
 		p->ruid = p->euid = p->suid = uid;
@@ -517,11 +533,9 @@ int pfs_process_setuid( struct pfs_process *p, uid_t uid ) {
 	return 0;
 }
 
-int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, gid_t egid, gid_t sgid ) {
+int pfs_process_setresgid(struct pfs_process *p, gid_t rgid, gid_t egid, gid_t sgid) {
 	if (!pfs_fake_setgid) return -EPERM;
-	if (!(privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid) &&  allowed_gid(p, sgid)))) {
-		return -EPERM;
-	}
+	if (!check_setgid(p, rgid, egid, sgid)) return -EPERM;
 
 	if (rgid != (gid_t) -1) {
 		p->rgid = rgid;
@@ -535,11 +549,9 @@ int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, gid_t egid, gid_t 
 	return 0;
 }
 
-int pfs_process_setregid( struct pfs_process *p, gid_t rgid, gid_t egid ) {
+int pfs_process_setregid(struct pfs_process *p, gid_t rgid, gid_t egid) {
 	if (!pfs_fake_setgid) return -EPERM;
-	if (!(privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid)))) {
-		return -EPERM;
-	}
+	if (!check_setgid(p, rgid, egid, -1)) return -EPERM;
 
 	if (egid != (gid_t) -1) {
 		p->egid = egid;
@@ -554,11 +566,9 @@ int pfs_process_setregid( struct pfs_process *p, gid_t rgid, gid_t egid ) {
 	return 0;
 }
 
-int pfs_process_setgid( struct pfs_process *p, gid_t gid ) {
+int pfs_process_setgid(struct pfs_process *p, gid_t gid) {
 	if (!pfs_fake_setgid) return -EPERM;
-	if (!(privileged_gid(p) || allowed_gid(p, gid))) {
-		return -EPERM;
-	}
+	if (!check_setgid(p, -1, gid, -1)) return -EPERM;
 
 	if (privileged_gid(p)) {
 		p->rgid = p->egid = p->sgid = gid;
@@ -576,7 +586,7 @@ int pfs_process_getgroups(struct pfs_process *p, int size, gid_t list[]) {
 	return p->ngroups;
 }
 
-int pfs_process_setgroups( struct pfs_process *p, size_t size, const gid_t *list ) {
+int pfs_process_setgroups(struct pfs_process *p, size_t size, const gid_t *list) {
 	if (!pfs_fake_setgid) return -EPERM;
 	if (size > PFS_NGROUPS_MAX) return -EINVAL;
 	if (!privileged_uid(p)) return -EPERM;
