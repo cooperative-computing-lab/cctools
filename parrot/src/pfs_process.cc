@@ -43,6 +43,8 @@ static int nprocs = 0;
 
 extern uid_t pfs_uid;
 extern gid_t pfs_gid;
+extern int pfs_fake_setuid;
+extern int pfs_fake_setgid;
 
 
 struct pfs_process * pfs_process_lookup( pid_t pid )
@@ -465,120 +467,123 @@ int privileged_gid(struct pfs_process *p) {
 }
 
 int pfs_process_setresuid( struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid ) {
-	if (privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid) &&  allowed_uid(p, suid))) {
-		if (ruid != (uid_t) -1) {
-			p->ruid = ruid;
-		}
-		if (euid != (uid_t) -1) {
-			p->euid = euid;
-		}
-		if (suid != (uid_t) -1) {
-			p->suid = suid;
-		}
-		return 1;
-	} else {
-		return 0;
+	if (!pfs_fake_setuid) return -EPERM;
+	if (!(privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid) &&  allowed_uid(p, suid)))) {
+		return -EPERM;
 	}
+
+	if (ruid != (uid_t) -1) {
+		p->ruid = ruid;
+	}
+	if (euid != (uid_t) -1) {
+		p->euid = euid;
+	}
+	if (suid != (uid_t) -1) {
+		p->suid = suid;
+	}
+	return 0;
 }
 
 int pfs_process_setreuid( struct pfs_process *p, uid_t ruid, uid_t euid ) {
-	if (privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid))) {
-		if (euid != (uid_t) -1) {
-			p->euid = euid;
-			if (p->euid != p->ruid) {
-				p->suid = p->euid;
-			}
-		}
-		if (ruid != (uid_t) -1) {
-			p->ruid = ruid;
+	if (!pfs_fake_setuid) return -EPERM;
+	if (!(privileged_uid(p) || (allowed_uid(p, ruid) && allowed_uid(p, euid)))) {
+		return -EPERM;
+	}
+
+	if (euid != (uid_t) -1) {
+		p->euid = euid;
+		if (p->euid != p->ruid) {
 			p->suid = p->euid;
 		}
-		return 1;
-	} else {
-		return 0;
 	}
+	if (ruid != (uid_t) -1) {
+		p->ruid = ruid;
+		p->suid = p->euid;
+	}
+	return 0;
 }
 
 int pfs_process_setuid( struct pfs_process *p, uid_t uid ) {
-	if (privileged_uid(p) || allowed_uid(p, uid)) {
-		if (privileged_uid(p)) {
-			p->ruid = p->euid = p->suid = uid;
-		} else {
-			p->euid = uid;
-		}
-		return 1;
-	} else {
-		return 0;
+	if (!pfs_fake_setuid) return -EPERM;
+	if (!(privileged_uid(p) || allowed_uid(p, uid))) {
+		return -EPERM;
 	}
+
+	if (privileged_uid(p)) {
+		p->ruid = p->euid = p->suid = uid;
+	} else {
+		p->euid = uid;
+	}
+	return 0;
 }
 
 int pfs_process_setresgid( struct pfs_process *p, gid_t rgid, gid_t egid, gid_t sgid ) {
-	if (privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid) &&  allowed_gid(p, sgid))) {
-		if (rgid != (gid_t) -1) {
-			p->rgid = rgid;
-		}
-		if (egid != (gid_t) -1) {
-			p->egid = egid;
-		}
-		if (sgid != (gid_t) -1) {
-			p->sgid = sgid;
-		}
-		return 1;
-	} else {
-		return 0;
+	if (!pfs_fake_setgid) return -EPERM;
+	if (!(privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid) &&  allowed_gid(p, sgid)))) {
+		return -EPERM;
 	}
+
+	if (rgid != (gid_t) -1) {
+		p->rgid = rgid;
+	}
+	if (egid != (gid_t) -1) {
+		p->egid = egid;
+	}
+	if (sgid != (gid_t) -1) {
+		p->sgid = sgid;
+	}
+	return 0;
 }
 
 int pfs_process_setregid( struct pfs_process *p, gid_t rgid, gid_t egid ) {
-	if (privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid))) {
-		if (egid != (gid_t) -1) {
-			p->egid = egid;
-			if (p->egid != p->rgid) {
-				p->sgid = p->egid;
-			}
-		}
-		if (rgid != (gid_t) -1) {
-			p->rgid = rgid;
+	if (!pfs_fake_setgid) return -EPERM;
+	if (!(privileged_gid(p) || (allowed_gid(p, rgid) && allowed_gid(p, egid)))) {
+		return -EPERM;
+	}
+
+	if (egid != (gid_t) -1) {
+		p->egid = egid;
+		if (p->egid != p->rgid) {
 			p->sgid = p->egid;
 		}
-		return 1;
-	} else {
-		return 0;
 	}
+	if (rgid != (gid_t) -1) {
+		p->rgid = rgid;
+		p->sgid = p->egid;
+	}
+	return 0;
 }
 
 int pfs_process_setgid( struct pfs_process *p, gid_t gid ) {
-	if (privileged_gid(p) || allowed_gid(p, gid)) {
-		if (privileged_gid(p)) {
-			p->rgid = p->egid = p->sgid = gid;
-		} else {
-			p->egid = gid;
-		}
-		return 1;
-	} else {
-		return 0;
+	if (!pfs_fake_setgid) return -EPERM;
+	if (!(privileged_gid(p) || allowed_gid(p, gid))) {
+		return -EPERM;
 	}
+
+	if (privileged_gid(p)) {
+		p->rgid = p->egid = p->sgid = gid;
+	} else {
+		p->egid = gid;
+	}
+	return 0;
 }
 
 int pfs_process_getgroups(struct pfs_process *p, int size, gid_t list[]) {
-	if (size == 0) {
-		return p->ngroups;
-	} else if (p->ngroups > size) {
-		return -EINVAL;
-	} else {
-		memcpy(list, p->groups, p->ngroups * sizeof(gid_t));
-		return p->ngroups;
-	}
+	if (p->ngroups > size) return -EINVAL;
+	if (size == 0) return p->ngroups;
+
+	memcpy(list, p->groups, p->ngroups * sizeof(gid_t));
+	return p->ngroups;
 }
 
 int pfs_process_setgroups( struct pfs_process *p, size_t size, const gid_t *list ) {
-	if (privileged_uid(p) && (size <= PFS_NGROUPS_MAX)) {
-		memcpy(p->groups, list, size * sizeof(gid_t));
-		p->ngroups = size;
-		return 1;
-	} else {
-		return 0;
-	}
+	if (!pfs_fake_setgid) return -EPERM;
+	if (size > PFS_NGROUPS_MAX) return -EINVAL;
+	if (!privileged_uid(p)) return -EPERM;
+
+	memcpy(p->groups, list, size * sizeof(gid_t));
+	p->ngroups = size;
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */
