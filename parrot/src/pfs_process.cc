@@ -466,6 +466,13 @@ static int check_setuid(struct pfs_process *p, uid_t ruid, uid_t euid, uid_t sui
 	return 1;
 }
 
+/*
+ * As reported by @khurtado, ssh seems to try to drop privileges
+ * regardless of the current user. Since an unprivileged user can only
+ * drop to themself, this is a no-op in most cases.
+ * Parrot silently ignores such no-op id changes, even without
+ * `--fake-setuid`.
+ */
 static int noop_setuid(struct pfs_process *p, uid_t ruid, uid_t euid, uid_t suid) {
 	if (ruid != (uid_t) -1 && ruid != p->ruid) return 0;
 	if (euid != (uid_t) -1 && euid != p->euid) return 0;
