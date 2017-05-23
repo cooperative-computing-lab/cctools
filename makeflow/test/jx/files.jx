@@ -1,0 +1,17 @@
+{
+  "rules":[
+    {
+      "command":"echo A > A",
+      "outputs":["A"]
+    },
+    {
+      "command":"cat A > B && echo B >> B",
+      "inputs": {"path": "A"},
+      "outputs":[{"path": "B"}]
+    },
+    {
+      "inputs": ["A", "B"],
+      "command": "[ \"$(wc -l A)\" = '1 A' ] && [ \"$(wc -l B)\" = '2 B' ]"
+    }
+  ]
+}
