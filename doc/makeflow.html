@@ -1100,12 +1100,15 @@ makeflow ...
 To use the JSON workflow format, invoke Makeflow as
 <code>makeflow --json input.json
 </code>
-</p>
+An example JSON workflow is available <a href="https://github.com/cooperative-computing-lab/cctools/blob/master/makeflow/example/example.json">here</a>.
+This workflow is equivalent to the <tt>convert</tt> example above.
+In general, the Make-style format is easier for humans to read, while the JSON format is simpler to parse and generate.</p>
 
 <p>Makeflow can also evaluate a workflow as <a href="jx.html">JX</a>.
 JX is a superset of JSON, so this evaluation step will leave normal JSON unchanged.
 Invoking Makeflow with the <tt>--jx</tt> option will evaluate the input workflow from JX to JSON before parsing,
-allowing for more compact workflow representations.</p>
+allowing for more compact workflow representations.
+The JSON example above was evaluated from <a href="https://github.com/cooperative-computing-lab/cctools/blob/master/makeflow/example/example.jx">this JX workflow</a>.</p>
 
 <p>All <tt>Object</tt>s are assumed to have <tt>String</tt> keys.
 All keys are optional unless otherwise specified.</p>
