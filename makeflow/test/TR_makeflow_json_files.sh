@@ -9,13 +9,13 @@ prepare()
 
 run()
 {
-	cd jx && ../../src/makeflow --jx files.jx && exit 0
+	cd json && ../../src/makeflow --json files.json && exit 0
 	exit 1
 }
 
 clean()
 {
-	cd jx && ../../src/makeflow --jx -c files.jx && exit 0
+	cd json && ../../src/makeflow --json -c files.json && exit 0
 	exit 1
 }
 
