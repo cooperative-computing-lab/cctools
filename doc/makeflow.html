@@ -72,7 +72,7 @@
 <ul>
 <li><a href=#language>Language Reference</a>
 <li><a href=#rescat>Resources and Categories</a>
-<li><a href=#jx>JX Format</a>
+<li><a href=#json>JSON Format</a>
 <li><a href=#log>Transaction Log</a>
 </ul>
 
@@ -1094,19 +1094,23 @@ makeflow ...
 <tr><td> analysis </td> <td> 4 </td> <td> 800  (from environment)</td> <td> 600 </td> </tr>
 </table>
 
-<a name=jx><h3>JX Format</h3></a>
+<a name=json><h3>JSON Format</h3></a>
 
-<p>Makeflow supports a JX workflow format in addition to the Make-inspired one. Before parsing a JX workflow, Makeflow also evaluates it as <a href="jx.html">JX</a>.
-JX is a superset of JSON, so this evaluation step will leave normal JSON unchanged.</p>
-
-To use the JX workflow format, invoke Makeflow as
-<code>makeflow --jx input.jx
+<p>Makeflow supports a JSON workflow format in addition to the Make-inspired one.
+To use the JSON workflow format, invoke Makeflow as
+<code>makeflow --json input.json
 </code>
+</p>
+
+<p>Makeflow can also evaluate a workflow as <a href="jx.html">JX</a>.
+JX is a superset of JSON, so this evaluation step will leave normal JSON unchanged.
+Invoking Makeflow with the <tt>--jx</tt> option will evaluate the input workflow from JX to JSON before parsing,
+allowing for more compact workflow representations.</p>
 
 <p>All <tt>Object</tt>s are assumed to have <tt>String</tt> keys.
 All keys are optional unless otherwise specified.</p>
 
-<p>A workflow is encoded as a JX object. Makeflow interprets the following keys.
+<p>A workflow is encoded as a JSON object. Makeflow interprets the following keys.
 All workflow-level keys are optional, though a workflow with no production rules does nothing.</p>
 
 <ul>
@@ -1133,7 +1137,7 @@ The contents of each <tt>Rule</tt> are discussed in the corresponding section.</
 
 <h4>Categories</h4>
 
-<p>A <tt>Category</tt> is encoded as a JX object with the following keys.</p>
+<p>A <tt>Category</tt> is encoded as a JSON object with the following keys.</p>
 
 <ul>
 <li><tt>"environment"</tt>: <tt>Object&lt;String&gt;</tt></li>
@@ -1146,7 +1150,7 @@ These values override workflow-level environment variables.</p>
 
 <h4>Rules</h4>
 
-<p>A <tt>Rule</tt> is encoded as a JX object with the following keys.</p>
+<p>A <tt>Rule</tt> is encoded as a JSON object with the following keys.</p>
 
 <ul>
 <li><tt>"inputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
@@ -1186,7 +1190,7 @@ Allowed values are <tt>&ldquo;first&rdquo;</tt>, <tt>&ldquo;max&rdquo;</tt>, or 
 
 <p>A <tt>File</tt> can be specified two ways.
 The more compact form is simply a <tt>String</tt> representing the path to the file.
-Alternatively, a <tt>File</tt> can be encoded as a JX object with the following keys.</p>
+Alternatively, a <tt>File</tt> can be encoded as a JSON object with the following keys.</p>
 
 <ul>
 <li><tt>"path"</tt>: <tt>String</tt> <em>(required)</em></li>
@@ -1199,7 +1203,7 @@ Alternatively, a <tt>File</tt> can be encoded as a JX object with the following 
 
 <h4>Makeflows</h4>
 
-<p>A sub-Makeflow is encoded as a JX object with the following keys.</p>
+<p>A sub-Makeflow is encoded as a JSON object with the following keys.</p>
 
 <ul>
 <li><tt>"path"</tt>: <tt>String</tt> <em>(required)</em></li>
@@ -1213,7 +1217,7 @@ The working directory will be set to <tt>"cwd"</tt>, if specified, for executing
 
 <h4>Resource Specifications</h4>
 
-<p><tt>Resources</tt> is encoded as a JX object with the following keys.</p>
+<p><tt>Resources</tt> is encoded as a JSON object with the following keys.</p>
 
 <ul>
 <li><tt>"cores"</tt>: <tt>Integer</tt></li>
