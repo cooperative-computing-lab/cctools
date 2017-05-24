@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "jx_function.h"
 
 #include "stringtools.h"
+#include "debug.h"
 
 #include <ctype.h>
 #include <string.h>
@@ -706,6 +707,7 @@ static struct jx * jx_parse_finish( struct jx_parser *p )
 {
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
+		debug(D_JX|D_NOTICE, "parse error: %s", jx_parser_error_string(p));
 		jx_parser_delete(p);
 		jx_delete(j);
 		return 0;
@@ -718,6 +720,7 @@ struct jx * jx_parser_yield( struct jx_parser *p )
 {
 	struct jx * j = jx_parse(p);
 	if(jx_parser_errors(p)) {
+		debug(D_JX|D_NOTICE, "parse error: %s", jx_parser_error_string(p));
 		jx_delete(j);
 		return 0;
 	}
