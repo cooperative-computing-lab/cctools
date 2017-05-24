@@ -59,6 +59,7 @@ struct jx_parser {
 	FILE *source_file;
 	const char *source_string;
 	struct link *source_link;
+	unsigned line;
 	time_t stoptime;
 	char *error_string;
 	int errors;
@@ -76,6 +77,7 @@ struct jx_parser * jx_parser_create( int strict_mode )
 	struct jx_parser *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
 	p->strict_mode = strict_mode;
+	p->line = 1;
 	return p;
 }
 
@@ -113,8 +115,8 @@ void jx_parser_delete( struct jx_parser *p )
 
 static void jx_parse_error( struct jx_parser *p, const char *str )
 {
-	if(p->error_string) free(p->error_string);
-	p->error_string = strdup(str);
+	free(p->error_string);
+	p->error_string = string_format("line %u: %s", p->line, str);
 	p->errors++;
 }
 
@@ -124,6 +126,7 @@ static int jx_getchar( struct jx_parser *p )
 
 	if(p->putback_char_valid) {
 		p->putback_char_valid = 0;
+		if (p->putback_char == '\n') ++p->line;
 		return p->putback_char;
 	}
 
@@ -146,11 +149,13 @@ static int jx_getchar( struct jx_parser *p )
 		}
 	}
 
+	if (c == '\n') ++p->line;
 	return c;
 }
 
 static void jx_ungetchar( struct jx_parser *p, int c )
 {
+	if (c == '\n') --p->line;
 	p->putback_char = c;
 	p->putback_char_valid = 1;
 }
@@ -398,6 +403,11 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s, int arglist )
 	t = jx_scan(s);
 	if(t==JX_TOKEN_COMMA) {
 		i->next = jx_parse_item_list(s, arglist);
+		if (jx_parser_errors(s)) {
+			// error set by deeper layer
+			jx_item_delete(i);
+			return 0;
+		}
 	} else if(t==rdelim) {
 		i->next = 0;
 	} else {
@@ -453,6 +463,11 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	t = jx_scan(s);
 	if(t==JX_TOKEN_COMMA) {
 		p->next = jx_parse_pair_list(s);
+		if (jx_parser_errors(s)) {
+			// error set by deeper layer
+			jx_pair_delete(p);
+			return 0;
+		}
 	} else if(t==JX_TOKEN_RBRACE) {
 		p->next = 0;
 	} else {
@@ -482,9 +497,25 @@ static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
 	case JX_TOKEN_RPAREN:
 		return 0;
 	case JX_TOKEN_LBRACE:
-		return jx_object(jx_parse_pair_list(s));
+		{
+			struct jx_pair *p = jx_parse_pair_list(s);
+			if (jx_parser_errors(s)) {
+				// error set by deeper level
+				jx_pair_delete(p);
+				return 0;
+			}
+			return jx_object(p);
+		}
 	case JX_TOKEN_LBRACKET:
-		return jx_array(jx_parse_item_list(s, arglist));
+		{
+			struct jx_item *i = jx_parse_item_list(s, arglist);
+			if (jx_parser_errors(s)) {
+				// error set by deeper level
+				jx_item_delete(i);
+				return 0;
+			}
+			return jx_array(i);
+		}
 	case JX_TOKEN_STRING:
 		return jx_string(s->token);
 	case JX_TOKEN_INTEGER:
@@ -635,15 +666,19 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			}
 			break;
 		case JX_TOKEN_FUNCTION:
-			if((f = jx_function_name_from_string(s->token)) &&
-			   (j = jx_parse_postfix(s, 1)) &&
-			   jx_istype(j, JX_ARRAY)) {
-				return jx_function(f, j);
-			} else {
+			if (!(f = jx_function_name_from_string(s->token))) {
 				jx_parse_error(s,"invalid function");
 				return NULL;
 			}
-			break;
+			if (!(j = jx_parse_postfix(s, 1))) {
+				// error set by deeper level
+				return NULL;
+			}
+			if (!jx_istype(j, JX_ARRAY)) {
+				jx_parse_error(s, "malformed function");
+				return NULL;
+			}
+			return jx_function(f, j);
 		case JX_TOKEN_ERROR:
 			if ((j = jx_parse_postfix(s, 0))) {
 				if (jx_error_valid(j)) {
