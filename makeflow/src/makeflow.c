@@ -1769,15 +1769,14 @@ int main(int argc, char *argv[])
 	printf("parsing %s...\n",dagfile);
 	struct dag *d;
 	if (json_input) {
-		// JX doesn't really use errno, so give something generic
-		errno = EINVAL;
 		struct jx *dag = NULL;
 		struct jx *ctx = NULL;
 		dag = jx_parse_file(dagfile);
+		if (!dag) fatal("failed to parse dagfile");
 		if (jx_input && jx_context) {
 			printf("using JX context %s\n", jx_context);
 			struct jx *t = jx_parse_file(jx_context);
-			if (!t) fatal("couldn't parse context: %s\n", strerror(errno));
+			if (!t) fatal("failed to parse context");
 			ctx = jx_eval(t, NULL);
 			jx_delete(t);
 		}
@@ -1789,6 +1788,8 @@ int main(int argc, char *argv[])
 		}
 		d = dag_from_jx(dag);
 		jx_delete(dag);
+		// JX doesn't really use errno, so give something generic
+		errno = EINVAL;
 	} else {
 		d = dag_from_file(dagfile);
 	}

@@ -44,12 +44,12 @@ static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_ta
 				}
 				set_insert(d->export_vars, key);
 			} else {
-				debug(D_MAKEFLOW_PARSER, "Environment key/value must be strings");
+				debug(D_MAKEFLOW_PARSER|D_NOTICE, "Environment key/value must be strings");
 				return 0;
 			}
 		}
 	} else {
-		debug(D_MAKEFLOW_PARSER, "Expected environment to be an object");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Expected environment to be an object");
 		return 0;
 	}
 	return 1;
@@ -108,7 +108,7 @@ static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 		const char *path = jx_lookup_string(j, "path");
 		const char *remote = jx_lookup_string(j, "remote_name");
 		if (!path) {
-			debug(D_MAKEFLOW_PARSER, "File lacks a path");
+			debug(D_MAKEFLOW_PARSER|D_NOTICE, "File lacks a path");
 			return 0;
 		}
 		if (input) {
@@ -120,7 +120,7 @@ static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 		}
 		return 1;
 	} else {
-		debug(D_MAKEFLOW_PARSER, "Input must be a string or object");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Input must be a string or object");
 		return 0;
 	}
 }
@@ -148,13 +148,13 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	struct jx *inputs = jx_lookup(j, "inputs");
 	debug(D_MAKEFLOW_PARSER, "Parsing inputs");
 	if (!files_from_jx(n, 1, inputs)) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing inputs");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing inputs");
 		return 0;
 	}
 	struct jx *outputs = jx_lookup(j, "outputs");
 	debug(D_MAKEFLOW_PARSER, "Parsing outputs");
 	if (!files_from_jx(n, 0, outputs)) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing outputs");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing outputs");
 		return 0;
 	}
 
@@ -162,7 +162,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	struct jx *command = jx_lookup(j, "command");
 
 	if (makeflow && command) {
-		debug(D_MAKEFLOW_PARSER, "Rule must not have both command and submakeflow");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Rule must not have both command and submakeflow");
 		return 0;
 	}
 
@@ -183,11 +183,11 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 				n->makeflow_cwd = path_getcwd();
 			}
 		} else {
-			debug(D_MAKEFLOW_PARSER, "Submakeflow must specify a path");
+			debug(D_MAKEFLOW_PARSER|D_NOTICE, "Submakeflow must specify a path");
 			return 0;
 		}
 	} else {
-		debug(D_MAKEFLOW_PARSER, "Rule must have a command or submakeflow");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Rule must have a command or submakeflow");
 		return 0;
 	}
 	n->next = d->nodes;
@@ -209,7 +209,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	}
 
 	if (!resources_from_jx(n->variables, jx_lookup(j, "resources"))) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing resources");
 		return 0;
 	}
 
@@ -225,7 +225,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 			debug(D_MAKEFLOW_PARSER, "error allocation");
 			n->resource_request = CATEGORY_ALLOCATION_ERROR;
 		} else {
-			debug(D_MAKEFLOW_PARSER, "Unknown allocation");
+			debug(D_MAKEFLOW_PARSER|D_NOTICE, "Unknown allocation");
 			return 0;
 		}
 	} else {
@@ -245,24 +245,22 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 static int category_from_jx(struct dag *d, const char *name, struct jx *j) {
 	struct category *c = makeflow_category_lookup_or_create(d, name);
 	if (!resources_from_jx(c->mf_variables, jx_lookup(j, "resources"))) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing resources");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing resources");
 		return 0;
 	}
 	struct jx *environment = jx_lookup(j, "environment");
 	if (environment && !environment_from_jx(d, NULL, c->mf_variables, environment)) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing environment");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing environment");
 		return 0;
 	}
 	return 1;
 }
 
-// This leaks memory on failure, but it's assumed that if the DAG can't be
-// parsed, the program will be exiting soon anyway
 struct dag *dag_from_jx(struct jx *j) {
 	if (!jx_istype(j, JX_OBJECT)) {
-		char *p = jx_print_string(j);
-		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Unable to build DAG:\n%s", p);
-		free(p);
+		char *s = jx_print_string(j);
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Workflow must be an object, got %s", s);
+		free(s);
 		return NULL;
 	}
 
@@ -278,13 +276,13 @@ struct dag *dag_from_jx(struct jx *j) {
 			if (jx_match_string(item, &key)) {
 				struct jx *value = jx_lookup(categories, key);
 				if (!category_from_jx(d, key, value)) {
-					debug(D_MAKEFLOW_PARSER, "Failure parsing category");
+					debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing category");
 					free(key);
 					return NULL;
 				}
 				free(key);
 			} else {
-				debug(D_MAKEFLOW_PARSER, "Category names must be strings");
+				debug(D_MAKEFLOW_PARSER|D_NOTICE, "Category names must be strings");
 				return NULL;
 			}
 		}
@@ -303,7 +301,7 @@ struct dag *dag_from_jx(struct jx *j) {
 
 	struct jx *environment = jx_lookup(j, "environment");
 	if (environment && !environment_from_jx(d, NULL, d->default_category->mf_variables, environment)) {
-		debug(D_MAKEFLOW_PARSER, "Failure parsing top-level category");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing top-level category");
 		return NULL;
 	} else {
 		debug(D_MAKEFLOW_PARSER, "Top-level environment malformed or missing");
@@ -315,7 +313,7 @@ struct dag *dag_from_jx(struct jx *j) {
 		void *i = NULL;
 		while ((item = jx_iterate_array(rules, &i))) {
 			if (!rule_from_jx(d, item)) {
-				debug(D_MAKEFLOW_PARSER, "Failure parsing rule");
+				debug(D_MAKEFLOW_PARSER|D_NOTICE, "Failure parsing rule");
 				return NULL;
 			}
 		}
