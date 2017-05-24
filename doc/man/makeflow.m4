@@ -59,6 +59,13 @@ OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job su
 OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, dryrun, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, wq, amazon, mesos. (default is local)
 OPTIONS_END
 
+SUBSECTION(JSON/JX Options)
+OPTIONS_BEGIN
+OPTION_ITEM(--json)Interpret PARAM(dagfile) as a JSON format Makeflow.
+OPTION_ITEM(--jx)Evaluate JX expressions in PARAM(dagfile). Implies --json.
+OPTION_PAIR(--jx-context, ctx)Use PARAM(ctx) as the context for evaluating JX.
+OPTIONS_END
+
 SUBSECTION(Debugging Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d, debug, subsystem)Enable debugging for this subsystem.
