@@ -299,6 +299,10 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_LPAREN;
 	} else if(c==')') {
 		return JX_TOKEN_RPAREN;
+	} else if (c=='#') {
+		while (c != '\n' && c != '\r' && c != EOF) c = jx_getchar(s);
+		jx_ungetchar(s, c);
+		goto retry;
 	} else if(strchr("0123456789.",c)) {
 		s->token[0] = c;
 		int i;
