@@ -93,36 +93,25 @@ static int resources_from_jx(struct hash_table *h, struct jx *j) {
 }
 
 static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
-	char *path;
-	if (jx_match_string(j, &path)) {
-		if (input) {
-			debug(D_MAKEFLOW_PARSER, "Input %s", path);
-			dag_node_add_source_file(n, path, NULL);
-		} else {
-			debug(D_MAKEFLOW_PARSER, "Output %s", path);
-			dag_node_add_target_file(n, path, NULL);
-		}
-		free(path);
-		return 1;
-	} else if (jx_istype(j, JX_OBJECT)) {
-		const char *path = jx_lookup_string(j, "path");
-		const char *remote = jx_lookup_string(j, "remote_name");
-		if (!path) {
-			debug(D_MAKEFLOW_PARSER|D_NOTICE, "File lacks a path");
-			return 0;
-		}
-		if (input) {
-			debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", path, remote ? remote : "NULL");
-			dag_node_add_source_file(n, path, remote);
-		} else {
-			debug(D_MAKEFLOW_PARSER, "Output %s, remote name %s", path, remote ? remote : "NULL");
-			dag_node_add_target_file(n, path, remote);
-		}
-		return 1;
-	} else {
-		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Input must be a string or object");
+	if (!jx_istype(j, JX_OBJECT)) {
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "File must be specified as an object");
 		return 0;
 	}
+
+	const char *path = jx_lookup_string(j, "path");
+	const char *remote = jx_lookup_string(j, "execution_path");
+	if (!path) {
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "File must have a path");
+		return 0;
+	}
+	if (input) {
+		debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", path, remote ? remote : "NULL");
+		dag_node_add_source_file(n, path, remote);
+	} else {
+		debug(D_MAKEFLOW_PARSER, "Output %s, remote name %s", path, remote ? remote : "NULL");
+		dag_node_add_target_file(n, path, remote);
+	}
+	return 1;
 }
 
 static int files_from_jx(struct dag_node *n, int inputs, struct jx *j) {

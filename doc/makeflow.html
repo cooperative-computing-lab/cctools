@@ -1192,17 +1192,16 @@ Allowed values are <tt>&ldquo;first&rdquo;</tt>, <tt>&ldquo;max&rdquo;</tt>, or 
 <h4>Files</h4>
 
 <p>A <tt>File</tt> can be specified two ways.
-The more compact form is simply a <tt>String</tt> representing the path to the file.
-Alternatively, a <tt>File</tt> can be encoded as a JSON object with the following keys.</p>
+A <tt>File</tt> is encoded as a JSON object with the following keys.</p>
 
 <ul>
 <li><tt>"path"</tt>: <tt>String</tt> <em>(required)</em></li>
-<li><tt>"remote_name"</tt>: <tt>String</tt></li>
+<li><tt>"execution_path"</tt>: <tt>String</tt></li>
 </ul>
 
-
-<p><tt>"path"</tt> gives the path to the file.
-<tt>"remote_name"</tt> specifies the remote name of the file. See the section on <a href="#details.renaming">remote renaming</a>.</p>
+<p><tt>"path"</tt> gives the local path path to the file.
+<tt>"execution_path"</tt> specifies the path at the execution site.
+See the section on <a href="#details.renaming">remote renaming</a> for details on using this feature.</p>
 
 <h4>Makeflows</h4>
 
