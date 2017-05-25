@@ -159,7 +159,6 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q, struct batch_j
 		list_first_item(running_pod_lst);	
 		while((job_id = (int *)list_next_item(running_pod_lst))) {
 			
-			int size = list_size(running_pod_lst);	
 			char *get_log_cmd = string_format("kubectl exec %s-%d -- tail -1 %s-%d.log", 
 					mf_uuid->str, *job_id, mf_uuid->str, *job_id);
 			FILE *cmd_fp;
