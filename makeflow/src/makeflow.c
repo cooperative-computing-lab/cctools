@@ -2084,7 +2084,7 @@ int main(int argc, char *argv[])
 	if (container_mode == CONTAINER_MODE_DOCKER) {
             unlink(CONTAINER_DOCKER_SH);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-            unlink(CONTAINER_DOCKER_SH);
+            unlink(CONTAINER_SINGULARITY_SH);
         }
 
 	if(makeflow_abort_flag) {
