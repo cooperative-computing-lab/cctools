@@ -11,6 +11,8 @@ See the file COPYING for details.
 
 #include <string.h>
 
+static struct jx *jx_check_errors(struct jx *j);
+
 static struct jx * jx_eval_null( jx_operator_t op )
 {
 	struct jx *err;
@@ -254,7 +256,7 @@ static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *
 		case JX_OP_NE:
 			return jx_boolean(!jx_equals(left, right));
 		case JX_OP_ADD:
-			return jx_array_concat(jx_copy(left), jx_copy(right), NULL);
+			return jx_check_errors(jx_array_concat(jx_copy(left), jx_copy(right), NULL));
 		default:
 			code = 1;
 			err = jx_object(NULL);
