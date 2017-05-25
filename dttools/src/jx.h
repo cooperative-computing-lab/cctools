@@ -60,6 +60,7 @@ typedef int64_t jx_int_t;
 
 struct jx_item {
 	struct jx      *value;	/**< value of this item */
+	unsigned line;
 	struct jx_item *next;	/**< pointer to next item */
 };
 
@@ -68,6 +69,7 @@ struct jx_item {
 struct jx_pair {
 	struct jx      *key;	/**< key of this pair */
 	struct jx      *value;  /**< value of this pair */
+	unsigned line;
 	struct jx_pair *next;   /**< pointer to next pair */
 };
 
@@ -92,6 +94,7 @@ typedef enum {
 
 struct jx_operator {
 	jx_operator_t type;
+	unsigned line;
 	struct jx *left;
 	struct jx *right;
 };
@@ -108,6 +111,7 @@ typedef enum {
 
 struct jx_function {
 	jx_function_t function;
+	unsigned line;
 	struct jx *arguments;
 };
 
@@ -115,6 +119,7 @@ struct jx_function {
 
 struct jx {
 	jx_type_t type;               /**< type of this value */
+	unsigned line;                /**< line where this value was defined */
 	union {
 		int boolean_value;      /**< value of @ref JX_BOOLEAN */
 		jx_int_t integer_value; /**< value of @ref JX_INTEGER */

@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "debug.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdio.h>
@@ -118,6 +119,13 @@ static void jx_parse_error( struct jx_parser *p, const char *str )
 	free(p->error_string);
 	p->error_string = string_format("line %u: %s", p->line, str);
 	p->errors++;
+}
+
+static struct jx *jx_add_lineno(struct jx_parser *p, struct jx *j) {
+	assert(p);
+	if (!j) return NULL;
+	j->line = p->line;
+	return j;
 }
 
 static int jx_getchar( struct jx_parser *p )
@@ -392,6 +400,7 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s, int arglist )
 	jx_unscan(s,t);
 
 	struct jx_item *i = jx_item(0,0);
+	i->line = s->line;
 
 	i->value = jx_parse(s);
 	if(!i->value) {
@@ -453,6 +462,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 		return 0;
 	}
 
+	p->line = s->line;
 	p->value = jx_parse(s);
 	if(!p->value) {
 		// error set by deeper layer
@@ -483,8 +493,8 @@ static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
 {
 	jx_token_t t = jx_scan(s);
 
-	if(arglist) {
-		if(t == JX_TOKEN_LPAREN) {
+	if (arglist) {
+		if (t == JX_TOKEN_LPAREN) {
 			t = JX_TOKEN_LBRACKET;
 		} else {
 			jx_parse_error(s,"function missing opening parenthesis");
@@ -492,67 +502,69 @@ static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
 		}
 	}
 
-	switch(t) {
-	case JX_TOKEN_EOF:
-	case JX_TOKEN_RPAREN:
-		return 0;
-	case JX_TOKEN_LBRACE:
-		{
+	switch (t) {
+		case JX_TOKEN_EOF:
+		case JX_TOKEN_RPAREN:
+			return NULL;
+		case JX_TOKEN_LBRACE: {
+			unsigned line = s->line;
 			struct jx_pair *p = jx_parse_pair_list(s);
 			if (jx_parser_errors(s)) {
 				// error set by deeper level
 				jx_pair_delete(p);
-				return 0;
+				return NULL;
 			}
-			return jx_object(p);
+			struct jx *j = jx_object(p);
+			j->line = line;
+			return j;
 		}
-	case JX_TOKEN_LBRACKET:
-		{
+		case JX_TOKEN_LBRACKET:	{
+			unsigned line = s->line;
 			struct jx_item *i = jx_parse_item_list(s, arglist);
 			if (jx_parser_errors(s)) {
 				// error set by deeper level
 				jx_item_delete(i);
-				return 0;
+				return NULL;
 			}
-			return jx_array(i);
+			struct jx *j = jx_array(i);
+			j->line = line;
+			return j;
 		}
-	case JX_TOKEN_STRING:
-		return jx_string(s->token);
-	case JX_TOKEN_INTEGER:
-		return jx_integer(s->integer_value);
-	case JX_TOKEN_DOUBLE:
-		return jx_double(s->double_value);
-	case JX_TOKEN_TRUE:
-		return jx_boolean(1);
-	case JX_TOKEN_FALSE:
-		return jx_boolean(0);
-	case JX_TOKEN_NULL:
-		return jx_null();
-	case JX_TOKEN_SYMBOL:
-		if(s->strict_mode) {
-			jx_parse_error(s,"symbols are not allowed in strict parsing mode");
-			return 0;
-		} else {
-			return jx_symbol(s->token);
+		case JX_TOKEN_STRING:
+			return jx_add_lineno(s, jx_string(s->token));
+		case JX_TOKEN_INTEGER:
+			return jx_add_lineno(s, jx_integer(s->integer_value));
+		case JX_TOKEN_DOUBLE:
+			return jx_add_lineno(s, jx_double(s->double_value));
+		case JX_TOKEN_TRUE:
+			return jx_add_lineno(s, jx_boolean(1));
+		case JX_TOKEN_FALSE:
+			return jx_add_lineno(s, jx_boolean(0));
+		case JX_TOKEN_NULL:
+			return jx_add_lineno(s, jx_null());
+		case JX_TOKEN_SYMBOL: {
+			if(s->strict_mode) {
+				jx_parse_error(s,"symbols are not allowed in strict parsing mode");
+				return NULL;
+			}
+			return jx_add_lineno(s, jx_symbol(s->token));
 		}
-		break;
-	case JX_TOKEN_LPAREN:
-		{
-		struct jx *j = jx_parse(s);
-		if(!j) return 0;
+		case JX_TOKEN_LPAREN: {
+			struct jx *j = jx_parse(s);
+			if (!j) return NULL;
 
-		t = jx_scan(s);
-		if(t!=JX_TOKEN_RPAREN) {
-			jx_parse_error(s,"missing closing parenthesis");
-			jx_delete(j);
-			return 0;
+			t = jx_scan(s);
+			if (t != JX_TOKEN_RPAREN) {
+				jx_parse_error(s, "missing closing parenthesis");
+				jx_delete(j);
+				return NULL;
+			}
+			return j;
 		}
-
-		return j;
+		default: {
+			jx_parse_error(s,"unexpected token");
+			return NULL;
 		}
-	default:
-		jx_parse_error(s,"unexpected token");
-		return 0;
 	}
 
 	/*
@@ -626,6 +638,7 @@ static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
 
 	jx_token_t t = jx_scan(s);
 	if(t==JX_TOKEN_LBRACKET) {
+		unsigned line = s->line;
 		struct jx *b = jx_parse(s);
 		if(!b) {
 			jx_delete(a);
@@ -640,7 +653,10 @@ static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
 			jx_delete(b);
 			return 0;
 		} else {
-			return jx_operator(JX_OP_LOOKUP,a,b);
+			struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
+			j->line = line;
+			j->u.oper.line = line;
+			return j;
 		}
 	} else {
 		jx_unscan(s,t);
@@ -650,27 +666,31 @@ static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
 
 static struct jx * jx_parse_unary( struct jx_parser *s )
 {
-	struct jx *j;
-	jx_function_t f;
-
 	jx_token_t t = jx_scan(s);
-	switch(t) {
+	switch (t) {
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
-		case JX_TOKEN_NOT:
-			j = jx_parse_postfix(s, 0);
-			if(j) {
-				return jx_operator(jx_token_to_operator(t),0,j);
-			} else {
-				return 0;
+		case JX_TOKEN_NOT: {
+			unsigned line = s->line;
+			struct jx *j = jx_parse_postfix(s, 0);
+			if (!j) {
+				// error set by deeper level
+				return NULL;
 			}
-			break;
-		case JX_TOKEN_FUNCTION:
-			if (!(f = jx_function_name_from_string(s->token))) {
+			j = jx_operator(jx_token_to_operator(t), NULL, j);
+			j->line = line;
+			j->u.oper.line = line;
+			return j;
+		}
+		case JX_TOKEN_FUNCTION: {
+			jx_function_t f = jx_function_name_from_string(s->token);
+			if (!f) {
 				jx_parse_error(s,"invalid function");
 				return NULL;
 			}
-			if (!(j = jx_parse_postfix(s, 1))) {
+			unsigned line = s->line;
+			struct jx *j = jx_parse_postfix(s, 1);
+			if (!j) {
 				// error set by deeper level
 				return NULL;
 			}
@@ -678,23 +698,32 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				jx_parse_error(s, "malformed function");
 				return NULL;
 			}
-			return jx_function(f, j);
-		case JX_TOKEN_ERROR:
-			if ((j = jx_parse_postfix(s, 0))) {
-				if (jx_error_valid(j)) {
-					return jx_error(j);
-				} else {
-					jx_parse_error(s, "error is missing a required field");
-					return NULL;
-				}
-			} else {
+			j = jx_function(f, j);
+			j->line = line;
+			j->u.func.line = line;
+			return j;
+		}
+		case JX_TOKEN_ERROR: {
+			unsigned line = s->line;
+			struct jx *j = jx_parse_postfix(s, 0);
+			if (!j) {
+				jx_parse_error(s, "error is missing a required field");
+				return NULL;
+			}
+			if (!jx_error_valid(j)) {
+				jx_delete(j);
 				jx_parse_error(s, "invalid error specification");
 				return NULL;
 			}
-			break;
-		default:
+			j = jx_error(j);
+			j->line = line;
+			j->u.err->line = line;
+			return j;
+		}
+		default: {
 			jx_unscan(s,t);
 			return jx_parse_postfix(s, 0);
+		}
 	}
 }
 
@@ -714,12 +743,16 @@ static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 	jx_operator_t op = jx_token_to_operator(t);
 
 	if(op!=JX_OP_INVALID && !jx_operator_is_unary(op) && jx_operator_precedence(op)==precedence ) {
+		unsigned line = s->line;
 		struct jx *b = jx_parse_binary(s,precedence);
-		if(b) {
-			return jx_operator(op,a,b);
+		if (b) {
+			struct jx *j = jx_operator(op, a, b);
+			j->line = line;
+			j->u.oper.line = line;
+			return j;
 		} else {
 			jx_delete(a);
-			return 0;
+			return NULL;
 		}
 	} else {
 		jx_unscan(s,t);
