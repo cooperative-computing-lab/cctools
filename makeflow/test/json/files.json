@@ -11,7 +11,7 @@
     },
     {
       "inputs": [{"path": "A"}, {"path": "B"}],
-      "command": "[ \"$(wc -l A)\" = '1 A' ] && [ \"$(wc -l B)\" = '2 B' ]"
+      "command": "wc -l A | grep 1 && wc -l B | grep 2"
     }
   ]
 }
