@@ -151,16 +151,16 @@ expression: a!=b
 value:      true
 
 expression: a<b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true<false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":72,"operator":true<false,"code":1}
 
 expression: a>b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true>false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":73,"operator":true>false,"code":1}
 
 expression: a<=b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true<=false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":74,"operator":true<=false,"code":1}
 
 expression: a>=b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true>=false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":75,"operator":true>=false,"code":1}
 
 expression: f==g
 value:      false
@@ -199,19 +199,19 @@ expression: x>=y
 value:      false
 
 expression: a+b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true+false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":91,"operator":true+false,"code":1}
 
 expression: a-b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true-false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":92,"operator":true-false,"code":1}
 
 expression: a*b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true*false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":93,"operator":true*false,"code":1}
 
 expression: a/b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true/false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":94,"operator":true/false,"code":1}
 
 expression: a%b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","operator":true%false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":95,"operator":true%false,"code":1}
 
 expression: f+g
 value:      3.64159
@@ -325,7 +325,7 @@ expression: foreach(x,range(5),"item"+str(x))
 value:      ["item0","item1","item2","item3","item4"]
 
 expression: join(["a","b",c])
-value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":152,"context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
 
 expression: join([1,2])
 value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","function":join([1,2]),"code":6}
@@ -349,10 +349,10 @@ expression: dbg(join(dbg(foreach(x,dbg(range(dbg(3))),dbg(dbg(str(dbg(x)))+dbg("
 value:      "0.1 1.2 2.3"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":162,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":163,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []

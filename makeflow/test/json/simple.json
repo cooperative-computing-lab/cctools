@@ -2,25 +2,25 @@
   "rules":[
     {
       "command":"echo A > A",
-      "outputs":["A"]
+      "outputs":[{"path": "A"}]
     },
     {
       "command":"echo B > B",
-      "outputs":["B"]
+      "outputs":[{"path": "B"}]
     },
     {
       "command":"echo C > C && cat A B >> C",
-      "outputs":["C"],
-      "inputs":["A", "B"]
+      "outputs":[{"path": "C"}],
+      "inputs":[{"path": "A"}, {"path": "B"}]
     },
     {
       "command":"sort C > D",
-      "outputs":["D"],
-      "inputs":["C"]
+      "outputs":[{"path": "D"}],
+      "inputs":[{"path": "C"}]
     },
     {
       "command": "[ $(cat C D | md5sum | cut -d ' ' -f 1) = 0d0d98ed89144d056c149efc75b0b2cc ]",
-      "inputs": ["C", "D"]
+      "inputs": [{"path": "C"}, {"path": "D"}]
     }
   ]
 }
