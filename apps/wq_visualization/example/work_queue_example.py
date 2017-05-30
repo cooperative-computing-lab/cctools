@@ -57,10 +57,10 @@ if __name__ == '__main__':
 
       t = Task(command)
 
-      # gzip is the same across all tasks, so we can cache it in the * workers.
-      # Note that when specifying a file, we have to name its local * name
-      # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the *
-      # following line, more often than not these are the same. */
+      # gzip is the same across all tasks, so we can cache it in the workers.
+      # Note that when specifying a file, we have to name its local name
+      # (e.g. gzip_path), and its remote name (e.g. "gzip"). Unlike the
+      # following line, more often than not these are the same.
       t.specify_file(gzip_path, "gzip", WORK_QUEUE_INPUT, cache=True)
 
       # files to be compressed are different across all tasks, so we do not
