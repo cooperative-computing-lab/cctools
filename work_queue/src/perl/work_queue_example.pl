@@ -45,10 +45,10 @@ for my $infile (@ARGV) {
 	my $t = Work_Queue::Task->new($command);
 
 	# gzip is the same across all tasks, so we can cache (the default)
-	# it in the * workers.  Note that when specifying a file, we have
-	# to name its local * name (e.g.  gzip_path), and its remote name
-	# (e.g. "gzip"). Unlike the * following line, more often than not
-	# these are the same. */
+	# it in the workers.  Note that when specifying a file, we have
+	# to name its local name (e.g.  gzip_path), and its remote name
+	# (e.g. "gzip"). Unlike the following line, more often than not
+	# these are the same.
 	$t->specify_input_file(local_name => $gzip_path, remote_name=>'gzip');
 
 	# files to be compressed are different across all tasks, so we do
