@@ -71,8 +71,10 @@ static batch_job_id_t batch_job_local_wait (struct batch_queue * q, struct batch
 
 		struct process_info *p = process_wait(timeout);
 		if(p) {
+			debug(D_LOCAL, "***********this is a subprocess %d", (int)p->pid);
 			struct batch_job_info *info = itable_remove(q->job_table, p->pid);
 			if(!info) {
+				debug(D_LOCAL, "***********not the right one");
 				process_putback(p);
 				return -1;
 			}
