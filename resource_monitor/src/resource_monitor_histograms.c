@@ -308,7 +308,8 @@ void create_output_directory(struct field_stats *h)
 	char *category = sanitize_path_name(h->source->category_name);
 	char *all_path = string_format("%s/%s/", output_directory, category);
 
-	if(create_dir(all_path, 0755) < 0 && errno != EEXIST)
+	errno = 0;
+	if(!create_dir(all_path, 0755) && errno != EEXIST)
 		fatal("Could not create directory: %s\n", all_path);
 
 	h->output_directory = all_path;
@@ -1240,7 +1241,9 @@ char *copy_outlier(struct rmsummary *s) {
 
 	char dir[PATH_MAX];
 	path_dirname(outlier, dir);
-	create_dir(dir, S_IRWXU);
+	errno = 0;
+	if(!create_dir(dir, S_IRWXU) && errno != EEXIST)
+		fatal("Could not create directory: %s\n", dir);
 
 	FILE *output = fopen(outlier, "w");
 	if(output) {
@@ -1616,7 +1619,8 @@ int main(int argc, char **argv)
 	output_directory = argv[optind];
 
 	char *outlier_dir = string_format("%s/%s", output_directory, OUTLIER_DIR);
-	if(create_dir(outlier_dir, 0755) < 0 && errno != EEXIST)
+	errno = 0;
+	if(!create_dir(outlier_dir, 0755) && errno != EEXIST)
 		fatal("Could not create outliers directory.");
 	free(outlier_dir);
 
