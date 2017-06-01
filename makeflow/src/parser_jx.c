@@ -94,14 +94,14 @@ static int resources_from_jx(struct hash_table *h, struct jx *j) {
 
 static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 	if (!jx_istype(j, JX_OBJECT)) {
-		debug(D_MAKEFLOW_PARSER|D_NOTICE, "File must be specified as an object");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "File must be specified a JSON object");
 		return 0;
 	}
 
 	const char *path = jx_lookup_string(j, "path");
 	const char *remote = jx_lookup_string(j, "execution_path");
 	if (!path) {
-		debug(D_MAKEFLOW_PARSER|D_NOTICE, "File must have a path");
+		debug(D_MAKEFLOW_PARSER|D_NOTICE, "File must be specified with a \"path\" key");
 		return 0;
 	}
 	if (input) {
