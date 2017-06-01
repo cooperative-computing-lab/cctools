@@ -1158,8 +1158,7 @@ These values override workflow-level environment variables.</p>
 <ul>
 <li><tt>"inputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
 <li><tt>"outputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
-<li><tt>"command"</tt>: <tt>String</tt> <em>(required unless <tt>"makeflow"</tt> is present)</em></li>
-<li><tt>"makeflow"</tt>: <tt>Makeflow</tt> <em>(required unless <tt>"command"</tt> is present)</em></li>
+<li><tt>"command"</tt>: <tt>String</tt></li>
 <li><tt>"local_job"</tt>: <tt>Boolean</tt></li>
 <li><tt>"category"</tt>: <tt>String</tt></li>
 <li><tt>"resources"</tt>: <tt>Resources</tt></li>
@@ -1172,9 +1171,8 @@ These values override workflow-level environment variables.</p>
 Makeflow will ensure that all inputs either exist or are created before executing the rule.
 After execution finishes, Makeflow will ensure that all outputs really exist.</p>
 
-<p>Every rule requires either a <tt>"command"</tt> or a <tt>"makeflow"</tt>, but not both.
-<tt>"command"</tt> is a string command to run in a shell.
-<tt>"makeflow"</tt> specifies a sub-Makeflow to run.</p>
+<p>Every rule requires a <tt>"command"</tt>
+which is a string command to run in a shell.</p>
 
 <p>If <tt>"local_job"</tt> is specified, Makeflow will only execute the rule locally, i.e. on the host where Makeflow is running.
 Local jobs are not scheduled on remote resources such as batch systems.</p>
@@ -1202,20 +1200,6 @@ A <tt>File</tt> is encoded as a JSON object with the following keys.</p>
 <p><tt>"path"</tt> gives the local path path to the file.
 <tt>"execution_path"</tt> specifies the path at the execution site.
 See the section on <a href="#details.renaming">remote renaming</a> for details on using this feature.</p>
-
-<h4>Makeflows</h4>
-
-<p>A sub-Makeflow is encoded as a JSON object with the following keys.</p>
-
-<ul>
-<li><tt>"path"</tt>: <tt>String</tt> <em>(required)</em></li>
-<li><tt>"cwd"</tt>: <tt>String</tt></li>
-</ul>
-
-
-<p>Makeflow will read in and execute the Makeflow at <tt>"path"</tt> as this rule&rsquo;s execution step.
-This sub-Makeflow must produce the rule&rsquo;s outputs.
-The working directory will be set to <tt>"cwd"</tt>, if specified, for executing the sub-Makeflow.</p>
 
 <h4>Resource Specifications</h4>
 
