@@ -126,10 +126,6 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static int json_input = 0;
-static int jx_input = 0;
-static char *jx_context = NULL;
-
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
 static char *container_image_tar = NULL;
@@ -1231,6 +1227,9 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	int json_input = 0;
+	int jx_input = 0;
+	char *jx_context = NULL;
 
 	random_init();
 	debug_config(argv[0]);
