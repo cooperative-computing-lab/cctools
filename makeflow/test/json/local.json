@@ -1,0 +1,15 @@
+{
+  "rules":[
+    {
+      "command":"echo A > A",
+      "local_job": true,
+      "outputs":[{"path": "A"}]
+    },
+    {
+      "command":"cat A > B && echo B >> B",
+      "inputs": [{"path": "A"}],
+      "outputs":[{"path": "B"}],
+      "local_job": true
+    }
+  ]
+}

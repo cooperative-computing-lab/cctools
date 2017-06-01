@@ -1,46 +1,59 @@
+# This is a sample Makeflow script that retrieves an image from the web,
+# creates four variations of it, and then combines them into an animation
+
+
+# The `let` here introduces new variable bindings,
+# so we don't have to repeat the strings in the inputs and commands.
+# Since this `let` is at the top-level, we could get the same effect by
+# running Makeflow with a JX context.
 let({
-  "CURL":"/usr/bin/curl"
+  "CURL": "/usr/bin/curl",
+  "CONVERT": "/usr/bin/convert"
 }, {
-  "comment":[
-    "This is a sample Makeflow script that retrieves an image from the web",
-    "creates four variations of it, and then combines them into an animation"
-  ],
-  "environment":{
-    "CONVERT":"/usr/bin/convert"
+
+  # Makeflow will set $CONVERT and $CURL in the environment when executing the tasks.
+  # We repeat the variables here so there's only one place to change the paths.
+  # In the rules, we can run $CONVERT rather than hardcoding paths.
+  "environment": {
+    "CONVERT": CONVERT,
+    "CURL": CURL
   },
-  "rules":[
+
+  # This is the meat of the Makeflow, the actual production rules
+  "rules": [
+    # Once the files are generated, this rule combines them into the final output.
     {
-      "command":"$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif",
-      "outputs":["capitol.montage.gif"],
-      "inputs":["capitol.jpg", "capitol.90.jpg", "capitol.180.jpg", "capitol.270.jpg", "capitol.360.jpg"]
+      "command": "$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif",
+      "outputs": ["capitol.montage.gif"],
+      "inputs": [CONVERT,
+                 "capitol.jpg",
+                 "capitol.90.jpg",
+                 "capitol.180.jpg",
+                 "capitol.270.jpg",
+                 "capitol.360.jpg"]
     },
+    # This rule downloads the input data.
     {
-      "command":"$CONVERT -swirl 90 capitol.jpg capitol.90.jpg",
-      "outputs":["capitol.90.jpg"],
-      "inputs":["capitol.jpg"]
-    },
+      # We could have let the shell substitute $CURL rather than concatenating
+      # the strings ourselves. Also note that we need to escape the double quotes
+      # around $URL so that it's properly quoted in the shell.
+      "command": CURL + " -o capitol.jpg \"$URL\"",
+      "outputs": ["capitol.jpg"],
+      # Makeflow requires programs to be specified as inputs as well.
+      "inputs": [CURL],
+      # Environment variables here apply only to the current rule.
+      "environment": {
+        "URL": "http://ccl.cse.nd.edu/images/capitol.jpg"
+      },
+      # If a rule is specified with local_job, it executes at the local site
+      "local_job": true
+    }] + foreach(i, ["90", "180", "270", "360"], 
+    # The `foreach` will build a rule for each of the angles we gave it.
     {
-      "command":"$CONVERT -swirl 180 capitol.jpg capitol.180.jpg",
-      "outputs":["capitol.180.jpg"],
-      "inputs":["capitol.jpg"]
-    },
-    {
-      "command":"$CONVERT -swirl 270 capitol.jpg capitol.270.jpg",
-      "outputs":["capitol.270.jpg"],
-      "inputs":["capitol.jpg"]
-    },
-    {
-      "command":"$CONVERT -swirl 360 capitol.jpg capitol.360.jpg",
-      "outputs":["capitol.360.jpg"],
-      "inputs":["capitol.jpg"]
-    },
-    let({
-      "URL":"http://ccl.cse.nd.edu/images/capitol.jpg"
-    }, {
-      "command":CURL + " -o capitol.jpg " + URL,
-      "outputs":["capitol.jpg"],
-      "comment":"If a rule is specified with local_job, it executes at the local site",
-      "local_job":true
+      # The current angle will be bound to `i`, so we can concatenate
+      # to build the command line and output.
+      "command": "$CONVERT -swirl " + i + " capitol.jpg capitol." + i + ".jpg",
+      "outputs": ["capitol." + i + ".jpg"],
+      "inputs": [CONVERT, "capitol.jpg"]
     })
-  ]
 })

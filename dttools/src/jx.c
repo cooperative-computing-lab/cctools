@@ -15,7 +15,7 @@ See the file COPYING for details.
 
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next )
 {
-	struct jx_pair *pair = malloc(sizeof(*pair));
+	struct jx_pair *pair = calloc(1, sizeof(*pair));
 	pair->key = key;
 	pair->value = value;
 	pair->next = next;
@@ -24,7 +24,7 @@ struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next
 
 struct jx_item * jx_item( struct jx *value, struct jx_item *next )
 {
-	struct jx_item *item = malloc(sizeof(*item));
+	struct jx_item *item = calloc(1, sizeof(*item));
 	item->value = value;
 	item->next = next;
 	return item;
@@ -32,7 +32,7 @@ struct jx_item * jx_item( struct jx *value, struct jx_item *next )
 
 static struct jx * jx_create( jx_type_t type )
 {
-	struct jx *j = malloc(sizeof(*j));
+	struct jx *j = calloc(1, sizeof(*j));
 	j->type = type;
 	return j;
 }
@@ -457,6 +457,7 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 	pair->key = jx_copy(p->key);
 	pair->value = jx_copy(p->value);
 	pair->next = jx_pair_copy(p->next);
+	pair->line = p->line;
 	return pair;
 }
 
@@ -466,40 +467,53 @@ struct jx_item * jx_item_copy( struct jx_item *i )
 	struct jx_item *item = malloc(sizeof(*item));
 	item->value = jx_copy(i->value);
 	item->next = jx_item_copy(i->next);
+	item->line = i->line;
 	return item;
 }
 
 struct jx  *jx_copy( struct jx *j )
 {
 	if(!j) return 0;
+	struct jx *c;
 
 	switch(j->type) {
 		case JX_NULL:
-			return jx_null();
+			c = jx_null();
+			break;
 		case JX_DOUBLE:
-			return jx_double(j->u.double_value);
+			c = jx_double(j->u.double_value);
+			break;
 		case JX_BOOLEAN:
-			return jx_boolean(j->u.boolean_value);
+			c = jx_boolean(j->u.boolean_value);
+			break;
 		case JX_INTEGER:
-			return jx_integer(j->u.integer_value);
+			c = jx_integer(j->u.integer_value);
+			break;
 		case JX_SYMBOL:
-			return jx_symbol(j->u.symbol_name);
+			c = jx_symbol(j->u.symbol_name);
+			break;
 		case JX_STRING:
-			return jx_string(j->u.string_value);
+			c = jx_string(j->u.string_value);
+			break;
 		case JX_ARRAY:
-			return jx_array(jx_item_copy(j->u.items));
+			c = jx_array(jx_item_copy(j->u.items));
+			break;
 		case JX_OBJECT:
-			return jx_object(jx_pair_copy(j->u.pairs));
+			c = jx_object(jx_pair_copy(j->u.pairs));
+			break;
 		case JX_OPERATOR:
-			return jx_operator(j->u.oper.type,jx_copy(j->u.oper.left),jx_copy(j->u.oper.right));
+			c = jx_operator(j->u.oper.type, jx_copy(j->u.oper.left), jx_copy(j->u.oper.right));
+			break;
 		case JX_FUNCTION:
-			return jx_function(j->u.func.function, jx_copy(j->u.func.arguments));
+			c = jx_function(j->u.func.function, jx_copy(j->u.func.arguments));
+			break;
 		case JX_ERROR:
-			return jx_error(jx_copy(j->u.err));
+			c = jx_error(jx_copy(j->u.err));
+			break;
 	}
 
-	/* not reachable, but some compilers complain. */
-	return 0;
+	c->line = j->line;
+	return c;
 }
 
 struct jx *jx_merge(struct jx *j, ...) {

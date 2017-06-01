@@ -9,13 +9,17 @@ See the file COPYING for details.
 #include "jx_function.h"
 #include "debug.h"
 
+#include <assert.h>
 #include <string.h>
 
-static struct jx * jx_eval_null( jx_operator_t op )
-{
+static struct jx *jx_check_errors(struct jx *j);
+
+static struct jx *jx_eval_null(struct jx_operator *op, struct jx *left, struct jx *right) {
 	struct jx *err;
 	int code;
-	switch(op) {
+
+	assert(op);
+	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(1);
 		case JX_OP_NE:
@@ -24,7 +28,8 @@ static struct jx * jx_eval_null( jx_operator_t op )
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("operator"), jx_operator(op, jx_null(), jx_null()));
+			jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_null(), jx_null()));
+			if (op->line) jx_insert_integer(err, "line", op->line);
 			jx_insert_string(err, "message", "unsupported operator on null");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -32,14 +37,14 @@ static struct jx * jx_eval_null( jx_operator_t op )
 	}
 }
 
-static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx *right )
-{
+static struct jx *jx_eval_boolean(struct jx_operator *op, struct jx *left, struct jx *right) {
 	struct jx *err;
 	int code;
 	int a = left ? left->u.boolean_value : 0;
 	int b = right ? right->u.boolean_value : 0;
 
-	switch(op) {
+	assert(op);
+	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(a==b);
 		case JX_OP_NE:
@@ -54,7 +59,8 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+			if (op->line) jx_insert_integer(err, "line", op->line);
 			jx_insert_string(err, "message", "unsupported operator on boolean");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -62,14 +68,14 @@ static struct jx * jx_eval_boolean( jx_operator_t op, struct jx *left, struct jx
 	}
 }
 
-static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx *right )
-{
+static struct jx *jx_eval_integer(struct jx_operator *op, struct jx *left, struct jx *right) {
 	struct jx *err;
 	int code;
 	jx_int_t a = left ? left->u.integer_value : 0;
 	jx_int_t b = right ? right->u.integer_value : 0;
 
-	switch(op) {
+	assert(op);
+	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(a==b);
 		case JX_OP_NE:
@@ -97,7 +103,8 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 				code = 5;
 				err = jx_object(NULL);
 				jx_insert_integer(err, "code", code);
-				jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+				if (op->line) jx_insert_integer(err, "line", op->line);
 				jx_insert_string(err, "message", "division by zero");
 				jx_insert_string(err, "name", jx_error_name(code));
 				jx_insert_string(err, "source", "jx_eval");
@@ -109,7 +116,8 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 				code = 5;
 				err = jx_object(NULL);
 				jx_insert_integer(err, "code", code);
-				jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+				if (op->line) jx_insert_integer(err, "line", op->line);
 				jx_insert_string(err, "message", "division by zero");
 				jx_insert_string(err, "name", jx_error_name(code));
 				jx_insert_string(err, "source", "jx_eval");
@@ -120,7 +128,8 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+			if (op->line) jx_insert_integer(err, "line", op->line);
 			jx_insert_string(err, "message", "unsupported operator on integer");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -128,14 +137,14 @@ static struct jx * jx_eval_integer( jx_operator_t op, struct jx *left, struct jx
 	}
 }
 
-static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx *right )
-{
+static struct jx *jx_eval_double(struct jx_operator *op, struct jx *left, struct jx *right) {
 	struct jx *err;
 	int code;
 	double a = left ? left->u.double_value : 0;
 	double b = right ? right->u.double_value : 0;
 
-	switch(op) {
+	assert(op);
+	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(a==b);
 			break;
@@ -168,7 +177,8 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 				code = 5;
 				err = jx_object(NULL);
 				jx_insert_integer(err, "code", code);
-				jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+				if (op->line) jx_insert_integer(err, "line", op->line);
 				jx_insert_string(err, "message", "division by zero");
 				jx_insert_string(err, "name", jx_error_name(code));
 				jx_insert_string(err, "source", "jx_eval");
@@ -180,7 +190,8 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 				code = 5;
 				err = jx_object(NULL);
 				jx_insert_integer(err, "code", code);
-				jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+				jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+				if (op->line) jx_insert_integer(err, "line", op->line);
 				jx_insert_string(err, "message", "division by zero");
 				jx_insert_string(err, "name", jx_error_name(code));
 				jx_insert_string(err, "source", "jx_eval");
@@ -191,7 +202,8 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+			if (op->line) jx_insert_integer(err, "line", op->line);
 			jx_insert_string(err, "message", "unsupported operator on double");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -199,14 +211,14 @@ static struct jx * jx_eval_double( jx_operator_t op, struct jx *left, struct jx 
 	}
 }
 
-static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx *right )
-{
+static struct jx *jx_eval_string(struct jx_operator *op, struct jx *left, struct jx *right) {
 	struct jx *err;
 	int code;
 	const char *a = left ? left->u.string_value : "";
 	const char *b = right ? right->u.string_value : "";
 
-	switch(op) {
+	assert(op);
+	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(0==strcmp(a,b));
 		case JX_OP_NE:
@@ -225,7 +237,8 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+			if (op->line) jx_insert_integer(err, "line", op->line);
 			jx_insert_string(err, "message", "unsupported operator on string");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -233,33 +246,35 @@ static struct jx * jx_eval_string( jx_operator_t op, struct jx *left, struct jx 
 	}
 }
 
-static struct jx * jx_eval_array( jx_operator_t op, struct jx *left, struct jx *right )
-{
+static struct jx *jx_eval_array(struct jx_operator *op, struct jx *left, struct jx *right) {
 	struct jx *err;
 	int code;
+	assert(op);
 	if (!(left && right)) {
 		err = jx_object(NULL);
 		code = 1;
 		jx_insert_integer(err, "code", code);
-		jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+		jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+		if (op->line) jx_insert_integer(err, "line", op->line);
 		jx_insert_string(err, "message", "missing arguments to array operator");
 		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
 
-	switch(op) {
+	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(jx_equals(left, right));
 		case JX_OP_NE:
 			return jx_boolean(!jx_equals(left, right));
 		case JX_OP_ADD:
-			return jx_array_concat(jx_copy(left), jx_copy(right), NULL);
+			return jx_check_errors(jx_array_concat(jx_copy(left), jx_copy(right), NULL));
 		default:
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("operator"), jx_operator(op, jx_copy(left), jx_copy(right)));
+			jx_insert(err, jx_string("operator"), jx_operator(op->type, jx_copy(left), jx_copy(right)));
+			if (op->line) jx_insert_integer(err, "line", op->line);
 			jx_insert_string(err, "message", "unsupported operator on array");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -287,6 +302,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			jx_insert_integer(err, "code", code);
 			jx_insert(err, jx_string("object"), jx_copy(left));
 			jx_insert(err, jx_string("key"), jx_copy(right));
+			if (right && right->line) jx_insert_integer(err, "line", right->line);
 			jx_insert_string(err, "message", "key not found");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -302,6 +318,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			jx_insert_integer(err, "code", code);
 			jx_insert(err, jx_string("array"), jx_copy(left));
 			jx_insert(err, jx_string("index"), jx_copy(right));
+			if (right && right->line) jx_insert_integer(err, "line", right->line);
 			jx_insert_string(err, "message", "index must be positive");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -315,6 +332,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 				jx_insert_integer(err, "code", code);
 				jx_insert(err, jx_string("array"), jx_copy(left));
 				jx_insert(err, jx_string("index"), jx_copy(right));
+				if (right && right->line) jx_insert_integer(err, "line", right->line);
 				jx_insert_string(err, "message", "index out of range");
 				jx_insert_string(err, "name", jx_error_name(code));
 				jx_insert_string(err, "source", "jx_eval");
@@ -332,6 +350,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 			jx_insert_integer(err, "code", code);
 			jx_insert(err, jx_string("array"), jx_copy(left));
 			jx_insert(err, jx_string("index"), jx_copy(right));
+			if (right && right->line) jx_insert_integer(err, "line", right->line);
 			jx_insert_string(err, "message", "index out of range");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -342,6 +361,7 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 		err = jx_object(NULL);
 		jx_insert_integer(err, "code", code);
 		jx_insert(err, jx_string("operator"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
+		if (right && right->line) jx_insert_integer(err, "line", right->line);
 		jx_insert_string(err, "message", "invalid type for lookup");
 		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
@@ -429,6 +449,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
 			jx_insert(err, jx_string("operator"), jx_operator(o->type, left, right));
+			if (o->line) jx_insert_integer(err, "line", o->line);
 			jx_insert_string(err, "message", "mismatched types for operator");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -438,28 +459,29 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 
 	switch(right->type) {
 		case JX_NULL:
-			result = jx_eval_null(o->type);
+			result = jx_eval_null(o, left, right);
 			break;
 		case JX_BOOLEAN:
-			result = jx_eval_boolean(o->type,left,right);
+			result = jx_eval_boolean(o, left, right);
 			break;
 		case JX_INTEGER:
-			result = jx_eval_integer(o->type,left,right);
+			result = jx_eval_integer(o, left, right);
 			break;
 		case JX_DOUBLE:
-			result = jx_eval_double(o->type,left,right);
+			result = jx_eval_double(o, left, right);
 			break;
 		case JX_STRING:
-			result = jx_eval_string(o->type,left,right);
+			result = jx_eval_string(o, left, right);
 			break;
 		case JX_ARRAY:
-			result = jx_eval_array(o->type,left,right);
+			result = jx_eval_array(o, left, right);
 			break;
 		default:
 			code = 1;
 			err = jx_object(NULL);
 			jx_insert_integer(err, "code", code);
 			jx_insert(err, jx_string("operator"), jx_operator(o->type, jx_copy(left), jx_copy(right)));
+			if (o->line) jx_insert_integer(err, "line", o->line);
 			jx_insert_string(err, "message", "rvalue does not support operators");
 			jx_insert_string(err, "name", jx_error_name(code));
 			jx_insert_string(err, "source", "jx_eval");
@@ -550,6 +572,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 					jx_insert_integer(err, "code", code);
 					jx_insert(err, jx_string("symbol"), jx_copy(j));
 					jx_insert(err, jx_string("context"), jx_copy(context));
+					if (j->line) jx_insert_integer(err, "line", j->line);
 					jx_insert_string(err, "message", "undefined symbol");
 					jx_insert_string(err, "name", jx_error_name(code));
 					jx_insert_string(err, "source", "jx_eval");
@@ -561,6 +584,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_STRING:
+		case JX_ERROR:
 		case JX_NULL:
 			return jx_copy(j);
 		case JX_ARRAY:
@@ -571,8 +595,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			return jx_eval_operator(&j->u.oper,context);
 		case JX_FUNCTION:
 			return jx_eval_function(&j->u.func,context);
-		case JX_ERROR:
-			return jx_copy(j);
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;

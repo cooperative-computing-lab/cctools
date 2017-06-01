@@ -1,0 +1,26 @@
+{
+  "rules":[
+    {
+      "command":"echo A > A",
+      "outputs":[{"path": "A"}]
+    },
+    {
+      "command":"echo B > B",
+      "outputs":[{"path": "B"}]
+    },
+    {
+      "command":"echo C > C && cat A B >> C",
+      "outputs":[{"path": "C"}],
+      "inputs":[{"path": "A"}, {"path": "B"}]
+    },
+    {
+      "command":"sort C > D",
+      "outputs":[{"path": "D"}],
+      "inputs":[{"path": "C"}]
+    },
+    {
+      "command": "[ -e C ] && [ -e D ]",
+      "inputs": [{"path": "C"}, {"path": "D"}]
+    }
+  ]
+}

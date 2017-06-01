@@ -1,0 +1,17 @@
+{
+  "rules":[
+    {
+      "command":"echo A > A",
+      "outputs":[{"path": "A"}]
+    },
+    {
+      "command":"cat A > B && echo B >> B",
+      "inputs": [{"path": "A"}],
+      "outputs":[{"path": "B"}]
+    },
+    {
+      "inputs": [{"path": "A"}, {"path": "B"}],
+      "command": "wc -l A | grep 1 && wc -l B | grep 2"
+    }
+  ]
+}

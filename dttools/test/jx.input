@@ -11,6 +11,7 @@
 "object": { "house": "home" }
 }
 
+#comment
 10
 3847.576
 .5
@@ -112,6 +113,7 @@ x||y
 (10*(20+30))
 (a==b) || ((f>g) && x<y);
 
+#[10,-90.5,true,false,null,[-1,-2,-3]];
 [10,-90.5,true,false,null,[-1,-2,-3]];
 
 list[2]
@@ -172,3 +174,4 @@ dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + db
 Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 
 let({"f": 2.2, "g": 4.5}, f + y)
+#end

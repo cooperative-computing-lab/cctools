@@ -126,9 +126,6 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static int jx_input = 0;
-static char *jx_context = NULL;
-
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
 static char *container_image_tar = NULL;
@@ -1169,7 +1166,8 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Use Parrot to restrict access to the given inputs/outputs.\n", "--enforcement");
 	printf(" %-30s Path to parrot_run (defaults to current directory).\n", "--parrot-path=<path>");
 	printf(" %-30s Indicate preferred master connection. Choose one of by_ip or by_hostname. (default is by_ip)\n", "--work-queue-preferred-connection");
-	printf(" %-30s Use JX format rather than Make-style format for the input file.\n", "--jx");
+	printf(" %-30s Use JSON format rather than Make-style format for the input file.\n", "--json");
+	printf(" %-30s Evaluate JX input. Implies --json\n", "--jx");
 	printf(" %-30s Evaluate the JX input in the given context.\n", "--jx-context");
         printf(" %-30s Wrap execution of all rules in a singularity container.\n","--singularity=<image>");
 	printf(" %-30s Assume the given directory is a shared filesystem accessible to all workers.\n", "--shared-fs");
@@ -1229,6 +1227,9 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	int json_input = 0;
+	int jx_input = 0;
+	char *jx_context = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1284,6 +1285,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_CONTEXT,
 		LONG_OPT_SKIP_FILE_CHECK,
@@ -1371,6 +1373,7 @@ int main(int argc, char *argv[])
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_CONTEXT},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
@@ -1651,6 +1654,8 @@ int main(int argc, char *argv[])
 				}
 			case LONG_OPT_JX:
 				jx_input = 1;
+			case LONG_OPT_JSON:
+				json_input = 1;
 				break;
 			case LONG_OPT_JX_CONTEXT:
 				jx_context = xxstrdup(optarg);
@@ -1762,21 +1767,28 @@ int main(int argc, char *argv[])
 
 	printf("parsing %s...\n",dagfile);
 	struct dag *d;
-	if (jx_input) {
-		struct jx *t = NULL;
-		if (jx_context) {
+	if (json_input) {
+		struct jx *dag = NULL;
+		struct jx *ctx = NULL;
+		dag = jx_parse_file(dagfile);
+		if (!dag) fatal("failed to parse dagfile");
+		if (jx_input && jx_context) {
 			printf("using JX context %s\n", jx_context);
-			t = jx_parse_file(jx_context);
-			if (!t) fatal("couldn't parse context file %s\n",jx_context);
+			struct jx *t = jx_parse_file(jx_context);
+			if (!t) fatal("failed to parse context");
+			ctx = jx_eval(t, NULL);
+			jx_delete(t);
 		}
-		struct jx *ctx = jx_eval(t, NULL);
-		jx_delete(t);
-		t = jx_parse_file(dagfile);
-		struct jx *dag = jx_eval(t, ctx);
-		jx_delete(t);
-		jx_delete(ctx);
+		if (jx_input) {
+			struct jx *t = dag;
+			dag = jx_eval(t, ctx);
+			jx_delete(t);
+			jx_delete(ctx);
+		}
 		d = dag_from_jx(dag);
 		jx_delete(dag);
+		// JX doesn't really use errno, so give something generic
+		errno = EINVAL;
 	} else {
 		d = dag_from_file(dagfile);
 	}
