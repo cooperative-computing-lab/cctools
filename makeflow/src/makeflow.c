@@ -935,11 +935,11 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
 			if(n->local_job) {
-				debug(D_ERROR, "Remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d (line %d).\n", n->nodeid, n->linenum);
+				debug(D_ERROR, "Remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d.\n", n->nodeid);
 				error = 1;
 				break;
 			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
-				debug(D_ERROR, "Remote renaming is not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
+				debug(D_ERROR, "Remote renaming is not supported on selected batch system. Rule %d.\n", n->nodeid);
 				error = 1;
 				break;
 			}
@@ -951,7 +951,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 				if(makeflow_file_on_sharedfs(f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
-					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
+					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
 					error = 1;
 					break;
 				}
@@ -962,7 +962,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 				if(makeflow_file_on_sharedfs(f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
-					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
+					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d.\n", n->nodeid);
 					error = 1;
 					break;
 				}
@@ -1007,6 +1007,7 @@ static void makeflow_run( struct dag *d )
 			break;
 
 		if(dag_remote_jobs_running(d)) {
+
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
@@ -1019,10 +1020,13 @@ static void makeflow_run( struct dag *d )
 		}
 
 		if(dag_local_jobs_running(d)) {
+			debug(D_MAKEFLOW_RUN, "==========local job running================");
 			time_t stoptime;
 			int tmp_timeout = 5;
 
 			if(dag_remote_jobs_running(d)) {
+
+				debug(D_MAKEFLOW_RUN, "**********remote running****************");
 				stoptime = time(0);
 			} else {
 				stoptime = time(0) + tmp_timeout;
@@ -1038,12 +1042,13 @@ static void makeflow_run( struct dag *d )
 		}
 
 		/* Make periodic report to catalog. */
-                timestamp_t now = timestamp_get();
-                if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
+		//report to catalog
+		timestamp_t now = timestamp_get();
+		if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
 			makeflow_catalog_summary(d, project,batch_queue_type,start);
 			last_time = now;
 			first_report = 0;
-                }
+		}
 
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
@@ -1179,6 +1184,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Indicate the host name of preferred mesos master.\n", "--mesos-master=<hostname:port>");
 	printf(" %-30s Indicate the path to mesos python2 site-packages.\n", "--mesos-path=<path>");
 	printf(" %-30s Indicate the linking libraries for running mesos.\n", "--mesos-preload=<path>");
+	printf(" %-30s Indicate the container image for running kubernetes pod.\n", "--k8s-image=<path>");
 	printf("\n*Monitor Options:\n\n");
 	printf(" %-30s Enable the resource monitor, and write the monitor logs to <dir>.\n", "--monitor=<dir>");
 	printf(" %-30s Set monitor interval to <#> seconds.		(default is 1 second)\n", "   --monitor-interval=<#>");
@@ -1229,6 +1235,7 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	char *k8s_image = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1301,7 +1308,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_WRITE_ONLY,
 		LONG_OPT_MESOS_MASTER,
 		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD
+		LONG_OPT_MESOS_PRELOAD,
+		LONG_OPT_K8S_IMG
 	};
 
 	static const struct option long_options_run[] = {
@@ -1382,6 +1390,7 @@ int main(int argc, char *argv[])
 		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
+		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{0, 0, 0, 0}
 	};
 
@@ -1679,6 +1688,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MESOS_PRELOAD:
 				mesos_preload = xxstrdup(optarg);
 				break;
+			case LONG_OPT_K8S_IMG:
+				k8s_image = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ARCHIVE:
 				should_read_archive = 1;
 				should_write_to_archive = 1;
@@ -1845,6 +1857,10 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
 		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
+	}
+	
+	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
+		batch_queue_set_option(remote_queue, "k8s-image", k8s_image);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
@@ -2065,7 +2081,7 @@ int main(int argc, char *argv[])
 	 * Set the abort and failed flag for batch_job_mesos mode.
 	 * Since batch_queue_delete(struct batch_queue *q) will call
 	 * batch_queue_mesos_free(struct batch_queue *q), which is defined 
-	 * in batch_job/src/batch_job_mesos.c. Then this function will check 
+	 * in batch_job/src/batch_job_mesos.c. This function will check 
 	 * the abort and failed status of the batch_queue and inform 
 	 * the makeflow mesos scheduler. 
 	 */
@@ -2085,7 +2101,7 @@ int main(int argc, char *argv[])
             unlink(CONTAINER_DOCKER_SH);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
             unlink(CONTAINER_SINGULARITY_SH);
-        }
+    }
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);

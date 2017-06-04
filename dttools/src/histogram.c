@@ -94,7 +94,6 @@ double histogram_bucket_size(struct histogram *h) {
 uint64_t bucket_of(struct histogram *h, double value) {
 
 	uint64_t b = ceil(value/h->bucket_size);
-	b = abs(b);
 
 	/*
 	 * times 2 so that we can intercalate negative and positive values. itable
