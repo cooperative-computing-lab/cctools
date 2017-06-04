@@ -20,6 +20,11 @@ static cctools_uuid_t *mf_uuid = NULL;
 static const char *k8s_image = NULL;
 static int count = 1;
 
+static const char *k8s_script = 
+#include "batch_job_k8s_script.c"
+
+static const char *k8s_script_file_name = "_temp_k8s_script.sh";
+
 static const char *k8s_config_tmpl = "\
 {\n\
     \"apiVersion\": \"v1\",\n\
@@ -64,7 +69,6 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 	
 	job_id = count ++;
 
-
 	debug(D_BATCH, "started job %d: %s", job_id, cmd);
 	struct batch_job_info *info = calloc(1, sizeof(*info));
 	info->submitted = time(0);
@@ -88,16 +92,17 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 	fprintf(fd, k8s_config_tmpl, pod_id, pod_id, k8s_image, job_id, pod_id);
 	fclose(fd);
 
-	char exe_path[MAX_BUF_SIZE];
-
-	if(readlink("/proc/self/exe", exe_path, MAX_BUF_SIZE) == -1) {
-		fatal("read \"proc/self/exe\" fail\n");
+	if(access(k8s_script_file_name, F_OK | X_OK) == -1) {
+		debug(D_BATCH, "Generating k8s script...");
+		FILE *f = fopen(k8s_script_file_name, "w");
+		fprintf(f, "%s", k8s_script);
+		fclose(f);
+		// Execute permissions
+		chmod(k8s_script_file_name, 0755);
 	}
 
-	char exe_dir_path[MAX_BUF_SIZE];
-	path_dirname(exe_path, exe_dir_path);
-
-	char *sh_cmd = string_format("/bin/bash %s/batch_job_k8s_script.sh %s %d \"%s\" \"%s\" \"%s\"", exe_dir_path, pod_id, job_id, extra_input_files, cmd, extra_output_files);
+	char *sh_cmd = string_format("/bin/bash %s %s %d \"%s\" \"%s\" \"%s\"", 
+            k8s_script_file_name, pod_id, job_id, extra_input_files, cmd, extra_output_files);
 
 	system(sh_cmd);
 	return job_id;
@@ -256,7 +261,7 @@ static int batch_job_k8s_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 }
 
-static int batch_queue_k8s_create (struct batch_queue *q)
+static int batch_queue_k8s_create(struct batch_queue *q)
 {
 	strncpy(q->logfile, "k8s.log", sizeof(q->logfile));
     batch_queue_set_feature(q, "batch_log_name", "%s.k8slog");

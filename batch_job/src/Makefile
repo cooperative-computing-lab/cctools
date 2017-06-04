@@ -40,6 +40,11 @@ batch_job_amazon_script.c: batch_job_amazon_script.sh
 	chmod 755 convert_script_to_code.pl
 	./convert_script_to_code.pl < $< > $@
 
+batch_job_k8s.c: batch_job_k8s_script.c
+
+batch_job_k8s_script.c: batch_job_k8s_script.sh
+	./convert_script_to_code.pl < $< > $@
+
 work_queue_factory: work_queue_factory.o libbatch_job.a $(EXTERNAL_LIBRARIES)
 
 # Note that work_queue_pool is the same as work_queue_factory, for backwards compatibility.
@@ -53,8 +58,7 @@ install:
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
-	cp batch_job_k8s_script.sh $(CCTOOLS_INSTALL_DIR)/bin
 
 clean:
-	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_job_amazon_script.c *.o
+	rm -rf $(OBJECTS) $(LIBRARIES) $(PROGRAMS) batch_job_amazon_script.c batch_job_k8s_script.c *.o
 
