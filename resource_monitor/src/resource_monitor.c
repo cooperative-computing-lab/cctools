@@ -1183,10 +1183,9 @@ int rmonitor_final_summary()
 	add_verbatim_field(monitor_self_info);
 
 	char hostname[DOMAIN_NAME_MAX];
-	domain_name_cache_guess(hostname);
 
 	char *host_info = NULL;
-	if(strlen(hostname) > 0) {
+	if(domain_name_cache_guess(hostname)) {
 		host_info = string_format("host:%s", hostname);
 		add_verbatim_field(host_info);
 	}
