@@ -1195,6 +1195,7 @@ int main(int argc, char *argv[])
 
 	random_init();
 	debug_config(argv[0]);
+	debug_config_file_size(string_metric_parse("0"));//to set debug file size to "don't delete anything"
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
