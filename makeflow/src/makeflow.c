@@ -1229,6 +1229,7 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	debug_config_file_size(string_metric_parse("0")); //passing 0 as a string normally defaults to proper behavior
 
 	random_init();
 	debug_config(argv[0]);
