@@ -247,6 +247,28 @@ class WQPlotLog(WQPlot):
         pout(file, 'set logscale y')
         pout(file, '')
 
+def check_gnuplot_version(gnuplot_cmd):
+        try:
+            gnuplot = Popen([gnuplot_cmd, '--version'], stdout = PIPE)
+            version = gnuplot.stdout.readline()
+            gnuplot.stdout.close()
+
+            result = re.match('gnuplot\s+(\d+\.\d+)\D', version)
+
+            if not result:
+                sys.stderr.write("Could not determine gnuplot version.")
+                exit(1)
+
+            version = result.group(1)
+
+            if float(version) <= 4.6:
+                sys.stderr.write("gnuplot is version %s, at least version 4.6 is required." % (version,))
+                exit(1)
+
+        except OSError:
+            sys.stderr.write("Could not execute '%s'. Please try again specifying -c <gnuplot-path>, or -Ttext\n" % (gnuplot_cmd, ))
+            exit(1)
+
 def show_usage():
     print '\n%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
     print '\t-h\t\t\tThis message.'
@@ -308,6 +330,10 @@ if __name__ == '__main__':
                 exit(1)
 
     try:
+
+        if extension is not (format + '.gnuplot'):
+            check_gnuplot_version(gnuplot_cmd)
+
         file        = open(logname)
         log_entries = read_log_entries(file, read_fields(file))
         times       = sort_time(log_entries)
