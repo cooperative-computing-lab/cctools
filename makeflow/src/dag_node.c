@@ -118,31 +118,6 @@ struct dag_node_footprint *dag_node_footprint_create()
 	return f;
 }
 
-void dag_node_footprint_delete(struct dag_node_footprint *f);
-
-void dag_node_delete(struct dag_node *n)
-{
-	hash_table_delete(n->variables);
-
-	itable_delete(n->remote_names);
-	hash_table_delete(n->remote_names_inv);
-
-	set_delete(n->descendants);
-	set_delete(n->ancestors);
-
-	list_delete(n->source_files);
-	list_delete(n->target_files);
-
-	if(n->footprint)
-		dag_node_footprint_delete(n->footprint);
-
-	rmsummary_delete(n->resources_requested);
-	if(n->resources_measured)
-		rmsummary_delete(n->resources_measured);
-
-	free(n);
-}
-
 void dag_node_footprint_delete(struct dag_node_footprint *f)
 {
 	set_delete(f->direct_children);
@@ -174,61 +149,27 @@ void dag_node_footprint_delete(struct dag_node_footprint *f)
 	free(f);
 }
 
-int dag_node_compare(struct dag_node *node1, struct dag_node *node2, dag_node_sort_t type)
+void dag_node_delete(struct dag_node *n)
 {
-	uint64_t size1 = 0;
-	uint64_t size2 = 0;
-	uint64_t size3 = 0;
-	uint64_t size4 = 0;
+	hash_table_delete(n->variables);
 
-	switch (type) {
-		case DAG_NODE_SORT_COMP:
-			if(node1 == node2)
-				return 1;
-			break;
-		case DAG_NODE_SORT_WGT_REV:
-			size1 = node1->footprint->wgt;
-			size2 = node2->footprint->wgt;
-			break;
-		case DAG_NODE_SORT_WGT:
-			size2 = node1->footprint->wgt;
-			size1 = node2->footprint->wgt;
-			break;
-		case DAG_NODE_SORT_RES_REV:
-			size1 = node1->footprint->res;
-			size2 = node2->footprint->res;
-			break;
-		case DAG_NODE_SORT_RES:
-			size2 = node1->footprint->res;
-			size1 = node2->footprint->res;
-			break;
-		case DAG_NODE_SORT_DIFF_REV:
-			size1 = node1->footprint->diff;
-			size2 = node2->footprint->diff;
-			size3 = node1->footprint->res;
-			size4 = node2->footprint->res;
-			break;
-		case DAG_NODE_SORT_DIFF:
-			size2 = node1->footprint->diff;
-			size1 = node2->footprint->diff;
-			size4 = node1->footprint->res;
-			size3 = node2->footprint->res;
-			break;
-		default:
-			return 0;
-	}
+	itable_delete(n->remote_names);
+	hash_table_delete(n->remote_names_inv);
 
-	if(size1 > size2)
-		return 1;
-	else if(size1 < size2)
-		return -1;
+	set_delete(n->descendants);
+	set_delete(n->ancestors);
 
-	if(size3 > size4)
-		return -1;
-	else if(size3 < size4)
-		return 1;
+	list_delete(n->source_files);
+	list_delete(n->target_files);
 
-	return 0;
+	if(n->footprint)
+		dag_node_footprint_delete(n->footprint);
+
+	rmsummary_delete(n->resources_requested);
+	if(n->resources_measured)
+		rmsummary_delete(n->resources_measured);
+
+	free(n);
 }
 
 int dag_node_comp(void *item, const void *arg)
@@ -236,7 +177,10 @@ int dag_node_comp(void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_COMP);
+	if(node1 == node2)
+		return 1;
+
+	return 0;
 }
 
 int dag_node_comp_wgt(const void *item, const void *arg)
@@ -244,7 +188,12 @@ int dag_node_comp_wgt(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_WGT);
+	if(node1->footprint->wgt < size2->footprint->wgt)
+		return 1;
+	else if(node1->footprint->wgt > size2->footprint->wgt)
+		return -1;
+
+	return 0;
 }
 
 int dag_node_comp_wgt_rev(const void *item, const void *arg)
@@ -252,7 +201,12 @@ int dag_node_comp_wgt_rev(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_WGT_REV);
+	if(node1->footprint->wgt > size2->footprint->wgt)
+		return 1;
+	else if(node1->footprint->wgt < size2->footprint->wgt)
+		return -1;
+
+	return 0;
 }
 
 int dag_node_comp_res(const void *item, const void *arg)
@@ -260,15 +214,33 @@ int dag_node_comp_res(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_RES);
+			size1 = node1->footprint->res;
+			size2 = node2->footprint->res;
+
+	if(node1->footprint->res > node2->footprint->res)
+		return 1;
+	else if(node1->footprint->res < node2->footprint->res)
+		return -1;
+
+	return 0;
 }
 
 int dag_node_comp_diff(const void *item, const void *arg)
 {
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
+	
+	if(node2->footprint->diff > node1->footprint->diff)
+		return 1;
+	else if(node2->footprint->diff < node1->footprint->diff)
+		return -1;
 
-	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_DIFF);
+	if(node2->footprint->res < node1->footprint->res)
+		return 1;
+	else if(node2->footprint->res > node1->footprint->res)
+		return -1;
+
+	return 0;
 }
 
 
@@ -276,8 +248,18 @@ int dag_node_comp_diff_rev(const void *item, const void *arg)
 {
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
+	
+	if(node1->footprint->diff > node2->footprint->diff)
+		return 1;
+	else if(node1->footprint->diff < node2->footprint->diff)
+		return -1;
 
-	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_DIFF_REV);
+	if(node1->footprint->res < node2->footprint->res)
+		return 1;
+	else if(node1->footprint->res > node2->footprint->res)
+		return -1;
+
+	return 0;
 }
 
 /* Returns the remotename used in rule n for local name filename */
@@ -760,7 +742,6 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 void dag_node_min_footprint( struct dag_node *n)
 {
 	set_delete(n->footprint->footprint_min_files);
-	printf("Min footprint for %d is %d vs %d\n", n->nodeid, n->footprint->delete_footprint, n->footprint->prog_min_footprint);
 	if(n->footprint->delete_footprint <= n->footprint->prog_min_footprint){
 		n->footprint->footprint_min_size = n->footprint->delete_footprint;
 		n->footprint->footprint_min_files = set_duplicate(n->footprint->delete_files);
