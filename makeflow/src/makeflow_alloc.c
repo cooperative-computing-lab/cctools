@@ -105,7 +105,7 @@ int makeflow_alloc_try_grow_alloc( struct makeflow_alloc *a, uint64_t inc)
 	if(!a) // Case that we are at parent and we will now try to grow
 		return 0;
 
-	printf("%"PRIu64"\t", inc);
+	//printf("%"PRIu64"\t", inc);
 	makeflow_alloc_print_stats(a, "TRY GROW");
 	struct makeflow_alloc *tmp = a->parent;
 	if(a->storage->free >= inc){ // Fits in the already free space
@@ -180,7 +180,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 			(alloc1->storage->free < n->footprint->target_size)){
 
 			dynamic_alloc += timestamp_get() - start;
-			printf("%d\t", n->nodeid);
+			//printf("%d\t", n->nodeid);
 			makeflow_alloc_print_stats(alloc1, "CHECK FAIL PRE-ALLOC");
 			return 0;
 		}
@@ -195,7 +195,7 @@ int makeflow_alloc_check_space( struct makeflow_alloc *a, struct dag_node *n)
 			|| (n == node1 && set_size(n->descendants) < 2 &&
 				makeflow_alloc_try_grow_alloc(alloc2, node1->footprint->self_res)))){
 			dynamic_alloc += timestamp_get() - start;
-			printf("%d\t%"PRIu64"\t", n->nodeid, makeflow_alloc_node_size(a, node1, n));
+			//printf("%d\t%"PRIu64"\t", n->nodeid, makeflow_alloc_node_size(a, node1, n));
 			makeflow_alloc_print_stats(alloc1, "CHECK FAIL NON-FIT");
 			makeflow_alloc_delete(alloc2);
 			return 0;
@@ -217,7 +217,7 @@ int makeflow_alloc_grow_alloc( struct makeflow_alloc *a, uint64_t inc)
 	if(!a) // Case that we are at parent and we will now try to grow
 		return 0;
 
-	printf("%"PRIu64"\t", inc);
+	//printf("%"PRIu64"\t", inc);
 	makeflow_alloc_print_stats(a, "GROW");
 	struct makeflow_alloc *tmp = a->parent;
 	if(a->storage->free >= inc){ // Fits in the already free space

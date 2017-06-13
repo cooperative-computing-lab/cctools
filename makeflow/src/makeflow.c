@@ -1124,9 +1124,10 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
-    timestamp_t last_time = timestamp_get();
+	// Start Catalog at current time
     timestamp_t start = timestamp_get();
-    int first_report = 1;
+	// Last Report is created stall for first reporting.
+    timestamp_t last_time = start - (60 * 1000 * 1000);
 	// Relevant to GC and allocations
 	int cleaned_completed_jobs = 0;
 
@@ -1191,13 +1192,13 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
-		/* Make periodic report to catalog. */
-                timestamp_t now = timestamp_get();
-                if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
-			makeflow_catalog_summary(d, project,batch_queue_type,start);
-			last_time = now;
-			first_report = 0;
-                }
+        /* Report to catalog */
+        timestamp_t now = timestamp_get();
+		/* If in reporting mode and 1 min has transpired */
+        if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
+            makeflow_catalog_summary(d, project,batch_queue_type,start);
+            last_time = now;
+        }
 
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
@@ -1210,7 +1211,6 @@ static void makeflow_run( struct dag *d )
 	}
 
 	/* Always make final report to catalog when workflow ends. */
-
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project,batch_queue_type,start);
 	}
@@ -1407,7 +1407,7 @@ int main(int argc, char *argv[])
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
-	int storage_type = MAKEFLOW_ALLOC_TYPE_MIN;
+	int storage_type = MAKEFLOW_ALLOC_TYPE_OFF;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
 
@@ -1831,7 +1831,7 @@ int main(int argc, char *argv[])
 				storage_limit = string_metric_parse(optarg);
 				break;
 			case LONG_OPT_STORAGE_PRINT:
-				if(storage_print) free(storage_print);
+				free(storage_print);
 				storage_print = xxstrdup(optarg);
 				break;
 			case LONG_OPT_DOCKER:

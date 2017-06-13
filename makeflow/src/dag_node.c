@@ -271,6 +271,15 @@ int dag_node_comp_diff(const void *item, const void *arg)
 	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_DIFF);
 }
 
+
+int dag_node_comp_diff_rev(const void *item, const void *arg)
+{
+	struct dag_node **node1 = (void *)item;
+	struct dag_node **node2 = (void *)arg;
+
+	return dag_node_compare((*node1), (*node2), DAG_NODE_SORT_DIFF_REV);
+}
+
 /* Returns the remotename used in rule n for local name filename */
 const char *dag_node_get_remote_name(struct dag_node *n, const char *filename)
 {
@@ -667,8 +676,8 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 	uint64_t footprint_size = 0;
 
 	/* Create a second list of direct children that allows us to
-		sort on footprint properties. This is needed
-		as we compare footprint and the residual nodes. */
+		sort on footprint properties. This is used
+		when we compare footprint and the residual nodes. */
 	set_first_element(n->footprint->direct_children);
 	while((node1 = set_next_element(n->footprint->direct_children))){
 		list_push_tail(tmp_direct_children, node1);
@@ -702,7 +711,7 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 				n->footprint->delete_footprint = dag_file_set_size(n->footprint->delete_files);
 
 			}
-			// This is where we would remove an input file is it wasn't needed for other branches
+			// This is where we would remove an input file if it wasn't needed for other branches
 			set_insert_set(footprint, node1->footprint->res_files);
 			list_push_tail(n->footprint->delete_run_order, node1);
 		}
@@ -751,6 +760,7 @@ void dag_node_determine_descendant_footprint(struct dag_node *n)
 void dag_node_min_footprint( struct dag_node *n)
 {
 	set_delete(n->footprint->footprint_min_files);
+	printf("Min footprint for %d is %d vs %d\n", n->nodeid, n->footprint->delete_footprint, n->footprint->prog_min_footprint);
 	if(n->footprint->delete_footprint <= n->footprint->prog_min_footprint){
 		n->footprint->footprint_min_size = n->footprint->delete_footprint;
 		n->footprint->footprint_min_files = set_duplicate(n->footprint->delete_files);
@@ -804,6 +814,7 @@ void dag_node_set_run_order_dependencies(struct dag_node *n)
 {
 	struct dag_node *node1 = n;
 	struct dag_node *node2;
+
 	list_first_item(n->footprint->run_order);
 	while((node2 = list_next_item(n->footprint->run_order))){
 		if(node2->footprint->dependencies)
@@ -837,6 +848,8 @@ void dag_node_determine_footprint(struct dag_node *n)
 
 	/* Finds the max of all three different weights. */
 	dag_node_max_footprint(n);
+
+	//dag_node_set_run_order_dependencies(n);
 
 	/* Mark node as having been updated. */
 	n->footprint->footprint_updated = 1;
@@ -956,13 +969,14 @@ void dag_node_print_footprint_node(struct dag_node *n, FILE *out, char *retrn, c
 		dag_node_print_file_set(n->footprint->prog_min_files, out, delim);
 		dag_node_print_file_set(n->footprint->prog_max_files, out, retrn);
 	}
+	
 }
 
 void dag_node_print_footprint(struct dag *d, struct dag_node *base, char *output)
 {
 	struct dag_node *n;
 
-	int tex = 1;
+	int tex = 0;
 
 	char *retrn = "\n";
 	char *node_retrn = "\n";
@@ -1029,14 +1043,16 @@ void dag_node_reset_updated(struct dag_node *n)
 
 int dag_node_dependencies_active(struct dag_node *n)
 {
+	return 1;
 	if(!n->footprint->dependencies)
 		return 1;
 
 	struct dag_node *n1;
 	set_first_element(n->footprint->dependencies);
 	while((n1 = set_next_element(n->footprint->dependencies))){
-		if(!(n1->state == DAG_NODE_STATE_RUNNING || n1->state == DAG_NODE_STATE_COMPLETE))
+		if(!(n1->state == DAG_NODE_STATE_RUNNING || n1->state == DAG_NODE_STATE_COMPLETE)){
 			return 0;
+		}
 	}
 
 	return 1;
