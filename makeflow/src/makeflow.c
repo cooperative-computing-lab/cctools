@@ -227,7 +227,7 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	list_first_item(outputs);
 
 	while((f = list_next_item(outputs)))
-		makeflow_clean_file(d, q, f, 0);
+		makeflow_clean_file(d, q, f, 0, storage_allocation);
 
 	makeflow_clean_node(d, q, n, 1);
 }

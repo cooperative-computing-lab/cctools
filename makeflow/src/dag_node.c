@@ -188,9 +188,9 @@ int dag_node_comp_wgt(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	if(node1->footprint->wgt < size2->footprint->wgt)
+	if((*node1)->footprint->wgt < (*node2)->footprint->wgt)
 		return 1;
-	else if(node1->footprint->wgt > size2->footprint->wgt)
+	else if((*node1)->footprint->wgt > (*node2)->footprint->wgt)
 		return -1;
 
 	return 0;
@@ -201,9 +201,9 @@ int dag_node_comp_wgt_rev(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-	if(node1->footprint->wgt > size2->footprint->wgt)
+	if((*node1)->footprint->wgt > (*node2)->footprint->wgt)
 		return 1;
-	else if(node1->footprint->wgt < size2->footprint->wgt)
+	else if((*node1)->footprint->wgt < (*node2)->footprint->wgt)
 		return -1;
 
 	return 0;
@@ -214,12 +214,9 @@ int dag_node_comp_res(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 
-			size1 = node1->footprint->res;
-			size2 = node2->footprint->res;
-
-	if(node1->footprint->res > node2->footprint->res)
+	if((*node1)->footprint->res > (*node2)->footprint->res)
 		return 1;
-	else if(node1->footprint->res < node2->footprint->res)
+	else if((*node1)->footprint->res < (*node2)->footprint->res)
 		return -1;
 
 	return 0;
@@ -230,14 +227,14 @@ int dag_node_comp_diff(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 	
-	if(node2->footprint->diff > node1->footprint->diff)
+	if((*node2)->footprint->diff > (*node1)->footprint->diff)
 		return 1;
-	else if(node2->footprint->diff < node1->footprint->diff)
+	else if((*node2)->footprint->diff < (*node1)->footprint->diff)
 		return -1;
 
-	if(node2->footprint->res < node1->footprint->res)
+	if((*node2)->footprint->res < (*node1)->footprint->res)
 		return 1;
-	else if(node2->footprint->res > node1->footprint->res)
+	else if((*node2)->footprint->res > (*node1)->footprint->res)
 		return -1;
 
 	return 0;
@@ -249,14 +246,14 @@ int dag_node_comp_diff_rev(const void *item, const void *arg)
 	struct dag_node **node1 = (void *)item;
 	struct dag_node **node2 = (void *)arg;
 	
-	if(node1->footprint->diff > node2->footprint->diff)
+	if((*node1)->footprint->diff > (*node2)->footprint->diff)
 		return 1;
-	else if(node1->footprint->diff < node2->footprint->diff)
+	else if((*node1)->footprint->diff < (*node2)->footprint->diff)
 		return -1;
 
-	if(node1->footprint->res < node2->footprint->res)
+	if((*node1)->footprint->res < (*node2)->footprint->res)
 		return 1;
-	else if(node1->footprint->res > node2->footprint->res)
+	else if((*node1)->footprint->res > (*node2)->footprint->res)
 		return -1;
 
 	return 0;
