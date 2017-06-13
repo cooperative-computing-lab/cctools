@@ -18,7 +18,7 @@ typedef enum {
 } container_mode_t;
 
 struct makeflow_wrapper {
-    const char *command;
+    char *command;
     struct list *input_files;
     struct list *output_files;
 

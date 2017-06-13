@@ -1845,11 +1845,11 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOCKER_TAR:
 				container_image_tar = xxstrdup(optarg);
 				break;
-                        case LONG_OPT_SINGULARITY:
-                                if(!wrapper) wrapper = makeflow_wrapper_create();
-                                container_mode = CONTAINER_MODE_SINGULARITY;
-                                container_image = xxstrdup(optarg);
-                                break;
+            case LONG_OPT_SINGULARITY:
+                if(!wrapper) wrapper = makeflow_wrapper_create();
+				container_mode = CONTAINER_MODE_SINGULARITY;
+                container_image = xxstrdup(optarg);
+                break;
 			case LONG_OPT_ALLOCATION_MODE:
 				if(!strcmp(optarg, "throughput")) {
 					allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
