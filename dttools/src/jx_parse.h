@@ -20,6 +20,7 @@ with the following exceptions:
 #include "jx.h"
 #include "link.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 
 struct jx_parser;
@@ -37,7 +38,7 @@ struct jx * jx_parse_file( const char *name );
 struct jx * jx_parse_link( struct link *l, time_t stoptime );
 
 /** Create a JX parser object.  @return A parser object. */
-struct jx_parser * jx_parser_create();
+struct jx_parser *jx_parser_create(bool strict_mode);
 
 /** Attach parser to a file.  @param p A parser object.  @param file A standard IO stream. */
 void jx_parser_read_stream( struct jx_parser *p, FILE *file );
