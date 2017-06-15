@@ -679,7 +679,7 @@ filesystem like NFS or HDFS, and so, to be safe, it copies all necessary depende
 be used to efficiently access files without making remote copies.
 Makeflow must be told where the shared filesystem is located, so that it
 can take advantage of it.  To enable this, invoke Makeflow with the 
-<code>--shared-fs</code> option, indicating the path where the shared
+<tt>--shared-fs</tt> option, indicating the path where the shared
 filesystem is mounted.  (This option can be given multiple times.)
 Makeflow will then verify the existence of input and output files in these
 locations, but will not cause them to be transferred.
@@ -690,9 +690,15 @@ For example, if you use NFS to access the <code>/home</code> and
 <code>/software</code> directories on your cluster, then invoke makeflow like this:
 </p>
 
-<code>
-makeflow --shared-fs /home --shared-fs /software example.makeflow ...
+<code>makeflow --shared-fs /home --shared-fs /software example.makeflow
 </code>
+
+<p>
+On files that are remotely renamed,
+<tt>--shared-fs</tt> has no effect.
+If it is important to avoid transfers of large files,
+do not use remote renaming.
+</p>
 
 <a name=consistency><h3>NFS Consistency Delay</h3></a>
 
