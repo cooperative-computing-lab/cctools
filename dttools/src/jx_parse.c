@@ -820,3 +820,5 @@ struct jx * jx_parse_file( const char *name )
 	fclose(file);
 	return j;
 }
+
+/* vim: set noexpandtab tabstop=4: */
