@@ -453,7 +453,7 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
-		if (makeflow_file_on_sharedfs(file->filename)) {
+		if (!dag_node_get_remote_name(node, file->filename) && makeflow_file_on_sharedfs(file->filename)) {
 			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n", file->filename);
 			continue;
 		}
