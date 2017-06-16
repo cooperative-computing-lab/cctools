@@ -281,6 +281,38 @@ static struct jx *jx_eval_array(struct jx_operator *op, struct jx *left, struct 
 	}
 }
 
+static struct jx *jx_eval_call(
+	struct jx *func, struct jx *args, struct jx *ctx) {
+	assert(func);
+	assert(func->type == JX_FUNCTION);
+	assert(args);
+	assert(args->type == JX_ARRAY);
+
+	ctx = jx_copy(ctx);
+	if (!ctx) ctx = jx_object(NULL);
+	assert(ctx->type == JX_OBJECT);
+
+	struct jx_item *p = func->u.func.params;
+	struct jx_item *a = args->u.items;
+	while (p) {
+		assert(p->value);
+		assert(p->value->type == JX_STRING);
+		if (a) {
+			jx_insert(ctx, jx_string(p->value->u.string_value),
+				jx_copy(a->value));
+			a = a->next;
+		} else {
+			jx_insert(ctx, jx_string(p->value->u.string_value),
+				jx_null());
+		}
+		p = p->next;
+	}
+
+	struct jx *j = jx_eval(func->u.func.body, ctx);
+	jx_delete(ctx);
+	return j;
+}
+
 /*
 Handle a lookup operator, which has two valid cases:
 1 - left is an object, right is a string, return the named item in the object.
@@ -421,6 +453,11 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_delete(left);
 			jx_delete(right);
 			return r;
+		} else if (o->type == JX_OP_CALL) {
+			struct jx *r = jx_eval_call(left, right, context);
+			jx_delete(left);
+			jx_delete(right);
+			return r;
 		} else {
 			code = 2;
 			err = jx_object(NULL);
@@ -538,25 +575,28 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	}
 
 	switch(j->type) {
-		case JX_SYMBOL:
-			if(context) {
-				struct jx *result = jx_lookup(context,j->u.symbol_name);
-				if(result) {
-					return jx_copy(result);
-				} else {
-					struct jx *err = jx_object(NULL);
-					int code = 0;
-					jx_insert_integer(err, "code", code);
-					jx_insert(err, jx_string("symbol"), jx_copy(j));
-					jx_insert(err, jx_string("context"), jx_copy(context));
-					if (j->line) jx_insert_integer(err, "line", j->line);
-					jx_insert_string(err, "message", "undefined symbol");
-					jx_insert_string(err, "name", jx_error_name(code));
-					jx_insert_string(err, "source", "jx_eval");
-					return jx_error(err);
-				}
+		case JX_SYMBOL: {
+			struct jx *result =
+				jx_lookup(context, j->u.symbol_name);
+			if (result) {
+				return jx_copy(result);
+			} else {
+				struct jx *err = jx_object(NULL);
+				int code = 0;
+				jx_insert_integer(err, "code", code);
+				jx_insert(err, jx_string("symbol"), jx_copy(j));
+				jx_insert(err, jx_string("context"),
+					jx_copy(context));
+				if (j->line)
+					jx_insert_integer(err, "line", j->line);
+				jx_insert_string(
+					err, "message", "undefined symbol");
+				jx_insert_string(
+					err, "name", jx_error_name(code));
+				jx_insert_string(err, "source", "jx_eval");
+				return jx_error(err);
 			}
-			return jx_null();
+			}
 		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
@@ -570,6 +610,9 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			return jx_check_errors(jx_object(jx_eval_pair(j->u.pairs,context)));
 		case JX_OPERATOR:
 			return jx_eval_operator(&j->u.oper,context);
+		case JX_FUNCTION:
+			// we should never eval a function body
+			abort();
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;
