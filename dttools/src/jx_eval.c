@@ -6,7 +6,6 @@ See the file COPYING for details.
 
 #include "jx_eval.h"
 #include "jx_print.h"
-#include "jx_function.h"
 #include "debug.h"
 
 #include <assert.h>
@@ -370,28 +369,6 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 	}
 }
 
-static struct jx *jx_eval_function( struct jx_function *f, struct jx *context )
-{
-	if(!f) return NULL;
-	switch(f->function) {
-		case JX_FUNCTION_DBG:
-			return jx_function_dbg(f, context);
-		case JX_FUNCTION_RANGE:
-			return jx_function_range(f, context);
-		case JX_FUNCTION_FOREACH:
-			return jx_function_foreach(f, context);
-		case JX_FUNCTION_STR:
-			return jx_function_str(f, context);
-		case JX_FUNCTION_JOIN:
-			return jx_function_join(f, context);
-		case JX_FUNCTION_LET:
-			return jx_function_let(f, context);
-		case JX_FUNCTION_INVALID:
-			return NULL;
-	}
-	return NULL;
-}
-
 /*
 Type conversion rules:
 Generally, operators are not meant to be applied to unequal types.
@@ -593,8 +570,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			return jx_check_errors(jx_object(jx_eval_pair(j->u.pairs,context)));
 		case JX_OPERATOR:
 			return jx_eval_operator(&j->u.oper,context);
-		case JX_FUNCTION:
-			return jx_eval_function(&j->u.func,context);
 	}
 	/* not reachable, but some compilers complain. */
 	return 0;

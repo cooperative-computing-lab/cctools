@@ -6,7 +6,6 @@ See the file COPYING for details.
 
 #include "jx_print.h"
 #include "jx_parse.h"
-#include "jx_function.h"
 
 #include <ctype.h>
 
@@ -51,8 +50,9 @@ const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_AND:	return "&&";
 		case JX_OP_OR:	return "||";
 		case JX_OP_NOT:	return "!";
-		// note that the closing bracket is in jx_print_subexpr
+		// note that the closing bracket/paren is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
+		case JX_OP_CALL: return "(";
 		default:        return "???";
 	}
 }
@@ -161,14 +161,14 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 		case JX_OPERATOR:
 			jx_print_subexpr(j->u.oper.left,j->u.oper.type,b);
 			buffer_putstring(b,jx_operator_string(j->u.oper.type));
-			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
+			if (j->u.oper.type == JX_OP_CALL) {
+				jx_item_print(j->u.oper.right->u.items, b);
+				buffer_putstring(b, ")");
+			} else {
+				jx_print_subexpr(
+					j->u.oper.right, j->u.oper.type, b);
+			}
 			if(j->u.oper.type==JX_OP_LOOKUP) buffer_putstring(b,"]");
-			break;
-		case JX_FUNCTION:
-			buffer_putstring(b, jx_function_name_to_string(j->u.func.function));
-			buffer_putstring(b, "(");
-			jx_print_args(j->u.func.arguments, b);
-			buffer_putstring(b, ")");
 			break;
 		case JX_ERROR:
 			buffer_putstring(b,"Error");

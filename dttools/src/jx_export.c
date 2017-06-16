@@ -110,11 +110,6 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		jx_print_stream(j,stream);
 		fprintf(stream,"</expr>\n");
 		break;
-	case JX_FUNCTION:
-		fprintf(stream,"<func>\n");
-		jx_print_stream(j,stream);
-		fprintf(stream,"</func>\n");
-		break;
 	case JX_ERROR:
 		fprintf(stream,"<error>\n");
 		jx_print_stream(j,stream);

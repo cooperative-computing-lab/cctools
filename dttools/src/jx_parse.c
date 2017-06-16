@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "jx_parse.h"
-#include "jx_function.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -21,7 +20,6 @@ typedef enum {
 	JX_TOKEN_INTEGER,
 	JX_TOKEN_DOUBLE,
 	JX_TOKEN_STRING,
-	JX_TOKEN_FUNCTION,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_LBRACKET,
 	JX_TOKEN_RBRACKET,
@@ -370,8 +368,6 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_NULL;
 				} else if(!strcmp(s->token, "Error")) {
 					return JX_TOKEN_ERROR;
-				} else if (jx_function_name_from_string(s->token)) {
-					return JX_TOKEN_FUNCTION;
 				} else {
 					return JX_TOKEN_SYMBOL;
 				}
@@ -590,6 +586,7 @@ int jx_operator_precedence( jx_operator_t t )
 		case JX_OP_DIV:	return 1;
 		case JX_OP_MOD:	return 1;
 		case JX_OP_LOOKUP: return 0;
+		case JX_OP_CALL: return 0;
 		default:	return 0;
 	}
 }
@@ -612,6 +609,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
+		case JX_TOKEN_LPAREN: return JX_OP_CALL;
 		default:		return JX_OP_INVALID;
 	}
 }
@@ -623,37 +621,49 @@ static bool jx_operator_is_unary(jx_operator_t op) {
 	}
 }
 
-static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
-{
-	struct jx *a = jx_parse_atomic(s, arglist);
-	if (!a)
-		return NULL;
+static struct jx *jx_parse_postfix(struct jx_parser *s) {
+	struct jx *a = jx_parse_atomic(s, false);
+	if (!a) return NULL;
 
 	jx_token_t t = jx_scan(s);
-	if(t==JX_TOKEN_LBRACKET) {
-		unsigned line = s->line;
-		struct jx *b = jx_parse(s);
-		if(!b) {
-			jx_delete(a);
-			// parse error already set
-			return NULL;
-		}
+	switch (t) {
+		case JX_TOKEN_LBRACKET: {
+			unsigned line = s->line;
+			struct jx *b = jx_parse(s);
+			if (!b) {
+				jx_delete(a);
+				// parse error already set
+				return NULL;
+			}
 
-		t = jx_scan(s);
-		if(t!=JX_TOKEN_RBRACKET) {
-			jx_parse_error(s,"missing closing bracket");
-			jx_delete(a);
-			jx_delete(b);
-			return NULL;
-		} else {
-			struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
+			t = jx_scan(s);
+			if (t != JX_TOKEN_RBRACKET) {
+				jx_parse_error(s, "missing closing bracket");
+				jx_delete(a);
+				jx_delete(b);
+				return NULL;
+			} else {
+				struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
+				j->line = line;
+				j->u.oper.line = line;
+				return j;
+			}
+		}
+		case JX_TOKEN_LPAREN: {
+			unsigned line = s->line;
+			jx_unscan(s, t);
+			struct jx *args = jx_parse_atomic(s, true);
+			// error set by deeper level
+			if (!args) return NULL;
+			struct jx *j = jx_operator(JX_OP_CALL, a, args);
 			j->line = line;
 			j->u.oper.line = line;
 			return j;
 		}
-	} else {
-		jx_unscan(s,t);
-		return a;
+		default: {
+			jx_unscan(s, t);
+			return a;
+		}
 	}
 }
 
@@ -665,7 +675,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_ADD:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s, false);
+			struct jx *j = jx_parse_postfix(s);
 			if (!j) {
 				// error set by deeper level
 				return NULL;
@@ -675,30 +685,9 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			j->u.oper.line = line;
 			return j;
 		}
-		case JX_TOKEN_FUNCTION: {
-			jx_function_t f = jx_function_name_from_string(s->token);
-			if (!f) {
-				jx_parse_error(s,"invalid function");
-				return NULL;
-			}
-			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s, true);
-			if (!j) {
-				// error set by deeper level
-				return NULL;
-			}
-			if (!jx_istype(j, JX_ARRAY)) {
-				jx_parse_error(s, "malformed function");
-				return NULL;
-			}
-			j = jx_function(f, j);
-			j->line = line;
-			j->u.func.line = line;
-			return j;
-		}
 		case JX_TOKEN_ERROR: {
 			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s, false);
+			struct jx *j = jx_parse_postfix(s);
 			if (!j) {
 				jx_parse_error(s, "error is missing a required field");
 				return NULL;
@@ -715,7 +704,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		}
 		default: {
 			jx_unscan(s,t);
-			return jx_parse_postfix(s, false);
+			return jx_parse_postfix(s);
 		}
 	}
 }

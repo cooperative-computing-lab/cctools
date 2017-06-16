@@ -50,7 +50,6 @@ typedef enum {
 	JX_ARRAY,	/**< array containing values */
 	JX_OBJECT,	/**< object containing key-value pairs */
 	JX_OPERATOR,	/**< operator on multiple values. */
-	JX_FUNCTION,	/**< function to be applied to some values */
 	JX_ERROR,	/**< indicates failed evaluation */
 } jx_type_t;
 
@@ -89,6 +88,7 @@ typedef enum {
 	JX_OP_OR,
 	JX_OP_NOT,
 	JX_OP_LOOKUP,
+	JX_OP_CALL,
 	JX_OP_INVALID,
 } jx_operator_t;
 
@@ -97,22 +97,6 @@ struct jx_operator {
 	unsigned line;
 	struct jx *left;
 	struct jx *right;
-};
-
-typedef enum {
-	JX_FUNCTION_INVALID = 0,
-	JX_FUNCTION_DBG,
-	JX_FUNCTION_RANGE,
-	JX_FUNCTION_STR,
-	JX_FUNCTION_FOREACH,
-	JX_FUNCTION_JOIN,
-	JX_FUNCTION_LET,
-} jx_function_t;
-
-struct jx_function {
-	jx_function_t function;
-	unsigned line;
-	struct jx *arguments;
 };
 
 /** JX value representing any expression type. */
@@ -129,7 +113,6 @@ struct jx {
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
-		struct jx_function func; /**< function of @ref JX_FUNCTION */
 		struct jx *err;  /**< error value of @ref JX_ERROR */
 	} u;
 };
@@ -151,9 +134,6 @@ struct jx * jx_string( const char *string_value );
 
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
-
-/** Create a JX function on the given arguments. @param func The function to be applied. @param args The function arguments. */
-struct jx *jx_function( jx_function_t func, struct jx *args );
 
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
