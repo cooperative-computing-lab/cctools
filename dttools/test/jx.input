@@ -12,112 +12,112 @@
 }
 
 #comment
-10
-3847.576
-.5
-10.
-987
-12347812309487
+10;
+3847.576;
+.5;
+10.;
+987;
+12347812309487;
 
-"hello"
-"goodbye\n"
-"\"quotes\""
-"tab\ttab\ttab\rreturn\nnewline\n"
-"\\\\\\\\"
+"hello";
+"goodbye\n";
+"\"quotes\"";
+"tab\ttab\ttab\rreturn\nnewline\n";
+"\\\\\\\\";
 
-true
-false
-null
-true && true
-true && false
-false && true
-false && false
-true || true
-true || false
-false || true
-false || false
-!true
-!false
+true;
+false;
+null;
+true && true;
+true && false;
+false && true;
+false && false;
+true || true;
+true || false;
+false || true;
+false || false;
+!true;
+!false;
 
-10 == 20
-10 != 20
-10 < 20
-10 <= 20
-10 > 20
-10 >= 20
+10 == 20;
+10 != 20;
+10 < 20;
+10 <= 20;
+10 > 20;
+10 >= 20;
 
-10.5 == 20.5
-10.5 != 20.5
-10.5 < 20.5
-10.5 <= 20.5
-10.5 > 20.5
-10.5 >= 20.5
+10.5 == 20.5;
+10.5 != 20.5;
+10.5 < 20.5;
+10.5 <= 20.5;
+10.5 > 20.5;
+10.5 >= 20.5;
 
-"hello" == "goodbye"
-"hello" != "goodbye"
-"hello" <= "goodbye"
-"hello" < "goodbye"
-"hello" > "goodbye"
-"hello" >= "goodbye"
+"hello" == "goodbye";
+"hello" != "goodbye";
+"hello" <= "goodbye";
+"hello" < "goodbye";
+"hello" > "goodbye";
+"hello" >= "goodbye";
 
-"hello" == "hello"
-"hello" != "hello"
-"hello" <= "hello"
-"hello" < "hello"
-"hello" > "hello"
-"hello" >= "hello"
+"hello" == "hello";
+"hello" != "hello";
+"hello" <= "hello";
+"hello" < "hello";
+"hello" > "hello";
+"hello" >= "hello";
 
-a==b
-a!=b
-a<b
-a>b
-a<=b
-a>=b
+a==b;
+a!=b;
+a<b;
+a>b;
+a<=b;
+a>=b;
 
-f==g
-f!=g
-f<g
-f>g
-f<=g
-f>=g
+f==g;
+f!=g;
+f<g;
+f>g;
+f<=g;
+f>=g;
 
-x==y
-x!=y
-x<y
-x>y
-x<=y
-x>=y
+x==y;
+x!=y;
+x<y;
+x>y;
+x<=y;
+x>=y;
 
-a+b
-a-b
-a*b
-a/b
-a%b
+a+b;
+a-b;
+a*b;
+a/b;
+a%b;
 
-f+g
-f-g
-f*g
-f/g
-f%g
+f+g;
+f-g;
+f*g;
+f/g;
+f%g;
 
-x+y
-x-y
-x*y
-x/y
-x%y
-x&&y
-x||y
+x+y;
+x-y;
+x*y;
+x/y;
+x%y;
+x&&y;
+x||y;
 
-(x+y)*(f+g)
-(10 + (20 * 30))
-(10*(20+30))
+(x+y)*(f+g);
+(10 + (20 * 30));
+(10*(20+30));
 (a==b) || ((f>g) && x<y);
 
 #[10,-90.5,true,false,null,[-1,-2,-3]];
 [10,-90.5,true,false,null,[-1,-2,-3]];
 
-list[2]
-object["house"]
+list[2];
+object["house"];
 
 {
 "command":"grep English "+infile+" > "+outfile,
@@ -126,52 +126,52 @@ object["house"]
 "environment":{"PATH":"/usr/bin"},
 "cores":1,
 "memory":16,
-"disk":1
-}
+"disk":1,
+};
 
-range(5)
-range(3, 7)
-range (7, 3)
-range(-1, 10, 2)
-range(1, 10, 0)
-range(0, 5, -1)
-range(5, 0, 1)
-range(5, 0, -1)
+range(5);
+range(3, 7);
+range (7, 3);
+range(-1, 10, 2);
+range(1, 10, 0);
+range(0, 5, -1);
+range(5, 0, 1);
+range(5, 0, -1);
 
-str()
-str(2)
-str(x + y)
-str(x, y)
-str(range(10))
-str("a")
+str();
+str(2);
+str(x + y);
+str(x, y);
+str(range(10));
+str("a");
 
-foreach("too", "few")
-foreach(x, "nope", str(x))
-foreach(x, range(5), "item" + str(x))
+foreach("too", "few");
+foreach(x, "nope", str(x));
+foreach(x, range(5), "item" + str(x));
 
-join(["a", "b", c])
-join([1, 2])
-join(["a", 2])
-join([])
-join(["a"])
-join(["a", "b", "c"])
-join(["a", "b", "c"], ", ")
+join(["a", "b", c]);
+join([1, 2]);
+join(["a", 2]);
+join([]);
+join(["a"]);
+join(["a", "b", "c"]);
+join(["a", "b", "c"], ", ");
 
-dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + dbg(str(dbg(dbg(x) + dbg(1)))) )))))
+dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + dbg(str(dbg(dbg(x) + dbg(1)))) )))));
 
-;10 + [1]
-;"abc" + [2]
-;[] + []
-;[] + [1]
-;[1] + []
-;[1, 2] + [3]
-;[1, 2] + [] + [4, [5, 6]]
-;[10] == [10]
-;[10] != [10]
-;[1,2, 3] == [1,3,2]
-;[1,2,[3,4]] == [1,2,[3,4]]
+10 + [1];
+"abc" + [2];
+[] + [];
+[] + [1];
+[1] + [];
+[1, 2] + [3];
+[1, 2] + [] + [4, [5, 6]];
+[10] == [10];
+[10] != [10];
+[1,2, 3] == [1,3,2];
+[1,2,[3,4]] == [1,2,[3,4]];
 
-Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"};
 
-let({"f": 2.2, "g": 4.5}, f + y)
+let({"f": 2.2, "g": 4.5}, f + y);
 #end
