@@ -8,10 +8,11 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "buffer.h"
 
+#include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next )
 {
@@ -126,6 +127,18 @@ struct jx * jx_error( struct jx *err )
 	if(!jx_error_valid(err)) return NULL;
 	struct jx *j = jx_create(JX_ERROR);
 	j->u.err = err;
+	return j;
+}
+
+struct jx *jx_function(
+	const char *name, struct jx_item *params, struct jx *body) {
+	assert(name);
+	assert(params);
+	assert(body);
+	struct jx *j = jx_create(JX_FUNCTION);
+	j->u.func.name = strdup(name);
+	j->u.func.params = params;
+	j->u.func.body = body;
 	return j;
 }
 
@@ -371,6 +384,11 @@ void jx_delete( struct jx *j )
 			jx_delete(j->u.oper.left);
 			jx_delete(j->u.oper.right);
 			break;
+		case JX_FUNCTION:
+			free(j->u.func.name);
+			jx_item_delete(j->u.func.params);
+			jx_delete(j->u.func.body);
+			break;
 		case JX_ERROR:
 			jx_delete(j->u.err);
 			break;
@@ -429,6 +447,11 @@ int jx_equals( struct jx *j, struct jx *k )
 			return j->u.oper.type == k->u.oper.type
 				&& jx_equals(j->u.oper.left,k->u.oper.right)
 				&& jx_equals(j->u.oper.right,j->u.oper.right);
+		case JX_FUNCTION:
+			return !strcmp(j->u.func.name, k->u.func.name)
+				&& jx_item_equals(
+					   j->u.func.params, k->u.func.params)
+				&& jx_equals(j->u.func.body, k->u.func.body);
 		case JX_ERROR:
 			return jx_equals(j->u.err, k->u.err);
 	}
@@ -491,6 +514,11 @@ struct jx  *jx_copy( struct jx *j )
 		case JX_OPERATOR:
 			c = jx_operator(j->u.oper.type, jx_copy(j->u.oper.left), jx_copy(j->u.oper.right));
 			break;
+		case JX_FUNCTION:
+			c = jx_function(j->u.func.name,
+				jx_item_copy(j->u.func.params),
+				jx_copy(j->u.func.body));
+			break;
 		case JX_ERROR:
 			c = jx_error(jx_copy(j->u.err));
 			break;
@@ -545,6 +573,7 @@ int jx_is_constant( struct jx *j )
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->u.pairs);
 		case JX_ERROR:
+		case JX_FUNCTION:
 		case JX_OPERATOR:
 			return 0;
 	}

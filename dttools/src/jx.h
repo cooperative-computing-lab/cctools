@@ -41,16 +41,17 @@ Will create the following output:
 
 /** JX atomic type.  */
 typedef enum {
-	JX_NULL = 0,	/**< null value */
-	JX_BOOLEAN,	/**< true or false */
-	JX_INTEGER,	/**< integer value */
-	JX_DOUBLE,	/**< floating point value */
-	JX_STRING,	/**< string value */
-	JX_SYMBOL,	/**< variable identifier */
-	JX_ARRAY,	/**< array containing values */
-	JX_OBJECT,	/**< object containing key-value pairs */
-	JX_OPERATOR,	/**< operator on multiple values. */
-	JX_ERROR,	/**< indicates failed evaluation */
+	JX_NULL = 0, /**< null value */
+	JX_BOOLEAN,  /**< true or false */
+	JX_INTEGER,  /**< integer value */
+	JX_DOUBLE,   /**< floating point value */
+	JX_STRING,   /**< string value */
+	JX_SYMBOL,   /**< variable identifier */
+	JX_ARRAY,    /**< array containing values */
+	JX_OBJECT,   /**< object containing key-value pairs */
+	JX_OPERATOR, /**< operator on multiple values. */
+	JX_FUNCTION, /**< function definition */
+	JX_ERROR,    /**< indicates failed evaluation */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
@@ -99,6 +100,13 @@ struct jx_operator {
 	struct jx *right;
 };
 
+struct jx_function {
+	char *name;
+	unsigned line;
+	struct jx_item *params;
+	struct jx *body;
+};
+
 /** JX value representing any expression type. */
 
 struct jx {
@@ -113,6 +121,7 @@ struct jx {
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
+		struct jx_function func; /**< value of @ref JX_FUNCTION */
 		struct jx *err;  /**< error value of @ref JX_ERROR */
 	} u;
 };
@@ -141,6 +150,12 @@ struct jx * jx_symbol( const char *symbol_name );
 
 /** Create a JX_ERROR. @param err The associated data for the error. This object MUST have a string at the "source" key. @return A JX error value, or NULL if "source" is missing. */
 struct jx * jx_error( struct jx *err );
+
+/** Create a JX_FUNCTION. @param params The list of JX_STRING parameter names.
+ * @param body The function body to evaluate. @returns A JX function definition.
+ */
+struct jx *jx_function(
+	const char *name, struct jx_item *params, struct jx *body);
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );
