@@ -454,7 +454,8 @@ static char * makeflow_file_list_format( struct dag_node *node, char *file_str, 
 	list_first_item(file_list);
 	while((file=list_next_item(file_list))) {
 		if (makeflow_file_on_sharedfs(file->filename)) {
-			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n", file->filename);
+			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n",
+				file->filename);
 			continue;
 		}
 		char *f = makeflow_file_format(node,file,queue);
@@ -945,8 +946,13 @@ static int makeflow_check_batch_consistency(struct dag *d)
 		if(!batch_queue_supports_feature(remote_queue, "absolute_path") && !n->local_job){
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)) && !error) {
-				if(makeflow_file_on_sharedfs(f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
+				if (makeflow_file_on_sharedfs(f->filename)) {
+					if (remotename)
+						fatal("Remote renaming for %s is not supported on a shared filesystem",
+							f->filename);
+					continue;
+				}
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
 					error = 1;
@@ -956,8 +962,13 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 			list_first_item(n->target_files);
 			while((f = list_next_item(n->target_files)) && !error) {
-				if(makeflow_file_on_sharedfs(f->filename)) continue;
 				const char *remotename = dag_node_get_remote_name(n, f->filename);
+				if (makeflow_file_on_sharedfs(f->filename)) {
+					if (remotename)
+						fatal("Remote renaming for %s is not supported on a shared filesystem",
+							f->filename);
+					continue;
+				}
 				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
 					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
 					error = 1;
