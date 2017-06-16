@@ -3,6 +3,7 @@ batch_submit_workers
 catalog_query
 catalog_server
 catalog_update
+category_test
 chunk_test
 disk_alloc_test
 disk_allocator
