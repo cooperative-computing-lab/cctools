@@ -285,8 +285,10 @@ static struct jx *jx_eval_call(
 	struct jx *func, struct jx *args, struct jx *ctx) {
 	assert(func);
 	assert(func->type == JX_FUNCTION);
+	assert(func->u.func.params);
 	assert(args);
 	assert(args->type == JX_ARRAY);
+	assert(args->u.items);
 
 	ctx = jx_copy(ctx);
 	if (!ctx) ctx = jx_object(NULL);
@@ -294,8 +296,7 @@ static struct jx *jx_eval_call(
 
 	struct jx_item *p = func->u.func.params;
 	struct jx_item *a = args->u.items;
-	while (p) {
-		assert(p->value);
+	while (p->value) {
 		assert(p->value->type == JX_STRING);
 		if (a) {
 			jx_insert(ctx, jx_string(p->value->u.string_value),

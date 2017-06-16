@@ -170,6 +170,7 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			}
 			if(j->u.oper.type==JX_OP_LOOKUP) buffer_putstring(b,"]");
 			break;
+		case JX_FUNCTION: buffer_putstring(b, j->u.func.name); break;
 		case JX_ERROR:
 			buffer_putstring(b,"Error");
 			jx_print_buffer(j->u.err, b);
