@@ -5,8 +5,9 @@ See the file COPYING for details.
 */
 
 #include "jx_eval.h"
-#include "jx_print.h"
 #include "debug.h"
+#include "jx_function.h"
+#include "jx_print.h"
 
 #include <assert.h>
 #include <string.h>
@@ -285,10 +286,18 @@ static struct jx *jx_eval_call(
 	struct jx *func, struct jx *args, struct jx *ctx) {
 	assert(func);
 	assert(func->type == JX_FUNCTION);
-	assert(func->u.func.params);
 	assert(args);
 	assert(args->type == JX_ARRAY);
-	assert(args->u.items);
+
+	if (!func->u.func.body) {
+		switch (func->u.func.builtin) {
+			case JX_BUILTIN_RANGE: return jx_function_range(args);
+		}
+		// invalid function, so bail out
+		abort();
+	}
+
+	assert(func->u.func.params);
 
 	ctx = jx_copy(ctx);
 	if (!ctx) ctx = jx_object(NULL);

@@ -133,8 +133,6 @@ struct jx * jx_error( struct jx *err )
 struct jx *jx_function(
 	const char *name, struct jx_item *params, struct jx *body) {
 	assert(name);
-	assert(params);
-	assert(body);
 	struct jx *j = jx_create(JX_FUNCTION);
 	j->u.func.name = strdup(name);
 	j->u.func.params = params;

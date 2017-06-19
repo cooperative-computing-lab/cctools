@@ -68,6 +68,7 @@ SOURCES = \
 	jx_table.c \
 	jx_export.c \
 	jx_eval.c \
+	jx_function.c \
 	link.c \
 	link_auth.c \
 	list.c \

@@ -100,11 +100,16 @@ struct jx_operator {
 	struct jx *right;
 };
 
+typedef enum {
+	JX_BUILTIN_RANGE,
+} jx_builtin_t;
+
 struct jx_function {
 	char *name;
 	unsigned line;
 	struct jx_item *params;
 	struct jx *body;
+	jx_builtin_t builtin;
 };
 
 /** JX value representing any expression type. */
