@@ -292,6 +292,7 @@ static struct jx *jx_eval_call(
 	if (!func->u.func.body) {
 		switch (func->u.func.builtin) {
 			case JX_BUILTIN_RANGE: return jx_function_range(args);
+			case JX_BUILTIN_FORMAT: return jx_function_format(args);
 		}
 		// invalid function, so bail out
 		abort();
@@ -569,11 +570,20 @@ static struct jx *jx_check_errors(struct jx *j)
 	}
 }
 
+static void jx_eval_add_builtin(
+	struct jx *ctx, const char *name, jx_builtin_t b) {
+	if (!jx_lookup(ctx, name)) {
+		struct jx *f = jx_function(name, NULL, NULL);
+		f->u.func.builtin = b;
+		jx_insert(ctx, jx_string(name), f);
+	}
+}
+
 struct jx * jx_eval( struct jx *j, struct jx *context )
 {
-	if(!j) return 0;
-
-	if (context && !jx_istype(context, JX_OBJECT)) {
+	if (!j) return NULL;
+	if (!context) context = jx_object(NULL);
+	if (!jx_istype(context, JX_OBJECT)) {
 		struct jx *err = jx_object(NULL);
 		int code = 7;
 		jx_insert_integer(err, "code", code);
@@ -583,6 +593,8 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
+	jx_eval_add_builtin(context, "range", JX_BUILTIN_RANGE);
+	jx_eval_add_builtin(context, "format", JX_BUILTIN_FORMAT);
 
 	switch(j->type) {
 		case JX_SYMBOL: {

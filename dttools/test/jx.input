@@ -138,26 +138,20 @@ range(0, 5, -1);
 range(5, 0, 1);
 range(5, 0, -1);
 
-str();
-str(2);
-str(x + y);
-str(x, y);
-str(range(10));
-str("a");
-
-foreach("too", "few");
-foreach(x, "nope", str(x));
-foreach(x, range(5), "item" + str(x));
-
-join(["a", "b", c]);
-join([1, 2]);
-join(["a", 2]);
-join([]);
-join(["a"]);
-join(["a", "b", "c"]);
-join(["a", "b", "c"], ", ");
-
-dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + dbg(str(dbg(dbg(x) + dbg(1)))) )))));
+format();
+format("%%");
+format("value: %i!!", x + y);
+format("%i", x, y);
+format("(%d, %i)", x, y);
+format("%i");
+format("%e", 1.2e-22);
+format("%E", 6.02e23);
+format("%f", 2.5);
+format("%F", 3.14);
+format("%g", 9.9e9);
+format("%G", 2.11111e-12);
+format("%b", false);
+format("%s", "foo");
 
 10 + [1];
 "abc" + [2];
@@ -173,5 +167,4 @@ dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + db
 
 Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"};
 
-let({"f": 2.2, "g": 4.5}, f + y);
 #end

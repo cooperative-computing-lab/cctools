@@ -529,6 +529,7 @@ struct jx  *jx_copy( struct jx *j )
 			c = jx_function(j->u.func.name,
 				jx_item_copy(j->u.func.params),
 				jx_copy(j->u.func.body));
+			c->u.func.builtin = j->u.func.builtin;
 			break;
 		case JX_ERROR:
 			c = jx_error(jx_copy(j->u.err));

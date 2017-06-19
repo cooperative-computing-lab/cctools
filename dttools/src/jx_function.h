@@ -10,5 +10,6 @@ See the file COPYING for details.
 #include "jx.h"
 
 struct jx *jx_function_range(struct jx *args);
+struct jx *jx_function_format(struct jx *args);
 
 #endif

@@ -3,17 +3,140 @@ Copyright (C) 2016- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
-#include <stdio.h>
 
-#include <string.h>
+#include <assert.h>
+#include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "jx.h"
 #include "jx_match.h"
-#include "xxmalloc.h"
+#include "jx_print.h"
 #include "stringtools.h"
+#include "xxmalloc.h"
+
+// FAIL(const char *name, struct jx *args, const char *message) -> !
+#define FAIL(name, args, message)                                              \
+	do {                                                                   \
+		int ciuygssd = 6;                                              \
+		struct jx *ebijuaef = jx_object(NULL);                         \
+		jx_insert_integer(ebijuaef, "code", ciuygssd);                 \
+		jx_insert(ebijuaef, jx_string("function"),                     \
+			jx_operator(JX_OP_CALL, jx_function(name, NULL, NULL), \
+				jx_copy(args)));                               \
+		if (args->line)                                                \
+			jx_insert_integer(ebijuaef, "line", args->line);       \
+		jx_insert_string(ebijuaef, "message", message);                \
+		jx_insert_string(ebijuaef, "name", jx_error_name(ciuygssd));   \
+		jx_insert_string(ebijuaef, "source", "jx_eval");               \
+		return jx_error(ebijuaef);                                     \
+	} while (false)
+
+static char *jx_function_format_value(char spec, struct jx *args) {
+	if (spec == '%') return xxstrdup("%");
+	char *result = NULL;
+	struct jx *j = jx_array_shift(args);
+	switch (spec) {
+		case 'd':
+		case 'i':
+			if (jx_istype(j, JX_INTEGER))
+				result = string_format(
+					"%" PRIi64, j->u.integer_value);
+			break;
+		case 'e':
+			if (jx_istype(j, JX_DOUBLE))
+				result = string_format("%e", j->u.double_value);
+			break;
+		case 'E':
+			if (jx_istype(j, JX_DOUBLE))
+				result = string_format("%E", j->u.double_value);
+			break;
+		case 'f':
+			if (jx_istype(j, JX_DOUBLE))
+				result = string_format("%f", j->u.double_value);
+			break;
+		case 'F':
+			if (jx_istype(j, JX_DOUBLE))
+				result = string_format("%F", j->u.double_value);
+			break;
+		case 'g':
+			if (jx_istype(j, JX_DOUBLE))
+				result = string_format("%g", j->u.double_value);
+			break;
+		case 'G':
+			if (jx_istype(j, JX_DOUBLE))
+				result = string_format("%G", j->u.double_value);
+			break;
+		case 's':
+			if (jx_istype(j, JX_STRING))
+				result = xxstrdup(j->u.string_value);
+			break;
+		case 'b':
+			if (jx_istype(j, JX_BOOLEAN))
+				result = j->u.boolean_value ? xxstrdup("true") : xxstrdup("false");
+			break;
+		default: break;
+	}
+	jx_delete(j);
+	return result;
+}
+
+struct jx *jx_function_format(struct jx *orig_args) {
+	assert(orig_args);
+	const char *funcname = "format";
+	const char *err = NULL;
+	char *format = NULL;
+	char *result = xxstrdup("");
+	struct jx *args = jx_copy(orig_args);
+	struct jx *j = jx_array_shift(args);
+	if (!jx_match_string(j, &format)) {
+		jx_delete(j);
+		err = "invalid/missing format string";
+		goto FAILURE;
+	}
+	jx_delete(j);
+	char *i = format;
+	bool spec = false;
+	while (*i) {
+		if (spec) {
+			spec = false;
+			char *next = jx_function_format_value(*i, args);
+			if (!next) {
+				err = "mismatched format specifier";
+				goto FAILURE;
+			}
+			result = string_combine(result, next);
+			free(next);
+		} else if (*i == '%') {
+			spec = true;
+		} else {
+			char next[2];
+			snprintf(next, 2, "%c", *i);
+			result = string_combine(result, next);
+		}
+		++i;
+	}
+	if (spec) {
+		err = "truncated format specifier";
+		goto FAILURE;
+	}
+	jx_delete(args);
+	free(format);
+	j = jx_string(result);
+	free(result);
+	return j;
+FAILURE:
+	jx_delete(args);
+	free(result);
+	free(format);
+	FAIL(funcname, orig_args, err);
+}
 
 // see https://docs.python.org/2/library/functions.html#range
 struct jx *jx_function_range(struct jx *args) {
+	const char *funcname = "range";
 	jx_int_t start, stop, step;
 
 	assert(args);
@@ -25,37 +148,10 @@ struct jx *jx_function_range(struct jx *args) {
 			break;
 		case 2: step = 1; break;
 		case 3: break;
-		default: {
-			int code = 6;
-			struct jx *err = jx_object(NULL);
-			jx_insert_integer(err, "code", code);
-			jx_insert(err, jx_string("function"),
-				jx_operator(JX_OP_CALL,
-					jx_function("range", NULL, NULL),
-					jx_copy(args)));
-			if (args->line)
-				jx_insert_integer(err, "line", args->line);
-			jx_insert_string(err, "message", "invalid arguments");
-			jx_insert_string(err, "name", jx_error_name(code));
-			jx_insert_string(err, "source", "jx_eval");
-			return jx_error(err);
-		}
+		default: FAIL(funcname, args, "invalid arguments");
 	}
 
-	if (step == 0) {
-		int code = 6;
-		struct jx *err = jx_object(NULL);
-		jx_insert_integer(err, "code", code);
-		jx_insert(err, jx_string("function"),
-			jx_operator(JX_OP_CALL,
-				jx_function("range", NULL, NULL),
-				jx_copy(args)));
-		if (args->line) jx_insert_integer(err, "line", args->line);
-		jx_insert_string(err, "message", "step must be nonzero");
-		jx_insert_string(err, "name", jx_error_name(code));
-		jx_insert_string(err, "source", "jx_eval");
-		return jx_error(err);
-	}
+	if (step == 0) FAIL(funcname, args, "step must be nonzero");
 
 	struct jx *result = jx_array(NULL);
 
