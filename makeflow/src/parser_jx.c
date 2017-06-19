@@ -21,6 +21,8 @@ See the file COPYING for details.
 #include "jx_match.h"
 #include "jx_print.h"
 
+#include <assert.h>
+
 static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_table *h, struct jx *env) {
 	int nodeid;
 

@@ -339,6 +339,19 @@ struct jx *jx_array_concat( struct jx *array, ...) {
 	return result;
 }
 
+struct jx *jx_array_shift(struct jx *array) {
+	if (!jx_istype(array, JX_ARRAY)) return NULL;
+	struct jx_item *i = array->u.items;
+	struct jx *result = NULL;
+	if (i) {
+		result = i->value;
+		array->u.items = i->next;
+		free(i);
+	}
+	return result;
+
+}
+
 void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;

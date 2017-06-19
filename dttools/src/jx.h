@@ -37,7 +37,6 @@ Will create the following output:
 */
 
 #include <stdint.h>
-#include <assert.h>
 
 /** JX atomic type.  */
 typedef enum {
@@ -253,6 +252,11 @@ struct jx * jx_array_index( struct jx *j, int nth );
 
 /** Concatenate the given arrays into a single array. The passed arrays are consumed. @param array An array to concatenate. The list of arrays must be terminated by NULL. */
 struct jx *jx_array_concat( struct jx *array, ...);
+
+/** Remove and return the first element in the array.
+ * @param array The JX_ARRAY to update.
+ * @returns The first value in array, or NULL if array is empty or not a JX_ARRAY. */
+struct jx *jx_array_shift(struct jx *array);
 
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
