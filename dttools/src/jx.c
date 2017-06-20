@@ -130,13 +130,14 @@ struct jx * jx_error( struct jx *err )
 	return j;
 }
 
-struct jx *jx_function(
-	const char *name, struct jx_item *params, struct jx *body) {
+struct jx *jx_function(const char *name, jx_builtin_t op,
+	struct jx_item *params, struct jx *body) {
 	assert(name);
 	struct jx *j = jx_create(JX_FUNCTION);
 	j->u.func.name = strdup(name);
 	j->u.func.params = params;
 	j->u.func.body = body;
+	j->u.func.builtin = op;
 	return j;
 }
 
@@ -526,10 +527,9 @@ struct jx  *jx_copy( struct jx *j )
 			c = jx_operator(j->u.oper.type, jx_copy(j->u.oper.left), jx_copy(j->u.oper.right));
 			break;
 		case JX_FUNCTION:
-			c = jx_function(j->u.func.name,
+			c = jx_function(j->u.func.name, j->u.func.builtin,
 				jx_item_copy(j->u.func.params),
 				jx_copy(j->u.func.body));
-			c->u.func.builtin = j->u.func.builtin;
 			break;
 		case JX_ERROR:
 			c = jx_error(jx_copy(j->u.err));

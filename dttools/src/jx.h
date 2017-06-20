@@ -100,6 +100,7 @@ struct jx_operator {
 };
 
 typedef enum {
+	JX_BUILTIN_LAMBDA,
 	JX_BUILTIN_RANGE,
 	JX_BUILTIN_FORMAT,
 } jx_builtin_t;
@@ -159,8 +160,8 @@ struct jx * jx_error( struct jx *err );
 /** Create a JX_FUNCTION. @param params The list of JX_STRING parameter names.
  * @param body The function body to evaluate. @returns A JX function definition.
  */
-struct jx *jx_function(
-	const char *name, struct jx_item *params, struct jx *body);
+struct jx *jx_function(const char *name, jx_builtin_t op,
+	struct jx_item *params, struct jx *body);
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );

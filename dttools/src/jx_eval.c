@@ -289,39 +289,42 @@ static struct jx *jx_eval_call(
 	assert(args);
 	assert(args->type == JX_ARRAY);
 
-	if (!func->u.func.body) {
-		switch (func->u.func.builtin) {
-			case JX_BUILTIN_RANGE: return jx_function_range(args);
-			case JX_BUILTIN_FORMAT: return jx_function_format(args);
+	switch (func->u.func.builtin) {
+		case JX_BUILTIN_RANGE: return jx_function_range(args);
+		case JX_BUILTIN_FORMAT: return jx_function_format(args);
+		case JX_BUILTIN_LAMBDA: {
+			assert(func->u.func.params);
+
+			ctx = jx_copy(ctx);
+			if (!ctx) ctx = jx_object(NULL);
+			assert(ctx->type == JX_OBJECT);
+
+			struct jx_item *p = func->u.func.params;
+			struct jx_item *a = args->u.items;
+			while (p->value) {
+				assert(p->value->type == JX_SYMBOL);
+				if (a) {
+					jx_insert(ctx,
+						jx_string(p->value->u
+								  .symbol_name),
+						jx_copy(a->value));
+					a = a->next;
+				} else {
+					jx_insert(ctx,
+						jx_string(p->value->u
+								  .symbol_name),
+						jx_null());
+				}
+				p = p->next;
+			}
+
+			struct jx *j = jx_eval(func->u.func.body, ctx);
+			jx_delete(ctx);
+			return j;
 		}
-		// invalid function, so bail out
-		abort();
 	}
-
-	assert(func->u.func.params);
-
-	ctx = jx_copy(ctx);
-	if (!ctx) ctx = jx_object(NULL);
-	assert(ctx->type == JX_OBJECT);
-
-	struct jx_item *p = func->u.func.params;
-	struct jx_item *a = args->u.items;
-	while (p->value) {
-		assert(p->value->type == JX_STRING);
-		if (a) {
-			jx_insert(ctx, jx_string(p->value->u.string_value),
-				jx_copy(a->value));
-			a = a->next;
-		} else {
-			jx_insert(ctx, jx_string(p->value->u.string_value),
-				jx_null());
-		}
-		p = p->next;
-	}
-
-	struct jx *j = jx_eval(func->u.func.body, ctx);
-	jx_delete(ctx);
-	return j;
+	// invalid function, so bail out
+	abort();
 }
 
 /*
@@ -573,9 +576,8 @@ static struct jx *jx_check_errors(struct jx *j)
 static void jx_eval_add_builtin(
 	struct jx *ctx, const char *name, jx_builtin_t b) {
 	if (!jx_lookup(ctx, name)) {
-		struct jx *f = jx_function(name, NULL, NULL);
-		f->u.func.builtin = b;
-		jx_insert(ctx, jx_string(name), f);
+		jx_insert(
+			ctx, jx_string(name), jx_function(name, b, NULL, NULL));
 	}
 }
 

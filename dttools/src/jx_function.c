@@ -17,14 +17,15 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-// FAIL(const char *name, struct jx *args, const char *message) -> !
-#define FAIL(name, args, message)                                              \
+// FAIL(const char *name, jx_builtin_t b struct jx *args, const char *message)
+#define FAIL(name, b, args, message)                                           \
 	do {                                                                   \
 		int ciuygssd = 6;                                              \
 		struct jx *ebijuaef = jx_object(NULL);                         \
 		jx_insert_integer(ebijuaef, "code", ciuygssd);                 \
 		jx_insert(ebijuaef, jx_string("function"),                     \
-			jx_operator(JX_OP_CALL, jx_function(name, NULL, NULL), \
+			jx_operator(JX_OP_CALL,                                \
+				jx_function(name, b, NULL, NULL),              \
 				jx_copy(args)));                               \
 		if (args->line)                                                \
 			jx_insert_integer(ebijuaef, "line", args->line);       \
@@ -131,7 +132,7 @@ FAILURE:
 	jx_delete(args);
 	free(result);
 	free(format);
-	FAIL(funcname, orig_args, err);
+	FAIL(funcname, JX_BUILTIN_FORMAT, orig_args, err);
 }
 
 // see https://docs.python.org/2/library/functions.html#range
@@ -148,10 +149,13 @@ struct jx *jx_function_range(struct jx *args) {
 			break;
 		case 2: step = 1; break;
 		case 3: break;
-		default: FAIL(funcname, args, "invalid arguments");
+		default:
+			FAIL(funcname, JX_BUILTIN_RANGE, args,
+				"invalid arguments");
 	}
 
-	if (step == 0) FAIL(funcname, args, "step must be nonzero");
+	if (step == 0)
+		FAIL(funcname, JX_BUILTIN_RANGE, args, "step must be nonzero");
 
 	struct jx *result = jx_array(NULL);
 
