@@ -49,6 +49,7 @@ typedef enum {
 	JX_TOKEN_RPAREN,
 	JX_TOKEN_FOR,
 	JX_TOKEN_IN,
+	JX_TOKEN_IF,
 	JX_TOKEN_PARSE_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
@@ -372,6 +373,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_FOR;
 				} else if (!strcmp(s->token, "in")) {
 					return JX_TOKEN_IN;
+				} else if (!strcmp(s->token, "if")) {
+					return JX_TOKEN_IF;
 				} else if(!strcmp(s->token, "Error")) {
 					return JX_TOKEN_ERROR;
 				} else {
@@ -438,6 +441,17 @@ static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 		}
 
 		t = jx_scan(s);
+		if (t == JX_TOKEN_IF) {
+			i->condition = jx_parse(s);
+			if (!i->condition) {
+				jx_item_delete(i);
+				if (jx_parser_errors(s)) return NULL;
+				jx_parse_error(s,
+					"EOF while parsing list comprehension");
+				return NULL;
+			}
+			t = jx_scan(s);
+		}
 	}
 
 	if(t==JX_TOKEN_COMMA) {

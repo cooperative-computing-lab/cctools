@@ -368,6 +368,7 @@ void jx_item_delete( struct jx_item *item )
 	jx_delete(item->value);
 	free(item->variable);
 	jx_delete(item->list);
+	jx_delete(item->condition);
 	jx_item_delete(item->next);
 	free(item);
 }
@@ -433,10 +434,11 @@ int jx_item_equals( struct jx_item *j, struct jx_item *k )
 	if(!j || !k) return 0;
 	if (j->variable && !k->variable) return 0;
 	if (!j->variable && k->variable) return 0;
-	if (j->variable && strcmp(j->variable, k->variable)) return 0;
-	if (!jx_equals(j->list, k->list)) return 0;
-	if (!jx_equals(j->value, k->value)) return 0;
-	return jx_item_equals(j->next, k->next);
+	return !(j->variable && strcmp(j->variable, k->variable))
+		&& jx_equals(j->list, k->list)
+		&& jx_equals(j->condition, k->condition)
+		&& jx_equals(j->value, k->value)
+		&& jx_item_equals(j->next, k->next);
 }
 
 int jx_equals( struct jx *j, struct jx *k )
@@ -497,6 +499,7 @@ struct jx_item * jx_item_copy( struct jx_item *i )
 	item->value = jx_copy(i->value);
 	if (i->variable) item->variable = strdup(i->variable);
 	item->list = jx_copy(i->list);
+	item->condition = jx_copy(i->condition);
 	item->next = jx_item_copy(i->next);
 	item->line = i->line;
 	return item;
@@ -574,7 +577,7 @@ int jx_pair_is_constant( struct jx_pair *p )
 int jx_item_is_constant( struct jx_item *i )
 {
 	if(!i) return 1;
-	if (i->variable || i->list) return 0;
+	if (i->variable || i->list || i->condition) return 0;
 	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 

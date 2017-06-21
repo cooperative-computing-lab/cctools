@@ -118,7 +118,8 @@ x||y;
 [format(":%d", 2*i) for i in range(10)];
 [i + 1 for i in [10 - i for i in range(10)]];
 [[[i, j] for j in range(3)] for i in [10 - i for i in range(4)]];
-[null for i in 7]
+[null for i in 7];
+[i for i in range(10) if i % 3 == 0];
 
 list[2];
 object["house"];

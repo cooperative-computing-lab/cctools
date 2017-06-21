@@ -62,6 +62,7 @@ struct jx_item {
 	struct jx *value;       /**< value of this item */
 	char *variable;		/**< variable for list comprehension */
 	struct jx *list;	/**< items for list comprehension */
+	struct jx *condition;   /**< condition for filtering list comprehension */
 	struct jx_item *next;	/**< pointer to next item */
 };
 

@@ -34,6 +34,10 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 		buffer_putstring(b, item->variable);
 		buffer_putstring(b, " in ");
 		jx_print_buffer(item->list, b);
+		if (item->condition) {
+			buffer_putstring(b, " if ");
+			jx_print_buffer(item->condition, b);
+		}
 	}
 	if(item->next) {
 		buffer_putstring(b,",");

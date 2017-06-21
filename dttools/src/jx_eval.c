@@ -429,18 +429,49 @@ static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
 	while ((j = jx_iterate_array(list, &i))) {
 		struct jx *ctx = jx_copy(context);
 		jx_insert(ctx, jx_string(item->variable), jx_copy(j));
-		j = jx_eval(item->value, ctx);
+		if (item->condition) {
+			struct jx *cond = jx_eval(item->condition, ctx);
+			if (jx_istype(cond, JX_ERROR)) {
+				jx_delete(ctx);
+				jx_delete(list);
+				jx_item_delete(result);
+				return jx_item(cond, NULL);
+			}
+			if (!jx_istype(cond, JX_BOOLEAN)) {
+				jx_delete(ctx);
+				jx_delete(list);
+				jx_item_delete(result);
+				struct jx *err = jx_object(NULL);
+				jx_insert_integer(err, "code", 2);
+				jx_insert(err, jx_string("condition"), cond);
+				if (item->line)
+					jx_insert_integer(
+						err, "line", item->line);
+				jx_insert_string(err, "message",
+					"list comprehension condition takes a boolean");
+				jx_insert_string(err, "name", jx_error_name(2));
+				jx_insert_string(err, "source", "jx_eval");
+				return jx_item(jx_error(err), NULL);
+			}
+			int ok = cond->u.boolean_value;
+			jx_delete(cond);
+			if (!ok) {
+				jx_delete(ctx);
+				continue;
+			}
+		}
+		struct jx *val = jx_eval(item->value, ctx);
 		jx_delete(ctx);
-		if (!j) {
+		if (!val) {
 			jx_delete(list);
 			jx_item_delete(result);
 			return NULL;
 		}
 		if (result) {
-			tail->next = jx_item(j, NULL);
+			tail->next = jx_item(val, NULL);
 			tail = tail->next;
 		} else {
-			result = jx_item(j, NULL);
+			result = jx_item(val, NULL);
 			tail = result;
 		}
 	}
