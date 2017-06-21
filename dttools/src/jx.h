@@ -58,8 +58,10 @@ typedef int64_t jx_int_t;
 /** JX item linked-list used by @ref JX_ARRAY and @ref jx.items */
 
 struct jx_item {
-	struct jx      *value;	/**< value of this item */
 	unsigned line;
+	struct jx *value;       /**< value of this item */
+	char *variable;		/**< variable for list comprehension */
+	struct jx *list;	/**< items for list comprehension */
 	struct jx_item *next;	/**< pointer to next item */
 };
 

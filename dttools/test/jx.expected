@@ -261,8 +261,20 @@ value:      500
 expression: a==b||(f>g&&x<y)
 value:      false
 
-expression: [10,-90.5,true,false,null,[-1,-2,-3]]
-value:      [10,-90.5,true,false,null,[-1,-2,-3]]
+expression: [[0,i] for i in [1,2,x],10,-90.5,true for i in range(5),false,null,[-1,-2,-3]]
+value:      [[0,1],[0,2],[0,10],10,-90.5,true,true,true,true,true,false,null,[-1,-2,-3]]
+
+expression: [format(":%d",2*i) for i in range(10)]
+value:      [":0",":2",":4",":6",":8",":10",":12",":14",":16",":18"]
+
+expression: [i+1 for i in [10-i for i in range(10)]]
+value:      [11,10,9,8,7,6,5,4,3,2]
+
+expression: [[[i,j] for j in range(3)] for i in [10-i for i in range(4)]]
+value:      [[[10,0],[10,1],[10,2]],[[9,0],[9,1],[9,2]],[[8,0],[8,1],[8,2]],[[7,0],[7,1],[7,2]]]
+
+expression: [null for i in 7]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"list comprehension takes an array","line":121,"list":7,"code":2}
 
 expression: list[2]
 value:      300
@@ -340,10 +352,10 @@ expression: format("%s","foo")
 value:      "foo"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":156,"operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":160,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":157,"operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":161,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []

@@ -114,7 +114,11 @@ x||y;
 (a==b) || ((f>g) && x<y);
 
 #[10,-90.5,true,false,null,[-1,-2,-3]];
-[10,-90.5,true,false,null,[-1,-2,-3]];
+[[0, i] for i in [1,2,x], 10,-90.5,true for i in range(5),false,null,[-1,-2,-3]];
+[format(":%d", 2*i) for i in range(10)];
+[i + 1 for i in [10 - i for i in range(10)]];
+[[[i, j] for j in range(3)] for i in [10 - i for i in range(4)]];
+[null for i in 7]
 
 list[2];
 object["house"];

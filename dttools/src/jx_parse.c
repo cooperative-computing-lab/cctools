@@ -47,6 +47,8 @@ typedef enum {
 	JX_TOKEN_NULL,
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
+	JX_TOKEN_FOR,
+	JX_TOKEN_IN,
 	JX_TOKEN_PARSE_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
@@ -366,6 +368,10 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_FALSE;
 				} else if(!strcmp(s->token,"null")) {
 					return JX_TOKEN_NULL;
+				} else if (!strcmp(s->token, "for")) {
+					return JX_TOKEN_FOR;
+				} else if (!strcmp(s->token, "in")) {
+					return JX_TOKEN_IN;
 				} else if(!strcmp(s->token, "Error")) {
 					return JX_TOKEN_ERROR;
 				} else {
@@ -404,6 +410,36 @@ static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 	}
 
 	t = jx_scan(s);
+	if (t == JX_TOKEN_FOR) {
+		t = jx_scan(s);
+		if (t != JX_TOKEN_SYMBOL) {
+			jx_item_delete(i);
+			jx_parse_error(
+				s, "expected variable for list comprehension");
+			return NULL;
+		}
+		i->variable = strdup(s->token);
+
+		t = jx_scan(s);
+		if (t != JX_TOKEN_IN) {
+			jx_item_delete(i);
+			jx_parse_error(s,
+				"malformed list comprehension (missing `in')");
+			return NULL;
+		}
+
+		i->list = jx_parse(s);
+		if (!i->list) {
+			jx_item_delete(i);
+			if (jx_parser_errors(s)) return NULL;
+			jx_parse_error(
+				s, "EOF while parsing list comprehension");
+			return NULL;
+		}
+
+		t = jx_scan(s);
+	}
+
 	if(t==JX_TOKEN_COMMA) {
 		i->next = jx_parse_item_list(s, arglist);
 		if (jx_parser_errors(s)) {

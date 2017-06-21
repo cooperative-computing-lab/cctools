@@ -98,6 +98,16 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		break;
 	case JX_ARRAY:
 		fprintf(stream,"<array>\n");
+		if (j->u.items && j->u.items->variable) {
+			fprintf(stream, "<var>");
+			fprintf(stream, j->u.items->variable);
+			fprintf(stream, "</var>");
+		}
+		if (j->u.items && j->u.items->list) {
+			fprintf(stream, "<list>");
+			jx_export_xml(j->u.items->list, stream);
+			fprintf(stream, "</list>");
+		}
 		for(i=j->u.items;i;i=i->next) {
 			fprintf(stream,"<item>");
 			jx_export_xml(i->value,stream);

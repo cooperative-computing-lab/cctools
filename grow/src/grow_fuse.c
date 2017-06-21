@@ -6,17 +6,18 @@
 
 #define FUSE_USE_VERSION 26
 
-#include <fuse.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <sys/stat.h>
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <fuse.h>
+#include <limits.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "grow.h"
 #include "debug.h"

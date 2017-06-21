@@ -398,14 +398,60 @@ static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context )
 	);
 }
 
-static struct jx_item * jx_eval_item( struct jx_item *item, struct jx *context )
-{
-	if(!item) return 0;
+static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
+	if (!item) return NULL;
+	assert((item->variable && item->list)
+		|| !(item->variable || item->list));
 
-	return jx_item(
-		jx_eval(item->value,context),
-		jx_eval_item(item->next,context)
-	);
+	if (!item->variable)
+		return jx_item(jx_eval(item->value, context),
+			jx_eval_item(item->next, context));
+
+	struct jx *list = jx_eval(item->list, context);
+	if (jx_istype(list, JX_ERROR)) return jx_item(list, NULL);
+	if (!jx_istype(list, JX_ARRAY)) {
+		struct jx *err = jx_object(NULL);
+		jx_insert_integer(err, "code", 2);
+		jx_insert(err, jx_string("list"), list);
+		if (item->line) jx_insert_integer(err, "line", item->line);
+		jx_insert_string(
+			err, "message", "list comprehension takes an array");
+		jx_insert_string(err, "name", jx_error_name(2));
+		jx_insert_string(err, "source", "jx_eval");
+		return jx_item(jx_error(err), NULL);
+	}
+
+	struct jx_item *result = NULL;
+	struct jx_item *tail = NULL;
+
+	struct jx *j = NULL;
+	void *i = NULL;
+	while ((j = jx_iterate_array(list, &i))) {
+		struct jx *ctx = jx_copy(context);
+		jx_insert(ctx, jx_string(item->variable), jx_copy(j));
+		j = jx_eval(item->value, ctx);
+		jx_delete(ctx);
+		if (!j) {
+			jx_delete(list);
+			jx_item_delete(result);
+			return NULL;
+		}
+		if (result) {
+			tail->next = jx_item(j, NULL);
+			tail = tail->next;
+		} else {
+			result = jx_item(j, NULL);
+			tail = result;
+		}
+	}
+
+	jx_delete(list);
+	if (result) {
+		tail->next = jx_eval_item(item->next, context);
+		return result;
+	} else {
+		return jx_eval_item(item->next, context);
+	}
 }
 
 static struct jx *jx_check_errors(struct jx *j)

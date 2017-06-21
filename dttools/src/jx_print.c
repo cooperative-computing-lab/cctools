@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 
+#include <assert.h>
 #include <ctype.h>
 
 static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
@@ -27,6 +28,13 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 	if(!item) return;
 
 	jx_print_buffer(item->value,b);
+	if (item->variable) {
+		assert(item->list);
+		buffer_putstring(b, " for ");
+		buffer_putstring(b, item->variable);
+		buffer_putstring(b, " in ");
+		jx_print_buffer(item->list, b);
+	}
 	if(item->next) {
 		buffer_putstring(b,",");
 		jx_item_print(item->next,b);

@@ -366,6 +366,8 @@ void jx_item_delete( struct jx_item *item )
 {
 	if(!item) return;
 	jx_delete(item->value);
+	free(item->variable);
+	jx_delete(item->list);
 	jx_item_delete(item->next);
 	free(item);
 }
@@ -429,7 +431,12 @@ int jx_item_equals( struct jx_item *j, struct jx_item *k )
 {
 	if(!j && !k) return 1;
 	if(!j || !k) return 0;
-	return jx_equals(j->value,k->value) && jx_item_equals(j->next,k->next);
+	if (j->variable && !k->variable) return 0;
+	if (!j->variable && k->variable) return 0;
+	if (j->variable && strcmp(j->variable, k->variable)) return 0;
+	if (!jx_equals(j->list, k->list)) return 0;
+	if (!jx_equals(j->value, k->value)) return 0;
+	return jx_item_equals(j->next, k->next);
 }
 
 int jx_equals( struct jx *j, struct jx *k )
@@ -475,7 +482,7 @@ int jx_equals( struct jx *j, struct jx *k )
 struct jx_pair * jx_pair_copy( struct jx_pair *p )
 {
 	if(!p) return 0;
-	struct jx_pair *pair = malloc(sizeof(*pair));
+	struct jx_pair *pair = calloc(1, sizeof(*pair));
 	pair->key = jx_copy(p->key);
 	pair->value = jx_copy(p->value);
 	pair->next = jx_pair_copy(p->next);
@@ -485,9 +492,11 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 
 struct jx_item * jx_item_copy( struct jx_item *i )
 {
-	if(!i) return 0;
-	struct jx_item *item = malloc(sizeof(*item));
+	if (!i) return 0;
+	struct jx_item *item = calloc(1, sizeof(*item));
 	item->value = jx_copy(i->value);
+	if (i->variable) item->variable = strdup(i->variable);
+	item->list = jx_copy(i->list);
 	item->next = jx_item_copy(i->next);
 	item->line = i->line;
 	return item;
@@ -565,6 +574,7 @@ int jx_pair_is_constant( struct jx_pair *p )
 int jx_item_is_constant( struct jx_item *i )
 {
 	if(!i) return 1;
+	if (i->variable || i->list) return 0;
 	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 
