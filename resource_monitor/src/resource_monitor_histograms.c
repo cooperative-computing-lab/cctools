@@ -91,6 +91,7 @@ struct field_stats {
 	struct allocation fa_perfect;
 	struct allocation fa_max;
 	struct allocation fa_95;
+	struct allocation fa_50;
 	struct allocation fa_min_waste_time_dependence;
 	struct allocation fa_min_waste_time_independence;
 	struct allocation fa_min_waste_brute_force;
@@ -590,7 +591,15 @@ struct field_stats *histogram_of_field(struct rmsummary_set *source, const char 
 	}
 
 	h->summaries_sorted = realloc(h->summaries_sorted, h->total_count * sizeof(struct rmsummary *));
-	h->histogram        = histogram_create(bucket_size_by_iqr(h));
+
+
+	double bucket_size = bucket_size_by_iqr(h);
+
+	if(strcmp(field, "wall_time") == 0 || strcmp(field, "cpu_time") == 0) {
+		bucket_size = bucket_size < 30000000 ? 30000000 : bucket_size;
+	}
+
+	h->histogram        = histogram_create(bucket_size);
 
 	list_first_item(source->summaries);
 	while((s = list_next_item(source->summaries)))
@@ -653,6 +662,7 @@ struct jx *field_to_json(struct field_stats *h)
 	jx_insert(policies, jx_string("perfect"), allocation_to_json(h, &(h->fa_perfect)));
 	jx_insert(policies, jx_string("maximum"), allocation_to_json(h, &(h->fa_max)));
 	jx_insert(policies, jx_string("P95"),     allocation_to_json(h, &(h->fa_95)));
+	jx_insert(policies, jx_string("P50"),     allocation_to_json(h, &(h->fa_50)));
 
 	if(brute_force) {
 		jx_insert(policies, jx_string("min_waste_brute_force"),      allocation_to_json(h, &(h->fa_min_waste_brute_force)));
@@ -753,7 +763,9 @@ double total_waste(struct field_stats *h, double first_alloc) {
 		waste += current_waste;
 	}
 
-	waste = rmsummary_to_external_unit("wall_time", waste);
+	if(!cumulative) {
+		waste = rmsummary_to_external_unit("wall_time", waste);
+	}
 	waste = rmsummary_to_external_unit(h->field,   waste);
 
 	return waste;
@@ -786,7 +798,6 @@ double total_committed(struct field_stats *h, double first_alloc) {
 		}
 	}
 
-	committed = rmsummary_to_external_unit("wall_time", committed);
 	committed = rmsummary_to_external_unit(h->field,   committed);
 
 	return committed;
@@ -811,7 +822,9 @@ double total_usage(struct field_stats *h) {
 		usage += current * wall_time;
 	}
 
-	usage = rmsummary_to_external_unit("wall_time", usage);
+	if(!cumulative) {
+		usage = rmsummary_to_external_unit("wall_time", usage);
+	}
 	usage = rmsummary_to_external_unit(h->field,   usage);
 
 	return usage;
@@ -1015,6 +1028,17 @@ void set_fa_95(struct rmsummary_set *s, struct hash_table *categories) {
 	} LOOP_END
 }
 
+void set_fa_50(struct rmsummary_set *s, struct hash_table *categories) {
+	LOOP_FIELD(field_name) {
+		if(!field_is_active(field_name)) {
+			continue;
+		}
+
+		struct field_stats *h = hash_table_lookup(s->stats, field_name);
+		set_fa_values(h, &(h->fa_50), value_of_p(h, 0.50));
+	} LOOP_END
+}
+
 void set_fa_max(struct rmsummary_set *s, struct hash_table *categories) {
 
 	LOOP_FIELD(field_name) {
@@ -1154,6 +1178,7 @@ void set_first_allocations_of_category(struct rmsummary_set *s, struct hash_tabl
 
 	set_fa_perfect(s, categories);
 	set_fa_95(s, categories);
+	set_fa_50(s, categories);
 	set_fa_max(s, categories);
 }
 
@@ -1277,7 +1302,7 @@ void write_webpage_stats_header(FILE *stream, struct field_stats *h)
 	fprintf(stream, "<td class=\"datahdr\" >&mu; <br> &#9643; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >(&mu;+&sigma;)/&mu;</td>");
 
-	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max value<br> &#9663; </td>");
+	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max value </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. max through<br> &#9663; </td>");
 	fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. min waste </td>");
 
@@ -1285,6 +1310,35 @@ void write_webpage_stats_header(FILE *stream, struct field_stats *h)
 		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f. m.t.</td>");
 		fprintf(stream, "<td class=\"datahdr\" >1<sup>st</sup> alloc. b.f. m.w. </td>");
 	}
+}
+
+const char *eng_format(double value) {
+	int  size = 1024;
+	static char *buffer = NULL;
+
+	if(!buffer) {
+		buffer = malloc(size);
+	}
+
+	int times=0;
+
+	do {
+
+		if(value < 1000) {
+			if(times > 0) {
+				snprintf(buffer, size, "%7.3lf&nbsp;xE%d", value, times*3);
+			} else {
+				snprintf(buffer, size, "%7.3lf", value);
+			}
+
+			break;
+		}
+
+		times++;
+		value /= 1000;
+	} while(value > 1);
+
+	return buffer;
 }
 
 void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int include_thumbnail)
@@ -1298,51 +1352,51 @@ void write_webpage_stats(FILE *stream, struct field_stats *h, char *prefix, int 
 	}
 	fprintf(stream, "</td>");
 
-	const char *fmt       = (rmsummary_field_is_float(h->field) ? "%.3lf\n" : "%.0lf\n");
-	const char *fmt_alloc = (rmsummary_field_is_float(h->field) ? "alloc:&nbsp;%.3lf\n" : "alloc:&nbsp;%.0lf\n");
-	const char *fmt_stats = "throu:&nbsp;%.2lf waste:&nbsp;%.0lf%%\n";
+	const char *fmt       = "%-10s";
+	const char *fmt_alloc = "alloc:&nbsp;%s\n";
+	const char *fmt_stats = "throu:&nbsp;%10.3lf waste:&nbsp;%6.2lf%%\n";
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, histogram_mode(h->histogram)));
+	fprintf(stream, fmt, eng_format(rmsummary_to_base_unit(h->field, histogram_mode(h->histogram))));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, fmt, rmsummary_to_external_unit(h->field, h->mean));
+	fprintf(stream, fmt, eng_format(rmsummary_to_base_unit(h->field, h->mean)));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\"> -- <br><br>\n");
-	fprintf(stream, "%6.2lf\n", h->mean > 0 ? (h->mean + sqrt(h->variance))/h->mean : -1);
+	fprintf(stream, fmt,  h->mean > 0 ? eng_format((h->mean + sqrt(h->variance))/h->mean) : "-1");
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, fmt_stats, h->fa_max.throughput/h->fa_max.throughput, ((100.0*h->fa_max.waste)/(h->fa_max.waste + h->usage)));
 	fprintf(stream, "<br><br>\n");
-	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max.first));
+	fprintf(stream, fmt_alloc, eng_format(rmsummary_to_base_unit(h->field, h->fa_max.first)));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, fmt_stats, h->fa_max_throughput.throughput/h->fa_max.throughput, ((100.0*h->fa_max_throughput.waste)/(h->fa_max_throughput.waste + h->usage)));
 	fprintf(stream, "<br><br>\n");
-	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max_throughput.first));
+	fprintf(stream, fmt_alloc, eng_format(rmsummary_to_base_unit(h->field, h->fa_max_throughput.first)));
 	fprintf(stream, "</td>\n");
 
 	fprintf(stream, "<td class=\"data\">\n");
 	fprintf(stream, fmt_stats, h->fa_min_waste_time_dependence.throughput/h->fa_max.throughput, ((100.0*h->fa_min_waste_time_dependence.waste)/(h->fa_min_waste_time_dependence.waste + h->usage)));
 	fprintf(stream, "<br><br>\n");
-	fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_min_waste_time_dependence.first));
+	fprintf(stream, fmt_alloc, eng_format(rmsummary_to_base_unit(h->field, h->fa_min_waste_time_dependence.first)));
 	fprintf(stream, "</td>\n");
 
 	if(brute_force) {
 		fprintf(stream, "<td class=\"data\">\n");
 		fprintf(stream, fmt_stats, h->fa_max_throughput_brute_force.throughput/h->fa_max.throughput, ((100.0*h->fa_max_throughput_brute_force.waste)/(h->fa_max_throughput_brute_force.waste + h->usage)));
 		fprintf(stream, "<br><br>\n");
-		fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_max_throughput_brute_force.first));
+		fprintf(stream, fmt_alloc, eng_format(rmsummary_to_base_unit(h->field, h->fa_max_throughput_brute_force.first)));
 		fprintf(stream, "</td>\n");
 
 		fprintf(stream, "<td class=\"data\">\n");
 		fprintf(stream, fmt_stats, h->fa_min_waste_brute_force.throughput/h->fa_max.throughput, ((100.0*h->fa_min_waste_brute_force.waste)/(h->fa_min_waste_brute_force.waste + h->usage)));
 		fprintf(stream, "<br><br>\n");
-		fprintf(stream, fmt_alloc, rmsummary_to_external_unit(h->field, h->fa_min_waste_brute_force.first));
+		fprintf(stream, fmt_alloc, eng_format(rmsummary_to_base_unit(h->field, h->fa_min_waste_brute_force.first)));
 		fprintf(stream, "</td>\n");
 	}
 }
@@ -1532,7 +1586,6 @@ int main(int argc, char **argv)
 				brute_force = 1;
 				break;
 			case 'j':
-				/* smaller bucket size */
 				omp_set_num_threads(atoi(optarg));
 				break;
 			case 'n':
