@@ -333,6 +333,17 @@ int batch_fs_chirp_putfile (struct batch_queue *q, const char *lpath, const char
 	return -1;
 }
 
+int batch_fs_chirp_rename (struct batch_queue *q, const char *lpath, const char *rpath)
+{
+	char lresolved[CHIRP_PATH_MAX];
+	char rresolved[CHIRP_PATH_MAX];
+	snprintf(lresolved, sizeof(lresolved), "%s/%s", getroot(q), lpath);
+	snprintf(rresolved, sizeof(rresolved), "%s/%s", getroot(q), rpath);
+	if (chirp_reli_rename(gethost(q), lresolved, rresolved, STOPTIME) <= 0) return 0;
+	return -1;
+}
+
+
 #define COPY_STATC( a, b )\
 	memset(&(b),0,sizeof(b));\
 	(b).st_dev = (a).cst_dev;\
@@ -388,6 +399,7 @@ const struct batch_queue_module batch_queue_chirp = {
 		batch_fs_chirp_getcwd,
 		batch_fs_chirp_mkdir,
 		batch_fs_chirp_putfile,
+		batch_fs_chirp_rename,
 		batch_fs_chirp_stat,
 		batch_fs_chirp_unlink,
 	},

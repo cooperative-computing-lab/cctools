@@ -255,6 +255,7 @@ batch_fs_stub_chdir(wq);
 batch_fs_stub_getcwd(wq);
 batch_fs_stub_mkdir(wq);
 batch_fs_stub_putfile(wq);
+batch_fs_stub_rename(wq);
 batch_fs_stub_stat(wq);
 batch_fs_stub_unlink(wq);
 
@@ -278,6 +279,7 @@ const struct batch_queue_module batch_queue_wq = {
 		batch_fs_wq_getcwd,
 		batch_fs_wq_mkdir,
 		batch_fs_wq_putfile,
+		batch_fs_wq_rename,
 		batch_fs_wq_stat,
 		batch_fs_wq_unlink,
 	},
