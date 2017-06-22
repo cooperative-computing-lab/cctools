@@ -121,12 +121,13 @@ void rmsummary_add(struct rmsummary *dest, const struct rmsummary *src);
 void rmsummary_debug_report(const struct rmsummary *s);
 
 double rmsummary_to_external_unit(const char *field, int64_t n);
+double rmsummary_to_base_unit(const char *field, int64_t n);
 int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *unit);
 
 size_t rmsummary_field_offset(const char *key);
 int64_t rmsummary_get_int_field_by_offset(const struct rmsummary *s, size_t offset);
 
-void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, double multiplier, int float_flag);
+void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, const char *base, double exttoint, double inttobase, int float_flag);
 int rmsummary_field_is_float(const char *key);
 
 struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i);
