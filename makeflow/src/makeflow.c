@@ -787,8 +787,6 @@ static int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 			} else {
 				debug(D_MAKEFLOW_RUN, "Copied %s -> %s",
 						f->filename, o->filename);
-				makeflow_log_file_state_change(
-						d, o, DAG_FILE_STATE_COMPLETE);
 			}
 		} else {
 			fprintf(stderr, "Skipping copy %s -> %s", f->filename,
