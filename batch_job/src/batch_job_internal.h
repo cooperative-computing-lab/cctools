@@ -35,6 +35,7 @@ struct batch_queue_module {
 		int (*getcwd) (struct batch_queue *q, char *buf, size_t size);
 		int (*mkdir) (struct batch_queue *q, const char *path, mode_t mode, int recursive);
 		int (*putfile) (struct batch_queue *q, const char *lpath, const char *rpath);
+		int (*rename) (struct batch_queue *q, const char *lpath, const char *rpath);
 		int (*stat) (struct batch_queue *q, const char *path, struct stat *buf);
 		int (*unlink) (struct batch_queue *q, const char *path);
 	} fs;
@@ -61,6 +62,7 @@ struct batch_queue {
 #define batch_fs_stub_getcwd(name)  static int batch_fs_##name##_getcwd (struct batch_queue *Q, char *buf, size_t size) { getcwd(buf, size); return 0; }
 #define batch_fs_stub_mkdir(name)  static int batch_fs_##name##_mkdir (struct batch_queue *Q, const char *path, mode_t mode, int recursive) { if (recursive) return create_dir(path, mode); else return mkdir(path, mode); }
 #define batch_fs_stub_putfile(name)  static int batch_fs_##name##_putfile (struct batch_queue *Q, const char *lpath, const char *rpath) { return copy_file_to_file(lpath, rpath); }
+#define batch_fs_stub_rename(name)  static int batch_fs_##name##_rename (struct batch_queue *Q, const char *lpath, const char *rpath) { return rename(lpath, rpath); }
 #define batch_fs_stub_stat(name)  static int batch_fs_##name##_stat (struct batch_queue *Q, const char *path, struct stat *buf) { return stat(path, buf); }
 #define batch_fs_stub_unlink(name)  static int batch_fs_##name##_unlink (struct batch_queue *Q, const char *path) { return delete_dir(path); }
 

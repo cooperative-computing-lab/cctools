@@ -349,6 +349,7 @@ batch_fs_stub_chdir(cluster);
 batch_fs_stub_getcwd(cluster);
 batch_fs_stub_mkdir(cluster);
 batch_fs_stub_putfile(cluster);
+batch_fs_stub_rename(cluster);
 batch_fs_stub_stat(cluster);
 batch_fs_stub_unlink(cluster);
 
@@ -372,6 +373,7 @@ const struct batch_queue_module batch_queue_cluster = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},
@@ -397,6 +399,7 @@ const struct batch_queue_module batch_queue_moab = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},
@@ -422,6 +425,7 @@ const struct batch_queue_module batch_queue_sge = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},
@@ -447,6 +451,7 @@ const struct batch_queue_module batch_queue_pbs = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},
@@ -472,6 +477,7 @@ const struct batch_queue_module batch_queue_torque = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},
@@ -497,6 +503,7 @@ const struct batch_queue_module batch_queue_slurm = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},

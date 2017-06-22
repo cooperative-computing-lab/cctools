@@ -40,7 +40,7 @@ static struct batch_queue_module batch_queue_unknown = {
 
 	{NULL, NULL, NULL},
 
-	{NULL, NULL, NULL, NULL, NULL, NULL},
+	{NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
 #define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, mesos, moab, slurm, chirp, amazon, dryrun"
@@ -255,6 +255,11 @@ int batch_fs_mkdir (struct batch_queue *q, const char *path, mode_t mode, int re
 int batch_fs_putfile (struct batch_queue *q, const char *lpath, const char *rpath)
 {
 	return q->module->fs.putfile(q, lpath, rpath);
+}
+
+int batch_fs_rename (struct batch_queue *q, const char *lpath, const char *rpath)
+{
+	return q->module->fs.rename(q, lpath, rpath);
 }
 
 int batch_fs_stat (struct batch_queue *q, const char *path, struct stat *buf)
