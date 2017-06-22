@@ -761,7 +761,7 @@ static int makeflow_prep_fail_dir(
 	}
 
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
-	fprintf(stderr, "rule %d failed, copying any outputs to %s\n",
+	fprintf(stderr, "rule %d failed, moving any outputs to %s\n",
 			n->nodeid, faildir);
 	rc = 0;
 FAILURE:
@@ -776,24 +776,26 @@ static int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 	assert(n);
 	assert(q);
 	assert(f);
-	if (!prep_failed) {
-		char *failout = string_format(
-				FAIL_DIR "/%s", n->nodeid, f->filename);
-		struct dag_file *o = makeflow_lookup_fail_file(d, q, failout);
-		if (o) {
-			if (batch_fs_putfile(q, f->filename, o->filename) < 0) {
-				debug(D_MAKEFLOW_RUN, "Failed to copy %s -> %s",
-						f->filename, o->filename);
-			} else {
-				debug(D_MAKEFLOW_RUN, "Copied %s -> %s",
-						f->filename, o->filename);
-			}
+
+	if (prep_failed) goto CLEANUP;
+
+	char *failout = string_format(
+			FAIL_DIR "/%s", n->nodeid, f->filename);
+	struct dag_file *o = makeflow_lookup_fail_file(d, q, failout);
+	if (o) {
+		if (batch_fs_rename(q, f->filename, o->filename) < 0) {
+			debug(D_MAKEFLOW_RUN, "Failed to rename %s -> %s",
+					f->filename, o->filename);
 		} else {
-			fprintf(stderr, "Skipping copy %s -> %s", f->filename,
-					failout);
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+			debug(D_MAKEFLOW_RUN, "Renamed %s -> %s",
+					f->filename, o->filename);
 		}
-		free(failout);
+	} else {
+		fprintf(stderr, "Skipping rename %s -> %s", f->filename, failout);
 	}
+	free(failout);
+CLEANUP:
 	return makeflow_clean_file(d, q, f, silent);
 }
 
@@ -860,7 +862,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 		int prep_failed = makeflow_prep_fail_dir(d, n, remote_queue);
 		if (prep_failed) {
-			fprintf(stderr, "rule %d failed, cannot copy outputs\n",
+			fprintf(stderr, "rule %d failed, cannot move outputs\n",
 					n->nodeid);
 		}
 
