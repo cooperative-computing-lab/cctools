@@ -103,7 +103,7 @@ void jx_export_xml( struct jx *j, FILE *stream )
 			jx_export_xml(i->value, stream);
 			if (i->variable) {
 				fprintf(stream, "<var>");
-				fprintf(stream, i->variable);
+				fprintf(stream, "%s", i->variable);
 				fprintf(stream, "</var>");
 			}
 			if (i->condition) {
@@ -128,7 +128,7 @@ void jx_export_xml( struct jx *j, FILE *stream )
 	case JX_FUNCTION:
 		fprintf(stream, "<func>");
 		fprintf(stream, "<name>");
-		fprintf(stream, j->u.func.name);
+		fprintf(stream, "%s", j->u.func.name);
 		fprintf(stream, "</name>");
 		for (struct jx_item *i = j->u.func.params; i; i = i->next) {
 			fprintf(stream, "<param>");
