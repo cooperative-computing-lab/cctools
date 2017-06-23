@@ -91,6 +91,7 @@ struct field_stats {
 	struct allocation fa_perfect;
 	struct allocation fa_max;
 	struct allocation fa_95;
+	struct allocation fa_50;
 	struct allocation fa_min_waste_time_dependence;
 	struct allocation fa_min_waste_time_independence;
 	struct allocation fa_min_waste_brute_force;
@@ -662,6 +663,7 @@ struct jx *field_to_json(struct field_stats *h)
 	jx_insert(policies, jx_string("perfect"), allocation_to_json(h, &(h->fa_perfect)));
 	jx_insert(policies, jx_string("maximum"), allocation_to_json(h, &(h->fa_max)));
 	jx_insert(policies, jx_string("P95"),     allocation_to_json(h, &(h->fa_95)));
+	jx_insert(policies, jx_string("P50"),     allocation_to_json(h, &(h->fa_50)));
 
 	if(brute_force) {
 		jx_insert(policies, jx_string("min_waste_brute_force"),      allocation_to_json(h, &(h->fa_min_waste_brute_force)));
@@ -1027,6 +1029,17 @@ void set_fa_95(struct rmsummary_set *s, struct hash_table *categories) {
 	} LOOP_END
 }
 
+void set_fa_50(struct rmsummary_set *s, struct hash_table *categories) {
+	LOOP_FIELD(field_name) {
+		if(!field_is_active(field_name)) {
+			continue;
+		}
+
+		struct field_stats *h = hash_table_lookup(s->stats, field_name);
+		set_fa_values(h, &(h->fa_50), value_of_p(h, 0.50));
+	} LOOP_END
+}
+
 void set_fa_max(struct rmsummary_set *s, struct hash_table *categories) {
 
 	LOOP_FIELD(field_name) {
@@ -1166,6 +1179,7 @@ void set_first_allocations_of_category(struct rmsummary_set *s, struct hash_tabl
 
 	set_fa_perfect(s, categories);
 	set_fa_95(s, categories);
+	set_fa_50(s, categories);
 	set_fa_max(s, categories);
 }
 
@@ -1570,7 +1584,6 @@ int main(int argc, char **argv)
 				brute_force = 1;
 				break;
 			case 'j':
-				/* smaller bucket size */
 				omp_set_num_threads(atoi(optarg));
 				break;
 			case 'n':
