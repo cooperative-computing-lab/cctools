@@ -120,6 +120,12 @@ x||y;
 [[[i, j] for j in range(3)] for i in [10 - i for i in range(4)]];
 [null for i in 7];
 [i for i in range(10) if i % 3 == 0];
+[[i, j] for i in range(4) for j in range(3)];
+[[i, j] for i in range(5) if (i + j) % 2 == 0 for j in range(4)];
+[[i, j] for i in range(5) for j in range(4) if j % 2 == 1];
+[[i, j] for i in range(5) if i % 2 == 0 for j in range(4) if j % 2 == 1];
+[[i, j] for i in range(5) if j % 2 == 0 for j in range(4) if i % 2 == 1];
+[[i, j, k, l] for i in range(4) for j in range(3) for k in range(3) for l in [true, false]];
 
 list[2];
 object["house"];

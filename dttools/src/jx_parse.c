@@ -392,6 +392,67 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	}
 }
 
+static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s, struct jx_comprehension *next) {
+	jx_token_t t = jx_scan(s);
+	if (t != JX_TOKEN_FOR) {
+		jx_unscan(s, t);
+		return next;
+	}
+
+	unsigned line = s->line;
+	char *variable = NULL;
+	struct jx *elements = NULL;
+	struct jx *condition = NULL;
+	struct jx_comprehension *result = NULL;
+
+	t = jx_scan(s);
+	if (t != JX_TOKEN_SYMBOL) {
+		jx_parse_error(s, "expected variable for list comprehension");
+		goto FAILURE;
+	}
+	variable = strdup(s->token);
+
+	t = jx_scan(s);
+	if (t != JX_TOKEN_IN) {
+		jx_parse_error(s, "malformed list comprehension (missing `in')");
+		goto FAILURE;
+	}
+
+	elements = jx_parse(s);
+	if (!elements) {
+		if (!jx_parser_errors(s)) jx_parse_error(s, "EOF while parsing list comprehension");
+		goto FAILURE;
+	}
+
+	t = jx_scan(s);
+	if (t == JX_TOKEN_IF) {
+		condition = jx_parse(s);
+		if (!condition) {
+			if (!jx_parser_errors(s)) jx_parse_error(s, "EOF while parsing list comprehension");
+			goto FAILURE;
+		}
+	} else {
+		jx_unscan(s, t);
+	}
+
+	result = jx_comprehension(
+		variable,
+		elements,
+		condition,
+		next);
+	result->line = line;
+	free(variable);
+
+	return jx_parse_comprehension(s, result);
+
+FAILURE:
+	free(variable);
+	jx_delete(elements);
+	jx_delete(condition);
+	jx_comprehension_delete(result);
+	return NULL;
+}
+
 static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 	jx_token_t rdelim = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
 	jx_token_t t = jx_scan(s);
@@ -411,49 +472,14 @@ static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 		jx_item_delete(i);
 		return NULL;
 	}
-
-	t = jx_scan(s);
-	if (t == JX_TOKEN_FOR) {
-		t = jx_scan(s);
-		if (t != JX_TOKEN_SYMBOL) {
-			jx_item_delete(i);
-			jx_parse_error(
-				s, "expected variable for list comprehension");
-			return NULL;
-		}
-		i->variable = strdup(s->token);
-
-		t = jx_scan(s);
-		if (t != JX_TOKEN_IN) {
-			jx_item_delete(i);
-			jx_parse_error(s,
-				"malformed list comprehension (missing `in')");
-			return NULL;
-		}
-
-		i->list = jx_parse(s);
-		if (!i->list) {
-			jx_item_delete(i);
-			if (jx_parser_errors(s)) return NULL;
-			jx_parse_error(
-				s, "EOF while parsing list comprehension");
-			return NULL;
-		}
-
-		t = jx_scan(s);
-		if (t == JX_TOKEN_IF) {
-			i->condition = jx_parse(s);
-			if (!i->condition) {
-				jx_item_delete(i);
-				if (jx_parser_errors(s)) return NULL;
-				jx_parse_error(s,
-					"EOF while parsing list comprehension");
-				return NULL;
-			}
-			t = jx_scan(s);
-		}
+	i->comp = jx_parse_comprehension(s, NULL);
+	if (jx_parser_errors(s)) {
+		// error set by deeper layer
+		jx_item_delete(i);
+		return NULL;
 	}
 
+	t = jx_scan(s);
 	if(t==JX_TOKEN_COMMA) {
 		i->next = jx_parse_item_list(s, arglist);
 		if (jx_parser_errors(s)) {

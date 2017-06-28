@@ -31,6 +31,17 @@ struct jx_item * jx_item( struct jx *value, struct jx_item *next )
 	return item;
 }
 
+struct jx_comprehension *jx_comprehension(const char *variable, struct jx *elements, struct jx *condition, struct jx_comprehension *next) {
+	assert(variable);
+	assert(elements);
+	struct jx_comprehension *comp = calloc(1, sizeof(*comp));
+	comp->variable = strdup(variable);
+	comp->elements = elements;
+	comp->condition = condition;
+	comp->next = next;
+	return comp;
+}
+
 static struct jx * jx_create( jx_type_t type )
 {
 	struct jx *j = calloc(1, sizeof(*j));
@@ -366,11 +377,18 @@ void jx_item_delete( struct jx_item *item )
 {
 	if(!item) return;
 	jx_delete(item->value);
-	free(item->variable);
-	jx_delete(item->list);
-	jx_delete(item->condition);
+	jx_comprehension_delete(item->comp);
 	jx_item_delete(item->next);
 	free(item);
+}
+
+void jx_comprehension_delete(struct jx_comprehension *comp) {
+	if (!comp) return;
+	free(comp->variable);
+	jx_delete(comp->elements);
+	jx_delete(comp->condition);
+	jx_comprehension_delete(comp->next);
+	free(comp);
 }
 
 void jx_delete( struct jx *j )
@@ -421,6 +439,15 @@ int jx_istrue( struct jx *j )
 	return j && j->type==JX_BOOLEAN && j->u.boolean_value;
 }
 
+int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension *k) {
+	if (!j && !k) return 1;
+	if (!j || !k) return 0;
+	return !strcmp(j->variable, k->variable)
+		&& jx_equals(j->elements, k->elements)
+		&& jx_equals(j->condition, k->condition)
+		&& jx_comprehension_equals(j->next, k->next);
+}
+
 int jx_pair_equals( struct jx_pair *j, struct jx_pair *k )
 {
 	if(!j && !k) return 1;
@@ -432,12 +459,8 @@ int jx_item_equals( struct jx_item *j, struct jx_item *k )
 {
 	if(!j && !k) return 1;
 	if(!j || !k) return 0;
-	if (j->variable && !k->variable) return 0;
-	if (!j->variable && k->variable) return 0;
-	return !(j->variable && strcmp(j->variable, k->variable))
-		&& jx_equals(j->list, k->list)
-		&& jx_equals(j->condition, k->condition)
-		&& jx_equals(j->value, k->value)
+	return jx_equals(j->value, k->value)
+		&& jx_comprehension_equals(j->comp, k->comp)
 		&& jx_item_equals(j->next, k->next);
 }
 
@@ -481,9 +504,20 @@ int jx_equals( struct jx *j, struct jx *k )
 	return 0;
 }
 
+struct jx_comprehension *jx_comprehension_copy(struct jx_comprehension *c) {
+	if (!c) return NULL;
+	struct jx_comprehension *comp = calloc(1, sizeof(*comp));
+	comp->line = c->line;
+	comp->variable = strdup(c->variable);
+	comp->elements = jx_copy(c->elements);
+	comp->condition = jx_copy(c->condition);
+	comp->next = jx_comprehension_copy(c->next);
+	return comp;
+}
+
 struct jx_pair * jx_pair_copy( struct jx_pair *p )
 {
-	if(!p) return 0;
+	if (!p) return NULL;
 	struct jx_pair *pair = calloc(1, sizeof(*pair));
 	pair->key = jx_copy(p->key);
 	pair->value = jx_copy(p->value);
@@ -494,14 +528,12 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 
 struct jx_item * jx_item_copy( struct jx_item *i )
 {
-	if (!i) return 0;
+	if (!i) return NULL;
 	struct jx_item *item = calloc(1, sizeof(*item));
-	item->value = jx_copy(i->value);
-	if (i->variable) item->variable = strdup(i->variable);
-	item->list = jx_copy(i->list);
-	item->condition = jx_copy(i->condition);
-	item->next = jx_item_copy(i->next);
 	item->line = i->line;
+	item->value = jx_copy(i->value);
+	item->comp = jx_comprehension_copy(i->comp);
+	item->next = jx_item_copy(i->next);
 	return item;
 }
 
@@ -566,18 +598,16 @@ struct jx *jx_merge(struct jx *j, ...) {
 	return result;
 }
 
-int jx_pair_is_constant( struct jx_pair *p )
-{
+static int jx_pair_is_constant(struct jx_pair *p) {
 	if(!p) return 1;
 	return jx_is_constant(p->key)
 		&& jx_is_constant(p->value)
 		&& jx_pair_is_constant(p->next);
 }
 
-int jx_item_is_constant( struct jx_item *i )
-{
+static int jx_item_is_constant(struct jx_item *i) {
 	if(!i) return 1;
-	if (i->variable || i->list || i->condition) return 0;
+	if (i->comp) return 0;
 	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 

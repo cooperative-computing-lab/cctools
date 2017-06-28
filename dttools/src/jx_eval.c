@@ -387,33 +387,17 @@ DONE:
 	return result;
 }
 
-static struct jx_pair * jx_eval_pair( struct jx_pair *pair, struct jx *context )
-{
-	if(!pair) return 0;
+static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehension *comp, struct jx *context) {
+	assert(body);
+	assert(comp);
 
-	return jx_pair(
-		jx_eval(pair->key,context),
-		jx_eval(pair->value,context),
-		jx_eval_pair(pair->next,context)
-	);
-}
-
-static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
-	if (!item) return NULL;
-	assert((item->variable && item->list)
-		|| !(item->variable || item->list));
-
-	if (!item->variable)
-		return jx_item(jx_eval(item->value, context),
-			jx_eval_item(item->next, context));
-
-	struct jx *list = jx_eval(item->list, context);
+	struct jx *list = jx_eval(comp->elements, context);
 	if (jx_istype(list, JX_ERROR)) return jx_item(list, NULL);
 	if (!jx_istype(list, JX_ARRAY)) {
 		struct jx *err = jx_object(NULL);
 		jx_insert_integer(err, "code", 2);
 		jx_insert(err, jx_string("list"), list);
-		if (item->line) jx_insert_integer(err, "line", item->line);
+		if (comp->line) jx_insert_integer(err, "line", comp->line);
 		jx_insert_string(
 			err, "message", "list comprehension takes an array");
 		jx_insert_string(err, "name", jx_error_name(2));
@@ -428,9 +412,9 @@ static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
 	void *i = NULL;
 	while ((j = jx_iterate_array(list, &i))) {
 		struct jx *ctx = jx_copy(context);
-		jx_insert(ctx, jx_string(item->variable), jx_copy(j));
-		if (item->condition) {
-			struct jx *cond = jx_eval(item->condition, ctx);
+		jx_insert(ctx, jx_string(comp->variable), jx_copy(j));
+		if (comp->condition) {
+			struct jx *cond = jx_eval(comp->condition, ctx);
 			if (jx_istype(cond, JX_ERROR)) {
 				jx_delete(ctx);
 				jx_delete(list);
@@ -444,9 +428,8 @@ static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
 				struct jx *err = jx_object(NULL);
 				jx_insert_integer(err, "code", 2);
 				jx_insert(err, jx_string("condition"), cond);
-				if (item->line)
-					jx_insert_integer(
-						err, "line", item->line);
+				if (cond->line)
+					jx_insert_integer(err, "line", cond->line);
 				jx_insert_string(err, "message",
 					"list comprehension condition takes a boolean");
 				jx_insert_string(err, "name", jx_error_name(2));
@@ -460,28 +443,63 @@ static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
 				continue;
 			}
 		}
-		struct jx *val = jx_eval(item->value, ctx);
-		jx_delete(ctx);
-		if (!val) {
-			jx_delete(list);
-			jx_item_delete(result);
-			return NULL;
-		}
-		if (result) {
-			tail->next = jx_item(val, NULL);
-			tail = tail->next;
+
+		if (comp->next) {
+			struct jx_item *val = jx_eval_comprehension(body, comp->next, ctx);
+			jx_delete(ctx);
+			if (result) {
+				tail->next = val;
+			} else {
+				result = tail = val;
+			}
+			while (tail && tail->next) tail = tail->next;
+
 		} else {
-			result = jx_item(val, NULL);
-			tail = result;
+			struct jx *val = jx_eval(body, ctx);
+			jx_delete(ctx);
+			if (!val) {
+				jx_delete(list);
+				jx_item_delete(result);
+				return NULL;
+			}
+			if (result) {
+				tail->next = jx_item(val, NULL);
+				tail = tail->next;
+			} else {
+				result = tail = jx_item(val, NULL);
+			}
 		}
 	}
 
 	jx_delete(list);
-	if (result) {
-		tail->next = jx_eval_item(item->next, context);
-		return result;
+	return result;
+}
+
+static struct jx_pair *jx_eval_pair(struct jx_pair *pair, struct jx *context) {
+	if (!pair) return 0;
+
+	return jx_pair(
+		jx_eval(pair->key, context),
+		jx_eval(pair->value, context),
+		jx_eval_pair(pair->next, context));
+}
+
+static struct jx_item *jx_eval_item(struct jx_item *item, struct jx *context) {
+	if (!item) return NULL;
+
+	if (item->comp) {
+		struct jx_item *result = jx_eval_comprehension(item->value, item->comp, context);
+		if (result) {
+			struct jx_item *i = result;
+			while (i->next) i = i->next;
+			i->next = jx_eval_item(item->next, context);
+			return result;
+		} else {
+			return jx_eval_item(item->next, context);
+		}
 	} else {
-		return jx_eval_item(item->next, context);
+		return jx_item(jx_eval(item->value, context),
+			jx_eval_item(item->next, context));
 	}
 }
 

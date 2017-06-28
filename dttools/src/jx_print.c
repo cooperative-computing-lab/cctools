@@ -10,6 +10,20 @@ See the file COPYING for details.
 #include <assert.h>
 #include <ctype.h>
 
+static void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b) {
+	if (!comp) return;
+	jx_comprehension_print(comp->next, b);
+
+	buffer_putstring(b, " for ");
+	buffer_putstring(b, comp->variable);
+	buffer_putstring(b, " in ");
+	jx_print_buffer(comp->elements, b);
+	if (comp->condition) {
+		buffer_putstring(b, " if ");
+		jx_print_buffer(comp->condition, b);
+	}
+}
+
 static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
 {
 	if(!pair) return;
@@ -27,18 +41,9 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 {
 	if(!item) return;
 
-	jx_print_buffer(item->value,b);
-	if (item->variable) {
-		assert(item->list);
-		buffer_putstring(b, " for ");
-		buffer_putstring(b, item->variable);
-		buffer_putstring(b, " in ");
-		jx_print_buffer(item->list, b);
-		if (item->condition) {
-			buffer_putstring(b, " if ");
-			jx_print_buffer(item->condition, b);
-		}
-	}
+	jx_print_buffer(item->value, b);
+	jx_comprehension_print(item->comp, b);
+
 	if(item->next) {
 		buffer_putstring(b,",");
 		jx_item_print(item->next,b);

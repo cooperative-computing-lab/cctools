@@ -101,21 +101,6 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		for (i = j->u.items; i; i = i->next) {
 			fprintf(stream, "<item>");
 			jx_export_xml(i->value, stream);
-			if (i->variable) {
-				fprintf(stream, "<var>");
-				fprintf(stream, "%s", i->variable);
-				fprintf(stream, "</var>");
-			}
-			if (i->condition) {
-				fprintf(stream, "<cond>");
-				jx_export_xml(i->condition, stream);
-				fprintf(stream, "</cond>");
-			}
-			if (i->list) {
-				fprintf(stream, "<list>");
-				jx_export_xml(i->list, stream);
-				fprintf(stream, "</list>");
-			}
 			fprintf(stream,"</item>");
 		}
 		fprintf(stream,"</array>\n");
