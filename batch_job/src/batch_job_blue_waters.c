@@ -301,6 +301,7 @@ batch_fs_stub_chdir(cluster);
 batch_fs_stub_getcwd(cluster);
 batch_fs_stub_mkdir(cluster);
 batch_fs_stub_putfile(cluster);
+batch_fs_stub_rename(cluster);
 batch_fs_stub_stat(cluster);
 batch_fs_stub_unlink(cluster);
 
@@ -324,6 +325,7 @@ const struct batch_queue_module batch_queue_blue_waters = {
 		batch_fs_cluster_getcwd,
 		batch_fs_cluster_mkdir,
 		batch_fs_cluster_putfile,
+		batch_fs_cluster_rename,
 		batch_fs_cluster_stat,
 		batch_fs_cluster_unlink,
 	},

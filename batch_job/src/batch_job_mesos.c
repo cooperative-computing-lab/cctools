@@ -375,6 +375,7 @@ batch_fs_stub_chdir(mesos);
 batch_fs_stub_getcwd(mesos);
 batch_fs_stub_mkdir(mesos);
 batch_fs_stub_putfile(mesos);
+batch_fs_stub_rename(mesos);
 batch_fs_stub_stat(mesos);
 batch_fs_stub_unlink(mesos);
 
@@ -398,6 +399,7 @@ const struct batch_queue_module batch_queue_mesos = {
 		batch_fs_mesos_getcwd,
 		batch_fs_mesos_mkdir,
 		batch_fs_mesos_putfile,
+		batch_fs_mesos_rename,
 		batch_fs_mesos_stat,
 		batch_fs_mesos_unlink,
 	},

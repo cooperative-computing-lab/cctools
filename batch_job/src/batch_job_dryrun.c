@@ -191,6 +191,22 @@ static int batch_fs_dryrun_putfile (struct batch_queue *q, const char *lpath, co
 	}
 }
 
+static int batch_fs_dryrun_rename (struct batch_queue *q, const char *lpath, const char *rpath) {
+	FILE *log;
+
+	if ((log = fopen(q->logfile, "a"))) {
+		char *escaped_lpath = string_escape_shell(lpath);
+		char *escaped_rpath = string_escape_shell(rpath);
+		fprintf(log, "mv %s %s\n", escaped_lpath, escaped_rpath);
+		free(escaped_lpath);
+		free(escaped_rpath);
+		fclose(log);
+		return 0;
+	} else {
+		return -1;
+	}
+}
+
 batch_queue_stub_free(dryrun);
 batch_queue_stub_port(dryrun);
 batch_queue_stub_option_update(dryrun);
@@ -215,6 +231,7 @@ const struct batch_queue_module batch_queue_dryrun = {
 		batch_fs_dryrun_getcwd,
 		batch_fs_dryrun_mkdir,
 		batch_fs_dryrun_putfile,
+		batch_fs_dryrun_rename,
 		batch_fs_dryrun_stat,
 		batch_fs_dryrun_unlink,
 	},

@@ -774,14 +774,21 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(job_failed) {
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue);
+		if (prep_failed) {
+			fprintf(stderr, "rule %d failed, cannot move outputs\n",
+					n->nodeid);
+		}
 
 		/* Clean files created in node. Clean existing and expected and record deletion. */
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
 			if(f->state == DAG_FILE_STATE_EXPECT) {
-				makeflow_clean_file(d, remote_queue, f, 1);
+				makeflow_clean_failed_file(d, n, remote_queue,
+						f, prep_failed, 1);
 			} else {
-				makeflow_clean_file(d, remote_queue, f, 0);
+				makeflow_clean_failed_file(d, n, remote_queue,
+						f, prep_failed, 0);
 			}
 		}
 
