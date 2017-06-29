@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper.h"
 #include "makeflow_gc.h"
 
+#include <assert.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <limits.h>
@@ -357,8 +358,7 @@ int makeflow_clean_prep_fail_dir(
 		goto FAILURE;
 	}
 	if (batch_fs_mkdir(q, f->filename, 0755, 0)) {
-		debug(D_MAKEFLOW_RUN,
-				"Unable to create failed output directory");
+		debug(D_MAKEFLOW_RUN, "Unable to create failed output directory: %s", strerror(errno));
 		goto FAILURE;
 	}
 
@@ -386,8 +386,8 @@ int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 	struct dag_file *o = dag_file_lookup_fail(d, q, failout);
 	if (o) {
 		if (batch_fs_rename(q, f->filename, o->filename) < 0) {
-			debug(D_MAKEFLOW_RUN, "Failed to rename %s -> %s",
-					f->filename, o->filename);
+			debug(D_MAKEFLOW_RUN, "Failed to rename %s -> %s: %s",
+					f->filename, o->filename, strerror(errno));
 		} else {
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 			debug(D_MAKEFLOW_RUN, "Renamed %s -> %s",

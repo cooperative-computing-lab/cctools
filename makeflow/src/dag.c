@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
