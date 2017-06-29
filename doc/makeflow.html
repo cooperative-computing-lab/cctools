@@ -226,7 +226,9 @@ output.txt: input.dat
 
 A variety of tools are available to help you monitor the progress of a workflow as it runs.
 Makeflow itself creates a transaction log (<tt>example.makeflow.makeflowlog</tt>) which
-contains details of each task as it runs:
+contains details of each task as it runs, tracking how many are idle,
+running, complete, and so forth.  These tools can read the transaction
+log and summarize the workflow:
 
 <ol>
 <li> <tt>makeflow_monitor</tt> reads the transaction log and produceds a continuous
@@ -241,6 +243,18 @@ graph showing the number of jobs ready, running, and complete over time:
 so that you can more easily understand the structure and dependencies.
 (Read more about <a href=#visualization>Visualization</a>
 </ol>
+
+<p>
+In addition, if you give the workflow a "project name" with the <tt>-N</tt>
+option, it will report its status to the <a href=catalog.html>catalog server</a> once per minute.  The <tt>makeflow_status</tt> command will query the catalog
+and summarize your currently running workloads, like this:
+</p>
+
+<pre>
+OWNER      PROJECT              JOBS   WAIT    RUN   COMP   ABRT   FAIL   TYPE
+alfred     simulation           2263   2258      1      4      0      0 condor
+betty      analysis             2260      1      1   2258      0      0     wq
+</pre>
 
 <a name=advice><h3>General Advice</h3></a>
 
