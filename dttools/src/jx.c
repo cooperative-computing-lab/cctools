@@ -317,6 +317,7 @@ void jx_array_append( struct jx *array, struct jx *value )
 struct jx * jx_array_index( struct jx *j, int nth )
 {
 	if (!jx_istype(j, JX_ARRAY)) return NULL;
+	if (nth < 0) return NULL;
 	struct jx_item *item = j->u.items;
 
 	for(int i = 0; i < nth; i++) {
