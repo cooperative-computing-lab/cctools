@@ -275,6 +275,13 @@ about how each job is constructed and sent to the underlying batch system.
 </p>
 
 <p>
+When debugging failed tasks, it is often useful to examine any output produced.
+Makeflow automatically saves these files in a <tt>makeflow.failed.$ruleno</tt> directory for each failed rule.
+Only the specified outputs of a rule will be saved.
+If the rule is retried and later succeeds, the failed outputs will be automatically deleted.
+</p>
+
+<p>
 Finally, Makeflow was created by the Cooperative Computing Lab at the University of Notre Dame.
 We are always happy to learn more about how Makeflow is used and assist you if you
 have questions or difficulty.  <p>For the latest information about Makeflow, please visit our <a href="http://ccl.cse.nd.edu/software/makeflow">web site</a> and subscribe to our <a href="http://ccl.cse.nd.edu/software">mailing list</a> for more information.
