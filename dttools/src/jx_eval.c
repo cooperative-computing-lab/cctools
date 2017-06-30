@@ -250,6 +250,43 @@ static struct jx *jx_eval_call(
 	abort();
 }
 
+static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
+	assert(array);
+	assert(slice);
+	assert(slice->type == JX_OPERATOR);
+	assert(slice->u.oper.type == JX_OP_SLICE);
+	struct jx *left = slice->u.oper.left;
+	struct jx *right = slice->u.oper.right;
+
+	if (array->type != JX_ARRAY) {
+		int code = 2;
+		struct jx *err = jx_object(NULL);
+		jx_insert_integer(err, "code", code);
+		jx_insert(err, jx_string("operator"), jx_operator(JX_OP_LOOKUP, jx_copy(array), jx_copy(slice)));
+		if (array->line) jx_insert_integer(err, "line", array->line);
+		jx_insert_string(err, "message", "only arrays support slicing");
+		jx_insert_string(err, "name", jx_error_name(code));
+		jx_insert_string(err, "source", "jx_eval");
+		return jx_error(err);
+	}
+	if (left && left->type != JX_INTEGER) FAILOP(2, (&slice->u.oper), jx_copy(left), jx_copy(right),
+		"slice indices must be integers");
+	if (right && right->type != JX_INTEGER) FAILOP(2, (&slice->u.oper), jx_copy(left), jx_copy(right),
+		"slice indices must be integers");
+
+	struct jx *result = jx_array(NULL);
+
+	// this is all SUPER inefficient
+	jx_int_t start = left ? left->u.integer_value : 0;
+	jx_int_t end = right ? right->u.integer_value : jx_array_length(array);
+	for (jx_int_t i = start; i < end; ++i) {
+		struct jx *j = jx_array_index(array, i);
+		if (j) jx_array_append(result, jx_copy(j));
+	}
+
+	return result;
+}
+
 /*
 Handle a lookup operator, which has two valid cases:
 1 - left is an object, right is a string, return the named item in the object.
@@ -326,6 +363,8 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		goto DONE;
 	}
 
+	if (o->type == JX_OP_SLICE) return jx_operator(JX_OP_SLICE, left, right);
+
 	if((left && right) && (left->type!=right->type) ) {
 		if( left->type==JX_INTEGER && right->type==JX_DOUBLE) {
 			struct jx *n = jx_double(left->u.integer_value);
@@ -344,7 +383,12 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_delete(right);
 			return jx_boolean(1);
 		} else if(o->type==JX_OP_LOOKUP) {
-			struct jx *r = jx_eval_lookup(left,right);
+			struct jx *r;
+			if (right->type == JX_OPERATOR && right->u.oper.type == JX_OP_SLICE) {
+				r = jx_eval_slice(left, right);
+			} else {
+				r = jx_eval_lookup(left, right);
+			}
 			jx_delete(left);
 			jx_delete(right);
 			return r;
@@ -452,6 +496,8 @@ static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehe
 			} else {
 				result = tail = val;
 			}
+			// this is going to go over the list LOTS of times
+			// in the various recursive calls
 			while (tail && tail->next) tail = tail->next;
 
 		} else {

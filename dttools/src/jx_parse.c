@@ -697,6 +697,46 @@ static bool jx_operator_is_unary(jx_operator_t op) {
 	}
 }
 
+static struct jx *jx_parse_index(struct jx_parser *s) {
+	struct jx *left = NULL;
+	struct jx *right = NULL;
+
+	jx_token_t t = jx_scan(s);
+	if (t == JX_TOKEN_COLON) {
+		jx_unscan(s, t);
+	} else {
+		jx_unscan(s, t);
+		left = jx_parse(s);
+		// error set by deeper level
+		if (!left) goto FAIL;
+	}
+
+	t = jx_scan(s);
+	if (t != JX_TOKEN_COLON) {
+		jx_unscan(s, t);
+		return left;
+	}
+	unsigned line = s->line;
+
+	t = jx_scan(s);
+	if (t == JX_TOKEN_RBRACKET) {
+		jx_unscan(s, t);
+	} else {
+		jx_unscan(s, t);
+		right = jx_parse(s);
+		// error set by deeper level
+		if (!right) goto FAIL;
+	}
+
+	struct jx *result = jx_operator(JX_OP_SLICE, left, right);
+	result->line = line;
+	return result;
+FAIL:
+	jx_delete(left);
+	jx_delete(right);
+	return NULL;
+}
+
 static struct jx *jx_parse_postfix(struct jx_parser *s) {
 	struct jx *a = jx_parse_atomic(s, false);
 	if (!a) return NULL;
@@ -705,7 +745,7 @@ static struct jx *jx_parse_postfix(struct jx_parser *s) {
 	switch (t) {
 		case JX_TOKEN_LBRACKET: {
 			unsigned line = s->line;
-			struct jx *b = jx_parse(s);
+			struct jx *b = jx_parse_index(s);
 			if (!b) {
 				jx_delete(a);
 				// parse error already set
@@ -718,12 +758,11 @@ static struct jx *jx_parse_postfix(struct jx_parser *s) {
 				jx_delete(a);
 				jx_delete(b);
 				return NULL;
-			} else {
-				struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
-				j->line = line;
-				j->u.oper.line = line;
-				return j;
 			}
+			struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
+			j->line = line;
+			j->u.oper.line = line;
+			return j;
 		}
 		case JX_TOKEN_LPAREN: {
 			unsigned line = s->line;

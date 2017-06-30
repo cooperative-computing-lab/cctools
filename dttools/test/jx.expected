@@ -300,6 +300,36 @@ value:      [[0,0,0,true],[1,0,0,true],[2,0,0,true],[3,0,0,true],[0,1,0,true],[1
 expression: list[2]
 value:      300
 
+expression: list[1:]
+value:      [200,300]
+
+expression: list[:2]
+value:      [100,200]
+
+expression: list[1:2]
+value:      [200]
+
+expression: list[:]
+value:      [100,200,300]
+
+expression: list[3:2]
+value:      []
+
+expression: list[(-11):3]
+value:      [100,200,300]
+
+expression: list[0:100]
+value:      [100,200,300]
+
+expression: list[true:4]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"slice indices must be integers","operator":true:4,"code":2}
+
+expression: list[4:null]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"slice indices must be integers","operator":4:null,"code":2}
+
+expression: list[true:false]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"slice indices must be integers","operator":true:false,"code":2}
+
 expression: object["house"]
 value:      "home"
 
@@ -373,10 +403,10 @@ expression: format("%s","foo")
 value:      "foo"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":167,"operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":177,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":168,"operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":178,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []
