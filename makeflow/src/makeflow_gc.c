@@ -343,11 +343,34 @@ int makeflow_clean_mount_target(const char *target) {
 	return 0;
 }
 
-int makeflow_clean_prep_fail_dir(
-		struct dag *d, struct dag_node *n, struct batch_queue *q) {
+int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
 	assert(d);
 	assert(n);
 	assert(q);
+
+	int rc = 0;
+	char *faildir = string_format(FAIL_DIR, n->nodeid);
+	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
+	if (!f) goto OUT;
+
+	if (makeflow_clean_file(d, q, f, 1)) {
+		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
+		goto OUT;
+	}
+
+	debug(D_MAKEFLOW_RUN, "removed any failed outputs at %s", faildir);
+	rc = 1;
+
+OUT:
+	free(faildir);
+	return rc;
+}
+
+int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
+	assert(d);
+	assert(n);
+	assert(q);
+
 	int rc = 1;
 	char *faildir = string_format(FAIL_DIR, n->nodeid);
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
