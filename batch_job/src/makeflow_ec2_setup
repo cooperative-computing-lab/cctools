@@ -1,0 +1,66 @@
+#!/bin/sh
+
+echo -n "Checking for aws command in PATH..."
+if which aws >/dev/null 2>&1
+then
+	echo "ok"
+else
+	echo "failed"
+	echo "*** The Amazon \"aws\" must be in your path to use this script."
+	exit 1
+fi
+
+echo -n "Checking for aws configuration..."
+if [ -f ~/.aws/config ]
+then
+	echo "ok"
+else
+	echo "failed"
+	echo "*** You must run \"aws configure\" before using this script."
+	exit 1
+fi
+
+echo -n "Checking for correct credentials..."
+if aws ec2 describe-instances > /dev/null 2>&1
+then
+	echo "ok"
+else
+	echo "failed"
+	echo "*** Your Amazon credentials are not set up correctly. Try \"aws ec2 describe-instances\" to troubleshoot."
+	exit 1
+fi
+
+CIDR_BLOCK=10.0.0.0/16
+UUID="$(uuidgen)"
+EC2_KEYPAIR_NAME=kp.${UUID}
+EC2_SECURITY_GROUP_NAME=sg.${UUID}
+
+echo "Creating virtual private cluster..."
+EC2_VPC=`aws ec2 create-vpc --cidr-block $CIDR_BLOCK --output text | cut -f 7`
+
+echo "Creating subnet..."
+EC2_SUBNET=`aws ec2 create-subnet --cidr-block $CIDR_BLOCK --vpc-id $EC2_VPC --output text | cut -f 9`
+aws ec2 modify-subnet-attribute --subnet-id $EC2_SUBNET --map-public-ip-on-launch
+
+echo "Setting up security group $EC2_SECURITY_GROUP_NAME..."
+EC2_SECURITY_GROUP=`aws ec2 create-security-group --vpc-id $EC2_VPC --group-name $EC2_SECURITY_GROUP_NAME --description "$EC2_SECURITY_GROUP_NAME" --output text`
+aws ec2 authorize-security-group-ingress --group-id $EC2_SECURITY_GROUP --port 22 --protocol tcp
+aws ec2 authorize-security-group-egress --group-id $EC2_SECURITY_GROUP --port 1024-10000 --protocol tcp
+
+echo "Creating keypair $EC2_KEYPAIR_NAME..."
+aws ec2 create-key-pair --key-name $EC2_KEYPAIR_NAME --output text | sed 's/.*KEYPAIR.*//' > $EC2_KEYPAIR_NAME.pem
+chmod 400 $EC2_KEYPAIR_NAME.pem
+
+echo "Creating amazon.config with all the details..."
+
+cat > amazon.config <<EOF
+export EC2_VPC=$EC2_VPC
+export EC2_SUBNET=$EC2_SUBNET
+export EC2_SECURITY_GROUP=$EC2_SECURITY_GROUP
+export EC2_SECURITY_GROUP_NAME=$EC2_SECURITY_GROUP_NAME
+export EC2_KEYPAIR_NAME=$EC2_KEYPAIR_NAME
+export EC2_INSTANCE_TYPE=t2.medium
+export EC2_AMI=ami-a4c7edb2
+EOF
+
+echo "Done!"

@@ -1,0 +1,17 @@
+#!/bin/sh
+
+source ./amazon.config
+
+echo "Deleting keypair $EC2_KEYPAIR_NAME..."
+aws ec2 delete-key-pair --key-name $EC2_KEYPAIR_NAME
+
+echo "Deleting security group $EC2_SECURITY_GROUP..."
+aws ec2 delete-security-group --group-id $EC2_SECURITY_GROUP
+
+echo "Deleting subnet $EC2_SUBNET..."
+aws ec2 delete-subnet --subnet-id $EC2_SUBNET
+
+echo "Deleting virtual private cluster $EC2_VPC..."
+aws ec2 delete-vpc --vpc-id $EC2_VPC
+
+echo "Done!"
