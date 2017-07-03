@@ -28,10 +28,6 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	if(ec2_home == NULL) {
 		fatal("EC2_HOME environment variable must be set to EC2 tools directory");
 	}
-	char *java_home = getenv("JAVA_HOME");
-	if(java_home == NULL) {
-		fatal("JAVA_HOME environment variable must be set");
-	}
 
 	char *amazon_credentials_filepath = hash_table_lookup(q->options,
 							      "amazon-credentials");
