@@ -34,6 +34,7 @@ void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t
 int  makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
 void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent );
 int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q);
+int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q);
 int makeflow_clean_failed_file(struct dag *d, struct dag_node *n, struct batch_queue *q, struct dag_file *f, int prep_failed, int silent);
 
 /* return 0 on success; return non-zero on failure. */
