@@ -11,6 +11,7 @@ hmac_test
 histogram_test
 int_sizes.h
 jx_test
+jx2json
 libdttools.a
 make_int_sizes
 microbench
