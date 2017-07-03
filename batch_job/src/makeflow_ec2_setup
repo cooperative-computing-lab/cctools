@@ -49,7 +49,7 @@ aws ec2 authorize-security-group-egress --group-id $EC2_SECURITY_GROUP --port 10
 
 echo "Creating keypair $EC2_KEYPAIR_NAME..."
 aws ec2 create-key-pair --key-name $EC2_KEYPAIR_NAME --output text | sed 's/.*KEYPAIR.*//' > $EC2_KEYPAIR_NAME.pem
-chmod 400 $EC2_KEYPAIR_NAME.pem
+chmod 600 $EC2_KEYPAIR_NAME.pem
 
 echo "Creating amazon.config with all the details..."
 

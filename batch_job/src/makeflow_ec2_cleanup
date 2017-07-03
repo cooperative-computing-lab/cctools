@@ -4,6 +4,7 @@ source ./amazon.config
 
 echo "Deleting keypair $EC2_KEYPAIR_NAME..."
 aws ec2 delete-key-pair --key-name $EC2_KEYPAIR_NAME
+rm $EC2_KEYPAIR_NAME.pem
 
 echo "Deleting security group $EC2_SECURITY_GROUP..."
 aws ec2 delete-security-group --group-id $EC2_SECURITY_GROUP
