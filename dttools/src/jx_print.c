@@ -10,7 +10,7 @@ See the file COPYING for details.
 #include <assert.h>
 #include <ctype.h>
 
-static void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b) {
+void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b) {
 	if (!comp) return;
 	jx_comprehension_print(comp->next, b);
 

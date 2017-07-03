@@ -38,4 +38,7 @@ void jx_print_args( struct jx *j, buffer_t *b );
 
 /** Get a string representation of an operator. @param type The operator to get. */
 const char * jx_operator_string( jx_operator_t type );
+
+// internal function for printing list comprehension expressions
+void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b);
 #endif

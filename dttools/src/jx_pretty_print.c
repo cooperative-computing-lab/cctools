@@ -38,6 +38,7 @@ static void jx_pretty_print_item( struct jx_item *item, buffer_t *b, int level)
 	buffer_printf(b,"%*s", level*SPACES, "");
 
 	jx_pretty_print_buffer(item->value, b, level );
+	jx_comprehension_print(item->comp, b);
 
 	if(item->next) {
 		buffer_putstring(b,",\n");
