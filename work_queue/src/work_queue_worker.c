@@ -63,13 +63,17 @@ See the file COPYING for details.
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
-#define WORKER_MODE_WORKER  1
-#define WORKER_MODE_FOREMAN 2
+typedef enum {
+	WORKER_MODE_WORKER,
+	WORKER_MODE_FOREMAN
+} worker_mode_t;
 
-#define NONE 0
-#define DOCKER 1
-#define DOCKER_PRESERVE 2
-#define UMBRELLA 3
+typedef enum {
+	CONTAINER_MODE_NONE,
+	CONTAINER_MODE_DOCKER,
+	CONTAINER_MODE_DOCKER_PRESERVE,
+	CONTAINER_MODE_UMBRELLA
+} container_mode_t;
 
 #define DEFAULT_WORK_DIR "/home/worker"
 
@@ -127,10 +131,9 @@ static int symlinks_enabled = 1;
 // Worker id. A unique id for this worker instance.
 static char *worker_id;
 
-static int worker_mode = WORKER_MODE_WORKER;
+static worker_mode_t worker_mode = WORKER_MODE_WORKER;
 
-// Do not run any container by default
-static int container_mode = NONE;
+static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static int load_from_tar = 0;
 
 struct master_address {
@@ -506,9 +509,9 @@ static int start_process( struct work_queue_process *p )
 
 	pid_t pid;
 
-	if (container_mode == DOCKER)
+	if (container_mode == CONTAINER_MODE_DOCKER)
 		pid = work_queue_process_execute(p, container_mode, img_name);
-	else if (container_mode == DOCKER_PRESERVE)
+	else if (container_mode == CONTAINER_MODE_DOCKER_PRESERVE)
 		pid = work_queue_process_execute(p, container_mode, container_name);
 	else
 		pid = work_queue_process_execute(p, container_mode);
@@ -2435,11 +2438,11 @@ int main(int argc, char *argv[])
 			show_help(argv[0]);
 			return 0;
 		case LONG_OPT_RUN_DOCKER:
-			container_mode = DOCKER;
+			container_mode = CONTAINER_MODE_DOCKER;
 			img_name = xxstrdup(optarg);
 			break;
 		case LONG_OPT_RUN_DOCKER_PRESERVE:
-			container_mode = DOCKER_PRESERVE;
+			container_mode = CONTAINER_MODE_DOCKER_PRESERVE;
 			img_name = xxstrdup(optarg);
 			break;
 		case LONG_OPT_BUILD_FROM_TAR:
@@ -2594,13 +2597,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(container_mode == DOCKER && load_from_tar == 1) {
+	if(container_mode == CONTAINER_MODE_DOCKER && load_from_tar == 1) {
 		char load_cmd[1024];
 		sprintf(load_cmd, "docker load < %s", tar_fn);
 		system(load_cmd);
 	}
 
-	if(container_mode == DOCKER_PRESERVE) {
+	if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
 		if (load_from_tar == 1) {
 			char load_cmd[1024];
 			sprintf(load_cmd, "docker load < %s", tar_fn);
@@ -2695,14 +2698,14 @@ int main(int argc, char *argv[])
 		sleep(backoff_interval);
 	}
 
-	if(container_mode == DOCKER_PRESERVE || container_mode == DOCKER) {
+	if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE || container_mode == CONTAINER_MODE_DOCKER) {
 		char stop_container_cmd[1024];
 		char rm_container_cmd[1024];
 
 		sprintf(stop_container_cmd, "docker stop %s", container_name);
 		sprintf(rm_container_cmd, "docker rm %s", container_name);
 
-		if(container_mode == DOCKER_PRESERVE) {
+		if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
 			//1. stop the container
 			system(stop_container_cmd);
 			//2. remove the container
