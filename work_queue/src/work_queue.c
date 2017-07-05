@@ -2588,6 +2588,18 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	int64_t actual = 0;
 
 	if(stat(localname, &local_info) < 0) {
+		if(lstat(localname,&local_info)==0) {
+			/*
+			If stat fails but lstat succeeds, we are looking at
+			a broken symbolic link.  This could be user error but
+			is more frequently an editor lock file or similar indication.
+			In this case, emit a warning but continue without sending
+			the file.
+			*/
+			debug(D_WQ|D_NOTICE,"skipping broken symbolic link: %s",localname);
+			return SUCCESS;
+		}
+
 		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
@@ -2665,7 +2677,7 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
 
 		struct stat local_info;
-		if(stat(localpath, &local_info)>=0) {
+		if(lstat(localpath, &local_info)>=0) {
 			if(S_ISDIR(local_info.st_mode))  {
 				result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
 			} else {
@@ -2695,7 +2707,7 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 	struct stat local_info;
 	struct stat *remote_info;
 
-	if(stat(expanded_local_name, &local_info) < 0) {
+	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
 		return APP_FAILURE;
 	}

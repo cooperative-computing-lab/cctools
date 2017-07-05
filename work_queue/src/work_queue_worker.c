@@ -472,7 +472,13 @@ int link_recursive( const char *source, const char *target )
 	} else {
 		if(link(source, target)==0) return 1;
 
-		if( (errno == EXDEV || errno == EPERM) && symlinks_enabled) {
+		/*
+		If the hard link failed, perhaps because the source
+		was a directory, or if hard links are not supported
+		in that file system, fall back to a symlink.
+		*/
+
+		if(symlinks_enabled) {
 
 			/*
 			Use an absolute path when symlinking, otherwise the link will
