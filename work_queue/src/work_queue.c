@@ -660,7 +660,7 @@ static double get_queue_transfer_rate(struct work_queue *q, char **data_source)
 	int64_t     q_total_bytes_transferred = q->stats->bytes_sent + q->stats->bytes_received;
 	timestamp_t q_total_transfer_time     = q->stats->time_send  + q->stats->time_receive;
 
-	// Note q_total_transfer_time is timestamp_t with units of milliseconds.
+	// Note q_total_transfer_time is timestamp_t with units of microseconds.
 	if(q_total_transfer_time>1000000) {
 		queue_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
 		if (data_source) {
@@ -698,7 +698,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	char *data_source;
 
 	if(w->total_transfer_time>1000000) {
-		// Note w->total_transfer_time is timestamp_t with units of milliseconds.
+		// Note w->total_transfer_time is timestamp_t with units of microseconds.
 		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
 		data_source = xxstrdup("worker's observed");
 	} else {
