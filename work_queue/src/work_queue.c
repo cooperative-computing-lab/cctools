@@ -65,10 +65,6 @@ The following major problems must be fixed:
 #include <string.h>
 #include <time.h>
 
-#ifdef CCTOOLS_OPSYS_SUNOS
-extern int setenv(const char *name, const char *value, int overwrite);
-#endif
-
 // The default tasks capacity reported before information is available.
 // Default capacity also implies 1 core, 1024 MB of disk and 512 memory per task.
 #define WORK_QUEUE_DEFAULT_CAPACITY_TASKS 10
@@ -98,7 +94,6 @@ typedef enum {
 	WORKER_FAILURE, 
 	APP_FAILURE
 } work_queue_result_code_t;
-
 
 typedef enum {
 	MSG_PROCESSED = 0,
@@ -665,7 +660,7 @@ static double get_queue_transfer_rate(struct work_queue *q, char **data_source)
 	int64_t     q_total_bytes_transferred = q->stats->bytes_sent + q->stats->bytes_received;
 	timestamp_t q_total_transfer_time     = q->stats->time_send  + q->stats->time_receive;
 
-	// Note q_total_transfer_time is timestamp_t with units of milliseconds.
+	// Note q_total_transfer_time is timestamp_t with units of microseconds.
 	if(q_total_transfer_time>1000000) {
 		queue_transfer_rate = 1000000.0 * q_total_bytes_transferred / q_total_transfer_time;
 		if (data_source) {
@@ -703,7 +698,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 	char *data_source;
 
 	if(w->total_transfer_time>1000000) {
-		// Note w->total_transfer_time is timestamp_t with units of milliseconds.
+		// Note w->total_transfer_time is timestamp_t with units of microseconds.
 		avg_transfer_rate = 1000000 * w->total_bytes_transferred / w->total_transfer_time;
 		data_source = xxstrdup("worker's observed");
 	} else {
@@ -2588,6 +2583,18 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	int64_t actual = 0;
 
 	if(stat(localname, &local_info) < 0) {
+		if(lstat(localname,&local_info)==0) {
+			/*
+			If stat fails but lstat succeeds, we are looking at
+			a broken symbolic link.  This could be user error but
+			is more frequently an editor lock file or similar indication.
+			In this case, emit a warning but continue without sending
+			the file.
+			*/
+			debug(D_WQ|D_NOTICE,"skipping broken symbolic link: %s",localname);
+			return SUCCESS;
+		}
+
 		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
@@ -2665,7 +2672,7 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
 
 		struct stat local_info;
-		if(stat(localpath, &local_info)>=0) {
+		if(lstat(localpath, &local_info)>=0) {
 			if(S_ISDIR(local_info.st_mode))  {
 				result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
 			} else {
@@ -2695,7 +2702,7 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 	struct stat local_info;
 	struct stat *remote_info;
 
-	if(stat(expanded_local_name, &local_info) < 0) {
+	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
 		return APP_FAILURE;
 	}
