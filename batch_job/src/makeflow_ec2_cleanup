@@ -9,10 +9,16 @@ rm $EC2_KEYPAIR_NAME.pem
 echo "Deleting security group $EC2_SECURITY_GROUP..."
 aws ec2 delete-security-group --group-id $EC2_SECURITY_GROUP
 
-echo "Deleting subnet $EC2_SUBNET..."
-aws ec2 delete-subnet --subnet-id $EC2_SUBNET
+#echo "Deleting subnet $EC2_SUBNET..."
+#aws ec2 delete-subnet --subnet-id $EC2_SUBNET
 
-echo "Deleting virtual private cluster $EC2_VPC..."
-aws ec2 delete-vpc --vpc-id $EC2_VPC
+#echo "Deleting route table $EC2_ROUTE_TABLE..."
+#aws ec2 delete-route-table --route-table-id $EC2_ROUTE_TABLE
+
+#echo "Deleting internet gateway $EC2_GATEWAY..."
+#aws ec2 delete-internet-gateway --gateway-id $EC2_GATEWAY"
+
+#echo "Deleting virtual private cluster $EC2_VPC..."
+#aws ec2 delete-vpc --vpc-id $EC2_VPC
 
 echo "Done!"
