@@ -21,26 +21,7 @@ char *amazon_script_filename = ".makeflow_amazon_ec2_script.sh";
 
 static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
-	char *amazon_config_path = hash_table_lookup(q->options,"amazon-config");
-	if(!amazon_config_filepath == NULL) {
-		fatal("Please specify an Amazon configuration with the --amazon-config flag");
-	}
-
-	struct jx *config = jx_parse_file(amazon_config_path);
-	if(!config) {
-		fatal("Couldn't parse Amazon config file %s.\n",amazon_config_path);
-	}
-
-	const char *amazon_ami = jx_lookup_string("ami");
-	const char *aws_access_key_id = jx_lookup_string(config, "aws_access_key_id");
-	const char *aws_secret_access_key = jx_lookup_string(config, "aws_access_key_id");
-
-	if(!aws_ami)
-		fatal("%s does not contain \"ami\" property",amazon_config_path);
-	if(!aws_access_key_id)
-		fatal("%s does not contain \"aws_access_key_id\"",amazon_config_path);
-	if(!aws_secret_access_key)
-		fatal("%s does not contain \"aws_secret_access_key\"",amazon_config_path);
+	// XXX still need to pass in environment somehow
 
 	if(access(amazon_script_filename, F_OK | X_OK) == -1) {
 		debug(D_BATCH, "Generating Amazon ec2 script...");
@@ -50,11 +31,9 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		chmod(amazon_script_filename, 0755);
 	}
 
-	// Run ec2 script
-	char *shell_cmd = string_format("./%s %s %s %s %s",
+	char *shell_cmd = string_format("./%s \"%s\" \"%s\" \"%s\"",
 					amazon_script_filename,
 					cmd,
-					amazon_ami,
 					extra_input_files,
 					extra_output_files);
 

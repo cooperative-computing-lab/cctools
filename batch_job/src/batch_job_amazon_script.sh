@@ -30,12 +30,11 @@ run_ssh_cmd () {
 }
 
 get_file_from_server_to_destination () {
-	echo "Copying file to $2"
-	scp -o StrictHostKeyChecking=no -i $EC2_KEYPAIR_NAME.pem ec2-user@$IP_ADDRESS:~/"$1" $2
+	scp -o StrictHostKeyChecking=no -i $EC2_KEYPAIR_NAME.pem ec2-user@${IP_ADDRESS}:$1 $2
 }
 
 copy_file_to_server () {
-	scp -o StrictHostKeyChecking=no -i $EC2_KEYPAIR_NAME.pem $* ec2-user@$IP_ADDRESS:~
+	scp -o StrictHostKeyChecking=no -i $EC2_KEYPAIR_NAME.pem $* ec2-user@${IP_ADDRESS}:
 }
 
 trap cleanup EXIT
@@ -86,19 +85,18 @@ do
 	echo -n .
 done
 
-# Run rest of ssh commands
 if [ $SUCCESSFUL_SSH -eq 0 ]
 then
-	# Pass input files
 	if ! [ -z "$INPUT_FILES" ]; then
 		INPUTS="$(echo $INPUT_FILES | sed 's/,/ /g')"
+		echo "Transferring input files: $INPUTS"
 		copy_file_to_server $INPUTS
 	fi
 
-	# Run command
+	echo "Executing remote command..."
 	run_ssh_cmd "$CMD"
 
-	# Get output files
 	OUTPUTS="$(echo $OUTPUT_FILES | sed 's/,/ /g')"
-	get_file_from_server_to_destination $OUTPUTS $OUTPUT_FILES_DESTINATION
+	echo "Getting output files: $OUTPUTS"
+	get_file_from_server_to_destination $OUTPUTS .
 fi
