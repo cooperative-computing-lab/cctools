@@ -65,10 +65,6 @@ The following major problems must be fixed:
 #include <string.h>
 #include <time.h>
 
-#ifdef CCTOOLS_OPSYS_SUNOS
-extern int setenv(const char *name, const char *value, int overwrite);
-#endif
-
 // The default tasks capacity reported before information is available.
 // Default capacity also implies 1 core, 1024 MB of disk and 512 memory per task.
 #define WORK_QUEUE_DEFAULT_CAPACITY_TASKS 10
@@ -98,7 +94,6 @@ typedef enum {
 	WORKER_FAILURE, 
 	APP_FAILURE
 } work_queue_result_code_t;
-
 
 typedef enum {
 	MSG_PROCESSED = 0,

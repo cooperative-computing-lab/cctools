@@ -63,10 +63,6 @@ See the file COPYING for details.
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
-#ifdef CCTOOLS_OPSYS_SUNOS
-extern int setenv(const char *name, const char *value, int overwrite);
-#endif
-
 #define WORKER_MODE_WORKER  1
 #define WORKER_MODE_FOREMAN 2
 
