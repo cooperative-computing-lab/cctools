@@ -75,7 +75,7 @@ typedef enum {
 	CONTAINER_MODE_UMBRELLA
 } container_mode_t;
 
-#define DEFAULT_WORK_DIR "/home/worker"
+#define DOCKER_WORK_DIR "/home/worker"
 
 // In single shot mode, immediately quit when disconnected.
 // Useful for accelerating the test suite.
@@ -2613,8 +2613,8 @@ int main(int argc, char *argv[])
 		sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
 		char container_mnt_point[1024];
 		char start_container_cmd[1024];
-		sprintf(container_mnt_point, "%s:%s", workspace, DEFAULT_WORK_DIR);
-		sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DEFAULT_WORK_DIR, img_name);
+		sprintf(container_mnt_point, "%s:%s", workspace, DOCKER_WORK_DIR);
+		sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DOCKER_WORK_DIR, img_name);
 		system(start_container_cmd);
 	}
 
