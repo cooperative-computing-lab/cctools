@@ -119,6 +119,10 @@ struct jx *jx_function_format(struct jx *orig_args) {
 		err = "truncated format specifier";
 		goto FAILURE;
 	}
+	if (jx_array_length(args) > 0) {
+		err = "too many arguments for format specifier";
+		goto FAILURE;
+	}
 	jx_delete(args);
 	free(format);
 	j = jx_string(result);

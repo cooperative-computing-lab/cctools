@@ -370,7 +370,7 @@ expression: format("value: %i!!",x+y)
 value:      "value: 30!!"
 
 expression: format("%i",x,y)
-value:      "10"
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too many arguments for format specifier","function":format("%i",10,20),"code":6}
 
 expression: format("(%d, %i)",x,y)
 value:      "(10, 20)"
@@ -400,10 +400,10 @@ expression: format("%s","foo")
 value:      "foo"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":178,"operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":177,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":179,"operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":178,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []
