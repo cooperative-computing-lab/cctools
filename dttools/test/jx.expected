@@ -244,10 +244,10 @@ expression: x%y
 value:      10
 
 expression: x and y
-value:      0
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":109,"operator":10 and 20,"code":1}
 
 expression: x or y
-value:      30
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":110,"operator":10 or 20,"code":1}
 
 expression: (x+y)*(f+g)
 value:      109.248

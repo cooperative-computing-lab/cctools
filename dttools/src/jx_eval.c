@@ -103,10 +103,6 @@ static struct jx *jx_eval_integer(struct jx_operator *op, struct jx *left, struc
 			return jx_boolean(a>b);
 		case JX_OP_GE:
 			return jx_boolean(a>=b);
-		case JX_OP_OR:
-			return jx_integer(a|b);
-		case JX_OP_AND:
-			return jx_integer(a&b);
 		case JX_OP_ADD:
 			return jx_integer(a+b);
 		case JX_OP_SUB:
@@ -131,31 +127,22 @@ static struct jx *jx_eval_double(struct jx_operator *op, struct jx *left, struct
 	switch(op->type) {
 		case JX_OP_EQ:
 			return jx_boolean(a==b);
-			break;
 		case JX_OP_NE:
 			return jx_boolean(a!=b);
-			break;
 		case JX_OP_LT:
 			return jx_boolean(a<b);
-			break;
 		case JX_OP_LE:
 			return jx_boolean(a<=b);
-			break;
 		case JX_OP_GT:
 			return jx_boolean(a>b);
-			break;
 		case JX_OP_GE:
 			return jx_boolean(a>=b);
-			break;
 		case JX_OP_ADD:
 			return jx_double(a+b);
-			break;
 		case JX_OP_SUB:
 			return jx_double(a-b);
-			break;
 		case JX_OP_MUL:
 			return jx_double(a*b);
-			break;
 		case JX_OP_DIV:
 			if(b==0) FAILOP(5, op, jx_copy(left), jx_copy(right), "division by zero");
 			return jx_double(a/b);
