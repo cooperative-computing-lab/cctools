@@ -129,12 +129,18 @@ x or y;
 [[i, j, k, l] for i in range(4) for j in range(3) for k in range(3) for l in [true, false]];
 
 list[2];
+list[-1];
+list[-3];
+list[-10];
 list[1:];
 list[:2];
 list[1:2];
 list[:];
 list[3:2];
 list[-11:3];
+list[3:-11];
+list[1:-1];
+list[-1:1];
 list[0:100];
 list[true:4];
 list[4:null];

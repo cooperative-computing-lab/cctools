@@ -262,10 +262,14 @@ static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
 		"slice indices must be integers");
 
 	struct jx *result = jx_array(NULL);
+	int len = jx_array_length(array);
 
 	// this is all SUPER inefficient
 	jx_int_t start = left ? left->u.integer_value : 0;
-	jx_int_t end = right ? right->u.integer_value : jx_array_length(array);
+	jx_int_t end = right ? right->u.integer_value : len;
+	if (start < 0) start += len;
+	if (end < 0) end += len;
+
 	for (jx_int_t i = start; i < end; ++i) {
 		struct jx *j = jx_array_index(array, i);
 		if (j) jx_array_append(result, jx_copy(j));
@@ -295,15 +299,18 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 		struct jx_item *item = left->u.items;
 		int count = right->u.integer_value;
 
-		if(count<0) FAILARR(left, right, "index must be positive");
+		if (count < 0) {
+			count += jx_array_length(left);
+			if (count < 0) FAILARR(left, right, "index out of range");
+		}
 
-		while(count>0) {
-			if(!item) FAILARR(left, right, "index out of range");
+		while (count > 0) {
+			if (!item) FAILARR(left, right, "index out of range");
 			item = item->next;
 			count--;
 		}
 
-		if(item) {
+		if (item) {
 			return jx_copy(item->value);
 		} else {
 			FAILARR(left, right, "index out of range");

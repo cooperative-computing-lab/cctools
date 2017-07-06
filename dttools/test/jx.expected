@@ -300,6 +300,15 @@ value:      [[0,0,0,true],[1,0,0,true],[2,0,0,true],[3,0,0,true],[0,1,0,true],[1
 expression: list[2]
 value:      300
 
+expression: list[(-1)]
+value:      300
+
+expression: list[(-3)]
+value:      100
+
+expression: list[(-10)]
+value:      Error{"source":"jx_eval","name":"range error","message":"index out of range","index":-10,"array":[100,200,300],"code":4}
+
 expression: list[1:]
 value:      [200,300]
 
@@ -317,6 +326,15 @@ value:      []
 
 expression: list[(-11):3]
 value:      [100,200,300]
+
+expression: list[3:(-11)]
+value:      []
+
+expression: list[1:(-1)]
+value:      [200]
+
+expression: list[(-1):1]
+value:      []
 
 expression: list[0:100]
 value:      [100,200,300]
@@ -400,10 +418,10 @@ expression: format("%s","foo")
 value:      "foo"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":177,"operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":183,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":178,"operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":184,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []
