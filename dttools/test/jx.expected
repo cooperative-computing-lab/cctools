@@ -396,9 +396,6 @@ value:      "9.9e+09"
 expression: format("%G",2.11111e-12)
 value:      "2.11111E-12"
 
-expression: format("%b",false)
-value:      "false"
-
 expression: format("%s","foo")
 value:      "foo"
 

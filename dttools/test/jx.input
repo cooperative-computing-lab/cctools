@@ -172,7 +172,6 @@ format("%f", 2.5);
 format("%F", 3.14);
 format("%g", 9.9e9);
 format("%G", 2.11111e-12);
-format("%b", false);
 format("%s", "foo");
 
 10 + [1];

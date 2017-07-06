@@ -74,10 +74,6 @@ static char *jx_function_format_value(char spec, struct jx *args) {
 			if (jx_istype(j, JX_STRING))
 				result = xxstrdup(j->u.string_value);
 			break;
-		case 'b':
-			if (jx_istype(j, JX_BOOLEAN))
-				result = j->u.boolean_value ? xxstrdup("true") : xxstrdup("false");
-			break;
 		default: break;
 	}
 	jx_delete(j);
