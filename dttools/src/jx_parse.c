@@ -262,11 +262,6 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_DIV;
 	} else if(c=='%') {
 		return JX_TOKEN_MOD;
-	} else if(c=='&') {
-		char d = jx_getchar(s);
-		if(d=='&') return JX_TOKEN_AND;
-		jx_parse_error(s,"invalid character: &");
-		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='|') {
 		char d = jx_getchar(s);
 		if(d=='|') return JX_TOKEN_OR;
@@ -276,7 +271,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
 		jx_ungetchar(s,d);
-		return JX_TOKEN_NOT;
+		jx_parse_error(s,"invalid character: !");
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
@@ -363,12 +359,18 @@ static jx_token_t jx_scan( struct jx_parser *s )
 			} else {
 				jx_ungetchar(s,c);
 				s->token[i] = 0;
-				if(!strcmp(s->token,"true")) {
+				if(!strcmp(s->token,"null")) {
+					return JX_TOKEN_NULL;
+				} else if(!strcmp(s->token,"true")) {
 					return JX_TOKEN_TRUE;
 				} else if(!strcmp(s->token,"false")) {
 					return JX_TOKEN_FALSE;
-				} else if(!strcmp(s->token,"null")) {
-					return JX_TOKEN_NULL;
+				} else if(!strcmp(s->token,"or")) {
+					return JX_TOKEN_OR;
+				} else if(!strcmp(s->token,"and")) {
+					return JX_TOKEN_AND;
+				} else if(!strcmp(s->token,"not")) {
+					return JX_TOKEN_NOT;
 				} else if (!strcmp(s->token, "for")) {
 					return JX_TOKEN_FOR;
 				} else if (!strcmp(s->token, "in")) {

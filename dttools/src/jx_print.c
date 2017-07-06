@@ -64,9 +64,9 @@ const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_MUL: return "*";
 		case JX_OP_DIV: return "/";
 		case JX_OP_MOD: return "%";
-		case JX_OP_AND:	return "&&";
-		case JX_OP_OR:	return "||";
-		case JX_OP_NOT:	return "!";
+		case JX_OP_AND:	return " and ";
+		case JX_OP_OR:	return " or ";
+		case JX_OP_NOT:	return " not ";
 		// note that the closing bracket/paren is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
 		case JX_OP_CALL: return "(";
