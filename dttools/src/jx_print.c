@@ -12,7 +12,6 @@ See the file COPYING for details.
 
 void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b) {
 	if (!comp) return;
-	jx_comprehension_print(comp->next, b);
 
 	buffer_putstring(b, " for ");
 	buffer_putstring(b, comp->variable);
@@ -22,6 +21,8 @@ void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b) {
 		buffer_putstring(b, " if ");
 		jx_print_buffer(comp->condition, b);
 	}
+
+	jx_comprehension_print(comp->next, b);
 }
 
 static void jx_pair_print( struct jx_pair *pair, buffer_t *b )

@@ -394,11 +394,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	}
 }
 
-static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s, struct jx_comprehension *next) {
+static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s) {
 	jx_token_t t = jx_scan(s);
 	if (t != JX_TOKEN_FOR) {
 		jx_unscan(s, t);
-		return next;
+		return NULL;
 	}
 
 	unsigned line = s->line;
@@ -441,11 +441,10 @@ static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s, stru
 		variable,
 		elements,
 		condition,
-		next);
+		jx_parse_comprehension(s));
 	result->line = line;
 	free(variable);
-
-	return jx_parse_comprehension(s, result);
+	return result;
 
 FAILURE:
 	free(variable);
@@ -474,7 +473,7 @@ static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 		jx_item_delete(i);
 		return NULL;
 	}
-	i->comp = jx_parse_comprehension(s, NULL);
+	i->comp = jx_parse_comprehension(s);
 	if (jx_parser_errors(s)) {
 		// error set by deeper layer
 		jx_item_delete(i);
