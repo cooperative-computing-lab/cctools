@@ -1328,7 +1328,12 @@ const char *eng_format(double value) {
 	do {
 
 		if(value < 1000) {
-			snprintf(buffer, size, "%7.3lf&nbsp;xE%d", value, times*3);
+			if(times > 0) {
+				snprintf(buffer, size, "%7.3lf&nbsp;xE%d", value, times*3);
+			} else {
+				snprintf(buffer, size, "%7.3lf", value);
+			}
+
 			break;
 		}
 
