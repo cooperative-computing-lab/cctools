@@ -42,7 +42,9 @@ struct conversion_field {
 	char *name;
 	char  *internal_unit;
 	char  *external_unit;
+	char  *base_unit;
 	double external_to_internal; // internal = external * this factor.
+	double internal_to_base;     // base     = internal * this factor.
 	int  float_flag;
 };
 
@@ -55,27 +57,27 @@ void initialize_units() {
 
 	conversion_fields = hash_table_create(32, 0);
 
-	rmsummary_add_conversion_field("wall_time",                "us",      "s",      USECOND,  1);
-	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      USECOND,  1);
-	rmsummary_add_conversion_field("start",                    "us",      "us",     1,        0);
-	rmsummary_add_conversion_field("end",                      "us",      "us",     1,        0);
-	rmsummary_add_conversion_field("memory",                   "MB",      "MB",     1,        0);
-	rmsummary_add_conversion_field("virtual_memory",           "MB",      "MB",     1,        0);
-	rmsummary_add_conversion_field("swap_memory",              "MB",      "MB",     1,        0);
-	rmsummary_add_conversion_field("disk",                     "MB",      "MB",     1,        0);
-	rmsummary_add_conversion_field("bytes_read",               "B",       "MB",     MEGABYTE, 1);
-	rmsummary_add_conversion_field("bytes_written",            "B",       "MB",     MEGABYTE, 1);
-	rmsummary_add_conversion_field("bytes_received",           "B",       "MB",     MEGABYTE, 1);
-	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     MEGABYTE, 1);
-	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   1000,     1);
-	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  1,        0);
-	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  1000,     1);
-	rmsummary_add_conversion_field("max_concurrent_processes", "procs",   "procs",  1,        0);
-	rmsummary_add_conversion_field("total_processes",          "procs",   "procs",  1,        0);
-	rmsummary_add_conversion_field("total_files",              "files",   "files",  1,        0);
+	rmsummary_add_conversion_field("wall_time",                "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
+	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
+	rmsummary_add_conversion_field("start",                    "us",      "us",     "s",       1,        1.0/USECOND,   0);
+	rmsummary_add_conversion_field("end",                      "us",      "us",     "s",       1,        1.0/USECOND,   0);
+	rmsummary_add_conversion_field("memory",                   "MB",      "MB",     "B",       1,        MEGABYTE,      0);
+	rmsummary_add_conversion_field("virtual_memory",           "MB",      "MB",     "B",       1,        MEGABYTE,      0);
+	rmsummary_add_conversion_field("swap_memory",              "MB",      "MB",     "B",       1,        MEGABYTE,      0);
+	rmsummary_add_conversion_field("disk",                     "MB",      "MB",     "B",       1,        MEGABYTE,      0);
+	rmsummary_add_conversion_field("bytes_read",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
+	rmsummary_add_conversion_field("bytes_written",            "B",       "MB",     "B",       MEGABYTE, 1,             1);
+	rmsummary_add_conversion_field("bytes_received",           "B",       "MB",     "B",       MEGABYTE, 1,             1);
+	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
+	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   "bps",     1000,     1,             1);
+	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  "cores",   1,        1,             0);
+	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1,             1);
+	rmsummary_add_conversion_field("max_concurrent_processes", "procs",   "procs",  "procs",   1,        1,             0);
+	rmsummary_add_conversion_field("total_processes",          "procs",   "procs",  "procs",   1,        1,             0);
+	rmsummary_add_conversion_field("total_files",              "files",   "files",  "files",   1,        1,             0);
 }
 
-void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, double multiplier, int float_flag) {
+void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, const char *base, double exttoint, double inttobase, int float_flag) {
 
 	if(!units_initialized)
 		initialize_units();
@@ -85,6 +87,7 @@ void rmsummary_add_conversion_field(const char *name, const char *internal, cons
 		free(c->name);
 		free(c->internal_unit);
 		free(c->external_unit);
+		free(c->base_unit);
 	}
 	else {
 		c = malloc(sizeof(struct conversion_field));
@@ -93,7 +96,9 @@ void rmsummary_add_conversion_field(const char *name, const char *internal, cons
 	c->name                 = xxstrdup(name);
 	c->internal_unit        = xxstrdup(internal);
 	c->external_unit        = xxstrdup(external);
-	c->external_to_internal = multiplier;
+	c->base_unit            = xxstrdup(base);
+	c->external_to_internal = exttoint;
+	c->internal_to_base     = inttobase;
 	c->float_flag           = float_flag;
 
 	hash_table_insert(conversion_fields, name, (void *) c);
@@ -135,6 +140,25 @@ double rmsummary_to_external_unit(const char *field, int64_t n) {
 	}
 
 	double nd = ((double) n) / cf->external_to_internal;
+
+	return nd;
+}
+
+double rmsummary_to_base_unit(const char *field, int64_t n) {
+
+	if(!units_initialized)
+		initialize_units();
+
+	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
+
+	const char *to_unit   = cf->base_unit;
+	const char *from_unit = cf->internal_unit;
+
+	if(from_unit && to_unit && (strcmp(from_unit, to_unit) == 0)) {
+		return (double) n;
+	}
+
+	double nd = ((double) n) * cf->internal_to_base;
 
 	return nd;
 }
