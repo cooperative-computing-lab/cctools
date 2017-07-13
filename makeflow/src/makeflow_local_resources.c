@@ -5,6 +5,7 @@
 #include "host_memory_info.h"
 #include "load_average.h"
 #include "macros.h"
+#include "debug.h"
 
 struct makeflow_local_resources * makeflow_local_resources_create()
 {
@@ -21,6 +22,11 @@ void makeflow_local_resources_delete( struct makeflow_local_resources *r )
 void makeflow_local_resources_print( struct makeflow_local_resources *r )
 {
 	printf("local resources: %d jobs, %d cores, %d MB memory, %d MB disk\n",r->jobs,r->cores,r->memory,r->disk);
+}
+
+void makeflow_local_resources_debug( struct makeflow_local_resources *r )
+{
+	debug(D_MAKEFLOW,"local resources: %d jobs, %d cores, %d MB memory, %d MB disk\n",r->jobs,r->cores,r->memory,r->disk);
 }
 
 void makeflow_local_resources_measure( struct makeflow_local_resources *r )
@@ -49,6 +55,7 @@ void makeflow_local_resources_subtract( struct makeflow_local_resources *r, stru
 	if(s->cores>=0)  r->cores -= s->cores;
 	if(s->memory>=0) r->memory -= s->memory;		
 	if(s->disk>=0)   r->disk -= s->disk;
+	makeflow_local_resources_debug(r);
 }
 
 void makeflow_local_resources_add( struct makeflow_local_resources *r, struct dag_node *n )
@@ -58,6 +65,7 @@ void makeflow_local_resources_add( struct makeflow_local_resources *r, struct da
 	if(s->cores>=0)  r->cores += s->cores;
 	if(s->memory>=0) r->memory += s->memory;		
 	if(s->disk>=0)   r->disk += s->disk;
+	makeflow_local_resources_debug(r);
 }
 
 
