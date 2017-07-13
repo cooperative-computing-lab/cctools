@@ -1843,52 +1843,69 @@ int main(int argc, char *argv[])
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
 
-	local_resources = makeflow_local_resources_create();
-	makeflow_local_resources_measure(local_resources);
-	makeflow_local_resources_print(local_resources);
-
 	d->allocation_mode = allocation_mode;
 
-	// Makeflows running LOCAL batch type have only one queue that behaves as if remote
-	// This forces -J vs -j to behave correctly
-	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-		explicit_remote_jobs_max = explicit_local_jobs_max;
-	}
+	local_resources = makeflow_local_resources_create();
+	makeflow_local_resources_measure(local_resources);
 
-	if(explicit_local_jobs_max) {
-		local_jobs_max = explicit_local_jobs_max;
-	} else {
-		local_jobs_max = load_average_get_cpus();
-	}
-
-	if(explicit_remote_jobs_max) {
-		remote_jobs_max = explicit_remote_jobs_max;
-	} else {
-		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			remote_jobs_max = load_average_get_cpus();
-		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-			remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
-		} else {
-			remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
-		}
-	}
+	/*
+	Environment variables override explicit settings for maximum jobs.
+	*/
 
 	s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
 	if(s) {
-		remote_jobs_max = MIN(remote_jobs_max, atoi(s));
+		explicit_remote_jobs_max = MIN(explicit_remote_jobs_max, atoi(s));
 	}
 
 	s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
 	if(s) {
-		int n = atoi(s);
-		local_jobs_max = MIN(local_jobs_max, n);
-		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			remote_jobs_max = MIN(local_jobs_max, n);
+		explicit_local_jobs_max = MIN(explicit_local_jobs_max, atoi(s));
+	}
+
+	/*
+	Handle the confusing case of specifying local/remote max
+	jobs when the job type is LOCAL.  Take either option to mean
+	both, use the minimum if both are set, and the number of cores
+	if neither is set.
+	*/
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+		int j;
+		if(explicit_remote_jobs_max && !explicit_local_jobs_max) {
+			j = explicit_remote_jobs_max;
+		} else if(explicit_local_jobs_max && !explicit_remote_jobs_max) {
+			j = explicit_local_jobs_max;
+		} else if(explicit_local_jobs_max && explicit_remote_jobs_max) {
+			j = MIN(explicit_local_jobs_max,explicit_remote_jobs_max);
+		} else {
+			j = local_resources->cores;
+		}
+		local_jobs_max = remote_jobs_max = j;
+
+	} else {
+		/* We are using a separate local and remote queue, so set them separately. */
+
+		if(explicit_local_jobs_max) {
+			local_jobs_max = explicit_local_jobs_max;
+		} else {
+			local_jobs_max = local_resources->cores;
+		}
+
+		if(explicit_remote_jobs_max) {
+			remote_jobs_max = explicit_remote_jobs_max;
+		} else {
+			if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+				remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+			} else {
+				remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+			}
 		}
 	}
 
-	remote_queue = batch_queue_create(batch_queue_type);
+	/* Display local resources after they are trimmed. */
+	makeflow_local_resources_print(local_resources);
 
+	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
