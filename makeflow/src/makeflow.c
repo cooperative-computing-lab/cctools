@@ -679,6 +679,19 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 	return 1;
 }
 
+int makeflow_nodes_local_waiting_count(const struct dag *d) {
+	int count = 0;
+
+	
+	struct dag_node *n;
+	for(n = d->nodes; n; n = n->next) {
+		if(n->state == DAG_NODE_STATE_WAITING && is_local_job(n))
+			count++;
+	}
+
+	return count;
+}
+
 /*
 Find all jobs ready to be run, then submit them.
 */
@@ -2166,6 +2179,12 @@ int main(int argc, char *argv[])
 	d->should_write_to_archive = should_write_to_archive;
 
 	makeflow_run(d);
+
+	if(makeflow_failed_flag == 0 && makeflow_nodes_local_waiting_count(d) > 0) {
+		makeflow_failed_flag = 1;
+		debug(D_ERROR, "There are local jobs that could not be run. Usually this means that makeflow did not have enough local resources to run them.");
+	}
+
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
