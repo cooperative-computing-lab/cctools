@@ -554,7 +554,7 @@ the necessary list of input and output files, and applying all
 wrappers and options.
 */
 
-static void makeflow_node_submit(struct dag *d, struct dag_node *n)
+static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
 	struct batch_queue *queue;
 	struct dag_file *f;
@@ -608,10 +608,14 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		did_find_archived_job = 1;
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
-		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
+
+		const struct rmsummary *resources = dag_node_dynamic_label(n);
+
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, resources);
 
 		/* Update all of the necessary data structures. */
 		if(n->jobid >= 0) {
+			memcpy(n->resources_allocated, resources, sizeof(struct rmsummary));
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 
 			if(is_local_job(n)) {
@@ -643,7 +647,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	jx_delete(envlist);
 }
 
-static int makeflow_node_ready(struct dag *d, struct dag_node *n)
+static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
 	struct dag_file *f;
 
@@ -651,7 +655,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 		return 0;
 
 	if(is_local_job(n)) {
-		if(!makeflow_local_resources_available(local_resources,n))
+		if(!makeflow_local_resources_available(local_resources,resources))
 			return 0;
 	}
 
@@ -688,8 +692,9 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 			break;
 		}
 
-		if(makeflow_node_ready(d, n)) {
-			makeflow_node_submit(d, n);
+		const struct rmsummary *resources = dag_node_dynamic_label(n);
+		if(makeflow_node_ready(d, n, resources)) {
+			makeflow_node_submit(d, n, resources);
 		}
 	}
 }
@@ -1868,7 +1873,7 @@ int main(int argc, char *argv[])
 	d->allocation_mode = allocation_mode;
 
 	/* Measure resources available for local job execution. */
-	local_resources = makeflow_local_resources_create();
+	local_resources = rmsummary_create(-1);
 	makeflow_local_resources_measure(local_resources);
 
 	if(explicit_local_cores)  local_resources->cores = explicit_local_cores;

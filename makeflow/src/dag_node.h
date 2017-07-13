@@ -58,7 +58,11 @@ struct dag_node {
 	struct hash_table *variables;       /* This node settings for variables with @ syntax */
 
 	category_allocation_t resource_request;  /* type of allocation for the node (user, unlabeled, max, etc.) */
-	struct rmsummary *resources_requested;   /* resources required by this rule */
+    struct rmsummary *resources_requested;   /* resources required explicitely by this rule alone, not taking
+                                                into account its category. Use dag_node_dynamic_label(n) for the
+                                                resources this node requests, taking into account categories,
+                                                dynamic resources, etc.  */
+    struct rmsummary *resources_allocated;   /* resources allocated to this node when submitted */
 	struct rmsummary *resources_measured;    /* resources measured on completion. */
 
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth

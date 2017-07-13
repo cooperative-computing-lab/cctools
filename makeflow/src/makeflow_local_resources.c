@@ -7,18 +7,6 @@
 #include "macros.h"
 #include "debug.h"
 
-struct rmsummary * makeflow_local_resources_create()
-{
-	struct rmsummary *r = malloc(sizeof(*r));
-	memset(r,0,sizeof(*r));
-	return r;
-}
-
-void makeflow_local_resources_delete( struct rmsummary *r )
-{
-	free(r);
-}
-
 void makeflow_local_resources_print( struct rmsummary *r )
 {
 	printf("local resources: %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk\n",r->cores,r->memory,r->disk);
@@ -42,28 +30,28 @@ void makeflow_local_resources_measure( struct rmsummary *r )
 	r->disk = avail / MEGA;
 }
 
-int  makeflow_local_resources_available( struct rmsummary *r, struct dag_node *n )
+int  makeflow_local_resources_available(struct rmsummary *local, const struct rmsummary *resources_asked)
 {
-	struct rmsummary *s = n->resources_requested;
-	return s->cores<=r->cores && s->memory<=r->memory && s->disk<=r->disk;
+	const struct rmsummary *s = resources_asked;
+	return s->cores<=local->cores && s->memory<=local->memory && s->disk<=local->disk;
 }
 
-void makeflow_local_resources_subtract( struct rmsummary *r, struct dag_node *n )
+void makeflow_local_resources_subtract( struct rmsummary *local, struct dag_node *n )
 {
-	struct rmsummary *s = n->resources_requested;
-	if(s->cores>=0)  r->cores -= s->cores;
-	if(s->memory>=0) r->memory -= s->memory;		
-	if(s->disk>=0)   r->disk -= s->disk;
-	makeflow_local_resources_debug(r);
+	const struct rmsummary *s = n->resources_allocated;
+	if(s->cores>=0)  local->cores -= s->cores;
+	if(s->memory>=0) local->memory -= s->memory;		
+	if(s->disk>=0)   local->disk -= s->disk;
+	makeflow_local_resources_debug(local);
 }
 
-void makeflow_local_resources_add( struct rmsummary *r, struct dag_node *n )
+void makeflow_local_resources_add( struct rmsummary *local, struct dag_node *n )
 {
-	struct rmsummary *s = n->resources_requested;
-	if(s->cores>=0)  r->cores += s->cores;
-	if(s->memory>=0) r->memory += s->memory;		
-	if(s->disk>=0)   r->disk += s->disk;
-	makeflow_local_resources_debug(r);
+	const struct rmsummary *s = n->resources_allocated;
+	if(s->cores>=0)  local->cores += s->cores;
+	if(s->memory>=0) local->memory += s->memory;		
+	if(s->disk>=0)   local->disk += s->disk;
+	makeflow_local_resources_debug(local);
 }
 
 

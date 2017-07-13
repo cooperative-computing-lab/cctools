@@ -42,7 +42,15 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->ancestor_depth = -1;
 
+	// resources explicitely requested for only this node in the dag file.
+	// PROBABLY not what you want. Most likely you want dag_node_dynamic_label(n)
 	n->resources_requested = rmsummary_create(-1);
+
+	// the value of dag_node_dynamic_label(n) when this node was submitted.
+	n->resources_allocated  = rmsummary_create(-1);
+
+	// resources used by the node, as measured by the resource_monitor (if
+	// using monitoring).
 	n->resources_measured  = NULL;
 
 	n->resource_request = CATEGORY_ALLOCATION_FIRST;
