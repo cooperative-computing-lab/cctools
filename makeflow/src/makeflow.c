@@ -117,7 +117,7 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-static struct makeflow_local_resources *local_resources = 0;
+static struct rmsummary *local_resources = 0;
 
 static int local_jobs_max = 1;
 static int remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;

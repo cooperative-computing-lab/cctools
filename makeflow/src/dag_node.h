@@ -102,7 +102,7 @@ void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
 
 struct jx * dag_node_env_create( struct dag *d, struct dag_node *n );
 
-const struct rmsummary *dag_node_dynamic_label(struct dag_node *n);
+const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n);
 
 void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec);
 

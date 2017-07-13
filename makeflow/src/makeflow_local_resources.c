@@ -7,29 +7,29 @@
 #include "macros.h"
 #include "debug.h"
 
-struct makeflow_local_resources * makeflow_local_resources_create()
+struct rmsummary * makeflow_local_resources_create()
 {
-	struct makeflow_local_resources *r = malloc(sizeof(*r));
+	struct rmsummary *r = malloc(sizeof(*r));
 	memset(r,0,sizeof(*r));
 	return r;
 }
 
-void makeflow_local_resources_delete( struct makeflow_local_resources *r )
+void makeflow_local_resources_delete( struct rmsummary *r )
 {
 	free(r);
 }
 
-void makeflow_local_resources_print( struct makeflow_local_resources *r )
+void makeflow_local_resources_print( struct rmsummary *r )
 {
-	printf("local resources: %d cores, %d MB memory, %d MB disk\n",r->cores,r->memory,r->disk);
+	printf("local resources: %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk\n",r->cores,r->memory,r->disk);
 }
 
-void makeflow_local_resources_debug( struct makeflow_local_resources *r )
+void makeflow_local_resources_debug( struct rmsummary *r )
 {
-	debug(D_MAKEFLOW,"local resources: %d cores, %d MB memory, %d MB disk\n",r->cores,r->memory,r->disk);
+	debug(D_MAKEFLOW,"local resources: %" PRId64 " cores, %" PRId64 " MB memory, %" PRId64 " MB disk\n",r->cores,r->memory,r->disk);
 }
 
-void makeflow_local_resources_measure( struct makeflow_local_resources *r )
+void makeflow_local_resources_measure( struct rmsummary *r )
 {
 	UINT64_T avail, total;
 
@@ -42,13 +42,13 @@ void makeflow_local_resources_measure( struct makeflow_local_resources *r )
 	r->disk = avail / MEGA;
 }
 
-int  makeflow_local_resources_available( struct makeflow_local_resources *r, struct dag_node *n )
+int  makeflow_local_resources_available( struct rmsummary *r, struct dag_node *n )
 {
 	struct rmsummary *s = n->resources_requested;
 	return s->cores<=r->cores && s->memory<=r->memory && s->disk<=r->disk;
 }
 
-void makeflow_local_resources_subtract( struct makeflow_local_resources *r, struct dag_node *n )
+void makeflow_local_resources_subtract( struct rmsummary *r, struct dag_node *n )
 {
 	struct rmsummary *s = n->resources_requested;
 	if(s->cores>=0)  r->cores -= s->cores;
@@ -57,7 +57,7 @@ void makeflow_local_resources_subtract( struct makeflow_local_resources *r, stru
 	makeflow_local_resources_debug(r);
 }
 
-void makeflow_local_resources_add( struct makeflow_local_resources *r, struct dag_node *n )
+void makeflow_local_resources_add( struct rmsummary *r, struct dag_node *n )
 {
 	struct rmsummary *s = n->resources_requested;
 	if(s->cores>=0)  r->cores += s->cores;
