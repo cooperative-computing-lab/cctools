@@ -50,6 +50,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_singularity.h"
 #include "makeflow_archive.h"
 #include "makeflow_catalog_reporter.h"
+#include "makeflow_local_resources.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -115,6 +116,8 @@ static double makeflow_gc_task_ratio = 0.05;
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
+
+static struct makeflow_local_resources *local_resources = 0;
 
 static int local_jobs_max = 1;
 static int remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
@@ -1815,6 +1818,10 @@ int main(int argc, char *argv[])
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
+
+	local_resources = makeflow_local_resources_create();
+	makeflow_local_resources_measure(local_resources);
+	makeflow_local_resources_print(local_resources);
 
 	d->allocation_mode = allocation_mode;
 
