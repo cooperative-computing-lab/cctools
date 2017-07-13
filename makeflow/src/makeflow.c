@@ -1917,10 +1917,10 @@ int main(int argc, char *argv[])
 				remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 			}
 		}
-		printf("max running remote jobs (-J): %d\n",remote_jobs_max);
+		printf("max running remote jobs: %d\n",remote_jobs_max);
 	}
 
-	printf("max running local jobs (-j): %d\n",local_jobs_max);
+	printf("max running local jobs: %d\n",local_jobs_max);
 
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
