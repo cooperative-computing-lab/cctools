@@ -18,11 +18,11 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "terminal_size.h"
 
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
 
 typedef enum {
 	FORMAT_TABLE,
@@ -48,7 +48,7 @@ static char *catalog_host = NULL;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
 static const char *where_expr = "true";
-static int columns = 80;
+static int rows=25, columns=80;
 
 /* negative columns mean a minimum of abs(value), but the column may expand if
  * columns available. */
@@ -488,16 +488,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
-	struct winsize window;
-	char *columns_str = getenv("COLUMNS");
-	if(columns_str) {
-		columns = atoi(columns_str);
-		/* use default of 80 columns when the value of columns_str is suspect. */
-		columns = columns < 1 ? 80 : columns;
-	} else if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &window) >= 0) {
-		columns = window.ws_col > 0 ? window.ws_col : columns;
-	}
-
+	terminal_size(&rows,&columns);
 
 	time_t stoptime = time(0) + work_queue_status_timeout;
 

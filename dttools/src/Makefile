@@ -101,6 +101,7 @@ SOURCES = \
 	stringtools.c \
 	text_array.c \
 	text_list.c \
+	terminal_size.c \
 	timer.c \
 	timestamp.c \
 	unlink_recursive.c \
