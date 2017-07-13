@@ -1174,6 +1174,9 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Show this help screen.\n", "-h,--help");
 	printf(" %-30s Max number of local jobs to run at once.	(default is # of cores)\n", "-j,--max-local=<#>");
 	printf(" %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
+	printf(" %-30s Max number of local cores to use.\n","   --local-cores=#");
+	printf(" %-30s Max amount of local memory (MB) to use.\n","   --local-memory=#");
+	printf(" %-30s Max amount of local disk (MB) to use.\n","   --local-disk=#");
 	printf("															(default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
 	printf(" %-30s Use this file for the makeflow log.		 (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	printf(" %-30s Use this file for the batch system log.	 (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
@@ -1243,6 +1246,10 @@ int main(int argc, char *argv[])
 	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
+	int explicit_local_cores = 0;
+	int explicit_local_memory = 0;
+	int explicit_local_disk = 0;
+
 	char *logfilename = NULL;
 	int port_set = 0;
 	timestamp_t runtime = 0;
@@ -1312,6 +1319,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_GC_SIZE,
+		LONG_OPT_LOCAL_CORES,
+		LONG_OPT_LOCAL_MEMORY,
+		LONG_OPT_LOCAL_DISK,
 		LONG_OPT_MONITOR,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LOG_NAME,
@@ -1343,7 +1353,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
-        LONG_OPT_SINGULARITY,
+		LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_READ_ONLY,
@@ -1375,6 +1385,9 @@ int main(int argc, char *argv[])
 		{"gc-count", required_argument, 0, 'G'},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"help", no_argument, 0, 'h'},
+		{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
+		{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
+		{"local-disk", required_argument, 0, LONG_OPT_LOCAL_DISK},
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
 		{"max-remote", required_argument, 0, 'J'},
@@ -1845,13 +1858,17 @@ int main(int argc, char *argv[])
 
 	d->allocation_mode = allocation_mode;
 
+	/* Measure resources available for local job execution. */
 	local_resources = makeflow_local_resources_create();
 	makeflow_local_resources_measure(local_resources);
 
-	/*
-	Environment variables override explicit settings for maximum jobs.
-	*/
+	if(explicit_local_cores)  local_resources->cores = explicit_local_cores;
+	if(explicit_local_memory) local_resources->memory = explicit_local_memory;
+	if(explicit_local_disk)   local_resources->disk = explicit_local_disk;
 
+	makeflow_local_resources_print(local_resources);
+
+	/* Environment variables override explicit settings for maximum jobs. */
 	s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
 	if(s) {
 		explicit_remote_jobs_max = MIN(explicit_remote_jobs_max, atoi(s));
@@ -1900,10 +1917,10 @@ int main(int argc, char *argv[])
 				remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 			}
 		}
+		printf("max running remote jobs (-J): %d\n",remote_jobs_max);
 	}
 
-	/* Display local resources after they are trimmed. */
-	makeflow_local_resources_print(local_resources);
+	printf("max running local jobs (-j): %d\n",local_jobs_max);
 
 	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
