@@ -165,6 +165,16 @@ static struct list *shared_fs_list = NULL;
 static int did_find_archived_job = 0;
 
 /*
+Determines if this is a local job that will consume
+local resources, regardless of the batch queue type.
+*/
+
+static int is_local_job( struct dag_node *n )
+{
+	return n->local_job || batch_queue_type==BATCH_QUEUE_TYPE_LOCAL;
+}
+
+/*
 Generates file list for node based on node files, wrapper
 input files, and monitor input files. Relies on %% nodeid
 replacement for monitor file names.
@@ -603,6 +613,11 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		/* Update all of the necessary data structures. */
 		if(n->jobid >= 0) {
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+
+			if(is_local_job(n)) {
+				makeflow_local_resources_subtract(local_resources,n);
+			}
+
 			if(n->local_job && local_queue) {
 				itable_insert(d->local_job_table, n->jobid, n);
 			} else {
@@ -634,6 +649,11 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
+
+	if(is_local_job(n)) {
+		if(!makeflow_local_resources_available(local_resources,n))
+			return 0;
+	}
 
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
@@ -728,6 +748,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
+
+	if(is_local_job(n)) {
+		makeflow_local_resources_add(local_resources,n);
+	}
 
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
