@@ -4,7 +4,6 @@
 #include "dag_node.h"
 
 struct makeflow_local_resources {
-	int jobs;
 	int cores;
 	int memory;
 	int disk;
