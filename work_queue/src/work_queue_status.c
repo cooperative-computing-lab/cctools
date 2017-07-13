@@ -18,6 +18,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "terminal_size.h"
 
 #include <errno.h>
 #include <string.h>
