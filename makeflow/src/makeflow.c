@@ -1546,6 +1546,15 @@ int main(int argc, char *argv[])
 			case 'm':
 				email_summary_to = xxstrdup(optarg);
 				break;
+			case LONG_OPT_LOCAL_CORES:
+				explicit_local_cores = atoi(optarg);
+				break;
+			case LONG_OPT_LOCAL_MEMORY:
+				explicit_local_memory = atoi(optarg);
+				break;
+			case LONG_OPT_LOCAL_DISK:
+				explicit_local_disk = atoi(optarg);
+				break;
 			case LONG_OPT_MONITOR:
 				if (!monitor) monitor = makeflow_monitor_create();
 				if(log_dir) free(log_dir);
