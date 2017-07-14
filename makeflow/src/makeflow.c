@@ -1153,6 +1153,7 @@ static void set_archive_directory_string(char **archive_directory, char *option_
 
 static void show_help_run(const char *cmd)
 {
+<<<<<<< HEAD
 		/* Stars indicate 80-column limit.  Try to keep things within 79 columns.       */
 	        /********************************************************************************/
 	printf("Use: ./makeflow [options] <dagfile>\n");
@@ -1219,6 +1220,7 @@ static void show_help_run(const char *cmd)
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config             Amazon config file from makeflow_ec2_setup.\n");
+    printf("    --amazon-ami                Specify amazon-ami (for use with -T amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
@@ -1251,6 +1253,7 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs. (def: resource-rule-%%)\n");
+=======
 }
 
 int main(int argc, char *argv[])
@@ -1280,7 +1283,13 @@ int main(int argc, char *argv[])
 	const char *work_queue_master_mode = "standalone";
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
+<<<<<<< HEAD
 	const char *amazon_config = NULL;
+=======
+	const char *amazon_credentials = NULL;
+	const char *amazon_ami = NULL;
+	const char *amazon_batch_img = NULL;
+>>>>>>> The amazon batch first round integration works. Need to clean it up by using the script and config file method, started in the included shell script
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1372,7 +1381,13 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER_OUTPUT,
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
+<<<<<<< HEAD
 		LONG_OPT_AMAZON_CONFIG,
+=======
+		LONG_OPT_AMAZON_CREDENTIALS,
+		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_AMAZON_BATCH_IMG,
+>>>>>>> The amazon batch first round integration works. Need to clean it up by using the script and config file method, started in the included shell script
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_ARGS,
@@ -1471,7 +1486,13 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
+<<<<<<< HEAD
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
+=======
+		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
+		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
+>>>>>>> The amazon batch first round integration works. Need to clean it up by using the script and config file method, started in the included shell script
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
@@ -1627,6 +1648,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AMAZON_CONFIG:
 				amazon_config = xxstrdup(optarg);
+				break;
+			case LONG_OPT_AMAZON_BATCH_IMG:
+				amazon_batch_img = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
@@ -2037,6 +2061,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
+	batch_queue_set_option(remote_queue, "amazon-batch-image",amazon_batch_img);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
