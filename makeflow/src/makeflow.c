@@ -50,6 +50,7 @@ See the file COPYING for details.
 #include "makeflow_wrapper_singularity.h"
 #include "makeflow_archive.h"
 #include "makeflow_catalog_reporter.h"
+#include "makeflow_local_resources.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -116,6 +117,8 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
+static struct rmsummary *local_resources = 0;
+
 static int local_jobs_max = 1;
 static int remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 
@@ -160,6 +163,16 @@ static int use_mountfile = 0;
 static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
+
+/*
+Determines if this is a local job that will consume
+local resources, regardless of the batch queue type.
+*/
+
+static int is_local_job( struct dag_node *n )
+{
+	return n->local_job || batch_queue_type==BATCH_QUEUE_TYPE_LOCAL;
+}
 
 /*
 Generates file list for node based on node files, wrapper
@@ -541,7 +554,7 @@ the necessary list of input and output files, and applying all
 wrappers and options.
 */
 
-static void makeflow_node_submit(struct dag *d, struct dag_node *n)
+static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
 	struct batch_queue *queue;
 	struct dag_file *f;
@@ -595,11 +608,20 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 		did_find_archived_job = 1;
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
-		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, dag_node_dynamic_label(n));
+
+		const struct rmsummary *resources = dag_node_dynamic_label(n);
+
+		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, resources);
 
 		/* Update all of the necessary data structures. */
 		if(n->jobid >= 0) {
+			memcpy(n->resources_allocated, resources, sizeof(struct rmsummary));
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+
+			if(is_local_job(n)) {
+				makeflow_local_resources_subtract(local_resources,n);
+			}
+
 			if(n->local_job && local_queue) {
 				itable_insert(d->local_job_table, n->jobid, n);
 			} else {
@@ -625,12 +647,17 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n)
 	jx_delete(envlist);
 }
 
-static int makeflow_node_ready(struct dag *d, struct dag_node *n)
+static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
 	struct dag_file *f;
 
 	if(n->state != DAG_NODE_STATE_WAITING)
 		return 0;
+
+	if(is_local_job(n)) {
+		if(!makeflow_local_resources_available(local_resources,resources))
+			return 0;
+	}
 
 	if(n->local_job && local_queue) {
 		if(dag_local_jobs_running(d) >= local_jobs_max)
@@ -652,6 +679,19 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n)
 	return 1;
 }
 
+int makeflow_nodes_local_waiting_count(const struct dag *d) {
+	int count = 0;
+
+	
+	struct dag_node *n;
+	for(n = d->nodes; n; n = n->next) {
+		if(n->state == DAG_NODE_STATE_WAITING && is_local_job(n))
+			count++;
+	}
+
+	return count;
+}
+
 /*
 Find all jobs ready to be run, then submit them.
 */
@@ -665,8 +705,9 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 			break;
 		}
 
-		if(makeflow_node_ready(d, n)) {
-			makeflow_node_submit(d, n);
+		const struct rmsummary *resources = dag_node_dynamic_label(n);
+		if(makeflow_node_ready(d, n, resources)) {
+			makeflow_node_submit(d, n, resources);
 		}
 	}
 }
@@ -725,6 +766,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
+
+	if(is_local_job(n)) {
+		makeflow_local_resources_add(local_resources,n);
+	}
 
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
@@ -1147,6 +1192,9 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s Show this help screen.\n", "-h,--help");
 	printf(" %-30s Max number of local jobs to run at once.	(default is # of cores)\n", "-j,--max-local=<#>");
 	printf(" %-30s Max number of remote jobs to run at once.\n", "-J,--max-remote=<#>");
+	printf(" %-30s Max number of local cores to use.\n","   --local-cores=#");
+	printf(" %-30s Max amount of local memory (MB) to use.\n","   --local-memory=#");
+	printf(" %-30s Max amount of local disk (MB) to use.\n","   --local-disk=#");
 	printf("															(default %d for -Twq, %d otherwise.)\n", 10*MAX_REMOTE_JOBS_DEFAULT, MAX_REMOTE_JOBS_DEFAULT );
 	printf(" %-30s Use this file for the makeflow log.		 (default is X.makeflowlog)\n", "-l,--makeflow-log=<logfile>");
 	printf(" %-30s Use this file for the batch system log.	 (default is X.<type>log)\n", "-L,--batch-log=<logfile>");
@@ -1216,6 +1264,10 @@ int main(int argc, char *argv[])
 	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
 	int explicit_local_jobs_max = 0;
+	int explicit_local_cores = 0;
+	int explicit_local_memory = 0;
+	int explicit_local_disk = 0;
+
 	char *logfilename = NULL;
 	int port_set = 0;
 	timestamp_t runtime = 0;
@@ -1285,6 +1337,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_GC_SIZE,
+		LONG_OPT_LOCAL_CORES,
+		LONG_OPT_LOCAL_MEMORY,
+		LONG_OPT_LOCAL_DISK,
 		LONG_OPT_MONITOR,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LOG_NAME,
@@ -1316,7 +1371,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
-        LONG_OPT_SINGULARITY,
+		LONG_OPT_SINGULARITY,
 		LONG_OPT_SHARED_FS,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_READ_ONLY,
@@ -1348,6 +1403,9 @@ int main(int argc, char *argv[])
 		{"gc-count", required_argument, 0, 'G'},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"help", no_argument, 0, 'h'},
+		{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
+		{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
+		{"local-disk", required_argument, 0, LONG_OPT_LOCAL_DISK},
 		{"makeflow-log", required_argument, 0, 'l'},
 		{"max-local", required_argument, 0, 'j'},
 		{"max-remote", required_argument, 0, 'J'},
@@ -1505,6 +1563,15 @@ int main(int argc, char *argv[])
 				break;
 			case 'm':
 				email_summary_to = xxstrdup(optarg);
+				break;
+			case LONG_OPT_LOCAL_CORES:
+				explicit_local_cores = atoi(optarg);
+				break;
+			case LONG_OPT_LOCAL_MEMORY:
+				explicit_local_memory = atoi(optarg);
+				break;
+			case LONG_OPT_LOCAL_DISK:
+				explicit_local_disk = atoi(optarg);
 				break;
 			case LONG_OPT_MONITOR:
 				if (!monitor) monitor = makeflow_monitor_create();
@@ -1818,46 +1885,71 @@ int main(int argc, char *argv[])
 
 	d->allocation_mode = allocation_mode;
 
-	// Makeflows running LOCAL batch type have only one queue that behaves as if remote
-	// This forces -J vs -j to behave correctly
-	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-		explicit_remote_jobs_max = explicit_local_jobs_max;
-	}
+	/* Measure resources available for local job execution. */
+	local_resources = rmsummary_create(-1);
+	makeflow_local_resources_measure(local_resources);
 
-	if(explicit_local_jobs_max) {
-		local_jobs_max = explicit_local_jobs_max;
-	} else {
-		local_jobs_max = load_average_get_cpus();
-	}
+	if(explicit_local_cores)  local_resources->cores = explicit_local_cores;
+	if(explicit_local_memory) local_resources->memory = explicit_local_memory;
+	if(explicit_local_disk)   local_resources->disk = explicit_local_disk;
 
-	if(explicit_remote_jobs_max) {
-		remote_jobs_max = explicit_remote_jobs_max;
-	} else {
-		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			remote_jobs_max = load_average_get_cpus();
-		} else if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
-			remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
-		} else {
-			remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
-		}
-	}
+	makeflow_local_resources_print(local_resources);
 
+	/* Environment variables override explicit settings for maximum jobs. */
 	s = getenv("MAKEFLOW_MAX_REMOTE_JOBS");
 	if(s) {
-		remote_jobs_max = MIN(remote_jobs_max, atoi(s));
+		explicit_remote_jobs_max = MIN(explicit_remote_jobs_max, atoi(s));
 	}
 
 	s = getenv("MAKEFLOW_MAX_LOCAL_JOBS");
 	if(s) {
-		int n = atoi(s);
-		local_jobs_max = MIN(local_jobs_max, n);
-		if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
-			remote_jobs_max = MIN(local_jobs_max, n);
-		}
+		explicit_local_jobs_max = MIN(explicit_local_jobs_max, atoi(s));
 	}
 
-	remote_queue = batch_queue_create(batch_queue_type);
+	/*
+	Handle the confusing case of specifying local/remote max
+	jobs when the job type is LOCAL.  Take either option to mean
+	both, use the minimum if both are set, and the number of cores
+	if neither is set.
+	*/
 
+	if(batch_queue_type == BATCH_QUEUE_TYPE_LOCAL) {
+		int j;
+		if(explicit_remote_jobs_max && !explicit_local_jobs_max) {
+			j = explicit_remote_jobs_max;
+		} else if(explicit_local_jobs_max && !explicit_remote_jobs_max) {
+			j = explicit_local_jobs_max;
+		} else if(explicit_local_jobs_max && explicit_remote_jobs_max) {
+			j = MIN(explicit_local_jobs_max,explicit_remote_jobs_max);
+		} else {
+			j = local_resources->cores;
+		}
+		local_jobs_max = remote_jobs_max = j;
+
+	} else {
+		/* We are using a separate local and remote queue, so set them separately. */
+
+		if(explicit_local_jobs_max) {
+			local_jobs_max = explicit_local_jobs_max;
+		} else {
+			local_jobs_max = local_resources->cores;
+		}
+
+		if(explicit_remote_jobs_max) {
+			remote_jobs_max = explicit_remote_jobs_max;
+		} else {
+			if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
+				remote_jobs_max = 10 * MAX_REMOTE_JOBS_DEFAULT;
+			} else {
+				remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
+			}
+		}
+		printf("max running remote jobs: %d\n",remote_jobs_max);
+	}
+
+	printf("max running local jobs: %d\n",local_jobs_max);
+
+	remote_queue = batch_queue_create(batch_queue_type);
 	if(!remote_queue) {
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
@@ -2087,6 +2179,12 @@ int main(int argc, char *argv[])
 	d->should_write_to_archive = should_write_to_archive;
 
 	makeflow_run(d);
+
+	if(makeflow_failed_flag == 0 && makeflow_nodes_local_waiting_count(d) > 0) {
+		makeflow_failed_flag = 1;
+		debug(D_ERROR, "There are local jobs that could not be run. Usually this means that makeflow did not have enough local resources to run them.");
+	}
+
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
