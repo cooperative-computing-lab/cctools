@@ -21,6 +21,9 @@
 static int initialized = 0;
 static char* queue_name = NULL;
 static char* compute_env_name = NULL;
+static char* vpc = NULL;
+static char* sec_group = NULL;
+static char* subnet = NULL;
 static int ids = 1;
 static struct itable* done_jobs;//might need an itable of itables for different runs....
 static struct itable* amazon_job_ids;
@@ -36,7 +39,14 @@ static struct internal_amazon_batch_amazon_ids{
 	char* master_env_prefix;
 }initialized_data;
 
-static char* create_alpha_code(int i){
+static struct jx* run_command(char* cmd){
+	FILE* out = popen(cmd,"r");
+	struct jx* jx = jx_parse_stream(out);
+	pclose(out);
+	return jx;
+}
+
+/*static char* create_alpha_code(int i){
 	char* ret = string_format("");
 	char a = 'a';
 	int j = i;
@@ -84,7 +94,7 @@ static char* wait_for_job_queue_creation(char* name, char* master_env_prefix){
 		}
 	}
 	return NULL;
-}
+}*/
 
 static void split_comma_list(char* in, int* size, char*** output){
 	*size = 0;
@@ -124,93 +134,120 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	if(initialized){
 		return initialized_data;
 	}
+	
+	FILE* config_file = fopen("./makeflow_amazon_batch.config","r");
+	if(!config_file){
+		system("amazon_batch_script.sh 4 3 4");
+	}
+	struct jx* config = jx_parse_file("./makeflow_amazon_batch.config");
+	
+	
 	initialized = 1;
 	instID = time(NULL);
 	queue_name = string_format("%i_ccl_amazon_batch_queue",instID);//should be unique
 	done_jobs = itable_create(0);//default size
 	amazon_job_ids = itable_create(0);
 	done_files = itable_create(0);
-	
+
+		
+
 	//get amazon stuff
-	char* amazon_credentials_filepath = hash_table_lookup(q->options,
-							      "amazon-credentials");
-	if(amazon_credentials_filepath == NULL) {
-		fatal("No amazon credentials passed. Please pass file containing amazon credentials using --amazon-credentials flag");
-	}
+	//char* amazon_credentials_filepath = hash_table_lookup(q->options,
+	//						      "amazon-credentials");
+	//if(amazon_credentials_filepath == NULL) {
+	//	fatal("No amazon credentials passed. Please pass file containing amazon credentials using --amazon-credentials flag");
+	//}
 	char* amazon_ami = hash_table_lookup(q->options,
 					     "amazon-ami");
 	if(amazon_ami == NULL) {
 		fatal("No ami image id passed. Please pass file containing ami image id using --amazon-ami flag");
 	}
 
-	struct jx* config = jx_parse_file(amazon_credentials_filepath);
-	if(!config) {
-		fatal("Amazon credentials file could not be opened");
-	}
+	//struct jx* config = jx_parse_file(amazon_credentials_filepath);
+	//if(!config) {
+	//	fatal("Amazon credentials file could not be opened");
+	//}
 
-	const char* aws_access_key_id = jx_lookup_string(config, "aws_access_key");
-	const char* aws_secret_access_key = jx_lookup_string(config, "aws_secret_access_key");
-	const char* aws_region = jx_lookup_string(config,"aws_ec2_region");
-	const char* aws_email = jx_lookup_string(config,"aws_email");
+	const char* aws_access_key_id = jx_lookup_string(config, "aws_id");
+	const char* aws_secret_access_key = jx_lookup_string(config, "aws_key");
+	const char* aws_region = jx_lookup_string(config,"aws_reg");
+	bucket_name = jx_lookup_string(config,"bucket");
+	vpc = jx_lookup_string(config,"vpc");
+	sec_group = jx_lookup_string(config,"sec_group");
+	queue_name = jx_lookup_string(config,"queue_name");
+	compute_env_name = jx_lookup_string(config,"env_name");
+	subnet = jx_lookup_string(config,"subnet");	
+
+	//const char* aws_email = jx_lookup_string(config,"aws_email");
 
 	if(!aws_access_key_id)
-		fatal("credentials file %s does not contain aws_access_key");
+		fatal("credentials file does not contain aws_id");
 	if(!aws_secret_access_key)
-		fatal("credentials file %s does not contain aws_secret_access_key");
+		fatal("credentials file does not contain aws_key");
 	if(!aws_region)
-		fatal("credentials file %s does not contain aws_ec2_region");
-	if(!aws_email)
-		fatal("credentials file %s does not contain aws_email");
+		fatal("credentials file does not contain aws_reg");
+	if(!bucket_name)
+		fatal("credentials file does not contain bucket");
+	if(!queue_name)
+		fatal("credentials file does not contain queue_name");
+	if(!compute_env_name)
+		fatal("credentials file does not contain env_name");
+	if(!vpc)
+		fatal("credentials file does not contain vpc");
+	if(!subnet)
+		fatal("credentials file does not contain subnet"); 
+	//if(!aws_email)
+	//	fatal("credentials file %s does not contain aws_email");
 		
 	char* env_var = string_format("AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_DEFAULT_REGION=%s ",aws_access_key_id,aws_secret_access_key,aws_region);
 	
 	FILE* out;
 	
 	//create compute environment
-	compute_env_name = string_format("%i_ccl_amazon_batch_compenv",instID);
+	//compute_env_name = string_format("%i_ccl_amazon_batch_compenv",instID);
 	//this is wrong, but I just want to try and do the
-	char* cmd = string_format("%s aws --region=%s batch create-compute-environment --compute-environment-name %s --type MANAGED --state ENABLED --compute-resources type=EC2,minvCpus=2,maxvCpus=4,desiredvCpus=2,instanceTypes=optimal,subnets=subnet-f8d9e19f,securityGroupIds=sg-8e010af5,instanceRole=ecsInstanceRole --service-role=arn:aws:iam::429641242186:role/service-role/AWSBatchServiceRole",env_var,aws_region,compute_env_name);
-	debug(D_BATCH,"Creating the Compute Environment: %s\n",cmd);
-	out = popen(cmd,"r");
-	struct jx* jx = jx_parse_stream(out);
-	jx_pretty_print_stream(jx,stderr);
-	pclose(out);
-	jx_delete(jx);
-	free(cmd);
+	//char* cmd = string_format("%s aws --region=%s batch create-compute-environment --compute-environment-name %s --type MANAGED --state ENABLED --compute-resources type=EC2,minvCpus=2,maxvCpus=4,desiredvCpus=2,instanceTypes=optimal,subnets=subnet-f8d9e19f,securityGroupIds=sg-8e010af5,instanceRole=ecsInstanceRole --service-role=arn:aws:iam::429641242186:role/service-role/AWSBatchServiceRole",env_var,aws_region,compute_env_name);
+	//debug(D_BATCH,"Creating the Compute Environment: %s\n",cmd);
+	//out = popen(cmd,"r");
+	//struct jx* jx = jx_parse_stream(out);
+	//jx_pretty_print_stream(jx,stderr);
+	//pclose(out);
+	//jx_delete(jx);
+	//free(cmd);
 	
-	if(wait_for_compute_env_creation(compute_env_name,env_var) != NULL){
-		fatal("ERROR WHEN CREATING THE COMPUTE ENVIRONMENT");
-	}
+	//if(wait_for_compute_env_creation(compute_env_name,env_var) != NULL){
+	//	fatal("ERROR WHEN CREATING THE COMPUTE ENVIRONMENT");
+	//}
 	
 	//create queue
-	cmd = string_format("%s aws --region=%s batch create-job-queue --state=ENABLED --priority=1 --job-queue-name=%s --compute-environment-order order=1,computeEnvironment=\"%s\"",env_var,aws_region,queue_name,compute_env_name);
-	debug(D_BATCH,"Creating the Batch Queue: %s\n",cmd);
-	out = popen(cmd,"r");
-	jx = jx_parse_stream(out);
-	pclose(out);
-	jx_pretty_print_stream(jx,stderr);
-	jx_delete(jx);
+	//cmd = string_format("%s aws --region=%s batch create-job-queue --state=ENABLED --priority=1 --job-queue-name=%s --compute-environment-order order=1,computeEnvironment=\"%s\"",env_var,aws_region,queue_name,compute_env_name);
+	//debug(D_BATCH,"Creating the Batch Queue: %s\n",cmd);
+	//out = popen(cmd,"r");
+	//jx = jx_parse_stream(out);
+	//pclose(out);
+	//jx_pretty_print_stream(jx,stderr);
+	//jx_delete(jx);
 
-	if(wait_for_job_queue_creation(queue_name,env_var) != NULL){
-		fatal("ERROR WHEN CREATING THE QUEUE");
-	}
+	//if(wait_for_job_queue_creation(queue_name,env_var) != NULL){
+	//	fatal("ERROR WHEN CREATING THE QUEUE");
+	//}
 	
-	bucket_name = create_alpha_code(instID);
-	char* tmpbn = string_format("ccl%s",bucket_name);
-	free(bucket_name);
-	bucket_name = tmpbn;
-	cmd = string_format("%s aws s3 mb s3://%s",env_var,bucket_name);
-	debug(D_BATCH,"\nRunning the following command: %s\n",cmd);
-	int ret = system(cmd);
-	debug(D_BATCH,"Creating new bucket return code: %i",ret);
-	free(cmd);
+	//bucket_name = create_alpha_code(instID);
+	//char* tmpbn = string_format("ccl%s",bucket_name);
+	//free(bucket_name);
+	//bucket_name = tmpbn;
+	//cmd = string_format("%s aws s3 mb s3://%s",env_var,bucket_name);
+	//debug(D_BATCH,"\nRunning the following command: %s\n",cmd);
+	//int ret = system(cmd);
+	//debug(D_BATCH,"Creating new bucket return code: %i",ret);
+	//free(cmd);
 	
 	
 	
 	initialized_data.aws_access_key_id = aws_access_key_id;
 	initialized_data.aws_secret_access_key = aws_secret_access_key;
 	initialized_data.aws_region=aws_region;
-	initialized_data.aws_email = aws_email;
+	//initialized_data.aws_email = aws_email;
 	initialized_data.master_env_prefix = env_var;
 	return initialized_data;
 }
