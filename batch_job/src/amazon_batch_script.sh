@@ -40,10 +40,13 @@ aws ec2 modify-subnet-attribute --subnet-id $ec2_subnet --map-public-ip-on-launc
 echo "\"subnet\":\"$ec2_subnet\"," >> $outputfile
 
 #echo create the security group
-ec2_security_group_name="makeflow_ccl_sec_group_$time"
-ec2_security_group_create_response="$(aws ec2 create-security-group --group-name $ec2_security_group_name --description "A Makeflow Security Group" --vpc-id $ec2_vpc)"
-ec2_security_group_id=$(python -c "import json; print json.loads('''$ec2_security_group_create_response''')['GroupId'];")
+#ec2_security_group_name="makeflow_ccl_sec_group_$time"
+#ec2_security_group_create_response="$(aws ec2 create-security-group --group-name $ec2_security_group_name --description "A Makeflow Security Group" --vpc-id $ec2_vpc)"
+#ec2_security_group_id=$(python -c "import json; print json.loads('''$ec2_security_group_create_response''')['GroupId'];")
+ec2_security_group_id=$(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$ec2_vpc --query 'SecurityGroups[0].GroupId' --output text)
 echo $ec2_security_group_id
+
+aws ec2 authorize-security-group-ingress --group-id $ec2_security_group_id --protocol all --port all
 
 echo "\"sec_group\":\"$ec2_security_group_id\"," >> $outputfile
 
