@@ -137,7 +137,7 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	
 	FILE* config_file = fopen("./makeflow_amazon_batch.config","r");
 	if(!config_file){
-		system("amazon_batch_script.sh 4 3 4");
+		system("amazon_batch_initialize 2 2 4");
 	}
 	struct jx* config = jx_parse_file("./makeflow_amazon_batch.config");
 	
@@ -171,12 +171,12 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	const char* aws_access_key_id = jx_lookup_string(config, "aws_id");
 	const char* aws_secret_access_key = jx_lookup_string(config, "aws_key");
 	const char* aws_region = jx_lookup_string(config,"aws_reg");
-	bucket_name = jx_lookup_string(config,"bucket");
-	vpc = jx_lookup_string(config,"vpc");
-	sec_group = jx_lookup_string(config,"sec_group");
-	queue_name = jx_lookup_string(config,"queue_name");
-	compute_env_name = jx_lookup_string(config,"env_name");
-	subnet = jx_lookup_string(config,"subnet");	
+	bucket_name = (char*)jx_lookup_string(config,"bucket");
+	vpc = (char*)jx_lookup_string(config,"vpc");
+	sec_group = (char*)jx_lookup_string(config,"sec_group");
+	queue_name = (char*)jx_lookup_string(config,"queue_name");
+	compute_env_name = (char*)jx_lookup_string(config,"env_name");
+	subnet = (char*)jx_lookup_string(config,"subnet");	
 
 	//const char* aws_email = jx_lookup_string(config,"aws_email");
 
