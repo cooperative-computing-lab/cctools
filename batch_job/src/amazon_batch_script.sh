@@ -24,15 +24,17 @@ echo "\"aws_key\":\"$aws_key\"," >> $outputfile
 echo "\"aws_reg\":\"$aws_reg\"," >> $outputfile
 
 #echo create the vpc
-ec2_vpc_create_response="$(aws ec2 create-vpc --cidr-block 10.0.0.0/16)"
-ec2_vpc=$(python -c "import json; print json.loads('''$ec2_vpc_create_response''')['Vpc']['VpcId'];")
+#ec2_vpc_create_response="$(aws ec2 create-vpc --cidr-block 10.0.0.0/16)"
+#ec2_vpc=$(python -c "import json; print json.loads('''$ec2_vpc_create_response''')['Vpc']['VpcId'];")
+ec2_vpc=$(aws ec2 describe-vpcs --query 'Vpcs[0].VpcId' --output text)
 echo $ec2_vpc
 
 echo "\"vpc\":\"$ec2_vpc\"," >> $outputfile
 
 #echo create the subnet
-ec2_subnet_create_response="$(aws ec2 create-subnet --vpc-id $ec2_vpc --cidr-block 10.0.1.0/24)"
-ec2_subnet=$(python -c "import json; print json.loads('''$ec2_subnet_create_response''')['Subnet']['SubnetId'];")
+#ec2_subnet_create_response="$(aws ec2 create-subnet --vpc-id $ec2_vpc --cidr-block 10.0.1.0/24)"
+#ec2_subnet=$(python -c "import json; print json.loads('''$ec2_subnet_create_response''')['Subnet']['SubnetId'];")
+ec2_subnet=$(aws ec2 describe-subnets --query 'Subnets[0].SubnetId' --output text)
 echo $ec2_subnet
 
 aws ec2 modify-subnet-attribute --subnet-id $ec2_subnet --map-public-ip-on-launch
