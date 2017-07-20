@@ -419,7 +419,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		pclose(out);
 		//check to see if we have more to go through
 		char* nxt = (char*)NULL;
-		if((nxt=jx_lookup_string(jx,"nextToken"))==NULL){
+		if((nxt=(char*)jx_lookup_string(jx,"nextToken"))==NULL){
 			done = 1;
 		}
 		//checking for our item
@@ -484,7 +484,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		pclose(out);
 		//check to see if we have more to go through
 		char* nxt = (char*)NULL;
-		if((nxt=jx_lookup_string(jx,"nextToken"))==NULL){
+		if((nxt=(char*)jx_lookup_string(jx,"nextToken"))==NULL){
 			done = 1;
 		}
 		//checking for our item
@@ -569,4 +569,5 @@ const struct batch_queue_module batch_queue_amazon_batch = {
 	 batch_fs_amazon_batch_stat,
 	 batch_fs_amazon_batch_unlink,
 	 },
+         0,
 };
