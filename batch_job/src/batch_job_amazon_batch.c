@@ -168,15 +168,15 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	//	fatal("Amazon credentials file could not be opened");
 	//}
 
-	const char* aws_access_key_id = jx_lookup_string(config, "aws_id");
-	const char* aws_secret_access_key = jx_lookup_string(config, "aws_key");
-	const char* aws_region = jx_lookup_string(config,"aws_reg");
-	bucket_name = (char*)jx_lookup_string(config,"bucket");
-	vpc = (char*)jx_lookup_string(config,"vpc");
-	sec_group = (char*)jx_lookup_string(config,"sec_group");
-	queue_name = (char*)jx_lookup_string(config,"queue_name");
-	compute_env_name = (char*)jx_lookup_string(config,"env_name");
-	subnet = (char*)jx_lookup_string(config,"subnet");	
+	char* aws_access_key_id     = (char*)jx_lookup_string(config, "aws_id");
+	char* aws_secret_access_key = (char*)jx_lookup_string(config, "aws_key");
+	char* aws_region            = (char*)jx_lookup_string(config,"aws_reg");
+	bucket_name                 = (char*)jx_lookup_string(config,"bucket");
+	vpc                         = (char*)jx_lookup_string(config,"vpc");
+	sec_group                   = (char*)jx_lookup_string(config,"sec_group");
+	queue_name                  = (char*)jx_lookup_string(config,"queue_name");
+	compute_env_name            = (char*)jx_lookup_string(config,"env_name");
+	subnet                      = (char*)jx_lookup_string(config,"subnet");	
 
 	//const char* aws_email = jx_lookup_string(config,"aws_email");
 
@@ -201,7 +201,7 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 		
 	char* env_var = string_format("AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_DEFAULT_REGION=%s ",aws_access_key_id,aws_secret_access_key,aws_region);
 	
-	FILE* out;
+	//FILE* out;
 	
 	//create compute environment
 	//compute_env_name = string_format("%i_ccl_amazon_batch_compenv",instID);
@@ -289,7 +289,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	//upload files to S3
 	int files_split_num = 0;//to prevent dirty data
 	char** files_split;
-	split_comma_list(extra_input_files,&files_split_num,&files_split);
+	split_comma_list((char*)extra_input_files,&files_split_num,&files_split);
 	debug(D_BATCH,"\nEXTRA INPUT FILES LIST: %s, len: %i\n",extra_input_files, files_split_num);
 	for(i=0; i<files_split_num; i++){
 		debug(D_BATCH,"\nSubmitting file: %s\n",files_split[i]);
@@ -300,7 +300,8 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	}
 	
 	//Create command to pull files from s3 and into local space to work on
-	char* new_cmd=string_format("");
+	char* new_cmd=malloc(sizeof(char)*1);
+        new_cmd[0]='\0';
 	if(files_split_num > 0){
 		char* copy_cmd_prefix = string_format("%s aws s3 cp ", env_var);
 		for(i=0; i<files_split_num; i++){
@@ -317,7 +318,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	free(new_cmd);
 	new_cmd = cmd_tmp;
 	//copy out any external files
-	split_comma_list(extra_output_files,&files_split_num,&files_split);
+	split_comma_list((char*)extra_output_files,&files_split_num,&files_split);
 	debug(D_BATCH,"\nNumber of output files: %i\n",files_split_num);
 	if(files_split_num > 0){
 		char* copy_cmd_prefix = string_format("%s aws s3 cp ", env_var);//AWS_ACCESS_KEY_ID=$ID_KEY AWS_SECRET_ACCESS_KEY=$SECRET AWS_DEFAULT_REGION=$REGION aws s3 cp ";
@@ -368,7 +369,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	pclose(out);
 	free(tmp);
 	
-	char* arn = jx_lookup_string(jx,"jobDefinitionArn");
+	char* arn = (char*)jx_lookup_string(jx,"jobDefinitionArn");
 	if(arn == NULL){
 		fatal("Fatal error when trying to create the job definition!");
 	}
@@ -381,7 +382,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	jx = jx_parse_stream(out);
 	free(tmp);
 	pclose(out);
-	char* jaid = jx_lookup_string(jx,"jobId");
+	char* jaid = (char*)jx_lookup_string(jx,"jobId");
 	if(!jaid)
 		fatal("NO JOB ID FROM AMAZON GIVEN");
 	itable_insert(amazon_job_ids,jobid,jaid);
@@ -417,7 +418,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		jx_pretty_print_stream(jx,stderr);
 		pclose(out);
 		//check to see if we have more to go through
-		char* nxt = NULL;
+		char* nxt = (char*)NULL;
 		if((nxt=jx_lookup_string(jx,"nextToken"))==NULL){
 			done = 1;
 		}
@@ -427,7 +428,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		int len = jx_array_length(jx_arr);
 		for(i=0; i<len; ++i){
 			struct jx* itm = jx_array_index(jx_arr,i);
-			char* jobname = jx_lookup_string(itm, "jobName");
+			char* jobname = (char*)jx_lookup_string(itm, "jobName");
 			int id = get_id_from_name(jobname);
 			//debug(D_BATCH,"\n\njobName: %s, jobid: %i\n\n",jobname,id);
 			if(itable_lookup(done_jobs,id+1) == NULL){
@@ -482,7 +483,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		jx_pretty_print_stream(jx,stderr);
 		pclose(out);
 		//check to see if we have more to go through
-		char* nxt = NULL;
+		char* nxt = (char*)NULL;
 		if((nxt=jx_lookup_string(jx,"nextToken"))==NULL){
 			done = 1;
 		}
@@ -491,7 +492,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		int len = jx_array_length(jx_arr);
 		for(i=0; i<len; ++i){
 			struct jx* itm = jx_array_index(jx_arr,i);
-			char* jobname = jx_lookup_string(itm, "jobName");
+			char* jobname = (char*)jx_lookup_string(itm, "jobName");
 			int id = get_id_from_name(jobname);
 			if(itable_lookup(done_jobs,id+1) == NULL){
 				//id is done, returning here
@@ -515,9 +516,9 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 
 static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t jobid){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
-	char* env_var = initialized_data.master_env_prefix; 
+	char* env_var = amazon_ids.master_env_prefix; 
 	if(itable_lookup(done_jobs,jobid)==NULL){
-		char* name = string_format("%s_%i",queue_name,jobid);
+		char* name = string_format("%s_%i",queue_name,(int)jobid);
 		itable_insert(done_jobs,jobid+1,name);
 	}
 	char* amazon_id;
