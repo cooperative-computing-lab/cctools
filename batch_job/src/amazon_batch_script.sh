@@ -24,17 +24,20 @@ echo "\"aws_key\":\"$aws_key\"," >> $outputfile
 echo "\"aws_reg\":\"$aws_reg\"," >> $outputfile
 
 #echo create the vpc
-#ec2_vpc_create_response="$(aws ec2 create-vpc --cidr-block 10.0.0.0/16)"
-#ec2_vpc=$(python -c "import json; print json.loads('''$ec2_vpc_create_response''')['Vpc']['VpcId'];")
-ec2_vpc=$(aws ec2 describe-vpcs --query 'Vpcs[0].VpcId' --output text)
+ec2_vpc_create_response="$(aws ec2 create-vpc --cidr-block 10.0.0.0/16)"
+ec2_vpc=$(python -c "import json; print json.loads('''$ec2_vpc_create_response''')['Vpc']['VpcId'];")
+#ec2_vpc=$(aws ec2 describe-vpcs --query 'Vpcs[0].VpcId' --output text)
 echo $ec2_vpc
+
+aws ec2 modify-vpc-attribute --vpc-id $ec2_vpc --enable-dns-hostnames
+#aws ec2 modify-vpc-attribute --vpc-id $ec2_vpc --enable-dns-support
 
 echo "\"vpc\":\"$ec2_vpc\"," >> $outputfile
 
 #echo create the subnet
-#ec2_subnet_create_response="$(aws ec2 create-subnet --vpc-id $ec2_vpc --cidr-block 10.0.1.0/24)"
-#ec2_subnet=$(python -c "import json; print json.loads('''$ec2_subnet_create_response''')['Subnet']['SubnetId'];")
-ec2_subnet=$(aws ec2 describe-subnets --query 'Subnets[0].SubnetId' --output text)
+ec2_subnet_create_response="$(aws ec2 create-subnet --vpc-id $ec2_vpc --cidr-block 10.0.1.0/24)"
+ec2_subnet=$(python -c "import json; print json.loads('''$ec2_subnet_create_response''')['Subnet']['SubnetId'];")
+#ec2_subnet=$(aws ec2 describe-subnets --query 'Subnets[0].SubnetId' --output text)
 echo $ec2_subnet
 
 aws ec2 modify-subnet-attribute --subnet-id $ec2_subnet --map-public-ip-on-launch
@@ -51,6 +54,18 @@ echo $ec2_security_group_id
 aws ec2 authorize-security-group-ingress --group-id $ec2_security_group_id --protocol all --port all
 
 echo "\"sec_group\":\"$ec2_security_group_id\"," >> $outputfile
+
+#create an internet gateway
+ec2_gateway=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)
+echo $ec2_gateway
+
+aws ec2 attach-internet-gateway --vpc-id $ec2_vpc --internet-gateway-id $ec2_gateway
+
+route_table=$(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$ec2_vpc --query 'RouteTables[0].RouteTableId' --output text)
+echo "THis is the route table: $route_table"
+aws ec2 create-route --route-table-id $route_table --destination-cidr-block 0.0.0.0/0 --gateway-id $ec2_gateway
+
+echo "\"gateway\":\"$ec2_gateway\"," >> $outputfile
 
 #echo creating the environment
 env_name="makeflow_ccl_env_$time"

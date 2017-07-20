@@ -14,6 +14,7 @@ ec2_security_group_id=$(python -c "import json; print json.load(open('$configFil
 env_name=$(python -c "import json; print json.load(open('$configFile','r'))['env_name'];")
 queue_name=$(python -c "import json; print json.load(open('$configFile','r'))['queue_name'];")
 bucket_name=$(python -c "import json; print json.load(open('$configFile','r'))['bucket'];")
+gateway=$(python -c "import json; print json.load(open('$configFile','r'))['gateway'];")
 
 #disabling jobqueues
 aws batch update-job-queue --job-queue $queue_name --state DISABLED
@@ -62,11 +63,16 @@ env_done_check_output="$(aws batch describe-compute-environments --compute-envir
 env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print len(k['computeEnvironments']) == 0;")
 done
 
+#delete the internet gateway
+aws ec2 detach-internet-gateway --vpc-id $ec2_vpc --internet-gateway-id $gateway
+aws ec2 delete-internet-gateway --internet-gateway-id $gateway
+
 #delete the security group
-aws ec2 delete-security-group --group-id $ec2_security_group_id
+#gets handled by the deletion of the vpc and subnets
+#aws ec2 delete-security-group --group-id $ec2_security_group_id
 
 #delete the subnet
-echo "THis is the subnet variable value: $ec2_subnet"
+#echo "THis is the subnet variable value: $ec2_subnet"
 aws ec2 delete-subnet --subnet-id $ec2_subnet
 
 #delete the vpc
