@@ -39,12 +39,12 @@ static struct internal_amazon_batch_amazon_ids{
 	char* master_env_prefix;
 }initialized_data;
 
-static struct jx* run_command(char* cmd){
+/*static struct jx* run_command(char* cmd){
 	FILE* out = popen(cmd,"r");
 	struct jx* jx = jx_parse_stream(out);
 	pclose(out);
 	return jx;
-}
+}*/
 
 /*static char* create_alpha_code(int i){
 	char* ret = string_format("");
@@ -569,5 +569,4 @@ const struct batch_queue_module batch_queue_amazon_batch = {
 	 batch_fs_amazon_batch_stat,
 	 batch_fs_amazon_batch_unlink,
 	 },
-         0,
 };
