@@ -258,7 +258,6 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	//so, we have the access keys, now we need to either set up the queues and exec environments, or add them.
 	int jobid = ids++;
 	char* job_name = string_format("%s_%i",queue_name,jobid);
-	char* queue = queue_name;
 	
 	//makeflow specifics
 	struct batch_job_info *info = malloc(sizeof(*info));
