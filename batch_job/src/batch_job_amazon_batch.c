@@ -253,7 +253,6 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	char* env_var = amazon_ids.master_env_prefix;
-	struct jx* jx;
 	
 	//so, we have the access keys, now we need to either set up the queues and exec environments, or add them.
 	int jobid = ids++;
@@ -285,6 +284,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	char* properties_string = string_format("{ \\\"image\\\": \\\"%s\\\", \\\"vcpus\\\": %i, \\\"memory\\\": %li, \\\"command\\\": [\\\"sh\\\",\\\"-c\\\",\\\"%s\\\"], \\\"environment\\\":[{\\\"name\\\":\\\"AWS_ACCESS_KEY_ID\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"AWS_SECRET_ACCESS_KEY\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"REGION\\\",\\\"value\\\":\\\"%s\\\"}] }", img,cpus,mem,fmt_cmd,amazon_ids.aws_access_key_id,amazon_ids.aws_secret_access_key,amazon_ids.aws_region);
 	
 	char* jaid = aws_submit_job(job_name,properties_string);
+	
 	itable_insert(amazon_job_ids,jobid,jaid);
 	itable_insert(done_files,jobid,string_format("%s",extra_output_files));
 	debug(D_BATCH,"Job %i successfully Submitted\n",jobid);
@@ -297,7 +297,6 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	//cleanup
 	free(job_name);
 	free(fmt_cmd);
-	jx_delete(jx);
 	
 	return jobid;
 	
