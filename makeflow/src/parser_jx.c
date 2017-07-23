@@ -21,6 +21,8 @@ See the file COPYING for details.
 #include "jx_match.h"
 #include "jx_print.h"
 
+#include <assert.h>
+
 static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_table *h, struct jx *env) {
 	int nodeid;
 
@@ -109,21 +111,28 @@ static int resources_from_jx(struct hash_table *h, struct jx *j) {
 
 static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 	assert(j);
+	assert(n);
+	const char *path = NULL;
+	const char *remote = NULL;
 
-	if (!jx_istype(j, JX_OBJECT)) {
-		debug(D_MAKEFLOW_PARSER|D_NOTICE,
-			"Line %u: File must be specified as a JSON object",
+	if (jx_istype(j, JX_STRING)) {
+		path = j->u.string_value;
+	} else if (jx_istype(j, JX_OBJECT)) {
+		path = jx_lookup_string(j, "path");
+		remote = jx_lookup_string(j, "execution_path");
+		if (!path) {
+			debug(D_MAKEFLOW_PARSER | D_NOTICE,
+				"File at line %u: missing \"path\" key",
+				j->line);
+			return 0;
+		}
+	} else {
+		debug(D_MAKEFLOW_PARSER | D_NOTICE,
+			"Line %u: File must be specified as a string or object",
 			j->line);
 		return 0;
 	}
 
-	const char *path = jx_lookup_string(j, "path");
-	const char *remote = jx_lookup_string(j, "execution_path");
-	if (!path) {
-		debug(D_MAKEFLOW_PARSER|D_NOTICE,
-			"File at line %u: missing \"path\" key", j->line);
-		return 0;
-	}
 	if (input) {
 		debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", path, remote ? remote : "NULL");
 		dag_node_add_source_file(n, path, remote);

@@ -19,11 +19,25 @@
 <div id="manual">
 <h1 id="jx">JX (JSON + Expressions)<a class="sectionlink" href="#jx" title="Link to this section.">&#x21d7;</a></h1>
 
-<p style="text-align: right;"><b>Last edited: 14 June 2016</b></p>
+<p style="text-align: right;"><b>Last edited: 5 July 2017</b></p>
 
-<p>JX is a superset of JSON with additional syntax for dynamically generating data. The use case in mind when designing JX was writing job descriptions for a workflow manager accepting JSON input. For workflows with a large number of rules with similar structure, it is sometimes necessary to write a script in another language like Python to generate the JSON output. It would be desirable to have a special-purpose language that can dynamically generate rules while still bearing a resemblance to JSON, and more importantly, still being readable. JX is much lighter than a full-featured language like Python or JavaScript, and is suited to embedding in other systems like a workflow manager.</p>
+<p>
+JX is a superset of JSON with additional syntax for dynamically generating data.
+The use case in mind when designing JX was writing job descriptions for a workflow manager accepting JSON input.
+For workflows with a large number of rules with similar structure,
+it is sometimes necessary to write a script in another language like Python to generate the JSON output.
+It would be desirable to have a special-purpose language that can dynamically generate rules while still bearing a resemblance to JSON,
+and more importantly, still being readable.
+JX is much lighter than a full-featured language like Python or JavaScript,
+and is suited to embedding in other systems like a workflow manager.
+</p>
 
-<p>Standard JSON syntax is supported, with two important additions: operators and functions. Operators include the usual arithmetic, comparison, and logical operators (e.g. +, &lt;=, &amp;&amp;) and are useful for simple computations. Note that JX is less forgiving than JavaScript with respect to type; values will <em>not</em> be coerced. JX syntax is styled after JavaScript, but does not strictly adhere to JS. While JX can often be interpreted as valid JS, the result is not necessarily the same between the two. This is especially apparent with the type coercions that JS performs. For all operators and functions, invalid invocation (wrong number of arguments, wrong arguments types, etc.) will return an error. The main exception is that integers will be promoted to doubles as needed. Thus JX is a superset of JSON, and (with care) mostly a subset of JS.</p>
+<p>
+Standard JSON syntax is supported, with some additions from Python.
+JX allows for expressions using Python's basic operators.
+These include the usual arithmetic, comparison, and logical operators (e.g. <tt>+</tt>, <tt>&lt;=</tt>, <tt>and</tt>, etc.).
+JX also includes Python's <tt>range()</tt> function for generating sequences of numbers.
+</p>
 
 <pre><code>"123" + 4
 =&gt; Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","operator":"123"+4,"code":2}
@@ -35,45 +49,18 @@
 =&gt; 127
 </code></pre>
 
-<p>JX supports the same basic types as JSON</p>
-
-<ul>
-<li>Null</li>
-<li>Boolean</li>
-<li>Integer</li>
-<li>Double</li>
-<li>String</li>
-<li>Object</li>
-<li>Array</li>
-</ul>
-
-<p>Note that unlike JSON, JX makes a distinction between integer and floating point values. Unevaluated JX may also contain</p>
-
-<ul>
-<li>Symbol</li>
-<li>Function</li>
-<li>Operator</li>
-<li>Error</li>
-</ul>
-
-<p>but evaluation will produce the plain JSON types above, assuming the evaluation succeeded. If an error occurs, evaluation stops and an error is returned to the caller. Error objects can include additional information indicating where the failure occurred and what the cause was. Details on the syntax and usage of Errors is given in a following section. If a non-error type is returned, then evaluation succeeded and the result contains only plain JSON types. JX expressions are evaluated in a <em>context</em>, which is an object mapping names to arbitrary JX values. On evaluating a symbol, the symbol's name is looked up in the current context. If found, the value from the context is substituted in place of the symbol. If the symbol is not found in the context, an error is returned.</p>
-
-<p>Functions allow for more advanced manipulations on the data. The details of required arguments, return type, side effects, etc. vary, but in general,</p>
-
-<ul>
-<li>functions are designed for generating/expanding data. This means no I/O access on the host, and (mostly) no side effects.</li>
-<li>the set of built in functions is fairly minimal.</li>
-<li>functions are strict about the types of their arguments, as are operators.</li>
-<li>evaluating a JX expression must have a finite time bound. This means no while loops and no lambda.</li>
-</ul>
-
-<p>In this example, foreach, range, and str are used to generate a list of filenames.</p>
-
-<pre><code>foreach(x, range(4), "input" + str(x) + ".dat")
-=&gt; ["input0.dat", "input1.dat", "input2.dat", "input3.dat"]
-</code></pre>
-
-<p>Functions may be nested or composed as needed, and will produce plain JSON when evaluated. Functions do not need to be given at the top level, and may be used to generate object keys, array elements, operands to JX operators, etc. The following sections give detailed descriptions of the currently supported operators and functions. </p>
+Evaluation will produce plain JSON types from JX,
+assuming the evaluation succeeded.
+If an error occurs, evaluation stops and an error is returned to the caller.
+Error objects can include additional information indicating where the failure occurred and what the cause was.
+Details on the syntax and usage of Errors is given in a following section.
+If a non-error type is returned, then evaluation succeeded and the result contains only plain JSON types.
+JX expressions are evaluated in a <em>context</em>,
+which is an object mapping names to arbitrary JX values.
+On evaluating a variable, the variable's name is looked up in the current context.
+If found, the value from the context is substituted in place of the variable.
+If the variable is not found in the context, an error is returned.
+</p>
 
 <p>JX supports comments, introduced by the <tt>&#35;</tt> character and continuing for the rest of the line.</p>
 
@@ -82,7 +69,7 @@
 <h3 id="complement">Logical Complement<a class="sectionlink" href="#complement" title="Link to this section.">&#x21d7;</a></h3>
 
 <blockquote>
-<pre><code>!Boolean -&gt; Boolean
+<pre><code>not Boolean -&gt; Boolean
 </code></pre>
 </blockquote>
 
@@ -112,15 +99,20 @@
 
 <h2 id="binary">Binary Operators<a class="sectionlink" href="#binary" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>For complicated expressions, parentheses may be used as grouping symbols. In the absence of parentheses, operators are evaluated left to right in order of precedence. From highest to lowest precedence,</p>
+<p>
+For complicated expressions, parentheses may be used as grouping symbols.
+JX does not allow tuples.
+In the absence of parentheses,
+operators are evaluated left to right in order of precedence. From highest to lowest precedence,</p>
 
 <ul>
-<li>lookup</li>
-<li>*, %, /</li>
-<li>+, -</li>
-<li>==, !=, &lt;, &lt;=, &gt;, &gt;=</li>
-<li>||</li>
-<li>&amp;&amp;</li>
+<li>lookup, function call</li>
+<li><tt>*</tt>, <tt>%</tt>, <tt>/</tt></li>
+<li><tt>+</tt>, <tt>-</tt></li>
+<li><tt>==</tt>, <tt>!=</tt>, <tt>&lt;</tt>, <tt>&lt;=</tt>, <tt>&gt;</tt>, <tt>&gt;=</tt></li>
+<li><tt>not</tt></li>
+<li><tt>and</tt></li>
+<li><tt>or</tt></li>
 </ul>
 
 <h3 id="lookup">Lookup<a class="sectionlink" href="#lookup" title="Link to this section.">&#x21d7;</a></h3>
@@ -132,7 +124,30 @@
 <p>where A,B = Array,Integer or A,B = Object,String</p>
 </blockquote>
 
-<p>Gets the item at the given index/key in a collection type. If the key/index is not present, returns null.</p>
+<p>
+Gets the item at the given index/key in a collection type.
+A negative index into an array is taken as the offset from the tail end.
+</p>
+
+<p>
+Arrays also support slicing, with the index is given as <tt>N:M</tt>
+where <tt>N</tt> and <tt>M</tt> are optional values that evaluate to integers.
+If either is absent, the beginning/end of the array is used.
+This slice syntax is based on Python's.
+
+<pre><code>range(10)
+= [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+range(10)[:3]
+= [0, 1, 2]
+
+range(10)[4:]
+= [4, 5, 6, 7, 8, 9]
+
+range(10)[3:7]
+= [3, 4, 5, 6]
+</code></pre>
+</p>
 
 <h3 id="addition">Addition<a class="sectionlink" href="#addition" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -199,34 +214,20 @@ Division by zero is an error.</p>
 <h3 id="conjunction">Conjunction<a class="sectionlink" href="#conjunction" title="Link to this section.">&#x21d7;</a></h3>
 
 <blockquote>
-<pre><code>A &amp;&amp; A -&gt; A
+<pre><code>Boolean and Boolean -&gt; Boolean
 </code></pre>
-
-<p>where A = Boolean|Integer</p>
 </blockquote>
 
-<p>The behaviour of the conjunction operator depends on the type of its operands.</p>
-
-<ul>
-<li>Boolean: logical AND</li>
-<li>Integer: bitwise AND</li>
-</ul>
+<p>Computes the logical conjunction of its operands.</p>
 
 <h3 id="disjunction">Disjunction<a class="sectionlink" href="#disjunction" title="Link to this section.">&#x21d7;</a></h3>
 
 <blockquote>
-<pre><code>Boolean || Boolean -&gt; Boolean
+<pre><code>Boolean or Boolean -&gt; Boolean
 </code></pre>
-
-<p>where A = Boolean|Integer</p>
 </blockquote>
 
-<p>The behaviour of the disjunction operator depends on the type of its operands.</p>
-
-<ul>
-<li>Boolean: logical OR</li>
-<li>Integer: bitwise OR</li>
-</ul>
+<p>Computes the logical disjunction of its operands.</p>
 
 <h3 id="equality">Equality<a class="sectionlink" href="#equality" title="Link to this section.">&#x21d7;</a></h3>
 
@@ -316,17 +317,6 @@ Division by zero is an error.</p>
 
 <h2 id="functions">Functions<a class="sectionlink" href="#functions" title="Link to this section.">&#x21d7;</a></h2>
 
-<h3>str</h3>
-
-<blockquote>
-<pre><code>str(A) -&gt; String
-</code></pre>
-</blockquote>
-
-<p>Returns a string representation of the given value.</p>
-
-<h3 id="range">range<a class="sectionlink" href="#range" title="Link to this section.">&#x21d7;</a></h3>
-
 <blockquote>
 <pre><code>range(A) -&gt; Array
 range(A, A[, A]) -&gt; Array
@@ -367,100 +357,92 @@ range(5,0,-1)
 
 <p>Calling with step = 0 is an error.</p>
 
-<h3 id="foreach">foreach<a class="sectionlink" href="#foreach" title="Link to this section.">&#x21d7;</a></h3>
-
 <blockquote>
-<pre><code>foreach(Symbol, A, B) -&gt; C
+<pre><code>format(A, ...) -&gt; String
 </code></pre>
 
-<p>where and A = [_] and C = [B]</p>
+<p>where A = String</p>
 </blockquote>
 
-<p>foreach provides similar functionality to the map function in other languages, but has reduced semantics to limit recursion. foreach requires three arguments.</p>
-
-<pre><code>foreach(var, items, body)
-</code></pre>
-
+<p>
+Replaces format specifiers in the given string.
+This function is based on C's <tt>printf</tt> function and provides the following format specifiers.
 <ul>
-<li>var: a Symbol to be used as the iteration variable</li>
-<li>items: an Array</li>
-<li>body: an arbitrary expression, probably containing var</li>
+	<li><tt>&#37;d</tt></li>
+	<li><tt>&#37;i</tt></li>
+	<li><tt>&#37;e</tt></li>
+	<li><tt>&#37;E</tt></li>
+	<li><tt>&#37;f</tt></li>
+	<li><tt>&#37;F</tt></li>
+	<li><tt>&#37;g</tt></li>
+	<li><tt>&#37;G</tt></li>
+	<li><tt>&#37;s</tt></li>
+	<li><tt>&#37;&#37;</tt></li>
 </ul>
+</p>
 
-<p>Evaluating foreach results in an Array of the same length as items, or null on invalid arguments. We bind var to each value in items in turn, and evaluate body with this extra binding.</p>
+<pre><code>format("file%d.txt", 10)
+= "file10.txt"
 
-<pre><code>foreach(x, range(4), x * 2)
-=&gt; [0, 2, 4, 6]
-
-foreach(x, [-1, 2.2, "foo"], str(x))
-=&gt; ["-1", "2.2", "foo"]
+format("SM%s_%d.sam", "10001", 23)
+= "SM10001_23.sam"
 </code></pre>
 
-<h3 id="join">join<a class="sectionlink" href="#join" title="Link to this section.">&#x21d7;</a></h3>
+<p>
+This function serves the same purpose as Python's format operator (&#37;).
+Since JX does not include tuples,
+it provides a function to allow formatting with multiple fields.
+JX's format function could be written in Python as follows.
 
-<blockquote>
-<pre><code>join(A[, B]) -&gt; String
+<pre><code>def format(spec, *args):
+    return spec % tuple(args)
+</code></pre>
+</p>
+
+<h2 id="comprehensions">Comprehensions<a class="sectionlink" href="#comprehensions" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>
+JX supports list comprehensions for expressing repeated structure.
+An entry in a list can be postfixed with one or more <tt>for</tt> clauses to evaluate the list item once for each entry in the specified list.
+A <tt>for</tt> clause consists of a variable and a list, along with an optional condition.
+
+<pre><code>[x + x for x in ["a", "b", "c"]]
+= ["aa", "bb", "cc"]
+
+[3 * i for i in range(4)]
+= [0, 3, 6, 9]
+
+[i for i in range(10) if i%2 == 0]
+= [0, 2, 4, 6, 8]
 </code></pre>
 
-<p>where A = [String] and B = String</p>
-</blockquote>
+If multiple clauses are specified,
+they are evaluated from left to right.
 
-<p>Takes an array of strings, and concatenates them into a single string. If the optional second argument is given, it is used as the separator, or " " otherwise.</p>
-
-<pre><code>join(["1", "2", "3"])
-=&gt; "1 2 3"
-
-join(["a", "b", "c"], ", ")
-=&gt; "a, b, c"
+<pre><code>[[i, j] for i in range(5) for j in range(4) if (i + j)%2 == 0]
+= [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2], [3, 1]]
 </code></pre>
-
-<h3 id="let">let<a class="sectionlink" href="#let" title="Link to this section.">&#x21d7;</a></h3>
-
-<blockquote>
-<pre><code>let(A, B) -&gt; C
-</code></pre>
-
-<p>where A = Object</p>
-</blockquote>
-
-<p>Evaluates an expression with local name bindings. The first argument is an object whose keys will be bound variable names when evaluating the second argument.
-Names specified in a local scope may shadow names in the enclosing scope.</p>
-
-<pre><code>let({"x": 10}, 1 + x)
-=&gt; 11
-
-let({"x": 10, "y": 20}, let({"x": 1}, x + y))
-=&gt; 21
-</code></pre>
-
-<h3 id="dbg">dbg<a class="sectionlink" href="#dbg" title="Link to this section.">&#x21d7;</a></h3>
-
-<blockquote>
-<pre><code>dbg(A) -&gt; A
-</code></pre>
-</blockquote>
-
-<p>This function simply returns its argument. As a side effect, it prints its argument before and after evaluation to stderr. This function might be useful to debug evaluation issues, as it lets you see the evaluation of arbitrary parts of an expression.</p>
-
-<pre><code>join(foreach(x, range(5), x))
-=&gt; Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","func":join(foreach(x,range(5),x)),"code":6}
-
-join(dbg(foreach(x, range(5), x)))
-+ dbg  in: foreach(x,range(5),x)
-+ dbg out: [0,1,2,3,4]
-</code></pre>
-
-<p>Recalling that join takes an array of Strings, not Integers, we should use</p>
-
-<pre><code>join(dbg(foreach(x, range(5), str(x))))
-+ dbg  in: foreach(x,range(5),str(x))
-+ dbg out: ["0","1","2","3","4"]
-=&gt; "0 1 2 3 4"
-</code></pre>
+</p>
 
 <h2 id="errors">Errors<a class="sectionlink" href="#errors" title="Link to this section.">&#x21d7;</a></h2>
 
-<p>JX has a special type, Error, to indicate some kind of failure or exceptional condition. If a function or operator is misapplied, jx_eval will return an error indicating the cause of the failure. While errors are valid JX, they are special in that they have no JSON equivalent. Furthermore, errors do not evaluate in the same way as other types. The additional information in an error is protected from evaluation, so calling jx_eval on an Error simply returns a copy. It is therefore safe to directly include the invalid function/operator in the body of an error. If a function or operator encounters an error as an argument, evaluation is aborted and the Error is returned as the result of evaluation. Thus if an error occurs deeply nested within a structure, the error will be passed up as the result of the entire evaluation. Errors are defined using the keyword Error followed by a body enclosed in curly braces.</p>
+<p>
+JX has a special type, Error, to indicate some kind of failure or exceptional condition.
+If a function or operator is misapplied,
+jx_eval will return an error indicating the cause of the failure.
+Errors are akin to Python's exceptions,
+but JX does not allow Errors to be caught;
+they simply terminate evaluation and report what happened.
+Errors do not evaluate in the same way as other types.
+The additional information in an error is protected from evaluation,
+so calling jx_eval on an Error simply returns a copy.
+It is therefore safe to directly include the invalid function/operator in the body of an error.
+If a function or operator encounters an error as an argument,
+evaluation is aborted and the Error is returned as the result of evaluation.
+Thus if an error occurs deeply nested within a structure,
+the error will be passed up as the result of the entire evaluation.
+Errors are defined using the keyword Error followed by a body enclosed in curly braces.
+</p>
 
 <pre><code>Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
 </code></pre>

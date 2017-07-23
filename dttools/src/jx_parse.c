@@ -5,7 +5,6 @@ See the file COPYING for details.
 */
 
 #include "jx_parse.h"
-#include "jx_function.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -21,7 +20,6 @@ typedef enum {
 	JX_TOKEN_INTEGER,
 	JX_TOKEN_DOUBLE,
 	JX_TOKEN_STRING,
-	JX_TOKEN_FUNCTION,
 	JX_TOKEN_ERROR,
 	JX_TOKEN_LBRACKET,
 	JX_TOKEN_RBRACKET,
@@ -49,6 +47,9 @@ typedef enum {
 	JX_TOKEN_NULL,
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
+	JX_TOKEN_FOR,
+	JX_TOKEN_IN,
+	JX_TOKEN_IF,
 	JX_TOKEN_PARSE_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
@@ -64,17 +65,16 @@ struct jx_parser {
 	time_t stoptime;
 	char *error_string;
 	int errors;
-	int strict_mode;
-	int putback_char_valid;
+	bool strict_mode;
+	bool putback_char_valid;
 	int putback_char;
-	int putback_token_valid;
+	bool putback_token_valid;
 	jx_token_t putback_token;
 	jx_int_t integer_value;
 	double double_value;
 };
 
-struct jx_parser * jx_parser_create( int strict_mode )
-{
+struct jx_parser *jx_parser_create(bool strict_mode) {
 	struct jx_parser *p = malloc(sizeof(*p));
 	memset(p,0,sizeof(*p));
 	p->strict_mode = strict_mode;
@@ -110,7 +110,7 @@ const char * jx_parser_error_string( struct jx_parser *p )
 
 void jx_parser_delete( struct jx_parser *p )
 {
-	if(p->error_string) free(p->error_string);
+	free(p->error_string);
 	free(p);
 }
 
@@ -133,7 +133,7 @@ static int jx_getchar( struct jx_parser *p )
 	int c=0;
 
 	if(p->putback_char_valid) {
-		p->putback_char_valid = 0;
+		p->putback_char_valid = false;
 		if (p->putback_char == '\n') ++p->line;
 		return p->putback_char;
 	}
@@ -165,7 +165,7 @@ static void jx_ungetchar( struct jx_parser *p, int c )
 {
 	if (c == '\n') --p->line;
 	p->putback_char = c;
-	p->putback_char_valid = 1;
+	p->putback_char_valid = true;
 }
 
 static int jx_scan_unicode( struct jx_parser *s )
@@ -219,7 +219,7 @@ static int jx_scan_string_char( struct jx_parser *s )
 static void jx_unscan( struct jx_parser *s, jx_token_t t )
 {
 	s->putback_token = t;
-	s->putback_token_valid = 1;
+	s->putback_token_valid = true;
 }
 
 static jx_token_t jx_scan( struct jx_parser *s )
@@ -227,7 +227,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	int c;
 
 	if(s->putback_token_valid) {
-		s->putback_token_valid = 0;
+		s->putback_token_valid = false;
 		return s->putback_token;
 	}
 
@@ -262,11 +262,6 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_DIV;
 	} else if(c=='%') {
 		return JX_TOKEN_MOD;
-	} else if(c=='&') {
-		char d = jx_getchar(s);
-		if(d=='&') return JX_TOKEN_AND;
-		jx_parse_error(s,"invalid character: &");
-		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='|') {
 		char d = jx_getchar(s);
 		if(d=='|') return JX_TOKEN_OR;
@@ -276,7 +271,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
 		jx_ungetchar(s,d);
-		return JX_TOKEN_NOT;
+		jx_parse_error(s,"invalid character: !");
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
@@ -363,16 +359,26 @@ static jx_token_t jx_scan( struct jx_parser *s )
 			} else {
 				jx_ungetchar(s,c);
 				s->token[i] = 0;
-				if(!strcmp(s->token,"true")) {
+				if(!strcmp(s->token,"null")) {
+					return JX_TOKEN_NULL;
+				} else if(!strcmp(s->token,"true")) {
 					return JX_TOKEN_TRUE;
 				} else if(!strcmp(s->token,"false")) {
 					return JX_TOKEN_FALSE;
-				} else if(!strcmp(s->token,"null")) {
-					return JX_TOKEN_NULL;
+				} else if(!strcmp(s->token,"or")) {
+					return JX_TOKEN_OR;
+				} else if(!strcmp(s->token,"and")) {
+					return JX_TOKEN_AND;
+				} else if(!strcmp(s->token,"not")) {
+					return JX_TOKEN_NOT;
+				} else if (!strcmp(s->token, "for")) {
+					return JX_TOKEN_FOR;
+				} else if (!strcmp(s->token, "in")) {
+					return JX_TOKEN_IN;
+				} else if (!strcmp(s->token, "if")) {
+					return JX_TOKEN_IF;
 				} else if(!strcmp(s->token, "Error")) {
 					return JX_TOKEN_ERROR;
-				} else if (jx_function_name_from_string(s->token)) {
-					return JX_TOKEN_FUNCTION;
 				} else {
 					return JX_TOKEN_SYMBOL;
 				}
@@ -388,25 +394,90 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	}
 }
 
-static struct jx_item * jx_parse_item_list( struct jx_parser *s, int arglist )
-{
+static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s) {
+	jx_token_t t = jx_scan(s);
+	if (t != JX_TOKEN_FOR) {
+		jx_unscan(s, t);
+		return NULL;
+	}
+
+	unsigned line = s->line;
+	char *variable = NULL;
+	struct jx *elements = NULL;
+	struct jx *condition = NULL;
+	struct jx_comprehension *result = NULL;
+
+	t = jx_scan(s);
+	if (t != JX_TOKEN_SYMBOL) {
+		jx_parse_error(s, "expected variable for list comprehension");
+		goto FAILURE;
+	}
+	variable = strdup(s->token);
+
+	t = jx_scan(s);
+	if (t != JX_TOKEN_IN) {
+		jx_parse_error(s, "malformed list comprehension (missing `in')");
+		goto FAILURE;
+	}
+
+	elements = jx_parse(s);
+	if (!elements) {
+		if (!jx_parser_errors(s)) jx_parse_error(s, "EOF while parsing list comprehension");
+		goto FAILURE;
+	}
+
+	t = jx_scan(s);
+	if (t == JX_TOKEN_IF) {
+		condition = jx_parse(s);
+		if (!condition) {
+			if (!jx_parser_errors(s)) jx_parse_error(s, "EOF while parsing list comprehension");
+			goto FAILURE;
+		}
+	} else {
+		jx_unscan(s, t);
+	}
+
+	result = jx_comprehension(
+		variable,
+		elements,
+		condition,
+		jx_parse_comprehension(s));
+	result->line = line;
+	free(variable);
+	return result;
+
+FAILURE:
+	free(variable);
+	jx_delete(elements);
+	jx_delete(condition);
+	jx_comprehension_delete(result);
+	return NULL;
+}
+
+static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 	jx_token_t rdelim = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
 	jx_token_t t = jx_scan(s);
 	if(t==rdelim) {
 		// empty list
-		return 0;
+		return NULL;
 	}
 
 	jx_unscan(s,t);
 
-	struct jx_item *i = jx_item(0,0);
+	struct jx_item *i = jx_item(NULL, NULL);
 	i->line = s->line;
 
 	i->value = jx_parse(s);
 	if(!i->value) {
 		// error set by deeper layer
 		jx_item_delete(i);
-		return 0;
+		return NULL;
+	}
+	i->comp = jx_parse_comprehension(s);
+	if (jx_parser_errors(s)) {
+		// error set by deeper layer
+		jx_item_delete(i);
+		return NULL;
 	}
 
 	t = jx_scan(s);
@@ -415,14 +486,14 @@ static struct jx_item * jx_parse_item_list( struct jx_parser *s, int arglist )
 		if (jx_parser_errors(s)) {
 			// error set by deeper layer
 			jx_item_delete(i);
-			return 0;
+			return NULL;
 		}
 	} else if(t==rdelim) {
-		i->next = 0;
+		i->next = NULL;
 	} else {
 		jx_parse_error(s,"list of items missing a comma or closing delimiter");
 		jx_item_delete(i);
-		return 0;
+		return NULL;
 	}
 
 	return i;
@@ -433,25 +504,25 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	jx_token_t t = jx_scan(s);
 	if(t==JX_TOKEN_RBRACE) {
 		// empty list
-		return 0;
+		return NULL;
 	}
 
 	jx_unscan(s,t);
 
-	struct jx_pair *p = jx_pair(0,0,0);
+	struct jx_pair *p = jx_pair(NULL, NULL, NULL);
 
 	p->key = jx_parse(s);
 	if(!p->key) {
 		// error set by deeper layer
 		jx_pair_delete(p);
-		return 0;
+		return NULL;
 	}
 
 	if(s->strict_mode) {
 		if(p->key->type!=JX_STRING) {
 			jx_parse_error(s,"key-value pair must have a string as the key");
 			jx_pair_delete(p);
-			return 0;
+			return NULL;
 		}
 	}
 
@@ -459,7 +530,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	if(t!=JX_TOKEN_COLON) {
 		jx_parse_error(s,"key-value pair must be separated by a colon");
 		jx_pair_delete(p);
-		return 0;
+		return NULL;
 	}
 
 	p->line = s->line;
@@ -467,7 +538,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	if(!p->value) {
 		// error set by deeper layer
 		jx_pair_delete(p);
-		return 0;
+		return NULL;
 	}
 
 	t = jx_scan(s);
@@ -476,21 +547,20 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 		if (jx_parser_errors(s)) {
 			// error set by deeper layer
 			jx_pair_delete(p);
-			return 0;
+			return NULL;
 		}
 	} else if(t==JX_TOKEN_RBRACE) {
-		p->next = 0;
+		p->next = NULL;
 	} else {
 		jx_parse_error(s,"key-value pairs missing a comma or closing brace");
 		jx_pair_delete(p);
-		return 0;
+		return NULL;
 	}
 
 	return p;
 }
 
-static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
-{
+static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist) {
 	jx_token_t t = jx_scan(s);
 
 	if (arglist) {
@@ -536,10 +606,8 @@ static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
 			return jx_add_lineno(s, jx_integer(s->integer_value));
 		case JX_TOKEN_DOUBLE:
 			return jx_add_lineno(s, jx_double(s->double_value));
-		case JX_TOKEN_TRUE:
-			return jx_add_lineno(s, jx_boolean(1));
-		case JX_TOKEN_FALSE:
-			return jx_add_lineno(s, jx_boolean(0));
+		case JX_TOKEN_TRUE: return jx_add_lineno(s, jx_boolean(true));
+		case JX_TOKEN_FALSE: return jx_add_lineno(s, jx_boolean(false));
 		case JX_TOKEN_NULL:
 			return jx_add_lineno(s, jx_null());
 		case JX_TOKEN_SYMBOL: {
@@ -573,7 +641,7 @@ static struct jx * jx_parse_atomic( struct jx_parser *s, int arglist )
 	*/
 
 	jx_parse_error(s,"parse error");
-	return 0;
+	return NULL;
 }
 
 #define JX_PRECEDENCE_MAX 5
@@ -595,6 +663,7 @@ int jx_operator_precedence( jx_operator_t t )
 		case JX_OP_DIV:	return 1;
 		case JX_OP_MOD:	return 1;
 		case JX_OP_LOOKUP: return 0;
+		case JX_OP_CALL: return 0;
 		default:	return 0;
 	}
 }
@@ -617,50 +686,100 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
+		case JX_TOKEN_LPAREN: return JX_OP_CALL;
 		default:		return JX_OP_INVALID;
 	}
 }
 
-static int jx_operator_is_unary( jx_operator_t op )
-{
+static bool jx_operator_is_unary(jx_operator_t op) {
 	switch(op) {
-		case JX_OP_NOT:
-			return 1;
-		default:
-			return 0;
+		case JX_OP_NOT: return true;
+		default: return false;
 	}
 }
 
-static struct jx * jx_parse_postfix( struct jx_parser *s, int arglist )
-{
-	struct jx *a = jx_parse_atomic(s, arglist);
-	if(!a) return 0;
+static struct jx *jx_parse_index(struct jx_parser *s) {
+	struct jx *left = NULL;
+	struct jx *right = NULL;
 
 	jx_token_t t = jx_scan(s);
-	if(t==JX_TOKEN_LBRACKET) {
-		unsigned line = s->line;
-		struct jx *b = jx_parse(s);
-		if(!b) {
-			jx_delete(a);
-			// parse error already set
-			return 0;
-		}
+	if (t == JX_TOKEN_COLON) {
+		jx_unscan(s, t);
+	} else {
+		jx_unscan(s, t);
+		left = jx_parse(s);
+		// error set by deeper level
+		if (!left) goto FAIL;
+	}
 
-		t = jx_scan(s);
-		if(t!=JX_TOKEN_RBRACKET) {
-			jx_parse_error(s,"missing closing bracket");
-			jx_delete(a);
-			jx_delete(b);
-			return 0;
-		} else {
+	t = jx_scan(s);
+	if (t != JX_TOKEN_COLON) {
+		jx_unscan(s, t);
+		return left;
+	}
+	unsigned line = s->line;
+
+	t = jx_scan(s);
+	if (t == JX_TOKEN_RBRACKET) {
+		jx_unscan(s, t);
+	} else {
+		jx_unscan(s, t);
+		right = jx_parse(s);
+		// error set by deeper level
+		if (!right) goto FAIL;
+	}
+
+	struct jx *result = jx_operator(JX_OP_SLICE, left, right);
+	result->line = line;
+	return result;
+FAIL:
+	jx_delete(left);
+	jx_delete(right);
+	return NULL;
+}
+
+static struct jx *jx_parse_postfix(struct jx_parser *s) {
+	struct jx *a = jx_parse_atomic(s, false);
+	if (!a) return NULL;
+
+	jx_token_t t = jx_scan(s);
+	switch (t) {
+		case JX_TOKEN_LBRACKET: {
+			unsigned line = s->line;
+			struct jx *b = jx_parse_index(s);
+			if (!b) {
+				jx_delete(a);
+				// parse error already set
+				return NULL;
+			}
+
+			t = jx_scan(s);
+			if (t != JX_TOKEN_RBRACKET) {
+				jx_parse_error(s, "missing closing bracket");
+				jx_delete(a);
+				jx_delete(b);
+				return NULL;
+			}
 			struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
 			j->line = line;
 			j->u.oper.line = line;
 			return j;
 		}
-	} else {
-		jx_unscan(s,t);
-		return a;
+		case JX_TOKEN_LPAREN: {
+			unsigned line = s->line;
+			jx_unscan(s, t);
+			struct jx *args = jx_parse_atomic(s, true);
+			// error set by deeper level
+			if (!args) return NULL;
+			struct jx *j = jx_operator(JX_OP_CALL, a, args);
+			j->line = line;
+			j->u.oper.line = line;
+			return j;
+		}
+		default: {
+			jx_unscan(s, t);
+			return a;
+		}
 	}
 }
 
@@ -672,7 +791,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_ADD:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s, 0);
+			struct jx *j = jx_parse_postfix(s);
 			if (!j) {
 				// error set by deeper level
 				return NULL;
@@ -682,30 +801,9 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			j->u.oper.line = line;
 			return j;
 		}
-		case JX_TOKEN_FUNCTION: {
-			jx_function_t f = jx_function_name_from_string(s->token);
-			if (!f) {
-				jx_parse_error(s,"invalid function");
-				return NULL;
-			}
-			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s, 1);
-			if (!j) {
-				// error set by deeper level
-				return NULL;
-			}
-			if (!jx_istype(j, JX_ARRAY)) {
-				jx_parse_error(s, "malformed function");
-				return NULL;
-			}
-			j = jx_function(f, j);
-			j->line = line;
-			j->u.func.line = line;
-			return j;
-		}
 		case JX_TOKEN_ERROR: {
 			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s, 0);
+			struct jx *j = jx_parse_postfix(s);
 			if (!j) {
 				jx_parse_error(s, "error is missing a required field");
 				return NULL;
@@ -722,7 +820,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		}
 		default: {
 			jx_unscan(s,t);
-			return jx_parse_postfix(s, 0);
+			return jx_parse_postfix(s);
 		}
 	}
 }
@@ -737,7 +835,8 @@ static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 		a = jx_parse_binary(s,precedence-1);
 	}
 
-	if(!a) return 0;
+	if (!a)
+		return NULL;
 
 	jx_token_t t = jx_scan(s);
 	jx_operator_t op = jx_token_to_operator(t);
@@ -763,7 +862,8 @@ static struct jx * jx_parse_binary( struct jx_parser *s, int precedence )
 struct jx * jx_parse( struct jx_parser *s )
 {
 	struct jx *j = jx_parse_binary(s,JX_PRECEDENCE_MAX);
-	if(!j) return 0;
+	if (!j)
+		return NULL;
 
 	jx_token_t t = jx_scan(s);
 	if(t!=JX_TOKEN_SEMI) jx_unscan(s,t);
@@ -778,7 +878,7 @@ static struct jx * jx_parse_finish( struct jx_parser *p )
 		debug(D_JX|D_NOTICE, "parse error: %s", jx_parser_error_string(p));
 		jx_parser_delete(p);
 		jx_delete(j);
-		return 0;
+		return NULL;
 	}
 	jx_parser_delete(p);
 	return j;
@@ -790,28 +890,28 @@ struct jx * jx_parser_yield( struct jx_parser *p )
 	if(jx_parser_errors(p)) {
 		debug(D_JX|D_NOTICE, "parse error: %s", jx_parser_error_string(p));
 		jx_delete(j);
-		return 0;
+		return NULL;
 	}
 	return j;
 }
 
 struct jx * jx_parse_string( const char *str )
 {
-	struct jx_parser *p = jx_parser_create(0);
+	struct jx_parser *p = jx_parser_create(false);
 	jx_parser_read_string(p,str);
 	return jx_parse_finish(p);
 }
 
 struct jx * jx_parse_link( struct link *l, time_t stoptime )
 {
-	struct jx_parser *p = jx_parser_create(0);
+	struct jx_parser *p = jx_parser_create(false);
 	jx_parser_read_link(p,l,stoptime);
 	return jx_parse_finish(p);
 }
 
 struct jx * jx_parse_stream( FILE *file )
 {
-	struct jx_parser *p = jx_parser_create(0);
+	struct jx_parser *p = jx_parser_create(false);
 	jx_parser_read_stream(p,file);
 	return jx_parse_finish(p);
 }
@@ -819,8 +919,11 @@ struct jx * jx_parse_stream( FILE *file )
 struct jx * jx_parse_file( const char *name )
 {
 	FILE *file = fopen(name,"r");
-	if(!file) return 0;
+	if (!file)
+		return NULL;
 	struct jx *j = jx_parse_stream(file);
 	fclose(file);
 	return j;
 }
+
+/* vim: set noexpandtab tabstop=4: */

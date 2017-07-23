@@ -8,10 +8,11 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "buffer.h"
 
+#include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next )
 {
@@ -28,6 +29,17 @@ struct jx_item * jx_item( struct jx *value, struct jx_item *next )
 	item->value = value;
 	item->next = next;
 	return item;
+}
+
+struct jx_comprehension *jx_comprehension(const char *variable, struct jx *elements, struct jx *condition, struct jx_comprehension *next) {
+	assert(variable);
+	assert(elements);
+	struct jx_comprehension *comp = calloc(1, sizeof(*comp));
+	comp->variable = strdup(variable);
+	comp->elements = elements;
+	comp->condition = condition;
+	comp->next = next;
+	return comp;
 }
 
 static struct jx * jx_create( jx_type_t type )
@@ -121,18 +133,22 @@ struct jx * jx_operator( jx_operator_t type, struct jx *left, struct jx *right )
 	return j;
 }
 
-struct jx *jx_function( jx_function_t func, struct jx *args ) {
-	struct jx * j = jx_create(JX_FUNCTION);
-	j->u.func.function = func;
-	j->u.func.arguments = args;
-	return j;
-}
-
 struct jx * jx_error( struct jx *err )
 {
 	if(!jx_error_valid(err)) return NULL;
 	struct jx *j = jx_create(JX_ERROR);
 	j->u.err = err;
+	return j;
+}
+
+struct jx *jx_function(const char *name, jx_builtin_t op,
+	struct jx_item *params, struct jx *body) {
+	assert(name);
+	struct jx *j = jx_create(JX_FUNCTION);
+	j->u.func.name = strdup(name);
+	j->u.func.params = params;
+	j->u.func.body = body;
+	j->u.func.builtin = op;
 	return j;
 }
 
@@ -301,6 +317,7 @@ void jx_array_append( struct jx *array, struct jx *value )
 struct jx * jx_array_index( struct jx *j, int nth )
 {
 	if (!jx_istype(j, JX_ARRAY)) return NULL;
+	if (nth < 0) return NULL;
 	struct jx_item *item = j->u.items;
 
 	for(int i = 0; i < nth; i++) {
@@ -335,6 +352,19 @@ struct jx *jx_array_concat( struct jx *array, ...) {
 	return result;
 }
 
+struct jx *jx_array_shift(struct jx *array) {
+	if (!jx_istype(array, JX_ARRAY)) return NULL;
+	struct jx_item *i = array->u.items;
+	struct jx *result = NULL;
+	if (i) {
+		result = i->value;
+		array->u.items = i->next;
+		free(i);
+	}
+	return result;
+
+}
+
 void jx_pair_delete( struct jx_pair *pair )
 {
 	if(!pair) return;
@@ -348,8 +378,18 @@ void jx_item_delete( struct jx_item *item )
 {
 	if(!item) return;
 	jx_delete(item->value);
+	jx_comprehension_delete(item->comp);
 	jx_item_delete(item->next);
 	free(item);
+}
+
+void jx_comprehension_delete(struct jx_comprehension *comp) {
+	if (!comp) return;
+	free(comp->variable);
+	jx_delete(comp->elements);
+	jx_delete(comp->condition);
+	jx_comprehension_delete(comp->next);
+	free(comp);
 }
 
 void jx_delete( struct jx *j )
@@ -379,7 +419,9 @@ void jx_delete( struct jx *j )
 			jx_delete(j->u.oper.right);
 			break;
 		case JX_FUNCTION:
-			jx_delete(j->u.func.arguments);
+			free(j->u.func.name);
+			jx_item_delete(j->u.func.params);
+			jx_delete(j->u.func.body);
 			break;
 		case JX_ERROR:
 			jx_delete(j->u.err);
@@ -398,6 +440,15 @@ int jx_istrue( struct jx *j )
 	return j && j->type==JX_BOOLEAN && j->u.boolean_value;
 }
 
+int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension *k) {
+	if (!j && !k) return 1;
+	if (!j || !k) return 0;
+	return !strcmp(j->variable, k->variable)
+		&& jx_equals(j->elements, k->elements)
+		&& jx_equals(j->condition, k->condition)
+		&& jx_comprehension_equals(j->next, k->next);
+}
+
 int jx_pair_equals( struct jx_pair *j, struct jx_pair *k )
 {
 	if(!j && !k) return 1;
@@ -409,7 +460,9 @@ int jx_item_equals( struct jx_item *j, struct jx_item *k )
 {
 	if(!j && !k) return 1;
 	if(!j || !k) return 0;
-	return jx_equals(j->value,k->value) && jx_item_equals(j->next,k->next);
+	return jx_equals(j->value, k->value)
+		&& jx_comprehension_equals(j->comp, k->comp)
+		&& jx_item_equals(j->next, k->next);
 }
 
 int jx_equals( struct jx *j, struct jx *k )
@@ -440,8 +493,10 @@ int jx_equals( struct jx *j, struct jx *k )
 				&& jx_equals(j->u.oper.left,k->u.oper.right)
 				&& jx_equals(j->u.oper.right,j->u.oper.right);
 		case JX_FUNCTION:
-			return j->u.func.function == k->u.func.function
-				&& jx_equals(j->u.func.arguments, k->u.func.arguments);
+			return !strcmp(j->u.func.name, k->u.func.name)
+				&& jx_item_equals(
+					   j->u.func.params, k->u.func.params)
+				&& jx_equals(j->u.func.body, k->u.func.body);
 		case JX_ERROR:
 			return jx_equals(j->u.err, k->u.err);
 	}
@@ -450,10 +505,21 @@ int jx_equals( struct jx *j, struct jx *k )
 	return 0;
 }
 
+struct jx_comprehension *jx_comprehension_copy(struct jx_comprehension *c) {
+	if (!c) return NULL;
+	struct jx_comprehension *comp = calloc(1, sizeof(*comp));
+	comp->line = c->line;
+	comp->variable = strdup(c->variable);
+	comp->elements = jx_copy(c->elements);
+	comp->condition = jx_copy(c->condition);
+	comp->next = jx_comprehension_copy(c->next);
+	return comp;
+}
+
 struct jx_pair * jx_pair_copy( struct jx_pair *p )
 {
-	if(!p) return 0;
-	struct jx_pair *pair = malloc(sizeof(*pair));
+	if (!p) return NULL;
+	struct jx_pair *pair = calloc(1, sizeof(*pair));
 	pair->key = jx_copy(p->key);
 	pair->value = jx_copy(p->value);
 	pair->next = jx_pair_copy(p->next);
@@ -463,11 +529,12 @@ struct jx_pair * jx_pair_copy( struct jx_pair *p )
 
 struct jx_item * jx_item_copy( struct jx_item *i )
 {
-	if(!i) return 0;
-	struct jx_item *item = malloc(sizeof(*item));
-	item->value = jx_copy(i->value);
-	item->next = jx_item_copy(i->next);
+	if (!i) return NULL;
+	struct jx_item *item = calloc(1, sizeof(*item));
 	item->line = i->line;
+	item->value = jx_copy(i->value);
+	item->comp = jx_comprehension_copy(i->comp);
+	item->next = jx_item_copy(i->next);
 	return item;
 }
 
@@ -505,7 +572,9 @@ struct jx  *jx_copy( struct jx *j )
 			c = jx_operator(j->u.oper.type, jx_copy(j->u.oper.left), jx_copy(j->u.oper.right));
 			break;
 		case JX_FUNCTION:
-			c = jx_function(j->u.func.function, jx_copy(j->u.func.arguments));
+			c = jx_function(j->u.func.name, j->u.func.builtin,
+				jx_item_copy(j->u.func.params),
+				jx_copy(j->u.func.body));
 			break;
 		case JX_ERROR:
 			c = jx_error(jx_copy(j->u.err));
@@ -530,17 +599,16 @@ struct jx *jx_merge(struct jx *j, ...) {
 	return result;
 }
 
-int jx_pair_is_constant( struct jx_pair *p )
-{
+static int jx_pair_is_constant(struct jx_pair *p) {
 	if(!p) return 1;
 	return jx_is_constant(p->key)
 		&& jx_is_constant(p->value)
 		&& jx_pair_is_constant(p->next);
 }
 
-int jx_item_is_constant( struct jx_item *i )
-{
+static int jx_item_is_constant(struct jx_item *i) {
 	if(!i) return 1;
+	if (i->comp) return 0;
 	return jx_is_constant(i->value) && jx_item_is_constant(i->next);
 }
 
@@ -560,8 +628,8 @@ int jx_is_constant( struct jx *j )
 			return jx_item_is_constant(j->u.items);
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->u.pairs);
-		case JX_FUNCTION:
 		case JX_ERROR:
+		case JX_FUNCTION:
 		case JX_OPERATOR:
 			return 0;
 	}

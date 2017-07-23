@@ -42,34 +42,34 @@ value:      false
 expression: null
 value:      null
 
-expression: true&&true
+expression: true and true
 value:      true
 
-expression: true&&false
+expression: true and false
 value:      false
 
-expression: false&&true
+expression: false and true
 value:      false
 
-expression: false&&false
+expression: false and false
 value:      false
 
-expression: true||true
+expression: true or true
 value:      true
 
-expression: true||false
+expression: true or false
 value:      true
 
-expression: false||true
+expression: false or true
 value:      true
 
-expression: false||false
+expression: false or false
 value:      false
 
-expression: !true
+expression:  not true
 value:      false
 
-expression: !false
+expression:  not false
 value:      true
 
 expression: 10==20
@@ -151,16 +151,16 @@ expression: a!=b
 value:      true
 
 expression: a<b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":72,"operator":true<false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":73,"operator":true<false,"code":1}
 
 expression: a>b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":73,"operator":true>false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":74,"operator":true>false,"code":1}
 
 expression: a<=b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":74,"operator":true<=false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":75,"operator":true<=false,"code":1}
 
 expression: a>=b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":75,"operator":true>=false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":76,"operator":true>=false,"code":1}
 
 expression: f==g
 value:      false
@@ -199,19 +199,19 @@ expression: x>=y
 value:      false
 
 expression: a+b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":91,"operator":true+false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":92,"operator":true+false,"code":1}
 
 expression: a-b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":92,"operator":true-false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":93,"operator":true-false,"code":1}
 
 expression: a*b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":93,"operator":true*false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":94,"operator":true*false,"code":1}
 
 expression: a/b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":94,"operator":true/false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":95,"operator":true/false,"code":1}
 
 expression: a%b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":95,"operator":true%false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":96,"operator":true%false,"code":1}
 
 expression: f+g
 value:      3.64159
@@ -243,11 +243,11 @@ value:      0
 expression: x%y
 value:      10
 
-expression: x&&y
-value:      0
+expression: x and y
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":109,"operator":10 and 20,"code":1}
 
-expression: x||y
-value:      30
+expression: x or y
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":110,"operator":10 or 20,"code":1}
 
 expression: (x+y)*(f+g)
 value:      109.248
@@ -258,14 +258,95 @@ value:      610
 expression: 10*(20+30)
 value:      500
 
-expression: a==b||(f>g&&x<y)
+expression: a==b or (f>g and x<y)
 value:      false
 
-expression: [10,-90.5,true,false,null,[-1,-2,-3]]
-value:      [10,-90.5,true,false,null,[-1,-2,-3]]
+expression: [[0,i] for i in [1,2,x],10,-90.5,true for i in range(5),false,null,[-1,-2,-3]]
+value:      [[0,1],[0,2],[0,10],10,-90.5,true,true,true,true,true,false,null,[-1,-2,-3]]
+
+expression: [format(":%d",2*i) for i in range(10)]
+value:      [":0",":2",":4",":6",":8",":10",":12",":14",":16",":18"]
+
+expression: [i+1 for i in [10-i for i in range(10)]]
+value:      [11,10,9,8,7,6,5,4,3,2]
+
+expression: [[[i,j] for j in range(3)] for i in [10-i for i in range(4)]]
+value:      [[[10,0],[10,1],[10,2]],[[9,0],[9,1],[9,2]],[[8,0],[8,1],[8,2]],[[7,0],[7,1],[7,2]]]
+
+expression: [null for i in 7]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"list comprehension takes an array","line":122,"list":7,"code":2}
+
+expression: [i for i in range(10) if i%3==0]
+value:      [0,3,6,9]
+
+expression: [[i,j] for i in range(4) for j in range(3)]
+value:      [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2],[3,0],[3,1],[3,2]]
+
+expression: [[i,j] for i in range(5) for j in range(4) if (i+j)%2==0]
+value:      [[0,0],[0,2],[1,1],[1,3],[2,0],[2,2],[3,1],[3,3],[4,0],[4,2]]
+
+expression: [[i,j] for i in range(5) for j in range(4) if j%2==1]
+value:      [[0,1],[0,3],[1,1],[1,3],[2,1],[2,3],[3,1],[3,3],[4,1],[4,3]]
+
+expression: [[i,j] for i in range(5) if i%2==0 for j in range(4) if j%2==1]
+value:      [[0,1],[0,3],[2,1],[2,3],[4,1],[4,3]]
+
+expression: [[i,j] for i in range(5) if j%2==0 for j in range(4) if i%2==1]
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":128,"context":{"i":0,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":j,"code":0}
+
+expression: [[i,j,k,l] for i in range(4) for j in range(3) for k in range(3) for l in [true,false]]
+value:      [[0,0,0,true],[0,0,0,false],[0,0,1,true],[0,0,1,false],[0,0,2,true],[0,0,2,false],[0,1,0,true],[0,1,0,false],[0,1,1,true],[0,1,1,false],[0,1,2,true],[0,1,2,false],[0,2,0,true],[0,2,0,false],[0,2,1,true],[0,2,1,false],[0,2,2,true],[0,2,2,false],[1,0,0,true],[1,0,0,false],[1,0,1,true],[1,0,1,false],[1,0,2,true],[1,0,2,false],[1,1,0,true],[1,1,0,false],[1,1,1,true],[1,1,1,false],[1,1,2,true],[1,1,2,false],[1,2,0,true],[1,2,0,false],[1,2,1,true],[1,2,1,false],[1,2,2,true],[1,2,2,false],[2,0,0,true],[2,0,0,false],[2,0,1,true],[2,0,1,false],[2,0,2,true],[2,0,2,false],[2,1,0,true],[2,1,0,false],[2,1,1,true],[2,1,1,false],[2,1,2,true],[2,1,2,false],[2,2,0,true],[2,2,0,false],[2,2,1,true],[2,2,1,false],[2,2,2,true],[2,2,2,false],[3,0,0,true],[3,0,0,false],[3,0,1,true],[3,0,1,false],[3,0,2,true],[3,0,2,false],[3,1,0,true],[3,1,0,false],[3,1,1,true],[3,1,1,false],[3,1,2,true],[3,1,2,false],[3,2,0,true],[3,2,0,false],[3,2,1,true],[3,2,1,false],[3,2,2,true],[3,2,2,false]]
 
 expression: list[2]
 value:      300
+
+expression: list[(-1)]
+value:      300
+
+expression: list[(-3)]
+value:      100
+
+expression: list[(-10)]
+value:      Error{"source":"jx_eval","name":"range error","message":"index out of range","index":-10,"array":[100,200,300],"code":4}
+
+expression: list[1:]
+value:      [200,300]
+
+expression: list[:2]
+value:      [100,200]
+
+expression: list[1:2]
+value:      [200]
+
+expression: list[:]
+value:      [100,200,300]
+
+expression: list[3:2]
+value:      []
+
+expression: list[(-11):3]
+value:      [100,200,300]
+
+expression: list[3:(-11)]
+value:      []
+
+expression: list[1:(-1)]
+value:      [200]
+
+expression: list[(-1):1]
+value:      []
+
+expression: list[0:100]
+value:      [100,200,300]
+
+expression: list[true:4]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"slice indices must be integers","operator":true:4,"code":2}
+
+expression: list[4:null]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"slice indices must be integers","operator":4:null,"code":2}
+
+expression: list[true:false]
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"slice indices must be integers","operator":true:false,"code":2}
 
 expression: object["house"]
 value:      "home"
@@ -297,62 +378,50 @@ value:      []
 expression: range(5,0,-1)
 value:      [5,4,3,2,1]
 
-expression: str()
-value:      ""
+expression: format()
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"invalid/missing format string","function":format(),"code":6}
 
-expression: str(2)
-value:      "2"
+expression: format("%%")
+value:      "%"
 
-expression: str(x+y)
-value:      "30"
+expression: format("value: %i!!",x+y)
+value:      "value: 30!!"
 
-expression: str(x,y)
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"at most one argument is allowed","function":str(x,y),"code":6}
+expression: format("%i",x,y)
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too many arguments for format specifier","function":format("%i",10,20),"code":6}
 
-expression: str(range(10))
-value:      "[0,1,2,3,4,5,6,7,8,9]"
+expression: format("(%d, %i)",x,y)
+value:      "(10, 20)"
 
-expression: str("a")
-value:      "a"
+expression: format("%i")
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"mismatched format specifier","function":format("%i"),"code":6}
 
-expression: foreach("too","few")
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"invalid arguments","function":foreach("too","few"),"code":6}
+expression: format("%e",1.2e-22)
+value:      "1.200000e-22"
 
-expression: foreach(x,"nope",str(x))
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"second argument must evaluate to an array","function":foreach(x,"nope",str(x)),"code":6}
+expression: format("%E",6.02e+23)
+value:      "6.020000E+23"
 
-expression: foreach(x,range(5),"item"+str(x))
-value:      ["item0","item1","item2","item3","item4"]
+expression: format("%f",2.5)
+value:      "2.500000"
 
-expression: join(["a","b",c])
-value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":152,"context":{"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
+expression: format("%F",3.14)
+value:      "3.140000"
 
-expression: join([1,2])
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","function":join([1,2]),"code":6}
+expression: format("%g",9.9e+09)
+value:      "9.9e+09"
 
-expression: join(["a",2])
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"joined items must be strings","function":join(["a",2]),"code":6}
+expression: format("%G",2.11111e-12)
+value:      "2.11111E-12"
 
-expression: join([])
-value:      ""
-
-expression: join(["a"])
-value:      "a"
-
-expression: join(["a","b","c"])
-value:      "a b c"
-
-expression: join(["a","b","c"],", ")
-value:      "a, b, c"
-
-expression: dbg(join(dbg(foreach(x,dbg(range(dbg(3))),dbg(dbg(str(dbg(x)))+dbg(".")+dbg(str(dbg(dbg(x)+dbg(1)))))))))
-value:      "0.1 1.2 2.3"
+expression: format("%s","foo")
+value:      "foo"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":162,"operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":183,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":163,"operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":184,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []
@@ -383,7 +452,4 @@ value:      true
 
 expression: Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 value:      Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
-
-expression: let({"f":2.2,"g":4.5},f+y)
-value:      22.2
 

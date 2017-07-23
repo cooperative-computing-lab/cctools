@@ -54,7 +54,7 @@ The following major problems must be fixed:
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>

@@ -59,9 +59,9 @@ SOURCES = \
 	itable.c \
 	json.c \
 	json_aux.c \
+	jx2json.c \
 	jx.c \
 	jx_database.c \
-	jx_function.c \
 	jx_match.c \
 	jx_parse.c \
 	jx_print.c \
@@ -69,6 +69,7 @@ SOURCES = \
 	jx_table.c \
 	jx_export.c \
 	jx_eval.c \
+	jx_function.c \
 	link.c \
 	link_auth.c \
 	list.c \
@@ -140,7 +141,7 @@ PRELOAD_LIBRARIES = libforce_halt_enospc.so
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.
-MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator
+MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json
 PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect cctools_python

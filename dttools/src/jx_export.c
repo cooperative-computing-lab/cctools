@@ -98,9 +98,9 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		break;
 	case JX_ARRAY:
 		fprintf(stream,"<array>\n");
-		for(i=j->u.items;i;i=i->next) {
-			fprintf(stream,"<item>");
-			jx_export_xml(i->value,stream);
+		for (i = j->u.items; i; i = i->next) {
+			fprintf(stream, "<item>");
+			jx_export_xml(i->value, stream);
 			fprintf(stream,"</item>");
 		}
 		fprintf(stream,"</array>\n");
@@ -111,9 +111,19 @@ void jx_export_xml( struct jx *j, FILE *stream )
 		fprintf(stream,"</expr>\n");
 		break;
 	case JX_FUNCTION:
-		fprintf(stream,"<func>\n");
-		jx_print_stream(j,stream);
-		fprintf(stream,"</func>\n");
+		fprintf(stream, "<func>");
+		fprintf(stream, "<name>");
+		fprintf(stream, "%s", j->u.func.name);
+		fprintf(stream, "</name>");
+		for (struct jx_item *i = j->u.func.params; i; i = i->next) {
+			fprintf(stream, "<param>");
+			jx_export_xml(i->value, stream);
+			fprintf(stream, "</param>");
+		}
+		fprintf(stream, "<body>");
+		jx_export_xml(j->u.func.body, stream);
+		fprintf(stream, "</body>");
+		fprintf(stream, "</func>");
 		break;
 	case JX_ERROR:
 		fprintf(stream,"<error>\n");

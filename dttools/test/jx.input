@@ -1,3 +1,4 @@
+#!/bin/false
 {
 "outfile":"results",
 "infile":"mydata",
@@ -12,112 +13,139 @@
 }
 
 #comment
-10
-3847.576
-.5
-10.
-987
-12347812309487
+10;
+3847.576;
+.5;
+10.;
+987;
+12347812309487;
 
-"hello"
-"goodbye\n"
-"\"quotes\""
-"tab\ttab\ttab\rreturn\nnewline\n"
-"\\\\\\\\"
+"hello";
+"goodbye\n";
+"\"quotes\"";
+"tab\ttab\ttab\rreturn\nnewline\n";
+"\\\\\\\\";
 
-true
-false
-null
-true && true
-true && false
-false && true
-false && false
-true || true
-true || false
-false || true
-false || false
-!true
-!false
+true;
+false;
+null;
+true and true;
+true and false;
+false and true;
+false and false;
+true or true;
+true or false;
+false or true;
+false or false;
+not true;
+not false;
 
-10 == 20
-10 != 20
-10 < 20
-10 <= 20
-10 > 20
-10 >= 20
+10 == 20;
+10 != 20;
+10 < 20;
+10 <= 20;
+10 > 20;
+10 >= 20;
 
-10.5 == 20.5
-10.5 != 20.5
-10.5 < 20.5
-10.5 <= 20.5
-10.5 > 20.5
-10.5 >= 20.5
+10.5 == 20.5;
+10.5 != 20.5;
+10.5 < 20.5;
+10.5 <= 20.5;
+10.5 > 20.5;
+10.5 >= 20.5;
 
-"hello" == "goodbye"
-"hello" != "goodbye"
-"hello" <= "goodbye"
-"hello" < "goodbye"
-"hello" > "goodbye"
-"hello" >= "goodbye"
+"hello" == "goodbye";
+"hello" != "goodbye";
+"hello" <= "goodbye";
+"hello" < "goodbye";
+"hello" > "goodbye";
+"hello" >= "goodbye";
 
-"hello" == "hello"
-"hello" != "hello"
-"hello" <= "hello"
-"hello" < "hello"
-"hello" > "hello"
-"hello" >= "hello"
+"hello" == "hello";
+"hello" != "hello";
+"hello" <= "hello";
+"hello" < "hello";
+"hello" > "hello";
+"hello" >= "hello";
 
-a==b
-a!=b
-a<b
-a>b
-a<=b
-a>=b
+a==b;
+a!=b;
+a<b;
+a>b;
+a<=b;
+a>=b;
 
-f==g
-f!=g
-f<g
-f>g
-f<=g
-f>=g
+f==g;
+f!=g;
+f<g;
+f>g;
+f<=g;
+f>=g;
 
-x==y
-x!=y
-x<y
-x>y
-x<=y
-x>=y
+x==y;
+x!=y;
+x<y;
+x>y;
+x<=y;
+x>=y;
 
-a+b
-a-b
-a*b
-a/b
-a%b
+a+b;
+a-b;
+a*b;
+a/b;
+a%b;
 
-f+g
-f-g
-f*g
-f/g
-f%g
+f+g;
+f-g;
+f*g;
+f/g;
+f%g;
 
-x+y
-x-y
-x*y
-x/y
-x%y
-x&&y
-x||y
+x+y;
+x-y;
+x*y;
+x/y;
+x%y;
+x and y;
+x or y;
 
-(x+y)*(f+g)
-(10 + (20 * 30))
-(10*(20+30))
-(a==b) || ((f>g) && x<y);
+(x+y)*(f+g);
+(10 + (20 * 30));
+(10*(20+30));
+(a==b) or ((f>g) and x<y);
 
 #[10,-90.5,true,false,null,[-1,-2,-3]];
-[10,-90.5,true,false,null,[-1,-2,-3]];
+[[0, i] for i in [1,2,x], 10,-90.5,true for i in range(5),false,null,[-1,-2,-3]];
+[format(":%d", 2*i) for i in range(10)];
+[i + 1 for i in [10 - i for i in range(10)]];
+[[[i, j] for j in range(3)] for i in [10 - i for i in range(4)]];
+[null for i in 7];
+[i for i in range(10) if i % 3 == 0];
+[[i, j] for i in range(4) for j in range(3)];
+[[i, j] for i in range(5) for j in range(4) if (i + j) % 2 == 0];
+[[i, j] for i in range(5) for j in range(4) if j % 2 == 1];
+[[i, j] for i in range(5) if i % 2 == 0 for j in range(4) if j % 2 == 1];
+[[i, j] for i in range(5) if j % 2 == 0 for j in range(4) if i % 2 == 1];
+[[i, j, k, l] for i in range(4) for j in range(3) for k in range(3) for l in [true, false]];
 
-list[2]
-object["house"]
+list[2];
+list[-1];
+list[-3];
+list[-10];
+list[1:];
+list[:2];
+list[1:2];
+list[:];
+list[3:2];
+list[-11:3];
+list[3:-11];
+list[1:-1];
+list[-1:1];
+list[0:100];
+list[true:4];
+list[4:null];
+list[true:false];
+object["house"];
 
 {
 "command":"grep English "+infile+" > "+outfile,
@@ -126,52 +154,44 @@ object["house"]
 "environment":{"PATH":"/usr/bin"},
 "cores":1,
 "memory":16,
-"disk":1
-}
+"disk":1,
+};
 
-range(5)
-range(3, 7)
-range (7, 3)
-range(-1, 10, 2)
-range(1, 10, 0)
-range(0, 5, -1)
-range(5, 0, 1)
-range(5, 0, -1)
+range(5);
+range(3, 7);
+range (7, 3);
+range(-1, 10, 2);
+range(1, 10, 0);
+range(0, 5, -1);
+range(5, 0, 1);
+range(5, 0, -1);
 
-str()
-str(2)
-str(x + y)
-str(x, y)
-str(range(10))
-str("a")
+format();
+format("%%");
+format("value: %i!!", x + y);
+format("%i", x, y);
+format("(%d, %i)", x, y);
+format("%i");
+format("%e", 1.2e-22);
+format("%E", 6.02e23);
+format("%f", 2.5);
+format("%F", 3.14);
+format("%g", 9.9e9);
+format("%G", 2.11111e-12);
+format("%s", "foo");
 
-foreach("too", "few")
-foreach(x, "nope", str(x))
-foreach(x, range(5), "item" + str(x))
+10 + [1];
+"abc" + [2];
+[] + [];
+[] + [1];
+[1] + [];
+[1, 2] + [3];
+[1, 2] + [] + [4, [5, 6]];
+[10] == [10];
+[10] != [10];
+[1,2, 3] == [1,3,2];
+[1,2,[3,4]] == [1,2,[3,4]];
 
-join(["a", "b", c])
-join([1, 2])
-join(["a", 2])
-join([])
-join(["a"])
-join(["a", "b", "c"])
-join(["a", "b", "c"], ", ")
+Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"};
 
-dbg(join(dbg(foreach(x, dbg(range(dbg(3))), dbg(dbg(str(dbg(x))) + dbg(".") + dbg(str(dbg(dbg(x) + dbg(1)))) )))))
-
-;10 + [1]
-;"abc" + [2]
-;[] + []
-;[] + [1]
-;[1] + []
-;[1, 2] + [3]
-;[1, 2] + [] + [4, [5, 6]]
-;[10] == [10]
-;[10] != [10]
-;[1,2, 3] == [1,3,2]
-;[1,2,[3,4]] == [1,2,[3,4]]
-
-Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
-
-let({"f": 2.2, "g": 4.5}, f + y)
 #end

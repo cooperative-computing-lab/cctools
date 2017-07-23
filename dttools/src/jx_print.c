@@ -6,9 +6,24 @@ See the file COPYING for details.
 
 #include "jx_print.h"
 #include "jx_parse.h"
-#include "jx_function.h"
 
+#include <assert.h>
 #include <ctype.h>
+
+void jx_comprehension_print(struct jx_comprehension *comp, buffer_t *b) {
+	if (!comp) return;
+
+	buffer_putstring(b, " for ");
+	buffer_putstring(b, comp->variable);
+	buffer_putstring(b, " in ");
+	jx_print_buffer(comp->elements, b);
+	if (comp->condition) {
+		buffer_putstring(b, " if ");
+		jx_print_buffer(comp->condition, b);
+	}
+
+	jx_comprehension_print(comp->next, b);
+}
 
 static void jx_pair_print( struct jx_pair *pair, buffer_t *b )
 {
@@ -27,7 +42,9 @@ static void jx_item_print( struct jx_item *item, buffer_t *b )
 {
 	if(!item) return;
 
-	jx_print_buffer(item->value,b);
+	jx_print_buffer(item->value, b);
+	jx_comprehension_print(item->comp, b);
+
 	if(item->next) {
 		buffer_putstring(b,",");
 		jx_item_print(item->next,b);
@@ -48,11 +65,13 @@ const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_MUL: return "*";
 		case JX_OP_DIV: return "/";
 		case JX_OP_MOD: return "%";
-		case JX_OP_AND:	return "&&";
-		case JX_OP_OR:	return "||";
-		case JX_OP_NOT:	return "!";
-		// note that the closing bracket is in jx_print_subexpr
+		case JX_OP_AND:	return " and ";
+		case JX_OP_OR:	return " or ";
+		case JX_OP_NOT:	return " not ";
+		// note that the closing bracket/paren is in jx_print_subexpr
 		case JX_OP_LOOKUP: return "[";
+		case JX_OP_CALL: return "(";
+		case JX_OP_SLICE: return ":";
 		default:        return "???";
 	}
 }
@@ -161,15 +180,16 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 		case JX_OPERATOR:
 			jx_print_subexpr(j->u.oper.left,j->u.oper.type,b);
 			buffer_putstring(b,jx_operator_string(j->u.oper.type));
-			jx_print_subexpr(j->u.oper.right,j->u.oper.type,b);
+			if (j->u.oper.type == JX_OP_CALL) {
+				jx_item_print(j->u.oper.right->u.items, b);
+				buffer_putstring(b, ")");
+			} else {
+				jx_print_subexpr(
+					j->u.oper.right, j->u.oper.type, b);
+			}
 			if(j->u.oper.type==JX_OP_LOOKUP) buffer_putstring(b,"]");
 			break;
-		case JX_FUNCTION:
-			buffer_putstring(b, jx_function_name_to_string(j->u.func.function));
-			buffer_putstring(b, "(");
-			jx_print_args(j->u.func.arguments, b);
-			buffer_putstring(b, ")");
-			break;
+		case JX_FUNCTION: buffer_putstring(b, j->u.func.name); break;
 		case JX_ERROR:
 			buffer_putstring(b,"Error");
 			jx_print_buffer(j->u.err, b);

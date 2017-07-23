@@ -37,30 +37,38 @@ Will create the following output:
 */
 
 #include <stdint.h>
-#include <assert.h>
 
 /** JX atomic type.  */
 typedef enum {
-	JX_NULL = 0,	/**< null value */
-	JX_BOOLEAN,	/**< true or false */
-	JX_INTEGER,	/**< integer value */
-	JX_DOUBLE,	/**< floating point value */
-	JX_STRING,	/**< string value */
-	JX_SYMBOL,	/**< variable identifier */
-	JX_ARRAY,	/**< array containing values */
-	JX_OBJECT,	/**< object containing key-value pairs */
-	JX_OPERATOR,	/**< operator on multiple values. */
-	JX_FUNCTION,	/**< function to be applied to some values */
-	JX_ERROR,	/**< indicates failed evaluation */
+	JX_NULL = 0, /**< null value */
+	JX_BOOLEAN,  /**< true or false */
+	JX_INTEGER,  /**< integer value */
+	JX_DOUBLE,   /**< floating point value */
+	JX_STRING,   /**< string value */
+	JX_SYMBOL,   /**< variable identifier */
+	JX_ARRAY,    /**< array containing values */
+	JX_OBJECT,   /**< object containing key-value pairs */
+	JX_OPERATOR, /**< operator on multiple values. */
+	JX_FUNCTION, /**< function definition */
+	JX_ERROR,    /**< indicates failed evaluation */
 } jx_type_t;
 
 typedef int64_t jx_int_t;
 
+struct jx_comprehension {
+	unsigned line;
+	char *variable; /**< variable for comprehension */
+	struct jx *elements; /**< items for list comprehension */
+	struct jx *condition; /**< condition for filtering list comprehension */
+	struct jx_comprehension *next;
+};
+
 /** JX item linked-list used by @ref JX_ARRAY and @ref jx.items */
 
 struct jx_item {
-	struct jx      *value;	/**< value of this item */
 	unsigned line;
+	struct jx *value;       /**< value of this item */
+	struct jx_comprehension *comp;
 	struct jx_item *next;	/**< pointer to next item */
 };
 
@@ -89,6 +97,8 @@ typedef enum {
 	JX_OP_OR,
 	JX_OP_NOT,
 	JX_OP_LOOKUP,
+	JX_OP_CALL,
+	JX_OP_SLICE,
 	JX_OP_INVALID,
 } jx_operator_t;
 
@@ -100,19 +110,17 @@ struct jx_operator {
 };
 
 typedef enum {
-	JX_FUNCTION_INVALID = 0,
-	JX_FUNCTION_DBG,
-	JX_FUNCTION_RANGE,
-	JX_FUNCTION_STR,
-	JX_FUNCTION_FOREACH,
-	JX_FUNCTION_JOIN,
-	JX_FUNCTION_LET,
-} jx_function_t;
+	JX_BUILTIN_LAMBDA,
+	JX_BUILTIN_RANGE,
+	JX_BUILTIN_FORMAT,
+} jx_builtin_t;
 
 struct jx_function {
-	jx_function_t function;
+	char *name;
 	unsigned line;
-	struct jx *arguments;
+	struct jx_item *params;
+	struct jx *body;
+	jx_builtin_t builtin;
 };
 
 /** JX value representing any expression type. */
@@ -129,7 +137,7 @@ struct jx {
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
-		struct jx_function func; /**< function of @ref JX_FUNCTION */
+		struct jx_function func; /**< value of @ref JX_FUNCTION */
 		struct jx *err;  /**< error value of @ref JX_ERROR */
 	} u;
 };
@@ -152,15 +160,18 @@ struct jx * jx_string( const char *string_value );
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );
 
-/** Create a JX function on the given arguments. @param func The function to be applied. @param args The function arguments. */
-struct jx *jx_function( jx_function_t func, struct jx *args );
-
 /** Create a JX symbol. Note that symbols are an extension to the JSON standard. A symbol is a reference to an external variable, which can be resolved by using @ref jx_eval. @param symbol_name A C string. @return A JX expression.
 */
 struct jx * jx_symbol( const char *symbol_name );
 
 /** Create a JX_ERROR. @param err The associated data for the error. This object MUST have a string at the "source" key. @return A JX error value, or NULL if "source" is missing. */
 struct jx * jx_error( struct jx *err );
+
+/** Create a JX_FUNCTION. @param params The list of JX_STRING parameter names.
+ * @param body The function body to evaluate. @returns A JX function definition.
+ */
+struct jx *jx_function(const char *name, jx_builtin_t op,
+	struct jx_item *params, struct jx *body);
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );
@@ -180,11 +191,24 @@ struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next
 /** Create a JX array item.  @param value The value of this item.  @param next The next item in the linked list.  @return An array item. */
 struct jx_item * jx_item( struct jx *value, struct jx_item *next );
 
+/** Create a JX comprehension.
+ * @param variable The variable name to bind.
+ * @param elements The elements to bind.
+ * @param condition The boolean filter to evaluate.
+ * @param next Nested comprehension(s).
+ * @returns A JX comprehension.
+ */
+struct jx_comprehension *jx_comprehension(const char *variable, struct jx *elements, struct jx *condition, struct jx_comprehension *next);
+
 /** Test an expression's type.  @param j An expression. @param type The desired type. @return True if the expression type matches, false otherwise. */
 int jx_istype( struct jx *j, jx_type_t type );
 
 /** Test an expression for the boolean value TRUE.  @param j An expression to test.  @return True if the expression is boolean and true. */
 int jx_istrue( struct jx *j );
+
+int jx_comprehension_equals(struct jx_comprehension *j, struct jx_comprehension *k);
+int jx_item_equals(struct jx_item *j, struct jx_item *k);
+int jx_pair_equals(struct jx_pair *j, struct jx_pair *k);
 
 /** Test two expressions for equality. @param j A constant expression. @param k A constant expression. @return True if equal, false if not.
 */
@@ -192,6 +216,10 @@ int jx_equals( struct jx *j, struct jx *k );
 
 /** Get the length of an array. Returns -1 if array is null or not an array. @param array The array to check. */
 int jx_array_length( struct jx *array );
+
+struct jx_comprehension *jx_comprehension_copy(struct jx_comprehension *c);
+struct jx_item *jx_item_copy(struct jx_item *i);
+struct jx_pair *jx_pair_copy(struct jx_pair *p);
 
 /** Duplicate an expression. @param j An expression. @return A copy of the expression, which must be deleted by @ref jx_delete
 */
@@ -205,6 +233,9 @@ void jx_pair_delete( struct jx_pair *p );
 
 /** Delete an array item.  @param i The array item to delete. */
 void jx_item_delete( struct jx_item *i );
+
+/** Delete a comprehension. @param c The comprehension to delete. */
+void jx_comprehension_delete(struct jx_comprehension *comp);
 
 /** Remove a key-value pair from an object.  @param object The object.  @param key The key. @return The corresponding value, or null if it is not present. */
 struct jx * jx_remove( struct jx *object, struct jx *key );
@@ -253,6 +284,11 @@ struct jx * jx_array_index( struct jx *j, int nth );
 
 /** Concatenate the given arrays into a single array. The passed arrays are consumed. @param array An array to concatenate. The list of arrays must be terminated by NULL. */
 struct jx *jx_array_concat( struct jx *array, ...);
+
+/** Remove and return the first element in the array.
+ * @param array The JX_ARRAY to update.
+ * @returns The first value in array, or NULL if array is empty or not a JX_ARRAY. */
+struct jx *jx_array_shift(struct jx *array);
 
 /** Determine if an expression is constant.  Traverses the expression recursively, and returns true if it consists only of constant values, arrays, and objects. @param j The expression to evaluate.  @return True if constant. */
 int jx_is_constant( struct jx *j );
