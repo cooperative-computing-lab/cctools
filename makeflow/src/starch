@@ -50,17 +50,15 @@ SFX_EXIT_STATUS=0
 
 if [ -z "$SFX_DIR" ]; then
     basename=`basename $SFX_FILE`
-    SFX_DIR=`hostname`.$USER.$basename.dir
+    SFX_DIR=$basename.$$.dir
     dir_lock=".${SFX_DIR}.lock"
 
     if [ ! -z "$CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$CONDOR_SCRATCH_DIR/$SFX_DIR
     elif [ ! -z "$_CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$_CONDOR_SCRATCH_DIR/$SFX_DIR
-    elif [ ! -z "$XGRID_AGENT_NAME" ]; then
-        SFX_DIR=`pwd`/$SFX_DIR
     else
-        SFX_DIR=/tmp/$SFX_DIR
+        SFX_DIR=`pwd`/$SFX_DIR
     fi
 
     if [ ! -z "$SFX_UNIQUE" ] && [ "$SFX_UNIQUE" = 1 ]; then
@@ -70,7 +68,7 @@ fi
 
 extract_real () {
     archive=`awk '/^__ARCHIVE__/ {print NR + 1; exit 0; }' $SFX_FILE`
-    tail -n+$archive $SFX_FILE | tar xj -C $SFX_DIR
+    tail -n+$archive $SFX_FILE | tar xz -C $SFX_DIR
     SFX_EXIT_STATUS=$?
 }
 
@@ -175,7 +173,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
     tmp_file.close()
 
     arc_path = tmp_file.name
-    archive  = Tar(arc_path, 'w:bz2')
+    archive  = Tar(arc_path, 'w:gz')
 
     logging.debug('adding executables...')
     executables = find_executables(executables)
