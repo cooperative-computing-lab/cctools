@@ -140,7 +140,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 
 	int i;
 	for(i=0;i<100;i++) {
-		debug(D_REMOTE,"testing for ssh ready: %s",cmd);
+		debug(D_BATCH,"testing for ssh ready: %s",cmd);
 		if(system(cmd)==0) {
 			result = 1;
 			break;
@@ -181,8 +181,6 @@ int run_task( struct aws_config *c, const char *ip_address, const char *command 
 
 const char * get_instance_property( struct jx *j, const char *name )
 {
-	debug(D_BATCH,"DEBUG: %s",jx_print_string(j));
-
 	j = jx_lookup(j,"Reservations");
 	if(!j || j->type!=JX_ARRAY || !j->u.items) return 0;
 
@@ -200,8 +198,6 @@ const char * get_instance_property( struct jx *j, const char *name )
 
 const char * get_instance_state_name( struct jx *j )
 {
-	debug(D_BATCH,"DEBUG: %s",jx_print_string(j));
-
 	j = jx_lookup(j,"Reservations");
 	if(!j || j->type!=JX_ARRAY || !j->u.items) return 0;
 
@@ -220,21 +216,69 @@ const char * get_instance_state_name( struct jx *j )
 	return jx_lookup_string(j,"Name");
 }
 
-int batch_job_amazon_subprocess( const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+int batch_job_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, const char *ip_address, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
+	/* Generate a unique script with the contents of the task. */
+	char *runscript = string_format(".makeflow_task_script_%d",getpid());
+	create_script(runscript,cmd,envlist);
+
+	/* Send the script and delete the local copy right away. */
+	put_file(aws_config,ip_address,runscript,"makeflow_task_script");
+	unlink(runscript);
+
+	/* Run the remote task. */
+	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
+
+	/* Retreive each of the output files from the instance. */
+
+	char *filelist = strdup(extra_output_files);
+	char *f = strtok(filelist,",");
+	while(f) {
+		// XXX need to handle remotename
+		get_file(aws_config,ip_address,f,f);
+		f = strtok(0,",");
+	}
+	free(filelist);
+
+	/* Destroy the remote instance. */
+	aws_terminate_instance(aws_config,instance_id);
+
+	return task_result;
+}
+
+/*
+To ensure that we track all instances correctly and avoid overloading the network,
+the setting up of an instance and the sending of input files are done sequentially
+within batch_job_amazon_submit.  Once the inputs are successfully sent, we fork
+a process in order to execute the desired task, and await its completion.
+*/
+
+static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
+{
+	/* Flush output streams before forking, to avoid stale buffered data. */
+	fflush(NULL);
+
+	/* Create the job table if it didn't already exist. */
+	if(!q->job_table) q->job_table = itable_create(0);
+
 	static struct aws_config * aws_config = 0;
 
-	// XXX load this from json configuration.
-
+	/* XXX get the AWS info from a configurable location */
 	if(!aws_config) aws_config = aws_config_load("amazon.json");
 
+	/* Create a new instance and return its unique ID. */
 	char *instance_id = aws_create_instance(aws_config);
 	if(!instance_id) {
 		debug(D_BATCH,"aws_create_instance failed");
-		sleep(5);
-		return 1;
+		sleep(1);
+		return -1;
 	}
 
+	/*
+	The instance is not immediately usable, so query the instance
+	state in a loop until it is no longer "pending".  When ready,
+	it should have a public IP address.
+	*/
 	char *ip_address = 0;
 
 	while(1) {
@@ -249,34 +293,37 @@ int batch_job_amazon_subprocess( const char *cmd, const char *extra_input_files,
 	
 		const char * state = get_instance_state_name(j);
 		if(!state) {
-			debug(D_BATCH,"state is not set");
+			debug(D_BATCH,"state is not set, keep trying...");
 			continue;
 		} else if(!strcmp(state,"pending")) {
-			debug(D_BATCH,"state is pending, check again later");
+			debug(D_BATCH,"state is 'pending', keep trying...");
 			continue;
 		} else if(!strcmp(state,"running")) {
-			debug(D_BATCH,"state is running, check for ip address");
+			debug(D_BATCH,"state is 'running', checking for ip address");
 			const char *i = get_instance_property(j,"PublicIpAddress");
 			if(i) {
 				debug(D_BATCH,"found ip address %s",i);
 				ip_address = strdup(i);
 				break;
 			} else {
-				debug(D_BATCH,"strange, ip address is not set!");
+				debug(D_BATCH,"strange, ip address is not set, keep trying...");
 				continue;
 			}
 		} else {
-			debug(D_BATCH,"state is %s, which is unexpected, bailing out",state);
-			return 1;
+			debug(D_BATCH,"state is '%s', which is unexpected, so aborting",state);
+			aws_terminate_instance(aws_config,instance_id);
+			return -1;
 		}
 	}
 
+	/*
+	Even though the instance is running, the ssh service is not necessarily running.
+	Probe it periodically until it is ready.
+	*/
+
 	wait_for_ssh_ready(aws_config,ip_address);
 
-	// XXX this needs to be unique
-	char *runscript = string_format("_makeflow_task_script_%d",rand());
-
-	create_script(runscript,cmd,envlist);
+	/* Send each of the input files to the instance. */
 
 	char *filelist = strdup(extra_input_files);
 	char *f = strtok(filelist,",");
@@ -287,30 +334,7 @@ int batch_job_amazon_subprocess( const char *cmd, const char *extra_input_files,
 	}
 	free(filelist);
 
-	put_file(aws_config,ip_address,runscript,"_makeflow_task_script");
-
-	int task_result = run_task(aws_config,ip_address,"./_makeflow_task_script");
-
-	filelist = strdup(extra_output_files);
-	f = strtok(filelist,",");
-	while(f) {
-		// XXX need to handle remotename
-		get_file(aws_config,ip_address,f,f);
-		f = strtok(0,",");
-	}
-	free(filelist);
-
-	aws_terminate_instance(aws_config,instance_id);
-	free(instance_id);
-
-	return task_result;
-}
-
-static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
-{
-	fflush(NULL);
-
-	if(!q->job_table) q->job_table = itable_create(0);
+	/* Now fork a new process to actually execute the task and wait for completion.*/
 
 	batch_job_id_t jobid = fork();
 	if(jobid > 0) {
@@ -320,12 +344,13 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
+		free(instance_id);
 		return jobid;
 	} else if(jobid < 0) {
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
 		return -1;
 	} else {
-		_exit(batch_job_amazon_subprocess(cmd,extra_input_files,extra_output_files,envlist));
+		_exit(batch_job_amazon_subprocess(aws_config,instance_id,ip_address,cmd,extra_input_files,extra_output_files,envlist));
 	}
 	return -1;
 }
