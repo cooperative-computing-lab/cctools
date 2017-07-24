@@ -397,7 +397,7 @@ def parse_command_line_options():
         logging.error('no executables specified')
 
     if not options.command:
-        options.command = os.path.basename(options.executables[0]) + ' "$@"'
+        options.command = os.path.basename(options.executables[0])
         logging.warn('no command specified, so using: %s' % options.command)
 
     logging.debug('command ... ' + options.command)
