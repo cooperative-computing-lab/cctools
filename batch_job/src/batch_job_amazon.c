@@ -103,7 +103,7 @@ struct jx * aws_describe_instance( struct aws_config *c, const char *instance_id
 
 /*
 Terminate an EC2 instance.  If termination is successfully applied, return true, otherwise return false.
- */
+*/
 
 int aws_terminate_instance( struct aws_config *c, const char *instance_id )
 {
@@ -116,6 +116,12 @@ int aws_terminate_instance( struct aws_config *c, const char *instance_id )
 		return 0;
 	}
 }
+
+/*
+Create an executable script with the necessary variables exported
+and the desired command.  This avoids problems with passing commands
+through quotes or losing environment variables through ssh.
+*/
 
 static int create_script( const char *filename, const char *cmd, struct jx *envlist )
 {
@@ -131,6 +137,10 @@ static int create_script( const char *filename, const char *cmd, struct jx *envl
 	chmod(filename,0755);
 	return 1;
 }
+
+/*
+Keep attempting to ssh to a host until success is achieved.
+*/
 
 static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 {
@@ -399,17 +409,21 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 	}
 }
 
+/*
+To kill an amazon job, we look up the details of the job,
+kill the local ssh process, and terminate the instance.
+*/
+
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-	int status;
-
 	if(kill(jobid, SIGTERM) == 0) {
 		if(!itable_lookup(q->job_table, jobid)) {
 			debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
 			return 0;
 		} else {
 			debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
-			waitpid(jobid, &status, 0);
+			struct process_info *p = process_waitpid(jobid,0);
+			if(p) free(p);
 			return 1;
 		}
 	} else {
