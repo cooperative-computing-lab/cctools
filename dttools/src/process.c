@@ -76,6 +76,28 @@ struct process_info *process_wait(int timeout)
 	return list_pop_head(complete_list);
 }
 
+static int pid_compare( void *a, const void *b )
+{
+	pid_t *pa = (pid_t *)a;
+	pid_t *pb = (pid_t *)b;
+
+	return *pa==*pb;
+}
+
+struct process_info *process_waitpid( pid_t pid, int timeout)
+{
+	if(!complete_list)
+		complete_list = list_create();
+
+	do {
+		struct process_info *p = list_find( complete_list, pid_compare, &pid );
+		if(p) return list_remove(complete_list,(void*)p);
+
+	} while(process_work(timeout));
+
+	return 0;
+}
+
 void process_putback(struct process_info *p)
 {
 	if(!complete_list)
