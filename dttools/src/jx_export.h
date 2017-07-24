@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include "jx_table.h"
 #include <stdio.h>
 
+void jx_export_shell( struct jx *j, FILE *stream );
 void jx_export_nvpair( struct jx *j, FILE *stream );
 void jx_export_old_classads( struct jx *j, FILE *stream );
 void jx_export_new_classads( struct jx *j, FILE *stream );
