@@ -215,7 +215,7 @@ int get_file( struct aws_config *c, const char *ip_address, const char *localnam
 
 int run_task( struct aws_config *c, const char *ip_address, const char *command )
 {
-	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,command);
+	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\"",c->keypair_name,ip_address,command);
 	debug(D_BATCH,"run_task: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
@@ -270,20 +270,7 @@ int batch_job_amazon_subprocess( struct aws_config *aws_config, struct batch_job
 	unlink(runscript);
 
 	/* Run the remote task. */
-	int task_result = run_task(aws_config,info->ip_address,"./makeflow_task_script");
-
-	/* Retreive each of the output files from the instance. */
-
-	char *filelist = strdup(info->extra_output_files);
-	char *f = strtok(filelist,",");
-	while(f) {
-		// XXX need to handle remotename
-		get_file(aws_config,info->ip_address,f,f);
-		f = strtok(0,",");
-	}
-	free(filelist);
-
-	return task_result;
+	return run_task(aws_config,info->ip_address,"./makeflow_task_script");
 }
 
 /*
@@ -440,7 +427,23 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 			int jobid = p->pid;
 			free(p);
 
+
+			/* Retreive each of the output files from the instance. */
+
+			char *filelist = strdup(i->extra_output_files);
+			char *f = strtok(filelist,",");
+			while(f) {
+				// XXX need to handle remotename
+				get_file(i->aws_config,i->ip_address,f,f);
+				f = strtok(0,",");
+			}
+			free(filelist);
+
+			/* Now destroy the instance */
+
 			aws_terminate_instance(i->aws_config,i->instance_id);
+
+			/* And clean up the object. */
 
 			free(i);
 			return jobid;
