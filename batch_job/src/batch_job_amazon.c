@@ -179,7 +179,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 {
 	int result = 0;
 
-	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s ls",c->keypair_name,ip_address);
+	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s ls >/dev/null 2>&1",c->keypair_name,ip_address);
 
 	int i;
 	for(i=0;i<100;i++) {
@@ -197,7 +197,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 
 int put_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
-	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\"",c->keypair_name,localname,ip_address,remotename);
+	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\" >/dev/null 2>&1",c->keypair_name,localname,ip_address,remotename);
 	debug(D_BATCH,"put_file: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
@@ -206,7 +206,7 @@ int put_file( struct aws_config *c, const char *ip_address, const char *localnam
 
 int get_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
-	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\"",c->keypair_name,ip_address,remotename,localname);
+	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,remotename,localname);
 	debug(D_BATCH,"get_file: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
@@ -215,7 +215,7 @@ int get_file( struct aws_config *c, const char *ip_address, const char *localnam
 
 int run_task( struct aws_config *c, const char *ip_address, const char *command )
 {
-	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\"",c->keypair_name,ip_address,command);
+	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,command);
 	debug(D_BATCH,"run_task: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
