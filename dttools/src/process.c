@@ -94,6 +94,8 @@ struct process_info *process_waitpid( pid_t pid, int timeout)
 		if(p) return list_remove(complete_list,(void*)p);
 
 	} while(process_work(timeout));
+
+	return 0;
 }
 
 void process_putback(struct process_info *p)
