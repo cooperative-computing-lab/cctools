@@ -21,6 +21,36 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
+struct batch_job_amazon_info {
+	struct batch_job_info info;
+	struct aws_config *aws_config;
+	char *instance_id;
+	char *ip_address;
+	char *cmd;
+	char *extra_input_files;
+	char *extra_output_files;
+	struct jx *envlist;
+};
+
+struct batch_job_amazon_info * batch_job_amazon_info_create()
+{
+	struct batch_job_amazon_info *i = malloc(sizeof(*i));
+	memset(i, 0, sizeof(*i));
+	return i;
+}
+
+void batch_job_amazon_info_delete( struct batch_job_amazon_info *i )
+{
+	if(!i) return;
+	if(i->instance_id) free(i->instance_id);
+	if(i->ip_address) free(i->ip_address);
+	if(i->cmd) free(i->cmd);
+	if(i->extra_input_files) free(i->extra_input_files);
+	if(i->extra_output_files) free(i->extra_output_files);
+	if(i->envlist) jx_delete(i->envlist);
+	free(i);
+}
+
 struct aws_config {
 	const char *image_id;
 	const char *instance_type;
@@ -229,32 +259,29 @@ const char * get_instance_state_name( struct jx *j )
 	return jx_lookup_string(j,"Name");
 }
 
-int batch_job_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, const char *ip_address, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
+int batch_job_amazon_subprocess( struct aws_config *aws_config, struct batch_job_amazon_info *info )
 {
 	/* Generate a unique script with the contents of the task. */
 	char *runscript = string_format(".makeflow_task_script_%d",getpid());
-	create_script(runscript,cmd,envlist);
+	create_script(runscript,info->cmd,info->envlist);
 
 	/* Send the script and delete the local copy right away. */
-	put_file(aws_config,ip_address,runscript,"makeflow_task_script");
+	put_file(aws_config,info->ip_address,runscript,"makeflow_task_script");
 	unlink(runscript);
 
 	/* Run the remote task. */
-	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
+	int task_result = run_task(aws_config,info->ip_address,"./makeflow_task_script");
 
 	/* Retreive each of the output files from the instance. */
 
-	char *filelist = strdup(extra_output_files);
+	char *filelist = strdup(info->extra_output_files);
 	char *f = strtok(filelist,",");
 	while(f) {
 		// XXX need to handle remotename
-		get_file(aws_config,ip_address,f,f);
+		get_file(aws_config,info->ip_address,f,f);
 		f = strtok(0,",");
 	}
 	free(filelist);
-
-	/* Destroy the remote instance. */
-	aws_terminate_instance(aws_config,instance_id);
 
 	return task_result;
 }
@@ -347,23 +374,33 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	}
 	free(filelist);
 
+	/* Create a new object describing the job */
+
+	struct batch_job_amazon_info *info = batch_job_amazon_info_create();
+
+	info->aws_config = aws_config;
+	info->instance_id = strdup(instance_id);
+	info->ip_address = strdup(ip_address);
+	info->cmd = strdup(cmd);
+	info->extra_input_files = strdup(extra_input_files);
+	info->extra_output_files = strdup(extra_output_files);
+	info->envlist = jx_copy(envlist);
+	info->info.submitted = time(0);
+	info->info.started = time(0);
+
 	/* Now fork a new process to actually execute the task and wait for completion.*/
 
 	batch_job_id_t jobid = fork();
 	if(jobid > 0) {
 		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
-		struct batch_job_info *info = malloc(sizeof(*info));
-		memset(info, 0, sizeof(*info));
-		info->submitted = time(0);
-		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
-		free(instance_id);
 		return jobid;
 	} else if(jobid < 0) {
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
+		batch_job_amazon_info_delete(info);
 		return -1;
 	} else {
-		_exit(batch_job_amazon_subprocess(aws_config,instance_id,ip_address,cmd,extra_input_files,extra_output_files,envlist));
+		_exit(batch_job_amazon_subprocess(aws_config,info));
 	}
 	return -1;
 }
@@ -381,11 +418,13 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 		struct process_info *p = process_wait(timeout);
 		if(p) {
-			struct batch_job_info *info = itable_remove(q->job_table, p->pid);
-			if(!info) {
+			struct batch_job_amazon_info *i = itable_remove(q->job_table, p->pid);
+			if(!i) {
 				process_putback(p);
 				return -1;
 			}
+
+			struct batch_job_info *info = &i->info;
 
 			info->finished = time(0);
 			if(WIFEXITED(p->status)) {
@@ -400,7 +439,10 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 			int jobid = p->pid;
 			free(p);
-			free(info);
+
+			aws_terminate_instance(i->aws_config,i->instance_id);
+
+			free(i);
 			return jobid;
 
 		} else if(errno == ESRCH || errno == ECHILD) {
@@ -414,26 +456,30 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 /*
 To kill an amazon job, we look up the details of the job,
-kill the local ssh process, and terminate the instance.
+kill the local ssh process forcibly, and then terminate
+the Amazon instance.
 */
 
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 {
-	if(kill(jobid, SIGTERM) == 0) {
-		if(!itable_lookup(q->job_table, jobid)) {
-			debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
-			return 0;
-		} else {
-			debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
-			struct process_info *p = process_waitpid(jobid,0);
-			if(p) free(p);
-			return 1;
-		}
-	} else {
-		debug(D_BATCH, "could not signal process %" PRIbjid ": %s\n", jobid, strerror(errno));
+	struct batch_job_amazon_info *info;
+
+	info = itable_lookup(q->job_table,jobid);
+	if(!info) {
+		debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
 		return 0;
 	}
 
+	kill(jobid,SIGKILL);
+
+	aws_terminate_instance(info->aws_config,info->instance_id);
+
+	debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
+	struct process_info *p = process_waitpid(jobid,0);
+	if(p) free(p);
+
+	batch_job_amazon_info_delete(info);
+	return 1;
 }
 
 batch_queue_stub_create(amazon);
