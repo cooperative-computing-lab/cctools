@@ -31,7 +31,7 @@ struct aws_config {
 struct aws_config * aws_config_load( const char *filename )
 {
 	struct jx * j = jx_parse_file(filename);
-	if(!j) fatal("couldn't parse %s\n",filename);
+	if(!j) fatal("%s isn't a valid json file\n",filename);
 
 	struct aws_config *c = malloc(sizeof(*c));
 
@@ -40,7 +40,10 @@ struct aws_config * aws_config_load( const char *filename )
 	c->security_group_id = jx_lookup_string(j,"security_group_id");
 	c->keypair_name      = jx_lookup_string(j,"keypair_name");
 
-	// XXX check for complete config here
+	if(!c->image_id) fatal("%s doesn't define image_id",filename);
+	if(!c->instance_type) fatal("%s doesn't define instance type",filename);
+	if(!c->security_group_id) fatal("%s doesn't define security_group_id",filename);
+	if(!c->keypair_name) fatal("%s doesn't define keypair_name",filename);
 
 	return c;
 }
