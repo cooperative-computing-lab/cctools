@@ -487,6 +487,10 @@ struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_
 			if(end_marker == '\n') {
 				lexer_discard_comments(lx);
 				break;
+			} else {
+				// # comment is quoted, so we simply insert it.
+				count++;
+				lexer_add_to_lexeme(lx, lexer_next_char(lx));
 			}
 		} else
 			break;
