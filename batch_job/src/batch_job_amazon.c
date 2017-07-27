@@ -113,13 +113,31 @@ char * aws_create_instance( struct aws_config *c )
 		c->security_group_id);
 
 	struct jx * jresult = json_command(str);
-	free(str);
-	if(!jresult) return 0;
+	if(!jresult) {
+		free(str);
+		return 0;
+	}
 
 	struct jx *jinstance = jx_lookup(jresult,"Instances")->u.items->value;
-	const char * result = jx_lookup_string(jinstance,"InstanceId");
-	// XXX leak failure yikes
-	return strdup(result);
+	if(!jinstance) {
+		debug(D_BATCH,"run-instances didn't return an Instances array");
+		jx_delete(jresult);
+		free(str);
+		return 0;
+	}
+	const char *id = jx_lookup_string(jinstance,"InstanceId");
+	if(!id) {
+		debug(D_BATCH,"run-instances didn't return an InstanceId!");
+		jx_delete(jresult);
+		free(str);
+		return 0;
+	}
+
+	char *result = strdup(id);
+
+	jx_delete(jresult);
+	free(str);
+	return result;
 }
 
 /*
