@@ -393,14 +393,57 @@ specified python library:</p>
                example.makeflow ...
 </code>
 
-<a name=ec2><h3>Amazon EC2</h3></a>
+<a name=ec2><h3>Amazon Web Services</h3></a>
 
-<p>To run jobs on Amazon EC2, give the <tt>-T ec2</tt> option,
-along with <tt>--amazon-ami</tt> to specify the machine image
-and <tt>--amazon-credentials</tt> to specify your Amazon credentials file.
-For each job to execute, Makeflow will create a virtual machine,
-upload the input files, run the job, download the output files,
-and then delete the virtual machine.</p>
+<p>
+Makeflow can be configured to run jobs remotely on Amazon Web Services.
+For each job in the workflow, a new virtual machine will be created,
+the job will run on the virtual machine, and then the virtual machine
+will be destroyed.
+</p>
+
+You will need to do some one-time setup first:
+
+<dir>
+<li> Create an account with <a href=http://aws.amazon.com>Amazon Web Services</a>, and test it out by creating and deleting some virtual machines manually.
+<li> Install the <a href=http://docs.aws.amazon.com/cli/latest/userguide/installing.html>AWS Command Line Interace</a> on the machine where you will
+run Makeflow.
+<li> Add the <tt>aws</tt> command to your PATH, run <tt>aws configure</tt> and
+enter your AWS Access Key ID, your AWS Secret Access Key,
+and your preferred region name.  (The keys can be obtained from the AWS
+web page by going to your profile menu, selecting "My Security Credentials"
+and then "Access Keys".  You may need to create a new access key.)
+</dir>
+
+Before proceeding, test that the command-line tool is working by entering:
+<code>aws ec2 describe-hosts
+</code>
+
+Which should display:
+<code>{
+    "Hosts": []
+}
+</code>
+
+Now you are ready to use Makeflow with Amazon.
+For each run of a workflow, use the <tt>makeflow_ec2_setup</tt> command,
+which will setup a virtual cluster, security group, and so forth,
+and store the necessary information into <tt>my.config</tt>.
+
+<code>makeflow_ec2_setup my.config
+</code>
+
+Then, run <tt>makeflow</tt> with the <tt>-T amazon</tt> option
+and <tt>--amazon-config my.config</tt> to use the configuration you
+just created.  You can run multiple workflows using a single configuration.
+
+<code>makeflow -T amazon --amazon-config my.config example.makeflow ...
+</code>
+
+When you are done, destroy the configuration with this command:
+
+<code>makeflow_ec2_cleanup my.config
+</code>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 
