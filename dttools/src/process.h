@@ -46,6 +46,12 @@ process completed in the available time.
 
 struct process_info *process_wait(int timeout);
 
+/** Wait for a specific process to complete and return its status.
+Like @ref process_wait, but waits for a specific pid.
+*/
+
+struct process_info *process_waitpid(pid_t pid, int timeout);
+
 /** Detect if a child process has completed.
 If so, its status may be obtained without delay by calling @ref process_wait .
 @return True if a child process has completed.
