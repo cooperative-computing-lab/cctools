@@ -32,14 +32,14 @@ struct batch_job_amazon_info {
 	struct jx *envlist;
 };
 
-struct batch_job_amazon_info * batch_job_amazon_info_create()
+static struct batch_job_amazon_info * batch_job_amazon_info_create()
 {
 	struct batch_job_amazon_info *i = malloc(sizeof(*i));
 	memset(i, 0, sizeof(*i));
 	return i;
 }
 
-void batch_job_amazon_info_delete( struct batch_job_amazon_info *i )
+static void batch_job_amazon_info_delete( struct batch_job_amazon_info *i )
 {
 	if(!i) return;
 	if(i->instance_id) free(i->instance_id);
@@ -58,7 +58,7 @@ struct aws_config {
 	const char *keypair_name;
 };
 
-struct aws_config * aws_config_load( const char *filename )
+static struct aws_config * aws_config_load( const char *filename )
 {
 	struct jx * j = jx_parse_file(filename);
 	if(!j) fatal("%s isn't a valid json file\n",filename);
@@ -83,7 +83,7 @@ Run an external command that produces json as output.
 Parse it and return the corresponding parsed JX object.
 */
 
-struct jx * json_command( const char *str )
+static struct jx * json_command( const char *str )
 {
 	debug(D_BATCH,"executing: %s",str);
 
@@ -104,7 +104,7 @@ struct jx * json_command( const char *str )
 Create an EC2 instance; on success return the instance id as a string that must be freed.  On failure, return zero.
 */
 
-char * aws_create_instance( struct aws_config *c )
+static char * aws_create_instance( struct aws_config *c )
 {
 	char *str = string_format("aws ec2 run-instances --image-id %s --instance-type %s --key-name %s --security-group-ids %s --output json",
 		c->image_id,
@@ -144,7 +144,7 @@ char * aws_create_instance( struct aws_config *c )
 Get the state of an EC2 instance, on success returns the state as a string that must be freed.  On failure, return zero.
 */
 
-struct jx * aws_describe_instance( struct aws_config *c, const char *instance_id )
+static struct jx * aws_describe_instance( struct aws_config *c, const char *instance_id )
 {
 	char *str = string_format("aws ec2 describe-instances --instance-ids %s --output json",instance_id);
 	struct jx *j = json_command(str);
@@ -156,7 +156,7 @@ struct jx * aws_describe_instance( struct aws_config *c, const char *instance_id
 Terminate an EC2 instance.  If termination is successfully applied, return true, otherwise return false.
 */
 
-int aws_terminate_instance( struct aws_config *c, const char *instance_id )
+static int aws_terminate_instance( struct aws_config *c, const char *instance_id )
 {
 	char *str = string_format("aws ec2 terminate-instances --instance-ids %s --output json",instance_id);
 	struct jx *jresult = json_command(str);
@@ -213,7 +213,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 	return result;
 }
 
-int put_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
+static int put_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
 	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\" >/dev/null 2>&1",c->keypair_name,localname,ip_address,remotename);
 	debug(D_BATCH,"put_file: %s\n",cmd);
@@ -222,7 +222,7 @@ int put_file( struct aws_config *c, const char *ip_address, const char *localnam
 	return result;
 }
 
-int get_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
+static int get_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
 	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,remotename,localname);
 	debug(D_BATCH,"get_file: %s\n",cmd);
@@ -231,7 +231,7 @@ int get_file( struct aws_config *c, const char *ip_address, const char *localnam
 	return result;
 }
 
-int run_task( struct aws_config *c, const char *ip_address, const char *command )
+static int run_task( struct aws_config *c, const char *ip_address, const char *command )
 {
 	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\"",c->keypair_name,ip_address,command);
 	debug(D_BATCH,"run_task: %s\n",cmd);
@@ -240,7 +240,7 @@ int run_task( struct aws_config *c, const char *ip_address, const char *command 
 	return result;
 }
 
-const char * get_instance_property( struct jx *j, const char *name )
+static const char * get_instance_property( struct jx *j, const char *name )
 {
 	j = jx_lookup(j,"Reservations");
 	if(!j || j->type!=JX_ARRAY || !j->u.items) return 0;
@@ -257,7 +257,7 @@ const char * get_instance_property( struct jx *j, const char *name )
 	return jx_lookup_string(j,name);
 }
 
-const char * get_instance_state_name( struct jx *j )
+static const char * get_instance_state_name( struct jx *j )
 {
 	j = jx_lookup(j,"Reservations");
 	if(!j || j->type!=JX_ARRAY || !j->u.items) return 0;
@@ -277,7 +277,7 @@ const char * get_instance_state_name( struct jx *j )
 	return jx_lookup_string(j,"Name");
 }
 
-int batch_job_amazon_subprocess( struct aws_config *aws_config, struct batch_job_amazon_info *info )
+static int batch_job_amazon_subprocess( struct aws_config *aws_config, struct batch_job_amazon_info *info )
 {
 	/* Generate a unique script with the contents of the task. */
 	char *runscript = string_format(".makeflow_task_script_%d",getpid());
