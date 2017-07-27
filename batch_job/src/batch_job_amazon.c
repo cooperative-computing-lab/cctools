@@ -20,6 +20,8 @@ See the file COPYING for details.
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 struct batch_job_amazon_info {
 	struct batch_job_info info;
@@ -278,6 +280,59 @@ static const char * get_instance_state_name( struct jx *j )
 }
 
 /*
+We use a shared SYSV sempahore here in order to
+manage file transfer concurrency.  On one hand,
+we want multiple subprocesses running at once,
+so that we don't wait long times for images to
+be created.  On the other hand, we don't want 
+multiple file transfers going on at once.
+So, each job is managed by a separate subprocess
+which acquires and releases a semaphore around file transfers.
+*/
+
+static int transfer_semaphore = -1;
+
+static void semaphore_down()
+{
+	if(transfer_semaphore<0) return;
+	struct sembuf buf;
+	buf.sem_num = 0;
+	buf.sem_op = -1;
+	buf.sem_flg = 0;
+	semop(transfer_semaphore,&buf,1);
+}
+
+static void semaphore_up()
+{
+	if(transfer_semaphore<0) return;
+	struct sembuf buf;
+	buf.sem_num = 0;
+	buf.sem_op = 1;
+	buf.sem_flg = 0;
+	semop(transfer_semaphore,&buf,1);
+}
+
+static void semaphore_create()
+{
+	if(transfer_semaphore!=-1) return;
+
+	transfer_semaphore = semget(IPC_PRIVATE,1,0600|IPC_CREAT);
+	if(transfer_semaphore<0) {
+		debug(D_REMOTE,"warning: couldn't create transfer semaphore (%s) but will proceed anyway",strerror(errno));
+		return;
+	}
+
+	union semun {
+		int value;
+		struct semid_ds *buf;
+		unsigned short *array;
+	} arg;
+	arg.value = 1;
+	semctl(transfer_semaphore,0,SETVAL,arg);
+}
+
+
+/*
 This function runs as a child process of makeflow and handles
 the execution of one task, after the instance is created.
 It waits for the instance to become ready, then probes the
@@ -324,7 +379,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 				jx_delete(j);
 				break;
 			} else {
-				debug(D_BATCH,"strange, ip address is not set, keep trying...");
+				debug(D_BATCH,"ip address is not set yet, keep trying...");
 				jx_delete(j);
 				continue;
 			}
@@ -343,6 +398,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	wait_for_ssh_ready(aws_config,ip_address);
 
 	/* Send each of the input files to the instance. */
+	semaphore_down();
 	put_files(aws_config,ip_address,extra_input_files);
 
 	/* Generate a unique script with the contents of the task. */
@@ -352,12 +408,15 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	/* Send the script and delete the local copy right away. */
 	put_file(aws_config,ip_address,runscript,"makeflow_task_script");
 	unlink(runscript);
+	semaphore_up();
 
 	/* Run the remote task. */
 	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
 
 	/* Retreive each of the output files from the instance. */
+	semaphore_down();
 	get_files(aws_config,ip_address,extra_output_files);
+	semaphore_up();
 
 	/* Return the task result regardless of the file fetch; makeflow will figure it out. */
 	return task_result;
@@ -377,6 +436,9 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 
 	/* Create the job table if it didn't already exist. */
 	if(!q->job_table) q->job_table = itable_create(0);
+
+	/* Create the shared transfer semaphore */
+	semaphore_create();
 
 	static struct aws_config * aws_config = 0;
 
