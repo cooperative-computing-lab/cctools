@@ -115,6 +115,8 @@ static char * aws_create_instance( struct aws_config *c )
 
 	jx_delete(jresult);
 	free(str);
+
+	printf("created virtual machine instance %s\n",id);
 	return result;
 }
 
@@ -140,6 +142,7 @@ static int aws_terminate_instance( struct aws_config *c, const char *instance_id
 	struct jx *jresult = json_command(str);
 	if(jresult) {
 		jx_delete(jresult);
+		printf("created virtual machine instance %s\n",instance_id);
 		return 1;
 	} else {
 		return 0;
