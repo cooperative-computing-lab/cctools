@@ -298,7 +298,7 @@ static void semaphore_down()
 	struct sembuf buf;
 	buf.sem_num = 0;
 	buf.sem_op = -1;
-	buf.sem_flg = 0;
+	buf.sem_flg = SEM_UNDO;
 	semop(transfer_semaphore,&buf,1);
 }
 
@@ -308,7 +308,7 @@ static void semaphore_up()
 	struct sembuf buf;
 	buf.sem_num = 0;
 	buf.sem_op = 1;
-	buf.sem_flg = 0;
+	buf.sem_flg = SEM_UNDO;
 	semop(transfer_semaphore,&buf,1);
 }
 
