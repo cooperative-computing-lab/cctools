@@ -178,7 +178,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 {
 	int result = 0;
 
-	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s ls >/dev/null 2>&1",c->keypair_name,ip_address);
+	char *cmd = string_format("ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s.pem ec2-user@%s ls >/dev/null 2>&1",c->keypair_name,ip_address);
 
 	int i;
 	for(i=0;i<100;i++) {
@@ -196,7 +196,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 
 static int put_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
-	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\" >/dev/null 2>&1",c->keypair_name,localname,ip_address,remotename);
+	char *cmd = string_format("scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\" >/dev/null 2>&1",c->keypair_name,localname,ip_address,remotename);
 	debug(D_BATCH,"put file: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
@@ -217,7 +217,7 @@ static void put_files( struct aws_config *aws_config, const char *ip_address, co
 
 static int get_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
-	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,remotename,localname);
+	char *cmd = string_format("scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,remotename,localname);
 	debug(D_BATCH,"get file: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
@@ -238,7 +238,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 
 static int run_task( struct aws_config *c, const char *ip_address, const char *command )
 {
-	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\"",c->keypair_name,ip_address,command);
+	char *cmd = string_format("ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\"",c->keypair_name,ip_address,command);
 	debug(D_BATCH,"run task: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
