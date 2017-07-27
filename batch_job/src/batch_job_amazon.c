@@ -440,10 +440,13 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	/* Create the shared transfer semaphore */
 	semaphore_create();
 
+	const char *config_file = batch_queue_get_option(q,"amazon-config");
+	if(!config_file) fatal("--amazon-config option is required");
+
 	static struct aws_config * aws_config = 0;
 
 	/* XXX get the AWS info from a configurable location */
-	if(!aws_config) aws_config = aws_config_load("amazon.json");
+	if(!aws_config) aws_config = aws_config_load(config_file);
 
 	/* Create a new instance and return its unique ID. */
 	char *instance_id = aws_create_instance(aws_config);

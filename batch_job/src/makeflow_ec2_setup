@@ -1,12 +1,20 @@
 #!/bin/sh
 
+if [ $# -ne 1 ]
+then
+	echo "use: $0: <config-file>"
+	exit 1
+fi
+
+configFile=$1
+
 echo -n "Checking for aws command in PATH..."
 if which aws >/dev/null 2>&1
 then
 	echo "ok"
 else
 	echo "failed"
-	echo "*** The Amazon \"aws\" must be in your path to use this script."
+	echo "$0: The \"aws\" command must be in your path to use this script."
 	exit 1
 fi
 
@@ -16,7 +24,7 @@ then
 	echo "ok"
 else
 	echo "failed"
-	echo "*** You must run \"aws configure\" before using this script."
+	echo "$0 You must run \"aws configure\" before using this script."
 	exit 1
 fi
 
@@ -26,57 +34,58 @@ then
 	echo "ok"
 else
 	echo "failed"
-	echo "*** Your Amazon credentials are not set up correctly. Try \"aws ec2 describe-instances\" to troubleshoot."
+	echo "$0: Your Amazon credentials are not set up correctly. Try \"aws ec2 describe-instances\" to troubleshoot."
 	exit 1
 fi
 
 CIDR_BLOCK=10.0.0.0/16
 UUID="$(uuidgen)"
-EC2_KEYPAIR_NAME=kp.${UUID}
-EC2_SECURITY_GROUP_NAME=sg.${UUID}
+KEYPAIR_NAME=kp.${UUID}
+SECURITY_GROUP_NAME=sg.${UUID}
 
 #echo "Creating virtual private cluster..."
-#EC2_VPC=`aws ec2 create-vpc --cidr-block $CIDR_BLOCK --output text | cut -f 7`
+#VPC=`aws ec2 create-vpc --cidr-block $CIDR_BLOCK --output text | cut -f 7`
 
 #echo "Creating internet gateway..."
-#EC2_GATEWAY=`aws ec2 create-internet-gateway --output text | cut -f 2`
+#GATEWAY=`aws ec2 create-internet-gateway --output text | cut -f 2`
 
 #echo "Attaching internet gateway..."
-#aws ec2 attach-internet-gateway --internet-gateway-id $EC2_GATEWAY --vpc-id $EC2_VPC
+#aws ec2 attach-internet-gateway --internet-gateway-id $GATEWAY --vpc-id $VPC
 
 #echo "Creating route table..."
-#EC2_ROUTE_TABLE=`aws ec2 create-route-table --vpc-id $EC2_VPC --output text | grep ROUTETABLE | cut -f 2`
+#ROUTE_TABLE=`aws ec2 create-route-table --vpc-id $VPC --output text | grep ROUTETABLE | cut -f 2`
 
 #echo "Creating route..."
-#aws ec2 create-route --route-table-id $EC2_ROUTE_TABLE --gateway-id $EC2_GATEWAY --destination-cidr-block 0.0.0.0/0
+#aws ec2 create-route --route-table-id $ROUTE_TABLE --gateway-id $GATEWAY --destination-cidr-block 0.0.0.0/0
 
 #echo "Creating subnet..."
-#EC2_SUBNET=`aws ec2 create-subnet --cidr-block $CIDR_BLOCK --vpc-id $EC2_VPC --output text | cut -f 9`
-#aws ec2 modify-subnet-attribute --subnet-id $EC2_SUBNET --map-public-ip-on-launch
+#SUBNET=`aws ec2 create-subnet --cidr-block $CIDR_BLOCK --vpc-id $VPC --output text | cut -f 9`
+#aws ec2 modify-subnet-attribute --subnet-id $SUBNET --map-public-ip-on-launch
 
-echo "Setting up security group $EC2_SECURITY_GROUP_NAME..."
-EC2_SECURITY_GROUP=`aws ec2 create-security-group --group-name $EC2_SECURITY_GROUP_NAME --description "$EC2_SECURITY_GROUP_NAME" --output text`
-aws ec2 authorize-security-group-ingress --group-id $EC2_SECURITY_GROUP --port 22 --cidr 0.0.0.0/0 --protocol tcp
-#aws ec2 authorize-security-group-egress --group-id $EC2_SECURITY_GROUP --port 1024-10000 --cidr 0.0.0.0/0 --protocol all
+echo "Setting up security group $SECURITY_GROUP_NAME..."
+SECURITY_GROUP=`aws ec2 create-security-group --group-name $SECURITY_GROUP_NAME --description "$SECURITY_GROUP_NAME" --output text`
+# Allow for ssh incoming traffic
+aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP --port 22 --cidr 0.0.0.0/0 --protocol tcp
+# Allow for makeflow / work queue / catalog traffic
+#aws ec2 authorize-security-group-egress --group-id $SECURITY_GROUP --port 1024-10000 --cidr 0.0.0.0/0 --protocol all
 
-# This ALMOST works.  We just need to remove the junk surrounding the key pair recorded here.
+echo "Creating keypair $KEYPAIR_NAME..."
+# Remove junk from around keypair that confuses ssh.
+aws ec2 create-key-pair --key-name $KEYPAIR_NAME --output text | sed 's/^.*\t-----/-----/' | sed 's/KEY-----.*$/KEY-----/'i > $KEYPAIR_NAME.pem
 
-echo "Creating keypair $EC2_KEYPAIR_NAME..."
-aws ec2 create-key-pair --key-name $EC2_KEYPAIR_NAME --output text | sed 's/^.*\t-----/-----/' | sed 's/KEY-----.*$/KEY-----/'i > $EC2_KEYPAIR_NAME.pem
-chmod 600 $EC2_KEYPAIR_NAME.pem
+# Permissions must be just so for ssh to be happy.
+chmod 600 $KEYPAIR_NAME.pem
 
-echo "Creating amazon.config with all the details..."
+echo "Creating $configFile with all the details..."
 
-cat > amazon.config <<EOF
-#export EC2_VPC=$EC2_VPC
-#export EC2_GATEWAY=$EC2_GATEWAY
-#export EC2_ROUTE_TABLE=$EC2_ROUTE_TABLE
-#export EC2_SUBNET=$EC2_SUBNET
-export EC2_SECURITY_GROUP=$EC2_SECURITY_GROUP
-export EC2_SECURITY_GROUP_NAME=$EC2_SECURITY_GROUP_NAME
-export EC2_KEYPAIR_NAME=$EC2_KEYPAIR_NAME
-export EC2_INSTANCE_TYPE=m3.medium
-export EC2_AMI=ami-a4c7edb2
+cat > $configFile <<EOF
+{
+"security_group_id" : "$SECURITY_GROUP",
+"security_group_name" : "$SECURITY_GROUP_NAME",
+"keypair_name" : "$KEYPAIR_NAME",
+"instance_type" : "m3.medium",
+"ami" : "ami-a4c7edb2"
+}
 EOF
 
 echo "Done!"
