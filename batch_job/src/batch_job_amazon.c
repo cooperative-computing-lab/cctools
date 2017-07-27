@@ -482,6 +482,15 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		free(info);
 		return -1;
 	} else {
+		/*
+		Set signals to default behavior, otherwise we get
+		competing behavior in the forked process.
+		*/
+
+		signal(SIGINT,SIG_DFL);
+		signal(SIGQUIT,SIG_DFL);
+		signal(SIGABRT,SIG_DFL);
+
 		_exit(batch_job_amazon_subprocess(aws_config,instance_id,cmd,extra_input_files,extra_output_files,envlist));
 	}
 	return -1;
