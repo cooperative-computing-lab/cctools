@@ -25,31 +25,7 @@ struct batch_job_amazon_info {
 	struct batch_job_info info;
 	struct aws_config *aws_config;
 	char *instance_id;
-	char *ip_address;
-	char *cmd;
-	char *extra_input_files;
-	char *extra_output_files;
-	struct jx *envlist;
 };
-
-static struct batch_job_amazon_info * batch_job_amazon_info_create()
-{
-	struct batch_job_amazon_info *i = malloc(sizeof(*i));
-	memset(i, 0, sizeof(*i));
-	return i;
-}
-
-static void batch_job_amazon_info_delete( struct batch_job_amazon_info *i )
-{
-	if(!i) return;
-	if(i->instance_id) free(i->instance_id);
-	if(i->ip_address) free(i->ip_address);
-	if(i->cmd) free(i->cmd);
-	if(i->extra_input_files) free(i->extra_input_files);
-	if(i->extra_output_files) free(i->extra_output_files);
-	if(i->envlist) jx_delete(i->envlist);
-	free(i);
-}
 
 struct aws_config {
 	const char *image_id;
@@ -277,18 +253,100 @@ static const char * get_instance_state_name( struct jx *j )
 	return jx_lookup_string(j,"Name");
 }
 
-static int batch_job_amazon_subprocess( struct aws_config *aws_config, struct batch_job_amazon_info *info )
+/*
+This function runs as a child process of makeflow and handles
+the execution of one task, after the instance is created.
+It waits for the instance to become ready, then probes the
+ssh server, sends the input file, runs the command,
+and extracts the output file.  We rely on the parent makeflow
+process to create and delete the instance as needed.
+*/
+
+static int batch_job_amazon_subprocess( struct aws_config *aws_config, const char *instance_id, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist )
 {
+	char *ip_address = 0;
+
+	while(1) {
+		sleep(5);
+
+		debug(D_BATCH,"getting instance state...");
+		struct jx *j = aws_describe_instance(aws_config,instance_id);
+		if(!j) {
+			debug(D_BATCH,"unable to get instance state");
+			continue;
+		}
+	
+		const char * state = get_instance_state_name(j);
+		if(!state) {
+			debug(D_BATCH,"state is not set, keep trying...");
+			jx_delete(j);
+			continue;
+		} else if(!strcmp(state,"pending")) {
+			debug(D_BATCH,"state is 'pending', keep trying...");
+			jx_delete(j);
+			continue;
+		} else if(!strcmp(state,"running")) {
+			debug(D_BATCH,"state is 'running', checking for ip address");
+			const char *i = get_instance_property(j,"PublicIpAddress");
+			if(i) {
+				debug(D_BATCH,"found ip address %s",i);
+				ip_address = strdup(i);
+				jx_delete(j);
+				break;
+			} else {
+				debug(D_BATCH,"strange, ip address is not set, keep trying...");
+				jx_delete(j);
+				continue;
+			}
+		} else {
+			debug(D_BATCH,"state is '%s', which is unexpected, so aborting",state);
+			jx_delete(j);
+			return 127;
+		}
+	}
+
+	/*
+	Even though the instance is running, the ssh service is not necessarily running.
+	Probe it periodically until it is ready.
+	*/
+
+	wait_for_ssh_ready(aws_config,ip_address);
+
+	/* Send each of the input files to the instance. */
+
+	char *filelist = strdup(extra_input_files);
+	char *f = strtok(filelist,",");
+	while(f) {
+		// XXX need to handle remotename
+		put_file(aws_config,ip_address,f,f);
+		f = strtok(0,",");
+	}
+	free(filelist);
+
 	/* Generate a unique script with the contents of the task. */
 	char *runscript = string_format(".makeflow_task_script_%d",getpid());
-	create_script(runscript,info->cmd,info->envlist);
+	create_script(runscript,cmd,envlist);
 
 	/* Send the script and delete the local copy right away. */
-	put_file(aws_config,info->ip_address,runscript,"makeflow_task_script");
+	put_file(aws_config,ip_address,runscript,"makeflow_task_script");
 	unlink(runscript);
 
 	/* Run the remote task. */
-	return run_task(aws_config,info->ip_address,"./makeflow_task_script");
+	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
+
+	/* Retreive each of the output files from the instance. */
+
+	filelist = strdup(extra_output_files);
+	f = strtok(filelist,",");
+	while(f) {
+		// XXX need to handle remotename
+		get_file(aws_config,ip_address,f,f);
+		f = strtok(0,",");
+	}
+	free(filelist);
+
+	/* Return the task result regardless of the file fetch; makeflow will figure it out. */
+	return task_result;
 }
 
 /*
@@ -319,77 +377,14 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		return -1;
 	}
 
-	/*
-	The instance is not immediately usable, so query the instance
-	state in a loop until it is no longer "pending".  When ready,
-	it should have a public IP address.
-	*/
-	char *ip_address = 0;
-
-	while(1) {
-		sleep(5);
-
-		debug(D_BATCH,"getting instance state...");
-		struct jx *j = aws_describe_instance(aws_config,instance_id);
-		if(!j) {
-			debug(D_BATCH,"unable to get instance state");
-			continue;
-		}
-	
-		const char * state = get_instance_state_name(j);
-		if(!state) {
-			debug(D_BATCH,"state is not set, keep trying...");
-			continue;
-		} else if(!strcmp(state,"pending")) {
-			debug(D_BATCH,"state is 'pending', keep trying...");
-			continue;
-		} else if(!strcmp(state,"running")) {
-			debug(D_BATCH,"state is 'running', checking for ip address");
-			const char *i = get_instance_property(j,"PublicIpAddress");
-			if(i) {
-				debug(D_BATCH,"found ip address %s",i);
-				ip_address = strdup(i);
-				break;
-			} else {
-				debug(D_BATCH,"strange, ip address is not set, keep trying...");
-				continue;
-			}
-		} else {
-			debug(D_BATCH,"state is '%s', which is unexpected, so aborting",state);
-			aws_terminate_instance(aws_config,instance_id);
-			return -1;
-		}
-	}
-
-	/*
-	Even though the instance is running, the ssh service is not necessarily running.
-	Probe it periodically until it is ready.
-	*/
-
-	wait_for_ssh_ready(aws_config,ip_address);
-
-	/* Send each of the input files to the instance. */
-
-	char *filelist = strdup(extra_input_files);
-	char *f = strtok(filelist,",");
-	while(f) {
-		// XXX need to handle remotename
-		put_file(aws_config,ip_address,f,f);
-		f = strtok(0,",");
-	}
-	free(filelist);
+	debug(D_BATCH,"created instance %s",instance_id);
 
 	/* Create a new object describing the job */
 
-	struct batch_job_amazon_info *info = batch_job_amazon_info_create();
-
+	struct batch_job_amazon_info *info = malloc(sizeof(*info));
+	memset(info,0,sizeof(*info));
 	info->aws_config = aws_config;
-	info->instance_id = strdup(instance_id);
-	info->ip_address = strdup(ip_address);
-	info->cmd = strdup(cmd);
-	info->extra_input_files = strdup(extra_input_files);
-	info->extra_output_files = strdup(extra_output_files);
-	info->envlist = jx_copy(envlist);
+ 	info->instance_id = instance_id;
 	info->info.submitted = time(0);
 	info->info.started = time(0);
 
@@ -402,10 +397,10 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		return jobid;
 	} else if(jobid < 0) {
 		debug(D_BATCH, "couldn't create new process: %s\n", strerror(errno));
-		batch_job_amazon_info_delete(info);
+		free(info);
 		return -1;
 	} else {
-		_exit(batch_job_amazon_subprocess(aws_config,info));
+		_exit(batch_job_amazon_subprocess(aws_config,instance_id,cmd,extra_input_files,extra_output_files,envlist));
 	}
 	return -1;
 }
@@ -444,18 +439,6 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 			int jobid = p->pid;
 			free(p);
-
-
-			/* Retreive each of the output files from the instance. */
-
-			char *filelist = strdup(i->extra_output_files);
-			char *f = strtok(filelist,",");
-			while(f) {
-				// XXX need to handle remotename
-				get_file(i->aws_config,i->ip_address,f,f);
-				f = strtok(0,",");
-			}
-			free(filelist);
 
 			/* Now destroy the instance */
 
@@ -498,8 +481,8 @@ static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 	debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
 	struct process_info *p = process_waitpid(jobid,0);
 	if(p) free(p);
+	if(info) free(info);
 
-	batch_job_amazon_info_delete(info);
 	return 1;
 }
 
