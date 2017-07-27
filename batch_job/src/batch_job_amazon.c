@@ -28,7 +28,7 @@ struct batch_job_amazon_info {
 };
 
 struct aws_config {
-	const char *image_id;
+	const char *ami;
 	const char *instance_type;
 	const char *security_group_id;
 	const char *keypair_name;
@@ -41,15 +41,15 @@ static struct aws_config * aws_config_load( const char *filename )
 
 	struct aws_config *c = malloc(sizeof(*c));
 
-	c->image_id          = jx_lookup_string(j,"image_id");
+	c->ami          = jx_lookup_string(j,"ami");
 	c->instance_type     = jx_lookup_string(j,"instance_type");
 	c->security_group_id = jx_lookup_string(j,"security_group_id");
 	c->keypair_name      = jx_lookup_string(j,"keypair_name");
 
-	if(!c->image_id) fatal("%s doesn't define image_id",filename);
-	if(!c->instance_type) fatal("%s doesn't define instance type",filename);
+	if(!c->ami)               fatal("%s doesn't define ami",filename);
+	if(!c->instance_type)     fatal("%s doesn't define instance type",filename);
 	if(!c->security_group_id) fatal("%s doesn't define security_group_id",filename);
-	if(!c->keypair_name) fatal("%s doesn't define keypair_name",filename);
+	if(!c->keypair_name)      fatal("%s doesn't define keypair_name",filename);
 
 	return c;
 }
@@ -83,7 +83,7 @@ Create an EC2 instance; on success return the instance id as a string that must 
 static char * aws_create_instance( struct aws_config *c )
 {
 	char *str = string_format("aws ec2 run-instances --image-id %s --instance-type %s --key-name %s --security-group-ids %s --output json",
-		c->image_id,
+		c->ami,
 		c->instance_type,
 		c->keypair_name,
 		c->security_group_id);
@@ -177,7 +177,7 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 
 	int i;
 	for(i=0;i<100;i++) {
-		debug(D_BATCH,"testing for ssh ready: %s",cmd);
+		debug(D_BATCH,"test ssh: %s",cmd);
 		if(system(cmd)==0) {
 			result = 1;
 			break;
@@ -192,25 +192,49 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 static int put_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
 	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\" >/dev/null 2>&1",c->keypair_name,localname,ip_address,remotename);
-	debug(D_BATCH,"put_file: %s\n",cmd);
+	debug(D_BATCH,"put file: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
 	return result;
+}
+
+static void put_files( struct aws_config *aws_config, const char *ip_address, const char *files )
+{
+	char *filelist = strdup(files);
+	char *f = strtok(filelist,",");
+	while(f) {
+		// XXX need to handle remotename
+		put_file(aws_config,ip_address,f,f);
+		f = strtok(0,",");
+	}
+	free(filelist);
 }
 
 static int get_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
 	char *cmd = string_format("scp -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,remotename,localname);
-	debug(D_BATCH,"get_file: %s\n",cmd);
+	debug(D_BATCH,"get file: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
 	return result;
 }
 
+static void get_files( struct aws_config *aws_config, const char *ip_address, const char *files )
+{
+	char *filelist = strdup(files);
+	char *f = strtok(filelist,",");
+	while(f) {
+		// XXX need to handle remotename
+		get_file(aws_config,ip_address,f,f);
+		f = strtok(0,",");
+	}
+	free(filelist);
+}
+
 static int run_task( struct aws_config *c, const char *ip_address, const char *command )
 {
 	char *cmd = string_format("ssh -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s\" \"%s\"",c->keypair_name,ip_address,command);
-	debug(D_BATCH,"run_task: %s\n",cmd);
+	debug(D_BATCH,"run task: %s\n",cmd);
 	int result = system(cmd);
 	free(cmd);
 	return result;
@@ -266,10 +290,16 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 {
 	char *ip_address = 0;
 
+	/*
+	Put the instance ID into the log file, so that output from
+	different concurrent instances can be disentangled.
+	*/
+
+	debug_config(instance_id);
+
 	while(1) {
 		sleep(5);
 
-		debug(D_BATCH,"getting instance state...");
 		struct jx *j = aws_describe_instance(aws_config,instance_id);
 		if(!j) {
 			debug(D_BATCH,"unable to get instance state");
@@ -313,15 +343,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	wait_for_ssh_ready(aws_config,ip_address);
 
 	/* Send each of the input files to the instance. */
-
-	char *filelist = strdup(extra_input_files);
-	char *f = strtok(filelist,",");
-	while(f) {
-		// XXX need to handle remotename
-		put_file(aws_config,ip_address,f,f);
-		f = strtok(0,",");
-	}
-	free(filelist);
+	put_files(aws_config,ip_address,extra_input_files);
 
 	/* Generate a unique script with the contents of the task. */
 	char *runscript = string_format(".makeflow_task_script_%d",getpid());
@@ -335,15 +357,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
 
 	/* Retreive each of the output files from the instance. */
-
-	filelist = strdup(extra_output_files);
-	f = strtok(filelist,",");
-	while(f) {
-		// XXX need to handle remotename
-		get_file(aws_config,ip_address,f,f);
-		f = strtok(0,",");
-	}
-	free(filelist);
+	get_files(aws_config,ip_address,extra_output_files);
 
 	/* Return the task result regardless of the file fetch; makeflow will figure it out. */
 	return task_result;
