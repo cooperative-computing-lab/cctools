@@ -481,6 +481,8 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	printf("submitting job: %s\n", command);
 
 	while(1) {
+		if(makeflow_abort_flag) break;
+
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist, resources);
 		if(jobid >= 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
