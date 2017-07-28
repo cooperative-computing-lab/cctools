@@ -201,22 +201,26 @@ static int wait_for_ssh_ready( struct aws_config *c, const char *ip_address )
 static int put_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
 {
 	char *cmd = string_format("scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s.pem \"%s\" \"ec2-user@%s:%s\" >/dev/null 2>&1",c->keypair_name,localname,ip_address,remotename);
-	debug(D_BATCH,"put file: %s\n",cmd);
+	debug(D_BATCH,"put_file: %s\n",cmd);
 	int result = system(cmd);
+	if(result<0) {
+		debug(D_BATCH,"put_file failed");
+	}
 	free(cmd);
 	return result;
 }
 
-static void put_files( struct aws_config *aws_config, const char *ip_address, const char *files )
+static int put_files( struct aws_config *aws_config, const char *ip_address, const char *files )
 {
 	char *filelist = strdup(files);
 	char *f = strtok(filelist,",");
 	while(f) {
 		// XXX need to handle remotename
-		put_file(aws_config,ip_address,f,f);
+		if(put_file(aws_config,ip_address,f,f)!=0) return -1;
 		f = strtok(0,",");
 	}
 	free(filelist);
+	return 0;
 }
 
 static int get_file( struct aws_config *c, const char *ip_address, const char *localname, const char *remotename )
@@ -224,6 +228,9 @@ static int get_file( struct aws_config *c, const char *ip_address, const char *l
 	char *cmd = string_format("scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i %s.pem \"ec2-user@%s:%s\" \"%s\" >/dev/null 2>&1",c->keypair_name,ip_address,remotename,localname);
 	debug(D_BATCH,"get file: %s\n",cmd);
 	int result = system(cmd);
+	if(result<0) {
+		debug(D_BATCH,"get_file failed");
+	}
 	free(cmd);
 	return result;
 }
@@ -234,6 +241,10 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 	char *f = strtok(filelist,",");
 	while(f) {
 		// XXX need to handle remotename
+		/*
+		In the case of failure, keep going b/c the other output files
+		may be necessary to debug the problem. 
+		*/
 		get_file(aws_config,ip_address,f,f);
 		f = strtok(0,",");
 	}
@@ -406,7 +417,15 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 
 	/* Send each of the input files to the instance. */
 	semaphore_down();
-	put_files(aws_config,ip_address,extra_input_files);
+	int result = put_files(aws_config,ip_address,extra_input_files);
+	semaphore_up();
+
+	/*
+	If we fail to send the fails, bail out early indicating
+	that the task did not run at all.
+	*/
+
+	if(result!=0) return 127;
 
 	/* Generate a unique script with the contents of the task. */
 	char *runscript = string_format(".makeflow_task_script_%d",getpid());
@@ -415,7 +434,6 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	/* Send the script and delete the local copy right away. */
 	put_file(aws_config,ip_address,runscript,"makeflow_task_script");
 	unlink(runscript);
-	semaphore_up();
 
 	/* Run the remote task. */
 	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
@@ -425,7 +443,11 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up();
 
-	/* Return the task result regardless of the file fetch; makeflow will figure it out. */
+	/* 
+	Return the task result regardless of the file fetch;
+	makeflow will figure out which files were actually produced
+	and then do the right thing.
+	*/
 	return task_result;
 }
 
