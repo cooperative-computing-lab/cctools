@@ -14,8 +14,12 @@ then
 	exit 1
 fi
 
-security_group_id=$(python -c "import json; print json.load(open('$configFile','r'))['security_group_id'];")
-keypair_name=$(python -c "import json; print json.load(open('$configFile','r'))['keypair_name'];")
+KEYPAIR_NAME=$(python -c "import json; print json.load(open('$configFile','r'))['keypair_name'];")
+SECURITY_GROUP_ID=$(python -c "import json; print json.load(open('$configFile','r'))['security_group_id'];")
+SUBNET=$(python -c "import json; print json.load(open('$configFile','r'))['subnet'];")
+ROUTE_TABLE=$(python -c "import json; print json.load(open('$configFile','r'))['route_table'];")
+GATEWAY=$(python -c "import json; print json.load(open('$configFile','r'))['gateway'];")
+VPC=$(python -c "import json; print json.load(open('$configFile','r'))['vpc'];")
 
 echo -n "Checking for aws command in PATH..."
 if which aws >/dev/null 2>&1
@@ -27,23 +31,21 @@ else
         exit 1
 fi
 
-echo "Deleting keypair $keypair_name..."
-aws ec2 delete-key-pair --key-name $keypair_name
-rm -f $keypair_name.pem
+echo "Deleting keypair $KEYPAIR_NAME..."
+aws ec2 delete-key-pair --key-name $KEYPAIR_NAME && rm -f ${KEYPAIR_NAME}.pem
 
-echo "Deleting security group $security_group..."
-aws ec2 delete-security-group --group-id $security_group_id
+#echo "Deleting security group $SECURITY_GROUP_ID"
+#aws ec2 delete-security-group --group-id $SECURITY_GROUP_ID
 
-#echo "Deleting subnet $EC2_SUBNET..."
-#aws ec2 delete-subnet --subnet-id $EC2_SUBNET
+echo "Deleting internet gateway $GATEWAY..."
+aws ec2 detach-internet-gateway --internet-gateway-id $GATEWAY --vpc-id $VPC
+aws ec2 delete-internet-gateway --internet-gateway-id $GATEWAY
 
-#echo "Deleting route table $EC2_ROUTE_TABLE..."
-#aws ec2 delete-route-table --route-table-id $EC2_ROUTE_TABLE
+echo "Deleting subnet $SUBNET..."
+aws ec2 delete-subnet --subnet-id $SUBNET
 
-#echo "Deleting internet gateway $EC2_GATEWAY..."
-#aws ec2 delete-internet-gateway --gateway-id $EC2_GATEWAY"
-
-#echo "Deleting virtual private cluster $EC2_VPC..."
-#aws ec2 delete-vpc --vpc-id $EC2_VPC
+echo "Deleting virtual private cluster $VPC..."
+aws ec2 delete-vpc --vpc-id $VPC
 
 echo "Done!"
+

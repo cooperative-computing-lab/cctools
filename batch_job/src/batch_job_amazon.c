@@ -1,4 +1,4 @@
-/*
+ /*
 Copyright (C) 2017- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
@@ -30,6 +30,7 @@ struct batch_job_amazon_info {
 };
 
 struct aws_config {
+	const char *subnet;
 	const char *ami;
 	const char *instance_type;
 	const char *security_group_id;
@@ -43,11 +44,13 @@ static struct aws_config * aws_config_load( const char *filename )
 
 	struct aws_config *c = malloc(sizeof(*c));
 
-	c->ami          = jx_lookup_string(j,"ami");
+	c->subnet            = jx_lookup_string(j,"subnet");
+	c->ami               = jx_lookup_string(j,"ami");
 	c->instance_type     = jx_lookup_string(j,"instance_type");
 	c->security_group_id = jx_lookup_string(j,"security_group_id");
 	c->keypair_name      = jx_lookup_string(j,"keypair_name");
 
+	if(!c->subnet)            fatal("%s doesn't define subnet",filename);
 	if(!c->ami)               fatal("%s doesn't define ami",filename);
 	if(!c->instance_type)     fatal("%s doesn't define instance type",filename);
 	if(!c->security_group_id) fatal("%s doesn't define security_group_id",filename);
@@ -84,7 +87,8 @@ Create an EC2 instance; on success return the instance id as a string that must 
 
 static char * aws_create_instance( struct aws_config *c )
 {
-	char *str = string_format("aws ec2 run-instances --image-id %s --instance-type %s --key-name %s --security-group-ids %s --output json",
+	char *str = string_format("aws ec2 run-instances --subnet %s --image-id %s --instance-type %s --key-name %s --security-group-ids %s --associate-public-ip-address --output json",
+		c->subnet,
 		c->ami,
 		c->instance_type,
 		c->keypair_name,

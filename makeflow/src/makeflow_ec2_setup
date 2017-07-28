@@ -39,35 +39,36 @@ else
 fi
 
 CIDR_BLOCK=10.0.0.0/16
+SUBNET_CIDR_BLOCK=10.0.1.0/24
 UUID="$(uuidgen)"
 KEYPAIR_NAME=kp.${UUID}
 SECURITY_GROUP_NAME=sg.${UUID}
 
-#echo "Creating virtual private cluster..."
-#VPC=`aws ec2 create-vpc --cidr-block $CIDR_BLOCK --output text | cut -f 7`
+echo "Creating virtual private cluster..."
+VPC=`aws ec2 create-vpc --cidr-block $CIDR_BLOCK --output text | cut -f 7`
 
-#echo "Creating internet gateway..."
-#GATEWAY=`aws ec2 create-internet-gateway --output text | cut -f 2`
+echo "Creating subnet..."
+SUBNET=`aws ec2 create-subnet --cidr-block $SUBNET_CIDR_BLOCK --vpc-id $VPC --output text | cut -f 9`
+aws ec2 modify-subnet-attribute --subnet-id $SUBNET --map-public-ip-on-launch
 
-#echo "Attaching internet gateway..."
-#aws ec2 attach-internet-gateway --internet-gateway-id $GATEWAY --vpc-id $VPC
+echo "Getting default security group of VPC $VPC..."
+SECURITY_GROUP=`aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC --query 'SecurityGroups[0].GroupId' --output text`
 
-#echo "Creating route table..."
-#ROUTE_TABLE=`aws ec2 create-route-table --vpc-id $VPC --output text | grep ROUTETABLE | cut -f 2`
-
-#echo "Creating route..."
-#aws ec2 create-route --route-table-id $ROUTE_TABLE --gateway-id $GATEWAY --destination-cidr-block 0.0.0.0/0
-
-#echo "Creating subnet..."
-#SUBNET=`aws ec2 create-subnet --cidr-block $CIDR_BLOCK --vpc-id $VPC --output text | cut -f 9`
-#aws ec2 modify-subnet-attribute --subnet-id $SUBNET --map-public-ip-on-launch
-
-echo "Setting up security group $SECURITY_GROUP_NAME..."
-SECURITY_GROUP=`aws ec2 create-security-group --group-name $SECURITY_GROUP_NAME --description "$SECURITY_GROUP_NAME" --output text`
+echo "Configuring security group $SECURITY_GROUP..."
 # Allow for ssh incoming traffic
 aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP --port 22 --cidr 0.0.0.0/0 --protocol tcp
-# Allow for makeflow / work queue / catalog traffic
-#aws ec2 authorize-security-group-egress --group-id $SECURITY_GROUP --port 1024-10000 --cidr 0.0.0.0/0 --protocol all
+
+echo "Creating internet gateway..."
+GATEWAY=`aws ec2 create-internet-gateway --output text | cut -f 2`
+
+echo "Attaching internet gateway..."
+aws ec2 attach-internet-gateway --internet-gateway-id $GATEWAY --vpc-id $VPC
+
+echo "Looking up route table..."
+ROUTE_TABLE=$(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC --query 'RouteTables[0].RouteTableId' --output text)
+
+echo "Creating route..."
+aws ec2 create-route --route-table-id $ROUTE_TABLE --gateway-id $GATEWAY --destination-cidr-block 0.0.0.0/0
 
 echo "Creating keypair $KEYPAIR_NAME..."
 # Remove junk from around keypair that confuses ssh.
@@ -80,11 +81,15 @@ echo "Creating $configFile with all the details..."
 
 cat > $configFile <<EOF
 {
+"vpc" : "$VPC",
+"subnet" : "$SUBNET",
+"gateway" : "$GATEWAY",
+"route_table" : "$ROUTE_TABLE",
 "security_group_id" : "$SECURITY_GROUP",
 "security_group_name" : "$SECURITY_GROUP_NAME",
 "keypair_name" : "$KEYPAIR_NAME",
-"instance_type" : "m3.medium",
-"ami" : "ami-a4c7edb2"
+"instance_type" : "t2.micro",
+"ami" : "ami-343a694f"
 }
 EOF
 
