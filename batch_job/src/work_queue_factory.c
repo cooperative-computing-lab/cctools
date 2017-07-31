@@ -1120,10 +1120,16 @@ int main(int argc, char *argv[])
 	}
 
 	if(amazon_config) {
+		char abs_path_name[PATH_MAX];
+
 		/* Store an absolute path b/c the factory will chdir later. */
-		if(amazon_config[0]!='/') {
-			amazon_config = string_format("%s/%s",get_current_dir_name(),amazon_config);
+
+		if(!realpath(config_file, abs_path_name)) {
+			fprintf(stderr,"couldn't find full path of %s: %s\n",config_file,strerror(errno));
+			return 1;
 		}
+
+		amazon_config = strdup(abs_path_name);
 	}
 
 	/*
