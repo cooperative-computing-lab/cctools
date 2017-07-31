@@ -358,7 +358,6 @@ int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_q
 		goto OUT;
 	}
 
-	debug(D_MAKEFLOW_RUN, "removed any failed outputs at %s", faildir);
 	rc = 1;
 
 OUT:
