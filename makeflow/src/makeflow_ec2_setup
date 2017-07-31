@@ -1,12 +1,13 @@
 #!/bin/sh
 
-if [ $# -ne 1 ]
+if [ $# -ne 2 ]
 then
-	echo "use: $0: <config-file>"
+	echo "use: $0: <config-file> <image-name>"
 	exit 1
 fi
 
 configFile=$1
+imageName=$2
 
 echo -n "Checking for aws command in PATH..."
 if which aws >/dev/null 2>&1
@@ -89,7 +90,7 @@ cat > $configFile <<EOF
 "security_group_name" : "$SECURITY_GROUP_NAME",
 "keypair_name" : "$KEYPAIR_NAME",
 "instance_type" : "t2.micro",
-"ami" : "ami-343a694f"
+"ami" : "$imageName",
 }
 EOF
 

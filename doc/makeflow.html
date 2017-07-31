@@ -426,11 +426,13 @@ Which should display:
 </code>
 
 Now you are ready to use Makeflow with Amazon.
-For each run of a workflow, use the <tt>makeflow_ec2_setup</tt> command,
-which will setup a virtual cluster, security group, and so forth,
-and store the necessary information into <tt>my.config</tt>.
+Before running a workflow, use the <tt>makeflow_ec2_setup</tt> command,
+which will setup a virtual private cluster, security group, keypairs, and
+other necessary details, and store the necessary information into <tt>my.config</tt>.
+Give the name of the Amazon Machine Image (AMI) you wish to use as the 
+second argument:
 
-<code>makeflow_ec2_setup my.config
+<code>makeflow_ec2_setup my.config ami-343a694f
 </code>
 
 Then, run <tt>makeflow</tt> with the <tt>-T amazon</tt> option
