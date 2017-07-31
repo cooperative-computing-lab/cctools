@@ -429,7 +429,7 @@ Now you are ready to use Makeflow with Amazon.
 Before running a workflow, use the <tt>makeflow_ec2_setup</tt> command,
 which will setup a virtual private cluster, security group, keypairs, and
 other necessary details, and store the necessary information into <tt>my.config</tt>.
-Give the name of the Amazon Machine Image (AMI) you wish to use as the 
+Give the name of the default Amazon Machine Image (AMI) you wish to use as the 
 second argument:
 
 <code>makeflow_ec2_setup my.config ami-343a694f
@@ -446,6 +446,30 @@ When you are done, destroy the configuration with this command:
 
 <code>makeflow_ec2_cleanup my.config
 </code>
+
+<p>
+Makeflow selects the virtual machine instance type automatically
+by translating the job resources
+into an appropriate instance type of the <tt>c4</tt> or <tt>m4</tt> category.
+For example, a job requiring
+CORES=2 and MEMORY=8000 will be placed into an <tt>m4.large</tt> instance type.
+If you do not specify any resources for a job,
+then it will be placed into a <tt>t2.micro</tt> instance,
+which has very limited performance.  To get good performance,
+you should label your jobs with the appropriate <tt>CORES</tt> and <tt>MEMORY</tt>.
+</p>
+
+<p>
+You can override the choice of virtual machine instance type,
+as well as the choice of virtual machine image (AMI) within
+the Makeflow on a job-by-job basis by setting the 
+<tt>AMAZON_INSTANCE_TYPE</tt> and <tt>AMAZON_AMI</tt>
+environment variables within the Makeflow file.  For example:
+
+<pre>
+export AMAZON_INSTANCE_TYPE=m4.4xlarge
+export AMAZON_AMI=ami-343a694f
+</pre>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 

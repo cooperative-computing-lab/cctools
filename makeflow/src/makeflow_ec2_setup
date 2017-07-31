@@ -89,7 +89,6 @@ cat > $configFile <<EOF
 "security_group_id" : "$SECURITY_GROUP",
 "security_group_name" : "$SECURITY_GROUP_NAME",
 "keypair_name" : "$KEYPAIR_NAME",
-"instance_type" : "t2.micro",
 "ami" : "$imageName",
 }
 EOF

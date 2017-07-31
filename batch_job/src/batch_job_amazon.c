@@ -29,10 +29,15 @@ struct batch_job_amazon_info {
 	char *instance_id;
 };
 
+struct aws_instance_type {
+	int cores;
+	int memory;
+	const char *name;
+};
+
 struct aws_config {
 	const char *subnet;
 	const char *ami;
-	const char *instance_type;
 	const char *security_group_id;
 	const char *keypair_name;
 };
@@ -46,17 +51,52 @@ static struct aws_config * aws_config_load( const char *filename )
 
 	c->subnet            = jx_lookup_string(j,"subnet");
 	c->ami               = jx_lookup_string(j,"ami");
-	c->instance_type     = jx_lookup_string(j,"instance_type");
 	c->security_group_id = jx_lookup_string(j,"security_group_id");
 	c->keypair_name      = jx_lookup_string(j,"keypair_name");
 
 	if(!c->subnet)            fatal("%s doesn't define subnet",filename);
 	if(!c->ami)               fatal("%s doesn't define ami",filename);
-	if(!c->instance_type)     fatal("%s doesn't define instance type",filename);
 	if(!c->security_group_id) fatal("%s doesn't define security_group_id",filename);
 	if(!c->keypair_name)      fatal("%s doesn't define keypair_name",filename);
 
 	return c;
+}
+
+static struct aws_instance_type aws_instance_table[] =
+{
+	{0,0,"t2.micro"},
+	{2,3,"c4.large"},
+	{2,8,"m4.large"},
+	{4,7,"c4.xlarge"},
+	{4,16,"m4.xlarge"},
+	{8,15,"c4.2xlarge"},
+	{8,32,"m4.2xlarge"},
+	{16,30,"c4.4xlarge"},
+	{16,64,"m4.4xlarge"},
+	{36,60,"c4.8xlarge"},
+	{40,160,"m4.10xlarge"},
+	{64,256,"m4.16xlarge"},
+	{0,0,0}
+};
+
+/*
+Select an instance type that is larger than or equal to
+the desired amount of cores, memory, and disk.  Return
+the name of the instance, if one exists, otherwise null.
+*/
+
+
+static const char * aws_instance_select( int cores, int memory, int disk )
+{
+	struct aws_instance_type *i;
+
+	for(i=aws_instance_table;i->name;i++) {
+		if(cores<=i->cores && memory<=i->memory) {
+			debug(D_REMOTE,"job requiring CORES=%d MEMORY=%d matches instance type %s",cores,memory,i->name);
+			return i->name;
+		}
+	}
+	return 0;
 }
 
 /*
@@ -85,12 +125,12 @@ static struct jx * json_command( const char *str )
 Create an EC2 instance; on success return the instance id as a string that must be freed.  On failure, return zero.
 */
 
-static char * aws_create_instance( struct aws_config *c )
+static char * aws_create_instance( struct aws_config *c, const char *instance_type, const char *ami )
 {
 	char *str = string_format("aws ec2 run-instances --subnet %s --image-id %s --instance-type %s --key-name %s --security-group-ids %s --associate-public-ip-address --output json",
 		c->subnet,
-		c->ami,
-		c->instance_type,
+		ami,
+		instance_type,
 		c->keypair_name,
 		c->security_group_id);
 
@@ -120,7 +160,7 @@ static char * aws_create_instance( struct aws_config *c )
 	jx_delete(jresult);
 	free(str);
 
-	printf("created virtual machine instance %s type %s image %s\n",result,c->instance_type,c->ami);
+	printf("created virtual machine instance %s type %s image %s\n",result,instance_type,ami);
 	return result;
 }
 
@@ -421,7 +461,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	semaphore_up();
 
 	/*
-	If we fail to send the fails, bail out early indicating
+	If we fail to send the files, bail out early indicating
 	that the task did not run at all.
 	*/
 
@@ -473,12 +513,23 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	if(!config_file) fatal("--amazon-config option is required");
 
 	static struct aws_config * aws_config = 0;
-
-	/* XXX get the AWS info from a configurable location */
 	if(!aws_config) aws_config = aws_config_load(config_file);
 
+	const char *instance_type = jx_lookup_string(envlist,"AMAZON_INSTANCE_TYPE");
+	if(!instance_type) {
+		instance_type = aws_instance_select(resources->cores,resources->memory,resources->disk);
+		if(!instance_type) {
+			printf("Couldn't find suitable instance type for job with CORES=%d, MEMORY=%d, DISK=%d\n",(int)resources->cores,(int)resources->memory,(int)resources->disk);
+			printf("You can choose one manually with AMAZON_INSTANCE_TYPE.\n");
+			return -1;
+		}
+	}
+
+	const char *ami = jx_lookup_string(envlist,"AMAZON_AMI");
+	if(!ami) ami = aws_config->ami;
+
 	/* Create a new instance and return its unique ID. */
-	char *instance_id = aws_create_instance(aws_config);
+	char *instance_id = aws_create_instance(aws_config,instance_type,ami);
 	if(!instance_id) {
 		debug(D_BATCH,"aws_create_instance failed");
 		sleep(1);
