@@ -494,6 +494,8 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	printf("submitting job: %s\n", command);
 
 	while(1) {
+		if(makeflow_abort_flag) break;
+
 		jobid = batch_job_submit(queue, command, input_files, output_files, envlist, resources);
 		if(jobid >= 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
@@ -1138,19 +1140,14 @@ Signal handler to catch abort signals.  Note that permissible actions in signal 
 
 static void handle_abort(int sig)
 {
-	static int abort_count_to_exit = 5;
-	
-	abort_count_to_exit -= 1;
 	int fd = open("/dev/tty", O_WRONLY);
 	if (fd >= 0) {
 		char buf[256];
-		snprintf(buf, sizeof(buf), "Received signal %d, will try to clean up remote resources. Send signal %d more times to force exit.\n", sig, abort_count_to_exit);
+		snprintf(buf, sizeof(buf), "received signal %d (%s), cleaning up remote jobs and files...\n",sig,strsignal(sig));
 		write(fd, buf, strlen(buf));
 		close(fd);
 	}
 
-	if (abort_count_to_exit == 1)
-		signal(sig, SIG_DFL);
 	makeflow_abort_flag = 1;
 
 }
@@ -1181,8 +1178,7 @@ static void show_help_run(const char *cmd)
 	printf(" %-30s %s\n\n", "", batch_queue_type_string());
 	printf("Other options are:\n");
 	printf(" %-30s Advertise the master information to a catalog server.\n", "-a,--advertise");
-	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
-	printf(" %-30s Specify amazon-ami (for use with -T amazon)\n", "--amazon-ami");
+	printf(" %-30s Specify amazon config file (for use with -T amazon)\n", "--amazon-config");
 	printf(" %-30s Disable the check for AFS. (experts only.)\n", "-A,--disable-afs-check");
 	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT \n", "-C,--catalog-server=<catalog>");
@@ -1280,8 +1276,7 @@ int main(int argc, char *argv[])
 	const char *work_queue_master_mode = "standalone";
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
-	const char *amazon_credentials = NULL;
-	const char *amazon_ami = NULL;
+	const char *amazon_config = NULL;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1358,8 +1353,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER_OUTPUT,
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
-		LONG_OPT_AMAZON_CREDENTIALS,
-		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_AMAZON_CONFIG,
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_CONTEXT,
@@ -1449,8 +1443,7 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
-		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
-		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_CONTEXT},
@@ -1601,11 +1594,8 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MOUNTS:
 				mountfile = xxstrdup(optarg);
 				break;
-			case LONG_OPT_AMAZON_CREDENTIALS:
-				amazon_credentials = xxstrdup(optarg);
-				break;
-			case LONG_OPT_AMAZON_AMI:
-				amazon_ami = xxstrdup(optarg);
+			case LONG_OPT_AMAZON_CONFIG:
+				amazon_config = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
@@ -1992,8 +1982,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
-	batch_queue_set_option(remote_queue, "amazon-credentials", amazon_credentials);
-	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
+	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 

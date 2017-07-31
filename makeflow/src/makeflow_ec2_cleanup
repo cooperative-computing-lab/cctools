@@ -1,0 +1,51 @@
+#!/bin/sh
+
+if [ "$#" -ne 1 ]; then
+	echo "use: $0 <config-file>"
+	exit 1
+fi
+
+configFile=$1
+
+echo "Loading config file $config..."
+if [ ! -f $configFile ]
+then
+	echo "$0: config file $configFile not found"
+	exit 1
+fi
+
+KEYPAIR_NAME=$(python -c "import json; print json.load(open('$configFile','r'))['keypair_name'];")
+SECURITY_GROUP_ID=$(python -c "import json; print json.load(open('$configFile','r'))['security_group_id'];")
+SUBNET=$(python -c "import json; print json.load(open('$configFile','r'))['subnet'];")
+ROUTE_TABLE=$(python -c "import json; print json.load(open('$configFile','r'))['route_table'];")
+GATEWAY=$(python -c "import json; print json.load(open('$configFile','r'))['gateway'];")
+VPC=$(python -c "import json; print json.load(open('$configFile','r'))['vpc'];")
+
+echo -n "Checking for aws command in PATH..."
+if which aws >/dev/null 2>&1
+then
+        echo "ok"
+else
+        echo "failed"
+        echo "$0: \"aws\" command must be in your path to use this script."
+        exit 1
+fi
+
+echo "Deleting keypair $KEYPAIR_NAME..."
+aws ec2 delete-key-pair --key-name $KEYPAIR_NAME && rm -f ${KEYPAIR_NAME}.pem
+
+#echo "Deleting security group $SECURITY_GROUP_ID"
+#aws ec2 delete-security-group --group-id $SECURITY_GROUP_ID
+
+echo "Deleting internet gateway $GATEWAY..."
+aws ec2 detach-internet-gateway --internet-gateway-id $GATEWAY --vpc-id $VPC
+aws ec2 delete-internet-gateway --internet-gateway-id $GATEWAY
+
+echo "Deleting subnet $SUBNET..."
+aws ec2 delete-subnet --subnet-id $SUBNET
+
+echo "Deleting virtual private cluster $VPC..."
+aws ec2 delete-vpc --vpc-id $VPC
+
+echo "Done!"
+

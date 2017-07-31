@@ -22,7 +22,6 @@ See the file COPYING for details.
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/ioctl.h>
 
 typedef enum {
 	FORMAT_TABLE,
@@ -476,6 +475,24 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 	return EXIT_SUCCESS;
 }
 
+#include <sys/ioctl.h>
+
+int terminal_columns( int fd )
+{
+	struct winsize window;
+	int columns = 80;
+
+	char *columns_str = getenv("COLUMNS");
+	if(columns_str) {
+		int c = atoi(columns_str);
+		if(c>=10) columns = c;
+	} else if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &window) >= 0) {
+		if(window.ws_col>=10) columns = window.ws_col;
+	}
+
+	return columns;
+}
+
 int main(int argc, char *argv[])
 {
 	const char *master_host  = NULL;
@@ -488,16 +505,7 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_DEBUG, argv[0]);
 
-	struct winsize window;
-	char *columns_str = getenv("COLUMNS");
-	if(columns_str) {
-		columns = atoi(columns_str);
-		/* use default of 80 columns when the value of columns_str is suspect. */
-		columns = columns < 1 ? 80 : columns;
-	} else if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &window) >= 0) {
-		columns = window.ws_col > 0 ? window.ws_col : columns;
-	}
-
+	columns = terminal_columns(1);
 
 	time_t stoptime = time(0) + work_queue_status_timeout;
 

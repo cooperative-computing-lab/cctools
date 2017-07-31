@@ -33,12 +33,6 @@ all: $(LIBRARIES) $(PROGRAMS)
 
 libbatch_job.a: $(OBJECTS)
 
-batch_job_amazon.c: batch_job_amazon_script.c
-
-batch_job_amazon_script.c: batch_job_amazon_script.sh
-	chmod 755 convert_script_to_code.pl
-	./convert_script_to_code.pl < $< > $@
-
 work_queue_factory: work_queue_factory.o libbatch_job.a $(EXTERNAL_LIBRARIES)
 
 # Note that work_queue_pool is the same as work_queue_factory, for backwards compatibility.

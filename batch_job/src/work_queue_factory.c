@@ -91,8 +91,7 @@ static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
 static char *config_file = 0;
-static char *amazon_credentials = NULL;
-static char *amazon_ami = NULL;
+static char *amazon_config = NULL;
 static char *condor_requirements = NULL;
 static char *batch_submit_options = NULL;
 
@@ -864,8 +863,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	printf(" %-30s Specify path to Amazon credentials (for use with -T amazon)\n", "--amazon-credentials");
-	printf(" %-30s Specify amazon machine image (AMI). (for use with -T amazon)\n", "--amazon-ami");
+	printf(" %-30s Specify Amazon config file (for use with -T amazon)\n", "--amazon-config");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
 	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos)\n", "--mesos-master");
@@ -882,8 +880,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_GPUS, 
 		LONG_OPT_TASKS_PER_WORKER, 
 		LONG_OPT_CONF_FILE, 
-		LONG_OPT_AMAZON_CREDENTIALS, 
-		LONG_OPT_AMAZON_AMI, 
+		LONG_OPT_AMAZON_CONFIG, 
 		LONG_OPT_FACTORY_TIMEOUT, 
 		LONG_OPT_AUTOSIZE, 
 		LONG_OPT_CONDOR_REQUIREMENTS, 
@@ -919,8 +916,7 @@ static const struct option long_options[] = {
 	{"debug-file-size", required_argument, 0, 'O'},
 	{"version", no_argument, 0, 'v'},
 	{"help", no_argument, 0, 'h'},
-	{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
-	{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+	{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
 	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
@@ -996,11 +992,8 @@ int main(int argc, char *argv[])
 			case LONG_OPT_CORES:
 				resources->cores = atoi(optarg);
 				break;
-			case LONG_OPT_AMAZON_CREDENTIALS:
-				amazon_credentials = xxstrdup(optarg);
-				break;
-			case LONG_OPT_AMAZON_AMI:
-				amazon_ami = xxstrdup(optarg);
+			case LONG_OPT_AMAZON_CONFIG:
+				amazon_config = xxstrdup(optarg);
 				break;
 			case LONG_OPT_MEMORY:
 				resources->memory = atoi(optarg);
@@ -1121,10 +1114,22 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-
 	if(workers_min>workers_max) {
 		fprintf(stderr,"work_queue_factory: min workers (%d) is greater than max workers (%d)\n",workers_min, workers_max);
 		return 1;
+	}
+
+	if(amazon_config) {
+		char abs_path_name[PATH_MAX];
+
+		/* Store an absolute path b/c the factory will chdir later. */
+
+		if(!realpath(config_file, abs_path_name)) {
+			fprintf(stderr,"couldn't find full path of %s: %s\n",config_file,strerror(errno));
+			return 1;
+		}
+
+		amazon_config = strdup(abs_path_name);
 	}
 
 	/*
@@ -1186,11 +1191,8 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(queue, "autosize", autosize ? "yes" : NULL);
 	set_worker_resources_options( queue );
 
-	if (amazon_credentials != NULL) {
-		batch_queue_set_option(queue, "amazon-credentials", amazon_credentials);
-	}
-	if (amazon_ami != NULL) {
-		batch_queue_set_option(queue, "amazon-ami", amazon_ami);
+	if(amazon_config) {
+		batch_queue_set_option(queue, "amazon-config", amazon_config );
 	}
 
 	if(condor_requirements != NULL && batch_queue_type != BATCH_QUEUE_TYPE_CONDOR) {
