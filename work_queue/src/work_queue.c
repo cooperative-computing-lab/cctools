@@ -107,6 +107,15 @@ typedef enum {
 	MON_FULL     = 2    /* generate summary, series and monitoring debug output. */
 } work_queue_monitoring_mode;
 
+typedef enum {
+	WORKER_DISCONNECT_UNKNOWN  = 0,
+	WORKER_DISCONNECT_EXPLICIT,
+	WORKER_DISCONNECT_STATUS_WORKER,
+	WORKER_DISCONNECT_IDLE_OUT,
+	WORKER_DISCONNECT_FAST_ABORT,
+	WORKER_DISCONNECT_FAILURE
+} worker_disconnect_reason;
+
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
@@ -238,7 +247,7 @@ struct blacklist_host_info {
 
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
-static void remove_worker(struct work_queue *q, struct work_queue_worker *w);
+static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason);
 
 static void add_task_report(struct work_queue *q, struct work_queue_task *t );
 
@@ -289,7 +298,7 @@ struct category *work_queue_category_lookup_or_create(struct work_queue *q, cons
 static void write_transaction(struct work_queue *q, const char *str);
 static void write_transaction_task(struct work_queue *q, struct work_queue_task *t);
 static void write_transaction_category(struct work_queue *q, struct category *c);
-static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving);
+static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving);
 static void write_transaction_worker_resources(struct work_queue *q, struct work_queue_worker *w);
 
 /** Clone a @ref work_queue_file
@@ -567,7 +576,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	} else if(string_prefix_is(field, "tasks_running")) {
 		w->stats->tasks_running = atoll(value);
 	} else if(string_prefix_is(field, "idle-disconnecting")) {
-		remove_worker(q, w);
+		remove_worker(q, w, WORKER_DISCONNECT_IDLE_OUT);
 		q->stats->workers_idled_out++;
 	} else if(string_prefix_is(field, "end_of_resource_update")) {
 		count_worker_resources(q, w);
@@ -575,7 +584,7 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 	} else if(string_prefix_is(field, "worker-id")) {
 		free(w->workerid);
 		w->workerid = xxstrdup(value);
-		write_transaction_worker(q, w, 0);
+		write_transaction_worker(q, w, 0, 0);
 	}
 
 	//Note we always mark info messages as processed, as they are optional.
@@ -852,7 +861,7 @@ static void record_removed_worker_stats(struct work_queue *q, struct work_queue_
 	qs->workers_removed = ws->workers_joined;
 }
 
-static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
+static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason)
 {
 	if(!q || !w) return;
 
@@ -860,7 +869,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	q->stats->workers_removed++;
 
-	write_transaction_worker(q, w, 1);
+	write_transaction_worker(q, w, 1, reason);
 
 	cleanup_worker(q, w);
 
@@ -895,8 +904,11 @@ static int release_worker(struct work_queue *q, struct work_queue_worker *w)
 {
 	if(!w) return 0;
 
+
 	send_worker_msg(q,w,"release\n");
-	remove_worker(q, w);
+
+	remove_worker(q, w, WORKER_DISCONNECT_EXPLICIT);
+
 	q->stats->workers_released++;
 
 	return 1;
@@ -1599,7 +1611,7 @@ static void handle_worker_failure(struct work_queue *q, struct work_queue_worker
 {
 	//WQ failures happen in the master-worker interactions. In this case, we
 	//remove the worker and retry the tasks dispatched to it elsewhere.
-	remove_worker(q, w);
+	remove_worker(q, w, WORKER_DISCONNECT_FAILURE);
 	return;
 }
 
@@ -2445,7 +2457,7 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	jx_print_link(a,l,stoptime);
 	jx_delete(a);
 
-	remove_worker(q, target);
+	remove_worker(q, target, WORKER_DISCONNECT_STATUS_WORKER);
 
 	return MSG_PROCESSED;
 }
@@ -3680,7 +3692,8 @@ static int abort_slow_workers(struct work_queue *q)
 			{
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
-				remove_worker(q, w);
+				remove_worker(q, w, WORKER_DISCONNECT_FAST_ABORT);
+
 				q->stats->workers_fast_aborted++;
 				removed++;
 			}
@@ -3695,7 +3708,7 @@ static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 	if(!w) return 0;
 
 	send_worker_msg(q,w,"exit\n");
-	remove_worker(q, w);
+	remove_worker(q, w, WORKER_DISCONNECT_EXPLICIT);
 	q->stats->workers_released++;
 
 	return 1;
@@ -6301,7 +6314,7 @@ static void write_transaction_category(struct work_queue *q, struct category *c)
 	buffer_free(&B);
 }
 
-static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving) {
+static void write_transaction_worker(struct work_queue *q, struct work_queue_worker *w, int leaving, worker_disconnect_reason reason_leaving) {
 	struct buffer B;
 	buffer_init(&B);
 
@@ -6309,6 +6322,27 @@ static void write_transaction_worker(struct work_queue *q, struct work_queue_wor
 
 	if(leaving) {
 		buffer_printf(&B, " DISCONNECTION");
+		switch(reason_leaving) {
+			case WORKER_DISCONNECT_IDLE_OUT:
+				buffer_printf(&B, " IDLE_OUT");
+				break;
+			case WORKER_DISCONNECT_FAST_ABORT:
+				buffer_printf(&B, " FAST_ABORT");
+				break;
+			case WORKER_DISCONNECT_FAILURE:
+				buffer_printf(&B, " FAILURE");
+				break;
+			case WORKER_DISCONNECT_STATUS_WORKER:
+				buffer_printf(&B, " STATUS_WORKER");
+				break;
+			case WORKER_DISCONNECT_EXPLICIT:
+				buffer_printf(&B, " EXPLICIT");
+				break;
+			case WORKER_DISCONNECT_UNKNOWN:
+			default:
+				buffer_printf(&B, " UNKNOWN");
+				break;
+		}
 	} else {
 		buffer_printf(&B, " CONNECTION");
 	}
@@ -6347,18 +6381,18 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		setvbuf(q->transactions_logfile, NULL, _IOLBF, 1024); // line buffered, we don't want incomplete lines
 		debug(D_WQ, "transactions log enabled and is being written to %s\n", logfile);
 
-		fprintf(q->transactions_logfile, "# date time master-pid MASTER START|END\n");
-		fprintf(q->transactions_logfile, "# date time master-pid WORKER worker-id host:port CONNECTION|DISCONNECTION\n");
-		fprintf(q->transactions_logfile, "# date time master-pid WORKER worker-id RESOURCES resources\n");
-		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MAX resources-max-per-task\n");
-		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
-		fprintf(q->transactions_logfile, "# date time master-pid CATEGORY name FIRST FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT resources-requested\n");
-		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid WAITING category-name FIRST_RESOURCES|MAX_RESOURCES resources-requested\n");
-		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RUNNING worker-address FIRST_RESOURCES|MAX_RESOURCES resources-given\n");
-		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
-		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RETRIEVED|DONE task-result ...\n");
-		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid RETRIEVED SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n");
-		fprintf(q->transactions_logfile, "# date time master-pid TASK taskid DONE SUCCESS|INPUT_MISS|OUTPUT_MISS|STDOUT_MISS|SIGNAL|END_TIME|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n\n");
+		fprintf(q->transactions_logfile, "# time master-pid MASTER START|END\n");
+		fprintf(q->transactions_logfile, "# time master-pid WORKER worker-id host:port CONNECTION|DISCONNECTION [UNKNOWN|IDLE_OUT|FAST_ABORT|FAILURE|STATUS_WORKER|EXPLICIT]\n");
+		fprintf(q->transactions_logfile, "# time master-pid WORKER worker-id RESOURCES resources\n");
+		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name MAX resources-max-per-task\n");
+		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name MIN resources-min-per-task-per-worker\n");
+		fprintf(q->transactions_logfile, "# time master-pid CATEGORY name FIRST FIXED|MAX|MIN_WASTE|MAX_THROUGHPUT resources-requested\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING category-name FIRST_RESOURCES|MAX_RESOURCES resources-requested\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RUNNING worker-address FIRST_RESOURCES|MAX_RESOURCES resources-given\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RETRIEVED|DONE task-result ...\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RETRIEVED SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid DONE SUCCESS|INPUT_MISS|OUTPUT_MISS|STDOUT_MISS|SIGNAL|END_TIME|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION [limits-exceeded]\n\n");
 
 		write_transaction(q, "MASTER START");
 		return 1;
