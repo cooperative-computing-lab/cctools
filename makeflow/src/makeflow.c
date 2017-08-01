@@ -1225,7 +1225,7 @@ static void show_help_run(const char *cmd)
 	printf(" -W,--wq-schedule=<mode>        Work Queue scheduling algor. (time|files|fcfs)\n");
 	printf(" --work-queue-preferred-connection    Preferred connection: by_ip | by_hostname\n");
 	        /********************************************************************************/
-	printf("\nBatch System Options\n");
+	printf("\nBatch System Options:\n");
 	printf("    --amazon-config             Amazon config file from makeflow_ec2_setup.\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
@@ -1234,7 +1234,7 @@ static void show_help_run(const char *cmd)
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
-	printf("Containers and Wrappers:\n");
+	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
 	printf(" --docker-tar=<tar file>        Load docker image from this tar file.\n");
 	printf(" --singularity=<image>          Run each task using this Singularity image.\n");
@@ -1252,7 +1252,7 @@ static void show_help_run(const char *cmd)
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	        /********************************************************************************/
 
-	printf("\nResource Monitoring Options\n");
+	printf("\nResource Monitoring Options:\n");
 	printf(" --monitor=<dir>                Enable resource monitor, write logs to <dir>\n");
 	printf(" --monitor-interval=<#>         Set monitor interval, in seconds. (default: 1s)\n");
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
