@@ -65,17 +65,17 @@ static struct aws_config * aws_config_load( const char *filename )
 static struct aws_instance_type aws_instance_table[] =
 {
 	{0,0,"t2.micro"},
-	{2,3,"c4.large"},
-	{2,8,"m4.large"},
-	{4,7,"c4.xlarge"},
-	{4,16,"m4.xlarge"},
-	{8,15,"c4.2xlarge"},
-	{8,32,"m4.2xlarge"},
-	{16,30,"c4.4xlarge"},
-	{16,64,"m4.4xlarge"},
-	{36,60,"c4.8xlarge"},
-	{40,160,"m4.10xlarge"},
-	{64,256,"m4.16xlarge"},
+	{2,3840,"c4.large"},
+	{2,8192,"m4.large"},
+	{4,7680,"c4.xlarge"},
+	{4,16384,"m4.xlarge"},
+	{8,15360,"c4.2xlarge"},
+	{8,32768,"m4.2xlarge"},
+	{16,30720,"c4.4xlarge"},
+	{16,65536,"m4.4xlarge"},
+	{36,61440,"c4.8xlarge"},
+	{40,163840,"m4.10xlarge"},
+	{64,262144,"m4.16xlarge"},
 	{0,0,0}
 };
 
