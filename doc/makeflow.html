@@ -193,13 +193,15 @@ makeflow: nothing left to do
 <code>makeflow --clean example.makeflow</code>
 
 <p>If you have access to a batch system like Condor, SGE, or Torque,
-you can direct Makeflow to run your jobs there by using the <tt>-T</tt> option:</p>
+or a cloud service provider like Amazon, you can direct Makeflow to run your jobs there by using the <tt>-T</tt> option:</p>
 
 <code>makeflow -T condor example.makeflow
   or
 makeflow -T sge example.makeflow
   or
 makeflow -T torque example.makeflow
+  or
+makeflow -T amazon example.makeflow
 ...
 </code>
 
@@ -208,7 +210,7 @@ To learn more about the various batch system options, see the <a href=#batch>Bat
 <a name=resources><h3>Resources</h3></a>
 
 <p>
-Some batch systems require information about exactly what resources
+Most batch systems require information about what resources
 each job needs, so as to schedule them appropriately.  You can convey
 this by setting the variables CORES, MEMORY (in MB), and DISK (in MB)
 ahead of each job.  Makeflow will translate this information as needed
@@ -317,9 +319,15 @@ and <tt>MAKEFLOW_MAX_LOCAL_JOBS</tt>.
 
 <a name=local><h3>Local Execution</h3></a>
 
-By default, Makeflow executes on the local machine.  Makeflow will attempt to
-use all of the cores available on your machine.  You can manually control
-the number of running jobs with the <tt>--max-local</tt> command line option.
+By default, Makeflow executes on the local machine.
+It will measure the available cores, memory, and disk
+on the local machine, and then run as many jobs as fit
+in those resources.  (Of course, you must label your jobs
+with <tt>CORES</tt>, <tt>MEMORY</tt>, and <tt>DISK</tt> appropriately.
+You can put an upper limit on the resources used with the
+<tt>--local-cores</tt>, <tt>--local-memory</tt>, and <tt>--local-disk</tt>
+options to Makeflow.  Also, the total number of jobs running
+locally can be limited with <tt>--max-local</tt>
 
 <a name=htcondor><h3>HTCondor</h3></a>
 
@@ -769,19 +777,18 @@ filesystem like NFS or HDFS, and so, to be safe, it copies all necessary depende
 be used to efficiently access files without making remote copies.
 Makeflow must be told where the shared filesystem is located, so that it
 can take advantage of it.  To enable this, invoke Makeflow with the 
-<code>--shared-fs</code> option, indicating the path where the shared
+<tt>--shared-fs</tt> option, indicating the path where the shared
 filesystem is mounted.  (This option can be given multiple times.)
 Makeflow will then verify the existence of input and output files in these
 locations, but will not cause them to be transferred.
 </p>
 
 <p>
-For example, if you use NFS to access the <code>/home</code> and
-<code>/software</code> directories on your cluster, then invoke makeflow like this:
+For example, if you use NFS to access the <tt>/home</tt> and
+<tt>/software</tt> directories on your cluster, then invoke makeflow like this:
 </p>
 
-<code>
-makeflow --shared-fs /home --shared-fs /software example.makeflow ...
+<code>makeflow --shared-fs /home --shared-fs /software example.makeflow ...
 </code>
 
 <a name=consistency><h3>NFS Consistency Delay</h3></a>
