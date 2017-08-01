@@ -317,9 +317,15 @@ and <tt>MAKEFLOW_MAX_LOCAL_JOBS</tt>.
 
 <a name=local><h3>Local Execution</h3></a>
 
-By default, Makeflow executes on the local machine.  Makeflow will attempt to
-use all of the cores available on your machine.  You can manually control
-the number of running jobs with the <tt>--max-local</tt> command line option.
+By default, Makeflow executes on the local machine.
+It will measure the available cores, memory, and disk
+on the local machine, and then run as many jobs as fit
+in those resources.  (Of course, you must label your jobs
+with <tt>CORES</tt>, <tt>MEMORY</tt>, and <tt>DISK</tt> appropriately.
+You can put an upper limit on the resources used with the
+<tt>--local-cores</tt>, <tt>--local-memory</tt>, and <tt>--local-disk</tt>
+options to Makeflow.  Also, the total number of jobs running
+locally can be limited with <tt>--max-local</tt>
 
 <a name=htcondor><h3>HTCondor</h3></a>
 
