@@ -106,9 +106,15 @@ static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
 
+/*
+In a signal handler, only a limited number of functions are safe to
+invoke, so we construct a string and emit it with a low-level write.
+*/
 
 static void handle_abort( int sig )
 {
+	const char *msg = "received abort signal, shutting down workers...\n";
+	write(1,msg,strlen(msg));
 	abort_flag = 1;
 }
 
@@ -833,7 +839,9 @@ static void mainloop( struct batch_queue *queue )
 		sleep(factory_period);
 	}
 
+	printf("removing %d workers...\n",itable_size(job_table));
 	remove_all_workers(queue,job_table);
+	printf("all workers removed.\n");
 	itable_delete(job_table);
 }
 
