@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2017- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef BATCH_JOB_INTERNAL_H_
 #define BATCH_JOB_INTERNAL_H_
 
