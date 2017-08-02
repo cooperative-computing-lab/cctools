@@ -2229,7 +2229,6 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"time_internal",info.time_internal);
 	jx_insert_integer(j,"time_polling",info.time_polling);
 	jx_insert_integer(j,"time_application",info.time_application);
-	jx_insert_integer(j, "time_master", ((info.time_status_msgs - info.prev_time_status_msgs) + (info.time_internal - info.prev_time_internal)));
 
 	jx_insert_integer(j,"time_workers_execute",info.time_workers_execute);
 	jx_insert_integer(j,"time_workers_execute_good",info.time_workers_execute_good);
@@ -3107,10 +3106,9 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	tr = calloc(1, sizeof(struct work_queue_task_report));
 
 	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
-	debug(D_WQ, "tr->transfer_time %"PRId64" = (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64")\n", tr->transfer_time, t->time_when_commit_end, t->time_when_commit_start, t->time_when_done, t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
-	debug(D_WQ, "tr->exec_time = %"PRId64"\n", t->time_workers_execute_last);
-	tr->master_time = (s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal);
+	tr->master_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
+	//(s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal);
 	if(!t->resources_allocated) {
 		return;
 	}
@@ -3166,6 +3164,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		while((tr = list_next_item(q->task_reports))) {
 			capacity.transfer_time += tr->transfer_time;
 			capacity.exec_time     += tr->exec_time;
+			capacity.master_time   += tr->master_time;
 
 			if(tr->resources) {
 				capacity.resources->cores  += tr->resources ? tr->resources->cores  : 1;
@@ -3188,9 +3187,10 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 	capacity.transfer_time = MAX(1, capacity.transfer_time);
 	capacity.exec_time     = MAX(1, capacity.exec_time);
+	capacity.master_time   = MAX(1, capacity.master_time);
 
 	// Never go below the default capacity
-	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, capacity.exec_time / capacity.transfer_time);
+	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, capacity.exec_time / (capacity.transfer_time + capacity.master_time));
 
 	s->capacity_tasks  = ratio;
 	s->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
@@ -4715,8 +4715,6 @@ struct work_queue *work_queue_create(int port)
 	q->time_last_wait = timestamp_get();
 
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
-	time_t ts;
-	time(&ts);
 	return q;
 }
 
@@ -5164,7 +5162,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-	struct work_queue_stats *s;
 	// remove from current tables:
 
 	if( old_state == WORK_QUEUE_TASK_READY ) {
@@ -5181,13 +5178,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
-			s = malloc(sizeof(struct work_queue_stats));
-			work_queue_get_stats(q, s);
-			//if(t->result == WORK_QUEUE_RESULT_SUCCESS) {
-			//	compute_capacity(q, s);
-			//}
-			log_queue_stats(q);
-			break;
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
 			fill_deprecated_tasks_stats(t);
@@ -5197,7 +5187,8 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			/* do nothing */
 			break;
 	}
-
+	
+	log_queue_stats(q);
 	write_transaction_task(q, t);
 
 	return old_state;
@@ -5567,10 +5558,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 {
 	int events = 0;
 
-	q->stats->prev_time_application = q->stats->time_application;
-	q->stats->prev_time_internal = q->stats->time_internal;
-	q->stats->prev_time_status_msgs = q->stats->time_status_msgs;
-	q->stats->prev_time_polling = q->stats->time_polling;
 	// account for time we spend outside work_queue_wait
 	q->stats->time_application += timestamp_get() - q->time_last_wait;
 

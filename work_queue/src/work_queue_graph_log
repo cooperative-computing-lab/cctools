@@ -49,9 +49,6 @@ def read_log_entries(file, fields):
     epoch = None
     count_lines = 0
     prev_line = None
-    alpha = 0.05
-    capacity_total = []
-    j = 0
 
     for line in file:
         count_lines = count_lines + 1
@@ -75,10 +72,7 @@ def read_log_entries(file, fields):
 
             log_entries[record['timestamp']] = record
 
-            record['time_master']   = record['time_send'] + record['time_receive']
             if(prev_line is None):
-#                record['time_master_weighted']  = record['time_master']
-#                record['time_execute_weighted'] = record['time_execute_good']
                 prev_line = record
 
             delta = {}
@@ -103,28 +97,9 @@ def read_log_entries(file, fields):
                 record['stack_time_application'] = 0
                 record['stack_time_other']       = 0
 
-            print "Execute: %d  I/O: %d  Capacity: %d\n" % (delta['time_execute_good'], delta['time_master'], record['capacity_weighted'])
             record['bytes_sent'] /= unit_factors['GB']
             record['bytes_received'] /= unit_factors['GB']
             record['bytes_transfered'] = record['bytes_sent'] + record['bytes_received']
-
-#            try:
-#                record['capacity_tasks'] = (record['time_execute_good']) / record['time_master']
-#            except ArithmeticError:
-#                record['capacity_tasks'] = 0 
-
-#            record['time_master'] = delta['time_send'] + delta['time_receive']
-
-#            record['time_master_weighted']   = (alpha * record['time_master'])                                  + ((1 - alpha) * prev_line['time_master_weighted'])
-#            record['time_execute_weighted']  = (alpha * (record['time_execute_good'] + record['time_polling'])) + ((1 - alpha) * prev_line['time_execute_weighted'])
-
-#            try:
-                #record['capacity_weighted'] = record['time_execute_weighted'] / record['time_master_weighted']
-#                record['capacity_weighted'] = (alpha * ((delta['time_execute_good'] / record['time_master']))) + ((1 - alpha) * prev_line['capacity_weighted'])
-                #record['capacity_weighted'] = (record['time_execute_good'] / (delta['time_send'] + delta['time_receive'])) * alpha + prev_line['capacity_weighted'] * (1-alpha)
-                #record['capacity_weighted'] = record['time_execute_weighted'] / record['time_master_weighted']
-#            except ArithmeticError:
-#                record['capacity_weighted'] = record['capacity_tasks']
 
             prev_line = record
 

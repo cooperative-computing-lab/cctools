@@ -252,6 +252,8 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
 
+		fprintf(stderr, "capacity_weighted: %d\n", capacity_weighted);
+
 		// first assume one task per worker
 		int need;
 		if(only_waiting) {

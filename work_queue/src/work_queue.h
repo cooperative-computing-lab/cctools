@@ -226,10 +226,6 @@ struct work_queue_stats {
 	timestamp_t time_internal;     /**< Total time the queue spents in internal processing. */
 	timestamp_t time_polling;      /**< Total time blocking waiting for worker communications (i.e., master idle waiting for a worker message). */
 	timestamp_t time_application;  /**< Total time spent outside work_queue_wait. */
-	timestamp_t prev_time_status_msgs; 
-	timestamp_t prev_time_internal;
-	timestamp_t prev_time_polling;
-	timestamp_t prev_time_application;
 
 	/* Workers time statistics: */
 	timestamp_t time_workers_execute;            /**< Total time workers spent executing done tasks. */
@@ -248,7 +244,6 @@ struct work_queue_stats {
 	int capacity_disk;      /**< The estimated number of workers' MB of disk that this master can effectively support.*/
 	int capacity_instantaneous; /**< The estimated number of tasks that this master can support considering only the most recently completed task. */
 	int capacity_weighted; /**< The estimated number of tasks that this master can support placing greater weight on the most recently completed task. */
-	int previous_capacity_weighted; /**< The previous calculation for weighted capacity. */
 	double capacity_weight;			/**< The weight value placed on the capacity_weighted calculation. */
 
 	int64_t total_cores;      /**< Total number of cores aggregated across the connected workers. */
