@@ -3145,7 +3145,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
-	int capacity_instantaneous;
+	int capacity_instantaneous = 0;
 	if(!s->capacity_weight) {
 		s->capacity_weight = alpha;
 	}
