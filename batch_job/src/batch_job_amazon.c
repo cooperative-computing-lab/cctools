@@ -92,7 +92,7 @@ static const char * aws_instance_select( int cores, int memory, int disk )
 
 	for(i=aws_instance_table;i->name;i++) {
 		if(cores<=i->cores && memory<=i->memory) {
-			debug(D_REMOTE,"job requiring CORES=%d MEMORY=%d matches instance type %s",cores,memory,i->name);
+			debug(D_BATCH,"job requiring CORES=%d MEMORY=%d matches instance type %s",cores,memory,i->name);
 			return i->name;
 		}
 	}
@@ -395,7 +395,7 @@ static void semaphore_create()
 
 	transfer_semaphore = semget(IPC_PRIVATE,1,0600|IPC_CREAT);
 	if(transfer_semaphore<0) {
-		debug(D_REMOTE,"warning: couldn't create transfer semaphore (%s) but will proceed anyway",strerror(errno));
+		debug(D_BATCH,"warning: couldn't create transfer semaphore (%s) but will proceed anyway",strerror(errno));
 		return;
 	}
 
@@ -673,7 +673,15 @@ static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 	return 1;
 }
 
-batch_queue_stub_create(amazon);
+static int batch_queue_amazon_create (struct batch_queue *q)
+{
+	batch_queue_set_feature(q, "output_directories", "true");
+	batch_queue_set_feature(q, "batch_log_name", "%s.amazonlog");
+	batch_queue_set_feature(q, "autosize", "yes");
+	batch_queue_set_feature(q, "remote_rename", "%s=%s");
+	return 0;
+}
+
 batch_queue_stub_free(amazon);
 batch_queue_stub_port(amazon);
 batch_queue_stub_option_update(amazon);
