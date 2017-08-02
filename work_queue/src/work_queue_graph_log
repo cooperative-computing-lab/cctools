@@ -63,7 +63,7 @@ def read_log_entries(file, fields):
                         epoch = numbers[i]/1000000
                     record['timestamp'] = numbers[i]/1000000 - epoch
                 elif time_field_p(field):
-                    record[field] = numbers[i]
+                    record[field] = numbers[i]/1000000
                 else:
                     record[field] = numbers[i]
 
@@ -338,7 +338,7 @@ if __name__ == '__main__':
 
         plots['tasks-capacities'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
                 title = "tasks instantaneous capacities",
-                fields = ['tasks_running', 'capacity_tasks', 'capacity_weighted'],
+                fields = ['tasks_running', 'capacity_instantaneous', 'capacity_weighted'],
                 labels = ['tasks running', 'tasks capacity raw', 'tasks capacity weighted'])
 
         plots['tasks-accum'] = WQPlot(x_units = x_units, ylabel = 'tasks', range = x_range,
