@@ -275,7 +275,7 @@ int get_masters( time_t stoptime )
 		catalog_host = strdup(CATALOG_HOST);
 	}
 
-	const char *query_expr = string_format("type==\"wq_master\" && %s",where_expr);
+	const char *query_expr = string_format("type==\"wq_master\" and %s",where_expr);
 
 	struct jx *jexpr = jx_parse_string(query_expr);
 	if(!jexpr) {
