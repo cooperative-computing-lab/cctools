@@ -98,11 +98,6 @@ static char *batch_submit_options = NULL;
 static char *wrapper_command = 0;
 static char *wrapper_input = 0;
 static char *worker_command = 0;
-int time_execute_previous = 0;
-int time_transfer_previous = 0;
-int capacity_weighted_previous = 0;
-double alpha = 0.1;
-int total_workers_requested = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -126,7 +121,6 @@ static void handle_abort( int sig )
 static void ignore_signal( int sig )
 {
 }
-
 
 int master_workers_capacity(struct jx *j) {
 	int capacity_tasks   = jx_lookup_integer(j, "capacity_tasks");
@@ -809,9 +803,6 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
-		total_workers_requested += new_workers_needed;
-		debug(D_WQ, "TOTAL WORKERS REQUESTED, WORKERS CONNECTED: %d %d", total_workers_requested, workers_connected);
-		
 		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
 		update_blacklisted_workers(queue, masters_list);
