@@ -1132,7 +1132,7 @@ int main(int argc, char *argv[])
 
 		/* Store an absolute path b/c the factory will chdir later. */
 
-		if(!realpath(config_file, abs_path_name)) {
+		if(!realpath(amazon_config, abs_path_name)) {
 			fprintf(stderr,"couldn't find full path of %s: %s\n",config_file,strerror(errno));
 			return 1;
 		}
