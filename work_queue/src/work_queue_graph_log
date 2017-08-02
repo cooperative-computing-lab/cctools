@@ -14,7 +14,7 @@ from subprocess import Popen, PIPE
 gnuplot_cmd   = 'gnuplot'
 format        = 'svg'
 extension     = format
-resolution    = 1          # this many seconds to one log entry. Default is 30 seconds.
+resolution    = 30          # this many seconds to one log entry. Default is 30 seconds.
 x_range       = None        # If unspecified, then plot all the valid range.
 geometry      = "600,480"   # width,height in pixels
 
