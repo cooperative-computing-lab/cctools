@@ -246,8 +246,6 @@ struct blacklist_host_info {
 	time_t release_at;
 };
 
-int master_capacity_weighted = 0;
-
 static void handle_worker_failure(struct work_queue *q, struct work_queue_worker *w);
 static void handle_app_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t);
 static void remove_worker(struct work_queue *q, struct work_queue_worker *w, worker_disconnect_reason reason);
@@ -1459,7 +1457,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Start receiving output...
 	t->time_when_retrieval = timestamp_get();
-	debug(D_BJ, "Task %d time_when_retrieval.\n", t->taskid);
 
 	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 		result = get_monitor_output_file(q,w,t);
@@ -1475,7 +1472,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	if(result == WORKER_FAILURE) {
 		// Finish receiving output:
 		t->time_when_done = timestamp_get();
-		debug(D_BJ, "Task %d time_when_done.\n", t->taskid);
 
 		return;
 	}
@@ -1494,7 +1490,6 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 
 	// Finish receiving output.
 	t->time_when_done = timestamp_get();
-	debug(D_BJ, "Task %d time_when_done.\n", t->taskid);
 
 	work_queue_accumulate_task(q, t);
 
@@ -1789,7 +1784,6 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 
 	execution_time = atoll(items[3]);
 	t->time_workers_execute_last = observed_execution_time > execution_time ? execution_time : observed_execution_time;
-	debug(D_BJ, "Task %d time_workers_execute_last.\n", t->taskid);
 
 	t->time_workers_execute_all += t->time_workers_execute_last;
 
@@ -2249,8 +2243,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
-	jx_insert_integer(j,"capacity_weighted",master_capacity_weighted);
-	debug(D_BJ, "FLAGGED: %d\t%d\n", info.capacity_instantaneous, master_capacity_weighted);
+	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
@@ -3118,7 +3111,6 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	tr->exec_time     = t->time_workers_execute_last;
 	debug(D_WQ, "tr->exec_time = %"PRId64"\n", t->time_workers_execute_last);
 	tr->master_time = (s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal);
-	debug(D_BJ, "tr->master_time = (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64") + (%"PRId64" - %"PRId64") = %"PRId64"\n", s.time_status_msgs, s.prev_time_status_msgs, s.time_internal, s.prev_time_internal, s.time_polling, s.prev_time_polling, tr->master_time);
 	if(!t->resources_allocated) {
 		return;
 	}
@@ -3153,6 +3145,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
+	int capacity_instantaneous;
 	if(!s->capacity_weight) {
 		s->capacity_weight = alpha;
 	}
@@ -3183,21 +3176,13 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
-			int capacity_instantaneous = (int) ceil(((float) tr->exec_time) / (tr->transfer_time + tr->master_time));
-			if(master_capacity_weighted == 0) {
+			capacity_instantaneous = (int) ceil(((float) tr->exec_time) / (tr->transfer_time + tr->master_time));
+			if(!s->capacity_weighted) {
 				s->capacity_weighted = capacity_instantaneous;
-				debug(D_BJ, "INITIAL: %d\n", s->capacity_weighted);
 			}
 			else {
-				s->capacity_weighted = (int) ceil((s->capacity_weight * capacity_instantaneous) + ((1 - s->capacity_weight) * master_capacity_weighted));
-				debug(D_BJ, "CALCULATED: %d\n", s->capacity_weighted);
+				s->capacity_weighted = (int) ceil((s->capacity_weight * capacity_instantaneous) + ((1 - s->capacity_weight) * s->capacity_weighted));
 			}
-			time_t ts;
-			time(&ts);
-			debug(D_BJ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d\n", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, s->tasks_running, s->tasks_waiting, s->workers_connected);
-			master_capacity_weighted = s->capacity_weighted;
-			debug(D_BJ, "MASTER: %d\n", master_capacity_weighted);
-			//q->stats->previous_capacity_weighted = s->capacity_weighted;
 		}
 	}
 
@@ -3211,8 +3196,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	s->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
 	s->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
 	s->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
-	s->capacity_instantaneous = 0;
-	//s->capacity_weighted = (int) ceil(weighted_capacity);
+	s->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -3526,10 +3510,8 @@ static void commit_task_to_worker(struct work_queue *q, struct work_queue_worker
 	t->host = xxstrdup(w->addrport);
 
 	t->time_when_commit_start = timestamp_get();
-	debug(D_BJ, "Task %d time_when_commit_start.\n", t->taskid);
 	work_queue_result_code_t result = start_one_task(q, w, t);
 	t->time_when_commit_end = timestamp_get();
-	debug(D_BJ, "Task %d time_when_commit_end.\n", t->taskid);
 
 	itable_insert(w->current_tasks, t->taskid, t);
 	itable_insert(q->worker_task_map, t->taskid, w); //add worker as execution site for t.
@@ -4735,7 +4717,6 @@ struct work_queue *work_queue_create(int port)
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	time_t ts;
 	time(&ts);
-	debug(D_BJ, "\nENGAGE: %lld\n", (long long) ts);
 	return q;
 }
 
@@ -5183,7 +5164,7 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-
+	struct work_queue_stats *s;
 	// remove from current tables:
 
 	if( old_state == WORK_QUEUE_TASK_READY ) {
@@ -5200,13 +5181,12 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			push_task_to_ready_list(q, t);
 			break;
 		case WORK_QUEUE_TASK_DONE:
-			if(t->result == WORK_QUEUE_RESULT_SUCCESS) {
-				struct work_queue_stats *s = malloc(sizeof(struct work_queue_stats));
-				work_queue_get_stats(q, s);
-				compute_capacity(q, s);
-			}
-			//work_queue_get_stats(q, s);
-			//log_queue_stats(q);
+			s = malloc(sizeof(struct work_queue_stats));
+			work_queue_get_stats(q, s);
+			//if(t->result == WORK_QUEUE_RESULT_SUCCESS) {
+			//	compute_capacity(q, s);
+			//}
+			log_queue_stats(q);
 			break;
 		case WORK_QUEUE_TASK_CANCELED:
 			/* tasks are freed when returned to user, thus we remove them from our local record */
@@ -6037,8 +6017,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	memcpy(s, qs, sizeof(*s));
 
-	s->previous_capacity_weighted = qs->previous_capacity_weighted;
-
 	int known = known_workers(q);
 
 	//info about workers
@@ -6067,8 +6045,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
 
-	//s->capacity_ratio, s->capacity_cores, s->capacity_memory, s->capacity_disk:
-	//compute_capacity(q, s);
+	compute_capacity(q, s);
 
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);

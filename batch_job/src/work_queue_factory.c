@@ -255,38 +255,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 
 		//int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
 		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
-		//int time_transfer = jx_lookup_integer(j, "time_send") + jx_lookup_integer(j, "time_receive");
-		//int time_execute = jx_lookup_integer(j, "time_workers_execute");
-		//const int time_master = jx_lookup_integer(j, "time_master");
-
-		//int execute_delta = time_execute - time_execute_previous;
-		//int transfer_delta = time_transfer - time_transfer_previous;
-		//double time_execute_weighted;
-		//double time_transfer_weighted;
-/*		int positive_deltas = (execute_delta > 0 && transfer_delta > 0);
-
-		if(!positive_deltas) {
-			time_execute = time_execute_previous;
-			time_transfer = time_transfer_previous;
-		}
-
-		capacity_weighted = capacity_weighted_previous;
-		if(transfer_delta > 0) {
-			if(capacity_weighted_previous == 0) {
-				capacity_weighted = (int) (alpha * ((double) execute_delta / (double) (transfer_delta + time_master)));
-			}
-			else {
-				capacity_weighted = (int) (alpha * ((double) execute_delta / (double) (transfer_delta + time_master)) + ((1.0 - alpha) * capacity_weighted_previous));
-			}
-		}
-
-		if(positive_deltas) {
-			capacity_weighted_previous = capacity_weighted;
-			time_execute_previous = time_execute;
-			time_transfer_previous = time_transfer;
-			fprintf(stderr, "New previous values set.\n");
-		}
-*/
 		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
 
@@ -842,7 +810,7 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
 		total_workers_requested += new_workers_needed;
-		debug(D_BJ, "TOTAL WORKERS REQUESTED, WORKERS CONNECTED: %d %d", total_workers_requested, workers_connected);
+		debug(D_WQ, "TOTAL WORKERS REQUESTED, WORKERS CONNECTED: %d %d", total_workers_requested, workers_connected);
 		
 		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
