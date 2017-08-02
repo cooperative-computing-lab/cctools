@@ -1083,12 +1083,15 @@ If no value is given, then the current value of the environment variable is pass
 
 <h4 id="details.renaming">Remote File Renaming<a class="sectionlink" href="#details.renaming" title="Link to this section.">&#x21d7;</a></h4>
 
-<p>With the Work Queue and Condor batch systems, Makeflow has a feature called
-remote file renaming. For example:</p>
+<p>When the underlying batch system supports it,
+Makeflow supports "Remote Renaming" where the name
+of a file in the execution sandbox is different than
+the name of the same file in the DAG.
+This is currently supported by the Work Queue, Condor, and Amazon batch system.
+</p>
 
-<code>local_name-&gt;remote_name</code>
-
-<p>indicates that the file <tt>local_name</tt> is called <tt>remote_name</tt>
+<p>
+For example, <tt>local_name-&gt;remote_name</tt> indicates that the file <tt>local_name</tt> is called <tt>remote_name</tt>
 in the remote system. Consider the following example:</p>
 
 <code>b.out: a.in myprog
