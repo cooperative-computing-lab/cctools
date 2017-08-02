@@ -52,6 +52,9 @@ tracer.table.h: syscall_32.tbl
 parrot_run: $(OBJECTS_PARROT_RUN) libparrot_client.a
 	$(CCTOOLS_CXX) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_MYSQL_LDFLAGS) $(CCTOOLS_XROOTD_LDFLAGS) $(CCTOOLS_CVMFS_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
+parrot_cvmfs_static_run: $(OBJECTS_PARROT_RUN) libparrot_client.a $(CCTOOLS_CVMFS_LDFLAGS) $(EXTERNAL_DEPENDENCIES)
+	$(CCTOOLS_CXX) -static -static-libstdc++ -static-libgcc -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) -Wl,-Bstatic $(CCTOOLS_EXTERNAL_LINKAGE)
+
 irods_reli.o: irods_reli.cc irods_reli.h
 	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_IRODS_CCFLAGS)
 
