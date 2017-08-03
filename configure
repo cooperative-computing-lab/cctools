@@ -845,26 +845,32 @@ then
 
 	if [ $perl != 0 ]
 	then
-		perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
-		perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
 
-		if [ $? = 0 ]
+		if perl -e 'eval { require ExtUtils::Embed }; $@ ? exit(1) : exit(0)'
 		then
-			# On OSX, the ExtUtils::Embed options contain options
-			# to generate triple-fat binaries, which fails when
-			# we attempt to bring in our thin binaries.
+			perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
+			perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
 
-			# To avoid this problem, remove all of the -arch XXX
-			# arguments, so that the compiler produces the default,
-			# which will be compatible with the other objects we compile.
-
-			if [ ${BUILD_SYS} = DARWIN ]
+			if [ $? = 0 ]
 			then
-				perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
-				perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
-			fi
+				# On OSX, the ExtUtils::Embed options contain options
+				# to generate triple-fat binaries, which fails when
+				# we attempt to bring in our thin binaries.
 
-			swig_bindings="$swig_bindings perl"
+				# To avoid this problem, remove all of the -arch XXX
+				# arguments, so that the compiler produces the default,
+				# which will be compatible with the other objects we compile.
+
+				if [ ${BUILD_SYS} = DARWIN ]
+				then
+					perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
+					perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
+				fi
+
+				swig_bindings="$swig_bindings perl"
+			else
+				perl=0
+			fi
 		else
 			perl=0
 		fi
