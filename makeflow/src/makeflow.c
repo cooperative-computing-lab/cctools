@@ -443,10 +443,9 @@ static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, stru
 	if(!remotename && umbrella) remotename = makeflow_wrapper_get_remote_name(umbrella->wrapper, n->d, f->filename);
 	if(!remotename) remotename = f->filename;
 
-	switch (batch_queue_get_type(queue)) {
-		case BATCH_QUEUE_TYPE_WORK_QUEUE:
+	if(batch_queue_supports_feature(queue,"remote_rename")) {
 			return string_format("%s=%s,", f->filename, remotename);
-		default:
+	} else {
 			return string_format("%s,", f->filename);
 	}
 }
