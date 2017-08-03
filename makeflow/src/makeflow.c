@@ -1277,7 +1277,7 @@ int main(int argc, char *argv[])
 	char *logfilename = NULL;
 	int port_set = 0;
 	timestamp_t runtime = 0;
-	int skip_afs_check = 0;
+	int disable_afs_check = 0;
 	int should_read_archive = 0;
 	int should_write_to_archive = 0;
 	timestamp_t time_completed = 0;
@@ -1477,7 +1477,7 @@ int main(int argc, char *argv[])
 				work_queue_master_mode = "catalog";
 				break;
 			case 'A':
-				skip_afs_check = 1;
+				disable_afs_check = 1;
 				break;
 			case 'B':
 				batch_submit_options = optarg;
@@ -1983,7 +1983,6 @@ int main(int argc, char *argv[])
 
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
-	batch_queue_set_option(remote_queue, "skip-afs-check", skip_afs_check ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
 	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
@@ -2053,6 +2052,24 @@ int main(int argc, char *argv[])
 
 	if (change_dir)
 		chdir(change_dir);
+
+	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR || container_mode==CONTAINER_MODE_DOCKER) ) {
+		char *cwd = path_getcwd();
+		if(!strncmp(cwd, "/afs", 4)) {
+			fprintf(stderr,"error: The working directory is '%s'\n", cwd);
+			if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
+				fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
+			}
+			if(container_mode==CONTAINER_MODE_DOCKER) {
+				fprintf(stderr,"This won't work because Docker cannot mount an AFS directory.\n");
+			}
+			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.");
+			fprintf(stderr,"Or, use the Work Queue batch system with -T wq.\n");
+			free(cwd);
+			exit(EXIT_FAILURE);
+		}
+		free(cwd);
+	}
 
 	/* Prepare the input files specified in the mountfile. */
 	if(mountfile && !clean_mode) {
@@ -2169,9 +2186,9 @@ int main(int argc, char *argv[])
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		makeflow_wrapper_docker_init(wrapper, container_image, container_image_tar);
-	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
+	} else if(container_mode == CONTAINER_MODE_SINGULARITY){
 		makeflow_wrapper_singularity_init(wrapper, container_image);
-    }
+	}
 
 	d->archive_directory = archive_directory;
 	d->should_read_archive = should_read_archive;
