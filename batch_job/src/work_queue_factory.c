@@ -249,10 +249,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 
 		//int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
 		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
-		int capacity = master_workers_capacity(j);
-		if(capacity_weighted > 0) { 
-			capacity = MIN(capacity_weighted, capacity);
-		}
+		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
 
 		// first assume one task per worker

@@ -3156,6 +3156,9 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		capacity.exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 		capacity.transfer_time = 1;
 
+		s->capacity_weighted = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+		capacity_instantaneous = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+
 		count = 1;
 	} else {
 		// Sum up the task reports available.
