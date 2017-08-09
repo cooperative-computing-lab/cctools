@@ -3108,7 +3108,6 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
 	tr->master_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
-	//(s.time_status_msgs - s.prev_time_status_msgs) + (s.time_internal - s.prev_time_internal);
 	if(!t->resources_allocated) {
 		return;
 	}
