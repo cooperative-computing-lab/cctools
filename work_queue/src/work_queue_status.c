@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <stdbool.h>
 
 typedef enum {
 	FORMAT_TABLE,
@@ -47,7 +48,7 @@ static int work_queue_status_timeout = 30;
 static char *catalog_host = NULL;
 int catalog_size = CATALOG_SIZE;
 static struct jx **global_catalog = NULL; //pointer to an array of jx pointers
-static const char *where_expr = "true";
+struct jx *jexpr = NULL;
 static int columns = 80;
 
 /* negative columns mean a minimum of abs(value), but the column may expand if
@@ -219,7 +220,11 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			cctools_version_print(stdout, argv[0]);
 			exit(EXIT_SUCCESS);
 		case LONG_OPT_WHERE:
-			where_expr = optarg;
+			jexpr = jx_parse_string(optarg);
+			if (!jexpr) {
+				fprintf(stderr,"invalid expression: %s\n", optarg);
+				exit(1);
+			}
 			break;
 		default:
 			show_help(argv[0]);
@@ -227,6 +232,8 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 			break;
 		}
 	}
+
+	if (!jexpr) jexpr = jx_boolean(true);
 
 	if(query_mode == NO_QUERY)
 		query_mode = QUERY_QUEUE;
@@ -276,13 +283,15 @@ int get_masters( time_t stoptime )
 		catalog_host = strdup(CATALOG_HOST);
 	}
 
-	const char *query_expr = string_format("type==\"wq_master\" && %s",where_expr);
-
-	struct jx *jexpr = jx_parse_string(query_expr);
-	if(!jexpr) {
-		fprintf(stderr,"invalid expression: %s\n",query_expr);
-		exit(1);
-	}
+	jexpr = jx_operator(
+		JX_OP_AND,
+		jexpr,
+		jx_operator(
+			JX_OP_EQ,
+			jx_symbol("type"),
+			jx_string("wq_master")
+		)
+	);
 
 	cq = catalog_query_create(catalog_host, jexpr, stoptime );
 	if(!cq)

@@ -139,22 +139,36 @@ int main(int argc, char** argv) {
     if(server==NULL){
         catalog_host = CATALOG_HOST;
     }
-    
-    //make query string
-    const char* query_expr = "type==\"makeflow\"";
-    if(project && username){
-        query_expr = string_format("%s && project==\"%s\" && username==\"%s\"",query_expr,project,username);
-    }else if(project) {
-        query_expr = string_format("%s && project==\"%s\"", query_expr, project);
-    } else if (username) {
-        query_expr = string_format("%s && username==\"%s\"", query_expr, username);
+
+    //make query
+    struct jx *jexpr = jx_operator(
+        JX_OP_EQ,
+        jx_symbol("type"),
+        jx_string("makeflow")
+    );
+
+    if (project) {
+        jexpr = jx_operator(
+            JX_OP_AND,
+            jexpr,
+            jx_operator(
+                JX_OP_EQ,
+                jx_symbol("project"),
+                jx_string(project)
+            )
+        );
     }
 
-    //turn query into jx
-    struct jx *jexpr = jx_parse_string(query_expr);
-    if (!jexpr) {
-        fprintf(stderr, "invalid expression: %s\n", query_expr);
-        return 1;
+    if (username) {
+        jexpr = jx_operator(
+            JX_OP_AND,
+            jexpr,
+            jx_operator(
+                JX_OP_EQ,
+                jx_symbol("username"),
+                jx_string(username)
+            )
+        );
     }
 
     time_t stoptime = time(0) + timeout;
