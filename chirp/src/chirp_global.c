@@ -125,7 +125,11 @@ static int server_table_load(time_t stoptime)
 
 	debug(D_CHIRP, "querying catalog at %s", CATALOG_HOST);
 
-	struct jx *jexpr = jx_parse_string("type==\"chirp\"");
+	struct jx *jexpr = jx_operator(
+		JX_OP_EQ,
+		jx_symbol("type"),
+		jx_string("chirp")
+	);
 	q = catalog_query_create(CATALOG_HOST, jexpr, stoptime);
 
 	if(!q) {
