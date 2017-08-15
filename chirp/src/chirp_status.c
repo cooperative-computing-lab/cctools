@@ -18,6 +18,7 @@ See the file COPYING for details.
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -127,12 +128,12 @@ int main(int argc, char *argv[])
 	INT64_T sum_total = 0, sum_avail = 0;
 	const char *filter_name = 0;
 	const char *filter_value = 0;
-	const char *where_expr = "true";
 	int show_all_types = 0;
 
 	const char *server_project = NULL;
 	time_t      server_lastheardfrom = 0;
 	uint64_t    server_avail = 0;
+	struct jx *jexpr = jx_boolean(true);
 
 	debug_config(argv[0]);
 
@@ -178,7 +179,11 @@ int main(int argc, char *argv[])
 			server_project = xxstrdup(optarg);
 			break;
 		case LONGOPT_WHERE:
-			where_expr = optarg;
+			jexpr = jx_parse_string(optarg);
+			if (!jexpr) {
+				fprintf(stderr,"invalid expression: %s\n", optarg);
+				return 1;
+			}
 			break;
 		case 'h':
 		default:
@@ -211,18 +216,24 @@ int main(int argc, char *argv[])
 
 	stoptime = time(0) + timeout;
 
-	const char *query_expr;
-
-	if(show_all_types) {
-		query_expr = where_expr;
-	} else {
-		query_expr = string_format("%s && (type==\"chirp\" || type==\"catalog\")",where_expr);
-	}
-
-	struct jx *jexpr = jx_parse_string(query_expr);
-	if(!jexpr) {
-		fprintf(stderr,"invalid expression: %s\n",query_expr);
-		return 1;
+	if (!show_all_types) {
+		jexpr = jx_operator(
+			JX_OP_AND,
+			jexpr,
+			jx_operator(
+				JX_OP_OR,
+				jx_operator(
+					JX_OP_EQ,
+					jx_symbol("type"),
+					jx_string("chirp")
+				),
+				jx_operator(
+					JX_OP_EQ,
+					jx_symbol("type"),
+					jx_string("catalog")
+				)
+			)
+		);
 	}
 
 	q = catalog_query_create(catalog_host, jexpr, stoptime);
