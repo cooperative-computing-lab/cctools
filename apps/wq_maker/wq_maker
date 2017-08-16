@@ -15,6 +15,9 @@
 #   Parallelizing Genome Annotation Using Maker and Work Queue",
 # IEEE International Conference on Computational Advances in Bio and Medical
 # Sciences, February, 2012.
+#
+# Updated by Nick Hazekamp
+# August, 2017
 
 use strict "refs";
 use strict "vars";
@@ -44,6 +47,7 @@ if( $version ne "2.31.8"){
 my $maker_help = `maker -h`;
 
 my $genome;
+my $dynamic_env = 0;
 my $augustus;
 my $base_name;
 my $mpi_arg;
@@ -82,6 +86,8 @@ Work Queue Options:
      -monitor-full            Enables full monitoring that creates a time series of tasks, may be extremely large.
 
      -stats <file>            Specifies the file were Work Queue master stats are written.
+
+     -dynamic_env             Configures maker EXE at work site. Only for use where maker -EXE correctly locates executables.
 ";
 
 #---Process options on the command line 
@@ -108,6 +114,7 @@ try{
            "monitor=s" => \$OPT{"monitor"},
            "monitor-full" => \$OPT{"monitor-full"},
            "stats=s" => \$OPT{"stats"},
+           "dynamic_env" => sub {$dynamic_env = 1;},
 	       "help|?" => sub {print $usage; exit(0)}
 	       );
 
@@ -456,7 +463,10 @@ sub submit_tasks {
 sub submit_task {
 	my($wq, $genome_chunk, $common_input_files, $output_dirs, $input_to_contigs) = @_;
 
-	my $task_command = "maker -EXE; ";
+	my $task_command = "";
+	if($dynamic_env){
+		$task_command .= "maker -EXE; ";
+	}
 	if($augustus){
 		$task_command .= "export AUGUSTUS_CONFIG_PATH=\$PWD/config; ";
 	}
