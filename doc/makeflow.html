@@ -111,7 +111,7 @@ Details for each of those systems are given in the <a href=#batch>Batch System S
 <a name=installing><h3>Installing</h3></a>
 
 <p> Makeflow is part of the <a href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>, which is easy to install.
-In most cases, you can should just build from source and install in your home directory like this:
+In most cases, you can just build from source and install in your home directory like this:
 
 <code>git clone https://github.com/cooperative-computing-lab/cctools cctools-source
 cd cctools-source
@@ -236,15 +236,15 @@ log and summarize the workflow:
 <ol>
 <li> <tt>makeflow_monitor</tt> reads the transaction log and produceds a continuous
 display that shows the overall time and progress through the workflow:
-<code>makeflow_monitor example.makeflow.makeflowlog
+<code>makeflow example.makeflow & makeflow_monitor example.makeflow.makeflowlog
 </code>
 <li><tt>makeflow_graph_log</tt> will read the transaction log, and produce a timeline
 graph showing the number of jobs ready, running, and complete over time:
-<code>makeflow_graph_log example.makeflow.makeflowlog example.png
+<code>makeflow example.makeflow & makeflow_graph_log example.makeflow.makeflowlog example.png
 </code>
 <li><tt>makeflow_viz</tt> will display the workflow in graphical form,
 so that you can more easily understand the structure and dependencies.
-(Read more about <a href=#visualization>Visualization</a>
+(Read more about <a href=#visualization>Visualization</a>)
 </ol>
 
 <p>
@@ -327,7 +327,7 @@ with <tt>CORES</tt>, <tt>MEMORY</tt>, and <tt>DISK</tt> appropriately.
 You can put an upper limit on the resources used with the
 <tt>--local-cores</tt>, <tt>--local-memory</tt>, and <tt>--local-disk</tt>
 options to Makeflow.  Also, the total number of jobs running
-locally can be limited with <tt>--max-local</tt>
+locally can be limited with <tt>--max-local</tt>.
 
 <a name=htcondor><h3>HTCondor</h3></a>
 
@@ -337,8 +337,7 @@ locally can be limited with <tt>--max-local</tt>
 Makeflow will automatically generate a submit file for each job.
 However, if you would like to customize the Condor submit file,
 use the <tt>-B</tt> option or <tt>BATCH_OPTIONS</tt> variable
-to specify text to add to the submit file.<
-/p>
+to specify text to add to the submit file.</p>
 
 <p>
 For example, if you want to add <tt>Requirements</tt> and <tt>Rank</tt> lines to
@@ -351,7 +350,7 @@ your Condor submit files, add this to your Makeflow:
 
 <p>
 Use the <tt>-T sge</tt> option to submit jobs to Sun Grid Engine
-or systems derived from it like <a href=http://gridscheduler.sourceforge.net>Open Grid Scheduler</a> or Univa Grid Engine.
+or systems derived from it like <a href=http://gridscheduler.sourceforge.net>Open Grid Scheduler</a> or <a href=http://www.univa.com/products/>Univa Grid Engine</a>.
 </p>
 
 <p>
@@ -437,7 +436,7 @@ Now you are ready to use Makeflow with Amazon.
 Before running a workflow, use the <tt>makeflow_ec2_setup</tt> command,
 which will setup a virtual private cluster, security group, keypairs, and
 other necessary details, and store the necessary information into <tt>my.config</tt>.
-Give the name of the default Amazon Machine Image (AMI) you wish to use as the 
+Give the name of the default <a href=https://console.aws.amazon.com/ec2/v2/home?#Images>Amazon Machine Image (AMI)</a> you wish to use as the 
 second argument:
 
 <code>makeflow_ec2_setup my.config ami-343a694f
@@ -474,10 +473,10 @@ the Makeflow on a job-by-job basis by setting the
 <tt>AMAZON_INSTANCE_TYPE</tt> and <tt>AMAZON_AMI</tt>
 environment variables within the Makeflow file.  For example:
 
-<pre>
+<code>
 export AMAZON_INSTANCE_TYPE=m4.4xlarge
 export AMAZON_AMI=ami-343a694f
-</pre>
+</code>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 
