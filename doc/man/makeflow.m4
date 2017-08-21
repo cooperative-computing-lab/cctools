@@ -156,6 +156,9 @@ SUBSECTION(Other Options)
 OPTIONS_BEGIN
 OPTION_ITEM(`-A, --disable-afs-check')Disable the check for AFS. (experts only)
 OPTION_ITEM(`-z, --zero-length-error')Force failure on zero-length output files.
+OPTION_TRIPLET(-g, gc, type)Enable garbage collection. (ref_cnt|on_demand|all)
+OPTION_PAIR(--gc-size, int)Set disk size to trigger GC. (on_demand only)
+OPTION_TRIPLET(-G, gc-count, int)Set number of files to trigger GC. (ref_cnt only)
 OPTION_PAIR(--wrapper,script) Wrap all commands with this BOLD(script). Each rule's original recipe is appended to BOLD(script) or replaces the first occurrence of BOLD({}) in BOLD(script).
 OPTION_PAIR(--wrapper-input,file) Wrapper command requires this input file. This option may be specified more than once, defining an array of inputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
 OPTION_PAIR(--wrapper-output,file) Wrapper command requires this output file. This option may be specified more than once, defining an array of outputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).

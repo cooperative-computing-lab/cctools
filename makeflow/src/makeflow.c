@@ -1205,6 +1205,9 @@ static void show_help_run(const char *cmd)
 	printf(" -A,--disable-afs-check         Disable the check for AFS. (experts only.)\n");
 	printf("    --cache=<dir>               Use this dir to cache downloaded mounted files.\n");
 	printf(" -X,--change-directory=<dir>    Change to <dir> before executing the workflow.\n");
+	printf(" -g,--gc=<type>                 Enable garbage collection. (ref_cnt|on_demand|all)\n");
+	printf("    --gc-size=<int>             Set disk size to trigger GC. (on_demand only)\n");
+	printf(" -G,--gc-count=<int>            Set number of files to trigger GC. (ref_cnt only)\n");
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
@@ -1405,7 +1408,6 @@ int main(int argc, char *argv[])
 		{"gc", required_argument, 0, 'g'},
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
 		{"gc-count", required_argument, 0, 'G'},
-		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"help", no_argument, 0, 'h'},
 		{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
 		{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
@@ -1523,7 +1525,7 @@ int main(int argc, char *argv[])
 			case 'g':
 				if(strcasecmp(optarg, "none") == 0) {
 					makeflow_gc_method = MAKEFLOW_GC_NONE;
-				} else if(strcasecmp(optarg, "ref_count") == 0) {
+				} else if(strcasecmp(optarg, "ref_cnt") == 0) {
 					makeflow_gc_method = MAKEFLOW_GC_COUNT;
 					if(makeflow_gc_count < 0)
 						makeflow_gc_count = 16;	/* Try to collect at most 16 files. */
