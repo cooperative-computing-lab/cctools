@@ -233,6 +233,7 @@ struct work_queue_worker {
 struct work_queue_task_report {
 	timestamp_t transfer_time;
 	timestamp_t exec_time;
+	timestamp_t master_time;
 
 	struct rmsummary *resources;
 };
@@ -464,6 +465,8 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_cores);
 	buffer_printf(&B, " %d", s.capacity_memory);
 	buffer_printf(&B, " %d", s.capacity_disk);
+	buffer_printf(&B, " %d", s.capacity_instantaneous);
+	buffer_printf(&B, " %d", s.capacity_weighted);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -2238,6 +2241,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
+	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
+	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
@@ -3094,13 +3099,15 @@ Used for computing queue capacity below.
 static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct work_queue_task_report *tr;
+	struct work_queue_stats s;
+	work_queue_get_stats(q, &s);
 
 	// Create a new report object and add it to the list.
 	tr = calloc(1, sizeof(struct work_queue_task_report));
 
 	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
-
+	tr->master_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
 	if(!t->resources_allocated) {
 		return;
 	}
@@ -3131,9 +3138,14 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	bzero(&capacity, sizeof(capacity));
 
 	capacity.resources = rmsummary_create(0);
-
-
+	
+	struct work_queue_task_report *tr;
+	double alpha = 0.05;
 	int count = list_size(q->task_reports);
+	int capacity_instantaneous = 0;
+	if(!s->capacity_weight) {
+		s->capacity_weight = alpha;
+	}
 
 	// Compute the average task properties.
 	if(count < 1) {
@@ -3144,14 +3156,17 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		capacity.exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 		capacity.transfer_time = 1;
 
+		s->capacity_weighted = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+		capacity_instantaneous = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+
 		count = 1;
 	} else {
 		// Sum up the task reports available.
-		struct work_queue_task_report *tr;
 		list_first_item(q->task_reports);
 		while((tr = list_next_item(q->task_reports))) {
 			capacity.transfer_time += tr->transfer_time;
 			capacity.exec_time     += tr->exec_time;
+			capacity.master_time   += tr->master_time;
 
 			if(tr->resources) {
 				capacity.resources->cores  += tr->resources ? tr->resources->cores  : 1;
@@ -3159,18 +3174,31 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 				capacity.resources->disk   += tr->resources ? tr->resources->disk   : 1024;
 			}
 		}
+
+		tr = list_peek_tail(q->task_reports);
+		if(tr->transfer_time > 0) {
+			capacity_instantaneous = (int) ceil(((float) tr->exec_time) / (tr->transfer_time + tr->master_time));
+			if(!s->capacity_weighted) {
+				s->capacity_weighted = capacity_instantaneous;
+			}
+			else {
+				s->capacity_weighted = (int) ceil((s->capacity_weight * capacity_instantaneous) + ((1 - s->capacity_weight) * s->capacity_weighted));
+			}
+		}
 	}
 
 	capacity.transfer_time = MAX(1, capacity.transfer_time);
 	capacity.exec_time     = MAX(1, capacity.exec_time);
+	capacity.master_time   = MAX(1, capacity.master_time);
 
 	// Never go below the default capacity
-	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, capacity.exec_time / capacity.transfer_time);
+	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, capacity.exec_time / (capacity.transfer_time + capacity.master_time));
 
 	s->capacity_tasks  = ratio;
 	s->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
 	s->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
 	s->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
+	s->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -5136,7 +5164,6 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 
 	work_queue_task_state_t old_state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
 	itable_insert(q->task_state_map, t->taskid, (void *) new_state);
-
 	// remove from current tables:
 
 	if( old_state == WORK_QUEUE_TASK_READY ) {
@@ -5162,7 +5189,8 @@ static work_queue_task_state_t change_task_state( struct work_queue *q, struct w
 			/* do nothing */
 			break;
 	}
-
+	
+	log_queue_stats(q);
 	write_transaction_task(q, t);
 
 	return old_state;
@@ -5466,7 +5494,6 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	END_ACCUM_TIME(q, time_polling);
 
-
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
 	int workers_removed = 0;
@@ -5544,6 +5571,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	int result;
 	struct work_queue_task *t = NULL;
 	// time left?
+
 	while( (stoptime == 0) || (time(0) <= stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
@@ -6006,7 +6034,6 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 		s->tasks_running = MIN(s->tasks_running, s->tasks_on_workers);
 	}
 
-	//s->capacity_ratio, s->capacity_cores, s->capacity_memory, s->capacity_disk:
 	compute_capacity(q, s);
 
 	//info about resources
@@ -6187,7 +6214,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"

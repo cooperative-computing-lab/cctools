@@ -122,7 +122,6 @@ static void ignore_signal( int sig )
 {
 }
 
-
 int master_workers_capacity(struct jx *j) {
 	int capacity_tasks   = jx_lookup_integer(j, "capacity_tasks");
 	int capacity_cores   = jx_lookup_integer(j, "capacity_cores");
@@ -248,6 +247,9 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 
+		//int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
+		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
+		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
 
 		// first assume one task per worker
@@ -266,7 +268,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		// consider if tasks declared resources...
 		need = MAX(need, master_workers_needed_by_resource(j));
 
-		int capacity = master_workers_capacity(j);
 		if(consider_capacity && capacity > 0) {
 			need = MIN(need, capacity);
 		}
@@ -576,6 +577,7 @@ int read_config_file(const char *config_file) {
 	assign_new_value(new_workers_max, workers_max, max-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_workers_min, workers_min, min-workers, int, JX_INTEGER, integer_value)
 	assign_new_value(new_workers_per_cycle, workers_per_cycle, workers-per-cycle, int, JX_INTEGER, integer_value)
+	assign_new_value(new_consider_capacity, consider_capacity, capacity, int, JX_INTEGER, integer_value)
 	assign_new_value(new_worker_timeout, worker_timeout, timeout, int, JX_INTEGER, integer_value)
 
 	assign_new_value(new_num_cores_option, resources->cores, cores,    int, JX_INTEGER, integer_value)
@@ -630,6 +632,7 @@ int read_config_file(const char *config_file) {
 	tasks_per_worker = new_tasks_per_worker;
 	autosize         = new_autosize_option;
 	factory_timeout  = new_factory_timeout_option;
+	consider_capacity = new_consider_capacity;
 
 	resources->cores  = new_num_cores_option;
 	resources->memory = new_num_memory_option;
