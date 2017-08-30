@@ -133,11 +133,11 @@ static const char nulpath[1] = "";
 #define PREAMBLE(fmt, ...) \
 	INT64_T rc = 0;\
 	int dirfd = -1;\
-	char basename[CHIRP_PATH_MAX];\
+	char basename[CHIRP_PATH_MAX] = {'\0'};\
 	debug(D_LOCAL, fmt, __VA_ARGS__);\
-	(void)rc;\
-	(void)dirfd;\
-	(void)basename[1];\
+	rc = 0;\
+	dirfd = -1;\
+	basename[0] = '\0';\
 
 #define CLOSE_DIRFD(fd) \
 	do {\

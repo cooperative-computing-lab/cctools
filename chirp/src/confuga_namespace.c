@@ -81,13 +81,13 @@ static const char nulpath[1] = "";
 	dirfd = dirfd_##path;
 
 #define PREAMBLE(fmt, ...) \
-	int rc;\
+	int rc = 0;\
 	int dirfd = -1;\
-	char basename[CONFUGA_PATH_MAX];\
+	char basename[CONFUGA_PATH_MAX] = {'\0'};\
 	debug(D_CONFUGA, fmt, __VA_ARGS__);\
-	(void)rc;\
-	(void)dirfd;\
-	(void)basename[1];
+	rc = 0;\
+	dirfd = -1;\
+	basename[0] = '\0';
 
 #define PROLOGUE \
 	goto out;\

@@ -768,7 +768,7 @@ aggregated together.  This function returns the current buffer size.
 @return The current file buffer size.
 */
 
-INT64_T chirp_reli_blocksize_get();
+INT64_T chirp_reli_blocksize_get(void);
 
 /** Set the buffer block size.
 This module performs input and output buffering to improve the performance of small I/O operations.
@@ -786,7 +786,7 @@ function must be invoked to clean up shared state such as TCP connections.
 After forking, each process will maintain its own connection to each Chirp server.
 */
 
-void chirp_reli_cleanup_before_fork();
+void chirp_reli_cleanup_before_fork(void);
 
 /** Closes the link to the host, if active.
 @param host A hostname may be a domain name or an IP address, followed by an optional colon and port number.
