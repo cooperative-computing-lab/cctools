@@ -119,13 +119,13 @@ void shutdown_handler()
 	exit(0);
 }
 
-void alarm_handler()
+void alarm_handler(int signo)
 {
 	fprintf(stderr, "%s: timeout\n", name);
 	shutdown_handler();
 }
 
-void sigterm_handler()
+void sigterm_handler(int signo)
 {
 	fprintf(stderr, "%s: aborting\n", name);
 	shutdown_handler();

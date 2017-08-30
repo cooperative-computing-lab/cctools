@@ -114,7 +114,7 @@ void category_specify_first_allocation_guess(struct category *c, const struct rm
 }
 
 /* set autoallocation mode for cores, memory, and disk.  To add other resources see category_enable_auto_resource. */
-void category_specify_allocation_mode(struct category *c, int mode) {
+void category_specify_allocation_mode(struct category *c, category_mode_t mode) {
 	struct rmsummary *r = c->autolabel_resource;
 
 	c->allocation_mode = mode;

@@ -97,7 +97,7 @@ struct category {
 };
 
 /* set autoallocation mode cores, memory, and disk. For other resources see category_enable_auto_resource. */
-void category_specify_allocation_mode(struct category *c, int mode);
+void category_specify_allocation_mode(struct category *c, category_mode_t mode);
 /* enable/disable autoallocation for the resource */
 int category_enable_auto_resource(struct category *c, const char *resource_name, int autolabel);
 

@@ -367,7 +367,7 @@ static ub4 jenkins_hash(k, length, initval)
 
 unsigned hash_string(const char *s)
 {
-	return jenkins_hash((const ub1 *) s, strlen(s), 0);
+	return jenkins_hash((const ub1 *) s, strlen(s), (ub4) 0);
 }
 
 /* vim: set noexpandtab tabstop=4: */

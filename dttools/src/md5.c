@@ -153,7 +153,7 @@ static void MD5Transform(state, block)
 {
 	uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
-	Decode(x, block, 64);
+	Decode(x, block, (size_t) 64);
 
 	/* Round 1 */
 	FF(a, b, c, d, x[0], S11, 0xd76aa478);	/* 1 */
@@ -287,7 +287,7 @@ void md5_final(digest, context)
 	size_t index, padLen;
 
 	/* Save number of bits */
-	Encode(bits, context->count, 8);
+	Encode(bits, context->count, (size_t) 8);
 
 	/* Pad out to 56 mod 64.
 	 */
@@ -299,7 +299,7 @@ void md5_final(digest, context)
 	md5_update(context, bits, 8);
 
 	/* Store state in digest */
-	Encode(digest, context->state, 16);
+	Encode(digest, context->state, (size_t) 16);
 
 	/* Zeroize sensitive information.
 	 */

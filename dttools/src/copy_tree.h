@@ -25,6 +25,7 @@ int copy_symlink(const char *source, const char *target);
 
 /* Only copy regular files, directories, and symlinks. */
 typedef enum {
+	FILE_TYPE_ERROR = -1,
 	FILE_TYPE_REG,
 	FILE_TYPE_LNK,
 	FILE_TYPE_DIR,

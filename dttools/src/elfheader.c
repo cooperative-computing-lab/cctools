@@ -141,7 +141,7 @@ static int elf_interp(int fd, int set, char *interp)
 			p16(hdr->e_phentsize);
 			p16(hdr->e_phnum);
 
-			phdr = addr+sizeof(*hdr);
+			phdr = (Elf32_Phdr *) addr + sizeof(*hdr);
 			for (i = 0; i < hdr->e_phnum; i++) {
 				if ((uintptr_t)&phdr[i+1] >= ((uintptr_t)addr+addr_len))
 					CATCH(ENOEXEC);
@@ -178,7 +178,7 @@ static int elf_interp(int fd, int set, char *interp)
 			p16(hdr->e_phentsize);
 			p16(hdr->e_phnum);
 
-			phdr = addr+sizeof(*hdr);
+			phdr = (Elf64_Phdr *) addr + sizeof(*hdr);
 			for (i = 0; i < hdr->e_phnum; i++) {
 				if ((uintptr_t)&phdr[i+1] >= ((uintptr_t)addr+addr_len))
 					CATCH(ENOEXEC);
