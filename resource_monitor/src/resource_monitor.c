@@ -898,14 +898,24 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 	int64_t diff_wall = tail->wall_time - head->wall_time;
 	int64_t diff_cpu  = tail->cpu_time  - head->cpu_time;
 
-	/* hack to elimiate noise. if diff_wall < 60s, we return 1. If command runs
-	 * for more than 60s, the average cpu/wall serves as a fallback in the
-	 * final summary. */
 
 	if(diff_wall < 60) {
+		/* hack to elimiate noise. if diff_wall < 60s, we return 1. If command runs
+		 * for more than 60s, the average cpu/wall serves as a fallback in the
+		 * final summary. */
 		return 1;
 	} else {
-		return (int64_t) MAX(1, ceil( ((double) diff_cpu)/diff_wall));
+		/* hack to eliminate noise. we do not round up unless more than %10 of
+		 * the additional core is used. */
+
+		double raw   = MAX(1, ((double) diff_cpu)/diff_wall);
+		double floor = trunc(raw);
+
+		if(raw - floor > 0.1) {
+			return (int64_t) ceil(raw);
+		} else {
+			return (int64_t) floor;
+		}
 	}
 }
 
