@@ -1460,7 +1460,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	// Start receiving output...
 	t->time_when_retrieval = timestamp_get();
 
-	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION && !q->monitor_do_not_enforce_limits) {
 		result = get_monitor_output_file(q,w,t);
 	} else {
 		result = get_output_files(q,w,t);
