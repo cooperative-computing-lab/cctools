@@ -599,11 +599,12 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 				jx_insert_integer(output, "signal", s->signal);
 				jx_insert_string(output, "exit_type", "signal");
 			} else if( strcmp(s->exit_type, "limits") == 0 ) {
+				jx_insert_string(output, "exit_type", "limits");
 				if(s->limits_exceeded) {
 					struct jx *lim = rmsummary_to_json(s->limits_exceeded, 1);
 					jx_insert(output, jx_string("limits_exceeded"), lim);
 				}
-				jx_insert_string(output, "exit_type", "limits");
+
 			} else {
 				jx_insert_string(output, "exit_type", s->exit_type);
 			}
