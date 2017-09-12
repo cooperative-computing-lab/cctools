@@ -43,16 +43,19 @@
 	struct fuse_root *root = ctx->private_data;
 
 static FILE *stats_out = NULL;
+static int cache_data = 0;
 
 static struct options {
 	int show_help;
 	const char *basedir;
 	const char *stats_file;
+	int cache_data;
 } options;
 
 static const struct fuse_opt option_spec[] = {
 	OPTION("--basedir %s", basedir),
 	OPTION("--stats-file %s", stats_file),
+	OPTION("--cache", cache_data),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	FUSE_OPT_END
@@ -70,6 +73,12 @@ static int cache_open(struct fuse_root *root, const char *path, int flags) {
 	struct grow_dirent *e = grow_lookup(path, root->metadata, 1);
 	if (!e) return -errno;
 	if (flags&O_WRONLY || flags&O_RDWR) return -EROFS;
+
+	if (!cache_data) {
+		stats_inc("grow.fuse.direct_open", 1);
+		while (path[0] == '/') ++path;
+		return openat(root->fd, path, flags);
+	}
 
 retry:
 	if (retries > 10) return -ELOOP;
@@ -382,6 +391,7 @@ int main(int argc, char *argv[]) {
 		assert(fuse_opt_add_arg(&args, "-ononempty") == 0);
 		assert(fuse_opt_add_arg(&args, "-okernel_cache") == 0);
 
+		cache_data = options.cache_data;
 		if (options.stats_file) {
 			stats_enable();
 			stats_out = fopen(options.stats_file, "w");
@@ -390,21 +400,23 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		char path[PATH_MAX];
-		char *tmpdir = getenv("TMPDIR");
-		if (!tmpdir) tmpdir = "/tmp";
-		snprintf(path, sizeof(path), "%s/.growcache", tmpdir);
-		if (mkdir(path, 0755) < 0 && errno != EEXIST) {
-			fatal("failed to make cache dir %s: %s", path, strerror(errno));
-		}
-		root.cache = open(path, O_PATH|O_DIRECTORY);
-		if (root.cache < 0) {
-			fatal("failed to open cache dir %s: %s", path, strerror(errno));
-		}
-		for (unsigned i = 0; i < 256; i++) {
-			sprintf(path, "%02x", i);
-			if (mkdirat(root.cache, path, 0755) < 0 && errno != EEXIST) {
-				fatal("failed to make cache subdir %s: path", path, strerror(errno));
+		if (cache_data) {
+			char path[PATH_MAX];
+			char *tmpdir = getenv("TMPDIR");
+			if (!tmpdir) tmpdir = "/tmp";
+			snprintf(path, sizeof(path), "%s/.growcache", tmpdir);
+			if (mkdir(path, 0755) < 0 && errno != EEXIST) {
+				fatal("failed to make cache dir %s: %s", path, strerror(errno));
+			}
+			root.cache = open(path, O_PATH|O_DIRECTORY);
+			if (root.cache < 0) {
+				fatal("failed to open cache dir %s: %s", path, strerror(errno));
+			}
+			for (unsigned i = 0; i < 256; i++) {
+				sprintf(path, "%02x", i);
+				if (mkdirat(root.cache, path, 0755) < 0 && errno != EEXIST) {
+					fatal("failed to make cache subdir %s: path", path, strerror(errno));
+				}
 			}
 		}
 
