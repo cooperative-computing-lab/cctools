@@ -873,7 +873,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(job_failed) {
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue);
+		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue, storage_allocation);
 		if (prep_failed) {
 			fprintf(stderr, "rule %d failed, cannot move outputs\n",
 					n->nodeid);
@@ -951,7 +951,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			makeflow_failed_flag = 1;
 		}
 	} else {
-		makeflow_clean_rm_fail_dir(d, n, remote_queue);
+		makeflow_clean_rm_fail_dir(d, n, remote_queue, storage_allocation);
 
 		if(makeflow_alloc_use_space(storage_allocation, n)){
 			makeflow_log_alloc_event(d, storage_allocation);

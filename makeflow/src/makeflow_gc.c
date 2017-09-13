@@ -349,7 +349,7 @@ int makeflow_clean_mount_target(const char *target) {
 	return 0;
 }
 
-int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
+int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q, struct makeflow_alloc *alloc) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -359,7 +359,7 @@ int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_q
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto OUT;
 
-	if (makeflow_clean_file(d, q, f, 1)) {
+	if (makeflow_clean_file(d, q, f, 1, alloc)) {
 		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
 		goto OUT;
 	}
@@ -371,7 +371,7 @@ OUT:
 	return rc;
 }
 
-int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
+int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q, struct makeflow_alloc *alloc) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -381,7 +381,7 @@ int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto FAILURE;
 
-	if (makeflow_clean_file(d, q, f, 1)) {
+	if (makeflow_clean_file(d, q, f, 1, alloc)) {
 		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
 		goto FAILURE;
 	}
@@ -401,7 +401,7 @@ FAILURE:
 
 int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 		struct batch_queue *q, struct dag_file *f, int prep_failed,
-		int silent) {
+		int silent, struct makeflow_alloc *alloc) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -426,7 +426,7 @@ int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 	}
 	free(failout);
 CLEANUP:
-	return makeflow_clean_file(d, q, f, silent);
+	return makeflow_clean_file(d, q, f, silent, alloc);
 }
 
 /* vim: set noexpandtab tabstop=4: */
