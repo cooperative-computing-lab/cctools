@@ -27,6 +27,7 @@ See the file COPYING for details.
 #include "daemon.h"
 #include "getopt_aux.h"
 #include "change_process_title.h"
+#include "zlib.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -105,6 +106,12 @@ static const char * history_dir = "catalog.history";
 static int outgoing_alarm = 0;
 static int outgoing_timeout = 300;
 static struct list *outgoing_host_list;
+
+/* Buffer for incoming raw data only needs to be as big as a max datagram. */
+static char raw_data[DATAGRAM_PAYLOAD_MAX];
+
+/* Buffer for uncompressed data is 1MB to accommodate expansion. */
+static char data[1024*1024];
 
 struct datagram *update_dgram = 0;
 
@@ -216,19 +223,38 @@ static void make_hash_key(struct jx *j, char *key)
 
 static void handle_updates(struct datagram *update_port)
 {
-	char data[DATAGRAM_PAYLOAD_MAX * 2];
 	char addr[DATAGRAM_ADDRESS_MAX];
 	char key[LINE_MAX];
 	int port;
-	int result;
+	unsigned long data_length;
+	int raw_data_length;
 	struct jx *j;
 
 	while(1) {
-		result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
-		if(result <= 0)
+		raw_data_length = datagram_recv(update_port, raw_data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
+		if(raw_data_length <= 0)
 			return;
 
-		data[result] = 0;
+		// If the packet starts with Control-Z (0x1A), it is compressed,
+		// so uncompress it to data[].  Otherwise just copy to data[];.
+
+		if(raw_data[0]==0x1A) {
+			data_length = sizeof(data);
+			int success = uncompress((Bytef*)data,&data_length,(const Bytef*)&raw_data[1],raw_data_length-1);
+			if(success!=Z_OK) {
+				debug(D_DEBUG,"warning: %s:%d sent invalid compressed data (ignoring it)\n",addr,port);
+				continue;
+			}
+		} else {
+			memcpy(data,raw_data,raw_data_length);
+			data_length = raw_data_length;
+		}
+
+		// Make sure the string data is null terminated.
+		data[data_length] = 0;
+
+		// Once uncompressed, if it starts with a bracket,
+		// then it is JX/JSON, otherwise it is the legacy nvpair format.
 
 		if(data[0]=='{') {
 			j = jx_parse_string(data);
