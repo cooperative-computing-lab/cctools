@@ -241,13 +241,8 @@ int catalog_query_send_update(const char *hosts, const char *text)
 
 	int res = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
 
-	if(res == Z_BUF_ERROR){
-	    printf("Buffer was too small!\n");
-		return 1;
-	}
-	if(res ==  Z_MEM_ERROR){
-		printf("Not enough memory for compression!\n");
-		return 2;
+	if(success!=Z_OK) {
+		debug(D_DEBUG,"warning: Unable compress data for catalog update.\n",addr,port);
 	}
 
 	do {
