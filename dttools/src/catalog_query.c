@@ -239,10 +239,10 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
 	compress_data[0] = 0x1A;
 
-	int res = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
+	int success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
 
 	if(success!=Z_OK) {
-		debug(D_DEBUG,"warning: Unable compress data for catalog update.\n",addr,port);
+		debug(D_DEBUG,"warning: Unable to compress data for update.\n");
 	}
 
 	do {
