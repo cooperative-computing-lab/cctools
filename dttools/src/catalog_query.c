@@ -216,14 +216,51 @@ void catalog_query_delete(struct catalog_query *q)
 	free(q);
 }
 
+char *catalog_query_compress_update(const char *text, unsigned long *data_length)
+{
+	char *do_compress = getenv("CATALOG_COMPRESS_UPDATES");
+
+	/* Do not compress if env var is set to off.*/
+	if(!do_compress || strcmp(do_compress, "on")) {
+		return NULL;
+	}
+
+	unsigned long compress_data_length;
+	/* Default to buffer error incase we don't compress. */
+	int success = Z_BUF_ERROR;
+
+	/* Estimates the bounds for the compressed data. */
+	compress_data_length = compressBound(*data_length);
+	char* compress_data= malloc(compress_data_length);
+
+	success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, *data_length);
+	/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
+	compress_data[0] = 0x1A;
+
+	/* Copy data over if not compressing or compression failed. */
+	if(success!=Z_OK) {
+		/* Compression failed, fall back to original uncompressed update. */
+		debug(D_DEBUG,"warning: Unable to compress data for update.\n");
+
+		free(compress_data);
+		return NULL;
+	} else {
+		debug(D_DEBUG,"Sending compressed update to catalog.\n");
+		/* Add 1 to the compresed data length to account for the leading 0x1A. */
+		*data_length = compress_data_length + 1;
+		return compress_data;
+	}
+}
+
 int catalog_query_send_update(const char *hosts, const char *text)
 {
 	int port;
 	int sent = 0;
-	unsigned long data_length, compress_data_length;
+	unsigned long data_length;
 	const char *next_host = hosts;
 	char address[DATAGRAM_ADDRESS_MAX];
 	char host[DOMAIN_NAME_MAX];
+	char *compress_data;
 	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
 
 	if (!d) {
@@ -232,36 +269,24 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	
 	data_length = strlen(text)+1;
 
-	/* Estimates the bounds for the compressed data. */
-	compress_data_length = compressBound(data_length);
-	char* compress_data= malloc(compress_data_length);
-
-	/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
-	compress_data[0] = 0x1A;
-
-	int res = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
-
-	if(res == Z_BUF_ERROR){
-	    printf("Buffer was too small!\n");
-		return 1;
-	}
-	if(res ==  Z_MEM_ERROR){
-		printf("Not enough memory for compression!\n");
-		return 2;
-	}
+	compress_data = catalog_query_compress_update(text, &data_length);
 
 	do {
 		next_host = parse_hostlist(next_host, host, &port);
 		if (domain_name_cache_lookup(host, address)) {
 			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
-			/* Add 1 to the compresed data length to account for the leading 0x1A. */
-			datagram_send(d, compress_data, compress_data_length+1, address, port);
+			if(!compress_data) {
+				datagram_send(d, text, data_length, address, port);
+			} else {
+				datagram_send(d, compress_data, data_length, address, port);
+			}
 			sent++;
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
 		}
 	} while (next_host);
 
+	free(compress_data);
 	datagram_delete(d);
 	return sent;
 }
