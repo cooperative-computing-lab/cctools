@@ -243,6 +243,10 @@ int catalog_query_send_update(const char *hosts, const char *text)
 
 	if(success!=Z_OK) {
 		debug(D_DEBUG,"warning: Unable to compress data for update.\n");
+		free(compress_data);
+		compress_data= malloc(data_length);
+		memcpy(compress_data,text,data_length);
+		compress_data_length = data_length;
 	}
 
 	do {
@@ -257,6 +261,8 @@ int catalog_query_send_update(const char *hosts, const char *text)
 		}
 	} while (next_host);
 
+	
+	free(compress_data);
 	datagram_delete(d);
 	return sent;
 }
