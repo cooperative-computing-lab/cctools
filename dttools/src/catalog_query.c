@@ -232,28 +232,44 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	
 	data_length = strlen(text)+1;
 
+	char *do_compress = getenv("CATALOG_COMPRESS_UPDATES");
+
+	/* Default to buffer error incase we don't compress. */
+	int success = Z_BUF_ERROR;
+
 	/* Estimates the bounds for the compressed data. */
 	compress_data_length = compressBound(data_length);
 	char* compress_data= malloc(compress_data_length);
 
-	int success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
-	/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
-	compress_data[0] = 0x1A;
+	/* Do not compress if env var is set to off.*/
+	if(!do_compress || strcmp(do_compress, "off")) {
+		success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
+		/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
+		compress_data[0] = 0x1A;
+	} 
 
+	/* Copy data over if not compressing or compression failed. */
 	if(success!=Z_OK) {
-		debug(D_DEBUG,"warning: Unable to compress data for update.\n");
+		if(!do_compress || strcmp(do_compress, "off")) {
+			/* Compression failed, fall back to original uncompressed update. */
+			debug(D_DEBUG,"warning: Unable to compress data for update.\n");
+		} else {
+			debug(D_DEBUG,"Sending uncompressed update to catalog.\n");
+		}
 		free(compress_data);
 		compress_data= malloc(data_length);
 		memcpy(compress_data,text,data_length);
 		compress_data_length = data_length;
+	} else {
+		/* Add 1 to the compresed data length to account for the leading 0x1A. */
+		compress_data_length += 1;
 	}
 
 	do {
 		next_host = parse_hostlist(next_host, host, &port);
 		if (domain_name_cache_lookup(host, address)) {
 			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
-			/* Add 1 to the compresed data length to account for the leading 0x1A. */
-			datagram_send(d, compress_data, compress_data_length+1, address, port);
+			datagram_send(d, compress_data, compress_data_length, address, port);
 			sent++;
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
