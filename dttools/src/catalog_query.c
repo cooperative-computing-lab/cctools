@@ -241,15 +241,17 @@ static void catalog_update_udp( const char *host, const char *address, int port,
 }
 
 
-static void catalog_update_tcp( const char *host, const char *address, int port, const char *text )
+static int catalog_update_tcp( const char *host, const char *address, int port, const char *text )
 {
 	debug(D_DEBUG, "sending update via tcp to %s(%s):%d", host, address, port);
 
 	time_t stoptime = time(0) + 15;
 	struct link *l = link_connect(address,port,stoptime);
 	if(!l) return 0;
+
 	link_write(l,text,strlen(text),stoptime);
 	link_close(l);
+	return 1;
 }
 
 
@@ -268,10 +270,10 @@ int catalog_query_send_update( const char *hosts, const char *text )
 		if (domain_name_cache_lookup(host, address)) {
 			if(use_udp) {
 				catalog_update_udp( host, address, port, text );
+				sent++;
 			} else {
-				catalog_update_tcp( host, address, port+1, text );
+				sent += catalog_update_tcp( host, address, port+1, text );
 			}
-			sent++;
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
 		}
