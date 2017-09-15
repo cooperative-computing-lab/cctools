@@ -2200,8 +2200,14 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"workers_released",info.workers_released);
 	jx_insert_integer(j,"workers_idled_out",info.workers_idled_out);
 	jx_insert_integer(j,"workers_fast_aborted",info.workers_fast_aborted);
-	jx_insert_integer(j,"workers_blacklisted",info.workers_blacklisted);
 	jx_insert_integer(j,"workers_lost",info.workers_lost);
+
+	//workers_blacklisted adds host names, not a count
+	struct jx *blacklist = blacklisted_to_json(q);
+	if(blacklist) {
+		jx_insert(j,jx_string("workers_blacklisted"), blacklist);
+	}
+
 
 	//send info on tasks
 	jx_insert_integer(j,"tasks_waiting",info.tasks_waiting);
@@ -2245,12 +2251,6 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
-
-	// Add the blacklisted workers
-	struct jx *blacklist = blacklisted_to_json(q);
-	if(blacklist) {
-		jx_insert(j,jx_string("workers_blacklisted"), blacklist);
-	}
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
