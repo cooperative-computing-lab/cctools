@@ -5572,7 +5572,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	struct work_queue_task *t = NULL;
 	// time left?
 
-	while( (stoptime == 0) || (time(0) <= stoptime) ) {
+	while( (stoptime == 0) || (time(0) < stoptime) ) {
 
 		BEGIN_ACCUM_TIME(q, time_internal);
 
