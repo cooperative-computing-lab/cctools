@@ -226,7 +226,8 @@ static void handle_updates(struct datagram *update_port)
 	char addr[DATAGRAM_ADDRESS_MAX];
 	char key[LINE_MAX];
 	int port;
-	unsigned long data_length, raw_data_length;
+	unsigned long data_length;
+	int raw_data_length;
 	struct jx *j;
 
 	while(1) {
