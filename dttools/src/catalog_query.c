@@ -215,31 +215,68 @@ void catalog_query_delete(struct catalog_query *q)
 	free(q);
 }
 
-int catalog_query_send_update(const char *hosts, const char *text)
+static int catalog_update_protocol()
+{
+	const char *protocol = getenv("CATALOG_UPDATE_PROTOCOL");
+	if(!protocol) {
+		return 1;
+	} else if(!strcmp(protocol,"udp")) {
+		return 1;
+	} else if(!strcmp(protocol,"tcp")) {
+		return 0;
+	} else {
+		debug(D_NOTICE,"CATALOG_UPDATE_PROTOCOL=%s but should be 'udp' or 'tcp' intead.",protocol);
+		return 1;
+	}
+}
+
+static void catalog_update_udp( const char *host, const char *address, int port, const char *text )
+{
+	debug(D_DEBUG, "sending update via udp to %s(%s):%d", host, address, port);
+
+	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
+	if(!d) return;
+	datagram_send(d, text, strlen(text), address, port);
+	datagram_delete(d);
+}
+
+
+static void catalog_update_tcp( const char *host, const char *address, int port, const char *text )
+{
+	debug(D_DEBUG, "sending update via tcp to %s(%s):%d", host, address, port);
+
+	time_t stoptime = time(0) + 15;
+	struct link *l = link_connect(address,port,stoptime);
+	if(!l) return 0;
+	link_write(l,text,strlen(text),stoptime);
+	link_close(l);
+}
+
+
+int catalog_query_send_update( const char *hosts, const char *text )
 {
 	int port;
 	int sent = 0;
 	const char *next_host = hosts;
 	char address[DATAGRAM_ADDRESS_MAX];
 	char host[DOMAIN_NAME_MAX];
-	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
 
-	if (!d) {
-		fatal("could not create datagram port!");
-	}
+	int use_udp = catalog_update_protocol();
 
 	do {
 		next_host = parse_hostlist(next_host, host, &port);
 		if (domain_name_cache_lookup(host, address)) {
-			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
-			datagram_send(d, text, strlen(text), address, port);
+			if(use_udp) {
+				catalog_update_udp( host, address, port, text );
+			} else {
+				catalog_update_tcp( host, address, port+1, text );
+			}
 			sent++;
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
 		}
 	} while (next_host);
 
-	datagram_delete(d);
 	return sent;
 }
 
