@@ -107,6 +107,7 @@ static int outgoing_timeout = 300;
 static struct list *outgoing_host_list;
 
 struct datagram *update_dgram = 0;
+struct link *update_port = 0;
 
 void shutdown_clean(int sig)
 {
@@ -214,36 +215,25 @@ static void make_hash_key(struct jx *j, char *key)
 	sprintf(key, "%s:%d:%s", addr, port, name);
 }
 
-static void handle_updates(struct datagram *update_port)
+static void handle_update( const char *addr, const char *data, const char *protocol )
 {
-	char data[DATAGRAM_PAYLOAD_MAX * 2];
-	char addr[DATAGRAM_ADDRESS_MAX];
 	char key[LINE_MAX];
-	int port;
-	int result;
-	struct jx *j;
-
-	while(1) {
-		result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
-		if(result <= 0)
-			return;
-
-		data[result] = 0;
+	struct jx *j=0;
 
 		if(data[0]=='{') {
 			j = jx_parse_string(data);
 			if(!j) {
 				debug(D_DEBUG,"warning: %s:%d sent invalid JSON data (ignoring it)\n%s\n",addr,port,data);
-				continue;
+				return;
 			}
 			if(!jx_is_constant(j)) {
 				debug(D_DEBUG,"warning: %s:%d sent non-constant JX data (ignoring it)\n%s\n",addr,port,data);
 				jx_delete(j);
-				continue;
+				return;
 			}
 		} else {
 			struct nvpair *nv = nvpair_create();
-			if(!nv) continue;
+			if(!nv) return;
 			nvpair_parse(nv, data);
 			j = nvpair_to_jx(nv);
 			nvpair_delete(nv);
@@ -290,8 +280,47 @@ static void handle_updates(struct datagram *update_port)
 
 		jx_database_insert(table, key, j);
 
-		debug(D_DEBUG, "received udp update from %s", key);
+		debug(D_DEBUG, "received %s update from %s",protocol,key);
+}
+
+static void handle_udp_updates(struct datagram *update_port)
+{
+	char data[DATAGRAM_PAYLOAD_MAX];
+	char addr[DATAGRAM_ADDRESS_MAX];
+	int port;
+
+	while(1) {
+		int result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
+		if(result <= 0)
+			return;
+
+		data[result] = 0;
+		handle_update(addr,data,"udp");
 	}
+}
+
+void handle_tcp_update( struct link *update_port )
+{
+	char data[1024*1024];
+
+	time_t stoptime = time(0) + 5;
+
+	struct link *l = link_accept(update_port,stoptime);
+	if(!l) return;
+
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+
+	link_address_remote(l,addr,&port);
+
+	int length = link_read(l,data,sizeof(data)-1,stoptime);
+
+	if(length>0) {
+		data[length] = 0;
+		handle_update(addr,data,"tcp");
+	}
+
+	link_close(l);
 }
 
 static struct jx_table html_headers[] = {
@@ -672,12 +701,22 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on UDP port %d", port);
 	}
 
+	update_port = link_serve_address(interface,port+1);
+	if(!update_port) {
+		if(interface)
+			fatal("couldn't listen on TCP address %s port %d", interface, port+1);
+		else
+			fatal("couldn't listen on TCP port %d", port+1);
+	}
+
 	opts_write_port_file(port_file,port);
 
 	while(1) {
 		fd_set rfds;
-		int ufd = datagram_fd(update_dgram);
+		int dfd = datagram_fd(update_dgram);
 		int lfd = link_fd(list_port);
+		int ufd = link_fd(update_port);
+
 		int result, maxfd;
 		struct timeval timeout;
 
@@ -700,11 +739,12 @@ int main(int argc, char *argv[])
 		}
 
 		FD_ZERO(&rfds);
+		FD_SET(dfd, &rfds);
 		FD_SET(ufd, &rfds);
 		if(child_procs_count < child_procs_max) {
 			FD_SET(lfd, &rfds);
 		}
-		maxfd = MAX(ufd, lfd) + 1;
+		maxfd = MAX(ufd,MAX(dfd, lfd)) + 1;
 
 		timeout.tv_sec = 5;
 		timeout.tv_usec = 0;
@@ -713,8 +753,12 @@ int main(int argc, char *argv[])
 		if(result <= 0)
 			continue;
 
+		if(FD_ISSET(dfd, &rfds)) {
+			handle_udp_updates(update_dgram);
+		}
+
 		if(FD_ISSET(ufd, &rfds)) {
-			handle_updates(update_dgram);
+			handle_tcp_update(update_port);
 		}
 
 		if(FD_ISSET(lfd, &rfds)) {

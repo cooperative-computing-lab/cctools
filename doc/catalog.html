@@ -102,6 +102,17 @@ These updates must be repeated on a regular basis, typically every 5 minutes,
 in order to keep the catalog up to date.  If an update is not received after
 15 minutes, the entry is removed from the catalog.
 </p>
+
+<p>
+By default, catalog updates are sent via the UDP protocol, which is
+fast and efficient for small (<1KB) messages.  If you have large messages
+or unusual networking conditions, you can alternatively send catalog
+updates via TCP instead.  To do this, set the following environment variable:
+</p>
+
+<pre>
+CATALOG_UPDATE_PROTOCOL=tcp
+</pre>
  
 <h2 id="running">Running a Catalog Server<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>
 <p>You may want to establish your own catalog server.  This can be
