@@ -545,7 +545,7 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	struct link *link, *list_port = 0;
+	struct link *link, *query_port = 0;
 	signed char ch;
 	time_t current;
 	int is_daemon = 0;
@@ -689,8 +689,8 @@ int main(int argc, char *argv[])
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
-	list_port = link_serve_address(interface, port);
-	if(list_port) {
+	query_port = link_serve_address(interface, port);
+	if(query_port) {
 		/*
 		If a port was chosen automatically, read it back
 		so that the same one can be used for the update port.
@@ -700,7 +700,7 @@ int main(int argc, char *argv[])
 
 		if(port==0) {
 			char addr[LINK_ADDRESS_MAX];
-			link_address_local(list_port,addr,&port);
+			link_address_local(query_port,addr,&port);
 		}
 	} else {
 		if(interface)
@@ -730,7 +730,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		fd_set rfds;
 		int dfd = datagram_fd(update_dgram);
-		int lfd = link_fd(list_port);
+		int lfd = link_fd(query_port);
 		int ufd = link_fd(update_port);
 
 		int result, maxfd;
@@ -778,7 +778,7 @@ int main(int argc, char *argv[])
 		}
 
 		if(FD_ISSET(lfd, &rfds)) {
-			link = link_accept(list_port, time(0) + 5);
+			link = link_accept(query_port, time(0) + 5);
 			if(link) {
 				if(fork_mode) {
 					pid_t pid = fork();
