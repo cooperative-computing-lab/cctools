@@ -287,6 +287,7 @@ static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct w
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
+static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_uplink );
 
 char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct rmsummary *limits);
 
@@ -750,7 +751,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
 	// Generate the master status in an jx, and print it to a buffer.
-	struct jx *j = queue_to_jx(q,foreman_uplink);
+	struct jx *j = queue_lean_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
@@ -2169,7 +2170,7 @@ static struct jx *categories_to_jx(struct work_queue *q) {
 
 /*
 queue_to_jx examines the overall queue status and creates
-an jx expression which can be sent to the catalog or directly to the
+an jx expression which can be sent directly to the
 user that connects via work_queue_status.
 */
 
@@ -2300,6 +2301,89 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	return j;
 }
+
+/*
+queue_to_jx examines the overall queue status and creates
+an jx expression which can be sent to the catalog.
+It different from queue_to_jx in that only the minimum information that
+workers, work_queue_status and the work_queue_factory need.
+*/
+
+static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_uplink )
+{
+	struct jx *j = jx_object(0);
+	if(!j) return 0;
+
+	// Insert all properties from work_queue_stats
+
+	struct work_queue_stats info;
+	work_queue_get_stats(q,&info);
+
+	//information regarding how to contact the master
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
+	jx_insert_string(j,"type","wq_master");
+	jx_insert_integer(j,"port",work_queue_port(q));
+
+	char owner[USERNAME_MAX];
+	username_get(owner);
+	jx_insert_string(j,"owner",owner);
+
+	if(q->name) jx_insert_string(j,"project",q->name);
+	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
+
+
+
+	struct jx *interfaces = interfaces_of_host();
+	if(interfaces) {
+		jx_insert(j,jx_string("network_interfaces"),interfaces);
+	}
+
+	//task information for general work_queue_status report
+	jx_insert_integer(j,"tasks_waiting",info.tasks_waiting);
+	jx_insert_integer(j,"tasks_running",info.tasks_running);
+	jx_insert_integer(j,"tasks_complete",info.tasks_done);    // tasks_complete is deprecated, but the old work_queue_status expects it.
+
+	//addtional task information for work_queue_factory
+	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
+	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
+
+	//capacity information the factory needs
+	jx_insert_integer(j,"capacity_tasks",info.capacity_tasks);
+	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
+	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
+	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
+	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
+
+	//resources information the factory needs
+	struct rmsummary *total = total_resources_needed(q);
+	jx_insert_integer(j,"tasks_total_cores",total->cores);
+	jx_insert_integer(j,"tasks_total_memory",total->memory);
+	jx_insert_integer(j,"tasks_total_disk",total->disk);
+
+	//worker information for general work_queue_status report
+	jx_insert_integer(j,"workers",info.workers_connected);
+
+
+	//additional worker information the factory needs
+	struct jx *blacklist = blacklisted_to_json(q);
+	if(blacklist) {
+		jx_insert(j,jx_string("workers_blacklisted"), blacklist);   //danger! unbounded field
+	}
+
+	// Add information about the foreman
+	if(foreman_uplink) {
+		int port;
+		char address[LINK_ADDRESS_MAX];
+		char addrport[WORK_QUEUE_LINE_MAX];
+
+		link_address_remote(foreman_uplink,address,&port);
+		sprintf(addrport,"%s:%d",address,port);
+		jx_insert_string(j,"my_master",addrport);
+	}
+
+	return j;
+}
+
 
 
 void current_tasks_to_jx( struct jx *j, struct work_queue_worker *w )
