@@ -2329,6 +2329,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_string(j,"owner",owner);
 
 	if(q->name) jx_insert_string(j,"project",q->name);
+	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
 	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
 
 
