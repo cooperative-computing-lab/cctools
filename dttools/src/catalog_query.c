@@ -236,10 +236,9 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	compress_data_length = compressBound(data_length);
 	char* compress_data= malloc(compress_data_length);
 
+	int success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
 	/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
 	compress_data[0] = 0x1A;
-
-	int success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
 
 	if(success!=Z_OK) {
 		debug(D_DEBUG,"warning: Unable to compress data for update.\n");
