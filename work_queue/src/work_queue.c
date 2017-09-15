@@ -2183,9 +2183,24 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	struct work_queue_stats info;
 	work_queue_get_stats(q,&info);
 
+	// Add special properties expected by the catalog server
+	char owner[USERNAME_MAX];
+	username_get(owner);
+
+	jx_insert_string(j,"type","wq_master");
+	if(q->name) jx_insert_string(j,"project",q->name);
+	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
+	jx_insert_string(j,"working_dir",q->workingdir);
+	jx_insert_string(j,"owner",owner);
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_integer(j,"port",work_queue_port(q));
 	jx_insert_integer(j,"priority",info.priority);
-	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
+	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
+
+	struct jx *interfaces = interfaces_of_host();
+	if(interfaces) {
+		jx_insert(j,jx_string("network_interfaces"),interfaces);
+	}
 
 	//send info on workers
 	jx_insert_integer(j,"workers",info.workers_connected);
@@ -2214,6 +2229,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"tasks_on_workers",info.tasks_on_workers);
 	jx_insert_integer(j,"tasks_running",info.tasks_running);
 	jx_insert_integer(j,"tasks_with_results",info.tasks_with_results);
+	jx_insert_integer(j,"tasks_left",q->num_tasks_left);
 
 	jx_insert_integer(j,"tasks_submitted",info.tasks_submitted);
 	jx_insert_integer(j,"tasks_dispatched",info.tasks_dispatched);
@@ -2250,28 +2266,10 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 
-	jx_insert_string(j,"master_preferred_connection",q->master_preferred_connection);
-
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
 	aggregate_workers_resources(q,&r);
 	work_queue_resources_add_to_jx(&r,j);
-
-	char owner[USERNAME_MAX];
-	username_get(owner);
-
-	// Add special properties expected by the catalog server
-	jx_insert_string(j,"type","wq_master");
-	if(q->name) jx_insert_string(j,"project",q->name);
-	jx_insert_integer(j,"starttime",(q->stats->time_when_started/1000000)); // catalog expects time_t not timestamp_t
-	jx_insert_string(j,"working_dir",q->workingdir);
-	jx_insert_string(j,"owner",owner);
-	jx_insert_string(j,"version",CCTOOLS_VERSION);
-
-	struct jx *interfaces = interfaces_of_host();
-	if(interfaces) {
-		jx_insert(j,jx_string("network_interfaces"),interfaces);
-	}
 
 	// If this is a foreman, add the master address and the disk resources
 	if(foreman_uplink) {
