@@ -46,6 +46,12 @@ See the file COPYING for details.
 /* Timeout in communicating with the querying client */
 #define HANDLE_QUERY_TIMEOUT 15
 
+/* Very short timeout to deal with TCP update, which blocks the server. */
+#define HANDLE_TCP_UPDATE_TIMEOUT 5
+
+/* Maximum size of a JX record arriving via TCP is 1MB. */
+#define TCP_PAYLOAD_MAX 1024*1024
+
 /* The table of record, hashed on address:port */
 static struct jx_database *table = 0;
 
@@ -283,6 +289,11 @@ static void handle_update( const char *addr, const char *data, const char *proto
 		debug(D_DEBUG, "received %s update from %s",protocol,key);
 }
 
+/*
+Where possible, we prefer to accept short updates via UDP,
+because these can be accepted quickly in a non-blocking manner.
+*/
+
 static void handle_udp_updates(struct datagram *update_port)
 {
 	char data[DATAGRAM_PAYLOAD_MAX];
@@ -299,11 +310,16 @@ static void handle_udp_updates(struct datagram *update_port)
 	}
 }
 
+/*
+Where necessary, we accept updates via TCP, but they cause
+the server to block, and so we impose a very short timeout on top.
+*/
+
 void handle_tcp_update( struct link *update_port )
 {
-	char data[1024*1024];
+	char data[TCP_PAYLOAD_MAX];
 
-	time_t stoptime = time(0) + 5;
+	time_t stoptime = time(0) + HANDLE_TCP_UPDATE_TIMEOUT;
 
 	struct link *l = link_accept(update_port,stoptime);
 	if(!l) return;
