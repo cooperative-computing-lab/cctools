@@ -247,7 +247,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 
-		//int capacity_instantaneous = jx_lookup_integer(j, "capacity_instantaneous");
 		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
