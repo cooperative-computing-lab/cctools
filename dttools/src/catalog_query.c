@@ -286,10 +286,7 @@ int catalog_query_send_update(const char *hosts, const char *text)
 		}
 	} while (next_host);
 
-	if(compress_data){
-		free(compress_data);
-	}
-
+	free(compress_data);
 	datagram_delete(d);
 	return sent;
 }
