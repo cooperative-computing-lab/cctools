@@ -113,6 +113,7 @@ typedef enum {
 	JX_BUILTIN_LAMBDA,
 	JX_BUILTIN_RANGE,
 	JX_BUILTIN_FORMAT,
+	JX_BUILTIN_JOIN,
 } jx_builtin_t;
 
 struct jx_function {

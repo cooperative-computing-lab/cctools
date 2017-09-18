@@ -170,3 +170,63 @@ struct jx *jx_function_range(struct jx *args) {
 
 	return result;
 }
+
+
+struct jx *jx_function_join(struct jx *orig_args) {
+	const char *funcname = "join";
+	const char *err = NULL;
+
+	struct jx *args = jx_copy(orig_args);
+	
+	int length = jx_array_length(args);
+	if(length>2){
+		err = "too many arguments to join";
+		goto FAILURE;
+	}
+	else if(length<=0){
+		err = "too few arguments to join";
+		goto FAILURE;
+	}
+	
+	struct jx *list = jx_array_shift(args);
+	if (!jx_istype(list, JX_ARRAY)){
+		err = "A list must be the first argument in join";
+		goto FAILURE;
+	}
+	
+	struct jx *delimeter=NULL;
+	if (length==2){
+		delimeter  = jx_array_shift(args);
+		if(!jx_istype(delimeter, JX_STRING)){
+			err = "A list must be the first argument in join";
+			goto FAILURE;
+		}
+	}
+	
+	char *result=xxstrdup("");	
+	int list_length = jx_array_length(list);
+	int location = 0;
+	struct jx *value=jx_array_shift(list);
+	while(value){
+		result = string_combine(result, value->u.string_value);
+		if(location<list_length-1){	
+			if(delimeter) result = string_combine(result, delimeter->u.string_value);
+			result = string_combine(result, " ");
+		}
+		value = jx_array_shift(list);
+		++location;
+	}
+	
+	jx_delete(args);
+	jx_delete(list);
+	jx_delete(delimeter);
+	struct jx *j = jx_string(result);
+	free(result);
+	return j;
+	
+	FAILURE:
+	    jx_delete(args);
+	    free(result);
+	    FAIL(funcname, JX_BUILTIN_FORMAT, orig_args, err);
+}
+
