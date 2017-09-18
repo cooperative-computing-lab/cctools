@@ -104,20 +104,20 @@ in order to keep the catalog up to date.  If an update is not received after
 </p>
 
 <p>
-Catalog updates are compressed to limit the possibility of packets being
-dropped enroute to the catalog. To disable this set the environment 
-variable <b>CATALOG_COMPRESS_UPDATES</b> to <b>off</b>.
+Catalog updates are now able to be compressed, limiting the possibility 
+of packets being dropped enroute to the catalog. To enable this set the 
+environment variable <b>CATALOG_COMPRESS_UPDATES</b> to <b>on</b>.
 </p>
 
 <p>
 Examples<br>
 CSH:<br>
-<code><b>setenv CATALOG_COMPRESS_UPDATES off</b></code>
+<code><b>setenv CATALOG_COMPRESS_UPDATES on</b></code>
 </p>
 
 <p>
 Bash:<br>
-<code><b>export CATALOG_COMPRESS_UPDATES=off</b></code>
+<code><b>export CATALOG_COMPRESS_UPDATES=on</b></code>
 </p>
 
 <h2 id="running">Running a Catalog Server<a class="sectionlink" href="#running" title="Link to this section.">&#x21d7;</a></h2>

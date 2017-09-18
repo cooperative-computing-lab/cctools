@@ -242,7 +242,7 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	char* compress_data= malloc(compress_data_length);
 
 	/* Do not compress if env var is set to off.*/
-	if(!do_compress || strcmp(do_compress, "off")) {
+	if(do_compress && !strcmp(do_compress, "on")) {
 		success = compress((Bytef*)compress_data+1, &compress_data_length, (const Bytef*)text, data_length);
 		/* Prefix the data with 0x1A (Control-Z) to indicate a compressed packet. */
 		compress_data[0] = 0x1A;
@@ -250,17 +250,16 @@ int catalog_query_send_update(const char *hosts, const char *text)
 
 	/* Copy data over if not compressing or compression failed. */
 	if(success!=Z_OK) {
-		if(!do_compress || strcmp(do_compress, "off")) {
+		if(do_compress && !strcmp(do_compress, "on")) {
 			/* Compression failed, fall back to original uncompressed update. */
 			debug(D_DEBUG,"warning: Unable to compress data for update.\n");
-		} else {
-			debug(D_DEBUG,"Sending uncompressed update to catalog.\n");
 		}
 		free(compress_data);
 		compress_data= malloc(data_length);
 		memcpy(compress_data,text,data_length);
 		compress_data_length = data_length;
 	} else {
+		debug(D_DEBUG,"Sending compressed update to catalog.\n");
 		/* Add 1 to the compresed data length to account for the leading 0x1A. */
 		compress_data_length += 1;
 	}
