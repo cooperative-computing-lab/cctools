@@ -5452,6 +5452,20 @@ static void print_password_warning( struct work_queue *q )
 
 struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 {
+
+	if(timeout == 0) {
+		// re-establish old, if unintended behavior, where 0 would wait at
+		// least a second. With 0, we would like the loop to be executed at
+		// least once, but right now we cannot enforce that. Making it 1, we
+		// guarantee that the wait loop is executed once.
+		timeout = 1;
+	}
+
+	if(timeout != WORK_QUEUE_WAITFORTASK && timeout < 0) {
+		debug(D_NOTICE|D_WQ, "Invalid wait timeout value '%d'. Waiting for 5 seconds.", timeout);
+		timeout = 5;
+	}
+
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
