@@ -6,7 +6,7 @@ PERL_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VER
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 # Perl also defines some HAS_* stuff so we need to undefine those too.
 LOCAL_CCFLAGS = -w -UHAS_USLEEP -UHAS_ISNAN -UHAS_UTIME -fPIC -Wno-unused-value -Wno-unused-variable $(CCTOOLS_PERL_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_PERL_LDFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_PERL_LDFLAGS) -lz
 
 EXTERNAL_DEPENDENCIES = ../libwork_queue.a ../../../dttools/src/libdttools.a
 WQPERLSO = work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
