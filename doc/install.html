@@ -36,14 +36,15 @@ Binary packages are available for several operating systems at the
 <a href="http://ccl.cse.nd.edu/software/download.shtml">download page</a>
 Simply unpack the tarball in any directory that you like,
 and then add the <tt>bin</tt> directory to your path.
-For example, to install cctools 6.0.15 for RHEL7 in your home directory:
+For example, to install cctools for RHEL7 in your home directory:
 </p>
 
-<code>cd $HOME
-wget http://ccl.cse.nd.edu/software/files/cctools-6.0.15-x86_64-redhat7.tar.gz
-gunzip cctools-6.0.15-x86_64-redhat7.tar.gz
-tar xvf cctools-6.0.15-x86_64-redhat7.tar
-export PATH=$HOME/cctools-6.0.15-x86_64-redhat7/bin:$PATH
+<code># replace VERSION with a version number found in the download page.
+CCTOOLS_NAME=cctools-VERSION-x86_64-redhat7
+cd $HOME
+wget http://ccl.cse.nd.edu/software/files/${CCTOOLS_NAME}.tar.gz
+tar zxvf ${CCTOOLS_NAME}.tar.gz
+export PATH=$HOME/${CCTOOLS_NAME}/bin:$PATH
 </code>
 
 <h2>Install From Source Tarball</h2>
@@ -53,10 +54,11 @@ Download a source package from the <a href="http://ccl.cse.nd.edu/software/downl
 And follow this recipe while logged in as any ordinary user:
 </p>
 
-<code>wget http://ccl.cse.nd.edu/software/files/cctools-6.0.15-source.tar.gz
-gunzip cctools-6.0.15-source.tar.gz
-tar xvf cctools-6.0.15-source.tar
-cd cctools-6.0.15-source
+<code># replace VERSION with a version number found in the download page.
+CCTOOLS_NAME=cctools-VERSION-source
+wget http://ccl.cse.nd.edu/software/files/${CCTOOLS_NAME}.tar.gz
+tar zxvf ${CCTOOLS_NAME}.tar.gz
+cd ${CCTOOLS_NAME}
 ./configure
 make
 make install
