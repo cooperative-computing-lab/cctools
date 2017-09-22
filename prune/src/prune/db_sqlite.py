@@ -572,7 +572,6 @@ CREATE TABLE IF NOT EXISTS todos (
 	def task_get( self, batch ):
 		calls = []
 		timer.start('db.task.get')
-
 		while True:
 			try:
 

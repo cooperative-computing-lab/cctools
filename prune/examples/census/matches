@@ -39,8 +39,8 @@ while line:
                 ones = True
         if ones and no_more:
             for l in matching_lines:
-                print l
-            print ''
+                print(l)
+            print('')
 
         cnt = 0
         ycnts = {}

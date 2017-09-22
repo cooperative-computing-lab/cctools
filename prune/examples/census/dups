@@ -25,10 +25,10 @@ while line:
         matching_lines.append( line )
     else:
         if len(matching_lines)>0:
-            print first_line
+            print(first_line)
             for l in matching_lines:
-                print l
-            print ''
+                print(l)
+            print('')
             matching_lines = []
         first_line = line
     cnt += 1

@@ -31,7 +31,7 @@ padding: 0.3%;
 <div id="manual">
 <h1>Prune User's Manual</h1>
 
-<p style="text-align: right;"><b>Last edited: June 2016</b></p>
+<p style="text-align: right;"><b>Last edited: September 2017</b></p>
 
 <p>Prune is Copyright (C) 2014- The University of Notre Dame.<br>
 All rights reserved.<br>
@@ -50,13 +50,13 @@ See the file COPYING for details.</p>
 <p>
 Prune is part of the <a href="http://ccl.cse.nd.edu/software">Cooperating Computing Tools</a>.
 The CCTools package can be downloaded from <a href="http://ccl.cse.nd.edu/software/download">this web page</a>.
-Follow the <a href=install.html>installation instructions</a> to setup CCTools
+Follow the <a href=../install.html>installation instructions</a> to setup CCTools
 required for running Prune.
 </p>
 
 <p>
 You will also need to set PYTHONPATH so that Prune modules from cctools can be imported in a Python script:</p>
-<code style="margin-right: auto;">export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python2.6/site-packages</code>
+<code style="margin-right: auto;">export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python2.7/site-packages</code>
 </p>
 
 
@@ -69,7 +69,10 @@ You will also need to set PYTHONPATH so that Prune modules from cctools can be i
   <code style="margin-right: auto;">###### Connect to a Prune repository ######
 ###### (Default location: ~/.prune) ######
 from prune import client
-prune = client.Connect()
+from os.path import expanduser
+
+HOME = expanduser("~")
+prune = client.Connect(base_dir = HOME+'/.prune') #Prune data is stored in base_dir
 
 ###### Import sources stage ######
 E1 = prune.nil
@@ -104,7 +107,7 @@ prune.export( D5, 'merge_sort.prune', lineage=2 )
 <p>  With CCTools libraries in your PYTHONPATH, you can execute the workflow with this command:</p>
 </p>
 
-<code style="margin-right: auto;">python2.6 merge_sort.py</code>
+<code style="margin-right: auto;">python merge_sort.py</code>
 
 <p>
   The merged results can be found in a file called merged_words.txt and the file merge_sort.prune contains a sharable package that describes the full workflow.
@@ -121,13 +124,15 @@ prune.export( D5, 'merge_sort.prune', lineage=2 )
   <p>The script command to specify an Umbrella environment looks like this:</p>
 
   <code style="margin-right: auto;">E1 = prune.envi_add( engine='umbrella', spec='cms.umbrella',
-        cvmfs_http_proxy='http://cache01.hep.wisc.edu:3128',
-        sandbox_mode='parrot', log='umbrella.log' )</code>
+                    sandbox_mode='parrot', log='umbrella.log',
+                    cms_siteconf='SITECONF.tar.gz',
+                    cvmfs_http_proxy='http://eddie.crc.nd.edu:3128',
+                    http_proxy='http://eddie.crc.nd.edu:3128' )</code>
 
 <p>  Execute the workflow with this command:</p>
 </p>
 
-<code style="margin-right: auto;">python2.6 hep.py</code>
+<code style="margin-right: auto;">python hep.py</code>
 
 
 <h2 id="census_example">Prune Example Workflow: U.S. Census<a class="sectionlink" href="#census_example" title="Link to this section.">&#x21d7;</a></h2>
@@ -142,7 +147,7 @@ prune.export( D5, 'merge_sort.prune', lineage=2 )
 
   <p>Now, running the workflow script initiates a Work Queue master that will wait for workers to attach to it in order to execute the tasks.</p>
 
-  <code style="margin-right: auto;">python2.6 match_people.py</code>
+  <code style="margin-right: auto;">python match_people.py</code>
 
   <p>The following command line instruction is one way to assign 10 workers to the Work Queue master:</p>
 

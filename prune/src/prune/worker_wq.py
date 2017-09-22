@@ -212,7 +212,9 @@ class Worker:
 			self.close_cmd = "echo \"prune_cmd_end `date '+%%s.%%N'`\" >> %s; " % (self.log_pathname) + self.close_cmd
 
 
+			print self.args,self.params
 			for i, arg in enumerate( self.args ):
+				# print i, arg, self.params
 				param = self.params[i]
 				it = glob.db.find_one( arg )
 				if not it:
@@ -283,9 +285,16 @@ class Worker:
 
 
 			inner_cmds = [	self.open_cmd_inner.strip(),
+							'ls -lahr /tmp >> %s' % (self.log_pathname),
+							'echo "/tmp/umbrella_prune/%s" >> %s' % (self.sbid, self.log_pathname),
 							'/bin/sh '+call_body['cmd'].strip(),
 							self.close_cmd_inner.strip(),
-							'mv %s final_data/%s' % (self.log_pathname, self.log_pathname)  ]
+							'mv %s final_data/%s' % (self.log_pathname, self.log_pathname),
+							'find /tmp >> %s' % (self.log_pathname),
+							'find /tmp/final_data >> %s' % (self.log_pathname),
+							'ls -lahr /tmp >> %s' % (self.log_pathname),
+							'ls -lahr /tmp/final_data >> %s' % (self.log_pathname),
+										]
 
 			arg_str = '  %sPRUNE_EXEC=PRUNE_EXEC_INNER' % (self.virtual_folder)
 
@@ -342,7 +351,7 @@ class Worker:
 			exec_file.write( "--log %s \\\n" % (env.body['log']) )
 			exec_file.write( "--spec %s \\\n" % (param) )
 			exec_file.write( "--localdir /tmp/umbrella_prune/ \\\n" )
-			exec_file.write( '--input "%s"  \\\n' % (arg_str[2:]) )
+			exec_file.write( '--inputs "%s"  \\\n' % (arg_str[2:]) )
 			exec_file.write( '--output "/tmp/final_data=/tmp/umbrella_prune/%s"  \\\n' % (self.sbid) )
 
 			if 'cvmfs_http_proxy' in env.body:
@@ -351,7 +360,7 @@ class Worker:
 
 
 			exec_file.write( self.close_cmd+"\n\n" )
-			#exec_file.write( "find ./\n\n" )
+			exec_file.write( "find /tmp/umbrella_prune/%s >> %s\n\n" % (self.sbid, self.log_pathname) )
 			exec_file.write( "cat /tmp/umbrella_prune/%s/PRUNE_TASK_LOG >> %s\n\n" % (self.sbid, self.log_pathname) )
 			exec_file.write( "echo \"prune_stage_out_start `date '+%%s'`\" >> %s\n" % (self.log_pathname) )
 			for ret in call_body['returns']:

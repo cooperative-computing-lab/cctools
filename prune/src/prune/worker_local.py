@@ -37,7 +37,6 @@ class Master:
 		sys.stdout.flush()
 		if batch:
 			calls = db.task_get( batch )
-
 			for call in calls:
 				self.execute( call )
 				started_worker_cnt += 1
@@ -69,12 +68,14 @@ class Master:
 
 				if worker.process.returncode != 0:
 					if len(stdout)>0:
-						d( 'exec', 'stdout:', stdout )
+						d( 'exec', 'stdout:\n', stdout )
 					if len(stderr)>0:
-						d( 'exec', 'stderr:', stderr )
+						d( 'exec', 'stderr:\n', stderr )
 				else:
+					if len(stdout)>0:
+						print 'stdout:\n', stdout
 					if len(stderr)>0:
-						print 'stderr:', stderr
+						print 'stderr:\n', stderr
 
 				worker.finish()
 				del self.workers[k]
@@ -128,6 +129,7 @@ class Worker:
 		self.process = None
 
 	def start( self ):
+		print 'starting...'
 		timer.start('work.stage_in')
 
 		self.start = time.time()
@@ -159,6 +161,7 @@ class Worker:
 			self.env = env = glob.db.find_one( env_key )
 
 		my_env = os.environ
+		print my_env
 
 
 		if env_key == self.nil or (env and env.body['engine'] == 'wrapper'):
@@ -176,6 +179,12 @@ class Worker:
 			for i, arg in enumerate( self.args ):
 				param = self.params[i]
 				it = glob.db.find_one( arg )
+				directory = os.path.dirname(self.sandbox + param)
+				try:
+				    os.stat(directory)
+				except:
+				    os.mkdir(directory)
+
 				if it.path:
 					if it.type == 'temp':
 						os.symlink( glob.cache_file_directory+it.path, self.sandbox + param )
@@ -267,7 +276,7 @@ class Worker:
 				exec_file.write( "--log %s \\\n" % (env.body['log']) )
 				exec_file.write( "--spec %s \\\n" % (param) )
 				exec_file.write( "--localdir /tmp/umbrella_prune/ \\\n" )
-				exec_file.write( '--input "%s"  \\\n' % (arg_str[2:]) )
+				exec_file.write( '--inputs "%s"  \\\n' % (arg_str[2:]) )
 				exec_file.write( '--output "/tmp/final_data=/tmp/umbrella_prune/%s"  \\\n' % (self.sbid) )
 
 				if 'cvmfs_http_proxy' in env.body:
@@ -316,7 +325,11 @@ class Worker:
 					results.append( cbid.strip() )
 				elif line.startswith('filesize'):
 					(a, fname, size) = line.split(' ')
-					sizes.append( int(size.strip()) )
+					size = size.strip()
+					if size and len(size)>0:
+						sizes.append( int(size) )
+					else:
+						sizes.append( -1 )
 				elif line.startswith('prune_call_start'):
 					(a, estart) = line.split(' ')
 				elif line.startswith('prune_call_end'):

@@ -6,7 +6,11 @@
 # See the file COPYING for details.
 
 from prune import client
-prune = client.Connect() #Connect to SQLite3
+from os.path import expanduser
+
+
+HOME = expanduser("~")
+prune = client.Connect(base_dir = HOME+'/.prune') #Prune data is stored in base_dir
 
 ###### Import sources stage ######
 E1 = prune.nil

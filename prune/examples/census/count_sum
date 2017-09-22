@@ -11,7 +11,7 @@ lowests = []
 for fname in sys.argv[1:]:
 	f = open( fname, 'r' )
 	line = f.readline()
-	#print line
+	#print(line)
 	pos = line.rfind('|')
 	key = line[0:pos]
 	cnt = int( line[pos+1:-1] )
@@ -48,7 +48,7 @@ while True:
 		else:
 			lines[i] = None
 
-	outdata.write( "%s|%i\n" % (lowest, total) )	
+	outdata.write( "%s|%i\n" % (lowest, total) )
 	#c += 1
 	#if c>10:
 	#	break

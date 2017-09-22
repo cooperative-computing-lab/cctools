@@ -7,8 +7,11 @@
 import os, sys, random, time
 
 from prune import client
+from os.path import expanduser
 
-prune = client.Connect()
+
+HOME = expanduser("~")
+prune = client.Connect(base_dir = HOME+'/.prune') #Prune data is stored in base_dir
 
 
 years = [3000,3010]
@@ -67,12 +70,10 @@ for year in years:
             args=[counter, nkey], params=['count','input_data_%i_%i'%(year,k)] )
         counts[year].append( ckey )
 
-        #prune.file_dump( counts[year][-1], 'count%i.txt'%year )
+        # prune.file_dump( counts[year][-1], 'count%i.txt'%year )
 
 for year in years:
     print 'counts[%i] = %s' % (year, counts[year])
-
-
 
 
 ##############################
@@ -126,8 +127,8 @@ counts_all, = prune.task_add( returns=['output'],
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
-prune.execute( worker_type='work_queue', name='prune_census_example' )
+prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 prune.file_dump( counts_all, 'counts_all.txt' )
 
@@ -183,8 +184,8 @@ for field in fields:
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
-prune.execute( worker_type='work_queue', name='prune_census_example' )
+prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 prune.file_dump( frequent_values['FN'], 'most_frequent_FN.txt' )
 
@@ -206,22 +207,22 @@ compare_words = prune.file_add( 'compare_word' )
 max_comparison = 25
 all_top_matches = []
 for i in range(0, max_comparison):
-    cmd = "python2.6 compare_word input_data %i > output_data" % (i)
+    cmd = "python compare_word input_data %i  > output_data" % (i)
     print cmd
     top_matches, = prune.task_add( returns=['output_data'],
                             env=jelly_env, cmd=cmd,
                             args=[frequent_values['FN'],compare_words], params=['input_data','compare_word'] )
     all_top_matches.append( top_matches )
     #print top_matches
-    #prune.file_dump( top_matches, 'tops/%ssimilarities_%i.txt' % ('FN',i) )
+    prune.file_dump( top_matches, '%s_similarities_%i.txt' % ('FN',i) )
     #final_keys.append( top_matches )
     #if i == 9131:
     #   prune.file_dump( top_matches, 'tops/%ssimilarities_%i.txt' % ('FN',i) )
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
-prune.execute( worker_type='work_queue', name='prune_census_example' )
+prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 ###### Save output data to local directory ######
 prune.export( all_top_matches[0], 'similarity_results.%i.txt'%(0) )
