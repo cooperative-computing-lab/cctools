@@ -5,7 +5,7 @@ include ../../../rules.mk
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS) -lz
 
 EXTERNAL_DEPENDENCIES = ../libwork_queue.a ../../../dttools/src/libdttools.a
 WQPYTHONSO = _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
