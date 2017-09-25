@@ -210,10 +210,10 @@ struct jx *jx_function_join(struct jx *orig_args) {
 	int location = 0;
 	struct jx *value=jx_array_shift(list);
 	while(value){
-		/*if (!jx_istype(value->u.string_value, JX_STRING)){
+		if (!jx_istype(value, JX_STRING)){
 			err = "All array values must be strings";
 			goto FAILURE;
-		}*/
+		}
 		result = string_combine(result, value->u.string_value);
 		if(location<list_length-1){	
 			if(delimeter) result = string_combine(result, delimeter->u.string_value);

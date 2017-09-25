@@ -292,7 +292,7 @@ expression: [[i,j] for i in range(5) if i%2==0 for j in range(4) if j%2==1]
 value:      [[0,1],[0,3],[2,1],[2,3],[4,1],[4,3]]
 
 expression: [[i,j] for i in range(5) if j%2==0 for j in range(4) if i%2==1]
-value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":128,"context":{"i":0,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":j,"code":0}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":128,"context":{"i":0,"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":j,"code":0}
 
 expression: [[i,j,k,l] for i in range(4) for j in range(3) for k in range(3) for l in [true,false]]
 value:      [[0,0,0,true],[0,0,0,false],[0,0,1,true],[0,0,1,false],[0,0,2,true],[0,0,2,false],[0,1,0,true],[0,1,0,false],[0,1,1,true],[0,1,1,false],[0,1,2,true],[0,1,2,false],[0,2,0,true],[0,2,0,false],[0,2,1,true],[0,2,1,false],[0,2,2,true],[0,2,2,false],[1,0,0,true],[1,0,0,false],[1,0,1,true],[1,0,1,false],[1,0,2,true],[1,0,2,false],[1,1,0,true],[1,1,0,false],[1,1,1,true],[1,1,1,false],[1,1,2,true],[1,1,2,false],[1,2,0,true],[1,2,0,false],[1,2,1,true],[1,2,1,false],[1,2,2,true],[1,2,2,false],[2,0,0,true],[2,0,0,false],[2,0,1,true],[2,0,1,false],[2,0,2,true],[2,0,2,false],[2,1,0,true],[2,1,0,false],[2,1,1,true],[2,1,1,false],[2,1,2,true],[2,1,2,false],[2,2,0,true],[2,2,0,false],[2,2,1,true],[2,2,1,false],[2,2,2,true],[2,2,2,false],[3,0,0,true],[3,0,0,false],[3,0,1,true],[3,0,1,false],[3,0,2,true],[3,0,2,false],[3,1,0,true],[3,1,0,false],[3,1,1,true],[3,1,1,false],[3,1,2,true],[3,1,2,false],[3,2,0,true],[3,2,0,false],[3,2,1,true],[3,2,1,false],[3,2,2,true],[3,2,2,false]]
@@ -451,32 +451,26 @@ expression: [1,2,[3,4]]==[1,2,[3,4]]
 value:      true
 
 expression: join([])
-value:		true
+value:      ""
 
-expression: join([], "")
-value: true
+expression: join([],"")
+value:      ""
 
-expression: join(["a", "b", "c", "d"], " ")
-value:		true
+expression: join(["a","b","c","d"]," ")
+value:      "a b c d"
 
 expression: join()
-value;		false
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too few arguments to join","function":join(),"code":6}
 
-expression:	join([a, b, c])
-value:		false
+expression: join([a,b,c])
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":199,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
 
-expression:	join(["a", "b", "c", "d"])
-value:		true
+expression: join(["a","b","c","d"])
+value:      "a b c d"
 
-expression: join(",", ["a", "b"])
-value: 		false
+expression: join(",",["a","b"])
+value:      Error{"source":"jx_eval","name":"invalid arguments","message":"A list must be the first argument in join","function":join(",",["a","b"]),"code":6}
 
-expression: join(["a", "b"], ",")
-value:		true
-
-expression: join(["a" "b"])
-value:		false
-
-expression: Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
-value:      Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
+expression: join(["a","b"],",")
+value:      "a,b"
 
