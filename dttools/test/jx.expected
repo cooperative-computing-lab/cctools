@@ -450,6 +450,33 @@ value:      false
 expression: [1,2,[3,4]]==[1,2,[3,4]]
 value:      true
 
+expression: join([])
+value:		true
+
+expression: join([], "")
+value: true
+
+expression: join(["a", "b", "c", "d"], " ")
+value:		true
+
+expression: join()
+value;		false
+
+expression:	join([a, b, c])
+value:		false
+
+expression:	join(["a", "b", "c", "d"])
+value:		true
+
+expression: join(",", ["a", "b"])
+value: 		false
+
+expression: join(["a", "b"], ",")
+value:		true
+
+expression: join(["a" "b"])
+value:		false
+
 expression: Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 value:      Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 
