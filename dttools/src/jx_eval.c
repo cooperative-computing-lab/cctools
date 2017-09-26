@@ -202,6 +202,7 @@ static struct jx *jx_eval_call(
 	switch (func->u.func.builtin) {
 		case JX_BUILTIN_RANGE: return jx_function_range(args);
 		case JX_BUILTIN_FORMAT: return jx_function_format(args);
+		case JX_BUILTIN_JOIN: return jx_function_join(args);
 		case JX_BUILTIN_LAMBDA: {
 			assert(func->u.func.params);
 
@@ -595,6 +596,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	}
 	jx_eval_add_builtin(context, "range", JX_BUILTIN_RANGE);
 	jx_eval_add_builtin(context, "format", JX_BUILTIN_FORMAT);
+	jx_eval_add_builtin(context, "join", JX_BUILTIN_JOIN);
 
 	switch(j->type) {
 		case JX_SYMBOL: {
