@@ -625,7 +625,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = MSG_PROCESSED;
 	} else if(string_prefix_is(line, "workqueue")) {
 		result = process_workqueue(q, w, line);
-	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status")) {
+	} else if (string_prefix_is(line,"queue_status") || string_prefix_is(line, "worker_status") || string_prefix_is(line, "task_status") || string_prefix_is(line, "wable_status") || string_prefix_is(line, "resources_status")) {
 		result = process_queue_status(q, w, line, stoptime);
 	} else if (string_prefix_is(line, "available_results")) {
 		hash_table_insert(q->workers_with_available_results, w->hashkey, w);
@@ -2540,6 +2540,14 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 	} else if(!strcmp(request, "wable")) {
 		jx_delete(a);
 		a = categories_to_jx(q);
+	} else if(!strcmp(request, "resources")) {
+		struct jx *j = queue_to_jx( q, 0 );
+		if(j) {
+			jx_array_insert(a, j);
+		}
+	} else {
+		debug(D_WQ, "Unknown status request: '%s'", request);
+		return MSG_FAILURE;
 	}
 
 	jx_print_link(a,l,stoptime);

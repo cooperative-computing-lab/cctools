@@ -432,7 +432,7 @@ int do_catalog_query(const char *project_name, struct jx_table *headers, time_t 
 int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 {
 	static struct jx_table *query_headers[] = { [QUERY_QUEUE] = queue_headers, task_headers, worker_headers, workers_able_headers, master_resource_headers };
-	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "wable", "master_resource"};
+	static const char * query_strings[] = { [QUERY_QUEUE] = "queue","task","worker", "wable", "resources"};
 
 	struct jx_table *query_header = query_headers[query_mode];
 	const char * query_string = query_strings[query_mode];
