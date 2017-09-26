@@ -51,6 +51,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
             slist = line.split()
             if slist[1] in ['STARTED']:
                 makeflow['start_time'] = int(slist[2])/1000000.0
+                makeflow['finished']   = None
             elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
                 makeflow['finished'] = slist[1]
                 makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time']
@@ -96,6 +97,7 @@ def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
 
     makeflow['prev_stream_pos'] = log_stream.tell()
     makeflow['history']  = history
+
     return makeflow
 
 def parse_makeflowlog(log_path, parse_dag = False):
