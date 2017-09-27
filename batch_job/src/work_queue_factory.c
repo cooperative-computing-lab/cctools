@@ -843,7 +843,14 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
-		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+		struct jx *j = factory_to_jx(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+
+		char *update_str = jx_print_string(j);
+		debug(D_WQ, "Sending status to the catalog server(s) at %s ...", catalog_host);
+		catalog_query_send_update(catalog_host, update_str);
+		print_stats(j);
+		free(update_str);
+		jx_delete(j);
 
 		update_blacklisted_workers(queue, masters_list);
 
