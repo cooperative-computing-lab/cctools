@@ -522,6 +522,72 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 	fflush(stdout);
 }
 
+struct jx *master_to_jx(struct jx *m) {
+
+	struct jx *j = jx_object(NULL);
+
+	jx_insert_string(j, "project", jx_lookup_string(m, "project"));
+
+	if(using_catalog) {
+		jx_insert_string(j, "name", jx_lookup_string(m, "name"));
+	} else {
+		jx_insert_string(j, "name", master_host);
+	}
+
+	jx_insert_string(j,  "port",              jx_lookup_string(m, "port"));
+	jx_insert_integer(j, "tasks_waiting",     jx_lookup_integer(m, "tasks_waiting"));
+	jx_insert_integer(j, "tasks_running",     jx_lookup_integer(m, "tasks_running"));
+	jx_insert_integer(j, "tasks_complete",    jx_lookup_integer(m, "tasks_complete"));
+	jx_insert_integer(j, "workers_connected", jx_lookup_integer(m, "workers"));
+
+	return j;
+}
+
+struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected) {
+
+	struct jx *j= jx_object(NULL);
+	jx_insert_string(j, "type", "wq_factory");
+
+	int to_connect = submitted - connected;
+
+	needed     = needed     > 0 ? needed    : 0;
+	requested  = requested  > 0 ? requested : 0;
+	to_connect = to_connect > 0 ? to_connect : 0;
+
+
+	jx_insert_integer(j, "workers_needed",     needed);
+	jx_insert_integer(j, "workers_requested",  requested);
+	jx_insert_integer(j, "workers_to_connect", to_connect);
+
+	struct jx *ms = jx_array(NULL);
+	if(masters && list_size(masters) > 0)
+	{
+		struct jx *m;
+		list_first_item(masters);
+		while((m = list_next_item(masters)))
+		{
+			jx_array_append(ms, master_to_jx(m));
+		}
+	}
+	jx_insert(j, jx_string("masters"), ms);
+
+
+	struct jx *fs = jx_array(NULL);
+	if(foremen && list_size(foremen) > 0)
+	{
+		struct jx *f;
+		list_first_item(foremen);
+		while((f = list_next_item(foremen)))
+		{
+			jx_array_append(fs, master_to_jx(f));
+
+		}
+	}
+	jx_insert(j, jx_string("foremen"), fs);
+
+	return j;
+}
+
 void delete_projects_list(struct list *l)
 {
 	if(l) {
