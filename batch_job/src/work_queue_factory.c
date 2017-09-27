@@ -64,7 +64,6 @@ static struct jx_table queue_headers[] = {
 static int work_queue_status_timeout = 30;
 
 static const char *catalog_host = 0;
-static int catalog_port = 0;
 
 static int factory_period = 30; // in seconds
 
@@ -331,12 +330,11 @@ static int submit_worker( struct batch_queue *queue )
 
 	if(using_catalog) {
 		cmd = string_format(
-		"%s -M %s -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"%s -M %s -t %d -C '%s' -d all -o worker.log %s %s %s",
 		worker,
 		submission_regex,
 		worker_timeout,
 		catalog_host,
-		catalog_port,
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		extra_worker_args ? extra_worker_args : ""
@@ -344,13 +342,12 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	else {
 		cmd = string_format(
-		"./%s %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"./%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
 		worker,
 		master_host,
 		master_port,
 		worker_timeout,
 		catalog_host,
-		catalog_port,
 		password_file ? "-P pwfile" : "",
 		resource_args ? resource_args : "",
 		extra_worker_args ? extra_worker_args : ""
@@ -731,7 +728,7 @@ static void mainloop( struct batch_queue *queue )
 		submission_regex = foremen_regex ? foremen_regex : project_regex;
 
 		if(using_catalog) {
-			masters_list = work_queue_catalog_query(catalog_host,catalog_port,project_regex);
+			masters_list = work_queue_catalog_query(catalog_host,-1,project_regex);
 		}
 		else {
 			masters_list = do_direct_query(master_host,master_port);
@@ -763,7 +760,7 @@ static void mainloop( struct batch_queue *queue )
 		if(foremen_regex)
 		{
 			debug(D_WQ,"evaluating foremen list...");
-			foremen_list    = work_queue_catalog_query(catalog_host,catalog_port,foremen_regex);
+			foremen_list    = work_queue_catalog_query(catalog_host,-1,foremen_regex);
 
 			/* add workers on foremen. Also, subtract foremen from workers
 			 * connected, as they were not deployed by the pool. */
@@ -900,13 +897,15 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WORKER_BINARY,
 		LONG_OPT_MESOS_MASTER, 
 		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD
+		LONG_OPT_MESOS_PRELOAD,
+		LONG_OPT_CATALOG
 	};
 
 static const struct option long_options[] = {
 	{"master-name", required_argument, 0, 'M'},
 	{"foremen-name", required_argument, 0, 'F'},
 	{"batch-type", required_argument, 0, 'T'},
+	{"catalog", required_argument, 0, LONG_OPT_CATALOG},
 	{"password", required_argument, 0, 'P'},
 	{"config-file", required_argument, 0, 'C'},
 	{"min-workers", required_argument, 0, 'w'},
@@ -949,7 +948,6 @@ int main(int argc, char *argv[])
 	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
 	catalog_host = CATALOG_HOST;
-	catalog_port = CATALOG_PORT;
 
 	batch_submit_options = getenv("BATCH_OPTIONS");
 
@@ -1074,6 +1072,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_MESOS_PRELOAD:
 				mesos_preload = xxstrdup(optarg);
+				break;
+			case LONG_OPT_CATALOG:
+				catalog_host = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
