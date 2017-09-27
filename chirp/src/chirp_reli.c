@@ -45,7 +45,7 @@ struct hash_table *table = 0;
 static int chirp_reli_blocksize = 65536;
 static int chirp_reli_default_nreps = 0;
 
-INT64_T chirp_reli_blocksize_get()
+INT64_T chirp_reli_blocksize_get(void)
 {
 	return chirp_reli_blocksize;
 }
@@ -1018,7 +1018,7 @@ INT64_T chirp_reli_bulkio( struct chirp_bulkio *v, int count, time_t stoptime )
 	}
 }
 
-void chirp_reli_cleanup_before_fork()
+void chirp_reli_cleanup_before_fork(void)
 {
 	char *host;
 	char *value;

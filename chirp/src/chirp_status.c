@@ -37,7 +37,7 @@ static struct jx_table headers[] = {
 	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 8},
 	{"total", "TOTAL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 8},
 	{"avail", "AVAIL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 8},
-	{0, 0, 0, 0, 0}
+	{0, 0, JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0}
 };
 
 static void show_help(const char *cmd)

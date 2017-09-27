@@ -187,7 +187,7 @@ file_type check_file_type(const char *source) {
 	struct stat st;
 	if(lstat(source, &st)) {
 		debug(D_DEBUG, "lstat(`%s`) failed: %s!\n", source, strerror(errno));
-		return -1;
+		return FILE_TYPE_ERROR;
 	}
 
 	if(S_ISREG(st.st_mode)) {

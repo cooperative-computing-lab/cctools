@@ -329,7 +329,7 @@ static struct jx_table html_headers[] = {
 	{"avail", "AVAIL", JX_TABLE_MODE_METRIC, JX_TABLE_ALIGN_RIGHT, 0},
 	{"load5", "LOAD5", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_RIGHT, 0},
 	{"version", "VERSION", JX_TABLE_MODE_PLAIN, JX_TABLE_ALIGN_LEFT, 0},
-	{0,0,0,0,0}
+	{0,0,JX_TABLE_MODE_PLAIN,JX_TABLE_ALIGN_LEFT,0}
 };
 
 static void handle_query(struct link *query_link)

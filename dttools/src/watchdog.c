@@ -53,7 +53,7 @@ static int stop_interval = 60;
 static int check_interval = 3600;
 static time_t last_check_time = 0;
 
-static void change_state(int newstate)
+static void change_state(state_t newstate)
 {
 	debug(D_DEBUG, "%s -> %s", state_name[state], state_name[newstate]);
 	state = newstate;

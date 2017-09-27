@@ -213,7 +213,7 @@ json_value * json_parse_ex (json_settings * settings,
    unsigned int cur_line;
    const json_char * cur_line_begin, * i, * end;
    json_value * top, * root, * alloc = 0;
-   static const json_state _state;
+   static const json_state _state = {};
    json_state state = _state;
    long flags;
    long num_digits, num_e;
@@ -240,8 +240,9 @@ json_value * json_parse_ex (json_settings * settings,
    {
       json_uchar uchar;
       unsigned char uc_b1, uc_b2, uc_b3, uc_b4;
-      json_char * string;
-      unsigned int string_length;
+
+      json_char *string = NULL;
+      unsigned int string_length = 0;
 
       top = root = 0;
       flags = flag_seek_value;
@@ -811,7 +812,7 @@ e_failed:
 
 json_value * json_parse (const json_char * json, size_t length)
 {
-   static const json_settings _settings;
+   static const json_settings _settings = {};
    json_settings settings = _settings;
    return json_parse_ex (&settings, json, length, 0);
 }
@@ -868,7 +869,7 @@ void json_value_free_ex (json_settings * settings, json_value * value)
 
 void json_value_free (json_value * value)
 {
-   static const json_settings _settings;
+   static const json_settings _settings = {};
    json_settings settings = _settings;
    settings.mem_free = default_free;
    json_value_free_ex (&settings, value);
