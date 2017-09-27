@@ -456,33 +456,20 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 
 }
 
-void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected)
-{
+void print_stats(struct jx *j) {
 	struct timeval tv;
 	struct tm *tm;
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	int to_connect = submitted - connected;
-
-	needed     = needed     > 0 ? needed    : 0;
-	requested  = requested  > 0 ? requested : 0;
-	to_connect = to_connect > 0 ? to_connect : 0;
-
 	fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
-			"|submitted: %d |needed: %d |waiting connection: %d |requested: %d \n",
+			"|submitted: %" PRId64 " |needed: %" PRId64 " |waiting connection: %" PRId64 " |requested: %" PRId64 " \n",
 			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
-			submitted, needed, to_connect, requested);
+			jx_lookup_integer(j, "workers_submitted"),
+			jx_lookup_integer(j, "workers_needed"),
+			jx_lookup_integer(j, "workers_to_connect"),
+			jx_lookup_integer(j, "workers_requested"));
 
-	int master_count = 0;
-	master_count += masters ? list_size(masters) : 0;
-	master_count += foremen ? list_size(foremen) : 0;
-
-	if(master_count < 1)
-	{
-		fprintf(stdout, "No change this cycle.\n\n");
-		return;
-	}
 
 	int columns = 80;
 	char *column_str = getenv("COLUMNS");
@@ -493,28 +480,19 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 
 	jx_table_print_header(queue_headers,stdout,columns);
 
-	struct jx *j;
-	if(masters && list_size(masters) > 0)
-	{
-		list_first_item(masters);
-		while((j = list_next_item(masters)))
-		{
-			if(!using_catalog) {
-				jx_insert_string(j, "name", master_host);
-			}
-			jx_table_print(queue_headers, j, stdout, columns);
+	struct jx *a = jx_lookup(j, "masters");
+	if(a) {
+		struct jx *m;
+		for (void *i = NULL; (m = jx_iterate_array(a, &i));) {
+			jx_table_print(queue_headers, m, stdout, columns);
 		}
 	}
 
-	if(foremen && list_size(foremen) > 0)
-	{
-		fprintf(stdout, "foremen:\n");
-
-		list_first_item(foremen);
-		while((j = list_next_item(foremen)))
-		{
-			jx_table_print(queue_headers, j, stdout, columns);
-
+	a = jx_lookup(j, "foremen");
+	if(a) {
+		struct jx *m;
+		for (void *i = NULL; (m = jx_iterate_array(a, &i));) {
+			jx_table_print(queue_headers, m, stdout, columns);
 		}
 	}
 
