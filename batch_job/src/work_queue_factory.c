@@ -512,7 +512,7 @@ struct jx *master_to_jx(struct jx *m) {
 		jx_insert_string(j, "name", master_host);
 	}
 
-	jx_insert_string(j,  "port",              jx_lookup_string(m, "port"));
+	jx_insert_integer(j,  "port",             jx_lookup_integer(m, "port"));
 	jx_insert_integer(j, "tasks_waiting",     jx_lookup_integer(m, "tasks_waiting"));
 	jx_insert_integer(j, "tasks_running",     jx_lookup_integer(m, "tasks_running"));
 	jx_insert_integer(j, "tasks_complete",    jx_lookup_integer(m, "tasks_complete"));
@@ -525,6 +525,11 @@ struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitt
 
 	struct jx *j= jx_object(NULL);
 	jx_insert_string(j, "type", "wq_factory");
+
+	if(using_catalog) {
+		jx_insert_string(j, "project_regex",    project_regex);
+		jx_insert_string(j, "submission_regex", submission_regex);
+	}
 
 	int to_connect = submitted - connected;
 
