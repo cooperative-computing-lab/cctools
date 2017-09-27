@@ -850,6 +850,7 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,-N,--master-name=<project>");\
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
+	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
 	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");

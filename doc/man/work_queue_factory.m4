@@ -48,6 +48,7 @@ SUBSECTION(Batch Options)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
 OPTION_TRIPLET(-T,batch-type, type)Batch system type: local, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, amazon, mesos. (default is local)
+OPTION_PAIR(--catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-B,batch-options, options)Add these options to all batch submit files.
 OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
 OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
