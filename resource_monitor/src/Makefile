@@ -4,7 +4,7 @@ include ../../config.mk
 include ../../rules.mk
 
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
-OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
+OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o rmonitor_file_watch.o
 
 PROGRAMS = resource_monitor piggybacker rmonitor_poll_example rmonitor_snapshot
 
@@ -43,7 +43,7 @@ $(PROGRAMS): ../../dttools/src/libdttools.a
 
 resource_monitor.o: resource_monitor.c rmonitor_piggyback.h
 
-resource_monitor: resource_monitor.o rmonitor_helper_comm.o
+resource_monitor: resource_monitor.o rmonitor_helper_comm.o rmonitor_file_watch.o
 
 rmonitor_snapshot: rmonitor_snapshot.o rmonitor_helper_comm.o
 
