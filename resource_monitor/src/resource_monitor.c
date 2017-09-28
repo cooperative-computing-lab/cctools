@@ -229,6 +229,8 @@ char *snapshot_signal_file = NULL;    /* name of the file that, if
 										 created. */
 struct list *snapshots = NULL;              /* list of snapshots, as json objects. */
 
+struct list *snapshot_labels = NULL;        /* list of labels for current snapshot. */
+
 /***
  * Utility functions (open log files, proc files, measure time)
  ***/
@@ -1012,8 +1014,8 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 }
 
-int record_snapshot(struct rmsummary *tr) {
-	char label[1024];
+int check_for_snapshot_file() {
+	static int count_from_file = 0;
 
 	if(!snapshot_signal_file) {
 		return 0;
@@ -1025,19 +1027,44 @@ int record_snapshot(struct rmsummary *tr) {
 		return 0;
 	}
 
-	if(!snapshots) {
-		snapshots = list_create(0);
-	}
+	int n = 1024;
+	char label[n];
 
 	label[0]='\0';
-	fgets(label, 1024, snap_f);
+	fgets(label, n, snap_f);
 	fclose(snap_f);
 	unlink(snapshot_signal_file);
 
 	string_chomp(label);
 
+	count_from_file++;
+
 	if(label[0] == '\0') {
-		snprintf(label, 1024, "snapshot %d", list_size(snapshots) + 1);
+		snprintf(label, n, "snapshot_%s %d", snapshot_signal_file, count_from_file);
+	}
+
+	list_push_tail(snapshot_labels, xxstrdup(label));
+
+	return 1;
+}
+
+int record_snapshot(struct rmsummary *tr) {
+	if(list_size(snapshot_labels) < 1) {
+		return 0;
+	}
+
+	buffer_t b;
+	buffer_init(&b);
+
+	char *str;
+	while((str = list_pop_head(snapshot_labels))) {
+		string_chomp(str);
+		buffer_printf(&b, "{%s}", str);
+		free(str);
+	}
+
+	if(!snapshots) {
+		snapshots = list_create(0);
 	}
 
 	snapshot->end       = usecs_since_epoch();
@@ -1045,27 +1072,26 @@ int record_snapshot(struct rmsummary *tr) {
 
 	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
 
-	jx_insert_string(j, "snapshot_name", label);
-
-	if(!j) {
-		return 0;
-	}
+	jx_insert_string(j, "snapshot_name", buffer_tostring(&b));
 
 	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
-	snap_f = fopen(output_file, "w");
-	free(output_file);
+	FILE *snap_f = fopen(output_file, "w");
 
 	if(!snap_f) {
-		return 0;
+		warn(D_WQ, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
+	} else {
+		jx_print_stream(j, snap_f);
+		fclose(snap_f);
 	}
 
-	jx_print_stream(j, snap_f);
-	fclose(snap_f);
+	free(output_file);
 
 	/* push to the front, since snapshots are writen in reverse order. */
 	list_push_head(snapshots, j);
 
-	debug(D_RMON, "Recoded snapshot: '%s'", label);
+	debug(D_RMON, "Recoded snapshot: '%s'", buffer_tostring(&b));
+
+	buffer_free(&b);
 
 	return 1;
 }
@@ -1605,7 +1631,14 @@ int rmonitor_dispatch_msg(void)
 
 	int recv_status = recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	if(recv_status < 0 || ((unsigned int) recv_status) < sizeof(msg)) {
+	if(recv_status < 0) {
+		if(errno != EAGAIN) {
+			debug(D_RMON, "Error receiving message: %s", strerror(errno));
+			return 1;
+		}
+	}
+
+	if(((unsigned int) recv_status) < sizeof(msg)) {
 		debug(D_RMON, "Malformed message from monitored processes. Ignoring.");
 		return 1;
 	}
@@ -1618,14 +1651,14 @@ int rmonitor_dispatch_msg(void)
 	if(!p)
 	{
 		/* We either got a malformed message, message from a
-		process we are not tracking anymore, or a message from
-		a newly created process.  */
+		process we are not tracking anymore, a message from
+		a newly created process, or a message from a snapshot process.  */
 		if( msg.type == END_WAIT )
         {
 			release_waiting_process(msg.origin);
 			return 1;
         }
-		else if(msg.type != BRANCH)
+		else if(msg.type != BRANCH && msg.type != SNAPSHOT)
 			return 1;
 	}
 
@@ -1700,6 +1733,10 @@ int rmonitor_dispatch_msg(void)
 					break;
 			}
             break;
+		case SNAPSHOT:
+			debug(D_RMON, "Snapshot msg label: '%s'\n", msg.data.s);
+			list_push_tail(snapshot_labels, xxstrdup(msg.data.s));
+			break;
         default:
             break;
     };
@@ -1709,7 +1746,7 @@ int rmonitor_dispatch_msg(void)
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
-	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END) {
+	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END || msg.type == SNAPSHOT) {
 		return 1;
 	} else {
 		return 0;
@@ -1754,11 +1791,11 @@ int wait_for_messages(int interval)
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
 			if (FD_ISSET(rmonitor_queue_fd, &rset)) {
-				urgent = rmonitor_dispatch_msg();
+				urgent |= rmonitor_dispatch_msg();
 			}
 
 			if (FD_ISSET(rmonitor_inotify_fd, &rset)) {
-				urgent = rmonitor_handle_inotify();
+				urgent |= rmonitor_handle_inotify();
 			}
 
 			if(urgent) {
@@ -1968,6 +2005,8 @@ int rmonitor_resources(long int interval /*in seconds */)
 		cleanup_zombies();
 
 		//process snapshot
+		check_for_snapshot_file();
+
 		if(record_snapshot(snapshot)) {
 			rmsummary_delete(snapshot);
 			snapshot = calloc(1, sizeof(*snapshot));
@@ -2029,6 +2068,8 @@ int main(int argc, char **argv) {
 	total_bytes_rx = 0;
 	total_bytes_tx = 0;
 	tx_rx_sizes    = list_create();
+
+	snapshot_labels = list_create(0);
 
     rmsummary_read_env_vars(resources_limits);
 

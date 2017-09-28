@@ -6,7 +6,7 @@ include ../../rules.mk
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
 
-PROGRAMS = resource_monitor piggybacker rmonitor_poll_example
+PROGRAMS = resource_monitor piggybacker rmonitor_poll_example rmonitor_snapshot
 
 ifneq ($(CCTOOLS_STATIC),1)
 PROGRAMS += resource_monitor_histograms
@@ -44,6 +44,8 @@ $(PROGRAMS): ../../dttools/src/libdttools.a
 resource_monitor.o: resource_monitor.c rmonitor_piggyback.h
 
 resource_monitor: resource_monitor.o rmonitor_helper_comm.o
+
+rmonitor_snapshot: rmonitor_snapshot.o rmonitor_helper_comm.o
 
 rmonitor_poll_example: rmonitor_poll_example.o
 
