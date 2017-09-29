@@ -257,6 +257,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 
 		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
+		fprintf(stderr, "Weighted Capacity: %d\n", capacity_weighted);
 		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int tasks = tr+tw+tl;
 
@@ -281,6 +282,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		}
 
 		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
+		fprintf(stderr, "Capacity: %d Need: %d \n",capacity,need);
 
 		needed_workers += need;
 		masters++;
