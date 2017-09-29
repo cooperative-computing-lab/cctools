@@ -59,7 +59,6 @@ SOURCES = \
 	itable.c \
 	json.c \
 	json_aux.c \
-	jx2json.c \
 	jx.c \
 	jx_database.c \
 	jx_match.c \
