@@ -270,6 +270,10 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if(c=='!') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
+		if(isalpha(d) || d == '_') {
+			jx_ungetchar(s,d);
+			return JX_TOKEN_NOT;
+		}
 		jx_ungetchar(s,d);
 		jx_parse_error(s,"invalid character: !");
 		return JX_TOKEN_PARSE_ERROR;
@@ -349,12 +353,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		}
 		jx_parse_error(s,"integer constant too long");
 		return JX_TOKEN_PARSE_ERROR;
-	} else if(isalpha(c) || c=='_') {
+	} else if(isalpha(c) || c=='_' || c=='&' || c=='|') {
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			c = jx_getchar(s);
-			if(isalnum(c) || c=='_') {
+			if(isalnum(c) || c=='_' || c=='&' || c=='|') {
 				s->token[i] = c;
 			} else {
 				jx_ungetchar(s,c);
@@ -367,7 +371,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_FALSE;
 				} else if(!strcmp(s->token,"or")) {
 					return JX_TOKEN_OR;
+				} else if (!strcmp(s->token,"||")) {
+					return JX_TOKEN_OR;
 				} else if(!strcmp(s->token,"and")) {
+					return JX_TOKEN_AND;
+				} else if(!strcmp(s->token,"&&")){
 					return JX_TOKEN_AND;
 				} else if(!strcmp(s->token,"not")) {
 					return JX_TOKEN_NOT;

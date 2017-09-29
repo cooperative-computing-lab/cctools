@@ -37,6 +37,7 @@ true or true;
 true or false;
 false or true;
 false or false;
+!true
 not true;
 not false;
 
@@ -106,6 +107,8 @@ x-y;
 x*y;
 x/y;
 x%y;
+x && y
+x || y
 x and y;
 x or y;
 
@@ -113,6 +116,7 @@ x or y;
 (10 + (20 * 30));
 (10*(20+30));
 (a==b) or ((f>g) and x<y);
+(a==b) || ((f>g) && x<y);
 
 #[10,-90.5,true,false,null,[-1,-2,-3]];
 [[0, i] for i in [1,2,x], 10,-90.5,true for i in range(5),false,null,[-1,-2,-3]];

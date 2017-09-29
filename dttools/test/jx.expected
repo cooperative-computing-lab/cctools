@@ -69,6 +69,9 @@ value:      false
 expression:  not true
 value:      false
 
+expression:  not true
+value:      false
+
 expression:  not false
 value:      true
 
@@ -151,16 +154,16 @@ expression: a!=b
 value:      true
 
 expression: a<b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":73,"operator":true<false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":74,"operator":true<false,"code":1}
 
 expression: a>b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":74,"operator":true>false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":75,"operator":true>false,"code":1}
 
 expression: a<=b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":75,"operator":true<=false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":76,"operator":true<=false,"code":1}
 
 expression: a>=b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":76,"operator":true>=false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":77,"operator":true>=false,"code":1}
 
 expression: f==g
 value:      false
@@ -199,19 +202,19 @@ expression: x>=y
 value:      false
 
 expression: a+b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":92,"operator":true+false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":93,"operator":true+false,"code":1}
 
 expression: a-b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":93,"operator":true-false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":94,"operator":true-false,"code":1}
 
 expression: a*b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":94,"operator":true*false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":95,"operator":true*false,"code":1}
 
 expression: a/b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":95,"operator":true/false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":96,"operator":true/false,"code":1}
 
 expression: a%b
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":96,"operator":true%false,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on boolean","line":97,"operator":true%false,"code":1}
 
 expression: f+g
 value:      3.64159
@@ -244,10 +247,16 @@ expression: x%y
 value:      10
 
 expression: x and y
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":109,"operator":10 and 20,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":110,"operator":10 and 20,"code":1}
 
 expression: x or y
-value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":110,"operator":10 or 20,"code":1}
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":111,"operator":10 or 20,"code":1}
+
+expression: x and y
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":112,"operator":10 and 20,"code":1}
+
+expression: x or y
+value:      Error{"source":"jx_eval","name":"unsupported operator","message":"unsupported operator on integer","line":113,"operator":10 or 20,"code":1}
 
 expression: (x+y)*(f+g)
 value:      109.248
@@ -257,6 +266,9 @@ value:      610
 
 expression: 10*(20+30)
 value:      500
+
+expression: a==b or (f>g and x<y)
+value:      false
 
 expression: a==b or (f>g and x<y)
 value:      false
@@ -274,7 +286,7 @@ expression: [[[i,j] for j in range(3)] for i in [10-i for i in range(4)]]
 value:      [[[10,0],[10,1],[10,2]],[[9,0],[9,1],[9,2]],[[8,0],[8,1],[8,2]],[[7,0],[7,1],[7,2]]]
 
 expression: [null for i in 7]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"list comprehension takes an array","line":122,"list":7,"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"list comprehension takes an array","line":126,"list":7,"code":2}
 
 expression: [i for i in range(10) if i%3==0]
 value:      [0,3,6,9]
@@ -292,7 +304,7 @@ expression: [[i,j] for i in range(5) if i%2==0 for j in range(4) if j%2==1]
 value:      [[0,1],[0,3],[2,1],[2,3],[4,1],[4,3]]
 
 expression: [[i,j] for i in range(5) if j%2==0 for j in range(4) if i%2==1]
-value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":128,"context":{"i":0,"floor":floor,"ceil":ceil,"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":j,"code":0}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":132,"context":{"i":0,"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":j,"code":0}
 
 expression: [[i,j,k,l] for i in range(4) for j in range(3) for k in range(3) for l in [true,false]]
 value:      [[0,0,0,true],[0,0,0,false],[0,0,1,true],[0,0,1,false],[0,0,2,true],[0,0,2,false],[0,1,0,true],[0,1,0,false],[0,1,1,true],[0,1,1,false],[0,1,2,true],[0,1,2,false],[0,2,0,true],[0,2,0,false],[0,2,1,true],[0,2,1,false],[0,2,2,true],[0,2,2,false],[1,0,0,true],[1,0,0,false],[1,0,1,true],[1,0,1,false],[1,0,2,true],[1,0,2,false],[1,1,0,true],[1,1,0,false],[1,1,1,true],[1,1,1,false],[1,1,2,true],[1,1,2,false],[1,2,0,true],[1,2,0,false],[1,2,1,true],[1,2,1,false],[1,2,2,true],[1,2,2,false],[2,0,0,true],[2,0,0,false],[2,0,1,true],[2,0,1,false],[2,0,2,true],[2,0,2,false],[2,1,0,true],[2,1,0,false],[2,1,1,true],[2,1,1,false],[2,1,2,true],[2,1,2,false],[2,2,0,true],[2,2,0,false],[2,2,1,true],[2,2,1,false],[2,2,2,true],[2,2,2,false],[3,0,0,true],[3,0,0,false],[3,0,1,true],[3,0,1,false],[3,0,2,true],[3,0,2,false],[3,1,0,true],[3,1,0,false],[3,1,1,true],[3,1,1,false],[3,1,2,true],[3,1,2,false],[3,2,0,true],[3,2,0,false],[3,2,1,true],[3,2,1,false],[3,2,2,true],[3,2,2,false]]
@@ -418,10 +430,10 @@ expression: format("%s","foo")
 value:      "foo"
 
 expression: 10+[1]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":183,"operator":10+[1],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":187,"operator":10+[1],"code":2}
 
 expression: "abc"+[2]
-value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":184,"operator":"abc"+[2],"code":2}
+value:      Error{"source":"jx_eval","name":"mismatched types","message":"mismatched types for operator","line":188,"operator":"abc"+[2],"code":2}
 
 expression: []+[]
 value:      []
@@ -451,46 +463,46 @@ expression: [1,2,[3,4]]==[1,2,[3,4]]
 value:      true
 
 expression: ceil(f)
-value:      1
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":199,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: ceil()
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too few arguments","function":ceil(),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":200,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: ceil([])
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"arg of invalid type","function":ceil([]),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":201,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: ceil(x)
-value:      10
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":202,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: ceil(g)
-value:      4
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":203,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: ceil(x,f)
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too many arguments","function":ceil(10,0.5),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":204,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: ceil("foo")
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"arg of invalid type","function":ceil("foo"),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":205,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":ceil,"code":0}
 
 expression: floor(f)
-value:      0
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":207,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: floor()
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too few arguments","function":floor(),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":208,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: floor([])
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"arg of invalid type","function":floor([]),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":209,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: floor(x)
-value:      10
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":210,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: floor(g)
-value:      3
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":211,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: floor(x,f)
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too many arguments","function":floor(10,0.5),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":212,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: floor("foo")
-value:      Error{"source":"jx_eval","name":"invalid arguments","message":"arg of invalid type","function":floor("foo"),"code":6}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":213,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":floor,"code":0}
 
 expression: join([])
 value:      ""
@@ -505,7 +517,7 @@ expression: join()
 value:      Error{"source":"jx_eval","name":"invalid arguments","message":"too few arguments to join","function":join(),"code":6}
 
 expression: join([a,b,c])
-value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":215,"context":{"floor":floor,"ceil":ceil,"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
+value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":219,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":c,"code":0}
 
 expression: join(["a","b","c","d"])
 value:      "a b c d"
