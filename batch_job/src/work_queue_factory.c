@@ -105,6 +105,9 @@ static int64_t factory_timeout = 0;
 
 struct batch_queue *queue = 0;
 
+//Environment variables to pass along in batch_job_submit
+struct jx *batch_env = NULL;
+
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -378,7 +381,7 @@ static int submit_worker( struct batch_queue *queue )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
-	return batch_job_submit(queue,cmd,files,"output.log",0,resources);
+	return batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
@@ -860,6 +863,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Maximum number of new workers per %d s.  (less than 1 disables limit, default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
 	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker");
 	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
+	printf(" %-30s Environment variable that should be added to the worker.  (May be specified multiple times)\n", "--env=<variable=value>");
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
@@ -899,7 +903,8 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_MESOS_MASTER, 
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
-		LONG_OPT_CATALOG
+		LONG_OPT_CATALOG,
+		LONG_OPT_ENVIRONMENT_VARIABLE
 	};
 
 static const struct option long_options[] = {
@@ -914,6 +919,7 @@ static const struct option long_options[] = {
 	{"workers-per-cycle", required_argument, 0, LONG_OPT_WORKERS_PER_CYCLE},
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
 	{"timeout", required_argument, 0, 't'},
+	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
 	{"extra-options", required_argument, 0, 'E'},
 	{"cores",  required_argument,  0,  LONG_OPT_CORES},
 	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
@@ -945,6 +951,12 @@ int main(int argc, char *argv[])
 	char *mesos_master = NULL;
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+
+	//Environment variable handling
+	char *ev = NULL;
+	char *env = NULL;
+	char *val = NULL;
+	batch_env = jx_object(NULL);
 
 	batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_UNKNOWN;
 
@@ -997,6 +1009,23 @@ int main(int argc, char *argv[])
 				break;
 			case 'E':
 				extra_worker_args = xxstrdup(optarg);
+				break;
+			case LONG_OPT_ENVIRONMENT_VARIABLE:
+				ev = xxstrdup(optarg);
+				env = strtok(ev, "=");
+				val = strtok(NULL, "=");
+				if(env && val) {
+					struct jx *jx_env = jx_string(env);
+					struct jx *jx_val = jx_string(val);
+					if(!jx_insert(batch_env, jx_env, jx_val)) {
+						fprintf(stderr, "could not insert key:value pair into JX object: %s\n", ev);
+						return EXIT_FAILURE;
+					}
+				}
+				else {
+					fprintf(stderr, "could not evaluate key:value pair: %s\n", ev);
+					return EXIT_FAILURE;
+				}
 				break;
 			case LONG_OPT_CORES:
 				resources->cores = atoi(optarg);
