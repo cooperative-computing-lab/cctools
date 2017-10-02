@@ -1325,6 +1325,7 @@ static void show_help_run(const char *cmd)
 	printf(" --mesos-master=<hostname:port> Mesos master address and port\n");
 	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
+	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
 	        /********************************************************************************/
 
 	printf("\nResource Monitoring Options:\n");
@@ -1388,6 +1389,7 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	int enable_example = 0;
+	char *k8s_image = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1470,6 +1472,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT
+		LONG_OPT_K8S_IMG
 	};
 
 	static const struct option long_options_run[] = {
@@ -1559,6 +1562,7 @@ int main(int argc, char *argv[])
 		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
+		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{0, 0, 0, 0}
 	};
 
@@ -1885,6 +1889,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MESOS_PRELOAD:
 				mesos_preload = xxstrdup(optarg);
 				break;
+			case LONG_OPT_K8S_IMG:
+				k8s_image = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ARCHIVE:
 				should_read_archive = 1;
 				should_write_to_archive = 1;
@@ -2079,6 +2086,10 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(remote_queue, "mesos-path", mesos_path);
 		batch_queue_set_option(remote_queue, "mesos-master", mesos_master);
 		batch_queue_set_option(remote_queue, "mesos-preload", mesos_preload);
+	}
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
+		batch_queue_set_option(remote_queue, "k8s-image", k8s_image);
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_DRYRUN) {
