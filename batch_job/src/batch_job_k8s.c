@@ -130,12 +130,6 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		return job_id;
 
 	} else if(pid == 0) {
-		
-		/*
- 		 * 1. kubectl create -f $mf_uuid-$count.json (create log)
-    	 * 2. "kubectl get pods $mf_uuid-$count" is running
-    	 * 3. kubectl cp extra_input_files $mf_uuid-$count:/
- 		 */
 
 		if(envlist) {
 			jx_export(envlist);
@@ -420,7 +414,15 @@ static int batch_queue_k8s_create(struct batch_queue *q)
 	return 0;
 }
 
-batch_queue_stub_free(k8s);
+static int batch_queue_k8s_free(struct batch_queue *q)
+{
+	char *cmd_rm_tmp_files = string_format("rm %s-*.json %s", 
+			mf_uuid->str, k8s_script_file_name);
+	system(cmd_rm_tmp_files);
+	return 0;
+	
+}
+
 batch_queue_stub_port(k8s);
 batch_queue_stub_option_update(k8s);
 
