@@ -83,6 +83,7 @@ The following major problems must be fixed:
 
 #define RESOURCE_MONITOR_TASK_LOCAL_NAME "wq-%d-task-%d"
 #define RESOURCE_MONITOR_REMOTE_NAME "cctools-monitor"
+#define RESOURCE_MONITOR_REMOTE_NAME_EVENTS RESOURCE_MONITOR_REMOTE_NAME "events.json"
 
 #define MAX_TASK_STDOUT_STORAGE (1*GIGABYTE)
 
@@ -193,7 +194,6 @@ struct work_queue {
 
 	char *monitor_output_directory;
 	char *monitor_summary_filename;
-	char *monitor_snapshot_file;           // Filename the monitor checks to produce snapshots.
 
 	char *monitor_exe;
 	struct rmsummary *measured_local_resources;
@@ -4530,6 +4530,17 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 	return 1;
 }
 
+int work_queue_specify_snapshot_file(struct work_queue_task *t, const char *monitor_snapshot_file) {
+
+	assert(monitor_snapshot_file);
+
+	free(t->monitor_snapshot_file);
+	t->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
+
+	return work_queue_task_specify_file(t, monitor_snapshot_file, RESOURCE_MONITOR_REMOTE_NAME_EVENTS, WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+
+}
+
 void work_queue_task_specify_algorithm(struct work_queue_task *t, work_queue_schedule_t algorithm)
 {
 	t->worker_selection_algorithm = algorithm;
@@ -4614,14 +4625,12 @@ void work_queue_task_delete(struct work_queue_task *t)
 {
 	struct work_queue_file *tf;
 	if(t) {
-		if(t->command_line)
-			free(t->command_line);
-		if(t->tag)
-			free(t->tag);
-		if(t->category)
-			free(t->category);
-		if(t->output)
-			free(t->output);
+
+		free(t->command_line);
+		free(t->tag);
+		free(t->category);
+		free(t->output);
+
 		if(t->input_files) {
 			while((tf = list_pop_tail(t->input_files))) {
 				work_queue_file_delete(tf);
@@ -4642,18 +4651,15 @@ void work_queue_task_delete(struct work_queue_task *t)
 			list_delete(t->env_list);
 		}
 
-		if(t->hostname)
-			free(t->hostname);
-		if(t->host)
-			free(t->host);
-		if(t->resources_requested)
-			rmsummary_delete(t->resources_requested);
-		if(t->resources_measured)
-			rmsummary_delete(t->resources_measured);
-		if(t->resources_allocated)
-			rmsummary_delete(t->resources_allocated);
-		if(t->monitor_output_directory)
-			free(t->monitor_output_directory);
+		free(t->hostname);
+		free(t->host);
+
+		rmsummary_delete(t->resources_requested);
+		rmsummary_delete(t->resources_measured);
+		rmsummary_delete(t->resources_allocated);
+
+		free(t->monitor_output_directory);
+		free(t->monitor_snapshot_file);
 
 		free(t);
 	}
@@ -4865,13 +4871,6 @@ int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output
 	return status;
 }
 
-void work_queue_enable_monitoring_snapshots(struct work_queue *q, const char *monitor_snapshot_file) {
-	assert(monitor_snapshot_file);
-
-	free(q->monitor_snapshot_file);
-	q->monitor_snapshot_file = xxstrdup(monitor_snapshot_file);
-}
-
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier)
 {
 	struct category *c = work_queue_category_lookup_or_create(q, category);
@@ -5067,8 +5066,6 @@ void work_queue_delete(struct work_queue *q)
 		if(q->current_max_worker)
 			rmsummary_delete(q->current_max_worker);
 
-		free(q->monitor_snapshot_file);
-
 		free(q);
 	}
 }
@@ -5175,9 +5172,9 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		free(tmp);
 	}
 
-	if(q->monitor_snapshot_file) {
+	if(t->monitor_snapshot_file) {
 		char *tmp = extra_options;
-		extra_options = string_format("%s --snapshot-file %s", tmp, q->monitor_snapshot_file);
+		extra_options = string_format("%s --snapshot-events %s", tmp, RESOURCE_MONITOR_REMOTE_NAME_EVENTS);
 		free(tmp);
 	}
 

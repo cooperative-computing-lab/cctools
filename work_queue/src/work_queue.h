@@ -149,6 +149,8 @@ struct work_queue_task {
 	struct rmsummary *resources_requested;                 /**< Number of cores, disk, memory, time, etc. the task requires. */
 	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref work_queue_enable_monitoring */
 
+	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
+
 	/* deprecated fields */
 	//int total_submissions;                                 /**< @deprecated Use try_count. */
 
@@ -500,6 +502,46 @@ This may be called on tasks after they are returned from @ref work_queue_wait.
 */
 void work_queue_task_delete(struct work_queue_task *t);
 
+
+/** When monitoring, indicates a json-encoded file that instructs the
+monitor to take a snapshot of the task resources. Snapshots appear in the JSON
+summary file of the task, under the key "snapshots". Snapshots are taken on
+events on files described in the monitor_snapshot_file. The monitor_snapshot_file
+is a json encoded file with the following format:
+
+    {
+        "FILENAME": {
+            "from-start":boolean,
+            "from-start-if-truncated":boolean,
+            "delete-if-found":boolean,
+            "events": [
+                {
+                    "label":"EVENT_NAME",
+                    "on-create":boolean,
+                    "on-truncate":boolean,
+                    "pattern":"REGEXP",
+                    "count":integer
+                },
+                {
+                    "label":"EVENT_NAME",
+                    ...
+                }
+            ]
+        },
+        "FILENAME": {
+            ...
+    }
+
+All fields but label are optional. For more information, consult the manual of the resource_monitor.
+
+@param t A work queue task object.
+@param monitor_snapshot_file A filename.
+@return 1 if the task file is successfully specified, 0 if either of @a t, or @a monitor_snapshot_file is null.
+*/
+
+int work_queue_specify_snapshot_file(struct work_queue_task *t, const char *monitor_snapshot_file);
+
+
 //@}
 
 /** @name Functions - Queues */
@@ -547,19 +589,6 @@ queue object.
 @return 1 on success, 0 if monitoring was not enabled.
 */
 int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory);
-
-
-/** When monitoring, indicates a file that when present, directs the resource
-monitor to take a snapshot of the resources. Snapshots appear in the JSON
-summary file of the task, under the key "snapshots". The file
-is removed after the snapshot, so that a new snapshot can be taken when it is
-recreated by a task. Optionaly, the first line of the file can be used to give
-an identifying label to the snapshot.
-@param q A work queue object.
-@param monitor_snapshot_file A filename.
-*/
-
-void work_queue_enable_monitoring_snapshots(struct work_queue *q, const char *monitor_snapshot_file);
 
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's
