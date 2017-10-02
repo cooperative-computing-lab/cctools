@@ -667,21 +667,30 @@ struct jx * jx_iterate_array(struct jx *j, void **i) {
 	}
 }
 
-struct jx * jx_iterate_keys(struct jx *j, void **i) {
+const char *jx_iterate_keys(struct jx *j, void **i) {
+	assert(i);
 	if (!i) return NULL;
-	if (*i) {
-		struct jx_pair *next = ((struct jx_pair *) *i)->next;
-		if (next) {
-			*i = next;
-			return next->key;
-		} else {
-			return NULL;
-		}
-	} else {
+	// The caller must initialize *i to NULL.
+	// After this, *i will always point to a valid address.
+	if (!(*i)) {
 		if (!jx_istype(j, JX_OBJECT)) return NULL;
-		*i = j->u.pairs;
-		return *i ? ((struct jx_pair *) *i)->key : NULL;
+		*i = &j->u.pairs;
 	}
+
+	struct jx_pair **p = *i;
+	while (*p) {
+		if (jx_istype((*p)->value, JX_STRING)) break;
+		p = &(*p)->next;
+	}
+
+	// End of the list
+	if (!(*p)) {
+		*i = p;
+		return NULL;
+	}
+
+	*i = &(*p)->next;
+	return (*p)->key->u.string_value;
 }
 
 struct jx * jx_iterate_values(struct jx *j, void **i) {
