@@ -2199,7 +2199,6 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_SNAPSHOT_FILE:
 				fatal("This option has been replaced with --snapshot-events. Please consult the manual of resource_monitor.");
-				snapshot_signal_file = xxstrdup(optarg);
 				break;
 			case LONG_OPT_SNAPSHOT_WATCH_CONF:
 				snapshot_watch_events_file = xxstrdup(optarg);
@@ -2286,28 +2285,12 @@ int main(int argc, char **argv) {
     snapshot->start  = summary->start;
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
-    if(log_inotify || snapshot_signal_file)
+    if(log_inotify)
     {
 	    rmonitor_inotify_fd     = inotify_init();
 	    alloced_inotify_watches = 100;
 	    inotify_watches         = (char **) calloc(alloced_inotify_watches, sizeof(char *));
 	}
-
-	if(snapshot_signal_file) {
-		char *full_path = malloc(PATH_MAX);
-
-		path_absolute(snapshot_signal_file, full_path, 0);
-
-		char *dir  = malloc(PATH_MAX);
-		path_dirname(full_path, dir);
-
-		free(snapshot_signal_file);
-		snapshot_signal_file = xxstrdup(path_basename(full_path));
-
-		rmonitor_add_file_watch(dir, 0, IN_CREATE);
-
-		free(full_path);
-    }
 #endif
 
 	/* if we are not following changes in directory, and no directory was manually added, we follow the current working directory. */
