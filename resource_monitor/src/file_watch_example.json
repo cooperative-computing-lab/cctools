@@ -24,7 +24,7 @@
         "events":[
             {
                 "label":"manualsnapshot",
-                "on-creation":true
+                "on-create":true
             }
         ]
     }

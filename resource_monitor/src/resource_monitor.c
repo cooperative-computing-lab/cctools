@@ -221,15 +221,6 @@ int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
 
-char *snapshot_signal_file = NULL;    /* name of the file that, if
-										 exists, makes the monitor record
-										 an snapshot of the current
-										 usage. The first line of the
-										 file labels the snapshot. The
-										 file is removed when the
-										 snapshot is recorded, so that
-										 multiple snapshots can be
-										 created. */
 char *snapshot_watch_events_file = NULL;   /* name of the file with a jx document that looks like:
 											  { "FILENAME" : [ { "pattern":"REGEXP", "label":"my snapshot", "max_count":1}, "FILENAME2" : ... ] }
 											  A snapshot is generated when pattern matches a line in the file FILENAME. */
@@ -723,15 +714,6 @@ int rmonitor_handle_inotify(void)
 					continue;
 				}
 
-				if (evdata[i].mask & IN_CREATE) {
-					if(snapshot_signal_file && strcmp(snapshot_signal_file, evdata[i].name) == 0) {
-							debug(D_RMON, "found snapshot file '%s'", fname);
-							rmonitor_add_file_watch(snapshot_signal_file, 0, IN_MODIFY | IN_OPEN | IN_CLOSE);
-							urgent = 1;
-					}
-					continue;
-				}
-
 				if (finfo == NULL) {
 					continue;
 				}
@@ -753,10 +735,6 @@ int rmonitor_handle_inotify(void)
 						debug(D_RMON, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
-					}
-
-					if(snapshot_signal_file && strcmp(fname, snapshot_signal_file) == 0) {
-						urgent = 1;
 					}
 				}
 			}
@@ -1022,40 +1000,6 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 	debug(D_RMON, "resources: %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 " %" PRId64 "% " PRId64 "\n", tr->wall_time + summary->start, tr->cpu_time, tr->max_concurrent_processes, tr->virtual_memory, tr->memory, tr->swap_memory, tr->bytes_read, tr->bytes_written, tr->bytes_received, tr->bytes_sent, tr->total_files, tr->disk);
 
-}
-
-int check_for_snapshot_file() {
-	static int count_from_file = 0;
-
-	if(!snapshot_signal_file) {
-		return 0;
-	}
-
-	FILE *snap_f = fopen(snapshot_signal_file, "r");
-	if(!snap_f) {
-		/* signal is unavailable, so no snapshot is taken. */
-		return 0;
-	}
-
-	int n = 1024;
-	char label[n];
-
-	label[0]='\0';
-	fgets(label, n, snap_f);
-	fclose(snap_f);
-	unlink(snapshot_signal_file);
-
-	string_chomp(label);
-
-	count_from_file++;
-
-	if(label[0] == '\0') {
-		snprintf(label, n, "snapshot_%s %d", snapshot_signal_file, count_from_file);
-	}
-
-	list_push_tail(snapshot_labels, xxstrdup(label));
-
-	return 1;
 }
 
 int record_snapshot(struct rmsummary *tr) {
@@ -2008,7 +1952,6 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s If <file> exists at the end of a measurement interval, take a snapshot of\n", "--snapshot-file=<file>");
     fprintf(stdout, "%-30s Configuration file for snapshots on file patterns.\n", "--snapshot-events=<file>");
     fprintf(stdout, "%-30s current resources, and delete <file>. If <file> has a non-empty first\n", "");
     fprintf(stdout, "%-30s line, it is used as a label for the snapshot.\n", "");
@@ -2060,9 +2003,6 @@ int rmonitor_resources(long int interval /*in seconds */)
 		release_waiting_processes();
 
 		cleanup_zombies();
-
-		//process snapshot
-		check_for_snapshot_file();
 
 		if(record_snapshot(snapshot)) {
 			rmsummary_delete(snapshot);
@@ -2258,6 +2198,7 @@ int main(int argc, char **argv) {
 				pprint_summaries = 0;
 				break;
 			case LONG_OPT_SNAPSHOT_FILE:
+				fatal("This option has been replaced with --snapshot-events. Please consult the manual of resource_monitor.");
 				snapshot_signal_file = xxstrdup(optarg);
 				break;
 			case LONG_OPT_SNAPSHOT_WATCH_CONF:
