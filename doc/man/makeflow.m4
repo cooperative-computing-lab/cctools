@@ -117,8 +117,6 @@ OPTIONS_BEGIN
 OPTION_PAIR(--singularity,image) Run each task in the Singularity container with this name.  The container will be created from the passed in image.
 OPTIONS_END
 
-
-
 SUBSECTION(Amazon Options)
 OPTIONS_BEGIN
 OPTION_PAIR(--amazon-credentials,path) Specify path to Amazon credentials file.
@@ -136,7 +134,12 @@ SUBSECTION(Mesos Options)
 OPTIONS_BEGIN
 OPTION_PAIR(--mesos-master, hostname) Indicate the host name of preferred mesos master.
 OPTION_PAIR(--mesos-path, filepath) Indicate the path to mesos python2 site-packages.
-OPTION_PAIR(--mesos-preload, library) Indicate the linking libraries for running mesos..
+OPTION_PAIR(--mesos-preload, library) Indicate the linking libraries for running mesos.
+OPTIONS_END
+
+SUBSECTION(Kubernetes Options)
+OPTIONS_BEGIN
+OPTION_PAIR(--k8s-image, docker_image) Indicate the Docker image for running pods on Kubernetes cluster. 
 OPTIONS_END
 
 SUBSECTION(Mountfile Support)
