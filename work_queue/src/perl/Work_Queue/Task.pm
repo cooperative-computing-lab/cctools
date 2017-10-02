@@ -183,6 +183,15 @@ sub specify_buffer {
 					  $args{cache});
 }
 
+sub specify_snapshot_file {
+	my $self = shift;
+	my $filename = shift;
+
+	croak "The snapshot file should be specified." unless $filename;
+
+	return work_queue_specify_snapshot_file($self->{_task}, $filename);
+}
+
 sub specify_max_retries {
 	my ($self, $retries) = @_;
 	return work_queue_task_specify_max_retries($self->{_task}, $retries);
@@ -684,6 +693,60 @@ May take the same values as Work_Queue::Task->specify_file.
 Legacy parameter for setting file caching attribute.  By default this is enabled.
 
 =back
+
+=head3 C<specify_snapshot_file>
+
+When monitoring, indicates a json-encoded file that instructs the monitor
+to take a snapshot of the task resources. Snapshots appear in the JSON
+summary file of the task, under the key "snapshots". Snapshots are taken
+on events on files described in the monitor_snapshot_file. The
+monitor_snapshot_file is a json encoded file with the following format:
+
+  {
+      "FILENAME": {
+          "from-start":boolean,
+          "from-start-if-truncated":boolean,
+          "delete-if-found":boolean,
+          "events": [
+              {
+                  "label":"EVENT_NAME",
+                  "on-create":boolean,
+                  "on-truncate":boolean,
+                  "pattern":"REGEXP",
+                  "count":integer
+              },
+              {
+                  "label":"EVENT_NAME",
+                  ...
+              }
+          ]
+      },
+      "FILENAME": {
+          ...
+  }
+
+All keys but "label" are optional:
+
+  from-start:boolean         If FILENAME exits when task starts running, process from line 1. Default: false, as the task may be appending to an already existing file.
+  from-start-if-truncated    If FILENAME is truncated, process from line 1. Default: true, to account for log rotations.
+  delete-if-found            Delete FILENAME when found. Default: false
+
+  events:
+  label        Name that identifies the snapshot. Only alphanumeric, -, and _
+               characters are allowed. 
+  on-create    Take a snapshot every time the file is created. Default: false
+  on-truncate  Take a snapshot when the file is truncated.    Default: false
+  on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
+  count        Maximum number of snapshots for this label. Default: -1 (no limit)
+
+Exactly one of on-create, on-truncate, or on-pattern should be specified. For more information, consult the manual of the resource_monitor.
+
+=item remote_name
+
+@param filename       The name of the snapshot events specification
+
+=back
+
 
 =head3 C<specify_max_retries>
 

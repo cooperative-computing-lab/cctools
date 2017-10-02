@@ -532,7 +532,21 @@ is a json encoded file with the following format:
             ...
     }
 
-All fields but label are optional. For more information, consult the manual of the resource_monitor.
+All fields but label are optional.
+
+            from-start:boolean         If FILENAME exits when task starts running, process from line 1. Default: false, as the task may be appending to an already existing file.
+            from-start-if-truncated    If FILENAME is truncated, process from line 1. Default: true, to account for log rotations.
+            delete-if-found            Delete FILENAME when found. Default: false
+
+            events:
+            label        Name that identifies the snapshot. Only alphanumeric, -,
+                         and _ characters are allowed. 
+            on-create    Take a snapshot every time the file is created. Default: false
+            on-truncate  Take a snapshot when the file is truncated.    Default: false
+            pattern      Take a snapshot when a line matches the regexp pattern.    Default: none
+            count        Maximum number of snapshots for this label. Default: -1 (no limit)
+
+For more information, consult the manual of the resource_monitor.
 
 @param t A work queue task object.
 @param monitor_snapshot_file A filename.
