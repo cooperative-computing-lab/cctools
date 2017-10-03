@@ -14,8 +14,9 @@ from class_item import Item
 from parser import Parser
 from db_sqlite import Database
 
-from prune import worker_local
-from prune import worker_wq
+from prune import master_local
+from prune import master_wq
+from prune import worker
 
 
 ROLE = 'Client'
@@ -29,17 +30,16 @@ class Connect:
 	def execute( self, worker_type, **kwargs ):
 		if 'stage' in kwargs:
 			glob.wq_stage = kwargs['stage']
-
 		if worker_type == 'local':
 			if 'cores' in kwargs:
 				glob.exec_local_concurrency = int(kwargs['cores'])
-			worker = worker_local.Master()
-			worker.run()
+			workers = master_local.Master()
+			workers.run()
 		elif worker_type == 'work_queue' or worker_type == 'wq':
 			if 'name' in kwargs:
 				glob.wq_name = kwargs['name']
-			worker = worker_wq.Master()
-			worker.run()
+			workers = master_wq.Master()
+			workers.run()
 
 
 
@@ -50,6 +50,8 @@ class Connect:
 				obj = {'engine':kwargs['engine'],
 					'open':kwargs['open'], 'close':kwargs['close'],
 					'args':kwargs['args'], 'params':kwargs['params']}
+				if 'http_proxy' in kwargs:
+					obj['http_proxy'] = kwargs['http_proxy']
 				it = Item( type='envi', body=obj )
 				glob.db.insert(it)
 				return it.cbid
@@ -58,11 +60,20 @@ class Connect:
 
 				filename = kwargs['spec']
 				cbid = self.file_add( filename )
+				args = [cbid]
+				params = ['SPEC.umbrella']
+
+				if kwargs['cms_siteconf']:
+					filename2 = kwargs['cms_siteconf']
+					cbid2 = self.file_add( filename2 )
+					args.append(cbid2)
+					params.append(filename2)
 
 				obj = {'engine':kwargs['engine'], 'spec':cbid,
 					'cvmfs_http_proxy':kwargs['cvmfs_http_proxy'],
+					'cms_siteconf':kwargs['cms_siteconf'],
 					'sandbox_mode':kwargs['sandbox_mode'],
-					'log':kwargs['log'], 'args':[cbid]}
+					'log':kwargs['log'], 'args':args, 'params':params}
 
 				it = Item( type='envi', body=obj )
 				glob.db.insert(it)
@@ -112,6 +123,8 @@ class Connect:
 
 
 	def task_add( self, returns, env, cmd, args=[], params=[], types=[], env_vars={}, precise=True):
+
+		# print '%s = %s (%s)'%(returns,cmd,args)
 		timer.start('client.task_add')
 		obj = {'returns':returns, 'env':env, 'cmd':cmd, 'args':args, 'params':params, 'types':types, 'env_vars':env_vars, 'precise':precise}
 		it = Item( type='call', body=obj )
@@ -127,31 +140,18 @@ class Connect:
 		return results
 
 
-	def step_add( self, name ):
+	def step_name( self, name ):
 		self.wait()
 		self.report()
 
 
 		print name
 		glob.workflow_step = name
-		print '=================='
-		print '------------------'
-		print '=================='
-		print '------------------'
-		print '=================='
-		print '------------------'
-		print '=================='
 
 
 
 	def report( self ):
-		print '------------------'
-		print '------------------'
-		print '------------------'
 		timer.report()
-		print '------------------'
-		print '------------------'
-		print '------------------'
 		timer.reset()
 
 		if glob.workflow_step and glob.workflow_step != 'Stage 0':
@@ -338,6 +338,11 @@ class Connect:
 		statinfo = os.stat(zipped)
 		print 'Export zipped: duration=%f size=%i' % (diff, statinfo.st_size)
 		'''
+
+
+
+
+
 
 	def load( self, pathname ):
 		timer.start('client.import')
@@ -615,7 +620,16 @@ class Connect:
 
 
 
-	def __init__( self ):
+	def __init__( self, base_dir = None, config = None ):
+		if config:
+			glob.set_config_file(config)
+
+		if base_dir:
+			if base_dir[-1]!='/':
+				base_dir += '/'
+			glob.set_base_dir(base_dir)
+
+
 		if not os.path.exists(glob.tmp_file_directory):
 			os.makedirs(glob.tmp_file_directory)
 

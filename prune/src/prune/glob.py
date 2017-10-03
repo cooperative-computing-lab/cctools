@@ -139,6 +139,8 @@ def set_config_file(new_config_file):
 					exec_local_concurrency = int(val)
 				else:
 					print 'Unknown config option:',key, val
+	else:
+		print 'File not found:',new_config_file
 
 
 config_file = HOME+'/.prune/config'

@@ -1,5 +1,5 @@
 #!/usr/bin/env cctools_python
-# CCTOOLS_PYTHON_VERSION 2.7 2.6
+# CCTOOLS_PYTHON_VERSION 2.7
 
 # Copyright (c) 2010- The University of Notre Dame.
 # This software is distributed under the GNU General Public License.
@@ -7,8 +7,11 @@
 import os, sys, random, time
 
 from prune import client
+from os.path import expanduser
 
-prune = client.Connect()
+
+HOME = expanduser("~")
+prune = client.Connect(base_dir = HOME+'/.prune') #Prune data is stored in base_dir
 
 
 years = [3000,3010]
@@ -77,7 +80,7 @@ for year in years:
     for u,ukey in enumerate(normalized_data_keys[year]):
 
         param = 'input_%i_%i' % (year, u)
-        cmd = "python2.6 map_all %i < %s " % (concurrency, param)
+        cmd = "python map_all %i < %s " % (concurrency, param)
         sorteds = prune.task_add( returns=returns,
             env=prune.nil, cmd=cmd,
             args=[map_all,ukey], params=['map_all',param] )
@@ -90,7 +93,7 @@ for year in years:
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='local', cores=8 )
 prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 prune.export( key_sorted_data[3000][1][1], '3000.1.1.txt' )
@@ -147,7 +150,7 @@ for u in range(0,concurrency):
     # #prune.file_dump( all_key, 'all_key_sample_%i.txt'%u )
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='local', cores=8 )
 prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 prune.export( year_blocks[ 0 ][ 3000 ], 'year_blocks.%i.%i.txt'%(0,3000) )
@@ -189,7 +192,7 @@ for u in range(0,concurrency):
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='local', cores=8 )
 prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 prune.export( blocks[ 0 ][ 6010 ], 'blocks.0.6010.txt' )
@@ -215,7 +218,7 @@ for u in range(0,concurrency):
             year2 = years[y2]
             ykey = year1+year2
 
-            cmd = "python2.6 dups < input_%i_%i > output_%i_%i" % (u,ykey, u,ykey)
+            cmd = "python dups < input_%i_%i > output_%i_%i" % (u,ykey, u,ykey)
             block_grouped, = prune.task_add( returns=['output_%i_%i'%(u,ykey)],
                 env=prune.nil, cmd=cmd,
                 args=[dups,blocks[u][ykey]], params=['dups','input_%i_%i'%(u,ykey)] )
@@ -226,7 +229,7 @@ for u in range(0,concurrency):
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='local', cores=8 )
 prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 prune.export( grouped_blocks[ 1 ][ 6010 ], 'grouped_blocks.1.6010.txt' )
@@ -252,7 +255,7 @@ for u in range(0,concurrency):
             year2 = years[y2]
             ykey = year1+year2
 
-            cmd = "python2.6 matches < input_%i_%i > output_%i_%i" % (u,ykey, u,ykey)
+            cmd = "python matches < input_%i_%i > output_%i_%i" % (u,ykey, u,ykey)
             block_matches, = prune.task_add( returns=['output_%i_%i'%(u,ykey)],
                 env=prune.nil, cmd=cmd,
                 args=[matches,grouped_blocks[u][ykey]], params=['matches','input_%i_%i'%(u,ykey)] )
@@ -263,7 +266,7 @@ print 'final_ids = %s' % (final_ids)
 
 
 ###### Execute the workflow ######
-#prune.execute( worker_type='local', cores=8 )
+# prune.execute( worker_type='local', cores=8 )
 prune.execute( worker_type='work_queue', name='prune_census_example' )
 
 ###### Save output data to local directory ######

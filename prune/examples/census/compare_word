@@ -32,9 +32,9 @@ while line:
 	line=indata.readline()
 
 #print len(values), 'total fields...\n'
-print '## This file shows the similarity scores for the first entry'
-print '## based on the Jaro-Winkler string comparison algorithm'
-print '#Similarity score|Word A|Frequency|Word B|Frequency'
+print('## This file shows the similarity scores for the first entry')
+print('## based on the Jaro-Winkler string comparison algorithm')
+print('#Similarity score|Word A|Frequency|Word B|Frequency')
 
 #max_scores = 200
 max_scores = sys.maxint
@@ -50,6 +50,6 @@ for i in range(pos,len(values)):
 	#	top_scores = top_scores[0:max_scores]
 	for ar in top_scores:
 		sim, i, j = ar
-		print '%s|%s|%i|%s|%i' % (sim, values[i], counts[i], values[j], counts[j])
+		print('%s|%s|%i|%s|%i' % (sim, values[i], counts[i], values[j], counts[j]))
 	break
 
