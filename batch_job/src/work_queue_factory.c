@@ -459,33 +459,20 @@ void remove_all_workers( struct batch_queue *queue, struct itable *job_table )
 
 }
 
-void print_stats(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected)
-{
+void print_stats(struct jx *j) {
 	struct timeval tv;
 	struct tm *tm;
 	gettimeofday(&tv, 0);
 	tm = localtime(&tv.tv_sec);
 
-	int to_connect = submitted - connected;
-
-	needed     = needed     > 0 ? needed    : 0;
-	requested  = requested  > 0 ? requested : 0;
-	to_connect = to_connect > 0 ? to_connect : 0;
-
 	fprintf(stdout, "%04d/%02d/%02d %02d:%02d:%02d: "
-			"|submitted: %d |needed: %d |waiting connection: %d |requested: %d \n",
+			"|submitted: %" PRId64 " |needed: %" PRId64 " |waiting connection: %" PRId64 " |requested: %" PRId64 " \n",
 			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
-			submitted, needed, to_connect, requested);
+			jx_lookup_integer(j, "workers_submitted"),
+			jx_lookup_integer(j, "workers_needed"),
+			jx_lookup_integer(j, "workers_to_connect"),
+			jx_lookup_integer(j, "workers_requested"));
 
-	int master_count = 0;
-	master_count += masters ? list_size(masters) : 0;
-	master_count += foremen ? list_size(foremen) : 0;
-
-	if(master_count < 1)
-	{
-		fprintf(stdout, "No change this cycle.\n\n");
-		return;
-	}
 
 	int columns = 80;
 	char *column_str = getenv("COLUMNS");
@@ -496,33 +483,95 @@ void print_stats(struct list *masters, struct list *foremen, int submitted, int 
 
 	jx_table_print_header(queue_headers,stdout,columns);
 
-	struct jx *j;
-	if(masters && list_size(masters) > 0)
-	{
-		list_first_item(masters);
-		while((j = list_next_item(masters)))
-		{
-			if(!using_catalog) {
-				jx_insert_string(j, "name", master_host);
-			}
-			jx_table_print(queue_headers, j, stdout, columns);
+	struct jx *a = jx_lookup(j, "masters");
+	if(a) {
+		struct jx *m;
+		for (void *i = NULL; (m = jx_iterate_array(a, &i));) {
+			jx_table_print(queue_headers, m, stdout, columns);
 		}
 	}
 
-	if(foremen && list_size(foremen) > 0)
-	{
-		fprintf(stdout, "foremen:\n");
-
-		list_first_item(foremen);
-		while((j = list_next_item(foremen)))
-		{
-			jx_table_print(queue_headers, j, stdout, columns);
-
+	a = jx_lookup(j, "foremen");
+	if(a) {
+		struct jx *m;
+		for (void *i = NULL; (m = jx_iterate_array(a, &i));) {
+			jx_table_print(queue_headers, m, stdout, columns);
 		}
 	}
 
 	fprintf(stdout, "\n");
 	fflush(stdout);
+}
+
+struct jx *master_to_jx(struct jx *m) {
+
+	struct jx *j = jx_object(NULL);
+
+	jx_insert_string(j, "project", jx_lookup_string(m, "project"));
+
+	if(using_catalog) {
+		jx_insert_string(j, "name", jx_lookup_string(m, "name"));
+	} else {
+		jx_insert_string(j, "name", master_host);
+	}
+
+	jx_insert_integer(j,  "port",             jx_lookup_integer(m, "port"));
+	jx_insert_integer(j, "tasks_waiting",     jx_lookup_integer(m, "tasks_waiting"));
+	jx_insert_integer(j, "tasks_running",     jx_lookup_integer(m, "tasks_running"));
+	jx_insert_integer(j, "tasks_complete",    jx_lookup_integer(m, "tasks_complete"));
+	jx_insert_integer(j, "workers_connected", jx_lookup_integer(m, "workers"));
+
+	return j;
+}
+
+struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitted, int needed, int requested, int connected) {
+
+	struct jx *j= jx_object(NULL);
+	jx_insert_string(j, "type", "wq_factory");
+
+	if(using_catalog) {
+		jx_insert_string(j, "project_regex",    project_regex);
+		jx_insert_string(j, "submission_regex", submission_regex);
+	}
+
+	int to_connect = submitted - connected;
+
+	needed     = needed     > 0 ? needed    : 0;
+	requested  = requested  > 0 ? requested : 0;
+	to_connect = to_connect > 0 ? to_connect : 0;
+
+
+	jx_insert_integer(j, "workers_needed",     needed);
+	jx_insert_integer(j, "workers_requested",  requested);
+	jx_insert_integer(j, "workers_to_connect", to_connect);
+
+	struct jx *ms = jx_array(NULL);
+	if(masters && list_size(masters) > 0)
+	{
+		struct jx *m;
+		list_first_item(masters);
+		while((m = list_next_item(masters)))
+		{
+			jx_array_append(ms, master_to_jx(m));
+		}
+	}
+	jx_insert(j, jx_string("masters"), ms);
+
+
+	struct jx *fs = jx_array(NULL);
+	if(foremen && list_size(foremen) > 0)
+	{
+		struct jx *f;
+		list_first_item(foremen);
+		while((f = list_next_item(foremen)))
+		{
+			jx_array_append(fs, master_to_jx(f));
+
+		}
+	}
+	jx_insert(j, jx_string("foremen"), fs);
+
+	return j;
 }
 
 void delete_projects_list(struct list *l)
@@ -802,7 +851,14 @@ static void mainloop( struct batch_queue *queue )
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
 
-		print_stats(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+		struct jx *j = factory_to_jx(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
+
+		char *update_str = jx_print_string(j);
+		debug(D_WQ, "Sending status to the catalog server(s) at %s ...", catalog_host);
+		catalog_query_send_update(catalog_host, update_str);
+		print_stats(j);
+		free(update_str);
+		jx_delete(j);
 
 		update_blacklisted_workers(queue, masters_list);
 
