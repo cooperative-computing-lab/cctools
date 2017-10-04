@@ -53,6 +53,8 @@ int rmonitor_get_sys_io_usage(  pid_t pid,        struct rmonitor_io_info *io);
 int rmonitor_get_map_io_usage(  pid_t pid,        struct rmonitor_io_info *io);
 int rmonitor_get_dsk_usage(     const char *path, struct statfs *disk);
 
+int rmonitor_get_loadavg(struct rmonitor_load_info *load);
+
 int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d, int max_time_for_measurement);
 
 void acc_cpu_time_usage( struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other);
