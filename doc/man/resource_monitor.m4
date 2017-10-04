@@ -258,7 +258,7 @@ LONGCODE_BEGIN
 }
 LONGCODE_END
 
-Generate snapshots everytime a line is added to "my.log":
+Generate snapshots every time a line is added to "my.log":
 
 LONGCODE_BEGIN
 {
@@ -298,7 +298,7 @@ LONGCODE_BEGIN
 }
 LONGCODE_END
 
-A task may be setup to generate a file everytime a snapshot is desired. The
+A task may be setup to generate a file every time a snapshot is desired. The
 monitor can detected this file, generate a snapshot, and delete the file to get
 ready for the next snapshot:
 
@@ -318,10 +318,11 @@ LONGCODE_BEGIN
 LONGCODE_END
 
 
-SECTION(BUGS)
+SECTION(BUGS AND KNOWN ISSUES)
 
 LIST_BEGIN
 LIST_ITEM(The monitor cannot track the children of statically linked executables.)
+LIST_ITEM(The option --snapshot-events assumes that the watched files are written by appending to them. File truncation may not be detected if between checks the size of the file is larger or equal to the size after truncation. File checks are fixed at intervals of 1 second.)
 LIST_END
 
 SECTION(COPYRIGHT)
