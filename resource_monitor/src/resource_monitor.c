@@ -843,6 +843,7 @@ void rmonitor_summary_header()
 	    fprintf(log_series, " %s", "bytes_received");
 	    fprintf(log_series, " %s", "bytes_sent");
 	    fprintf(log_series, " %s", "bandwidth");
+	    fprintf(log_series, " %s", "machine_load");
 
 	    if(resources_flags->disk)
 	    {
@@ -961,6 +962,9 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->disk = (int64_t) (d->byte_count + ONE_MEGABYTE - 1) / ONE_MEGABYTE;
 
 	tr->fs_nodes          = (int64_t) f->disk.f_ffree;
+
+	tr->machine_load = p->load.last_minute;
+	tr->machine_cpus = p->load.cpus;
 }
 
 void rmonitor_find_max_tree(struct rmsummary *result, struct rmsummary *tr)
@@ -992,6 +996,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 		fprintf(log_series, " %" PRId64, tr->bytes_received);
 		fprintf(log_series, " %" PRId64, tr->bytes_sent);
 		fprintf(log_series, " %" PRId64, tr->bandwidth);
+		fprintf(log_series, " %04.2lf" PRId64, tr->machine_load / 1000.0);
 
 		if(resources_flags->disk)
 		{

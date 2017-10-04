@@ -72,6 +72,8 @@ void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_
 		acc_sys_io_usage(&acc->io, &p->io);
 		acc_map_io_usage(&acc->io, &p->io);
 	}
+	
+	rmonitor_get_loadavg(&acc->load);
 }
 
 void rmonitor_poll_all_wds_once(struct hash_table *wdirs, struct rmonitor_wdir_info *acc, int max_time_for_measurement)
@@ -173,7 +175,7 @@ FILE *open_proc_file(pid_t pid, char *filename)
 		return NULL;
 #endif
 
-		if(pid > 0)
+		if(pid > -1)
 		{
 			sprintf(fproc_path, "/proc/%d/%s", pid, filename);
 		}
@@ -265,7 +267,7 @@ int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 	if(n != 1)
 		return 1;
 
-	FILE *fuptime = open_proc_file(0, "uptime");
+	FILE *fuptime = open_proc_file(-1, "uptime");
 	if(!fuptime)
 		return 1;
 
@@ -319,6 +321,20 @@ void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_
 	acc->delta += other->delta;
 }
 
+int rmonitor_get_loadavg(struct rmonitor_load_info *load)
+{
+	double last_minute;
+	int status = getloadavg(&last_minute, 1);
+
+	if(status != 1) {
+		last_minute = -1;
+	}
+
+	load->last_minute = (int64_t) ceil(last_minute * 1000);
+	load->cpus        = load_average_get_cpus();
+
+	return 0;
+}
 
 int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
@@ -764,6 +780,9 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	if(f) {
 		tr->fs_nodes          = (int64_t) f->disk.f_ffree;
 	}
+
+	tr->machine_load = p->load.last_minute;
+	tr->machine_cpus = p->load.cpus;
 }
 
 struct rmsummary *rmonitor_measure_process(pid_t pid) {

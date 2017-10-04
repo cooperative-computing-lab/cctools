@@ -63,6 +63,11 @@ struct rmonitor_mem_info
 	uint64_t data;
 };
 
+struct rmonitor_load_info {
+    uint64_t last_minute;
+    uint64_t cpus;
+};
+
 struct rmonitor_io_info
 {
 	uint64_t chars_read;
@@ -129,6 +134,7 @@ struct rmonitor_process_info
 	struct rmonitor_mem_info      mem;
 	struct rmonitor_cpu_time_info cpu;
 	struct rmonitor_io_info       io;
+	struct rmonitor_load_info     load;
 	struct rmonitor_wdir_info    *wd;
 };
 

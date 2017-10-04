@@ -57,6 +57,7 @@ void initialize_units() {
 
 	conversion_fields = hash_table_create(32, 0);
 
+                                   // name                 internal  external      base       exttoint     inttobase    float_flag
 	rmsummary_add_conversion_field("wall_time",                "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
 	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
 	rmsummary_add_conversion_field("start",                    "us",      "us",     "s",       1,        1.0/USECOND,   0);
@@ -71,7 +72,9 @@ void initialize_units() {
 	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
 	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   "bps",     1000,     1,             1);
 	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  "cores",   1,        1,             0);
-	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1,             1);
+	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1/1000.0,      1);
+	rmsummary_add_conversion_field("machine_cpus",             "cores",   "cores",  "cores",   1,        1,             0);
+	rmsummary_add_conversion_field("machine_load",             "mprocs",  "procs",  "procs",   1000,     1/1000.0,      1);
 	rmsummary_add_conversion_field("max_concurrent_processes", "procs",   "procs",  "procs",   1,        1,             0);
 	rmsummary_add_conversion_field("total_processes",          "procs",   "procs",  "procs",   1,        1,             0);
 	rmsummary_add_conversion_field("total_files",              "files",   "files",  "files",   1,        1,             0);
@@ -313,6 +316,14 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->gpus;
 	}
 
+	if(strcmp(key, "machine_cpus") == 0) {
+		return s->machine_cpus;
+	}
+
+	if(strcmp(key, "machine_load") == 0) {
+		return s->machine_load;
+	}
+
 	if(strcmp(key, "snapshots_count") == 0) {
 		return s->snapshots_count;
 	}
@@ -455,6 +466,16 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
+	if(strcmp(key, "machine_cpus") == 0) {
+		s->machine_cpus = value;
+		return 1;
+	}
+
+	if(strcmp(key, "machine_load") == 0) {
+		s->machine_load = value;
+		return 1;
+	}
+
 	if(strcmp(key, "gpus") == 0) {
 		s->gpus = value;
 		return 1;
@@ -542,6 +563,8 @@ struct jx *peak_times_to_json(struct rmsummary *s) {
 	peak_time_to_json(output, cf, s, max_concurrent_processes);
 	peak_time_to_json(output, cf, s, cores);
 	peak_time_to_json(output, cf, s, cpu_time);
+	peak_time_to_json(output, cf, s, machine_cpus);
+	peak_time_to_json(output, cf, s, machine_load);
 
 	jx_insert(output, jx_string("units"), jx_string(cf->external_unit));
 
@@ -573,6 +596,8 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 		}
 	}
 
+	field_to_json(output, s, machine_load);
+	field_to_json(output, s, machine_cpus);
 	field_to_json(output, s, disk);
 	field_to_json(output, s, total_files);
 	field_to_json(output, s, bandwidth);
@@ -937,9 +962,10 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, total_files);
 	rmsummary_apply_op(dest, src, fn, disk);
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
-
 	rmsummary_apply_op(dest, src, fn, cores);
 	rmsummary_apply_op(dest, src, fn, cores_avg);
+	rmsummary_apply_op(dest, src, fn, machine_cpus);
+	rmsummary_apply_op(dest, src, fn, machine_load);
 
 }
 
@@ -1028,6 +1054,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 	merge_limit(dest, src, disk);
 	merge_limit(dest, src, cores);
 	merge_limit(dest, src, cores_avg);
+	merge_limit(dest, src, machine_load);
 	merge_limit(dest, src, fs_nodes);
 
 }
@@ -1088,6 +1115,8 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	max_op_w_time(dest, src, total_files);
 	max_op_w_time(dest, src, disk);
 	max_op_w_time(dest, src, cores);
+	max_op_w_time(dest, src, machine_cpus);
+	max_op_w_time(dest, src, machine_load);
 	max_op_w_time(dest, src, fs_nodes);
 }
 
@@ -1174,6 +1203,10 @@ void rmsummary_debug_report(const struct rmsummary *s)
 		debug(D_DEBUG, "max resource %-18s   : %" PRId64 "\n", "total_files", s->total_files);
 	if(s->disk != -1)
 		debug(D_DEBUG, "max resource %-18s MB: %" PRId64 "\n", "disk", s->disk);
+	if(s->machine_load != -1)
+		debug(D_DEBUG, "max resource %-18s mprocs: %" PRId64 "\n", "machine_load", s->machine_load);
+	if(s->machine_cpus != -1)
+		debug(D_DEBUG, "max resource %-18s cores: %" PRId64 "\n", "machine_cpus", s->machine_cpus);
 }
 
 size_t rmsummary_field_offset(const char *key) {
@@ -1243,6 +1276,14 @@ size_t rmsummary_field_offset(const char *key) {
 
 	if(!strcmp(key, "max_concurrent_processes")) {
 		return offsetof(struct rmsummary, max_concurrent_processes);
+	}
+
+	if(!strcmp(key, "machine_load")) {
+		return offsetof(struct rmsummary, machine_load);
+	}
+
+	if(!strcmp(key, "machine_cpus")) {
+		return offsetof(struct rmsummary, machine_cpus);
 	}
 
 	fatal("Field '%s' was not found.");
