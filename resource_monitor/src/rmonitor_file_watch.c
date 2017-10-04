@@ -12,12 +12,11 @@
 
 #include "buffer.h"
 #include "debug.h"
+#include "get_line.h"
 #include "rmonitor_helper_comm.h"
 #include "rmonitor_file_watch.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-
-#define WATCH_FILE_LINE_SIZE 4096
 
 int parse_boolean(const char *fname, struct jx *spec, const char *key, int default_value) {
 
@@ -212,7 +211,6 @@ int request_snapshot(struct rmonitor_file_watch_info *f) {
 void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
 
     struct rmonitor_file_watch_event *e;
-    static char line[WATCH_FILE_LINE_SIZE];
     struct stat s;
 
     for(;;) {
@@ -277,7 +275,8 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
                     fatal("Could not seek file '%s': %s.", strerror(errno)); 
                 }
 
-                while(fgets(line, WATCH_FILE_LINE_SIZE, fp)) {
+                char *line;
+                while((line = get_line(fp))) {
                     list_first_item(f->events);
                     while((e = list_next_item(f->events))) {
                         if(e->max_count < 0 || e->max_count < e->total_count) { 
@@ -287,6 +286,7 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
                             }
                         }
                     }
+                    free(line);
                 }
 
                 f->position = ftell(fp);
