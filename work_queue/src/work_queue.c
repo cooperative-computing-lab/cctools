@@ -196,6 +196,8 @@ struct work_queue {
 	char *monitor_snapshot_file;           // Filename the monitor checks to produce snapshots.
 
 	char *monitor_exe;
+	int  monitor_do_not_enforce_limits;
+
 	struct rmsummary *measured_local_resources;
 	struct rmsummary *current_max_worker;
 
@@ -1459,7 +1461,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	// Start receiving output...
 	t->time_when_retrieval = timestamp_get();
 
-	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
+	if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION && !q->monitor_do_not_enforce_limits) {
 		result = get_monitor_output_file(q,w,t);
 	} else {
 		result = get_output_files(q,w,t);
@@ -5181,6 +5183,12 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		free(tmp);
 	}
 
+	if(q->monitor_do_not_enforce_limits) {
+		char *tmp = extra_options;
+		extra_options = string_format("%s --without-limits", tmp);
+		free(tmp);
+	}
+
 	int extra_files = (q->monitor_mode == MON_FULL);
 
 	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0);
@@ -6027,6 +6035,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 
 	} else if(!strcmp(name, "category-steady-n-tasks")) {
 		category_tune_bucket_size("category-steady-n-tasks", (int) value);
+
+	} else if(!strcmp(name, "rmonitor-do-not-enforce-limits-use-carefully")) {
+		q->monitor_do_not_enforce_limits = (int) value;
 
 	} else {
 		debug(D_NOTICE|D_WQ, "Warning: tuning parameter \"%s\" not recognized\n", name);

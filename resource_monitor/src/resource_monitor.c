@@ -188,8 +188,11 @@ struct hash_table *wdirs;       /* Maps paths to working directory structures. *
 struct itable *filesysms;       /* Maps st_dev ids (from stat syscall) to filesystem structures. */
 struct hash_table *files;       /* Keeps track of which files have been opened. */
 
-static int follow_chdir = 0;    /* Keep track of all the working directories per process. */
+static int follow_chdir     = 0; /* Keep track of all the working directories per process. */
 static int pprint_summaries = 1; /* Pretty-print json summaries. */
+
+static int limits_were_exceeded  = 0; /* Were resources ever exceeded? */
+static int enforce_limits        = 1; /* Terminate if resources are exhausted. */
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
 static char **inotify_watches;  /* Keeps track of created inotify watches. */
@@ -1095,11 +1098,13 @@ void decode_zombie_status(struct rmsummary *summary, int wait_status)
 		summary->exit_status = WEXITSTATUS(wait_status);
 	}
 
-	if(summary->limits_exceeded)
-	{
+	if(limits_were_exceeded) {
 		free(summary->exit_type);
 		summary->exit_type   = xxstrdup("limits");
-		summary->exit_status = 128 + SIGTERM;
+
+		if(enforce_limits) {
+			summary->exit_status = 128 + SIGTERM;
+		}
 	}
 }
 
@@ -1244,7 +1249,7 @@ int rmonitor_final_summary()
 
 	int status;
 
-	if(summary->limits_exceeded) {
+	if(limits_were_exceeded) {
 		status = RM_OVERFLOW;
 	} else if(summary->exit_status != 0) {
 		status = RM_TASK_ERROR;
@@ -1528,14 +1533,15 @@ void rmonitor_final_cleanup(int signum)
 		debug(D_RMON, "Limit " #fld " broken.\n");\
 		if(!(tr)->limits_exceeded) { (tr)->limits_exceeded = rmsummary_create(-1); }\
 		(tr)->limits_exceeded->fld = resources_limits->fld;\
+		limits_were_exceeded_now = 1;\
 	}
 
-/* return 0 means above limit, 1 means limist ok */
-int rmonitor_check_limits(struct rmsummary *tr)
+/* return 1 means above limit, 0 means limist ok */
+int rmonitor_resources_exhausted_check(struct rmsummary *tr)
 {
-	tr->limits_exceeded = NULL;
+	int limits_were_exceeded_now = 0;
 
-	/* Consider errors as resources exhausted. Used for ENOSPC, ENFILE, etc. */
+	/* Consider fatal errors as resources exhausted. Used for ENOSPC, ENFILE, etc. */
 	if(tr->last_error)
 		return 0;
 
@@ -1559,10 +1565,24 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, total_files);
 	over_limit_check(tr, disk);
 
-	if(tr->limits_exceeded)
-		return 0;
-	else
+	if(limits_were_exceeded_now) {
 		return 1;
+	}
+
+	return 0;
+}
+
+void rmonitor_enforce_limits(struct rmsummary *s) {
+	int exhaustion = rmonitor_resources_exhausted_check(summary);
+
+	if(!exhaustion) {
+		return;
+	}
+
+	limits_were_exceeded = 1;
+
+	if(exhaustion && enforce_limits)
+		rmonitor_final_cleanup(SIGTERM);
 }
 
 /***
@@ -1706,8 +1726,7 @@ int rmonitor_dispatch_msg(void)
 
 	summary->last_error = msg.error;
 
-	if(!rmonitor_check_limits(summary))
-		rmonitor_final_cleanup(SIGTERM);
+	rmonitor_enforce_limits(summary);
 
 	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END) {
 		return 1;
@@ -1899,6 +1918,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
     fprintf(stdout, "%-30s Use string of the form \"var: value, var: value\" to specify.\n", "-L,--limits=<string>");
     fprintf(stdout, "%-30s resource limits. Can be specified multiple times.\n", "");
+    fprintf(stdout, "%-30s Do not terminate when resource limits are reached.\n", "--without-limits");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
@@ -1960,8 +1980,7 @@ int rmonitor_resources(long int interval /*in seconds */)
 		rmonitor_find_max_tree(snapshot, resources_now);
 		rmonitor_log_row(resources_now);
 
-		if(!rmonitor_check_limits(summary))
-			rmonitor_final_cleanup(SIGTERM);
+		rmonitor_enforce_limits(summary);
 
 		release_waiting_processes();
 
@@ -2052,7 +2071,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_FOLLOW_CHDIR,
 		LONG_OPT_MEASURE_DIR,
 		LONG_OPT_NO_PPRINT,
-		LONG_OPT_SNAPSHOT_FILE
+		LONG_OPT_SNAPSHOT_FILE,
+		LONG_OPT_DO_NOT_ENFORCE
 	};
 
     static const struct option long_options[] =
@@ -2079,6 +2099,8 @@ int main(int argc, char **argv) {
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
 		    {"snapshot-file", required_argument, 0, LONG_OPT_SNAPSHOT_FILE},
+
+		    {"without-limits", no_argument, 0, LONG_OPT_DO_NOT_ENFORCE},
 
 		    {0, 0, 0, 0}
 	    };
@@ -2158,6 +2180,9 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_SNAPSHOT_FILE:
 				snapshot_signal_file = xxstrdup(optarg);
+				break;
+			case LONG_OPT_DO_NOT_ENFORCE:
+				enforce_limits = 0;
 				break;
 			default:
 				show_help(argv[0]);
