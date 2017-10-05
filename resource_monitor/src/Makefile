@@ -4,9 +4,11 @@ include ../../config.mk
 include ../../rules.mk
 
 LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
-OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o
+OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o rmonitor_file_watch.o
 
-PROGRAMS = resource_monitor piggybacker rmonitor_poll_example
+LOCAL_LINKAGE = ../../dttools/src/libdttools.a
+
+PROGRAMS = resource_monitor piggybacker rmonitor_poll_example rmonitor_snapshot
 
 ifneq ($(CCTOOLS_STATIC),1)
 PROGRAMS += resource_monitor_histograms
@@ -22,9 +24,9 @@ all: $(TARGETS) bindings
 # Note below: we use gcc on static builds so that the library gets to use the system linker.
 librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o
 ifeq ($(CCTOOLS_STATIC),1)
-	gcc           -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_LINKAGE) ../../dttools/src/libdttools.a $(CCTOOLS_EXTERNAL_LINKAGE)
+	gcc           -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 else
-	$(CCTOOLS_LD) -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_LDFLAGS) ../../dttools/src/libdttools.a $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+	$(CCTOOLS_LD) -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 endif
 
 piggybacker: piggybacker.o
@@ -39,11 +41,11 @@ else
 	$(CCTOOLS_LD) -O3 -fopenmp -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 endif
 
-$(PROGRAMS): ../../dttools/src/libdttools.a
-
 resource_monitor.o: resource_monitor.c rmonitor_piggyback.h
 
-resource_monitor: resource_monitor.o rmonitor_helper_comm.o
+resource_monitor: resource_monitor.o rmonitor_helper_comm.o rmonitor_file_watch.o
+
+rmonitor_snapshot: rmonitor_snapshot.o rmonitor_helper_comm.o
 
 rmonitor_poll_example: rmonitor_poll_example.o
 

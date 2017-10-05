@@ -378,9 +378,6 @@ ssize_t write(int fd, const void *buf, size_t count)
 		msg.type   = WRITE;
 	}
 
-
-	if(!original_write) rmonitor_helper_initialize();
-
 	ssize_t real_count;
 	START(msg)
 		real_count = original_write(fd, buf, count);
@@ -407,8 +404,6 @@ ssize_t read(int fd, void *buf, size_t count)
 	} else {
 		msg.type   = READ;
 	}
-
-	if(!original_read) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -456,8 +451,6 @@ ssize_t recvfrom(int fd, void *buf, size_t count, int flags, struct sockaddr *sr
 	msg.type   = RX;
 	msg.origin = getpid();
 
-	if(!original_recvfrom) rmonitor_helper_initialize();
-
 	ssize_t real_count;
 	START(msg)
 		real_count = original_recvfrom(fd, buf, count, flags, src, addrlen);
@@ -480,8 +473,6 @@ ssize_t send(int fd, const void *buf, size_t count, int flags)
 
 	msg.type   = TX;
 	msg.origin = getpid();
-
-	if(!original_send) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -506,8 +497,6 @@ ssize_t sendmsg(int fd, const struct msghdr *mg, int flags)
 	msg.type   = TX;
 	msg.origin = getpid();
 
-	if(!original_sendmsg) rmonitor_helper_initialize();
-
 	ssize_t real_count;
 	START(msg)
 		real_count = original_sendmsg(fd, mg, flags);
@@ -531,8 +520,6 @@ ssize_t recvmsg(int fd, struct msghdr *mg, int flags)
 
 	msg.type   = RX;
 	msg.origin = getpid();
-
-	if(!original_recvmsg) rmonitor_helper_initialize();
 
 	ssize_t real_count;
 	START(msg)
@@ -693,7 +680,6 @@ pid_t wait(int *status)
 void __attribute__((constructor)) init() {
 	/* find the dlsym values when loading the library. */
 	rmonitor_helper_initialize();
-	assert(original_fork);
 }
 
 /* wrap main ensures exit_wrapper_preamble runs, and thus monitoring

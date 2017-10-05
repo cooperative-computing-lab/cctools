@@ -67,6 +67,9 @@ const char *str_msgtype(enum rmonitor_msg_type n)
 		case TX:
 			return "sent";
 			break;
+		case SNAPSHOT:
+			return "snapshot";
+			break;
 		default:
 			return "unknown";
 			break;

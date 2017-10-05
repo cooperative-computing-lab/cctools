@@ -217,6 +217,59 @@ class Task(_object):
         flags = Task._determine_file_flags(flags, cache)
         return work_queue_task_specify_buffer(self._task, buffer, len(buffer), remote_name, flags)
 
+    # When monitoring, indicates a json-encoded file that instructs the monitor
+    # to take a snapshot of the task resources. Snapshots appear in the JSON
+    # summary file of the task, under the key "snapshots". Snapshots are taken
+    # on events on files described in the monitor_snapshot_file. The
+    # monitor_snapshot_file is a json encoded file with the following format:
+    #
+    #   {
+    #       "FILENAME": {
+    #           "from-start":boolean,
+    #           "from-start-if-truncated":boolean,
+    #           "delete-if-found":boolean,
+    #           "events": [
+    #               {
+    #                   "label":"EVENT_NAME",
+    #                   "on-create":boolean,
+    #                   "on-truncate":boolean,
+    #                   "pattern":"REGEXP",
+    #                   "count":integer
+    #               },
+    #               {
+    #                   "label":"EVENT_NAME",
+    #                   ...
+    #               }
+    #           ]
+    #       },
+    #       "FILENAME": {
+    #           ...
+    #   }
+    #
+    # All keys but "label" are optional:
+    #
+    #   from-start:boolean         If FILENAME exits when task starts running, process from line 1. Default: false, as the task may be appending to an already existing file.
+    #   from-start-if-truncated    If FILENAME is truncated, process from line 1. Default: true, to account for log rotations.
+    #   delete-if-found            Delete FILENAME when found. Default: false
+    #
+    #   events:
+    #   label        Name that identifies the snapshot. Only alphanumeric, -,
+    #                and _ characters are allowed. 
+    #   on-create    Take a snapshot every time the file is created. Default: false
+    #   on-truncate  Take a snapshot when the file is truncated.    Default: false
+    #   on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
+    #   count        Maximum number of snapshots for this label. Default: -1 (no limit)
+    #
+    # Exactly one of on-create, on-truncate, or on-pattern should be specified.
+    # For more information, consult the manual of the resource_monitor.
+    #
+    # @param self           Reference to the current task object.
+    # @param filename       The name of the snapshot events specification
+    def specify_snapshot_file(self, filename):
+        return work_queue_specify_snapshot_file(self._task, filename)
+
+
+
     ##
     # Indicate the number of times the task should be retried. If 0 (the
     # default), the task is tried indefinitely. A task that did not succeed
@@ -890,20 +943,6 @@ class WorkQueue(_object):
     # @param dirname    Directory name for the monitor output.
     def enable_monitoring_full(self, dirname):
         return work_queue_enable_monitoring_full(self._work_queue, dirname)
-
-    ## When monitoring, indicates a file that when present, directs the resource
-    # monitor to take a snapshot of the resources. Snapshots appear in the JSON
-    # summary file of the task, under the key "snapshots". The file
-    # is removed after the snapshot, so that a new snapshot can be taken when it is
-    # recreated by a task. Optionaly, the first line of the file can be used to give
-    # an identifying label to the snapshot.
-
-    # @param self 	Reference to the current work queue object.
-    # @param signal_file Name of the file which presence directs the resource
-    # monitor to take a snapshot. After the snapshot, THIS FILE IS REMOVED.
-    def enable_monitoring_snapshots(self, filename):
-        return work_queue_enable_monitoring_snapshots(self._work_queue, filename)
-
 
     ##
     # Turn on or off fast abort functionality for a given queue for tasks in

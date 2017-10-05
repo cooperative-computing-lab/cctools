@@ -7,8 +7,6 @@ BOLD(resource_monitor) - monitors the cpu, memory, io, and disk usage of a tree 
 SECTION(SYNOPSIS)
 CODE(BOLD(resource_monitor [options] -- command [command-options]))
 
-CODE(BOLD(resource_monitorv [options] -- command [command-options]))
-
 SECTION(DESCRIPTION)
 
 BOLD(resource_monitor) is a tool to monitor the computational
@@ -40,47 +38,57 @@ as json with the maximum values of resource used, a time-series that shows the
 resources used at given time intervals, and a list of files that were opened
 during execution.
 
-The summary file has the following fields:
+The summary file is a JSON document with the following fields. Unless indicated, all fields are integers.
 
 LONGCODE_BEGIN
-command:                   [the command line given as an argument]
-start:                     [microseconds at the start of execution, since the epoch, int]
-end:                       [microseconds at the end of execution, since the epoch,   int]
-exit_type:                 [one of normal, signal or limit,                       string]
-signal:                    [number of the signal that terminated the process.
-                            Only present if exit_type is signal                      int]
-cores:                     [number of cores. Computed as cpu_time/wall_time        float]
-limits_exceeded:           [resources over the limit. Only present if
-                            exit_type is limit,                                   string]
-exit_status:               [final status of the parent process,                      int]
-max_concurrent_processes:  [the maximum number of processes running concurrently,    int]
-total_processes:           [count of all of the processes created,                   int]
-wall_time:                 [microseconds spent during execution, end - start,        int]
-cpu_time:                  [user + system time of the execution, in microseconds,    int]
-virtual_memory:            [maximum virtual memory across all processes, in MB,      int]
-memory:                    [maximum resident size across all processes, in MB,       int]
-swap_memory:               [maximum swap usage across all processes, in MB,          int]
-bytes_read:                [amount of data read from disk, in MB,                    int]
-bytes_written:             [amount of data written to disk, in MB,                   int]
-total_files:               [total maximum number of files and directories of
-                            all the working directories in the tree,                 int]
-disk:                      [size in MB of all working directories in the tree,       int]
+command:                  the command line given as an argument
+start:                    microseconds at start of execution, since the epoch
+end:                      microseconds at end of execution, since the epoch
+exit_type:                one of "normal", "signal" or "limit" (a string)
+signal:                   number of the signal that terminated the process
+                          Only present if exit_type is signal
+cores:                    maximum number of cores used
+cores_avg:                number of cores as cpu_time/wall_time (a float)
+exit_status:              final status of the parent process
+max_concurrent_processes: the maximum number of processes running concurrently
+total_processes:          count of all of the processes created
+wall_time:                microseconds spent during execution, end - start
+cpu_time:                 user+system time of the execution, in microseconds
+virtual_memory:           maximum virtual memory across all processes, in MB
+memory:                   maximum resident size across all processes, in MB
+swap_memory:              maximum swap usage across all processes, in MB
+bytes_read:               amount of data read from disk, in MB
+bytes_written:            amount of data written to disk, in MB
+bytes_received:           amount of data read from network interfaces, in MB
+bytes_sent:               amount of data written to network interfaces, in MB
+bandwidth:                maximum bandwidth used, in Mbps
+total_files:              total maximum number of files and directories of
+                          all the working directories in the tree
+disk:                     size in MB of all working directories in the tree
+limits_exceeded:          resources over the limit with -l, -L options (JSON)
+peak_times:               seconds from start when a maximum occured (JSON)
+snapshots:                List of intermediate measurements, identified by
+                          snapshot_name (JSON)
 LONGCODE_END
 
-The time-series log has a row per time sample. For each row, the columns have the following meaning:
+The time-series log has a row per time sample. For each row, the columns have the following meaning (all columns are integers):
 
 LONGCODE_BEGIN
-wall_clock                [the sample time, since the epoch, in microseconds,      int]
-cpu_time                  [accumulated user + kernel time, in microseconds,        int]
-concurrent                [concurrent processes at the time of the sample,         int]
-virtual                   [current virtual memory size, in MB,                     int]
-resident                  [current resident memory size, in MB,                    int]
-swap                      [current swap usage, in MB,                              int]
-bytes_read                [accumulated number of bytes read,                       int]
-bytes_written             [accumulated number of bytes written,                    int]
-files                     [current number of files and directories, across all
-                           working directories in the tree,                        int]
-disk                      [current size of working directories in the tree, in MB  int]
+wall_clock                the sample time, since the epoch, in microseconds
+cpu_time                  accumulated user + kernel time, in microseconds
+cores                     current number of cores used
+max_concurrent_processes  concurrent processes at the time of the sample
+virtual_memory            current virtual memory size, in MB
+memory                    current resident memory size, in MB
+swap_memory               current swap usage, in MB
+bytes_read                accumulated number of bytes read, in bytes
+bytes_written             accumulated number of bytes written, in bytes
+bytes_received            accumulated number of bytes received, in bytes
+bytes_sent                accumulated number of bytes sent, in bytes
+bandwidth                 current bandwidth, in bps
+total_files               current number of files and directories, across all
+                          working directories in the tree
+disk                      current size of working directories in the tree, in MB
 LONGCODE_END
 
 SECTION(OPTIONS)
@@ -101,7 +109,7 @@ OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. If not specified, foll
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
-OPTION_ITEM(--snapshot-file=<file>) If <file> exists at the end of a measurement interval, take a snapshot of current resources, and delete <file>. If <file> has a non-empty first line, it is used as a label for the snapshot.
+OPTION_ITEM(--snapshot-events=<file>)Configuration file for snapshots on file patterns. See below.
 OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
 OPTIONS_END
@@ -138,6 +146,66 @@ LIST_END
 
 To obtain the exit status of the original command, see the generated file with extension CODE(.summary).
 
+
+SECTION(SNAPSHOTS)
+
+The resource_monitor  can be directed to take snapshots of the resources used
+according to the files created by the processes monitored. The typical use of
+monitoring snapshots is to set a watch on a log file, and generate a snapshot
+when a line in the log matches a pattern. To activate the snapshot facility,
+use the command line argument --snapshot-events=<file>, in which <file> is a
+JSON-encoded document with the following format:
+
+LONGCODE_BEGIN
+    {
+        "FILENAME": {
+            "from-start":boolean,
+            "from-start-if-truncated":boolean,
+            "delete-if-found":boolean,
+            "events": [
+                {
+                    "label":"EVENT_NAME",
+                    "on-create":boolean,
+                    "on-truncate":boolean,
+                    "pattern":"REGEXP",
+                    "count":integer
+                },
+                {
+                    "label":"EVENT_NAME",
+                    ...
+                }
+            ]
+        },
+        "FILENAME": {
+            ...
+    }
+LONGCODE_END
+
+All fields but BOLD(label) are optional. 
+
+            FILENAME:                  Name of a file to watch.
+            from-start:boolean         If FILENAME exits when the monitor starts running, process from line 1. Default: false, as monitored processes may be appending to already existing files.
+            from-start-if-truncated    If FILENAME is truncated, process from line 1. Default: true, to account for log rotations.
+            delete-if-found            Delete FILENAME when found. Default: false
+
+            events:
+            label        Name that identifies the snapshot. Only alphanumeric, -,
+                         and _ characters are allowed. 
+            on-create    Take a snapshot every time the file is created. Default: false
+            on-truncate  Take a snapshot when the file is truncated.    Default: false
+            on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
+            count        Maximum number of snapshots for this label. Default: -1 (no limit)
+
+The snapshots are recorded both in the main resource summary file under the key
+BOLD(snapshots), and as a JSON-encoded document, with the extension
+.snapshot.NN, in which NN is the sequence number of the snapshot. The snapshots
+are identified with the key "snapshot_name", which is a comma separated string
+of BOLD(label)`('count`)' elements. A label corresponds to a name that
+identifies the snapshot, and the count is the number of times an event was
+triggered since last check (several events may be triggered, for example, when
+several matching lines are written to the log). Several events may have the same label, and exactly one of on-create, on-truncate, and on-pattern should be specified per event.
+
+
 SECTION(EXAMPLES)
 
 To monitor 'sleep 10', at 2 second intervals, with output to sleep-log.summary, and with a monitor alarm at 5 seconds:
@@ -172,10 +240,89 @@ LONGCODE_END
 wraps every task with the monitor and writes the resulting summaries in
 CODE(some-log-file). 
 
-SECTION(BUGS)
+SECTION(SNAPSHOTS EXAMPLES)
+
+Generate a snapshot when "my.log" is created:
+
+LONGCODE_BEGIN
+{
+    "my.log":
+        {
+            "events":[
+                {
+                    "label":"MY_LOG_STARTED",
+                    "on-create:true
+                }
+            ]
+        }
+}
+LONGCODE_END
+
+Generate snapshots every time a line is added to "my.log":
+
+LONGCODE_BEGIN
+{
+    "my.log":
+        {
+            "events":[
+                {
+                    "label":"MY_LOG_LINE",
+                    "pattern":"^.*$"
+                }
+            ]
+        }
+}
+LONGCODE_END
+
+Generate snapshots on particular lines of "my.log":
+
+LONGCODE_BEGIN
+{
+    "my.log":
+        {
+            "events":[
+                {
+                    "label":"started",
+                    "pattern":"^# START"
+                },
+                {
+                    "label":"end-of-start",
+                    "pattern":"^# PROCESSING"
+                }
+                {
+                    "label":"end-of-processing",
+                    "pattern":"^# ANALYSIS"
+                }
+            ]
+        }
+}
+LONGCODE_END
+
+A task may be setup to generate a file every time a snapshot is desired. The
+monitor can detected this file, generate a snapshot, and delete the file to get
+ready for the next snapshot:
+
+LONGCODE_BEGIN
+{
+    "please-take-a-snapshot":
+        {
+            "delete-if-found":true,
+            "events":[
+                {
+                    "label":"manual-snapshot",
+                    "on-create":true
+                }
+            ]
+        }
+}
+LONGCODE_END
+
+
+SECTION(BUGS AND KNOWN ISSUES)
 
 LIST_BEGIN
 LIST_ITEM(The monitor cannot track the children of statically linked executables.)
+LIST_ITEM(The option --snapshot-events assumes that the watched files are written by appending to them. File truncation may not be detected if between checks the size of the file is larger or equal to the size after truncation. File checks are fixed at intervals of 1 second.)
 LIST_END
 
 SECTION(COPYRIGHT)

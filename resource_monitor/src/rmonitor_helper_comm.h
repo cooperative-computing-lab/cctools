@@ -13,7 +13,7 @@ See the file COPYING for details.
 #define RESOURCE_MONITOR_HELPER_ENV_VAR "CCTOOLS_RESOURCE_MONITOR_HELPER"
 #define RESOURCE_MONITOR_INFO_ENV_VAR   "CCTOOLS_RESOURCE_MONITOR_INFO"
 
-enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN_INPUT, OPEN_OUTPUT, READ, WRITE, RX, TX };
+enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN_INPUT, OPEN_OUTPUT, READ, WRITE, RX, TX, SNAPSHOT };
 
 /* BRANCH: pid of parent
  * END:    pid of child that ended
@@ -22,8 +22,9 @@ enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN_INPUT, OPEN_OU
  * OPEN_OUTPUT: path of the file opened, or "" if not a regular file.
  * READ:   Number of bytes read.
  * WRITE:  Number of bytes written.
- * READ:   Number of bytes received.
- * WRITE:  Number of bytes sent.
+ * RX:     Number of bytes received.
+ * TX:     Number of bytes sent.
+ * SNAPSHOT: snapshot name
  */
 
 struct rmonitor_msg

@@ -136,6 +136,8 @@ See the file COPYING for details.
 #include "itable.h"
 #include "jx.h"
 #include "jx_print.h"
+#include "jx_pretty_print.h"
+#include "jx_parse.h"
 #include "list.h"
 #include "macros.h"
 #include "path.h"
@@ -146,6 +148,7 @@ See the file COPYING for details.
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
+#include "rmonitor_file_watch.h"
 
 #define RESOURCE_MONITOR_USE_INOTIFY 1
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
@@ -218,16 +221,16 @@ int64_t total_bytes_tx;   /* total bytes sent */
 
 const char *sh_cmd_line = NULL;    /* command line passed with the --sh option. */
 
-char *snapshot_signal_file = NULL;    /* name of the file that, if
-										 exists, makes the monitor record
-										 an snapshot of the current
-										 usage. The first line of the
-										 file labels the snapshot. The
-										 file is removed when the
-										 snapshot is recorded, so that
-										 multiple snapshots can be
-										 created. */
-struct list *snapshots = NULL;              /* list of snapshots, as json objects. */
+char *snapshot_watch_events_file = NULL;   /* name of the file with a jx document that looks like:
+											  { "FILENAME" : [ { "pattern":"REGEXP", "label":"my snapshot", "max_count":1}, "FILENAME2" : ... ] }
+											  A snapshot is generated when pattern matches a line in the file FILENAME. */
+
+
+struct list *snapshots = NULL;          /* list of snapshots, as json objects. */
+
+struct list *snapshot_labels = NULL;    /* list of labels for current snapshot. */
+
+struct itable *snapshot_watch_pids;     /* pid of all processes watching files for snapshots. */
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -711,15 +714,6 @@ int rmonitor_handle_inotify(void)
 					continue;
 				}
 
-				if (evdata[i].mask & IN_CREATE) {
-					if(snapshot_signal_file && strcmp(snapshot_signal_file, evdata[i].name) == 0) {
-							debug(D_RMON, "found snapshot file '%s'", fname);
-							rmonitor_add_file_watch(snapshot_signal_file, 0, IN_MODIFY | IN_OPEN | IN_CLOSE);
-							urgent = 1;
-					}
-					continue;
-				}
-
 				if (finfo == NULL) {
 					continue;
 				}
@@ -741,10 +735,6 @@ int rmonitor_handle_inotify(void)
 						debug(D_RMON, "removed watch (id: %d) for file %s", evdata[i].wd, fname);
 						free(fname);
 						inotify_watches[evdata[i].wd] = NULL;
-					}
-
-					if(snapshot_signal_file && strcmp(fname, snapshot_signal_file) == 0) {
-						urgent = 1;
 					}
 				}
 			}
@@ -1018,31 +1008,25 @@ void rmonitor_log_row(struct rmsummary *tr)
 }
 
 int record_snapshot(struct rmsummary *tr) {
-	char label[1024];
-
-	if(!snapshot_signal_file) {
+	if(list_size(snapshot_labels) < 1) {
 		return 0;
 	}
 
-	FILE *snap_f = fopen(snapshot_signal_file, "r");
-	if(!snap_f) {
-		/* signal is unavailable, so no snapshot is taken. */
-		return 0;
+	buffer_t b;
+	buffer_init(&b);
+
+	const char *sep ="";
+
+	char *str;
+	while((str = list_pop_head(snapshot_labels))) {
+		string_chomp(str);
+		buffer_printf(&b, "%s%s", sep, str);
+		sep = ",";
+		free(str);
 	}
 
 	if(!snapshots) {
 		snapshots = list_create(0);
-	}
-
-	label[0]='\0';
-	fgets(label, 1024, snap_f);
-	fclose(snap_f);
-	unlink(snapshot_signal_file);
-
-	string_chomp(label);
-
-	if(label[0] == '\0') {
-		snprintf(label, 1024, "snapshot %d", list_size(snapshots) + 1);
 	}
 
 	snapshot->end       = usecs_since_epoch();
@@ -1050,27 +1034,26 @@ int record_snapshot(struct rmsummary *tr) {
 
 	struct jx *j = rmsummary_to_json(tr, /* only resources */ 1);
 
-	jx_insert_string(j, "snapshot_name", label);
-
-	if(!j) {
-		return 0;
-	}
+	jx_insert_string(j, "snapshot_name", buffer_tostring(&b));
 
 	char *output_file = string_format("%s.snapshot.%02d", template_path, list_size(snapshots));
-	snap_f = fopen(output_file, "w");
-	free(output_file);
+	FILE *snap_f = fopen(output_file, "w");
 
 	if(!snap_f) {
-		return 0;
+		warn(D_WQ, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
+	} else {
+		jx_pretty_print_stream(j, snap_f);
+		fclose(snap_f);
 	}
 
-	jx_print_stream(j, snap_f);
-	fclose(snap_f);
+	free(output_file);
 
 	/* push to the front, since snapshots are writen in reverse order. */
 	list_push_head(snapshots, j);
 
-	debug(D_RMON, "Recoded snapshot: '%s'", label);
+	debug(D_RMON, "Recoded snapshot: '%s'", buffer_tostring(&b));
+
+	buffer_free(&b);
 
 	return 1;
 }
@@ -1364,6 +1347,47 @@ void ping_processes(void)
         }
 }
 
+void set_snapshot_watch_events() {
+
+	if(!snapshot_watch_events_file) {
+		return;
+	}
+
+	struct jx *j = jx_parse_file(snapshot_watch_events_file);
+
+	if(!j) {
+		debug(D_FATAL, "Could not process '%s' snapshots file.", snapshot_watch_events_file);
+		exit(RM_MONITOR_ERROR);
+	}
+
+	void *i = NULL;
+	struct jx *key;
+	while((key = jx_iterate_keys(j, &i))) {
+		const char *fname = key->u.string_value;
+		struct jx *array  = jx_lookup(j, fname);
+
+		if(!jx_istype(array , JX_OBJECT)) {
+			debug(D_FATAL, "Error processing snapshot configurations for %s. Not of the form {\"FILENAME\" : { \"events\" : [ { \"label\": ..., }, ... ]", fname);
+			exit(RM_MONITOR_ERROR);
+		}
+
+		pid_t pid = rmonitor_watch_file(fname, array);
+
+		itable_insert(snapshot_watch_pids, (uintptr_t) pid, (void *) snapshot_watch_pids);
+	}
+}
+
+void terminate_snapshot_watch_events() {
+  uint64_t pid;
+  void *dummy;
+
+  itable_firstkey(snapshot_watch_pids);
+  while(itable_nextkey(snapshot_watch_pids, &pid, &dummy)) {
+        kill(pid, SIGKILL);
+  }
+
+}
+
 struct rmsummary *rmonitor_final_usage_tree(void)
 {
     struct rusage usg;
@@ -1524,6 +1548,8 @@ void rmonitor_final_cleanup(int signum)
     if(log_inotify)
 	    fclose(log_inotify);
 
+	terminate_snapshot_watch_events();
+
     exit(status);
 }
 
@@ -1610,7 +1636,14 @@ int rmonitor_dispatch_msg(void)
 
 	int recv_status = recv_monitor_msg(rmonitor_queue_fd, &msg);
 
-	if(recv_status < 0 || ((unsigned int) recv_status) < sizeof(msg)) {
+	if(recv_status < 0) {
+		if(errno != EAGAIN) {
+			debug(D_RMON, "Error receiving message: %s", strerror(errno));
+			return 1;
+		}
+	}
+
+	if(((unsigned int) recv_status) < sizeof(msg)) {
 		debug(D_RMON, "Malformed message from monitored processes. Ignoring.");
 		return 1;
 	}
@@ -1623,14 +1656,14 @@ int rmonitor_dispatch_msg(void)
 	if(!p)
 	{
 		/* We either got a malformed message, message from a
-		process we are not tracking anymore, or a message from
-		a newly created process.  */
+		process we are not tracking anymore, a message from
+		a newly created process, or a message from a snapshot process.  */
 		if( msg.type == END_WAIT )
         {
 			release_waiting_process(msg.origin);
 			return 1;
         }
-		else if(msg.type != BRANCH)
+		else if(msg.type != BRANCH && msg.type != SNAPSHOT)
 			return 1;
 	}
 
@@ -1705,6 +1738,10 @@ int rmonitor_dispatch_msg(void)
 					break;
 			}
             break;
+		case SNAPSHOT:
+			debug(D_RMON, "Snapshot msg label: '%s'\n", msg.data.s);
+			list_push_tail(snapshot_labels, xxstrdup(msg.data.s));
+			break;
         default:
             break;
     };
@@ -1714,7 +1751,7 @@ int rmonitor_dispatch_msg(void)
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
-	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END) {
+	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END || msg.type == SNAPSHOT) {
 		return 1;
 	} else {
 		return 0;
@@ -1759,11 +1796,11 @@ int wait_for_messages(int interval)
 			count = select(nfds, &rset, NULL, NULL, &timeout);
 
 			if (FD_ISSET(rmonitor_queue_fd, &rset)) {
-				urgent = rmonitor_dispatch_msg();
+				urgent |= rmonitor_dispatch_msg();
 			}
 
 			if (FD_ISSET(rmonitor_inotify_fd, &rset)) {
-				urgent = rmonitor_handle_inotify();
+				urgent |= rmonitor_handle_inotify();
 			}
 
 			if(urgent) {
@@ -1920,7 +1957,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s If <file> exists at the end of a measurement interval, take a snapshot of\n", "--snapshot-file=<file>");
+    fprintf(stdout, "%-30s Configuration file for snapshots on file patterns.\n", "--snapshot-events=<file>");
     fprintf(stdout, "%-30s current resources, and delete <file>. If <file> has a non-empty first\n", "");
     fprintf(stdout, "%-30s line, it is used as a label for the snapshot.\n", "");
 }
@@ -1972,7 +2009,6 @@ int rmonitor_resources(long int interval /*in seconds */)
 
 		cleanup_zombies();
 
-		//process snapshot
 		if(record_snapshot(snapshot)) {
 			rmsummary_delete(snapshot);
 			snapshot = calloc(1, sizeof(*snapshot));
@@ -2035,6 +2071,9 @@ int main(int argc, char **argv) {
 	total_bytes_tx = 0;
 	tx_rx_sizes    = list_create();
 
+	snapshot_labels = list_create(0);
+	snapshot_watch_pids = itable_create(0);
+
     rmsummary_read_env_vars(resources_limits);
 
     processes = itable_create(0);
@@ -2057,7 +2096,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_FOLLOW_CHDIR,
 		LONG_OPT_MEASURE_DIR,
 		LONG_OPT_NO_PPRINT,
-		LONG_OPT_SNAPSHOT_FILE
+		LONG_OPT_SNAPSHOT_FILE,
+		LONG_OPT_SNAPSHOT_WATCH_CONF
 	};
 
     static const struct option long_options[] =
@@ -2083,7 +2123,8 @@ int main(int argc, char **argv) {
 		    {"with-inotify",           no_argument, 0, LONG_OPT_OPENED_FILES},
 		    {"without-disk-footprint", no_argument, 0, LONG_OPT_NO_DISK_FOOTPRINT},
 
-		    {"snapshot-file", required_argument, 0, LONG_OPT_SNAPSHOT_FILE},
+		    {"snapshot-file",   required_argument, 0, LONG_OPT_SNAPSHOT_FILE},
+		    {"snapshot-events", required_argument, 0, LONG_OPT_SNAPSHOT_WATCH_CONF},
 
 		    {0, 0, 0, 0}
 	    };
@@ -2162,7 +2203,10 @@ int main(int argc, char **argv) {
 				pprint_summaries = 0;
 				break;
 			case LONG_OPT_SNAPSHOT_FILE:
-				snapshot_signal_file = xxstrdup(optarg);
+				fatal("This option has been replaced with --snapshot-events. Please consult the manual of resource_monitor.");
+				break;
+			case LONG_OPT_SNAPSHOT_WATCH_CONF:
+				snapshot_watch_events_file = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
@@ -2246,28 +2290,12 @@ int main(int argc, char **argv) {
     snapshot->start  = summary->start;
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
-    if(log_inotify || snapshot_signal_file)
+    if(log_inotify)
     {
 	    rmonitor_inotify_fd     = inotify_init();
 	    alloced_inotify_watches = 100;
 	    inotify_watches         = (char **) calloc(alloced_inotify_watches, sizeof(char *));
 	}
-
-	if(snapshot_signal_file) {
-		char *full_path = malloc(PATH_MAX);
-
-		path_absolute(snapshot_signal_file, full_path, 0);
-
-		char *dir  = malloc(PATH_MAX);
-		path_dirname(full_path, dir);
-
-		free(snapshot_signal_file);
-		snapshot_signal_file = xxstrdup(path_basename(full_path));
-
-		rmonitor_add_file_watch(dir, 0, IN_CREATE);
-
-		free(full_path);
-    }
 #endif
 
 	/* if we are not following changes in directory, and no directory was manually added, we follow the current working directory. */
@@ -2281,6 +2309,8 @@ int main(int argc, char **argv) {
 		debug(D_FATAL, "Error reading %s.", executable);
 		exit(RM_MONITOR_ERROR);
 	}
+
+	set_snapshot_watch_events();
 
 	spawn_first_process(executable, argv + optind, child_in_foreground);
     rmonitor_resources(interval);
