@@ -559,9 +559,9 @@ static struct jx *jx_check_errors(struct jx *j)
 			return j;
 		case JX_OBJECT:
 			for(struct jx_pair *p = j->u.pairs; p; p = p->next) {
-				if(jx_istype(p->key, JX_ERROR)) err = jx_copy(p->key);
-				if(jx_istype(p->value, JX_ERROR)) err = jx_copy(p->value);
-				if(err) {
+				if (jx_istype(p->key, JX_ERROR)) err = jx_copy(p->key);
+				if (!err && jx_istype(p->value, JX_ERROR)) err = jx_copy(p->value);
+				if (err) {
 					jx_delete(j);
 					return err;
 				}
