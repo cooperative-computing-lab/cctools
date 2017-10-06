@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
 	FILE *stream = stdin;
 	struct jx *ctx = NULL;
 	struct jx *body = NULL;
+	struct jx *tmp = NULL;
 	void (*print_stream)(struct jx *, FILE *) = jx_print_stream;
 
 	int c;
@@ -85,7 +86,9 @@ int main(int argc, char *argv[]) {
 		if (!ctx) return 1;
 	}
 
+	tmp = ctx;
 	ctx = jx_eval(ctx, NULL);
+	jx_delete(tmp);
 	if (jx_istype(ctx, JX_ERROR)) {
 		printf("invalid context\n");
 		print_stream(ctx, stdout);
@@ -106,9 +109,13 @@ int main(int argc, char *argv[]) {
 	fclose(stream);
 	if (!body) return 1;
 
+	tmp = body;
 	body = jx_eval(body, ctx);
+	jx_delete(tmp);
 	print_stream(body, stdout);
 	printf("\n");
+	jx_delete(body);
+	jx_delete(ctx);
 	return 0;
 }
 
