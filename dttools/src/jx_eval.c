@@ -582,13 +582,18 @@ static void jx_eval_add_builtin(
 
 struct jx * jx_eval( struct jx *j, struct jx *context )
 {
+	struct jx *result = NULL;
 	if (!j) return NULL;
-	if (!context) context = jx_object(NULL);
+	if (context) {
+		context = jx_copy(context);
+	} else {
+		context = jx_object(NULL);
+	}
 	if (!jx_istype(context, JX_OBJECT)) {
 		struct jx *err = jx_object(NULL);
 		int code = 7;
 		jx_insert_integer(err, "code", code);
-		jx_insert(err, jx_string("context"), jx_copy(context));
+		jx_insert(err, jx_string("context"), context);
 		jx_insert_string(err, "message", "context must be an object");
 		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
@@ -600,17 +605,16 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 
 	switch(j->type) {
 		case JX_SYMBOL: {
-			struct jx *result =
-				jx_lookup(context, j->u.symbol_name);
-			if (result) {
-				return jx_copy(result);
+			struct jx *t = jx_lookup(context, j->u.symbol_name);
+			if (t) {
+				result = jx_copy(t);
+				break;
 			} else {
 				struct jx *err = jx_object(NULL);
 				int code = 0;
 				jx_insert_integer(err, "code", code);
 				jx_insert(err, jx_string("symbol"), jx_copy(j));
-				jx_insert(err, jx_string("context"),
-					jx_copy(context));
+				jx_insert(err, jx_string("context"), context);
 				if (j->line)
 					jx_insert_integer(err, "line", j->line);
 				jx_insert_string(
@@ -620,24 +624,29 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}
-			}
+		}
 		case JX_DOUBLE:
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_STRING:
 		case JX_ERROR:
 		case JX_NULL:
-			return jx_copy(j);
+			result = jx_copy(j);
+			break;
 		case JX_ARRAY:
-			return jx_check_errors(jx_array(jx_eval_item(j->u.items,context)));
+			result = jx_check_errors(jx_array(jx_eval_item(j->u.items, context)));
+			break;
 		case JX_OBJECT:
-			return jx_check_errors(jx_object(jx_eval_pair(j->u.pairs,context)));
+			result = jx_check_errors(jx_object(jx_eval_pair(j->u.pairs, context)));
+			break;
 		case JX_OPERATOR:
-			return jx_eval_operator(&j->u.oper,context);
+			result = jx_eval_operator(&j->u.oper, context);
+			break;
 		case JX_FUNCTION:
 			// we should never eval a function body
 			abort();
 	}
-	/* not reachable, but some compilers complain. */
-	return 0;
+
+	jx_delete(context);
+	return result;
 }
