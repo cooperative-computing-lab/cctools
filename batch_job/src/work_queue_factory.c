@@ -515,11 +515,11 @@ struct jx *master_to_jx(struct jx *m) {
 		jx_insert_string(j, "name", master_host);
 	}
 
-	jx_insert_integer(j,  "port",             jx_lookup_integer(m, "port"));
-	jx_insert_integer(j, "tasks_waiting",     jx_lookup_integer(m, "tasks_waiting"));
-	jx_insert_integer(j, "tasks_running",     jx_lookup_integer(m, "tasks_running"));
-	jx_insert_integer(j, "tasks_complete",    jx_lookup_integer(m, "tasks_complete"));
-	jx_insert_integer(j, "workers_connected", jx_lookup_integer(m, "workers"));
+	jx_insert_integer(j, "port",           jx_lookup_integer(m, "port"));
+	jx_insert_integer(j, "tasks_waiting",  jx_lookup_integer(m, "tasks_waiting"));
+	jx_insert_integer(j, "tasks_running",  jx_lookup_integer(m, "tasks_running"));
+	jx_insert_integer(j, "tasks_complete", jx_lookup_integer(m, "tasks_complete"));
+	jx_insert_integer(j, "workers",        jx_lookup_integer(m, "workers"));
 
 	return j;
 }
