@@ -1375,6 +1375,8 @@ void set_snapshot_watch_events() {
 
 		itable_insert(snapshot_watch_pids, (uintptr_t) pid, (void *) snapshot_watch_pids);
 	}
+
+	jx_delete(j);
 }
 
 void terminate_snapshot_watch_events() {
