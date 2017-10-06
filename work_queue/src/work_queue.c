@@ -2363,6 +2363,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 
 	//worker information for general work_queue_status report
 	jx_insert_integer(j,"workers",info.workers_connected);
+	jx_insert_integer(j,"workers_connected",info.workers_connected);
 
 
 	//additional worker information the factory needs
