@@ -5,7 +5,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include <string.h>
 #include "catalog_query.h"
 #include "http_query.h"
 #include "jx.h"
@@ -20,7 +19,9 @@ See the file COPYING for details.
 #include "set.h"
 #include "list.h"
 #include "address.h"
-#include "zlib.h"
+
+#include <string.h>
+#include <zlib.h>
 
 struct catalog_query {
 	struct jx *data;

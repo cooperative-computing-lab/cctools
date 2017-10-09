@@ -27,7 +27,6 @@ See the file COPYING for details.
 #include "daemon.h"
 #include "getopt_aux.h"
 #include "change_process_title.h"
-#include "zlib.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -37,6 +36,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/select.h>
+#include <zlib.h>
 
 #ifndef LINE_MAX
 #define LINE_MAX 1024
