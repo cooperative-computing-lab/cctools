@@ -42,8 +42,11 @@ typedef enum {
 	JX_TOKEN_DIV,
 	JX_TOKEN_MOD,
 	JX_TOKEN_AND,
+	JX_TOKEN_C_AND,
 	JX_TOKEN_OR,
+	JX_TOKEN_C_OR,
 	JX_TOKEN_NOT,
+	JX_TOKEN_C_NOT,
 	JX_TOKEN_NULL,
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
@@ -270,9 +273,9 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if(c=='!') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
-		if(isalpha(d) || d == '_') {
+		else {
 			jx_ungetchar(s,d);
-			return JX_TOKEN_NOT;
+			return JX_TOKEN_C_NOT;
 		}
 		jx_ungetchar(s,d);
 		jx_parse_error(s,"invalid character: !");
@@ -292,6 +295,16 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		if(d=='=') return JX_TOKEN_GE;
 		jx_ungetchar(s,d);
 		return JX_TOKEN_GT;
+	} else if (c=='&') {
+		char d = jx_getchar(s);
+		if(d=='&') return JX_TOKEN_C_AND;
+		jx_parse_error(s, "invalid character: &");
+		return JX_TOKEN_PARSE_ERROR;
+	} else if (c=='|') {
+		char d = jx_getchar(s);
+		if(d=='|') return JX_TOKEN_C_OR;
+		jx_parse_error(s, "invalid character: |");
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='\"') {
 		int i;
 		for(i=0;i<MAX_TOKEN_SIZE;i++) {
@@ -353,12 +366,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		}
 		jx_parse_error(s,"integer constant too long");
 		return JX_TOKEN_PARSE_ERROR;
-	} else if(isalpha(c) || c=='_' || c=='&' || c=='|') {
+	} else if(isalpha(c) || c=='_') {
 		s->token[0] = c;
 		int i;
 		for(i=1;i<MAX_TOKEN_SIZE;i++) {
 			c = jx_getchar(s);
-			if(isalnum(c) || c=='_' || c=='&' || c=='|') {
+			if(isalnum(c) || c=='_') {
 				s->token[i] = c;
 			} else {
 				jx_ungetchar(s,c);
@@ -371,11 +384,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_FALSE;
 				} else if(!strcmp(s->token,"or")) {
 					return JX_TOKEN_OR;
-				} else if (!strcmp(s->token,"||")) {
-					return JX_TOKEN_OR;
 				} else if(!strcmp(s->token,"and")) {
-					return JX_TOKEN_AND;
-				} else if(!strcmp(s->token,"&&")){
 					return JX_TOKEN_AND;
 				} else if(!strcmp(s->token,"not")) {
 					return JX_TOKEN_NOT;
@@ -691,8 +700,11 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_DIV:	return JX_OP_DIV;
 		case JX_TOKEN_MOD:	return JX_OP_MOD;
 		case JX_TOKEN_AND:	return JX_OP_AND;
+		case JX_TOKEN_C_AND:return JX_OP_C_AND;
 		case JX_TOKEN_OR:	return JX_OP_OR;
+		case JX_TOKEN_C_OR:	return JX_OP_C_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
+		case JX_TOKEN_C_NOT:return JX_OP_C_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_LPAREN: return JX_OP_CALL;
 		default:		return JX_OP_INVALID;
