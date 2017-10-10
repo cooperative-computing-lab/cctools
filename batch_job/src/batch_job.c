@@ -20,6 +20,7 @@ See the file COPYING for details.
 
 extern const struct batch_queue_module batch_queue_amazon;
 extern const struct batch_queue_module batch_queue_lambda;
+extern const struct batch_queue_module batch_queue_amazon_batch;
 extern const struct batch_queue_module batch_queue_chirp;
 extern const struct batch_queue_module batch_queue_cluster;
 extern const struct batch_queue_module batch_queue_condor;
@@ -45,10 +46,12 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, lambda, dryrun"
+
+#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, dryrun, lambda, amazon-batch"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_amazon,
+	&batch_queue_amazon_batch,
 	&batch_queue_lambda,
 #ifdef CCTOOLS_WITH_CHIRP
 	&batch_queue_chirp,
