@@ -67,7 +67,7 @@ aws ec2 create-route --route-table-id $route_table --destination-cidr-block 0.0.
 
 echo "\"gateway\":\"$ec2_gateway\"," >> $outputfile
 
-#echo creating the environment
+echo "creating the environment"
 env_name="makeflow_ccl_env_$time"
 account_num_id=$(aws ec2 describe-security-groups --group-names 'Default' --query 'SecurityGroups[0].OwnerId' --output text) #got from stack overflow: "Quick Way to get AWS Account number from the cli tools?
 env_output_response=$(aws batch create-compute-environment --compute-environment-name $env_name --type MANAGED --state ENABLED --compute-resources type=EC2,minvCpus=$min_cpus,maxvCpus=$max_cpus,desiredvCpus=$cpus,instanceTypes=optimal,subnets=$ec2_subnet,securityGroupIds=$ec2_security_group_id,instanceRole=ecsInstanceRole --service-role=arn:aws:iam::$account_num_id:role/service-role/AWSBatchServiceRole)
