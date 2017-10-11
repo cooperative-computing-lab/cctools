@@ -18,7 +18,7 @@ top_character.txt : characters_henry_iv_part_1.txt characters_henry_iv_part_2.tx
 characters_henry_iv_part_1.txt : henry_iv_part_1.txt henry_iv_part_1.sfx text_analyzer.pl
 	./henry_iv_part_1.sfx
 
-# If a rule is preceded by LOCAL, it executes at the local site.
+#If a rule is preceded by LOCAL, it executes at the local site.
 henry_iv_part_1.sfx : henry_iv_part_1.txt text_analyzer.pl
 	LOCAL starch -C starch.config -c "perl text_analyzer.pl henry_iv_part_1.txt" henry_iv_part_1.sfx
 

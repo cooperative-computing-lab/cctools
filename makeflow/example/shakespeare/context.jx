@@ -1,0 +1,9 @@
+{
+#Here is a list of the plays we will retrieve
+"PLAYS": ["henry_iv_part_1",
+			  "henry_iv_part_2",
+			  "henry_vi_part_1",
+			  "henry_vi_part_2",
+			  "henry_vi_part_3"
+	]
+}
