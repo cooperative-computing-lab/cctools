@@ -1,0 +1,52 @@
+#This is a sample Makeflow script which retrieves a sampling of William Shakespeare's plays (raw text modified from source at shakespeare.mit.edu),
+#runs an analysis of the amount of dialogue for each character in the sampled plays, and returns the character with the most dialogue and the
+#number of times that character spoke.
+#
+#For each text retrieved (Henry IV Part 1, Henry IV Part 2, Henry VI Part 1, Henry VI Part 2, and Henry VI Part 3) Makeflow will retrieve the text
+#file of the play, package the version of Perl at the local site (via Starch, another part of CCTools), and run the script text_analyzer.pl.
+#The text_analyzer.pl script reads the play it is given and produces a list of characters in the play and how many times they each speak.
+#
+#The execution flow for a single play would look like this:
+#curl->starch->perl->output.txt
+#
+#The final task in this makeflow produces top_character.txt which reports the character with the most dialogue out of all plays read.
+
+#This is the final task in the workflow. Notice that the order we write rules does not matter, Makeflow will figure it out for us.
+top_character.txt : characters_henry_iv_part_1.txt characters_henry_iv_part_2.txt characters_henry_vi_part_1.txt characters_henry_vi_part_2.txt characters_henry_vi_part_3.txt count_characters.pl
+	perl count_characters.pl
+
+#If a rule is preceded by LOCAL, it executes at the local site.
+perl.sfx : /usr/bin/perl text_analyzer.pl
+	LOCAL starch -C starch.config -c "perl text_analyzer.pl" perl.sfx
+
+characters_henry_iv_part_1.txt : henry_iv_part_1.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_iv_part_1.txt
+
+henry_iv_part_1.txt :
+	LOCAL curl -o henry_iv_part_1.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_iv_part_1.txt
+
+#Notice this rule relies on characters_henry_iv_part_1.txt, so it will have to wait for the previous task to finish before it can run.
+characters_henry_iv_part_2.txt : characters_henry_iv_part_1.txt henry_iv_part_2.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_iv_part_2.txt
+
+henry_iv_part_2.txt :
+	LOCAL curl -o henry_iv_part_2.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_iv_part_2.txt
+
+characters_henry_vi_part_1.txt : henry_vi_part_1.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_vi_part_1.txt
+
+henry_vi_part_1.txt :
+	LOCAL curl -o henry_vi_part_1.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_vi_part_1.txt
+
+characters_henry_vi_part_2.txt : characters_henry_vi_part_1.txt henry_vi_part_2.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_vi_part_2.txt
+
+henry_vi_part_2.txt :
+	LOCAL curl -o henry_vi_part_2.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_vi_part_2.txt
+
+characters_henry_vi_part_3.txt : characters_henry_vi_part_2.txt henry_vi_part_3.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_vi_part_3.txt
+
+henry_vi_part_3.txt :
+	LOCAL curl -o henry_vi_part_3.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_vi_part_3.txt
+

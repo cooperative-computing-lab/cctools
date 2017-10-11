@@ -1,0 +1,92 @@
+#This is a sample Makeflow script written in JX which retrieves a sampling of William Shakespeare's plays (raw text modified from 
+#source at shakespeare.mit.edu), runs an analysis of the amount of dialogue for each character in the sampled plays, and returns 
+#the character with the most dialogue and the number of times that character spoke.
+#
+#For each text retrieved (Henry IV Part 1, Henry IV Part 2, Henry VI Part 1, Henry VI Part 2, and Henry VI Part 3) Makeflow will retrieve the text
+#file of the play, package the version of Perl at the local site (via Starch, another part of CCTools), and run the script text_analyzer.pl.
+#The text_analyzer.pl script reads the play it is given and produces a list of characters in the play and how many times they each speak.
+#
+#The execution flow for a single play would look like this:
+#curl->starch->perl->output.txt
+#
+#The final task in this makeflow produces top_character.txt which reports the character with the most dialogue out of all plays read.
+
+{
+"rules": [
+#This is the final task in the workflow. Notice that the order we write rules does not matter, Makeflow will figure it out for us.
+{
+	"command": "perl count_characters.pl",
+	"inputs": [format("characters_%s.txt", p) for p in PLAYS,
+			   "count_characters.pl"
+	],
+	"outputs": ["top_character.txt"]
+},
+
+#JX allows us to condense rules down to patterns using list comprehension.
+#In the rule below, we tell Makeflow to get all the plays listed in our context.jx file.
+#Look at example in shakespeare.makeflow to see the expanded version using the Make syntax.
+{
+	"command": format("curl -o %s.txt http://ccl.cse.nd.edu/workflows/shakespeare/%s.txt", p, p),
+	"inputs": [],
+	"outputs": [format("%s.txt", p)],
+	"local_job": true
+} for p in PLAYS,
+
+# If a rule has local_job set to true, it executes at the local site.
+{
+	"command": "starch -C starch.config -c \"perl text_analyzer.pl\" perl.sfx",
+	"inputs": ["/usr/bin/perl",
+			   "text_analyzer.pl"
+	],
+	"outputs": ["perl.sfx"],
+	"local_job": true
+},
+
+{
+	"command": "./perl.sfx henry_iv_part_1.txt",
+	"inputs": ["henry_iv_part_1.txt",
+			   "perl.sfx",
+			   "text_analyzer.pl"
+	],
+	"outputs": ["characters_henry_iv_part_1.txt"]
+},
+{
+	"command": "./perl.sfx henry_iv_part_2.txt",
+	"inputs": ["characters_henry_iv_part_1.txt",
+			   "henry_iv_part_2.txt",
+			   "perl.sfx",
+			   "text_analyzer.pl"
+	],
+	"outputs": ["characters_henry_iv_part_2.txt"]
+},
+
+{
+	"command": "./perl.sfx henry_vi_part_1.txt",
+	"inputs": ["henry_vi_part_1.txt",
+			   "perl.sfx",
+			   "text_analyzer.pl"
+	],
+	"outputs": ["characters_henry_vi_part_1.txt"]
+},
+#Notice this next rule relies on characters_henry_iv_part_1.txt, so it will have to wait for the previous task to finish before it can run.
+{
+	"command": "./perl.sfx henry_vi_part_2.txt",
+	"inputs": ["characters_henry_vi_part_1.txt",
+			   "henry_vi_part_2.txt",
+			   "perl.sfx",
+			   "text_analyzer.pl"
+	],
+	"outputs": ["characters_henry_vi_part_2.txt"]
+},
+{
+	"command": "./perl.sfx henry_vi_part_3.txt",
+	"inputs": ["characters_henry_vi_part_1.txt",
+			   "characters_henry_vi_part_2.txt",
+			   "henry_vi_part_3.txt",
+			   "perl.sfx",
+			   "text_analyzer.pl"
+	],
+	"outputs": ["characters_henry_vi_part_3.txt"]
+}
+
+]}
