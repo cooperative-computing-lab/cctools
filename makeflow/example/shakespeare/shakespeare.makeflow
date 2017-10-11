@@ -15,49 +15,37 @@
 top_character.txt : characters_henry_iv_part_1.txt characters_henry_iv_part_2.txt characters_henry_vi_part_1.txt characters_henry_vi_part_2.txt characters_henry_vi_part_3.txt count_characters.pl
 	perl count_characters.pl
 
-characters_henry_iv_part_1.txt : henry_iv_part_1.txt henry_iv_part_1.sfx text_analyzer.pl
-	./henry_iv_part_1.sfx
-
 #If a rule is preceded by LOCAL, it executes at the local site.
-henry_iv_part_1.sfx : henry_iv_part_1.txt text_analyzer.pl
-	LOCAL starch -C starch.config -c "perl text_analyzer.pl henry_iv_part_1.txt" henry_iv_part_1.sfx
+perl.sfx : /usr/bin/perl text_analyzer.pl
+	LOCAL starch -C starch.config -c "perl text_analyzer.pl" perl.sfx
+
+characters_henry_iv_part_1.txt : henry_iv_part_1.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_iv_part_1.txt
 
 henry_iv_part_1.txt :
 	LOCAL curl -o henry_iv_part_1.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_iv_part_1.txt
 
 #Notice this rule relies on characters_henry_iv_part_1.txt, so it will have to wait for the previous task to finish before it can run.
-characters_henry_iv_part_2.txt : characters_henry_iv_part_1.txt henry_iv_part_2.txt henry_iv_part_2.sfx text_analyzer.pl
-	./henry_iv_part_2.sfx
-
-henry_iv_part_2.sfx : henry_iv_part_2.txt text_analyzer.pl
-	LOCAL starch -C starch.config -c "perl text_analyzer.pl henry_iv_part_2.txt" henry_iv_part_2.sfx
+characters_henry_iv_part_2.txt : characters_henry_iv_part_1.txt henry_iv_part_2.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_iv_part_2.txt
 
 henry_iv_part_2.txt :
 	LOCAL curl -o henry_iv_part_2.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_iv_part_2.txt
 
-characters_henry_vi_part_1.txt : henry_vi_part_1.txt henry_vi_part_1.sfx text_analyzer.pl
-	./henry_vi_part_1.sfx
-
-henry_vi_part_1.sfx : henry_vi_part_1.txt text_analyzer.pl
-	LOCAL starch -C starch.config -c "perl text_analyzer.pl henry_vi_part_1.txt" henry_vi_part_1.sfx
+characters_henry_vi_part_1.txt : henry_vi_part_1.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_vi_part_1.txt
 
 henry_vi_part_1.txt :
 	LOCAL curl -o henry_vi_part_1.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_vi_part_1.txt
 
-characters_henry_vi_part_2.txt : characters_henry_vi_part_1.txt henry_vi_part_2.txt henry_vi_part_2.sfx text_analyzer.pl
-	./henry_vi_part_2.sfx
-
-henry_vi_part_2.sfx : henry_vi_part_2.txt text_analyzer.pl
-	LOCAL starch -C starch.config -c "perl text_analyzer.pl henry_vi_part_2.txt" henry_vi_part_2.sfx
+characters_henry_vi_part_2.txt : characters_henry_vi_part_1.txt henry_vi_part_2.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_vi_part_2.txt
 
 henry_vi_part_2.txt :
 	LOCAL curl -o henry_vi_part_2.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_vi_part_2.txt
 
-characters_henry_vi_part_3.txt : characters_henry_vi_part_2.txt henry_vi_part_3.txt henry_vi_part_3.sfx text_analyzer.pl
-	./henry_vi_part_3.sfx
-
-henry_vi_part_3.sfx : henry_vi_part_3.txt text_analyzer.pl
-	LOCAL starch -C starch.config -c "perl text_analyzer.pl henry_vi_part_3.txt" henry_vi_part_3.sfx
+characters_henry_vi_part_3.txt : characters_henry_vi_part_2.txt henry_vi_part_3.txt perl.sfx text_analyzer.pl
+	./perl.sfx henry_vi_part_3.txt
 
 henry_vi_part_3.txt :
 	LOCAL curl -o henry_vi_part_3.txt http://ccl.cse.nd.edu/workflows/shakespeare/henry_vi_part_3.txt

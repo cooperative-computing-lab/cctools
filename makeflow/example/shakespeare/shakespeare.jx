@@ -34,56 +34,56 @@
 
 # If a rule has local_job set to true, it executes at the local site.
 {
-	"command": format("starch -C starch.config -c \"perl text_analyzer.pl %s.txt\" %s.sfx", p, p),
-	"inputs": [format("%s.txt", p),
+	"command": "starch -C starch.config -c \"perl text_analyzer.pl\" perl.sfx",
+	"inputs": ["/usr/bin/perl",
 			   "text_analyzer.pl"
 	],
-	"outputs": [format("%s.sfx", p)],
+	"outputs": ["perl.sfx"],
 	"local_job": true
-} for p in PLAYS,
+},
 
 {
-	"command": "./henry_iv_part_1.sfx",
+	"command": "./perl.sfx henry_iv_part_1.txt",
 	"inputs": ["henry_iv_part_1.txt",
-			   "henry_iv_part_1.sfx",
+			   "perl.sfx",
 			   "text_analyzer.pl"
 	],
 	"outputs": ["characters_henry_iv_part_1.txt"]
 },
 {
-	"command": "./henry_iv_part_2.sfx",
+	"command": "./perl.sfx henry_iv_part_2.txt",
 	"inputs": ["characters_henry_iv_part_1.txt",
 			   "henry_iv_part_2.txt",
-			   "henry_iv_part_2.sfx",
+			   "perl.sfx",
 			   "text_analyzer.pl"
 	],
 	"outputs": ["characters_henry_iv_part_2.txt"]
 },
 
 {
-	"command": "./henry_vi_part_1.sfx",
+	"command": "./perl.sfx henry_vi_part_1.txt",
 	"inputs": ["henry_vi_part_1.txt",
-			   "henry_vi_part_1.sfx",
+			   "perl.sfx",
 			   "text_analyzer.pl"
 	],
 	"outputs": ["characters_henry_vi_part_1.txt"]
 },
 #Notice this next rule relies on characters_henry_iv_part_1.txt, so it will have to wait for the previous task to finish before it can run.
 {
-	"command": "./henry_vi_part_2.sfx",
+	"command": "./perl.sfx henry_vi_part_2.txt",
 	"inputs": ["characters_henry_vi_part_1.txt",
 			   "henry_vi_part_2.txt",
-			   "henry_vi_part_2.sfx",
+			   "perl.sfx",
 			   "text_analyzer.pl"
 	],
 	"outputs": ["characters_henry_vi_part_2.txt"]
 },
 {
-	"command": "./henry_vi_part_3.sfx",
+	"command": "./perl.sfx henry_vi_part_3.txt",
 	"inputs": ["characters_henry_vi_part_1.txt",
 			   "characters_henry_vi_part_2.txt",
 			   "henry_vi_part_3.txt",
-			   "henry_vi_part_3.sfx",
+			   "perl.sfx",
 			   "text_analyzer.pl"
 	],
 	"outputs": ["characters_henry_vi_part_3.txt"]
