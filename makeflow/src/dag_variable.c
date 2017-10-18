@@ -186,9 +186,15 @@ struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_vari
 	if(!s->dag)
 		return NULL;
 
+	/* do not look further than the current location of the rule in the makeflow file, if given. */
+	int nodeid = s->dag->nodeid_counter;
+	if(s->node) {
+		nodeid = s->node->nodeid;
+	}
+
 	/* Try the category variables table */
 	if(s->category) {
-		v = dag_variable_get_value(name, s->category->mf_variables, s->dag->nodeid_counter);
+		v = dag_variable_get_value(name, s->category->mf_variables, nodeid);
 		if(v) {
 			s->table = s->dag->default_category->mf_variables;
 			return v;
@@ -196,7 +202,7 @@ struct dag_variable_value *dag_variable_lookup(const char *name, struct dag_vari
 	}
 
 	/* Try dag variables table */
-	v = dag_variable_get_value(name, s->dag->default_category->mf_variables, s->dag->nodeid_counter);
+	v = dag_variable_get_value(name, s->dag->default_category->mf_variables, nodeid);
 	if(v) {
 		s->table = s->dag->default_category->mf_variables;
 		return v;
