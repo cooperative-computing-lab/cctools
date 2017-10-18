@@ -1188,7 +1188,9 @@ static void show_help_run(const char *cmd)
 	printf(" -m,--email=<email>             Send summary of workflow to this email at end\n");
 	printf("    --json                      Use JSON format for the workflow specification.\n");
 	printf("    --jx                        Use JX format for the workflow specification.\n");
-	printf("    --jx-context=<file>         Evaluate the JX input in the given context.\n");
+	printf("    --jx-args=<file>            Evaluate the JX input with keys and values in file defined as variables.\n");
+	printf("    --jx-context=<file>         Deprecated. Equivalent to --jx-args.\n");
+	printf("    --jx-define=<VAR>=<EXPR>   Set the JX variable VAR to the JX expression EXPR.\n");
 	printf("    --log-verbose               Add node id symbol tags in the makeflow log.\n");
 	printf(" -j,--max-local=<#>             Max number of local jobs to run at once.\n");
 	printf(" -J,--max-remote=<#>            Max number of remote jobs to run at once.\n");
@@ -1309,7 +1311,9 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	int json_input = 0;
 	int jx_input = 0;
-	char *jx_context = NULL;
+	struct jx *jx_args = jx_object(NULL);
+	struct jx *jx_expr = NULL;
+	struct jx *jx_tmp = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1369,7 +1373,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_AMAZON_CONFIG,
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
-		LONG_OPT_JX_CONTEXT,
+		LONG_OPT_JX_ARGS,
+		LONG_OPT_JX_DEFINE,
 		LONG_OPT_SKIP_FILE_CHECK,
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
@@ -1458,7 +1463,9 @@ int main(int argc, char *argv[])
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
-		{"jx-context", required_argument, 0, LONG_OPT_JX_CONTEXT},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-args", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
         {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
@@ -1746,8 +1753,35 @@ int main(int argc, char *argv[])
 			case LONG_OPT_JSON:
 				json_input = 1;
 				break;
-			case LONG_OPT_JX_CONTEXT:
-				jx_context = xxstrdup(optarg);
+			case LONG_OPT_JX_ARGS:
+				jx_input = 1;
+				jx_expr = jx_parse_file(optarg);
+				if (!jx_expr)
+						fatal("failed to parse context");
+				jx_tmp = jx_eval(jx_expr, NULL);
+				jx_delete(jx_expr);
+				jx_expr = jx_tmp;
+				if (jx_istype(jx_expr, JX_ERROR)) {
+						jx_print_stream(jx_expr, stderr);
+						fatal("\nError in JX args");
+				}
+				if (!jx_istype(jx_expr, JX_OBJECT))
+						fatal("Args file must contain a JX object");
+				jx_tmp = jx_merge(jx_args, jx_expr, NULL);
+				jx_delete(jx_expr);
+				jx_delete(jx_args);
+				jx_args = jx_tmp;
+				break;
+			case LONG_OPT_JX_DEFINE:
+				jx_input = 1;
+				s = strchr(optarg, '=');
+				if (!s)
+						fatal("JX variable must be of the form VAR=EXPR");
+				*s = '\0';
+				jx_expr = jx_parse_string(s + 1);
+				if (!jx_expr)
+						fatal("Invalid JX expression");
+				jx_insert(jx_args, jx_string(optarg), jx_expr);
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
@@ -1856,23 +1890,14 @@ int main(int argc, char *argv[])
 
 	printf("parsing %s...\n",dagfile);
 	struct dag *d;
-	if (json_input) {
-		struct jx *dag = NULL;
-		struct jx *ctx = NULL;
-		dag = jx_parse_file(dagfile);
+	if (json_input || jx_input) {
+		struct jx *dag = jx_parse_file(dagfile);
 		if (!dag) fatal("failed to parse dagfile");
-		if (jx_input && jx_context) {
-			printf("using JX context %s\n", jx_context);
-			struct jx *t = jx_parse_file(jx_context);
-			if (!t) fatal("failed to parse context");
-			ctx = jx_eval(t, NULL);
-			jx_delete(t);
-		}
 		if (jx_input) {
-			struct jx *t = dag;
-			dag = jx_eval(t, ctx);
-			jx_delete(t);
-			jx_delete(ctx);
+			jx_tmp = jx_eval(dag, jx_args);
+			jx_delete(dag);
+			jx_delete(jx_args);
+			dag = jx_tmp;
 		}
 		d = dag_from_jx(dag);
 		jx_delete(dag);
