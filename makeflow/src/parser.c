@@ -139,8 +139,8 @@ void dag_close_over_environment(struct dag *d)
 	char *name;
 	struct dag_variable_value *v;
 
-	set_first_element(d->special_vars);
-	while((name = set_next_element(d->special_vars)))
+	hash_table_first_element(d->special_vars);
+	while((name = hash_table_next_element(d->special_vars)))
 	{
 		v = dag_variable_get_value(name, d->default_category->mf_variables, d->nodeid_counter);
 		if(!v)
@@ -154,8 +154,8 @@ void dag_close_over_environment(struct dag *d)
 		}
 	}
 
-	set_first_element(d->export_vars);
-	while((name = set_next_element(d->export_vars)))
+	hash_table_first_element(d->export_vars);
+	while((name = hash_table_next_element(d->export_vars)))
 	{
 		v = dag_variable_get_value(name, d->default_category->mf_variables, d->nodeid_counter);
 		if(!v)
@@ -907,7 +907,7 @@ static int dag_parse_export(struct lexer *bk)
 			break;
 		}
 
-		set_insert(bk->d->export_vars, name);
+		hash_table_insert(bk->d->export_vars, name);
 		count++;
 		debug(D_MAKEFLOW_PARSER, "export variable: %s", name);
 	}
