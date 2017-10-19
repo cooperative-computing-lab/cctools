@@ -208,9 +208,8 @@ struct jx *jx_function_join(struct jx *orig_args) {
 	}
 	
 	result=xxstrdup("");	
-	int list_length = jx_array_length(list);
 	struct jx *value=NULL;
-	for (size_t location = 0; value = jx_array_shift(list); location++){
+	for (size_t location = 0; (value = jx_array_shift(list)); location++){
 		if (!jx_istype(value, JX_STRING)){
 			err = "All array values must be strings";
 			goto FAILURE;
