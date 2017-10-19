@@ -115,10 +115,21 @@ static void makeflow_log_sync( struct dag *d, int force )
 {
 	static time_t last_fsync = 0;
 
+	/* Force buffered data to the kernel. */
+	fflush(d->logfile);
+
+	/* Every 60 seconds, force kernel buffered data to disk. */
 	if(force || (time(NULL)-last_fsync) > 60) {
 		fsync(fileno(d->logfile));
 		last_fsync = time(NULL);
 	}
+}
+
+void makeflow_log_close( struct dag *d )
+{
+	makeflow_log_sync(d,1);
+	fclose(d->logfile);
+	d->logfile = 0;
 }
 
 void makeflow_log_started_event( struct dag *d )
