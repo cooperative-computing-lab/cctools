@@ -2249,6 +2249,8 @@ int main(int argc, char *argv[])
 		exit(EXIT_SUCCESS);
 	}
 
+	makeflow_log_close(d);
+
 	free(archive_directory);
 
 	return 0;
