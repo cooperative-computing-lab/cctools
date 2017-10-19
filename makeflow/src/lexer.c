@@ -1073,7 +1073,12 @@ int lexer_read_directive(struct lexer *lx, struct token *name)
 			break;
 		}
 
-		lexer_read_literal(lx);
+		int count = lexer_read_literal(lx);
+
+		if(count < 1) {
+			lexer_report_error(lx, "Literal value (alphanumeric or single-quote string) missing.");
+		}
+
 		struct token *t = lexer_pack_token(lx, TOKEN_LITERAL);
 		lexer_push_token(lx, t);
 		lexer_discard_white_space(lx);

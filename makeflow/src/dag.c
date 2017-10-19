@@ -24,7 +24,6 @@ See the file COPYING for details.
 #include "dag.h"
 #include "dag_resources.h"
 
-struct dag_variable *dag_variable_create(const char *name, const char *initial_value);
 
 struct dag *dag_create()
 {
@@ -54,14 +53,6 @@ struct dag *dag_create()
 	d->archive_directory = NULL;
 	d->should_read_archive = 0;
 	d->should_write_to_archive = 0;
-
-	/* Add GC_*_LIST to variables table to ensure it is in
-	 * global DAG scope. /
-	hash_table_insert(d->variables,"GC_PRESERVE_LIST"   , dag_variable_create(NULL, ""));
-	hash_table_insert(d->variables,"GC_COLLECT_LIST"  , dag_variable_create(NULL, ""));
-	hash_table_insert(d->variables,"MAKEFLOW_INPUTS"   , dag_variable_create(NULL, ""));
-	hash_table_insert(d->variables,"MAKEFLOW_OUTPUTS"  , dag_variable_create(NULL, ""));
-	*/
 
 	/* Declare special variables */
 	set_insert(d->special_vars, "CATEGORY");
