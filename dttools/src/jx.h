@@ -93,8 +93,6 @@ typedef enum {
 	JX_OP_MUL,
 	JX_OP_DIV,
 	JX_OP_MOD,
-	JX_OP_CEIL,
-	JX_OP_FLOOR,
 	JX_OP_AND,
 	JX_OP_OR,
 	JX_OP_NOT,

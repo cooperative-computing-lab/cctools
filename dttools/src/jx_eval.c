@@ -116,10 +116,6 @@ static struct jx *jx_eval_integer(struct jx_operator *op, struct jx *left, struc
 		case JX_OP_MOD:
 			if(b==0) FAILOP(5, op, jx_copy(left), jx_copy(right), "division by zero");
 			return jx_integer(a%b);
-		case JX_OP_CEIL:
-			return jx_integer(ceil(right->u.integer_value));
-		case JX_OP_FLOOR:
-			return jx_integer(floor(right->u.integer_value));
 		default: FAILOP(1, op, jx_copy(left), jx_copy(right), "unsupported operator on integer");
 	}
 }
@@ -154,10 +150,6 @@ static struct jx *jx_eval_double(struct jx_operator *op, struct jx *left, struct
 		case JX_OP_MOD:
 			if(b==0) FAILOP(5, op, jx_copy(left), jx_copy(right), "division by zero");
 			return jx_double((jx_int_t)a%(jx_int_t)b);
-		case JX_OP_CEIL:
-			return jx_double(ceil(right->u.double_value));
-		case JX_OP_FLOOR:
-			return jx_double(floor(right->u.double_value));
 		default: FAILOP(1, op, jx_copy(left), jx_copy(right), "unsupported operator on double");
 	}
 }
