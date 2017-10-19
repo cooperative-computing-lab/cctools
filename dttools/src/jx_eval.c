@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
+#include <math.h>
 
 // FAILOP(int code, jx_operator *op, struct jx *left, struct jx *right, const char *message)
 // left, right, and message are evaluated exactly once
@@ -115,6 +116,10 @@ static struct jx *jx_eval_integer(struct jx_operator *op, struct jx *left, struc
 		case JX_OP_MOD:
 			if(b==0) FAILOP(5, op, jx_copy(left), jx_copy(right), "division by zero");
 			return jx_integer(a%b);
+		case JX_OP_CEIL:
+			return jx_integer(ceil(right->u.integer_value));
+		case JX_OP_FLOOR:
+			return jx_integer(floor(right->u.integer_value));
 		default: FAILOP(1, op, jx_copy(left), jx_copy(right), "unsupported operator on integer");
 	}
 }
@@ -149,6 +154,10 @@ static struct jx *jx_eval_double(struct jx_operator *op, struct jx *left, struct
 		case JX_OP_MOD:
 			if(b==0) FAILOP(5, op, jx_copy(left), jx_copy(right), "division by zero");
 			return jx_double((jx_int_t)a%(jx_int_t)b);
+		case JX_OP_CEIL:
+			return jx_double(ceil(right->u.double_value));
+		case JX_OP_FLOOR:
+			return jx_double(floor(right->u.double_value));
 		default: FAILOP(1, op, jx_copy(left), jx_copy(right), "unsupported operator on double");
 	}
 }
@@ -203,6 +212,8 @@ static struct jx *jx_eval_call(
 		case JX_BUILTIN_RANGE: return jx_function_range(args);
 		case JX_BUILTIN_FORMAT: return jx_function_format(args);
 		case JX_BUILTIN_JOIN: return jx_function_join(args);
+		case JX_BUILTIN_CEIL: return jx_function_ceil(args);
+		case JX_BUILTIN_FLOOR: return jx_function_floor(args);
 		case JX_BUILTIN_LAMBDA: {
 			assert(func->u.func.params);
 
@@ -602,6 +613,8 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	jx_eval_add_builtin(context, "range", JX_BUILTIN_RANGE);
 	jx_eval_add_builtin(context, "format", JX_BUILTIN_FORMAT);
 	jx_eval_add_builtin(context, "join", JX_BUILTIN_JOIN);
+	jx_eval_add_builtin(context, "ceil", JX_BUILTIN_CEIL);
+	jx_eval_add_builtin(context, "floor", JX_BUILTIN_FLOOR);
 
 	switch(j->type) {
 		case JX_SYMBOL: {

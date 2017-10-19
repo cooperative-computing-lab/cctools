@@ -192,15 +192,31 @@ format("%s", "foo");
 [1,2, 3] == [1,3,2];
 [1,2,[3,4]] == [1,2,[3,4]];
 
-join([])
-join([], "")
-join(["a", "b", "c", "d"], " ")
-join()
-join([a, b, c])
-join(["a", "b", "c", "d"])
-join(",", ["a", "b"])
-join(["a", "b"], ",")
-join(["a" "b"])
+ceil(f);
+ceil();
+ceil([]);
+ceil(x);
+ceil(g);
+ceil(x, f);
+ceil("foo");
+
+floor(f);
+floor();
+floor([]);
+floor(x);
+floor(g);
+floor(x, f);
+floor("foo");
+
+join([]);
+join([], "");
+join(["a", "b", "c", "d"], " ");
+join();
+join([a, b, c]);
+join(["a", "b", "c", "d"]);
+join(",", ["a", "b"]);
+join(["a", "b"], ",");
+join(["a", "b"]);
 
 Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"};
 

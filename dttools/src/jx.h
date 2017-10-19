@@ -93,6 +93,8 @@ typedef enum {
 	JX_OP_MUL,
 	JX_OP_DIV,
 	JX_OP_MOD,
+	JX_OP_CEIL,
+	JX_OP_FLOOR,
 	JX_OP_AND,
 	JX_OP_OR,
 	JX_OP_NOT,
@@ -114,6 +116,8 @@ typedef enum {
 	JX_BUILTIN_RANGE,
 	JX_BUILTIN_FORMAT,
 	JX_BUILTIN_JOIN,
+	JX_BUILTIN_CEIL,
+	JX_BUILTIN_FLOOR,
 } jx_builtin_t;
 
 struct jx_function {

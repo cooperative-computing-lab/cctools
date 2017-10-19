@@ -63,6 +63,7 @@ struct jx * jx_symbol( const char *symbol_name )
 
 struct jx * jx_string( const char *string_value )
 {
+	assert(string_value);
 	struct jx *j = jx_create(JX_STRING);
 	j->u.string_value = strdup(string_value);
 	return j;
