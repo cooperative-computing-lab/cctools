@@ -29,6 +29,7 @@ static const char *k8s_script =
 #include "batch_job_k8s_script.c"
 
 static const char *k8s_script_file_name = "_temp_k8s_script.sh";
+static const char *kubectl_failed_log = "kubectl_failed.log";
 
 static const char *k8s_config_tmpl = "\
 {\n\
@@ -74,6 +75,9 @@ typedef struct k8s_job_info{
 	char *extra_input_files;
 	char *extra_output_files;
 	int is_running;
+	int is_failed;
+	char *failed_info;
+	int exit_code;
 } k8s_job_info;
 
 static k8s_job_info* create_k8s_job_info(int job_id, const char *cmd, 
@@ -85,6 +89,7 @@ static k8s_job_info* create_k8s_job_info(int job_id, const char *cmd,
 	new_job_info->extra_input_files = xxstrdup(extra_input_files);
 	new_job_info->extra_output_files = xxstrdup(extra_output_files);
 	new_job_info->is_running = 0;
+	new_job_info->is_failed = 0;
 
 	return new_job_info;
 }
@@ -110,6 +115,11 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 		}
 	}
 	
+	if(access(kubectl_failed_log, F_OK | X_OK) == -1) {
+		FILE *f = fopen(kubectl_failed_log, "w");
+		fclose(f);
+	}
+
 	fflush(NULL);
 	pid_t pid = fork();
 	
@@ -231,7 +241,7 @@ static int batch_job_k8s_remove (struct batch_queue *q, batch_job_id_t jobid)
 }
 
 static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
-		k8s_job_info *curr_k8s_job_info, int exited_normally, 
+		k8s_job_info *curr_k8s_job_info, int exited_normally, int exit_code,
 		struct batch_job_info *info_out, struct list *running_pod_lst,
 		struct batch_queue *q)
 {
@@ -242,7 +252,7 @@ static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
 	info->exited_normally = exited_normally;
 	// TODO get exact exit_code
 	if (exited_normally == 0) {
-		info->exit_code = 1;
+		info->exit_code = exit_code;
 	}
 	memcpy(info_out, info, sizeof(*info));
 	free(info);
@@ -259,6 +269,34 @@ static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
 
 }
 
+static k8s_job_info *batch_job_k8s_get_kubectl_failed_task()
+{
+	FILE *kubectl_failed_fp = fopen(kubectl_failed_log, "r");	
+	char failed_job_info[128];
+	while(fgets(failed_job_info, sizeof(failed_job_info)-1, kubectl_failed_fp) != NULL) {
+		char *pch, *job_id, *failed_info, *exit_code; 
+		int job_id_int;
+		pch = strtok(failed_job_info, ","); 
+		job_id = xxstrdup(pch);
+		job_id_int = atoi(job_id);
+		free(job_id);
+		k8s_job_info *curr_job_info = itable_lookup(k8s_job_info_table, job_id_int);
+		if(curr_job_info->is_failed == 0) {
+			curr_job_info->is_failed = 1;
+			pch = strtok(NULL, ",");
+			failed_info = xxstrdup(pch);
+			pch = strtok(NULL, ",");
+			exit_code = xxstrdup(pch);
+			curr_job_info->failed_info = failed_info;
+			curr_job_info->exit_code = atoi(exit_code);
+			fclose(kubectl_failed_fp);
+			return curr_job_info;
+		} 
+	}
+	fclose(kubectl_failed_fp);
+	return NULL;
+}	
+
 static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q, 
 		struct batch_job_info * info_out, time_t stoptime)
 {
@@ -271,10 +309,11 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 	 * 5. job_done 
 	 */
 
+	debug(D_BATCH, "++++++++++++++++k8s_wait+++++++++++++++++++");
 	struct list *running_pod_lst = NULL;
 
 	while(1) {
-	
+		debug(D_BATCH, "+++++++++++++++++1 +++++++++++++++++++");
 		// generate the list of running pod	
 		if(running_pod_lst != NULL) {
 			list_free(running_pod_lst);	
@@ -288,6 +327,10 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 		FILE *cmd_fp;
 		char pod_info[128];
 		cmd_fp = popen(cmd, "r");
+		
+		if(!cmd_fp) {
+			fatal("1st popen failed: %s", strerror(errno));
+		}
 
 		while(fgets(pod_info, sizeof(pod_info)-1, cmd_fp) != NULL) {
 			char *pch, *pod_id, *pod_state;
@@ -311,12 +354,24 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 				int curr_job_id_int = atoi(curr_job_id);
 				k8s_job_info *curr_k8s_job_info = itable_lookup(k8s_job_info_table, curr_job_id_int);
 				batch_job_k8s_handle_complete_task(pod_id, curr_job_id_int, 
-						curr_k8s_job_info, 1, info_out, running_pod_lst, q);
+						curr_k8s_job_info, 0, 1, info_out, running_pod_lst, q);
 				return curr_job_id_int;
 			}
 		}
 		pclose(cmd_fp);
+		
+		debug(D_BATCH, "+++++++++++++++++2 +++++++++++++++++++");
+		// check if there is a task failed because of local kubectl failure
+		k8s_job_info *failed_job_info = batch_job_k8s_get_kubectl_failed_task();
+		if(failed_job_info != NULL) {
+			char *pod_id = string_format("%s-%d", mf_uuid->str, failed_job_info->job_id);
+			batch_job_k8s_handle_complete_task(pod_id, failed_job_info->job_id, 
+					failed_job_info, 0, failed_job_info->exit_code, info_out, running_pod_lst, q);
+			free(pod_id);
+			return failed_job_info->job_id;
+		}
 
+		debug(D_BATCH, "+++++++++++++++++3 +++++++++++++++++++");
 		// iterate the running pods
 		char *curr_pod_id;
 		list_first_item(running_pod_lst);	
@@ -327,6 +382,9 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 			FILE *cmd_fp;
 			char log_tail_content[64];
 			cmd_fp = popen(get_log_cmd, "r");
+			if(!cmd_fp) {
+				fatal("2nd popen failed: %s", strerror(errno));
+			}
 			fgets(log_tail_content, sizeof(log_tail_content)-1, cmd_fp);
 			pclose(cmd_fp);	
 			
@@ -383,13 +441,13 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 				// and delete the pod on k8s cluster
 				
 				batch_job_k8s_handle_complete_task(curr_pod_id, curr_job_id_int,
-						curr_k8s_job_info, 1, info_out, running_pod_lst, q);
+						curr_k8s_job_info, 1, 0, info_out, running_pod_lst, q);
 				return curr_job_id_int;
 
 			} else if (strcmp(task_state, "exec_failed") == 0) {
-
+				int exit_code_int = atoi(strtok(NULL, ","));
 				batch_job_k8s_handle_complete_task(curr_pod_id, curr_job_id_int, 
-						curr_k8s_job_info, 0, info_out, running_pod_lst, q);
+						curr_k8s_job_info, 0, exit_code_int, info_out, running_pod_lst, q);
 				return curr_job_id_int;
 
 			} else {
@@ -400,6 +458,8 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 
 		if(stoptime != 0 && time(0) >= stoptime)
 			return -1;
+		
+		sleep(10);		
 
 	}
 }
