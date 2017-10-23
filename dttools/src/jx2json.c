@@ -24,7 +24,9 @@ static void show_help() {
 	printf("\n");
 	printf("If INPUT is not specified, stdin is used.");
 	printf("OPTIONS are:\n");
-	printf(optfmt, "-c", "--context <FILE>", "Evaluate FILE and use it as the context");
+	printf(optfmt, "-a", "--args <FILE>", "Evaluate FILE and use it as the context");
+	printf(optfmt, "-d", "--define <VAR>=<EXPR>", "Bind EXPR to the variable VAR.");
+	printf(optfmt, "-c", "--context <FILE>", "Deprecated.");
 	printf(optfmt, "-p", "--pretty", "Print more readable JSON");
 	printf(optfmt, "-v", "--version", "Show version number");
 	printf(optfmt, "-h", "--help", "Help: Show these options");
@@ -34,23 +36,73 @@ static const struct option long_options[] = {
 	{"help", no_argument, 0, 'h'},
 	{"version", no_argument, 0, 'v'},
 	{"pretty", no_argument, 0, 'p'},
-	{"context", required_argument, 0, 'c'},
+	{"context", required_argument, 0, 'a'},
+	{"define", required_argument, 0, 'd'},
+	{"args", required_argument, 0, 'a'},
 	{0, 0, 0, 0}};
 
 int main(int argc, char *argv[]) {
-	char *context = NULL;
+	struct jx *ctx = jx_object(NULL);
 	char *input = NULL;
 	FILE *stream = stdin;
-	struct jx *ctx = NULL;
 	struct jx *body = NULL;
 	struct jx *tmp = NULL;
+	char *s;
 	void (*print_stream)(struct jx *, FILE *) = jx_print_stream;
 
 	int c;
-	while ((c = getopt_long(argc, argv, "vhc:p", long_options, NULL)) > -1) {
+	while ((c = getopt_long(argc, argv, "vha:d:p", long_options, NULL)) > -1) {
 		switch (c) {
-			case 'c':
-				context = strdup(optarg);
+			case 'a': {
+				FILE *f = fopen(optarg, "r");
+				if (!f) {
+					fprintf(stderr, "failed to open args file %s: %s\n",
+						optarg, strerror(errno));
+					return 1;
+				}
+				body = jx_parse_stream(f);
+				fclose(f);
+				if (!body) {
+					fprintf(stderr, "invalid args file %s\n",
+						optarg);
+					return 1;
+				}
+				tmp = jx_eval(body, NULL);
+				jx_delete(body);
+				body = tmp;
+				if (jx_istype(body, JX_ERROR)) {
+					printf("invalid args\n");
+					print_stream(ctx, stdout);
+					printf("\n");
+					return 1;
+				}
+				tmp = jx_merge(ctx, body, NULL);
+				jx_delete(body);
+				jx_delete(ctx);
+				ctx = tmp;
+				break;
+			}
+			case 'd':
+				s = strchr(optarg, '=');
+				if (!s) {
+					fprintf(stderr, "malformed variable\n");
+					return 1;
+				}
+				*s = '\0';
+				body = jx_parse_string(s + 1);
+				if (!body) {
+					fprintf(stderr, "malformed JX expression\n");
+					return 1;
+				}
+				tmp = jx_eval(body, NULL);
+				jx_delete(body);
+				if (jx_istype(tmp, JX_ERROR)) {
+					printf("invalid expression\n");
+					print_stream(ctx, stdout);
+					printf("\n");
+					return 1;
+				}
+				jx_insert(ctx, jx_string(optarg), tmp);
 				break;
 			case 'p':
 				print_stream = jx_pretty_print_stream;
@@ -74,28 +126,6 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (context) {
-		FILE *f = fopen(context, "r");
-		if (!f) {
-			fprintf(stderr, "failed to open context file %s: %s\n",
-				context, strerror(errno));
-			return 1;
-		}
-		ctx = jx_parse_stream(f);
-		fclose(f);
-		if (!ctx) return 1;
-	}
-
-	tmp = ctx;
-	ctx = jx_eval(ctx, NULL);
-	jx_delete(tmp);
-	if (jx_istype(ctx, JX_ERROR)) {
-		printf("invalid context\n");
-		print_stream(ctx, stdout);
-		printf("\n");
-		return 1;
-	}
-
 	if (input) {
 		stream = fopen(input, "r");
 		if (!stream) {
@@ -107,12 +137,15 @@ int main(int argc, char *argv[]) {
 
 	body = jx_parse_stream(stream);
 	fclose(stream);
-	if (!body) return 1;
+	if (!body) {
+		fprintf(stderr, "malformed JX\n");
+		return 1;
+	}
 
 	tmp = body;
 	body = jx_eval(body, ctx);
 	jx_delete(tmp);
-	print_stream(body, stdout);
+	jx_print_stream(body, stdout);
 	printf("\n");
 	jx_delete(body);
 	jx_delete(ctx);

@@ -63,7 +63,9 @@ SUBSECTION(JSON/JX Options)
 OPTIONS_BEGIN
 OPTION_ITEM(--json)Interpret PARAM(dagfile) as a JSON format Makeflow.
 OPTION_ITEM(--jx)Evaluate JX expressions in PARAM(dagfile). Implies --json.
-OPTION_PAIR(--jx-context, ctx)Use PARAM(ctx) as the context for evaluating JX.
+OPTION_PAIR(--jx-args, args)Read variable definitions from the JX file PARAM(args).
+OPTION_PAIR(--jx-define, VAL=EXPR)Set the variable PARAM(VAL) to the JX expression PARAM(EXPR).
+OPTION_PAIR(--jx-context, ctx)Deprecated.
 OPTIONS_END
 
 SUBSECTION(Debugging Options)
