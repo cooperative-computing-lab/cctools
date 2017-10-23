@@ -38,7 +38,7 @@ int main( int argc, char *argv[] )
 	while(1) {
 		struct jx *j = jx_parse(p);
 
-		if(!j) {
+		if(!j && !jx_parser_errors(p)) {
 			// end of file
 			break;
 		} else if(!jx_parser_errors(p)) {

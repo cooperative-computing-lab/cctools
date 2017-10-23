@@ -114,6 +114,8 @@ typedef enum {
 	JX_BUILTIN_RANGE,
 	JX_BUILTIN_FORMAT,
 	JX_BUILTIN_JOIN,
+	JX_BUILTIN_CEIL,
+	JX_BUILTIN_FLOOR,
 } jx_builtin_t;
 
 struct jx_function {

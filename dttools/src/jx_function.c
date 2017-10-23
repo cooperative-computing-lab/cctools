@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include <assert.h>
+#include <math.h>
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -173,13 +174,14 @@ struct jx *jx_function_range(struct jx *args) {
 
 
 struct jx *jx_function_join(struct jx *orig_args) {
+	assert(orig_args);
 	const char *funcname = "join";
 	const char *err = NULL;
 	char *result = NULL;
 
 	struct jx *args = jx_copy(orig_args);
 	struct jx *list = NULL;
-	struct jx *delimeter=NULL;	
+	struct jx *delimeter= NULL;	
 
 	int length = jx_array_length(args);
 	if(length>2){
@@ -206,28 +208,27 @@ struct jx *jx_function_join(struct jx *orig_args) {
 	}
 	
 	result=xxstrdup("");	
-	int list_length = jx_array_length(list);
-	int location = 0;
-	struct jx *value=jx_array_shift(list);
-	while(value){
+	struct jx *value=NULL;
+	for (size_t location = 0; (value = jx_array_shift(list)); location++){
 		if (!jx_istype(value, JX_STRING)){
 			err = "All array values must be strings";
 			goto FAILURE;
 		}
-		result = string_combine(result, value->u.string_value);
-		if(location<list_length-1){	
+		if(location > 0){	
 			if(delimeter) result = string_combine(result, delimeter->u.string_value);
 			else result = string_combine(result, " ");
 		}
-		value = jx_array_shift(list);
-		++location;
+		result = string_combine(result, value->u.string_value);
+		jx_delete(value);
 	}
-	
+
 	jx_delete(args);
 	jx_delete(list);
 	jx_delete(delimeter);
+	assert(result);
 	struct jx *j = jx_string(result);
 	free(result);
+	assert(j);
 	return j;
 	
 	FAILURE:
@@ -235,6 +236,87 @@ struct jx *jx_function_join(struct jx *orig_args) {
 	    jx_delete(list);
 		jx_delete(delimeter);
 		free(result);
-	    FAIL(funcname, JX_BUILTIN_FORMAT, orig_args, err);
+	    FAIL(funcname, JX_BUILTIN_JOIN, orig_args, err);
 }
+
+struct jx *jx_function_ceil(struct jx *orig_args) {
+	assert(orig_args);
+	const char *funcname = "ceil";
+	const char *err = NULL;
+
+	struct jx *args = jx_copy(orig_args);
+	struct jx *val = jx_array_shift(args);
+	struct jx *result = NULL;	
+
+	int length = jx_array_length(orig_args);
+	if(length>1){
+		err = "too many arguments";
+		goto FAILURE;
+	} else if(length<=0){
+		err = "too few arguments";
+		goto FAILURE;
+	}
+
+	switch (val->type) {
+		case JX_DOUBLE:
+			result = jx_double(ceil(val->u.double_value));
+			break;
+		case JX_INTEGER:
+			result = jx_integer(ceil(val->u.integer_value));
+			break;
+		default: 
+			err = "arg of invalid type";
+			goto FAILURE;
+	}	
+
+	jx_delete(args);
+	jx_delete(val);
+	return result;
+	
+	FAILURE:
+	    jx_delete(args);
+	    jx_delete(val);
+	    FAIL(funcname, JX_BUILTIN_CEIL, orig_args, err);
+}
+
+struct jx *jx_function_floor(struct jx *orig_args) {
+	assert(orig_args);
+	const char *funcname = "floor";
+	const char *err = NULL;
+
+	struct jx *args = jx_copy(orig_args);
+	struct jx *val = jx_array_shift(args);
+	struct jx *result = NULL;	
+
+	int length = jx_array_length(orig_args);
+	if(length>1){
+		err = "too many arguments";
+		goto FAILURE;
+	} else if(length<=0){
+		err = "too few arguments";
+		goto FAILURE;
+	}
+
+	switch (val->type) {
+		case JX_DOUBLE:
+			result = jx_double(floor(val->u.double_value));
+			break;
+		case JX_INTEGER:
+			result = jx_integer(floor(val->u.integer_value));
+			break;
+		default: 
+			err = "arg of invalid type";
+			goto FAILURE;
+	}	
+
+	jx_delete(args);
+	jx_delete(val);
+	return result;
+	
+	FAILURE:
+	    jx_delete(args);
+	    jx_delete(val);
+	    FAIL(funcname, JX_BUILTIN_FLOOR, orig_args, err);
+}
+
 

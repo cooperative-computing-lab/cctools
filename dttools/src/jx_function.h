@@ -12,5 +12,7 @@ See the file COPYING for details.
 struct jx *jx_function_range(struct jx *args);
 struct jx *jx_function_format(struct jx *args);
 struct jx *jx_function_join(struct jx *args);
+struct jx *jx_function_ceil(struct jx *args);
+struct jx *jx_function_floor(struct jx *args);
 
 #endif
