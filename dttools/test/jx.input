@@ -36,7 +36,7 @@ true && false;
 false and true;
 false && true;
 false and false;
-flase && false;
+false && false;
 true or true;
 true || true;
 true or false;
@@ -45,7 +45,7 @@ false or true;
 false || true;
 false or false;
 false || false;
-!true
+!true;
 not true;
 not false;
 
@@ -115,8 +115,8 @@ x-y;
 x*y;
 x/y;
 x%y;
-x && y
-x || y
+x && y;
+x || y;
 x and y;
 x or y;
 

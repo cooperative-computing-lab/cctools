@@ -265,21 +265,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_DIV;
 	} else if(c=='%') {
 		return JX_TOKEN_MOD;
-	} else if(c=='|') {
-		char d = jx_getchar(s);
-		if(d=='|') return JX_TOKEN_OR;
-		jx_parse_error(s,"invalid character: |");
-		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='!') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
-		else {
-			jx_ungetchar(s,d);
-			return JX_TOKEN_C_NOT;
-		}
 		jx_ungetchar(s,d);
-		jx_parse_error(s,"invalid character: !");
-		return JX_TOKEN_PARSE_ERROR;
+		return JX_TOKEN_C_NOT;
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
@@ -809,6 +799,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 	switch (t) {
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
+		case JX_TOKEN_C_NOT:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
 			struct jx *j = jx_parse_postfix(s);

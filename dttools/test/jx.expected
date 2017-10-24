@@ -63,8 +63,8 @@ value:      false
 expression: false and false
 value:      false
 
-expression: flase and false
-value:      Error{"source":"jx_eval","name":"undefined symbol","message":"undefined symbol","line":39,"context":{"join":join,"format":format,"range":range,"outfile":"results","infile":"mydata","a":true,"b":false,"f":0.5,"g":3.14159,"x":10,"y":20,"list":[100,200,300],"object":{"house":"home"}},"symbol":flase,"code":0}
+expression: false and false
+value:      false
 
 expression: true or true
 value:      true
