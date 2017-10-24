@@ -385,15 +385,6 @@ fi
 
 export HOST_MULTIARCH=$(check_multiarch)
 
-if [ -f config.mk ]; then
-	echo "we are reconfiguring - prepare with make clean..."
-	if make clean; then
-		echo 'make clean - ok'
-	else
-		echo "make clean failed ($?); continuing"
-	fi
-fi
-
 rm -f config.mk
 
 require_path ${ccompiler}
