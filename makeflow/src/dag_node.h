@@ -33,27 +33,27 @@ typedef enum {
 */
 
 struct dag_node {
-	struct dag *d;					/* Dag this node belongs too. */
-	const char *command;			/* The command line to execute. */
+	struct dag *d;           /* Dag this node belongs too. */
+	const char *command;     /* The command line to execute. */
 
-	int nodeid;						/* The ordinal number as the rule appears in the makeflow file */
-	int linenum;					/* Line number of the node's rule definition */
-	int local_job;					/* Flag: does this node run locally? */
+	int nodeid;              /* The ordinal number as the rule appears in the makeflow file */
+	int linenum;             /* Line number of the node's rule definition */
+	int local_job;           /* Flag: does this node run locally? */
 
-	struct set *descendants;		/* The nodes of which this node is an immediate ancestor */
-	struct set *ancestors;			/* The nodes of which this node is an immediate descendant */
-	int ancestor_depth;				/* The depth of the ancestor tree for this node */
+	struct set *descendants; /* The nodes of which this node is an immediate ancestor */
+	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */
+	int ancestor_depth;      /* The depth of the ancestor tree for this node */
 
-	int nested_job;					/* Flag: Is this a recursive call to makeflow? */
-	const char *makeflow_dag;		/* Name of the sub-makeflow to run, if nested_job is true. */
-	const char *makeflow_cwd;		/* Working dir of the sub-makeflow to run, if nested_job is true. */
+	int nested_job;            /* Flag: Is this a recursive call to makeflow? */
+	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if nested_job is true. */
+	const char *makeflow_cwd;  /* Working dir of the sub-makeflow to run, if nested_job is true. */
 
-	struct itable *remote_names;    /* Mapping from struct *dag_files to remotenames (char *) */
+	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
-	struct list *source_files;		/* list of dag_files of the node's requirements */
-	struct list *target_files;		/* list of dag_files of the node's productions */
+	struct list   *source_files;        /* list of dag_files of the node's requirements */
+	struct list   *target_files;        /* list of dag_files of the node's productions */
 
-	struct dag_node_footprint *footprint; /* Pointer to footprint structure created when using storage limits*/
+	struct dag_node_footprint *footprint; /* Pointer to footprint structure created when using storage limits */
 
 	struct category *category;          /* The set of task this node belongs too. Ideally, the makeflow
 										   file labeled which tasks have comparable resource usage. */
@@ -70,21 +70,22 @@ struct dag_node {
 	/* Variables used in dag_width, dag_width_uniform_task, and dag_depth
 	* functions. Probably we should move them only to those functions, using
 	* hashes.*/
-	int level;                      /* The depth of a node in the dag */
-	int children;                   /* The number of nodes this node is the immediate ancestor */
+	int level;                          /* The depth of a node in the dag */
+	int children;                       /* The number of nodes this node is the immediate ancestor */
 	int children_remaining;
-	int only_my_children;           /* Number of nodes this node is the only parent. */
+	int only_my_children;               /* Number of nodes this node is the only parent. */
 
 	/* dynamic properties of execution */
-	batch_job_id_t jobid;           /* The id this node get, either from the local or remote batch system. */
-	dag_node_state_t state;         /* Enum: DAG_NODE_STATE_{WAITING,RUNNING,...} */
-	int failure_count;              /* How many times has this rule failed? (see -R and -r) */
+	batch_job_id_t jobid;               /* The id this node get, either from the local or remote batch system. */
+	dag_node_state_t state;             /* Enum: DAG_NODE_STATE_{WAITING,RUNNING,...} */
+	int failure_count;                  /* How many times has this rule failed? (see -R and -r) */
 	time_t previous_completion;
 
-	const char *umbrella_spec;      /* the umbrella spec file for executing this job */
+	const char *umbrella_spec;          /* the umbrella spec file for executing this job */
+	
 	char *archive_id;
 
-	struct dag_node *next;          /* The next node in the list of nodes */
+	struct dag_node *next;              /* The next node in the list of nodes */
 };
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);

@@ -32,14 +32,15 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
 
+	n->source_files = list_create();
+	n->target_files = list_create();
+
 	n->remote_names = itable_create(0);
 	n->remote_names_inv = hash_table_create(0, 0);
 
 	n->descendants = set_create(0);
 	n->ancestors = set_create(0);
 
-	n->source_files = list_create();
-	n->target_files = list_create();
 	n->ancestor_depth = -1;
 
 	// resources explicitely requested for only this node in the dag file.
@@ -85,6 +86,24 @@ void dag_node_delete(struct dag_node *n)
 		rmsummary_delete(n->resources_measured);
 
 	free(n);
+}
+
+const char *dag_node_state_name(dag_node_state_t state)
+{
+	switch (state) {
+	case DAG_NODE_STATE_WAITING:
+		return "waiting";
+	case DAG_NODE_STATE_RUNNING:
+		return "running";
+	case DAG_NODE_STATE_COMPLETE:
+		return "complete";
+	case DAG_NODE_STATE_FAILED:
+		return "failed";
+	case DAG_NODE_STATE_ABORTED:
+		return "aborted";
+	default:
+		return "unknown";
+	}
 }
 
 /* Returns the remotename used in rule n for local name filename */
@@ -325,24 +344,6 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
 
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n) {
 	return category_dynamic_task_max_resources(n->category, NULL, n->resource_request);
-}
-
-const char *dag_node_state_name(dag_node_state_t state)
-{
-	switch (state) {
-	case DAG_NODE_STATE_WAITING:
-		return "waiting";
-	case DAG_NODE_STATE_RUNNING:
-		return "running";
-	case DAG_NODE_STATE_COMPLETE:
-		return "complete";
-	case DAG_NODE_STATE_FAILED:
-		return "failed";
-	case DAG_NODE_STATE_ABORTED:
-		return "aborted";
-	default:
-		return "unknown";
-	}
 }
 
 /* vim: set noexpandtab tabstop=4: */
