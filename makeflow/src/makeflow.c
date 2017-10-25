@@ -403,7 +403,7 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 	}
 
 	dag_node_footprint_calculate(n);
-if(storage_print){
+	if(storage_print){
 		dag_node_footprint_find_largest_residual(n, NULL);
 		dag_node_footprint_print(d, n, storage_print);
 		exit(0);
