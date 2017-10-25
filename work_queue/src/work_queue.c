@@ -89,7 +89,8 @@ The following major problems must be fixed:
 
 #define MAX_NEW_WORKERS 10
 
-int p_cap = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+//Capacity of tasks for the master, converted to capacity of workers in Factory
+int wq_capacity = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
@@ -470,7 +471,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_disk);
 	buffer_printf(&B, " %d", s.capacity_instantaneous);
 	//buffer_printf(&B, " %d", s.capacity_weighted);
-	buffer_printf(&B, " %d", p_cap);
+	buffer_printf(&B, " %d", wq_capacity);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -2277,7 +2278,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	//jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
-	jx_insert_integer(j,"capacity_weighted",p_cap);
+	jx_insert_integer(j,"capacity_weighted",wq_capacity);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -3282,15 +3283,13 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
 			//capacity_instantaneous = (int) ceil(((float) tr->exec_time) / (tr->transfer_time + tr->master_time));
-			s->capacity_weighted = p_cap;
+			s->capacity_weighted = wq_capacity;
 			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->master_time));
-			debug(D_WQ, "Before: %d %d", capacity_instantaneous, s->capacity_weighted);
 			s->capacity_weighted = (int) ceil((s->capacity_weight * (float) capacity_instantaneous) + ((1.0 - s->capacity_weight) * s->capacity_weighted));
-			p_cap = s->capacity_weighted;
+			wq_capacity = s->capacity_weighted;
 			time_t ts;
-            time(&ts);
-            debug(D_WQ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, count, s->workers_connected);
-            debug(D_WQ, "After: %d", s->capacity_weighted);
+			time(&ts);
+			debug(D_WQ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, count, s->workers_connected);
 		}
 	}
 
