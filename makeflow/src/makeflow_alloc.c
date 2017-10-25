@@ -52,6 +52,8 @@ struct makeflow_alloc * makeflow_alloc_create(int nodeid, struct makeflow_alloc 
 	a->residuals = list_create();
 	a->locked = locked;
 	a->ordered = 1;
+	if(type == MAKEFLOW_ALLOC_TYPE_NOT_ENABLED) 
+		type = MAKEFLOW_ALLOC_TYPE_OFF;  // OFF by defualt.
 	a->enabled = type;
 
 	makeflow_alloc_print_stats(a, "CREATE");

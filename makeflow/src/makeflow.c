@@ -166,7 +166,7 @@ static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
 
-static struct makeflow_alloc *storage_allocation = 0;
+static struct makeflow_alloc *storage_allocation = NULL;
 
 /* Variables used to hold the time used for storage alloc. */
 uint64_t static_analysis = 0;
@@ -604,9 +604,9 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		queue = remote_queue;
 	}
 
-	if(makeflow_alloc_commit_space(storage_allocation, n)){
+	if(storage_allocation && makeflow_alloc_commit_space(storage_allocation, n)){
 		makeflow_log_alloc_event(d, storage_allocation);
-	} else if (storage_allocation->locked)  {
+	} else if (storage_allocation && storage_allocation->locked)  {
 		printf("Unable to commit enough space for execution\n");
 	}
 
@@ -719,7 +719,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	if(storage_allocation->locked){
+	if(storage_allocation && storage_allocation->locked){
 		if(!( makeflow_alloc_check_space(storage_allocation, n))){
 			return 0;
 		}
@@ -953,7 +953,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	} else {
 		makeflow_clean_rm_fail_dir(d, n, remote_queue, storage_allocation);
 
-		if(makeflow_alloc_use_space(storage_allocation, n)){
+		if(storage_allocation && makeflow_alloc_use_space(storage_allocation, n)){
 			makeflow_log_alloc_event(d, storage_allocation);
 		}
 
@@ -963,13 +963,13 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			f->reference_count+= -1;
 			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
-				if(storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
+				if(storage_allocation && storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
 					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
 			}
 		}
 
 		/* Delete output files that have no use and are not actual outputs */
-		if(storage_allocation->locked){
+		if(storage_allocation && storage_allocation->locked){
 			list_first_item(n->target_files);
 			while((f = list_next_item(n->target_files))){
 				if(f->reference_count == 0 && f->type != DAG_FILE_TYPE_OUTPUT)
@@ -993,9 +993,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			list_delete(input_list);
 		}
 
-		if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
+		if(storage_allocation && makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
 			makeflow_log_alloc_event(d, storage_allocation);
-		} else if (storage_allocation->locked) {
+		} else if (storage_allocation && storage_allocation->locked) {
 			printf("Unable to release space\n");
 		}
 
@@ -1304,7 +1304,8 @@ static void show_help_run(const char *cmd)
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
-	printf("    --storage-limit             Set storage limit for Makeflow (default is off)\n");
+	printf("    --storage-limit=<int>       Set storage limit for Makeflow (default is off)\n");
+	printf("    --storage-type=<type>       Type of storage limit(0:MAX,1:MIN,2:OUTPUT,3:OFF\n");
 	printf("    --storage-print=<file>      Print storage limit calculated by Makeflow\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
@@ -1407,7 +1408,7 @@ int main(int argc, char *argv[])
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
-	int storage_type = MAKEFLOW_ALLOC_TYPE_OFF;
+	int storage_type = MAKEFLOW_ALLOC_TYPE_NOT_ENABLED;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
 
@@ -1975,11 +1976,9 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	if(storage_limit){
+	if(storage_limit || storage_type != MAKEFLOW_ALLOC_TYPE_NOT_ENABLED){
 		storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1, storage_type);
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
-	} else {
-		storage_allocation = makeflow_alloc_create(-1, NULL, 0, 0, storage_type);
 	}
 
 
@@ -2355,9 +2354,11 @@ int main(int argc, char *argv[])
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
-	makeflow_log_alloc_event(d, storage_allocation);
-	makeflow_log_event(d, "STATIC_ANALYSIS", static_analysis);
-	makeflow_log_event(d, "DYNAMIC_ALLOC", makeflow_alloc_get_dynamic_alloc_time());
+	if(storage_allocation){
+		makeflow_log_alloc_event(d, storage_allocation);
+		makeflow_log_event(d, "STATIC_ANALYSIS", static_analysis);
+		makeflow_log_event(d, "DYNAMIC_ALLOC", makeflow_alloc_get_dynamic_alloc_time());
+	}
 
 	if(local_queue)
 		batch_queue_delete(local_queue);

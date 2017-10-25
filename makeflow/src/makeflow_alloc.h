@@ -15,15 +15,16 @@ This module implements resource allocations.
 */
 
 typedef enum {
-	MAKEFLOW_ALLOC_RELEASE_COMMIT,		/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_RELEASE_USED			/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_RELEASE_COMMIT,		/* Intended to denote release of committed space, not used */
+	MAKEFLOW_ALLOC_RELEASE_USED			/* Denotes release of used space */
 } makeflow_alloc_release;
 
 typedef enum {
-	MAKEFLOW_ALLOC_TYPE_MAX = 0,		/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_TYPE_MIN,			/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_TYPE_OUT,			/* Clean nothing, default. */
-	MAKEFLOW_ALLOC_TYPE_OFF 		   	/* Clean nothing, default. */
+	MAKEFLOW_ALLOC_TYPE_MAX = 0,		/* Allocation events are logged, limit set to max size for concurrency */
+	MAKEFLOW_ALLOC_TYPE_MIN,			/* Allocation events are logged, limit is imposed on footprint of nodes */
+	MAKEFLOW_ALLOC_TYPE_OUT,			/* Allocation events are logged, limit tracks only on output of active nodes */
+	MAKEFLOW_ALLOC_TYPE_OFF, 		   	/* Allocation events are logged, but doesn't limit storage */
+	MAKEFLOW_ALLOC_TYPE_NOT_ENABLED   	/* Allocation monitoring is not enabled. */
 } makeflow_alloc_type;
 
 struct makeflow_alloc_unit {
