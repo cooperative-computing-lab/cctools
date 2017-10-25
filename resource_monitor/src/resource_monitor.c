@@ -1361,9 +1361,8 @@ void set_snapshot_watch_events() {
 	}
 
 	void *i = NULL;
-	struct jx *key;
-	while((key = jx_iterate_keys(j, &i))) {
-		const char *fname = key->u.string_value;
+	const char *fname;
+	while((fname = jx_iterate_keys(j, &i))) {
 		struct jx *array  = jx_lookup(j, fname);
 
 		if(!jx_istype(array , JX_OBJECT)) {
