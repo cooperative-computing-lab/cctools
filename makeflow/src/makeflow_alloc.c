@@ -8,6 +8,7 @@
 
 #include "dag_file.h"
 #include "dag_node.h"
+#include "dag_node_footprint.h"
 #include "debug.h"
 #include "makeflow_alloc.h"
 

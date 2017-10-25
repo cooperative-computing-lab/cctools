@@ -35,6 +35,7 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "dag_node.h"
+#include "dag_node_footprint.h"
 #include "dag_visitors.h"
 #include "parser.h"
 #include "parser_jx.h"
@@ -388,7 +389,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 }
 
-static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, const char *dagfile)
+static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
 {
 	uint64_t start = timestamp_get();
 	struct dag_node *n = dag_node_create(d, -1);
@@ -401,14 +402,10 @@ static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print, cons
 		}
 	}
 
-	dag_node_determine_children(n);
-	dag_node_reset_updated(n);
-	dag_node_prepare_node_terminal_files(n);
-	dag_node_prepare_node_size(n);
-	dag_node_determine_footprint(n);
-	if(storage_print){
-		dag_node_find_largest_residual(n, NULL);
-		dag_node_print_footprint(d, n, storage_print);
+	dag_node_footprint_calculate(n);
+if(storage_print){
+		dag_node_footprint_find_largest_residual(n, NULL);
+		dag_node_footprint_print(d, n, storage_print);
 		exit(0);
 	}
 	uint64_t end = timestamp_get();
@@ -724,7 +721,7 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 			return 0;
 		}
 
-		if (!(dag_node_dependencies_active(n))){
+		if (!(dag_node_footprint_dependencies_active(n))){
 			return 0;
 		}
 	}
@@ -2196,7 +2193,7 @@ int main(int argc, char *argv[])
 	makeflow_parse_input_outputs(d);
 
 	if(storage_print || storage_limit)
-		makeflow_prepare_node_sizes(d, storage_print, dagfile);
+		makeflow_prepare_node_sizes(d, storage_print);
 
 	makeflow_prepare_nested_jobs(d);
 
