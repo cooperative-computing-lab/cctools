@@ -39,24 +39,17 @@ static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_ta
 	}
 
 	if (jx_istype(env, JX_OBJECT)) {
-		struct jx *item;
+		const char *key;
 		void *i = NULL;
-		while ((item = jx_iterate_keys(env, &i))) {
-			char *key;
+		while ((key = jx_iterate_keys(env, &i))) {
+			key = xxstrdup(key);
 			const char *value;
-			if (jx_match_string(item, &key)) {
-				debug(D_MAKEFLOW_PARSER, "export %s", key);
-				if ((value = jx_lookup_string(env, key))) {
-					debug(D_MAKEFLOW_PARSER, "env %s=%s", key, value);
-					dag_variable_add_value(key, h, nodeid, value);
-				}
-				set_insert(d->export_vars, key);
-			} else {
-				debug(D_MAKEFLOW_PARSER|D_NOTICE,
-					"Line %u: Environment key/value must be strings",
-					item->line);
-				return 0;
+			debug(D_MAKEFLOW_PARSER, "export %s", key);
+			if ((value = jx_lookup_string(env, key))) {
+				debug(D_MAKEFLOW_PARSER, "env %s=%s", key, value);
+				dag_variable_add_value(key, h, nodeid, value);
 			}
+			set_insert(d->export_vars, key);
 		}
 	} else {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
@@ -326,24 +319,14 @@ struct dag *dag_from_jx(struct jx *j) {
 	debug(D_MAKEFLOW_PARSER, "Parsing categories");
 	struct jx *categories = jx_lookup(j, "categories");
 	if (jx_istype(categories, JX_OBJECT)) {
-		struct jx *item;
+		const char *key;
 		void *i = NULL;
-		while ((item = jx_iterate_keys(categories, &i))) {
-			char *key;
-			if (jx_match_string(item, &key)) {
-				struct jx *value = jx_lookup(categories, key);
-				if (!category_from_jx(d, key, value)) {
-					debug(D_MAKEFLOW_PARSER|D_NOTICE,
-						"Line %u: Failure parsing category",
-						item->line);
-					free(key);
-					return NULL;
-				}
-				free(key);
-			} else {
+		while ((key = jx_iterate_keys(categories, &i))) {
+			struct jx *value = jx_lookup(categories, key);
+			if (!category_from_jx(d, key, value)) {
 				debug(D_MAKEFLOW_PARSER|D_NOTICE,
-					"Line %u: Category names must be strings",
-					item->line);
+					"Line %u: Failure parsing category",
+					value->line);
 				return NULL;
 			}
 		}

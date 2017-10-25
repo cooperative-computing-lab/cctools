@@ -356,7 +356,7 @@ struct jx * jx_iterate_values(struct jx *j, void **i);
  * @param i A variable to store the iteration state.
  * @return A pointer to each key in the object, and NULL when iteration is finished.
  */
-struct jx * jx_iterate_keys(struct jx *j, void **i);
+const char *jx_iterate_keys(struct jx *j, void **i);
 
 /** Merge an arbitrary number of JX_OBJECTs into a single new one. The constituent objects are not consumed. Objects are merged in the order given, i.e. a key can replace an identical key in a preceding object. The last argument must be NULL to mark the end of the list. @return A merged JX_OBJECT that must be deleted with jx_delete. */
 struct jx *jx_merge(struct jx *j, ...);
