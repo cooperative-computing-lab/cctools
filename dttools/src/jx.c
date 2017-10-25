@@ -679,7 +679,7 @@ const char *jx_iterate_keys(struct jx *j, void **i) {
 
 	struct jx_pair **p = *i;
 	while (*p) {
-		if (jx_istype((*p)->value, JX_STRING)) break;
+		if (jx_istype((*p)->key, JX_STRING)) break;
 		p = &(*p)->next;
 	}
 
