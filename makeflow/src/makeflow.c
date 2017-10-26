@@ -1122,16 +1122,16 @@ static void makeflow_run( struct dag *d )
 	batch_job_id_t jobid;
 	struct batch_job_info info;
 	// Start Catalog at current time
-    timestamp_t start = timestamp_get();
+	timestamp_t start = timestamp_get();
 	// Last Report is created stall for first reporting.
-    timestamp_t last_time = start - (60 * 1000 * 1000);
+	timestamp_t last_time = start - (60 * 1000 * 1000);
 	// Relevant to GC and allocations
 	int cleaned_completed_jobs = 0;
 
-    //reporting to catalog
-    if(catalog_reporting_on){
-        makeflow_catalog_summary(d, project, batch_queue_type, start);
-    }
+	//reporting to catalog
+	if(catalog_reporting_on){
+		makeflow_catalog_summary(d, project, batch_queue_type, start);
+	}
 
 	while(!makeflow_abort_flag) {
 		did_find_archived_job = 0;
