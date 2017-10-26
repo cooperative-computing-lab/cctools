@@ -77,13 +77,10 @@ static struct jx *jx_eval_boolean(struct jx_operator *op, struct jx *left, struc
 		case JX_OP_NE:
 			return jx_boolean(a!=b);
 		case JX_OP_AND:
-		case JX_OP_C_AND:
 			return jx_boolean(a&&b);
 		case JX_OP_OR:
-		case JX_OP_C_OR:
 			return jx_boolean(a||b);
 		case JX_OP_NOT:
-		case JX_OP_C_NOT:
 			return jx_boolean(!b);
 		default: FAILOP(1, op, jx_copy(left), jx_copy(right), "unsupported operator on boolean");
 	}

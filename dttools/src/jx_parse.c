@@ -690,11 +690,11 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_DIV:	return JX_OP_DIV;
 		case JX_TOKEN_MOD:	return JX_OP_MOD;
 		case JX_TOKEN_AND:	return JX_OP_AND;
-		case JX_TOKEN_C_AND:return JX_OP_C_AND;
+		case JX_TOKEN_C_AND:return JX_OP_AND;
 		case JX_TOKEN_OR:	return JX_OP_OR;
-		case JX_TOKEN_C_OR:	return JX_OP_C_OR;
+		case JX_TOKEN_C_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
-		case JX_TOKEN_C_NOT:return JX_OP_C_NOT;
+		case JX_TOKEN_C_NOT:return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_LPAREN: return JX_OP_CALL;
 		default:		return JX_OP_INVALID;
