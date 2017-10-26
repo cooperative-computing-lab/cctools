@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
 	tmp = body;
 	body = jx_eval(body, ctx);
 	jx_delete(tmp);
-	jx_print_stream(body, stdout);
+	print_stream(body, stdout);
 	printf("\n");
 	jx_delete(body);
 	jx_delete(ctx);
