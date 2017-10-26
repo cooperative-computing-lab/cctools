@@ -1189,13 +1189,13 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
-        /* Report to catalog */
-        timestamp_t now = timestamp_get();
+		/* Report to catalog */
+		timestamp_t now = timestamp_get();
 		/* If in reporting mode and 1 min has transpired */
-        if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
-            makeflow_catalog_summary(d, project,batch_queue_type,start);
-            last_time = now;
-        }
+		if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
+			makeflow_catalog_summary(d, project,batch_queue_type,start);
+			last_time = now;
+		}
 
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
@@ -1214,10 +1214,8 @@ static void makeflow_run( struct dag *d )
 
 	if(makeflow_abort_flag) {
 		makeflow_abort_all(d);
-	} else {
-		if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
-			makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0, storage_allocation);
-		}
+	} else if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
+		makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0, storage_allocation);
 	}
 }
 
@@ -1568,7 +1566,7 @@ int main(int argc, char *argv[])
 		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
-        {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
 		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
 		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
@@ -1721,7 +1719,7 @@ int main(int argc, char *argv[])
 				free(project);
 				project = xxstrdup(optarg);
 				work_queue_master_mode = "catalog";
-                                catalog_reporting_on = 1; //set to true
+				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -1843,11 +1841,11 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOCKER_TAR:
 				container_image_tar = xxstrdup(optarg);
 				break;
-            case LONG_OPT_SINGULARITY:
-                if(!wrapper) wrapper = makeflow_wrapper_create();
+			case LONG_OPT_SINGULARITY:
+				if(!wrapper) wrapper = makeflow_wrapper_create();
 				container_mode = CONTAINER_MODE_SINGULARITY;
-                container_image = xxstrdup(optarg);
-                break;
+				container_image = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ALLOCATION_MODE:
 				if(!strcmp(optarg, "throughput")) {
 					allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
@@ -2381,10 +2379,10 @@ int main(int argc, char *argv[])
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-            unlink(CONTAINER_DOCKER_SH);
+		unlink(CONTAINER_DOCKER_SH);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-            unlink(CONTAINER_SINGULARITY_SH);
-        }
+		unlink(CONTAINER_SINGULARITY_SH);
+	}
 
 	if(wrapper){
 		makeflow_wrapper_delete(wrapper);
