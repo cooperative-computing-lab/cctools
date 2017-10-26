@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "dag.h"
+#include "dag_node_footprint.h"
 #include "dag_node.h"
 
 #include "debug.h"
@@ -55,11 +56,36 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->resource_request = CATEGORY_ALLOCATION_FIRST;
 
+	n->footprint = NULL;
+
 	n->umbrella_spec = NULL;
 
 	n->archive_id = NULL;
 
 	return n;
+}
+
+void dag_node_delete(struct dag_node *n)
+{
+	hash_table_delete(n->variables);
+
+	itable_delete(n->remote_names);
+	hash_table_delete(n->remote_names_inv);
+
+	set_delete(n->descendants);
+	set_delete(n->ancestors);
+
+	list_delete(n->source_files);
+	list_delete(n->target_files);
+
+	if(n->footprint)
+		dag_node_footprint_delete(n->footprint);
+
+	rmsummary_delete(n->resources_requested);
+	if(n->resources_measured)
+		rmsummary_delete(n->resources_measured);
+
+	free(n);
 }
 
 const char *dag_node_state_name(dag_node_state_t state)

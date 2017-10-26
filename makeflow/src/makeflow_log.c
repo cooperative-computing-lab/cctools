@@ -166,6 +166,12 @@ void makeflow_log_cache_event( struct dag *d, const char *cache_dir ) {
 	makeflow_log_sync(d,1);
 }
 
+void makeflow_log_event( struct dag *d, char *name, uint64_t value)
+{
+	fprintf(d->logfile, "# EVENT\t%"PRIu64"\t%s\t%" PRIu64 "\n", timestamp_get(), name, value);
+	makeflow_log_sync(d,1);
+}
+
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate )
 {
 	debug(D_MAKEFLOW_RUN, "node %d %s -> %s\n", n->nodeid, dag_node_state_name(n->state), dag_node_state_name(newstate));
@@ -210,6 +216,12 @@ void makeflow_log_file_list_state_change( struct dag *d, struct list *file_list,
 	}
 }
 
+void makeflow_log_alloc_event( struct dag *d, struct makeflow_alloc *a )
+{
+	fprintf(d->logfile, "# ALLOC %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64"\n", timestamp_get(), a->storage->total, a->storage->used, a->storage->greedy, a->storage->commit, a->storage->free, d->total_file_size);
+	makeflow_log_sync(d,0);
+}
+
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected )
 {
 	fprintf(d->logfile, "# GC %" PRIu64 " %d %" PRIu64 " %d\n", timestamp_get(), collected, elapsed, total_collected);
@@ -243,7 +255,6 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 			linenum++;
 
 			if(sscanf(line, "# FILE %" SCNu64 " %s %d %" SCNu64 "", &previous_completion_time, file, &file_state, &size) == 4) {
-
 				f = dag_file_lookup_or_create(d, file);
 				f->state = file_state;
 				if(file_state == DAG_FILE_STATE_EXISTS){
@@ -382,7 +393,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 				continue;
 			if(dag_file_should_exist(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
 				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
-				makeflow_clean_file(d, queue, f, 0);
+				makeflow_clean_file(d, queue, f, 0, NULL);
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
 			}
 		}

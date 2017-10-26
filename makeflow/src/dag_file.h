@@ -26,6 +26,7 @@ typedef enum {
 	DAG_FILE_STATE_UP         /* UNUSED STATE, included for when files can be uploaded */
 } dag_file_state_t;
 
+
 typedef enum {
 	DAG_FILE_TYPE_INPUT,       /* File has no rule that creates it or is specified as input.
                                   No input files are cleaned in garbage collection */
@@ -95,6 +96,7 @@ int dag_file_should_exist( const struct dag_file *f );
 @return One if in transit state, zero if not.
 */
 int dag_file_in_trans( const struct dag_file *f );
+uint64_t dag_file_size( const struct dag_file *f );
 
 /** Report the size of file. If no actual size exists, estimated size will be used.
 @param f dag_file.

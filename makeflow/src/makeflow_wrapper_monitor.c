@@ -38,6 +38,18 @@ struct makeflow_monitor * makeflow_monitor_create()
 	return m;
 }
 
+void makeflow_monitor_delete(struct makeflow_monitor *m)
+{
+	makeflow_wrapper_delete(m->wrapper);
+	if(m->log_prefix)
+		free(m->log_prefix);
+
+	if(m->exe)
+		free(m->exe);
+
+	free(m);
+}
+
 /*
  * Prepare for monitoring by creating wrapper command and attaching the
  * appropriate input and output dependencies.
@@ -120,7 +132,7 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 		output_prefix = xxstrdup(path_basename(m->log_prefix));
 	}
 
-	char * result = resource_monitor_write_command(executable,
+	char * command = resource_monitor_write_command(executable,
 			output_prefix,
 			dag_node_dynamic_label(n),
 			extra_options,
@@ -129,12 +141,13 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 			m->enable_list_files);
 
 	char *nodeid = string_format("%d",n->nodeid);
-	result = string_replace_percents(result, nodeid);
+	char *result = string_replace_percents(command, nodeid);
 
 	free(executable);
 	free(extra_options);
 	free(nodeid);
 	free(output_prefix);
+	free(command);
 
 	return result;
 }

@@ -43,6 +43,7 @@ struct dag *dag_create()
 	d->special_vars = set_create(0);
 	d->completed_files = 0;
 	d->deleted_files = 0;
+	d->total_file_size = 0;
 
 	d->categories   = hash_table_create(0, 0);
 	d->default_category = makeflow_category_lookup_or_create(d, "default");
@@ -466,4 +467,17 @@ struct dag_file *dag_file_lookup_fail(
 	}
 }
 
+uint64_t dag_absolute_filesize( struct dag *d )
+{
+	uint64_t size = 0;
+	struct dag_file *f;
+	char *filename;
+	hash_table_firstkey(d->files);
+	while((hash_table_nextkey(d->files, &filename, (void **) &f))){
+		if(f->created_by) {
+			size += dag_file_size(f);
+		}
+	}
+	return size;
+}
 /* vim: set noexpandtab tabstop=4: */

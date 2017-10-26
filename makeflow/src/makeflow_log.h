@@ -23,9 +23,11 @@ void makeflow_log_started_event( struct dag *d );
 void makeflow_log_aborted_event( struct dag *d );
 void makeflow_log_failed_event( struct dag *d );
 void makeflow_log_completed_event( struct dag *d );
+void makeflow_log_event( struct dag *d, char *name, uint64_t value);
 void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate );
 void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int newstate );
 void makeflow_log_file_list_state_change( struct dag *d, struct list *fl, int newstate );
+void makeflow_log_alloc_event( struct dag *d, struct makeflow_alloc *alloc );
 void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, int total_collected );
 void makeflow_log_close(struct dag *d );
 

@@ -34,11 +34,14 @@ See the file COPYING for details.
 #include "sha1.h"
 
 #include "dag.h"
+#include "dag_node.h"
+#include "dag_node_footprint.h"
 #include "dag_visitors.h"
 #include "parser.h"
 #include "parser_jx.h"
 
 #include "makeflow_summary.h"
+#include "makeflow_alloc.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
@@ -164,6 +167,11 @@ static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
 
+static struct makeflow_alloc *storage_allocation = NULL;
+
+/* Variables used to hold the time used for storage alloc. */
+uint64_t static_analysis = 0;
+
 /*
 Determines if this is a local job that will consume
 local resources, regardless of the batch queue type.
@@ -220,7 +228,7 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	list_first_item(outputs);
 
 	while((f = list_next_item(outputs)))
-		makeflow_clean_file(d, q, f, 0);
+		makeflow_clean_file(d, q, f, 0, storage_allocation);
 
 	makeflow_clean_node(d, q, n, 1);
 }
@@ -343,7 +351,8 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	struct list *outputs = makeflow_generate_output_files(n);
 	list_first_item(outputs);
 	while((f1 = list_next_item(outputs)))
-		makeflow_clean_file(d, remote_queue, f1, 0);
+		makeflow_clean_file(d, remote_queue, f1, 0, storage_allocation);
+	list_delete(outputs);
 	makeflow_clean_node(d, remote_queue, n, 0);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
@@ -378,6 +387,30 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 			}
 		}
 	}
+}
+
+static void makeflow_prepare_node_sizes(struct dag *d, char *storage_print)
+{
+	uint64_t start = timestamp_get();
+	struct dag_node *n = dag_node_create(d, -1);
+	n->state = DAG_NODE_STATE_COMPLETE;
+	struct dag_node *p;
+
+	for(p = d->nodes; p; p = p->next) {
+		if(set_size(p->ancestors) == 0) {
+			set_push(n->descendants, p);
+		}
+	}
+
+	dag_node_footprint_calculate(n);
+	if(storage_print){
+		dag_node_footprint_find_largest_residual(n, NULL);
+		dag_node_footprint_print(d, n, storage_print);
+		exit(0);
+	}
+	uint64_t end = timestamp_get();
+	static_analysis += end - start;
+	dag_node_delete(n);
 }
 
 /*
@@ -568,6 +601,12 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		queue = remote_queue;
 	}
 
+	if(storage_allocation && makeflow_alloc_commit_space(storage_allocation, n)){
+		makeflow_log_alloc_event(d, storage_allocation);
+	} else if (storage_allocation && storage_allocation->locked)  {
+		printf("Unable to commit enough space for execution\n");
+	}
+
 	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
 
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
@@ -640,9 +679,9 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		free(previous_batch_options);
 	}
 
-	free(command);
 	list_delete(input_list);
 	list_delete(output_list);
+	free(command);
 	free(input_files);
 	free(output_files);
 	jx_delete(envlist);
@@ -673,6 +712,16 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		if(dag_file_should_exist(f)) {
 			continue;
 		} else {
+			return 0;
+		}
+	}
+
+	if(storage_allocation && storage_allocation->locked){
+		if(!( makeflow_alloc_check_space(storage_allocation, n))){
+			return 0;
+		}
+
+		if (!(dag_node_footprint_dependencies_active(n))){
 			return 0;
 		}
 	}
@@ -717,7 +766,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 Check the the indicated file was created and log, error, or retry as appropriate.
 */
 
-int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
+int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, struct dag_file *f)
 {
 	struct stat buf;
 	int file_created = 0;
@@ -735,6 +784,7 @@ int makeflow_node_check_file_was_created(struct dag_node *n, struct dag_file *f)
 			/* File was created and has length larger than zero. */
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
 			f->actual_size = buf.st_size;
+			d->total_file_size += f->actual_size;
 			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
@@ -804,7 +854,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	else if(info->exited_normally && info->exit_code == 0) {
 		list_first_item(outputs);
 		while((f = list_next_item(outputs))) {
-			if(!makeflow_node_check_file_was_created(n, f))
+			if(!makeflow_node_check_file_was_created(d, n, f))
 			{
 				job_failed = 1;
 			}
@@ -820,7 +870,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	if(job_failed) {
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue);
+		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue, storage_allocation);
 		if (prep_failed) {
 			fprintf(stderr, "rule %d failed, cannot move outputs\n",
 					n->nodeid);
@@ -831,10 +881,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		while((f = list_next_item(outputs))) {
 			if(f->state == DAG_FILE_STATE_EXPECT) {
 				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 1);
+						f, prep_failed, 1, storage_allocation);
 			} else {
 				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 0);
+						f, prep_failed, 0, storage_allocation);
 			}
 		}
 
@@ -898,14 +948,30 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			makeflow_failed_flag = 1;
 		}
 	} else {
-		makeflow_clean_rm_fail_dir(d, n, remote_queue);
+		makeflow_clean_rm_fail_dir(d, n, remote_queue, storage_allocation);
+
+		if(storage_allocation && makeflow_alloc_use_space(storage_allocation, n)){
+			makeflow_log_alloc_event(d, storage_allocation);
+		}
 
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
 		while((f = list_next_item(n->source_files))) {
 			f->reference_count+= -1;
-			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS)
+			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
+				if(storage_allocation && storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
+					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
+			}
+		}
+
+		/* Delete output files that have no use and are not actual outputs */
+		if(storage_allocation && storage_allocation->locked){
+			list_first_item(n->target_files);
+			while((f = list_next_item(n->target_files))){
+				if(f->reference_count == 0 && f->type != DAG_FILE_TYPE_OUTPUT)
+					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
+			}
 		}
 
 		/* store node into archiving directory  */
@@ -922,6 +988,12 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			free(input_files);
 			free(output_files);
 			list_delete(input_list);
+		}
+
+		if(storage_allocation && makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
+			makeflow_log_alloc_event(d, storage_allocation);
+		} else if (storage_allocation && storage_allocation->locked) {
+			printf("Unable to release space\n");
 		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
@@ -1049,30 +1121,46 @@ static void makeflow_run( struct dag *d )
 	struct dag_node *n;
 	batch_job_id_t jobid;
 	struct batch_job_info info;
-        timestamp_t last_time = timestamp_get();
-        timestamp_t start = timestamp_get();
-        int first_report = 1;
+	// Start Catalog at current time
+	timestamp_t start = timestamp_get();
+	// Last Report is created stall for first reporting.
+	timestamp_t last_time = start - (60 * 1000 * 1000);
+	// Relevant to GC and allocations
+	int cleaned_completed_jobs = 0;
 
-        //reporting to catalog
-        if(catalog_reporting_on){
-            makeflow_catalog_summary(d, project, batch_queue_type, start);
-        }
+	//reporting to catalog
+	if(catalog_reporting_on){
+		makeflow_catalog_summary(d, project, batch_queue_type, start);
+	}
 
 	while(!makeflow_abort_flag) {
 		did_find_archived_job = 0;
 		makeflow_dispatch_ready_jobs(d);
 		/*
+			We continue the loop under 4 conditions:
+			1. We have local jobs running
+			2. We have remote jobs running
+			3. We have archival jobs to be found (See Note)
+			4. We have cleaned completed jobs to ensure allocated jobs can run
+
+		Note:
  		Due to the fact that archived jobs are never "run", no local or remote jobs are added
  		to the remote or local job table if all ready jobs were found within the archive.
  		Thus makeflow_dispatch_ready_jobs must run at least once more if an archived job was found.
  		*/
-		if(dag_local_jobs_running(d)==0 && dag_remote_jobs_running(d)==0 && did_find_archived_job == 0 )
+		if(dag_local_jobs_running(d)==0 && 
+			dag_remote_jobs_running(d)==0 && 
+			did_find_archived_job == 0 && 
+			cleaned_completed_jobs == 0 )
 			break;
+
+		cleaned_completed_jobs = 0;
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
+				cleaned_completed_jobs = 1;
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
@@ -1093,6 +1181,7 @@ static void makeflow_run( struct dag *d )
 
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
+				cleaned_completed_jobs = 1;
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n)
@@ -1100,36 +1189,33 @@ static void makeflow_run( struct dag *d )
 			}
 		}
 
-		/* Make periodic report to catalog. */
-                timestamp_t now = timestamp_get();
-                if(catalog_reporting_on && (((now-last_time) > (60 * 1000 * 1000)) || first_report==1)){ //if we are in reporting mode, and if either it's our first report, or 1 min has transpired
+		/* Report to catalog */
+		timestamp_t now = timestamp_get();
+		/* If in reporting mode and 1 min has transpired */
+		if(catalog_reporting_on && ((now-last_time) > (60 * 1000 * 1000))){ 
 			makeflow_catalog_summary(d, project,batch_queue_type,start);
 			last_time = now;
-			first_report = 0;
-                }
+		}
 
 		/* Rather than try to garbage collect after each time in this
 		 * wait loop, perform garbage collection after a proportional
 		 * amount of tasks have passed. */
 		makeflow_gc_barrier--;
 		if(makeflow_gc_method != MAKEFLOW_GC_NONE && makeflow_gc_barrier == 0) {
-			makeflow_gc(d, remote_queue, makeflow_gc_method, makeflow_gc_size, makeflow_gc_count);
+			makeflow_gc(d, remote_queue, makeflow_gc_method, makeflow_gc_size, makeflow_gc_count, storage_allocation);
 			makeflow_gc_barrier = MAX(d->nodeid_counter * makeflow_gc_task_ratio, 1);
 		}
 	}
 
 	/* Always make final report to catalog when workflow ends. */
-
 	if(catalog_reporting_on){
 		makeflow_catalog_summary(d, project,batch_queue_type,start);
 	}
 
 	if(makeflow_abort_flag) {
 		makeflow_abort_all(d);
-	} else {
-		if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
-			makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0);
-		}
+	} else if(!makeflow_failed_flag && makeflow_gc_method != MAKEFLOW_GC_NONE) {
+		makeflow_gc(d,remote_queue,MAKEFLOW_GC_ALL,0,0, storage_allocation);
 	}
 }
 
@@ -1213,6 +1299,9 @@ static void show_help_run(const char *cmd)
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
+	printf("    --storage-limit=<int>       Set storage limit for Makeflow (default is off)\n");
+	printf("    --storage-type=<type>       Type of storage limit(0:MAX,1:MIN,2:OUTPUT,3:OFF\n");
+	printf("    --storage-print=<file>      Print storage limit calculated by Makeflow\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
@@ -1314,6 +1403,9 @@ int main(int argc, char *argv[])
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
+	int storage_type = MAKEFLOW_ALLOC_TYPE_NOT_ENABLED;
+	uint64_t storage_limit = 0;
+	char *storage_print = NULL;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1358,6 +1450,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
+		LONG_OPT_STORAGE_TYPE,
+		LONG_OPT_STORAGE_LIMIT,
+		LONG_OPT_STORAGE_PRINT,
 		LONG_OPT_PASSWORD,
 		LONG_OPT_TICKETS,
 		LONG_OPT_VERBOSE_PARSING,
@@ -1435,6 +1530,9 @@ int main(int argc, char *argv[])
 		{"retry-count", required_argument, 0, 'r'},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
+		{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
+		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
+		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
@@ -1468,7 +1566,7 @@ int main(int argc, char *argv[])
 		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
-        {"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
 		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
 		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
@@ -1621,7 +1719,7 @@ int main(int argc, char *argv[])
 				free(project);
 				project = xxstrdup(optarg);
 				work_queue_master_mode = "catalog";
-                                catalog_reporting_on = 1; //set to true
+				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
 				debug_config_file(optarg);
@@ -1722,6 +1820,16 @@ int main(int argc, char *argv[])
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
 				list_push_head(shared_fs_list, xxstrdup(optarg));
 				break;
+			case LONG_OPT_STORAGE_TYPE:
+				storage_type = atoi(optarg);
+				break;
+			case LONG_OPT_STORAGE_LIMIT:
+				storage_limit = string_metric_parse(optarg);
+				break;
+			case LONG_OPT_STORAGE_PRINT:
+				free(storage_print);
+				storage_print = xxstrdup(optarg);
+				break;
 			case LONG_OPT_DOCKER:
 				if(!wrapper) wrapper = makeflow_wrapper_create();
 				container_mode = CONTAINER_MODE_DOCKER;
@@ -1733,11 +1841,11 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOCKER_TAR:
 				container_image_tar = xxstrdup(optarg);
 				break;
-                        case LONG_OPT_SINGULARITY:
-                                if(!wrapper) wrapper = makeflow_wrapper_create();
-                                container_mode = CONTAINER_MODE_SINGULARITY;
-                                container_image = xxstrdup(optarg);
-                                break;
+			case LONG_OPT_SINGULARITY:
+				if(!wrapper) wrapper = makeflow_wrapper_create();
+				container_mode = CONTAINER_MODE_SINGULARITY;
+				container_image = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ALLOCATION_MODE:
 				if(!strcmp(optarg, "throughput")) {
 					allocation_mode = CATEGORY_ALLOCATION_MODE_MAX_THROUGHPUT;
@@ -1862,6 +1970,12 @@ int main(int argc, char *argv[])
 	} else {
 		dagfile = argv[optind];
 	}
+
+	if(storage_limit || storage_type != MAKEFLOW_ALLOC_TYPE_NOT_ENABLED){
+		storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1, storage_type);
+		makeflow_gc_method = MAKEFLOW_GC_ALL;
+	}
+
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
 		if(strcmp(work_queue_master_mode, "catalog") == 0 && project == NULL) {
@@ -2075,6 +2189,10 @@ int main(int argc, char *argv[])
 	}
 
 	makeflow_parse_input_outputs(d);
+
+	if(storage_print || storage_limit)
+		makeflow_prepare_node_sizes(d, storage_print);
+
 	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
@@ -2178,7 +2296,7 @@ int main(int argc, char *argv[])
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
 		printf("cleaning filesystem...\n");
-		if(makeflow_clean(d, remote_queue, clean_mode)) {
+		if(makeflow_clean(d, remote_queue, clean_mode, storage_allocation)) {
 			fprintf(stderr, "Failed to clean up makeflow!\n");
 			exit(EXIT_FAILURE);
 		}
@@ -2231,6 +2349,12 @@ int main(int argc, char *argv[])
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
+	if(storage_allocation){
+		makeflow_log_alloc_event(d, storage_allocation);
+		makeflow_log_event(d, "STATIC_ANALYSIS", static_analysis);
+		makeflow_log_event(d, "DYNAMIC_ALLOC", makeflow_alloc_get_dynamic_alloc_time());
+	}
+
 	if(local_queue)
 		batch_queue_delete(local_queue);
 
@@ -2255,10 +2379,18 @@ int main(int argc, char *argv[])
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 	if (container_mode == CONTAINER_MODE_DOCKER) {
-            unlink(CONTAINER_DOCKER_SH);
+		unlink(CONTAINER_DOCKER_SH);
 	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-            unlink(CONTAINER_SINGULARITY_SH);
-        }
+		unlink(CONTAINER_SINGULARITY_SH);
+	}
+
+	if(wrapper){
+		makeflow_wrapper_delete(wrapper);
+	}
+
+	if(monitor){
+		makeflow_monitor_delete(monitor);
+	}
 
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
