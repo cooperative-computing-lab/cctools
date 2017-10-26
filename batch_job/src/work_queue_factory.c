@@ -98,6 +98,8 @@ static char *wrapper_command = 0;
 static char *wrapper_input = 0;
 static char *worker_command = 0;
 
+static char *os = NULL;
+
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
 
@@ -329,7 +331,7 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	const char *worker = "./work_queue_worker";
+	const char *worker = os ? "work_queue_worker": "./work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -345,7 +347,7 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	else {
 		cmd = string_format(
-		"./%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
+		"%s %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
 		worker,
 		master_host,
 		master_port,
@@ -365,7 +367,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = string_format("work_queue_worker");
+	char *files = os ? string_format("") : string_format("work_queue_worker");
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -377,6 +379,14 @@ static int submit_worker( struct batch_queue *queue )
 		char *newfiles = string_format("%s,%s",files,wrapper_input);
 		free(files);
 		files = newfiles;
+	}
+	
+	if(os){
+		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,cmd);
+		free(cmd);
+		cmd = temp;
+		//alternative might be to place the runos.py file in this folder, and then ask for the actual image itself, thus making this much more portable.
+		//files = string_format("%s,%s,%s","run_os",os,cmd);
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
@@ -960,7 +970,8 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_CATALOG,
-		LONG_OPT_ENVIRONMENT_VARIABLE
+		LONG_OPT_ENVIRONMENT_VARIABLE,
+		LONG_OPT_RUN_OS,
 	};
 
 static const struct option long_options[] = {
@@ -998,6 +1009,7 @@ static const struct option long_options[] = {
 	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
+	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{0,0,0,0}
 };
 
@@ -1161,6 +1173,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_CATALOG:
 				catalog_host = xxstrdup(optarg);
+				break;
+			case LONG_OPT_RUN_OS:
+				os = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
