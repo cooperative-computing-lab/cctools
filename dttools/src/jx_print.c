@@ -69,6 +69,7 @@ const char * jx_operator_string( jx_operator_t type )
 		case JX_OP_OR:	return " or ";
 		case JX_OP_NOT:	return " not ";
 		// note that the closing bracket/paren is in jx_print_subexpr
+		case JX_OP_CALL: return "(";
 		case JX_OP_LOOKUP: return "[";
 		case JX_OP_SLICE: return ":";
 		default:        return "???";
