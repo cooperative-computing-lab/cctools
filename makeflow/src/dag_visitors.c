@@ -1245,8 +1245,9 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 		if(n->nested_job) {
 			submakeflow = jx_object(NULL);
 			jx_insert(submakeflow, jx_string("path"), jx_string(n->makeflow_dag));
-			jx_insert(submakeflow, jx_string("cwd"), jx_string(n->makeflow_cwd));
+			jx_insert(submakeflow, jx_string("args"), n->makeflow_args);
 			jx_insert(rule, jx_string("makeflow"), submakeflow);
+			jx_insert(submakeflow, jx_string("cwd"), jx_string(n->makeflow_cwd));
 		} else {
 			jx_insert(rule, jx_string("command"), jx_string(n->command));
 		}

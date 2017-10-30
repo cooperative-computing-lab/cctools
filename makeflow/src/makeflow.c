@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx.h"
 #include "jx_parse.h"
+#include "jx_print.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -57,6 +58,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <libgen.h>
+#include <time.h>
 
 #include <assert.h>
 #include <unistd.h>
@@ -218,11 +220,67 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 {
 	makeflow_generate_files(n, task);
 
+	if(n->nested_job) {
+		char *context_content = jx_print_string(n->makeflow_args);
+		char *tag = string_format("%s.%u", strdup(n->makeflow_dag), (unsigned)time(NULL));
+		char *context_title = string_format("context.jx.%s", tag);
+		n->context_file = context_title;
+		FILE *context_file = fopen(context_title, "w");
+		if(!context_file){
+			fprintf(stderr, "Erorr creating file: %s\n", strerror(errno));
+			exit(1);
+		}
+		fputs(context_content, context_file);
+		fclose(context_file);
+		n->log_file = string_format("%s.makeflowlog", tag);
+		makeflow_hook_add_input_file(n->d, task, n->makeflow_dag, NULL);
+		makeflow_hook_add_input_file(n->d, task, context_title, NULL);
+		makeflow_hook_add_output_file(n->d, task, n->log_file, NULL);
+		n->sub_dir = string_format("%s.%u", n->makeflow_dag, (unsigned)time(NULL));
+	}
+
 	/* Expand the command according to each of the wrappers */
 	makeflow_wrap_wrapper(task, n, wrapper);
 	makeflow_wrap_enforcer(task, n, enforcer);
 	makeflow_wrap_umbrella(task, n, umbrella, queue);
 	makeflow_wrap_monitor(task, n, queue, monitor);
+}
+
+char *submakeflow_command_create(struct dag_node *d, struct list **input_list, struct list **output_list){
+	struct list_node *file;
+	char * input_string = NULL;
+	list_first_item(*input_list);
+	file = list_next_item(*input_list);
+	bool files_needed = true;
+	if (file) input_string = string_combine(input_string, "cp -R ");
+	else (files_needed) = false;
+	while(file){
+		input_string = string_combine(input_string, file->data);
+		input_string = string_combine(input_string, " ");
+		file = list_next_item(*input_list);
+	}
+	if(files_needed) { 
+		input_string = string_combine(input_string, d->sub_dir);
+		input_string = string_combine(input_string, "; ");
+	}
+	
+	char * output_string = NULL;
+	list_first_item(*output_list);
+	file = list_next_item(*output_list);
+	if (file) output_string = string_combine(output_string, "cp -R ");
+	else (files_needed) = false;
+	while(file){
+		output_string = string_combine(output_string, file->data);
+		output_string = string_combine(output_string, " ");
+		file = list_next_item(*output_list);
+	}
+	if(files_needed) { 
+		output_string = string_combine(output_string, "../");
+		output_string = string_combine(output_string, "; ");
+	}
+	// Explitly pass in name of desired log file
+	char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", d->sub_dir, input_string, d->sub_dir, d->local_jobs_avail, d->log_file, d->makeflow_dag, d->context_file, output_string, d->sub_dir, d->context_file); 
+	return new_command;
 }
 
 /*
@@ -443,10 +501,7 @@ static void makeflow_prepare_nested_jobs(struct dag *d)
 		struct dag_node *n;
 		for(n = d->nodes; n; n = n->next) {
 			if(n->nested_job && ((n->local_job && local_queue) || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
-				char *command = xxmalloc(strlen(n->command) + 20);
-				sprintf(command, "%s -j %d", n->command, local_jobs_max / dag_nested_width);
-				free((char *) n->command);
-				n->command = command;
+				n->local_jobs_avail = local_jobs_max / dag_nested_width;
 			}
 		}
 	}
@@ -2092,10 +2147,8 @@ int main(int argc, char *argv[])
 	makeflow_parse_input_outputs(d);
 
 	makeflow_prepare_nested_jobs(d);
-
 	if (change_dir)
 		chdir(change_dir);
-
 	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR || container_mode==CONTAINER_MODE_DOCKER) ) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {

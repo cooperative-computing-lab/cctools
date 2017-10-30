@@ -11,13 +11,14 @@ See the file COPYING for details.
 #include "parser_jx.h"
 #include "xxmalloc.h"
 #include "set.h"
+#include "list.h"
 #include "itable.h"
 #include "stringtools.h"
-#include "path.h"
 #include "hash_table.h"
 #include "debug.h"
 #include "parser.h"
 #include "rmsummary.h"
+#include "jx.h"
 #include "jx_eval.h"
 #include "jx_match.h"
 #include "jx_print.h"
@@ -182,38 +183,43 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 		return 0;
 	}
 
-	struct jx *makeflow = jx_lookup(j, "makeflow");
-	struct jx *command = jx_lookup(j, "command");
+	struct jx *type = jx_lookup(j, "type");
+	
+	struct jx *makeflow = NULL;
+	struct jx *command = NULL;
+	
+	if(jx_istype(type, JX_STRING)){
+		if(!strcmp(type->u.string_value, "makeflow")){
+			makeflow = jx_lookup(j, "makeflow");
+		}
+		else {
+			command = jx_lookup(j, "command");
+		}
+	}
+	else{
+		command = jx_lookup(j, "command");
+	}
 
-	if (makeflow && command) {
+	if (!makeflow && !command) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
-			"Rule at line %u: can not have both command and submakeflow",
+			"Rule at line %u: command or submakeflow must be defined",
 			j->line);
 		return 0;
 	}
-
+	
+	n->nested_job = 0;
 	if (jx_match_string(command, (char **) &n->command)) {
 		debug(D_MAKEFLOW_PARSER, "command: %s", n->command);
-	} else if (jx_istype(makeflow, JX_OBJECT)) {
-		const char *path = jx_lookup_string(makeflow, "path");
-		if (!path) {
-			debug(D_MAKEFLOW_PARSER|D_NOTICE,
-				"Sub-Makeflow at line %u: must specify a path",
-				makeflow->line);
-			return 0;
-		}
-		debug(D_MAKEFLOW_PARSER, "Line %u: Submakeflow at %s", makeflow->line, path);
+	} else if (jx_match_string(makeflow, (char **) &n->makeflow_dag)) {
 		n->nested_job = 1;
-		n->makeflow_dag = xxstrdup(path);
-		const char *cwd = jx_lookup_string(makeflow, "cwd");
-		if (cwd) {
-			debug(D_MAKEFLOW_PARSER, "working directory %s", cwd);
-			n->makeflow_cwd = xxstrdup(cwd);
+		debug(D_MAKEFLOW_PARSER, "Line %u: Submakeflow at %s", makeflow->line, n->makeflow_dag);
+		struct jx *args= jx_lookup(j, "args");
+		if (jx_istype(args, JX_OBJECT)) {
+			n->makeflow_args = jx_copy(args);;
 		} else {
 			debug(D_MAKEFLOW_PARSER,
-				"Sub-Makeflow at line %u: cwd malformed or missing, using process cwd",
+				"Sub-Makeflow at line %u: Argument list not specified",
 				makeflow->line);
-			n->makeflow_cwd = path_getcwd();
 		}
 	} else {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,

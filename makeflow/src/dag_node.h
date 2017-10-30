@@ -13,6 +13,8 @@ See the file COPYING for details.
 #include "set.h"
 #include "hash_table.h"
 #include "itable.h"
+#include "list.h"
+#include "jx.h"
 
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
@@ -47,7 +49,12 @@ struct dag_node {
 
 	int nested_job;            /* Flag: Is this a recursive call to makeflow? */
 	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if nested_job is true. */
+	struct jx *makeflow_args;  /*Arguments to add to the context of the submakeflow, if nested_job is true. */
 	const char *makeflow_cwd;  /* Working dir of the sub-makeflow to run, if nested_job is true. */
+	char *log_file;
+	char *context_file;
+	char *sub_dir;
+	int local_jobs_avail;
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
