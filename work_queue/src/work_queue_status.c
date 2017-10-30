@@ -463,15 +463,19 @@ int do_direct_query( const char *master_host, int master_port, time_t stoptime )
 
 	if(format_mode==FORMAT_TABLE) {
 		jx_table_print_header(query_header,stdout,columns);
-	}
 
-	struct jx_item *i;
-	for(i=jarray->u.items;i;i=i->next) {
-		if(format_mode == FORMAT_TABLE) {
-			jx_table_print(query_header,i->value,stdout,columns);
+		struct jx_item *i;
+		for(i=jarray->u.items;i;i=i->next) {
+			if(format_mode == FORMAT_TABLE) {
+				jx_table_print(query_header,i->value,stdout,columns);
+			}
+		}
+	} else {
+		if( query_mode == QUERY_QUEUE ) {
+			//if queue info, drop the array.
+			jx_print_stream(jarray->u.items->value,stdout);
 		} else {
-			// XXX need to print the whole array syntax
-			jx_print_stream(i->value,stdout);
+			jx_print_stream(jarray,stdout);
 		}
 	}
 
