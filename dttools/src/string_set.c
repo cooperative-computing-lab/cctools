@@ -94,6 +94,7 @@ void string_set_clear(struct string_set *s)
 		e = s->buckets[i];
 		while(e) {
 			f = e->next;
+			free(e->element);
 			free(e);
 			e = f;
 		}
@@ -200,7 +201,12 @@ int string_set_insert(struct string_set *s, const char *element)
 	if(!e)
 		return 0;
 
-	e->element = element;
+	e->element = strdup(element);
+	if(!e->element) {
+		free(e);
+		return 0;
+	}
+
 	e->hash = hash;
 	e->next = s->buckets[index];
 	s->buckets[index] = e;
@@ -243,6 +249,7 @@ int string_set_remove(struct string_set *s, const char *element)
 			} else {
 				s->buckets[index] = e->next;
 			}
+			free(e->element);
 			free(e);
 			s->size--;
 			return 1;
