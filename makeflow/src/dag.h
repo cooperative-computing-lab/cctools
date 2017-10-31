@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "dag_variable.h"
 
 #include "itable.h"
+#include "string_set.h"
 #include "set.h"
 #include "timestamp.h"
 #include "batch_job.h"
@@ -29,8 +30,8 @@ struct dag {
 	struct set *outputs;               /* Set of every struct dag_file specified as output. */
 	struct hash_table *categories;     /* Mapping from labels to category structures. */
 	struct category *default_category; /* Default for all rules and variables without an explicit category. */
-	struct hash_table *export_vars;    /* List of variables with prefix export. (these are setenv'ed eventually). */
-	struct hash_table *special_vars;   /* List of special variables, such as category, cores, memory, etc. */
+	struct string_set *export_vars;    /* List of variables with prefix export. (these are setenv'ed eventually). */
+	struct string_set *special_vars;   /* List of special variables, such as category, cores, memory, etc. */
 	category_mode_t allocation_mode;   /* One of CATEGORY_ALLOCATION_MODE_{FIXED,MAX_THROUGHTPUT,MIN_WASTE} */
 
 

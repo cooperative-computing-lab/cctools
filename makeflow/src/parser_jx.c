@@ -49,7 +49,7 @@ static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_ta
 				debug(D_MAKEFLOW_PARSER, "env %s=%s", key, value);
 				dag_variable_add_value(key, h, nodeid, value);
 			}
-			set_insert(d->export_vars, key);
+			string_set_insert(d->export_vars, key);
 		}
 	} else {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
