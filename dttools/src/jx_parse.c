@@ -42,8 +42,11 @@ typedef enum {
 	JX_TOKEN_DIV,
 	JX_TOKEN_MOD,
 	JX_TOKEN_AND,
+	JX_TOKEN_C_AND,
 	JX_TOKEN_OR,
+	JX_TOKEN_C_OR,
 	JX_TOKEN_NOT,
+	JX_TOKEN_C_NOT,
 	JX_TOKEN_NULL,
 	JX_TOKEN_LPAREN,
 	JX_TOKEN_RPAREN,
@@ -262,17 +265,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		return JX_TOKEN_DIV;
 	} else if(c=='%') {
 		return JX_TOKEN_MOD;
-	} else if(c=='|') {
-		char d = jx_getchar(s);
-		if(d=='|') return JX_TOKEN_OR;
-		jx_parse_error(s,"invalid character: |");
-		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='!') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_NE;
 		jx_ungetchar(s,d);
-		jx_parse_error(s,"invalid character: !");
-		return JX_TOKEN_PARSE_ERROR;
+		return JX_TOKEN_C_NOT;
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
@@ -288,6 +285,16 @@ static jx_token_t jx_scan( struct jx_parser *s )
 		if(d=='=') return JX_TOKEN_GE;
 		jx_ungetchar(s,d);
 		return JX_TOKEN_GT;
+	} else if (c=='&') {
+		char d = jx_getchar(s);
+		if(d=='&') return JX_TOKEN_C_AND;
+		jx_parse_error(s, "invalid character: &");
+		return JX_TOKEN_PARSE_ERROR;
+	} else if (c=='|') {
+		char d = jx_getchar(s);
+		if(d=='|') return JX_TOKEN_C_OR;
+		jx_parse_error(s, "invalid character: |");
+		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='\"') {
 		int i;
 		for(i=0;i<MAX_TOKEN_SIZE;i++) {
@@ -683,8 +690,11 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_DIV:	return JX_OP_DIV;
 		case JX_TOKEN_MOD:	return JX_OP_MOD;
 		case JX_TOKEN_AND:	return JX_OP_AND;
+		case JX_TOKEN_C_AND:return JX_OP_AND;
 		case JX_TOKEN_OR:	return JX_OP_OR;
+		case JX_TOKEN_C_OR:	return JX_OP_OR;
 		case JX_TOKEN_NOT:	return JX_OP_NOT;
+		case JX_TOKEN_C_NOT:return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_LPAREN: return JX_OP_CALL;
 		default:		return JX_OP_INVALID;
@@ -789,6 +799,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 	switch (t) {
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
+		case JX_TOKEN_C_NOT:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
 			struct jx *j = jx_parse_postfix(s);
