@@ -23,7 +23,8 @@ See the file COPYING for details.
 static int file_fd = -1;
 static struct stat file_stat;
 static char file_path[PATH_MAX];
-static off_t file_size_max = 1<<20;
+/* Default size of 0 will not roll over debug info. */
+static off_t file_size_max = 0;
 
 /* define custom debug for catch */
 #undef debug
