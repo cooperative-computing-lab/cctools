@@ -274,7 +274,7 @@ void string_set_first_element(struct string_set *s)
 int string_set_next_element(struct string_set *s, char **element)
 {
 	if(s->ientry) {
-		**element = (void *) s->ientry->element;
+		*element = (char *) s->ientry->element;
 
 		s->ientry = s->ientry->next;
 		if(!s->ientry) {
