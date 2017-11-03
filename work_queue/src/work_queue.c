@@ -4814,13 +4814,12 @@ struct work_queue *work_queue_create(int port)
 
 	q->time_last_wait = timestamp_get();
 
-	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	char hostname[DOMAIN_NAME_MAX];
 	if(domain_name_cache_guess(hostname)) {
 		debug(D_WQ, "Master advertising as %s:%d", hostname, q->port);
 	}
 	else {
-		debug(D_WQ, "Could not resolve master hostname.");
+		debug(D_WQ, "Work Queue is listening on port %d.", q->port);
 	}
 	return q;
 }
