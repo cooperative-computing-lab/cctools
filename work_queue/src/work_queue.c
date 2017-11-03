@@ -54,12 +54,10 @@ The following major problems must be fixed:
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/socket.h>
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
-#include <netdb.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -4817,12 +4815,13 @@ struct work_queue *work_queue_create(int port)
 	q->time_last_wait = timestamp_get();
 
 	debug(D_WQ, "Work Queue is listening on port %d.", q->port);
-	char host[LINK_ADDRESS_MAX];
-	host[LINK_ADDRESS_MAX - 1] = '\0';
-	gethostname(host, LINK_ADDRESS_MAX - 1);
-	struct hostent* h;
-	h = gethostbyname(host);
-	debug(D_WQ, "Master advertising as %s:%d", h->h_name, q->port);
+	char hostname[DOMAIN_NAME_MAX];
+	if(domain_name_cache_guess(hostname)) {
+		debug(D_WQ, "Master advertising as %s:%d", hostname, q->port);
+	}
+	else {
+		debug(D_WQ, "Could not resolve master hostname.");
+	}
 	return q;
 }
 
