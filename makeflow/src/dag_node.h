@@ -111,7 +111,7 @@ void dag_node_print_debug_resources(struct dag_node *n);
 const char *dag_node_state_name(dag_node_state_t state);
 void dag_node_state_change(struct dag *d, struct dag_node *n, int newstate);
 
-struct jx * dag_node_env_create( struct dag *d, struct dag_node *n );
+struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_send_all_local_environment );
 
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n);
 

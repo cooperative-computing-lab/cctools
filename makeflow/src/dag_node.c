@@ -20,6 +20,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <unistd.h>
 
+extern char **environ; 
+
 struct dag_node *dag_node_create(struct dag *d, int linenum)
 {
 	struct dag_node *n;
@@ -295,17 +297,41 @@ void dag_node_print_debug_resources(struct dag_node *n)
 		debug(D_MAKEFLOW_RUN, "gpus:  %"PRId64".\n",       r->gpus);
 }
 
+void dag_node_add_local_environment(struct jx *j) {
+
+		char **var;
+		for(var = environ; *var; var++) {
+			char *name   = xxstrdup(*var);
+			char *value  = strchr(name, '=');
+
+			if(value) {
+				*value = '\0'; 
+				value++;
+			} else {
+				value = "";
+			}
+
+			jx_insert(j, jx_string(name), jx_string(value));
+
+			free(name);
+		}
+}
+
 /*
 Creates a jx object containing the explicit environment
 strings for this given node.
 */
 
-struct jx * dag_node_env_create( struct dag *d, struct dag_node *n )
+struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_send_all_local_environment )
 {
 	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
 	char *key;
 
 	struct jx *object = jx_object(0);
+
+	if(should_send_all_local_environment) {
+		dag_node_add_local_environment(object);
+	}
 
 	char *num_cores = dag_variable_lookup_string(RESOURCES_CORES, &s);
 	char *num_omp_threads = dag_variable_lookup_string("OMP_NUM_THREADS", &s);
