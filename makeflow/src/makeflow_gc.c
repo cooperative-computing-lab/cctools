@@ -65,7 +65,7 @@ and would be better handled by invoking batch_job_local.
 
 static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
 {
-	struct jx *j = dag_node_env_create(d,n);
+	struct jx *j = dag_node_env_create(d,n,0);
 	if(j) {
 		jx_export(j);
 		jx_delete(j);

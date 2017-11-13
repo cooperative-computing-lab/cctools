@@ -163,6 +163,8 @@ static char *mountfile = NULL;
 static char *mount_cache = NULL;
 static int use_mountfile = 0;
 
+static int should_send_all_local_environment = 0;
+
 static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
@@ -628,7 +630,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	batch_queue_set_int_option(queue, "task-id", n->nodeid);
 
 	/* Generate the environment vars specific to this node. */
-	struct jx *envlist = dag_node_env_create(d,n);
+	struct jx *envlist = dag_node_env_create(d,n,should_send_all_local_environment);
 
 	/* Logs the creation of output files. */
 	makeflow_log_file_list_state_change(d,output_list,DAG_FILE_STATE_EXPECT);
@@ -1283,6 +1285,7 @@ static void show_help_run(const char *cmd)
 	printf(" -l,--makeflow-log=<logfile>    Use this file for the makeflow log.\n");
 	printf(" -R,--retry                     Retry failed batch jobs up to 5 times.\n");
 	printf(" -r,--retry-count=<n>           Retry failed batch jobs up to n times.\n");
+	printf("    --send-environment          Send all local environment variables in remote execution.\n");
 	printf(" -S,--submission-timeout=<#>    Time to retry failed batch job submission.\n");
 	printf(" -f,--summary-log=<file>        Write summary of workflow to this file at end.\n");
 	        /********************************************************************************/
@@ -1485,7 +1488,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_ARCHIVE_WRITE_ONLY,
 		LONG_OPT_MESOS_MASTER,
 		LONG_OPT_MESOS_PATH,
-		LONG_OPT_MESOS_PRELOAD
+		LONG_OPT_MESOS_PRELOAD,
+		LONG_OPT_SEND_ENVIRONMENT
 	};
 
 	static const struct option long_options_run[] = {
@@ -1528,6 +1532,7 @@ int main(int argc, char *argv[])
 		{"project-name", required_argument, 0, 'N'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
+		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
 		{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
@@ -1927,6 +1932,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_ARCHIVE_WRITE_ONLY:
 				should_write_to_archive = 1;
 				set_archive_directory_string(&archive_directory, optarg);
+				break;
+			case LONG_OPT_SEND_ENVIRONMENT:
+				should_send_all_local_environment = 1;
 				break;
 			default:
 				show_help_run(argv[0]);
