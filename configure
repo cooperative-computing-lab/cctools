@@ -1203,7 +1203,10 @@ else
 	exit 1
 fi
 
-if [ ${BUILD_SYS} != CYGWIN ]
+if [ "$optstatic" = 1 ]
+then
+	static_libraries="../../dttools/src/libdttools.a ${zlib_path}/lib/libz.a"
+elif [ ${BUILD_SYS} != CYGWIN ]
 then
 	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
 else
@@ -1318,7 +1321,7 @@ then
 	fi
 fi
 
-if [ "${include_package_ftplite}" = ftplite ]
+if [ "${include_package_ftplite}" = ftp_lite ]
 then
 	if [ "$optstatic" = 1 ]
 	then
@@ -1469,6 +1472,8 @@ CCTOOLS_BASE_LDFLAGS = ${ldflags}
 CCTOOLS_INTERNAL_LDFLAGS = \$(CCTOOLS_BASE_LDFLAGS) ${internal_ldflags}
 
 CCTOOLS_EXTERNAL_LINKAGE = ${external_libraries}
+
+CCTOOLS_STATIC_LINKAGE = ${static_libraries}
 
 CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
