@@ -246,40 +246,33 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 	makeflow_wrap_monitor(task, n, queue, monitor);
 }
 
-char *submakeflow_command_create(struct dag_node *d, struct list **input_list, struct list **output_list){
+char *submakeflow_command_create(struct dag_node *n, struct list **input_list, struct list **output_list){
 	struct list_node *file;
 	char * input_string = NULL;
 	list_first_item(*input_list);
 	file = list_next_item(*input_list);
-	bool files_needed = true;
-	if (file) input_string = string_combine(input_string, "cp -R ");
-	else (files_needed) = false;
 	while(file){
-		input_string = string_combine(input_string, file->data);
-		input_string = string_combine(input_string, " ");
+		char *remote_file = NULL;
+		struct dag_file *orig_file = (struct dag_file *) hash_table_lookup(n->d->files, (char *) file->data);
+		if((remote_file = itable_lookup(n->remote_names, (uintptr_t) orig_file))) { }
+		else remote_file = file->data;
+		input_string = string_combine(input_string, string_format("cp -R %s %s/%s; ", (char *) file->data, n->sub_dir, remote_file));
 		file = list_next_item(*input_list);
-	}
-	if(files_needed) { 
-		input_string = string_combine(input_string, d->sub_dir);
-		input_string = string_combine(input_string, "; ");
 	}
 	
 	char * output_string = NULL;
 	list_first_item(*output_list);
 	file = list_next_item(*output_list);
-	if (file) output_string = string_combine(output_string, "cp -R ");
-	else (files_needed) = false;
 	while(file){
-		output_string = string_combine(output_string, file->data);
-		output_string = string_combine(output_string, " ");
+		char *remote_file = NULL;
+		struct dag_file *orig_file = (struct dag_file *) hash_table_lookup(n->d->files, (char *) file->data);
+		if((remote_file = itable_lookup(n->remote_names, (uintptr_t) orig_file))) { }
+		else remote_file = file->data;
+		output_string = string_combine(output_string, string_format("cp -R %s ../%s; ", remote_file, (char *) file->data));
 		file = list_next_item(*output_list);
 	}
-	if(files_needed) { 
-		output_string = string_combine(output_string, "../");
-		output_string = string_combine(output_string, "; ");
-	}
 	// Explitly pass in name of desired log file
-	char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", d->sub_dir, input_string, d->sub_dir, d->local_jobs_avail, d->log_file, d->makeflow_dag, d->context_file, output_string, d->sub_dir, d->context_file); 
+	char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", n->sub_dir, input_string, n->sub_dir, n->local_jobs_avail, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file); 
 	return new_command;
 }
 
@@ -290,7 +283,6 @@ Abort one job in a given batch queue.
 static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_queue *q, UINT64_T jobid, const char *name )
 {
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
-
 	batch_job_remove(q, jobid);
 
 	makeflow_hook_node_abort(n);
@@ -578,7 +570,6 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, str
 
 	return 0;
 }
-
 
 /*
 Submit a node to the appropriate batch system, after materializing
@@ -1016,9 +1007,11 @@ static int makeflow_check_batch_consistency(struct dag *d)
 				error = 1;
 				break;
 			} else if (!batch_queue_supports_feature(remote_queue, "remote_rename")) {
-				debug(D_ERROR, "Remote renaming is not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
-				error = 1;
-				break;
+				if(!n->nested_job){
+					debug(D_ERROR, "Remote renaming is not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
+					error = 1;
+					break;
+				}
 			}
 		}
 

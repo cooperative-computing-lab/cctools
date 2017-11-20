@@ -25,6 +25,8 @@ See the file COPYING for details.
 
 #include <assert.h>
 
+int rule_num = 0;
+
 static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_table *h, struct jx *env) {
 	int nodeid;
 
@@ -165,6 +167,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 
 	debug(D_MAKEFLOW_PARSER, "Line %u: Parsing rule", j->line);
 	struct dag_node *n = dag_node_create(d, 0);
+	n->rule_num = rule_num++;
 
 	struct jx *inputs = jx_lookup(j, "inputs");
 	debug(D_MAKEFLOW_PARSER, "Parsing inputs");

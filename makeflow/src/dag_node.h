@@ -41,6 +41,7 @@ struct dag_node {
 
 	int nodeid;              /* The ordinal number as the rule appears in the makeflow file */
 	int linenum;             /* Line number of the node's rule definition */
+	int rule_num;
 	int local_job;           /* Flag: does this node run locally? */
 
 	struct set *descendants; /* The nodes of which this node is an immediate ancestor */
