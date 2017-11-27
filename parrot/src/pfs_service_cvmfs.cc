@@ -705,10 +705,14 @@ static void cvmfs_read_config()
 	}
 #endif
 
+#if LIBCVMFS_REVISION < 23
 	char *allow_switching = getenv("PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES");
 	if( allow_switching && strcmp(allow_switching,"0")!=0) {
 		pfs_cvmfs_repo_switching = true;
-	}
+  }
+#else
+	pfs_cvmfs_repo_switching = true;
+#endif
 	{
 		buffer_t B;
 		buffer_init(&B);
