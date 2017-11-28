@@ -367,7 +367,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files = os ? string_format("") : string_format("work_queue_worker");
+	char *files=string_format("%s","");// = os ? string_format("%s","") : string_format("work_queue_worker");
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -382,11 +382,18 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(os){
+		char* vc3_cmd = string_format("/afs/crc.nd.edu/group/ccl/software/vc3-builder --require cctools-statics -- %s",cmd);
 		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,cmd);
+		char* together = string_format("%s %s",vc3_cmd,temp);
+		free(temp);
 		free(cmd);
-		cmd = temp;
+		cmd = together;
 		//alternative might be to place the runos.py file in this folder, and then ask for the actual image itself, thus making this much more portable.
 		//files = string_format("%s,%s,%s","run_os",os,cmd);
+	}else{
+		char* vc3_cmd = string_format("/afs/crc.nd.edu/group/ccl/software/vc3-builder --require cctools-statics -- %s",cmd);
+		free(cmd);
+		cmd = vc3_cmd;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
