@@ -261,8 +261,8 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 			return -1;
 		}
 	
-		double cores = 0.5;
-		double memory = 1024.0;
+		double cores = 0.0;
+		double memory = 0.0;
 
 		if(resources) {
 			cores = resources->cores  > -1 ? (double)resources->cores  : cores;
@@ -278,14 +278,16 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 			memory = min_resource->mem / 1000;
 			free(min_resource);
 		}
-
-		char *k8s_cpu, *k8s_memory;
 		
-		k8s_cpu = string_format("%f", cores);
-		k8s_memory = string_format("%fMi", memory);
+		if (cores != 0.0 && memory != 0.0) {
+			char *k8s_cpu, *k8s_memory;
+				
+			k8s_cpu = string_format("%f", cores);
+			k8s_memory = string_format("%fMi", memory);
 
-		resources_block = string_format(resource_tmpl, 
-				k8s_cpu, k8s_memory, k8s_cpu, k8s_memory);
+			resources_block = string_format(resource_tmpl, 
+					k8s_cpu, k8s_memory, k8s_cpu, k8s_memory);
+		}
 
 		fprintf(fd, k8s_config_tmpl, mf_uuid->str, pod_id, pod_id, k8s_image, 
 				resources_block, job_id, pod_id);
