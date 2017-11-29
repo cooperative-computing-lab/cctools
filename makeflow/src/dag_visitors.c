@@ -25,6 +25,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "path.h"
 #include "set.h"
+#include "string_set.h"
 #include "stringtools.h"
 #include "copy_stream.h"
 
@@ -50,12 +51,12 @@ int dag_to_file_var(const char *name, struct hash_table *vars, int nodeid, FILE 
 	return 0;
 }
 
-int dag_to_file_vars(struct set *var_names, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
+int dag_to_file_vars(struct string_set *var_names, struct hash_table *vars, int nodeid, FILE * dag_stream, const char *prefix)
 {
 	char *name;
 
-	set_first_element(var_names);
-	while((name = set_next_element(var_names)))
+	string_set_first_element(var_names);
+	while(string_set_next_element(var_names, &name))
 	{
 		dag_to_file_var(name, vars, nodeid, dag_stream, prefix);
 	}
@@ -68,11 +69,11 @@ int dag_to_file_exports(const struct dag *d, FILE * dag_stream, const char *pref
 {
 	char *name;
 
-	struct set *vars = d->export_vars;
+	struct string_set *vars = d->export_vars;
 
 	struct dag_variable_value *v;
-	set_first_element(vars);
-	for(name = set_next_element(vars); name; name = set_next_element(vars))
+	string_set_first_element(vars);
+	while(string_set_next_element(vars, &name))
 	{
 		v = dag_variable_get_value(name, d->default_category->mf_variables, 0);
 		if(v)

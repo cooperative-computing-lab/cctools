@@ -351,8 +351,8 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 		jx_insert(object, jx_string(RESOURCES_CORES), jx_string("1"));
 	}
 
-	set_first_element(d->export_vars);
-	while((key = set_next_element(d->export_vars))) {
+	string_set_first_element(d->export_vars);
+	while(string_set_next_element(d->export_vars, &key)) {
 		char *value = dag_variable_lookup_string(key, &s);
 		if(value) {
 			jx_insert(object,jx_string(key),jx_string(value));

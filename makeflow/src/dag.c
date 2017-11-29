@@ -39,8 +39,8 @@ struct dag *dag_create()
 	d->inputs = set_create(0);
 	d->outputs = set_create(0);
 	d->nodeid_counter = 0;
-	d->export_vars  = set_create(0);
-	d->special_vars = set_create(0);
+	d->export_vars  = string_set_create(0, 0);
+	d->special_vars = string_set_create(0, 0);
 	d->completed_files = 0;
 	d->deleted_files = 0;
 	d->total_file_size = 0;
@@ -56,19 +56,19 @@ struct dag *dag_create()
 	d->should_write_to_archive = 0;
 
 	/* Declare special variables */
-	set_insert(d->special_vars, "CATEGORY");
-	set_insert(d->special_vars, "SYMBOL");          /* Deprecated alias for CATEGORY */
-	set_insert(d->special_vars, RESOURCES_CORES);
-	set_insert(d->special_vars, RESOURCES_MEMORY);
-	set_insert(d->special_vars, RESOURCES_DISK);
-	set_insert(d->special_vars, RESOURCES_GPUS);
+	string_set_insert(d->special_vars, "CATEGORY");
+	string_set_insert(d->special_vars, "SYMBOL");          /* Deprecated alias for CATEGORY */
+	string_set_insert(d->special_vars, RESOURCES_CORES);
+	string_set_insert(d->special_vars, RESOURCES_MEMORY);
+	string_set_insert(d->special_vars, RESOURCES_DISK);
+	string_set_insert(d->special_vars, RESOURCES_GPUS);
 
 	/* export all variables related to resources */
-	set_insert(d->export_vars, "CATEGORY");
-	set_insert(d->export_vars, RESOURCES_CORES);
-	set_insert(d->export_vars, RESOURCES_MEMORY);
-	set_insert(d->export_vars, RESOURCES_DISK);
-	set_insert(d->export_vars, RESOURCES_GPUS);
+	string_set_insert(d->export_vars, "CATEGORY");
+	string_set_insert(d->export_vars, RESOURCES_CORES);
+	string_set_insert(d->export_vars, RESOURCES_MEMORY);
+	string_set_insert(d->export_vars, RESOURCES_DISK);
+	string_set_insert(d->export_vars, RESOURCES_GPUS);
 
 	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
 	return d;

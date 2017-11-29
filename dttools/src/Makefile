@@ -99,6 +99,7 @@ SOURCES = \
 	stats.c \
 	string_array.c \
 	stringtools.c \
+	string_set.c \
 	text_array.c \
 	text_list.c \
 	timer.c \
