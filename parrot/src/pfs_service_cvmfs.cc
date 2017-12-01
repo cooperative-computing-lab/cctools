@@ -55,15 +55,17 @@ extern struct jx *pfs_cvmfs_options;
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
 
-#define CERN_KEY_PLACEHOLDER   "<BUILTIN-cern.ch.pub>"
-#define OASIS_KEY_PLACEHOLDER  "<BUILTIN-opensciencegrid.org.pub>"
+#define CERN_KEY_PLACEHOLDER     "<BUILTIN-cern.ch.pub>"
 #define CERN_IT1_KEY_PLACEHOLDER "<BUILTIN-cern-it1.ch.pub>"
+#define CERN_IT4_KEY_PLACEHOLDER "<BUILTIN-cern-it4.ch.pub>"
+#define CERN_IT5_KEY_PLACEHOLDER "<BUILTIN-cern-it5.ch.pub>"
+#define OASIS_KEY_PLACEHOLDER    "<BUILTIN-opensciencegrid.org.pub>"
 
 /* All repositories are matched in order, therefore we write them from less to more specific */
 static const char *default_cvmfs_repo =
 "*:try_local_filesystem \
 \
- *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/cvmfs/*.cern.ch;http://cernvmfs.gridpp.rl.ac.uk/cvmfs/*.cern.ch;http://cvmfs.racf.bnl.gov/cvmfs/*.cern.ch \
+ *.cern.ch:pubkey=" CERN_KEY_PLACEHOLDER ":" CERN_IT1_KEY_PLACEHOLDER ":" CERN_IT4_KEY_PLACEHOLDER ":" CERN_IT5_KEY_PLACEHOLDER ",url=http://cvmfs-stratum-one.cern.ch/cvmfs/*.cern.ch;http://cernvmfs.gridpp.rl.ac.uk/cvmfs/*.cern.ch;http://cvmfs.racf.bnl.gov/cvmfs/*.cern.ch \
 \
  *.opensciencegrid.org:pubkey=" OASIS_KEY_PLACEHOLDER ",url=http://oasis-replica.opensciencegrid.org:8000/cvmfs/*;http://cvmfs.fnal.gov:8000/cvmfs/*;http://cvmfs.racf.bnl.gov:8000/cvmfs/*";
 
@@ -110,6 +112,34 @@ urzo3WSNCzJngiGMh1vM5iSlGLpCdSGzdwxLGwc1VjRM7q3KAd7M7TJCynKqXZPX\n\
 R2xiD6I/p4xv39AnwphCFSmDh0MWE1WeeNHIiiveikvvN+l8d/ZNASIDhKNCsz6o\n\
 aFDsGXvjGy7dg43YzjSSYSFGUnONtl5Fe6y4bQZj1LEPbeInW334MAbMwYF4LKma\n\
 yQIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+
+static bool wrote_cern_it4_key;
+static std::string cern_it4_key_fname;
+static const char *cern_it4_key_text =
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzlAraXimfJP5ie0KtDAE\n\
+rNUU5d9bzst+kqfhnb0U0OUtmCIbsueaDlbMmTdRSHMr+T0jI8i9CZxJwtxDqll+\n\
+UuB3Li2hYBhk0tYTy29JJYvofVULvrw1kMSLKyTWnV30/MHjYxhLHoZWfdepTjVg\n\
+lM0rP58K10wR3Z/AaaikOcy4z6P/MHs9ES1jdZqEBQEmmzKw5nf7pfU2QuVWJrKP\n\
+wZ9XeYDzipVbMc1zaLEK0slE+bm2ge/Myvuj/rpYKT+6qzbasQg62abGFuOrjgKI\n\
+X4/BVnilkhUfH6ssRKw4yehlKG1M5KJje2+y+iVvLbfoaw3g1Sjrf4p3Gq+ul7AC\n\
+PwIDAQAB\n\
+-----END PUBLIC KEY-----\n\
+";
+
+static bool wrote_cern_it5_key;
+static std::string cern_it5_key_fname;
+static const char *cern_it5_key_text =
+"-----BEGIN PUBLIC KEY-----\n\
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqFzLLZAg2xmHJLbbq0+N\n\
+eYtjRDghUK5mYhARndnC3skFVowDTiqJVc9dIDX5zuxQ9HyC0iKM1HbvN64IH/Uf\n\
+qoXLyZLiXbFwpg6BtEJxwhijdZCiCC5PC//Bb7zSFIVZvWjndujr6ejaY6kx3+jI\n\
+sU1HSJ66pqorj+D1fbZCziLcWbS1GzceZ7aTYYPUdGZF1CgjBK5uKrEAoBsPgjWo\n\
++YOEkjskY7swfhUzkCe0YyMyAaS0gsWgYrY2ebrpauFFqKxveKWjDVBTGcwDhiBX\n\
+60inUgD6CJXhUpvGHfU8V7Bv6l7dmyzhq/Bk2kRC92TIvxfaHRmS7nuknUY0hW6t\n\
+2QIDAQAB\n\
 -----END PUBLIC KEY-----\n\
 ";
 
@@ -377,6 +407,30 @@ static bool write_cern_it1_key()
 	return true;
 }
 
+static bool write_cern_it4_key()
+{
+	if( wrote_cern_it4_key ) {
+		return true;
+	}
+	if( !write_key(cern_it4_key_text,"cern_it4.ch.pub",cern_it4_key_fname) ) {
+		return false;
+	}
+	wrote_cern_it4_key = true;
+	return true;
+}
+
+static bool write_cern_it5_key()
+{
+	if( wrote_cern_it5_key ) {
+		return true;
+	}
+	if( !write_key(cern_it5_key_text,"cern_it5.ch.pub",cern_it5_key_fname) ) {
+		return false;
+	}
+	wrote_cern_it5_key = true;
+	return true;
+}
+
 
 static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 {
@@ -435,6 +489,45 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 		f->cvmfs_options.replace(cern_key_pos-f->cvmfs_options.c_str(),strlen(CERN_KEY_PLACEHOLDER),cern_key_fname);
 	}
 
+	// check for references to the cern_it1.ch.pub key
+	char const *cern_it1_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT1_KEY_PLACEHOLDER);
+	if( cern_it1_key_pos ) {
+		if( !write_cern_it1_key() ) {
+			debug(D_CVMFS|D_NOTICE,
+				  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it1.ch.pub",
+				  f->host.c_str());
+			return false;
+		}
+
+		f->cvmfs_options.replace(cern_it1_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT1_KEY_PLACEHOLDER),cern_it1_key_fname);
+	}
+
+	// check for references to the cern_it4.ch.pub key
+	char const *cern_it4_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT4_KEY_PLACEHOLDER);
+	if( cern_it4_key_pos ) {
+		if( !write_cern_it4_key() ) {
+			debug(D_CVMFS|D_NOTICE,
+				  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it4.ch.pub",
+				  f->host.c_str());
+			return false;
+		}
+
+		f->cvmfs_options.replace(cern_it4_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT4_KEY_PLACEHOLDER),cern_it4_key_fname);
+	}
+
+	// check for references to the cern_it5.ch.pub key
+	char const *cern_it5_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT5_KEY_PLACEHOLDER);
+	if( cern_it5_key_pos ) {
+		if( !write_cern_it5_key() ) {
+			debug(D_CVMFS|D_NOTICE,
+				  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it5.ch.pub",
+				  f->host.c_str());
+			return false;
+		}
+
+		f->cvmfs_options.replace(cern_it5_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT5_KEY_PLACEHOLDER),cern_it5_key_fname);
+	}
+
 	// check for references to the built-in opensciencegrid.org.pub key
 	char const *oasis_key_pos = strstr(f->cvmfs_options.c_str(),OASIS_KEY_PLACEHOLDER);
 	if( oasis_key_pos ) {
@@ -446,19 +539,6 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 		}
 
 		f->cvmfs_options.replace(oasis_key_pos-f->cvmfs_options.c_str(),strlen(OASIS_KEY_PLACEHOLDER),oasis_key_fname);
-	}
-
-	// check for references to the built-in cern_it1.ch.pub key
-	char const *cern_it1_key_pos = strstr(f->cvmfs_options.c_str(),CERN_IT1_KEY_PLACEHOLDER);
-	if( cern_it1_key_pos ) {
-		if( !write_cern_it1_key() ) {
-			debug(D_CVMFS|D_NOTICE,
-				  "ERROR: cannot load cvmfs repository %s, because failed to write cern_it1.ch.pub",
-				  f->host.c_str());
-			return false;
-		}
-
-		f->cvmfs_options.replace(cern_it1_key_pos-f->cvmfs_options.c_str(),strlen(CERN_IT1_KEY_PLACEHOLDER),cern_it1_key_fname);
 	}
 
 #if LIBCVMFS_VERSION == 1
