@@ -331,13 +331,13 @@ static int describe_aws_job(char* aws_jobid, char* env_var){
 		int64_t created_string = (int64_t) jx_lookup_integer(first_item,"createdAt");
 		int64_t start_string = (int64_t)jx_lookup_integer(first_item,"startedAt");
 		int64_t end_string = (int64_t)jx_lookup_integer(first_item,"stoppedAt");
-		if(created_string != (int64_t)NULL){
+		if(created_string != 0 ){
 			debug(D_BATCH,"Job %s was created at: %"PRIi64"",aws_jobid,created_string);
 		}
-		if(start_string != (int64_t)NULL){
+		if(start_string != 0 ){
 			debug(D_BATCH,"Job %s started at: %"PRIi64"",aws_jobid,start_string);
 		}
-		if(end_string != (int64_t)NULL){
+		if(end_string != 0 ){
 			debug(D_BATCH,"Job %s ended at: %"PRIi64"",aws_jobid,end_string);
 		}
 	}
