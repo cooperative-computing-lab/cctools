@@ -26,7 +26,7 @@ EOF
 	if [ X$FOREMAN = X1 ]
 	then
 		echo "starting foreman"
-		work_queue_worker -d all -o foreman.log --foreman -Z foreman.port localhost `cat master.port` --timeout 10 --single-shot &
+		work_queue_worker -d all -o foreman.log --foreman -Z foreman.port localhost `cat master.port` --timeout 20 --single-shot &
 		wait_for_file_creation foreman.port 5
 
 		port=`cat foreman.port`
@@ -35,7 +35,7 @@ EOF
 	fi
 
 	echo "starting worker"
-	work_queue_worker -d all -o worker.log localhost $port --timeout 10 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
+	work_queue_worker -d all -o worker.log localhost $port -b 2 --timeout 10 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
 
 	echo "checking for output"
 	i=0

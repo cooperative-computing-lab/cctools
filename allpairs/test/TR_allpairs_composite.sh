@@ -48,7 +48,7 @@ run()
 	run_local_worker $PORT_FILE &
 	echo $! > $WORKER_PID
 
-	wait_for_file_creation $DONE_FILE 15
+	wait_for_file_creation $DONE_FILE 30
 
 	echo "checking output"
 	awk '$3 ~ /^0$/{print $1}' $TEST_OUTPUT_STEP | sort -n | uniq > $TEST_OUTPUT
