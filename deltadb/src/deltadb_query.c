@@ -248,7 +248,11 @@ static void display_deferred_time( struct deltadb *db )
 
 int deltadb_create_event( struct deltadb *db, const char *key, struct jx *jobject )
 {
-	if(!deltadb_boolean_expr(db->filter_expr,jobject)) return 1;
+	if(!deltadb_boolean_expr(db->filter_expr,jobject)) {
+		jx_delete(jobject);
+		return 1;
+	}
+
 	hash_table_insert(db->table,key,jobject);
 
 	if(display_mode==MODE_STREAM) {
@@ -278,7 +282,10 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
 {
 	struct jx * jobject = hash_table_lookup(db->table,key);
-	if(!jobject) return 1;
+	if(!jobject) {
+		jx_delete(jvalue);
+		return 1;
+	}
 
 	struct jx *jname = jx_string(name);
 	jx_delete(jx_remove(jobject,jname));
