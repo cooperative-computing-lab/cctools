@@ -1,8 +1,9 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
+Copyright (C) 2005- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
 
 #include "batch_job_internal.h"
 #include "process.h"
@@ -27,8 +28,7 @@ static char* compute_env_name = NULL;
 static char* vpc = NULL;
 static char* sec_group = NULL;
 static char* subnet = NULL;
-//static int ids = 1;
-static struct itable* done_jobs;//might need an itable of itables for different runs....
+static struct itable* done_jobs;
 static struct itable* amazon_job_ids;
 static struct itable* done_files;
 static int instID;
@@ -74,7 +74,6 @@ static void split_comma_list(char* in, int* size, char*** output){
 	while(ta != NULL){
 		if(strlen(ta) < 1) continue;
 		*size += 1;
-		//free(ta);//hoepfully doesn't crash everything: it did...
 		ta = strtok(0,",");
 	}
 	
@@ -101,8 +100,9 @@ static void clean_str_array(int size, char*** array){
 	free(*array);
 }
 
-static void upload_input_files_to_s3(char* files,char* jobname){
+static int upload_input_files_to_s3(char* files,char* jobname){
 	int i;
+	int success = 1;
 	int files_split_num = 0;//to prevent dirty data
 	char* env_var = initialized_data.master_env_prefix;
 	char** files_split;
@@ -113,14 +113,19 @@ static void upload_input_files_to_s3(char* files,char* jobname){
 			continue;
 		}
 		debug(D_BATCH,"Submitting file: %s",files_split[i]);
-		//using a suggestion from stack overflow
-		char* put_file_command = string_format("%s /usr/bin/time -f \"Submitting File %s for Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 sync . s3://%s/ --exclude '*' --include '%s'",env_var,files_split[i],jobname,bucket_name,files_split[i]);
+		char* put_file_command = string_format("%s /usr/bin/time -f \"Submitting File %s for Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
 		int ret = system(put_file_command);
-		debug(D_BATCH,"File Submission: %s return code: %i",files_split[i],ret);
+		if(ret != 0){
+			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",files_split[i],ret);
+			success = 0;
+		}else{
+			debug(D_BATCH,"File Submission: %s SUCCESS return code: %i",files_split[i],ret);
+		}
 		//assume everything went well?
 		hash_table_insert(submitted_files,files_split[i],&HAS_SUBMITTED_VALUE);
 	}
 	clean_str_array(files_split_num,&files_split);
+	return success;
 }
 
 
@@ -128,12 +133,12 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	if(initialized){
 		return initialized_data;
 	}
-	
-	FILE* config_file = fopen("./makeflow_amazon_batch.config","r");
-	if(!config_file){
-		system("amazon_batch_initialize 2 2 4");
+	char* config_file = hash_table_lookup(q->options,"amazon-batch-config");
+	if(!config_file) {
+		fatal("No amazon config file passed!");
 	}
-	struct jx* config = jx_parse_file("./makeflow_amazon_batch.config");
+	
+	struct jx* config = jx_parse_file(config_file);
 	
 	
 	initialized = 1;
@@ -163,21 +168,21 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	//const char* aws_email = jx_lookup_string(config,"aws_email");
 
 	if(!aws_access_key_id)
-		fatal("credentials file does not contain aws_id");
+		fatal("credentials file %s does not contain aws_id",config_file);
 	if(!aws_secret_access_key)
-		fatal("credentials file does not contain aws_key");
+		fatal("credentials file %s does not contain aws_key",config_file);
 	if(!aws_region)
-		fatal("credentials file does not contain aws_reg");
+		fatal("credentials file %s does not contain aws_reg",config_file);
 	if(!bucket_name)
-		fatal("credentials file does not contain bucket");
+		fatal("credentials file %s does not contain bucket",config_file);
 	if(!queue_name)
-		fatal("credentials file does not contain queue_name");
+		fatal("credentials file %s does not contain queue_name",config_file);
 	if(!compute_env_name)
-		fatal("credentials file does not contain env_name");
+		fatal("credentials file %s does not contain env_name",config_file);
 	if(!vpc)
-		fatal("credentials file does not contain vpc");
+		fatal("credentials file %s does not contain vpc",config_file);
 	if(!subnet)
-		fatal("credentials file does not contain subnet"); 
+		fatal("credentials file %s does not contain subnet",config_file); 
 	
 	char* env_var = string_format("AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_DEFAULT_REGION=%s ",aws_access_key_id,aws_secret_access_key,aws_region);
 	
@@ -188,12 +193,6 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	initialized_data.master_env_prefix = env_var;
 	return initialized_data;
 }
-
-/*static batch_job_id_t get_id_from_name(char* name){//name has structure of "QUEUENAME_id"
-	int i = strrpos(name,'_');//get last instance
-	int k = atoi(&(name[i+1]));
-	return k;
-}*/
 
 static char* generate_s3_cp_cmds(char* files, char* src, char* dst){
 	char* env_var = initialized_data.master_env_prefix;
@@ -298,47 +297,48 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	jx_delete(jx);
 	return jaid;
 }
-
-//Return of 1 means: job exists, succeeded
-//Return of 0 means: job exists, failed
-//Return of -1 means: job exists, but in non-final state
-//Return of -2 means: job doesn't exist, should treat as a failure
+enum{
+	describe_aws_job_success = 1, //job exists, succeeded
+	describe_aws_job_failed = 0, //job exists, failed
+	describe_aws_job_non_final = -1, //exists, but in non-final state
+	descibe_aws_job_non_exist = -2 //job doesn't exist, should treat as a failure
+};
 static int describe_aws_job(char* aws_jobid, char* env_var){
 	//fprintf(stderr,"aws_jobid:%s\n\n",aws_jobid);
 	char* cmd = string_format("%s aws batch describe-jobs --jobs %s",env_var,aws_jobid);
 	struct jx* jx = run_command(cmd);
 	free(cmd);
-	int succeed = -1;
+	int succeed = describe_aws_job_non_final; //default status
 	struct jx* jobs_array = jx_lookup(jx,"jobs");
 	if(!jobs_array){
 		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
-		return -2;
+		return descibe_aws_job_non_exist;
 	}
 	struct jx* first_item = jx_array_index(jobs_array,0);
 	if(!first_item){
 		debug(D_BATCH,"Problem wigh given aws_jobid: %s",aws_jobid);
-		return -2;
+		return descibe_aws_job_non_exist;
 	}
 	if(strstr((char*)jx_lookup_string(first_item,"status"),"SUCCEEDED")){
-		succeed = 1;
+		succeed = describe_aws_job_success;
 	}
 	if(strstr((char*)jx_lookup_string(first_item,"status"),"FAILED")){
-		succeed = 0;
+		succeed = describe_aws_job_failed;
 	}
 	//jx_pretty_print_stream(first_item,stderr);
 	//start and stop
-	if(succeed >=0){	
+	if(succeed == describe_aws_job_success || succeed == describe_aws_job_failed){	
 		int64_t created_string = (int64_t) jx_lookup_integer(first_item,"createdAt");
 		int64_t start_string = (int64_t)jx_lookup_integer(first_item,"startedAt");
 		int64_t end_string = (int64_t)jx_lookup_integer(first_item,"stoppedAt");
-		if(created_string != NULL){
-			debug(D_BATCH,"Job %s was created at: %li",aws_jobid,created_string);
+		if(created_string != (int64_t)NULL){
+			debug(D_BATCH,"Job %s was created at: %"PRIi64"",aws_jobid,created_string);
 		}
-		if(start_string != NULL){
-			debug(D_BATCH,"Job %s started at: %li",aws_jobid,start_string);
+		if(start_string != (int64_t)NULL){
+			debug(D_BATCH,"Job %s started at: %"PRIi64"",aws_jobid,start_string);
 		}
-		if(end_string != NULL){
-			debug(D_BATCH,"Job %s ended at: %li",aws_jobid,end_string);
+		if(end_string != (int64_t)NULL){
+			debug(D_BATCH,"Job %s ended at: %"PRIi64"",aws_jobid,end_string);
 		}
 	}
 	jx_delete(jx);
@@ -482,101 +482,6 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 			continue;
 		}
 	}
-	/*while(!done){
-		char* popenstr = string_format("%s aws batch list-jobs --job-queue %s --job-status SUCCEEDED",env_var,queue_name);
-		debug(D_BATCH,"Listing the jobs-succeeded: %s\n",popenstr);
-		//FILE* out = popen(popenstr,"r");//need to decide on the queue name for jobs....
-		struct jx* jx= run_command(popenstr);
-		//check to see if we have more to go through
-		char* nxt = (char*)NULL;
-		if((nxt=(char*)jx_lookup_string(jx,"nextToken"))==NULL){
-			done = 1;
-		}
-		//checking for our item
-		struct jx* jx_arr = jx_lookup(jx,"jobSummaryList");
-		int len = jx_array_length(jx_arr);
-		for(i=0; i<len; ++i){
-			struct jx* itm = jx_array_index(jx_arr,i);
-			char* jobname = (char*)jx_lookup_string(itm, "jobName");
-			int id = get_id_from_name(jobname);
-			//debug(D_BATCH,"\n\njobName: %s, jobid: %i\n\n",jobname,id);
-			if(itable_lookup(done_jobs,id+1) == NULL){
-				//id is done, returning here
-				debug(D_BATCH,"\n\nInserting id: %i into done_jobs\n\n",id);
-				itable_insert(done_jobs,id+1,jobname);
-				
-				//pull files from s3
-				char* output_files = itable_lookup(done_files,id);
-				int num_done_files=0;
-				char** done_files_list;
-				split_comma_list(output_files,&num_done_files,&done_files_list);
-				if(num_done_files > 0){
-					int j = 0;
-					for(j=0; j<num_done_files; j++){
-						debug(D_BATCH,"\nCopying over %s",done_files_list[j]);
-						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,done_files_list[j],done_files_list[j]);
-						int outputcode = system(get_from_s3_cmd);
-						debug(D_BATCH,"\noutput code from calling S3 to pull file %s: %i",done_files_list[j],outputcode);
-						FILE* tmpOut = fopen(done_files_list[j],"r");
-						if(tmpOut){
-							debug(D_BATCH,"\nFile does indeed exist: %s\n",done_files_list[j]);
-							fclose(tmpOut);
-						}else{
-							debug(D_BATCH,"\nFile doesn't exist: %s\n",done_files_list[j]);
-						}
-						free(get_from_s3_cmd);
-					}
-				}
-				clean_str_array(num_done_files,&done_files_list);
-				
-				//Let Makeflow know we're all done!
-				debug(D_BATCH,"\n\nRemoving the job from the job_table\n\n");
-				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_job_amazon.c
-				info->finished = time(0);//get now
-				info->exited_normally=1;
-				info->exit_code=0;//NEED TO FIX EVENTUALLY, and find how to ACTUALLY get the exit code
-				debug(D_BATCH,"\n\ncopying over the data to info_out\n\n");
-				memcpy(info_out, info, sizeof(struct batch_job_info));
-				free(info);
-				return id;
-			}
-		}
-	}
-	//failed check
-	done  = 0;
-	while(!done){
-		char* popenstr = string_format("%s aws batch list-jobs --job-queue %s --job-status FAILED",env_var,queue_name);
-		debug(D_BATCH,"Listing the jobs-failed: %s\n",popenstr);
-		//FILE* out = popen(popenstr,"r");//need to decide on the queue name for jobs....
-		struct jx* jx= run_command(popenstr);
-		//check to see if we have more to go through
-		char* nxt = (char*)NULL;
-		if((nxt=(char*)jx_lookup_string(jx,"nextToken"))==NULL){
-			done = 1;
-		}
-		//checking for our item
-		struct jx* jx_arr = jx_lookup(jx,"jobSummaryList");
-		int len = jx_array_length(jx_arr);
-		for(i=0; i<len; ++i){
-			struct jx* itm = jx_array_index(jx_arr,i);
-			char* jobname = (char*)jx_lookup_string(itm, "jobName");
-			int id = get_id_from_name(jobname);
-			if(itable_lookup(done_jobs,id+1)==NULL){
-			//id is done, returning here
-				itable_insert(done_jobs,id+1,jobname);
-				
-				debug(D_BATCH,"Failed job: %i\n",id);
-				
-				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_job_amazon.c
-				info->finished = time(0);//get now
-				info->exited_normally=0;
-				info->exit_code=1;//NEED TO FIX EVENTUALLY, and find how to ACTUALLY get the exit code
-				memcpy(info_out, info, sizeof(*info));
-				free(info);
-				return id;
-			}
-		}
-	}*/
 	//if we get to this point, we should probably clean up and exit....
 	return -1;
 }
