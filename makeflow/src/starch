@@ -140,7 +140,7 @@ if [ -d "$SFX_DIR/bin" ]; then
 fi
 
 if [ -d "$SFX_DIR/lib" ]; then
-    if [ x"`uname -s`" == x"Darwin" ]; then
+    if [ x"`uname -s`" = x"Darwin" ]; then
         if [ -z "$DYLD_LIBRARY_PATH" ]; then
             export DYLD_LIBRARY_PATH=$SFX_DIR/lib
         else
