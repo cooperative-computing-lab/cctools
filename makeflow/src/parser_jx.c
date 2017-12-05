@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "debug.h"
 #include "parser.h"
+#include "rmsummary.h"
 #include "jx_eval.h"
 #include "jx_match.h"
 #include "jx_print.h"
@@ -27,7 +28,7 @@ static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_ta
 	int nodeid;
 
 	if (!env) {
-		debug(D_MAKEFLOW_PARSER, "Missing \"environment\"");
+		debug(D_MAKEFLOW_PARSER, "No \"environment\" specified");
 		return 1;
 	}
 	debug(D_MAKEFLOW_PARSER, "Line %u: Parsing \"environment\"", env->line);
@@ -60,43 +61,44 @@ static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_ta
 	return 1;
 }
 
-static int resources_from_jx(struct hash_table *h, struct jx *j) {
+static int resources_from_jx(struct hash_table *h, struct jx *j, int nodeid) {
 	if (!j) {
-		debug(D_MAKEFLOW_PARSER, "Missing \"resources\"");
+		debug(D_MAKEFLOW_PARSER, "No \"resources\" specified");
 		return 1;
 	}
 	debug(D_MAKEFLOW_PARSER, "Line %u: Parsing \"resources\"", j->line);
 
-	int cores = jx_lookup_integer(j, "cores");
-	if (cores) {
-		debug(D_MAKEFLOW_PARSER, "%d core(s)", cores);
-		dag_variable_add_value(RESOURCES_CORES, h, 0, string_format("%d", cores));
-	} else {
-		debug(D_MAKEFLOW_PARSER, "Resources at line %u: \"cores\" malformed or missing", j->line);
-	}
-
-	int disk = jx_lookup_integer(j, "disk");
-	if (disk) {
-		debug(D_MAKEFLOW_PARSER, "%d disk(s)", disk);
-		dag_variable_add_value(RESOURCES_DISK, h, 0, string_format("%d", disk));
-	} else {
-		debug(D_MAKEFLOW_PARSER, "Resources at line %u: \"disks\" malformed or missing", j->line);
-	}
-
-	int memory = jx_lookup_integer(j, "memory");
-	if (memory) {
-		debug(D_MAKEFLOW_PARSER, "%d memory", memory);
-		dag_variable_add_value(RESOURCES_MEMORY, h, 0, string_format("%d", memory));
-	} else {
-		debug(D_MAKEFLOW_PARSER, "Resources at line %u: \"memory\" malformed or missing", j->line);
-	}
-
-	int gpus = jx_lookup_integer(j, "gpus");
-	if (gpus) {
-		debug(D_MAKEFLOW_PARSER, "%d gpus", gpus);
-		dag_variable_add_value(RESOURCES_GPUS, h, 0, string_format("%d", gpus));
-	} else {
-		debug(D_MAKEFLOW_PARSER, "Resources at line %u: \"gpus\" malformed or missing", j->line);
+	const char *key;
+	void *i = NULL;
+	while ((key = jx_iterate_keys(j, &i))) {
+		if(!strcmp(key, "cores")){	
+			int cores = jx_lookup_integer(j, "cores");
+			if (cores) {
+				debug(D_MAKEFLOW_PARSER, "%d core(s)", cores);
+				dag_variable_add_value(RESOURCES_CORES, h, nodeid, string_format("%d", cores));
+			}
+		} else if(!strcmp(key, "disk")){	
+			int disk = jx_lookup_integer(j, "disk");
+			if (disk) {
+				debug(D_MAKEFLOW_PARSER, "%d disk", disk);
+				dag_variable_add_value(RESOURCES_DISK, h, nodeid, string_format("%d", disk));
+			}
+		} else if(!strcmp(key, "memory")){	
+			int memory = jx_lookup_integer(j, "memory");
+			if (memory) {
+				debug(D_MAKEFLOW_PARSER, "%d memory", memory);
+				dag_variable_add_value(RESOURCES_MEMORY, h, nodeid, string_format("%d", memory));
+			}
+		} else if(!strcmp(key, "memory")){	
+			int gpus = jx_lookup_integer(j, "gpus");
+			if (gpus) {
+				debug(D_MAKEFLOW_PARSER, "%d gpus", gpus);
+				dag_variable_add_value(RESOURCES_GPUS, h, nodeid, string_format("%d", gpus));
+			}
+		} else {
+			debug(D_MAKEFLOW_PARSER, "Line %u: Unknown resource %s", j->line, key);
+			return 0;
+		}
 	}
 
 	return 1;
@@ -185,7 +187,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 
 	if (makeflow && command) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
-			"Rule at line %u: must not have both command and submakeflow",
+			"Rule at line %u: can not have both command and submakeflow",
 			j->line);
 		return 0;
 	}
@@ -238,7 +240,8 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 		n->category = makeflow_category_lookup_or_create(d, "default");
 	}
 
-	if (!resources_from_jx(n->variables, jx_lookup(j, "resources"))) {
+	struct jx *resource = jx_lookup(j, "resources");
+	if (resource && !resources_from_jx(n->variables, resource, n->nodeid)) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
 			"Rule at line %u: Failure parsing resources",
 			j->line);
@@ -264,14 +267,10 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 			n->resource_request = CATEGORY_ALLOCATION_ERROR;
 		} else {
 			debug(D_MAKEFLOW_PARSER|D_NOTICE,
-				"Rule at line %u: Unknown allocation",
+				"Rule at line %u: Unknown allocation type",
 				j->line);
 			return 0;
 		}
-	} else {
-		debug(D_MAKEFLOW_PARSER,
-			"Rule at line %u: Allocation malformed or missing",
-			j->line);
 	}
 
 	environment_from_jx(d, n, n->variables, jx_lookup(j, "environment"));
@@ -283,7 +282,8 @@ static int category_from_jx(struct dag *d, const char *name, struct jx *j) {
 	assert(j);
 
 	struct category *c = makeflow_category_lookup_or_create(d, name);
-	if (!resources_from_jx(c->mf_variables, jx_lookup(j, "resources"))) {
+	struct jx *resource = jx_lookup(j, "resources");
+	if (resource && !resources_from_jx(c->mf_variables, resource, 0)) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
 			"Line %u: Failure parsing resources",
 			j->line);
@@ -372,7 +372,11 @@ struct dag *dag_parse_jx(struct dag *d, struct jx *j) {
 	}
 
 	dag_close_over_environment(d);
+	dag_close_over_nodes(d);
 	dag_close_over_categories(d);
+
+	dag_compile_ancestors(d);
+
 	return d;
 }
 

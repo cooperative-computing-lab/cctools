@@ -109,6 +109,7 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 	}
 
 	dag_close_over_environment(d);
+	dag_close_over_nodes(d);
 	dag_close_over_categories(d);
 
 	dag_compile_ancestors(d);
@@ -155,6 +156,45 @@ void dag_close_over_environment(struct dag *d)
 
 }
 
+void rmsummary_set_resources_from_env(struct rmsummary *rs, struct dag_variable_lookup_set s)
+{
+	struct dag_variable_value *val;
+
+	val = dag_variable_lookup(RESOURCES_CORES, &s);
+	if(val) {
+		rs->cores = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_DISK, &s);
+	if(val) {
+		rs->disk = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_MEMORY, &s);
+	if(val) {
+		rs->memory = atoll(val->value);
+	}
+
+	val = dag_variable_lookup(RESOURCES_GPUS, &s);
+	if(val) {
+		rs->gpus = atoll(val->value);
+	}
+}
+
+void dag_close_over_nodes(struct dag *d)
+{
+	struct dag_node *n;
+
+	for(n = d->nodes; n; n = n->next) {
+		struct rmsummary *rs = n->resources_requested;
+
+		struct dag_variable_lookup_set s = {NULL, NULL, n, NULL };
+		
+		rmsummary_set_resources_from_env(rs, s);
+	}
+
+}
+
 void dag_close_over_categories(struct dag *d) {
 	/* per category, we assign the values found for resources. */
 
@@ -166,27 +206,8 @@ void dag_close_over_categories(struct dag *d) {
 		struct rmsummary *rs = rmsummary_create(-1);
 
 		struct dag_variable_lookup_set s = {d, c, NULL, NULL };
-		struct dag_variable_value *val;
 
-		val = dag_variable_lookup(RESOURCES_CORES, &s);
-		if(val) {
-			rs->cores = atoll(val->value);
-		}
-
-		val = dag_variable_lookup(RESOURCES_DISK, &s);
-		if(val) {
-			rs->disk = atoll(val->value);
-		}
-
-		val = dag_variable_lookup(RESOURCES_MEMORY, &s);
-		if(val) {
-			rs->memory = atoll(val->value);
-		}
-
-		val = dag_variable_lookup(RESOURCES_GPUS, &s);
-		if(val) {
-			rs->gpus = atoll(val->value);
-		}
+		rmsummary_set_resources_from_env(rs, s);
 
 		c->max_allocation = rs;
 	}
