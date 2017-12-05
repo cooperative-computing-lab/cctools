@@ -17,6 +17,7 @@ bucket_name=$(python -c "import json; print json.load(open('$configFile','r'))['
 gateway=$(python -c "import json; print json.load(open('$configFile','r'))['gateway'];")
 
 #disabling jobqueues
+echo "Deleting queue"
 aws batch update-job-queue --job-queue $queue_name --state DISABLED
 
 queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_name)"
@@ -27,7 +28,7 @@ queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_nam
 queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print k['jobQueues'][0]['state'] != 'ENABLED' and k['jobQueues'][0]['status'] == 'VALID';")
 done
 
-#deleting all environments
+#deleting all jobqueues
 aws batch delete-job-queue --job-queue $queue_name
 
 queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_name)"
@@ -41,6 +42,7 @@ done
 
 
 #disabling the environment
+echo "Deleting environments"
 aws batch update-compute-environment --compute-environment $env_name --state DISABLED
 
 env_done_check_output="$(aws batch describe-compute-environments --compute-environments $env_name)"
@@ -64,6 +66,7 @@ env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); p
 done
 
 #delete the internet gateway
+echo "Deleting gateway"
 aws ec2 detach-internet-gateway --vpc-id $ec2_vpc --internet-gateway-id $gateway
 aws ec2 delete-internet-gateway --internet-gateway-id $gateway
 
@@ -73,11 +76,13 @@ aws ec2 delete-internet-gateway --internet-gateway-id $gateway
 
 #delete the subnet
 #echo "THis is the subnet variable value: $ec2_subnet"
+echo "Deleting subnet"
 aws ec2 delete-subnet --subnet-id $ec2_subnet
 
 #delete the vpc
-
+echo "deleting vpc"
 aws ec2 delete-vpc --vpc-id $ec2_vpc
 
 #delete the bucket
+echo "deleting bucket"
 aws s3 rb s3://$bucket_name --force
