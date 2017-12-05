@@ -3,7 +3,7 @@ include ../../rules.mk
 
 LIBRARIES = libbatch_job.a
 
-PROGRAMS = work_queue_factory work_queue_pool amazon_batch_cleanup amazon_batch_initialize
+PROGRAMS = work_queue_factory work_queue_pool makeflow_amazon_batch_setup makeflow_amazon_batch_cleanup
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
 CHIRP_LIB=../../chirp/src/libchirp.a
@@ -46,11 +46,11 @@ work_queue_factory: work_queue_factory.o libbatch_job.a $(EXTERNAL_LIBRARIES)
 work_queue_pool: work_queue_factory
 	cp $< $@
 
-amazon_batch_cleanup:
-	cp amazon_batch_cleanup_script.sh amazon_batch_cleanup
+makeflow_amazon_batch_cleanup:
+	cp amazon_batch_cleanup_script.sh makeflow_amazon_batch_cleanup
 
-amazon_batch_initialize:
-	cp amazon_batch_script.sh amazon_batch_initialize
+makeflow_amazon_batch_setup:
+	cp amazon_batch_script.sh makeflow_amazon_batch_setup
 
 install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
