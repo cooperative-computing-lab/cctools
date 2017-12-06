@@ -331,7 +331,7 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	const char *worker = os ? "work_queue_worker": "./work_queue_worker";
+	const char *worker = "work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -382,14 +382,16 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(os){
-		char* vc3_cmd = string_format("/afs/crc.nd.edu/group/ccl/software/vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,cmd);
-		char* together = string_format("%s %s",vc3_cmd,temp);
-		free(temp);
+		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
+		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,vc3_cmd);
+		free(vc3_cmd);
 		free(cmd);
-		cmd = together;
+		cmd = temp;
 		//alternative might be to place the runos.py file in this folder, and then ask for the actual image itself, thus making this much more portable.
 		//files = string_format("%s,%s,%s","run_os",os,cmd);
+		temp = string_format("%s,%s",files,"/afs/crc.nd.edu/group/ccl/software/vc3-builder");
+		free(files);
+		files = temp;
 	}else{
 		char* vc3_cmd = string_format("/afs/crc.nd.edu/group/ccl/software/vc3-builder --require cctools-statics -- %s",cmd);
 		free(cmd);
@@ -956,6 +958,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify the linking libraries for running mesos(for use with -T mesos)\n", "--mesos-preload");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--worker-binary=<file>");
+	printf(" %-30s Will make best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS","--runos=<os_img>");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
