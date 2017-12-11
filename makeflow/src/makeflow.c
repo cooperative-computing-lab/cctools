@@ -256,23 +256,27 @@ char *submakeflow_command_create(struct dag_node *n, struct list **input_list, s
 		struct dag_file *orig_file = (struct dag_file *) hash_table_lookup(n->d->files, (char *) file->data);
 		if((remote_file = itable_lookup(n->remote_names, (uintptr_t) orig_file))) { }
 		else remote_file = file->data;
-		input_string = string_combine(input_string, string_format("cp -R %s %s/%s; ", (char *) file->data, n->sub_dir, remote_file));
+		input_string = string_combine(input_string, string_format("cp -R %s %s/%s&& ", (char *) file->data, n->sub_dir, remote_file));
 		file = list_next_item(*input_list);
 	}
 	
 	char * output_string = NULL;
 	list_first_item(*output_list);
 	file = list_next_item(*output_list);
+	struct list_node *next_file = list_next_item(*output_list);
 	while(file){
 		char *remote_file = NULL;
 		struct dag_file *orig_file = (struct dag_file *) hash_table_lookup(n->d->files, (char *) file->data);
 		if((remote_file = itable_lookup(n->remote_names, (uintptr_t) orig_file))) { }
 		else remote_file = file->data;
-		output_string = string_combine(output_string, string_format("cp -R %s ../%s; ", remote_file, (char *) file->data));
-		file = list_next_item(*output_list);
+		if(next_file) output_string = string_combine(output_string, string_format("cp -R %s ../%s&& ", remote_file, (char *) file->data));
+		else  output_string = string_combine(output_string, string_format("cp -R %s ../%s", remote_file, (char *) file->data));
+		file = next_file;
+		next_file = list_next_item(*output_list);
 	}
 	// Explitly pass in name of desired log file
-	char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", n->sub_dir, input_string, n->sub_dir, n->local_jobs_avail, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file); 
+	//char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", n->sub_dir, input_string, n->sub_dir, n->local_jobs_avail, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file); 
+	char * new_command = string_format("mkdir %s&& %s (cd %s&& makeflow -T local --local-cores=1 --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"&& %s); status=$?; rm -rf %s; rm %s; exit $status;", n->sub_dir, input_string, n->sub_dir, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file); 
 	return new_command;
 }
 
@@ -519,7 +523,6 @@ static int makeflow_file_on_sharedfs( const char *filename )
 {
 	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
-
 
 /*
 Submit one fully formed job, retrying failures up to the makeflow_submit_timeout.
