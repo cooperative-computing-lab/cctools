@@ -1278,7 +1278,10 @@ These values override workflow-level environment variables.</p>
 <ul>
 <li><tt>"inputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
 <li><tt>"outputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
+<li><tt>"type"</tt>: <tt>String</tt></li>
 <li><tt>"command"</tt>: <tt>String</tt></li>
+<li><tt>"makeflow"</tt>: <tt>File</tt></li>
+<li><tt>"args"</tt>: <tt>Object&lt;String&gt;</tt></li>
 <li><tt>"local_job"</tt>: <tt>Boolean</tt></li>
 <li><tt>"category"</tt>: <tt>String</tt></li>
 <li><tt>"resources"</tt>: <tt>Resources</tt></li>
@@ -1291,8 +1294,14 @@ These values override workflow-level environment variables.</p>
 Makeflow will ensure that all inputs either exist or are created before executing the rule.
 After execution finishes, Makeflow will ensure that all outputs really exist.</p>
 
-<p>Every rule requires a <tt>"command"</tt>
+<p>The <tt>"type"</tt> specifes whether the rule runs a nested workflow or is a command via the keyword <tt>"makeflow"</tt>.  If anything else is specified, it is assumed to be a normal command.<p>
+
+<p>Every rule, except nested makeflows, requires a <tt>"command"</tt>
 which is a string command to run in a shell.</p>
+
+<p>A nested makeflow requires that the makeflow to be run be specified under the <tt>"makeflow"</tt> tag.</p>
+
+<p>If a certain context or set of arugments is used within a nested makeflow it is specified as a JSON or JX object under the <tt>"args"</tt> tag. At runtime, this will create a context file based on these arguments.</p>
 
 <p>If <tt>"local_job"</tt> is specified, Makeflow will only execute the rule locally, i.e. on the host where Makeflow is running.
 Local jobs are not scheduled on remote resources such as batch systems.</p>
