@@ -39,6 +39,10 @@ See the file COPYING for details.
 #include "getopt_aux.h"
 #include "random.h"
 #include "path.h"
+#include "jx.h"
+#include "jx_eval.h"
+#include "jx_parse.h"
+#include "jx_print.h"
 #include "jx_pretty_print.h"
 
 #include "dag.h"
@@ -56,22 +60,26 @@ enum {
 
 /* Unique integers for long options. */
 
-enum { LONG_OPT_PPM_ROW,
-	   LONG_OPT_PPM_FILE,
-	   LONG_OPT_PPM_EXE,
-	   LONG_OPT_PPM_LEVELS,
-	   LONG_OPT_DOT_PROPORTIONAL,
-	   LONG_OPT_DOT_CONDENSE,
-	   LONG_OPT_DOT_LABELS,
-	   LONG_OPT_DOT_NO_LABELS,
-	   LONG_OPT_DOT_TASK_ID,
-	   LONG_OPT_DOT_DETAILS,
-	   LONG_OPT_DOT_NO_DETAILS,
-	   LONG_OPT_DOT_GRAPH,
-	   LONG_OPT_DOT_NODE,
-	   LONG_OPT_DOT_EDGE,
-	   LONG_OPT_DOT_TASK,
-	   LONG_OPT_DOT_FILE
+enum {	LONG_OPT_PPM_ROW,
+		LONG_OPT_PPM_FILE,
+		LONG_OPT_PPM_EXE,
+		LONG_OPT_PPM_LEVELS,
+		LONG_OPT_DOT_PROPORTIONAL,
+		LONG_OPT_DOT_CONDENSE,
+		LONG_OPT_DOT_LABELS,
+		LONG_OPT_DOT_NO_LABELS,
+		LONG_OPT_DOT_TASK_ID,
+		LONG_OPT_DOT_DETAILS,
+		LONG_OPT_DOT_NO_DETAILS,
+		LONG_OPT_DOT_GRAPH,
+		LONG_OPT_DOT_NODE,
+		LONG_OPT_DOT_EDGE,
+		LONG_OPT_DOT_TASK,
+		LONG_OPT_DOT_FILE,
+		LONG_OPT_JSON,
+		LONG_OPT_JX,
+		LONG_OPT_JX_ARGS,
+		LONG_OPT_JX_DEFINE
 };
 
 static void show_help_viz(const char *cmd)
@@ -102,6 +110,14 @@ static void show_help_viz(const char *cmd)
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
 	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
 	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
+
+
+	fprintf(stdout, "\nThe following options are for JX/JSON formatted DAG files:\n\n");
+	fprintf(stdout, " %-30s Use JSON format for the workflow specification.\n", "--json");
+	fprintf(stdout, " %-30s Use JX format for the workflow specification.\n", "--jx");
+	fprintf(stdout, " %-30s Evaluate the JX input with keys and values in file defined as variables.\n", "--jx-args=<file>");
+	fprintf(stdout, " %-30s Set the JX variable VAR to the JX expression EXPR.\n", "jx-define=<VAR>=<EXPR>");
+	
 }
 
 int main(int argc, char *argv[])
@@ -127,6 +143,13 @@ int main(int argc, char *argv[])
 	char *file_attr = NULL;
 	char *ppm_option = NULL;
 
+	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
+	struct jx *jx_args = jx_object(NULL);
+	struct jx *jx_expr = NULL;
+	struct jx *jx_tmp = NULL;
+	char *s;
+	
+
 	static const struct option long_options_viz[] = {
 		{"display-mode", required_argument, 0, 'D'},
 		{"help", no_argument, 0, 'h'},
@@ -142,6 +165,11 @@ int main(int argc, char *argv[])
 		{"dot-edge-attr", required_argument, 0, LONG_OPT_DOT_EDGE},
 		{"dot-task-attr", required_argument, 0, LONG_OPT_DOT_TASK},
 		{"dot-file-attr", required_argument, 0, LONG_OPT_DOT_FILE},
+		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"jx", no_argument, 0, LONG_OPT_JX},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-args", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -207,6 +235,42 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOT_FILE:
 				file_attr = xxstrdup(optarg);
 				break;
+			case LONG_OPT_JSON:
+				dag_syntax = DAG_SYNTAX_JSON;
+				break;
+			case LONG_OPT_JX:
+				dag_syntax = DAG_SYNTAX_JX;
+				break;
+			case LONG_OPT_JX_ARGS:
+				dag_syntax = DAG_SYNTAX_JX;
+				jx_expr = jx_parse_file(optarg);
+				if (!jx_expr)
+						fatal("failed to parse context");
+				jx_tmp = jx_eval(jx_expr, NULL);
+				jx_delete(jx_expr);
+				jx_expr = jx_tmp;
+				if (jx_istype(jx_expr, JX_ERROR)) {
+						jx_print_stream(jx_expr, stderr);
+						fatal("\nError in JX args");
+				}
+				if (!jx_istype(jx_expr, JX_OBJECT))
+						fatal("Args file must contain a JX object");
+				jx_tmp = jx_merge(jx_args, jx_expr, NULL);
+				jx_delete(jx_expr);
+				jx_delete(jx_args);
+				jx_args = jx_tmp;
+				break;
+			case LONG_OPT_JX_DEFINE:
+				dag_syntax = DAG_SYNTAX_JX;
+				s = strchr(optarg, '=');
+				if (!s)
+						fatal("JX variable must be of the form VAR=EXPR");
+				*s = '\0';
+				jx_expr = jx_parse_string(s + 1);
+				if (!jx_expr)
+						fatal("Invalid JX expression");
+				jx_insert(jx_args, jx_string(optarg), jx_expr);
+				break;
 			case LONG_OPT_PPM_EXE:
 				display_mode = SHOW_DAG_PPM;
 				ppm_option = optarg;
@@ -251,7 +315,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	struct dag *d = dag_from_file(dagfile, DAG_SYNTAX_MAKE, NULL);
+	struct dag *d = dag_from_file(dagfile, dag_syntax, NULL);
 	if(!d) {
 		fatal("makeflow_viz: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
