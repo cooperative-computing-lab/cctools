@@ -1401,8 +1401,7 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
-	int json_input = 0;
-	int jx_input = 0;
+	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
 	struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
@@ -1861,13 +1860,14 @@ int main(int argc, char *argv[])
 				} else {
 					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
 				}
-			case LONG_OPT_JX:
-				jx_input = 1;
 			case LONG_OPT_JSON:
-				json_input = 1;
+				dag_syntax = DAG_SYNTAX_JSON;
+				break;
+			case LONG_OPT_JX:
+				dag_syntax = DAG_SYNTAX_JX;
 				break;
 			case LONG_OPT_JX_ARGS:
-				jx_input = 1;
+				dag_syntax = DAG_SYNTAX_JX;
 				jx_expr = jx_parse_file(optarg);
 				if (!jx_expr)
 						fatal("failed to parse context");
@@ -1886,7 +1886,7 @@ int main(int argc, char *argv[])
 				jx_args = jx_tmp;
 				break;
 			case LONG_OPT_JX_DEFINE:
-				jx_input = 1;
+				dag_syntax = DAG_SYNTAX_JX;
 				s = strchr(optarg, '=');
 				if (!s)
 						fatal("JX variable must be of the form VAR=EXPR");
@@ -2011,23 +2011,8 @@ int main(int argc, char *argv[])
 		logfilename = string_format("%s.makeflowlog", dagfile);
 
 	printf("parsing %s...\n",dagfile);
-	struct dag *d;
-	if (json_input || jx_input) {
-		struct jx *dag = jx_parse_file(dagfile);
-		if (!dag) fatal("failed to parse dagfile");
-		if (jx_input) {
-			jx_tmp = jx_eval(dag, jx_args);
-			jx_delete(dag);
-			jx_delete(jx_args);
-			dag = jx_tmp;
-		}
-		d = dag_from_jx(dag);
-		jx_delete(dag);
-		// JX doesn't really use errno, so give something generic
-		errno = EINVAL;
-	} else {
-		d = dag_from_file(dagfile);
-	}
+	struct dag *d = dag_from_file(dagfile, dag_syntax, jx_args);
+
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}

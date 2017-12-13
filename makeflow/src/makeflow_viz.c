@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	struct dag *d = dag_from_file(dagfile);
+	struct dag *d = dag_from_file(dagfile, DAG_SYNTAX_MAKE, NULL);
 	if(!d) {
 		fatal("makeflow_viz: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
