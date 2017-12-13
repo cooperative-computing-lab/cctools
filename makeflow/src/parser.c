@@ -81,7 +81,7 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 	//Create empty dag to be assigned during parse
 	d = dag_create();
 	
-	// Initial verification of file existence
+	// Actually parse file/data into DAG
 	switch (format){
 		case DAG_SYNTAX_MAKE:
 			d->filename = xxstrdup(filename);
