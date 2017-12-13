@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	struct dag *d = dag_from_file(dagfile, dag_syntax, NULL);
+	struct dag *d = dag_from_file(dagfile, dag_syntax, jx_args);
 	if(!d) {
 		fatal("makeflow_analyze: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
