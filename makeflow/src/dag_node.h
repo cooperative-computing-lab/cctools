@@ -89,6 +89,7 @@ struct dag_node {
 };
 
 struct dag_node *dag_node_create(struct dag *d, int linenum);
+struct jx * dag_node_to_jx( struct dag *d, struct dag_node *n , int send_all_local_env);
 void dag_node_delete(struct dag_node *n);
 struct dag_node_size *dag_node_size_create(struct dag_node *n, uint64_t size);
 

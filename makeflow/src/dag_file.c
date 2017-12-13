@@ -32,6 +32,24 @@ struct dag_file * dag_file_create( const char *filename )
 	return f;
 }
 
+/* Return JX object containing name, remote name, and size. */
+
+struct jx * dag_file_to_jx( struct dag_file *f, struct dag_node *n)
+{
+	struct jx *file = jx_object(0);
+
+	jx_insert(file, jx_string("filename"), jx_string(f->filename));
+
+	const char *remote_name = dag_node_get_remote_name(n, f->filename);
+	if(remote_name){
+		jx_insert(file, jx_string("remote_filename"), jx_string(remote_name));
+	}
+
+	jx_insert(file, jx_string("size"), jx_integer(dag_file_size(f)));
+
+	return file;
+}
+
 /* Converts enum to string value for decoding file state */
 const char *dag_file_state_name(dag_file_state_t state)
 {
