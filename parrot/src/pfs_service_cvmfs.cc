@@ -329,7 +329,7 @@ static void cvmfs_dirent_to_stat(struct cvmfs_dirent *d, struct pfs_stat *s)
 	s->st_ctime = d->mtime;
 }
 
-static void cvmfs_parrot_logger(const char *msg)
+void cvmfs_parrot_logger(const char *msg)
 {
 	debug(D_CVMFS, "%s", msg);
 }
