@@ -27,9 +27,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
 #include "jx.h"
-#include "jx_print.h"
 #include "jx_parse.h"
-#include "jx_eval.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -1403,8 +1401,6 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
-	struct jx *jx_expr = NULL;
-	struct jx *jx_tmp = NULL;
 	int storage_type = MAKEFLOW_ALLOC_TYPE_NOT_ENABLED;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
@@ -1868,33 +1864,13 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_JX_ARGS:
 				dag_syntax = DAG_SYNTAX_JX;
-				jx_expr = jx_parse_file(optarg);
-				if (!jx_expr)
-						fatal("failed to parse context");
-				jx_tmp = jx_eval(jx_expr, NULL);
-				jx_delete(jx_expr);
-				jx_expr = jx_tmp;
-				if (jx_istype(jx_expr, JX_ERROR)) {
-						jx_print_stream(jx_expr, stderr);
-						fatal("\nError in JX args");
-				}
-				if (!jx_istype(jx_expr, JX_OBJECT))
-						fatal("Args file must contain a JX object");
-				jx_tmp = jx_merge(jx_args, jx_expr, NULL);
-				jx_delete(jx_expr);
-				jx_delete(jx_args);
-				jx_args = jx_tmp;
+				if(!jx_parse_cmd_args(jx_args, optarg))
+					fatal("Failed to parse in JX Args File.\n");
 				break;
 			case LONG_OPT_JX_DEFINE:
 				dag_syntax = DAG_SYNTAX_JX;
-				s = strchr(optarg, '=');
-				if (!s)
-						fatal("JX variable must be of the form VAR=EXPR");
-				*s = '\0';
-				jx_expr = jx_parse_string(s + 1);
-				if (!jx_expr)
-						fatal("Invalid JX expression");
-				jx_insert(jx_args, jx_string(optarg), jx_expr);
+				if(!jx_parse_cmd_define(jx_args, optarg))
+					fatal("Failed to parse in JX Define.\n");
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();

@@ -5,6 +5,8 @@ See the file COPYING for details.
 */
 
 #include "jx_parse.h"
+#include "jx_print.h"
+#include "jx_eval.h"
 
 #include "stringtools.h"
 #include "debug.h"
@@ -935,6 +937,60 @@ struct jx * jx_parse_file( const char *name )
 	struct jx *j = jx_parse_stream(file);
 	fclose(file);
 	return j;
+}
+
+int jx_parse_cmd_args( struct jx * jx_args, char * args_file)
+{
+    struct jx *jx_expr = NULL;
+    struct jx *jx_tmp = NULL;
+
+	jx_expr = jx_parse_file(args_file);
+    if (!jx_expr){
+		debug(D_JX, "failed to parse context");
+		return 1;
+	}
+
+    jx_tmp = jx_eval(jx_expr, NULL);
+    jx_delete(jx_expr);
+    jx_expr = jx_tmp;
+    if (jx_istype(jx_expr, JX_ERROR)) {
+        jx_print_stream(jx_expr, stderr);
+        debug(D_JX, "\nError in JX args");
+		return 1;
+    }
+
+    if (!jx_istype(jx_expr, JX_OBJECT)){
+        debug(D_JX, "Args file must contain a JX object");
+		return 1;
+	}
+
+    jx_tmp = jx_merge(jx_args, jx_expr, NULL);
+    jx_delete(jx_expr);
+    jx_delete(jx_args);
+    jx_args = jx_tmp;
+
+	return 1;
+}
+
+int jx_parse_cmd_define( struct jx * jx_args, char * define_stmt )
+{
+	char *s;
+    struct jx *jx_expr = NULL;
+
+	s = strchr(define_stmt, '=');
+    if (!s){
+        debug(D_JX, "JX variable must be of the form VAR=EXPR");
+		return 1;
+	}
+    *s = '\0';
+    jx_expr = jx_parse_string(s + 1);
+    if (!jx_expr){
+        debug(D_JX, "Invalid JX expression");
+		return 1;
+	}
+	jx_insert(jx_args, jx_string(optarg), jx_expr);
+
+	return 0;
 }
 
 /* vim: set noexpandtab tabstop=4: */
