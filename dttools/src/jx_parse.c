@@ -947,7 +947,7 @@ int jx_parse_cmd_args( struct jx * jx_args, char * args_file)
 	jx_expr = jx_parse_file(args_file);
     if (!jx_expr){
 		debug(D_JX, "failed to parse context");
-		return 1;
+		return 0;
 	}
 
     jx_tmp = jx_eval(jx_expr, NULL);
@@ -956,12 +956,12 @@ int jx_parse_cmd_args( struct jx * jx_args, char * args_file)
     if (jx_istype(jx_expr, JX_ERROR)) {
         jx_print_stream(jx_expr, stderr);
         debug(D_JX, "\nError in JX args");
-		return 1;
+		return 0;
     }
 
     if (!jx_istype(jx_expr, JX_OBJECT)){
         debug(D_JX, "Args file must contain a JX object");
-		return 1;
+		return 0;
 	}
 
     jx_tmp = jx_merge(jx_args, jx_expr, NULL);
@@ -980,17 +980,17 @@ int jx_parse_cmd_define( struct jx * jx_args, char * define_stmt )
 	s = strchr(define_stmt, '=');
     if (!s){
         debug(D_JX, "JX variable must be of the form VAR=EXPR");
-		return 1;
+		return 0;
 	}
     *s = '\0';
     jx_expr = jx_parse_string(s + 1);
     if (!jx_expr){
         debug(D_JX, "Invalid JX expression");
-		return 1;
+		return 0;
 	}
 	jx_insert(jx_args, jx_string(optarg), jx_expr);
 
-	return 0;
+	return 1;
 }
 
 /* vim: set noexpandtab tabstop=4: */
