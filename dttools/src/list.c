@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 
-struct list *list_create()
+struct list *list_create(void)
 {
 	struct list *l;
 
