@@ -329,7 +329,7 @@ void initialize_watch_events(struct rmonitor_file_watch_info *f, struct jx *watc
         fatal("Value for key 'events' in file watch for '%s' is not an array.", f->filename);
     }
 
-    f->events = list_create(0);
+    f->events = list_create();
 
     struct jx *event_spec;
     int error = 0;
