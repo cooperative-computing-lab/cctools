@@ -37,6 +37,20 @@ struct jx * jx_parse_file( const char *name );
 /** Parse a network link to a JX expression. @param l A @ref link object.  @param stoptime The absolute time at which to stop.   @return A JX expression which must be deleted with @ref jx_delete. If the parse fails or no JSON value is present, null is returned. */
 struct jx * jx_parse_link( struct link *l, time_t stoptime );
 
+/** Parse a jx argument file from a commandline option
+@param jx_args An empty or partially defined jx_object that can be added to to instantiate the JX arguments for JX Eval.
+@param args_file Name of the jx_args file that will be read in.
+@return 1 if successfully added to jx_args, 0 if failed.
+*/
+int jx_parse_cmd_args( struct jx * jx_args, char * args_file);
+
+/** Parse a jx define statement from a commandline option
+@param jx_args An empty or partially defined jx_object that can be added to to instantiate the JX arguments for JX Eval.
+@param define_stmt Commandline value of from VAR=EXPR.
+@return 1 if successfully added to jx_args, 0 if failed.
+*/
+int jx_parse_cmd_define( struct jx * jx_args, char * define_stmt );
+
 /** Create a JX parser object.  @return A parser object. */
 struct jx_parser *jx_parser_create(bool strict_mode);
 

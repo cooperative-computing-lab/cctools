@@ -27,9 +27,7 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
 #include "jx.h"
-#include "jx_print.h"
 #include "jx_parse.h"
-#include "jx_eval.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -1401,11 +1399,8 @@ int main(int argc, char *argv[])
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
-	int json_input = 0;
-	int jx_input = 0;
+	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
-	struct jx *jx_expr = NULL;
-	struct jx *jx_tmp = NULL;
 	int storage_type = MAKEFLOW_ALLOC_TYPE_NOT_ENABLED;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
@@ -1861,40 +1856,21 @@ int main(int argc, char *argv[])
 				} else {
 					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
 				}
-			case LONG_OPT_JX:
-				jx_input = 1;
 			case LONG_OPT_JSON:
-				json_input = 1;
+				dag_syntax = DAG_SYNTAX_JSON;
+				break;
+			case LONG_OPT_JX:
+				dag_syntax = DAG_SYNTAX_JX;
 				break;
 			case LONG_OPT_JX_ARGS:
-				jx_input = 1;
-				jx_expr = jx_parse_file(optarg);
-				if (!jx_expr)
-						fatal("failed to parse context");
-				jx_tmp = jx_eval(jx_expr, NULL);
-				jx_delete(jx_expr);
-				jx_expr = jx_tmp;
-				if (jx_istype(jx_expr, JX_ERROR)) {
-						jx_print_stream(jx_expr, stderr);
-						fatal("\nError in JX args");
-				}
-				if (!jx_istype(jx_expr, JX_OBJECT))
-						fatal("Args file must contain a JX object");
-				jx_tmp = jx_merge(jx_args, jx_expr, NULL);
-				jx_delete(jx_expr);
-				jx_delete(jx_args);
-				jx_args = jx_tmp;
+				dag_syntax = DAG_SYNTAX_JX;
+				if(!jx_parse_cmd_args(jx_args, optarg))
+					fatal("Failed to parse in JX Args File.\n");
 				break;
 			case LONG_OPT_JX_DEFINE:
-				jx_input = 1;
-				s = strchr(optarg, '=');
-				if (!s)
-						fatal("JX variable must be of the form VAR=EXPR");
-				*s = '\0';
-				jx_expr = jx_parse_string(s + 1);
-				if (!jx_expr)
-						fatal("Invalid JX expression");
-				jx_insert(jx_args, jx_string(optarg), jx_expr);
+				dag_syntax = DAG_SYNTAX_JX;
+				if(!jx_parse_cmd_define(jx_args, optarg))
+					fatal("Failed to parse in JX Define.\n");
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
@@ -2011,23 +1987,8 @@ int main(int argc, char *argv[])
 		logfilename = string_format("%s.makeflowlog", dagfile);
 
 	printf("parsing %s...\n",dagfile);
-	struct dag *d;
-	if (json_input || jx_input) {
-		struct jx *dag = jx_parse_file(dagfile);
-		if (!dag) fatal("failed to parse dagfile");
-		if (jx_input) {
-			jx_tmp = jx_eval(dag, jx_args);
-			jx_delete(dag);
-			jx_delete(jx_args);
-			dag = jx_tmp;
-		}
-		d = dag_from_jx(dag);
-		jx_delete(dag);
-		// JX doesn't really use errno, so give something generic
-		errno = EINVAL;
-	} else {
-		d = dag_from_file(dagfile);
-	}
+	struct dag *d = dag_from_file(dagfile, dag_syntax, jx_args);
+
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}

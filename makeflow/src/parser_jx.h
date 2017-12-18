@@ -9,7 +9,7 @@ See the file COPYING for details.
 
 #include "dag.h"
 
-struct dag *dag_from_jx(struct jx *);
+struct dag *dag_parse_jx(struct dag *d, struct jx *);
 
 #endif
 

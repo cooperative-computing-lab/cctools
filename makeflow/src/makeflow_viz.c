@@ -39,6 +39,8 @@ See the file COPYING for details.
 #include "getopt_aux.h"
 #include "random.h"
 #include "path.h"
+#include "jx.h"
+#include "jx_parse.h"
 #include "jx_pretty_print.h"
 
 #include "dag.h"
@@ -56,22 +58,26 @@ enum {
 
 /* Unique integers for long options. */
 
-enum { LONG_OPT_PPM_ROW,
-	   LONG_OPT_PPM_FILE,
-	   LONG_OPT_PPM_EXE,
-	   LONG_OPT_PPM_LEVELS,
-	   LONG_OPT_DOT_PROPORTIONAL,
-	   LONG_OPT_DOT_CONDENSE,
-	   LONG_OPT_DOT_LABELS,
-	   LONG_OPT_DOT_NO_LABELS,
-	   LONG_OPT_DOT_TASK_ID,
-	   LONG_OPT_DOT_DETAILS,
-	   LONG_OPT_DOT_NO_DETAILS,
-	   LONG_OPT_DOT_GRAPH,
-	   LONG_OPT_DOT_NODE,
-	   LONG_OPT_DOT_EDGE,
-	   LONG_OPT_DOT_TASK,
-	   LONG_OPT_DOT_FILE
+enum {	LONG_OPT_PPM_ROW,
+		LONG_OPT_PPM_FILE,
+		LONG_OPT_PPM_EXE,
+		LONG_OPT_PPM_LEVELS,
+		LONG_OPT_DOT_PROPORTIONAL,
+		LONG_OPT_DOT_CONDENSE,
+		LONG_OPT_DOT_LABELS,
+		LONG_OPT_DOT_NO_LABELS,
+		LONG_OPT_DOT_TASK_ID,
+		LONG_OPT_DOT_DETAILS,
+		LONG_OPT_DOT_NO_DETAILS,
+		LONG_OPT_DOT_GRAPH,
+		LONG_OPT_DOT_NODE,
+		LONG_OPT_DOT_EDGE,
+		LONG_OPT_DOT_TASK,
+		LONG_OPT_DOT_FILE,
+		LONG_OPT_JSON,
+		LONG_OPT_JX,
+		LONG_OPT_JX_ARGS,
+		LONG_OPT_JX_DEFINE
 };
 
 static void show_help_viz(const char *cmd)
@@ -102,6 +108,14 @@ static void show_help_viz(const char *cmd)
 	fprintf(stdout, " %-30s Highlight node that creates file <file> in completion graph\n", "--ppm-highlight-file=<file>");
 	fprintf(stdout, " %-30s Highlight executable <exe> in completion grap\n", "--ppm-highlight-exe=<exe>");
 	fprintf(stdout, " %-30s Display different levels of depth in completion graph\n", "--ppm-show-levels");
+
+
+	fprintf(stdout, "\nThe following options are for JX/JSON formatted DAG files:\n\n");
+	fprintf(stdout, " %-30s Use JSON format for the workflow specification.\n", "--json");
+	fprintf(stdout, " %-30s Use JX format for the workflow specification.\n", "--jx");
+	fprintf(stdout, " %-30s Evaluate the JX input with keys and values in file defined as variables.\n", "--jx-args=<file>");
+	fprintf(stdout, " %-30s Set the JX variable VAR to the JX expression EXPR.\n", "jx-define=<VAR>=<EXPR>");
+	
 }
 
 int main(int argc, char *argv[])
@@ -127,6 +141,10 @@ int main(int argc, char *argv[])
 	char *file_attr = NULL;
 	char *ppm_option = NULL;
 
+	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
+	struct jx *jx_args = jx_object(NULL);
+	
+
 	static const struct option long_options_viz[] = {
 		{"display-mode", required_argument, 0, 'D'},
 		{"help", no_argument, 0, 'h'},
@@ -142,6 +160,11 @@ int main(int argc, char *argv[])
 		{"dot-edge-attr", required_argument, 0, LONG_OPT_DOT_EDGE},
 		{"dot-task-attr", required_argument, 0, LONG_OPT_DOT_TASK},
 		{"dot-file-attr", required_argument, 0, LONG_OPT_DOT_FILE},
+		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"jx", no_argument, 0, LONG_OPT_JX},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-args", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"ppm-highlight-row", required_argument, 0, LONG_OPT_PPM_ROW},
 		{"ppm-highlight-exe", required_argument, 0, LONG_OPT_PPM_EXE},
 		{"ppm-highlight-file", required_argument, 0, LONG_OPT_PPM_FILE},
@@ -207,6 +230,22 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOT_FILE:
 				file_attr = xxstrdup(optarg);
 				break;
+			case LONG_OPT_JSON:
+				dag_syntax = DAG_SYNTAX_JSON;
+				break;
+			case LONG_OPT_JX:
+				dag_syntax = DAG_SYNTAX_JX;
+				break;
+			case LONG_OPT_JX_ARGS:
+				dag_syntax = DAG_SYNTAX_JX;
+				if(!jx_parse_cmd_args(jx_args, optarg))
+					fatal("Failed to parse in JX Args File.\n");
+				break;
+			case LONG_OPT_JX_DEFINE:
+				dag_syntax = DAG_SYNTAX_JX;
+				if(!jx_parse_cmd_define(jx_args, optarg))
+					fatal("Failed to parse in JX Define.\n");
+				break;
 			case LONG_OPT_PPM_EXE:
 				display_mode = SHOW_DAG_PPM;
 				ppm_option = optarg;
@@ -251,7 +290,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	struct dag *d = dag_from_file(dagfile);
+	struct dag *d = dag_from_file(dagfile, dag_syntax, jx_args);
 	if(!d) {
 		fatal("makeflow_viz: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}

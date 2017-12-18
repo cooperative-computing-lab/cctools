@@ -299,7 +299,7 @@ static int category_from_jx(struct dag *d, const char *name, struct jx *j) {
 	return 1;
 }
 
-struct dag *dag_from_jx(struct jx *j) {
+struct dag *dag_parse_jx(struct dag *d, struct jx *j) {
 	if (!j) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE, "Missing DAG");
 		return NULL;
@@ -313,8 +313,6 @@ struct dag *dag_from_jx(struct jx *j) {
 		free(s);
 		return NULL;
 	}
-
-	struct dag *d = dag_create();
 
 	debug(D_MAKEFLOW_PARSER, "Parsing categories");
 	struct jx *categories = jx_lookup(j, "categories");

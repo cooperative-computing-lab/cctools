@@ -40,6 +40,8 @@ See the file COPYING for details.
 #include "rmonitor.h"
 #include "random.h"
 #include "path.h"
+#include "jx.h"
+#include "jx_parse.h"
 
 #include "dag.h"
 #include "dag_visitors.h"
@@ -200,7 +202,21 @@ static void show_help_analyze(const char *cmd)
 	fprintf(stdout, " %-30s Syntax check.\n", "-k,--syntax-check");
 	fprintf(stdout, " %-30s Show output files.\n", "-O,--show-output");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
+
+	fprintf(stdout, "\nThe following options are for JX/JSON formatted DAG files:\n\n");
+	fprintf(stdout, " %-30s Use JSON format for the workflow specification.\n", "--json");
+	fprintf(stdout, " %-30s Use JX format for the workflow specification.\n", "--jx");
+	fprintf(stdout, " %-30s Evaluate the JX input with keys and values in file defined as variables.\n", "--jx-args=<file>");
+	fprintf(stdout, " %-30s Set the JX variable VAR to the JX expression EXPR.\n", "jx-define=<VAR>=<EXPR>");
+	
+
 }
+
+enum {	LONG_OPT_JSON,
+        LONG_OPT_JX,
+        LONG_OPT_JX_ARGS,
+        LONG_OPT_JX_DEFINE
+};
 
 int main(int argc, char *argv[])
 {
@@ -215,6 +231,9 @@ int main(int argc, char *argv[])
 	char *bundle_directory = NULL;
 	int syntax_check = 0;
 
+	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
+	struct jx *jx_args = jx_object(NULL);
+
 	static const struct option long_options_analyze[] = {
 		{"bundle-dir", required_argument, 0, 'b'},
 		{"help", no_argument, 0, 'h'},
@@ -222,6 +241,11 @@ int main(int argc, char *argv[])
 		{"show-input", no_argument, 0, 'I'},
 		{"syntax-check", no_argument, 0, 'k'},
 		{"show-output", no_argument, 0, 'O'},
+		{"json", no_argument, 0, LONG_OPT_JSON},
+		{"jx", no_argument, 0, LONG_OPT_JX},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-args", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -253,6 +277,22 @@ int main(int argc, char *argv[])
 			case 'v':
 				cctools_version_print(stdout, argv[0]);
 				return 0;
+			case LONG_OPT_JSON:
+				dag_syntax = DAG_SYNTAX_JSON;
+				break;
+			case LONG_OPT_JX:
+				dag_syntax = DAG_SYNTAX_JX;
+				break;
+			case LONG_OPT_JX_ARGS:
+				dag_syntax = DAG_SYNTAX_JX;
+				if(!jx_parse_cmd_args(jx_args, optarg))
+					fatal("Failed to parse in JX Args File.\n");
+				break;
+			case LONG_OPT_JX_DEFINE:
+				dag_syntax = DAG_SYNTAX_JX;
+				if(!jx_parse_cmd_define(jx_args, optarg))
+					fatal("Failed to parse in JX Define.\n");
+				break;
 			default:
 				show_help_analyze(argv[0]);
 				return 1;
@@ -272,7 +312,7 @@ int main(int argc, char *argv[])
 		dagfile = argv[optind];
 	}
 
-	struct dag *d = dag_from_file(dagfile);
+	struct dag *d = dag_from_file(dagfile, dag_syntax, jx_args);
 	if(!d) {
 		fatal("makeflow_analyze: couldn't load %s: %s\n", dagfile, strerror(errno));
 	}
