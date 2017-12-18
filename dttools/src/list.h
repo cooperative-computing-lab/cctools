@@ -59,7 +59,7 @@ typedef int (*list_op_t) (void *item, const void *arg);
 @return A pointer to an empty linked list.
 */
 
-struct list *list_create();
+struct list *list_create(void);
 
 /** Duplicate a linked list
 Returns a copy of the linked list.  Note that the

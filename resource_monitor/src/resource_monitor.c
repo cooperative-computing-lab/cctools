@@ -1026,7 +1026,7 @@ int record_snapshot(struct rmsummary *tr) {
 	}
 
 	if(!snapshots) {
-		snapshots = list_create(0);
+		snapshots = list_create();
 	}
 
 	snapshot->end       = usecs_since_epoch();
@@ -2073,7 +2073,7 @@ int main(int argc, char **argv) {
 	total_bytes_tx = 0;
 	tx_rx_sizes    = list_create();
 
-	snapshot_labels = list_create(0);
+	snapshot_labels = list_create();
 	snapshot_watch_pids = itable_create(0);
 
     rmsummary_read_env_vars(resources_limits);

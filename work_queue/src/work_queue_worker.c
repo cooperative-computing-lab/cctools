@@ -1948,7 +1948,7 @@ int serve_master_by_hostport_list(struct list *master_addresses) {
 
 static struct list *interfaces_to_list(const char *addr, int port, struct jx *ifas) {
 
-	struct list *l = list_create(0);
+	struct list *l = list_create();
 	struct jx *ifa;
 
 	int found_canonical = 0;
@@ -2100,7 +2100,7 @@ static void read_resources_env_vars() {
 }
 
 struct list *parse_master_addresses(const char *specs, int default_port) {
-	struct list *masters = list_create(0);
+	struct list *masters = list_create();
 
 	char *masters_args = xxstrdup(specs);
 
