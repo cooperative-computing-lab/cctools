@@ -45,6 +45,19 @@ EOF
 		if [ ! -f $file ]
 		then
 			echo "$file is missing!"
+
+			if [ -f foreman.log  ]
+			then
+				echo "foreman log:"
+				cat foreman.log
+			fi
+
+			if [ -f worker.log  ]
+			then
+				echo "worker log:"
+				cat worker.log
+			fi
+
 			return 1
 		fi
 		i=$((i+1))
