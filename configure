@@ -983,7 +983,7 @@ then
 		echo "*** skipping python bindings support"
 	fi
 fi
-if [ $fuse_avail != yes ]; then
+if [ "$fuse_avail" != yes ]; then
 	echo "grow_fuse requires FUSE"
 fi
 
