@@ -46,6 +46,12 @@ EOF
 		then
 			echo "$file is missing!"
 
+			if [ -f master.log  ]
+			then
+				echo "master log:"
+				cat master.log
+			fi
+
 			if [ -f foreman.log  ]
 			then
 				echo "foreman log:"
