@@ -7,7 +7,7 @@
 c="./hostport.$PPID"
 
 myp() {
-	parrot --no-chirp-catalog --timeout=5 --work-dir="/chirp/$hostport/" "$@"
+	parrot --no-chirp-catalog --timeout=15 --work-dir="/chirp/$hostport/" "$@"
 }
 
 prepare()
