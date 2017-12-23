@@ -35,6 +35,7 @@ static const char *k8s_script =
 
 static const char *k8s_script_file_name = "_temp_k8s_script.sh";
 static const char *kubectl_failed_log = "kubectl_failed.log";
+static const char *default_docker_image = "centos";
 
 static const char *k8s_config_tmpl = "\
 {\n\
@@ -215,7 +216,9 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 
 	if(k8s_image == NULL) {
 		if((k8s_image = batch_queue_get_option(q, "k8s-image")) == NULL) {
-			fatal("Please specify the container image by using \"--k8s-image\"");
+			debug(D_BATCH, "No Docker image specified, will use %s by default", default_docker_image);
+			k8s_image = default_docker_image;
+			//fatal("Please specify the container image by using \"--k8s-image\"");
 		}
 	}
 	
