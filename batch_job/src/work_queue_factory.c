@@ -108,6 +108,8 @@ struct batch_queue *queue = 0;
 //Environment variables to pass along in batch_job_submit
 struct jx *batch_env = NULL;
 
+//0 means the container image does not container work_queue_worker binary
+int k8s_worker_image = 0;
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -377,8 +379,13 @@ static int submit_worker( struct batch_queue *queue )
 		free(cmd);
 		cmd = newcmd;
 	}
-
-	char *files = string_format("work_queue_worker");
+	
+	char *files = NULL;	
+	if(!k8s_worker_image) {
+		files = string_format("work_queue_worker");
+	} else {
+		files = string_format("");
+	}
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -971,7 +978,6 @@ int main(int argc, char *argv[])
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
-	int k8s_worker_image = 0;
 
 	//Environment variable handling
 	char *ev = NULL;
