@@ -389,7 +389,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = temp;
 		//alternative might be to place the runos.py file in this folder, and then ask for the actual image itself, thus making this much more portable.
 		//files = string_format("%s,%s,%s","run_os",os,cmd);
-		temp = string_format("%s,%s",files,"/afs/crc.nd.edu/group/ccl/software/vc3-builder");
+		temp = string_format("%s,%s",files,"vc3-builder");
 		free(files);
 		files = temp;
 	}else{
@@ -1287,6 +1287,9 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
+	
+	sprintf(cmd,"cp 'vc3-builder' '%s'",scratch_dir);
+	system(cmd);
 
 	if(password_file) {
 		sprintf(cmd,"cp %s %s/pwfile",password_file,scratch_dir);
