@@ -15,12 +15,16 @@ See the file COPYING for details.
 #include "jx_pretty_print.h"
 #include "itable.h"
 #include "hash_table.h"
+#include "fast_popen.h"
 
 
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <errno.h>
 
 static int initialized = 0;
 static char* queue_name = NULL;
@@ -35,6 +39,11 @@ static int instID;
 static char* bucket_name = NULL;
 static struct hash_table* submitted_files = NULL;
 static int HAS_SUBMITTED_VALUE = 1;
+
+static FILE *sh_popen(const char *command);
+static int sh_pclose(FILE * file);
+static int sh_system(const char* command);
+
 
 union amazon_batch_ccl_guid{
 	char c[8];
@@ -61,9 +70,15 @@ static unsigned int gen_guid(){
 	return guid.ul;	
 }
 static struct jx* run_command(char* cmd){
-	FILE* out = popen(cmd,"r");
+	FILE* out = sh_popen(cmd);
+	if(out == NULL){
+		fatal("fast_popen returned a null FILE* pointer");
+	}
 	struct jx* jx = jx_parse_stream(out);
-	pclose(out);
+	if(jx == NULL){
+		fatal("JX parse stream out returned a null jx object");
+	}
+	sh_pclose(out);
 	return jx;
 }
 
@@ -114,7 +129,7 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 		}
 		debug(D_BATCH,"Submitting file: %s",files_split[i]);
 		char* put_file_command = string_format("%s /usr/bin/time -f \"Submitting File %s for Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
-		int ret = system(put_file_command);
+		int ret = sh_system(put_file_command);
 		if(ret != 0){
 			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",files_split[i],ret);
 			success = 0;
@@ -262,9 +277,9 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 	free(final_cmd);
 	
 	//make executable and put into s3
-	system("chmod +x TEMPFILE.sh");
+	sh_system("chmod +x TEMPFILE.sh");
 	cmd_tmp = string_format("%s /usr/bin/time -f \"Submitting cmd_file Job %s_%u: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp ./TEMPFILE.sh s3://%s/COMAND_FILE_%u.sh",env_var,queue_name,jobid,bucket_name,jobid);
-	system(cmd_tmp);
+	sh_system(cmd_tmp);
 	free(cmd_tmp);
 	remove("TEMPFILE.sh");	
 	//return final_cmd;
@@ -276,6 +291,8 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	char* env_var = initialized_data.master_env_prefix;
 	//submit the job-def
 	char* tmp = string_format("%s /usr/bin/time -f \"Registering Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name,job_name, properties_string);
+	//free(tmp);
+	//tmp = string_format("/usr/bin/time -f \"Registering Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",job_name,job_name, properties_string);
 	debug(D_BATCH,"Creating the Job Definition: %s",tmp);
         struct jx* jx = run_command(tmp);
 	free(tmp);
@@ -288,6 +305,8 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	
 	//now that we have create a job-definition, we can submit the job.
 	tmp = string_format("%s /usr/bin/time -f \"Submitting Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",env_var,job_name,job_name,queue,job_name);
+	//free(tmp);
+	//tmp = string_format("/usr/bin/time -f \"Submitting Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",job_name,job_name,queue,job_name);
 	debug(D_BATCH,"Submitting the job: %s",tmp);
 	jx = run_command(tmp);
 	free(tmp);
@@ -306,6 +325,8 @@ enum{
 static int describe_aws_job(char* aws_jobid, char* env_var){
 	//fprintf(stderr,"aws_jobid:%s\n\n",aws_jobid);
 	char* cmd = string_format("%s aws batch describe-jobs --jobs %s",env_var,aws_jobid);
+	free(cmd);
+	cmd = string_format("%s aws batch describe-jobs --jobs %s",env_var,aws_jobid);
 	struct jx* jx = run_command(cmd);
 	free(cmd);
 	int succeed = describe_aws_job_non_final; //default status
@@ -348,7 +369,7 @@ static int describe_aws_job(char* aws_jobid, char* env_var){
 static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	char* env_var = amazon_ids.master_env_prefix;
-	fprintf(stderr,"env_var:%s",env_var);	
+	fprintf(stderr,"env_var: %s\n",env_var);	
 
 	//so, we have the access keys, now we need to either set up the queues and exec environments, or add them.
 	unsigned int jobid = gen_guid();
@@ -437,7 +458,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 					for(j=0; j<num_done_files; j++){
 						debug(D_BATCH,"Copying over %s",done_files_list[j]);
 						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,done_files_list[j],done_files_list[j]);
-						int outputcode = system(get_from_s3_cmd);
+						int outputcode = sh_system(get_from_s3_cmd);
 						debug(D_BATCH,"output code from calling S3 to pull file %s: %i",done_files_list[j],outputcode);
 						FILE* tmpOut = fopen(done_files_list[j],"r");
 						if(tmpOut){
@@ -499,7 +520,7 @@ static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t j
 	}
 	char* cmd = string_format("%s aws batch terminate-job --jobid %s --reason \"Makeflow Killed\"",env_var,amazon_id);
 	debug(D_BATCH,"Terminating the job: %s\n",cmd);
-	system(cmd);
+	sh_system(cmd);
 	free(cmd);
 	return 0;
 	
@@ -542,3 +563,121 @@ const struct batch_queue_module batch_queue_amazon_batch = {
 	 batch_fs_amazon_batch_unlink,
 	 },
 };
+
+static int sh_system(const char* command) {
+	int pid;
+	int res = 0;
+	pid = fork();
+	if (pid == 0) {//child
+		char* argv[4];
+		argv[0] = "sh";
+		argv[1] = "-c";
+		argv[2] = (char*)command;
+		argv[3] = NULL;
+
+		res = execvp(argv[0], argv);
+		if (res < 0) {
+			perror("Batch Job SH_system past execvp: ");
+		}
+	} else if (pid > 0) {//parent
+		int status;
+		res = waitpid(pid, &status, 0);
+		if (WIFEXITED(status)) {
+			return WEXITSTATUS(status);
+		}
+	} else {
+		fprintf(stderr, "error in forking\n");
+	}
+	return -17;
+
+}
+
+static struct itable *process_table = 0;
+
+static FILE *sh_popen(const char *command)
+{
+	pid_t pid;
+	int argc;
+	char **argv;
+	int fds[2];
+	char cmd[4096];
+	int result;
+
+	strcpy(cmd, command);
+
+	if(string_split_quotes(cmd, &argc, &argv) < 1)
+		return 0;
+	
+	argv = malloc(sizeof(char*)*4);
+	argv[0]="sh";
+	argv[1]="-c";
+	argv[2] = (char*)command;
+	argv[3] = NULL;
+	argc = 4;
+
+	if(argc < 1)
+		return 0;
+
+	result = pipe(fds);
+	if(result < 0) {
+		free(argv);
+		return 0;
+	}
+
+	pid = fork();
+	if(pid > 0) {
+		free(argv);
+		close(fds[1]);
+
+		if(!process_table)
+			process_table = itable_create(0);
+
+		itable_insert(process_table, fds[0], (void *) (PTRINT_T) pid);
+		return fdopen(fds[0], "r");
+
+	} else if(pid == 0) {
+
+		int i;
+
+		close(0);
+		i = dup2(fds[1], STDOUT_FILENO); if(i < 0) perror("Error Dup2 stdout");
+		i = dup2(fds[1], STDERR_FILENO); if(i < 0) perror("Error Dup2 stderr");
+		close(fds[1]);
+		close(fds[0]);
+
+		i = execvp(argv[0], argv);
+		if (i<0) perror("Error in execvp");
+		_exit(1);
+
+	} else {
+		free(argv);
+		return 0;
+	}
+}
+
+static int sh_pclose(FILE * file)
+{
+	pid_t pid;
+	int result;
+	int status;
+
+	pid = (PTRINT_T) itable_remove(process_table, fileno(file));
+
+	fclose(file);
+
+	while(1) {
+		result = waitpid(pid, &status, 0);
+		if(result == pid) {
+			return 0;
+		} else {
+			if(errno == EINTR) {
+				continue;
+			} else {
+				break;
+			}
+		}
+	}
+
+	errno = ECHILD;
+	return -1;
+}
