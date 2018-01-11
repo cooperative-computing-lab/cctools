@@ -107,7 +107,7 @@ struct makeflow_hook {
 	 * @param jx the struct with arguments for hook.
 	 * @return 1 if successfully created, 0 if failed.
 	 */
-	int (*create)        (struct jx *);
+	int (*create)        (struct jx *hook_args);
 
 	/* Destroy/Clean up hooks.
 	 *
@@ -138,14 +138,14 @@ struct makeflow_hook {
 	 * @param dag The DAG about to be started.
 	 * @return 1 if dag start step successful, 0 if not.
 	 */
-	int (*dag_start)     (struct dag *);
+	int (*dag_start)     (struct dag *d);
 
 	/* Hook for a successfully completed DAG.
 	 * 
 	 * @param dag The DAG that was complete.
 	 * @return 1 if dag end step successful, 0 if not.
 	 */
-	int (*dag_end)       (struct dag *);
+	int (*dag_end)       (struct dag *d);
 
 	/* Hook for a failed DAG.
 	 * 
@@ -155,7 +155,7 @@ struct makeflow_hook {
 	 * @param dag The DAG that was failed.
 	 * @return 1 if dag fail step successful, 0 if not.
 	 */
-	int (*dag_fail)      (struct dag *);
+	int (*dag_fail)      (struct dag *d);
 
 	/* Hook for an aborted DAG.
 	 * 
@@ -165,7 +165,7 @@ struct makeflow_hook {
 	 * @param dag The DAG that was aborted.
 	 * @return 1 if dag abort step successful, 0 if not.
 	 */
-	int (*dag_abort)     (struct dag *);
+	int (*dag_abort)     (struct dag *d);
 
 	/* ADD WRAPPERS IN EITHER CREATE CHECK OR SUBMIT */
 
@@ -179,7 +179,7 @@ struct makeflow_hook {
 	 *             features of used batch_job system.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_create)   (struct dag_node *, struct hash_table *);
+	int (*node_create)   (struct dag_node *n, struct hash_table *features);
 
 	/* Hook when a node is checked for submission.
 	 * 
@@ -192,7 +192,7 @@ struct makeflow_hook {
 	 *             features of used batch_job system.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_check)    (struct dag_node *, struct hash_table *);
+	int (*node_check)    (struct dag_node *n, struct hash_table *features);
 
 	/* Hook just prior to node submission.
 	 * 
@@ -205,7 +205,7 @@ struct makeflow_hook {
 	 * @param dag_node The dag_node that is being checked.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_submit)   (struct dag_node *);
+	int (*node_submit)   (struct dag_node *n);
 
 	/* Augment/Modify the job strucuture passed to batch system.
 	 *
@@ -222,7 +222,7 @@ struct makeflow_hook {
 	 * @param jx the job specification as encoded like a wrapper (see json).
 	 * @return 1 if successfully modified, 0 if not.
 	 */
-	int (*batch_submit) ( struct batch_queue *, struct jx *);
+	int (*batch_submit) ( struct batch_queue *q, struct jx *task);
 
 
 	/* Hook after node is collected, but prior to qualifying node success.
@@ -234,7 +234,7 @@ struct makeflow_hook {
 	 * @param batch_job_info The info struct passed by batch queue.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_end)      (struct dag_node *, struct batch_job_info *);
+	int (*node_end)      (struct dag_node *n, struct batch_job_info *info);
 
 	/* Hook if node was successful.
 	 * 
@@ -242,7 +242,7 @@ struct makeflow_hook {
 	 * @param batch_job_info The info struct passed by batch queue.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_success)  (struct dag_node *, struct batch_job_info *);
+	int (*node_success)  (struct dag_node *n, struct batch_job_info *info);
 
 	/* Hook if node failed.
 	 * 
@@ -250,7 +250,7 @@ struct makeflow_hook {
 	 * @param batch_job_info The info struct passed by batch queue.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_fail)     (struct dag_node *, struct batch_job_info *);
+	int (*node_fail)     (struct dag_node *n, struct batch_job_info *info);
 
 	/* Hook if node aborted.
 	 * 
@@ -258,7 +258,7 @@ struct makeflow_hook {
 	 * @param batch_job_info The info struct passed by batch queue.
 	 * @return 1 if successful, 0 if not.
 	 */
-	int (*node_abort)    (struct dag_node *, struct batch_job_info *);
+	int (*node_abort)    (struct dag_node *n, struct batch_job_info *info);
 
 	/* Hook when file is created.
 	 * 
@@ -267,21 +267,21 @@ struct makeflow_hook {
 	 * @param dag_file The dag_file that was initialized.
 	 * @return 1 is successful, 0 if not.
 	 */
-	int (*file_create)   (struct dag_file *);
+	int (*file_create)   (struct dag_file *f);
 
 	/* Hook when file is expected, prior to node submission.
 	 *
 	 * @param dag_file The dag_file that is expected.
 	 * @return 1 is successful, 0 if not.
 	 */
-	int (*file_expect)   (struct dag_file *);
+	int (*file_expect)   (struct dag_file *f);
 
 	/* Hook when file is registered as existing.
 	 *
 	 * @param dag_file The dag_file that exists.
 	 * @return 1 is successful, 0 if not.
 	 */
-	int (*file_exist)    (struct dag_file *);
+	int (*file_exist)    (struct dag_file *f);
 
 	/* Hook when file is registered as complete.
 	 *
@@ -292,7 +292,7 @@ struct makeflow_hook {
 	 * @param dag_file The dag_file that completed.
 	 * @return 1 is successful, 0 if not.
 	 */
-	int (*file_complete) (struct dag_file *);
+	int (*file_complete) (struct dag_file *f);
 
 	/* Hook when file is about to be clean.
 	 *
@@ -302,14 +302,14 @@ struct makeflow_hook {
 	 * @param dag_file The dag_file that is to be cleaned.
 	 * @return 1 is successful, 0 if not.
 	 */
-	int (*file_clean)    (struct dag_file *);
+	int (*file_clean)    (struct dag_file *f);
 
 	/* Hook when file has been deleted.
 	 *
 	 * @param dag_file The dag_file that is to be cleaned.
 	 * @return 1 is successful, 0 if not.
 	 */
-	int (*file_deleted)  (struct dag_file *);
+	int (*file_deleted)  (struct dag_file *f);
 	
 };
 
