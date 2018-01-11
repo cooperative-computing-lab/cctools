@@ -1163,17 +1163,12 @@ int main(int argc, char *argv[])
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
-<<<<<<< HEAD
 	const char *lambda_config = NULL;
 	const char *amazon_credentials = NULL;
 	const char *amazon_ami = NULL;
 	const char *amazon_batch_img = NULL;
-=======
 	const char *amazon_credentials = NULL;
-	const char *amazon_ami = NULL;
-	const char *amazon_batch_img = NULL;
 	const char *amazon_batch_cfg = NULL;
->>>>>>> fixed the Makefile and makeflow.c help options
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1271,17 +1266,11 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_OPT,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
-<<<<<<< HEAD
 		LONG_OPT_LAMBDA_CONFIG,
 		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_AMAZON_BATCH_IMG,
-=======
-		LONG_OPT_AMAZON_CREDENTIALS,
-		LONG_OPT_AMAZON_AMI,
-		LONG_OPT_AMAZON_BATCH_IMG,
 		LONG_OPT_AMAZON_BATCH_CFG,
->>>>>>> fixed the Makefile and makeflow.c help options
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_ARGS,
@@ -1384,20 +1373,13 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
-<<<<<<< HEAD
 		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
 		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
-=======
-		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
-		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
-		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
-		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
 		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
->>>>>>> fixed the Makefile and makeflow.c help options
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
@@ -1801,6 +1783,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SANDBOX:
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
+			case LONG_OPT_AMAZON_AMI:
+				amazon_ami = xxstrdup(optarg);
+				break;
 			case LONG_OPT_ARGV: {
 				debug(D_MAKEFLOW, "loading argv from %s", optarg);
 				struct jx *j = jx_parse_file(optarg);
@@ -2019,6 +2004,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
+	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
