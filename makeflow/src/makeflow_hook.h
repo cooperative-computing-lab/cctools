@@ -87,11 +87,9 @@
  *
  * Here are list the immutable features and structures for each
  * high level struct:
- * DAG:
- * Node:
- * File:
- *
- * Almost all operations take a path which can be of any length.
+ * DAG: /TODO
+ * Node: /TODO
+ * File: /TODO
  */
 struct makeflow_hook {
 
