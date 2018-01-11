@@ -17,6 +17,8 @@
 #include "dag.h"
 #include "dag_node.h"
 #include "dag_file.h"
+#include "hash_table.h"
+#include "jx.h"
 
 /* ----------------------------------------------------------- *
  * Basic MAKEFLOW HOOK API					       *
