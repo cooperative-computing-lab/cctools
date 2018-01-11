@@ -1661,6 +1661,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL64_recvmsg:
 		case SYSCALL64_sendmsg:
+		case SYSCALL64_recvmmsg:
+		case SYSCALL64_sendmmsg:
 			if (entering && !p->table->isnative(args[0])) {
 				divert_to_dummy(p,-EBADF);
 				break;
@@ -3198,7 +3200,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_preadv:
 		case SYSCALL64_ptrace:
 		case SYSCALL64_pwritev:
-		case SYSCALL64_recvmmsg:
 		case SYSCALL64_renameat2:
 		case SYSCALL64_request_key:
 		case SYSCALL64_rt_tgsigqueueinfo:
@@ -3209,7 +3210,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL64_semop:
 		case SYSCALL64_semtimedop:
 		case SYSCALL64_sendfile:
-		case SYSCALL64_sendmmsg:
 		case SYSCALL64_set_mempolicy:
 		case SYSCALL64_setns:
 		case SYSCALL64_splice:
