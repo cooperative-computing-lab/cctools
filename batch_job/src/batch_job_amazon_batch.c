@@ -536,6 +536,7 @@ batch_fs_stub_chdir(amazon_batch);
 batch_fs_stub_getcwd(amazon_batch);
 batch_fs_stub_mkdir(amazon_batch);
 batch_fs_stub_putfile(amazon_batch);
+batch_fs_stub_rename(amazon_batch);
 batch_fs_stub_stat(amazon_batch);
 batch_fs_stub_unlink(amazon_batch);
 
@@ -549,19 +550,20 @@ const struct batch_queue_module batch_queue_amazon_batch = {
 	batch_queue_amazon_batch_option_update,
 
 	{
-	 batch_job_amazon_batch_submit,
-	 batch_job_amazon_batch_wait,
-	 batch_job_amazon_batch_remove,
-	 },
+		batch_job_amazon_batch_submit,
+		batch_job_amazon_batch_wait,
+		batch_job_amazon_batch_remove,
+	},
 
 	{
-	 batch_fs_amazon_batch_chdir,
-	 batch_fs_amazon_batch_getcwd,
-	 batch_fs_amazon_batch_mkdir,
-	 batch_fs_amazon_batch_putfile,
-	 batch_fs_amazon_batch_stat,
-	 batch_fs_amazon_batch_unlink,
-	 },
+		batch_fs_amazon_batch_chdir,
+		batch_fs_amazon_batch_getcwd,
+		batch_fs_amazon_batch_mkdir,
+		batch_fs_amazon_batch_putfile,
+		batch_fs_amazon_batch_rename,
+		batch_fs_amazon_batch_stat,
+		batch_fs_amazon_batch_unlink,
+	},
 };
 
 static int sh_system(const char* command) {
@@ -580,10 +582,10 @@ static int sh_system(const char* command) {
 			perror("Batch Job SH_system past execvp: ");
 		}
 	} else if (pid > 0) {//parent
-		int status;
-		res = waitpid(pid, &status, 0);
-		if (WIFEXITED(status)) {
-			return WEXITSTATUS(status);
+		struct process_info* pres;
+		while((pres = process_waitpid(pid, 0)) == 0);
+		if (WIFEXITED(pres->status)) {
+			return WEXITSTATUS(pres->status);
 		}
 	} else {
 		fprintf(stderr, "error in forking\n");
@@ -658,16 +660,15 @@ static FILE *sh_popen(const char *command)
 static int sh_pclose(FILE * file)
 {
 	pid_t pid;
-	int result;
-	int status;
+	struct process_info* result;
 
 	pid = (PTRINT_T) itable_remove(process_table, fileno(file));
 
 	fclose(file);
 
 	while(1) {
-		result = waitpid(pid, &status, 0);
-		if(result == pid) {
+		while((result = process_waitpid(pid,0)) == 0);
+		if(result->pid == pid) {
 			return 0;
 		} else {
 			if(errno == EINTR) {
