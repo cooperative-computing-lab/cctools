@@ -1927,6 +1927,8 @@ static void decode_syscall( struct pfs_process *p, int entering )
 
 		case SYSCALL32_recvmsg:
 		case SYSCALL32_sendmsg:
+		case SYSCALL32_recvmmsg:
+		case SYSCALL32_sendmmsg:
 			if (entering && !p->table->isnative(args[0])) {
 				divert_to_dummy(p,-EBADF);
 				break;
@@ -3535,7 +3537,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_ptrace:
 		case SYSCALL32_pwritev:
 		case SYSCALL32_readdir:
-		case SYSCALL32_recvmmsg:
 		case SYSCALL32_renameat2:
 		case SYSCALL32_request_key:
 		case SYSCALL32_restart_syscall:
@@ -3543,7 +3544,6 @@ static void decode_syscall( struct pfs_process *p, int entering )
 		case SYSCALL32_seccomp:
 		case SYSCALL32_sendfile64:
 		case SYSCALL32_sendfile:
-		case SYSCALL32_sendmmsg:
 		case SYSCALL32_set_mempolicy:
 		case SYSCALL32_setfsgid:
 		case SYSCALL32_setfsuid:
