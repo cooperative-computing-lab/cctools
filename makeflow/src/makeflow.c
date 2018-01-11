@@ -52,6 +52,7 @@ See the file COPYING for details.
 #include "makeflow_archive.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
+#include "makeflow_hook.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -155,6 +156,8 @@ static struct makeflow_monitor *monitor = 0;
 static struct makeflow_wrapper *enforcer = 0;
 static struct makeflow_wrapper_umbrella *umbrella = 0;
 
+static struct list *makeflow_hooks = NULL;
+
 static int catalog_reporting_on = 0;
 
 static char *mountfile = NULL;
@@ -171,6 +174,27 @@ static struct makeflow_alloc *storage_allocation = NULL;
 
 /* Variables used to hold the time used for storage alloc. */
 uint64_t static_analysis = 0;
+
+#define MAKEFLOW_HOOK_CALL(hook_name, ...) do { \
+	if (!makeflow_hooks) \
+		makeflow_hooks = list_create(); \
+	list_first_item(makeflow_hooks); \
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) { \
+		int rc = MAKEFLOW_HOOK_SUCCESS; \
+		if (h->hook_name) \
+			rc = h->hook_name(__VA_ARGS__); \
+		if (rc !=MAKEFLOW_HOOK_SUCCESS) \
+			fatal("hook %s:" #hook_name " returned %d",h->module_name?h->module_name:"", rc); \
+	} \
+} while (0)
+
+static void register_hook(struct makeflow_hook *hook) {
+	assert(hook);
+	if (!makeflow_hooks) makeflow_hooks = list_create();
+	struct makeflow_hook *h = xxmalloc(sizeof(*h));
+	memcpy(h, hook, sizeof(*h));
+	list_push_head(makeflow_hooks, h);
+}
 
 /*
 Determines if this is a local job that will consume
@@ -1404,6 +1428,8 @@ int main(int argc, char *argv[])
 	int storage_type = MAKEFLOW_ALLOC_TYPE_NOT_ENABLED;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
+	
+	struct jx *hook_args = jx_object(NULL);
 
 	random_init();
 	debug_config(argv[0]);
@@ -1938,9 +1964,21 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
+	// REGISTER HOOKS HERE
 	if (enforcer && umbrella) {
 		fatal("enforcement and Umbrella are mutually exclusive\n");
 	}
+
+	int example = 1;
+	if (example){
+		extern struct makeflow_hook makeflow_hook_example;
+		register_hook(&makeflow_hook_example);
+	}
+
+
+	// FINISHED REGISTERING HOOKS
+	
+	MAKEFLOW_HOOK_CALL(create, hook_args);
 
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
@@ -2361,6 +2399,12 @@ int main(int argc, char *argv[])
 		makeflow_monitor_delete(monitor);
 	}
 
+	MAKEFLOW_HOOK_CALL(destroy);
+
+	makeflow_log_close(d);
+
+	free(archive_directory);
+
 	if(makeflow_abort_flag) {
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
@@ -2374,11 +2418,6 @@ int main(int argc, char *argv[])
 		printf("nothing left to do.\n");
 		exit(EXIT_SUCCESS);
 	}
-
-	makeflow_log_close(d);
-
-	free(archive_directory);
-
 	return 0;
 }
 
