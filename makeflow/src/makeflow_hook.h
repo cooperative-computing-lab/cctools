@@ -113,9 +113,10 @@ struct makeflow_hook {
 	 * or structs left during execution. Most will be removed when exiting.
 	 * This should only be used to clean up internal strucutures.
 	 *
+	 * @param d The DAG that is about to be destroyed.
 	 * @return 1 if successfully destroyed, 0 if not.
 	 */
-	int (*destroy)       ();
+	int (*destroy)       (struct dag *d);
 
 	/* Hook prior to dag creation.
 	 * 
@@ -316,5 +317,35 @@ typedef enum {
     MAKEFLOW_HOOK_FAILURE
 } makeflow_hook_return;
 
+struct batch_queue * makeflow_get_remote_queue();
+struct batch_queue * makeflow_get_local_queue();
+
+void makeflow_hook_register(struct makeflow_hook *hook);
+
+int makeflow_hook_create(struct jx *args);
+
+int makeflow_hook_destroy(struct dag *d);
+
+int makeflow_hook_dag_init(struct dag *d);
+
+int makeflow_hook_dag_parse(struct dag *d);
+
+int makeflow_hook_dag_start(struct dag *d);
+
+int makeflow_hook_dag_end(struct dag *d);
+
+int makeflow_hook_dag_fail(struct dag *d);
+
+int makeflow_hook_dag_abort(struct dag *d);
+
+int makeflow_hook_node_create(struct dag_node *n, struct hash_table *feat);
+
+int makeflow_hook_node_submit(struct dag_node *n);
+
+int makeflow_hook_node_success(struct dag_node *n, struct batch_job_info *bji);
+
+int makeflow_hook_node_fail(struct dag_node *n, struct batch_job_info *bji);
+
+int makeflow_hook_node_abort(struct dag_node *n, struct batch_job_info *bji);
 
 #endif

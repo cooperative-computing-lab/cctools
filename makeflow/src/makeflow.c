@@ -119,6 +119,16 @@ static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
+struct batch_queue * makeflow_get_remote_queue(){
+	return remote_queue;
+}
+
+struct batch_queue * makeflow_get_local_queue(){
+	return local_queue;
+}
+
+
+
 static struct rmsummary *local_resources = 0;
 
 static int local_jobs_max = 1;
@@ -156,8 +166,6 @@ static struct makeflow_monitor *monitor = 0;
 static struct makeflow_wrapper *enforcer = 0;
 static struct makeflow_wrapper_umbrella *umbrella = 0;
 
-static struct list *makeflow_hooks = NULL;
-
 static int catalog_reporting_on = 0;
 
 static char *mountfile = NULL;
@@ -174,27 +182,6 @@ static struct makeflow_alloc *storage_allocation = NULL;
 
 /* Variables used to hold the time used for storage alloc. */
 uint64_t static_analysis = 0;
-
-#define MAKEFLOW_HOOK_CALL(hook_name, ...) do { \
-	if (!makeflow_hooks) \
-		makeflow_hooks = list_create(); \
-	list_first_item(makeflow_hooks); \
-	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) { \
-		int rc = MAKEFLOW_HOOK_SUCCESS; \
-		if (h->hook_name) \
-			rc = h->hook_name(__VA_ARGS__); \
-		if (rc !=MAKEFLOW_HOOK_SUCCESS) \
-			fatal("hook %s:" #hook_name " returned %d",h->module_name?h->module_name:"", rc); \
-	} \
-} while (0)
-
-static void register_hook(struct makeflow_hook *hook) {
-	assert(hook);
-	if (!makeflow_hooks) makeflow_hooks = list_create();
-	struct makeflow_hook *h = xxmalloc(sizeof(*h));
-	memcpy(h, hook, sizeof(*h));
-	list_push_head(makeflow_hooks, h);
-}
 
 /*
 Determines if this is a local job that will consume
@@ -1972,13 +1959,13 @@ int main(int argc, char *argv[])
 	int example = 1;
 	if (example){
 		extern struct makeflow_hook makeflow_hook_example;
-		register_hook(&makeflow_hook_example);
+		makeflow_hook_register(&makeflow_hook_example);
 	}
 
 
 	// FINISHED REGISTERING HOOKS
 	
-	MAKEFLOW_HOOK_CALL(create, hook_args);
+	makeflow_hook_create(hook_args);
 
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
@@ -2399,7 +2386,7 @@ int main(int argc, char *argv[])
 		makeflow_monitor_delete(monitor);
 	}
 
-	MAKEFLOW_HOOK_CALL(destroy);
+	makeflow_hook_destroy(d);
 
 	makeflow_log_close(d);
 

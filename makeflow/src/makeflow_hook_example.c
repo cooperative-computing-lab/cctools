@@ -5,7 +5,6 @@
  */
 
 #include "makeflow_hook.h"
-#include "jx.h"
 
 #include <stdio.h>
 
@@ -17,7 +16,7 @@ static int makeflow_hook_example_create(struct jx *args){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int makeflow_hook_example_destroy(){
+static int makeflow_hook_example_destroy(struct dag *d){
 	printf("Goodbye from module: EXAMPLE.\n");
 	return MAKEFLOW_HOOK_SUCCESS;
 }
