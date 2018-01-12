@@ -518,7 +518,7 @@ static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t j
 	if((amazon_id=itable_lookup(amazon_job_ids,jobid))==NULL){
 		return -1;
 	}
-	char* cmd = string_format("%s aws batch terminate-job --jobid %s --reason \"Makeflow Killed\"",env_var,amazon_id);
+	char* cmd = string_format("%s aws batch terminate-job --job-id %s --reason \"Makeflow Killed\"",env_var,amazon_id);
 	debug(D_BATCH,"Terminating the job: %s\n",cmd);
 	sh_system(cmd);
 	free(cmd);
@@ -668,8 +668,8 @@ static int sh_pclose(FILE * file)
 
 	while(1) {
 		while((result = process_waitpid(pid,0)) == 0);
-		if(result->pid == pid) {
-			return 0;
+		if(WIFEXITED(result->status)) {
+			return WEXITSTATUS(result->status);
 		} else {
 			if(errno == EINTR) {
 				continue;
