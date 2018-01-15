@@ -18,7 +18,7 @@ See the file COPYING for details.
  **/
 struct batch_file *batch_file_create(struct batch_queue *queue, char * name_on_submission, char * name_on_execution)
 {
-	struct batch_file *f = malloc(sizeof(*f));
+	struct batch_file *f = calloc(1,sizeof(*f));
     f->name_on_submission = xxstrdup(name_on_submission);
 
 	if(batch_queue_supports_feature(queue, "remote_rename") && name_on_execution){
@@ -37,6 +37,9 @@ struct batch_file *batch_file_create(struct batch_queue *queue, char * name_on_s
  **/
 void batch_file_delete(struct batch_file *f)
 {
+	if(!f)
+		return;
+
 	free(f->name_on_submission);
 	free(f->name_on_execution);
 
@@ -67,10 +70,7 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files )
 
     char * file_str = strdup("");
 
-	/* This could be set using batch_queue feature or option 
-	 * to allow for batch system specific separators. */
-	char * separator = ",";
-	int location = 0;
+	char * separator = "";
 
     if(!files) return file_str;
 
@@ -81,12 +81,15 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files )
 			continue;
 
 		/* Only add separator if past first item. */
-		if(location == 0)
-			file_str = string_combine(file_str,separator);
+		file_str = string_combine(file_str,separator);
 
         char *f = batch_file_to_string(queue, file);
         file_str = string_combine(file_str,f);
-		location++;
+	
+		/* This could be set using batch_queue feature or option 
+		 * to allow for batch system specific separators. */
+		separator = ",";
+
         free(f);
     }
 
