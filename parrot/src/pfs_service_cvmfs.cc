@@ -588,15 +588,6 @@ static bool cvmfs_activate_filesystem(struct cvmfs_filesystem *f)
 		return false;
 	}
 
-	char *proxy = cvmfs_options_get(fs_options, "CVMFS_HTTP_PROXY");
-	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
-		debug(D_CVMFS|D_NOTICE, "CVMFS requires an http proxy.  None has been configured!");
-		debug(D_CVMFS, "Ignoring configuration of CVMFS repository %s", fqrn);
-		free(proxy);
-		return false;
-	}
-	free(proxy);
-
 	char *repo_options_str = cvmfs_options_dump(fs_options);
 	debug(D_CVMFS, "cvmfs_attach_repo_v2(%s)", repo_options_str);
 	cvmfs_options_free(repo_options_str);
