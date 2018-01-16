@@ -43,7 +43,12 @@ transfer_inps()\n\
 	for i in $(echo $inps | sed \"s/,/ /g\")\n\
     do\n\
 		echo \"kubectl cp $i $pod_id:/$i\"\n\
+		size=$(wc -c $i | awk '{print $1}')\n\
+		start_time=$(date +%s)\n\
         cmd_retry \"kubectl cp $i $pod_id:/$i\" \"cp\"\n\
+		end_time=$(date +%s)\n\
+	    dur=$((end_time-start_time))\n\
+		update_log \"The size of $i is $size byte, and it is transferred in $dur milliseconds\"\n\
     done\n\
 	update_log \"$job_id,inps_transferred,$(TZ=UTC date +\\\"%H%M%S\\\")\"\n\
 }\n\
