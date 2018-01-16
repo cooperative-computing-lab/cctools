@@ -42,8 +42,8 @@ transfer_inps()\n\
 {\n\
 	for i in $(echo $inps | sed \"s/,/ /g\")\n\
     do\n\
-		echo \"kubectl cp $i $pod_id:/\"\n\
-        cmd_retry \"kubectl cp $i $pod_id:/\" \"cp\"\n\
+		echo \"kubectl cp $i $pod_id:/$i\"\n\
+        cmd_retry \"kubectl cp $i $pod_id:/$i\" \"cp\"\n\
     done\n\
 	update_log \"$job_id,inps_transferred,$(TZ=UTC date +\\\"%H%M%S\\\")\"\n\
 }\n\
