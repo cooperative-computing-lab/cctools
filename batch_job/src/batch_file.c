@@ -27,8 +27,6 @@ struct batch_file *batch_file_create(struct batch_queue *queue, char * name_on_s
 		f->name_on_execution = xxstrdup(name_on_submission);
 	}
 
-	f->batch_sys_include = BATCH_FILE_INCLUDE;
-
     return f;
 }
 
@@ -76,10 +74,6 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files )
 
     list_first_item(files);
     while((file=list_next_item(files))) {
-		/* This file was set to be excluded from file list. */
-		if(file->batch_sys_include == BATCH_FILE_EXCLUDE)
-			continue;
-
 		/* Only add separator if past first item. */
 		file_str = string_combine(file_str,separator);
 
@@ -94,13 +88,5 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files )
     }
 
     return file_str;
-}
-
-/**
- * Set if file is to be included or not in files string
- **/
-void batch_file_set_inclusion_mode(struct batch_file *f, batch_file_inclusion_t inclusion)
-{
-	f->batch_sys_include = inclusion;
 }
 

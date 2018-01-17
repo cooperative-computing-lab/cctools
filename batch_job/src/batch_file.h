@@ -10,22 +10,9 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "list.h"
 
-/**
- * Batch file inclusion is used to determine if a file will be explicitly mentioned
- * the the underlying batch system. The current use case will be shared-fs module in
- * Makeflow, which allows for us to ignore specification if the file is in a common
- * available location. We still want the task's file list to be complete, but want
- * to allow for files to be excluded from the required files list when submitted.
- **/
-typedef enum {
-    BATCH_FILE_INCLUDE,   /* This file is included in files string. (Default) */
-    BATCH_FILE_EXCLUDE,   /* This file is excluded from files string. */
-} batch_file_inclusion_t;
-
 struct batch_file {
 	char *name_on_submission;
 	char *name_on_execution;
-	batch_file_inclusion_t batch_sys_include;
 };
 
 /** Create batch_file struct.
@@ -59,13 +46,5 @@ char * batch_file_to_string(struct batch_queue *queue, struct batch_file *f );
 */
 char * batch_files_to_string(struct batch_queue *queue, struct list *files );
 
-/** Set that this batch_file is ignored by batch_queue. 
- Used in batch_file_to_string to exclude file from string list, but
- acknowledge the necessity of this file.
-@param file The batch_file to be ignored/enabled.
-@param ignored If BATCH_FILE_INCLUDE this file will be included in files string,
-	if BATCH_FILE_EXCLUDE this file is ignored for files string.
-*/
-void batch_file_set_inclusion_mode(struct batch_file *f, batch_file_inclusion_t inclusion);
 
 #endif
