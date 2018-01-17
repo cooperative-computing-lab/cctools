@@ -375,11 +375,13 @@ static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
 {
 	struct batch_job_info *info;
 	int timeout = 5;
-	debug(D_BATCH, "%d is failed to execute.", job_id);
 	info = itable_remove(q->job_table, job_id);
 	info->exited_normally = exited_normally;
 	if (exited_normally == 0) {
 		info->exit_code = exit_code;
+		debug(D_BATCH, "%d is failed to execute.", job_id);
+	} else {
+		debug(D_BATCH, "%d successfully complete.", job_id);
 	}
 	memcpy(info_out, info, sizeof(*info));
 	free(info);
