@@ -384,7 +384,7 @@ static int submit_worker( struct batch_queue *queue )
 	if(!k8s_worker_image) {
 		files = string_format("work_queue_worker");
 	} else {
-		files = string_format("");
+		files = "";
 	}
 
 	if(password_file) {
