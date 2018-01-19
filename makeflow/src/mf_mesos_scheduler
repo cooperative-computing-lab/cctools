@@ -41,7 +41,7 @@ from Queue import Queue
 setting_module_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "mf_mesos_setting")
 mms = imp.load_source("mf_mesos_setting", setting_module_path)
 
-sys.path.insert(0,sys.argv[3])
+# sys.path.insert(0,sys.argv[3])
 
 from mesos.interface import Scheduler
 from mesos.native import MesosSchedulerDriver
@@ -161,7 +161,8 @@ class MakeflowScheduler(Scheduler):
         executor.executor_id.value = str(uuid.uuid4())
         cctools_bin_path = os.path.dirname(os.path.realpath(__file__))
         ld_preload = os.getenv('LD_PRELOAD')
-        sh_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mf-mesos-executor')
+        python_path = os.getenv('PYTHONPATH')
+        sh_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'mf_mesos_executor')
         task_cmd_sh = "task_{0}_cmd".format(mf_task.task_id)
         task_cmd_f = open(task_cmd_sh, "w+")
         task_cmd_f.write(mf_task.cmd)
@@ -175,18 +176,22 @@ class MakeflowScheduler(Scheduler):
 
         executor.name = "{0} makeflow mesos executor".format(mf_task.task_id) 
         executor.source = "python executor"
-        executor.command.value = "{0} \"./{1}\" {2} {3} {4} {5}".format(sh_path, task_cmd_sh, 
-                executor.executor_id.value, executor.framework_id.value, sys.argv[3], hostname)
+        executor.command.value = "{0} \"./{1}\" {2} {3} {4}".format(sh_path, task_cmd_sh, 
+                executor.executor_id.value, executor.framework_id.value, hostname)
         
-        # add $CCTOOLS as the env variables for executor command
-        cctools_env = executor.command.environment.variables.add()
-        cctools_env.name = "CCTOOLS_BIN"
-        cctools_env.value = os.path.dirname(os.path.realpath(__file__))
-
         # add $LD_PRELOAD as the env variables for executor command
-        ld_preload_env = executor.command.environment.variables.add()
-        ld_preload_env.name = "LD_PRELOAD"
-        ld_preload_env.value = ld_preload
+        if ld_preload:
+            logger.info("Add LD_PRELOAD env var with value: {0}".format(ld_preload))
+            ld_preload_env = executor.command.environment.variables.add()
+            ld_preload_env.name = "LD_PRELOAD"
+            ld_preload_env.value = ld_preload
+
+        # add $PYTHONPATH as the env variables for executor command
+        if python_path:
+            logger.info("Add PYTHONPATH env var with value: {0}".format(python_path))
+            python_path_env = executor.command.environment.variables.add()
+            python_path_env.name = "PYTHONPATH"
+            python_path_env.value = python_path
 
         # add input files list to the executor_info
         for fn in mf_task.inp_fns:

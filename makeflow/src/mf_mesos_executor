@@ -17,7 +17,7 @@ import logging
 import threading
 import subprocess
 
-sys.path.insert(0, sys.argv[4])
+# sys.path.insert(0, sys.argv[4])
 
 from mesos.native import MesosExecutorDriver
 from mesos.interface import Executor
@@ -144,7 +144,7 @@ class MakeflowMesosExecutor(Executor):
             
 if __name__ == '__main__':
     print "starting makeflow mesos executor!"
-    driver = MesosExecutorDriver(MakeflowMesosExecutor(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[5]))
+    driver = MesosExecutorDriver(MakeflowMesosExecutor(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
 
     status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
 
