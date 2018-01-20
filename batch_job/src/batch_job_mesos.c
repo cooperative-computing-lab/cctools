@@ -90,20 +90,19 @@ static void start_mesos_scheduler(struct batch_queue *q)
 		if(mesos_py_path) {
 			char *mesos_python_path = xxstrdup(mesos_py_path);
 			python_path = string_format("PYTHONPATH=%s", mesos_python_path);
-		} else {
-			debug(BATCH_QUEUE_TYPE_MESOS, "++++++++++++ use default python path");
-			python_path = "PYTHONPATH=/usr/local/lib/python2.7/dist-packages:/usr/lib/python2.7/dist-packages";
 		}	
 		
 		char *envs[3];
-		if(mesos_preload) {
+		if(ld_preload_str && python_path) {
 			envs[0] = ld_preload_str;
 			envs[1] = python_path;
-		} else {
+		} else if(!ld_preload_str && python_path) {
 			envs[0] = python_path;
+		} else if(ld_preload_str && !python_path) {
+			envs[0] = ld_preload_str;
+		} else {
+			envs[0] = NULL;
 		}
-		
-		debug(BATCH_QUEUE_TYPE_MESOS, "------------- %s", envs[0]);
 
 		const char *batch_log_name = q->logfile;  
 
@@ -122,6 +121,7 @@ static void start_mesos_scheduler(struct batch_queue *q)
 
 	    close(mesos_fd);
 		
+
 		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, 
 			mesos_master, (char *) 0, envs);
 

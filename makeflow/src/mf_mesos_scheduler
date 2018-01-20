@@ -577,8 +577,8 @@ class MakefowMonitor(threading.Thread):
             os.remove(fn_run_tks_path)
         if os.path.isfile(fn_finish_tks_path):
             os.remove(fn_finish_tks_path)
-        if os.path.isfile(fn_slave_stderr):
-            os.remove(fn_slave_stderr)
+        # if os.path.isfile(fn_slave_stderr):
+        #    os.remove(fn_slave_stderr)
         
         while(not self.is_all_executor_stopped()):
             pass
