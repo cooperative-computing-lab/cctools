@@ -2,25 +2,25 @@
   "rules":[
     {
       "command":"echo A > A",
-      "outputs":[{"path": "A"}]
+      "outputs":[{"name_on_submission": "A"}]
     },
     {
       "command":"echo B > B",
-      "outputs":[{"path": "B"}]
+      "outputs":[{"name_on_submission": "B"}]
     },
     {
       "command":"echo C > C && cat A B >> C",
-      "outputs":[{"path": "C"}],
-      "inputs":[{"path": "A"}, {"path": "B"}]
+      "outputs":[{"name_on_submission": "C"}],
+      "inputs":[{"name_on_submission": "A"}, {"name_on_submission": "B"}]
     },
     {
       "command":"sort C > D",
-      "outputs":[{"path": "D"}],
-      "inputs":[{"path": "C"}]
+      "outputs":[{"name_on_submission": "D"}],
+      "inputs":[{"name_on_submission": "C"}]
     },
     {
       "command": "[ -e C ] && [ -e D ]",
-      "inputs": [{"path": "C"}, {"path": "D"}]
+      "inputs": [{"name_on_submission": "C"}, {"name_on_submission": "D"}]
     }
   ]
 }
