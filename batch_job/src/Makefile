@@ -13,6 +13,8 @@ endif
 EXTERNAL_LIBRARIES = ../../work_queue/src/libwork_queue.a $(CHIRP_LIB) ../../dttools/src/libdttools.a
 
 SOURCES = \
+	batch_file.c \
+	batch_task.c \
 	batch_job.c \
 	batch_job_amazon.c \
 	batch_job_dryrun.c \
