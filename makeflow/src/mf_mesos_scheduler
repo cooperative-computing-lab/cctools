@@ -153,6 +153,7 @@ class MakeflowScheduler(Scheduler):
         num_running_tasks = tasks_running + tasks_staging + tasks_starting
 
         logger.info("{0} cpu {1} used, {2} memory {3} used, {4} disk {5} used, {6} active tasks, {7} finished tasks".format(cpu_offered, cpu_used, mem_offered, mem_used, disk_offered, disk_used, num_running_tasks, self.finished_tasks))
+        logger.info("{0} tasks are running, {1} are staging, {2} are starting, {3} are finished".format(tasks_running, tasks_staging, tasks_starting, tasks_finished))
 
     # Create a ExecutorInfo instance for mesos task
     def new_mesos_executor(self, mf_task, framework_id, hostname, task_cpu, task_mem, task_disk):
