@@ -111,8 +111,8 @@ static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 	if (jx_istype(j, JX_STRING)) {
 		path = j->u.string_value;
 	} else if (jx_istype(j, JX_OBJECT)) {
-		path = jx_lookup_string(j, "path");
-		remote = jx_lookup_string(j, "execution_path");
+		path = jx_lookup_string(j, "name_on_submission");
+		remote = jx_lookup_string(j, "name_on_execution");
 		if (!path) {
 			debug(D_MAKEFLOW_PARSER | D_NOTICE,
 				"File at line %u: missing \"path\" key",

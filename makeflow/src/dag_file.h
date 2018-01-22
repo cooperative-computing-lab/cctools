@@ -68,7 +68,9 @@ struct dag_file {
 struct dag_file *dag_file_create( const char *filename );
 
 /** Create JX object of file struct.
-* Contains filename, remote_filename, and size.
+Contains name_on_submission(originally filename), 
+name_on_execution(originally remote_filename), 
+and size if defined.
 * @param f dag_file.
 * @param n dag_node to provide context for remote names.
 * @return JX object of file.
