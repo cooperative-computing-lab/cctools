@@ -1200,7 +1200,7 @@ static void makeflow_run( struct dag *d )
  		*/
 		if(dag_local_jobs_running(d)==0 && 
 			dag_remote_jobs_running(d)==0 && 
-			makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_FAILURE &&
+			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END) &&
 			did_find_archived_job == 0 && 
 			cleaned_completed_jobs == 0 )
 			break;

@@ -57,8 +57,11 @@ int makeflow_hook_dag_check(struct dag *d){
         int rc = MAKEFLOW_HOOK_SUCCESS;
         if (h->dag_check)
             rc = h->dag_check(d);
-        if (rc !=MAKEFLOW_HOOK_SUCCESS)
+
+        if (rc !=MAKEFLOW_HOOK_SUCCESS){
             debug(D_MAKEFLOW_HOOK, "Hook %s:dag_check rejected DAG",h->module_name?h->module_name:"");
+			return rc;
+		}
     }
 
     return MAKEFLOW_HOOK_SUCCESS;
@@ -76,15 +79,18 @@ int makeflow_hook_dag_start(struct dag *d){
 
 int makeflow_hook_dag_loop(struct dag *d){
     if (!makeflow_hooks)
-        return MAKEFLOW_HOOK_SUCCESS;
+        return MAKEFLOW_HOOK_END;
 
     list_first_item(makeflow_hooks);
     for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
         int rc = MAKEFLOW_HOOK_SUCCESS;
         if (h->dag_loop)
             rc = h->dag_loop(d);
-        if (rc !=MAKEFLOW_HOOK_SUCCESS)
+
+        if (rc !=MAKEFLOW_HOOK_SUCCESS){
             debug(D_MAKEFLOW_HOOK, "Hook %s:dag_loop rejected DAG",h->module_name?h->module_name:"");
+			return rc;
+		}
     }
 
     return MAKEFLOW_HOOK_SUCCESS;
@@ -120,8 +126,11 @@ int makeflow_hook_node_check(struct dag_node *node, struct batch_queue *queue){
         int rc = MAKEFLOW_HOOK_SUCCESS;
         if (h->node_check)
             rc = h->node_check(node, queue);
-        if (rc !=MAKEFLOW_HOOK_SUCCESS)
+
+        if (rc !=MAKEFLOW_HOOK_SUCCESS){
             debug(D_MAKEFLOW_HOOK, "Hook %s:node_check rejected Node %d",h->module_name?h->module_name:"", node->nodeid);
+			return rc;
+		}
     }
 
     return MAKEFLOW_HOOK_SUCCESS;
