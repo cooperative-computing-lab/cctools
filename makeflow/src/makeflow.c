@@ -2448,7 +2448,6 @@ int main(int argc, char *argv[])
 		makeflow_hook_dag_fail(d);
 		makeflow_log_failed_event(d);
 		fprintf(stderr, "workflow failed.\n");
-		exit(EXIT_FAILURE);
 		exit_value = EXIT_FAILURE;
 	} else {
 		makeflow_hook_dag_end(d);
