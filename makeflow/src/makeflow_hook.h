@@ -377,7 +377,7 @@ struct makeflow_hook {
 typedef enum {
     MAKEFLOW_HOOK_SUCCESS = 0,
     MAKEFLOW_HOOK_FAILURE
-} makeflow_hook_return;
+} makeflow_hook_result;
 
 struct batch_queue * makeflow_get_remote_queue();
 struct batch_queue * makeflow_get_local_queue();
