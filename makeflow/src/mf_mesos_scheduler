@@ -443,7 +443,7 @@ class MakeflowScheduler(Scheduler):
                     oup_fn.write("{0},finished\n".format(curr_task_id))
                     mms.tasks_info_dict[curr_task_id].action = "finished"
                     self.clean_mesos_file(curr_task_id)
-
+                    
                     oup_fn.close()
 
                 self.finished_tasks += 1
