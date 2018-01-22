@@ -60,6 +60,16 @@ struct batch_job_info {
 	int disk_allocation_exhausted; /**< Non-zero if the job filled its loop device allocation to capacity, zero otherwise */
 };
 
+/** Create a new batch_job_info struct.
+@return A new empty batch_job_info struct.
+*/
+struct batch_job_info *batch_job_info_create();
+
+/** Delete a batch_job_info struct.
+@param info The batch_job_info struct to be deleted.
+*/
+void batch_job_info_delete(struct batch_job_info *info);
+
 /** Create a new batch queue.
 @param type The type of the queue.
 @return A new batch queue object on success, null on failure.

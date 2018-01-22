@@ -20,12 +20,14 @@ struct batch_task {
 
 	char *command;               /* The command line to execute. */
 
-	struct list   *input_files;  /* Task's required inputs */
-	struct list   *output_files; /* Task's expected outputs */
+	struct list   *input_files;  /* Task's required inputs, type batch_file */
+	struct list   *output_files; /* Task's expected outputs, type batch_file */
 
 	struct rmsummary *resources; /* Resources assigned to task */
 
 	struct jx *envlist;          /* JSON formatted environment list */ 
+
+	struct batch_job_info *info; /* Stores the info struct created by batch_job. */
 };
 
 /** Create a batch_task struct.
@@ -91,6 +93,13 @@ void batch_task_set_resources(struct batch_task *t, struct rmsummary *resources)
 @param envlist The jx_object specifying the environment.
 */
 void batch_task_set_envlist(struct batch_task *t, struct jx *envlist);
+
+/** Set the batch_job_info of this task.
+ Performs simple copy into already allocated memory.
+@param t The batch_task that was completed.
+@param info The batch_job_info of the completed task.
+*/
+void batch_task_set_info(struct batch_task *t, struct batch_job_info *info);
 
 #endif
 /* vim: set noexpandtab tabstop=4: */

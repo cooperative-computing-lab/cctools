@@ -18,6 +18,8 @@ struct batch_task *batch_task_create(struct batch_queue *queue)
 	t->input_files = list_create();
 	t->output_files = list_create();
 
+	t->info = batch_job_info_create();
+
 	return t;
 }
 
@@ -46,6 +48,8 @@ void batch_task_delete(struct batch_task *t)
 
 	jx_delete(t->envlist);
 
+	batch_job_info_delete(t->info);
+
 	free(t);
 }
 
@@ -53,7 +57,7 @@ void batch_task_delete(struct batch_task *t)
 struct batch_file * batch_task_add_input_file(struct batch_task *task, char * name_on_submission, char * name_on_execution)
 {
 	struct batch_file *f = batch_file_create(task->queue, name_on_submission, name_on_execution);
-    list_push_tail(task->input_files, f);
+	list_push_tail(task->input_files, f);
 
 	return f;
 
@@ -63,7 +67,7 @@ struct batch_file * batch_task_add_input_file(struct batch_task *task, char * na
 struct batch_file * batch_task_add_output_file(struct batch_task *task, char * name_on_submission, char * name_on_execution)
 {
 	struct batch_file *f = batch_file_create(task->queue, name_on_submission, name_on_execution);
-    list_push_tail(task->output_files, f);
+	list_push_tail(task->output_files, f);
 
 	return f;
 }
@@ -81,15 +85,15 @@ void batch_task_set_command(struct batch_task *t, char *command)
 */
 void batch_task_wrap_command(struct batch_task *t, char *command)
 {
-    if(!command) return; 
+	if(!command) return; 
 
-    char *id = string_format("%d",t->taskid);
-    char *wrap_tmp = string_replace_percents(command, id);
+	char *id = string_format("%d",t->taskid);
+	char *wrap_tmp = string_replace_percents(command, id);
 
-    free(id);
+	free(id);
 
-    char *result = string_wrap_command(t->command, wrap_tmp);
-    free(wrap_tmp);
+	char *result = string_wrap_command(t->command, wrap_tmp);
+	free(wrap_tmp);
 
 	free(t->command);
 	t->command = result;
@@ -111,6 +115,22 @@ void batch_task_set_envlist(struct batch_task *t, struct jx *envlist)
 {
 	jx_delete(t->envlist);
 	t->envlist = jx_copy(envlist);
+}
+
+/** Sets the batch_job_info of batch_task.
+ Manually copies data into struct.
+ Does not free in current code, but as this become standard
+ in batch_job interface we should.
+*/
+void batch_task_set_info(struct batch_task *t, struct batch_job_info *info)
+{
+	t->info->submitted = info->submitted;
+	t->info->started   = info->started  ;
+	t->info->finished  = info->finished ;
+	t->info->exited_normally = info->exited_normally;
+	t->info->exit_code = info->exit_code;
+	t->info->exit_signal = info->exit_signal;
+	t->info->disk_allocation_exhausted = info->disk_allocation_exhausted;
 }
 
 /* vim: set noexpandtab tabstop=4: */
