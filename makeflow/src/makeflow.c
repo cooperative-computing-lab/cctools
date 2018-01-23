@@ -52,6 +52,7 @@ See the file COPYING for details.
 #include "makeflow_archive.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
+#include "makeflow_hook.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -117,6 +118,22 @@ static double makeflow_gc_task_ratio = 0.05;
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
+
+struct batch_queue * makeflow_get_remote_queue(){
+	return remote_queue;
+}
+
+struct batch_queue * makeflow_get_local_queue(){
+	return local_queue;
+}
+
+struct batch_queue * makeflow_get_queue(struct dag_node *n){
+    if(n->local_job && local_queue) {
+        return local_queue;
+    } else {
+        return remote_queue;
+    }
+}
 
 static struct rmsummary *local_resources = 0;
 
@@ -221,6 +238,8 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
 
 	batch_job_remove(q, jobid);
+
+	makeflow_hook_node_abort(n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 
 	struct list *outputs = makeflow_generate_output_files(n);
@@ -525,6 +544,9 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", command);
 
+	/* As integration moves forward batch_task will be added in. */
+	makeflow_hook_batch_submit(queue);
+
 	while(1) {
 		if(makeflow_abort_flag) break;
 
@@ -633,6 +655,9 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	/* Logs the creation of output files. */
 	makeflow_log_file_list_state_change(d,output_list,DAG_FILE_STATE_EXPECT);
 
+	/* As integration moves forward we will initialize and pass a batch_task. */
+	makeflow_hook_node_submit(n, queue);
+
 	/* check archiving directory to see if node has already been preserved */
 	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
 		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
@@ -726,7 +751,11 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 		}
 	}
 
-	return 1;
+
+    /* If all makeflow checks pass for this node we will 
+     return the result of the hooks, which will be 1 if all pass
+     and 0 if any fail. */
+    return (makeflow_hook_node_check(n, remote_queue) == MAKEFLOW_HOOK_SUCCESS);
 }
 
 int makeflow_nodes_local_waiting_count(const struct dag *d) {
@@ -815,12 +844,20 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	int job_failed = 0;
 	int monitor_retried = 0;
 
+	/* As integration moves forward batch_task will also be passed. */
+	/* This is intended for changes to the batch_task that need no
+		no context from dag_node/dag, such as shared_fs. */
+	makeflow_hook_batch_retrieve(queue);
+
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
 
 	if(is_local_job(n)) {
 		makeflow_local_resources_add(local_resources,n);
 	}
+
+	/* As integration moves forward batch_task will also be passed. */
+	makeflow_hook_node_end(n, info);
 
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
@@ -869,6 +906,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	}
 
 	if(job_failed) {
+		/* As integration moves forward batch_task will also be passed. */
+		/* If a hook indicates failure here, it is not fatal, but will result
+			in a failed task. */
+		int hook_success = makeflow_hook_node_fail(n, info);
+
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue, storage_allocation);
 		if (prep_failed) {
@@ -928,7 +970,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		}
 
 		if(!monitor_retried) {
-			if(makeflow_retry_flag || info->exit_code == 101) {
+			if(!hook_success || makeflow_retry_flag || info->exit_code == 101) {
 				n->failure_count++;
 				if(n->failure_count > makeflow_retry_max) {
 					notice(D_MAKEFLOW_RUN, "job %s failed too many times.", n->command);
@@ -948,6 +990,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			makeflow_failed_flag = 1;
 		}
 	} else {
+		
+
 		makeflow_clean_rm_fail_dir(d, n, remote_queue, storage_allocation);
 
 		if(storage_allocation && makeflow_alloc_use_space(storage_allocation, n)){
@@ -960,6 +1004,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			f->reference_count+= -1;
 			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
+				makeflow_hook_file_complete(f);
 				if(storage_allocation && storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
 					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
 			}
@@ -995,6 +1040,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		} else if (storage_allocation && storage_allocation->locked) {
 			printf("Unable to release space\n");
 		}
+
+		/* As integration moves forward batch_task will also be passed. */
+		/* node_success is after file_complete to allow for the final state of the
+			files to be reflected in the structs. Allows for cleanup or archiving.*/
+		makeflow_hook_node_success(n, info);
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
@@ -1150,6 +1200,7 @@ static void makeflow_run( struct dag *d )
  		*/
 		if(dag_local_jobs_running(d)==0 && 
 			dag_remote_jobs_running(d)==0 && 
+			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END) &&
 			did_find_archived_job == 0 && 
 			cleaned_completed_jobs == 0 )
 			break;
@@ -1404,6 +1455,9 @@ int main(int argc, char *argv[])
 	int storage_type = MAKEFLOW_ALLOC_TYPE_NOT_ENABLED;
 	uint64_t storage_limit = 0;
 	char *storage_print = NULL;
+	
+	struct jx *hook_args = jx_object(NULL);
+	int enable_example = 0;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1437,6 +1491,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DEBUG_ROTATE_MAX,
 		LONG_OPT_DISABLE_BATCH_CACHE,
 		LONG_OPT_DOT_CONDENSE,
+		LONG_OPT_HOOK_EXAMPLE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_GC_SIZE,
 		LONG_OPT_LOCAL_CORES,
@@ -1503,6 +1558,7 @@ int main(int argc, char *argv[])
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
+		{"enable_hook_example", required_argument, 0, LONG_OPT_HOOK_EXAMPLE},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"gc", required_argument, 0, 'g'},
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
@@ -1786,6 +1842,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DISABLE_BATCH_CACHE:
 				cache_mode = 0;
 				break;
+			case LONG_OPT_HOOK_EXAMPLE:
+				enable_example = 1;
+				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 				wq_wait_queue_size = optarg;
 				break;
@@ -1938,9 +1997,20 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
+	// REGISTER HOOKS HERE
 	if (enforcer && umbrella) {
 		fatal("enforcement and Umbrella are mutually exclusive\n");
 	}
+
+	if (enable_example){
+		extern struct makeflow_hook makeflow_hook_example;
+		makeflow_hook_register(&makeflow_hook_example);
+	}
+
+
+	// FINISHED REGISTERING HOOKS
+	
+	makeflow_hook_create(hook_args);
 
 	if((argc - optind) != 1) {
 		int rv = access("./Makeflow", R_OK);
@@ -2199,9 +2269,14 @@ int main(int argc, char *argv[])
 	}
 
 	printf("checking %s for consistency...\n",dagfile);
+	if(makeflow_hook_dag_check(d) == MAKEFLOW_HOOK_FAILURE) {
+		exit(EXIT_FAILURE);
+	}
+
 	if(!makeflow_check(d)) {
 		exit(EXIT_FAILURE);
 	}
+
 	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
 		exit(EXIT_FAILURE);
 	}
@@ -2264,6 +2339,7 @@ int main(int argc, char *argv[])
 	}
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
+		makeflow_hook_dag_clean(d);
 		printf("cleaning filesystem...\n");
 		if(makeflow_clean(d, remote_queue, clean_mode, storage_allocation)) {
 			fprintf(stderr, "Failed to clean up makeflow!\n");
@@ -2283,6 +2359,7 @@ int main(int argc, char *argv[])
 	dag_mount_clean(d);
 
 	printf("starting workflow....\n");
+	makeflow_hook_dag_start(d);
 
 	port = batch_queue_port(remote_queue);
 	if(work_queue_port_file)
@@ -2361,23 +2438,31 @@ int main(int argc, char *argv[])
 		makeflow_monitor_delete(monitor);
 	}
 
+	int exit_value;
 	if(makeflow_abort_flag) {
+		makeflow_hook_dag_abort(d);
 		makeflow_log_aborted_event(d);
 		fprintf(stderr, "workflow was aborted.\n");
-		exit(EXIT_FAILURE);
+		exit_value = EXIT_FAILURE;
 	} else if(makeflow_failed_flag) {
+		makeflow_hook_dag_fail(d);
 		makeflow_log_failed_event(d);
 		fprintf(stderr, "workflow failed.\n");
-		exit(EXIT_FAILURE);
+		exit_value = EXIT_FAILURE;
 	} else {
+		makeflow_hook_dag_end(d);
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
-		exit(EXIT_SUCCESS);
+		exit_value = EXIT_SUCCESS;
 	}
+
+	makeflow_hook_destroy(d);
 
 	makeflow_log_close(d);
 
 	free(archive_directory);
+
+	exit(exit_value);
 
 	return 0;
 }
