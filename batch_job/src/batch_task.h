@@ -20,8 +20,8 @@ struct batch_task {
 
 	char *command;               /* The command line to execute. */
 
-	struct list   *input_files;  /* Task's required inputs, type batch_file */
-	struct list   *output_files; /* Task's expected outputs, type batch_file */
+	struct list   *input_files;  /* Task's required inputs */
+	struct list   *output_files; /* Task's expected outputs */
 
 	struct rmsummary *resources; /* Resources assigned to task */
 
@@ -43,33 +43,33 @@ struct batch_task *batch_task_create(struct batch_queue *queue );
 void batch_task_delete(struct batch_task *t);
 
 /** Add file to input list of batch_task
- Creates a new batch_file from name_on_submission and name_on_execution.
+ Creates a new batch_file from outer_name and inner_name.
  This newly created file is add to input_files.
- For clarifications on name_on_submission, name_on_execution, and their uses see batch_file.
+ For clarifications on outer_name, inner_name, and their uses see batch_file.
 @param task The batch_task this file is being added to.
-@param name_on_submission The name of the file at submission/host site.
-@param name_on_execution The name of the file at execution site.
+@param outer_name The name of the file at submission/host site.
+@param inner_name The name of the file at execution site.
 @return A pointer to the newly allocated batch_file struct.
 */
-struct batch_file * batch_task_add_input_file(struct batch_task *task, char * name_on_submission, char * name_on_execution);
+struct batch_file * batch_task_add_input_file(struct batch_task *task, const char * outer_name, const char * inner_name);
 
 /** Add file to output list of batch_task
- Creates a new batch_file from name_on_submission and name_on_execution.
+ Creates a new batch_file from outer_name and inner_name.
  This newly created file is add to output_files.
- For clarifications on name_on_submission, name_on_execution, and their uses see batch_file.
+ For clarifications on outer_name, inner_name, and their uses see batch_file.
 @param task The batch_task this file is being added to.
-@param name_on_submission The name of the file at submission/host site.
-@param name_on_execution The name of the file at execution site.
+@param outer_name The name of the file at submission/host site.
+@param inner_name The name of the file at execution site.
 @return A pointer to the newly allocated batch_file struct.
 */
-struct batch_file * batch_task_add_output_file(struct batch_task *task, char * name_on_submission, char * name_on_execution);
+struct batch_file * batch_task_add_output_file(struct batch_task *task, const char * outer_name, const char * inner_name);
 
 /** Set the command of the batch_task.
  Frees previous command and xxstrdups new command.
 @param t The batch_task to be updated.
 @param command The new command to use.
 */
-void batch_task_set_command(struct batch_task *t, char *command);
+void batch_task_set_command(struct batch_task *t, const char *command);
 
 /** Wrap the existing command with a template string.
  This uses string_wrap_command to wrap command, see stringtools.h for details.
@@ -78,14 +78,14 @@ void batch_task_set_command(struct batch_task *t, char *command);
 @param t The batch_task whose command is being wrapped.
 @param command The command template that will wrap existing command.
 */
-void batch_task_wrap_command(struct batch_task *t, char *command);
+void batch_task_wrap_command(struct batch_task *t, const char *command);
 
 /** Set the resources needed for task.
  This function will make a copy of full copy of resources using rmsummary_copy().
 @param t The batch_task requiring specified resources.
 @param resources A rmsummary specifying required resources.
 */
-void batch_task_set_resources(struct batch_task *t, struct rmsummary *resources);
+void batch_task_set_resources(struct batch_task *t, const struct rmsummary *resources);
 
 /** Set the envlist for this task.
  This function will make a copy using jx_copy of envlist.
