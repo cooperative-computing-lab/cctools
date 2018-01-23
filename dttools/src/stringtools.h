@@ -24,6 +24,15 @@ typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
   */
 char *string_escape_shell (const char *str);
 
+/** Takes a command string and escapes quote characters.
+  Mallocs space for new string and does not modify original string.
+  The resulting string is wrapped in double quotes,
+  and will be subject to shell expansion.
+  @param str Command string presented to be quoted.
+  @return String with characters quoted.
+  */
+char *string_quote_shell (const char *str);
+
 /** Takes a command string, escapes double quotes with another double 
   quote, and escapes single quotes with two additional single quotes.
   This is a utilized when putting wrapped and nested commands in Condor.
