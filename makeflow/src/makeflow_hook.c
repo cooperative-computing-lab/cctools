@@ -1,6 +1,10 @@
-
 #include <assert.h>
+
 #include "debug.h"
+#include "stringtools.h"
+
+#include "batch_job.h"
+#include "batch_task.h"
 
 #include "makeflow_hook.h"
 #include "xxmalloc.h"
@@ -24,6 +28,45 @@ struct list * makeflow_hooks = NULL;
 			fatal("hook %s:" #hook_name " returned %d",h->module_name?h->module_name:"", rc); \
 	} \
 } while (0)
+
+
+
+struct dag_file *makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern)
+{
+    char *id = string_format("%d",task->taskid);
+    char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
+    char * name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+
+    /* Output of dag_file is returned to use for final filename. */
+    struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
+
+    batch_task_add_input_file(task, name_on_submission, name_on_execution);
+
+    free(id);
+    free(name_on_submission);
+    free(name_on_execution);
+
+    return f;
+}
+
+struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern)
+{
+    char *id = string_format("%d",task->taskid);
+    char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
+    char * name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+
+    /* Output of dag_file is returned to use for final filename. */
+    struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
+
+    batch_task_add_output_file(task, name_on_submission, name_on_execution);
+
+    free(id);
+    free(name_on_submission);
+    free(name_on_execution);
+
+    return f;
+}
+
 
 void makeflow_hook_register(struct makeflow_hook *hook) {
 	assert(hook);

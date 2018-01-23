@@ -14,10 +14,10 @@
  */
 
 #include "batch_job.h"
+#include "batch_task.h"
 #include "dag.h"
 #include "dag_node.h"
 #include "dag_file.h"
-#include "batch_job.h"
 #include "jx.h"
 
 /* ----------------------------------------------------------- *
@@ -383,6 +383,30 @@ typedef enum {
 struct batch_queue * makeflow_get_remote_queue();
 struct batch_queue * makeflow_get_local_queue();
 struct batch_queue * makeflow_get_queue(struct dag_node *node);
+
+/** Add file to batch_task and DAG.
+ *  This function takes a pattern for name_on_submission and name_on_exectution,
+ *   replaces %% with the taskid, creates a dag_file to associate with the DAG, 
+ *    and adds the specific names to the batch_task input files.
+ *    @param d The DAG these files are created in.
+ *    @param task The batch_task this file is added to.
+ *    @param name_on_submission The pattern of the name from the submission/host site.
+ *    @param name_on_execution The pattern of the name at execution site.
+ *    @return The DAG file that was either found or created in the dag.
+ *    */
+struct dag_file * makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern);
+
+/** Add file to batch_task and DAG.
+ *  This function takes a pattern for name_on_submission and name_on_exectution,
+ *   replaces %% with the taskid, creates a dag_file to associate with the DAG, 
+ *    and adds the specific names to the batch_task output files.
+ *    @param d The DAG these files are created in.
+ *    @param task The batch_task this file is added to.
+ *    @param name_on_submission The pattern of the name from the submission/host site.
+ *    @param name_on_execution The pattern of the name at execution site.
+ *    @return The DAG file that was either found or created in the dag.
+ *    */
+struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern);
 
 /** Add/Register makeflow_hook struct in list of hooks.
  Example of use see above.
