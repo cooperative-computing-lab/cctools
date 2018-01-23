@@ -98,7 +98,7 @@ an example.
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
 static sig_atomic_t makeflow_abort_flag = 0;
-static int makeflow_failed_flag = 0;
+static int makeflow_failed_flag = 1; // Makeflow fails by default. This is changed at dag start to indicate correct start.
 static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = 5;
@@ -2134,7 +2134,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "makeflow: couldn't create batch queue.\n");
 		if(port != 0)
 			fprintf(stderr, "makeflow: perhaps port %d is already in use?\n", port);
-		exit(EXIT_FAILURE);
+		goto FAILURE_LABEL;
 	}
 
 	if(!batchlogfilename) {
@@ -2250,7 +2250,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.");
 			fprintf(stderr,"Or, use the Work Queue batch system with -T wq.\n");
 			free(cwd);
-			exit(EXIT_FAILURE);
+			goto FAILURE_LABEL;
 		}
 		free(cwd);
 	}
@@ -2270,15 +2270,15 @@ int main(int argc, char *argv[])
 
 	printf("checking %s for consistency...\n",dagfile);
 	if(makeflow_hook_dag_check(d) == MAKEFLOW_HOOK_FAILURE) {
-		exit(EXIT_FAILURE);
+		goto FAILURE_LABEL;
 	}
 
 	if(!makeflow_check(d)) {
-		exit(EXIT_FAILURE);
+		goto FAILURE_LABEL;
 	}
 
 	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
-		exit(EXIT_FAILURE);
+		goto FAILURE_LABEL;
 	}
 
 	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
@@ -2292,8 +2292,7 @@ int main(int argc, char *argv[])
 	 * a cache dir logged, these two dirs must be the same. Otherwise exit.
 	 */
 	if(makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check )) {
-		dag_mount_clean(d);
-		exit(EXIT_FAILURE);
+		goto FAILURE_LABEL;
 	}
 
 	/* This check must happen after makeflow_log_recover which may load the cache_dir info into d->cache_dir.
@@ -2301,16 +2300,14 @@ int main(int argc, char *argv[])
 	 */
 	if(use_mountfile) {
 		if(makeflow_mount_check_target(d)) {
-			dag_mount_clean(d);
-			exit(EXIT_FAILURE);
+			goto FAILURE_LABEL;
 		}
 	}
 
 	if(use_mountfile && !clean_mode) {
 		if(makeflow_mounts_install(d)) {
 			fprintf(stderr, "Failed to install the dependencies specified in the mountfile!\n");
-			dag_mount_clean(d);
-			exit(EXIT_FAILURE);
+			goto FAILURE_LABEL;
 		}
 	}
 
@@ -2342,8 +2339,8 @@ int main(int argc, char *argv[])
 		makeflow_hook_dag_clean(d);
 		printf("cleaning filesystem...\n");
 		if(makeflow_clean(d, remote_queue, clean_mode, storage_allocation)) {
-			fprintf(stderr, "Failed to clean up makeflow!\n");
-			exit(EXIT_FAILURE);
+			debug(D_NOTICE, "Failed to clean up makeflow!\n");
+			goto FAILURE_LABEL;
 		}
 
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
@@ -2352,11 +2349,6 @@ int main(int argc, char *argv[])
 
 		exit(0);
 	}
-
-	/* this func call guarantees the mount fields set up from the info of the makeflow log file are cleaned up
-	 * even if the user does not use --mounts or -c option.
-	 */
-	dag_mount_clean(d);
 
 	printf("starting workflow....\n");
 	makeflow_hook_dag_start(d);
@@ -2385,6 +2377,10 @@ int main(int argc, char *argv[])
 	d->should_read_archive = should_read_archive;
 	d->should_write_to_archive = should_write_to_archive;
 
+	/* Makeflow fails by default if we goto FAILURE_LABEL.
+		This indicates we have correctly initialized. */
+	makeflow_failed_flag = 0;
+
 	makeflow_run(d);
 
 	if(makeflow_failed_flag == 0 && makeflow_nodes_local_waiting_count(d) > 0) {
@@ -2392,6 +2388,7 @@ int main(int argc, char *argv[])
 		debug(D_ERROR, "There are local jobs that could not be run. Usually this means that makeflow did not have enough local resources to run them.");
 	}
 
+FAILURE_LABEL:
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
