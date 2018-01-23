@@ -57,17 +57,16 @@ void batch_task_delete(struct batch_task *t)
 struct batch_file * batch_task_add_input_file(struct batch_task *task, const char * outer_name, const char * inner_name)
 {
 	struct batch_file *f = batch_file_create(task->queue, outer_name, inner_name);
-    list_push_tail(task->input_files, f);
+	list_push_tail(task->input_files, f);
 
 	return f;
-
 }
 
 /** Creates new batch_file and adds to outputs. */
 struct batch_file * batch_task_add_output_file(struct batch_task *task, const char * outer_name, const char * inner_name)
 {
 	struct batch_file *f = batch_file_create(task->queue, outer_name, inner_name);
-    list_push_tail(task->output_files, f);
+	list_push_tail(task->output_files, f);
 
 	return f;
 }
@@ -85,15 +84,15 @@ void batch_task_set_command(struct batch_task *t, const char *command)
 */
 void batch_task_wrap_command(struct batch_task *t, const char *command)
 {
-    if(!command) return; 
+	if(!command) return; 
 
-    char *id = string_format("%d",t->taskid);
-    char *wrap_tmp = string_replace_percents(command, id);
+	char *id = string_format("%d",t->taskid);
+	char *wrap_tmp = string_replace_percents(command, id);
 
-    free(id);
+	free(id);
 
-    char *result = string_wrap_command(t->command, wrap_tmp);
-    free(wrap_tmp);
+	char *result = string_wrap_command(t->command, wrap_tmp);
+	free(wrap_tmp);
 
 	free(t->command);
 	t->command = result;
