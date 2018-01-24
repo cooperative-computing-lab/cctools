@@ -53,9 +53,9 @@ if [ -z "$SFX_DIR" ]; then
     SFX_DIR=$basename.$$.dir
     dir_lock=".${SFX_DIR}.lock"
 
-    if [ ! -z "$CONDOR_SCRATCH_DIR" ]; then
+    if [ -d "$CONDOR_SCRATCH_DIR" ] && [ -r "$CONDOR_SCRATCH_DIR" ] && [ -w "$CONDOR_SCRATCH_DIR" ] && [ -x "$CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$CONDOR_SCRATCH_DIR/$SFX_DIR
-    elif [ ! -z "$_CONDOR_SCRATCH_DIR" ]; then
+    elif [ -d "$_CONDOR_SCRATCH_DIR" ] && [ -r "$_CONDOR_SCRATCH_DIR" ] && [ -w "$_CONDOR_SCRATCH_DIR" ] && [ -x "$_CONDOR_SCRATCH_DIR" ]; then
         SFX_DIR=$_CONDOR_SCRATCH_DIR/$SFX_DIR
     else
         SFX_DIR=`pwd`/$SFX_DIR
