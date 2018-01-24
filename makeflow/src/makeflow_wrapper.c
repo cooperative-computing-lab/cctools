@@ -109,8 +109,10 @@ void makeflow_wrapper_generate_files( struct batch_task *task, struct list *inpu
 				remote = xxstrdup(p+1);
 				itable_insert(w->remote_names, (uintptr_t) file, (void *)remote);
 				hash_table_insert(w->remote_names_inv, remote, (void *)file);
+				makeflow_hook_add_input_file(n->d, task, f, remote);
+			} else {
+				makeflow_hook_add_output_file(n->d, task, f, NULL);
 			}
-			makeflow_hook_add_input_file(n->d, task, f, remote);
 			*p = '=';
 		} else {
 			file = dag_file_lookup_or_create(n->d, f);
@@ -136,8 +138,10 @@ void makeflow_wrapper_generate_files( struct batch_task *task, struct list *inpu
 				remote = xxstrdup(p+1);
 				itable_insert(w->remote_names, (uintptr_t) file, (void *)remote);
 				hash_table_insert(w->remote_names_inv, remote, (void *)file);
+				makeflow_hook_add_output_file(n->d, task, f, remote);
+			} else {
+				makeflow_hook_add_output_file(n->d, task, f, NULL);
 			}
-			makeflow_hook_add_output_file(n->d, task, f, remote);
 			*p = '=';
 		} else {
 			file = dag_file_lookup_or_create(n->d, f);
