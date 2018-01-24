@@ -606,8 +606,8 @@ int pfs_process_setgid(struct pfs_process *p, gid_t gid) {
 }
 
 int pfs_process_getgroups(struct pfs_process *p, int size, gid_t list[]) {
-	if (p->ngroups > size) return -EINVAL;
 	if (size == 0) return p->ngroups;
+	if (p->ngroups > size) return -EINVAL;
 
 	memcpy(list, p->groups, p->ngroups * sizeof(gid_t));
 	return p->ngroups;
