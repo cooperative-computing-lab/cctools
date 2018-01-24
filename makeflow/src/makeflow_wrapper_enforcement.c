@@ -65,7 +65,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	char *mountlist_path = string_format(mountlist_pattern "%d", n->nodeid);
 	char *tmp_path = string_format(tmp_pattern "%d", n->nodeid);
 
-	makeflow_log_dag_file_state_change(n->d, dag_file_lookup_or_create(n->d, mountlist_path), DAG_FILE_STATE_EXPECT);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, mountlist_path), DAG_FILE_STATE_EXPECT);
 
 	/* make an invalid mountfile to send */
 	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
@@ -75,9 +75,9 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	write(mountlist_fd, "mountlist\n", 10);
 	close(mountlist_fd);
 
-	makeflow_log_dag_file_state_change(n->d, dag_file_lookup_or_create(n->d, mountlist_path), DAG_FILE_STATE_EXISTS);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, mountlist_path), DAG_FILE_STATE_EXISTS);
 
-	makeflow_log_dag_file_state_change(n->d, dag_file_lookup_or_create(n->d, enforcer_path), DAG_FILE_STATE_EXPECT);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, enforcer_path), DAG_FILE_STATE_EXPECT);
 
 	/* and generate a wrapper script with the current nodeid */
 	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT, S_IRWXU);
@@ -119,7 +119,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "exit $RC\n");
 	fclose(enforcer);
 
-	makeflow_log_dag_file_state_change(n->d, dag_file_lookup_or_create(n->d, enforcer_path), DAG_FILE_STATE_EXISTS);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, enforcer_path), DAG_FILE_STATE_EXISTS);
 
 	free(enforcer_path);
 	free(mountlist_path);

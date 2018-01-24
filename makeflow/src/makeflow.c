@@ -667,7 +667,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		n->state = DAG_NODE_STATE_RUNNING;
 		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))) {
-			makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 		}
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 		did_find_archived_job = 1;
@@ -814,7 +814,7 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 			debug(D_MAKEFLOW_RUN, "File %s created by rule %d.\n", f->filename, n->nodeid);
 			f->actual_size = buf.st_size;
 			d->total_file_size += f->actual_size;
-			makeflow_log_dag_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
+			makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_EXISTS);
 			file_created = 1;
 			break;
 		}
@@ -1003,7 +1003,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		while((f = list_next_item(n->source_files))) {
 			f->reference_count+= -1;
 			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
-				makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 				makeflow_hook_file_complete(f);
 				if(storage_allocation && storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
 					makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
@@ -2330,12 +2330,12 @@ int main(int argc, char *argv[])
 	}
 
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
-	makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
+	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
 
 	if(batch_queue_supports_feature(remote_queue, "batch_log_transactions")) {
 		const char *transactions = batch_queue_get_option(remote_queue, "batch_log_transactions_name");
 		f = dag_file_lookup_or_create(d, transactions);
-		makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
+		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
 	}
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {

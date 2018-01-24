@@ -188,7 +188,7 @@ void makeflow_log_state_change( struct dag *d, struct dag_node *n, int newstate 
 	makeflow_log_sync(d,0);
 }
 
-void makeflow_log_dag_file_state_change( struct dag *d, struct dag_file *f, int newstate )
+void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int newstate )
 {
 	debug(D_MAKEFLOW_RUN, "file %s %s -> %s\n", f->filename, dag_file_state_name(f->state), dag_file_state_name(newstate));
 
@@ -207,7 +207,7 @@ void makeflow_log_dag_file_state_change( struct dag *d, struct dag_file *f, int 
 
 void makeflow_log_batch_file_state_change( struct dag *d, struct batch_file *f, int newstate )
 {
-	makeflow_log_dag_file_state_change(d, dag_file_lookup_or_create(d, f->outer_name), newstate);
+	makeflow_log_file_state_change(d, dag_file_lookup_or_create(d, f->outer_name), newstate);
 }
 
 void makeflow_log_batch_file_list_state_change( struct dag *d, struct list *file_list, int newstate )
@@ -231,7 +231,7 @@ void makeflow_log_dag_file_list_state_change( struct dag *d, struct list *file_l
 
 	list_first_item(file_list);
 	while((f=list_next_item(file_list))) {
-		makeflow_log_dag_file_state_change(d,f,newstate);
+		makeflow_log_file_state_change(d,f,newstate);
 	}
 }
 
@@ -405,7 +405,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 		while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 			if(dag_file_should_exist(f) && !dag_file_is_source(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
 				fprintf(stderr, "makeflow: %s is reported as existing, but does not exist.\n", f->filename);
-				makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
 				continue;
 			}
 			if(S_ISDIR(buf.st_mode))
@@ -413,7 +413,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 			if(dag_file_should_exist(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
 				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
 				makeflow_clean_file(d, queue, f, 0, NULL);
-				makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
 			}
 		}
 	}
