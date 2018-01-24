@@ -117,7 +117,7 @@ void makeflow_wrap_umbrella(struct batch_task *task, struct dag_node *n, struct 
 	if(n->umbrella_spec){
 		makeflow_hook_add_input_file(n->d, task, n->umbrella_spec, path_basename(n->umbrella_spec));
 	} else {
-		makeflow_hook_add_input_file(n->d, task, w->spec, path_basename(w->spec));
+		return;
 	}
 
 	if(w->binary) makeflow_hook_add_input_file(n->d, task, w->binary, path_basename(w->binary));
