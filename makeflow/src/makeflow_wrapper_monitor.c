@@ -77,7 +77,7 @@ void makeflow_prepare_for_monitoring( struct dag *d, struct makeflow_monitor *m,
 	}
 	if(result == 0){ // Either the mkdir was successful, or create_dir was successful. aka created in Makeflow
 		struct dag_file *f = dag_file_lookup_or_create(d, log_dir);
-		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
+		makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
 	}
 
 	m->log_prefix = string_format("%s/%s", log_dir, log_format);

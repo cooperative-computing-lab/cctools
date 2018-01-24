@@ -156,13 +156,13 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 		if(alloc && f->created_by)
 			makeflow_alloc_release_space(alloc, f->created_by, f->actual_size, MAKEFLOW_ALLOC_RELEASE_USED);
 		d->total_file_size -= f->actual_size;
-		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+		makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 		if(alloc)
 			makeflow_log_alloc_event(d, alloc);
 
 	} else if(errno != ENOENT) {
 		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+			makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 
 			debug(D_MAKEFLOW_RUN, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
 			return 1;
@@ -391,7 +391,7 @@ int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch
 		goto FAILURE;
 	}
 
-	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
+	makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
 	fprintf(stderr, "rule %d failed, moving any outputs to %s\n",
 			n->nodeid, faildir);
 	rc = 0;
@@ -418,7 +418,7 @@ int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 			debug(D_MAKEFLOW_RUN, "Failed to rename %s -> %s: %s",
 					f->filename, o->filename, strerror(errno));
 		} else {
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
+			makeflow_log_dag_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 			debug(D_MAKEFLOW_RUN, "Renamed %s -> %s",
 					f->filename, o->filename);
 		}
