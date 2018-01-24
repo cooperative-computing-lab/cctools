@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "dag_node.h"
 
 #include "debug.h"
+#include "batch_task.h"
 #include "rmsummary.h"
 #include "list.h"
 #include "stringtools.h"
@@ -24,10 +25,8 @@ extern char **environ;
 
 struct dag_node *dag_node_create(struct dag *d, int linenum)
 {
-	struct dag_node *n;
+	struct dag_node *n = calloc(1, sizeof(*n));
 
-	n = malloc(sizeof(struct dag_node));
-	memset(n, 0, sizeof(struct dag_node));
 	n->d = d;
 	n->linenum = linenum;
 	n->state = DAG_NODE_STATE_WAITING;
@@ -57,12 +56,6 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->resources_measured  = NULL;
 
 	n->resource_request = CATEGORY_ALLOCATION_FIRST;
-
-	n->footprint = NULL;
-
-	n->umbrella_spec = NULL;
-
-	n->archive_id = NULL;
 
 	return n;
 }
@@ -370,6 +363,29 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n) {
 	return category_dynamic_task_max_resources(n->category, n->resources_requested, n->resource_request);
+}
+
+struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue *queue, int full_env_list)
+{
+	struct batch_task *task = batch_task_create(queue);
+	batch_task_set_command(task, n->command);
+
+	struct dag_file *f;
+	list_first_item(n->source_files);
+	while((f = list_next_item(n->source_files))){
+		batch_task_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+	}
+
+	list_first_item(n->target_files);
+	while((f = list_next_item(n->target_files))){
+		batch_task_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+	}
+
+	batch_task_set_resources(task, dag_node_dynamic_label(n));
+
+	batch_task_set_envlist(task, dag_node_env_create(n->d, n, full_env_list));
+
+	return task;
 }
 
 /* vim: set noexpandtab tabstop=4: */

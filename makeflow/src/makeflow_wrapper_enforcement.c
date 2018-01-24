@@ -55,11 +55,11 @@ void makeflow_wrapper_enforcer_init(struct makeflow_wrapper *w, char *parrot_pat
 	w->command = xxstrdup("./" enforcer_pattern "%%");
 }
 
-char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_wrapper *w, struct list *input_list, struct list *output_list )
+void makeflow_wrap_enforcer( struct batch_task *task, struct dag_node *n, struct makeflow_wrapper *w)
 {
-	if(!w) return result;
+	if(!w) return ;
 
-	struct dag_file *f;
+	struct batch_file *f;
 	FILE *enforcer = NULL;
 	char *enforcer_path = string_format(enforcer_pattern "%d", n->nodeid);
 	char *mountlist_path = string_format(mountlist_pattern "%d", n->nodeid);
@@ -102,13 +102,13 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "$HOME/.Xauthority\trwx\n");
 	fprintf(enforcer, "/tmp/.X11-unix\trwx\n");
 
-	list_first_item(input_list);
-	while((f=list_next_item(input_list))) {
-		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
+	list_first_item(task->input_files);
+	while((f=list_next_item(task->input_files))) {
+		fprintf(enforcer, "$PWD/%s\trwx\n", f->inner_name);
 	}
-	list_first_item(output_list);
-	while((f=list_next_item(output_list))) {
-		fprintf(enforcer, "$PWD/%s\trwx\n", f->filename);
+	list_first_item(task->output_files);
+	while((f=list_next_item(task->output_files))) {
+		fprintf(enforcer, "$PWD/%s\trwx\n", f->inner_name);
 	}
 	fprintf(enforcer, "EOF\n\n");
 	fprintf(enforcer, "mkdir -p \"$PWD/%s\"\n", tmp_path);
@@ -125,5 +125,5 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	free(mountlist_path);
 	free(tmp_path);
 
-	return makeflow_wrap_wrapper(result, n, w);
+	makeflow_wrap_wrapper(task, n, w);
 }

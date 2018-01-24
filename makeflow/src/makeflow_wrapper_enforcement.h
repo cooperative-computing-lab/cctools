@@ -9,6 +9,6 @@ See the file COPYING for details.
 #define MAKEFLOW_WRAPPER_ENFORCEMENT_H
 
 void makeflow_wrapper_enforcer_init( struct makeflow_wrapper *w, char *parrot_path );
-char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_wrapper *w, struct list *input_list, struct list *output_list );
+void makeflow_wrap_enforcer( struct batch_task *task, struct dag_node *n, struct makeflow_wrapper *w);
 
 #endif

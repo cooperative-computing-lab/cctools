@@ -9,7 +9,10 @@
 #include "list.h"
 #include "xxmalloc.h"
 
+#include "batch_task.h"
+
 #include "dag.h"
+#include "makeflow_hook.h"
 #include "makeflow_wrapper.h"
 
 #include <string.h>
@@ -84,12 +87,10 @@ void makeflow_wrapper_add_output_file( struct makeflow_wrapper *w, const char *f
 	list_push_tail(w->output_files, f);
 }
 
-struct list *makeflow_wrapper_generate_files( struct list *result, struct list *input, struct dag_node *n, struct makeflow_wrapper *w)
+void makeflow_wrapper_generate_files( struct batch_task *task, struct list *input, struct list *output, struct dag_node *n, struct makeflow_wrapper *w)
 {
 	char *f;
 	char *nodeid = string_format("%d",n->nodeid);
-
-	struct list *files = list_create();
 
 	list_first_item(input);
 	while((f = list_next_item(input)))
@@ -109,18 +110,43 @@ struct list *makeflow_wrapper_generate_files( struct list *result, struct list *
 				itable_insert(w->remote_names, (uintptr_t) file, (void *)remote);
 				hash_table_insert(w->remote_names_inv, remote, (void *)file);
 			}
+			makeflow_hook_add_input_file(n->d, task, f, remote);
 			*p = '=';
 		} else {
 			file = dag_file_lookup_or_create(n->d, f);
+			makeflow_hook_add_input_file(n->d, task, f, NULL);
 		}
 		free(f);
-		list_push_tail(files, file);
+	}
+
+	list_first_item(output);
+	while((f = list_next_item(output)))
+	{
+		char *filename = string_replace_percents(f, nodeid);
+		char *f = xxstrdup(filename);
+		free(filename);
+
+		char *remote, *p;
+		struct dag_file *file;
+		p = strchr(f, '=');
+		if(p) {
+			*p = 0;
+			file = dag_file_lookup_or_create(n->d, f);
+			if(!n->local_job && !itable_lookup(w->remote_names, (uintptr_t) file)){
+				remote = xxstrdup(p+1);
+				itable_insert(w->remote_names, (uintptr_t) file, (void *)remote);
+				hash_table_insert(w->remote_names_inv, remote, (void *)file);
+			}
+			makeflow_hook_add_output_file(n->d, task, f, remote);
+			*p = '=';
+		} else {
+			file = dag_file_lookup_or_create(n->d, f);
+			makeflow_hook_add_output_file(n->d, task, f, NULL);
+		}
+		free(f);
 	}
 	free(nodeid);
 
-	result = list_splice(result, files);
-
-	return result;
 }
 
 /* Returns the remotename used in wrapper for local name filename */
@@ -137,17 +163,15 @@ const char *makeflow_wrapper_get_remote_name(struct makeflow_wrapper *w, struct 
 
 /* Takes node->command and wraps it in wrapper_command. Then, if in monitor
  *  * mode, wraps the wrapped command in the monitor command. */
-char *makeflow_wrap_wrapper( char *command,  struct dag_node *n, struct makeflow_wrapper *w )
+void makeflow_wrap_wrapper( struct batch_task *task,  struct dag_node *n, struct makeflow_wrapper *w )
 {
-	if(!w) return xxstrdup(command);
+	if(!w) return ;
 
 	char *nodeid = string_format("%d",n->nodeid);
 	char *wrap_tmp = string_replace_percents(w->command, nodeid);
 
 	free(nodeid);
 
-	char *result = string_wrap_command(command, wrap_tmp);
+	batch_task_wrap_command(task, wrap_tmp);
 	free(wrap_tmp);
-
-	return result;
 }

@@ -179,23 +179,23 @@ int makeflow_hook_node_check(struct dag_node *node, struct batch_queue *queue){
     return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_node_submit(struct dag_node *node, struct batch_queue *queue){
-	MAKEFLOW_HOOK_CALL(node_submit, node, queue);
+int makeflow_hook_node_submit(struct dag_node *node, struct batch_task *task){
+	MAKEFLOW_HOOK_CALL(node_submit, node, task);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_node_end(struct dag_node *node, struct batch_job_info *info){
-    MAKEFLOW_HOOK_CALL(node_end, node, info);
+int makeflow_hook_node_end(struct dag_node *node, struct batch_task *task){
+    MAKEFLOW_HOOK_CALL(node_end, node, task);
     return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_node_success(struct dag_node *node, struct batch_job_info *info){
-	MAKEFLOW_HOOK_CALL(node_success, node, info);
+int makeflow_hook_node_success(struct dag_node *node, struct batch_task *task){
+	MAKEFLOW_HOOK_CALL(node_success, node, task);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_node_fail(struct dag_node *node, struct batch_job_info *info){
-	MAKEFLOW_HOOK_CALL(node_fail, node, info);
+int makeflow_hook_node_fail(struct dag_node *node, struct batch_task *task){
+	MAKEFLOW_HOOK_CALL(node_fail, node, task);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
@@ -204,13 +204,13 @@ int makeflow_hook_node_abort(struct dag_node *node){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_batch_submit(struct batch_queue *queue){
-    MAKEFLOW_HOOK_CALL(batch_submit, queue);
+int makeflow_hook_batch_submit(struct batch_task *task){
+    MAKEFLOW_HOOK_CALL(batch_submit, task);
     return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_batch_retrieve(struct batch_queue *queue){
-    MAKEFLOW_HOOK_CALL(batch_retrieve, queue);
+int makeflow_hook_batch_retrieve(struct batch_task *task){
+    MAKEFLOW_HOOK_CALL(batch_retrieve, task);
     return MAKEFLOW_HOOK_SUCCESS;
 }
 

@@ -35,8 +35,8 @@ void makeflow_wrapper_delete(struct makeflow_wrapper *w);
 void makeflow_wrapper_add_command(struct makeflow_wrapper *w, const char *cmd);
 void makeflow_wrapper_add_input_file(struct makeflow_wrapper *w, const char *file);
 void makeflow_wrapper_add_output_file(struct makeflow_wrapper *w, const char *file);
-struct list *makeflow_wrapper_generate_files(struct list *result, struct list *input, struct dag_node *n, struct makeflow_wrapper *w);
-char *makeflow_wrap_wrapper(char *result, struct dag_node *n, struct makeflow_wrapper *w);
+void makeflow_wrapper_generate_files(struct batch_task *task, struct list *input, struct list *output, struct dag_node *n, struct makeflow_wrapper *w);
+void makeflow_wrap_wrapper(struct batch_task *task, struct dag_node *n, struct makeflow_wrapper *w);
 
 const char *makeflow_wrapper_get_remote_name(struct makeflow_wrapper *w, struct dag *d, const char *filename);
 
