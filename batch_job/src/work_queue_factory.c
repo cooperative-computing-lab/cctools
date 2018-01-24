@@ -382,7 +382,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(os){
-		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
+		char* vc3_cmd = string_format("strace -f -o vc3_with_job ./vc3-builder --require cctools-statics -- %s",cmd);
+		//char* vc3_cmd = string_format("strace -f -o vc3_builder_strace ./vc3-builder --require cctools-statics -- date ");
 		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,vc3_cmd);
 		free(vc3_cmd);
 		free(cmd);
@@ -1287,9 +1288,13 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
-	
-	sprintf(cmd,"cp 'vc3-builder' '%s'",scratch_dir);
-	system(cmd);
+
+	memset(cmd,'\0',1024*sizeof(char));
+	sprintf(cmd,"cp \"$(which vc3-builder)\" '%s'",scratch_dir);
+	int k = system(cmd);
+	if(k){
+		fprintf(stderr,"can't copy vc3-builder!: %i\n",k);
+	}
 
 	if(password_file) {
 		sprintf(cmd,"cp %s %s/pwfile",password_file,scratch_dir);
