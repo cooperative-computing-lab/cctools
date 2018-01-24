@@ -11,17 +11,17 @@ See the file COPYING for details.
 #include "list.h"
 
 struct batch_file {
-	char *name_on_submission;
-	char *name_on_execution;
+	char *outer_name;
+	char *inner_name;
 };
 
 /** Create batch_file struct.
 @param queue The batch_queue that this file is being created for. 
-@param name_on_submission A pointer to the file's name host/submission side.
-@param name_on_execution  A pointer to the file's name execution side.
+@param outer_name A pointer to the file's name host/submission side.
+@param inner_name  A pointer to the file's name execution side.
 @return batch_file struct.
 */
-struct batch_file *batch_file_create(struct batch_queue *queue, char *name_on_submission, char *name_on_execution );
+struct batch_file *batch_file_create(struct batch_queue *queue, const char *outer_name, const char *inner_name );
 
 /** Delete batch_file struct.
  This includes freeing host_name and exe_name if defined.
@@ -30,8 +30,8 @@ struct batch_file *batch_file_create(struct batch_queue *queue, char *name_on_su
 void batch_file_delete(struct batch_file *f);
 
 /** Output batch_file as a string.
- Format is "name_on_submission=name_on_execution" where batch_queue supports 
- remote renaming and "name_on_submission" where it does not.
+ Format is "outer_name=inner_name" where batch_queue supports 
+ remote renaming and "outer_name" where it does not.
 @param queue The batch_queue that this is being flattened for. 
 @param file A batch_file struct to be stringified. 
 @return pointer to char * representing the flattened list.

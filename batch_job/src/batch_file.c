@@ -9,37 +9,37 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 
 /**
- * Create batch_file from name_on_submission and name_on_execution.
- * Host name indicates the name that will be on the host/submission side.
+ * Create batch_file from outer_name and inner_name.
+ * Outer/DAG name indicates the name that will be on the host/submission side.
  *  This is equivalent to the filename in Makeflow.
- * Exe name indicates the name that will be used for execution.
- *  IF no name_on_execution is given, or the specified batch_queue does not support
- *  remote renaming the name_on_submission will be used.
+ * Inner/task name indicates the name that will be used for execution.
+ *  IF no inner_name is given, or the specified batch_queue does not support
+ *  remote renaming the outer_name will be used.
  **/
-struct batch_file *batch_file_create(struct batch_queue *queue, char * name_on_submission, char * name_on_execution)
+struct batch_file *batch_file_create(struct batch_queue *queue, const char * outer_name, const char * inner_name)
 {
 	struct batch_file *f = calloc(1,sizeof(*f));
-    f->name_on_submission = xxstrdup(name_on_submission);
+    f->outer_name = xxstrdup(outer_name);
 
-	if(batch_queue_supports_feature(queue, "remote_rename") && name_on_execution){
-		f->name_on_execution = xxstrdup(name_on_execution);
+	if(batch_queue_supports_feature(queue, "remote_rename") && inner_name){
+		f->inner_name = xxstrdup(inner_name);
 	} else {
-		f->name_on_execution = xxstrdup(name_on_submission);
+		f->inner_name = xxstrdup(outer_name);
 	}
 
     return f;
 }
 
 /**
- * Delete batch_file, including freeing name_on_submission and name_on_execution/
+ * Delete batch_file, including freeing outer_name and inner_name/
  **/
 void batch_file_delete(struct batch_file *f)
 {
 	if(!f)
 		return;
 
-	free(f->name_on_submission);
-	free(f->name_on_execution);
+	free(f->outer_name);
+	free(f->inner_name);
 
 	free(f);
 }
@@ -52,9 +52,9 @@ void batch_file_delete(struct batch_file *f)
 char * batch_file_to_string(struct batch_queue *queue, struct batch_file *f )
 {
     if(batch_queue_supports_feature(queue,"remote_rename")) {
-            return string_format("%s=%s", f->name_on_submission, f->name_on_execution);
+            return string_format("%s=%s", f->outer_name, f->inner_name);
     } else {
-            return string_format("%s", f->name_on_submission);
+            return string_format("%s", f->outer_name);
     }
 }
 
