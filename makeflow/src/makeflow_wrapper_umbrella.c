@@ -112,6 +112,8 @@ char *makeflow_umbrella_print_files(struct list *files, bool is_output) {
 
 void makeflow_wrap_umbrella(struct batch_task *task, struct dag_node *n, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue)
 {
+	if(!w) return;
+
 	if(n->umbrella_spec){
 		makeflow_hook_add_input_file(n->d, task, n->umbrella_spec, path_basename(n->umbrella_spec));
 	} else {
