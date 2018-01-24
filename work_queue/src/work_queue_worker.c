@@ -1757,16 +1757,17 @@ static int workspace_create() {
 
 	// Setup working space(dir)
 	const char *workdir;
-	if (user_specified_workdir){
+	const char *workdir_tmp;
+	if (user_specified_workdir) {
 		workdir = user_specified_workdir;
-	} else if(getenv("_CONDOR_SCRATCH_DIR")) {
-		workdir = getenv("_CONDOR_SCRATCH_DIR");
-	} else if(getenv("TMPDIR")) {
-		workdir = getenv("TMPDIR");
-	} else if(getenv("TEMP")) {
-		workdir = getenv("TEMP");
-	} else if(getenv("TMP")) {
-		workdir = getenv("TMP");
+	} else if((workdir_tmp = getenv("_CONDOR_SCRATCH_DIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
+		workdir = workdir_tmp;
+	} else if((workdir_tmp = getenv("TMPDIR")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
+		workdir = workdir_tmp;
+	} else if((workdir_tmp = getenv("TEMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
+		workdir = workdir_tmp;
+	} else if((workdir_tmp = getenv("TMP")) && access(workdir_tmp, R_OK|W_OK|X_OK) == 0) {
+		workdir = workdir_tmp;
 	} else {
 		workdir = "/tmp";
 	}
