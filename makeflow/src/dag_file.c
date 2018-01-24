@@ -38,11 +38,11 @@ struct jx * dag_file_to_jx( struct dag_file *f, struct dag_node *n)
 {
 	struct jx *file = jx_object(0);
 
-	jx_insert(file, jx_string("name_on_submission"), jx_string(f->filename));
+	jx_insert(file, jx_string("dag_name"), jx_string(f->filename));
 
 	const char *remote_name = dag_node_get_remote_name(n, f->filename);
 	if(remote_name){
-		jx_insert(file, jx_string("name_on_execution"), jx_string(remote_name));
+		jx_insert(file, jx_string("task_name"), jx_string(remote_name));
 	}
 
 	jx_insert(file, jx_string("size"), jx_integer(dag_file_size(f)));
