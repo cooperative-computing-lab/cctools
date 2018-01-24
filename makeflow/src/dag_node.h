@@ -86,7 +86,7 @@ struct dag_node {
 	
 	char *archive_id;
 
-	struct batch_task *task;            /* Batch Tax associated with job at batch_submit. */
+	struct batch_task *task;            /* Batch task associated with job at batch_submit. */
 
 	struct dag_node *next;              /* The next node in the list of nodes */
 };

@@ -5,7 +5,6 @@
  * */
 
 #include "create_dir.h"
-#include "batch_task.h"
 #include "debug.h"
 #include "path.h"
 #include "rmonitor.h"
@@ -15,7 +14,6 @@
 #include "dag.h"
 #include "dag_file.h"
 #include "makeflow_log.h"
-#include "makeflow_hook.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_wrapper_monitor.h"
 
@@ -83,6 +81,33 @@ void makeflow_prepare_for_monitoring( struct dag *d, struct makeflow_monitor *m,
 	}
 
 	m->log_prefix = string_format("%s/%s", log_dir, log_format);
+	char *log_name;
+
+	if(m->exe_remote){
+		log_name = string_format("%s=%s", m->exe, m->exe_remote);
+		makeflow_wrapper_add_input_file(m->wrapper, log_name);
+		free(log_name);
+	} else {
+		makeflow_wrapper_add_input_file(m->wrapper, m->exe);
+	}
+
+	log_name = string_format("%s.summary", m->log_prefix);
+	makeflow_wrapper_add_output_file(m->wrapper, log_name);
+	free(log_name);
+
+	if(m->enable_time_series)
+	{
+		log_name = string_format("%s.series", m->log_prefix);
+		makeflow_wrapper_add_output_file(m->wrapper, log_name);
+		free(log_name);
+	}
+
+	if(m->enable_list_files)
+	{
+		log_name = string_format("%s.files", m->log_prefix);
+		makeflow_wrapper_add_output_file(m->wrapper, log_name);
+		free(log_name);
+	}
 }
 
 /*
@@ -129,35 +154,9 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 
 /* Takes node->command and wraps it in wrapper_command. Then, if in monitor
  *  * mode, wraps the wrapped command in the monitor command. */
-void makeflow_wrap_monitor(struct batch_task *task, struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m )
+void makeflow_wrap_monitor( struct batch_task *task, struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m )
 {
 	if(!m) return ;
-
-	char *log_name;
-
-	if(m->exe_remote){
-		makeflow_hook_add_input_file(n->d, task, m->exe, m->exe_remote);
-	} else {
-		makeflow_hook_add_input_file(n->d, task, m->exe, NULL);
-	}
-
-	log_name = string_format("%s.summary", m->log_prefix);
-	makeflow_hook_add_input_file(n->d, task, log_name, NULL);
-	free(log_name);
-
-	if(m->enable_time_series)
-	{
-		log_name = string_format("%s.series", m->log_prefix);
-		makeflow_hook_add_input_file(n->d, task, log_name, NULL);
-		free(log_name);
-	}
-
-	if(m->enable_list_files)
-	{
-		log_name = string_format("%s.files", m->log_prefix);
-		makeflow_hook_add_input_file(n->d, task, log_name, NULL);
-		free(log_name);
-	}
 
 	char *monitor_command = makeflow_rmonitor_wrapper_command(m, queue, n);
 	batch_task_wrap_command(task, monitor_command);

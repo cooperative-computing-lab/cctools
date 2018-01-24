@@ -214,6 +214,24 @@ void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
 }
 
 /*
+Expand a dag_node into a text list of input files,
+output files, and a command, by applying all wrappers
+and settings.  Used at both job submission and completion
+to obtain identical strings.
+*/
+
+static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct batch_task *task )
+{
+	makeflow_generate_files(n, task);
+
+	/* Expand the command according to each of the wrappers */
+	makeflow_wrap_wrapper(task, n, wrapper);
+	makeflow_wrap_enforcer(task, n, enforcer);
+	makeflow_wrap_umbrella(task, n, umbrella, queue);
+	makeflow_wrap_monitor(task, n, queue, monitor);
+}
+
+/*
 Abort one job in a given batch queue.
 */
 
@@ -232,6 +250,9 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	/* Create generic task if one does not exist. This occurs in log recovery. */
 	if(!n->task){
 		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+
+		/* This augments the task struct, should be replaced with hook in future. */
+		makeflow_node_expand(n, q, n->task);
 	}
 
 	/* Clean all files associated with task, includes node and hook files. */
@@ -362,6 +383,9 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 
 	if(!n->task){
 		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+
+		/* This augments the task struct, should be replaced with hook in future. */
+		makeflow_node_expand(n, makeflow_get_queue(n), n->task);
 	}
 
 	// Clean up things associated with this node
@@ -500,6 +524,7 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, str
 	while(1) {
 		if(makeflow_abort_flag) break;
 
+		/* This will eventually be replaced by submit (queue, task )... */
 		jobid = batch_job_submit(queue,
 								task->command,
 								batch_files_to_string(queue, task->input_files),
@@ -529,23 +554,6 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, str
 	return 0;
 }
 
-/*
-Expand a dag_node into a text list of input files,
-output files, and a command, by applying all wrappers
-and settings.  Used at both job submission and completion
-to obtain identical strings.
-*/
-
-static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct batch_task *task )
-{
-	makeflow_generate_files(n, task);
-
-	/* Expand the command according to each of the wrappers */
-	makeflow_wrap_wrapper(task, n, wrapper);
-	makeflow_wrap_enforcer(task, n, enforcer);
-	makeflow_wrap_umbrella(task, n, umbrella, queue);
-	makeflow_wrap_monitor(task, n, queue, monitor);
-}
 
 /*
 Submit a node to the appropriate batch system, after materializing
@@ -566,7 +574,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
-	char *batch_options		  = dag_variable_lookup_string("BATCH_OPTIONS", &s);
+	char *batch_options	= dag_variable_lookup_string("BATCH_OPTIONS", &s);
 
 	char *previous_batch_options = NULL;
 	if(batch_queue_get_option(queue, "batch-options"))
@@ -591,6 +599,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	makeflow_log_batch_file_list_state_change(d,task->output_files,DAG_FILE_STATE_EXPECT);
 
 	/* check archiving directory to see if node has already been preserved */
+	/* This does not jive with task yet. Discussion needed on what the goal of archive is (node level or task level). */
 	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, task->command, n->source_files, n->target_files)){
 		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
 
@@ -607,6 +616,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 
 		/* Update all of the necessary data structures. */
 		if(n->jobid >= 0) {
+			/* Not sure if this is necessary/what it does. */
 			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 
@@ -633,7 +643,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		batch_queue_set_option(queue, "batch-options", previous_batch_options);
 		free(previous_batch_options);
 	}
-
 }
 
 static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
@@ -677,8 +686,8 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 
 
 	/* If all makeflow checks pass for this node we will 
-	 return the result of the hooks, which will be 1 if all pass
-	 and 0 if any fail. */
+	return the result of the hooks, which will be 1 if all pass
+	and 0 if any fail. */
 	return (makeflow_hook_node_check(n, remote_queue) == MAKEFLOW_HOOK_SUCCESS);
 }
 
