@@ -479,55 +479,6 @@ static int makeflow_file_on_sharedfs( const char *filename )
 	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
 
-/*
-Given a file, return the string that identifies it appropriately
-for the given batch system, combining the local and remote name
-and making substitutions according to the node.
-*/
-
-static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
-{
-	const char *remotename = dag_node_get_remote_name(n, f->filename);
-	if(!remotename && wrapper) remotename = makeflow_wrapper_get_remote_name(wrapper, n->d, f->filename);
-	if(!remotename && enforcer) remotename = makeflow_wrapper_get_remote_name(enforcer, n->d, f->filename);
-	if(!remotename && monitor) remotename = makeflow_wrapper_get_remote_name(monitor->wrapper, n->d, f->filename);
-	if(!remotename && umbrella) remotename = makeflow_wrapper_get_remote_name(umbrella->wrapper, n->d, f->filename);
-	if(!remotename) remotename = f->filename;
-
-	if(batch_queue_supports_feature(queue,"remote_rename")) {
-			return string_format("%s=%s,", f->filename, remotename);
-	} else {
-			return string_format("%s,", f->filename);
-	}
-}
-
-/*
-Given a list of files, add the files to the given string.
-Returns the original string, realloced if necessary
-*/
-
-static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
-{
-	struct dag_file *file;
-
-	if(!file_str) file_str = strdup("");
-
-	if(!file_list) return file_str;
-
-	list_first_item(file_list);
-	while((file=list_next_item(file_list))) {
-		if (makeflow_file_on_sharedfs(file->filename)) {
-			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n",
-				file->filename);
-			continue;
-		}
-		char *f = makeflow_file_format(node,file,queue);
-		file_str = string_combine(file_str,f);
-		free(f);
-	}
-
-	return file_str;
-}
 
 /*
 Submit one fully formed job, retrying failures up to the makeflow_submit_timeout.
