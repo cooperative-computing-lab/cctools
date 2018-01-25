@@ -382,21 +382,20 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(os){
-		char* vc3_cmd = string_format("strace -f -o vc3_with_job ./vc3-builder --require cctools-statics -- %s",cmd);
-		//char* vc3_cmd = string_format("strace -f -o vc3_builder_strace ./vc3-builder --require cctools-statics -- date ");
+		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
 		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,vc3_cmd);
 		free(vc3_cmd);
 		free(cmd);
 		cmd = temp;
-		//alternative might be to place the runos.py file in this folder, and then ask for the actual image itself, thus making this much more portable.
-		//files = string_format("%s,%s,%s","run_os",os,cmd);
 		temp = string_format("%s,%s",files,"vc3-builder");
 		free(files);
 		files = temp;
 	}else{
-		char* vc3_cmd = string_format("/afs/crc.nd.edu/group/ccl/software/vc3-builder --require cctools-statics -- %s",cmd);
+		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
+		char* temp = string_format("%s,%s",files,"vc3-builder");
 		free(cmd);
 		cmd = vc3_cmd;
+		files = temp;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
@@ -1294,6 +1293,7 @@ int main(int argc, char *argv[])
 	int k = system(cmd);
 	if(k){
 		fprintf(stderr,"can't copy vc3-builder!: %i\n",k);
+		exit(EXIT_FAILURE);
 	}
 
 	if(password_file) {
