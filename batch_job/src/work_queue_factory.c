@@ -347,7 +347,7 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	else {
 		cmd = string_format(
-		"%s %s %d -t %d -C '%s:%d' -d all -o worker.log %s %s %s",
+		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
 		worker,
 		master_host,
 		master_port,
