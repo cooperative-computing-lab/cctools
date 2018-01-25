@@ -30,8 +30,6 @@ struct batch_task {
 	struct batch_job_info *info; /* Stores the info struct created by batch_job. */
 };
 
-struct batch_task_wrapper;
-
 /** Create a batch_task struct.
 @param queue The queue this task is associated with/assigned to.
 @return A batch_task struct in newly alloced space.
@@ -102,61 +100,6 @@ void batch_task_set_envlist(struct batch_task *t, struct jx *envlist);
 @param info The batch_job_info of the completed task.
 */
 void batch_task_set_info(struct batch_task *t, struct batch_job_info *info);
-
-/** Create a builder for a batch task command wrapper.
- * Use batch_task_wrapper_pre, batch_task_wrapper_cmd, etc. to add
- * commands to the wrapper. These exist only in memory until
- * calling batch_task_wrapper_write. Each command must exit successfully
- * to continue executing the wrapper.
- */
-struct batch_task_wrapper *batch_task_wrapper_create(void);
-
-/** Free a batch_task_wrapper.
- * Any scripts written out will continue to work after
- * calling this function.
- */
-void batch_task_wrapper_delete(struct batch_task_wrapper *w);
-
-/** Add a shell command to the batch task wrapper.
- * Can be called multiple times to append multiple commands.
- * These commands run before cmd or argv.
- * Each command must be a self-contained shell statement.
- * @param cmd The shell command to add.
- */
-void batch_task_wrapper_pre(struct batch_task_wrapper *w, const char *cmd);
-
-/** Specify a command line to execute in the wrapper.
- * The arguments in argv are executed as-is, with no shell interpretation.
- * This command executes after any pre commands.
- * It is undefined behavior to add another command after calling this.
- * @param argv The command line to run.
- */
-void batch_task_wrapper_argv(struct batch_task_wrapper *w, char *const argv[]);
-
-/** Specify a command line to execute with shell interpretation.
- * Same as batch_task_wrapper_argv, but each arg is individually
- * interpreted by the shell for variable substitution and such.
- * It is undefined behavior to add another command after calling this.
- * @param argv The command line to run.
- */
-void batch_task_wrapper_cmd(struct batch_task_wrapper *w, char *const argv[]);
-
-/** Specify cleanup commands.
- * The shell statement specified will be executed before exiting the wrapper,
- * even if previous commands failed. This is a good place for cleanup actions.
- * Can be called multiple times.
- * @param cmd The shell command to add.
- */
-void batch_task_wrapper_post(struct batch_task_wrapper *w, const char *cmd);
-
-/**
- * Write out the batch_task_wrapper as a shell script.
- * Does not consume the batch_task_wrapper.
- * @param prefix The prefix to use to generate a unique name for the wrapper.
- * @returns The name of the generated wrapper, which the caller must free().
- * @returns NULL on failure, and sets errno.
- */
-char *batch_task_wrapper_write(struct batch_task_wrapper *w, struct batch_task *task, const char *prefix);
 
 #endif
 /* vim: set noexpandtab tabstop=4: */
