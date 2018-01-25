@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include "batch_file.h"
 #include "makeflow_log.h"
 #include "makeflow_gc.h"
 #include "dag.h"
@@ -204,7 +205,25 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 	makeflow_log_sync(d,0);
 }
 
-void makeflow_log_file_list_state_change( struct dag *d, struct list *file_list, int newstate )
+void makeflow_log_batch_file_state_change( struct dag *d, struct batch_file *f, int newstate )
+{
+	makeflow_log_file_state_change(d, dag_file_lookup_or_create(d, f->outer_name), newstate);
+}
+
+void makeflow_log_batch_file_list_state_change( struct dag *d, struct list *file_list, int newstate )
+{
+	struct batch_file *f;
+
+	if(!d || !file_list) return;
+
+	list_first_item(file_list);
+	while((f=list_next_item(file_list))) {
+		makeflow_log_batch_file_state_change(d,f,newstate);
+	}
+}
+
+
+void makeflow_log_dag_file_list_state_change( struct dag *d, struct list *file_list, int newstate )
 {
 	struct dag_file *f;
 

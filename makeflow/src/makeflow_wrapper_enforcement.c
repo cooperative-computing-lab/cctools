@@ -59,16 +59,13 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 {
 	if(!w) return result;
 
-	struct list *enforcer_paths;
 	struct dag_file *f;
 	FILE *enforcer = NULL;
 	char *enforcer_path = string_format(enforcer_pattern "%d", n->nodeid);
 	char *mountlist_path = string_format(mountlist_pattern "%d", n->nodeid);
 	char *tmp_path = string_format(tmp_pattern "%d", n->nodeid);
 
-	enforcer_paths = list_create();
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, mountlist_path));
-	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXPECT);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, mountlist_path), DAG_FILE_STATE_EXPECT);
 
 	/* make an invalid mountfile to send */
 	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
@@ -78,12 +75,9 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	write(mountlist_fd, "mountlist\n", 10);
 	close(mountlist_fd);
 
-	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXISTS);
-	list_delete(enforcer_paths);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, mountlist_path), DAG_FILE_STATE_EXISTS);
 
-	enforcer_paths = list_create();
-	list_push_tail(enforcer_paths, dag_file_lookup_or_create(n->d, enforcer_path));
-	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXPECT);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, enforcer_path), DAG_FILE_STATE_EXPECT);
 
 	/* and generate a wrapper script with the current nodeid */
 	int enforcer_fd = open(enforcer_path, O_WRONLY|O_CREAT, S_IRWXU);
@@ -125,8 +119,7 @@ char *makeflow_wrap_enforcer( char *result, struct dag_node *n, struct makeflow_
 	fprintf(enforcer, "exit $RC\n");
 	fclose(enforcer);
 
-	makeflow_log_file_list_state_change(n->d,enforcer_paths,DAG_FILE_STATE_EXISTS);
-	list_delete(enforcer_paths);
+	makeflow_log_file_state_change(n->d, dag_file_lookup_or_create(n->d, enforcer_path), DAG_FILE_STATE_EXISTS);
 
 	free(enforcer_path);
 	free(mountlist_path);

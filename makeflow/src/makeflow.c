@@ -653,7 +653,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	struct jx *envlist = dag_node_env_create(d,n,should_send_all_local_environment);
 
 	/* Logs the creation of output files. */
-	makeflow_log_file_list_state_change(d,output_list,DAG_FILE_STATE_EXPECT);
+	makeflow_log_dag_file_list_state_change(d,output_list,DAG_FILE_STATE_EXPECT);
 
 	/* As integration moves forward we will initialize and pass a batch_task. */
 	makeflow_hook_node_submit(n, queue);
