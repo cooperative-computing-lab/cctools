@@ -1248,7 +1248,7 @@ bool cvmfs_dirent::lookup(pfs_name * path, bool follow_leaf_symlinks, bool expan
 			return false;
 	}
 
-	name = strdup(subpath);
+	name = strdup(path->rest);
 	mode = st.st_mode;
 	size = st.st_size;
 	inode = st.st_ino;
@@ -1347,8 +1347,8 @@ class pfs_service_cvmfs:public pfs_service {
 			return 0;
 		}
 
-		debug(D_CVMFS,"open(%s)",name->rest);
-		int fd = compat_cvmfs_open(name->rest);
+		debug(D_CVMFS,"open(%s)", d.name);
+		int fd = compat_cvmfs_open(d.name);
 
 		if(fd<0) return 0;
 
@@ -1404,8 +1404,8 @@ class pfs_service_cvmfs:public pfs_service {
 		char **buf = NULL;
 		size_t buflen = 0;
 
-		debug(D_CVMFS, "getdir(%s)", name->rest);
-		int rc = compat_cvmfs_listdir(name->rest, &buf, &buflen);
+		debug(D_CVMFS, "getdir(%s)", d.name);
+		int rc = compat_cvmfs_listdir(d.name, &buf, &buflen);
 
 		if(rc<0) return 0;
 
@@ -1554,7 +1554,7 @@ class pfs_service_cvmfs:public pfs_service {
 
 		struct cvmfs_dirent d;
 
-		if(!d.lookup(name, 0, 0)) {
+		if(!d.lookup(name, 0, 1)) {
 			if( errno == EAGAIN ) {
 				class pfs_service *local = pfs_service_lookup_default();
 				return local->readlink(name,buf,bufsiz);
@@ -1563,8 +1563,8 @@ class pfs_service_cvmfs:public pfs_service {
 		}
 
 		if(S_ISLNK(d.mode)) {
-			debug(D_CVMFS, "readlink(%s)", name->rest);
-			int rc = compat_cvmfs_readlink(name->rest, buf, bufsiz);
+			debug(D_CVMFS, "readlink(%s)", d.name);
+			int rc = compat_cvmfs_readlink(d.name, buf, bufsiz);
 
 			if(rc < 0) return rc;
 
