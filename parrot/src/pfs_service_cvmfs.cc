@@ -1082,6 +1082,46 @@ static void chomp_slashes( char *s )
 				t--;
 		}
 }
+
+static int do_readlink(pfs_name *name, char *buf, pfs_size_t bufsiz, bool expand_internal_symlinks) {
+
+	/*
+	If we get readlink("/cvmfs"), return not-a-link.
+	*/
+
+	if(!name->host[0]) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/*
+	Otherwise, do the lookup in CVMFS itself.
+	*/
+
+	struct cvmfs_dirent d;
+
+	if(!d.lookup(name, 0, expand_internal_symlinks)) {
+		if( errno == EAGAIN ) {
+			class pfs_service *local = pfs_service_lookup_default();
+			return local->readlink(name,buf,bufsiz);
+		}
+		return -1;
+	}
+
+	if(S_ISLNK(d.mode)) {
+		debug(D_CVMFS, "readlink(%s)", d.name);
+		int rc = compat_cvmfs_readlink(d.name, buf, bufsiz);
+
+		if(rc < 0) return rc;
+
+		return strlen(buf);
+	} else {
+		errno = EINVAL;
+		return -1;
+	}
+}
+
+
 static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 {
 
@@ -1107,7 +1147,7 @@ static bool path_expand_symlink(struct pfs_name *path, struct pfs_name *xpath)
 
 		strncat(xpath->rest, path_head, PFS_PATH_MAX - 1);
 
-		int rl = xpath->service->readlink(xpath, link_target, PFS_PATH_MAX - 1);
+		int rl = do_readlink(xpath, link_target, PFS_PATH_MAX - 1, false);
 
 		if(rl<0) {
 			if(errno==EINVAL) {
@@ -1538,41 +1578,7 @@ class pfs_service_cvmfs:public pfs_service {
 	}
 
 	virtual int readlink(pfs_name * name, char *buf, pfs_size_t bufsiz) {
-
-				/*
-				If we get readlink("/cvmfs"), return not-a-link.
-				*/
-
-				if(!name->host[0]) {
-			errno = EINVAL;
-			return -1;
-				}
-
-				/*
-				Otherwise, do the lookup in CVMFS itself.
-				*/
-
-		struct cvmfs_dirent d;
-
-		if(!d.lookup(name, 0, 1)) {
-			if( errno == EAGAIN ) {
-				class pfs_service *local = pfs_service_lookup_default();
-				return local->readlink(name,buf,bufsiz);
-			}
-			return -1;
-		}
-
-		if(S_ISLNK(d.mode)) {
-			debug(D_CVMFS, "readlink(%s)", d.name);
-			int rc = compat_cvmfs_readlink(d.name, buf, bufsiz);
-
-			if(rc < 0) return rc;
-
-			return strlen(buf);
-		} else {
-			errno = EINVAL;
-			return -1;
-		}
+			return do_readlink(name, buf, bufsiz, true);
 	}
 
 	virtual int mkdir(pfs_name * name, mode_t mode) {
