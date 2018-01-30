@@ -128,11 +128,11 @@ struct batch_queue * makeflow_get_local_queue(){
 }
 
 struct batch_queue * makeflow_get_queue(struct dag_node *n){
-    if(n->local_job && local_queue) {
-        return local_queue;
-    } else {
-        return remote_queue;
-    }
+	if(n->local_job && local_queue) {
+		return local_queue;
+	} else {
+		return remote_queue;
+	}
 }
 
 static struct rmsummary *local_resources = 0;
@@ -205,28 +205,30 @@ input files, and monitor input files. Relies on %% nodeid
 replacement for monitor file names.
 */
 
-static struct list *makeflow_generate_input_files( struct dag_node *n )
+void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
 {
-	struct list *result = list_duplicate(n->source_files);
-
-	if(wrapper)  result = makeflow_wrapper_generate_files(result, wrapper->input_files, n, wrapper);
-	if(enforcer) result = makeflow_wrapper_generate_files(result, enforcer->input_files, n, enforcer);
-	if(umbrella) result = makeflow_wrapper_generate_files(result, umbrella->wrapper->input_files, n, umbrella->wrapper);
-	if(monitor)  result = makeflow_wrapper_generate_files(result, monitor->wrapper->input_files, n, monitor->wrapper);
-
-	return result;
+	if(wrapper)  makeflow_wrapper_generate_files(task, wrapper->input_files, wrapper->output_files, n, wrapper);
+	if(enforcer) makeflow_wrapper_generate_files(task, enforcer->input_files, enforcer->output_files, n, enforcer);
+	if(umbrella) makeflow_wrapper_generate_files(task, umbrella->wrapper->input_files, umbrella->wrapper->output_files, n, umbrella->wrapper);
+	if(monitor)  makeflow_wrapper_generate_files(task, monitor->wrapper->input_files, monitor->wrapper->output_files, n, monitor->wrapper);
 }
 
-static struct list *makeflow_generate_output_files( struct dag_node *n )
+/*
+Expand a dag_node into a text list of input files,
+output files, and a command, by applying all wrappers
+and settings.  Used at both job submission and completion
+to obtain identical strings.
+*/
+
+static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct batch_task *task )
 {
-	struct list *result = list_duplicate(n->target_files);
+	makeflow_generate_files(n, task);
 
-	if(wrapper)  result = makeflow_wrapper_generate_files(result, wrapper->output_files, n, wrapper);
-	if(enforcer) result = makeflow_wrapper_generate_files(result, enforcer->output_files, n, enforcer);
-	if(umbrella) result = makeflow_wrapper_generate_files(result, umbrella->wrapper->output_files, n, umbrella->wrapper);
-	if(monitor)  result = makeflow_wrapper_generate_files(result, monitor->wrapper->output_files, n, monitor->wrapper);
-
-	return result;
+	/* Expand the command according to each of the wrappers */
+	makeflow_wrap_wrapper(task, n, wrapper);
+	makeflow_wrap_enforcer(task, n, enforcer);
+	makeflow_wrap_umbrella(task, n, umbrella, queue);
+	makeflow_wrap_monitor(task, n, queue, monitor);
 }
 
 /*
@@ -242,12 +244,23 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	makeflow_hook_node_abort(n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
 
-	struct list *outputs = makeflow_generate_output_files(n);
-	struct dag_file *f;
-	list_first_item(outputs);
+	struct batch_file *bf;
+	struct dag_file *df;
 
-	while((f = list_next_item(outputs)))
-		makeflow_clean_file(d, q, f, 0, storage_allocation);
+	/* Create generic task if one does not exist. This occurs in log recovery. */
+	if(!n->task){
+		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+
+		/* This augments the task struct, should be replaced with hook in future. */
+		makeflow_node_expand(n, q, n->task);
+	}
+
+	/* Clean all files associated with task, includes node and hook files. */
+	list_first_item(n->task->output_files);
+	while((bf = list_next_item(n->task->output_files))){
+		df = dag_file_lookup_or_create(d, bf->outer_name);
+		makeflow_clean_file(d, q, df, 0, storage_allocation);
+	}
 
 	makeflow_clean_node(d, q, n, 1);
 }
@@ -346,6 +359,7 @@ Reset all state to cause a node to be re-run.
 void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
 {
 	struct dag_node *p;
+	struct batch_file *bf;
 	struct dag_file *f1;
 	struct dag_file *f2;
 	int child_node_found;
@@ -366,12 +380,21 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 			itable_remove(d->remote_job_table, n->jobid);
 		}
 	}
+
+	if(!n->task){
+		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+
+		/* This augments the task struct, should be replaced with hook in future. */
+		makeflow_node_expand(n, makeflow_get_queue(n), n->task);
+	}
+
 	// Clean up things associated with this node
-	struct list *outputs = makeflow_generate_output_files(n);
-	list_first_item(outputs);
-	while((f1 = list_next_item(outputs)))
+	list_first_item(n->task->output_files);
+	while((bf = list_next_item(n->task->output_files))) {
+		f1 = dag_file_lookup_or_create(d, bf->outer_name);
 		makeflow_clean_file(d, remote_queue, f1, 0, storage_allocation);
-	list_delete(outputs);
+	}
+
 	makeflow_clean_node(d, remote_queue, n, 0);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
@@ -480,79 +503,37 @@ static int makeflow_file_on_sharedfs( const char *filename )
 	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
 
-/*
-Given a file, return the string that identifies it appropriately
-for the given batch system, combining the local and remote name
-and making substitutions according to the node.
-*/
-
-static char * makeflow_file_format( struct dag_node *n, struct dag_file *f, struct batch_queue *queue )
-{
-	const char *remotename = dag_node_get_remote_name(n, f->filename);
-	if(!remotename && wrapper) remotename = makeflow_wrapper_get_remote_name(wrapper, n->d, f->filename);
-	if(!remotename && enforcer) remotename = makeflow_wrapper_get_remote_name(enforcer, n->d, f->filename);
-	if(!remotename && monitor) remotename = makeflow_wrapper_get_remote_name(monitor->wrapper, n->d, f->filename);
-	if(!remotename && umbrella) remotename = makeflow_wrapper_get_remote_name(umbrella->wrapper, n->d, f->filename);
-	if(!remotename) remotename = f->filename;
-
-	if(batch_queue_supports_feature(queue,"remote_rename")) {
-			return string_format("%s=%s,", f->filename, remotename);
-	} else {
-			return string_format("%s,", f->filename);
-	}
-}
-
-/*
-Given a list of files, add the files to the given string.
-Returns the original string, realloced if necessary
-*/
-
-static char * makeflow_file_list_format( struct dag_node *node, char *file_str, struct list *file_list, struct batch_queue *queue )
-{
-	struct dag_file *file;
-
-	if(!file_str) file_str = strdup("");
-
-	if(!file_list) return file_str;
-
-	list_first_item(file_list);
-	while((file=list_next_item(file_list))) {
-		if (makeflow_file_on_sharedfs(file->filename)) {
-			debug(D_MAKEFLOW_RUN, "Skipping file %s on shared fs\n",
-				file->filename);
-			continue;
-		}
-		char *f = makeflow_file_format(node,file,queue);
-		file_str = string_combine(file_str,f);
-		free(f);
-	}
-
-	return file_str;
-}
 
 /*
 Submit one fully formed job, retrying failures up to the makeflow_submit_timeout.
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, const char *command, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
 	batch_job_id_t jobid = 0;
 
-	/* Display the fully elaborated command, just like Make does. */
-	printf("submitting job: %s\n", command);
 
-	/* As integration moves forward batch_task will be added in. */
-	makeflow_hook_batch_submit(queue);
+	/* Display the fully elaborated command, just like Make does. */
+	printf("submitting job: %s\n", task->command);
+
+	makeflow_hook_batch_submit(task);
 
 	while(1) {
 		if(makeflow_abort_flag) break;
 
-		jobid = batch_job_submit(queue, command, input_files, output_files, envlist, resources);
+		/* This will eventually be replaced by submit (queue, task )... */
+		jobid = batch_job_submit(queue,
+								task->command,
+								batch_files_to_string(queue, task->input_files),
+								batch_files_to_string(queue, task->output_files),
+								task->envlist,
+								task->resources);
 		if(jobid >= 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
+			task->jobid = jobid;
 			return jobid;
 		}
 
@@ -573,36 +554,6 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, con
 	return 0;
 }
 
-/*
-Expand a dag_node into a text list of input files,
-output files, and a command, by applying all wrappers
-and settings.  Used at both job submission and completion
-to obtain identical strings.
-*/
-
-static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct list **input_list, struct list **output_list, char **input_files, char **output_files, char **command )
-{
-	makeflow_wrapper_umbrella_set_input_files(umbrella, queue, n);
-
-	if (*input_list == NULL) {
-		*input_list  = makeflow_generate_input_files(n);
-	}
-
-	if (*output_list == NULL) {
-		*output_list = makeflow_generate_output_files(n);
-	}
-
-	/* Create strings for all the files mentioned by this node. */
-	*input_files  = makeflow_file_list_format(n, 0, *input_list,  queue);
-	*output_files = makeflow_file_list_format(n, 0, *output_list, queue);
-
-	/* Expand the command according to each of the wrappers */
-	*command = strdup(n->command);
-	*command = makeflow_wrap_wrapper(*command, n, wrapper);
-	*command = makeflow_wrap_enforcer(*command, n, enforcer, *input_list, *output_list);
-	*command = makeflow_wrap_umbrella(*command, n, umbrella, queue, *input_files, *output_files);
-	*command = makeflow_wrap_monitor(*command, n, queue, monitor);
-}
 
 /*
 Submit a node to the appropriate batch system, after materializing
@@ -612,30 +563,18 @@ wrappers and options.
 
 static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
-	struct batch_queue *queue;
-	struct dag_file *f;
-	struct list *input_list = NULL, *output_list = NULL;
-	char *input_files = NULL, *output_files = NULL, *command = NULL;
-
-	if(n->local_job && local_queue) {
-		queue = local_queue;
-	} else {
-		queue = remote_queue;
-	}
-
+	struct batch_queue *queue = makeflow_get_queue(n);
 	if(storage_allocation && makeflow_alloc_commit_space(storage_allocation, n)){
 		makeflow_log_alloc_event(d, storage_allocation);
 	} else if (storage_allocation && storage_allocation->locked)  {
 		printf("Unable to commit enough space for execution\n");
 	}
 
-	makeflow_node_expand(n, queue, &input_list, &output_list, &input_files, &output_files, &command);
-
 	/* Before setting the batch job options (stored in the "BATCH_OPTIONS"
 	 * variable), we must save the previous global queue value, and then
 	 * restore it after we submit. */
 	struct dag_variable_lookup_set s = { d, n->category, n, NULL };
-	char *batch_options          = dag_variable_lookup_string("BATCH_OPTIONS", &s);
+	char *batch_options	= dag_variable_lookup_string("BATCH_OPTIONS", &s);
 
 	char *previous_batch_options = NULL;
 	if(batch_queue_get_option(queue, "batch-options"))
@@ -647,41 +586,41 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		free(batch_options);
 	}
 
-	batch_queue_set_int_option(queue, "task-id", n->nodeid);
+	/* Create task from node information */
+	struct batch_task *task = dag_node_to_batch_task(n, queue, should_send_all_local_environment);
+	batch_queue_set_int_option(queue, "task-id", task->taskid);
 
-	/* Generate the environment vars specific to this node. */
-	struct jx *envlist = dag_node_env_create(d,n,should_send_all_local_environment);
+	/* This augments the task struct, should be replaced with node_submit in future. */
+	makeflow_node_expand(n, queue, task);
 
-	/* Logs the creation of output files. */
-	makeflow_log_dag_file_list_state_change(d,output_list,DAG_FILE_STATE_EXPECT);
+	makeflow_hook_node_submit(n, task);
 
-	/* As integration moves forward we will initialize and pass a batch_task. */
-	makeflow_hook_node_submit(n, queue);
+	/* Logs the expectation of output files. */
+	makeflow_log_batch_file_list_state_change(d,task->output_files,DAG_FILE_STATE_EXPECT);
 
 	/* check archiving directory to see if node has already been preserved */
-	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, command, input_list, output_list)) {
+	/* This does not jive with task yet. Discussion needed on what the goal of archive is (node level or task level). */
+	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, task->command, n->source_files, n->target_files)){
 		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
 
 		/* copy archived files to working directory and update state for node and dag_files */
-		makeflow_archive_copy_preserved_files(d, n, output_list);
+		makeflow_archive_copy_preserved_files(d, n, n->target_files);
 		n->state = DAG_NODE_STATE_RUNNING;
-		list_first_item(n->target_files);
-		while((f = list_next_item(n->target_files))) {
-			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXISTS);
-		}
+		makeflow_log_batch_file_list_state_change(d,task->output_files, DAG_FILE_STATE_EXISTS);
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 		did_find_archived_job = 1;
 	} else {
 		/* Now submit the actual job, retrying failures as needed. */
 
-		const struct rmsummary *resources = dag_node_dynamic_label(n);
-
-		n->jobid = makeflow_node_submit_retry(queue,command,input_files,output_files,envlist, resources);
+		n->jobid = makeflow_node_submit_retry(queue, task);
 
 		/* Update all of the necessary data structures. */
 		if(n->jobid >= 0) {
-			memcpy(n->resources_allocated, resources, sizeof(struct rmsummary));
+			/* Not sure if this is necessary/what it does. */
+			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+
+			n->task = task;
 
 			if(is_local_job(n)) {
 				makeflow_local_resources_subtract(local_resources,n);
@@ -694,6 +633,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 			}
 		} else {
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+			batch_task_delete(task);
 			makeflow_failed_flag = 1;
 		}
 	}
@@ -703,13 +643,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		batch_queue_set_option(queue, "batch-options", previous_batch_options);
 		free(previous_batch_options);
 	}
-
-	list_delete(input_list);
-	list_delete(output_list);
-	free(command);
-	free(input_files);
-	free(output_files);
-	jx_delete(envlist);
 }
 
 static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
@@ -752,10 +685,10 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 	}
 
 
-    /* If all makeflow checks pass for this node we will 
-     return the result of the hooks, which will be 1 if all pass
-     and 0 if any fail. */
-    return (makeflow_hook_node_check(n, remote_queue) == MAKEFLOW_HOOK_SUCCESS);
+	/* If all makeflow checks pass for this node we will 
+	return the result of the hooks, which will be 1 if all pass
+	and 0 if any fail. */
+	return (makeflow_hook_node_check(n, remote_queue) == MAKEFLOW_HOOK_SUCCESS);
 }
 
 int makeflow_nodes_local_waiting_count(const struct dag *d) {
@@ -838,8 +771,9 @@ int makeflow_node_check_file_was_created(struct dag *d, struct dag_node *n, stru
 Mark the given task as completing, using the batch_job_info completion structure provided by batch_job.
 */
 
-static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_job_info *info)
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task)
 {
+	struct batch_file *bf;
 	struct dag_file *f;
 	int job_failed = 0;
 	int monitor_retried = 0;
@@ -847,7 +781,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	/* As integration moves forward batch_task will also be passed. */
 	/* This is intended for changes to the batch_task that need no
 		no context from dag_node/dag, such as shared_fs. */
-	makeflow_hook_batch_retrieve(queue);
+	makeflow_hook_batch_retrieve(task);
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
@@ -856,8 +790,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_local_resources_add(local_resources,n);
 	}
 
-	/* As integration moves forward batch_task will also be passed. */
-	makeflow_hook_node_end(n, info);
+	makeflow_hook_node_end(n, task);
 
 	if(monitor) {
 		char *nodeid = string_format("%d",n->nodeid);
@@ -883,24 +816,23 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		free(summary_name);
 	}
 
-	struct list *outputs = makeflow_generate_output_files(n);
-
-	if(info->disk_allocation_exhausted) {
+	if(task->info->disk_allocation_exhausted) {
 		job_failed = 1;
 	}
-	else if(info->exited_normally && info->exit_code == 0) {
-		list_first_item(outputs);
-		while((f = list_next_item(outputs))) {
+	else if(task->info->exited_normally && task->info->exit_code == 0) {
+		list_first_item(n->task->output_files);
+		while((bf = list_next_item(n->task->output_files))) {
+			f = dag_file_lookup_or_create(d, bf->outer_name);
 			if(!makeflow_node_check_file_was_created(d, n, f))
 			{
 				job_failed = 1;
 			}
 		}
 	} else {
-		if(info->exited_normally) {
-			fprintf(stderr, "%s failed with exit code %d\n", n->command, info->exit_code);
+		if(task->info->exited_normally) {
+			fprintf(stderr, "%s failed with exit code %d\n", n->command, task->info->exit_code);
 		} else {
-			fprintf(stderr, "%s crashed with signal %d (%s)\n", n->command, info->exit_signal, strsignal(info->exit_signal));
+			fprintf(stderr, "%s crashed with signal %d (%s)\n", n->command, task->info->exit_signal, strsignal(task->info->exit_signal));
 		}
 		job_failed = 1;
 	}
@@ -909,7 +841,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* As integration moves forward batch_task will also be passed. */
 		/* If a hook indicates failure here, it is not fatal, but will result
 			in a failed task. */
-		int hook_success = makeflow_hook_node_fail(n, info);
+		int hook_success = makeflow_hook_node_fail(n, task);
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue, storage_allocation);
@@ -919,9 +851,12 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		}
 
 		/* Clean files created in node. Clean existing and expected and record deletion. */
-		list_first_item(outputs);
-		while((f = list_next_item(outputs))) {
-			if(f->state == DAG_FILE_STATE_EXPECT) {
+		list_first_item(n->task->output_files);
+		while((bf = list_next_item(n->task->output_files))) {
+			f = dag_file_lookup_or_create(d, bf->outer_name);
+
+			/* Either the file was created and not confirmed or a hook removed the file. */
+			if(f->state == DAG_FILE_STATE_EXPECT || f->state == DAG_FILE_STATE_DELETE) {
 				makeflow_clean_failed_file(d, n, remote_queue,
 						f, prep_failed, 1, storage_allocation);
 			} else {
@@ -930,7 +865,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		if(info->disk_allocation_exhausted) {
+		if(task->info->disk_allocation_exhausted) {
 			fprintf(stderr, "\nrule %d failed because it exceeded its loop device allocation capacity.\n", n->nodeid);
 			if(n->resources_measured)
 			{
@@ -949,7 +884,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		if(monitor && info->exit_code == RM_OVERFLOW)
+		if(monitor && task->info->exit_code == RM_OVERFLOW)
 		{
 			debug(D_MAKEFLOW_RUN, "rule %d failed because it exceeded the resources limits.\n", n->nodeid);
 			if(n->resources_measured && n->resources_measured->limits_exceeded)
@@ -970,7 +905,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		}
 
 		if(!monitor_retried) {
-			if(!hook_success || makeflow_retry_flag || info->exit_code == 101) {
+			if(!hook_success || makeflow_retry_flag || task->info->exit_code == 101) {
 				n->failure_count++;
 				if(n->failure_count > makeflow_retry_max) {
 					notice(D_MAKEFLOW_RUN, "job %s failed too many times.", n->command);
@@ -1022,17 +957,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* store node into archiving directory  */
 		if (d->should_write_to_archive) {
 			printf("archiving node within archiving directory\n");
-			struct list *input_list = NULL;
-			char *input_files = NULL, *output_files = NULL, *command = NULL;
-
-			makeflow_node_expand(n, queue, &input_list, &outputs, &input_files, &output_files, &command);
-
-			makeflow_archive_populate(d, n, command, input_list, outputs, info);
-
-			free(command);
-			free(input_files);
-			free(output_files);
-			list_delete(input_list);
+			makeflow_archive_populate(d, n, task->command, n->source_files, n->target_files, task->info);
 		}
 
 		if(storage_allocation && makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
@@ -1044,11 +969,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		/* As integration moves forward batch_task will also be passed. */
 		/* node_success is after file_complete to allow for the final state of the
 			files to be reflected in the structs. Allows for cleanup or archiving.*/
-		makeflow_hook_node_success(n, info);
+		makeflow_hook_node_success(n, task);
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
-	list_delete(outputs);
 }
 
 /*
@@ -1215,8 +1139,11 @@ static void makeflow_run( struct dag *d )
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
-				if(n)
-					makeflow_node_complete(d, n, remote_queue, &info);
+				if(n){
+					// Stop gap until batch_job_wait returns task struct
+					batch_task_set_info(n->task, &info);
+					makeflow_node_complete(d, n, remote_queue, n->task);
+				}
 			}
 		}
 
@@ -1235,8 +1162,11 @@ static void makeflow_run( struct dag *d )
 				cleaned_completed_jobs = 1;
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
-				if(n)
-					makeflow_node_complete(d, n, local_queue, &info);
+				if(n){
+					// Stop gap until batch_job_wait returns task struct
+					batch_task_set_info(n->task, &info);
+					makeflow_node_complete(d, n, local_queue, n->task);
+				}
 			}
 		}
 

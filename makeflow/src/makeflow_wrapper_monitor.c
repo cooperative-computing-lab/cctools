@@ -154,15 +154,13 @@ char *makeflow_rmonitor_wrapper_command( struct makeflow_monitor *m, struct batc
 
 /* Takes node->command and wraps it in wrapper_command. Then, if in monitor
  *  * mode, wraps the wrapped command in the monitor command. */
-char *makeflow_wrap_monitor( char *result, struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m )
+void makeflow_wrap_monitor( struct batch_task *task, struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m )
 {
-	if(!m) return result;
+	if(!m) return ;
 
 	char *monitor_command = makeflow_rmonitor_wrapper_command(m, queue, n);
-	result = string_wrap_command(result, monitor_command);
+	batch_task_wrap_command(task, monitor_command);
 	free(monitor_command);
-
-	return result;
 }
 
 int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queue *queue, struct makeflow_monitor *m)

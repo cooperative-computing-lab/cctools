@@ -16,6 +16,7 @@
 #include "debug.h"
 #include "dag.h"
 #include "xxmalloc.h"
+#include "makeflow_hook.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_wrapper_umbrella.h"
 #include "path.h"
@@ -73,45 +74,7 @@ void makeflow_wrapper_umbrella_set_mode(struct makeflow_wrapper_umbrella *w, con
 	}
 }
 
-void makeflow_wrapper_umbrella_set_input_files(struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, struct dag_node *n) {
-	bool remote_rename_support = false;
-
-	if(!w) return;
-
-	// every rule may have its own umbrella spec file.
-	// to avoid w->wrapper->input_files accumulating umbrella spec files for different rules, first delete it and then recreate it.
-	list_delete(w->wrapper->input_files);
-	w->wrapper->input_files = list_create();
-
-	if(!n->umbrella_spec)  return;
-
-	if (batch_queue_supports_feature(queue, "remote_rename")) {
-		remote_rename_support = true;
-	}
-
-	// add umbrella_spec (if specified) and umbrella_binary (if specified) into the input file list of w->wrapper
-	if (!remote_rename_support) {
-		makeflow_wrapper_add_input_file(w->wrapper, n->umbrella_spec);
-		if(w->binary) makeflow_wrapper_add_input_file(w->wrapper, w->binary);
-	} else {
-		{
-			char *s = string_format("%s=%s", n->umbrella_spec, path_basename(n->umbrella_spec));
-			if(!s) fatal("string_format for umbrella spec failed: %s.\n", strerror(errno));
-			makeflow_wrapper_add_input_file(w->wrapper, s);
-			free(s);
-		}
-		if(w->binary) {
-			char *s = string_format("%s=%s", w->binary, path_basename(w->binary));
-			if(!s) fatal("string_format for umbrella binary failed: %s.\n", strerror(errno));
-			makeflow_wrapper_add_input_file(w->wrapper, s);
-			free(s);
-		}
-	}
-}
-
 void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, struct dag *d) {
-	struct dag_node *cur;
-
 	if(!w->binary) {
 		debug(D_MAKEFLOW_RUN, "the --umbrella-binary option is not set, therefore an umbrella binary should be available on an execution node if umbrella is used to deliver the execution environment.\n");
 	}
@@ -122,28 +85,6 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 		debug(D_MAKEFLOW_RUN, "setting wrapper_umbrella->log_prefix to %s\n", w->log_prefix);
 	}
 
-	cur = d->nodes;
-	while(cur) {
-		char *umbrella_logfile = NULL;
-
-		if(!cur->umbrella_spec) {
-			cur = cur->next;
-			continue;
-		}
-
-		umbrella_logfile = string_format("%s.%d", w->log_prefix, cur->nodeid);
-
-		// A makeflow run may fail if some jobs failed on some bad workers, and the user may want to
-		// retrying the makeflow to rerun these failed jobs.
-		// Checking the existence of umbrella_logfile would cause makeflow retries fail.
-		// Therefore, we stop check the existence of umbrella_logfile here.
-
-		// add umbrella_logfile into the target files of a dag_node
-		dag_node_add_target_file(cur, umbrella_logfile, NULL);
-		free(umbrella_logfile);
-		cur = cur->next;
-	}
-
 	if(!w->mode) {
 		w->mode = "local";
 		debug(D_MAKEFLOW_RUN, "setting wrapper_umbrella->mode to %s\n", w->mode);
@@ -151,114 +92,95 @@ void makeflow_wrapper_umbrella_preparation(struct makeflow_wrapper_umbrella *w, 
 }
 
 // the caller should free the result.
-char *create_umbrella_opt(bool remote_rename_support, char *files, bool is_output, const char *umbrella_logfile) {
-	char *s = files;
-	size_t size;
-	char *result = NULL;
-
-	// the result will be freed by the caller, therefore returning a copy of s is needed.
-	// Returning the original copy and free the original copy may cuase memory corruption.
-	if(!strcmp(s, "")) return xxstrdup(s);
+char *makeflow_umbrella_print_files(struct list *files, bool is_output) {
+	struct batch_file *f;
+	char *result = "";
 
 	// construct the --output or --inputs option of umbrella based on files
-	while((size = strcspn(s, ",\0")) > 0) {
-		char *t;
-		s[size] = '\0';
+	list_first_item(files);
+	while((f = list_next_item(files))){
+		result = string_combine(result, f->inner_name);
+		result = string_combine(result, "=");
+		result = string_combine(result, f->inner_name);
 
-		if(!remote_rename_support) {
-			t = s;
-		} else {
-			t = strchr(s, '=');
-			t++;
-		}
-
-		// avoid adding umbrella_logfile into umbrella_output_opt
-		if(strcmp(t, umbrella_logfile)) {
-			result = string_combine(result, t);
-			result = string_combine(result, "=");
-			result = string_combine(result, t);
-
-			if(is_output) result = string_combine(result, ":f,");
-			else result = string_combine(result, ",");
-		}
-
-		s[size] = ',';
-		s += size+1;
+		if(is_output) result = string_combine(result, ":f,");
+		else result = string_combine(result, ",");
 	}
 
 	return result;
 }
 
-char *makeflow_wrap_umbrella(char *result, struct dag_node *n, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue, char *input_files, char *output_files) {
-	if(!n->umbrella_spec) return result;
+void makeflow_wrap_umbrella(struct batch_task *task, struct dag_node *n, struct makeflow_wrapper_umbrella *w, struct batch_queue *queue)
+{
+	if(!w) return;
+
+	if(n->umbrella_spec){
+		makeflow_hook_add_input_file(n->d, task, n->umbrella_spec, path_basename(n->umbrella_spec));
+	} else {
+		return;
+	}
+
+	if(w->binary) makeflow_hook_add_input_file(n->d, task, w->binary, path_basename(w->binary));
+
+	debug(D_MAKEFLOW_HOOK, "input_files: %s\n", batch_files_to_string(queue, task->input_files));
+	char *umbrella_input_opt = makeflow_umbrella_print_files(task->input_files, false);
+	debug(D_MAKEFLOW_HOOK, "umbrella input opt: %s\n", umbrella_input_opt);
+
+	debug(D_MAKEFLOW_HOOK, "output_files: %s\n", batch_files_to_string(queue, task->output_files));
+	char *umbrella_output_opt = makeflow_umbrella_print_files(task->output_files, true);
+	debug(D_MAKEFLOW_HOOK, "umbrella output opt: %s\n", umbrella_output_opt);
+
+	struct dag_file *log_file = makeflow_hook_add_output_file(n->d, task, w->log_prefix, NULL);
+
+	char *local_binary = NULL;
+	/* If no binary is specified always assume umbrella is in path. */
+	if (!w->binary) {
+		local_binary = xxstrdup("umbrella");
+	/* If remote rename isn't allowed pass binary as specified locally. */
+	} else if (!batch_queue_supports_feature(queue, "remote_rename")) {
+		local_binary = xxstrdup(w->binary);
+	/* If we have the binary and can remotely rename, use ./binary (usually umbrella). */
+	} else {
+		local_binary = string_format("./%s",path_basename(w->binary));
+	}
+
+	char *local_spec = NULL;
+	/* If the node has a specific spec listed use this. */
+	if(n->umbrella_spec){
+		/* Use the basename if we can remote rename. */
+		if (!batch_queue_supports_feature(queue, "remote_rename")) {
+			local_spec = xxstrdup(n->umbrella_spec);
+		} else {
+			local_spec = xxstrdup(path_basename(n->umbrella_spec));
+		}
+	/* If no specific spec use generic. */
+	} else {
+		/* Use the basename if we can remote rename. */
+		if (!batch_queue_supports_feature(queue, "remote_rename")) {
+			local_spec = xxstrdup(w->spec);
+		} else {
+			local_spec = xxstrdup(path_basename(w->spec));
+		}
+	}
 
 	char *umbrella_command = NULL;
-	char *umbrella_input_opt = NULL;
-	char *umbrella_output_opt = NULL;
-	char *umbrella_logfile = NULL;
-	bool remote_rename_support = false;
 
-	if (batch_queue_supports_feature(queue, "remote_rename")) {
-		remote_rename_support = true;
-	}
+	umbrella_command = string_format("%s --spec \"%s\" \
+		--localdir ./umbrella_test \
+		--inputs \"%s\" \
+		--output \"%s\" \
+		--sandbox_mode \"%s\" \
+		--log \"%s\" \
+		run \'{}\'", local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, w->mode, log_file->filename);
 
-	umbrella_logfile = string_format("%s.%d", w->log_prefix, n->nodeid);
+	debug(D_MAKEFLOW_HOOK, "umbrella wrapper command: %s\n", umbrella_command);
 
-	debug(D_MAKEFLOW_RUN, "input_files: %s\n", input_files);
-	umbrella_input_opt = create_umbrella_opt(remote_rename_support, input_files, false, umbrella_logfile);
-	debug(D_MAKEFLOW_RUN, "umbrella input opt: %s\n", umbrella_input_opt);
+	batch_task_wrap_command(task, umbrella_command);
+	debug(D_MAKEFLOW_HOOK, "umbrella command: %s\n", task->command);
 
-	debug(D_MAKEFLOW_RUN, "output_files: %s\n", output_files);
-	umbrella_output_opt = create_umbrella_opt(remote_rename_support, output_files, true, umbrella_logfile);
-	debug(D_MAKEFLOW_RUN, "umbrella output opt: %s\n", umbrella_output_opt);
-
-	// construct umbrella_command
-	if(!remote_rename_support) {
-		if(!w->binary) {
-			umbrella_command = string_format("umbrella --spec \"%s\" \
-				--localdir ./umbrella_test \
-				--inputs \"%s\" \
-				--output \"%s\" \
-				--sandbox_mode \"%s\" \
-				--log \"%s\" \
-				run \'{}\'", n->umbrella_spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
-		} else {
-			umbrella_command = string_format("%s --spec \"%s\" \
-				--localdir ./umbrella_test \
-				--inputs \"%s\" \
-				--output \"%s\" \
-				--sandbox_mode \"%s\" \
-				--log \"%s\" \
-				run \'{}\'", w->binary, n->umbrella_spec, umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
-		}
-	} else {
-		if(!w->binary) {
-			umbrella_command = string_format("umbrella --spec \"%s\" \
-				--localdir ./umbrella_test \
-				--inputs \"%s\" \
-				--output \"%s\" \
-				--sandbox_mode \"%s\" \
-				--log \"%s\" \
-				run \'{}\'", path_basename(n->umbrella_spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
-		} else {
-			umbrella_command = string_format("./%s --spec \"%s\" \
-				--localdir ./umbrella_test \
-				--inputs \"%s\" \
-				--output \"%s\" \
-				--sandbox_mode \"%s\" \
-				--log \"%s\" \
-				run \'{}\'", path_basename(w->binary), path_basename(n->umbrella_spec), umbrella_input_opt, umbrella_output_opt, w->mode, umbrella_logfile);
-		}
-	}
-
-	debug(D_MAKEFLOW_RUN, "umbrella wrapper command: %s\n", umbrella_command);
-
-	result = string_wrap_command(result, umbrella_command);
-	debug(D_MAKEFLOW_RUN, "umbrella command: %s\n", result);
-
+	free(local_binary);
+	free(local_spec);
 	free(umbrella_command);
 	free(umbrella_input_opt);
 	free(umbrella_output_opt);
-	free(umbrella_logfile);
-	return result;
 }

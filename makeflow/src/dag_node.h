@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define DAG_NODE_H
 
 #include "batch_job.h"
+#include "batch_task.h"
 #include "category.h"
 #include "set.h"
 #include "hash_table.h"
@@ -85,6 +86,8 @@ struct dag_node {
 	
 	char *archive_id;
 
+	struct batch_task *task;            /* Batch task associated with job at batch_submit. */
+
 	struct dag_node *next;              /* The next node in the list of nodes */
 };
 
@@ -116,5 +119,7 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n);
 
 void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec);
+
+struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue *queue, int full_env_list);
 
 #endif
