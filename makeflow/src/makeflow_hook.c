@@ -68,12 +68,33 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
 }
 
 
-void makeflow_hook_register(struct makeflow_hook *hook) {
+int makeflow_hook_register_hook(struct makeflow_hook *hook) {
 	assert(hook);
 	if (!makeflow_hooks) makeflow_hooks = list_create();
-	struct makeflow_hook *h = xxmalloc(sizeof(*h));
-	memcpy(h, hook, sizeof(*h));
-	list_push_head(makeflow_hooks, h);
+
+	/* Add hook by default, if it doesn't exists in list of hooks. */
+	int rc = MAKEFLOW_HOOK_SUCCESS;
+	struct makeflow_hook *h = NULL;
+
+	if(hook->register_hook){
+		rc = hook->register_hook(hook, makeflow_hooks);
+	} else {
+		list_first_item(makeflow_hooks);
+		while((h = list_next_item(makeflow_hooks))){
+			if(!strcmp(h->module_name, hook->module_name)){
+				rc = MAKEFLOW_HOOK_SKIP;
+				break;
+			}
+		}
+	}
+
+	if(rc == MAKEFLOW_HOOK_SUCCESS){
+		h = xxmalloc(sizeof(*h));
+		memcpy(h, hook, sizeof(*h));
+
+		list_push_tail(makeflow_hooks, h);
+	}
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_create(struct jx *args){
@@ -121,14 +142,17 @@ int makeflow_hook_dag_start(struct dag *d){
 }
 
 int makeflow_hook_dag_loop(struct dag *d){
-    if (!makeflow_hooks)
-        return MAKEFLOW_HOOK_END;
+    int rc = MAKEFLOW_HOOK_END;
+	if(!makeflow_hooks)
+		return rc;
 
     list_first_item(makeflow_hooks);
     for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
-        int rc = MAKEFLOW_HOOK_SUCCESS;
-        if (h->dag_loop)
+        if (h->dag_loop) {
             rc = h->dag_loop(d);
+		} else {
+			continue;
+		}
 
         if (rc !=MAKEFLOW_HOOK_SUCCESS){
             debug(D_MAKEFLOW_HOOK, "Hook %s:dag_loop rejected DAG",h->module_name?h->module_name:"");
@@ -136,7 +160,7 @@ int makeflow_hook_dag_loop(struct dag *d){
 		}
     }
 
-    return MAKEFLOW_HOOK_SUCCESS;
+    return rc;
 }
 
 

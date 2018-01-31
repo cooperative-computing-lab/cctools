@@ -1387,7 +1387,6 @@ int main(int argc, char *argv[])
 	char *storage_print = NULL;
 	
 	struct jx *hook_args = jx_object(NULL);
-	int enable_example = 0;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1488,7 +1487,7 @@ int main(int argc, char *argv[])
 		{"disable-afs-check", no_argument, 0, 'A'},
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
-		{"enable_hook_example", required_argument, 0, LONG_OPT_HOOK_EXAMPLE},
+		{"enable_hook_example", no_argument, 0, LONG_OPT_HOOK_EXAMPLE},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"gc", required_argument, 0, 'g'},
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
@@ -1773,7 +1772,10 @@ int main(int argc, char *argv[])
 				cache_mode = 0;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
-				enable_example = 1;
+				{
+					extern struct makeflow_hook makeflow_hook_example;
+					makeflow_hook_register_hook(&makeflow_hook_example);
+				}
 				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 				wq_wait_queue_size = optarg;
@@ -1932,14 +1934,6 @@ int main(int argc, char *argv[])
 		fatal("enforcement and Umbrella are mutually exclusive\n");
 	}
 
-	if (enable_example){
-		extern struct makeflow_hook makeflow_hook_example;
-		makeflow_hook_register(&makeflow_hook_example);
-	}
-
-
-	// FINISHED REGISTERING HOOKS
-	
 	makeflow_hook_create(hook_args);
 
 	if((argc - optind) != 1) {
