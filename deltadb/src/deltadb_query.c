@@ -140,11 +140,10 @@ static int checkpoint_read( struct deltadb *db, const char *filename )
 
 static void display_reduce_exprs( struct deltadb *db, time_t current )
 {
-	struct list_node *n;
-
 	/* Reset all reductions. */
-	for(n=db->reduce_exprs->head;n;n=n->next) {
-		deltadb_reduction_reset(n->data);
+	list_first_item(db->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
+		deltadb_reduction_reset(r);
 	}
 
 	/* For each item in the hash table: */
@@ -158,17 +157,17 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 		if(!deltadb_boolean_expr(db->where_expr,jobject)) continue;
 
 		/* Update each reduction with its value. */
-		for(n=db->reduce_exprs->head;n;n=n->next) {
-			struct deltadb_reduction *r = n->data;
+		list_first_item(db->reduce_exprs);
+		for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
 			struct jx *value = jx_eval(r->expr,jobject);
 			if(value && !jx_istype(value, JX_ERROR)) {
 				if(value->type==JX_INTEGER) {
-					deltadb_reduction_update(n->data,(double)value->u.integer_value);
+					deltadb_reduction_update(r,(double)value->u.integer_value);
 				} else if(value->type==JX_DOUBLE) {
-					deltadb_reduction_update(n->data,value->u.double_value);
+					deltadb_reduction_update(r,value->u.double_value);
 				} else {
 					// treat non-numerics as 1, to facilitate operations like COUNT
-					deltadb_reduction_update(n->data,1);
+					deltadb_reduction_update(r,1);
 				}
 
 				jx_delete(value);
@@ -187,8 +186,9 @@ static void display_reduce_exprs( struct deltadb *db, time_t current )
 	}
 
 	/* For each reduction, display the final value. */
-	for(n=db->reduce_exprs->head;n;n=n->next) {
-		printf("%lf\t",deltadb_reduction_value(n->data));
+	list_first_item(db->reduce_exprs);
+	for(struct deltadb_reduction *r; (r = list_next_item(db->reduce_exprs));) {
+		printf("%lf\t",deltadb_reduction_value(r));
 	}
 
 	printf("\n");
@@ -220,9 +220,9 @@ static void display_output_exprs( struct deltadb *db, time_t current )
 
 		/* For each output expression, compute the value and print. */
 
-		struct list_node *n;
-		for(n=db->output_exprs->head;n;n=n->next) {
-			struct jx *jvalue = jx_eval(n->data,jobject);
+		list_first_item(db->output_exprs);
+		for(struct jx *j; (j = list_next_item(db->output_exprs));) {
+			struct jx *jvalue = jx_eval(j,jobject);
 			jx_print_stream(jvalue,stdout);
 			printf("\t");
 			jx_delete(jvalue);
@@ -624,8 +624,8 @@ int main( int argc, char *argv[] )
 	db->display_every = display_every;
 
 	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
-		struct deltadb_reduction *r = db->reduce_exprs->head->data;
-		const char *name = jx_print_string(db->output_exprs->head->data);
+		struct deltadb_reduction *r = list_peek_head(db->reduce_exprs);
+		const char *name = jx_print_string(list_peek_head(db->output_exprs));
 		fprintf(stderr,"deltadb_query: cannot mix reductions like 'MAX(%s)' with plain outputs like '%s'\n",jx_print_string(r->expr),name);
 		return 1;
 	}
