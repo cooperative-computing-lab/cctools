@@ -35,6 +35,7 @@ static const char *k8s_script =
 
 static const char *k8s_script_file_name = "_temp_k8s_script.sh";
 static const char *kubectl_failed_log = "kubectl_failed.log";
+static const char *default_docker_image = "centos";
 
 static const char *k8s_config_tmpl = "\
 {\n\
@@ -215,7 +216,9 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 
 	if(k8s_image == NULL) {
 		if((k8s_image = batch_queue_get_option(q, "k8s-image")) == NULL) {
-			fatal("Please specify the container image by using \"--k8s-image\"");
+			debug(D_BATCH, "No Docker image specified, will use %s by default", default_docker_image);
+			k8s_image = default_docker_image;
+			//fatal("Please specify the container image by using \"--k8s-image\"");
 		}
 	}
 	
@@ -261,8 +264,8 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 			return -1;
 		}
 	
-		double cores = 0.5;
-		double memory = 1024.0;
+		double cores = 0.0;
+		double memory = 0.0;
 
 		if(resources) {
 			cores = resources->cores  > -1 ? (double)resources->cores  : cores;
@@ -278,14 +281,16 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 			memory = min_resource->mem / 1000;
 			free(min_resource);
 		}
-
-		char *k8s_cpu, *k8s_memory;
 		
-		k8s_cpu = string_format("%f", cores);
-		k8s_memory = string_format("%fMi", memory);
+		if (cores != 0.0 && memory != 0.0) {
+			char *k8s_cpu, *k8s_memory;
+				
+			k8s_cpu = string_format("%f", cores);
+			k8s_memory = string_format("%fMi", memory);
 
-		resources_block = string_format(resource_tmpl, 
-				k8s_cpu, k8s_memory, k8s_cpu, k8s_memory);
+			resources_block = string_format(resource_tmpl, 
+					k8s_cpu, k8s_memory, k8s_cpu, k8s_memory);
+		}
 
 		fprintf(fd, k8s_config_tmpl, mf_uuid->str, pod_id, pod_id, k8s_image, 
 				resources_block, job_id, pod_id);
@@ -370,11 +375,13 @@ static void batch_job_k8s_handle_complete_task (char *pod_id, int job_id,
 {
 	struct batch_job_info *info;
 	int timeout = 5;
-	debug(D_BATCH, "%d is failed to execute.", job_id);
 	info = itable_remove(q->job_table, job_id);
 	info->exited_normally = exited_normally;
 	if (exited_normally == 0) {
 		info->exit_code = exit_code;
+		debug(D_BATCH, "%d is failed to execute.", job_id);
+	} else {
+		debug(D_BATCH, "%d successfully complete.", job_id);
 	}
 	memcpy(info_out, info, sizeof(*info));
 	free(info);
@@ -421,15 +428,29 @@ static k8s_job_info *batch_job_k8s_get_kubectl_failed_task()
 	fclose(kubectl_failed_fp);
 	return NULL;
 }	
-
-static int batch_job_k8s_gen_running_pod_lst(struct list **running_pod_lst)
+// ContainerCreating
+// Terminating
+static int batch_job_k8s_gen_running_pod_lst(struct list **running_pod_lst, 
+		struct list **terminating_pod_lst, struct list **creating_pod_lst)
 {
 	if(*running_pod_lst != NULL) {
 		list_free(*running_pod_lst);	
 		list_delete(*running_pod_lst);
 	}
 	
+	if(*terminating_pod_lst != NULL) {
+		list_free(*terminating_pod_lst);
+		list_delete(*terminating_pod_lst);
+	}
+
+	if(*creating_pod_lst != NULL) {
+		list_free(*creating_pod_lst);
+		list_delete(*creating_pod_lst);
+	}
+
 	*running_pod_lst = list_create();	
+	*terminating_pod_lst = list_create();
+	*creating_pod_lst = list_create();
 	
 	char *cmd = string_format("kubectl get pods --show-all -l app=%s | awk \'{if (NR != 1) {print $1\" \"$3}}\' 2>&1 ", 
 			mf_uuid->str);
@@ -455,8 +476,19 @@ static int batch_job_k8s_gen_running_pod_lst(struct list **running_pod_lst)
 		
 
 		if(strcmp(pod_state, "Running") == 0) {
+			debug(D_BATCH, "%s is Running", pod_id);
 			list_push_tail(*running_pod_lst, (void *) pod_id);
 		} 
+
+		if(strcmp(pod_state, "Terminating") == 0) {
+			debug(D_BATCH, "%s is being terminated", pod_id);
+			list_push_tail(*terminating_pod_lst, (void *) pod_id);
+		}	
+
+		if(strcmp(pod_state, "ContainerCreating") == 0) {
+			debug(D_BATCH, "%s is being created", pod_id);
+			list_push_tail(*creating_pod_lst, (void *) pod_id);
+		}
 
 		if(strcmp(pod_state, "Failed") == 0 || 
 				strcmp(pod_state, "OutOfcpu") == 0 ||
@@ -491,6 +523,8 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 	 */
 
 	struct list *running_pod_lst = NULL;
+	struct list *terminating_pod_lst = NULL;
+	struct list *creating_pod_lst = NULL;
 
 	while(1) {
 
@@ -505,7 +539,7 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 		}
 
 		// 2. Generate the list of running pod	
-		int failed_job_id = batch_job_k8s_gen_running_pod_lst(&running_pod_lst);
+		int failed_job_id = batch_job_k8s_gen_running_pod_lst(&running_pod_lst, &terminating_pod_lst, &creating_pod_lst);
 		// if failed_job_id == -1, batch_job_k8s_gen_running_pod_lst function call
 		// failed, return -1
 		if(failed_job_id == -1) {
@@ -524,7 +558,10 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 		// 3. Iterate the running pods, execute tasks that have container ready 
 		char *curr_pod_id;
 		int retry_get_pod_status = 0;
-		list_first_item(running_pod_lst);	
+		list_first_item(running_pod_lst);
+		debug(D_BATCH, "there are %d of running pods", list_size(running_pod_lst));
+		debug(D_BATCH, "there are %d of terminating pods", list_size(terminating_pod_lst));
+		debug(D_BATCH, "there are %d of creating pods", list_size(creating_pod_lst));
 		while((curr_pod_id = (char *)list_next_item(running_pod_lst))) {
 			
 			char *get_log_cmd = string_format("kubectl exec %s -- tail -1 %s.log", 

@@ -40,10 +40,19 @@ create_pod()\n\
 \n\
 transfer_inps()\n\
 {\n\
+	if [ ! -f throughput.log ]\n\
+	then\n\
+		cmd_retry \"touch throughput.log\" \"touch\"\n\
+	fi\n\
 	for i in $(echo $inps | sed \"s/,/ /g\")\n\
     do\n\
-		echo \"kubectl cp $i $pod_id:/\"\n\
-        cmd_retry \"kubectl cp $i $pod_id:/\" \"cp\"\n\
+		echo \"kubectl cp $i $pod_id:/$i\"\n\
+		size=$(wc -c $i | awk '{print $1}')\n\
+		start_time=$(date +%s)\n\
+       		cmd_retry \"kubectl cp $i $pod_id:/$i\" \"cp\"\n\
+		end_time=$(date +%s)\n\
+	    	dur=$((end_time-start_time))\n\
+		echo \"The size of $i is $size byte, and it is transferred in $dur milliseconds\" >> throughput.log\n\
     done\n\
 	update_log \"$job_id,inps_transferred,$(TZ=UTC date +\\\"%H%M%S\\\")\"\n\
 }\n\
