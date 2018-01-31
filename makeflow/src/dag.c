@@ -441,32 +441,6 @@ int dag_mount_clean( struct dag *d ) {
 	return 0;
 }
 
-struct dag_file *dag_file_lookup_fail(
-		struct dag *d, struct batch_queue *q, const char *path) {
-	assert(d);
-	assert(q);
-	assert(path);
-	struct stat buf;
-	struct dag_file *f = dag_file_from_name(d, path);
-	if (f) {
-		if (f->type == DAG_FILE_TYPE_INPUT) {
-			debug(D_MAKEFLOW_RUN,
-					"skipping %s since it's specified as an input",
-					path);
-			return NULL;
-		}
-		return f;
-	} else {
-		if (!batch_fs_stat(q, path, &buf)) {
-			debug(D_MAKEFLOW_RUN,
-					"skipping %s since it already exists",
-					path);
-			return NULL;
-		}
-		return dag_file_lookup_or_create(d, path);
-	}
-}
-
 uint64_t dag_absolute_filesize( struct dag *d )
 {
 	uint64_t size = 0;

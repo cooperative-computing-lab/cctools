@@ -798,11 +798,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		int hook_success = makeflow_hook_node_fail(n, task);
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue);
-		if (prep_failed) {
-			fprintf(stderr, "rule %d failed, cannot move outputs\n",
-					n->nodeid);
-		}
 
 		/* Clean files created in node. Clean existing and expected and record deletion. */
 		list_first_item(n->task->output_files);
@@ -811,11 +806,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 			/* Either the file was created and not confirmed or a hook removed the file. */
 			if(f->state == DAG_FILE_STATE_EXPECT || f->state == DAG_FILE_STATE_DELETE) {
-				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 1);
+				makeflow_clean_file(d, remote_queue, f, 1, storage_allocation);
 			} else {
-				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 0);
+				makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
 			}
 		}
 
@@ -879,9 +872,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			makeflow_failed_flag = 1;
 		}
 	} else {
-		
-
-		makeflow_clean_rm_fail_dir(d, n, remote_queue);
 
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
