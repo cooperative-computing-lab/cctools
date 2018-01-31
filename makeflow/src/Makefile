@@ -17,9 +17,9 @@ MAKEFLOW_MODULES = \
  makeflow_module_fail_dir.o\
  makeflow_module_resource_monitor.o\
  makeflow_module_sandbox.o\
+ makeflow_module_shared_fs.o\
  makeflow_module_singularity.o\
  makeflow_module_storage_allocation.o\
-
 
 TARGETS = $(PROGRAMS)
 

@@ -101,17 +101,17 @@ static int dag_check(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int batch_submit(struct batch_queue *queue, struct batch_task *t){
+static int batch_submit(struct batch_task *t){
 	struct batch_file *f = NULL;
 	struct list *saved_inputs = list_create();
 	struct list *saved_outputs = list_create();
 
 	list_first_item(t->input_files);
 	while((f = list_next_item(t->input_files))){
-		if(batch_file_on_sharedfs(f->name_on_submission)) {
+		if(batch_file_on_sharedfs(f->outer_name)) {
 			list_remove(t->input_files, f);
 			list_push_tail(saved_inputs, f);
-			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->name_on_submission);
+			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
 		}
 	}
 	itable_insert(shared_fs_saved_inputs, t->taskid, saved_inputs);
@@ -119,17 +119,17 @@ static int batch_submit(struct batch_queue *queue, struct batch_task *t){
 
 	list_first_item(t->output_files);
 	while((f = list_next_item(t->output_files))){
-		if(batch_file_on_sharedfs(f->name_on_submission)) {
+		if(batch_file_on_sharedfs(f->outer_name)) {
 			list_remove(t->output_files, f);
 			list_push_tail(saved_outputs, f);
-			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->name_on_submission);
+			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
 		}
 	}
 	itable_insert(shared_fs_saved_outputs, t->taskid, saved_outputs);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_end(struct dag_node *n, struct batch_task *t, struct batch_job_info *bji){
+static int batch_retrieve(struct batch_task *t){
 	struct batch_file *f = NULL;
     struct list *saved_inputs = itable_remove(shared_fs_saved_inputs, t->taskid);
     struct list *saved_outputs = itable_remove(shared_fs_saved_outputs, t->taskid);
@@ -139,7 +139,7 @@ static int node_end(struct dag_node *n, struct batch_task *t, struct batch_job_i
 	    while((f = list_next_item(saved_inputs))){
 	        list_push_tail(t->input_files, f);
 	        list_remove(saved_inputs, f);
-			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->name_on_submission);
+			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_inputs);
 	}
@@ -149,7 +149,7 @@ static int node_end(struct dag_node *n, struct batch_task *t, struct batch_job_i
 	    while((f = list_next_item(saved_outputs))){
 	        list_push_tail(t->output_files, f);
 	        list_remove(saved_outputs, f);
-			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->name_on_submission);
+			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_outputs);
 	}
@@ -165,7 +165,7 @@ struct makeflow_hook makeflow_hook_shared_fs = {
 
 	.batch_submit = batch_submit,
 
-	.node_end = node_end,
+	.batch_retrieve = batch_retrieve,
 };
 
 
