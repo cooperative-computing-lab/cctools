@@ -1774,7 +1774,7 @@ int main(int argc, char *argv[])
 			case LONG_OPT_HOOK_EXAMPLE:
 				{
 					extern struct makeflow_hook makeflow_hook_example;
-					makeflow_hook_register_hook(&makeflow_hook_example);
+					makeflow_hook_register(&makeflow_hook_example);
 				}
 				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:

@@ -68,7 +68,7 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
 }
 
 
-int makeflow_hook_register_hook(struct makeflow_hook *hook) {
+int makeflow_hook_register(struct makeflow_hook *hook) {
 	assert(hook);
 	if (!makeflow_hooks) makeflow_hooks = list_create();
 
@@ -93,8 +93,11 @@ int makeflow_hook_register_hook(struct makeflow_hook *hook) {
 		memcpy(h, hook, sizeof(*h));
 
 		list_push_tail(makeflow_hooks, h);
+	} else if(rc == MAKEFLOW_HOOK_FAILURE){
+		debug(D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
 	}
-	return MAKEFLOW_HOOK_SUCCESS;
+
+	return rc;
 }
 
 int makeflow_hook_create(struct jx *args){

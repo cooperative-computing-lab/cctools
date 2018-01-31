@@ -435,7 +435,7 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
  Example of use see above.
 @param hook The new hook to register.
 */
-int makeflow_hook_register_hook(struct makeflow_hook *hook);
+int makeflow_hook_register(struct makeflow_hook *hook);
 
 int makeflow_hook_create(struct jx *args);
 
