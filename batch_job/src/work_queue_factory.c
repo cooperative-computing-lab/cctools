@@ -98,7 +98,7 @@ static char *wrapper_command = 0;
 static char *wrapper_input = 0;
 static char *worker_command = 0;
 
-static char *os = NULL;
+static char *runos_os = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -331,7 +331,7 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	const char *worker = "work_queue_worker";
+	const char *worker = runos_os ? "work_queue_worker" : "./work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -367,7 +367,7 @@ static int submit_worker( struct batch_queue *queue )
 		cmd = newcmd;
 	}
 
-	char *files=string_format("%s","");// = os ? string_format("%s","") : string_format("work_queue_worker");
+	char *files=xxstrdup("");
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -381,9 +381,9 @@ static int submit_worker( struct batch_queue *queue )
 		files = newfiles;
 	}
 	
-	if(os){
+	if(runos_os){
 		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",os,vc3_cmd);
+		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",runos_os,vc3_cmd);
 		free(vc3_cmd);
 		free(cmd);
 		cmd = temp;
@@ -391,11 +391,9 @@ static int submit_worker( struct batch_queue *queue )
 		free(files);
 		files = temp;
 	}else{
-		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("%s,%s",files,"vc3-builder");
-		free(cmd);
-		cmd = vc3_cmd;
-		files = temp;
+		char* temp = string_format("%s,%s",files,worker);
+		free(files);
+		files=temp;
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
@@ -1185,7 +1183,7 @@ int main(int argc, char *argv[])
 				catalog_host = xxstrdup(optarg);
 				break;
 			case LONG_OPT_RUN_OS:
-				os = xxstrdup(optarg);
+				runos_os = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
@@ -1273,27 +1271,28 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	char cmd[1024];
+	char* cmd;
 	if(worker_command != NULL){
-		sprintf(cmd,"cp '%s' '%s'",worker_command,scratch_dir);
+		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
 			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
 	}else{
-		sprintf(cmd,"cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
+		cmd = string_format("cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
 		if (system(cmd)) {
 			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	memset(cmd,'\0',1024*sizeof(char));
-	sprintf(cmd,"cp \"$(which vc3-builder)\" '%s'",scratch_dir);
-	int k = system(cmd);
-	if(k){
-		fprintf(stderr,"can't copy vc3-builder!: %i\n",k);
-		exit(EXIT_FAILURE);
+	if(runos_os) {
+		cmd = string_format("cp \"$(which vc3-builder)\" '%s'", scratch_dir);
+		int k = system(cmd);
+		if (k) {
+			fprintf(stderr, "can't copy vc3-builder! Please make sure it's in your path. Error code: %i\n", k);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if(password_file) {
