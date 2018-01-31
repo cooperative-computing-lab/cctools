@@ -1336,6 +1336,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_HOOK_EXAMPLE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
+		LONG_OPT_FAIL_DIR,
 		LONG_OPT_GC_SIZE,
 		LONG_OPT_LOCAL_CORES,
 		LONG_OPT_LOCAL_MEMORY,
@@ -1426,6 +1427,7 @@ int main(int argc, char *argv[])
 		{"project-name", required_argument, 0, 'N'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
+		{"save-failures", no_argument, 0, LONG_OPT_FAIL_DIR},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
@@ -1827,6 +1829,12 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_PARROT_PATH:
 				parrot_path = xxstrdup(optarg);
+				break;
+			case LONG_OPT_FAIL_DIR:
+				{
+					extern struct makeflow_hook makeflow_hook_fail_dir;
+					makeflow_hook_register(&makeflow_hook_fail_dir);
+				}
 				break;
 		}
 	}
