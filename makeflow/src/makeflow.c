@@ -1651,7 +1651,7 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SHARED_FS:
 				{
 					extern struct makeflow_hook makeflow_hook_shared_fs;
-					makeflow_hook_register_hook(&makeflow_hook_shared_fs);
+					makeflow_hook_register(&makeflow_hook_shared_fs);
 				}
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
 				if(!jx_lookup(hook_args, "shared_fs_list"))
