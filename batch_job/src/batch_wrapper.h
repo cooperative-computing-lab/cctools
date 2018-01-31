@@ -69,7 +69,15 @@ void batch_wrapper_post(struct batch_wrapper *w, const char *cmd);
  * @returns The name of the generated wrapper, which the caller must free().
  * @returns NULL on failure, and sets errno.
  */
-char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task, const char *prefix);
+char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *t, const char *prefix);
+
+/** Generate one or more wrapper scripts from a JX command spec.
+ * All generated scripts will be added as inputs to the given
+ * batch task.
+ * @returns The name of the outermost wrapper script.
+ * @returns NULL on failure, and sets errno.
+ */
+char *batch_wrapper_expand(struct batch_task *t, struct jx *spec);
 
 #endif
 /* vim: set noexpandtab tabstop=4: */
