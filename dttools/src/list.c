@@ -9,6 +9,20 @@ See the file COPYING for details.
 
 #include <stdlib.h>
 
+struct list_node {
+	void *data;
+	struct list_node *next;
+	struct list_node *prev;
+	double priority;
+};
+
+struct list {
+	struct list_node *head;
+	struct list_node *tail;
+	struct list_node *iter;
+	int size;
+};
+
 struct list *list_create(void)
 {
 	struct list *l;

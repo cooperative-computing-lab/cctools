@@ -39,20 +39,6 @@ transparently modify the linker namespace we are using.
 #define list_first_item			cctools_list_first_item
 #define list_next_item			cctools_list_next_item
 
-struct list_node {
-	void *data;
-	struct list_node *next;
-	struct list_node *prev;
-	double priority;
-};
-
-struct list {
-	struct list_node *head;
-	struct list_node *tail;
-	struct list_node *iter;
-	int size;
-};
-
 typedef int (*list_op_t) (void *item, const void *arg);
 
 /** Create a new linked list.
