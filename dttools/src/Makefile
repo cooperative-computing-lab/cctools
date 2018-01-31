@@ -75,7 +75,6 @@ SOURCES = \
 	load_average.c \
 	md5.c \
 	memfdexe.c \
-	mergesort.c \
 	mkdir_recursive.c \
 	twister.c \
 	nvpair.c \
