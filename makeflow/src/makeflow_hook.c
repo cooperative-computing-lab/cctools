@@ -110,11 +110,6 @@ int makeflow_hook_destroy(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_dag_init(struct dag *d){
-	MAKEFLOW_HOOK_CALL(dag_init, d);
-	return MAKEFLOW_HOOK_SUCCESS;
-}
-
 int makeflow_hook_dag_check(struct dag *d){
 	if (!makeflow_hooks)
 		return MAKEFLOW_HOOK_SUCCESS;
@@ -125,8 +120,14 @@ int makeflow_hook_dag_check(struct dag *d){
 		if (h->dag_check)
 			rc = h->dag_check(d);
 
+		/* If the return is not success return this to Makeflow.
+		 * If it was a failure report this in debugging, if it was something
+		 * else than the system is chosing to exit. A case for this is the
+		 * storage allocation printing function. If not returning FAILURE
+		 * the module should provide a printout for why it is exiting. */
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){
-			debug(D_MAKEFLOW_HOOK, "Hook %s:dag_check rejected DAG",h->module_name?h->module_name:"");
+			if (rc ==MAKEFLOW_HOOK_FAILURE)
+				debug(D_MAKEFLOW_HOOK, "Hook %s:dag_check rejected DAG",h->module_name?h->module_name:"");
 			return rc;
 		}
 	}
@@ -168,7 +169,21 @@ int makeflow_hook_dag_loop(struct dag *d){
 
 
 int makeflow_hook_dag_end(struct dag *d){
-	MAKEFLOW_HOOK_CALL(dag_end, d);
+	if (!makeflow_hooks)
+		return MAKEFLOW_HOOK_SUCCESS;
+
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		int rc = MAKEFLOW_HOOK_SUCCESS;
+		if (h->dag_end)
+			rc = h->dag_end(d);
+
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:dag_end failed dag",h->module_name?h->module_name:"");
+			return rc;
+		}
+	}
+
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
@@ -182,8 +197,8 @@ int makeflow_hook_dag_abort(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_node_create(struct dag_node *node, struct batch_queue *queue){
-	MAKEFLOW_HOOK_CALL(node_create, node, queue);
+int makeflow_hook_dag_success(struct dag *d){
+	MAKEFLOW_HOOK_CALL(dag_success, d);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 

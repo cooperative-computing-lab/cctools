@@ -146,16 +146,6 @@ struct makeflow_hook {
 	 */
 	int (*destroy)       (struct dag *d);
 
-	/* Hook prior to dag creation.
-	 * 
-	 * This is set after hook create, but prior to DAG creation.
-	 * This is for adding features to the Makeflow environment, but not to
-	 * the dag itself as it does not exist.
-	 *
-	 * @return MAKEFLOW_HOOK_SUCCESS if dag init step successful, MAKEFLOW_HOOK_FAILURE if not.
-	 */
-	int (*dag_init)      ();
-
 	/* Hook after to dag validation.
 	 * 
 	 * This is set after dag parse, but prior to DAG start.
@@ -205,8 +195,15 @@ struct makeflow_hook {
 	 */
 	int (*dag_loop)     (struct dag *d);
 
-	/* Hook for a successfully completed DAG.
-	 * 
+	/* Hook for a completed DAG.
+	 *
+	 * Failing a hook at this point indicates that work was left undone or
+	 * failed as a result of the hook. This is used to check if the DAG was 
+	 * left in an unfinished state as a result of the hook, which is possible
+	 * when using resource allocations.
+	 *
+	 * MAKEFLOW_HOOK_FAILURE will cause Makeflow to exit with a failed status.
+	 *
 	 * @param dag The DAG that was complete.
 	 * @return MAKEFLOW_HOOK_SUCCESS if dag end step successful, MAKEFLOW_HOOK_FAILURE if not.
 	 */
@@ -232,19 +229,15 @@ struct makeflow_hook {
 	 */
 	int (*dag_abort)     (struct dag *d);
 
-	/* ADD WRAPPERS IN EITHER CREATE CHECK OR SUBMIT */
-
-	/* Hook when a node is created.
+	/* Hook for a successfully completed DAG.
 	 * 
-	 * This hook occurs during parse when a node is created. Is the first
-	 * opportunity to see the command, files, env, and resources.
+	 * This does not change that the DAG has success, but gives the
+	 * hook access to internal stats for success analysis.
 	 *
-	 * @param dag_node The dag_node that was just created.
-	 * @param batch_job_feature A strucuture that describes supported
-	 *             features of used batch_job system.
-	 * @return MAKEFLOW_HOOK_SUCCESS if successful, MAKEFLOW_HOOK_FAILURE if not.
+	 * @param dag The DAG that was aborted.
+	 * @return MAKEFLOW_HOOK_SUCCESS if dag abort step successful, MAKEFLOW_HOOK_FAILURE if not.
 	 */
-	int (*node_create)   (struct dag_node *node, struct batch_queue *queue);
+	int (*dag_success)     (struct dag *d);
 
 	/* Hook when a node is checked for submission.
 	 * 
@@ -336,36 +329,6 @@ struct makeflow_hook {
 	 */
 	int (*batch_retrieve) ( struct batch_task *task);
 
-
-	/* Hook when file is created.
-	 * 
-	 * Allows modifications when file is created.
-	 *
-	 * Not currently used.
-	 *
-	 * @param dag_file The dag_file that was initialized.
-	 * @return MAKEFLOW_HOOK_SUCCESS is successful, MAKEFLOW_HOOK_FAILURE if not.
-	 */
-	int (*file_create)   (struct dag_file *file);
-
-	/* Hook when file is expected, prior to node submission.
-	 *
-	 * Not currently being used.
-	 *
-	 * @param dag_file The dag_file that is expected.
-	 * @return MAKEFLOW_HOOK_SUCCESS is successful, MAKEFLOW_HOOK_FAILURE if not.
-	 */
-	int (*file_expect)   (struct dag_file *file);
-
-	/* Hook when file is registered as existing.
-	 *
-	 * Not currently being used.
-	 *
-	 * @param dag_file The dag_file that exists.
-	 * @return MAKEFLOW_HOOK_SUCCESS is successful, MAKEFLOW_HOOK_FAILURE if not.
-	 */
-	int (*file_exist)    (struct dag_file *file);
-
 	/* Hook when file is registered as complete.
 	 *
 	 * Complete means that the file still exists, 
@@ -441,8 +404,6 @@ int makeflow_hook_create(struct jx *args);
 
 int makeflow_hook_destroy(struct dag *d);
 
-int makeflow_hook_dag_init(struct dag *d);
-
 int makeflow_hook_dag_check(struct dag *d);
 
 int makeflow_hook_dag_clean(struct dag *d);
@@ -456,6 +417,8 @@ int makeflow_hook_dag_end(struct dag *d);
 int makeflow_hook_dag_fail(struct dag *d);
 
 int makeflow_hook_dag_abort(struct dag *d);
+
+int makeflow_hook_dag_success(struct dag *d);
 
 int makeflow_hook_node_create(struct dag_node *node, struct batch_queue *queue);
 

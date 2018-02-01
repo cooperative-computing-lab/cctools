@@ -39,7 +39,6 @@ See the file COPYING for details.
 #include "parser_jx.h"
 
 #include "makeflow_summary.h"
-#include "makeflow_alloc.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
@@ -1032,8 +1031,6 @@ static void makeflow_run( struct dag *d )
 	timestamp_t start = timestamp_get();
 	// Last Report is created stall for first reporting.
 	timestamp_t last_time = start - (60 * 1000 * 1000);
-	// Relevant to GC and allocations
-	int cleaned_completed_jobs = 0;
 
 	//reporting to catalog
 	if(catalog_reporting_on){
@@ -1058,17 +1055,13 @@ static void makeflow_run( struct dag *d )
 		if(dag_local_jobs_running(d)==0 && 
 			dag_remote_jobs_running(d)==0 && 
 			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END) &&
-			did_find_archived_job == 0 && 
-			cleaned_completed_jobs == 0 )
+			did_find_archived_job == 0)
 			break;
-
-		cleaned_completed_jobs = 0;
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
 			jobid = batch_job_wait_timeout(remote_queue, &info, time(0) + tmp_timeout);
 			if(jobid > 0) {
-				cleaned_completed_jobs = 1;
 				printf("job %"PRIbjid" completed\n",jobid);
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->remote_job_table, jobid);
@@ -1092,7 +1085,6 @@ static void makeflow_run( struct dag *d )
 
 			jobid = batch_job_wait_timeout(local_queue, &info, stoptime);
 			if(jobid > 0) {
-				cleaned_completed_jobs = 1;
 				debug(D_MAKEFLOW_RUN, "Job %" PRIbjid " has returned.\n", jobid);
 				n = itable_remove(d->local_job_table, jobid);
 				if(n){
@@ -2125,10 +2117,6 @@ int main(int argc, char *argv[])
 	}
 
 	printf("checking %s for consistency...\n",dagfile);
-	if(makeflow_hook_dag_check(d) == MAKEFLOW_HOOK_FAILURE) {
-		goto EXIT_WITH_FAILURE;
-	}
-
 	if(!makeflow_check(d)) {
 		goto EXIT_WITH_FAILURE;
 	}
@@ -2137,6 +2125,12 @@ int main(int argc, char *argv[])
 		goto EXIT_WITH_FAILURE;
 	}
 
+	int rc = makeflow_hook_dag_check(d);
+	if(rc == MAKEFLOW_HOOK_FAILURE) {
+		goto EXIT_WITH_FAILURE;
+	} else if(rc == MAKEFLOW_HOOK_END) {
+		goto EXIT_WITH_SUCCESS;
+	}
 	printf("%s has %d rules.\n",dagfile,d->nodeid_counter);
 
 	setlinebuf(stdout);
@@ -2203,7 +2197,7 @@ int main(int argc, char *argv[])
 			unlink(logfilename);
 		}
 
-		exit(0);
+		goto EXIT_WITH_SUCCESS;
 	}
 
 	printf("starting workflow....\n");
@@ -2233,17 +2227,21 @@ int main(int argc, char *argv[])
 	d->should_read_archive = should_read_archive;
 	d->should_write_to_archive = should_write_to_archive;
 
-	/* Makeflow fails by default if we goto EXIT_WITH_FAILURE.
-		This indicates we have correctly initialized. */
-	makeflow_failed_flag = 0;
-
 	makeflow_run(d);
 
 	if(makeflow_failed_flag == 0 && makeflow_nodes_local_waiting_count(d) > 0) {
-		makeflow_failed_flag = 1;
 		debug(D_ERROR, "There are local jobs that could not be run. Usually this means that makeflow did not have enough local resources to run them.");
 		goto EXIT_WITH_FAILURE;
 	}
+
+	if(makeflow_hook_dag_end(d) != MAKEFLOW_HOOK_SUCCESS){
+		goto EXIT_WITH_FAILURE;
+	}
+
+EXIT_WITH_SUCCESS:
+	/* Makeflow fails by default if we goto EXIT_WITH_FAILURE.
+		This indicates we have correctly initialized. */
+	makeflow_failed_flag = 0;
 
 EXIT_WITH_FAILURE:
 	time_completed = timestamp_get();
@@ -2298,7 +2296,7 @@ EXIT_WITH_FAILURE:
 		fprintf(stderr, "workflow failed.\n");
 		exit_value = EXIT_FAILURE;
 	} else {
-		makeflow_hook_dag_end(d);
+		makeflow_hook_dag_success(d);
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
 		exit_value = EXIT_SUCCESS;
