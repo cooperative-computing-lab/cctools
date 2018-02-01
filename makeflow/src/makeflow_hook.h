@@ -51,6 +51,7 @@
  *
  * E.G.
  * struct makeflow_hook makeflow_hook_example = {
+ *    .module_name = "EXAMPLE",
  *    .create = makeflow_hook_example_create,
  *    .destroy = makeflow_hook_example_destroy,
  * }
@@ -64,7 +65,7 @@
  *
  * E.G.
  * extern struct makeflow_hook makeflow_hook_example;
- * register_hook(&makeflow_hook_example);
+ * makeflow_hook_register_hook(&makeflow_hook_example);
  *
  * Finally, the file where your hook definition resides needs
  * to be added to the makeflow/src/Makefile so that it is built.
@@ -93,7 +94,34 @@
  */
 struct makeflow_hook {
 
+	/* Module Name.
+	 *
+	 * MUST BE DEFINED.
+	 *
+	 * This name defines how we can identify this module.
+	 * This is used in register hook and to identify 
+	 * debug and failure statements.
+	 */
 	const char * module_name;
+
+	/* Register hook.
+	 *
+	 * Registers the hook into a linked list of hooks. The order of the
+	 * hooks may vary with the order of invocation from the argument
+	 * parsing in makeflow. This hook allows a the called hook to inspect
+	 * the registered hooks and determine:
+	 * 1) If it can be added (we can disallow conflicting hooks).
+	 * 2) If multiple instance can be used, such as nesting containers or
+	 *		wrappers.
+	 * 3) If features are affected by presence of other hooks
+	 *		(allowance of absolute paths).
+	 *
+	 * @param hook The hook that is being registered.
+	 * @param hook_list The list of already registered hooks.
+	 * @return MAKEFLOW_HOOK_SUCCESS if it is to be added, 
+	 *		and MAKEFLOW_HOOK_SKIP if it is to be skipped.
+	 */
+	int (*register_hook) (struct makeflow_hook *hook, struct list *hook_list);
 
 	/* Initialize hooks.
 	 *
@@ -371,6 +399,7 @@ struct makeflow_hook {
 typedef enum {
     MAKEFLOW_HOOK_SUCCESS = 0,
     MAKEFLOW_HOOK_FAILURE,
+    MAKEFLOW_HOOK_SKIP,
     MAKEFLOW_HOOK_END
 } makeflow_hook_result;
 
@@ -406,7 +435,7 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
  Example of use see above.
 @param hook The new hook to register.
 */
-void makeflow_hook_register(struct makeflow_hook *hook);
+int makeflow_hook_register(struct makeflow_hook *hook);
 
 int makeflow_hook_create(struct jx *args);
 
