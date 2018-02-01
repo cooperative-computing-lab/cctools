@@ -420,8 +420,6 @@ int makeflow_hook_dag_abort(struct dag *d);
 
 int makeflow_hook_dag_success(struct dag *d);
 
-int makeflow_hook_node_create(struct dag_node *node, struct batch_queue *queue);
-
 int makeflow_hook_node_check(struct dag_node *node, struct batch_queue *queue);
 
 int makeflow_hook_node_submit(struct dag_node *node, struct batch_task *task);
