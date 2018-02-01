@@ -45,6 +45,8 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
+#define CCTOOLS_RUNOS_PATH /afs/crc.nd.edu/group/ccl/software/runos/runos.py
+
 typedef enum {
 	FORMAT_TABLE,
 	FORMAT_LONG
@@ -383,7 +385,7 @@ static int submit_worker( struct batch_queue *queue )
 	
 	if(runos_os){
 		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("python /afs/crc.nd.edu/group/ccl/software/runos/runos.py %s %s",runos_os,vc3_cmd);
+		char* temp = string_format("python CCTOOLS_RUNOS_PATH %s %s",runos_os,vc3_cmd);
 		free(vc3_cmd);
 		free(cmd);
 		cmd = temp;
