@@ -45,7 +45,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH /afs/crc.nd.edu/group/ccl/software/runos/runos.py
+#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos.py"
 
 typedef enum {
 	FORMAT_TABLE,
@@ -385,7 +385,7 @@ static int submit_worker( struct batch_queue *queue )
 	
 	if(runos_os){
 		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
-		char* temp = string_format("python CCTOOLS_RUNOS_PATH %s %s",runos_os,vc3_cmd);
+		char* temp = string_format("python %s %s %s",CCTOOLS_RUNOS_PATH,runos_os,vc3_cmd);
 		free(vc3_cmd);
 		free(cmd);
 		cmd = temp;
@@ -1280,15 +1280,16 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
+		free(cmd);
 	}else{
 		cmd = string_format("cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
 		if (system(cmd)) {
 			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
 			exit(EXIT_FAILURE);
 		}
+		free(cmd);
 	}
 	
-	free(cmd);
 	
 	if(runos_os) {
 		cmd = string_format("cp \"$(which vc3-builder)\" '%s'", scratch_dir);
@@ -1300,8 +1301,9 @@ int main(int argc, char *argv[])
 	}
 
 	if(password_file) {
-		sprintf(cmd,"cp %s %s/pwfile",password_file,scratch_dir);
+		cmd = string_format("cp %s %s/pwfile",password_file,scratch_dir);
 		system(cmd);
+		free(cmd);
 	}
 
 	if(chdir(scratch_dir)!=0) {
