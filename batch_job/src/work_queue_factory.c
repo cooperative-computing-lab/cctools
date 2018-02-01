@@ -1287,7 +1287,9 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
-
+	
+	free(cmd);
+	
 	if(runos_os) {
 		cmd = string_format("cp \"$(which vc3-builder)\" '%s'", scratch_dir);
 		int k = system(cmd);
