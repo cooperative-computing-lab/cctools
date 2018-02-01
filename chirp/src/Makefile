@@ -28,13 +28,22 @@ TARGETS = $(PROGRAMS) $(LIBRARIES) bindings
 all: $(TARGETS)
 
 chirp: chirp_tool.o
+ifeq ($(CCTOOLS_STATIC),1)
+	$(CCTOOLS_LD) -static -g -o $@ $(LOCAL_LINKAGE) $^ $(CCTOOLS_STATIC_LINKAGE)
+else
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE) $(CCTOOLS_READLINE_LDFLAGS)
+endif
 
+ifeq ($(CCTOOLS_STATIC),1)
+chirp_fuse:
+	@echo "chirp_fuse cannot be built statically"
+else
 chirp_fuse: chirp_fuse.o
 	$(CCTOOLS_LD) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LDFLAGS) $^ $(LOCAL_LINKAGE) $(CCTOOLS_FUSE_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 chirp_fuse.o: chirp_fuse.c
 	$(CCTOOLS_CC) -o $@ -c $(CCTOOLS_INTERNAL_CCFLAGS) $(LOCAL_CCFLAGS) $(CCTOOLS_FUSE_CCFLAGS) $<
+endif
 
 chirp_job.o chirp_fs_local_scheduler.o: chirp_sqlite.h
 

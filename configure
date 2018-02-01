@@ -1281,6 +1281,12 @@ fi
 
 # Check which packages we can build, according to the results above
 echo "checking for package compatibility..."
+
+if [ "${include_package_chirp}" = chirp ]
+then
+		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP"
+fi
+
 if [ "$include_package_parrot" = parrot ]
 then
 	if [ -d parrot -a $BUILD_SYS = LINUX ]
@@ -1307,17 +1313,6 @@ then
 	else
 		echo "resource_monitor is NOT supported on ${BUILD_SYS}"
 		include_package_resource_monitor=""
-	fi
-fi
-
-if [ "${include_package_chirp}" = chirp ]
-then
-	if [ "$optstatic" = 1 ]
-	then
-		echo "chirp cannot currently be build statically".
-		include_package_chirp=""
-	else
-		internal_ccflags="${internal_ccflags} -DCCTOOLS_WITH_CHIRP"
 	fi
 fi
 
