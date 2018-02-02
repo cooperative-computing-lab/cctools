@@ -1309,6 +1309,8 @@ int main(int argc, char *argv[])
 	struct jx *jx_args = jx_object(NULL);
 	
 	struct jx *hook_args = jx_object(NULL);
+	extern struct makeflow_hook makeflow_hook_example;
+	extern struct makeflow_hook makeflow_hook_storage_allocation;
 
 	random_init();
 	debug_config(argv[0]);
@@ -1694,10 +1696,7 @@ int main(int argc, char *argv[])
 				cache_mode = 0;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
-				{
-					extern struct makeflow_hook makeflow_hook_example;
-					makeflow_hook_register(&makeflow_hook_example);
-				}
+				makeflow_hook_register(&makeflow_hook_example);
 				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 				wq_wait_queue_size = optarg;
@@ -1734,24 +1733,15 @@ int main(int argc, char *argv[])
 				list_push_head(shared_fs_list, xxstrdup(optarg));
 				break;
 			case LONG_OPT_STORAGE_TYPE:
-				{
-					extern struct makeflow_hook makeflow_hook_storage_allocation;
-					makeflow_hook_register(&makeflow_hook_storage_allocation);
-				}
+				makeflow_hook_register(&makeflow_hook_storage_allocation);
 				jx_insert(hook_args, jx_string("storage_allocation_type"), jx_integer(atoi(optarg)));
 				break;
 			case LONG_OPT_STORAGE_LIMIT:
-				{
-					extern struct makeflow_hook makeflow_hook_storage_allocation;
-					makeflow_hook_register(&makeflow_hook_storage_allocation);
-				}
+				makeflow_hook_register(&makeflow_hook_storage_allocation);
 				jx_insert(hook_args, jx_string("storage_allocation_limit"), jx_integer(string_metric_parse(optarg)));
 				break;
 			case LONG_OPT_STORAGE_PRINT:
-				{
-					extern struct makeflow_hook makeflow_hook_storage_allocation;
-					makeflow_hook_register(&makeflow_hook_storage_allocation);
-				}
+				makeflow_hook_register(&makeflow_hook_storage_allocation);
 				jx_insert(hook_args, jx_string("storage_allocation_print"), jx_string(optarg));
 				break;
 			case LONG_OPT_DOCKER:
