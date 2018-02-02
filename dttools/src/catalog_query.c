@@ -219,13 +219,6 @@ void catalog_query_delete(struct catalog_query *q)
 
 char *catalog_query_compress_update(const char *text, unsigned long *data_length)
 {
-	char *do_compress = getenv("CATALOG_COMPRESS_UPDATES");
-
-	/* Do not compress if env var is set to off.*/
-	if(!do_compress || strcmp(do_compress, "on")) {
-		return NULL;
-	}
-
 	unsigned long compress_data_length;
 	/* Default to buffer error incase we don't compress. */
 	int success = Z_BUF_ERROR;
@@ -242,11 +235,9 @@ char *catalog_query_compress_update(const char *text, unsigned long *data_length
 	if(success!=Z_OK) {
 		/* Compression failed, fall back to original uncompressed update. */
 		debug(D_DEBUG,"warning: Unable to compress data for update.\n");
-
 		free(compress_data);
 		return NULL;
 	} else {
-		debug(D_DEBUG,"Sending compressed update to catalog.\n");
 		/* Add 1 to the compresed data length to account for the leading 0x1A. */
 		*data_length = compress_data_length + 1;
 		return compress_data;
@@ -255,13 +246,10 @@ char *catalog_query_compress_update(const char *text, unsigned long *data_length
 
 int catalog_query_send_update(const char *hosts, const char *text)
 {
-	int port;
 	int sent = 0;
 	unsigned long data_length;
 	const char *next_host = hosts;
-	char address[DATAGRAM_ADDRESS_MAX];
-	char host[DOMAIN_NAME_MAX];
-	char *compress_data;
+	char *update_data = 0;
 	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
 
 	if (!d) {
@@ -270,24 +258,44 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	
 	data_length = strlen(text)+1;
 
-	compress_data = catalog_query_compress_update(text, &data_length);
+	size_t compress_limit = 1200;
+	const char *compress_limit_str = getenv("CATALOG_UPDATE_LIMIT");
+	if(compress_limit_str) compress_limit = atoi(compress_limit_str);
+
+	if(strlen(text)<compress_limit) {
+		update_data = strdup(text);
+	} else {
+		update_data = catalog_query_compress_update(text, &data_length);
+		if(!update_data) {
+			datagram_delete(d);
+			return 0;
+		}
+
+		debug(D_DEBUG,"compressed update message from %d to %d bytes",(int)strlen(text),(int)data_length);
+
+		if(data_length>compress_limit) {
+			debug(D_NOTICE,"compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)",(int)compress_limit);
+			datagram_delete(d);
+			return 0;
+		}
+	}
 
 	do {
+		char address[DATAGRAM_ADDRESS_MAX];
+		char host[DOMAIN_NAME_MAX];
+		int port;
+
 		next_host = parse_hostlist(next_host, host, &port);
 		if (domain_name_cache_lookup(host, address)) {
 			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
-			if(!compress_data) {
-				datagram_send(d, text, data_length, address, port);
-			} else {
-				datagram_send(d, compress_data, data_length, address, port);
-			}
+			datagram_send(d, update_data, data_length, address, port);
 			sent++;
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
 		}
 	} while (next_host);
 
-	free(compress_data);
+	free(update_data);
 	datagram_delete(d);
 	return sent;
 }
