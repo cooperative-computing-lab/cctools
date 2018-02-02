@@ -243,7 +243,7 @@ char *catalog_query_compress_update(const char *text, unsigned long *data_length
 	}
 }
 
-int catalog_query_send_update(const char *hosts, const char *text)
+static int catalog_query_send_update_internal(const char *hosts, const char *text, int fail_if_too_big )
 {
 	int sent = 0;
 	unsigned long data_length;
@@ -272,8 +272,8 @@ int catalog_query_send_update(const char *hosts, const char *text)
 
 		debug(D_DEBUG,"compressed update message from %d to %d bytes",(int)strlen(text),(int)data_length);
 
-		if(data_length>compress_limit) {
-			debug(D_NOTICE,"compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)",(int)compress_limit);
+		if(data_length>compress_limit && fail_if_too_big) {
+			debug(D_DEBUG,"compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)",(int)compress_limit);
 			datagram_delete(d);
 			return 0;
 		}
@@ -297,6 +297,16 @@ int catalog_query_send_update(const char *hosts, const char *text)
 	free(update_data);
 	datagram_delete(d);
 	return sent;
+}
+
+int catalog_query_send_update(const char *hosts, const char *text)
+{
+	return catalog_query_send_update_internal(hosts,text,0);
+}
+
+int catalog_query_send_update_conditional(const char *hosts, const char *text)
+{
+	return catalog_query_send_update_internal(hosts,text,1);
 }
 
 /* vim: set noexpandtab tabstop=4: */

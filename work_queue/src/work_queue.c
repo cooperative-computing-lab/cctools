@@ -756,7 +756,7 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 
 	// Send the buffer.
 	debug(D_WQ, "Advertising master status to the catalog server(s) at %s ...", q->catalog_hosts);
-	if(!catalog_query_send_update(q->catalog_hosts, str)) {
+	if(!catalog_query_send_update_conditional(q->catalog_hosts, str)) {
 
 		// If the send failed b/c the buffer is too big, send the lean version instead.
 		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
