@@ -71,6 +71,7 @@ SOURCES = \
 	jx_function.c \
 	link.c \
 	link_auth.c \
+	linkedlist.c \
 	list.c \
 	load_average.c \
 	md5.c \
