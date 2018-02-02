@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "random.h"
 
 struct batch_wrapper {
 	struct list *pre;
@@ -148,14 +149,15 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 	fprintf(wrapper, "set -e\n");
 
 	if (w->post) {
-		// function name unlikely to collide with user's stuff
-		fprintf(wrapper, "CLEANUP_76tnb43rr7 () {\n");
+		char fresh[16];
+		random_hex(fresh, sizeof(fresh));
+		fprintf(wrapper, "CLEANUP_%s () {\n", fresh);
 		list_first_item(w->post);
 		for (const char *c; (c = list_next_item(w->post));) {
 			fprintf(wrapper, "eval %s\n", c);
 		}
 		fprintf(wrapper, "}\n");
-		fprintf(wrapper, "trap CLEANUP_76tnb43rr7 EXIT INT TERM\n");
+		fprintf(wrapper, "trap CLEANUP_%s EXIT INT TERM\n", fresh);
 	}
 
 	if (w->pre) {
