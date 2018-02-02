@@ -62,6 +62,14 @@ void batch_wrapper_cmd(struct batch_wrapper *w, const char *cmd);
  */
 void batch_wrapper_post(struct batch_wrapper *w, const char *cmd);
 
+/** Set the name prefix to use for the wrapper script.
+ * The actual filename will consist of the prefix, an underscore,
+ * and some random characters to ensure that the name is unique.
+ * Defaults to "./wrapper"
+ * @param prefix The filename prefix to use.
+ */
+void batch_wrapper_prefix(struct batch_wrapper *w, const char *prefix);
+
 /**
  * Write out the batch_wrapper as a shell script.
  * Does not consume the batch_wrapper.
@@ -69,7 +77,7 @@ void batch_wrapper_post(struct batch_wrapper *w, const char *cmd);
  * @returns The name of the generated wrapper, which the caller must free().
  * @returns NULL on failure, and sets errno.
  */
-char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *t, const char *prefix);
+char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *t);
 
 /** Generate one or more wrapper scripts from a JX command spec.
  * All generated scripts will be added as inputs to the given

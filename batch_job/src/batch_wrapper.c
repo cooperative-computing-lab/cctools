@@ -21,6 +21,7 @@ struct batch_wrapper {
 	struct list *post;
 	struct list *argv;
 	char *cmd;
+	char *prefix;
 };
 
 struct batch_wrapper *batch_wrapper_create(void) {
@@ -36,6 +37,7 @@ void batch_wrapper_delete(struct batch_wrapper *w) {
 	list_free(w->argv);
 	list_delete(w->argv);
 	free(w->cmd);
+	free(w->prefix);
 	free(w);
 }
 
@@ -100,12 +102,18 @@ void batch_wrapper_post(struct batch_wrapper *w, const char *cmd) {
 	assert(rc == 1);
 }
 
-char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task, const char *prefix) {
+void batch_wrapper_prefix(struct batch_wrapper *w, const char *prefix) {
+	assert(w);
+	assert(prefix);
+	assert(!w->prefix);
+	w->prefix = xxstrdup(prefix);
+}
+
+char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 	assert(w);
 	assert(task);
-	assert(prefix);
 
-	char *name = string_format("%sXXXXXX", prefix);
+	char *name = string_format("%s_XXXXXX", w->prefix ? w->prefix : "./wrapper");
 	int wrapper_fd = mkstemp(name);
 	if (wrapper_fd == -1) {
 		int saved_errno = errno;
@@ -226,6 +234,15 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 		goto FAIL;
 	}
 
+	struct jx *prefix = jx_lookup(spec, "prefix");
+	if (prefix) {
+		if (!jx_istype(prefix, JX_STRING)) {
+			debug(D_NOTICE|D_BATCH, "prefix must be a string");
+			goto FAIL;
+		}
+		batch_wrapper_prefix(w, prefix->u.string_value);
+	}
+
 	struct jx *pre = jx_lookup(spec, "pre");
 	if (pre) {
 		if (!jx_istype(pre, JX_ARRAY)) {
@@ -315,7 +332,7 @@ char *batch_wrapper_expand(struct batch_task *t, struct jx *spec) {
 		goto FAIL;
 	}
 
-	result = batch_wrapper_write(w, t, "./wrapper_");
+	result = batch_wrapper_write(w, t);
 FAIL:
 	batch_wrapper_delete(w);
 	return result;
