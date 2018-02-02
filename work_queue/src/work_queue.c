@@ -751,12 +751,20 @@ void update_catalog(struct work_queue *q, struct link *foreman_uplink, int force
 	if(!q->catalog_hosts) q->catalog_hosts = xxstrdup(CATALOG_HOST);
 
 	// Generate the master status in an jx, and print it to a buffer.
-	struct jx *j = queue_lean_to_jx(q,foreman_uplink);
+	struct jx *j = queue_to_jx(q,foreman_uplink);
 	char *str = jx_print_string(j);
 
 	// Send the buffer.
 	debug(D_WQ, "Advertising master status to the catalog server(s) at %s ...", q->catalog_hosts);
-	catalog_query_send_update(q->catalog_hosts, str);
+	if(!catalog_query_send_update(q->catalog_hosts, str)) {
+
+		// If the send failed b/c the buffer is too big, send the lean version instead.
+		struct jx *lj = queue_lean_to_jx(q,foreman_uplink);
+		char *lstr = jx_print_string(lj);
+		catalog_query_send_update(q->catalog_hosts,lstr);
+		free(lstr);
+		jx_delete(lj);
+	}
 
 	// Clean up.
 	free(str);
