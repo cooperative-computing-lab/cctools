@@ -146,26 +146,25 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 /* Clean a specific file, while emitting an appropriate message. */
 
-int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent, struct makeflow_alloc *alloc)
+int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
 {
 	if(!f)
 		return 1;
 
+	makeflow_hook_file_clean(f);
+
 	if(batch_fs_unlink(queue, f->filename) == 0) {
 		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
-		if(alloc && f->created_by)
-			makeflow_alloc_release_space(alloc, f->created_by, f->actual_size, MAKEFLOW_ALLOC_RELEASE_USED);
 		d->total_file_size -= f->actual_size;
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
-		if(alloc)
-			makeflow_log_alloc_event(d, alloc);
+		makeflow_hook_file_deleted(f);
 
 	} else if(errno != ENOENT) {
 		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 
-			debug(D_MAKEFLOW_RUN, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
-			return 1;
+		debug(D_MAKEFLOW_RUN, "Makeflow: Couldn't delete %s: %s\n", f->filename, strerror(errno));
+		return 1;
 	}
 	return 0;
 }
@@ -185,7 +184,7 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 
 /* Clean the entire dag by cleaning all nodes. */
 
-int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth, struct makeflow_alloc *alloc)
+int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth)
 {
 	struct dag_file *f;
 	char *name;
@@ -198,7 +197,7 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 
 		/* We have a record of the file, but it is no longer created or used so delete */
 		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
-			makeflow_clean_file(d, queue, f, silent, alloc);
+			makeflow_clean_file(d, queue, f, silent);
 
 		if(dag_file_is_source(f)) {
 			if(f->source && (clean_depth == MAKEFLOW_CLEAN_CACHE || clean_depth == MAKEFLOW_CLEAN_ALL)) { 
@@ -212,11 +211,11 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 		}
 
 		if(clean_depth == MAKEFLOW_CLEAN_ALL){
-			makeflow_clean_file(d, queue, f, silent, alloc);
+			makeflow_clean_file(d, queue, f, silent);
 		} else if(set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_OUTPUTS)) {
-			makeflow_clean_file(d, queue, f, silent, alloc);
+			makeflow_clean_file(d, queue, f, silent);
 		} else if(!set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_INTERMEDIATES)){
-			makeflow_clean_file(d, queue, f, silent, alloc);
+			makeflow_clean_file(d, queue, f, silent);
 		}
 	}
 
@@ -250,7 +249,7 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 
 /* Collect available garbage, up to a limit of maxfiles. */
 
-static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfiles, struct makeflow_alloc *alloc )
+static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfiles)
 {
 	int collected = 0;
 	struct dag_file *f;
@@ -267,7 +266,7 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 			&& !dag_file_is_source(f)
 			&& !set_lookup(d->outputs, f)
 			&& !set_lookup(d->inputs, f)
-			&& makeflow_clean_file(d, queue, f, 0, alloc)){
+			&& makeflow_clean_file(d, queue, f, 0)){
 			collected++;
 		}
 	}
@@ -283,7 +282,7 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 
 /* Collect garbage only if conditions warrant. */
 
-void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count, struct makeflow_alloc *alloc )
+void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count)
 {
 	if(size == 0)
 		size = MAKEFLOW_MIN_SPACE;
@@ -292,22 +291,22 @@ void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t
 		break;
 	case MAKEFLOW_GC_COUNT:
 		debug(D_MAKEFLOW_RUN, "Performing incremental file (%d) garbage collection", count);
-		makeflow_gc_all(d, queue, count, alloc);
+		makeflow_gc_all(d, queue, count);
 		break;
 	case MAKEFLOW_GC_ON_DEMAND:
 		if(d->completed_files - d->deleted_files > count || directory_low_disk(".",size)){
 			debug(D_MAKEFLOW_RUN, "Performing on demand (%d) garbage collection", count);
-			makeflow_gc_all(d, queue, INT_MAX, alloc);
+			makeflow_gc_all(d, queue, INT_MAX);
 		}
 		break;
 	case MAKEFLOW_GC_SIZE:
 		if(directory_low_disk(".", size)) {
 			debug(D_MAKEFLOW_RUN, "Performing size (%d) garbage collection", count);
-			makeflow_gc_all(d, queue, INT_MAX, alloc);
+			makeflow_gc_all(d, queue, INT_MAX);
 		}
 		break;
 	case MAKEFLOW_GC_ALL:
-		makeflow_gc_all(d, queue, INT_MAX, alloc);
+		makeflow_gc_all(d, queue, INT_MAX);
 		break;
 	}
 }
@@ -350,7 +349,7 @@ int makeflow_clean_mount_target(const char *target) {
 	return 0;
 }
 
-int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q, struct makeflow_alloc *alloc) {
+int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -360,7 +359,7 @@ int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_q
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto OUT;
 
-	if (makeflow_clean_file(d, q, f, 1, alloc)) {
+	if (makeflow_clean_file(d, q, f, 1)) {
 		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
 		goto OUT;
 	}
@@ -372,7 +371,7 @@ OUT:
 	return rc;
 }
 
-int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q, struct makeflow_alloc *alloc) {
+int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -382,7 +381,7 @@ int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto FAILURE;
 
-	if (makeflow_clean_file(d, q, f, 1, alloc)) {
+	if (makeflow_clean_file(d, q, f, 1)) {
 		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
 		goto FAILURE;
 	}
@@ -402,7 +401,7 @@ FAILURE:
 
 int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 		struct batch_queue *q, struct dag_file *f, int prep_failed,
-		int silent, struct makeflow_alloc *alloc) {
+		int silent) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -427,7 +426,7 @@ int makeflow_clean_failed_file(struct dag *d, struct dag_node *n,
 	}
 	free(failout);
 CLEANUP:
-	return makeflow_clean_file(d, q, f, silent, alloc);
+	return makeflow_clean_file(d, q, f, silent);
 }
 
 /* vim: set noexpandtab tabstop=4: */

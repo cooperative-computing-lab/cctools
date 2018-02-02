@@ -128,6 +128,9 @@ static void makeflow_log_sync( struct dag *d, int force )
 
 void makeflow_log_close( struct dag *d )
 {
+	/* In the case where Makeflow exits prior to opening log. */
+	if(!d->logfile) return;
+
 	makeflow_log_sync(d,1);
 	fclose(d->logfile);
 	d->logfile = 0;
@@ -141,18 +144,27 @@ void makeflow_log_started_event( struct dag *d )
 
 void makeflow_log_aborted_event( struct dag *d )
 {
+	/* In the case where Makeflow exits prior to opening log. */
+	if(!d->logfile) return;
+
 	fprintf(d->logfile, "# ABORTED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
 
 void makeflow_log_failed_event( struct dag *d )
 {
+	/* In the case where Makeflow exits prior to opening log. */
+	if(!d->logfile) return;
+
 	fprintf(d->logfile, "# FAILED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
 
 void makeflow_log_completed_event( struct dag *d )
 {
+	/* In the case where Makeflow exits prior to opening log. */
+	if(!d->logfile) return;
+
 	fprintf(d->logfile, "# COMPLETED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
 }
@@ -412,7 +424,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 				continue;
 			if(dag_file_should_exist(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
 				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
-				makeflow_clean_file(d, queue, f, 0, NULL);
+				makeflow_clean_file(d, queue, f, 0);
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
 			}
 		}
