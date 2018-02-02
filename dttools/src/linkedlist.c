@@ -244,7 +244,7 @@ bool linkedlist_drop(struct linkedlist_cursor *cur) {
 	}
 
 	cur->target->prev = cur->target;
-
+	linkedlist_item_ref(cur->target->next);
 	linkedlist_item_unref(cur->target);
 	linkedlist_item_unref(cur->target);
 	return true;
