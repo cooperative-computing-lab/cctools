@@ -167,9 +167,9 @@ int main (int argc, char *argv[])
 	assert(linkedlist_tell(cur) == -1);
 
 	// delete the cursors and try to delete while there are items
-	linkedlist_cursor_delete(cur);
-	linkedlist_cursor_delete(alt);
-	ok = linkedlist_delete(list);
+	linkedlist_cursor_destroy(cur);
+	linkedlist_cursor_destroy(alt);
+	ok = linkedlist_destroy(list);
 	assert(!ok);
 
 	// we still need a cursor...
@@ -184,14 +184,14 @@ int main (int argc, char *argv[])
 	}
 
 	// try to delete while there's an outstanding cursor
-	ok = linkedlist_delete(list);
+	ok = linkedlist_destroy(list);
 	assert(!ok);
 
 	// delete said cursor
-	linkedlist_cursor_delete(cur);
+	linkedlist_cursor_destroy(cur);
 
 	// finally delete the list
-	ok = linkedlist_delete(list);
+	ok = linkedlist_destroy(list);
 	assert(ok);
 
 	return 0;

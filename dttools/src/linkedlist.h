@@ -51,7 +51,7 @@ struct linkedlist *linkedlist_create(void);
  * @returns true if the list was deleted.
  * @returns false if the list is non-empty or there are live cursors.
  */
-bool linkedlist_delete(struct linkedlist *list);
+bool linkedlist_destroy(struct linkedlist *list);
 
 /** Get the number of items in a list.
  * @param list The list to look at.
@@ -61,7 +61,7 @@ unsigned linkedlist_size(struct linkedlist *list);
 
 /** Create a new cursor on a list.
  * The cursor's position is initially undefined.
- * The cursor must be deleted with @ref linkedlist_cursor_delete.
+ * The cursor must be deleted with @ref linkedlist_cursor_destroy.
  * @param list The list to use.
  * @returns A pointer to a new cursor.
  */
@@ -73,7 +73,7 @@ struct linkedlist_cursor *linkedlist_cursor_create(struct linkedlist *list);
  * This does not modify the underlying list.
  * @param cur The cursor to free.
  */
-void linkedlist_cursor_delete(struct linkedlist_cursor *cur);
+void linkedlist_cursor_destroy(struct linkedlist_cursor *cur);
 
 /** Get a copy of an existing cursor.
  * The returned cursor is independent from the original, but initially

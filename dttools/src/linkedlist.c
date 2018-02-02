@@ -94,7 +94,7 @@ unsigned linkedlist_size(struct linkedlist *list) {
 	return list->length;
 }
 
-bool linkedlist_delete(struct linkedlist *list) {
+bool linkedlist_destroy(struct linkedlist *list) {
 	if (!list) return true;
 	if (linkedlist_size(list) > 0) return false;
 	assert(list->head == NULL);
@@ -120,7 +120,7 @@ void linkedlist_cursor_reset(struct linkedlist_cursor *cur) {
 	cur->target = NULL;
 }
 
-void linkedlist_cursor_delete(struct linkedlist_cursor *cur) {
+void linkedlist_cursor_destroy(struct linkedlist_cursor *cur) {
 	assert(cur);
 	assert(cur->list);
 	linkedlist_cursor_reset(cur); // relaxes
