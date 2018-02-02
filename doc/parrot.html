@@ -750,6 +750,17 @@ Parrot supports 64 bit programs and processors in the following combinations:
 </table>
 </center>
 
+<h2 id="docker">parrot inside docker<a class="sectionlink" href="#docker" title="Link to this section.">&#x21d7;</a></h2>
+
+Docker by default blocks ptrace, the system call on which parrot relies. To
+run parrot inside docker, the container needs to be started using the
+<tt>--security-opt&nbsp;seccomp=unconfined</tt> command line argument. For
+example:
+
+<code>
+    docker run --security-opt seccomp=unconfined MY-DOCKER-IMAGE
+</code>
+
 <h2 id="moreinfo">For More Information<a class="sectionlink" href="#moreinfo" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
