@@ -347,29 +347,19 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	else {
 		if(k8s_worker_image) {
-			cmd = string_format(
-			"work_queue_worker %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
-			master_host,
-			master_port,
-			worker_timeout,
-			catalog_host,
-			password_file ? "-P pwfile" : "",
-			resource_args ? resource_args : "",
-			extra_worker_args ? extra_worker_args : ""
-			);
-		} else {
-			cmd = string_format(
-			"./%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
-			worker,
-			master_host,
-			master_port,
-			worker_timeout,
-			catalog_host,
-			password_file ? "-P pwfile" : "",
-			resource_args ? resource_args : "",
-			extra_worker_args ? extra_worker_args : ""
-			);
-		}
+			worker = "work_queue_worker";
+		} 
+		cmd = string_format(
+		"./%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
+		worker,
+		master_host,
+		master_port,
+		worker_timeout,
+		catalog_host,
+		password_file ? "-P pwfile" : "",
+		resource_args ? resource_args : "",
+		extra_worker_args ? extra_worker_args : ""
+		);
 	}
 
 	if(wrapper_command) {
