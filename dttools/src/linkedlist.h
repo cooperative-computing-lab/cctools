@@ -57,7 +57,7 @@ bool linkedlist_delete(struct linkedlist *list);
  * @param list The list to look at.
  * @returns The number of items in the list.
  */
-unsigned linkedlist_length(struct linkedlist *list);
+unsigned linkedlist_size(struct linkedlist *list);
 
 /** Create a new cursor on a list.
  * The cursor's position is initially undefined.

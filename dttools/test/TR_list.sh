@@ -21,7 +21,7 @@ int main (int argc, char *argv[])
 	// first create an empty list
 	struct linkedlist *list = linkedlist_create();
 	assert(list);
-	assert(linkedlist_length(list) == 0);
+	assert(linkedlist_size(list) == 0);
 
 	// make a cursor on it
 	struct linkedlist_cursor *cur = linkedlist_cursor_create(list);
@@ -44,10 +44,10 @@ int main (int argc, char *argv[])
 
 	// put in a couple of items
 	linkedlist_insert(cur, (void *) 3);
-	assert(linkedlist_length(list) == 1);
+	assert(linkedlist_size(list) == 1);
 	assert(linkedlist_tell(cur) == -1);
 	linkedlist_insert(cur, (void *) 2);
-	assert(linkedlist_length(list) == 2);
+	assert(linkedlist_size(list) == 2);
 	assert(linkedlist_tell(cur) == -1);
 
 	// move on to an item
@@ -90,7 +90,7 @@ int main (int argc, char *argv[])
 	assert(ok);
 	assert(linkedlist_tell(alt) == 0);
 	linkedlist_insert(alt, (void *) 7);
-	assert(linkedlist_length(list) == 3);
+	assert(linkedlist_size(list) == 3);
 
 	// make sure the original cursor is OK
 	assert(linkedlist_tell(cur) == 2);
@@ -137,7 +137,7 @@ int main (int argc, char *argv[])
 	// drop the middle element
 	ok = linkedlist_drop(cur);
 	assert(ok);
-	assert(linkedlist_length(list) == 2);
+	assert(linkedlist_size(list) == 2);
 
 	// and check both again
 	assert(linkedlist_tell(cur) == 1);

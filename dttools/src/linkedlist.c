@@ -89,14 +89,14 @@ struct linkedlist *linkedlist_create(void) {
 	return out;
 }
 
-unsigned linkedlist_length(struct linkedlist *list) {
+unsigned linkedlist_size(struct linkedlist *list) {
 	assert(list);
 	return list->length;
 }
 
 bool linkedlist_delete(struct linkedlist *list) {
 	if (!list) return true;
-	if (linkedlist_length(list) > 0) return false;
+	if (linkedlist_size(list) > 0) return false;
 	assert(list->head == NULL);
 	assert(list->tail == NULL);
 	if (list->refcount > 0) return false;
@@ -196,7 +196,7 @@ bool linkedlist_seek(struct linkedlist_cursor *cur, int index) {
 	assert(cur->list);
 
 	if (index < 0) {
-		if ((unsigned) abs(index) > linkedlist_length(cur->list)) return false;
+		if ((unsigned) abs(index) > linkedlist_size(cur->list)) return false;
 		linkedlist_item_unref(cur->target);
 		struct linkedlist_item *target = cur->list->tail;
 		assert(target);
@@ -207,7 +207,7 @@ bool linkedlist_seek(struct linkedlist_cursor *cur, int index) {
 		linkedlist_item_ref(target);
 		cur->target = target;
 	} else {
-		if ((unsigned) index >= linkedlist_length(cur->list)) return false;
+		if ((unsigned) index >= linkedlist_size(cur->list)) return false;
 		linkedlist_item_unref(cur->target);
 		struct linkedlist_item *target = cur->list->head;
 		assert(target);
