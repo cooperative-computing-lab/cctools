@@ -71,6 +71,14 @@ struct batch_file * batch_task_add_output_file(struct batch_task *task, const ch
 */
 void batch_task_set_command(struct batch_task *t, const char *command);
 
+/** Set the batch task's command to the given JX command spec.
+ * The JX command spec is first expanded, and replaces the
+ * batch task's previous command.
+ * @param t The batch_task to be updated.
+ * @param command The spec to use.
+ */
+void batch_task_set_command_spec(struct batch_task *t, struct jx *command);
+
 /** Wrap the existing command with a template string.
  This uses string_wrap_command to wrap command, see stringtools.h for details.
  This function allocates a new string with the result and free the previous command.

@@ -54,6 +54,34 @@ char *string_escape_shell( const char *str )
 	return result;
 }
 
+char *string_quote_shell(const char *str) {
+	int backslashed = 0;
+	buffer_t B[1];
+	buffer_init(B);
+	buffer_abortonfailure(B, 1);
+
+	const char *s;
+	buffer_putliteral(B, "\"");
+	for (s=str; *s; s++) {
+		if (backslashed) {
+			backslashed = 0;
+		} else {
+			if (*s == '"')
+				buffer_putliteral(B,"\\");
+			else if (*s == '\\')
+				backslashed = 1;
+		}
+		buffer_putlstring(B,s,1);
+	}
+	buffer_putliteral(B,"\"");
+
+	char *result;
+	buffer_dup(B,&result);
+	buffer_free(B);
+
+	return result;
+}
+
 /*
  * Based on HTCondor documentation:
  * -The white space characters of spaces or tabs delimit arguments.

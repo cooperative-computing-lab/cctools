@@ -4,9 +4,14 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <string.h>
+#include <errno.h>
+
 #include "batch_task.h"
+#include "batch_wrapper.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "debug.h"
 
 /** Creates new batch_task and initializes file lists. */
 struct batch_task *batch_task_create(struct batch_queue *queue)
@@ -130,6 +135,18 @@ void batch_task_set_info(struct batch_task *t, struct batch_job_info *info)
 	t->info->exit_code = info->exit_code;
 	t->info->exit_signal = info->exit_signal;
 	t->info->disk_allocation_exhausted = info->disk_allocation_exhausted;
+}
+
+void batch_task_set_command_spec(struct batch_task *t, struct jx *command) {
+	char *new_command = batch_wrapper_expand(t, command);
+	if (!new_command) {
+		int saved_errno = errno;
+		debug(D_NOTICE|D_BATCH, "failed to expand wrapper command: %s", strerror(errno));
+		errno = saved_errno;
+		return;
+	}
+	batch_task_set_command(t, new_command);
+	free(new_command);
 }
 
 /* vim: set noexpandtab tabstop=4: */
