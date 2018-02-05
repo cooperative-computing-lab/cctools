@@ -1430,7 +1430,7 @@ int main(int argc, char *argv[])
 		{"project-name", required_argument, 0, 'N'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
-		{"save-failures", no_argument, 0, LONG_OPT_FAIL_DIR},
+		{"do-not-save-failed-output", no_argument, 0, LONG_OPT_FAIL_DIR},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
