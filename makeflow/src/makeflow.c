@@ -48,7 +48,6 @@ See the file COPYING for details.
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
-#include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
 #include "makeflow_wrapper_enforcement.h"
 #include "makeflow_catalog_reporter.h"
@@ -168,7 +167,6 @@ static int log_verbose_mode = 0;
 
 static struct makeflow_wrapper *wrapper = 0;
 static struct makeflow_wrapper *enforcer = 0;
-static struct makeflow_wrapper_umbrella *umbrella = 0;
 
 static int catalog_reporting_on = 0;
 
@@ -198,7 +196,6 @@ void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
 {
 	if(wrapper)  makeflow_wrapper_generate_files(task, wrapper->input_files, wrapper->output_files, n, wrapper);
 	if(enforcer) makeflow_wrapper_generate_files(task, enforcer->input_files, enforcer->output_files, n, enforcer);
-	if(umbrella) makeflow_wrapper_generate_files(task, umbrella->wrapper->input_files, umbrella->wrapper->output_files, n, umbrella->wrapper);
 }
 
 /*
@@ -215,7 +212,6 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 	/* Expand the command according to each of the wrappers */
 	makeflow_wrap_wrapper(task, n, wrapper);
 	makeflow_wrap_enforcer(task, n, enforcer);
-	makeflow_wrap_umbrella(task, n, umbrella, queue);
 }
 
 /*
@@ -1227,6 +1223,7 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_shared_fs;
 	extern struct makeflow_hook makeflow_hook_singularity;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
+	extern struct makeflow_hook makeflow_hook_umbrella;
 	extern struct makeflow_hook makeflow_hook_vc3_builder;
 
 #ifdef HAS_CURL
@@ -1815,21 +1812,20 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_binary(umbrella, (const char *)xxstrdup(optarg));
+				makeflow_hook_register(&makeflow_hook_umbrella);
+				jx_insert(hook_args, jx_string("umbrella_binary"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_LOG_PREFIX:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_log_prefix(umbrella, (const char *)xxstrdup(optarg));
+				makeflow_hook_register(&makeflow_hook_umbrella);
+				jx_insert(hook_args, jx_string("umbrella_log_prefix"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_MODE:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_mode(umbrella, (const char *)xxstrdup(optarg));
+				makeflow_hook_register(&makeflow_hook_umbrella);
+				jx_insert(hook_args, jx_string("umbrella_mode"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_SPEC:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_spec(umbrella, (const char *)xxstrdup(optarg));
-				break;
+				makeflow_hook_register(&makeflow_hook_umbrella);
+				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
 			case LONG_OPT_MESOS_MASTER:
 				mesos_master = xxstrdup(optarg);
 				break;
@@ -1993,13 +1989,7 @@ int main(int argc, char *argv[])
 	}
 
 	// REGISTER HOOKS HERE
-	if (enforcer && umbrella) {
-		fatal("enforcement and Umbrella are mutually exclusive\n");
-	}
-
-	if (makeflow_hook_register(&makeflow_hook_shared_fs, &hook_args) == MAKEFLOW_HOOK_FAILURE)
-		goto EXIT_WITH_FAILURE;
-
+	/* This is intended for hooks that are on by default. */
 	if(save_failure){
 		if (makeflow_hook_register(&makeflow_hook_fail_dir, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 			goto EXIT_WITH_FAILURE;
@@ -2205,33 +2195,6 @@ int main(int argc, char *argv[])
 
 	if(makeflow_gc_method == MAKEFLOW_GC_SIZE && !batch_queue_supports_feature(remote_queue, "gc_size")) {
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
-	}
-
-	/* Set dag_node->umbrella_spec */
-	if(!clean_mode) {
-		struct dag_node *cur;
-		cur = d->nodes;
-		while(cur) {
-			struct dag_variable_lookup_set s = {d, cur->category, cur, NULL};
-			char *spec = NULL;
-			spec = dag_variable_lookup_string("SPEC", &s);
-			if(spec) {
-				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the makefile ...\n", cur->nodeid);
-				dag_node_set_umbrella_spec(cur, xxstrdup(spec));
-			} else if(umbrella && umbrella->spec) {
-				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the --umbrella_spec option ...\n", cur->nodeid);
-				dag_node_set_umbrella_spec(cur, umbrella->spec);
-			}
-			free(spec);
-			cur = cur->next;
-		}
-
-		debug(D_MAKEFLOW_RUN, "makeflow_wrapper_umbrella_preparation...\n");
-		// When the user specifies umbrella specs in a makefile, but does not use any `--umbrella...` option,
-		// an umbrella wrapper was created to hold the default values for umbrella-related setttings such as
-		// log_prefix and default umbrella execution engine.
-		if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-		makeflow_wrapper_umbrella_preparation(umbrella, d);
 	}
 
 	if(enforcer) {
