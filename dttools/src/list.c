@@ -1,420 +1,626 @@
 /*
-Copyright (C) 2003-2004 Douglas Thain and the University of Wisconsin
-Copyright (C) 2005- The University of Notre Dame
+Copyright (C) 2018- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <assert.h>
+#include <limits.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "list.h"
 
-#include <stdlib.h>
-
-struct list_node {
-	void *data;
-	struct list_node *next;
-	struct list_node *prev;
-	double priority;
-};
-
 struct list {
-	struct list_node *head;
-	struct list_node *tail;
-	struct list_node *iter;
-	int size;
+	unsigned refcount;
+	unsigned length;
+	struct list_item *head;
+	struct list_item *tail;
+	struct list_cursor *iter;
 };
 
-struct list *list_create(void)
-{
-	struct list *l;
+struct list_item {
+	unsigned refcount;
+	double priority;
+	struct list *list;
+	struct list_item *next;
+	struct list_item *prev;
+	void *data;
+};
 
-	l = malloc(sizeof(struct list));
-	if(!l)
-		return 0;
+struct list_cursor {
+	struct list *list;
+	struct list_item *target;
+};
 
-	l->head = 0;
-	l->tail = 0;
-	l->size = 0;
-	l->iter = 0;
-
-	return l;
+static void oom(void) {
+	const char *message = "out of memory\n";
+	write(STDERR_FILENO, message, strlen(message));
+	abort();
 }
 
-struct list *list_splice(struct list *top, struct list *bottom)
-{
-	if(!top->head) {
-		list_delete(top);
-		return bottom;
+static void list_ref(struct list *list) {
+	if (!list) return;
+	assert(list->refcount < UINT_MAX);
+	++list->refcount;
+}
+
+static void list_unref(struct list *list) {
+	if (!list) return;
+	assert(list->refcount > 0);
+	--list->refcount;
+}
+
+static void list_item_ref(struct list_item *item) {
+	if (!item) return;
+	assert(item->refcount < UINT_MAX);
+	++item->refcount;
+}
+
+static void list_item_unref(struct list_item *item) {
+	if (!item) return;
+	assert(item->refcount > 0);
+	if (--item->refcount == 0) {
+		if (item->prev != item)
+			list_item_unref(item->prev);
+		list_item_unref(item->next);
+		free(item);
+	}
+}
+
+static void list_cursor_relax(struct list_cursor *cur) {
+	assert(cur);
+	if (!cur->target) return;
+	if (cur->target->prev != cur->target) return;
+
+	struct list_item *old = cur->target;
+	struct list_item *tmp = old;
+	while (tmp && tmp->prev == tmp) {
+		tmp = tmp->next;
 	}
 
-	if(!bottom->head) {
-		list_delete(bottom);
-		return top;
+	list_item_ref(tmp);
+	list_item_unref(old);
+	cur->target = tmp;
+}
+
+struct list *list_create(void) {
+	struct list *out = calloc(1, sizeof(*out));
+	if (!out) oom();
+	out->iter = list_cursor_create(out);
+	return out;
+}
+
+unsigned list_length(struct list *list) {
+	assert(list);
+	return list->length;
+}
+
+bool list_destroy(struct list *list) {
+	if (!list) return true;
+	if (list_size(list) > 0) return false;
+	assert(list->head == NULL);
+	assert(list->tail == NULL);
+	if (list->refcount > 1) return false;
+	list_cursor_destroy(list->iter);
+	free(list);
+	return true;
+}
+
+struct list_cursor *list_cursor_create(struct list *list) {
+	assert(list);
+	struct list_cursor *cur = calloc(1, sizeof(*cur));
+	if (!cur) oom();
+	cur->list = list;
+	list_ref(list);
+	return cur;
+}
+
+void list_cursor_reset(struct list_cursor *cur) {
+	assert(cur);
+	list_cursor_relax(cur);
+	list_item_unref(cur->target);
+	cur->target = NULL;
+}
+
+void list_cursor_destroy(struct list_cursor *cur) {
+	assert(cur);
+	assert(cur->list);
+	list_cursor_reset(cur); // relaxes
+	list_unref(cur->list);
+	free(cur);
+}
+
+bool list_get(struct list_cursor *cur, void **item) {
+	assert(cur);
+	list_cursor_relax(cur);
+	if (!cur->target) return false;
+	*item = cur->target->data;
+	return true;
+}
+
+bool list_set(struct list_cursor *cur, void *item) {
+	assert(cur);
+	list_cursor_relax(cur);
+	if (!cur->target) return false;
+	cur->target->data = item;
+	return true;
+}
+
+double list_get_priority(struct list_cursor *cur) {
+	assert(cur);
+	list_cursor_relax(cur);
+	if (!cur->target) return NAN;
+	return cur->target->priority;
+}
+
+bool list_set_priority(struct list_cursor *cur, double priority) {
+	assert(cur);
+	list_cursor_relax(cur);
+	if (!cur->target) return false;
+	cur->target->priority = priority;
+	return true;
+}
+
+struct list_cursor *list_cursor_clone(struct list_cursor *cur) {
+	assert(cur);
+	assert(cur->list);
+	list_cursor_relax(cur);
+	struct list_cursor *out = list_cursor_create(cur->list);
+	out->target = cur->target;
+	list_item_ref(out->target);
+	return out;
+}
+
+bool list_next(struct list_cursor *cur) {
+	assert(cur);
+	list_cursor_relax(cur);
+	struct list_item *old = cur->target;
+	if (!old) return false;
+	list_item_ref(old->next);
+	cur->target = old->next;
+	list_item_unref(old);
+	return cur->target ? true : false;
+}
+
+bool list_prev(struct list_cursor *cur) {
+	assert(cur);
+	list_cursor_relax(cur);
+	struct list_item *old = cur->target;
+	if (!old) return false;
+	list_item_ref(old->prev);
+	cur->target = old->prev;
+	list_item_unref(old);
+	return cur->target ? true : false;
+}
+
+int list_tell(struct list_cursor *cur) {
+	assert(cur);
+	assert(cur->list);
+	list_cursor_relax(cur);
+	if (!cur->target) return -1;
+
+	int pos = 0;
+	for (struct list_item *i = cur->list->head; i != cur->target; i = i->next) {
+		assert(i);
+		assert(pos < INT_MAX);
+		++pos;
+	}
+	return pos;
+}
+
+bool list_seek(struct list_cursor *cur, int index) {
+	assert(cur);
+	assert(cur->list);
+
+	if (index < 0) {
+		if (abs(index) > list_size(cur->list)) return false;
+		list_item_unref(cur->target);
+		struct list_item *target = cur->list->tail;
+		assert(target);
+		while (++index) {
+			target = target->prev;
+			assert(target);
+		}
+		list_item_ref(target);
+		cur->target = target;
+	} else {
+		if (index >= list_size(cur->list)) return false;
+		list_item_unref(cur->target);
+		struct list_item *target = cur->list->head;
+		assert(target);
+		while (index--) {
+			target = target->next;
+			assert(target);
+		}
+		list_item_ref(target);
+		cur->target = target;
+	}
+	return true;
+}
+
+bool list_drop(struct list_cursor *cur) {
+	assert(cur);
+	assert(cur->list);
+	list_cursor_relax(cur);
+	if (!cur->target) return false;
+	assert(cur->list->length > 0);
+	--cur->list->length;
+
+	struct list_item *next = cur->target->next;
+	struct list_item *prev = cur->target->prev;
+
+	if (next) {
+		next->prev = prev;
+	} else {
+		cur->list->tail = prev;
+	}
+	if (prev) {
+		prev->next = next;
+	} else {
+		cur->list->head = next;
 	}
 
-	top->tail->next = bottom->head;
-	top->tail = bottom->tail;
+	cur->target->prev = cur->target;
+	list_item_ref(cur->target->next);
+	list_item_unref(cur->target);
+	list_item_unref(cur->target);
+	return true;
+}
 
-	bottom->head->prev = top->tail;
-	bottom->head = 0;
-	bottom->tail = 0;
+void list_insert(struct list_cursor *cur, void *item) {
+	assert(cur);
+	assert(cur->list);
+	list_cursor_relax(cur);
 
-	top->size += bottom->size;
-	top->iter = 0;
+	struct list_item *node = calloc(1, sizeof(*node));
+	if (!node) oom();
+	node->refcount = 2;
+	node->list = cur->list;
+	node->data = item;
+	assert(cur->list->length < UINT_MAX);
+	++cur->list->length;
+
+	if (cur->target) {
+		struct list_item *left = cur->target;
+		struct list_item *right = left->next;
+		node->next = right;
+		node->prev = left;
+		left->next = node;
+		if (right) {
+			right->prev = node;
+		} else {
+			cur->list->tail = node;
+		}
+	} else {
+		node->next = cur->list->head;
+		if (node->next) {
+			assert(node->next->prev == NULL);
+			node->next->prev = node;
+		} else {
+			cur->list->tail = node;
+		}
+		cur->list->head = node;
+	}
+}
+
+/*
+ * The rest of the functions make up the existing list API. They are widely used
+ * throughout the codebase. These high-level functions are implemented
+ * based on the minimal core above.
+ */
+
+
+int list_size(struct list *list) {
+	return (int) list_length(list);
+}
+
+struct list *list_splice(struct list *top, struct list *bottom) {
+	assert(top);
+	assert(bottom);
+
+	void *item;
+
+	struct list_cursor *cur_top = list_cursor_create(top);
+	struct list_cursor *cur_bot = list_cursor_create(bottom);
+
+	for (list_seek(cur_bot, 0); list_get(cur_bot, &item); list_next(cur_bot)) {
+		list_seek(cur_top, -1);
+		list_insert(cur_top, item);
+	}
+
+	list_cursor_destroy(cur_top);
+	list_cursor_destroy(cur_bot);
 
 	list_delete(bottom);
+
 	return top;
 }
 
-struct list *list_split(struct list *l, list_op_t comparator, const void *arg)
-{
-	struct list *nl;
-	struct list_node *n;
-	int count = 0;
+struct list *list_split(struct list *l, list_op_t comparator, const void *arg) {
+	assert(l);
 
-	if(!arg || l->size < 2)
-		return NULL;
+	void *item;
+	struct list *out = NULL;
 
-	for(n = l->head; n; n = n->next) {
-		if(comparator(n->data, arg))
-			break;
-		else
-			count++;
+	if (!arg) return NULL;
+
+	struct list_cursor *cur = list_cursor_create(l);
+	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
+		if (comparator(item, arg)) break;
 	}
-	if(!n || !count)
-		return NULL;
 
-	nl = list_create();
-	nl->tail = l->tail;
-	l->tail = n->prev;
-	nl->head = n;
+	while (list_get(cur, &item)) {
+		if (!out) out = list_create();
+		struct list_cursor *end = list_cursor_create(out);
+		list_seek(end, -1);
+		list_insert(end, item);
+		list_drop(cur);
+		list_cursor_destroy(end);
+	}
 
-	l->tail->next = 0;
-	nl->head->prev = 0;
-
-	nl->size = l->size - count;
-	l->size = count;
-
-	return nl;
+	return out;
 }
 
-void list_delete(struct list *l)
-{
-	struct list_node *n, *m;
-
-	if(!l)
+void list_delete(struct list *l) {
+	if (!l)
 		return;
 
-	for(n = l->head; n; n = m) {
-		m = n->next;
-		free(n);
-	}
+	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, 0);
+	while (list_drop(cur)) continue;
+	list_cursor_destroy(cur);
 
-	free(l);
+	bool ok = list_destroy(l);
+	assert(ok);
 }
 
-void list_free(struct list *l)
-{
-	struct list_node *n;
-	if(!l)
+void list_free(struct list *l) {
+	void *item;
+
+	if (!l)
 		return;
-	for(n = l->head; n; n = n->next) {
-		free(n->data);
+
+	struct list_cursor *cur = list_cursor_create(l);
+	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
+		free(item);
 	}
+	list_cursor_destroy(cur);
 }
 
-int list_size(struct list *l)
-{
-	return l->size;
-}
+int list_push_priority(struct list *l, void *item, double priority) {
+	bool ok;
+	struct list_cursor *cur = list_cursor_create(l);
 
-static struct list_node *new_node(void *data, struct list_node *prev, struct list_node *next)
-{
-	struct list_node *node;
-
-	node = malloc(sizeof(struct list_node));
-	node->data = data;
-	node->next = next;
-	node->prev = prev;
-	node->priority = 0;
-
-	if(next) {
-		next->prev = node;
-	}
-	if(prev) {
-		prev->next = node;
-	}
-
-	return node;
-}
-
-int list_push_priority(struct list *l, void *item, double priority)
-{
-	struct list_node *n;
-	struct list_node *node;
-	int result;
-
-	if(!l->tail) {
-		result = list_push_tail(l, item);
-		if(result)
-			l->tail->priority = priority;
-		return result;
-	}
-
-	if(l->tail->priority >= priority) {
-		result = list_push_tail(l, item);
-		if(result)
-			l->tail->priority = priority;
-		return result;
-	}
-
-	for(n = l->tail; n; n = n->prev) {
-		if(n->priority >= priority) {
-			node = new_node(item, n, n->next);
-			l->size++;
-			node->priority = priority;
-			return 1;
+	if (list_size(l) == 0) {
+		list_insert(cur, item);
+		ok = list_seek(cur, 0);
+		assert(ok);
+	} else {
+		ok = list_seek(cur, -1);
+		assert(ok);
+		do {
+			double p = list_get_priority(cur);
+			if (priority > p) break;
+		} while (list_prev(cur));
+		list_insert(cur, item);
+		ok = list_next(cur);
+		if (!ok) {
+			ok = list_seek(cur, 0);
+			assert(ok);
 		}
 	}
 
-	result = list_push_tail(l, item);
-	if(result)
-		l->tail->priority = priority;
-	return result;
+	ok = list_set_priority(cur, priority);
+	assert(ok);
+
+	list_cursor_destroy(cur);
+	return 1;
 }
 
-int list_push_head(struct list *l, void *item)
-{
-	struct list_node *node;
-
-	node = new_node(item, 0, l->head);
-	if(!node)
-		return 0;
-	l->head = node;
-	if(!l->tail)
-		l->tail = node;
-	l->size++;
+int list_push_head(struct list *l, void *item) {
+	struct list_cursor *cur = list_cursor_create(l);
+	list_insert(cur, item);
+	list_cursor_destroy(cur);
 
 	return 1;
 }
 
-int list_push_tail(struct list *l, void *item)
-{
-	struct list_node *node;
-
-	node = new_node(item, l->tail, 0);
-	if(!node)
-		return 0;
-	l->tail = node;
-	if(!l->head)
-		l->head = node;
-	l->size++;
-
+int list_push_tail(struct list *l, void *item) {
+	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, -1);
+	list_insert(cur, item);
+	list_cursor_destroy(cur);
 
 	return 1;
 }
 
-void *list_pop_head(struct list *l)
-{
-	struct list_node *node;
-	void *item;
+void *list_pop_head(struct list *l) {
+	void *item = NULL;
 
-	if(!l)
-		return 0;
-	if(!l->head)
-		return 0;
+	if (!l)
+		return NULL;
 
-	node = l->head;
-	l->head = l->head->next;
-	if(l->head) {
-		l->head->prev = 0;
-	} else {
-		l->tail = 0;
-	}
-	item = node->data;
-	free(node);
-	l->size--;
+	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, 0);
+	list_get(cur, &item);
+	list_drop(cur);
+	list_cursor_destroy(cur);
 
 	return item;
 }
 
-void *list_pop_tail(struct list *l)
-{
-	struct list_node *node;
-	void *item;
+void *list_pop_tail(struct list *l) {
+	void *item = NULL;
 
-	if(!l)
-		return 0;
-	if(!l->tail)
-		return 0;
+	if (!l)
+		return NULL;
 
-	node = l->tail;
-	l->tail = l->tail->prev;
-	if(l->tail) {
-		l->tail->next = 0;
-	} else {
-		l->head = 0;
-	}
-	item = node->data;
-	free(node);
-	l->size--;
+	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, -1);
+	list_get(cur, &item);
+	list_drop(cur);
+	list_cursor_destroy(cur);
 
 	return item;
 }
 
-void *list_peek_head(struct list *l)
-{
-	if(!l)
-		return 0;
+void *list_peek_head(struct list *l) {
+	void *item = NULL;
 
-	if(l->head) {
-		return l->head->data;
-	} else {
-		return 0;
-	}
+	if (!l)
+		return NULL;
+
+	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, 0);
+	list_get(cur, &item);
+	list_cursor_destroy(cur);
+
+	return item;
 }
 
-void *list_peek_tail(struct list *l)
-{
-	if(!l)
-		return 0;
+void *list_peek_tail(struct list *l) {
+	void *item = NULL;
 
-	if(l->tail) {
-		return l->tail->data;
-	} else {
-		return 0;
-	}
+	if (!l)
+		return NULL;
+
+	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, -1);
+	list_get(cur, &item);
+	list_cursor_destroy(cur);
+
+	return item;
 }
 
-void *list_peek_current(struct list *l)
-{
-	if(!l)
-		return 0;
+void *list_peek_current(struct list *l) {
+	void *item = NULL;
 
-	if(l->iter) {
-		return l->iter->data;
-	} else {
-		return 0;
-	}
+	if (!l)
+		return NULL;
+
+	list_get(l->iter, &item);
+	return item;
 }
 
-void *list_remove(struct list *l, const void *value)
-{
-	struct list_node *n;
-	void *data;
+void *list_remove(struct list *l, const void *value) {
+	void *item;
+	void *out = NULL;
+	bool ok;
 
-	if(!value)
-		return 0;
-	for(n = l->head; n; n = n->next) {
-		if(value == n->data) {
-			data = n->data;
-			if(n->next)
-				n->next->prev = n->prev;
-			if(n->prev)
-				n->prev->next = n->next;
-			if(n == l->head)
-				l->head = n->next;
-			if(n == l->tail)
-				l->tail = n->prev;
-			free(n);
-			l->size--;
-			return data;
+	if (!value)
+		return NULL;
+
+	struct list_cursor *cur = list_cursor_create(l);
+	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
+		if (value == item) {
+			out = item;
+			ok = list_drop(cur);
+			assert(ok);
+			break;
 		}
 	}
+	list_cursor_destroy(cur);
 
-	return 0;
+	return out;
 }
 
-void *list_find(struct list *l, list_op_t comparator, const void *arg)
-{
-	struct list_node *n;
+void *list_find(struct list *l, list_op_t comparator, const void *arg) {
+	void *item;
+	void *out = NULL;
 
-	for(n = l->head; n; n = n->next) {
-		if(comparator(n->data, arg))
-			return n->data;
+	struct list_cursor *cur = list_cursor_create(l);
+	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
+		if(comparator(item, arg))
+			out = item;
+			break;
 	}
+	list_cursor_destroy(cur);
 
-	return 0;
+	return out;
 }
 
-int list_iterate(struct list *l, list_op_t operator, const void *arg)
-{
-	struct list_node *n;
+int list_iterate(struct list *l, list_op_t operator, const void *arg) {
+	void *item;
 	int alltheway = 1;
 
-	for(n = l->head; n; n = n->next) {
-		if(!operator(n->data, arg)) {
+	struct list_cursor *cur = list_cursor_create(l);
+	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
+		if (!operator(item, arg)) {
 			alltheway = 0;
 			break;
 		}
 	}
+	list_cursor_destroy(cur);
 
 	return alltheway;
 }
 
-int list_iterate_reverse(struct list *l, list_op_t operator, const void *arg)
-{
-	struct list_node *n;
+int list_iterate_reverse(struct list *l, list_op_t operator, const void *arg) {
+	void *item;
 	int alltheway = 1;
 
-	for(n = l->tail; n; n = n->prev) {
-		if(!operator(n->data, arg)) {
+	struct list_cursor *cur = list_cursor_create(l);
+	for (list_seek(cur, -1); list_get(cur, &item); list_prev(cur)) {
+		if (!operator(item, arg)) {
 			alltheway = 0;
 			break;
 		}
 	}
+	list_cursor_destroy(cur);
 
 	return alltheway;
 }
 
-void list_first_item(struct list *list)
-{
-	list->iter = list->head;
+void list_first_item(struct list *list) {
+	list_seek(list->iter, 0);
 }
 
-void *list_next_item(struct list *list)
-{
-	if(list->iter) {
-		void *v = list->iter->data;
-		list->iter = list->iter->next;
-		return v;
-	} else {
-		return 0;
-	}
+void *list_next_item(struct list *list) {
+	void *item = NULL;
+	list_get(list->iter, &item);
+	list_next(list->iter);
+	return item;
 }
 
-struct list *list_duplicate(struct list *list)
-{
-	struct list *list2;
-	struct list_node *node;
-	list2 = list_create();
-	node = list->head;
-	while(node) {
-		list_push_tail(list2, node->data);
-		if(list->iter == node) {
-			list2->iter = list2->tail;
-		}
-		node = node->next;
+struct list *list_duplicate(struct list *src) {
+	void *item;
+	struct list *dst = list_create();
+	struct list_cursor *src_cur = list_cursor_create(src);
+	struct list_cursor *dst_cur = list_cursor_create(dst);
+
+	for (list_seek(src_cur, -1); list_get(src_cur, &item); list_prev(src_cur)) {
+		list_insert(dst_cur, item);
 	}
 
-	return list2;
+	list_cursor_destroy(src_cur);
+	list_cursor_destroy(dst_cur);
+	return dst;
 }
 
-struct list *list_sort(struct list *list, int (*comparator) (const void *, const void *))
-{
-	void **array;
+struct list *list_sort(struct list *list, int (*comparator) (const void *, const void *)) {
+	void **array = NULL;
 	int size, i = 0;
+
+	struct list_cursor *cur = list_cursor_create(list);
+	if (!list_seek(cur, 0)) goto DONE;
 
 	size = list_size(list);
 	array = malloc(size * sizeof(*array));
-	while(list_size(list)) {
-		array[i] = list_pop_head(list);
+
+	while (list_get(cur, &array[i])) {
+		list_drop(cur);
 		i++;
 	}
 	qsort(array, size, sizeof(*array), comparator);
-	for(i = 0; i < size; i++) {
-		list_push_tail(list, array[i]);
+	for(i = size - 1; i >= 0; i--) {
+		list_insert(cur, array[i]);
 	}
+DONE:
 	free(array);
+	list_cursor_destroy(cur);
 	return list;
 }
 
