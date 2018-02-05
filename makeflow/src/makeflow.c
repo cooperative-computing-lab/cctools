@@ -798,11 +798,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		int hook_success = makeflow_hook_node_fail(n, task);
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		int prep_failed = makeflow_clean_prep_fail_dir(d, n, remote_queue);
-		if (prep_failed) {
-			fprintf(stderr, "rule %d failed, cannot move outputs\n",
-					n->nodeid);
-		}
 
 		/* Clean files created in node. Clean existing and expected and record deletion. */
 		list_first_item(n->task->output_files);
@@ -811,11 +806,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 			/* Either the file was created and not confirmed or a hook removed the file. */
 			if(f->state == DAG_FILE_STATE_EXPECT || f->state == DAG_FILE_STATE_DELETE) {
-				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 1);
+				makeflow_clean_file(d, remote_queue, f, 1);
 			} else {
-				makeflow_clean_failed_file(d, n, remote_queue,
-						f, prep_failed, 0);
+				makeflow_clean_file(d, remote_queue, f, 0);
 			}
 		}
 
@@ -879,9 +872,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			makeflow_failed_flag = 1;
 		}
 	} else {
-		
-
-		makeflow_clean_rm_fail_dir(d, n, remote_queue);
 
 		/* Mark source files that have been used by this node */
 		list_first_item(n->source_files);
@@ -1205,6 +1195,7 @@ static void show_help_run(const char *cmd)
 	printf(" -G,--gc-count=<int>            Set number of files to trigger GC. (ref_cnt only)\n");
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
+	printf("    --do-not-save-failed-output Disables moving output of failed nodes to directory.\n"); 
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
 	printf("    --storage-limit=<int>       Set storage limit for Makeflow (default is off)\n");
 	printf("    --storage-type=<type>       Type of storage limit(0:MAX,1:MIN,2:OUTPUT,3:OFF\n");
@@ -1310,6 +1301,9 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	extern struct makeflow_hook makeflow_hook_example;
+	extern struct makeflow_hook makeflow_hook_fail_dir;
+	/* Using fail directories is on by default */
+	int save_failure = 1;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 
 	random_init();
@@ -1346,6 +1340,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOT_CONDENSE,
 		LONG_OPT_HOOK_EXAMPLE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
+		LONG_OPT_FAIL_DIR,
 		LONG_OPT_GC_SIZE,
 		LONG_OPT_LOCAL_CORES,
 		LONG_OPT_LOCAL_MEMORY,
@@ -1436,6 +1431,7 @@ int main(int argc, char *argv[])
 		{"project-name", required_argument, 0, 'N'},
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
+		{"do-not-save-failed-output", no_argument, 0, LONG_OPT_FAIL_DIR},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
@@ -1838,6 +1834,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_PARROT_PATH:
 				parrot_path = xxstrdup(optarg);
 				break;
+			case LONG_OPT_FAIL_DIR:
+				save_failure = 0;
+				break;
 		}
 	}
 
@@ -1855,6 +1854,10 @@ int main(int argc, char *argv[])
 	// REGISTER HOOKS HERE
 	if (enforcer && umbrella) {
 		fatal("enforcement and Umbrella are mutually exclusive\n");
+	}
+
+	if(save_failure){
+		makeflow_hook_register(&makeflow_hook_fail_dir);
 	}
 
 	makeflow_hook_create(hook_args);

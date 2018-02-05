@@ -64,7 +64,6 @@ void dag_count_states(struct dag *d);
 
 struct dag_file *dag_file_lookup_or_create(struct dag *d, const char *filename);
 struct dag_file *dag_file_from_name(struct dag *d, const char *filename);
-struct dag_file *dag_file_lookup_fail(struct dag *d, struct batch_queue *q, const char *path);
 
 int dag_width( struct dag *d, int nested );
 int dag_depth( struct dag *d );
