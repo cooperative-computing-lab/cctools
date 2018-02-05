@@ -50,6 +50,7 @@ transparently modify the linker namespace we are using.
 #define list_cursor_create		cctools_list_cursor_create
 #define list_cursor_destroy		cctools_list_cursor_destroy
 #define list_cursor_clone		cctools_list_cursor_clone
+#define list_cursor_moved		cctools_list_cursor_moved
 #define list_reset			cctools_list_reset
 #define list_seek			cctools_list_seek
 #define list_tell			cctools_list_tell
@@ -125,6 +126,17 @@ void list_cursor_destroy(struct list_cursor *cur);
  * @returns A new cursor, which must also be deleted.
  */
 struct list_cursor *list_cursor_clone(struct list_cursor *cur);
+
+/** Check if a cursor moved since it was last placed.
+ * That happens if another cursor drops the item under this cursor.
+ * It is generally a very bad idea to read and modify the same parts of
+ * a list at the same time from multiple places, so if you need this
+ * check, you might want to rethink your code.
+ * @param cur The cursor to check.
+ * @returns true if another cursor dropped an item and moved this cursor.
+ * @returns false if this cursor is still on the item it was last moved to.
+ */
+bool list_cursor_moved(struct list_cursor *cur);
 
 /** Reset the position of a cursor.
  * After calling, the cursor's position will be undefined, just like

@@ -72,8 +72,7 @@ static void list_item_unref(struct list_item *item) {
 
 static void list_cursor_relax(struct list_cursor *cur) {
 	assert(cur);
-	if (!cur->target) return;
-	if (cur->target->prev != cur->target) return;
+	if (!list_cursor_moved(cur)) return;
 
 	struct list_item *old = cur->target;
 	struct list_item *tmp = old;
@@ -131,6 +130,13 @@ void list_cursor_destroy(struct list_cursor *cur) {
 	list_cursor_reset(cur); // relaxes
 	list_unref(cur->list);
 	free(cur);
+}
+
+bool list_cursor_moved(struct list_cursor *cur) {
+	assert(cur);
+	if (!cur->target) return false;
+	if (cur->target->prev == cur->target) return true;
+	return false;
 }
 
 bool list_get(struct list_cursor *cur, void **item) {
