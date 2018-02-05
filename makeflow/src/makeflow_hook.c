@@ -35,7 +35,10 @@ struct dag_file *makeflow_hook_add_input_file(struct dag *d, struct batch_task *
 {
 	char *id = string_format("%d",task->taskid);
 	char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
-	char * name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	char * name_on_execution = NULL;
+	if(name_on_execution_pattern){
+		name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	}
 
 	/* Output of dag_file is returned to use for final filename. */
 	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
@@ -53,7 +56,10 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
 {
 	char *id = string_format("%d",task->taskid);
 	char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
-	char * name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	char * name_on_execution = NULL;
+	if(name_on_execution_pattern){
+		name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	}
 
 	/* Output of dag_file is returned to use for final filename. */
 	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
