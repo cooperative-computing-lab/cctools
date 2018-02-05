@@ -1195,6 +1195,7 @@ static void show_help_run(const char *cmd)
 	printf(" -G,--gc-count=<int>            Set number of files to trigger GC. (ref_cnt only)\n");
 	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
+	printf("    --do-not-save-failed-output Disables moving output of failed nodes to directory.\n"); 
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
 	printf("    --storage-limit=<int>       Set storage limit for Makeflow (default is off)\n");
 	printf("    --storage-type=<type>       Type of storage limit(0:MAX,1:MIN,2:OUTPUT,3:OFF\n");
