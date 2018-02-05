@@ -46,7 +46,7 @@ struct dag_file *dag_file_lookup_fail(struct dag *d, struct batch_queue *q, cons
 	}
 }
 
-int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q, struct makeflow_alloc *alloc) {
+int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -56,7 +56,7 @@ int makeflow_clean_rm_fail_dir(struct dag *d, struct dag_node *n, struct batch_q
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto OUT;
 
-	if (makeflow_clean_file(d, q, f, 1, alloc)) {
+	if (makeflow_clean_file(d, q, f, 1)) {
 		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
 		goto OUT;
 	}
@@ -68,7 +68,7 @@ OUT:
 	return rc;
 }
 
-int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q, struct makeflow_alloc *alloc) {
+int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
 	assert(d);
 	assert(n);
 	assert(q);
@@ -78,7 +78,7 @@ int makeflow_clean_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto FAILURE;
 
-	if (makeflow_clean_file(d, q, f, 1, alloc)) {
+	if (makeflow_clean_file(d, q, f, 1)) {
 		debug(D_MAKEFLOW_RUN, "Unable to clean failed output");
 		goto FAILURE;
 	}
@@ -121,7 +121,7 @@ int makeflow_clean_failed_file(struct dag *d, struct dag_node *n, struct batch_q
 	}
 	free(failout);
 CLEANUP:
-	return makeflow_clean_file(d, q, f, silent, NULL);
+	return makeflow_clean_file(d, q, f, silent);
 }
 
 int makeflow_hook_fail_dir_prep(struct dag *d, struct dag_node *n, struct batch_queue *q) {
@@ -134,7 +134,7 @@ int makeflow_hook_fail_dir_prep(struct dag *d, struct dag_node *n, struct batch_
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto FAILURE;
 
-	if (makeflow_clean_file(d, q, f, 1, NULL)) {
+	if (makeflow_clean_file(d, q, f, 1)) {
 		debug(D_MAKEFLOW_HOOK, "Unable to clean failed output");
 		goto FAILURE;
 	}
@@ -165,7 +165,7 @@ static int node_success(struct dag_node *n, struct batch_task *task){
 	struct dag_file *f = dag_file_lookup_fail(d, q, faildir);
 	if (!f) goto OUT;
 
-	if (makeflow_clean_file(n->d, q, f, 1, NULL)) {
+	if (makeflow_clean_file(n->d, q, f, 1)) {
 		debug(D_MAKEFLOW_HOOK, "Unable to clean failed output");
 		goto OUT;
 	}

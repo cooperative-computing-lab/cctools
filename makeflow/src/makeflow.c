@@ -806,9 +806,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 			/* Either the file was created and not confirmed or a hook removed the file. */
 			if(f->state == DAG_FILE_STATE_EXPECT || f->state == DAG_FILE_STATE_DELETE) {
-				makeflow_clean_file(d, remote_queue, f, 1, storage_allocation);
+				makeflow_clean_file(d, remote_queue, f, 1);
 			} else {
-				makeflow_clean_file(d, remote_queue, f, 0, storage_allocation);
+				makeflow_clean_file(d, remote_queue, f, 0);
 			}
 		}
 
@@ -1300,6 +1300,9 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	extern struct makeflow_hook makeflow_hook_example;
+	extern struct makeflow_hook makeflow_hook_fail_dir;
+	/* Using fail directories is on by default */
+	int save_failure = 1;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 
 	random_init();
@@ -1831,10 +1834,7 @@ int main(int argc, char *argv[])
 				parrot_path = xxstrdup(optarg);
 				break;
 			case LONG_OPT_FAIL_DIR:
-				{
-					extern struct makeflow_hook makeflow_hook_fail_dir;
-					makeflow_hook_register(&makeflow_hook_fail_dir);
-				}
+				save_failure = 0;
 				break;
 		}
 	}
@@ -1853,6 +1853,10 @@ int main(int argc, char *argv[])
 	// REGISTER HOOKS HERE
 	if (enforcer && umbrella) {
 		fatal("enforcement and Umbrella are mutually exclusive\n");
+	}
+
+	if(save_failure){
+		makeflow_hook_register(&makeflow_hook_fail_dir);
 	}
 
 	makeflow_hook_create(hook_args);
