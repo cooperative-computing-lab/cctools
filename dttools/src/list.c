@@ -539,9 +539,10 @@ void *list_find(struct list *l, list_op_t comparator, const void *arg) {
 
 	struct list_cursor *cur = list_cursor_create(l);
 	for (list_seek(cur, 0); list_get(cur, &item); list_next(cur)) {
-		if(comparator(item, arg))
+		if(comparator(item, arg)) {
 			out = item;
 			break;
+		}
 	}
 	list_cursor_destroy(cur);
 
