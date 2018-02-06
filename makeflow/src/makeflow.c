@@ -47,7 +47,6 @@ See the file COPYING for details.
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
 #include "makeflow_wrapper_enforcement.h"
-#include "makeflow_wrapper_singularity.h"
 #include "makeflow_archive.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
@@ -1308,6 +1307,7 @@ int main(int argc, char *argv[])
 	/* Using fail directories is on by default */
 	int save_failure = 1;
 	extern struct makeflow_hook makeflow_hook_sandbox;
+	extern struct makeflow_hook makeflow_hook_singularity;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 
 	random_init();
@@ -1760,9 +1760,8 @@ int main(int argc, char *argv[])
 				container_image_tar = xxstrdup(optarg);
 				break;
 			case LONG_OPT_SINGULARITY:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				container_mode = CONTAINER_MODE_SINGULARITY;
-				container_image = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_singularity);
+				jx_insert(hook_args, jx_string("singularity_container_image"), jx_string(optarg));
 				break;
 			case LONG_OPT_ALLOCATION_MODE:
 				if(!strcmp(optarg, "throughput")) {
@@ -2230,8 +2229,6 @@ int main(int argc, char *argv[])
 
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		makeflow_wrapper_docker_init(wrapper, container_image, container_image_tar);
-	} else if(container_mode == CONTAINER_MODE_SINGULARITY){
-		makeflow_wrapper_singularity_init(wrapper, container_image);
 	}
 
 	d->archive_directory = archive_directory;
@@ -2258,9 +2255,6 @@ EXIT_WITH_FAILURE:
 	time_completed = timestamp_get();
 	runtime = time_completed - runtime;
 
-	if(local_queue)
-		batch_queue_delete(local_queue);
-
 	/*
 	 * Set the abort and failed flag for batch_job_mesos mode.
 	 * Since batch_queue_delete(struct batch_queue *q) will call
@@ -2275,16 +2269,12 @@ EXIT_WITH_FAILURE:
 		batch_queue_set_int_option(remote_queue, "batch-queue-failed-flag", (int)makeflow_failed_flag);
 	}
 
-	batch_queue_delete(remote_queue);
-
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
 
 	/* XXX better to write created files to log, then delete those listed in log. */
 	if (container_mode == CONTAINER_MODE_DOCKER) {
 		unlink(CONTAINER_DOCKER_SH);
-	}else if(container_mode == CONTAINER_MODE_SINGULARITY){
-		unlink(CONTAINER_SINGULARITY_SH);
 	}
 
 	if(wrapper){
@@ -2314,6 +2304,11 @@ EXIT_WITH_FAILURE:
 	}
 
 	makeflow_hook_destroy(d);
+
+	/* Batch queues are removed after hooks are destroyed to allow for file clean up on related files. */
+	batch_queue_delete(remote_queue);
+	if(local_queue)
+		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
 
