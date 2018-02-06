@@ -140,7 +140,7 @@ static int node_success(struct dag_node *n, struct batch_task *task){
     while((f = list_next_item(n->source_files))) {
         if(f->state == DAG_FILE_STATE_COMPLETE){
             if(storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
-				makeflow_clean_file(n->d, makeflow_get_queue(n), f, 0);
+				makeflow_clean_file(n->d, makeflow_get_queue(n), f);
 		}
 	}
 
@@ -149,7 +149,7 @@ static int node_success(struct dag_node *n, struct batch_task *task){
         list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))){
 			if(f->reference_count == 0 && f->type != DAG_FILE_TYPE_OUTPUT)
-				makeflow_clean_file(n->d, makeflow_get_queue(n), f, 0);
+				makeflow_clean_file(n->d, makeflow_get_queue(n), f);
 		}
 	}
 

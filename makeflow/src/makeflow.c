@@ -253,10 +253,10 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	list_first_item(n->task->output_files);
 	while((bf = list_next_item(n->task->output_files))){
 		df = dag_file_lookup_or_create(d, bf->outer_name);
-		makeflow_clean_file(d, q, df, 0);
+		makeflow_clean_file(d, q, df);
 	}
 
-	makeflow_clean_node(d, q, n, 1);
+	makeflow_clean_node(d, q, n);
 }
 
 /*
@@ -386,10 +386,10 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	list_first_item(n->task->output_files);
 	while((bf = list_next_item(n->task->output_files))) {
 		f1 = dag_file_lookup_or_create(d, bf->outer_name);
-		makeflow_clean_file(d, remote_queue, f1, 0);
+		makeflow_clean_file(d, remote_queue, f1);
 	}
 
-	makeflow_clean_node(d, remote_queue, n, 0);
+	makeflow_clean_node(d, remote_queue, n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
 	// For each parent node, rerun it if input file was garbage collected
@@ -806,9 +806,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 			/* Either the file was created and not confirmed or a hook removed the file. */
 			if(f->state == DAG_FILE_STATE_EXPECT || f->state == DAG_FILE_STATE_DELETE) {
-				makeflow_clean_file(d, remote_queue, f, 1);
+				makeflow_clean_file(d, remote_queue, f);
 			} else {
-				makeflow_clean_file(d, remote_queue, f, 0);
+				makeflow_clean_file(d, remote_queue, f);
 			}
 		}
 
