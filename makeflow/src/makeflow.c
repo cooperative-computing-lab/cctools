@@ -42,7 +42,6 @@ See the file COPYING for details.
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
-#include "makeflow_wrapper_docker.h"
 #include "makeflow_wrapper_monitor.h"
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
@@ -147,7 +146,6 @@ static int cache_mode = 1;
 
 static container_mode_t container_mode = CONTAINER_MODE_NONE;
 static char *container_image = NULL;
-static char *container_image_tar = NULL;
 
 static char *parrot_path = "./parrot_run";
 
@@ -1305,6 +1303,7 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	char *k8s_image = NULL;
+	extern struct makeflow_hook makeflow_hook_docker;
 	extern struct makeflow_hook makeflow_hook_example;
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
@@ -1759,15 +1758,15 @@ int main(int argc, char *argv[])
 				jx_insert(hook_args, jx_string("storage_allocation_print"), jx_string(optarg));
 				break;
 			case LONG_OPT_DOCKER:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				container_mode = CONTAINER_MODE_DOCKER;
-				container_image = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_docker);
+				jx_insert(hook_args, jx_string("docker_container_image"), jx_string(optarg));
 				break;
 			case LONG_OPT_SKIP_FILE_CHECK:
 				skip_file_check = 1;
 				break;
 			case LONG_OPT_DOCKER_TAR:
-				container_image_tar = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_docker);
+				jx_insert(hook_args, jx_string("docker_container_tar"), jx_string(optarg));
 				break;
 			case LONG_OPT_SINGULARITY:
 				makeflow_hook_register(&makeflow_hook_singularity);
@@ -2241,10 +2240,6 @@ int main(int argc, char *argv[])
 
 	runtime = timestamp_get();
 
-	if (container_mode == CONTAINER_MODE_DOCKER) {
-		makeflow_wrapper_docker_init(wrapper, container_image, container_image_tar);
-	}
-
 	d->archive_directory = archive_directory;
 	d->should_read_archive = should_read_archive;
 	d->should_write_to_archive = should_write_to_archive;
@@ -2285,11 +2280,6 @@ EXIT_WITH_FAILURE:
 
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
-
-	/* XXX better to write created files to log, then delete those listed in log. */
-	if (container_mode == CONTAINER_MODE_DOCKER) {
-		unlink(CONTAINER_DOCKER_SH);
-	}
 
 	if(wrapper){
 		makeflow_wrapper_delete(wrapper);
