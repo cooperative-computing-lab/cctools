@@ -223,13 +223,8 @@ static int node_submit(struct dag_node *n, struct batch_task *t)
 
 	char *umbrella_command = NULL;
 
-	umbrella_command = string_format("%s --spec \"%s\" \
-		--localdir ./umbrella_test \
-		--inputs \"%s\" \
-		--output \"%s\" \
-		--sandbox_mode \"%s\" \
-		--log \"%s\" \
-		run \'{}\'", local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, mode, log_file->filename);
+	umbrella_command = string_format("%s --spec \"%s\" --localdir ./umbrella_test --inputs \"%s\" --output \"%s\" --sandbox_mode \"%s\" --log \"%s\" run \'{}\'", 
+		local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, mode, log_file->filename);
 
 	debug(D_MAKEFLOW_HOOK, "umbrella wrapper command: %s\n", umbrella_command);
 
