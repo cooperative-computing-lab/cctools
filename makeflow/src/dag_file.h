@@ -67,6 +67,16 @@ struct dag_file {
 */
 struct dag_file *dag_file_create( const char *filename );
 
+/** Create JX object of file struct.
+Contains dag_name (originally filename, will be outer_name in code), 
+task_name(originally remote_filename, will be inner_name in code), 
+and size if defined.
+* @param f dag_file.
+* @param n dag_node to provide context for remote names.
+* @return JX object of file.
+*/
+struct jx * dag_file_to_jx( struct dag_file *f, struct dag_node *n);
+
 /** Returns the string defining the files state, intended for logging.
 @param Enum DAG_FILE_STATE_* for the printable name of the state.
 @return Const char of the name.

@@ -33,47 +33,77 @@ struct list * makeflow_hooks = NULL;
 
 struct dag_file *makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern)
 {
-    char *id = string_format("%d",task->taskid);
-    char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
-    char * name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	char *id = string_format("%d",task->taskid);
+	char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
+	char * name_on_execution = NULL;
+	if(name_on_execution_pattern){
+		name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	}
 
-    /* Output of dag_file is returned to use for final filename. */
-    struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
+	/* Output of dag_file is returned to use for final filename. */
+	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
 
-    batch_task_add_input_file(task, name_on_submission, name_on_execution);
+	batch_task_add_input_file(task, name_on_submission, name_on_execution);
 
-    free(id);
-    free(name_on_submission);
-    free(name_on_execution);
+	free(id);
+	free(name_on_submission);
+	free(name_on_execution);
 
-    return f;
+	return f;
 }
 
 struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern)
 {
-    char *id = string_format("%d",task->taskid);
-    char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
-    char * name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	char *id = string_format("%d",task->taskid);
+	char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
+	char * name_on_execution = NULL;
+	if(name_on_execution_pattern){
+		name_on_execution = string_replace_percents(name_on_execution_pattern, id);
+	}
 
-    /* Output of dag_file is returned to use for final filename. */
-    struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
+	/* Output of dag_file is returned to use for final filename. */
+	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
 
-    batch_task_add_output_file(task, name_on_submission, name_on_execution);
+	batch_task_add_output_file(task, name_on_submission, name_on_execution);
 
-    free(id);
-    free(name_on_submission);
-    free(name_on_execution);
+	free(id);
+	free(name_on_submission);
+	free(name_on_execution);
 
-    return f;
+	return f;
 }
 
 
-void makeflow_hook_register(struct makeflow_hook *hook) {
+int makeflow_hook_register(struct makeflow_hook *hook) {
 	assert(hook);
 	if (!makeflow_hooks) makeflow_hooks = list_create();
-	struct makeflow_hook *h = xxmalloc(sizeof(*h));
-	memcpy(h, hook, sizeof(*h));
-	list_push_head(makeflow_hooks, h);
+
+	/* Add hook by default, if it doesn't exists in list of hooks. */
+	int rc = MAKEFLOW_HOOK_SUCCESS;
+	struct makeflow_hook *h = NULL;
+
+	if(hook->register_hook){
+		rc = hook->register_hook(hook, makeflow_hooks);
+	} else {
+		list_first_item(makeflow_hooks);
+		while((h = list_next_item(makeflow_hooks))){
+			if(!strcmp(h->module_name, hook->module_name)){
+				rc = MAKEFLOW_HOOK_SKIP;
+				break;
+			}
+		}
+	}
+
+	if(rc == MAKEFLOW_HOOK_SUCCESS){
+		h = xxmalloc(sizeof(*h));
+		memcpy(h, hook, sizeof(*h));
+
+		list_push_tail(makeflow_hooks, h);
+	} else if(rc == MAKEFLOW_HOOK_FAILURE){
+		debug(D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
+	}
+
+	return rc;
 }
 
 int makeflow_hook_create(struct jx *args){
@@ -86,33 +116,34 @@ int makeflow_hook_destroy(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_dag_init(struct dag *d){
-	MAKEFLOW_HOOK_CALL(dag_init, d);
+int makeflow_hook_dag_check(struct dag *d){
+	if (!makeflow_hooks)
+		return MAKEFLOW_HOOK_SUCCESS;
+
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		int rc = MAKEFLOW_HOOK_SUCCESS;
+		if (h->dag_check)
+			rc = h->dag_check(d);
+
+		/* If the return is not success return this to Makeflow.
+		 * If it was a failure report this in debugging, if it was something
+		 * else than the system is chosing to exit. A case for this is the
+		 * storage allocation printing function. If not returning FAILURE
+		 * the module should provide a printout for why it is exiting. */
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			if (rc ==MAKEFLOW_HOOK_FAILURE)
+				debug(D_MAKEFLOW_HOOK, "Hook %s:dag_check rejected DAG",h->module_name?h->module_name:"");
+			return rc;
+		}
+	}
+
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_dag_check(struct dag *d){
-    if (!makeflow_hooks)
-        return MAKEFLOW_HOOK_SUCCESS;
-
-    list_first_item(makeflow_hooks);
-    for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
-        int rc = MAKEFLOW_HOOK_SUCCESS;
-        if (h->dag_check)
-            rc = h->dag_check(d);
-
-        if (rc !=MAKEFLOW_HOOK_SUCCESS){
-            debug(D_MAKEFLOW_HOOK, "Hook %s:dag_check rejected DAG",h->module_name?h->module_name:"");
-			return rc;
-		}
-    }
-
-    return MAKEFLOW_HOOK_SUCCESS;
-}
-
 int makeflow_hook_dag_clean(struct dag *d){
-    MAKEFLOW_HOOK_CALL(dag_clean, d);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(dag_clean, d);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_dag_start(struct dag *d){
@@ -121,27 +152,44 @@ int makeflow_hook_dag_start(struct dag *d){
 }
 
 int makeflow_hook_dag_loop(struct dag *d){
-    if (!makeflow_hooks)
-        return MAKEFLOW_HOOK_END;
+	int rc = MAKEFLOW_HOOK_END;
+	if(!makeflow_hooks)
+		return rc;
 
-    list_first_item(makeflow_hooks);
-    for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
-        int rc = MAKEFLOW_HOOK_SUCCESS;
-        if (h->dag_loop)
-            rc = h->dag_loop(d);
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		if (h->dag_loop) {
+			rc = h->dag_loop(d);
+		} else {
+			continue;
+		}
 
-        if (rc !=MAKEFLOW_HOOK_SUCCESS){
-            debug(D_MAKEFLOW_HOOK, "Hook %s:dag_loop rejected DAG",h->module_name?h->module_name:"");
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:dag_loop rejected DAG",h->module_name?h->module_name:"");
 			return rc;
 		}
-    }
+	}
 
-    return MAKEFLOW_HOOK_SUCCESS;
+	return rc;
 }
 
 
 int makeflow_hook_dag_end(struct dag *d){
-	MAKEFLOW_HOOK_CALL(dag_end, d);
+	if (!makeflow_hooks)
+		return MAKEFLOW_HOOK_SUCCESS;
+
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		int rc = MAKEFLOW_HOOK_SUCCESS;
+		if (h->dag_end)
+			rc = h->dag_end(d);
+
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:dag_end failed dag",h->module_name?h->module_name:"");
+			return rc;
+		}
+	}
+
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
@@ -155,28 +203,28 @@ int makeflow_hook_dag_abort(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_hook_node_create(struct dag_node *node, struct batch_queue *queue){
-	MAKEFLOW_HOOK_CALL(node_create, node, queue);
+int makeflow_hook_dag_success(struct dag *d){
+	MAKEFLOW_HOOK_CALL(dag_success, d);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_node_check(struct dag_node *node, struct batch_queue *queue){
-    if (!makeflow_hooks)
-        return MAKEFLOW_HOOK_SUCCESS;
+	if (!makeflow_hooks)
+		return MAKEFLOW_HOOK_SUCCESS;
 
-    list_first_item(makeflow_hooks);
-    for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
-        int rc = MAKEFLOW_HOOK_SUCCESS;
-        if (h->node_check)
-            rc = h->node_check(node, queue);
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		int rc = MAKEFLOW_HOOK_SUCCESS;
+		if (h->node_check)
+			rc = h->node_check(node, queue);
 
-        if (rc !=MAKEFLOW_HOOK_SUCCESS){
-            debug(D_MAKEFLOW_HOOK, "Hook %s:node_check rejected Node %d",h->module_name?h->module_name:"", node->nodeid);
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:node_check rejected Node %d",h->module_name?h->module_name:"", node->nodeid);
 			return rc;
 		}
-    }
+	}
 
-    return MAKEFLOW_HOOK_SUCCESS;
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_node_submit(struct dag_node *node, struct batch_task *task){
@@ -185,8 +233,8 @@ int makeflow_hook_node_submit(struct dag_node *node, struct batch_task *task){
 }
 
 int makeflow_hook_node_end(struct dag_node *node, struct batch_task *task){
-    MAKEFLOW_HOOK_CALL(node_end, node, task);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(node_end, node, task);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_node_success(struct dag_node *node, struct batch_task *task){
@@ -205,27 +253,27 @@ int makeflow_hook_node_abort(struct dag_node *node){
 }
 
 int makeflow_hook_batch_submit(struct batch_task *task){
-    MAKEFLOW_HOOK_CALL(batch_submit, task);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(batch_submit, task);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_batch_retrieve(struct batch_task *task){
-    MAKEFLOW_HOOK_CALL(batch_retrieve, task);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(batch_retrieve, task);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_file_complete(struct dag_file *file){
-    MAKEFLOW_HOOK_CALL(file_complete, file);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(file_complete, file);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_file_clean(struct dag_file *file){
-    MAKEFLOW_HOOK_CALL(file_clean, file);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(file_clean, file);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_file_deleted(struct dag_file *file){
-    MAKEFLOW_HOOK_CALL(file_deleted, file);
-    return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(file_deleted, file);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
   

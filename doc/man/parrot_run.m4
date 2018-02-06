@@ -106,6 +106,17 @@ LONGCODE_BEGIN
 % /usr/bin/ls|stat
 LONGCODE_END
 
+SECTION(NOTES ON DOCKER)
+
+Docker by default blocks ptrace, the system call on which parrot relies. To
+run parrot inside docker, the container needs to be started using the
+CODE(--security-opt seccomp=unconfined) command line argument. For
+example:
+
+LONGCODE_BEGIN
+    docker run --security-opt seccomp=unconfined MY-DOCKER-IMAGE
+LONGCODE_END
+
 SECTION(COPYRIGHT)
 
 COPYRIGHT_BOILERPLATE
