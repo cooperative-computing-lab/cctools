@@ -146,7 +146,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 /* Clean a specific file, while emitting an appropriate message. */
 
-int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent)
+int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f)
 {
 	if(!f)
 		return 1;
@@ -169,7 +169,7 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 	return 0;
 }
 
-void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent)
+void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n)
 {
 	if(n->nested_job){
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
@@ -191,13 +191,10 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
-		int silent = 1;
-		if(dag_file_should_exist(f))
-			silent = 0;
 
 		/* We have a record of the file, but it is no longer created or used so delete */
 		if(dag_file_is_source(f) && dag_file_is_sink(f) && !set_lookup(d->inputs, f))
-			makeflow_clean_file(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f);
 
 		if(dag_file_is_source(f)) {
 			if(f->source && (clean_depth == MAKEFLOW_CLEAN_CACHE || clean_depth == MAKEFLOW_CLEAN_ALL)) { 
@@ -211,11 +208,11 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 		}
 
 		if(clean_depth == MAKEFLOW_CLEAN_ALL){
-			makeflow_clean_file(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f);
 		} else if(set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_OUTPUTS)) {
-			makeflow_clean_file(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f);
 		} else if(!set_lookup(d->outputs, f) && (clean_depth == MAKEFLOW_CLEAN_INTERMEDIATES)){
-			makeflow_clean_file(d, queue, f, silent);
+			makeflow_clean_file(d, queue, f);
 		}
 	}
 
@@ -266,7 +263,7 @@ static void makeflow_gc_all( struct dag *d, struct batch_queue *queue, int maxfi
 			&& !dag_file_is_source(f)
 			&& !set_lookup(d->outputs, f)
 			&& !set_lookup(d->inputs, f)
-			&& makeflow_clean_file(d, queue, f, 0)){
+			&& makeflow_clean_file(d, queue, f)){
 			collected++;
 		}
 	}

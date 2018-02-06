@@ -33,8 +33,8 @@ typedef enum {
 
 void makeflow_parse_input_outputs( struct dag *d );
 void makeflow_gc( struct dag *d, struct batch_queue *queue, makeflow_gc_method_t method, uint64_t size, int count );
-int  makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f, int silent );
-void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n, int silent );
+int  makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f );
+void makeflow_clean_node( struct dag *d, struct batch_queue *queue, struct dag_node *n );
 
 /* return 0 on success; return non-zero on failure. */
 int makeflow_clean( struct dag *d, struct batch_queue *queue, makeflow_clean_depth clean_depth );
