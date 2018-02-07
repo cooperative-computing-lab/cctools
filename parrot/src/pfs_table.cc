@@ -395,24 +395,33 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 	char link_target[PFS_PATH_MAX];
 	char link_parent[PFS_PATH_MAX];
 	struct pfs_name new_pname = *pname;
+	int in_proc = false;
 
-	if (string_match_regex(pname->path, "^/proc/self(/|$)|^/proc/[0-9]+/ns/")) {
+	if (string_match_regex(pname->path, "^/proc/self(/|$)")) {
 		/*
 		 * We need to handle /proc/self in resolve_name, and eagerly following it here would
 		 * give Parrot's PID. Return for now, and let resolve name call us again after it
 		 * rewrites the path to /proc/[pid]/.
-		 *
-		 * Depending on kernel version, /proc/[pid]/ns/ might contain magical dangling symlinks that can
-		 * nonetheless be opened as usual. If Parrot tries to follow them, it will return
-		 * erroneous ENOENT.
 		 */
 		return;
 	}
+
+	if (string_prefix_is(pname->path, "/proc/")) in_proc = true;
 
 	int rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
 	if (rlres > 0) {
 		/* readlink does not NULL-terminate */
 		link_target[rlres] = '\000';
+
+		/*
+		 * Some locations in /proc (e.g. /proc/$PID/ns/, /proc/$PID/fd/
+		 * with pipes) might contain magic dangling symlinks that can
+		 * nonetheless be opened as usual. If Parrot tries to follow them,
+		 * it will return erroneous ENOENT. While under /proc, don't try
+		 * to follow symlinks of this form.
+		 */
+		if (in_proc && string_match_regex(link_target, "^[a-z]+:\\[[0-9]+\\]$")) return;
+
 		const char *basename_start = path_basename(pname->logical_name);
 		size_t dirname_len = basename_start - pname->logical_name;
 		strncpy(link_parent, pname->logical_name, dirname_len);
