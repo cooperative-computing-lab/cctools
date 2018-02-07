@@ -562,3 +562,4 @@ const struct batch_queue_module batch_queue_amazon_batch = {
 		batch_fs_amazon_batch_unlink,
 	},
 };
+
