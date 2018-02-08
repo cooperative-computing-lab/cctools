@@ -176,6 +176,14 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	char *function_name = strdup(jx_lookup_string(j, "function_name"));
 	jx_delete(j);
 
+	char *bucket_folder = bucket_folder_create(getpid());
+	if(!bucket_folder) return -1;
+
+	struct jx *inputq = process_filestring(input_files);
+	int status = upload_files(inputq, profile_name, region_name, bucket_name, bucket_folder);
+	jx_delete(inputq);
+	if(status!=0) return -1;
+
 	struct batch_job_info *info = malloc(sizeof(*info));
 	memset(info, 0, sizeof(*info));
 
@@ -198,16 +206,9 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	}
 	/* child */
 	else if(jobid == 0) {
-		char *bucket_folder = bucket_folder_create(getpid());
-		struct jx *inputq = process_filestring(input_files);
 		struct jx *outputq = process_filestring(output_files);
 		char *payload = payload_create(cmdline, region_name, bucket_folder, bucket_name, inputq, outputq);
-
 		int status;
-
-		/* Upload all the inputs for the job to S3 */
-		status = upload_files(inputq, profile_name, region_name, bucket_name, bucket_folder);
-		if(status!=0) _exit(1);
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
 		status = invoke_function(profile_name, region_name, function_name, payload);
@@ -256,14 +257,19 @@ static batch_job_id_t batch_job_lambda_wait(struct batch_queue *q, struct batch_
 	}
 }
 
+/*
+To remove a job, we must kill its proxy process,
+which will then be returned by batch_job_wait when complete.
+*/
+
 static int batch_job_lambda_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
-	struct batch_job_info *info = itable_lookup(q->job_table, jobid);
-	printf("Job started at: %d\n", (int) info->started);
-	info->finished = time(0);
-	info->exited_normally = 0;
-	info->exit_signal = 0;
-	return 0;
+	if(itable_lookup(q->job_table, jobid)) {
+		kill(jobid,SIGKILL);
+		return 1;
+	} else {
+		return 0;
+	}
 }
 
 batch_queue_stub_create(lambda);
