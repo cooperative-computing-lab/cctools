@@ -73,7 +73,6 @@ transparently modify the linker namespace we are using.
 #define list_find			cctools_list_find
 #define list_splice			cctools_list_splice
 #define list_split			cctools_list_split
-#define list_push_priority		cctools_list_push_priority
 #define list_push_head			cctools_list_push_head
 #define list_push_tail			cctools_list_push_tail
 #define list_iterate			cctools_list_iterate
@@ -202,22 +201,6 @@ bool list_get(struct list_cursor *cur, void **item);
  */
 bool list_set(struct list_cursor *cur, void *item);
 
-/** Get the priority of the item under a cursor.
- * @param cur The cursor to look at.
- * @returns The priority of the item, defaults to zero.
- * @returns NaN if the cursor position is undefined.
- */
-double list_get_priority(struct list_cursor *cur);
-
-/** Set the priority of the value under the cursor.
- * If the cursor position is undefined, this function simply returns false.
- * @param cur The cursor position to set.
- * @param priority The priority to set to.
- * @returns true on success.
- * @returns false if the cursor position is undefined.
- */
-bool list_set_priority(struct list_cursor *cur, double priority);
-
 /** Remove the item under the cursor.
  * This function is safe to use while iterating over a list,
  * and in the presence of other cursors. Any cursors on the same item
@@ -297,14 +280,6 @@ Otherwise src will contain all elements [src->head, arg) and a new list will be 
 */
 
 struct list *list_split(struct list *src, list_op_t cmp, const void *arg);
-
-/** Push an item in priority order.
-@param list The list to push onto.
-@param item The item to push onto the list.
-@param prio The integer priority of the item.
-@return True on success, false on failure (due to out of memory.)
-*/
-int list_push_priority(struct list *list, void *item, double prio);
 
 /** Push an item onto the list head.
 @param list The list to push onto.

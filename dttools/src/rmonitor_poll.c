@@ -474,7 +474,18 @@ int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 			hash_table_insert(maps, info->map_name, infos);
 		}
 
-		list_push_priority(infos, info, -1*(info->map_start));
+		struct rmonitor_mem_info *i = NULL;
+		struct list_cursor *cur = list_cursor_create(infos);
+		for (list_seek(cur, -1); list_get(cur, (void **) &i); list_prev(cur)) {
+			if (i->map_start < info->map_start) {
+				list_insert(cur, info);
+				break;
+			}
+			i = NULL;
+		}
+		// if infos is empty or we ran off the beginning, i is NULL here
+		if (!i) list_insert(cur, info);
+		list_cursor_destroy(cur);
 	}
 
 	fclose(fmem);

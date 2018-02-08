@@ -5211,7 +5211,19 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	}
 
 	if(by_priority) {
-		list_push_priority(q->ready_list,t,t->priority);
+		struct work_queue_task *i = NULL;
+		struct list_cursor *cur = list_cursor_create(q->ready_list);
+		for (list_seek(cur, -1); list_get(cur, (void **) &i); list_prev(cur)) {
+			if (i->priority > t->priority) {
+				list_insert(cur, t);
+				break;
+			}
+			i = NULL;
+		}
+		// if the ready list is empty or we ran off the beginning,
+		// i is NULL here
+		if (!i) list_insert(cur, t);
+		list_cursor_destroy(cur);
 	} else {
 		list_push_head(q->ready_list,t);
 	}

@@ -23,7 +23,6 @@ struct list {
 
 struct list_item {
 	unsigned refcount;
-	double priority;
 	struct list *list;
 	struct list_item *next;
 	struct list_item *prev;
@@ -152,21 +151,6 @@ bool list_set(struct list_cursor *cur, void *item) {
 	list_cursor_relax(cur);
 	if (!cur->target) return false;
 	cur->target->data = item;
-	return true;
-}
-
-double list_get_priority(struct list_cursor *cur) {
-	assert(cur);
-	list_cursor_relax(cur);
-	if (!cur->target) return NAN;
-	return cur->target->priority;
-}
-
-bool list_set_priority(struct list_cursor *cur, double priority) {
-	assert(cur);
-	list_cursor_relax(cur);
-	if (!cur->target) return false;
-	cur->target->priority = priority;
 	return true;
 }
 
@@ -394,36 +378,6 @@ void list_free(struct list *l) {
 		free(item);
 	}
 	list_cursor_destroy(cur);
-}
-
-int list_push_priority(struct list *l, void *item, double priority) {
-	bool ok;
-	struct list_cursor *cur = list_cursor_create(l);
-
-	if (list_size(l) == 0) {
-		list_insert(cur, item);
-		ok = list_seek(cur, 0);
-		assert(ok);
-	} else {
-		ok = list_seek(cur, -1);
-		assert(ok);
-		do {
-			double p = list_get_priority(cur);
-			if (priority > p) break;
-		} while (list_prev(cur));
-		list_insert(cur, item);
-		ok = list_next(cur);
-		if (!ok) {
-			ok = list_seek(cur, 0);
-			assert(ok);
-		}
-	}
-
-	ok = list_set_priority(cur, priority);
-	assert(ok);
-
-	list_cursor_destroy(cur);
-	return 1;
 }
 
 int list_push_head(struct list *l, void *item) {
