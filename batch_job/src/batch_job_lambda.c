@@ -47,6 +47,7 @@ Returns zero on success.
 static int upload_file( struct lambda_config *config, const char *file_name )
 {
 	char *cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", config->profile_name, config->region_name, file_name, config->bucket_name, config->bucket_folder, file_name);
+	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -67,6 +68,7 @@ indicates this is the case.
 static int download_file( struct lambda_config *config, const char *file_name )
 {
 	char *cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", config->profile_name, config->region_name, config->bucket_name, config->bucket_folder, file_name, file_name);
+	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -79,6 +81,7 @@ it to finish.  Returns zero on success.
 static int invoke_function( struct lambda_config *config, const char *payload)
 {
 	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null > /dev/null", config->profile_name, config->region_name, config->function_name, payload);
+	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -101,8 +104,8 @@ char *payload_create(struct lambda_config *config, const char *cmdline, struct j
 }
 
 /*
-Sanitizes the file lists to retrieve just the filenames in the cases
-of an '='
+Sanitizes the file lists to retrieve just the filenames in the cases of an '='
+XXX This isn't right yet b/c the = indicates renaming a file in transit.
 */
 struct jx *process_filestring(const char *filestring)
 {
@@ -124,7 +127,7 @@ struct jx *process_filestring(const char *filestring)
 }
 
 /*
-Uploads files to S3
+Uploads files to S3.  Return zero on success, non-zero otherwise.
 */
 
 int upload_files(struct lambda_config *config, struct jx *uploadq )
@@ -133,26 +136,37 @@ int upload_files(struct lambda_config *config, struct jx *uploadq )
 	for( i=0; i<jx_array_length(uploadq); i++ ) {
 		char *file_name = jx_print_string(jx_array_index(uploadq, i));
 		int status = upload_file(config,file_name);
+		if(status!=0) {
+			debug(D_DEBUG,"upload of %s failed, aborting job submission",file_name);
+			free(file_name);
+			return 1;
+		}
 		free(file_name);
-		if(status!=0) return 1;
 	}
 	return 0;
 }
 
 /*
-Downloads files from S3
+Download files from S3.  If any file fails to download, keep going,
+so thta the caller will be able to debug the result.  Makeflow will
+detect that not all files were returned.
 */
+
 int download_files(struct lambda_config *config, struct jx *downloadq )
 {
+	int nfailures = 0;
+
 	int i;
 	for( i=0; i<jx_array_length(downloadq); i++ ) {
 		char *file_name = jx_print_string(jx_array_index(downloadq, i));
 		int status = download_file(config,file_name);
+		if(status!=0) {
+			debug(D_DEBUG,"download of %s failed, still continuing",file_name);
+			nfailures++;
+		}
 		free(file_name);
-		if(status!=0) return 1;
 	}
-
-	return 0;
+	return nfailures;
 }
 
 static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources)
