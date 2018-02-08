@@ -1178,7 +1178,8 @@ int main( int argc, char *argv[] )
 	}
 
 	if (http_proxy)
-		setenv("HTTP_PROXY", http_proxy, 1);
+		setenv("PARROT_HTTP_PROXY", http_proxy, 1);
+
 	http_proxy = (char *)realloc(http_proxy, 0);
 
 	if (!create_dir(pfs_temp_dir, S_IRWXU))
