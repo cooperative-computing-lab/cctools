@@ -1306,6 +1306,7 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
 	int save_failure = 1;
+	extern struct makeflow_hook makeflow_hook_sandbox;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 
 	random_init();
@@ -1353,6 +1354,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
+		LONG_OPT_SANDBOX,
 		LONG_OPT_STORAGE_TYPE,
 		LONG_OPT_STORAGE_LIMIT,
 		LONG_OPT_STORAGE_PRINT,
@@ -1435,6 +1437,7 @@ int main(int argc, char *argv[])
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
 		{"do-not-save-failed-output", no_argument, 0, LONG_OPT_FAIL_DIR},
+		{"sandbox", no_argument, 0, LONG_OPT_SANDBOX},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
 		{"show-output", no_argument, 0, 'O'},
@@ -1843,6 +1846,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;
+				break;
+			case LONG_OPT_SANDBOX:
+				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
 		}
 	}
