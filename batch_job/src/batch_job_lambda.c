@@ -10,12 +10,32 @@
 #include <string.h>
 #include <unistd.h>
 
-/*
-This is the file where the Lambda function stores it's
-response. For now there's no good use for it, but it may be
-valuable in the future
-*/
-static const char *output_file_name = "/dev/null";
+struct lambda_config {
+	const char *bucket_name;
+	const char *region_name;
+	const char *profile_name;
+	const char *function_name;
+};
+
+static struct lambda_config * lambda_config_load( const char *filename )
+{
+	struct jx * j = jx_parse_file(filename);
+	if(!j) fatal("%s isn't a valid json file\n",filename);
+
+	struct lambda_config *c = malloc(sizeof(*c));
+
+	c->bucket_name   = jx_lookup_string(j,"bucket_name");
+	c->region_name   = jx_lookup_string(j,"region_name");
+	c->profile_name  = jx_lookup_string(j,"profile_name");
+	c->function_name = jx_lookup_string(j,"function_name");
+
+	if(!c->bucket_name)    fatal("%s doesn't define bucket_name",filename);
+	if(!c->region_name)    fatal("%s doesn't define region_name",filename);
+	if(!c->profile_name)   fatal("%s doesn't define profile_name",filename);
+	if(!c->function_name)  fatal("%s doesn't define function_name",filename);
+
+	return c;
+}
 
 /*
 Decides what to name the folder where files will be uploaded to and
@@ -67,7 +87,7 @@ it to finish.  Returns zero on success.
 */
 static int invoke_function(const char *profile_name, const char *region_name, const char *function_name, const char *payload)
 {
-	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' %s > /dev/null", profile_name, region_name, function_name, payload, output_file_name);
+	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null > /dev/null", profile_name, region_name, function_name, payload);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -146,41 +166,17 @@ int download_files(struct jx *downloadq, const char *profile_name, const char *r
 
 static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources)
 {
-	/* Parse the config file produced by batch_job_lambda_setup.sh */
-	char *config_file_name = hash_table_lookup(q->options, "lambda-config");
-	if(!config_file_name) {
-		fatal("No Lambda config file passed. Please pass config file containing using --lambda-config");
-	}
+	const char *config_file = hash_table_lookup(q->options, "lambda-config");
+	if(!config_file) fatal("--lambda-config option is required");
 
-	struct jx *j = jx_parse_file(config_file_name);
-	if(!j) {
-		fatal("Couldn't parse setup file\n");
-	}
-
-	if(!jx_lookup_string(j, "bucket_name")) {
-		fatal("Couldn't parse the bucket name\n");
-	}
-	if(!jx_lookup_string(j, "region_name")) {
-		fatal("Couldn't parse the region name\n");
-	}
-	if(!jx_lookup_string(j, "profile_name")) {
-		fatal("Couldn't parse the profile name\n");
-	}
-	if(!jx_lookup_string(j, "function_name")) {
-		fatal("Couldn't parse the function name\n");
-	}
-
-	char *bucket_name = strdup(jx_lookup_string(j, "bucket_name"));
-	char *region_name = strdup(jx_lookup_string(j, "region_name"));
-	char *profile_name = strdup(jx_lookup_string(j, "profile_name"));
-	char *function_name = strdup(jx_lookup_string(j, "function_name"));
-	jx_delete(j);
+	static struct lambda_config *config = 0;
+	if(!config) config = lambda_config_load(config_file);
 
 	char *bucket_folder = bucket_folder_create(getpid());
 	if(!bucket_folder) return -1;
 
 	struct jx *inputq = process_filestring(input_files);
-	int status = upload_files(inputq, profile_name, region_name, bucket_name, bucket_folder);
+	int status = upload_files(inputq, config->profile_name, config->region_name, config->bucket_name, bucket_folder);
 	jx_delete(inputq);
 	if(status!=0) return -1;
 
@@ -193,11 +189,6 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 
 	/* parent */
 	if(jobid > 0) {
-		free(bucket_name);
-		free(region_name);
-		free(profile_name);
-		free(function_name);
-
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
@@ -207,15 +198,15 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	/* child */
 	else if(jobid == 0) {
 		struct jx *outputq = process_filestring(output_files);
-		char *payload = payload_create(cmdline, region_name, bucket_folder, bucket_name, inputq, outputq);
+		char *payload = payload_create(cmdline, config->region_name, bucket_folder, config->bucket_name, inputq, outputq);
 		int status;
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
-		status = invoke_function(profile_name, region_name, function_name, payload);
+		status = invoke_function(config->profile_name, config->region_name, config->function_name, payload);
 		if(status!=0) _exit(1);
 
 		/* Retrieve the outputs from S3 */
-		status = download_files(outputq, profile_name, region_name, bucket_name, bucket_folder);
+		status = download_files(outputq, config->profile_name, config->region_name, config->bucket_name, bucket_folder);
 		if(status!=0) _exit(1);
 
 		_exit(0);
