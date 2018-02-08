@@ -44,9 +44,9 @@ Upload a file to the appropriate bucket.
 Returns zero on success.
 */
 
-static int upload_file(const char *file_name, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+static int upload_file(const char *file_name, struct lambda_config *config )
 {
-	char *cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", profile_name, region_name, file_name, bucket_name, bucket_folder, file_name);
+	char *cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", config->profile_name, config->region_name, file_name, config->bucket_name, config->bucket_folder, file_name);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -64,9 +64,9 @@ then we should not have to request a file more than once. Testing
 indicates this is the case.
  */
 
-static int download_file(const char *file_name, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+static int download_file(const char *file_name, struct lambda_config *config )
 {
-	char *cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", profile_name, region_name, bucket_name, bucket_folder, file_name, file_name);
+	char *cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", config->profile_name, config->region_name, config->bucket_name, config->bucket_folder, file_name, file_name);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -76,9 +76,9 @@ static int download_file(const char *file_name, const char *profile_name, const 
 Forks an invocation process for the Lambda function and waits for
 it to finish.  Returns zero on success.
 */
-static int invoke_function(const char *profile_name, const char *region_name, const char *function_name, const char *payload)
+static int invoke_function( struct lambda_config *config, const char *payload)
 {
-	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null > /dev/null", profile_name, region_name, function_name, payload);
+	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null > /dev/null", config->profile_name, config->region_name, config->function_name, payload);
 	int r = system(cmd);
 	free(cmd);
 	return r;
@@ -88,13 +88,13 @@ static int invoke_function(const char *profile_name, const char *region_name, co
 Creates the json payload to be sent to the Lambda function. It is the
 'event' variable in the Lambda function code
 */
-char *payload_create(const char *cmdline, const char *region_name, const char *bucket_folder, const char *bucket_name, struct jx *inputq, struct jx *outputq)
+char *payload_create(const char *cmdline, struct lambda_config *config, struct jx *inputq, struct jx *outputq)
 {
 	struct jx *payload = jx_object(0);
 	jx_insert_string(payload, "cmd", cmdline);
-	jx_insert_string(payload, "region_name", region_name);
-	jx_insert_string(payload, "bucket_name", bucket_name);
-	jx_insert_string(payload, "bucket_folder", bucket_folder);
+	jx_insert_string(payload, "region_name", config->region_name);
+	jx_insert_string(payload, "bucket_name", config->bucket_name);
+	jx_insert_string(payload, "bucket_folder", config->bucket_folder);
 	jx_insert(payload, jx_string("input_names"), inputq);
 	jx_insert(payload, jx_string("output_names"), outputq);
 	return jx_print_string(payload);
@@ -127,12 +127,12 @@ struct jx *process_filestring(const char *filestring)
 Uploads files to S3
 */
 
-int upload_files(struct jx *uploadq, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+int upload_files(struct jx *uploadq, struct lambda_config *config )
 {
 	int i;
 	for( i=0; i<jx_array_length(uploadq); i++ ) {
 		char *file_name = jx_print_string(jx_array_index(uploadq, i));
-		int status = upload_file(file_name, profile_name, region_name, bucket_name, bucket_folder);
+		int status = upload_file(file_name, config );
 		free(file_name);
 		if(status!=0) return 1;
 	}
@@ -142,12 +142,12 @@ int upload_files(struct jx *uploadq, const char *profile_name, const char *regio
 /*
 Downloads files from S3
 */
-int download_files(struct jx *downloadq, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+int download_files(struct jx *downloadq, struct lambda_config *config )
 {
 	int i;
 	for( i=0; i<jx_array_length(downloadq); i++ ) {
 		char *file_name = jx_print_string(jx_array_index(downloadq, i));
-		int status = download_file(file_name, profile_name, region_name, bucket_name, bucket_folder);
+		int status = download_file(file_name,config);
 		free(file_name);
 		if(status!=0) return 1;
 	}
@@ -164,7 +164,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	if(!config) config = lambda_config_load(config_file);
 
 	struct jx *inputq = process_filestring(input_files);
-	int status = upload_files(inputq, config->profile_name, config->region_name, config->bucket_name, config->bucket_folder);
+	int status = upload_files(inputq,config);
 	jx_delete(inputq);
 	if(status!=0) return -1;
 
@@ -186,15 +186,15 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	/* child */
 	else if(jobid == 0) {
 		struct jx *outputq = process_filestring(output_files);
-		char *payload = payload_create(cmdline, config->region_name, config->bucket_folder, config->bucket_name, inputq, outputq);
+		char *payload = payload_create(cmdline,config,inputq,outputq);
 		int status;
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
-		status = invoke_function(config->profile_name, config->region_name, config->function_name, payload);
+		status = invoke_function(config,payload);
 		if(status!=0) _exit(1);
 
 		/* Retrieve the outputs from S3 */
-		status = download_files(outputq, config->profile_name, config->region_name, config->bucket_name, config->bucket_folder);
+		status = download_files(outputq, config);
 		if(status!=0) _exit(1);
 
 		_exit(0);
