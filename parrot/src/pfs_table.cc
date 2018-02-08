@@ -421,6 +421,7 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 		 * to follow symlinks of this form.
 		 */
 		if (in_proc && string_match_regex(link_target, "^[a-z]+:\\[[0-9]+\\]$")) return;
+		if (in_proc && string_match_regex(link_target, "^anon_inode:\\[?[a-zA-Z_0-9]+\\]?$")) return;
 
 		const char *basename_start = path_basename(pname->logical_name);
 		size_t dirname_len = basename_start - pname->logical_name;
