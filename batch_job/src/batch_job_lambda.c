@@ -44,7 +44,7 @@ Upload a file to the appropriate bucket.
 Returns zero on success.
 */
 
-static int upload_file(const char *file_name, struct lambda_config *config )
+static int upload_file( struct lambda_config *config, const char *file_name )
 {
 	char *cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", config->profile_name, config->region_name, file_name, config->bucket_name, config->bucket_folder, file_name);
 	int r = system(cmd);
@@ -64,7 +64,7 @@ then we should not have to request a file more than once. Testing
 indicates this is the case.
  */
 
-static int download_file(const char *file_name, struct lambda_config *config )
+static int download_file( struct lambda_config *config, const char *file_name )
 {
 	char *cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", config->profile_name, config->region_name, config->bucket_name, config->bucket_folder, file_name, file_name);
 	int r = system(cmd);
@@ -88,7 +88,7 @@ static int invoke_function( struct lambda_config *config, const char *payload)
 Creates the json payload to be sent to the Lambda function. It is the
 'event' variable in the Lambda function code
 */
-char *payload_create(const char *cmdline, struct lambda_config *config, struct jx *inputq, struct jx *outputq)
+char *payload_create(struct lambda_config *config, const char *cmdline, struct jx *inputq, struct jx *outputq)
 {
 	struct jx *payload = jx_object(0);
 	jx_insert_string(payload, "cmd", cmdline);
@@ -127,12 +127,12 @@ struct jx *process_filestring(const char *filestring)
 Uploads files to S3
 */
 
-int upload_files(struct jx *uploadq, struct lambda_config *config )
+int upload_files(struct lambda_config *config, struct jx *uploadq )
 {
 	int i;
 	for( i=0; i<jx_array_length(uploadq); i++ ) {
 		char *file_name = jx_print_string(jx_array_index(uploadq, i));
-		int status = upload_file(file_name, config );
+		int status = upload_file(config,file_name);
 		free(file_name);
 		if(status!=0) return 1;
 	}
@@ -142,12 +142,12 @@ int upload_files(struct jx *uploadq, struct lambda_config *config )
 /*
 Downloads files from S3
 */
-int download_files(struct jx *downloadq, struct lambda_config *config )
+int download_files(struct lambda_config *config, struct jx *downloadq )
 {
 	int i;
 	for( i=0; i<jx_array_length(downloadq); i++ ) {
 		char *file_name = jx_print_string(jx_array_index(downloadq, i));
-		int status = download_file(file_name,config);
+		int status = download_file(config,file_name);
 		free(file_name);
 		if(status!=0) return 1;
 	}
@@ -164,7 +164,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	if(!config) config = lambda_config_load(config_file);
 
 	struct jx *inputq = process_filestring(input_files);
-	int status = upload_files(inputq,config);
+	int status = upload_files(config,inputq);
 	jx_delete(inputq);
 	if(status!=0) return -1;
 
@@ -186,7 +186,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	/* child */
 	else if(jobid == 0) {
 		struct jx *outputq = process_filestring(output_files);
-		char *payload = payload_create(cmdline,config,inputq,outputq);
+		char *payload = payload_create(config,cmdline,inputq,outputq);
 		int status;
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
@@ -194,7 +194,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		if(status!=0) _exit(1);
 
 		/* Retrieve the outputs from S3 */
-		status = download_files(outputq, config);
+		status = download_files(config,outputq);
 		if(status!=0) _exit(1);
 
 		_exit(0);
