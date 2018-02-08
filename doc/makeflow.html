@@ -38,6 +38,7 @@
 <li><a href=#moab>Moab</a>
 <li><a href=#mesos>Mesos</a>
 <li><a href=#ec2>Amazon EC2</a>
+<li><a href=#ec2>Amazon Lambda</a>
 <li><a href=#generic>Generic Cluster</a>
 </ul>
 
@@ -485,14 +486,14 @@ export AMAZON_AMI=ami-343a694f
 
 <p>An execution environment must be set up among the necessary AWS
 	services: a permissions role, a Lambda function, and an S3
-	bucket. The <tt>batch_job_lambda_setup.sh</tt> script and its associated flags will do this and output a configuration file for passing to makeflow.</p>
+	bucket. The <tt>makeflow_lambda_setup</tt> script and its associated flags will do this and output a configuration file for passing to makeflow.</p>
 
 <p>Having configured the environment, one may invoke makeflow with <tt>-T lambda</tt> and <tt>--lambda-config</tt> to
 	specify the configuration file produced earlier.</p>
 
 <p>Once you are finished with an execution environment it can be
 	destroyed: deleting the permissions role, the Lambda function, and the
-	S3 bucket and its contents. The <tt>batch_job_lambda_teardown.sh</tt> script and its associated flags will do this.</p>
+	S3 bucket and its contents. The <tt>makeflow_lambda_cleanup</tt> script and its associated flags will do this.</p>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 
