@@ -22,12 +22,15 @@
 
 static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct batch_task *task){
 	struct batch_wrapper *wrapper = batch_wrapper_create();
+	char *cmd = string_format("task_%d", task->taskid);
+	batch_wrapper_prefix(wrapper, cmd);
+	free(cmd);
 
 	/* Save the directory we were originally working in. */
 	//batch_wrapper_pre(wrapper, "export CUR_WORK_DIR=$(pwd)");
 
 	/* Create sandbox. This should probably have a hex or random tail to be unique. */
-	char *cmd = string_format("mkdir task_%d_sandbox", task->taskid);
+	cmd = string_format("mkdir task_%d_sandbox", task->taskid);
 	batch_wrapper_pre(wrapper, cmd);
 	free(cmd);
 
