@@ -1217,7 +1217,8 @@ static void show_help_run(const char *cmd)
 	printf(" --work-queue-preferred-connection    Preferred connection: by_ip | by_hostname\n");
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
-	printf("    --amazon-config             Amazon config file from makeflow_ec2_setup.\n");
+	printf("    --amazon-config             Amazon EC2 config file from makeflow_ec2_setup.\n");
+	printf("    --lambda-config             Amazon Lambda config file from makeflow_lambda_setup.\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
@@ -1279,6 +1280,7 @@ int main(int argc, char *argv[])
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
+	const char *lambda_config = NULL;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1367,6 +1369,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
+		LONG_OPT_LAMBDA_CONFIG,
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_ARGS,
@@ -1464,6 +1467,7 @@ int main(int argc, char *argv[])
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
+		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
@@ -1618,6 +1622,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AMAZON_CONFIG:
 				amazon_config = xxstrdup(optarg);
+				break;
+			case LONG_OPT_LAMBDA_CONFIG:
+				lambda_config = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
@@ -2016,6 +2023,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "caching", cache_mode ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "wait-queue-size", wq_wait_queue_size);
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
+	batch_queue_set_option(remote_queue, "lambda-config", lambda_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 

@@ -25,6 +25,8 @@ SOURCES = \
 	batch_job_condor.c \
 	batch_job_local.c \
 	batch_job_work_queue.c\
+	batch_job_lambda.c \
+	batch_job_work_queue.c \
 	batch_job_mesos.c \
 	mesos_task.c
 

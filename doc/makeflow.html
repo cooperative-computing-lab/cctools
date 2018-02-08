@@ -104,7 +104,7 @@ workflows from existing applications.</p>
 
 Makeflow can send your jobs to a wide variety of services,
 such as batch systems (HTCondor, SGE, PBS, Torque),
-cluster managers (Mesos and Kubernetes), cloud services (Amazon EC2)
+cluster managers (Mesos and Kubernetes), cloud services (Amazon EC2 or Lambda)
 and container environments like Docker and Singularity.
 Details for each of those systems are given in the <a href=#batch>Batch System Support</a> section.
 
@@ -477,6 +477,22 @@ environment variables within the Makeflow file.  For example:
 export AMAZON_INSTANCE_TYPE=m4.4xlarge
 export AMAZON_AMI=ami-343a694f
 </code>
+
+<a name=lambda><h3>Amazon Lambda</h3></a>
+
+<p>To use this batch system, one must have an Amazon Web Services <a href="http://docs.aws.amazon.com/lambda/latest/dg/setting-up.html">account</a> and
+	an <a href="http://docs.aws.amazon.com/cli/latest/userguide/installing.html">installation</a> of the AWS-CLI. Make sure it is <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html">set up</a> and <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html">configured</a> correctly.</p>
+
+<p>An execution environment must be set up among the necessary AWS
+	services: a permissions role, a Lambda function, and an S3
+	bucket. The <tt>batch_job_lambda_setup.sh</tt> script and its associated flags will do this and output a configuration file for passing to makeflow.</p>
+
+<p>Having configured the environment, one may invoke makeflow with <tt>-T lambda</tt> and <tt>--lambda-config</tt> to
+	specify the configuration file produced earlier.</p>
+
+<p>Once you are finished with an execution environment it can be
+	destroyed: deleting the permissions role, the Lambda function, and the
+	S3 bucket and its contents. The <tt>batch_job_lambda_teardown.sh</tt> script and its associated flags will do this.</p>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 
