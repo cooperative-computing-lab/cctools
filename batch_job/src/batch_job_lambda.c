@@ -1,3 +1,9 @@
+/*
+Copyright (c) 2018- The University of Notre Dame.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details. 
+*/
+
 #include "batch_job_internal.h"
 #include "process.h"
 #include "batch_job.h"
@@ -130,11 +136,11 @@ struct jx *process_filestring(const char *filestring)
 Uploads files to S3.  Return zero on success, non-zero otherwise.
 */
 
-int upload_files(struct lambda_config *config, struct jx *uploadq )
+int upload_files(struct lambda_config *config, struct jx *file_list )
 {
 	int i;
-	for( i=0; i<jx_array_length(uploadq); i++ ) {
-		char *file_name = jx_print_string(jx_array_index(uploadq, i));
+	for( i=0; i<jx_array_length(file_list); i++ ) {
+		char *file_name = jx_print_string(jx_array_index(file_list, i));
 		int status = upload_file(config,file_name);
 		if(status!=0) {
 			debug(D_DEBUG,"upload of %s failed, aborting job submission",file_name);
@@ -152,13 +158,13 @@ so thta the caller will be able to debug the result.  Makeflow will
 detect that not all files were returned.
 */
 
-int download_files(struct lambda_config *config, struct jx *downloadq )
+int download_files(struct lambda_config *config, struct jx *file_list )
 {
 	int nfailures = 0;
 
 	int i;
-	for( i=0; i<jx_array_length(downloadq); i++ ) {
-		char *file_name = jx_print_string(jx_array_index(downloadq, i));
+	for( i=0; i<jx_array_length(file_list); i++ ) {
+		char *file_name = jx_print_string(jx_array_index(file_list, i));
 		int status = download_file(config,file_name);
 		if(status!=0) {
 			debug(D_DEBUG,"download of %s failed, still continuing",file_name);
@@ -169,7 +175,7 @@ int download_files(struct lambda_config *config, struct jx *downloadq )
 	return nfailures;
 }
 
-static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources)
+static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_file_string, const char *output_file_string, struct jx *envlist, const struct rmsummary *resources)
 {
 	const char *config_file = hash_table_lookup(q->options, "lambda-config");
 	if(!config_file) fatal("--lambda-config option is required");
@@ -177,9 +183,9 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	static struct lambda_config *config = 0;
 	if(!config) config = lambda_config_load(config_file);
 
-	struct jx *inputq = process_filestring(input_files);
-	int status = upload_files(config,inputq);
-	jx_delete(inputq);
+	struct jx *input_files = process_filestring(input_file_string);
+	int status = upload_files(config,input_files);
+	jx_delete(input_files);
 	if(status!=0) return -1;
 
 	struct batch_job_info *info = malloc(sizeof(*info));
@@ -199,8 +205,8 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	}
 	/* child */
 	else if(jobid == 0) {
-		struct jx *outputq = process_filestring(output_files);
-		char *payload = payload_create(config,cmdline,inputq,outputq);
+		struct jx *output_files = process_filestring(output_file_string);
+		char *payload = payload_create(config,cmdline,input_files,output_files);
 		int status;
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
@@ -208,7 +214,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		if(status!=0) _exit(1);
 
 		/* Retrieve the outputs from S3 */
-		status = download_files(config,outputq);
+		status = download_files(config,output_files);
 		if(status!=0) _exit(1);
 
 		_exit(0);
