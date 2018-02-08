@@ -17,21 +17,21 @@ MAKEFLOW_INPUTS=
 MAKEFLOW_OUTPUTS=capitol.montage.gif
 
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
-	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif; sleep 2
+	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
 capitol.90.jpg: capitol.jpg
-	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg; sleep 2
+	$CONVERT -swirl 90 capitol.jpg capitol.90.jpg
 
 capitol.180.jpg: capitol.jpg
-	$CONVERT -swirl 180 capitol.jpg capitol.180.jpg; sleep 2
+	$CONVERT -swirl 180 capitol.jpg capitol.180.jpg
 
 capitol.270.jpg: capitol.jpg
-	$CONVERT -swirl 270 capitol.jpg capitol.270.jpg; sleep 2
+	$CONVERT -swirl 270 capitol.jpg capitol.270.jpg
 
 capitol.360.jpg: capitol.jpg
-	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg; sleep 2
+	$CONVERT -swirl 360 capitol.jpg capitol.360.jpg
 
 # If a rule is preceded by LOCAL, it executes at the local site.
 capitol.jpg:
-	LOCAL $CURL -o capitol.jpg $URL ; sleep 2
+	LOCAL $CURL -o capitol.jpg $URL
 
