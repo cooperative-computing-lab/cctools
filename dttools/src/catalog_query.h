@@ -57,4 +57,12 @@ hosts is a comma delimited list of hosts, each of which can be host or host:port
 */
 int catalog_query_send_update(const char *hosts, const char *text);
 
+/** Send update text to the given hosts, but fail if the update text
+cannot be compressed to a suitable size.
+@param hosts A list of hosts to which to send updates
+@param text String to send
+@return The number of updates successfully sent, 
+*/
+int catalog_query_send_update_conditional(const char *hosts, const char *text);
+
 #endif
