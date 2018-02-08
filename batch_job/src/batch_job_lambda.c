@@ -12,6 +12,7 @@
 
 struct lambda_config {
 	const char *bucket_name;
+	const char *bucket_folder;
 	const char *region_name;
 	const char *profile_name;
 	const char *function_name;
@@ -25,6 +26,7 @@ static struct lambda_config * lambda_config_load( const char *filename )
 	struct lambda_config *c = malloc(sizeof(*c));
 
 	c->bucket_name   = jx_lookup_string(j,"bucket_name");
+	c->bucket_folder = string_format("makeflow_%d",getpid());
 	c->region_name   = jx_lookup_string(j,"region_name");
 	c->profile_name  = jx_lookup_string(j,"profile_name");
 	c->function_name = jx_lookup_string(j,"function_name");
@@ -35,17 +37,6 @@ static struct lambda_config * lambda_config_load( const char *filename )
 	if(!c->function_name)  fatal("%s doesn't define function_name",filename);
 
 	return c;
-}
-
-/*
-Decides what to name the folder where files will be uploaded to and
-downloaded from for this particular job.
-*/
-static char *bucket_folder_create(int pid)
-{
-	char *bucket_folder = malloc(sizeof(*bucket_folder) * 256);
-	sprintf(bucket_folder, "%d", pid);
-	return bucket_folder;
 }
 
 /*
@@ -172,11 +163,8 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	static struct lambda_config *config = 0;
 	if(!config) config = lambda_config_load(config_file);
 
-	char *bucket_folder = bucket_folder_create(getpid());
-	if(!bucket_folder) return -1;
-
 	struct jx *inputq = process_filestring(input_files);
-	int status = upload_files(inputq, config->profile_name, config->region_name, config->bucket_name, bucket_folder);
+	int status = upload_files(inputq, config->profile_name, config->region_name, config->bucket_name, config->bucket_folder);
 	jx_delete(inputq);
 	if(status!=0) return -1;
 
@@ -198,7 +186,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	/* child */
 	else if(jobid == 0) {
 		struct jx *outputq = process_filestring(output_files);
-		char *payload = payload_create(cmdline, config->region_name, bucket_folder, config->bucket_name, inputq, outputq);
+		char *payload = payload_create(cmdline, config->region_name, config->bucket_folder, config->bucket_name, inputq, outputq);
 		int status;
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
@@ -206,7 +194,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		if(status!=0) _exit(1);
 
 		/* Retrieve the outputs from S3 */
-		status = download_files(outputq, config->profile_name, config->region_name, config->bucket_name, bucket_folder);
+		status = download_files(outputq, config->profile_name, config->region_name, config->bucket_name, config->bucket_folder);
 		if(status!=0) _exit(1);
 
 		_exit(0);
