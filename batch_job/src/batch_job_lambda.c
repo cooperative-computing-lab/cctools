@@ -11,14 +11,6 @@
 #include <unistd.h>
 
 /*
-These determine whether the down/uploads will all be forked at once
-(in parallel) or one after another (in series). In my tests series
-always performs the best.
-*/
-#define UPLOAD_IN_PARALLEL 0
-#define DOWNLOAD_IN_PARALLEL 0
-
-/*
 This is the file where the Lambda function stores it's
 response. For now there's no good use for it, but it may be
 valuable in the future
@@ -29,7 +21,7 @@ static const char *output_file_name = "/dev/null";
 Decides what to name the folder where files will be uploaded to and
 downloaded from for this particular job.
 */
-char *bucket_folder_create(int pid)
+static char *bucket_folder_create(int pid)
 {
 	char *bucket_folder = malloc(sizeof(*bucket_folder) * 256);
 	sprintf(bucket_folder, "%d", pid);
@@ -37,41 +29,21 @@ char *bucket_folder_create(int pid)
 }
 
 /*
-Forks an upload process and waits, or forks them all at once,
-depending on UPLOAD_IN_PARALLEL
+Upload a file to the appropriate bucket.
+Returns zero on success.
 */
-int upload_file(const char *file_name, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+
+static int upload_file(const char *file_name, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
 {
-	int jobid = fork();
-	/* parent */
-	if(jobid > 0) {
-		int status;
-		if(UPLOAD_IN_PARALLEL) {
-			return jobid;
-		} else {
-			waitpid(jobid, &status, 0);
-			if(WIFEXITED(status)) {
-				return WEXITSTATUS(status);
-			}
-			return 1;
-		}
-	}
-	/* child */
-	else if(jobid == 0) {
-		char *shell_cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", profile_name, region_name, file_name, bucket_name, bucket_folder, file_name);
-		execlp("sh", "sh", "-c", shell_cmd, (char *) 0);
-		free(shell_cmd);
-		_exit(1);
-	}
-	/* error */
-	else {
-		return -1;
-	}
+	char *cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", profile_name, region_name, file_name, bucket_name, bucket_folder, file_name);
+	int r = system(cmd);
+	free(cmd);
+	return r;
 }
 
 /*
-Forks a download process and waits, or forks them all at once,
-depending on DOWNLOAD_IN_PARALLEL.
+Download a file from the appropriate bucket.
+Returns zero on success.
 
 Given that we are using a blocking --invocation-type of the Lambda
 function (we are, 'RequestResponse', as seen in invoke_function()),
@@ -80,72 +52,25 @@ see http://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#Consistency
 then we should not have to request a file more than once. Testing
 indicates this is the case.
  */
-int download_file(const char *file_name, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
-{
-	int jobid = fork();
 
-	/* parent */
-	if(jobid > 0) {
-		int status;
-		if(DOWNLOAD_IN_PARALLEL) {
-			return jobid;
-		} else {
-			waitpid(jobid, &status, 0);
-			if(WIFEXITED(status)) {
-				return WEXITSTATUS(status);
-			}
-			return 1;
-		}
-	}
-	/* child */
-	else if(jobid == 0) {
-		char *shell_cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", profile_name, region_name, bucket_name, bucket_folder, file_name, file_name);
-		execlp("sh", "sh", "-c", shell_cmd, (char *) 0);
-		free(shell_cmd);
-		_exit(1);
-	}
-	/* error */
-	else {
-		return -1;
-	}
+static int download_file(const char *file_name, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+{
+	char *cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", profile_name, region_name, bucket_name, bucket_folder, file_name, file_name);
+	int r = system(cmd);
+	free(cmd);
+	return r;
 }
 
 /*
 Forks an invocation process for the Lambda function and waits for
-it to finish
+it to finish.  Returns zero on success.
 */
-int invoke_function(const char *profile_name, const char *region_name, const char *function_name, const char *payload)
+static int invoke_function(const char *profile_name, const char *region_name, const char *function_name, const char *payload)
 {
-	char *shell_cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' %s > /dev/null",
-					profile_name,
-					region_name,
-					function_name,
-					payload,
-					output_file_name);
-	int jobid = fork();
-
-	/* parent */
-	if(jobid > 0) {
-		int status;
-		waitpid(jobid, &status, 0);
-		free(shell_cmd);
-		if(WIFEXITED(status)) {
-			return WEXITSTATUS(status);
-		}
-		return 1;
-	}
-	/* child */
-	else if(jobid == 0) {
-		execlp("sh", "sh", "-c", shell_cmd, (char *) 0);
-		free(shell_cmd);
-		_exit(1);
-	}
-	/* error */
-	else {
-		return -1;
-	}
-
-	return 0;
+	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' %s > /dev/null", profile_name, region_name, function_name, payload, output_file_name);
+	int r = system(cmd);
+	free(cmd);
+	return r;
 }
 
 /*
@@ -190,49 +115,33 @@ struct jx *process_filestring(const char *filestring)
 /*
 Uploads files to S3
 */
-void perform_uploads(struct jx *uploadq, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+
+int upload_files(struct jx *uploadq, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
 {
-	char *file_name;
-
-	int status;
-	for(int i = 0; i < jx_array_length(uploadq); ++i) {
-		file_name = jx_print_string(jx_array_index(uploadq, i));
-		status = upload_file(file_name, profile_name, region_name, bucket_name, bucket_folder);
-		if(status != 0) {
-			/* there was a problem downloading, I'm not sure how to handle it */
-		}
+	int i;
+	for( i=0; i<jx_array_length(uploadq); i++ ) {
+		char *file_name = jx_print_string(jx_array_index(uploadq, i));
+		int status = upload_file(file_name, profile_name, region_name, bucket_name, bucket_folder);
 		free(file_name);
+		if(status!=0) return 1;
 	}
-
-	if(UPLOAD_IN_PARALLEL) {
-		for(int i = 0; i < jx_array_length(uploadq); ++i) {
-			wait(0);
-		}
-	}
+	return 0;
 }
 
 /*
 Downloads files from S3
 */
-void perform_downloads(struct jx *downloadq, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
+int download_files(struct jx *downloadq, const char *profile_name, const char *region_name, const char *bucket_name, const char *bucket_folder)
 {
-	char *file_name;
-
-	int status;
-	for(int i = 0; i < jx_array_length(downloadq); ++i) {
-		file_name = jx_print_string(jx_array_index(downloadq, i));
-		status = download_file(file_name, profile_name, region_name, bucket_name, bucket_folder);
-		if(status != 0) {
-			/* there was a problem downloading, I'm not sure how to handle it */
-		}
+	int i;
+	for( i=0; i<jx_array_length(downloadq); i++ ) {
+		char *file_name = jx_print_string(jx_array_index(downloadq, i));
+		int status = download_file(file_name, profile_name, region_name, bucket_name, bucket_folder);
 		free(file_name);
+		if(status!=0) return 1;
 	}
 
-	if(DOWNLOAD_IN_PARALLEL) {
-		for(int i = 0; i < jx_array_length(downloadq); ++i) {
-			wait(0);
-		}
-	}
+	return 0;
 }
 
 static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_files, const char *output_files, struct jx *envlist, const struct rmsummary *resources)
@@ -294,28 +203,21 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		struct jx *outputq = process_filestring(output_files);
 		char *payload = payload_create(cmdline, region_name, bucket_folder, bucket_name, inputq, outputq);
 
+		int status;
+
 		/* Upload all the inputs for the job to S3 */
-		perform_uploads(inputq, profile_name, region_name, bucket_name, bucket_folder);
+		status = upload_files(inputq, profile_name, region_name, bucket_name, bucket_folder);
+		if(status!=0) _exit(1);
 
 		/* Invoke the Lambda function, producing the outputs in S3 */
-		int status = invoke_function(profile_name, region_name, function_name, payload);
-		if(status != 0) {
-			/* there was a problem invoking, I'm not sure how to handle it */
-		}
+		status = invoke_function(profile_name, region_name, function_name, payload);
+		if(status!=0) _exit(1);
 
 		/* Retrieve the outputs from S3 */
-		perform_downloads(outputq, profile_name, region_name, bucket_name, bucket_folder);
+		status = download_files(outputq, profile_name, region_name, bucket_name, bucket_folder);
+		if(status!=0) _exit(1);
 
-		free(bucket_name);
-		free(region_name);
-		free(profile_name);
-		free(function_name);
-		free(bucket_folder);
-		free(payload);
-		jx_delete(inputq);
-		jx_delete(outputq);
-
-		exit(0);
+		_exit(0);
 	}
 	/* error */
 	else {
