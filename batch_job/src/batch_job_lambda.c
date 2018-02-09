@@ -4,6 +4,33 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details. 
 */
 
+/*
+Theory of operation:
+
+batch_job_lambda assumes that the caller has already set up
+an s3 bucket and a generic lambda function.  (This is done by
+makeflow_lambda_setup.)  To execute a batch job, this module
+uploads the input files to the bucket, then invokes the function,
+passing a "payload" JSON object which describes the job.
+The generic lambda then pulls the input files from the bucket,
+runs the job as a sub-process, and then pushes the output files
+back to the bucket.  This module then pulls the output files down
+from the bucket, and the job is done.
+*/
+
+/*
+Things that need to be fixed in this code:
+1 - Every input file is transferred for every job.  Instead, we should
+only transfer files if they do not exist. 
+
+2 - Directories don't work as input/output files.
+The "sync" command can be used to move directories, but it doesn't
+work for plain files, so we need to sense the type, and then move it.
+
+3 - File renaming is not supported. Input/output files must have
+the same name inside and outside of the sandbox.
+*/
+
 #include "batch_job_internal.h"
 #include "process.h"
 #include "batch_job.h"
