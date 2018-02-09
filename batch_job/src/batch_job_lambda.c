@@ -86,7 +86,7 @@ it to finish.  Returns zero on success.
 */
 static int invoke_function( struct lambda_config *config, const char *payload)
 {
-	char *cmd = string_format("aws --profile %s --region %s lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null > /dev/null", config->profile_name, config->region_name, config->function_name, payload);
+	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' outfile", config->function_name, payload);
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -97,15 +97,15 @@ static int invoke_function( struct lambda_config *config, const char *payload)
 Creates the json payload to be sent to the Lambda function. It is the
 'event' variable in the Lambda function code
 */
-char *payload_create(struct lambda_config *config, const char *cmdline, struct jx *inputq, struct jx *outputq)
+char *payload_create(struct lambda_config *config, const char *cmdline, struct jx *input_files, struct jx *output_files)
 {
 	struct jx *payload = jx_object(0);
 	jx_insert_string(payload, "cmd", cmdline);
 	jx_insert_string(payload, "region_name", config->region_name);
 	jx_insert_string(payload, "bucket_name", config->bucket_name);
 	jx_insert_string(payload, "bucket_folder", config->bucket_folder);
-	jx_insert(payload, jx_string("input_names"), inputq);
-	jx_insert(payload, jx_string("output_names"), outputq);
+	jx_insert(payload, jx_string("input_names"), input_files);
+	jx_insert(payload, jx_string("output_names"), output_files);
 	return jx_print_string(payload);
 }
 
@@ -140,14 +140,12 @@ int upload_files(struct lambda_config *config, struct jx *file_list )
 {
 	int i;
 	for( i=0; i<jx_array_length(file_list); i++ ) {
-		char *file_name = jx_print_string(jx_array_index(file_list, i));
+		char *file_name = jx_array_index(file_list, i)->u.string_value;
 		int status = upload_file(config,file_name);
 		if(status!=0) {
 			debug(D_DEBUG,"upload of %s failed, aborting job submission",file_name);
-			free(file_name);
 			return 1;
 		}
-		free(file_name);
 	}
 	return 0;
 }
@@ -164,13 +162,12 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 
 	int i;
 	for( i=0; i<jx_array_length(file_list); i++ ) {
-		char *file_name = jx_print_string(jx_array_index(file_list, i));
+		char *file_name = jx_array_index(file_list, i)->u.string_value;
 		int status = download_file(config,file_name);
 		if(status!=0) {
 			debug(D_DEBUG,"download of %s failed, still continuing",file_name);
 			nfailures++;
 		}
-		free(file_name);
 	}
 	return nfailures;
 }
@@ -186,6 +183,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	struct jx *input_files = process_filestring(input_file_string);
 	int status = upload_files(config,input_files);
 	jx_delete(input_files);
+
 	if(status!=0) return -1;
 
 	struct batch_job_info *info = malloc(sizeof(*info));
@@ -200,11 +198,11 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
-
 		return jobid;
 	}
 	/* child */
 	else if(jobid == 0) {
+		struct jx *input_files = process_filestring(input_file_string);
 		struct jx *output_files = process_filestring(output_file_string);
 		char *payload = payload_create(config,cmdline,input_files,output_files);
 		int status;
