@@ -125,7 +125,12 @@ def handler(event, context):
     bucket_name = event["bucket_name"]
     bucket_folder = event["bucket_folder"]
     work_dir = os.path.join("/tmp/", bucket_folder)
-    os.mkdir(work_dir)
+    try:
+        os.mkdir(work_dir)
+    except OSError, e:
+        if e.errno != 17:
+            raise
+        pass
     for input_name in event["input_names"]:
         input_key = os.path.join(bucket_folder, input_name)
         input_path = os.path.join(work_dir, input_name)
