@@ -481,19 +481,29 @@ export AMAZON_AMI=ami-343a694f
 
 <a name=lambda><h3>Amazon Lambda</h3></a>
 
-<p>To use this batch system, one must have an Amazon Web Services <a href="http://docs.aws.amazon.com/lambda/latest/dg/setting-up.html">account</a> and
-	an <a href="http://docs.aws.amazon.com/cli/latest/userguide/installing.html">installation</a> of the AWS-CLI. Make sure it is <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-set-up.html">set up</a> and <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html">configured</a> correctly.</p>
+To use Amazon Lambda, first set up an AWS account and install the <tt>aws</tt> command line tools as noted above.
+<p>
+Then, use the <tt>makeflow_lambda_setup</tt> command, which will establish
+the appropriate roles, buckets, and functions needed to use Amazon Lambda.
+The names of these items will be stored in a config file named on the command line:
+<pre>
+makeflow_lambda_setup my.config
+</pre>
 
-<p>An execution environment must be set up among the necessary AWS
-	services: a permissions role, a Lambda function, and an S3
-	bucket. The <tt>makeflow_lambda_setup</tt> script and its associated flags will do this and output a configuration file for passing to makeflow.</p>
+Then, you may use <tt>makeflow</tt> normally, indicating <tt>lambda</tt> as
+the batch type, and passing in the configuration file with the <tt>--lambda-config</tt> option:
 
-<p>Having configured the environment, one may invoke makeflow with <tt>-T lambda</tt> and <tt>--lambda-config</tt> to
-	specify the configuration file produced earlier.</p>
+<pre>
+makeflow -T lambda --lambda-config my.config example.makeflow ...
+</pre>
 
-<p>Once you are finished with an execution environment it can be
-	destroyed: deleting the permissions role, the Lambda function, and the
-	S3 bucket and its contents. The <tt>makeflow_lambda_cleanup</tt> script and its associated flags will do this.</p>
+You may run multiple workflows in this fashion.  When you are ready to
+clean up the associated state in Amazon, run <tt>makeflow_lambda_cleanup</tt>
+and pass in the configuration file:
+
+<pre>
+makeflow_lambda_cleanup my.config
+</pre>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 
