@@ -165,37 +165,23 @@ EOF
 # This packages the code for deployment
 zip -q "$FUNCTION_PACKAGE" "$FUNCTION_SOURCE"
 
-echo -n "Creating lambda function $FUNCTION_NAME..."
+# The function creation does not succeed right away b/c
+# it takes time for the role to propagate, so we must retry until success.
 
+echo -n "Creating lambda function $FUNCTION_NAME..."
 while [ 1 ]
 do
-aws lambda create-function \
-                 --function-name "$FUNCTION_NAME" \
-                 --zip-file fileb://"$FUNCTION_PACKAGE" \
-                 --role "$ROLE_ARN" \
-                 --handler "$FUNCTION_NAME".handler \
-                 --runtime python2.7 \
-                 --timeout 300
-if [ $? = 0 ]
-then
-	break
-else
-	echo -n "."
-	sleep  1
-fi
-
+	if aws lambda create-function --function-name "$FUNCTION_NAME" --zip-file fileb://"$FUNCTION_PACKAGE" --role "$ROLE_ARN" --handler "$FUNCTION_NAME".handler --runtime python2.7 --timeout 300 >/dev/null 2>&1
+	then
+		echo "ok"
+		break
+	else
+		echo -n "."
+		sleep 1
+	fi
 done
 
-if [ $? = 0 ]
-then
-	echo "ok"
-else
-	echo "Failed!"
-	exit 1
-fi
-
-rm "$FUNCTION_SOURCE"
-rm "$FUNCTION_PACKAGE"
+rm -f "$FUNCTION_SOURCE" "$FUNCTION_PACKAGE"
 
 echo -n "Creating bucket $BUCKET_NAME..."
 aws s3 mb s3://"$BUCKET_NAME" > /dev/null
