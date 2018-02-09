@@ -52,7 +52,7 @@ Returns zero on success.
 
 static int upload_file( struct lambda_config *config, const char *file_name )
 {
-	char *cmd = string_format("aws --profile %s --region %s s3 cp %s s3://%s/%s/%s --quiet", config->profile_name, config->region_name, file_name, config->bucket_name, config->bucket_folder, file_name);
+	char *cmd = string_format("aws s3 cp %s s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, file_name);
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -73,7 +73,7 @@ indicates this is the case.
 
 static int download_file( struct lambda_config *config, const char *file_name )
 {
-	char *cmd = string_format("aws --profile %s --region %s s3 cp s3://%s/%s/%s %s --quiet", config->profile_name, config->region_name, config->bucket_name, config->bucket_folder, file_name, file_name);
+	char *cmd = string_format("aws s3 cp s3://%s/%s/%s %s --quiet", config->bucket_name, config->bucket_folder, file_name, file_name);
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -86,7 +86,7 @@ it to finish.  Returns zero on success.
 */
 static int invoke_function( struct lambda_config *config, const char *payload)
 {
-	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' outfile", config->function_name, payload);
+	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null >dev/null", config->function_name, payload);
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
