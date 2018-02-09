@@ -26,14 +26,16 @@ See the file COPYING for details.
  * index. Negative indices are interpreted relative to the tail of the
  * list, so index 0 is the head, and index -1 is the tail.
  *
- * If a cursor is on an item that is deleted, it is automatically shifted
- * on to the next item. If there are no items to the right, or if they
- * are all subsequently deleted, the cursor's position becomes undefined.
+ * After an item is dropped, it will not be reachable by seeking or moving.
+ * If a cursor is on an item that is deleted, it will no longer be able
+ * to interact with that item. The cursor can only move off the item.
+ * Once all cursors have moved off the item, it is finally free()d.
  */
 
 #ifndef LIST_H
 #define LIST_H
 
+#include <limits.h>
 #include <stdbool.h>
 
 /*
@@ -50,7 +52,6 @@ transparently modify the linker namespace we are using.
 #define list_cursor_create		cctools_list_cursor_create
 #define list_cursor_destroy		cctools_list_cursor_destroy
 #define list_cursor_clone		cctools_list_cursor_clone
-#define list_cursor_moved		cctools_list_cursor_moved
 #define list_reset			cctools_list_reset
 #define list_seek			cctools_list_seek
 #define list_tell			cctools_list_tell
@@ -126,17 +127,6 @@ void list_cursor_destroy(struct list_cursor *cur);
  */
 struct list_cursor *list_cursor_clone(struct list_cursor *cur);
 
-/** Check if a cursor moved since it was last placed.
- * That happens if another cursor drops the item under this cursor.
- * It is generally a very bad idea to read and modify the same parts of
- * a list at the same time from multiple places, so if you need this
- * check, you might want to rethink your code.
- * @param cur The cursor to check.
- * @returns true if another cursor dropped an item and moved this cursor.
- * @returns false if this cursor is still on the item it was last moved to.
- */
-bool list_cursor_moved(struct list_cursor *cur);
-
 /** Reset the position of a cursor.
  * After calling, the cursor's position will be undefined, just like
  * a newly-created cursor. This function always succeeds.
@@ -161,8 +151,9 @@ bool list_seek(struct list_cursor *cur, int index);
  * a list is subject to change. This function walks from the
  * beginning of the list to determine the cursor's current index.
  * @param cur The cursor to check.
- * @returns a non-negative number if the cursor is on a list item.
- * @returns -1 if the cursor's position is undefined.
+ * @returns a non-negative number indicating the index of a list item.
+ * @returns a negative number if the cursor is on a dropped item.
+ * @returns INT_MIN if the cursor position is undefined.
  */
 int list_tell(struct list_cursor *cur);
 

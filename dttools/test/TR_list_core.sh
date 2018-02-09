@@ -28,7 +28,7 @@ int main (int argc, char *argv[])
 	assert(cur);
 
 	// ensure that things don't work when position is undefined
-	assert(list_tell(cur) == -1);
+	assert(list_tell(cur) == INT_MIN);
 	ok = list_seek(cur, 0);
 	assert(!ok);
 	ok = list_next(cur);
@@ -45,10 +45,10 @@ int main (int argc, char *argv[])
 	// put in a couple of items
 	list_insert(cur, (void *) 3);
 	assert(list_size(list) == 1);
-	assert(list_tell(cur) == -1);
+	assert(list_tell(cur) == INT_MIN);
 	list_insert(cur, (void *) 2);
 	assert(list_size(list) == 2);
-	assert(list_tell(cur) == -1);
+	assert(list_tell(cur) == INT_MIN);
 
 	// move on to an item
 	ok = list_seek(cur, 0);
@@ -85,7 +85,7 @@ int main (int argc, char *argv[])
 
 	// make another cursor, and insert between the two elements
 	struct list_cursor *alt = list_cursor_create(list);
-	assert(list_tell(alt) == -1);
+	assert(list_tell(alt) == INT_MIN);
 	ok = list_seek(alt, -2);
 	assert(ok);
 	assert(list_tell(alt) == 0);
@@ -140,20 +140,27 @@ int main (int argc, char *argv[])
 	assert(list_size(list) == 2);
 
 	// and check both again
-	assert(list_tell(cur) == 1);
+	assert(list_tell(cur) == -1);
+	ok = list_get(cur, (void **) &item);
+	assert(!ok);
+	ok = list_next(cur);
+	assert(ok);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 3);
+	assert(list_tell(cur) == 1);
 
-	assert(list_tell(alt) == 1);
+	assert(list_tell(alt) == -1);
 	ok = list_get(alt, (void **) &item);
-	assert(ok);
-	assert(item == 3);
+	assert(!ok);
 
 	// walk off the right
 	ok = list_next(alt);
+	assert(ok);
+	assert(list_tell(alt) == 1);
+	ok = list_next(alt);
 	assert(!ok);
-	assert(list_tell(alt) == -1);
+	assert(list_tell(alt) == INT_MIN);
 
 	// and the left
 	ok = list_prev(cur);
@@ -164,7 +171,7 @@ int main (int argc, char *argv[])
 	assert(item == 5);
 	ok = list_prev(cur);
 	assert(!ok);
-	assert(list_tell(cur) == -1);
+	assert(list_tell(cur) == INT_MIN);
 
 	// delete the cursors and try to delete while there are items
 	list_cursor_destroy(cur);
@@ -178,10 +185,10 @@ int main (int argc, char *argv[])
 
 	// clear the list
 	list_seek(cur, 0);
-	while (list_tell(cur) != -1) {
+	do {
 		ok = list_drop(cur);
 		assert(ok);
-	}
+	} while (list_next(cur));
 
 	// try to delete while there's an outstanding cursor
 	ok = list_destroy(list);
