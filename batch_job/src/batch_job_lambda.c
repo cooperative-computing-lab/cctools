@@ -23,9 +23,7 @@ Things that need to be fixed in this code:
 1 - Every input file is transferred for every job.  Instead, we should
 only transfer files if they do not exist. 
 
-2 - Directories don't work as input/output files.
-The "sync" command can be used to move directories, but it doesn't
-work for plain files, so we need to sense the type, and then move it.
+2 - The function execution side is unable to download directories.
 
 3 - File renaming is not supported. Input/output files must have
 the same name inside and outside of the sandbox.
@@ -36,6 +34,7 @@ the same name inside and outside of the sandbox.
 #include "batch_job.h"
 #include "stringtools.h"
 #include "debug.h"
+#include "path.h"
 #include "jx_print.h"
 #include "jx_parse.h"
 
@@ -74,9 +73,17 @@ static struct lambda_config * lambda_config_load( const char *filename )
 }
 
 /*
-Upload a file to the appropriate bucket.
-Returns zero on success.
+Upload a file/dir to the appropriate bucket.  This is a bit complicated b/c "s3 cp" only works on files, and "s3 sync" only works on directories, not files.
 */
+
+static int upload_dir( struct lambda_config *config, const char *file_name)
+{
+	char *cmd = string_format("aws s3 sync %s s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, path_basename(file_name));
+	debug(D_BATCH,"%s",cmd);
+	int r = system(cmd);
+	free(cmd);
+	return r;
+}
 
 static int upload_file( struct lambda_config *config, const char *file_name )
 {
@@ -87,9 +94,24 @@ static int upload_file( struct lambda_config *config, const char *file_name )
 	return r;
 }
 
+static int upload_item( struct lambda_config *config, const char *file_name )
+{
+	struct stat info;
+
+	int result = stat(file_name,&info);
+	if(result!=0) {
+		debug(D_BATCH,"couldn't access input file %s: %s",file_name,strerror(errno));
+		return -1;
+	}
+
+	if(S_ISDIR(info.st_mode)) {
+		return upload_dir(config,file_name);
+	} else {
+		return upload_file(config,file_name);
+	}
+}
 /*
-Download a file from the appropriate bucket.
-Returns zero on success.
+Download a file from the appropriate bucket. Amazingly, S3 does not provide a way to sense whether an object is a file or a directory, so we try "s3 cp" first and then "s3 sync" if it fails.
 
 Given that we are using a blocking --invocation-type of the Lambda
 function (we are, 'RequestResponse', as seen in invoke_function()),
@@ -108,13 +130,29 @@ static int download_file( struct lambda_config *config, const char *file_name )
 	return r;
 }
 
+static int download_dir( struct lambda_config *config, const char *file_name )
+{
+	char *cmd = string_format("aws s3 sync s3://%s/%s/%s %s --quiet", config->bucket_name, config->bucket_folder, file_name, file_name);
+	debug(D_BATCH,"%s",cmd);
+	int r = system(cmd);
+	free(cmd);
+	return r;
+}
+
+static int download_item( struct lambda_config *config, const char *file_name )
+{
+	int r = download_file(config,file_name);
+	if(r!=0) r = download_dir(config,file_name);
+	return r;
+}
+
 /*
 Forks an invocation process for the Lambda function and waits for
 it to finish.  Returns zero on success.
 */
 static int invoke_function( struct lambda_config *config, const char *payload)
 {
-	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null >dev/null", config->function_name, payload);
+	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null >/dev/null", config->function_name, payload);
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -169,7 +207,7 @@ int upload_files(struct lambda_config *config, struct jx *file_list )
 	int i;
 	for( i=0; i<jx_array_length(file_list); i++ ) {
 		char *file_name = jx_array_index(file_list, i)->u.string_value;
-		int status = upload_file(config,file_name);
+		int status = upload_item(config,file_name);
 		if(status!=0) {
 			debug(D_BATCH,"upload of %s failed, aborting job submission",file_name);
 			return 1;
@@ -180,7 +218,7 @@ int upload_files(struct lambda_config *config, struct jx *file_list )
 
 /*
 Download files from S3.  If any file fails to download, keep going,
-so thta the caller will be able to debug the result.  Makeflow will
+so that the caller will be able to debug the result.  Makeflow will
 detect that not all files were returned.
 */
 
@@ -191,7 +229,7 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 	int i;
 	for( i=0; i<jx_array_length(file_list); i++ ) {
 		char *file_name = jx_array_index(file_list, i)->u.string_value;
-		int status = download_file(config,file_name);
+		int status = download_item(config,file_name);
 		if(status!=0) {
 			debug(D_BATCH,"download of %s failed, still continuing",file_name);
 			nfailures++;
