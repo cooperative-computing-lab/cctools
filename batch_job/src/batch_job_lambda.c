@@ -42,8 +42,6 @@ only transfer files if they do not exist.
 struct lambda_config {
 	const char *bucket_name;
 	const char *bucket_folder;
-	const char *region_name;
-	const char *profile_name;
 	const char *function_name;
 };
 
@@ -56,13 +54,9 @@ static struct lambda_config * lambda_config_load( const char *filename )
 
 	c->bucket_name   = jx_lookup_string(j,"bucket_name");
 	c->bucket_folder = string_format("makeflow_%d",getpid());
-	c->region_name   = jx_lookup_string(j,"region_name");
-	c->profile_name  = jx_lookup_string(j,"profile_name");
 	c->function_name = jx_lookup_string(j,"function_name");
 
 	if(!c->bucket_name)    fatal("%s doesn't define bucket_name",filename);
-	if(!c->region_name)    fatal("%s doesn't define region_name",filename);
-	if(!c->profile_name)   fatal("%s doesn't define profile_name",filename);
 	if(!c->function_name)  fatal("%s doesn't define function_name",filename);
 
 	return c;
@@ -163,7 +157,6 @@ char *payload_create(struct lambda_config *config, const char *cmdline, struct j
 {
 	struct jx *payload = jx_object(0);
 	jx_insert_string(payload, "cmd", cmdline);
-	jx_insert_string(payload, "region_name", config->region_name);
 	jx_insert_string(payload, "bucket_name", config->bucket_name);
 	jx_insert_string(payload, "bucket_folder", config->bucket_folder);
 	jx_insert(payload, jx_string("input_files"), jx_copy(input_files));

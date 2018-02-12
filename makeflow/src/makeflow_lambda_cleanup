@@ -24,12 +24,10 @@ echo "Parsing $CONFIG_FILE..."
 ROLE_NAME=$(fetch_field role_name)
 BUCKET_NAME=$(fetch_field bucket_name)
 FUNCTION_NAME=$(fetch_field function_name)
-REGION_NAME=$(fetch_field region_name)
-PROFILE_NAME=$(fetch_field profile_name)
 S3_ROLE_POLICY_ARN=$(fetch_field s3_role_policy_arn)
 LAMBDA_ROLE_POLICY_ARN=$(fetch_field lambda_role_policy_arn)
 
-AWS_CMD="aws --profile $PROFILE_NAME --region $REGION_NAME"
+AWS_CMD="aws"
 
 echo "Deleting function $FUNCTION_NAME..."
 $AWS_CMD lambda delete-function --function-name "$FUNCTION_NAME"

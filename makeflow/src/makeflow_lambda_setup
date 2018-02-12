@@ -8,8 +8,6 @@ UUID="$(uuidgen)"
 ROLE_NAME="makeflow-role-$UUID"
 BUCKET_NAME="makeflow-bucket-$UUID"
 FUNCTION_NAME="makeflow-function-$UUID"
-REGION_NAME="us-east-1"
-PROFILE_NAME="default"
 
 FUNCTION_SOURCE="$FUNCTION_NAME".py
 FUNCTION_PACKAGE="$FUNCTION_NAME".zip
@@ -200,7 +198,7 @@ fi
 
 echo -n "Creating $CONFIG_FILE..."
 
-printf '{"%s":"%s","%s":"%s","%s":"%s","%s":"%s","%s":"%s","%s":"%s","%s":"%s"}\n' "role_name" "$ROLE_NAME" "bucket_name" "$BUCKET_NAME" "function_name" "$FUNCTION_NAME" "region_name" "$REGION_NAME" "profile_name" "$PROFILE_NAME" "s3_role_policy_arn" "$S3_ROLE_POLICY_ARN" "lambda_role_policy_arn" "$LAMBDA_ROLE_POLICY_ARN" > "$CONFIG_FILE"
+printf '{"%s":"%s","%s":"%s","%s":"%s","%s":"%s","%s":"%s"}\n' "role_name" "$ROLE_NAME" "bucket_name" "$BUCKET_NAME" "function_name" "$FUNCTION_NAME" "s3_role_policy_arn" "$S3_ROLE_POLICY_ARN" "lambda_role_policy_arn" "$LAMBDA_ROLE_POLICY_ARN" > "$CONFIG_FILE"
 
 echo "ok"
 
