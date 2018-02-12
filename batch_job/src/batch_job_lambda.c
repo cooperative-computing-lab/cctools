@@ -171,7 +171,7 @@ int upload_files(struct lambda_config *config, struct jx *file_list )
 		char *file_name = jx_array_index(file_list, i)->u.string_value;
 		int status = upload_file(config,file_name);
 		if(status!=0) {
-			debug(D_DEBUG,"upload of %s failed, aborting job submission",file_name);
+			debug(D_BATCH,"upload of %s failed, aborting job submission",file_name);
 			return 1;
 		}
 	}
@@ -193,7 +193,7 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 		char *file_name = jx_array_index(file_list, i)->u.string_value;
 		int status = download_file(config,file_name);
 		if(status!=0) {
-			debug(D_DEBUG,"download of %s failed, still continuing",file_name);
+			debug(D_BATCH,"download of %s failed, still continuing",file_name);
 			nfailures++;
 		}
 	}
@@ -251,7 +251,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		int result = batch_job_lambda_subprocess(config,cmdline,input_file_string,output_file_string);
 		_exit(result);
 	} else {
-		debug(D_DEBUG,"failed to fork: %s\n",strerror(errno));
+		debug(D_BATCH,"failed to fork: %s\n",strerror(errno));
 		return -1;
 	}
 }
