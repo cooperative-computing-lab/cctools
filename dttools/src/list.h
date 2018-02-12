@@ -16,8 +16,8 @@ See the file COPYING for details.
  * by moving forward and backward in the list.
  *
  * After creation, a cursor's position is undefined. It could be thought
- * of as sitting at index -∞. Insertions in this state always place
- * the item at the head of the list, and the cursor's position is
+ * of as sitting at index ∞. Insertions in this state always place
+ * the item at the tail of the list, and the cursor's position is
  * unaffected. Calls that examine the value under a cursor fail if the
  * position is undefined.
  *
@@ -205,20 +205,14 @@ bool list_set(struct list_cursor *cur, void *item);
  */
 bool list_drop(struct list_cursor *cur);
 
-/** Insert an item to the right of the cursor.
- * If the cursor position is undefined, insert at the list head.
+/** Insert an item to the left of the cursor.
+ * If the cursor position is undefined, insert at the list tail.
  * There are no restrictions on the pointer value, so inserting
  * a null pointer is perfectly valid. The cursor position is unchanged.
  * @param cur The cursor to use.
  * @param item The pointer to insert.
  */
 void list_insert(struct list_cursor *cur, void *item);
-
-
-
-
-
-
 
 
 // Utility functions
@@ -320,9 +314,9 @@ void *list_peek_tail(struct list *list);
 */
 void *list_peek_current(struct list *list);
 
-/** Push an item on the tail of a list in priority order.
+/** Push an item onto of a list in priority order.
  * The passed-in function is used to determine the priority of each item.
- * The new item is inserted at the rightmost position such that
+ * The new item is inserted at the leftmost position such that
  *     p(n) >= p(item) > p(n + 1)
  * in the general position. If a list is built using list_push_priority()
  * with the same priority function, it will always be sorted. Note that each

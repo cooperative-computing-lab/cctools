@@ -44,10 +44,10 @@ int main (int argc, char *argv[])
 	assert(!ok);
 
 	// put in a couple of items
-	list_insert(cur, (void *) 3);
+	list_insert(cur, (void *) 2);
 	assert(list_size(list) == 1);
 	assert(!list_tell(cur, &pos));
-	list_insert(cur, (void *) 2);
+	list_insert(cur, (void *) 3);
 	assert(list_size(list) == 2);
 	assert(!list_tell(cur, &pos));
 
@@ -71,55 +71,51 @@ int main (int argc, char *argv[])
 	assert(ok);
 	assert(item == 5);
 
-	// try a negative index
-	ok = list_seek(cur, -1);
-	assert(ok);
-
 	// try to seek past the beginning
 	ok = list_seek(cur, -3);
 	assert(!ok);
 
-	// check we're on the right item
+	// check we're still on the right item
 	assert(list_tell(cur, &pos));
-	assert(pos == 1);
+	assert(pos == 0);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
-	assert(item == 3);
+	assert(item == 5);
 
 	// make another cursor, and insert between the two elements
 	struct list_cursor *alt = list_cursor_create(list);
 	assert(!list_tell(alt, &pos));
-	ok = list_seek(alt, -2);
+	ok = list_seek(alt, -1);
 	assert(ok);
 	assert(list_tell(alt, &pos));
-	assert(pos == 0);
+	assert(pos == 1);
 	list_insert(alt, (void *) 7);
 	assert(list_size(list) == 3);
 
 	// make sure the original cursor is OK
 	assert(list_tell(cur, &pos));
-	assert(pos == 2);
-	ok = list_get(cur, (void **) &item);
-	assert(ok);
-	assert(item == 3);
-
-	// and the new cursor
-	assert(list_tell(alt, &pos));
 	assert(pos == 0);
-	ok = list_get(alt, (void **) &item);
+	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 5);
 
+	// and the new cursor
+	assert(list_tell(alt, &pos));
+	assert(pos == 2);
+	ok = list_get(alt, (void **) &item);
+	assert(ok);
+	assert(item == 3);
+
 	// move to the new item
-	ok = list_next(alt);
+	ok = list_prev(alt);
 	assert(ok);
 
 	// and check both again
 	assert(list_tell(cur, &pos));
-	assert(pos == 2);
+	assert(pos == 0);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
-	assert(item == 3);
+	assert(item == 5);
 
 	assert(list_tell(alt, &pos));
 	assert(pos == 1);
@@ -128,7 +124,7 @@ int main (int argc, char *argv[])
 	assert(item == 7);
 
 	// now move the old cursor to the same place
-	ok = list_prev(cur);
+	ok = list_next(cur);
 	assert(ok);
 
 	// and check both again

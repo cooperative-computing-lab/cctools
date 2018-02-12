@@ -252,24 +252,26 @@ void list_insert(struct list_cursor *cur, void *item) {
 	++cur->list->length;
 
 	if (cur->target) {
-		struct list_item *left = cur->target;
-		struct list_item *right = left->next;
+		struct list_item *right = cur->target;
+		struct list_item *left = right->prev;
 		node->next = right;
 		node->prev = left;
-		left->next = node;
-		if (right) {
-			right->prev = node;
+		right->prev = node;
+		if (left) {
+			left->next = node;
 		} else {
-			cur->list->tail = node;
+			cur->list->head = node;
 		}
 	} else {
-		node->next = cur->list->head;
-		cur->list->head = node;
-		if (node->next) {
-			assert(node->next->prev == NULL);
-			node->next->prev = node;
+		struct list_item *tail = cur->list->tail;
+		node->prev = tail;
+		cur->list->tail = node;
+		if (tail) {
+			assert(tail->next == NULL);
+			tail->next = node;
 		} else {
-			cur->list->tail = node;
+			assert(!cur->list->head);
+			cur->list->head = node;
 		}
 	}
 }
@@ -306,19 +308,19 @@ struct list *list_splice(struct list *top, struct list *bottom) {
 	struct list_cursor *cur_top = list_cursor_create(top);
 	struct list_cursor *cur_bot = list_cursor_create(bottom);
 
-	for (list_seek(cur_top, -1); list_get(cur_top, &item); list_prev(cur_top)) {
-		list_insert(cur_bot, item);
-		list_drop(cur_top);
+	for (list_seek(cur_bot, 0); list_get(cur_bot, &item); list_next(cur_bot)) {
+		list_insert(cur_top, item);
+		list_drop(cur_bot);
 	}
 
 	list_cursor_destroy(cur_bot);
 	list_cursor_destroy(cur_top);
 
-	ok = list_destroy(top);
+	ok = list_destroy(bottom);
 	assert(ok);
 
-	list_reset(bottom->iter);
-	return bottom;
+	list_reset(top->iter);
+	return top;
 }
 
 struct list *list_split(struct list *l, list_op_t comparator, const void *arg) {
@@ -338,7 +340,6 @@ struct list *list_split(struct list *l, list_op_t comparator, const void *arg) {
 	while (list_get(cur, &item)) {
 		if (!out) out = list_create();
 		struct list_cursor *end = list_cursor_create(out);
-		list_seek(end, -1);
 		list_insert(end, item);
 		list_cursor_destroy(end);
 		list_drop(cur);
@@ -379,18 +380,16 @@ void list_free(struct list *l) {
 
 int list_push_head(struct list *l, void *item) {
 	struct list_cursor *cur = list_cursor_create(l);
+	list_seek(cur, 0);
 	list_insert(cur, item);
 	list_cursor_destroy(cur);
-
 	return 1;
 }
 
 int list_push_tail(struct list *l, void *item) {
 	struct list_cursor *cur = list_cursor_create(l);
-	list_seek(cur, -1);
 	list_insert(cur, item);
 	list_cursor_destroy(cur);
-
 	return 1;
 }
 
@@ -549,7 +548,7 @@ struct list *list_duplicate(struct list *src) {
 	struct list_cursor *src_cur = list_cursor_create(src);
 	struct list_cursor *dst_cur = list_cursor_create(dst);
 
-	for (list_seek(src_cur, -1); list_get(src_cur, &item); list_prev(src_cur)) {
+	for (list_seek(src_cur, 0); list_get(src_cur, &item); list_next(src_cur)) {
 		list_insert(dst_cur, item);
 	}
 
@@ -574,7 +573,7 @@ struct list *list_sort(struct list *list, int (*comparator) (const void *, const
 		i++;
 	}
 	qsort(array, size, sizeof(*array), comparator);
-	for(i = size - 1; i >= 0; i--) {
+	for(i = 0; i < size; i++) {
 		list_insert(cur, array[i]);
 	}
 DONE:
@@ -590,14 +589,14 @@ void list_push_priority(struct list *list, list_priority_t p, void *item) {
 
 	void *i = NULL;
 	struct list_cursor *cur = list_cursor_create(list);
-	for (list_seek(cur, -1); list_get(cur, &i); list_prev(cur)) {
-			if (p(i) >= p(item)) {
+	for (list_seek(cur, 0); list_get(cur, &i); list_next(cur)) {
+			if (p(i) < p(item)) {
 				list_insert(cur, item);
 				break;
 			}
 			i = NULL;
 		}
-		// if the list is empty or we ran off the beginning,
+		// if the list is empty or we ran off the end,
 		// i is NULL here
 		if (!i) list_insert(cur, item);
 		list_cursor_destroy(cur);
