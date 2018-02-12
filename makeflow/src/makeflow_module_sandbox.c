@@ -29,44 +29,39 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 	batch_wrapper_pre(wrapper, "export CUR_WORK_DIR=$(pwd)");
 
 	/* Create sandbox. This should probably have a hex or random tail to be unique. */
-	char *cmd = string_format("mkdir %s", wrap_name);
+	char *cmd = string_format("export SANDBOX=$(mktemp -d %s_XXXXXX)", wrap_name);
 	batch_wrapper_pre(wrapper, cmd);
 	free(cmd);
+	free(wrap_name);
 
 	struct batch_file *f;
 	list_first_item(task->input_files);
 	while((f = list_next_item(task->input_files))){
 		/* Add a cp for each file. Not linking as wq may already have done this. Not moving as it may be local. */
-		cmd = string_format("cp %s %s/%s", f->inner_name, wrap_name, f->inner_name);
+		cmd = string_format("cp %s $SANDBOX/%s", f->inner_name, f->inner_name);
 		batch_wrapper_pre(wrapper, cmd);
 		free(cmd);
 	}
 	/* Enter into sandbox_dir. */
-	cmd = string_format("cd %s", wrap_name);
-	batch_wrapper_pre(wrapper, cmd);
-	free(cmd);
+	batch_wrapper_pre(wrapper, "cd $SANDBOX");
 
 	/* Execute the previous levels commmand. */
-	cmd = string_format("sh -c \"%s\"", task->command);
-	batch_wrapper_cmd(wrapper, cmd);
-	free(cmd);
+	batch_wrapper_cmd(wrapper, task->command);
 
 	/* Once the command is finished go back to working dir. */
 	batch_wrapper_post(wrapper, "cd $CUR_WORK_DIR");
 
 	list_first_item(task->output_files);
 	while((f = list_next_item(task->output_files))){
-		/* Copy out results to expected location. */
-		cmd = string_format("cp %s/%s %s", wrap_name, f->inner_name, f->inner_name);
+		/* Copy out results to expected location. OR TRUE so that lack of one file does not
+           prevent other files from being sent back.*/
+		cmd = string_format("cp $SANDBOX/%s %s || true", f->inner_name, f->inner_name);
 		batch_wrapper_post(wrapper, cmd);
 		free(cmd);
 	}
 
 	/* Remove and fully wipe out sandbox. */
-	cmd = string_format("rm -rf %s", wrap_name);
-	batch_wrapper_post(wrapper, cmd);
-	free(cmd);
-	free(wrap_name);
+	batch_wrapper_post(wrapper, "rm -rf $SANDBOX");
 
 	cmd = batch_wrapper_write(wrapper, task);
 	if(cmd){
