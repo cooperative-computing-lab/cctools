@@ -6,12 +6,58 @@
 # Created on Jul 7, 2017, 1:48:40 PM
 #
 
+if [ -z "$1" ]; then
+	echo "Empty number of CPUs requested."
+	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
+	exit -17
+fi
+
+if [ -z "$2" ]; then
+	echo "Empty number of CPUs requested."
+	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
+	exit -17
+fi
+
+if [ -z "$3" ]; then
+	echo "Empty number of CPUs requested."
+	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
+	exit -17
+fi
+
 cpus=$1
 min_cpus=$2
 max_cpus=$3
 time=$(date +%s)
 
-outputfile="makeflow_amazon_batch.config"
+if [ $cpus -lt $min_cpus ]; then
+	echo "Desired number of cpus must be greater than or equal to minimum number of cpus"
+	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
+        exit -17
+fi
+
+if [ $cpus -gt $max_cpus ]; then
+	echo "Desired number of cpus must be less than or equal to maximum number of cpus"
+        echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
+        exit -17
+fi
+
+if [ $max_cpus -lt $min_cpus ]; then
+	echo "Minimum number of cpus must be less than or equal to maximum number of cpus"
+        echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
+        exit -17
+fi
+
+if [ -n "$4" ]; then
+	outputfile="$4"
+else
+	outputfile="makeflow_amazon_batch.config"
+fi
+
+if [ -e $outputfile ]; then
+	echo "File: $outputfile already exists! Please cleanup/delete first"
+	exit -12
+fi
+
 echo "{" >> $outputfile
 
 #Grabbing the necessary keys
@@ -62,8 +108,8 @@ echo "created gateway: $ec2_gateway"
 aws ec2 attach-internet-gateway --vpc-id $ec2_vpc --internet-gateway-id $ec2_gateway
 
 route_table=$(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$ec2_vpc --query 'RouteTables[0].RouteTableId' --output text)
-echo "THis is the route table: $route_table"
-aws ec2 create-route --route-table-id $route_table --destination-cidr-block 0.0.0.0/0 --gateway-id $ec2_gateway
+echo "This is the route table: $route_table"
+should_be_true_json=$(aws ec2 create-route --route-table-id $route_table --destination-cidr-block 0.0.0.0/0 --gateway-id $ec2_gateway)
 
 echo "\"gateway\":\"$ec2_gateway\"," >> $outputfile
 
