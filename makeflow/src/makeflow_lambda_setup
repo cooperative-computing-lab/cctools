@@ -115,12 +115,14 @@ fi
 # This is the Lambda function. 'event' is a JSON object passed to the function by the invoker.
 cat > "$FUNCTION_SOURCE" <<- EOF
 import boto3
+import botocore
 import subprocess
 import os
 import shutil
 
 def handler(event, context):
-    s3 = boto3.client(service_name='s3', region_name=event["region_name"], config=boto3.session.Config(signature_version='s3v4'))
+    s3 = boto3.resource('s3')
+
     # get inputs from S3 into filesystem
     bucket_name = event["bucket_name"]
     bucket_folder = event["bucket_folder"]
@@ -133,29 +135,29 @@ def handler(event, context):
             raise
         pass
  
-   os.chdir(work_dir)
+    os.chdir(work_dir)
 
-   for input_file in event["input_files"]:
-	inner_name = input_file["inner_name"];
-	outer_name = input_file["outer_name"];
+    for input_file in event["input_files"]:
+        inner_name = input_file["inner_name"]
+        outer_name = input_file["outer_name"]
         bucket_key = os.path.join(bucket_folder, outer_name)
 
         try:
-	    s3.meta.client.download_file(bucket_name,bucket_key,inner_name);
+            s3.Bucket(bucket_name).download_file(bucket_key,inner_name)
         except Exception as e:
             return "Couldn't download {} from s3://{}/{} reason: {}".format(inner_name,bucket_name,bucket_key,e)
 
     # run the command
-    subprocess.call(event["cmd"]), shell=True)
+    subprocess.call(event["cmd"], shell=True)
 
     # put outputs into S3
     for output_file in event["output_files"]:
         inner_name = output_file["inner_name"]
         outer_name = output_file["outer_name"]
-	bucket_key = os.path.join(bucket_folder,outer_name)
+        bucket_key = os.path.join(bucket_folder,outer_name)
 
         try:
-	    s3.meta.client.upload_file(bucket_name,bucket_key,inner_name);
+            s3.Bucket(bucket_name).upload_file(inner_name,bucket_key)
         except Exception as e:
             return "Couldn't upload {} to s3://{}/{} reason: {}".format(inner_name,bucket_name,bucket_key,e)
 

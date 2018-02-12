@@ -170,10 +170,10 @@ char *payload_create(struct lambda_config *config, const char *cmdline, struct j
 	jx_insert_string(payload, "region_name", config->region_name);
 	jx_insert_string(payload, "bucket_name", config->bucket_name);
 	jx_insert_string(payload, "bucket_folder", config->bucket_folder);
-	jx_insert(payload, jx_string("input_files"), input_files);
-	jx_insert(payload, jx_string("output_files"), output_files);
-	char * str = jx_print_string(payload);
-	jx_delete(payload);
+	jx_insert(payload, jx_string("input_files"), jx_copy(input_files));
+	jx_insert(payload, jx_string("output_files"), jx_copy(output_files));
+	char *str = jx_print_string(payload);
+       	jx_delete(payload);
 	return str;
 
 }
@@ -249,12 +249,14 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 	for( i=0; i<jx_array_length(file_list); i++ ) {
 		struct jx *file_object = jx_array_index(file_list, i);
 		const char *file_name = jx_lookup_string(file_object,"outer_name");
+
 		int status = download_item(config,file_name);
 		if(status!=0) {
 			debug(D_BATCH,"download of %s failed, still continuing",file_name);
 			nfailures++;
 		}
 	}
+
 	return nfailures;
 }
 
@@ -262,16 +264,15 @@ static int batch_job_lambda_subprocess( struct lambda_config *config, const char
 {
 	struct jx *input_files = filestring_to_jx(input_file_string);
 	struct jx *output_files = filestring_to_jx(output_file_string);
+
 	char *payload = payload_create(config,cmdline,input_files,output_files);
 	int status;
 
 	/* Invoke the Lambda function, producing the outputs in S3 */
 	status = invoke_function(config,payload);
-	if(status!=0) return status;
 
 	/* Retrieve the outputs from S3 */
 	status = download_files(config,output_files);
-	if(status!=0) return status;
 
 	return status;
 }
@@ -360,7 +361,12 @@ static int batch_job_lambda_remove(struct batch_queue *q, batch_job_id_t jobid)
 	}
 }
 
-batch_queue_stub_create(lambda);
+static int batch_queue_lambda_create( struct batch_queue *q )
+{
+	batch_queue_set_feature(q, "remote_rename", "%s=%s");
+	return 0;
+}
+
 batch_queue_stub_free(lambda);
 batch_queue_stub_port(lambda);
 batch_queue_stub_option_update(lambda);
