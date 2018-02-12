@@ -26,7 +26,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 	batch_wrapper_prefix(wrapper, wrap_name);
 
 	/* Save the directory we were originally working in. */
-	//batch_wrapper_pre(wrapper, "export CUR_WORK_DIR=$(pwd)");
+	batch_wrapper_pre(wrapper, "export CUR_WORK_DIR=$(pwd)");
 
 	/* Create sandbox. This should probably have a hex or random tail to be unique. */
 	char *cmd = string_format("mkdir %s", wrap_name);
@@ -52,8 +52,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 	free(cmd);
 
 	/* Once the command is finished go back to working dir. */
-	batch_wrapper_post(wrapper, "cd ..");
-	//batch_wrapper_post(wrapper, "cd $CUR_WORK_DIR");
+	batch_wrapper_post(wrapper, "cd $CUR_WORK_DIR");
 
 	list_first_item(task->output_files);
 	while((f = list_next_item(task->output_files))){
