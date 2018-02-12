@@ -4,6 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -422,6 +423,12 @@ struct rmonitor_mem_info *rmonitor_get_map_info(FILE *fmem, int rewind_flag) {
 	return NULL;
 }
 
+static double rmonitor_mem_info_priority(void *item) {
+	assert(item);
+	struct rmonitor_mem_info *i = item;
+	return -1*(i->map_start);
+}
+
 int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 {
 	// /dev/proc/[pid]/smaps:
@@ -474,18 +481,7 @@ int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 			hash_table_insert(maps, info->map_name, infos);
 		}
 
-		struct rmonitor_mem_info *i = NULL;
-		struct list_cursor *cur = list_cursor_create(infos);
-		for (list_seek(cur, -1); list_get(cur, (void **) &i); list_prev(cur)) {
-			if (i->map_start < info->map_start) {
-				list_insert(cur, info);
-				break;
-			}
-			i = NULL;
-		}
-		// if infos is empty or we ran off the beginning, i is NULL here
-		if (!i) list_insert(cur, info);
-		list_cursor_destroy(cur);
+		list_push_priority(infos, rmonitor_mem_info_priority, info);
 	}
 
 	fclose(fmem);

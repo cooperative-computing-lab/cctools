@@ -76,6 +76,7 @@ transparently modify the linker namespace we are using.
 #define list_split			cctools_list_split
 #define list_push_head			cctools_list_push_head
 #define list_push_tail			cctools_list_push_tail
+#define list_push_priority		cctools_list_push_priority
 #define list_iterate			cctools_list_iterate
 #define list_iterate_reverse		cctools_list_iterate_reverse
 #define list_first_item			cctools_list_first_item
@@ -221,6 +222,7 @@ void list_insert(struct list_cursor *cur, void *item);
 // Utility functions
 
 typedef int (*list_op_t) (void *item, const void *arg);
+typedef double (*list_priority_t) (void *item);
 
 /** Count the elements in a list.
  * @param list The list to count.
@@ -315,6 +317,20 @@ void *list_peek_tail(struct list *list);
 @return The item at the list head, or null if list is empty.
 */
 void *list_peek_current(struct list *list);
+
+/** Push an item on the tail of a list in priority order.
+ * The passed-in function is used to determine the priority of each item.
+ * The new item is inserted at the rightmost position such that
+ *     p(n) >= p(item) > p(n + 1)
+ * in the general position. If a list is built using list_push_priority()
+ * with the same priority function, it will always be sorted. Note that each
+ * insertion takes O(n) time, where n is the number of list items.
+ * See list_sort() for a more efficient way to sort an entire list.
+ * @param list The list to modify.
+ * @param p The priority function to apply to list items.
+ * @param item The new item to insert in priority order.
+ */
+void list_push_priority(struct list *list, list_priority_t p, void *item);
 
 /** Find an element within a list
 This function searches the list, comparing each element in the list to arg, and returns a pointer to the first matching element.

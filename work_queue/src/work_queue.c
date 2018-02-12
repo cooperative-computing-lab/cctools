@@ -5196,6 +5196,12 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 	return wrap_cmd;
 }
 
+static double work_queue_task_priority(void *item) {
+	assert(item);
+	struct work_queue_task *t = item;
+	return t->priority;
+}
+
 /* Put a given task on the ready list, taking into account the task priority and the queue schedule. */
 
 void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
@@ -5211,19 +5217,7 @@ void push_task_to_ready_list( struct work_queue *q, struct work_queue_task *t )
 	}
 
 	if(by_priority) {
-		struct work_queue_task *i = NULL;
-		struct list_cursor *cur = list_cursor_create(q->ready_list);
-		for (list_seek(cur, -1); list_get(cur, (void **) &i); list_prev(cur)) {
-			if (i->priority > t->priority) {
-				list_insert(cur, t);
-				break;
-			}
-			i = NULL;
-		}
-		// if the ready list is empty or we ran off the beginning,
-		// i is NULL here
-		if (!i) list_insert(cur, t);
-		list_cursor_destroy(cur);
+		list_push_priority(q->ready_list, work_queue_task_priority, t);
 	} else {
 		list_push_head(q->ready_list,t);
 	}

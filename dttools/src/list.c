@@ -580,4 +580,24 @@ DONE:
 	return list;
 }
 
+
+void list_push_priority(struct list *list, list_priority_t p, void *item) {
+	assert(list);
+	assert(p);
+
+	void *i = NULL;
+	struct list_cursor *cur = list_cursor_create(list);
+	for (list_seek(cur, -1); list_get(cur, &i); list_prev(cur)) {
+			if (p(i) >= p(item)) {
+				list_insert(cur, item);
+				break;
+			}
+			i = NULL;
+		}
+		// if the list is empty or we ran off the beginning,
+		// i is NULL here
+		if (!i) list_insert(cur, item);
+		list_cursor_destroy(cur);
+}
+
 /* vim: set noexpandtab tabstop=4: */
