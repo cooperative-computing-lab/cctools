@@ -42,6 +42,7 @@ the same name inside and outside of the sandbox.
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 struct lambda_config {
 	const char *bucket_name;
@@ -199,6 +200,24 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 	return nfailures;
 }
 
+static int batch_job_lambda_subprocess( struct lambda_config *config, const char *cmdline, const char *input_file_string, const char *output_file_string )
+{
+	struct jx *input_files = process_filestring(input_file_string);
+	struct jx *output_files = process_filestring(output_file_string);
+	char *payload = payload_create(config,cmdline,input_files,output_files);
+	int status;
+
+	/* Invoke the Lambda function, producing the outputs in S3 */
+	status = invoke_function(config,payload);
+	if(status!=0) return status;
+
+	/* Retrieve the outputs from S3 */
+	status = download_files(config,output_files);
+	if(status!=0) return status;
+
+	return status;
+}
+
 static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_file_string, const char *output_file_string, struct jx *envlist, const struct rmsummary *resources)
 {
 	const char *config_file = hash_table_lookup(q->options, "lambda-config");
@@ -211,41 +230,28 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	int status = upload_files(config,input_files);
 	jx_delete(input_files);
 
-	if(status!=0) return -1;
-
-	struct batch_job_info *info = malloc(sizeof(*info));
-	memset(info, 0, sizeof(*info));
-
-	debug(D_BATCH, "Forking Lambda script process...");
+	if(status!=0) {
+		debug(D_BATCH, "failed to upload all input files");
+		return -1;
+	}
 
 	batch_job_id_t jobid = fork();
 
-	/* parent */
 	if(jobid > 0) {
+		/* parent process */
+		debug(D_BATCH, "lambda: forked child process %d",(int)jobid);
+		struct batch_job_info *info = malloc(sizeof(*info));
+		memset(info, 0, sizeof(*info));
 		info->submitted = time(0);
 		info->started = time(0);
 		itable_insert(q->job_table, jobid, info);
 		return jobid;
-	}
-	/* child */
-	else if(jobid == 0) {
-		struct jx *input_files = process_filestring(input_file_string);
-		struct jx *output_files = process_filestring(output_file_string);
-		char *payload = payload_create(config,cmdline,input_files,output_files);
-		int status;
-
-		/* Invoke the Lambda function, producing the outputs in S3 */
-		status = invoke_function(config,payload);
-		if(status!=0) _exit(1);
-
-		/* Retrieve the outputs from S3 */
-		status = download_files(config,output_files);
-		if(status!=0) _exit(1);
-
-		_exit(0);
-	}
-	/* error */
-	else {
+	} else if(jobid == 0) {
+		/* child process */
+		int result = batch_job_lambda_subprocess(config,cmdline,input_file_string,output_file_string);
+		_exit(result);
+	} else {
+		debug(D_DEBUG,"failed to fork: %s\n",strerror(errno));
 		return -1;
 	}
 }
