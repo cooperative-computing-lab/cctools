@@ -5,4 +5,3 @@ See the file COPYING for details.
 */
 
 struct category *makeflow_category_lookup_or_create(const struct dag *d, const char *name);
-

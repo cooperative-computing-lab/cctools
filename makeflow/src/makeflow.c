@@ -259,7 +259,7 @@ char *submakeflow_command_create(struct dag_node *n, struct list **input_list, s
 		input_string = string_combine(input_string, string_format("cp -R %s %s/%s&& ", (char *) file->data, n->sub_dir, remote_file));
 		file = list_next_item(*input_list);
 	}
-	
+
 	char * output_string = NULL;
 	list_first_item(*output_list);
 	file = list_next_item(*output_list);
@@ -275,8 +275,8 @@ char *submakeflow_command_create(struct dag_node *n, struct list **input_list, s
 		next_file = list_next_item(*output_list);
 	}
 	// Explitly pass in name of desired log file
-	//char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", n->sub_dir, input_string, n->sub_dir, n->local_jobs_avail, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file); 
-	char * new_command = string_format("mkdir %s&& %s (cd %s&& makeflow -T local --local-cores=1 --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"&& %s); status=$?; rm -rf %s; rm %s; exit $status;", n->sub_dir, input_string, n->sub_dir, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file); 
+	//char * new_command = string_format("mkdir %s; %s cd %s; makeflow -T local -j %d --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"; %s cd ../; rm -rf %s; rm %s;", n->sub_dir, input_string, n->sub_dir, n->local_jobs_avail, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file);
+	char * new_command = string_format("mkdir %s&& %s (cd %s&& makeflow -T local --local-cores=1 --makeflow-log=\"%s\" --jx %s --jx-context=\"%s\"&& %s); status=$?; rm -rf %s; rm %s; exit $status;", n->sub_dir, input_string, n->sub_dir, n->log_file, n->makeflow_dag, n->context_file, output_string, n->sub_dir, n->context_file);
 	return new_command;
 }
 
@@ -287,6 +287,7 @@ Abort one job in a given batch queue.
 static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_queue *q, UINT64_T jobid, const char *name )
 {
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
+
 	batch_job_remove(q, jobid);
 
 	makeflow_hook_node_abort(n);
@@ -524,6 +525,7 @@ static int makeflow_file_on_sharedfs( const char *filename )
 	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
 
+
 /*
 Submit one fully formed job, retrying failures up to the makeflow_submit_timeout.
 This is necessary because busy batch systems occasionally do not accept a job submission.
@@ -573,6 +575,7 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, str
 
 	return 0;
 }
+
 
 /*
 Submit a node to the appropriate batch system, after materializing
@@ -2143,8 +2146,10 @@ int main(int argc, char *argv[])
 	makeflow_parse_input_outputs(d);
 
 	makeflow_prepare_nested_jobs(d);
+
 	if (change_dir)
 		chdir(change_dir);
+
 	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR || container_mode==CONTAINER_MODE_DOCKER) ) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {

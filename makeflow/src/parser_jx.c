@@ -187,10 +187,10 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	}
 
 	struct jx *type = jx_lookup(j, "type");
-	
+
 	struct jx *makeflow = NULL;
 	struct jx *command = NULL;
-	
+
 	if(jx_istype(type, JX_STRING)){
 		if(!strcmp(type->u.string_value, "makeflow")){
 			makeflow = jx_lookup(j, "makeflow");
@@ -209,7 +209,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 			j->line);
 		return 0;
 	}
-	
+
 	n->nested_job = 0;
 	if (jx_match_string(command, (char **) &n->command)) {
 		debug(D_MAKEFLOW_PARSER, "command: %s", n->command);
