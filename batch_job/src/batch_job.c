@@ -31,6 +31,7 @@ extern const struct batch_queue_module batch_queue_blue_waters;
 extern const struct batch_queue_module batch_queue_slurm;
 extern const struct batch_queue_module batch_queue_wq;
 extern const struct batch_queue_module batch_queue_mesos;
+extern const struct batch_queue_module batch_queue_k8s;
 extern const struct batch_queue_module batch_queue_dryrun;
 
 static struct batch_queue_module batch_queue_unknown = {
@@ -43,7 +44,7 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, mesos, moab, slurm, chirp, amazon, dryrun"
+#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, dryrun"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_amazon,
@@ -61,6 +62,7 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_slurm,
 	&batch_queue_wq,
 	&batch_queue_mesos,
+	&batch_queue_k8s,
 	&batch_queue_dryrun,
 	&batch_queue_unknown
 };
