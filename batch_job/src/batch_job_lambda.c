@@ -190,25 +190,25 @@ struct jx *filestring_to_jx(const char *filestring)
 {
 	struct jx *file_array = jx_array(0);
 
-	char *files, *inner_name, *outer_name;
+	char *files, *outer_name, *inner_name;
 	if(filestring) {
 		files = strdup(filestring);
-		inner_name = strtok(files, " \t,");
-		while(inner_name) {
-			outer_name = strchr(inner_name,'=');
-			if(outer_name) {
-				*outer_name = 0;
-				outer_name++;
+		outer_name = strtok(files, " \t,");
+		while(outer_name) {
+			inner_name = strchr(outer_name,'=');
+			if(inner_name) {
+				*inner_name = 0;
+				inner_name++;
 			} else {
-				outer_name = inner_name;
+				inner_name = outer_name;
 			}
 
 			struct jx *file_object = jx_object(0);
-			jx_insert(file_object,jx_string("inner_name"),jx_string(inner_name));
 			jx_insert(file_object,jx_string("outer_name"),jx_string(outer_name));
+			jx_insert(file_object,jx_string("inner_name"),jx_string(inner_name));
 			jx_array_append(file_array,file_object);
 
-			inner_name = strtok(0, " \t,");
+			outer_name = strtok(0, " \t,");
 		}
 		free(files);
 	}
