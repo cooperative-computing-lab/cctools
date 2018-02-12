@@ -16,6 +16,7 @@ prepare()
 int main (int argc, char *argv[])
 {
 	bool ok;
+	unsigned pos;
 	intptr_t item = 0;
 
 	// first create an empty list
@@ -28,7 +29,7 @@ int main (int argc, char *argv[])
 	assert(cur);
 
 	// ensure that things don't work when position is undefined
-	assert(list_tell(cur) == INT_MIN);
+	assert(!list_tell(cur, &pos));
 	ok = list_seek(cur, 0);
 	assert(!ok);
 	ok = list_next(cur);
@@ -45,10 +46,10 @@ int main (int argc, char *argv[])
 	// put in a couple of items
 	list_insert(cur, (void *) 3);
 	assert(list_size(list) == 1);
-	assert(list_tell(cur) == INT_MIN);
+	assert(!list_tell(cur, &pos));
 	list_insert(cur, (void *) 2);
 	assert(list_size(list) == 2);
-	assert(list_tell(cur) == INT_MIN);
+	assert(!list_tell(cur, &pos));
 
 	// move on to an item
 	ok = list_seek(cur, 0);
@@ -59,7 +60,8 @@ int main (int argc, char *argv[])
 	assert(!ok);
 
 	// try basic functionality
-	assert(list_tell(cur) == 0);
+	assert(list_tell(cur, &pos));
+	assert(pos == 0);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 2);
@@ -78,28 +80,32 @@ int main (int argc, char *argv[])
 	assert(!ok);
 
 	// check we're on the right item
-	assert(list_tell(cur) == 1);
+	assert(list_tell(cur, &pos));
+	assert(pos == 1);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 3);
 
 	// make another cursor, and insert between the two elements
 	struct list_cursor *alt = list_cursor_create(list);
-	assert(list_tell(alt) == INT_MIN);
+	assert(!list_tell(alt, &pos));
 	ok = list_seek(alt, -2);
 	assert(ok);
-	assert(list_tell(alt) == 0);
+	assert(list_tell(alt, &pos));
+	assert(pos == 0);
 	list_insert(alt, (void *) 7);
 	assert(list_size(list) == 3);
 
 	// make sure the original cursor is OK
-	assert(list_tell(cur) == 2);
+	assert(list_tell(cur, &pos));
+	assert(pos == 2);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 3);
 
 	// and the new cursor
-	assert(list_tell(alt) == 0);
+	assert(list_tell(alt, &pos));
+	assert(pos == 0);
 	ok = list_get(alt, (void **) &item);
 	assert(ok);
 	assert(item == 5);
@@ -109,12 +115,14 @@ int main (int argc, char *argv[])
 	assert(ok);
 
 	// and check both again
-	assert(list_tell(cur) == 2);
+	assert(list_tell(cur, &pos));
+	assert(pos == 2);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 3);
 
-	assert(list_tell(alt) == 1);
+	assert(list_tell(alt, &pos));
+	assert(pos == 1);
 	ok = list_get(alt, (void **) &item);
 	assert(ok);
 	assert(item == 7);
@@ -124,12 +132,14 @@ int main (int argc, char *argv[])
 	assert(ok);
 
 	// and check both again
-	assert(list_tell(cur) == 1);
+	assert(list_tell(cur, &pos));
+	assert(pos == 1);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 7);
 
-	assert(list_tell(alt) == 1);
+	assert(list_tell(alt, &pos));
+	assert(pos == 1);
 	ok = list_get(alt, (void **) &item);
 	assert(ok);
 	assert(item == 7);
@@ -140,7 +150,7 @@ int main (int argc, char *argv[])
 	assert(list_size(list) == 2);
 
 	// and check both again
-	assert(list_tell(cur) == -1);
+	assert(!list_tell(cur, &pos));
 	ok = list_get(cur, (void **) &item);
 	assert(!ok);
 	ok = list_next(cur);
@@ -148,30 +158,33 @@ int main (int argc, char *argv[])
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 3);
-	assert(list_tell(cur) == 1);
+	assert(list_tell(cur, &pos));
+	assert(pos == 1);
 
-	assert(list_tell(alt) == -1);
+	assert(!list_tell(alt, &pos));
 	ok = list_get(alt, (void **) &item);
 	assert(!ok);
 
 	// walk off the right
 	ok = list_next(alt);
 	assert(ok);
-	assert(list_tell(alt) == 1);
+	assert(list_tell(alt, &pos));
+	assert(pos == 1);
 	ok = list_next(alt);
 	assert(!ok);
-	assert(list_tell(alt) == INT_MIN);
+	assert(!list_tell(alt, &pos));
 
 	// and the left
 	ok = list_prev(cur);
 	assert(ok);
-	assert(list_tell(cur) == 0);
+	assert(list_tell(cur, &pos));
+	assert(pos == 0);
 	ok = list_get(cur, (void **) &item);
 	assert(ok);
 	assert(item == 5);
 	ok = list_prev(cur);
 	assert(!ok);
-	assert(list_tell(cur) == INT_MIN);
+	assert(!list_tell(cur, &pos));
 
 	// delete the cursors and try to delete while there are items
 	list_cursor_destroy(cur);

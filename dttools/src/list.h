@@ -151,12 +151,14 @@ bool list_seek(struct list_cursor *cur, int index);
  * Due to insertions and deletions, an item's index within
  * a list is subject to change. This function walks from the
  * beginning of the list to determine the cursor's current index.
+ * If the cursor's position is undefined, or sitting on a dropped item,
+ * this function returns false and does not modify the passed in index.
  * @param cur The cursor to check.
- * @returns a non-negative number indicating the index of a list item.
- * @returns a negative number if the cursor is on a dropped item.
- * @returns INT_MIN if the cursor position is undefined.
+ * @param index The location to store the index.
+ * @returns true if the cursor's index was written.
+ * @returns false if the cursor position is undefined or the item was dropped.
  */
-int list_tell(struct list_cursor *cur);
+bool list_tell(struct list_cursor *cur, unsigned *index);
 
 /** Move a cursor to the next item.
  * @param cur The cursor to move.

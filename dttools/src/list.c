@@ -179,19 +179,22 @@ bool list_prev(struct list_cursor *cur) {
 	return cur->target ? true : false;
 }
 
-int list_tell(struct list_cursor *cur) {
+bool list_tell(struct list_cursor *cur, unsigned *index) {
 	assert(cur);
 	assert(cur->list);
-	if (!cur->target) return INT_MIN;
+	assert(index);
+	if (!cur->target) return false;
 
-	int pos = 0;
+	unsigned pos = 0;
 	for (struct list_item *i = cur->list->head; i != cur->target; i = i->next) {
 		assert(i);
 		if (i->dead) continue;
 		assert(pos < INT_MAX);
 		++pos;
 	}
-	return cur->target->dead ? -pos : pos;
+	if (cur->target->dead) return false;
+	*index = pos;
+	return true;
 }
 
 bool list_seek(struct list_cursor *cur, int index) {
