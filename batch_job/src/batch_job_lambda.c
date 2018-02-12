@@ -22,11 +22,7 @@ from the bucket, and the job is done.
 Things that need to be fixed in this code:
 1 - Every input file is transferred for every job.  Instead, we should
 only transfer files if they do not exist. 
-
 2 - The function execution side is unable to download directories.
-
-3 - File renaming is not supported. Input/output files must have
-the same name inside and outside of the sandbox.
 */
 
 #include "batch_job_internal.h"
