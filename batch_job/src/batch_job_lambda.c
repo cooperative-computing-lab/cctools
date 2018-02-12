@@ -170,32 +170,50 @@ char *payload_create(struct lambda_config *config, const char *cmdline, struct j
 	jx_insert_string(payload, "region_name", config->region_name);
 	jx_insert_string(payload, "bucket_name", config->bucket_name);
 	jx_insert_string(payload, "bucket_folder", config->bucket_folder);
-	jx_insert(payload, jx_string("input_names"), input_files);
-	jx_insert(payload, jx_string("output_names"), output_files);
-	return jx_print_string(payload);
+	jx_insert(payload, jx_string("input_files"), input_files);
+	jx_insert(payload, jx_string("output_files"), output_files);
+	char * str = jx_print_string(payload);
+	jx_delete(payload);
+	return str;
+
 }
 
 /*
-Sanitizes the file lists to retrieve just the filenames in the cases of an '='
-XXX This isn't right yet b/c the = indicates renaming a file in transit.
+Converts a list of files in the form of a string "a,b=c" into a JX array of the form:
+[
+{ "inner_name":"a", "outer_name":"a" },
+{ "inner_name":"b", "outer_name":"c" }
+]
 */
-struct jx *process_filestring(const char *filestring)
-{
-	struct jx *fileq = jx_array(0);
 
-	char *files, *f, *p;
+struct jx *filestring_to_jx(const char *filestring)
+{
+	struct jx *file_array = jx_array(0);
+
+	char *files, *inner_name, *outer_name;
 	if(filestring) {
 		files = strdup(filestring);
-		f = strtok(files, " \t,");
-		while(f) {
-			p = strchr(f, '=');
-			jx_array_append(fileq, jx_string(p ? p + 1 : f));
-			f = strtok(0, " \t,");
+		inner_name = strtok(files, " \t,");
+		while(inner_name) {
+			outer_name = strchr(inner_name,'=');
+			if(outer_name) {
+				*outer_name = 0;
+				outer_name++;
+			} else {
+				outer_name = inner_name;
+			}
+
+			struct jx *file_object = jx_object(0);
+			jx_insert(file_object,jx_string("inner_name"),jx_string(inner_name));
+			jx_insert(file_object,jx_string("outer_name"),jx_string(outer_name));
+			jx_array_append(file_array,file_object);
+
+			inner_name = strtok(0, " \t,");
 		}
 		free(files);
 	}
 
-	return fileq;
+	return file_array;
 }
 
 /*
@@ -206,7 +224,8 @@ int upload_files(struct lambda_config *config, struct jx *file_list )
 {
 	int i;
 	for( i=0; i<jx_array_length(file_list); i++ ) {
-		char *file_name = jx_array_index(file_list, i)->u.string_value;
+		struct jx *file_object = jx_array_index(file_list, i);
+		const char *file_name = jx_lookup_string(file_object,"outer_name");
 		int status = upload_item(config,file_name);
 		if(status!=0) {
 			debug(D_BATCH,"upload of %s failed, aborting job submission",file_name);
@@ -228,7 +247,8 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 
 	int i;
 	for( i=0; i<jx_array_length(file_list); i++ ) {
-		char *file_name = jx_array_index(file_list, i)->u.string_value;
+		struct jx *file_object = jx_array_index(file_list, i);
+		const char *file_name = jx_lookup_string(file_object,"outer_name");
 		int status = download_item(config,file_name);
 		if(status!=0) {
 			debug(D_BATCH,"download of %s failed, still continuing",file_name);
@@ -240,8 +260,8 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 
 static int batch_job_lambda_subprocess( struct lambda_config *config, const char *cmdline, const char *input_file_string, const char *output_file_string )
 {
-	struct jx *input_files = process_filestring(input_file_string);
-	struct jx *output_files = process_filestring(output_file_string);
+	struct jx *input_files = filestring_to_jx(input_file_string);
+	struct jx *output_files = filestring_to_jx(output_file_string);
 	char *payload = payload_create(config,cmdline,input_files,output_files);
 	int status;
 
@@ -264,7 +284,7 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 	static struct lambda_config *config = 0;
 	if(!config) config = lambda_config_load(config_file);
 
-	struct jx *input_files = process_filestring(input_file_string);
+	struct jx *input_files = filestring_to_jx(input_file_string);
 	int status = upload_files(config,input_files);
 	jx_delete(input_files);
 

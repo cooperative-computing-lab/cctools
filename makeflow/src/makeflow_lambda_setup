@@ -124,6 +124,7 @@ def handler(event, context):
     # get inputs from S3 into filesystem
     bucket_name = event["bucket_name"]
     bucket_folder = event["bucket_folder"]
+
     work_dir = os.path.join("/tmp/", bucket_folder)
     try:
         os.mkdir(work_dir)
@@ -131,37 +132,34 @@ def handler(event, context):
         if e.errno != 17:
             raise
         pass
-    for input_name in event["input_names"]:
-        input_key = os.path.join(bucket_folder, input_name)
-        input_path = os.path.join(work_dir, input_name)
+ 
+   os.chdir(work_dir)
+
+   for input_file in event["input_files"]:
+	inner_name = input_file["inner_name"];
+	outer_name = input_file["outer_name"];
+        bucket_key = os.path.join(bucket_folder, outer_name)
+
         try:
-            input_response = s3.get_object(Bucket=bucket_name, Key=input_key)
-            try:
-                os.makedirs(os.path.dirname(input_path))
-            except OSError, e:
-                if e.errno != 17:
-                    raise
-                pass
-            input_file = open(input_path, "wb")
-            input_file.write(input_response["Body"].read())
-            input_file.close()
+	    s3.meta.client.download_file(bucket_name,bucket_key,inner_name);
         except Exception as e:
-            return "Error encountered while retrieving input\nbucket_name = {}\nbucket_folder = {}\nwork_dir = {}\ninput_name = {}\ninput_key = {}\ninput_path = {}\nevent = {}\nexception = {}\n".format(bucket_name, bucket_folder, work_dir, input_name, input_key, input_path, event, e)
+            return "Couldn't download {} from s3://{}/{} reason: {}".format(inner_name,bucket_name,bucket_key,e)
 
     # run the command
-    subprocess.call("cd "+work_dir+"; {}".format(event["cmd"]), shell=True)
+    subprocess.call(event["cmd"]), shell=True)
 
     # put outputs into S3
-    for output_name in event["output_names"]:
-        output_key = os.path.join(bucket_folder, output_name)
-        output_path = os.path.join(work_dir, output_name)
-        try:
-            output_file = open(output_path, "rb")
-            output_response = s3.put_object(Bucket=bucket_name, Key=output_key, Body=output_file)
-            output_file.close()
-        except Exception as e:
-            return "Error encountered while storing output\nbucket_name = {}\nbucket_folder = {}\nwork_dir = {}\noutput_name = {}\noutput_key = {}\noutput_path = {}\nevent = {}\nexception = {}\n".format(bucket_name, bucket_folder, work_dir, output_name, output_key, output_path, event, e)
+    for output_file in event["output_files"]:
+        inner_name = output_file["inner_name"]
+        outer_name = output_file["outer_name"]
+	bucket_key = os.path.join(bucket_folder,outer_name)
 
+        try:
+	    s3.meta.client.upload_file(bucket_name,bucket_key,inner_name);
+        except Exception as e:
+            return "Couldn't upload {} to s3://{}/{} reason: {}".format(inner_name,bucket_name,bucket_key,e)
+
+    os.chdir("/tmp")
     shutil.rmtree(work_dir)
 
     return "Lambda invocation successful\nevent = {}\n".format(event)
