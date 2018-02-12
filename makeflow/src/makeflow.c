@@ -874,8 +874,9 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	} else {
 
 		/* Mark source files that have been used by this node */
-		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files))) {
+		list_first_item(task->input_files);
+		while((bf = list_next_item(task->input_files))) {
+			f = dag_file_lookup_or_create(d, bf->inner_name);
 			f->reference_count+= -1;
 			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
