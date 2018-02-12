@@ -73,6 +73,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 		debug(D_MAKEFLOW_HOOK, "Failed to create wrapper: errno %d, %s", errno, strerror(errno));
 		return MAKEFLOW_HOOK_FAILURE;
 	}
+	free(cmd);
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
