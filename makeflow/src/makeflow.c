@@ -236,7 +236,7 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 		makeflow_hook_add_input_file(n->d, task, n->makeflow_dag, NULL);
 		makeflow_hook_add_input_file(n->d, task, context_title, NULL);
 		makeflow_hook_add_output_file(n->d, task, n->log_file, NULL);
-		n->sub_dir = string_format("%s.%u", n->makeflow_dag, (unsigned)time(NULL));
+		n->sub_dir = string_format("%s.%u", n->makeflow_dag, n->nodeid);
 	}
 
 	/* Expand the command according to each of the wrappers */
