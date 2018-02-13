@@ -10,6 +10,7 @@
 #include "batch_wrapper.h"
 
 #include "dag.h"
+#include "dag_file.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_hook.h"
@@ -18,7 +19,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define CONTAINER_SINGULARITY_SH "singularity.wrapper.sh"
+#define CONTAINER_SINGULARITY_SH "./singularity.wrapper.sh"
 
 char *singularity_image = NULL;
 
@@ -35,25 +36,18 @@ static int create( struct jx *hook_args )
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy( struct dag *d )
-{
-	if(makeflow_clean_file(d, makeflow_get_remote_queue(), dag_file_lookup_or_create(d, CONTAINER_SINGULARITY_SH)))
-		return MAKEFLOW_HOOK_SUCCESS;
-	return MAKEFLOW_HOOK_FAILURE;
-}
-
 static int node_submit(struct dag_node *n, struct batch_task *t){
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	batch_wrapper_prefix(wrapper, CONTAINER_SINGULARITY_SH);
 
-	char *cmd = string_format("singularity exec --home `pwd` %s \"$@\"", singularity_image);
+	char *cmd = string_format("singularity exec --home $(pwd) --bind $(pwd):/disk %s %s", singularity_image, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);
 
 	cmd = batch_wrapper_write(wrapper, t);
 	if(cmd){
 		batch_task_set_command(t, cmd);
-		struct dag_file *df = makeflow_hook_add_input_file(n->d, t, cmd, cmd);
+		struct dag_file *df = makeflow_hook_add_input_file(n->d, t, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);
 	} else {
@@ -62,7 +56,7 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 	}
 	free(cmd);
 
-	makeflow_hook_add_input_file(n->d, t, singularity_image, NULL);
+	makeflow_hook_add_input_file(n->d, t, singularity_image, NULL, DAG_FILE_TYPE_GLOBAL);
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -70,7 +64,6 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 struct makeflow_hook makeflow_hook_singularity = {
 	.module_name = "Singularity",
 	.create = create,
-	.destroy = destroy,
 
 	.node_submit = node_submit,
 };

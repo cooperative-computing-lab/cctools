@@ -66,7 +66,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 	cmd = batch_wrapper_write(wrapper, task);
 	if(cmd){
 		batch_task_set_command(task, cmd);
-		struct dag_file *df = makeflow_hook_add_input_file(node->d, task, cmd, cmd);
+		struct dag_file *df = makeflow_hook_add_input_file(node->d, task, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(node->d, df, DAG_FILE_STATE_EXISTS);
 	} else {

@@ -206,6 +206,8 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 
 	f->state = newstate;
 
+	if(f->type == DAG_FILE_TYPE_GLOBAL) return;
+
 	timestamp_t time = timestamp_get();
 	fprintf(d->logfile, "# FILE %" PRIu64 " %s %d %" PRIu64 "\n", time, f->filename, f->state, dag_file_size(f));
 	if(f->state == DAG_FILE_STATE_EXISTS){

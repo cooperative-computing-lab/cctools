@@ -31,49 +31,25 @@ struct list * makeflow_hooks = NULL;
 
 
 
-struct dag_file *makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern)
+struct dag_file *makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type)
 {
-	char *id = string_format("%d",task->taskid);
-	char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
-	char * name_on_execution = NULL;
-	if(name_on_execution_pattern){
-		name_on_execution = string_replace_percents(name_on_execution_pattern, id);
-	}
-
 	/* Output of dag_file is returned to use for final filename. */
 	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
 	/* Indicate this is an temporary file that should be cleaned up. */
-	f->type = DAG_FILE_TYPE_TEMP;
-	f->reference_count = 1;
+	f->type = file_type;
 
 	batch_task_add_input_file(task, name_on_submission, name_on_execution);
-
-	free(id);
-	free(name_on_submission);
-	free(name_on_execution);
 
 	return f;
 }
 
-struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern)
+struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type)
 {
-	char *id = string_format("%d",task->taskid);
-	char * name_on_submission = string_replace_percents(name_on_submission_pattern, id);
-	char * name_on_execution = NULL;
-	if(name_on_execution_pattern){
-		name_on_execution = string_replace_percents(name_on_execution_pattern, id);
-	}
-
 	/* Output of dag_file is returned to use for final filename. */
 	struct dag_file *f = dag_file_lookup_or_create(d, name_on_submission);
-	f->type = DAG_FILE_TYPE_INTERMEDIATE;
-	f->reference_count = 1;
+	f->type = file_type;
 
 	batch_task_add_output_file(task, name_on_submission, name_on_execution);
-
-	free(id);
-	free(name_on_submission);
-	free(name_on_execution);
 
 	return f;
 }
