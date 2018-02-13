@@ -23,15 +23,10 @@
 
 char *singularity_image = NULL;
 
-char *singularity_tar = NULL;
-
 static int create( struct jx *hook_args )
 {
     if(jx_lookup_string(hook_args, "singularity_container_image"))
         singularity_image = xxstrdup(jx_lookup_string(hook_args, "singularity_container_image"));	
-
-    if(jx_lookup_string(hook_args, "singularity_image_tar"))
-        singularity_tar = xxstrdup(jx_lookup_string(hook_args, "singularity_image_tar"));	
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -40,6 +35,7 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	batch_wrapper_prefix(wrapper, CONTAINER_SINGULARITY_SH);
 
+	/* Assumes a /disk dir in the image. */
 	char *cmd = string_format("singularity exec --home $(pwd) --bind $(pwd):/disk %s %s", singularity_image, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);

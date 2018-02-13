@@ -206,6 +206,7 @@ void makeflow_log_file_state_change( struct dag *d, struct dag_file *f, int news
 
 	f->state = newstate;
 
+	/* If a file is a wrapper global file do not log to avoid cleaning floating global files. */
 	if(f->type == DAG_FILE_TYPE_GLOBAL) return;
 
 	timestamp_t time = timestamp_get();
