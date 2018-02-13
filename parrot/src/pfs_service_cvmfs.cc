@@ -614,7 +614,7 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	f->cvmfs_ctx = NULL;
 #endif
 
-	char *proxy = getenv("HTTP_PROXY");
+	char *proxy = getenv("PARROT_HTTP_PROXY");
 #if LIBCVMFS_REVISION < 23
 	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
 		if( !strstr(user_options,"proxies=") ) {
