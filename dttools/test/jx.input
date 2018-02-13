@@ -230,6 +230,13 @@ join(",", ["a", "b"]);
 join(["a", "b"], ",");
 join(["a", "b"]);
 
+basename("/usr/lib");
+basename("/usr/");
+basename("usr");
+basename("/");
+basename(".");
+basename("..");
+
 Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"};
 
 #end

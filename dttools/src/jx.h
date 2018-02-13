@@ -116,6 +116,7 @@ typedef enum {
 	JX_BUILTIN_JOIN,
 	JX_BUILTIN_CEIL,
 	JX_BUILTIN_FLOOR,
+	JX_BUILTIN_BASENAME,
 } jx_builtin_t;
 
 struct jx_function {

@@ -320,3 +320,32 @@ struct jx *jx_function_floor(struct jx *orig_args) {
 }
 
 
+struct jx *jx_function_basename(struct jx *args) {
+	assert(args);
+	const char *funcname = "basename";
+	const char *err = NULL;
+
+	struct jx *result = NULL;
+
+	int length = jx_array_length(args);
+	if (length != 1){
+		err = "basename takes one argument";
+		goto FAILURE;
+	}
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) {
+		err = "basename takes a string";
+		goto FAILURE;
+	}
+	char *val = xxstrdup(a->u.string_value);
+	result = jx_string(basename(val));
+	free(val);
+
+	return result;
+
+	FAILURE:
+	FAIL(funcname, JX_BUILTIN_FLOOR, args, err);
+}
