@@ -348,7 +348,7 @@ struct jx *jx_function_basename(struct jx *args) {
 	return result;
 
 	FAILURE:
-	FAIL(funcname, JX_BUILTIN_FLOOR, args, err);
+	FAIL(funcname, JX_BUILTIN_BASENAME, args, err);
 }
 
 struct jx *jx_function_dirname(struct jx *args) {
@@ -378,5 +378,35 @@ struct jx *jx_function_dirname(struct jx *args) {
 	return result;
 
 	FAILURE:
-	FAIL(funcname, JX_BUILTIN_FLOOR, args, err);
+	FAIL(funcname, JX_BUILTIN_DIRNAME, args, err);
+}
+
+struct jx *jx_function_escape(struct jx *args) {
+	assert(args);
+	const char *funcname = "escape";
+	const char *err = NULL;
+
+	struct jx *result = NULL;
+
+	int length = jx_array_length(args);
+	if (length != 1){
+		err = "escape takes one argument";
+		goto FAILURE;
+	}
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) {
+		err = "escape takes a string";
+		goto FAILURE;
+	}
+	char *val = string_escape_shell(a->u.string_value);
+	result = jx_string(val);
+	free(val);
+
+	return result;
+
+	FAILURE:
+	FAIL(funcname, JX_BUILTIN_ESCAPE, args, err);
 }

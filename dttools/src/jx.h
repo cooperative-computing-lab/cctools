@@ -118,6 +118,7 @@ typedef enum {
 	JX_BUILTIN_FLOOR,
 	JX_BUILTIN_BASENAME,
 	JX_BUILTIN_DIRNAME,
+	JX_BUILTIN_ESCAPE,
 } jx_builtin_t;
 
 struct jx_function {

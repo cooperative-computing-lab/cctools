@@ -16,5 +16,6 @@ struct jx *jx_function_ceil(struct jx *args);
 struct jx *jx_function_floor(struct jx *args);
 struct jx *jx_function_basename(struct jx *args);
 struct jx *jx_function_dirname(struct jx *args);
+struct jx *jx_function_escape(struct jx *args);
 
 #endif
