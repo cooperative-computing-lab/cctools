@@ -25,8 +25,9 @@ char *singularity_image = NULL;
 
 static int create( struct jx *hook_args )
 {
-    if(jx_lookup_string(hook_args, "singularity_container_image"))
+    if(jx_lookup_string(hook_args, "singularity_container_image")){
         singularity_image = xxstrdup(jx_lookup_string(hook_args, "singularity_container_image"));	
+	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
