@@ -27,12 +27,6 @@ Files are stored in S3 underneath their "outer" name, and are then
 downloaded to the function where they are stored with the "inner" name.
 */
 
-/*
-Things that need to be fixed in this code:
-1 - Every input file is transferred for every job.  Instead, we should
-only transfer files if they do not exist. 
-*/
-
 #include "batch_job_internal.h"
 #include "process.h"
 #include "batch_job.h"
@@ -98,12 +92,30 @@ static int isdir( const char *path )
 
 static int upload_item( struct lambda_config *config, const char *file_name )
 {
-	debug(D_BATCH,"uploading %s to S3...",file_name);
-	if(isdir(file_name)) {
-		return upload_dir(config,file_name);
-	} else {
-		return upload_file(config,file_name);
+	static struct hash_table *uploaded_files = 0;
+
+	if(!uploaded_files) uploaded_files = hash_table_create(0,0);
+
+	if(hash_table_lookup(uploaded_files,file_name)) {
+		debug(D_BATCH,"input file %s is already cached in S3",file_name);
+		return 0;
 	}
+
+	debug(D_BATCH,"uploading %s to S3...",file_name);
+
+	int result;
+
+	if(isdir(file_name)) {
+		result = upload_dir(config,file_name);
+	} else {
+		result = upload_file(config,file_name);
+	}
+
+	if(result==0) {
+		hash_table_insert(uploaded_files,file_name,strdup(file_name));
+	}
+
+	return result;
 }
 
 static int download_file( struct lambda_config *config, const char *file_name )
