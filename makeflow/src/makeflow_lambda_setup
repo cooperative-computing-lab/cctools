@@ -117,22 +117,22 @@ import botocore
 import subprocess
 import os
 import shutil
+import tempfile
+
+# This handler function is called once for each task invocation
 
 def handler(event, context):
     s3 = boto3.resource('s3')
 
-    # get inputs from S3 into filesystem
     bucket_name = event["bucket_name"]
     bucket_folder = event["bucket_folder"]
 
-    work_dir = os.path.join("/tmp/", bucket_folder)
-    try:
-        os.mkdir(work_dir)
-    except OSError, e:
-        if e.errno != 17:
-            raise
-        pass
- 
+    # Create a unique directory for handling up/downloads
+    # so as not to pollute the working directory.
+    transfer_dir = tempfile.mkdtemp();
+
+    # For each task execution, create a working directory
+    work_dir = tempfile.mkdtemp();
     os.chdir(work_dir)
 
     for file in event["input_files"]:
@@ -142,12 +142,13 @@ def handler(event, context):
             bucket_key = os.path.join(bucket_folder, file["outer_name"])
 
             if type == "tgz":
-                # this should be done inside a sandbox dir
+                os.chdir(transfer_dir)
                 tgz = file["outer_name"] + ".tgz"
                 s3.Bucket(bucket_name).download_file(bucket_key,tgz)
                 subprocess.call("tar xzf " + tgz, shell=True)
                 os.unlink(tgz)
-                os.rename(file["outer_name"],file["inner_name"])
+                os.rename(file["outer_name"],os.path.join(work_dir,file["inner_name"]))
+                os.chdir(work_dir)
             else:
                 s3.Bucket(bucket_name).download_file(bucket_key,file["inner_name"])
 
@@ -162,12 +163,13 @@ def handler(event, context):
             bucket_key = os.path.join(bucket_folder, file["outer_name"])
 
             if os.path.isdir(file["inner_name"]):
+                os.chdir(transfer_dir)
                 bucket_key = bucket_key + ".tgz"
                 tgz = file["outer_name"] + ".tgz"
-                os.rename(file["inner_name"],file["outer_name"])
+                os.rename(os.path.join(work_dir,file["inner_name"]),file["outer_name"])
                 subprocess.call("tar czf " + tgz + " " + file["outer_name"],shell=True)
                 s3.Bucket(bucket_name).upload_file(tgz,bucket_key)
-                
+                os.chdir(work_dir)
             else:
                 s3.Bucket(bucket_name).upload_file(file["inner_name"],bucket_key)
 
@@ -176,6 +178,7 @@ def handler(event, context):
 
     os.chdir("/tmp")
     shutil.rmtree(work_dir)
+    shutil.rmtree(transfer_dir)
 
     return "Lambda invocation successful\nevent = {}\n".format(event)
 EOF
