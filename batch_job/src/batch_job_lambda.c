@@ -336,16 +336,29 @@ static batch_job_id_t batch_job_lambda_wait(struct batch_queue *q, struct batch_
 }
 
 /*
-To remove a job, we must kill its proxy process,
-which will then be returned by batch_job_wait when complete.
+To remove a job, we take it out of the job table,
+kill the proxy process, and then wait for the proxy
+process to be returned by waitpid().  If it's not
+in the job table, then it's not a valid job.
 */
 
 static int batch_job_lambda_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
-	if(itable_lookup(q->job_table, jobid)) {
+	struct batch_job_info *info;
+	info = itable_remove(q->job_table, jobid);
+	if(info) {
+		free(info);
+
+		debug(D_BATCH,"killing jobid %d...",(int)jobid);
 		kill(jobid,SIGKILL);
+
+		debug(D_BATCH,"waiting for job %d to die...",(int)jobid);
+		struct process_info *p = process_waitpid(jobid,60);
+		if(p) free(p);
+
 		return 1;
 	} else {
+		debug(D_BATCH,"no such jobid %d",(int)jobid);
 		return 0;
 	}
 }
