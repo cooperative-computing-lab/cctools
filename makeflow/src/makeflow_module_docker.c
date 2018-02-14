@@ -71,7 +71,6 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 		free(load);
 		makeflow_hook_add_input_file(n->d, t, docker_tar, NULL, DAG_FILE_TYPE_GLOBAL);
 	}
-	makeflow_hook_add_input_file(n->d, t, docker_image, NULL, DAG_FILE_TYPE_GLOBAL);
 
 	char *cmd = string_format("docker run --rm -m 1g -v $CUR_WORK_DIR:$DEFAULT_DIR -w $DEFAULT_DIR %s %s", docker_image, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
