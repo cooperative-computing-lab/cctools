@@ -68,7 +68,7 @@ Upload a file/dir to the appropriate bucket.  This is a bit complicated b/c "s3 
 
 static int upload_dir( struct lambda_config *config, const char *file_name)
 {
-	char *cmd = string_format("aws s3 sync %s s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, path_basename(file_name));
+	char *cmd = string_format("tar cvzf - %s | aws s3 cp - s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, path_basename(file_name));
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -84,17 +84,17 @@ static int upload_file( struct lambda_config *config, const char *file_name )
 	return r;
 }
 
-static int upload_item( struct lambda_config *config, const char *file_name )
+static int isdir( const char *path )
 {
 	struct stat info;
+	int result = stat(path,&info);
+	if(result!=0) return 0;
+	return S_ISDIR(info.st_mode);
+}
 
-	int result = stat(file_name,&info);
-	if(result!=0) {
-		debug(D_BATCH,"couldn't access input file %s: %s",file_name,strerror(errno));
-		return -1;
-	}
-
-	if(S_ISDIR(info.st_mode)) {
+static int upload_item( struct lambda_config *config, const char *file_name )
+{
+	if(isdir(file_name)) {
 		return upload_dir(config,file_name);
 	} else {
 		return upload_file(config,file_name);
@@ -131,9 +131,7 @@ static int download_dir( struct lambda_config *config, const char *file_name )
 
 static int download_item( struct lambda_config *config, const char *file_name )
 {
-	int r = download_file(config,file_name);
-	if(r!=0) r = download_dir(config,file_name);
-	return r;
+	return download_file(config,file_name);
 }
 
 /*
@@ -171,7 +169,7 @@ char *payload_create(struct lambda_config *config, const char *cmdline, struct j
 Converts a list of files in the form of a string "a,b=c" into a JX array of the form:
 [
 { "inner_name":"a", "outer_name":"a" },
-{ "inner_name":"b", "outer_name":"c" }
+{ "inner_name":"b", "outer_name":"c", "type":"tgz" }
 ]
 */
 
@@ -195,6 +193,11 @@ struct jx *filestring_to_jx(const char *filestring)
 			struct jx *file_object = jx_object(0);
 			jx_insert(file_object,jx_string("outer_name"),jx_string(outer_name));
 			jx_insert(file_object,jx_string("inner_name"),jx_string(inner_name));
+			if(isdir(inner_name)) {
+				jx_insert(file_object,jx_string("type"),jx_string("tgz"));
+			} else {
+				jx_insert(file_object,jx_string("type"),jx_string("file"));
+			}
 			jx_array_append(file_array,file_object);
 
 			outer_name = strtok(0, " \t,");
