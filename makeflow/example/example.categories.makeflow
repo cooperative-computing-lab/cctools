@@ -31,7 +31,7 @@ MAKEFLOW_OUTPUTS=capitol.montage.gif
 .MAKEFLOW MEMORY 50
 .MAKEFLOW DISK 100
 capitol.montage.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
-	$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
+	$CONVERT -delay 10 -loop 0 -limit thread $CORES capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.montage.gif
 
 .MAKEFLOW CATEGORY analysis
 .MAKEFLOW CORES 1

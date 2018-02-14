@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "xxmalloc.h"
 #include "jx.h"
+#include "jx_match.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -99,6 +100,40 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	return 1;
 }
 
+static char *cluster_set_resource_string(struct batch_queue *q, const struct rmsummary *resources)
+{
+	char *cluster_resources = NULL;
+	const char *ignore_mem = hash_table_lookup(q->options, "ignore-mem-spec");
+
+	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
+		char *mem = string_format(",mem=%" PRId64 "mb", resources->memory);
+		char *disk = string_format(",file=%" PRId64 "mb", resources->disk);
+		cluster_resources = string_format(" -l nodes=1:ppn=%" PRId64 "%s%s ", 
+			resources->cores>0 ? resources->cores : 1,
+			resources->memory>0 ? mem : "",
+			resources->disk>0 ? disk  : "");
+		free(mem);
+		free(disk);
+	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
+		char *mem = NULL;
+		if(!strcmp("no", ignore_mem)){
+			mem = string_format(" --mem=%" PRId64 "M", resources->memory);
+		}
+		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
+		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
+		cluster_resources = string_format(" -N 1 -n %" PRId64 "%s ", 
+			resources->cores>0 ? resources->cores : 1,
+			(resources->memory>0 && mem) ? mem : "");
+		free(mem);
+	}
+	const char *safe_mode = hash_table_lookup(q->options, "safe-submit-mode");
+	if(!strcmp("yes", safe_mode))
+		free(cluster_resources);
+	if(!cluster_resources)
+		cluster_resources = xxstrdup("");
+	return cluster_resources;
+}
+
 static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
 {
 	batch_job_id_t jobid;
@@ -109,6 +144,8 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
 		return -1;
 	}
+
+	char *cluster_resources = cluster_set_resource_string(q, resources);
 
 	/*
 	Experiment shows that passing environment variables
@@ -149,14 +186,16 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	*/
 	static uint16_t submit_id = 0;
 
-	char *command = string_format("%s %s %s makeflow%" PRIu16 " %s %s.wrapper",
+	char *command = string_format("%s %s %s %s makeflow%" PRIu16 " %s %s.wrapper",
 		cluster_submit_cmd,
+		cluster_resources,
 		cluster_options,
 		cluster_jobname_var,
 		submit_id++,
 		options ? options : "",
 		cluster_name);
 
+	free(cluster_resources);
 	debug(D_BATCH, "%s", command);
 
 	FILE *file = popen(command, "r");
