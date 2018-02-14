@@ -30,8 +30,8 @@ static int create( struct jx *hook_args )
 		singularity_image = xxstrdup(jx_lookup_string(hook_args, "singularity_container_image"));	
 	}
 
-	if(jx_lookup_string(hook_args, "singularity_container_image")){
-		singularity_opt = xxstrdup(jx_lookup_string(hook_args, "singularity_container_image"));	
+	if(jx_lookup_string(hook_args, "singularity_container_options")){
+		singularity_opt = xxstrdup(jx_lookup_string(hook_args, "singularity_container_options"));	
 	} else {
 		singularity_opt = xxstrdup("");
 	}
