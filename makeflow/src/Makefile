@@ -10,9 +10,9 @@ OBJECTS = dag.o dag_node_footprint.o dag_node.o dag_file.o dag_variable.o dag_vi
 PROGRAMS = makeflow makeflow_viz makeflow_analyze makeflow_linker makeflow_status
 
 SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch makeflow_linker_perl_driver makeflow_linker_python_driver makeflow_archive_query mf_mesos_scheduler mf_mesos_executor mf_mesos_setting makeflow_ec2_setup makeflow_ec2_cleanup
-MAKEFLOW_WRAPPERS =  makeflow_wrapper_monitor.o makeflow_wrapper_docker.o makeflow_wrapper_enforcement.o makeflow_wrapper_umbrella.o makeflow_mounts.o makeflow_wrapper_singularity.o
+MAKEFLOW_WRAPPERS =  makeflow_wrapper_monitor.o makeflow_wrapper_docker.o makeflow_wrapper_enforcement.o makeflow_wrapper_umbrella.o makeflow_mounts.o
 MAKEFLOW_HOOKS = makeflow_hook_example.o
-MAKEFLOW_MODULES = makeflow_module_storage_allocation.o makeflow_module_fail_dir.o makeflow_module_sandbox.o
+MAKEFLOW_MODULES = makeflow_module_storage_allocation.o makeflow_module_fail_dir.o makeflow_module_sandbox.o makeflow_module_singularity.o
 
 TARGETS = $(PROGRAMS)
 

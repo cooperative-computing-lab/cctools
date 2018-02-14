@@ -378,9 +378,10 @@ struct batch_queue * makeflow_get_queue(struct dag_node *node);
  *    @param task The batch_task this file is added to.
  *    @param name_on_submission The pattern of the name from the submission/host site.
  *    @param name_on_execution The pattern of the name at execution site.
+ *    @param file_type The type of file used in wrapper, GLOBAL or TEMP. TEMP is cleaned after each node.
  *    @return The DAG file that was either found or created in the dag.
  *    */
-struct dag_file * makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern);
+struct dag_file * makeflow_hook_add_input_file(struct dag *d, struct batch_task *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type);
 
 /** Add file to batch_task and DAG.
  *  This function takes a pattern for name_on_submission and name_on_exectution,
@@ -390,9 +391,10 @@ struct dag_file * makeflow_hook_add_input_file(struct dag *d, struct batch_task 
  *    @param task The batch_task this file is added to.
  *    @param name_on_submission The pattern of the name from the submission/host site.
  *    @param name_on_execution The pattern of the name at execution site.
+ *    @param file_type The type of file used in wrapper, GLOBAL or TEMP. TEMP is cleaned after each node.
  *    @return The DAG file that was either found or created in the dag.
  *    */
-struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission_pattern, const char * name_on_execution_pattern);
+struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task *task, const char * name_on_submission, const char * name_on_execution, dag_file_type_t file_type);
 
 /** Add/Register makeflow_hook struct in list of hooks.
  Example of use see above.
