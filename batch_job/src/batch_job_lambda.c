@@ -22,7 +22,6 @@ from the bucket, and the job is done.
 Things that need to be fixed in this code:
 1 - Every input file is transferred for every job.  Instead, we should
 only transfer files if they do not exist. 
-2 - The function execution side is unable to download directories.
 */
 
 #include "batch_job_internal.h"
@@ -62,10 +61,6 @@ static struct lambda_config * lambda_config_load( const char *filename )
 	return c;
 }
 
-/*
-Upload a file/dir to the appropriate bucket.  This is a bit complicated b/c "s3 cp" only works on files, and "s3 sync" only works on directories, not files.
-*/
-
 static int upload_dir( struct lambda_config *config, const char *file_name)
 {
 	char *cmd = string_format("tar cvzf - %s | aws s3 cp - s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, path_basename(file_name));
@@ -94,22 +89,13 @@ static int isdir( const char *path )
 
 static int upload_item( struct lambda_config *config, const char *file_name )
 {
+	debug(D_BATCH,"uploading %s to S3...",file_name);
 	if(isdir(file_name)) {
 		return upload_dir(config,file_name);
 	} else {
 		return upload_file(config,file_name);
 	}
 }
-/*
-Download a file from the appropriate bucket. Amazingly, S3 does not provide a way to sense whether an object is a file or a directory, so we try "s3 cp" first and then "s3 sync" if it fails.
-
-Given that we are using a blocking --invocation-type of the Lambda
-function (we are, 'RequestResponse', as seen in invoke_function()),
-and that AWS S3 guarantees read-after-write consistency (it should,
-see http://docs.aws.amazon.com/AmazonS3/latest/dev/Introduction.html#ConsistencyModel),
-then we should not have to request a file more than once. Testing
-indicates this is the case.
- */
 
 static int download_file( struct lambda_config *config, const char *file_name )
 {
@@ -120,18 +106,32 @@ static int download_file( struct lambda_config *config, const char *file_name )
 	return r;
 }
 
-static int download_dir( struct lambda_config *config, const char *file_name )
-{
-	char *cmd = string_format("aws s3 sync s3://%s/%s/%s %s --quiet", config->bucket_name, config->bucket_folder, file_name, file_name);
-	debug(D_BATCH,"%s",cmd);
-	int r = system(cmd);
-	free(cmd);
-	return r;
-}
-
 static int download_item( struct lambda_config *config, const char *file_name )
 {
-	return download_file(config,file_name);
+	int result = 1;
+
+	debug(D_BATCH,"downloading %s from S3",file_name);
+
+	if(download_file(config,file_name)==0) {
+		result = 0;
+	} else {
+		char *tar_name = string_format("%s.tgz",file_name);
+		if(download_file(config,tar_name)==0) {
+			char *cmd = string_format("tar xvzf %s",tar_name);
+			debug(D_BATCH,"%s",cmd);
+			if(system(cmd)==0) {
+				result = 0;
+			} else {
+				debug(D_BATCH,"unable to un-tar %s!",tar_name);
+				result = 1;
+			}
+			unlink(tar_name);
+		} else {
+			debug(D_BATCH,"unable to download %s as file or directory",tar_name);
+		}
+		free(tar_name);
+	}
+	return result;
 }
 
 /*

@@ -160,7 +160,16 @@ def handler(event, context):
     for file in event["output_files"]:
         try:
             bucket_key = os.path.join(bucket_folder, file["outer_name"])
-            s3.Bucket(bucket_name).upload_file(file["inner_name"],bucket_key)
+
+            if os.path.isdir(file["inner_name"]):
+                bucket_key = bucket_key + ".tgz"
+                tgz = file["outer_name"] + ".tgz"
+                os.rename(file["inner_name"],file["outer_name"])
+                subprocess.call("tar cvzf " + tgz + " " + file["outer_name"],shell=True)
+                s3.Bucket(bucket_name).upload_file(tgz,bucket_key)
+                
+            else:
+                s3.Bucket(bucket_name).upload_file(file["inner_name"],bucket_key)
 
         except Exception as e:
             return "Couldn't upload {} to s3://{}/{} reason: {}".format(file["inner_name"],bucket_name,bucket_key,e)
