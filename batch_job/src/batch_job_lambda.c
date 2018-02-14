@@ -16,6 +16,15 @@ The generic lambda then pulls the input files from the bucket,
 runs the job as a sub-process, and then pushes the output files
 back to the bucket.  This module then pulls the output files down
 from the bucket, and the job is done.
+
+A wrinkle is that S3 doesn't treat directories as first class citizens.
+To avoid complications of simulating directories, we upload directory
+dependencies as tarballs.  For output paths -- which we don't know
+in advance if they are directories -- we attempt to download as a file
+first, and then look for file.tgz to represent a directory with the same name.
+
+Files are stored in S3 underneath their "outer" name, and are then
+downloaded to the function where they are stored with the "inner" name.
 */
 
 /*
@@ -168,7 +177,7 @@ char *payload_create(struct lambda_config *config, const char *cmdline, struct j
 /*
 Converts a list of files in the form of a string "a,b=c" into a JX array of the form:
 [
-{ "inner_name":"a", "outer_name":"a" },
+{ "inner_name":"a", "outer_name":"a", "type":"file" },
 { "inner_name":"b", "outer_name":"c", "type":"tgz" }
 ]
 */
