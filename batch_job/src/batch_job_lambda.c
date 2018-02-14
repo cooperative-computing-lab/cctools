@@ -7,10 +7,17 @@ See the file COPYING for details.
 /*
 Theory of operation:
 
-batch_job_lambda assumes that the caller has already set up
-an s3 bucket and a generic lambda function.  (This is done by
-makeflow_lambda_setup.)  To execute a batch job, this module
-uploads the input files to the bucket, then invokes the function,
+batch_job_lambda assumes that the a generic lambda function
+and an S3 bucket have been created by makeflow_lambda_setup,
+and the necessary info recorded to a config file, which is
+loaded here.
+
+Each run of a makeflow does in a distinct directory (makeflow_%d)
+within the bucket, which is not (yet) deleted at the end of
+a run.  The entire bucket is deleted by makeflow_lambda_cleanup.
+
+For each batch job, this module uploads the input files
+to the bucket, then invokes the generic lambda function,
 passing a "payload" JSON object which describes the job.
 The generic lambda then pulls the input files from the bucket,
 runs the job as a sub-process, and then pushes the output files
@@ -40,6 +47,10 @@ downloaded to the function where they are stored with the "inner" name.
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+
+/*
+Load the existing lambda configuration info from the given file name.
+*/
 
 struct lambda_config {
 	const char *bucket_name;
@@ -273,6 +284,13 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 	return nfailures;
 }
 
+/*
+Within a child process, invoke the lambda function itself,
+and then download the output files.  It would be better to
+download the outputs as part of wait(), but that information
+is not (currently) available within batch_job_lambda_wait().
+*/
+
 static int batch_job_lambda_subprocess( struct lambda_config *config, const char *cmdline, const char *input_file_string, const char *output_file_string )
 {
 	struct jx *input_files = filestring_to_jx(input_file_string);
@@ -289,6 +307,11 @@ static int batch_job_lambda_subprocess( struct lambda_config *config, const char
 
 	return status;
 }
+
+/*
+Submit a lambda job by uploading the input files, forking
+a child process, and invoking the subprocess function.
+*/
 
 static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_file_string, const char *output_file_string, struct jx *envlist, const struct rmsummary *resources)
 {
@@ -327,6 +350,12 @@ static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char 
 		return -1;
 	}
 }
+
+/*
+Wait for a completed lambda task by waiting for the
+containing subprocess.  Note that the process module is needed
+here to avoid accidentally reaping unrelated processes.
+*/
 
 static batch_job_id_t batch_job_lambda_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
 {
