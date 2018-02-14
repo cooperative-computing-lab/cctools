@@ -79,7 +79,7 @@ int makeflow_hook_register(struct makeflow_hook *hook) {
 		h = xxmalloc(sizeof(*h));
 		memcpy(h, hook, sizeof(*h));
 
-		list_push_tail(makeflow_hooks, h);
+		list_push_head(makeflow_hooks, h);
 	} else if(rc == MAKEFLOW_HOOK_FAILURE){
 		debug(D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
 	}
