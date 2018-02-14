@@ -1228,7 +1228,8 @@ static void show_help_run(const char *cmd)
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
 	printf(" --docker-tar=<tar file>        Load docker image from this tar file.\n");
-	printf(" --singularity=<image>          Run each task using this Singularity image.\n");
+	printf(" --singularity=<image>          Run each task using Singularity exec with image.\n");
+	printf(" --singularity-opt=<string      Pass singularity command line options.\n");
 	printf(" --umbrella-spec=<file>         Run each task using this Umbrella spec.\n");
 	printf(" --umbrella-binary=<file>       Path to Umbrella binary.\n");
 	printf(" --umbrella-log-prefix=<string> Umbrella log file prefix\n");
@@ -1385,6 +1386,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
 		LONG_OPT_SINGULARITY,
+		LONG_OPT_SINGULARITY_OPT,
 		LONG_OPT_SHARED_FS,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_READ_ONLY,
@@ -1479,6 +1481,7 @@ int main(int argc, char *argv[])
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+		{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
 		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
 		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
 		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
@@ -1762,6 +1765,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SINGULARITY:
 				makeflow_hook_register(&makeflow_hook_singularity);
 				jx_insert(hook_args, jx_string("singularity_container_image"), jx_string(optarg));
+				break;
+			case LONG_OPT_SINGULARITY_OPT:
+				jx_insert(hook_args, jx_string("singularity_container_options"), jx_string(optarg));
 				break;
 			case LONG_OPT_ALLOCATION_MODE:
 				if(!strcmp(optarg, "throughput")) {
