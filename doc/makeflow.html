@@ -383,7 +383,7 @@ For example, to specify that jobs should be submitted to the <tt>devel</tt> queu
 
 <p>
 Makeflow can be used with Apache Mesos. To run Makeflow with Mesos,
-give thebatch mode via <tt>-T mesos</tt> and pass the hostname and 
+give the batch mode via <tt>-T mesos</tt> and pass the hostname and 
 port number of Mesos master to Makeflow with the <tt>--mesos-master</tt> option.
 Since the Makeflow-Mesos Scheduler is based on Mesos Python2 API, the path to Mesos 
 Python2 library should be included in the <tt>$PATH</tt>, or one can specify a 
@@ -399,6 +399,27 @@ specified python library:</p>
 <code>makeflow -T mesos --mesos-master localhost:5050 
                --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages 
                example.makeflow ...
+</code>
+
+<a name=k8s><h3>Kubernetes</h3></a>
+
+<p>
+Makeflow can be run on <a href=https://kubernetes.io/>Kubernetes</a> cluster. 
+To run Makeflow with Kuberenetes, give the batch mode via <tt>-T k8s</tt> and 
+indicate the desired Docker image with the <tt>--k8s-image</tt> option.
+
+The Kubernetes mode is depend on kubectl, before starting Makeflow, make sure kubectl
+has been <a href=https://kubernetes.io/docs/tasks/tools/install-kubectl/>installed and correctly set up</a> 
+to access the desired Kubernetes cluster. 
+</p>
+
+<p>
+Following is an example of running Makeflow on a Kuberenetes cluster using
+centos image.
+</p>
+
+<code>
+    makeflow -T k8s --k8s-image "centos" example.makeflow
 </code>
 
 <a name=ec2><h3>Amazon Web Services</h3></a>

@@ -136,6 +136,14 @@ static int node_fail(struct dag_node *n, struct batch_task *task){
 					n->nodeid); 
 	}
 
+	list_first_item(task->input_files);
+	while((bf = list_next_item(task->input_files))) {
+		df = dag_file_lookup_or_create(n->d, bf->outer_name);
+		if(df->type == DAG_FILE_TYPE_TEMP) {
+			makeflow_module_clean_fail_file(n->d, n, makeflow_get_queue(n), df, prep_failed, 1);
+		}
+	}
+
 	/* Clean files created in node. Clean existing and expected and record deletion. */
 	list_first_item(task->output_files);
 	while((bf = list_next_item(task->output_files))) {

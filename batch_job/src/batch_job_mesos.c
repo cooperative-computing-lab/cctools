@@ -81,13 +81,28 @@ static void start_mesos_scheduler(struct batch_queue *q)
 	
 	    char *exe_py_path = string_format("%s/mf_mesos_scheduler", exe_dir_path);
 		char *ld_preload_str = NULL;
+		char *python_path = NULL;
 	
 		if(mesos_preload) {
 			ld_preload_str = string_format("LD_PRELOAD=%s", mesos_preload);
-		} 
-		char *envs[] = {ld_preload_str, NULL};
-	
-		char *mesos_python_path = xxstrdup(mesos_py_path);
+		}
+
+		if(mesos_py_path) {
+			char *mesos_python_path = xxstrdup(mesos_py_path);
+			python_path = string_format("PYTHONPATH=%s", mesos_python_path);
+		}	
+		
+		char *envs[3];
+		if(ld_preload_str && python_path) {
+			envs[0] = ld_preload_str;
+			envs[1] = python_path;
+		} else if(!ld_preload_str && python_path) {
+			envs[0] = python_path;
+		} else if(ld_preload_str && !python_path) {
+			envs[0] = ld_preload_str;
+		} else {
+			envs[0] = NULL;
+		}
 
 		const char *batch_log_name = q->logfile;  
 
@@ -105,9 +120,10 @@ static void start_mesos_scheduler(struct batch_queue *q)
 	   	}
 
 	    close(mesos_fd);
+		
 
 		execle("/usr/bin/python", "python", exe_py_path, mesos_cwd, 
-			mesos_master, mesos_python_path, (char *) 0, envs);
+			mesos_master, (char *) 0, envs);
 
 		exit(errno);
 
@@ -128,12 +144,10 @@ static batch_job_id_t batch_job_mesos_submit (struct batch_queue *q, const char 
 	// Get the path to mesos python site-packages
 	if (!is_mesos_py_path_known) {
 		mesos_py_path = batch_queue_get_option(q, "mesos-path");
-		if (mesos_py_path == NULL) {
-			fatal("Please specify the mesos python path by using --mesos-path");
-		} else {
+		if (mesos_py_path != NULL) {
 			debug(D_INFO, "Get mesos_path %s from command line\n", mesos_py_path);
-			is_mesos_py_path_known = 1;
 		}
+		is_mesos_py_path_known = 1;
 	}
 
 	// Get the mesos master address

@@ -28,6 +28,7 @@ SOURCES = \
 	batch_job_lambda.c \
 	batch_job_work_queue.c \
 	batch_job_mesos.c \
+	batch_job_k8s.c \
 	mesos_task.c
 
 PUBLIC_HEADERS = batch_job.h

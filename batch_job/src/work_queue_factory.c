@@ -112,6 +112,8 @@ struct batch_queue *queue = 0;
 //Environment variables to pass along in batch_job_submit
 struct jx *batch_env = NULL;
 
+//0 means the container image does not container work_queue_worker binary
+int k8s_worker_image = 0;
 /*
 In a signal handler, only a limited number of functions are safe to
 invoke, so we construct a string and emit it with a low-level write.
@@ -348,6 +350,9 @@ static int submit_worker( struct batch_queue *queue )
 		);
 	}
 	else {
+		if(k8s_worker_image) {
+			worker = "work_queue_worker";
+		} 
 		cmd = string_format(
 		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
 		worker,
@@ -368,8 +373,13 @@ static int submit_worker( struct batch_queue *queue )
 		free(cmd);
 		cmd = newcmd;
 	}
-
-	char *files=xxstrdup("");
+	
+	char *files = NULL;	
+	if(!k8s_worker_image) {
+		files = string_format("work_queue_worker");
+	} else {
+		files = xxstrdup("");
+	}
 
 	if(password_file) {
 		char *newfiles = string_format("%s,pwfile",files);
@@ -944,7 +954,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
-	printf(" %-30s Automatically size a worker to an available slot (Condor and Mesos).\n", "--autosize");
+	printf(" %-30s Automatically size a worker to an available slot (Condor, Mesos and Kubernetes).\n", "--autosize");
 	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
 	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
@@ -956,6 +966,8 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos)\n", "--mesos-master");
 	printf(" %-30s Specify path to mesos python library (for use with -T mesos)\n", "--mesos-path");
 	printf(" %-30s Specify the linking libraries for running mesos(for use with -T mesos)\n", "--mesos-preload");
+	printf(" %-30s Specify the container image for using Kubernetes(for use with -T k8s)\n", "--k8s-image");
+	printf(" %-30s Specify the container image that contains work_queue_worker availabe for using Kubernetes(for use with -T k8s)\n", "--k8s-worker-image");
 	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--worker-binary=<file>");
 	printf(" %-30s Will make best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS","--runos=<os_img>");
@@ -979,6 +991,8 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_MESOS_MASTER, 
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
+		LONG_OPT_K8S_IMAGE,
+		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
 		LONG_OPT_ENVIRONMENT_VARIABLE,
 		LONG_OPT_RUN_OS,
@@ -1019,6 +1033,8 @@ static const struct option long_options[] = {
 	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
+	{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMAGE},
+	{"k8s-worker-image", required_argument, 0, LONG_OPT_K8S_WORKER_IMAGE},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{0,0,0,0}
 };
@@ -1029,6 +1045,7 @@ int main(int argc, char *argv[])
 	char *mesos_master = NULL;
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+	char *k8s_image = NULL;
 
 	//Environment variable handling
 	char *ev = NULL;
@@ -1180,6 +1197,13 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_MESOS_PRELOAD:
 				mesos_preload = xxstrdup(optarg);
+				break;
+			case LONG_OPT_K8S_IMAGE:
+				k8s_image = xxstrdup(optarg);
+				break;
+			case LONG_OPT_K8S_WORKER_IMAGE:
+				k8s_image = xxstrdup(optarg);
+				k8s_worker_image = 1;
 				break;
 			case LONG_OPT_CATALOG:
 				catalog_host = xxstrdup(optarg);
@@ -1341,6 +1365,10 @@ int main(int argc, char *argv[])
 		batch_queue_set_option(queue, "mesos-master", mesos_master);
 		batch_queue_set_option(queue, "mesos-preload", mesos_preload);
 		batch_queue_set_logfile(queue, "work_queue_factory.mesoslog");
+	}
+	
+	if(batch_queue_type == BATCH_QUEUE_TYPE_K8S) {
+		batch_queue_set_option(queue, "k8s-image", k8s_image);
 	}
 
 	mainloop( queue );
