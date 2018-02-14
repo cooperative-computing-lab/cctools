@@ -130,6 +130,8 @@ static int node_submit(struct dag_node *n, struct batch_task *task){
 static int node_success(struct dag_node *n, struct batch_task *task){
 	struct dag_file *f = NULL;
 	cleaned_completed_node = 1;
+
+	debug(D_MAKEFLOW_HOOK, "Storage Alloc Hook node success\n");
 	
     if(makeflow_alloc_use_space(storage_allocation, n)){
 		makeflow_log_alloc_event(n->d, storage_allocation);

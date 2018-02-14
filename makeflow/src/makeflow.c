@@ -872,6 +872,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		}
 	} else {
 
+		debug(D_MAKEFLOW, "Node %d was successful.\n", n->nodeid);
+
 		/* Mark source files that have been used by this node */
 		list_first_item(task->input_files);
 		while((bf = list_next_item(task->input_files))) {

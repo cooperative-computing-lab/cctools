@@ -3,7 +3,7 @@ DISK=3
 
 .SIZE O 1
 O: 
-	dd if=/dev/zero of=O bs=1 count=1; sleep 1; ls -l | wc -l >> alloc.out
+	dd if=/dev/zero of=O bs=1 count=1
 
 .SIZE O_l 1
 

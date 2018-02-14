@@ -37,7 +37,7 @@ struct dag_file *makeflow_module_lookup_fail_dir(struct dag *d, struct batch_que
 		return f;
 	} else {
 		if (!batch_fs_stat(q, path, &buf)) {
-			debug(D_MAKEFLOW_RUN,
+			debug(D_MAKEFLOW_HOOK,
 					"skipping %s since it already exists",
 					path);
 			return NULL;
@@ -46,32 +46,34 @@ struct dag_file *makeflow_module_lookup_fail_dir(struct dag *d, struct batch_que
 	}
 }
 
-int makeflow_module_clean_fail_file(struct dag *d, struct dag_node *n, struct batch_queue *q, struct dag_file *f, int prep_failed, int silent) {
+int makeflow_module_move_fail_file(struct dag *d, struct dag_node *n, struct batch_queue *q, struct dag_file *f) {
 	assert(d);
 	assert(n);
 	assert(q);
 	assert(f);
 
-	if (prep_failed) goto CLEANUP;
-
-	char *failout = string_format(
-			FAIL_DIR "/%s", n->nodeid, f->filename);
+	char *failout = string_format( FAIL_DIR "/%s", n->nodeid, f->filename);
 	struct dag_file *o = makeflow_module_lookup_fail_dir(d, q, failout);
 	if (o) {
+		if(f->state == DAG_FILE_STATE_DELETE){
+			debug(D_MAKEFLOW_HOOK, "File %s has already been deleted by another hook",f->filename);
+			return MAKEFLOW_HOOK_SUCCESS;
+		}
+
 		if (batch_fs_rename(q, f->filename, o->filename) < 0) {
-			debug(D_MAKEFLOW_RUN, "Failed to rename %s -> %s: %s",
+			debug(D_MAKEFLOW_HOOK, "Failed to rename %s -> %s: %s",
 					f->filename, o->filename, strerror(errno));
 		} else {
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
-			debug(D_MAKEFLOW_RUN, "Renamed %s -> %s",
+			debug(D_MAKEFLOW_HOOK, "Renamed %s -> %s",
 					f->filename, o->filename);
+			return MAKEFLOW_HOOK_SUCCESS;
 		}
 	} else {
 		fprintf(stderr, "Skipping rename %s -> %s", f->filename, failout);
 	}
 	free(failout);
-CLEANUP:
-	return makeflow_clean_file(d, q, f);
+	return MAKEFLOW_HOOK_FAILURE;
 }
 
 int makeflow_module_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
@@ -110,20 +112,15 @@ static int node_success(struct dag_node *n, struct batch_task *task){
 	assert(n);
 	assert(q);
 
-	int rc = MAKEFLOW_HOOK_FAILURE;
+	int rc = MAKEFLOW_HOOK_SUCCESS;
 	char *faildir = string_format(FAIL_DIR, n->nodeid);
-	struct dag_file *f = makeflow_module_lookup_fail_dir(d, q, faildir);
-	if (!f) goto OUT;
-
-	if (makeflow_clean_file(n->d, q, f)) {
-		debug(D_MAKEFLOW_HOOK, "Unable to clean failed output");
-		goto OUT;
-	}
-
-	rc = MAKEFLOW_HOOK_SUCCESS;
-
-OUT:
+	struct dag_file *f = dag_file_from_name(d, faildir);
 	free(faildir);
+
+	if (f && makeflow_clean_file(n->d, q, f)) {
+		debug(D_MAKEFLOW_HOOK, "Unable to clean failed output");
+		rc = MAKEFLOW_HOOK_FAILURE;
+	}
 	return rc;
 }
 
@@ -134,25 +131,23 @@ static int node_fail(struct dag_node *n, struct batch_task *task){
 	if (prep_failed) { 
 		fprintf(stderr, "rule %d failed, cannot move outputs\n", 
 					n->nodeid); 
+		return MAKEFLOW_HOOK_FAILURE;
 	}
 
+	/* Move temp inputs(wrappers) of failed node. Mark deleted if successful rename. */
 	list_first_item(task->input_files);
 	while((bf = list_next_item(task->input_files))) {
 		df = dag_file_lookup_or_create(n->d, bf->outer_name);
 		if(df->type == DAG_FILE_TYPE_TEMP) {
-			makeflow_module_clean_fail_file(n->d, n, makeflow_get_queue(n), df, prep_failed, 1);
+			makeflow_module_move_fail_file(n->d, n, makeflow_get_queue(n), df);
 		}
 	}
 
-	/* Clean files created in node. Clean existing and expected and record deletion. */
+	/* Move all outputs of failed node. Mark deleted if successful rename. */
 	list_first_item(task->output_files);
 	while((bf = list_next_item(task->output_files))) {
 		df = dag_file_lookup_or_create(n->d, bf->outer_name);
-		if(df->state == DAG_FILE_STATE_EXPECT) {
-			makeflow_module_clean_fail_file(n->d, n, makeflow_get_queue(n), df, prep_failed, 1);
-		} else {
-			makeflow_module_clean_fail_file(n->d, n, makeflow_get_queue(n), df, prep_failed, 0);
-		}
+		makeflow_module_move_fail_file(n->d, n, makeflow_get_queue(n), df);
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;

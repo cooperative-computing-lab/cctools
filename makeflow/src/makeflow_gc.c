@@ -158,7 +158,6 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 		d->total_file_size -= f->actual_size;
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 		makeflow_hook_file_deleted(f);
-
 	} else if(errno != ENOENT) {
 		if(f->state == DAG_FILE_STATE_EXPECT || dag_file_should_exist(f))
 			makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
