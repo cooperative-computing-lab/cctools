@@ -144,9 +144,6 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static container_mode_t container_mode = CONTAINER_MODE_NONE;
-static char *container_image = NULL;
-
 static char *parrot_path = "./parrot_run";
 
 /*
@@ -2108,16 +2105,11 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
-	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR || container_mode==CONTAINER_MODE_DOCKER) ) {
+	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR)) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
 			fprintf(stderr,"error: The working directory is '%s'\n", cwd);
-			if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-				fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
-			}
-			if(container_mode==CONTAINER_MODE_DOCKER) {
-				fprintf(stderr,"This won't work because Docker cannot mount an AFS directory.\n");
-			}
+			fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
 			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.");
 			fprintf(stderr,"Or, use the Work Queue batch system with -T wq.\n");
 			free(cwd);

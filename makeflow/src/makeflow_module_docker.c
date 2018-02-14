@@ -4,18 +4,22 @@
  See the file COPYING for details.
  */
 
+#include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "batch_task.h"
+#include "batch_wrapper.h"
+#include "debug.h"
 #include "path.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
-#include "batch_wrapper.h"
 
 #include "dag.h"
 #include "dag_file.h"
 #include "makeflow_gc.h"
+#include "makeflow_log.h"
 #include "makeflow_hook.h"
 
 #define CONTAINER_DOCKER_SH "./docker.wrapper.sh_"
@@ -71,14 +75,14 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 
 	char *cmd = string_format("docker run --rm -m 1g -v $CUR_WORK_DIR:$DEFAULT_DIR -w $DEFAULT_DIR %s %s", docker_image, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
-	free(cmd)
+	free(cmd);
 
-	cmd = batch_wrapper_write(wrapper, task);
+	cmd = batch_wrapper_write(wrapper, t);
 	if(cmd){
-		batch_task_set_command(task, cmd);
-		struct dag_file *df = makeflow_hook_add_input_file(node->d, task, cmd, cmd);
+		batch_task_set_command(t, cmd);
+		struct dag_file *df = makeflow_hook_add_input_file(n->d, t, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
-		makeflow_log_file_state_change(node->d, df, DAG_FILE_STATE_EXISTS);
+		makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);
 	} else {
 		debug(D_MAKEFLOW_HOOK, "Failed to create wrapper: errno %d, %s", errno, strerror(errno));
 		return MAKEFLOW_HOOK_FAILURE;
