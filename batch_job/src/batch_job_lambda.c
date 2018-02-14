@@ -63,7 +63,7 @@ static struct lambda_config * lambda_config_load( const char *filename )
 
 static int upload_dir( struct lambda_config *config, const char *file_name)
 {
-	char *cmd = string_format("tar cvzf - %s | aws s3 cp - s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, path_basename(file_name));
+	char *cmd = string_format("tar czf - %s | aws s3 cp - s3://%s/%s/%s --quiet", file_name, config->bucket_name, config->bucket_folder, path_basename(file_name));
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -117,7 +117,7 @@ static int download_item( struct lambda_config *config, const char *file_name )
 	} else {
 		char *tar_name = string_format("%s.tgz",file_name);
 		if(download_file(config,tar_name)==0) {
-			char *cmd = string_format("tar xvzf %s",tar_name);
+			char *cmd = string_format("tar xzf %s",tar_name);
 			debug(D_BATCH,"%s",cmd);
 			if(system(cmd)==0) {
 				result = 0;
