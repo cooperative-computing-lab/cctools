@@ -206,6 +206,9 @@ static struct jx *jx_eval_call(
 		case JX_BUILTIN_JOIN: return jx_function_join(args);
 		case JX_BUILTIN_CEIL: return jx_function_ceil(args);
 		case JX_BUILTIN_FLOOR: return jx_function_floor(args);
+		case JX_BUILTIN_BASENAME: return jx_function_basename(args);
+		case JX_BUILTIN_DIRNAME: return jx_function_dirname(args);
+		case JX_BUILTIN_ESCAPE: return jx_function_escape(args);
 		case JX_BUILTIN_LAMBDA: {
 			assert(func->u.func.params);
 
@@ -607,6 +610,9 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	jx_eval_add_builtin(context, "join", JX_BUILTIN_JOIN);
 	jx_eval_add_builtin(context, "ceil", JX_BUILTIN_CEIL);
 	jx_eval_add_builtin(context, "floor", JX_BUILTIN_FLOOR);
+	jx_eval_add_builtin(context, "basename", JX_BUILTIN_BASENAME);
+	jx_eval_add_builtin(context, "dirname", JX_BUILTIN_DIRNAME);
+	jx_eval_add_builtin(context, "escape", JX_BUILTIN_ESCAPE);
 
 	switch(j->type) {
 		case JX_SYMBOL: {
