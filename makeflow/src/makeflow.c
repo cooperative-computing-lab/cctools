@@ -1218,6 +1218,7 @@ static void show_help_run(const char *cmd)
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config             Amazon config file from makeflow_ec2_setup.\n");
+    printf("    --amazon-ami                Specify amazon-ami (for use with -T amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
@@ -1281,6 +1282,8 @@ int main(int argc, char *argv[])
 	const char *work_queue_port_file = NULL;
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
+	const char *amazon_ami = NULL;
+	const char *amazon_batch_cfg = NULL;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
 	char *wq_wait_queue_size = 0;
@@ -1313,6 +1316,7 @@ int main(int argc, char *argv[])
 
 	random_init();
 	debug_config(argv[0]);
+	debug_config_file_size(string_metric_parse("0"));//to set debug file size to "don't delete anything"
 
 	s = getenv("MAKEFLOW_BATCH_QUEUE_TYPE");
 	if(s) {
@@ -1373,6 +1377,10 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
+		LONG_OPT_AMAZON_CREDENTIALS,
+		LONG_OPT_AMAZON_AMI,
+		LONG_OPT_AMAZON_BATCH_IMG,
+		LONG_OPT_AMAZON_BATCH_CFG,
 		LONG_OPT_JSON,
 		LONG_OPT_JX,
 		LONG_OPT_JX_ARGS,
@@ -1473,6 +1481,8 @@ int main(int argc, char *argv[])
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
+		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
+		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
 		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
@@ -1629,6 +1639,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_AMAZON_CONFIG:
 				amazon_config = xxstrdup(optarg);
+				break;
+			case LONG_OPT_AMAZON_BATCH_CFG:
+				amazon_batch_cfg = xxstrdup(optarg);
 				break;
 			case 'M':
 			case 'N':
@@ -1856,6 +1869,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SANDBOX:
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
+			case LONG_OPT_AMAZON_AMI:
+				amazon_ami = xxstrdup(optarg);
+				break;
 		}
 	}
 
@@ -2041,6 +2057,8 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-config", amazon_config);
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
+	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
+	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);

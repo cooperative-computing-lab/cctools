@@ -1316,10 +1316,10 @@ int main(int argc, char *argv[])
 	
 	
 	if(runos_os) {
-		cmd = string_format("cp \"$(which vc3-builder)\" '%s'", scratch_dir);
+		cmd = string_format("cp '/afs/crc.nd.edu/group/ccl/software/vc3-builder' '%s'", scratch_dir);
 		int k = system(cmd);
 		if (k) {
-			fprintf(stderr, "can't copy vc3-builder! Please make sure it's in your path. Error code: %i\n", k);
+			fprintf(stderr, "can't copy vc3-builder! Please make sure it is at location `/afs/crc.nd.edu/group/ccl/software/vc3-builder`. Error code: %i\n", k);
 			exit(EXIT_FAILURE);
 		}
 	}
