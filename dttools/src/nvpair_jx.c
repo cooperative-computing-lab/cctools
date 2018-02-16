@@ -95,7 +95,7 @@ struct jx * nvpair_to_jx( struct nvpair *nv )
 	return object;
 }
 
-struct jx * nvpair_load_jx( const char *path )
+struct jx * jx_parse_nvpair_file( const char *path )
 {
 	struct jx *j = 0;
 

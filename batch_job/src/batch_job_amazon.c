@@ -45,7 +45,7 @@ struct aws_config {
 
 static struct aws_config * aws_config_load( const char *filename )
 {
-	struct jx * j = nvpair_load_jx(filename);
+	struct jx * j = jx_parse_nvpair_file(filename);
 	if(!j) fatal("%s isn't a valid config file\n",filename);
 
 	struct aws_config *c = malloc(sizeof(*c));

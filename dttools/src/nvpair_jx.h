@@ -15,6 +15,6 @@ the latter.
 
 struct nvpair * jx_to_nvpair( struct jx *j );
 struct jx * nvpair_to_jx( struct nvpair *nv );
-struct jx * nvpair_load_jx( const char *path );
+struct jx * jx_parse_nvpair_file( const char *path );
 
 #endif

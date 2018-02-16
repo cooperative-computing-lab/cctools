@@ -61,7 +61,7 @@ struct lambda_config {
 
 static struct lambda_config * lambda_config_load( const char *filename )
 {
-	struct jx * j = nvpair_load_jx(filename);
+	struct jx * j = jx_parse_nvpair_file(filename);
 	if(!j) fatal("%s isn't a valid config file\n",filename);
 
 	struct lambda_config *c = malloc(sizeof(*c));
