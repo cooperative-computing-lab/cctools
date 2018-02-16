@@ -16,7 +16,7 @@ fi
 
 fetch_field()
 {
-	python -c "import json; print json.load(open('$CONFIG_FILE','r'))['$1'];"
+	grep $1 $CONFIG_FILE | cut -d " " -f 2
 }
 
 echo "Parsing $CONFIG_FILE..."

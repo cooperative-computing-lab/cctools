@@ -42,6 +42,7 @@ downloaded to the function where they are stored with the "inner" name.
 #include "path.h"
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "nvpair_jx.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -60,8 +61,8 @@ struct lambda_config {
 
 static struct lambda_config * lambda_config_load( const char *filename )
 {
-	struct jx * j = jx_parse_file(filename);
-	if(!j) fatal("%s isn't a valid json file\n",filename);
+	struct jx * j = nvpair_load_jx(filename);
+	if(!j) fatal("%s isn't a valid config file\n",filename);
 
 	struct lambda_config *c = malloc(sizeof(*c));
 

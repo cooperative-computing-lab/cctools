@@ -95,4 +95,21 @@ struct jx * nvpair_to_jx( struct nvpair *nv )
 	return object;
 }
 
+struct jx * nvpair_load_jx( const char *path )
+{
+	struct jx *j = 0;
+
+	FILE * file = fopen(path,"r");
+	if(file) {
+		struct nvpair *nv = nvpair_create();
+		if(nv) {
+			nvpair_parse_stream(nv,file);
+			j = nvpair_to_jx(nv);
+			nvpair_delete(nv);
+		}
+		fclose(file);
+	}
+
+	return j;
+}
 

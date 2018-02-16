@@ -215,8 +215,13 @@ else
 fi
 
 echo -n "Creating $CONFIG_FILE..."
-
-printf '{"%s":"%s","%s":"%s","%s":"%s","%s":"%s","%s":"%s"}\n' "role_name" "$ROLE_NAME" "bucket_name" "$BUCKET_NAME" "function_name" "$FUNCTION_NAME" "s3_role_policy_arn" "$S3_ROLE_POLICY_ARN" "lambda_role_policy_arn" "$LAMBDA_ROLE_POLICY_ARN" > "$CONFIG_FILE"
+cat > $CONFIG_FILE <<EOF
+role_name $ROLE_NAME
+bucket_name $BUCKET_NAME
+function_name $FUNCTION_NAME
+s3_role_policy_arn $S3_ROLE_POLICY_ARN
+lambda_role_policy_arn $LAMBDA_ROLE_POLICY_ARN
+EOF
 
 echo "ok"
 
