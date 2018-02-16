@@ -22,7 +22,7 @@
 
 static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct batch_task *task){
 	struct batch_wrapper *wrapper = batch_wrapper_create();
-	char *wrap_name = string_format("task_%d_sandbox", task->taskid);
+	char *wrap_name = string_format("./task_%d_sandbox", task->taskid);
 	batch_wrapper_prefix(wrapper, wrap_name);
 
 	/* Save the directory we were originally working in. */
@@ -37,8 +37,11 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 	struct batch_file *f;
 	list_first_item(task->input_files);
 	while((f = list_next_item(task->input_files))){
+		/* Skip if absolute path. */
+		if(f->inner_name[0] == '/') continue;
+
 		/* Add a cp for each file. Not linking as wq may already have done this. Not moving as it may be local. */
-		cmd = string_format("cp %s $SANDBOX/%s", f->inner_name, f->inner_name);
+		cmd = string_format("mkdir -p $(dirname $SANDBOX/%s) && cp %s $SANDBOX/%s", f->inner_name, f->inner_name, f->inner_name);
 		batch_wrapper_pre(wrapper, cmd);
 		free(cmd);
 	}
@@ -53,9 +56,12 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 
 	list_first_item(task->output_files);
 	while((f = list_next_item(task->output_files))){
+		/* Skip if absolute path. */
+		if(f->inner_name[0] == '/') continue;
+
 		/* Copy out results to expected location. OR TRUE so that lack of one file does not
            prevent other files from being sent back.*/
-		cmd = string_format("cp $SANDBOX/%s %s || true", f->inner_name, f->inner_name);
+		cmd = string_format("mkdir -p $(dirname %s) && cp $SANDBOX/%s %s || true", f->inner_name, f->inner_name, f->inner_name);
 		batch_wrapper_post(wrapper, cmd);
 		free(cmd);
 	}
@@ -66,7 +72,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 	cmd = batch_wrapper_write(wrapper, task);
 	if(cmd){
 		batch_task_set_command(task, cmd);
-		struct dag_file *df = makeflow_hook_add_input_file(node->d, task, cmd, cmd);
+		struct dag_file *df = makeflow_hook_add_input_file(node->d, task, cmd, cmd, DAG_FILE_TYPE_TEMP);
 		debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
 		makeflow_log_file_state_change(node->d, df, DAG_FILE_STATE_EXISTS);
 	} else {

@@ -397,15 +397,6 @@ void pfs_table::follow_symlink( struct pfs_name *pname, mode_t mode, int depth )
 	struct pfs_name new_pname = *pname;
 	int in_proc = false;
 
-	if (string_match_regex(pname->path, "^/proc/self(/|$)")) {
-		/*
-		 * We need to handle /proc/self in resolve_name, and eagerly following it here would
-		 * give Parrot's PID. Return for now, and let resolve name call us again after it
-		 * rewrites the path to /proc/[pid]/.
-		 */
-		return;
-	}
-
 	if (string_prefix_is(pname->path, "/proc/")) in_proc = true;
 
 	int rlres = new_pname.service->readlink(pname,link_target,PFS_PATH_MAX-1);
@@ -564,11 +555,6 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			pname->is_local = 0;
 		}
 
-		/* Enable cross service symlink resolution */
-		if (do_follow_symlink && pfs_follow_symlinks) {
-			follow_symlink(pname, mode, depth + 1);
-		}
-
 		if(pattern_match(pname->path, "^/proc/self/?()", &n) >= 0) {
 			strncpy(full_logical_name, pname->path, sizeof(full_logical_name));
 			snprintf(pname->path, sizeof(pname->path), "/proc/%d/%s", pfs_process_getpid(), &full_logical_name[n]);
@@ -591,7 +577,7 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			pname->is_local = 1;
 		}
 
-		/* Follow again in case we replaced /proc/self */
+		/* Enable cross service symlink resolution */
 		if (do_follow_symlink && pfs_follow_symlinks) {
 			follow_symlink(pname, mode, depth + 1);
 		}

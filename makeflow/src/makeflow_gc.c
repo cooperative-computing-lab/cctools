@@ -148,7 +148,7 @@ void makeflow_parse_input_outputs( struct dag *d )
 
 int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_file *f)
 {
-	if(!f)
+	if(!f || f->type == DAG_FILE_TYPE_GLOBAL)
 		return 1;
 
 	makeflow_hook_file_clean(f);

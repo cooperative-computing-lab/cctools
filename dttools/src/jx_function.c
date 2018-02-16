@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <libgen.h>
 
 #include "jx.h"
 #include "jx_match.h"
@@ -320,3 +321,92 @@ struct jx *jx_function_floor(struct jx *orig_args) {
 }
 
 
+struct jx *jx_function_basename(struct jx *args) {
+	assert(args);
+	const char *funcname = "basename";
+	const char *err = NULL;
+
+	struct jx *result = NULL;
+
+	int length = jx_array_length(args);
+	if (length != 1){
+		err = "basename takes one argument";
+		goto FAILURE;
+	}
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) {
+		err = "basename takes a string";
+		goto FAILURE;
+	}
+	char *val = xxstrdup(a->u.string_value);
+	result = jx_string(basename(val));
+	free(val);
+
+	return result;
+
+	FAILURE:
+	FAIL(funcname, JX_BUILTIN_BASENAME, args, err);
+}
+
+struct jx *jx_function_dirname(struct jx *args) {
+	assert(args);
+	const char *funcname = "dirname";
+	const char *err = NULL;
+
+	struct jx *result = NULL;
+
+	int length = jx_array_length(args);
+	if (length != 1){
+		err = "dirname takes one argument";
+		goto FAILURE;
+	}
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) {
+		err = "dirname takes a string";
+		goto FAILURE;
+	}
+	char *val = xxstrdup(a->u.string_value);
+	result = jx_string(dirname(val));
+	free(val);
+
+	return result;
+
+	FAILURE:
+	FAIL(funcname, JX_BUILTIN_DIRNAME, args, err);
+}
+
+struct jx *jx_function_escape(struct jx *args) {
+	assert(args);
+	const char *funcname = "escape";
+	const char *err = NULL;
+
+	struct jx *result = NULL;
+
+	int length = jx_array_length(args);
+	if (length != 1){
+		err = "escape takes one argument";
+		goto FAILURE;
+	}
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) {
+		err = "escape takes a string";
+		goto FAILURE;
+	}
+	char *val = string_escape_shell(a->u.string_value);
+	result = jx_string(val);
+	free(val);
+
+	return result;
+
+	FAILURE:
+	FAIL(funcname, JX_BUILTIN_ESCAPE, args, err);
+}

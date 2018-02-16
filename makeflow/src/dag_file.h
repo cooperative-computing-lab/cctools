@@ -28,14 +28,18 @@ typedef enum {
 
 
 typedef enum {
+	/* File types are specific to DAG files. */
 	DAG_FILE_TYPE_INPUT,       /* File has no rule that creates it or is specified as input.
                                   No input files are cleaned in garbage collection */
 	DAG_FILE_TYPE_OUTPUT,      /* If outputs are specified with MAKEFLOW_OUTPUTS then the specified
                                   files are this category, otherwise all sink files are included.
                                   No output files are cleaned in garbage collection */
 	DAG_FILE_TYPE_INTERMEDIATE,/* Files that are created and used in DAG, but can be deleted */
-	DAG_FILE_TYPE_TEMP         /* File created for node that should be removed after completion.
+	/* File types that are specific to hook/wrapper. */
+	DAG_FILE_TYPE_TEMP,        /* File created for node that should be removed after completion.
                                   If node fails, should be moved to fail dir. */
+	DAG_FILE_TYPE_GLOBAL       /* File that exists prior to DAG. Is not logged otherwise future
+                                  invocations of Makeflow will clean it. */
 } dag_file_type_t;
 
 /* the type of a dependency specified in the mountfile */
