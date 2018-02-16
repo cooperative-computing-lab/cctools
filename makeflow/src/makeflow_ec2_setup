@@ -81,16 +81,14 @@ chmod 600 $KEYPAIR_NAME.pem
 echo "Creating $configFile with all the details..."
 
 cat > $configFile <<EOF
-{
-"vpc" : "$VPC",
-"subnet" : "$SUBNET",
-"gateway" : "$GATEWAY",
-"route_table" : "$ROUTE_TABLE",
-"security_group_id" : "$SECURITY_GROUP",
-"security_group_name" : "$SECURITY_GROUP_NAME",
-"keypair_name" : "$KEYPAIR_NAME",
-"ami" : "$imageName",
-}
+vpc $VPC
+subnet $SUBNET
+gateway $GATEWAY
+route_table $ROUTE_TABLE
+security_group_id $SECURITY_GROUP
+security_group_name $SECURITY_GROUP_NAME
+keypair_name $KEYPAIR_NAME
+ami $imageName
 EOF
 
 echo "Done!"
