@@ -44,7 +44,6 @@ See the file COPYING for details.
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
-#include "makeflow_wrapper_monitor.h"
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
 #include "makeflow_wrapper_enforcement.h"
@@ -163,7 +162,6 @@ once weaver/pbui tools are updated.)
 static int log_verbose_mode = 0;
 
 static struct makeflow_wrapper *wrapper = 0;
-static struct makeflow_monitor *monitor = 0;
 static struct makeflow_wrapper *enforcer = 0;
 static struct makeflow_wrapper_umbrella *umbrella = 0;
 
@@ -200,7 +198,6 @@ void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
 	if(wrapper)  makeflow_wrapper_generate_files(task, wrapper->input_files, wrapper->output_files, n, wrapper);
 	if(enforcer) makeflow_wrapper_generate_files(task, enforcer->input_files, enforcer->output_files, n, enforcer);
 	if(umbrella) makeflow_wrapper_generate_files(task, umbrella->wrapper->input_files, umbrella->wrapper->output_files, n, umbrella->wrapper);
-	if(monitor)  makeflow_wrapper_generate_files(task, monitor->wrapper->input_files, monitor->wrapper->output_files, n, monitor->wrapper);
 }
 
 /*
@@ -218,7 +215,6 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 	makeflow_wrap_wrapper(task, n, wrapper);
 	makeflow_wrap_enforcer(task, n, enforcer);
 	makeflow_wrap_umbrella(task, n, umbrella, queue);
-	makeflow_wrap_monitor(task, n, queue, monitor);
 }
 
 /*
@@ -726,7 +722,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	struct batch_file *bf;
 	struct dag_file *f;
 	int job_failed = 0;
-	int monitor_retried = 0;
 
 	/* As integration moves forward batch_task will also be passed. */
 	/* This is intended for changes to the batch_task that need no
@@ -742,39 +737,11 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 	makeflow_hook_node_end(n, task);
 
-	if(monitor) {
-		char *nodeid = string_format("%d",n->nodeid);
-		char *output_prefix = NULL;
- 		if(batch_queue_supports_feature(queue, "output_directories") || n->local_job) {
-			output_prefix = xxstrdup(monitor->log_prefix);
-		} else {
-			output_prefix = xxstrdup(path_basename(monitor->log_prefix));
-		}
-		char *log_name_prefix = string_replace_percents(output_prefix, nodeid);
-		char *summary_name = string_format("%s.summary", log_name_prefix);
-
-		if(n->resources_measured)
-			rmsummary_delete(n->resources_measured);
-		n->resources_measured = rmsummary_parse_file_single(summary_name);
-
-		category_accumulate_summary(n->category, n->resources_measured, NULL);
-
-		makeflow_monitor_move_output_if_needed(n, queue, monitor);
-
-		free(nodeid);
-		free(log_name_prefix);
-		free(summary_name);
-	}
-
-	if(task->info->disk_allocation_exhausted) {
-		job_failed = 1;
-	}
-	else if(task->info->exited_normally && task->info->exit_code == 0) {
+	if (task->info->exited_normally && task->info->exit_code == 0) {
 		list_first_item(n->task->output_files);
-		while((bf = list_next_item(n->task->output_files))) {
+		while ((bf = list_next_item(n->task->output_files))) {
 			f = dag_file_lookup_or_create(d, bf->outer_name);
-			if(!makeflow_node_check_file_was_created(d, n, f))
-			{
+			if (!makeflow_node_check_file_was_created(d, n, f)) {
 				job_failed = 1;
 			}
 		}
@@ -823,44 +790,17 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				n->resource_request = next;
 				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
 				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-				if(monitor) { monitor_retried = 1; }
 			}
 		}
 
-		if(monitor && task->info->exit_code == RM_OVERFLOW)
-		{
-			debug(D_MAKEFLOW_RUN, "rule %d failed because it exceeded the resources limits.\n", n->nodeid);
-			if(n->resources_measured && n->resources_measured->limits_exceeded)
-			{
-				char *str = rmsummary_print_string(n->resources_measured->limits_exceeded, 1);
-				debug(D_MAKEFLOW_RUN, "%s", str);
-				free(str);
-			}
-
-			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
-
-			if(next != CATEGORY_ALLOCATION_ERROR) {
-				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
-				n->resource_request = next;
-				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-				monitor_retried = 1;
-			}
-		}
-
-		if(!monitor_retried) {
-			if(!hook_success || makeflow_retry_flag || task->info->exit_code == 101) {
-				n->failure_count++;
-				if(n->failure_count > makeflow_retry_max) {
-					notice(D_MAKEFLOW_RUN, "job %s failed too many times.", n->command);
-					makeflow_failed_flag = 1;
-				} else {
-					notice(D_MAKEFLOW_RUN, "will retry failed job %s", n->command);
-					makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-				}
-			}
-			else
-			{
+		if (!hook_success || makeflow_retry_flag || task->info->exit_code == 101) {
+			n->failure_count++;
+			if (n->failure_count > makeflow_retry_max) {
+				notice(D_MAKEFLOW_RUN, "job %s failed too many times.", n->command);
 				makeflow_failed_flag = 1;
+			} else {
+				notice(D_MAKEFLOW_RUN, "will retry failed job %s", n->command);
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 			}
 		}
 		else
@@ -1291,8 +1231,6 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
-	char *log_dir = NULL;
-	char *log_format = NULL;
 	char *archive_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	shared_fs_list = list_create();
@@ -1309,6 +1247,8 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
 	int save_failure = 1;
+	extern struct makeflow_hook makeflow_hook_loop_device;
+	extern struct makeflow_hook makeflow_hook_resource_monitor;
 	extern struct makeflow_hook makeflow_hook_sandbox;
 	extern struct makeflow_hook makeflow_hook_singularity;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
@@ -1400,9 +1340,11 @@ int main(int argc, char *argv[])
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
-		LONG_OPT_K8S_IMG
+		LONG_OPT_K8S_IMG,
+		LONG_OPT_LOOP_DEVICE,
 	};
 
+<<<<<<< HEAD
 	static const struct option long_options_run[] = {
 		{"advertise", no_argument, 0, 'a'},
 		{"allocation", required_argument, 0, LONG_OPT_ALLOCATION_MODE},
@@ -1499,6 +1441,99 @@ int main(int argc, char *argv[])
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{0, 0, 0, 0}
 	};
+=======
+	static const struct option long_options_run[] = {{"advertise", no_argument, 0, 'a'},
+			{"allocation", required_argument, 0, LONG_OPT_ALLOCATION_MODE},
+			{"auth", required_argument, 0, LONG_OPT_AUTH},
+			{"batch-log", required_argument, 0, 'L'},
+			{"batch-options", required_argument, 0, 'B'},
+			{"batch-type", required_argument, 0, 'T'},
+			{"cache", required_argument, 0, LONG_OPT_CACHE},
+			{"catalog-server", required_argument, 0, 'C'},
+			{"clean", optional_argument, 0, 'c'},
+			{"debug", required_argument, 0, 'd'},
+			{"debug-file", required_argument, 0, 'o'},
+			{"debug-rotate-max", required_argument, 0, LONG_OPT_DEBUG_ROTATE_MAX},
+			{"disable-afs-check", no_argument, 0, 'A'},
+			{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
+			{"email", required_argument, 0, 'm'},
+			{"enable_hook_example", no_argument, 0, LONG_OPT_HOOK_EXAMPLE},
+			{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
+			{"gc", required_argument, 0, 'g'},
+			{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
+			{"gc-count", required_argument, 0, 'G'},
+			{"help", no_argument, 0, 'h'},
+			{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
+			{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
+			{"local-disk", required_argument, 0, LONG_OPT_LOCAL_DISK},
+			{"makeflow-log", required_argument, 0, 'l'},
+			{"max-local", required_argument, 0, 'j'},
+			{"max-remote", required_argument, 0, 'J'},
+			{"monitor", required_argument, 0, LONG_OPT_MONITOR},
+			{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
+			{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
+			{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
+			{"monitor-with-time-series", no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
+			{"mounts", required_argument, 0, LONG_OPT_MOUNTS},
+			{"password", required_argument, 0, LONG_OPT_PASSWORD},
+			{"port", required_argument, 0, 'p'},
+			{"port-file", required_argument, 0, 'Z'},
+			{"priority", required_argument, 0, 'P'},
+			{"project-name", required_argument, 0, 'N'},
+			{"retry", no_argument, 0, 'R'},
+			{"retry-count", required_argument, 0, 'r'},
+			{"do-not-save-failed-output", no_argument, 0, LONG_OPT_FAIL_DIR},
+			{"sandbox", no_argument, 0, LONG_OPT_SANDBOX},
+			{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
+			{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
+			{"show-output", no_argument, 0, 'O'},
+			{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
+			{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
+			{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
+			{"submission-timeout", required_argument, 0, 'S'},
+			{"summary-log", required_argument, 0, 'f'},
+			{"tickets", required_argument, 0, LONG_OPT_TICKETS},
+			{"version", no_argument, 0, 'v'},
+			{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
+			{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
+			{"skip-file-check", no_argument, 0, LONG_OPT_SKIP_FILE_CHECK},
+			{"umbrella-binary", required_argument, 0, LONG_OPT_UMBRELLA_BINARY},
+			{"umbrella-log-prefix", required_argument, 0, LONG_OPT_UMBRELLA_LOG_PREFIX},
+			{"umbrella-mode", required_argument, 0, LONG_OPT_UMBRELLA_MODE},
+			{"umbrella-spec", required_argument, 0, LONG_OPT_UMBRELLA_SPEC},
+			{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
+			{"wq-estimate-capacity", no_argument, 0, 'E'},
+			{"wq-fast-abort", required_argument, 0, 'F'},
+			{"wq-keepalive-interval", required_argument, 0, 'u'},
+			{"wq-keepalive-timeout", required_argument, 0, 't'},
+			{"wq-schedule", required_argument, 0, 'W'},
+			{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS},
+			{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
+			{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
+			{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
+			{"zero-length-error", no_argument, 0, 'z'},
+			{"change-directory", required_argument, 0, 'X'},
+			{"docker", required_argument, 0, LONG_OPT_DOCKER},
+			{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
+			{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
+			{"json", no_argument, 0, LONG_OPT_JSON},
+			{"jx", no_argument, 0, LONG_OPT_JX},
+			{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
+			{"jx-args", required_argument, 0, LONG_OPT_JX_ARGS},
+			{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
+			{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
+			{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
+			{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
+			{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
+			{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
+			{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
+			{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
+			{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
+			{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
+			{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
+			{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
+			{"device-alloce", required_argument, 0, LONG_OPT_LOOP_DEVICE},
+			{0, 0, 0, 0}};
 
 	static const char option_string_run[] = "aAB:c::C:d:Ef:F:g:G:hj:J:l:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 
@@ -1608,26 +1643,24 @@ int main(int argc, char *argv[])
 				explicit_local_disk = atoi(optarg);
 				break;
 			case LONG_OPT_MONITOR:
-				if (!monitor) monitor = makeflow_monitor_create();
-				if(log_dir) free(log_dir);
-				log_dir = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_log_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_MONITOR_INTERVAL:
-				if (!monitor) monitor = makeflow_monitor_create();
-				monitor->interval = atoi(optarg);
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_interval"), jx_integer(atoi(optarg)));
 				break;
 			case LONG_OPT_MONITOR_TIME_SERIES:
-				if (!monitor) monitor = makeflow_monitor_create();
-				monitor->enable_time_series = 1;
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_enable_time_series"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_OPENED_FILES:
-				if (!monitor) monitor = makeflow_monitor_create();
-				monitor->enable_list_files = 1;
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_enable_list_files"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_LOG_NAME:
-				if (!monitor) monitor = makeflow_monitor_create();
-				if(log_format) free(log_format);
-				log_format = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_log_format"), jx_string(optarg));
 				break;
 			case LONG_OPT_CACHE:
 				mount_cache = xxstrdup(optarg);
@@ -1868,6 +1901,7 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SANDBOX:
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
+<<<<<<< HEAD
 			case LONG_OPT_ARGV: {
 				debug(D_MAKEFLOW, "loading argv from %s", optarg);
 				struct jx *j = jx_parse_file(optarg);
@@ -1891,6 +1925,9 @@ int main(int argc, char *argv[])
 				jx_delete(j);
 				break;
 			}
+			case LONG_OPT_LOOP_DEVICE:
+				makeflow_hook_register(&makeflow_hook_loop_device);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -2214,21 +2251,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if(monitor) {
-		if(!log_dir)
-			fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
-
-		if(!log_format)
-			log_format = xxstrdup(DEFAULT_MONITOR_LOG_FORMAT);
-
-		if(monitor->interval < 1)
-			fatal("Monitoring interval should be positive.");
-
-		makeflow_prepare_for_monitoring(d, monitor, remote_queue, log_dir, log_format);
-		free(log_dir);
-		free(log_format);
-	}
-
 	struct dag_file *f = dag_file_lookup_or_create(d, batchlogfilename);
 	makeflow_log_file_state_change(d, f, DAG_FILE_STATE_EXPECT);
 
@@ -2313,10 +2335,6 @@ EXIT_WITH_FAILURE:
 
 	if(wrapper){
 		makeflow_wrapper_delete(wrapper);
-	}
-
-	if(monitor){
-		makeflow_monitor_delete(monitor);
 	}
 
 	int exit_value;
