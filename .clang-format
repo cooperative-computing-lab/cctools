@@ -7,3 +7,4 @@ AlignAfterOpenBracket: DontAlign
 BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
+BreakStringLiterals: false
