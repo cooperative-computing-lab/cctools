@@ -1,0 +1,230 @@
+#!/bin/sh
+
+SCRIPT_NAME="$0"
+CONFIG_FILE=$1
+
+UUID="$(uuidgen)"
+
+ROLE_NAME="makeflow-role-$UUID"
+BUCKET_NAME="makeflow-bucket-$UUID"
+FUNCTION_NAME="makeflow-function-$UUID"
+
+FUNCTION_SOURCE="$FUNCTION_NAME".py
+FUNCTION_PACKAGE="$FUNCTION_NAME".zip
+ROLE_POLICY_FILE="makeflow-policy-$UUID.json"
+
+if [ $# -ne 1 ]
+then
+	echo "use: $0 <config-file>"
+	exit 1
+fi
+
+echo -n "Checking for aws command in PATH..."
+if which aws >/dev/null 2>&1
+then
+	echo "ok"
+else
+	echo "failed"
+	echo "$0: The \"aws\" command must be in your path to use this script."
+	exit 1
+fi
+
+echo -n "Checking for aws configuration..."
+if [ -f ~/.aws/config ]
+then
+	echo "ok"
+else
+	echo "failed"
+	echo "$0 You must run \"aws configure\" before using this script."
+	exit 1
+
+fi
+
+echo -n "Checking that aws command works..."
+if aws ec2 describe-instances > /dev/null 2>&1
+then
+	echo "ok"
+else
+	echo "failed"
+	echo "$0: Your Amazon credentials are not set up correctly. Try \"aws ec2 describe-instances\" to troubleshoot."
+	exit 1
+fi
+
+# Create the role that will be attributed to the Lambda function. This
+# gives the Lambda function 'permission' to access S3 and to execute
+
+echo -n "Creating role policy file $ROLE_POLICY_FILE..."
+
+# The skeleton of the role, to which we will attach the policies
+cat > "$ROLE_POLICY_FILE" <<- EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+echo "ok"
+
+echo -n "Creating iam role $ROLE_NAME..."
+ROLE_ARN=$(aws iam create-role --output text --role-name "$ROLE_NAME" --assume-role-policy-document file://`pwd`/$ROLE_POLICY_FILE | grep "$ROLE_NAME" | awk '{print $2}')
+if [ $? = 0 ]
+then
+	echo "ok"
+else
+	echo "failed!"
+	exit 1
+fi
+
+rm "$ROLE_POLICY_FILE"
+
+# This policy, when attached to the role, gives 'permission' to access S3
+S3_ROLE_POLICY_ARN=arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+# This policy, when attached to the role, makes the Lambda function 'recognizable' by the Lambda service
+LAMBDA_ROLE_POLICY_ARN=arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+echo -n "Attaching S3 policy to role $ROLE_ARN..."
+aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$S3_ROLE_POLICY_ARN"
+if [ $? = 0 ]
+then
+	echo "ok"
+else
+	echo "failed!"
+	exit 1
+fi
+
+echo -n "Attaching lambda execution policy to role $ROLE_ARN..."
+aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$LAMBDA_ROLE_POLICY_ARN"
+if [ $? = 0 ]
+then
+	echo "ok"
+else
+	echo "failed!"
+	exit 1
+fi
+
+# This is the Lambda function. 'event' is a JSON object passed to the function by the invoker.
+cat > "$FUNCTION_SOURCE" <<- EOF
+import boto3
+import botocore
+import subprocess
+import os
+import shutil
+import tempfile
+
+# This handler function is called once for each task invocation
+
+def handler(event, context):
+    s3 = boto3.resource('s3')
+
+    bucket_name = event["bucket_name"]
+    bucket_folder = event["bucket_folder"]
+
+    # Create a unique directory for handling up/downloads
+    # so as not to pollute the working directory.
+    transfer_dir = tempfile.mkdtemp();
+
+    # For each task execution, create a working directory
+    work_dir = tempfile.mkdtemp();
+    os.chdir(work_dir)
+
+    for file in event["input_files"]:
+        try:
+            type = file["type"]
+
+            bucket_key = os.path.join(bucket_folder, file["outer_name"])
+
+            if type == "tgz":
+                os.chdir(transfer_dir)
+                tgz = file["outer_name"] + ".tgz"
+                s3.Bucket(bucket_name).download_file(bucket_key,tgz)
+                subprocess.call("tar xzf " + tgz, shell=True)
+                os.unlink(tgz)
+                os.rename(file["outer_name"],os.path.join(work_dir,file["inner_name"]))
+                os.chdir(work_dir)
+            else:
+                s3.Bucket(bucket_name).download_file(bucket_key,file["inner_name"])
+
+        except Exception as e:
+            return "Couldn't download {} from s3://{}/{} reason: {}".format(file["inner_name"],bucket_name,bucket_key,e)
+
+    # run the command
+    subprocess.call(event["cmd"], shell=True)
+
+    for file in event["output_files"]:
+        try:
+            bucket_key = os.path.join(bucket_folder, file["outer_name"])
+
+            if os.path.isdir(file["inner_name"]):
+                os.chdir(transfer_dir)
+                bucket_key = bucket_key + ".tgz"
+                tgz = file["outer_name"] + ".tgz"
+                os.rename(os.path.join(work_dir,file["inner_name"]),file["outer_name"])
+                subprocess.call("tar czf " + tgz + " " + file["outer_name"],shell=True)
+                s3.Bucket(bucket_name).upload_file(tgz,bucket_key)
+                os.chdir(work_dir)
+            else:
+                s3.Bucket(bucket_name).upload_file(file["inner_name"],bucket_key)
+
+        except Exception as e:
+            return "Couldn't upload {} to s3://{}/{} reason: {}".format(file["inner_name"],bucket_name,bucket_key,e)
+
+    os.chdir("/tmp")
+    shutil.rmtree(work_dir)
+    shutil.rmtree(transfer_dir)
+
+    return "Lambda invocation successful\nevent = {}\n".format(event)
+EOF
+
+# This packages the code for deployment
+zip -q "$FUNCTION_PACKAGE" "$FUNCTION_SOURCE"
+
+# The function creation does not succeed right away b/c
+# it takes time for the role to propagate, so we must retry until success.
+
+echo -n "Creating lambda function $FUNCTION_NAME..."
+while [ 1 ]
+do
+	if aws lambda create-function --function-name "$FUNCTION_NAME" --zip-file fileb://"$FUNCTION_PACKAGE" --role "$ROLE_ARN" --handler "$FUNCTION_NAME".handler --runtime python2.7 --timeout 300 >/dev/null 2>&1
+	then
+		echo "ok"
+		break
+	else
+		echo -n "."
+		sleep 1
+	fi
+done
+
+rm -f "$FUNCTION_SOURCE" "$FUNCTION_PACKAGE"
+
+echo -n "Creating bucket $BUCKET_NAME..."
+aws s3 mb s3://"$BUCKET_NAME" > /dev/null
+if [ $? = 0 ]
+then
+	echo "ok"
+else
+	echo "failed"
+	exit 1
+fi
+
+echo -n "Creating $CONFIG_FILE..."
+cat > $CONFIG_FILE <<EOF
+role_name $ROLE_NAME
+bucket_name $BUCKET_NAME
+function_name $FUNCTION_NAME
+s3_role_policy_arn $S3_ROLE_POLICY_ARN
+lambda_role_policy_arn $LAMBDA_ROLE_POLICY_ARN
+EOF
+
+echo "ok"
+
+exit 0
+
+

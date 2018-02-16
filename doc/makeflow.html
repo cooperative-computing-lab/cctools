@@ -38,6 +38,7 @@
 <li><a href=#moab>Moab</a>
 <li><a href=#mesos>Mesos</a>
 <li><a href=#ec2>Amazon EC2</a>
+<li><a href=#ec2>Amazon Lambda</a>
 <li><a href=#generic>Generic Cluster</a>
 </ul>
 
@@ -104,7 +105,7 @@ workflows from existing applications.</p>
 
 Makeflow can send your jobs to a wide variety of services,
 such as batch systems (HTCondor, SGE, PBS, Torque),
-cluster managers (Mesos and Kubernetes), cloud services (Amazon EC2)
+cluster managers (Mesos and Kubernetes), cloud services (Amazon EC2 or Lambda)
 and container environments like Docker and Singularity.
 Details for each of those systems are given in the <a href=#batch>Batch System Support</a> section.
 
@@ -498,6 +499,32 @@ environment variables within the Makeflow file.  For example:
 export AMAZON_INSTANCE_TYPE=m4.4xlarge
 export AMAZON_AMI=ami-343a694f
 </code>
+
+<a name=lambda><h3>Amazon Lambda</h3></a>
+
+To use Amazon Lambda, first set up an AWS account and install the <tt>aws</tt> command line tools as noted above.
+<p>
+Then, use the <tt>makeflow_lambda_setup</tt> command, which will establish
+the appropriate roles, buckets, and functions needed to use Amazon Lambda.
+The names of these items will be stored in a config file named on the command line:
+<pre>
+makeflow_lambda_setup my.config
+</pre>
+
+Then, you may use <tt>makeflow</tt> normally, indicating <tt>lambda</tt> as
+the batch type, and passing in the configuration file with the <tt>--lambda-config</tt> option:
+
+<pre>
+makeflow -T lambda --lambda-config my.config example.makeflow ...
+</pre>
+
+You may run multiple workflows in this fashion.  When you are ready to
+clean up the associated state in Amazon, run <tt>makeflow_lambda_cleanup</tt>
+and pass in the configuration file:
+
+<pre>
+makeflow_lambda_cleanup my.config
+</pre>
 
 <a name=generic><h3>Generic Cluster Submission</h3>
 
