@@ -8,13 +8,33 @@
 
 configFile=$1
 
-ec2_vpc=$(python -c "import json; print json.load(open('$configFile','r'))['vpc'];")
-ec2_subnet=$(python -c "import json; print json.load(open('$configFile','r'))['subnet'];")
-ec2_security_group_id=$(python -c "import json; print json.load(open('$configFile','r'))['sec_group'];")
-env_name=$(python -c "import json; print json.load(open('$configFile','r'))['env_name'];")
-queue_name=$(python -c "import json; print json.load(open('$configFile','r'))['queue_name'];")
-bucket_name=$(python -c "import json; print json.load(open('$configFile','r'))['bucket'];")
-gateway=$(python -c "import json; print json.load(open('$configFile','r'))['gateway'];")
+
+if [ ! -e $configFile ]; then
+	echo "Config file not present! Please provide it to run this script"
+	exit 1
+fi
+
+load_field()
+{
+	grep $1 $configFile | cut -d ":" -f 2 | tr -d '"' | tr -d ','
+}
+
+#ec2_vpc=$(python -c "import json; print json.load(open('$configFile','r'))['vpc'];")
+#ec2_subnet=$(python -c "import json; print json.load(open('$configFile','r'))['subnet'];")
+#ec2_security_group_id=$(python -c "import json; print json.load(open('$configFile','r'))['sec_group'];")
+#env_name=$(python -c "import json; print json.load(open('$configFile','r'))['env_name'];")
+#queue_name=$(python -c "import json; print json.load(open('$configFile','r'))['queue_name'];")
+#bucket_name=$(python -c "import json; print json.load(open('$configFile','r'))['bucket'];")
+#gateway=$(python -c "import json; print json.load(open('$configFile','r'))['gateway'];")
+
+ec2_vpc=$(load_field vpc)
+ec2_subnet=$(load_field subnet)
+ec2_security_group_id=$(load_field sec_group)
+env_name=$(load_field env_name)
+queue_name=$(load_field queue_name)
+bucket_name=$(load_field bucket)
+gateway=$(load_field gateway)
+
 
 #disabling jobqueues
 echo "Deleting queue"

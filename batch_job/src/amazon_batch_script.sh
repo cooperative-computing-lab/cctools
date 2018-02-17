@@ -6,6 +6,27 @@
 # Created on Jul 7, 2017, 1:48:40 PM
 #
 
+
+
+#AmazonS3FullAccess
+#AmazonEC2ContainerServiceFullAccess
+#AmazonEC2ContainerServiceRole
+#}
+#    "Version": "2012-10-17",
+#    "Statement": [
+#        {
+#            "Sid": "Stmt1497492706000",
+#            "Effect": "Allow",
+#            "Action": [
+#                "batch:*"
+#            ],
+#            "Resource": [
+#                "*"
+#            ]
+#        }
+#    ]
+#}
+
 if [ -z "$1" ]; then
 	echo "Empty number of CPUs requested."
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
