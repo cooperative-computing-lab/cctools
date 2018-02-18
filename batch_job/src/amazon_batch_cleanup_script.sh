@@ -40,23 +40,36 @@ gateway=$(load_field gateway)
 echo "Deleting queue"
 aws batch update-job-queue --job-queue $queue_name --state DISABLED
 
-queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_name)"
-queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print k['jobQueues'][0]['state'] != 'ENABLED' and k['jobQueues'][0]['status'] == 'VALID';")
-while [ "$queue_done" != "True" ]
+#queue_done_check_output="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
+#queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print k['jobQueues'][0]['state'] != 'ENABLED' and k['jobQueues'][0]['status'] == 'VALID';")
+#queue_done=$queue_done_check_output
+#while [ "$queue_done" != "VALID" ]
+#do
+#queue_done_check_output="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
+#queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print k['jobQueues'][0]['state'] != 'ENABLED' and k['jobQueues'][0]['status'] == 'VALID';")
+#queue_done=$queue_done_check_output
+#done
+
+queue_status="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
+queue_state="$(aws --output text --query 'jobQueues[0].state' batch describe-job-queues --job-queues $queue_name)"
+
+while ! [ "$queue_status" == "VALID" -a "$queue_state" != "ENABLED"  ]
 do
-queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_name)"
-queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print k['jobQueues'][0]['state'] != 'ENABLED' and k['jobQueues'][0]['status'] == 'VALID';")
+	queue_status="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
+	queue_state="$(aws --output text --query 'jobQueues[0].state' batch describe-job-queues --job-queues $queue_name)"
 done
 
 #deleting all jobqueues
 aws batch delete-job-queue --job-queue $queue_name
 
-queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_name)"
-queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print len(k['jobQueues']) == 0;")
-while [ "$queue_done" != "True" ]
+queue_done_check_output="$(aws --output text batch describe-job-queues --job-queues $queue_name)"
+#queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print len(k['jobQueues']) == 0;")
+queue_done=$queue_done_check_output
+while [ ! -z "$queue_done" ]
 do
-queue_done_check_output="$(aws batch describe-job-queues --job-queues $queue_name)"
-queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print len(k['jobQueues']) == 0;")
+queue_done_check_output="$(aws --output text batch describe-job-queues --job-queues $queue_name)"
+#queue_done=$(python -c "import json; k=json.loads('''$queue_done_check_output'''); print len(k['jobQueues']) == 0;")
+queue_done=$queue_done_check_output
 done
 
 
@@ -65,24 +78,32 @@ done
 echo "Deleting environments"
 aws batch update-compute-environment --compute-environment $env_name --state DISABLED
 
-env_done_check_output="$(aws batch describe-compute-environments --compute-environments $env_name)"
-env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print k['computeEnvironments'][0]['state'] != 'ENABLED' and k['computeEnvironments'][0]['status'] == 'VALID';")
-while [ "$env_done" != "True" ]
+env_status="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
+env_state="$(aws --output text --query 'computeEnvironments[0].state' batch describe-compute-environments --compute-environments $env_name)"
+
+while ! [ "$env_status" == "VALID" -a "$env_state" != "ENABLED"  ]
 do
-env_done_check_output="$(aws batch describe-compute-environments --compute-environments $env_name)"
-env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print k['computeEnvironments'][0]['state'] != 'ENABLED' and k['computeEnvironments'][0]['status'] == 'VALID';")
+#env_done_check_output="$(aws --output text batch describe-compute-environments --compute-environments $env_name)"
+#env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print k['computeEnvironments'][0]['state'] != 'ENABLED' and k['computeEnvironments'][0]['status'] == 'VALID';")
+#env_done=$env_done_check_output
+env_status="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
+env_state="$(aws --output text --query 'computeEnvironments[0].state' batch describe-compute-environments --compute-environments $env_name)"
+
+
 done
 
 
 #deleting the environment
 aws batch delete-compute-environment --compute-environment $env_name
 
-env_done_check_output="$(aws batch describe-compute-environments --compute-environments $env_name)"
-env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print len(k['computeEnvironments']) == 0;")
-while [ "$env_done" != "True" ]
+env_done_check_output="$(aws --output text batch describe-compute-environments --compute-environments $env_name)"
+#env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print len(k['computeEnvironments']) == 0;")
+env_done=$env_done_check_output
+while [ ! -z "$env_done" ]
 do
-env_done_check_output="$(aws batch describe-compute-environments --compute-environments $env_name)"
-env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print len(k['computeEnvironments']) == 0;")
+env_done_check_output="$(aws --output text batch describe-compute-environments --compute-environments $env_name)"
+#env_done=$(python -c "import json; k=json.loads('''$env_done_check_output'''); print len(k['computeEnvironments']) == 0;")
+env_done=$env_done_check_output
 done
 
 #delete the internet gateway
