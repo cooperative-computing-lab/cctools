@@ -213,22 +213,8 @@ echo "\"queue_name\":\"$queue_name\"," >> $outputfile
 
 #echo creating the bucket
 bucket_pre=$(python -c "print ''.join([chr(ord('a')+int(x)) for x in '$time'])")
-
-b_time="$time"
-b_pre=""
-#for ( i=0; i<${#b_time}; i++ ); do
-b_pre = `grep -o . <<< "$b_time" | while read character; do
-	b=97
-	c=$(printf "%d" $character)
-	let "b += $c"
-	d=$(awk -vb=$b 'BEGIN{printf "%c", b}')
-	b_pre="$b_pre$d"
-done`
-
-echo "b_pre is $b_pre"
-
-echo "created bucket: ccl$bucket_pre" 
-bucket_name="ccl$bucket_pre"
+echo "created bucket: ccl-$time" 
+bucket_name="ccl-$time"
 make_bucket_response="$(aws --output json s3 mb s3://$bucket_name)"
 
 echo "\"bucket\":\"$bucket_name\"" >> $outputfile
