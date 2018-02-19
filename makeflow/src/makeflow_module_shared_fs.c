@@ -80,66 +80,49 @@ static int node_file_uses_unsupported_shared_fs( struct dag_node *n, struct dag_
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
 	if (batch_file_on_sharedfs(f->filename)) {
 		if (remotename){
-			debug(D_NOTICE|D_MAKEFLOW_HOOK, "Remote renaming for %s is not supported on a shared filesystem",
+			debug(D_ERROR|D_MAKEFLOW_HOOK, "Remote renaming for %s is not supported on a shared filesystem",
 					f->filename);
-			return SHARED_FS_RENAME;
+			return MAKEFLOW_HOOK_FAILURE;
 		}
-	} else {
-		debug(D_NOTICE|D_MAKEFLOW_HOOK, "Absolute paths are not supported on %s: file %s",
-					batch_queue_type_to_string(batch_queue_get_type(makeflow_get_queue(n))), f->filename);
-		return SHARED_FS_UNSUPPORTED;
+	} else if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)){
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "Absolute paths are not supported on %s: File %s Rule %d (line %d).\n",
+					batch_queue_type_to_string(batch_queue_get_type(makeflow_get_queue(n))), 
+					f->filename, n->nodeid, n->linenum);
+		return MAKEFLOW_HOOK_FAILURE;
 	}
-	return SHARED_FS_SUPPORTED;
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 static int node_files_uses_unsupported_shared_fs( struct dag_node *n, struct list *files)
 {
 	struct dag_file *f;
-	int rename_on_shared_fs = 0;
-	int abs_path_unsupported = 0;
+	int failed = 0;
 	list_first_item(files);
 	while((f = list_next_item(files))) {
-		shared_fs_support_t rc = node_file_uses_unsupported_shared_fs(n, f);
-		if(rc == SHARED_FS_RENAME)
-			rename_on_shared_fs = 1;
-
-		if(rc == SHARED_FS_UNSUPPORTED)
-			abs_path_unsupported = 1;
+		int rc = node_file_uses_unsupported_shared_fs(n, f);
+		if(rc != MAKEFLOW_HOOK_SUCCESS)
+			failed = 1;
 	}
-	if(abs_path_unsupported)
-		return SHARED_FS_UNSUPPORTED;
-	if(rename_on_shared_fs)
-		return SHARED_FS_RENAME;
-	return SHARED_FS_SUPPORTED;
+	if(failed)
+		return MAKEFLOW_HOOK_FAILURE;
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 static int dag_check(struct dag *d){
 	struct dag_node *n;
-	int rename_on_shared_fs = 0;
-	int abs_path_unsupported = 0;
+	int failed = 0;
 	for(n = d->nodes; n; n = n->next) {
 		if(!batch_queue_supports_feature(makeflow_get_queue(n), "absolute_path")){
-			shared_fs_support_t rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
-			if(rc == SHARED_FS_RENAME)
-				rename_on_shared_fs = 1;
-
-			if(rc == SHARED_FS_UNSUPPORTED)
-				abs_path_unsupported = 1;
+			int rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
+			if(rc != MAKEFLOW_HOOK_SUCCESS)
+				failed = 1;
 
 			rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
-			if(rc == SHARED_FS_RENAME)
-				rename_on_shared_fs = 1;
-
-			if(rc == SHARED_FS_UNSUPPORTED)
-				abs_path_unsupported = 1;
+			if(rc != MAKEFLOW_HOOK_SUCCESS)
+				failed = 1;
 		}
 	}
-	if(abs_path_unsupported){
-		debug(D_NOTICE|D_MAKEFLOW_HOOK,"Instead, run your workflow from a local disk like /tmp.");
-		debug(D_NOTICE|D_MAKEFLOW_HOOK,"Or, use the Work Queue batch system with -T wq.\n");
-		return MAKEFLOW_HOOK_FAILURE;
-	}
-	if(rename_on_shared_fs)
+	if(failed)
 		return MAKEFLOW_HOOK_FAILURE;
 	return MAKEFLOW_HOOK_SUCCESS;
 }

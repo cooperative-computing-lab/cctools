@@ -860,7 +860,6 @@ are supported by the batch system, such as work_queue specific options.
 static int makeflow_check_batch_consistency(struct dag *d)
 {
 	struct dag_node *n;
-	struct dag_file *f;
 	int error = 0;
 
 	debug(D_MAKEFLOW_RUN, "checking for consistency of batch system support...\n");
@@ -876,28 +875,6 @@ static int makeflow_check_batch_consistency(struct dag *d)
 				debug(D_ERROR, "Remote renaming is not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
 				error = 1;
 				break;
-			}
-		}
-
-		if(!batch_queue_supports_feature(remote_queue, "absolute_path") && !n->local_job){
-			list_first_item(n->source_files);
-			while((f = list_next_item(n->source_files)) && !error) {
-				const char *remotename = dag_node_get_remote_name(n, f->filename);
-				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
-					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
-					error = 1;
-					break;
-				}
-			}
-
-			list_first_item(n->target_files);
-			while((f = list_next_item(n->target_files)) && !error) {
-				const char *remotename = dag_node_get_remote_name(n, f->filename);
-				if((remotename && *remotename == '/') || (*f->filename == '/' && !remotename)) {
-					debug(D_ERROR, "Absolute paths are not supported on selected batch system. Rule %d (line %d).\n", n->nodeid, n->linenum);
-					error = 1;
-					break;
-				}
 			}
 		}
 	}
@@ -1212,6 +1189,7 @@ int main(int argc, char *argv[])
 	int save_failure = 1;
 	extern struct makeflow_hook makeflow_hook_resource_monitor;
 	extern struct makeflow_hook makeflow_hook_sandbox;
+	extern struct makeflow_hook makeflow_hook_shared_fs;
 	extern struct makeflow_hook makeflow_hook_singularity;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
 
@@ -1649,10 +1627,6 @@ int main(int argc, char *argv[])
 				makeflow_wrapper_add_output_file(wrapper, optarg);
 				break;
 			case LONG_OPT_SHARED_FS:
-				{
-					extern struct makeflow_hook makeflow_hook_shared_fs;
-					makeflow_hook_register(&makeflow_hook_shared_fs);
-				}
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
 				if(!jx_lookup(hook_args, "shared_fs_list"))
 					jx_insert(hook_args, jx_string("shared_fs_list"),jx_array(NULL));
@@ -1820,6 +1794,8 @@ int main(int argc, char *argv[])
 	if (enforcer && umbrella) {
 		fatal("enforcement and Umbrella are mutually exclusive\n");
 	}
+
+	makeflow_hook_register(&makeflow_hook_shared_fs);
 
 	if(save_failure){
 		makeflow_hook_register(&makeflow_hook_fail_dir);
