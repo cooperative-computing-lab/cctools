@@ -1224,8 +1224,9 @@ static void show_help_run(const char *cmd)
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
 	printf(" --docker-tar=<tar file>        Load docker image from this tar file.\n");
+	printf(" --docker-opt=<string>          Pass docker command line options.\n");
 	printf(" --singularity=<image>          Run each task using Singularity exec with image.\n");
-	printf(" --singularity-opt=<string      Pass singularity command line options.\n");
+	printf(" --singularity-opt=<string>     Pass singularity command line options.\n");
 	printf(" --umbrella-spec=<file>         Run each task using this Umbrella spec.\n");
 	printf(" --umbrella-binary=<file>       Path to Umbrella binary.\n");
 	printf(" --umbrella-log-prefix=<string> Umbrella log file prefix\n");
@@ -1369,6 +1370,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
 		LONG_OPT_DOCKER,
+		LONG_OPT_DOCKER_OPT,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
 		LONG_OPT_LAMBDA_CONFIG,
@@ -1471,6 +1473,7 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
+		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
@@ -1764,6 +1767,10 @@ int main(int argc, char *argv[])
 			case LONG_OPT_DOCKER_TAR:
 				makeflow_hook_register(&makeflow_hook_docker);
 				jx_insert(hook_args, jx_string("docker_container_tar"), jx_string(optarg));
+				break;
+			case LONG_OPT_DOCKER_OPT:
+				makeflow_hook_register(&makeflow_hook_docker);
+				jx_insert(hook_args, jx_string("docker_container_opt"), jx_string(optarg));
 				break;
 			case LONG_OPT_SINGULARITY:
 				makeflow_hook_register(&makeflow_hook_singularity);

@@ -28,14 +28,23 @@ char *docker_image = NULL;
 
 char *docker_tar = NULL;
 
+char *docker_opt = NULL;
+
 static int create( struct jx *hook_args )
 {
 	if(jx_lookup_string(hook_args, "docker_container_image")){
 		docker_image = xxstrdup(jx_lookup_string(hook_args, "docker_container_image"));	
+	} else {
+		debug(D_NOTICE|D_MAKEFLOW_HOOK, "Docker hook requires container image name to be specified");
+		return MAKEFLOW_HOOK_FAILURE;
 	}
 
 	if(jx_lookup_string(hook_args, "docker_container_tar")){
 		docker_tar = xxstrdup(jx_lookup_string(hook_args, "docker_container_tar"));	
+	}
+
+	if(jx_lookup_string(hook_args, "docker_container_opt")){
+		docker_opt = xxstrdup(jx_lookup_string(hook_args, "docker_container_opt"));	
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
@@ -74,7 +83,8 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 		makeflow_hook_add_input_file(n->d, t, docker_tar, NULL, DAG_FILE_TYPE_GLOBAL);
 	}
 
-	char *cmd = string_format("docker run --rm -m 1g -v $CUR_WORK_DIR:$DEFAULT_DIR -w $DEFAULT_DIR %s %s", docker_image, t->command);
+	char *cmd = string_format("docker run --rm -v $CUR_WORK_DIR:$DEFAULT_DIR -w $DEFAULT_DIR %s %s %s", 
+			docker_opt, docker_image, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);
 
