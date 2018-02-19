@@ -120,13 +120,13 @@ else
 	exit -33
 fi
 
-check_arn_iam=$(aws --output json iam get-role --role-name AWSBatchServiceRole)
-if [[ $check_arn_iam = *"CreateDate"*  ]]; then
-	echo "credentials have IAM with AWSBatchServiceRole set up, good!"
-else
-	echo "current user doesn't have AWSBatchServiceRole attached to credientials: please fix in amazon console"
-	exit -44
-fi
+#check_arn_iam=$(aws --output json iam get-role --role-name AWSBatchServiceRole)
+#if [[ $check_arn_iam = *"CreateDate"*  ]]; then
+#	echo "credentials have IAM with AWSBatchServiceRole set up, good!"
+#else
+#	echo "current user doesn't have AWSBatchServiceRole attached to credientials: please fix in amazon console"
+#	exit -44
+#fi
 
 #Grabbing the necessary keys
 aws_id=$(load_fieldINI aws_access_key_id ~/.aws/credentials)
