@@ -45,7 +45,18 @@ static int create( struct jx *hook_args )
 
 	if(jx_lookup_string(hook_args, "docker_container_opt")){
 		docker_opt = xxstrdup(jx_lookup_string(hook_args, "docker_container_opt"));	
+	} else {
+		docker_opt = xxstrdup("");
 	}
+
+	return MAKEFLOW_HOOK_SUCCESS;
+}
+
+static int destroy( struct dag *d )
+{
+	free(docker_image);
+	free(docker_tar);
+	free(docker_opt);
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -106,6 +117,7 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 struct makeflow_hook makeflow_hook_docker = {
 	.module_name = "Docker",
 	.create = create,
+	.destroy = destroy,
 
 	.dag_check = dag_check,
 
