@@ -42,7 +42,6 @@ See the file COPYING for details.
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
-#include "makeflow_wrapper_docker.h"
 #include "makeflow_wrapper_monitor.h"
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
@@ -144,10 +143,6 @@ static int output_len_check = 0;
 static int skip_file_check = 0;
 
 static int cache_mode = 1;
-
-static container_mode_t container_mode = CONTAINER_MODE_NONE;
-static char *container_image = NULL;
-static char *container_image_tar = NULL;
 
 static char *parrot_path = "./parrot_run";
 
@@ -1229,8 +1224,9 @@ static void show_help_run(const char *cmd)
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
 	printf(" --docker-tar=<tar file>        Load docker image from this tar file.\n");
+	printf(" --docker-opt=<string>          Pass docker command line options.\n");
 	printf(" --singularity=<image>          Run each task using Singularity exec with image.\n");
-	printf(" --singularity-opt=<string      Pass singularity command line options.\n");
+	printf(" --singularity-opt=<string>     Pass singularity command line options.\n");
 	printf(" --umbrella-spec=<file>         Run each task using this Umbrella spec.\n");
 	printf(" --umbrella-binary=<file>       Path to Umbrella binary.\n");
 	printf(" --umbrella-log-prefix=<string> Umbrella log file prefix\n");
@@ -1305,6 +1301,7 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	char *k8s_image = NULL;
+	extern struct makeflow_hook makeflow_hook_docker;
 	extern struct makeflow_hook makeflow_hook_example;
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
@@ -1373,6 +1370,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WRAPPER_OUTPUT,
 		LONG_OPT_DOCKER,
+		LONG_OPT_DOCKER_OPT,
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
 		LONG_OPT_LAMBDA_CONFIG,
@@ -1475,6 +1473,7 @@ int main(int argc, char *argv[])
 		{"change-directory", required_argument, 0, 'X'},
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
+		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
@@ -1759,15 +1758,19 @@ int main(int argc, char *argv[])
 				jx_insert(hook_args, jx_string("storage_allocation_print"), jx_string(optarg));
 				break;
 			case LONG_OPT_DOCKER:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				container_mode = CONTAINER_MODE_DOCKER;
-				container_image = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_docker);
+				jx_insert(hook_args, jx_string("docker_container_image"), jx_string(optarg));
 				break;
 			case LONG_OPT_SKIP_FILE_CHECK:
 				skip_file_check = 1;
 				break;
 			case LONG_OPT_DOCKER_TAR:
-				container_image_tar = xxstrdup(optarg);
+				makeflow_hook_register(&makeflow_hook_docker);
+				jx_insert(hook_args, jx_string("docker_container_tar"), jx_string(optarg));
+				break;
+			case LONG_OPT_DOCKER_OPT:
+				makeflow_hook_register(&makeflow_hook_docker);
+				jx_insert(hook_args, jx_string("docker_container_opt"), jx_string(optarg));
 				break;
 			case LONG_OPT_SINGULARITY:
 				makeflow_hook_register(&makeflow_hook_singularity);
@@ -2109,16 +2112,11 @@ int main(int argc, char *argv[])
 	if (change_dir)
 		chdir(change_dir);
 
-	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR || container_mode==CONTAINER_MODE_DOCKER) ) {
+	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR)) {
 		char *cwd = path_getcwd();
 		if(!strncmp(cwd, "/afs", 4)) {
 			fprintf(stderr,"error: The working directory is '%s'\n", cwd);
-			if(batch_queue_type==BATCH_QUEUE_TYPE_CONDOR) {
-				fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
-			}
-			if(container_mode==CONTAINER_MODE_DOCKER) {
-				fprintf(stderr,"This won't work because Docker cannot mount an AFS directory.\n");
-			}
+			fprintf(stderr,"This won't work because Condor is not able to write to files in AFS.\n");
 			fprintf(stderr,"Instead, run your workflow from a local disk like /tmp.");
 			fprintf(stderr,"Or, use the Work Queue batch system with -T wq.\n");
 			free(cwd);
@@ -2241,10 +2239,6 @@ int main(int argc, char *argv[])
 
 	runtime = timestamp_get();
 
-	if (container_mode == CONTAINER_MODE_DOCKER) {
-		makeflow_wrapper_docker_init(wrapper, container_image, container_image_tar);
-	}
-
 	d->archive_directory = archive_directory;
 	d->should_read_archive = should_read_archive;
 	d->should_write_to_archive = should_write_to_archive;
@@ -2285,11 +2279,6 @@ EXIT_WITH_FAILURE:
 
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
-
-	/* XXX better to write created files to log, then delete those listed in log. */
-	if (container_mode == CONTAINER_MODE_DOCKER) {
-		unlink(CONTAINER_DOCKER_SH);
-	}
 
 	if(wrapper){
 		makeflow_wrapper_delete(wrapper);
