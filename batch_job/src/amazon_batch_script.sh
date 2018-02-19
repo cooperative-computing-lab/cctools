@@ -140,8 +140,7 @@ echo "\"aws_key\":\"$aws_key\"," >> $outputfile
 echo "\"aws_reg\":\"$aws_reg\"," >> $outputfile
 
 #echo create the vpc
-ec2_vpc_create_response="$(aws --output text --query 'Vpc.VpcId' ec2 create-vpc --cidr-block 10.0.0.0/16)"
-ec2_vpc=$ec2_vpc_create_response
+ec2_vpc="$(aws --output text --query 'Vpc.VpcId' ec2 create-vpc --cidr-block 10.0.0.0/16)"
 echo "created vpc: $ec2_vpc"
 
 aws --output json ec2 modify-vpc-attribute --vpc-id $ec2_vpc --enable-dns-hostnames
@@ -150,8 +149,7 @@ aws --output json ec2 modify-vpc-attribute --vpc-id $ec2_vpc --enable-dns-hostna
 echo "\"vpc\":\"$ec2_vpc\"," >> $outputfile
 
 #echo create the subnet
-ec2_subnet_create_response="$(aws --output text --query 'Subnet.SubnetId' ec2 create-subnet --vpc-id $ec2_vpc --cidr-block 10.0.1.0/24)"
-ec2_subnet=$ec2_subnet_create_response
+ec2_subnet="$(aws --output text --query 'Subnet.SubnetId' ec2 create-subnet --vpc-id $ec2_vpc --cidr-block 10.0.1.0/24)"
 echo "created subnet: $ec2_subnet"
 
 aws --output json ec2 modify-subnet-attribute --subnet-id $ec2_subnet --map-public-ip-on-launch
@@ -159,7 +157,6 @@ aws --output json ec2 modify-subnet-attribute --subnet-id $ec2_subnet --map-publ
 echo "\"subnet\":\"$ec2_subnet\"," >> $outputfile
 
 #echo create the security group
-#ec2_security_group_name="makeflow_ccl_sec_group_$time"
 ec2_security_group_id=$(aws --output json ec2 describe-security-groups --filters Name=vpc-id,Values=$ec2_vpc --query 'SecurityGroups[0].GroupId' --output text)
 echo "created security group: $ec2_security_group_id"
 
@@ -183,14 +180,11 @@ echo "creating the environment"
 env_name="makeflow_ccl_env_$time"
 account_num_id=$(aws ec2 describe-security-groups --group-names 'Default' --query 'SecurityGroups[0].OwnerId' --output text) #got from stack overflow: "Quick Way to get AWS Account number from the cli tools?
 env_output_response=$(aws --output json batch create-compute-environment --compute-environment-name $env_name --type MANAGED --state ENABLED --compute-resources type=EC2,minvCpus=$min_cpus,maxvCpus=$max_cpus,desiredvCpus=$cpus,instanceTypes=optimal,subnets=$ec2_subnet,securityGroupIds=$ec2_security_group_id,instanceRole=ecsInstanceRole --service-role=arn:aws:iam::$account_num_id:role/service-role/AWSBatchServiceRole)
-#echo $batch_compenv_create_response
-echo "checkingStatus"
-env_done_check_output="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
-env_done=$env_done_check_output
+
+env_done="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
 while [ "$env_done" != "VALID" ]
 do
-	env_done_check_output="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
-	env_done=$env_done_check_output
+	env_done="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
 done
 
 echo "\"env_name\":\"$env_name\"," >> $outputfile
@@ -200,22 +194,19 @@ queue_name="makeflow_ccl_queue_$time"
 batch_queue_create_response="$(aws --output json --region=$aws_reg batch create-job-queue --state=ENABLED --priority=1 --job-queue-name=$queue_name --compute-environment-order order=1,computeEnvironment=$env_name)"
 echo $batch_queue_create_response
 
-queue_done_check_output="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
-queue_done=$queue_done_check_output
+queue_done="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
 while [ "$queue_done" != "VALID" ]
 do
-queue_done_check_output="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
-queue_done=$queue_done_check_output
+queue_done="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
 done
 
 echo "created queue: $queue_name"
 echo "\"queue_name\":\"$queue_name\"," >> $outputfile
 
 #echo creating the bucket
-bucket_pre=$(python -c "print ''.join([chr(ord('a')+int(x)) for x in '$time'])")
-echo "created bucket: ccl-$time" 
 bucket_name="ccl-$time"
 make_bucket_response="$(aws --output json s3 mb s3://$bucket_name)"
+echo "created bucket: ccl-$time" 
 
 echo "\"bucket\":\"$bucket_name\"" >> $outputfile
 
