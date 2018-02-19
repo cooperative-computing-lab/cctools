@@ -67,7 +67,7 @@ submit_workers_command()
 {
 	# rewrite cores, memory, disk with size of given slot. (sometimes the slot
 	# given is larger than the minimum requested).
-	arguments="$arguments --cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024])"
+	arguments="--cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024]) $arguments"
 
 	cat > condor_submit_file <<EOF
 universe = vanilla
