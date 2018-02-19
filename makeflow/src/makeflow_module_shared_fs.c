@@ -36,7 +36,7 @@ static int prefix_match(void *stem, const void *filename) {
 
 static int batch_file_on_sharedfs( const char *filename )
 {
-    return !list_iterate(shared_fs_list,prefix_match,filename);
+	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
 
 static int create(struct jx *args){
@@ -69,35 +69,78 @@ static int destroy(){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
+typedef enum {
+	SHARED_FS_SUPPORTED,
+	SHARED_FS_RENAME,
+	SHARED_FS_UNSUPPORTED,
+} shared_fs_support_t;
+
+static int node_file_uses_unsupported_shared_fs( struct dag_node *n, struct dag_file *f)
+{
+	const char *remotename = dag_node_get_remote_name(n, f->filename);
+	if (batch_file_on_sharedfs(f->filename)) {
+		if (remotename){
+			debug(D_NOTICE|D_MAKEFLOW_HOOK, "Remote renaming for %s is not supported on a shared filesystem",
+					f->filename);
+			return SHARED_FS_RENAME;
+		}
+	} else {
+		debug(D_NOTICE|D_MAKEFLOW_HOOK, "Absolute paths are not supported on %s: file %s",
+					batch_queue_type_to_string(batch_queue_get_type(makeflow_get_queue(n))), f->filename);
+		return SHARED_FS_UNSUPPORTED;
+	}
+	return SHARED_FS_SUPPORTED;
+}
+
+static int node_files_uses_unsupported_shared_fs( struct dag_node *n, struct list *files)
+{
+	struct dag_file *f;
+	int rename_on_shared_fs = 0;
+	int abs_path_unsupported = 0;
+	list_first_item(files);
+	while((f = list_next_item(files))) {
+		shared_fs_support_t rc = node_file_uses_unsupported_shared_fs(n, f);
+		if(rc == SHARED_FS_RENAME)
+			rename_on_shared_fs = 1;
+
+		if(rc == SHARED_FS_UNSUPPORTED)
+			abs_path_unsupported = 1;
+	}
+	if(abs_path_unsupported)
+		return SHARED_FS_UNSUPPORTED;
+	if(rename_on_shared_fs)
+		return SHARED_FS_RENAME;
+	return SHARED_FS_SUPPORTED;
+}
+
 static int dag_check(struct dag *d){
 	struct dag_node *n;
-	struct dag_file *f;
+	int rename_on_shared_fs = 0;
+	int abs_path_unsupported = 0;
 	for(n = d->nodes; n; n = n->next) {
-		if(!batch_queue_supports_feature(makeflow_get_remote_queue(), "absolute_path") && !n->local_job){
-			list_first_item(n->source_files);
-			while((f = list_next_item(n->source_files))) {
-				const char *remotename = dag_node_get_remote_name(n, f->filename);
-				if (batch_file_on_sharedfs(f->filename)) {
-					if (remotename){
-						fatal("Remote renaming for %s is not supported on a shared filesystem",
-								f->filename);
-						return MAKEFLOW_HOOK_FAILURE;
-					}
-				}
-			}
+		if(!batch_queue_supports_feature(makeflow_get_queue(n), "absolute_path")){
+			shared_fs_support_t rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
+			if(rc == SHARED_FS_RENAME)
+				rename_on_shared_fs = 1;
 
-			list_first_item(n->target_files);
-			while((f = list_next_item(n->target_files))) {
-				const char *remotename = dag_node_get_remote_name(n, f->filename);
-				if (batch_file_on_sharedfs(f->filename)) {
-					if (remotename){
-						fatal("Remote renaming for %s is not supported on a shared filesystem",f->filename);
-						return MAKEFLOW_HOOK_FAILURE;
-					}
-				}
-			}
+			if(rc == SHARED_FS_UNSUPPORTED)
+				abs_path_unsupported = 1;
+
+			rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
+			if(rc == SHARED_FS_RENAME)
+				rename_on_shared_fs = 1;
+
+			if(rc == SHARED_FS_UNSUPPORTED)
+				abs_path_unsupported = 1;
 		}
 	}
+	if(abs_path_unsupported){
+		debug(D_NOTICE|D_MAKEFLOW_HOOK,"Instead, run your workflow from a local disk like /tmp.");
+		debug(D_NOTICE|D_MAKEFLOW_HOOK,"Or, use the Work Queue batch system with -T wq.\n");
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+	if(rename_on_shared_fs)
+		return MAKEFLOW_HOOK_FAILURE;
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
@@ -131,14 +174,14 @@ static int batch_submit(struct batch_task *t){
 
 static int batch_retrieve(struct batch_task *t){
 	struct batch_file *f = NULL;
-    struct list *saved_inputs = itable_remove(shared_fs_saved_inputs, t->taskid);
-    struct list *saved_outputs = itable_remove(shared_fs_saved_outputs, t->taskid);
+	struct list *saved_inputs = itable_remove(shared_fs_saved_inputs, t->taskid);
+	struct list *saved_outputs = itable_remove(shared_fs_saved_outputs, t->taskid);
 
 	if(saved_inputs){
-	    list_first_item(saved_inputs);
-	    while((f = list_next_item(saved_inputs))){
-	        list_push_tail(t->input_files, f);
-	        list_remove(saved_inputs, f);
+		list_first_item(saved_inputs);
+		while((f = list_next_item(saved_inputs))){
+			list_push_tail(t->input_files, f);
+			list_remove(saved_inputs, f);
 			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_inputs);
@@ -146,14 +189,14 @@ static int batch_retrieve(struct batch_task *t){
 
 	if(saved_outputs){
 		list_first_item(saved_outputs);
-	    while((f = list_next_item(saved_outputs))){
-	        list_push_tail(t->output_files, f);
-	        list_remove(saved_outputs, f);
+		while((f = list_next_item(saved_outputs))){
+			list_push_tail(t->output_files, f);
+			list_remove(saved_outputs, f);
 			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_outputs);
 	}
-    return MAKEFLOW_HOOK_SUCCESS;
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 struct makeflow_hook makeflow_hook_shared_fs = {
