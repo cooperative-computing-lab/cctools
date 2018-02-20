@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include "process.h"
 #include "xxmalloc.h"
 #include "jx.h"
+#include "jx_match.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -104,17 +105,19 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	char *cluster_resources = NULL;
 
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE) { // Should be supported, but untested || q->type == BATCH_QUEUE_TYPE_PBS){
-		char *mem = string_format(":mem=%" PRId64 "mb", resources->memory);
-		char *disk = string_format(":disk=%" PRId64 "mb", resources->disk);
-		cluster_resources = string_format(" -l nodes=1:ppn:%" PRId64 "%s%s ", 
-			resources->cores ? resources->cores : 1,
-			resources->memory>0 ? mem : "",
-			resources->disk>0 ? disk  : "");
-		free(mem);
-		free(disk);
-	} else {
-		cluster_resources = xxstrdup("");
+		if(!hash_table_lookup(q->options, "batch-options")){
+			char *mem = string_format(":mem=%" PRId64 "mb", resources->memory);
+			char *disk = string_format(":disk=%" PRId64 "mb", resources->disk);
+			cluster_resources = string_format(" -l nodes=1:ppn:%" PRId64 "%s%s ", 
+				resources->cores ? resources->cores : 1,
+				resources->memory>0 ? mem : "",
+				resources->disk>0 ? disk  : "");
+			free(mem);
+			free(disk);
+		}
 	}
+	if(!cluster_resources)
+		cluster_resources = xxstrdup("");
 	return cluster_resources;
 }
 
