@@ -1099,6 +1099,7 @@ static void show_help_run(const char *cmd)
 	printf("    --amazon-config             Amazon EC2 config file from makeflow_ec2_setup.\n");
 	printf("    --lambda-config             Amazon Lambda config file from makeflow_lambda_setup.\n");
     printf("    --amazon-ami                Specify amazon-ami (for use with -T amazon-batch)\n");
+    printf("    --amazon-batch-config       Amazon config file from makeflow_amazon_batch_setup.\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
