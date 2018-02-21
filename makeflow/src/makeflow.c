@@ -28,6 +28,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx.h"
 #include "jx_parse.h"
+#include "jx_match.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -176,6 +177,74 @@ static int should_send_all_local_environment = 0;
 static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
+
+static struct list *jx_argv = NULL;
+static struct jx *jx_optarg = NULL;
+
+static void push_jx_argv(struct jx *j) {
+	assert(j);
+	if (!jx_argv)
+			jx_argv = list_create();
+	list_push_head(jx_argv, j);
+}
+
+int option_from_name(const struct option *opt, const char *name, int *indexptr) {
+	assert(opt);
+	assert(name);
+	for (int i = 0; opt[i].name; ++i) {
+		if (!strcmp(name, opt[i].name)) {
+			if (indexptr)
+				*indexptr = i;
+			return opt[i].val;
+		}
+	}
+	return 0;
+}
+
+char *optarg_from_jx(struct jx *j) {
+	if (!j) return NULL;
+	switch (j->type) {
+	case JX_BOOLEAN:
+		return j->u.boolean_value ? xxstrdup("true") : xxstrdup("false");
+	case JX_INTEGER:
+		return string_format("%" PRIi64, j->u.integer_value);
+	case JX_DOUBLE:
+		return string_format("%g", j->u.double_value);
+	case JX_STRING:
+		return xxstrdup(j->u.string_value);
+	default:
+		return NULL;
+	}
+}
+
+static int makeflow_getopt(int argc, char *const argv[], const char *optstring, const struct option *longopts, int *longindex) {
+	static void *i = NULL;
+	static char *val = NULL;
+
+	free(val);
+	val = NULL;
+	jx_delete(jx_optarg);
+	jx_optarg = NULL;
+	if (!jx_argv)
+			jx_argv = list_create();
+
+	struct jx *head = list_peek_head(jx_argv);;
+	if (head) {
+		const char *key = jx_iterate_keys(head, &i);
+		if (key) {
+			jx_optarg = jx_copy(jx_lookup(head, key));
+			val = optarg_from_jx(jx_optarg);
+			optarg = val;
+			return option_from_name(longopts, key, longindex);
+		} else {
+			i = NULL;
+			jx_delete(list_pop_head(jx_argv));
+			return makeflow_getopt(argc, argv, optstring, longopts, longindex);
+		}
+	} else {
+		return getopt_long(argc, argv, optstring, longopts, longindex);
+	}
+}
 
 /*
 Determines if this is a local job that will consume
@@ -1156,6 +1225,7 @@ static void show_help_run(const char *cmd)
 	printf(" -o,--debug-file=<file>         Send debugging to this file.\n");
 	printf("    --debug-rotate-max=<bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -T,--batch-type=<type>         Select batch system: %s\n",batch_queue_type_string());
+	printf("    --argv=<file>         		Include command line arguments from a JSON file.\n");
 	printf(" -v,--version                   Show version string\n");
 	printf(" -h,--help                      Show this help screen.\n");
 	        /********************************************************************************/
@@ -1167,7 +1237,7 @@ static void show_help_run(const char *cmd)
 	printf("    --jx                        Use JX format for the workflow specification.\n");
 	printf("    --jx-args=<file>            Evaluate the JX input with keys and values in file defined as variables.\n");
 	printf("    --jx-context=<file>         Deprecated. Equivalent to --jx-args.\n");
-	printf("    --jx-define=<VAR>=<EXPR>   Set the JX variable VAR to the JX expression EXPR.\n");
+	printf("    --jx-define=<VAR>=<EXPR>	Set the JX variable VAR to the JX expression EXPR.\n");
 	printf("    --log-verbose               Add node id symbol tags in the makeflow log.\n");
 	printf(" -j,--max-local=<#>             Max number of local jobs to run at once.\n");
 	printf(" -J,--max-remote=<#>            Max number of remote jobs to run at once.\n");
@@ -1253,7 +1323,7 @@ static void show_help_run(const char *cmd)
 int main(int argc, char *argv[])
 {
 	int c;
-	const char *dagfile;
+	char *dagfile = NULL;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
 	const char *batch_submit_options = getenv("BATCH_OPTIONS");
@@ -1338,6 +1408,7 @@ int main(int argc, char *argv[])
 
 	enum {
 		LONG_OPT_AUTH = UCHAR_MAX+1,
+		LONG_OPT_ARGV,
 		LONG_OPT_CACHE,
 		LONG_OPT_DEBUG_ROTATE_MAX,
 		LONG_OPT_DISABLE_BATCH_CACHE,
@@ -1402,6 +1473,7 @@ int main(int argc, char *argv[])
 	static const struct option long_options_run[] = {
 		{"advertise", no_argument, 0, 'a'},
 		{"allocation", required_argument, 0, LONG_OPT_ALLOCATION_MODE},
+		{"argv", required_argument, 0, LONG_OPT_ARGV},
 		{"auth", required_argument, 0, LONG_OPT_AUTH},
 		{"batch-log", required_argument, 0, 'L'},
 		{"batch-options", required_argument, 0, 'B'},
@@ -1497,7 +1569,7 @@ int main(int argc, char *argv[])
 
 	static const char option_string_run[] = "aAB:c::C:d:Ef:F:g:G:hj:J:l:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 
-	while((c = getopt_long(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
+	while((c = makeflow_getopt(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = "catalog";
@@ -1691,6 +1763,9 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				break;
+			case 'X':
+				change_dir = optarg;
+				break;
 			case 'z':
 				output_len_check = 1;
 				break;
@@ -1848,12 +1923,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SEND_ENVIRONMENT:
 				should_send_all_local_environment = 1;
 				break;
-			default:
-				show_help_run(argv[0]);
-				return 1;
-			case 'X':
-				change_dir = optarg;
-				break;
 			case LONG_OPT_ENFORCEMENT:
 				if(!enforcer) enforcer = makeflow_wrapper_create();
 				break;
@@ -1866,6 +1935,26 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SANDBOX:
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
+			case LONG_OPT_ARGV: {
+				struct jx *j = jx_parse_file(optarg);
+				if (!j)
+					fatal("failed to parse JSON argv %s", optarg);
+				if (!jx_istype(j, JX_OBJECT))
+					fatal("argv must be a JX object");
+				struct jx *k = jx_string("MAKEFLOW");
+				struct jx *v = jx_remove(j, k);
+				jx_delete(k);
+				if (v && dagfile)
+					fatal("only one dagfile can be specified");
+				if (!jx_match_string(v, &dagfile))
+					fatal("dagfile must be a string filename");
+				jx_delete(v);
+				push_jx_argv(j);
+				break;
+			}
+			default:
+				show_help_run(argv[0]);
+				return 1;
 		}
 	}
 
@@ -1891,7 +1980,11 @@ int main(int argc, char *argv[])
 
 	makeflow_hook_create(hook_args);
 
-	if((argc - optind) != 1) {
+	if((argc - optind) == 1) {
+		if (dagfile)
+			fatal("only one dagfile can be specified");
+		dagfile = xxstrdup(argv[optind]);
+	} else if (!dagfile) {
 		int rv = access("./Makeflow", R_OK);
 		if(rv < 0) {
 			fprintf(stderr, "makeflow: No makeflow specified and file \"./Makeflow\" could not be found.\n");
@@ -1899,9 +1992,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		dagfile = "./Makeflow";
-	} else {
-		dagfile = argv[optind];
+		dagfile = xxstrdup("./Makeflow");
 	}
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE) {
