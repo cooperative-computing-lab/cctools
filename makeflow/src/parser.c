@@ -204,7 +204,6 @@ void dag_close_over_nodes(struct dag *d)
 		
 		rmsummary_set_resources_from_env(rs, s);
 	}
-
 }
 
 void dag_close_over_categories(struct dag *d) {
@@ -222,6 +221,10 @@ void dag_close_over_categories(struct dag *d) {
 		struct dag_variable_lookup_set s = {d, c, NULL, NULL };
 
 		rmsummary_set_resources_from_env(rs, s);
+
+		char *resources = rmsummary_print_string(rs, 1);
+		debug(D_MAKEFLOW_PARSER, "Category %s defined as: %s", name, resources);
+		free(resources);
 
 		c->max_allocation = rs;
 	}
