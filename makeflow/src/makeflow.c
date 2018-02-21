@@ -1225,7 +1225,7 @@ static void show_help_run(const char *cmd)
 	printf(" -o,--debug-file=<file>         Send debugging to this file.\n");
 	printf("    --debug-rotate-max=<bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -T,--batch-type=<type>         Select batch system: %s\n",batch_queue_type_string());
-	printf("    --argv=<file>         		Include command line arguments from a JSON file.\n");
+	printf("    --argv=<file>               Include command line arguments from a JSON file.\n");
 	printf(" -v,--version                   Show version string\n");
 	printf(" -h,--help                      Show this help screen.\n");
 	        /********************************************************************************/
