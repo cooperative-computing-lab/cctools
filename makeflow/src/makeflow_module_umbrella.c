@@ -21,11 +21,13 @@
 
 #include "batch_job.h"
 #include "batch_task.h"
+#include "batch_wrapper.h"
 
 #include "dag.h"
 #include "dag_node.h"
 
 #include "makeflow_hook.h"
+#include "makeflow_log.h"
 
 static char *spec;
 static char *binary;
@@ -129,7 +131,7 @@ static int dag_check( struct dag *d ){
 static int dag_start( struct dag *d ){
 	/* If no log_prefix is set use the makeflow name as a starter. */
 	if(!log_prefix){
-		log_prefix = string_format("%s.umbrella.log.%%", d->filename);
+		log_prefix = string_format("%s.umbrella.log.", d->filename);
 		debug(D_MAKEFLOW_HOOK, "setting wrapper_umbrella->log_prefix to %s\n", log_prefix);
 	}
 
@@ -172,13 +174,16 @@ char *makeflow_umbrella_print_files(struct list *files, bool is_output) {
 
 static int node_submit(struct dag_node *n, struct batch_task *t)
 {
+    struct batch_wrapper *wrapper = batch_wrapper_create();
+    batch_wrapper_prefix(wrapper, "./umbrella");
+
 	if(n->umbrella_spec){
-		makeflow_hook_add_input_file(n->d, t, n->umbrella_spec, path_basename(n->umbrella_spec));
+		makeflow_hook_add_input_file(n->d, t, n->umbrella_spec, path_basename(n->umbrella_spec), DAG_FILE_TYPE_GLOBAL);
 	} else {
-		makeflow_hook_add_input_file(n->d, t, spec, path_basename(spec));
+		makeflow_hook_add_input_file(n->d, t, spec, path_basename(spec), DAG_FILE_TYPE_GLOBAL);
 	}
 
-	if(binary) makeflow_hook_add_input_file(n->d, t, binary, path_basename(binary));
+	if(binary) makeflow_hook_add_input_file(n->d, t, binary, path_basename(binary), DAG_FILE_TYPE_GLOBAL);
 
 	debug(D_MAKEFLOW_HOOK, "input_files: %s\n", batch_files_to_string(makeflow_get_queue(n), t->input_files));
 	char *umbrella_input_opt = makeflow_umbrella_print_files(t->input_files, false);
@@ -188,7 +193,9 @@ static int node_submit(struct dag_node *n, struct batch_task *t)
 	char *umbrella_output_opt = makeflow_umbrella_print_files(t->output_files, true);
 	debug(D_MAKEFLOW_HOOK, "umbrella output opt: %s\n", umbrella_output_opt);
 
-	struct dag_file *log_file = makeflow_hook_add_output_file(n->d, t, log_prefix, NULL);
+	char *log = string_format("%s%d", log_prefix, n->nodeid);
+	struct dag_file *log_file = makeflow_hook_add_output_file(n->d, t, log, NULL, DAG_FILE_TYPE_INTERMEDIATE);
+	free(log);
 
 	char *local_binary = NULL;
 	/* If no binary is specified always assume umbrella is in path. */
@@ -221,19 +228,25 @@ static int node_submit(struct dag_node *n, struct batch_task *t)
 		}
 	}
 
-	char *umbrella_command = NULL;
+	char *cmd = string_format("%s --spec \"%s\" --localdir ./umbrella_test --inputs \"%s\" --output \"%s\" --sandbox_mode \"%s\" --log \"%s\" run \"%s\"", 
+		local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, mode, log_file->filename, t->command);
+	batch_wrapper_cmd(wrapper, cmd);
+	free(cmd);
 
-	umbrella_command = string_format("%s --spec \"%s\" --localdir ./umbrella_test --inputs \"%s\" --output \"%s\" --sandbox_mode \"%s\" --log \"%s\" run \'{}\'", 
-		local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, mode, log_file->filename);
-
-	debug(D_MAKEFLOW_HOOK, "umbrella wrapper command: %s\n", umbrella_command);
-
-	batch_task_wrap_command(t, umbrella_command);
-	debug(D_MAKEFLOW_HOOK, "umbrella command: %s\n", t->command);
+    cmd = batch_wrapper_write(wrapper, t);
+    if(cmd){
+        batch_task_set_command(t, cmd);
+        struct dag_file *df = makeflow_hook_add_input_file(n->d, t, cmd, cmd, DAG_FILE_TYPE_TEMP);
+        debug(D_MAKEFLOW_HOOK, "Wrapper written to %s", df->filename);
+        makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);
+    } else {
+        debug(D_MAKEFLOW_HOOK, "Failed to create wrapper: errno %d, %s", errno, strerror(errno));
+        return MAKEFLOW_HOOK_FAILURE;
+    }
+    free(cmd);
 
 	free(local_binary);
 	free(local_spec);
-	free(umbrella_command);
 	free(umbrella_input_opt);
 	free(umbrella_output_opt);
 	return MAKEFLOW_HOOK_SUCCESS;
