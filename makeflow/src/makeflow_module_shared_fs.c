@@ -69,12 +69,6 @@ static int destroy(){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-typedef enum {
-	SHARED_FS_SUPPORTED,
-	SHARED_FS_RENAME,
-	SHARED_FS_UNSUPPORTED,
-} shared_fs_support_t;
-
 static int node_file_uses_unsupported_shared_fs( struct dag_node *n, struct dag_file *f)
 {
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
