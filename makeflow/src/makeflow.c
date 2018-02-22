@@ -1143,7 +1143,7 @@ int main(int argc, char *argv[])
 	char *dagfile = NULL;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
-	const char *batch_submit_options = getenv("BATCH_OPTIONS");
+	const char *batch_submit_options = NULL;
 	makeflow_clean_depth clean_mode = MAKEFLOW_CLEAN_NONE;
 	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
@@ -2084,6 +2084,13 @@ int main(int argc, char *argv[])
 		fprintf(file, "set -e\n");
 		fprintf(file, "\n# %s version %s (released %s)\n\n", argv[0], CCTOOLS_VERSION, CCTOOLS_RELEASE_DATE);
 		fclose(file);
+	}
+
+	if(!batch_submit_options){
+		batch_submit_options = getenv("BATCH_OPTIONS");
+		if(batch_submit_options){
+			debug(D_MAKEFLOW, "BATCH_OPTIONS pulled from environment: %s", batch_submit_options);
+		}
 	}
 
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
