@@ -46,6 +46,7 @@ See the file COPYING for details.
 #include <signal.h>
 
 #define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos.py"
+#define CCTOOLS_VC3_BUILDER_PATH "/afs/crc.nd.edu/group/ccl/software/vc3-builder-src/vc3-builder"
 
 typedef enum {
 	FORMAT_TABLE,
@@ -1316,10 +1317,10 @@ int main(int argc, char *argv[])
 	
 	
 	if(runos_os) {
-		cmd = string_format("cp \"$(which vc3-builder)\" '%s'", scratch_dir);
+		cmd = string_format("cp '%s' '%s'",  CCTOOLS_VC3_BUILDER_PATH, scratch_dir);
 		int k = system(cmd);
 		if (k) {
-			fprintf(stderr, "can't copy vc3-builder! Please make sure it's in your path. Error code: %i\n", k);
+			fprintf(stderr, "can't copy vc3-builder! Please make sure it's at `%s`. Error code: %i\n",  CCTOOLS_VC3_BUILDER_PATH, k);
 			exit(EXIT_FAILURE);
 		}
 	}
