@@ -178,14 +178,20 @@ static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
 
+static struct list *jx_argv_stack = NULL;
 static struct list *jx_argv = NULL;
 static struct jx *jx_optarg = NULL;
 
 static void push_jx_argv(struct jx *j) {
 	assert(j);
-	if (!jx_argv)
-			jx_argv = list_create();
+	if (!jx_argv) {
+		jx_argv = list_create();
+	}
+	if (!jx_argv_stack) {
+		jx_argv_stack = list_create();
+	}
 	list_push_head(jx_argv, j);
+	list_push_head(jx_argv_stack, NULL);
 }
 
 int option_from_name(const struct option *opt, const char *name, int *indexptr) {
@@ -193,8 +199,9 @@ int option_from_name(const struct option *opt, const char *name, int *indexptr) 
 	assert(name);
 	for (int i = 0; opt[i].name; ++i) {
 		if (!strcmp(name, opt[i].name)) {
-			if (indexptr)
+			if (indexptr) {
 				*indexptr = i;
+			}
 			return opt[i].val;
 		}
 	}
@@ -218,26 +225,28 @@ char *optarg_from_jx(struct jx *j) {
 }
 
 static int makeflow_getopt(int argc, char *const argv[], const char *optstring, const struct option *longopts, int *longindex) {
-	static void *i = NULL;
 	static char *val = NULL;
 
 	free(val);
 	val = NULL;
 	jx_delete(jx_optarg);
 	jx_optarg = NULL;
-	if (!jx_argv)
-			jx_argv = list_create();
+	if (!jx_argv) {
+		jx_argv = list_create();
+	}
 
-	struct jx *head = list_peek_head(jx_argv);;
+	struct jx *head = list_peek_head(jx_argv);
 	if (head) {
+		void *i = list_pop_head(jx_argv_stack);
 		const char *key = jx_iterate_keys(head, &i);
 		if (key) {
-			jx_optarg = jx_copy(jx_lookup(head, key));
+			jx_optarg = jx_copy(jx_get_value(&i));
+			assert(jx_optarg);
 			val = optarg_from_jx(jx_optarg);
 			optarg = val;
+			list_push_head(jx_argv_stack, i);
 			return option_from_name(longopts, key, longindex);
 		} else {
-			i = NULL;
 			jx_delete(list_pop_head(jx_argv));
 			return makeflow_getopt(argc, argv, optstring, longopts, longindex);
 		}
@@ -1936,18 +1945,23 @@ int main(int argc, char *argv[])
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
 			case LONG_OPT_ARGV: {
+				debug(D_MAKEFLOW, "loading argv from %s", optarg);
 				struct jx *j = jx_parse_file(optarg);
-				if (!j)
+				if (!j) {
 					fatal("failed to parse JSON argv %s", optarg);
-				if (!jx_istype(j, JX_OBJECT))
+				}
+				if (!jx_istype(j, JX_OBJECT)) {
 					fatal("argv must be a JX object");
+				}
 				struct jx *k = jx_string("MAKEFLOW");
 				struct jx *v = jx_remove(j, k);
 				jx_delete(k);
-				if (v && dagfile)
+				if (v && dagfile) {
 					fatal("only one dagfile can be specified");
-				if (!jx_match_string(v, &dagfile))
+				}
+				if (v && !jx_match_string(v, &dagfile)) {
 					fatal("dagfile must be a string filename");
+				}
 				jx_delete(v);
 				push_jx_argv(j);
 				break;
@@ -1981,8 +1995,9 @@ int main(int argc, char *argv[])
 	makeflow_hook_create(hook_args);
 
 	if((argc - optind) == 1) {
-		if (dagfile)
+		if (dagfile) {
 			fatal("only one dagfile can be specified");
+		}
 		dagfile = xxstrdup(argv[optind]);
 	} else if (!dagfile) {
 		int rv = access("./Makeflow", R_OK);
