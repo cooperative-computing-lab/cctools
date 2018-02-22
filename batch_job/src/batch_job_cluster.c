@@ -105,8 +105,8 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 	char *cluster_resources = NULL;
 
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
-		char *mem = string_format(",mem=%mb" PRId64 "", resources->memory);
-		char *disk = string_format(",file=%mb" PRId64 "", resources->disk);
+		char *mem = string_format(",mem=%" PRId64 "mb", resources->memory);
+		char *disk = string_format(",file=%" PRId64 "mb", resources->disk);
 		cluster_resources = string_format(" -l nodes=1,ppn=%" PRId64 "%s%s ", 
 			resources->cores ? resources->cores : 1,
 			resources->memory>0 ? mem : "",
