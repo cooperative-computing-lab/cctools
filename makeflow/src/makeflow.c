@@ -27,8 +27,9 @@ See the file COPYING for details.
 #include "work_queue_catalog.h"
 #include "xxmalloc.h"
 #include "jx.h"
-#include "jx_parse.h"
 #include "jx_match.h"
+#include "jx_parse.h"
+#include "jx_getopt.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -177,83 +178,6 @@ static int should_send_all_local_environment = 0;
 static struct list *shared_fs_list = NULL;
 
 static int did_find_archived_job = 0;
-
-static struct list *jx_argv_stack = NULL;
-static struct list *jx_argv = NULL;
-static struct jx *jx_optarg = NULL;
-
-static void push_jx_argv(struct jx *j) {
-	assert(j);
-	if (!jx_argv) {
-		jx_argv = list_create();
-	}
-	if (!jx_argv_stack) {
-		jx_argv_stack = list_create();
-	}
-	list_push_head(jx_argv, j);
-	list_push_head(jx_argv_stack, NULL);
-}
-
-int option_from_name(const struct option *opt, const char *name, int *indexptr) {
-	assert(opt);
-	assert(name);
-	for (int i = 0; opt[i].name; ++i) {
-		if (!strcmp(name, opt[i].name)) {
-			if (indexptr) {
-				*indexptr = i;
-			}
-			return opt[i].val;
-		}
-	}
-	return 0;
-}
-
-char *optarg_from_jx(struct jx *j) {
-	if (!j) return NULL;
-	switch (j->type) {
-	case JX_BOOLEAN:
-		return j->u.boolean_value ? xxstrdup("true") : xxstrdup("false");
-	case JX_INTEGER:
-		return string_format("%" PRIi64, j->u.integer_value);
-	case JX_DOUBLE:
-		return string_format("%g", j->u.double_value);
-	case JX_STRING:
-		return xxstrdup(j->u.string_value);
-	default:
-		return NULL;
-	}
-}
-
-static int makeflow_getopt(int argc, char *const argv[], const char *optstring, const struct option *longopts, int *longindex) {
-	static char *val = NULL;
-
-	free(val);
-	val = NULL;
-	jx_delete(jx_optarg);
-	jx_optarg = NULL;
-	if (!jx_argv) {
-		jx_argv = list_create();
-	}
-
-	struct jx *head = list_peek_head(jx_argv);
-	if (head) {
-		void *i = list_pop_head(jx_argv_stack);
-		const char *key = jx_iterate_keys(head, &i);
-		if (key) {
-			jx_optarg = jx_copy(jx_get_value(&i));
-			assert(jx_optarg);
-			val = optarg_from_jx(jx_optarg);
-			optarg = val;
-			list_push_head(jx_argv_stack, i);
-			return option_from_name(longopts, key, longindex);
-		} else {
-			jx_delete(list_pop_head(jx_argv));
-			return makeflow_getopt(argc, argv, optstring, longopts, longindex);
-		}
-	} else {
-		return getopt_long(argc, argv, optstring, longopts, longindex);
-	}
-}
 
 /*
 Determines if this is a local job that will consume
@@ -1578,7 +1502,7 @@ int main(int argc, char *argv[])
 
 	static const char option_string_run[] = "aAB:c::C:d:Ef:F:g:G:hj:J:l:L:m:M:N:o:Op:P:r:RS:t:T:u:vW:X:zZ:";
 
-	while((c = makeflow_getopt(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
+	while((c = jx_getopt(argc, argv, option_string_run, long_options_run, NULL)) >= 0) {
 		switch (c) {
 			case 'a':
 				work_queue_master_mode = "catalog";
@@ -1963,7 +1887,8 @@ int main(int argc, char *argv[])
 					fatal("dagfile must be a string filename");
 				}
 				jx_delete(v);
-				push_jx_argv(j);
+				jx_getopt_push(j);
+				jx_delete(j);
 				break;
 			}
 			default:
