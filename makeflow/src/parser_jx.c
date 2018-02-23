@@ -117,7 +117,7 @@ static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 		remote = jx_lookup_string(j, "task_name");
 		if (!path) {
 			debug(D_MAKEFLOW_PARSER | D_NOTICE,
-				"File at line %u: missing \"path\" key",
+				"File at line %u: missing \"dag_name\" key",
 				j->line);
 			return 0;
 		}

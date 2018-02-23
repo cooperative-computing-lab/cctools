@@ -361,6 +361,23 @@ struct jx * jx_iterate_values(struct jx *j, void **i);
  */
 const char *jx_iterate_keys(struct jx *j, void **i);
 
+/* Get the current key while iterating over an object.
+ * The iteration variable must have been passed to jx_iterate_keys
+ * or jx_iterate_values. This directly fetches the current key rather than
+ * doing a lookup from the beginning, so it takes constant time and
+ * can handle repeated keys.
+ */
+const char *jx_get_key(void **i);
+
+/* Get the current value while iterating over an object.
+ * The iteration variable must have been passed to jx_iterate_keys
+ * or jx_iterate_values. This directly fetches the current value rather than
+ * doing a lookup from the beginning, so it takes constant time and
+ * can handle repeated keys.
+ */
+struct jx *jx_get_value(void **i);
+
+
 /** Merge an arbitrary number of JX_OBJECTs into a single new one. The constituent objects are not consumed. Objects are merged in the order given, i.e. a key can replace an identical key in a preceding object. The last argument must be NULL to mark the end of the list. @return A merged JX_OBJECT that must be deleted with jx_delete. */
 struct jx *jx_merge(struct jx *j, ...);
 

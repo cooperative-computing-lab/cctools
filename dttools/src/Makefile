@@ -61,6 +61,7 @@ SOURCES = \
 	json_aux.c \
 	jx.c \
 	jx_database.c \
+	jx_getopt.c \
 	jx_match.c \
 	jx_parse.c \
 	jx_print.c \

@@ -652,63 +652,48 @@ void jx_export( struct jx *j )
 }
 
 struct jx * jx_iterate_array(struct jx *j, void **i) {
-	if (!i) return NULL;
-	if (*i) {
-		struct jx_item *next = ((struct jx_item *) *i)->next;
-		if (next) {
-			*i = next;
-			return next->value;
-		} else {
-			return NULL;
-		}
-	} else {
-		if (!jx_istype(j, JX_ARRAY)) return NULL;
-		*i = j->u.items;
-		return *i ? ((struct jx_item *) *i)->value : NULL;
+	struct jx_item **x = (struct jx_item **) i;
+	assert(x);
+
+	if (*x) {
+		*x = (*x)->next;
+	} else if (jx_istype(j, JX_ARRAY)) {
+		*x = j->u.items;
 	}
+	return *x ? (*x)->value : NULL;
+}
+
+static void advance_object_iter(struct jx *j, void **i) {
+	struct jx_pair **p = (struct jx_pair **) i;
+	assert(p);
+
+	if (*p) {
+		*p = (*p)->next;
+	} else if (jx_istype(j, JX_OBJECT)) {
+		*p = j->u.pairs;
+	}
+}
+
+const char *jx_get_key(void **i) {
+	assert(i);
+	struct jx_pair *p = *i;
+	return p ? p->key->u.string_value : NULL;
+}
+
+struct jx *jx_get_value(void **i) {
+	assert(i);
+	struct jx_pair *p = *i;
+	return p ? p->value : NULL;
 }
 
 const char *jx_iterate_keys(struct jx *j, void **i) {
-	assert(i);
-	if (!i) return NULL;
-	// The caller must initialize *i to NULL.
-	// After this, *i will always point to a valid address.
-	if (!(*i)) {
-		if (!jx_istype(j, JX_OBJECT)) return NULL;
-		*i = &j->u.pairs;
-	}
-
-	struct jx_pair **p = *i;
-	while (*p) {
-		if (jx_istype((*p)->key, JX_STRING)) break;
-		p = &(*p)->next;
-	}
-
-	// End of the list
-	if (!(*p)) {
-		*i = p;
-		return NULL;
-	}
-
-	*i = &(*p)->next;
-	return (*p)->key->u.string_value;
+	advance_object_iter(j, i);
+	return jx_get_key(i);
 }
 
 struct jx * jx_iterate_values(struct jx *j, void **i) {
-	if (!i) return NULL;
-	if (*i) {
-		struct jx_pair *next = ((struct jx_pair *) *i)->next;
-		if (next) {
-			*i = next;
-			return next->value;
-		} else {
-			return NULL;
-		}
-	} else {
-		if (!jx_istype(j, JX_OBJECT)) return NULL;
-		*i = j->u.pairs;
-		return *i ? ((struct jx_pair *) *i)->value : NULL;
-	}
+	advance_object_iter(j, i);
+	return jx_get_value(i);
 }
 
 const char *jx_error_name(int code) {
