@@ -782,15 +782,6 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 				rmsummary_print(stderr, n->resources_measured, /* pprint */ 0, /* extra fields */ NULL);
 				fprintf(stderr, "\n");
 			}
-
-			category_allocation_t next = category_next_label(n->category, n->resource_request, /* resource overflow */ 1, n->resources_requested, n->resources_measured);
-
-			if(next != CATEGORY_ALLOCATION_ERROR) {
-				debug(D_MAKEFLOW_RUN, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
-				n->resource_request = next;
-				fprintf(stderr, "\nrule %d resubmitting with maximum resources.\n", n->nodeid);
-				makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
-			}
 		}
 
 		if (!hook_success || makeflow_retry_flag || task->info->exit_code == 101) {
@@ -1247,7 +1238,6 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
 	int save_failure = 1;
-	extern struct makeflow_hook makeflow_hook_loop_device;
 	extern struct makeflow_hook makeflow_hook_resource_monitor;
 	extern struct makeflow_hook makeflow_hook_sandbox;
 	extern struct makeflow_hook makeflow_hook_singularity;
@@ -1341,7 +1331,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
-		LONG_OPT_LOOP_DEVICE,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1807,7 +1796,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SANDBOX:
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
-<<<<<<< HEAD
 			case LONG_OPT_ARGV: {
 				debug(D_MAKEFLOW, "loading argv from %s", optarg);
 				struct jx *j = jx_parse_file(optarg);

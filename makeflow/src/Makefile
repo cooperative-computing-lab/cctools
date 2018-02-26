@@ -15,7 +15,6 @@ MAKEFLOW_HOOKS = makeflow_hook_example.o
 MAKEFLOW_MODULES = \
  makeflow_module_docker.o\
  makeflow_module_fail_dir.o\
- makeflow_module_loop_device.o\
  makeflow_module_resource_monitor.o\
  makeflow_module_sandbox.o\
  makeflow_module_singularity.o\
