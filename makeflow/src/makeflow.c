@@ -1819,9 +1819,6 @@ int main(int argc, char *argv[])
 				jx_delete(j);
 				break;
 			}
-			case LONG_OPT_LOOP_DEVICE:
-				makeflow_hook_register(&makeflow_hook_loop_device);
-				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
