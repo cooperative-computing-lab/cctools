@@ -49,7 +49,13 @@ static int create(struct jx *args){
 		struct jx *array = jx_lookup(args, "shared_fs_list");
 		struct jx *item = NULL;
 		while((item = jx_array_shift(array))) {
-			list_push_head(shared_fs_list, xxstrdup(item->u.string_value));
+			if(item->type == JX_STRING){
+				list_push_head(shared_fs_list, xxstrdup(item->u.string_value));
+			} else {
+				debug(D_ERROR|D_MAKEFLOW_HOOK, "Non-string argument passed to Shared FS hook");
+				return MAKEFLOW_HOOK_FAILURE;
+			}
+			jx_delete(item);
 		}
 	}
 	
@@ -57,13 +63,8 @@ static int create(struct jx *args){
 }
 
 static int destroy(){
-	char * fs = NULL;
-
-	list_first_item(shared_fs_list);
-	while((fs = list_next_item(shared_fs_list))){
-		free(fs);
-	}
-
+	list_free(shared_fs_list);
+	list_delete(shared_fs_list);
 	itable_delete(shared_fs_saved_inputs);
 	itable_delete(shared_fs_saved_outputs);
 	return MAKEFLOW_HOOK_SUCCESS;
