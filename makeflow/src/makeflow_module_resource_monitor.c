@@ -301,15 +301,8 @@ static int node_end(struct dag_node *n, struct batch_task *task)
 
 static int node_fail(struct dag_node *n, struct batch_task *task)
 {
-	if (task->info->disk_allocation_exhausted) {
-		fprintf(stderr, "\nrule %d failed because it exceeded its disk allocation capacity.\n", n->nodeid);
-		if (n->resources_measured) {
-			rmsummary_print(stderr, n->resources_measured,
-					/* pprint */ 0,
-					/* extra fields */ NULL);
-			fprintf(stderr, "\n");
-		}
-	} else if (task->info->exit_code == RM_OVERFLOW) {
+	/* Currently checking the case where either rm ran out of disk or it caught an overflow. Slightly redundant. */
+	if ((task->info->disk_allocation_exhausted) || (task->info->exit_code == RM_OVERFLOW)) {
 		debug(D_MAKEFLOW_HOOK, "rule %d failed because it exceeded the resources limits.\n", n->nodeid);
 		if (n->resources_measured && n->resources_measured->limits_exceeded) {
 			char *str = rmsummary_print_string(n->resources_measured->limits_exceeded, 1);
