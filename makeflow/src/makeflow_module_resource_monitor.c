@@ -71,7 +71,7 @@ static int create(struct jx *args)
 	monitor->enable_list_files = jx_lookup_integer(args, "resource_monitor_enable_list_files");
 
 	if (!monitor->log_dir) {
-		fatal("Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
+		debug(D_ERROR|D_MAKEFLOW_HOOK,"Monitor mode was enabled, but a log output directory was not specified (use --monitor=<dir>)");
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 
@@ -81,16 +81,17 @@ static int create(struct jx *args)
 	monitor->log_prefix = string_format("%s/%s", monitor->log_dir, monitor->log_format);
 
 	if (monitor->interval < 1) {
-		fatal("Monitoring interval should be positive.");
+		debug(D_ERROR|D_MAKEFLOW_HOOK,"Monitoring interval should be positive.");
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 
 	monitor->exe = resource_monitor_locate(NULL);
 	if (!monitor->exe) {
-		fatal("Monitor mode was enabled, but could not find resource_monitor in PATH.");
+		debug(D_ERROR|D_MAKEFLOW_HOOK,"Monitor mode was enabled, but could not find resource_monitor in PATH.");
+		return MAKEFLOW_HOOK_FAILURE;
 	}
 
-	monitor->exe_remote = path_basename(monitor->exe);
+	monitor->exe_remote = xxstrdup("cctools-monitor");
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -117,7 +118,7 @@ static int dag_start(struct dag *d)
 		if (errno == ENOENT) {
 			result = !create_dir(monitor->log_dir, 0777);
 		} else if (errno != EEXIST) {
-			fatal("Monitor mode was enabled, but could not create output directory. %s", strerror(errno));
+			debug(D_ERROR|D_MAKEFLOW_HOOK,"Monitor mode was enabled, but could not create output directory. %s", strerror(errno));
 		}
 	}
 	if (result == 0) { // Either the mkdir was successful, or create_dir was successful. aka created in Makeflow
