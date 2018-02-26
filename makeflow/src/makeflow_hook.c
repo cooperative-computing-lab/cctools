@@ -224,8 +224,23 @@ int makeflow_hook_node_success(struct dag_node *node, struct batch_task *task){
 }
 
 int makeflow_hook_node_fail(struct dag_node *node, struct batch_task *task){
-	MAKEFLOW_HOOK_CALL(node_fail, node, task);
-	return MAKEFLOW_HOOK_SUCCESS;
+	if (!makeflow_hooks)
+		return MAKEFLOW_HOOK_SUCCESS;
+
+	int hook_return = MAKEFLOW_HOOK_SUCCESS;
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		int rc = MAKEFLOW_HOOK_SUCCESS;
+		if (h->node_fail)
+			rc = h->node_fail(node, task);
+
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:node_fail failed Node %d",h->module_name?h->module_name:"", node->nodeid);
+			hook_return = rc;
+		}
+	}
+
+	return hook_return;
 }
 
 int makeflow_hook_node_abort(struct dag_node *node){
