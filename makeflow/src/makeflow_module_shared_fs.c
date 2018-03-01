@@ -45,8 +45,8 @@ static int create(struct jx *args){
 	shared_fs_saved_outputs = itable_create(0);
 
 	//JX ARRAY ITERATE
-	if(jx_lookup(args, "shared_fs_list")){
-		struct jx *array = jx_lookup(args, "shared_fs_list");
+	struct jx *array = jx_lookup(args, "shared_fs_list");
+	if (array && array->type == JX_ARRAY) {
 		struct jx *item = NULL;
 		while((item = jx_array_shift(array))) {
 			if(item->type == JX_STRING){
