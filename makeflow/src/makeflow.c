@@ -1805,13 +1805,16 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_JX_ARGS:
 				dag_syntax = DAG_SYNTAX_JX;
-				if(!jx_parse_cmd_args(jx_args, optarg))
+				jx_args = jx_parse_cmd_args(jx_args, optarg);
+				if (!jx_args) {
 					fatal("Failed to parse in JX Args File.\n");
+				}
 				break;
 			case LONG_OPT_JX_DEFINE:
 				dag_syntax = DAG_SYNTAX_JX;
-				if(!jx_parse_cmd_define(jx_args, optarg))
+				if (!jx_parse_cmd_define(jx_args, optarg)) {
 					fatal("Failed to parse in JX Define.\n");
+				}
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
 				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
