@@ -950,12 +950,12 @@ struct jx *jx_parse_cmd_args(struct jx *jx_args, char *args_file) {
 		goto FAILURE;
 	}
 
-	jx_tmp = jx_eval(jx_expr, NULL);
+	jx_tmp = jx_eval(jx_expr, jx_args);
 	jx_delete(jx_expr);
 	jx_expr = NULL;
 	if (jx_istype(jx_tmp, JX_ERROR)) {
-		jx_print_stream(jx_tmp, stderr);
 		debug(D_JX, "\nError in JX args");
+		jx_print_stream(jx_tmp, stderr);
 		goto FAILURE;
 	}
 
@@ -976,6 +976,7 @@ FAILURE:
 int jx_parse_cmd_define(struct jx *jx_args, char *define_stmt) {
 	char *s;
     struct jx *jx_expr = NULL;
+	struct jx *jx_tmp = NULL;
 
 	s = strchr(define_stmt, '=');
     if (!s){
@@ -988,7 +989,18 @@ int jx_parse_cmd_define(struct jx *jx_args, char *define_stmt) {
         debug(D_JX, "Invalid JX expression");
 		return 0;
 	}
-	jx_insert(jx_args, jx_string(optarg), jx_expr);
+
+	jx_tmp = jx_eval(jx_expr, jx_args);
+	jx_delete(jx_expr);
+
+	if (jx_istype(jx_tmp, JX_ERROR)) {
+		debug(D_JX, "\nError in JX define");
+		jx_print_stream(jx_tmp, stderr);
+		jx_delete(jx_tmp);
+		return 0;
+	}
+
+	jx_insert(jx_args, jx_string(optarg), jx_tmp);
 
 	return 1;
 }
