@@ -125,6 +125,8 @@ void dag_close_over_environment(struct dag *d)
 	char *name;
 	struct dag_variable_value *v;
 
+	if (!d) return;
+
 	string_set_first_element(d->special_vars);
 	while(string_set_next_element(d->special_vars, &name))
 	{
@@ -185,6 +187,8 @@ void dag_close_over_nodes(struct dag *d)
 {
 	struct dag_node *n;
 
+	if (!d) return;
+
 	for(n = d->nodes; n; n = n->next) {
 		struct rmsummary *rs = n->resources_requested;
 
@@ -200,6 +204,8 @@ void dag_close_over_categories(struct dag *d) {
 
 	struct category *c;
 	char *name;
+
+	if (!d) return;
 
 	hash_table_firstkey(d->categories);
 	while(hash_table_nextkey(d->categories, &name, (void **) &c)) {
