@@ -162,9 +162,9 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	submitted_files = hash_table_create(0,0);
 		
 
-	char* amazon_ami = hash_table_lookup(q->options,"amazon-ami");
+	char* amazon_ami = hash_table_lookup(q->options,"amazon-batch-img");
 	if(amazon_ami == NULL) {
-		fatal("No ami image id passed. Please pass file containing ami image id using --amazon-ami flag");
+		fatal("No image id passed. Please pass file containing ami image id using --amazon-batch-img flag");
 	}
 
 	char* aws_access_key_id     = (char*)jx_lookup_string(config, "aws_id");

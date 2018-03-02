@@ -1098,7 +1098,7 @@ static void show_help_run(const char *cmd)
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config             Amazon EC2 config file from makeflow_ec2_setup.\n");
 	printf("    --lambda-config             Amazon Lambda config file from makeflow_lambda_setup.\n");
-    printf("    --amazon-ami                Specify amazon-ami (for use with -T amazon-batch)\n");
+    printf("    --amazon-batch-img          Specify amazon ECS Image (for use with -T amazon-batch)\n");
     printf("    --amazon-batch-config       Amazon config file from makeflow_amazon_batch_setup.\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
@@ -1165,10 +1165,7 @@ int main(int argc, char *argv[])
 	double wq_option_fast_abort_multiplier = -1.0;
 	const char *amazon_config = NULL;
 	const char *lambda_config = NULL;
-	const char *amazon_credentials = NULL;
-	const char *amazon_ami = NULL;
 	const char *amazon_batch_img = NULL;
-	const char *amazon_credentials = NULL;
 	const char *amazon_batch_cfg = NULL;
 	const char *priority = NULL;
 	char *work_queue_password = NULL;
@@ -1268,7 +1265,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
 		LONG_OPT_LAMBDA_CONFIG,
-		LONG_OPT_AMAZON_CREDENTIALS,
 		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_AMAZON_BATCH_IMG,
 		LONG_OPT_AMAZON_BATCH_CFG,
@@ -1377,7 +1373,6 @@ int main(int argc, char *argv[])
 		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
-		{"amazon-credentials", required_argument, 0, LONG_OPT_AMAZON_CREDENTIALS},
 		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
 		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
@@ -1784,9 +1779,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_SANDBOX:
 				makeflow_hook_register(&makeflow_hook_sandbox);
 				break;
-			case LONG_OPT_AMAZON_AMI:
-				amazon_ami = xxstrdup(optarg);
-				break;
 			case LONG_OPT_ARGV: {
 				debug(D_MAKEFLOW, "loading argv from %s", optarg);
 				struct jx *j = jx_parse_file(optarg);
@@ -2005,7 +1997,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "working-dir", working_dir);
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
-	batch_queue_set_option(remote_queue, "amazon-ami", amazon_ami);
+	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
