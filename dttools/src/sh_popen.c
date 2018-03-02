@@ -24,8 +24,9 @@ FILE *sh_popen(const char *command)
 
 	strcpy(cmd, command);
 
-	if(string_split_quotes(cmd, &argc, &argv) < 1)
+	if(string_split_quotes(cmd, &argc, &argv) < 1){
 		return 0;
+	}
 	
 	argv = malloc(sizeof(char*)*4);
 	argv[0]="sh";
@@ -34,8 +35,9 @@ FILE *sh_popen(const char *command)
 	argv[3] = NULL;
 	argc = 4;
 
-	if(argc < 1)
+	if(argc < 1){
 		return 0;
+	}
 
 	result = pipe(fds);
 	if(result < 0) {
