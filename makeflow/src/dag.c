@@ -80,6 +80,8 @@ void dag_compile_ancestors(struct dag *d)
 	struct dag_file *f;
 	char *name;
 
+	if (!d) return;
+
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 		m = f->created_by;

@@ -939,43 +939,44 @@ struct jx * jx_parse_file( const char *name )
 	return j;
 }
 
-int jx_parse_cmd_args( struct jx * jx_args, char * args_file)
-{
-    struct jx *jx_expr = NULL;
-    struct jx *jx_tmp = NULL;
+struct jx *jx_parse_cmd_args(struct jx *jx_args, char *args_file) {
+	struct jx *jx_expr = NULL;
+	struct jx *jx_tmp = NULL;
+	struct jx *out = NULL;
 
 	jx_expr = jx_parse_file(args_file);
-    if (!jx_expr){
+	if (!jx_expr){
 		debug(D_JX, "failed to parse context");
-		return 0;
+		goto FAILURE;
 	}
 
-    jx_tmp = jx_eval(jx_expr, NULL);
-    jx_delete(jx_expr);
-    jx_expr = jx_tmp;
-    if (jx_istype(jx_expr, JX_ERROR)) {
-        jx_print_stream(jx_expr, stderr);
-        debug(D_JX, "\nError in JX args");
-		return 0;
-    }
-
-    if (!jx_istype(jx_expr, JX_OBJECT)){
-        debug(D_JX, "Args file must contain a JX object");
-		return 0;
+	jx_tmp = jx_eval(jx_expr, jx_args);
+	jx_delete(jx_expr);
+	jx_expr = NULL;
+	if (jx_istype(jx_tmp, JX_ERROR)) {
+		debug(D_JX, "\nError in JX args");
+		jx_print_stream(jx_tmp, stderr);
+		goto FAILURE;
 	}
 
-    jx_tmp = jx_merge(jx_args, jx_expr, NULL);
-    jx_delete(jx_expr);
-    jx_delete(jx_args);
-    jx_args = jx_tmp;
+	if (!jx_istype(jx_tmp, JX_OBJECT)){
+		debug(D_JX, "Args file must contain a JX object");
+		goto FAILURE;
+	}
 
-	return 1;
+	out = jx_merge(jx_args, jx_tmp, NULL);
+FAILURE:
+	jx_delete(jx_expr);
+	jx_delete(jx_args);
+	jx_delete(jx_tmp);
+
+	return out;
 }
 
-int jx_parse_cmd_define( struct jx * jx_args, char * define_stmt )
-{
+int jx_parse_cmd_define(struct jx *jx_args, char *define_stmt) {
 	char *s;
     struct jx *jx_expr = NULL;
+	struct jx *jx_tmp = NULL;
 
 	s = strchr(define_stmt, '=');
     if (!s){
@@ -988,7 +989,18 @@ int jx_parse_cmd_define( struct jx * jx_args, char * define_stmt )
         debug(D_JX, "Invalid JX expression");
 		return 0;
 	}
-	jx_insert(jx_args, jx_string(optarg), jx_expr);
+
+	jx_tmp = jx_eval(jx_expr, jx_args);
+	jx_delete(jx_expr);
+
+	if (jx_istype(jx_tmp, JX_ERROR)) {
+		debug(D_JX, "\nError in JX define");
+		jx_print_stream(jx_tmp, stderr);
+		jx_delete(jx_tmp);
+		return 0;
+	}
+
+	jx_insert(jx_args, jx_string(optarg), jx_tmp);
 
 	return 1;
 }
