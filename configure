@@ -1037,7 +1037,7 @@ then
 			if check_file ${python3_include}/Python.h && check_file ${python3}-config
 			then
 				echo "found python3 development libraries"
-				python3_ccflags=`${python3}-config --cflags`
+				python3_ccflags=$(${python3}-config --includes)
 				python3_ldflags=`${python3}-config --ldflags`
 
 				# On OSX, the ExtUtils::Embed options contain options
