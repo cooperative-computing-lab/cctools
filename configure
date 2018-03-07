@@ -1105,7 +1105,7 @@ then
 		if [ -n "$swig" ]
 		then
 			swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
-			if [ ! \( "$python_major_version" -eq 2 -a "$python_minor_version" -eq 4 \) -a `format_version $swig_version` -eq `format_version 1.3.29` ]
+			if [ ! \( "$python_major_version" = 2 -a "$python_minor_version" = 4 \) -a `format_version $swig_version` = `format_version 1.3.29` ]
 			then
 				echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
 				echo "*** skipping swig bindings for work queue and chirp"
