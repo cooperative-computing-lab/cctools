@@ -911,7 +911,7 @@ then
 	echo "python version is ${python_version}"
 	python_major_version=`echo ${python_version} | cut -d . -f 1`
 	python_minor_version=`echo ${python_version} | cut -d . -f 2 | cut -d . -f 1,2`
-	if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
+	if [ "$python_major_version" = 2 -a "$python_minor_version" -ge 4 ]
 	then
 		if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 		then
@@ -1024,14 +1024,13 @@ then
 	else
 		python3=0
 	fi
-
 	if [ $python3 != 0 ]
 	then
 		python3_version=`${python3} -V 2>&1 | cut -d " " -f 2`
 		echo "python3 version is ${python3_version}"
 		python3_major_version=`echo ${python3_version} | cut -d . -f 1`
 		python3_minor_version=`echo ${python3_version} | cut -d . -f 2 | cut -d . -f 1,2`
-		if [ "$python3_major_version" -eq 3 ]
+		if [ "$python3_major_version" = 3 ]
 		then
 			python3_include=`${python3} -c 'from distutils import sysconfig; print(sysconfig.get_python_inc())'`
 			if check_file ${python3_include}/Python.h && check_file ${python3}-config
