@@ -15,7 +15,7 @@ PROGRAMS += resource_monitor_histograms
 endif
 
 # currently only python bindings have been implemented
-CCTOOLS_SWIG_BINDINGS := $(findstring python, $(CCTOOLS_SWIG_BINDINGS))
+CCTOOLS_SWIG_BINDINGS := $(filter python, $(CCTOOLS_SWIG_BINDINGS))
 
 TARGETS = $(LIBRARIES) $(PROGRAMS)
 
