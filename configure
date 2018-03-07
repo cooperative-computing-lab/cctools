@@ -1038,7 +1038,30 @@ then
 			then
 				echo "found python3 development libraries"
 				python3_ccflags=$(${python3}-config --includes)
-				python3_ldflags=`${python3}-config --ldflags`
+				# python3_ldflags=$(${python3}-config --ldflags) # it includes static libs, so we need:
+				python3_ldflags_file=`mktemp tmp.XXXXXX`
+				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
+from re import search
+from distutils import sysconfig
+
+libname = sysconfig.get_config_var('LDLIBRARY')
+
+libs = []
+
+if not search('^libpython.*\.so.*', libname):
+    libs.append('-L' + sysconfig.get_config_var('LIBPL'))
+
+libs.append('-L' + ' -L'.join(sysconfig.get_config_var('LIBDIR').split()))
+libs.append('-lpython' + sysconfig.get_config_var('LDVERSION'))
+libs.extend(sysconfig.get_config_var('LIBS').split())
+libs.extend(sysconfig.get_config_var('SYSLIBS').split())
+libs.append('-lz')
+libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
+
+print(' '.join(libs))
+EOF
+				python3_ldflags=$(cat $python3_ldflags_file)
+				rm $python3_ldflags_file
 
 				# On OSX, the ExtUtils::Embed options contain options
 				# to generate triple-fat binaries, which fails when
