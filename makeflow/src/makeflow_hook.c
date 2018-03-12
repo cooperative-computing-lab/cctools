@@ -81,7 +81,7 @@ int makeflow_hook_register(struct makeflow_hook *hook) {
 		memcpy(h, hook, sizeof(*h));
 		debug(D_MAKEFLOW_HOOK, "Hook %s:registered",h->module_name?h->module_name:"");
 
-		list_push_head(makeflow_hooks, h);
+		list_push_tail(makeflow_hooks, h);
 	} else if(rc == MAKEFLOW_HOOK_FAILURE){
 		debug(D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
 	} else if(rc == MAKEFLOW_HOOK_SKIP){
@@ -105,8 +105,9 @@ int makeflow_hook_dag_check(struct dag *d){
 	if (!makeflow_hooks)
 		return MAKEFLOW_HOOK_SUCCESS;
 
+	struct makeflow_hook *h;
 	list_first_item(makeflow_hooks);
-	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+	while((h = list_next_item(makeflow_hooks))){
 		int rc = MAKEFLOW_HOOK_SUCCESS;
 		if (h->dag_check)
 			rc = h->dag_check(d);

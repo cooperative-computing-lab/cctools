@@ -144,7 +144,9 @@ static int node_submit(struct dag_node *n, struct batch_task *task)
 	char *executable = NULL;
 
 	struct batch_wrapper *wrapper = batch_wrapper_create();
-	batch_wrapper_prefix(wrapper, "./resource_monitor");
+	char *prefix = string_format("./resource_monitor_%d", n->nodeid);
+	batch_wrapper_prefix(wrapper, prefix);
+	free(prefix);
 
 	// Add/Use the existing executable that has been used for previous nodes.
 	makeflow_hook_add_input_file(n->d, task, monitor->exe, monitor->exe_remote, DAG_FILE_TYPE_GLOBAL);
@@ -187,8 +189,13 @@ static int node_submit(struct dag_node *n, struct batch_task *task)
 		output_prefix = xxstrdup(path_basename(log_prefix));
 	}
 
-	char *cmd = resource_monitor_write_command(executable, output_prefix, dag_node_dynamic_label(n), extra_options,
-			monitor->enable_debug, monitor->enable_time_series, monitor->enable_list_files);
+	char *cmd = resource_monitor_write_command(executable, 
+					output_prefix, 
+					dag_node_dynamic_label(n), 
+					extra_options,
+					monitor->enable_debug, 
+					monitor->enable_time_series, 
+					monitor->enable_list_files);
 
 	free(executable);
 	free(extra_options);
@@ -218,6 +225,7 @@ static int node_submit(struct dag_node *n, struct batch_task *task)
 int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queue *queue)
 {
 	if (!batch_queue_supports_feature(queue, "output_directories")) {
+		struct dag_file *f;
 		char *log_prefix = set_log_prefix(n);
 		char *output_prefix = xxstrdup(path_basename(log_prefix));
 
@@ -233,6 +241,9 @@ int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queu
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Error moving Resource Monitor output %s:%s. %s\n", old_path, new_path,
 					strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
+		} else {
+			f = dag_file_from_name(n->d, old_path);
+			if(f) makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_DELETE);
 		}
 		free(old_path);
 		free(new_path);
@@ -244,6 +255,9 @@ int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queu
 				debug(D_ERROR|D_MAKEFLOW_HOOK, "Error moving Resource Monitor output %s:%s. %s\n", old_path,
 						new_path, strerror(errno));
 				return MAKEFLOW_HOOK_FAILURE;
+			} else {
+				f = dag_file_from_name(n->d, old_path);
+				if(f) makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_DELETE);
 			}
 			free(old_path);
 			free(new_path);
@@ -256,6 +270,9 @@ int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queu
 				debug(D_ERROR|D_MAKEFLOW_HOOK, "Error moving Resource Monitor output %s:%s. %s\n", old_path,
 						new_path, strerror(errno));
 				return MAKEFLOW_HOOK_FAILURE;
+			} else {
+				f = dag_file_from_name(n->d, old_path);
+				if(f) makeflow_log_file_state_change(n->d, f, DAG_FILE_STATE_DELETE);
 			}
 			free(old_path);
 			free(new_path);

@@ -127,9 +127,10 @@ static int node_success(struct dag_node *n, struct batch_task *task){
 static int node_fail(struct dag_node *n, struct batch_task *task){
 	struct batch_file *bf = NULL;
 	struct dag_file *df = NULL;
+	debug(D_MAKEFLOW_HOOK, "Entered failed fail dir");
 	int prep_failed =  makeflow_module_prep_fail_dir(n->d, n, task->queue); 
 	if (prep_failed) { 
-		fprintf(stderr, "rule %d failed, cannot move outputs\n", 
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "rule %d failed, cannot move outputs\n", 
 					n->nodeid); 
 		return MAKEFLOW_HOOK_FAILURE;
 	}
