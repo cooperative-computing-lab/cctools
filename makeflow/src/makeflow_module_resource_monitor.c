@@ -301,6 +301,7 @@ static int node_end(struct dag_node *n, struct batch_task *task)
 
 static int node_fail(struct dag_node *n, struct batch_task *task)
 {
+	int rc = MAKEFLOW_HOOK_FAILURE;
 	debug(D_MAKEFLOW_HOOK, "Entered failed resource monitor");
 	/* Currently checking the case where either rm ran out of disk or it caught an overflow. Slightly redundant. */
 	if ((task->info->disk_allocation_exhausted) || (task->info->exit_code == RM_OVERFLOW)) {
@@ -311,7 +312,11 @@ static int node_fail(struct dag_node *n, struct batch_task *task)
 			free(str);
 		}
 	} else {
-		return MAKEFLOW_HOOK_SUCCESS;
+		debug(D_MAKEFLOW_HOOK, "rule %d failed, but was not attributed to resource monitor.\n", n->nodeid);
+		/* The node failed, but we are not sure its the resource monitor.
+		 * We will return that did not fail on resource monitor, but still
+		 * update the next allocation numbers incase it was. */
+		rc = MAKEFLOW_HOOK_SUCCESS;
 	}
 
 	category_allocation_t next = category_next_label(n->category, n->resource_request,
@@ -321,9 +326,11 @@ static int node_fail(struct dag_node *n, struct batch_task *task)
 		debug(D_MAKEFLOW_HOOK, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
 		n->resource_request = next;
 		makeflow_log_state_change(n->d, n, DAG_NODE_STATE_WAITING);
+	} else {
+		debug(D_MAKEFLOW_HOOK, "Rule %d failed to setting new resource allocation.\n", n->nodeid);
 	}
 
-	return MAKEFLOW_HOOK_FAILURE;
+	return rc;
 }
 
 struct makeflow_hook makeflow_hook_resource_monitor = {
