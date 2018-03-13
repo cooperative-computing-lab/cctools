@@ -911,7 +911,7 @@ then
 	echo "python version is ${python_version}"
 	python_major_version=`echo ${python_version} | cut -d . -f 1`
 	python_minor_version=`echo ${python_version} | cut -d . -f 2 | cut -d . -f 1,2`
-	if [ "$python_major_version" -eq 2 -a "$python_minor_version" -ge 4 ]
+	if [ "$python_major_version" = 2 -a "$python_minor_version" -ge 4 ]
 	then
 		if check_file ${python_path}/include/python2.$python_minor_version/Python.h
 		then
@@ -1024,21 +1024,43 @@ then
 	else
 		python3=0
 	fi
-
 	if [ $python3 != 0 ]
 	then
 		python3_version=`${python3} -V 2>&1 | cut -d " " -f 2`
 		echo "python3 version is ${python3_version}"
 		python3_major_version=`echo ${python3_version} | cut -d . -f 1`
 		python3_minor_version=`echo ${python3_version} | cut -d . -f 2 | cut -d . -f 1,2`
-		if [ "$python3_major_version" -eq 3 ]
+		if [ "$python3_major_version" = 3 ]
 		then
 			python3_include=`${python3} -c 'from distutils import sysconfig; print(sysconfig.get_python_inc())'`
 			if check_file ${python3_include}/Python.h && check_file ${python3}-config
 			then
 				echo "found python3 development libraries"
-				python3_ccflags=`${python3}-config --cflags`
-				python3_ldflags=`${python3}-config --ldflags`
+				python3_ccflags=$(${python3}-config --includes)
+				# python3_ldflags=$(${python3}-config --ldflags) # it includes static libs, so we need:
+				python3_ldflags_file=`mktemp tmp.XXXXXX`
+				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
+from re import search
+from distutils import sysconfig
+
+libname = sysconfig.get_config_var('LDLIBRARY')
+
+libs = []
+
+if not search('^libpython.*\.so.*', libname):
+    libs.append('-L' + sysconfig.get_config_var('LIBPL'))
+
+libs.append('-L' + ' -L'.join(sysconfig.get_config_var('LIBDIR').split()))
+libs.append('-lpython' + sysconfig.get_config_var('LDVERSION'))
+libs.extend(sysconfig.get_config_var('LIBS').split())
+libs.extend(sysconfig.get_config_var('SYSLIBS').split())
+libs.append('-lz')
+libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
+
+print(' '.join(libs))
+EOF
+				python3_ldflags=$(cat $python3_ldflags_file)
+				rm $python3_ldflags_file
 
 				# On OSX, the ExtUtils::Embed options contain options
 				# to generate triple-fat binaries, which fails when
@@ -1105,7 +1127,7 @@ then
 		if [ -n "$swig" ]
 		then
 			swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
-			if [ ! \( "$python_major_version" -eq 2 -a "$python_minor_version" -eq 4 \) -a `format_version $swig_version` -eq `format_version 1.3.29` ]
+			if [ ! \( "$python_major_version" = 2 -a "$python_minor_version" = 4 \) -a `format_version $swig_version` = `format_version 1.3.29` ]
 			then
 				echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
 				echo "*** skipping swig bindings for work queue and chirp"
