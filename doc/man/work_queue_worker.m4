@@ -40,6 +40,8 @@ MANPAGE(condor_submit_workers,1) respectively.
 
 SECTION(OPTIONS)
 OPTIONS_BEGIN
+OPTION_ITEM(-v, --version')Show version string.
+OPTION_ITEM(-h, --help')Show this help message.
 OPTION_TRIPLET(-N,-M, master-name, name)Set the name of the project this worker should work for.  A worker can have multiple projects.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
@@ -57,23 +59,21 @@ OPTION_TRIPLET(-t, timeout, time)Abort after this amount of idle time. (default=
 OPTION_TRIPLET(-w, tcp-window-size, size)Set TCP window size.
 OPTION_TRIPLET(-i, min-backoff, time)Set initial value for backoff interval when worker fails to connect to a master. (default=1s)
 OPTION_TRIPLET(-b, max-backoff, time)Set maxmimum value for backoff interval when worker fails to connect to a master. (default=60s)
-OPTION_TRIPLET(-z, disk-threshold, size)Set available disk space threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
+OPTION_TRIPLET(-z, disk-threshold, size)Minimum free disk space in MB. When free disk space is less than this value, the worker will clean up and try to reconnect. (default=100MB)
 OPTION_PAIR(--memory-threshold, size)Set available memory threshold (in MB). When exceeded worker will clean up and reconnect. (default=100MB)
 OPTION_TRIPLET(-A, arch, arch)Set the architecture string the worker reports to its supervisor. (default=the value reported by uname)
 OPTION_TRIPLET(-O, os, os)Set the operating system string the worker reports to its supervisor. (default=the value reported by uname)
 OPTION_TRIPLET(-s, workdir, path)Set the location where the worker should create its working directory. (default=/tmp)
 OPTION_PAIR(--bandwidth, mbps)Set the maximum bandwidth the foreman will consume in Mbps. (default=unlimited)
-OPTION_PAIR(--volatility, chance)Set the percent chance a worker will decide to shut down every minute.
 OPTION_PAIR(--cores, n)Set the number of cores this worker should use.  Set it to 0 to have the worker use all of the available resources. (default=1)
 OPTION_PAIR(--gpus, n)Set the number of GPUs this worker should use. (default=0)
 OPTION_PAIR(--memory, mb)Manually set the amount of memory (in MB) reported by this worker.
 OPTION_PAIR(--disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
 OPTION_PAIR(--wall-time, s)Set the maximum number of seconds the worker may be active.
-OPTION_ITEM(-v, --version')Show version string.
-OPTION_ITEM(-h, --help')Show this help message.
 OPTION_PAIR(--docker, image) Enable the worker to run each task with a container based on this image.
 OPTION_PAIR(--docker-preserve, image) Enable the worker to run all tasks with a shared container based on this image.
 OPTION_PAIR(--docker-tar, tarball) Load docker image from this tarball.
+OPTION_PAIR(--volatility, chance)Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).
 OPTIONS_END
 
 SECTION(FOREMAN MODE)
