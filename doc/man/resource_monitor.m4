@@ -95,24 +95,25 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
 OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
-OPTION_TRIPLET(-i,interval,n)Interval between observations, in seconds (default=1).
+OPTION_ITEM(`-v,--version')Show version string.
+OPTION_ITEM(`-h,--help')Show help text.
+OPTION_TRIPLET(-i,interval,n)Maximum interval between observations, in seconds (default=1).
+OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
 OPTION_TRIPLET(-c,sh,str)Read command line from <str>, and execute as '/bin/sh -c <str>'.
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
 OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value\' to specify resource limits. (Could be specified multiple times.)
 OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
 OPTION_TRIPLET(-O,with-output-files,template)Specify template for log files (default=resource-pid-<pid>).
 OPTION_ITEM(--with-time-series)Write resource time series to <template>.series.
-OPTION_ITEM(--with-inotify)Write inotify statistics to <template>.files.
+OPTION_ITEM(--with-inotify)Write inotify statistics of opened files to default=<template>.files.
 OPTION_TRIPLET(-V,verbatim-to-summary,str)Include this string verbatim in a line in the summary. (Could be specified multiple times.)
+OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
 OPTION_ITEM(--follow-chdir)Follow processes' current working directories.
-OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. If not specified, follow the current directory. Can be specified multiple times.
-OPTION_ITEM(--without-time-series)Do not write the time-series log file.
-OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
-OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
-OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
+OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint. Overrides --measure-dir.
+OPTION_ITEM(--no-pprint)Do not pretty-print summaries.
 OPTION_ITEM(--snapshot-events=<file>)Configuration file for snapshots on file patterns. See below.
-OPTION_ITEM(`-v,--version')Show version string.
-OPTION_ITEM(`-h,--help')Show help text.
+
+
 OPTIONS_END
 
 The limits file should contain lines of the form:
