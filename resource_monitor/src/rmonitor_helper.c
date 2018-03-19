@@ -119,6 +119,10 @@ void rmonitor_helper_initialize() {
 	define_original_dlsym(open64);
 #endif
 
+	if(!family_of_fd) {
+		family_of_fd = itable_create(8);
+	}
+
 	initializing_helper = 0;
 }
 
@@ -232,8 +236,9 @@ int close(int fd)
 		return syscall(SYS_close, fd);
 	}
 
-	if(family_of_fd)
+	if(family_of_fd) {
 		itable_remove(family_of_fd, fd);
+	}
 
 	int status = original_close(fd);
 
@@ -347,9 +352,6 @@ int socket(int domain, int type, int protocol)
 		rmonitor_helper_initialize();
 		assert(original_socket);
 	}
-
-	if(!family_of_fd)
-		family_of_fd = itable_create(8);
 
 	fd = original_socket(domain, type, protocol);
 
@@ -578,7 +580,6 @@ void exit_wrapper_preamble(int status)
 	} else {
 		signal(SIGCONT, old_handler);
 	}
-
 
 	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }

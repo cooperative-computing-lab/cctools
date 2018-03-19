@@ -24,9 +24,9 @@ all: $(TARGETS) bindings
 # Note below: we use gcc on static builds so that the library gets to use the system linker.
 librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rmonitor_helper.o rmonitor_helper_comm.o
 ifeq ($(CCTOOLS_STATIC),1)
-	gcc           -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+	gcc           -shared -Wl,-init,rmonitor_helper_initialize -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 else
-	$(CCTOOLS_LD) -shared -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
+	$(CCTOOLS_CC) -shared -Wl,-init,rmonitor_helper_initialize -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 endif
 
 piggybacker: piggybacker.o
