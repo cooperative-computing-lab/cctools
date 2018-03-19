@@ -199,6 +199,8 @@ static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
 
+static int stop_short_running = 0; /* Stop to analyze process that run for less than RESOURCE_MONITOR_SHORT_TIME seconds. By default such processes are not stopped. */
+
 struct itable *wdirs_rc;        /* Counts how many rmonitor_process_info use a rmonitor_wdir_info. */
 struct itable *filesys_rc;      /* Counts how many rmonitor_wdir_info use a rmonitor_filesys_info. */
 
@@ -1759,11 +1761,23 @@ int rmonitor_dispatch_msg(void)
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
-	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END || msg.type == SNAPSHOT) {
+	// find out if messages are urgent:
+	if(msg.type == SNAPSHOT) {
 		return 1;
-	} else {
-		return 0;
 	}
+
+	if(msg.type == END_WAIT || msg.type == END) {
+		if(msg.origin != first_process_pid && !stop_short_running) {
+			if(msg.end < (msg.start + RESOURCE_MONITOR_SHORT_TIME)) {
+				// for short running processes END_WAIT and END are not urgent.
+				return 0;
+			}
+		}
+
+		return 1;
+	}
+
+	return 0;
 }
 
 int wait_for_messages(int interval)
@@ -2105,7 +2119,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_MEASURE_DIR,
 		LONG_OPT_NO_PPRINT,
 		LONG_OPT_SNAPSHOT_FILE,
-		LONG_OPT_SNAPSHOT_WATCH_CONF
+		LONG_OPT_SNAPSHOT_WATCH_CONF,
+		LONG_OPT_STOP_SHORT_RUNNING
 	};
 
     static const struct option long_options[] =
@@ -2125,6 +2140,8 @@ int main(int argc, char **argv) {
 		    {"follow-chdir", no_argument,       0,  LONG_OPT_FOLLOW_CHDIR},
 		    {"measure-dir",  required_argument, 0,  LONG_OPT_MEASURE_DIR},
 		    {"no-pprint",    no_argument,       0,  LONG_OPT_NO_PPRINT},
+
+		    {"accurate-short-processes", no_argument, 0, LONG_OPT_STOP_SHORT_RUNNING},
 
 		    {"with-output-files",      required_argument, 0,  'O'},
 		    {"with-time-series",       no_argument, 0, LONG_OPT_TIME_SERIES},
@@ -2207,6 +2224,9 @@ int main(int argc, char **argv) {
 					exit(RM_MONITOR_ERROR);
 				}
 				break;
+			case LONG_OPT_STOP_SHORT_RUNNING:
+				stop_short_running = 1;
+				break;
 			case LONG_OPT_NO_PPRINT:
 				pprint_summaries = 0;
 				break;
@@ -2279,7 +2299,7 @@ int main(int argc, char **argv) {
     }
 
     write_helper_lib();
-    rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
+    rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd, stop_short_running);
 
 	summary_path = default_summary_name(template_path);
 

@@ -67,6 +67,7 @@ static struct itable *family_of_fd = NULL;
 static uint64_t start_time = 0;
 static uint64_t end_time   = 0;
 
+static int stop_short_running = 0; /* Stop processes that run for less than RESOURCE_MONITOR_SHORT_TIME seconds. */
 static int root_process       = 0;  /* 1 for first process to be monitored. */
 
 #define declare_original_dlsym(name) __typeof__(name) *original_ ## name;
@@ -134,6 +135,11 @@ void rmonitor_helper_initialize() {
 		root_process = 0;
 	}
 
+	if(getenv(RESOURCE_MONITOR_HELPER_STOP_SHORT)) {
+		stop_short_running = 1;
+	} else {
+		stop_short_running = 0;
+	}
 
 	start_time = timestamp_get();
 
@@ -582,8 +588,19 @@ void exit_wrapper_preamble(int status)
 	sighandler_t old_handler = signal(SIGCONT, exit_signal_handler);
 
 	int blocking_signals = 0;
-	if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
-		blocking_signals = 1;
+	int short_process    = 0;
+
+	if(!root_process && !stop_short_running) {
+		if(end_time < (start_time + RESOURCE_MONITOR_SHORT_TIME)) {
+			short_process = 1;
+		}
+	}
+
+	// If not short running, stop the process for examination.
+	if(!short_process) {
+		if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
+			blocking_signals = 1;
+		}
 	}
 
 	send_monitor_msg(&msg);
@@ -622,6 +639,8 @@ void exit(int status)
 		syscall(SYS_exit, status);
 	}
 
+	end_time = timestamp_get();
+
 	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();
 
@@ -645,8 +664,6 @@ void _exit(int status)
 	if(!original_exit){
 		syscall(SYS_exit, status);
 	}
-
-	end_time = timestamp_get();
 
 	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();

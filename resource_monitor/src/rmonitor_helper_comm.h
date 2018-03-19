@@ -11,9 +11,12 @@ See the file COPYING for details.
 #define RMONITOR_HELPER_COMM_H
 
 #define RESOURCE_MONITOR_HELPER_ENV_VAR    "CCTOOLS_RESOURCE_MONITOR_HELPER"
+#define RESOURCE_MONITOR_HELPER_STOP_SHORT "CCTOOLS_RESOURCE_MONITOR_STOP_SHORT"
 #define RESOURCE_MONITOR_ROOT_PROCESS      "CCTOOLS_RESOURCE_ROOT_PROCESS"
 #define RESOURCE_MONITOR_INFO_ENV_VAR      "CCTOOLS_RESOURCE_MONITOR_INFO"
 
+// in useconds
+#define RESOURCE_MONITOR_SHORT_TIME      250000
 
 enum rmonitor_msg_type { BRANCH, WAIT, END_WAIT, END, CHDIR, OPEN_INPUT, OPEN_OUTPUT, READ, WRITE, RX, TX, SNAPSHOT };
 
@@ -43,7 +46,7 @@ struct rmonitor_msg
 	}                     data;
 };
 
-int rmonitor_helper_init(char *path_from_cmdline, int *fd);
+int rmonitor_helper_init(char *path_from_cmdline, int *fd, int stop_short_running);
 
 const char *str_msgtype(enum rmonitor_msg_type n);
 
