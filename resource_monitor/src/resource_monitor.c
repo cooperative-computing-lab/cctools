@@ -1258,13 +1258,19 @@ void rmonitor_track_process(pid_t pid)
 	char *newpath;
 	struct rmonitor_process_info *p;
 
-	if(!ping_process(pid))
+	if(!pid) {
 		return;
+	}
+
+	if(!ping_process(pid)) {
+		return;
+	}
 
 	p = itable_lookup(processes, pid);
 
-	if(p)
+	if(p) {
 		return;
+	}
 
 	p = malloc(sizeof(struct rmonitor_process_info));
 	bzero(p, sizeof(struct rmonitor_process_info));
