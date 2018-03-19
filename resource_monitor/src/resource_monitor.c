@@ -1977,6 +1977,8 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
+    fprintf(stdout, "%-30s Accurately measure short running processes (adds overhead).\n", "--accurate-short-processes");
+    fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Configuration file for snapshots on file patterns.\n", "--snapshot-events=<file>");
