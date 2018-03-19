@@ -254,6 +254,9 @@ int rmonitor_helper_init(char *lib_default_path, int *fd)
 		debug(D_RMON,"setting LD_PRELOAD to %s\n", ld_preload);
 
 
+		/* First process will unset this variable. */
+		setenv(RESOURCE_MONITOR_ROOT_PROCESS, "1", 1);
+
 		setenv("LD_PRELOAD", ld_preload, 1);
 
 		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, rmonitor_port);

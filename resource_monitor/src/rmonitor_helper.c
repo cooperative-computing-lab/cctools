@@ -67,6 +67,7 @@ static struct itable *family_of_fd = NULL;
 static uint64_t start_time = 0;
 static uint64_t end_time   = 0;
 
+static int root_process       = 0;  /* 1 for first process to be monitored. */
 
 #define declare_original_dlsym(name) __typeof__(name) *original_ ## name;
 #define define_original_dlsym(name) original_ ## name = dlsym(RTLD_NEXT, #name);
@@ -124,6 +125,13 @@ void rmonitor_helper_initialize() {
 
 	if(!family_of_fd) {
 		family_of_fd = itable_create(8);
+	}
+
+	if(getenv(RESOURCE_MONITOR_ROOT_PROCESS)) {
+		root_process = 1;
+		unsetenv(RESOURCE_MONITOR_ROOT_PROCESS);
+	} else {
+		root_process = 0;
 	}
 
 
