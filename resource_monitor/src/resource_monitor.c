@@ -1289,6 +1289,7 @@ void rmonitor_track_process(pid_t pid)
 	p->running = 1;
 	p->waiting = 0;
 
+	rmonitor_poll_process_once(p);
 	summary->total_processes++;
 }
 
