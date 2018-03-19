@@ -64,6 +64,9 @@
 #define END(msg)   POP_ERRNO(msg) if(msg.type == RX || msg.type == TX) msg.end = timestamp_get(); }
 
 static struct itable *family_of_fd = NULL;
+static uint64_t start_time = 0;
+static uint64_t end_time   = 0;
+
 
 #define declare_original_dlsym(name) __typeof__(name) *original_ ## name;
 #define define_original_dlsym(name) original_ ## name = dlsym(RTLD_NEXT, #name);
@@ -122,6 +125,9 @@ void rmonitor_helper_initialize() {
 	if(!family_of_fd) {
 		family_of_fd = itable_create(8);
 	}
+
+
+	start_time = timestamp_get();
 
 	initializing_helper = 0;
 }
@@ -562,6 +568,8 @@ void exit_wrapper_preamble(int status)
 	msg.error  = 0;
 	msg.origin = getpid();
 	msg.data.n = status;
+	msg.start  = start_time;
+	msg.end    = end_time;;
 
 	sighandler_t old_handler = signal(SIGCONT, exit_signal_handler);
 
@@ -593,6 +601,8 @@ void end_wrapper_epilogue(void)
 	msg.error  = 0;
 	msg.origin = getpid();
 	msg.data.p = getpid();
+	msg.start  = start_time;
+	msg.end    = end_time;;
 
 	send_monitor_msg(&msg);
 }
@@ -627,6 +637,8 @@ void _exit(int status)
 	if(!original_exit){
 		syscall(SYS_exit, status);
 	}
+
+	end_time = timestamp_get();
 
 	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();
