@@ -109,6 +109,7 @@ OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. If not specified, foll
 OPTION_ITEM(--without-time-series)Do not write the time-series log file.
 OPTION_ITEM(--without-opened-files)Do not write the list of opened files.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint (default).
+OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
 OPTION_ITEM(--snapshot-events=<file>)Configuration file for snapshots on file patterns. See below.
 OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
