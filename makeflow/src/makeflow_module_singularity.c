@@ -51,7 +51,9 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 	batch_wrapper_prefix(wrapper, CONTAINER_SINGULARITY_SH);
 
 	/* Assumes a /disk dir in the image. */
-	char *cmd = string_format("singularity exec --home $(pwd) %s %s %s", singularity_opt, singularity_image, t->command);
+	char *task_cmd = string_escape_shell(t->command);
+	char *cmd = string_format("singularity exec --home $(pwd) %s %s sh -c %s", singularity_opt, singularity_image, t->command);
+	free(task_cmd);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);
 
