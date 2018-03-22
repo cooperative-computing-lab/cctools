@@ -8,3 +8,4 @@ BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
 BreakStringLiterals: false
+BinPackArguments: false

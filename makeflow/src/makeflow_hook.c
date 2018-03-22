@@ -62,6 +62,7 @@ int makeflow_hook_register(struct makeflow_hook *hook) {
 	/* Add hook by default, if it doesn't exists in list of hooks. */
 	int rc = MAKEFLOW_HOOK_SUCCESS;
 	struct makeflow_hook *h = NULL;
+	debug(D_MAKEFLOW_HOOK, "Hook %s:trying to registered",hook->module_name?hook->module_name:"");
 
 	if(hook->register_hook){
 		rc = hook->register_hook(hook, makeflow_hooks);
@@ -78,10 +79,13 @@ int makeflow_hook_register(struct makeflow_hook *hook) {
 	if(rc == MAKEFLOW_HOOK_SUCCESS){
 		h = xxmalloc(sizeof(*h));
 		memcpy(h, hook, sizeof(*h));
+		debug(D_MAKEFLOW_HOOK, "Hook %s:registered",h->module_name?h->module_name:"");
 
-		list_push_head(makeflow_hooks, h);
+		list_push_tail(makeflow_hooks, h);
 	} else if(rc == MAKEFLOW_HOOK_FAILURE){
 		debug(D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
+	} else if(rc == MAKEFLOW_HOOK_SKIP){
+		debug(D_MAKEFLOW_HOOK, "Hook %s:register skipped",h->module_name?h->module_name:"");
 	}
 
 	return rc;
@@ -101,8 +105,9 @@ int makeflow_hook_dag_check(struct dag *d){
 	if (!makeflow_hooks)
 		return MAKEFLOW_HOOK_SUCCESS;
 
+	struct makeflow_hook *h;
 	list_first_item(makeflow_hooks);
-	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+	while((h = list_next_item(makeflow_hooks))){
 		int rc = MAKEFLOW_HOOK_SUCCESS;
 		if (h->dag_check)
 			rc = h->dag_check(d);
@@ -224,8 +229,25 @@ int makeflow_hook_node_success(struct dag_node *node, struct batch_task *task){
 }
 
 int makeflow_hook_node_fail(struct dag_node *node, struct batch_task *task){
-	MAKEFLOW_HOOK_CALL(node_fail, node, task);
-	return MAKEFLOW_HOOK_SUCCESS;
+	if (!makeflow_hooks)
+		return MAKEFLOW_HOOK_SUCCESS;
+
+	int hook_return = MAKEFLOW_HOOK_SUCCESS;
+	list_first_item(makeflow_hooks);
+	for (struct makeflow_hook *h; (h = list_next_item(makeflow_hooks));) {
+		int rc = MAKEFLOW_HOOK_SUCCESS;
+		if (h->node_fail){
+			debug(D_MAKEFLOW_HOOK, "Checking %s\n", h->module_name);
+			rc = h->node_fail(node, task);
+		}
+
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:node_fail failed Node %d",h->module_name?h->module_name:"", node->nodeid);
+			hook_return = rc;
+		}
+	}
+
+	return hook_return;
 }
 
 int makeflow_hook_node_abort(struct dag_node *node){
