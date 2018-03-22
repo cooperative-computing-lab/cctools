@@ -1673,8 +1673,9 @@ int rmonitor_dispatch_msg(void)
 			release_waiting_process(msg.origin);
 			return 1;
         }
-		else if(msg.type != BRANCH && msg.type != SNAPSHOT)
+		else if(msg.type != BRANCH && msg.type != SNAPSHOT) {
 			return 1;
+		}
 	}
 
     switch(msg.type)
@@ -1682,14 +1683,16 @@ int rmonitor_dispatch_msg(void)
         case BRANCH:
 			msg.error = 0;
             rmonitor_track_process(msg.origin);
-            if(summary->max_concurrent_processes < itable_size(processes))
+            if(summary->max_concurrent_processes < itable_size(processes)) {
                 summary->max_concurrent_processes = itable_size(processes);
+			}
             break;
         case END_WAIT:
 			msg.error = 0;
             p->waiting = 1;
-			if(msg.origin == first_process_pid)
+			if(msg.origin == first_process_pid) {
 				first_process_exit_status = msg.data.n;
+			}
             break;
         case END:
 			msg.error = 0;
@@ -1697,8 +1700,9 @@ int rmonitor_dispatch_msg(void)
             break;
         case CHDIR:
 			msg.error = 0;
-			if(follow_chdir)
+			if(follow_chdir) {
 				p->wd = lookup_or_create_wd(p->wd, msg.data.s);
+			}
             break;
 		case OPEN_INPUT:
 		case OPEN_OUTPUT:
@@ -1763,20 +1767,31 @@ int rmonitor_dispatch_msg(void)
 
 	// find out if messages are urgent:
 	if(msg.type == SNAPSHOT) {
+		// SNAPSHOTs are always urgent
 		return 1;
 	}
 
 	if(msg.type == END_WAIT || msg.type == END) {
-		if(msg.origin != first_process_pid && !stop_short_running) {
-			if(msg.end < (msg.start + RESOURCE_MONITOR_SHORT_TIME)) {
-				// for short running processes END_WAIT and END are not urgent.
-				return 0;
-			}
+		if(msg.origin == first_process_pid) {
+			// ENDs from the first process are always urgent.
+			return 1;
 		}
 
+		if(stop_short_running) {
+			// we are stopping all processes, so all ENDs are urgent.
+			return 1;
+		}
+
+		if(msg.end < (msg.start + RESOURCE_MONITOR_SHORT_TIME)) {
+			// for short running processes END_WAIT and END are not urgent.
+			return 0;
+		}
+
+		// ENDs for long running processes are always urgent.
 		return 1;
 	}
 
+	// Any other case is not urgent.
 	return 0;
 }
 
