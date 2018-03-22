@@ -141,7 +141,7 @@ PRELOAD_LIBRARIES = libforce_halt_enospc.so
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.
-MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json
+MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json jx2env
 PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect cctools_python
