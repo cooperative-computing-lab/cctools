@@ -141,8 +141,6 @@ void rmonitor_helper_initialize() {
 		stop_short_running = 0;
 	}
 
-	start_time = timestamp_get();
-
 	initializing_helper = 0;
 }
 
@@ -161,6 +159,10 @@ pid_t fork()
 
 	if(!pid)
 	{
+		char start_tmp[256];
+		snprintf(start_tmp, 256, "%" PRId64, timestamp_get());
+		setenv(RESOURCE_MONITOR_PROCESS_START, start_tmp, 1);
+
 		struct rmonitor_msg msg;
 		msg.type   = BRANCH;
 
@@ -577,6 +579,10 @@ void exit_wrapper_preamble(int status)
 
 	debug(D_RMON, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
+	char *start_tmp = getenv(RESOURCE_MONITOR_PROCESS_START);
+	start_time = start_tmp ? atoll(start_tmp) : 0;
+	end_time = timestamp_get();
+
 	struct rmonitor_msg msg;
 	msg.type   = END_WAIT;
 	msg.error  = 0;
@@ -587,16 +593,24 @@ void exit_wrapper_preamble(int status)
 
 	sighandler_t old_handler = signal(SIGCONT, exit_signal_handler);
 
-	int blocking_signals = 0;
-	int short_process    = 0;
-
-	if(!root_process && !stop_short_running) {
-		if(end_time < (start_time + RESOURCE_MONITOR_SHORT_TIME)) {
-			short_process = 1;
-		}
+	int short_process = 0;
+	if(root_process) {
+		// root process is never considered a short running process
+		short_process = 0;
+	} else if(stop_short_running) {
+		// we are stopping all processes, so no process is considered short running
+		short_process = 0;
+	} else if(end_time < (start_time + RESOURCE_MONITOR_SHORT_TIME)) {
+		// process ran for less than RESOURCE_MONITOR_SHORT_TIME, so it is
+		// considered short running.
+		short_process = 1;
+	} else {
+		// anything else is not considered a short running process
+		short_process = 0;
 	}
 
 	// If not short running, stop the process for examination.
+	int blocking_signals = 0;
 	if(!short_process) {
 		if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
 			blocking_signals = 1;
@@ -638,8 +652,6 @@ void exit(int status)
 	if(!original_exit){
 		syscall(SYS_exit, status);
 	}
-
-	end_time = timestamp_get();
 
 	exit_wrapper_preamble(status);
 	end_wrapper_epilogue();

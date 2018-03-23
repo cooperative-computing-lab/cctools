@@ -260,6 +260,12 @@ int rmonitor_helper_init(char *lib_default_path, int *fd, int stop_short_running
 		/* First process will unset this variable. */
 		setenv(RESOURCE_MONITOR_ROOT_PROCESS, "1", 1);
 
+		/* Each process sets this variable to its start time after a fork,
+		 * except for the first process, which for which we set here. */
+		char *start_time = string_format("%" PRId64, timestamp_get());
+		setenv(RESOURCE_MONITOR_PROCESS_START, start_time, 1);
+		free(start_time);
+
 		setenv("LD_PRELOAD", ld_preload, 1);
 
 		debug(D_RMON,"setting %s to %s\n", RESOURCE_MONITOR_INFO_ENV_VAR, rmonitor_port);
