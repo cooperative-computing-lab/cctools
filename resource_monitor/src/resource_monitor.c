@@ -199,6 +199,8 @@ static char **inotify_watches;  /* Keeps track of created inotify watches. */
 static int alloced_inotify_watches = 0;
 #endif
 
+static int stop_short_running = 0; /* Stop to analyze process that run for less than RESOURCE_MONITOR_SHORT_TIME seconds. By default such processes are not stopped. */
+
 struct itable *wdirs_rc;        /* Counts how many rmonitor_process_info use a rmonitor_wdir_info. */
 struct itable *filesys_rc;      /* Counts how many rmonitor_wdir_info use a rmonitor_filesys_info. */
 
@@ -1258,13 +1260,19 @@ void rmonitor_track_process(pid_t pid)
 	char *newpath;
 	struct rmonitor_process_info *p;
 
-	if(!ping_process(pid))
+	if(!pid) {
 		return;
+	}
+
+	if(!ping_process(pid)) {
+		return;
+	}
 
 	p = itable_lookup(processes, pid);
 
-	if(p)
+	if(p) {
 		return;
+	}
 
 	p = malloc(sizeof(struct rmonitor_process_info));
 	bzero(p, sizeof(struct rmonitor_process_info));
@@ -1283,6 +1291,7 @@ void rmonitor_track_process(pid_t pid)
 	p->running = 1;
 	p->waiting = 0;
 
+	rmonitor_poll_process_once(p);
 	summary->total_processes++;
 }
 
@@ -1664,8 +1673,9 @@ int rmonitor_dispatch_msg(void)
 			release_waiting_process(msg.origin);
 			return 1;
         }
-		else if(msg.type != BRANCH && msg.type != SNAPSHOT)
+		else if(msg.type != BRANCH && msg.type != SNAPSHOT) {
 			return 1;
+		}
 	}
 
     switch(msg.type)
@@ -1673,14 +1683,16 @@ int rmonitor_dispatch_msg(void)
         case BRANCH:
 			msg.error = 0;
             rmonitor_track_process(msg.origin);
-            if(summary->max_concurrent_processes < itable_size(processes))
+            if(summary->max_concurrent_processes < itable_size(processes)) {
                 summary->max_concurrent_processes = itable_size(processes);
+			}
             break;
         case END_WAIT:
 			msg.error = 0;
             p->waiting = 1;
-			if(msg.origin == first_process_pid)
+			if(msg.origin == first_process_pid) {
 				first_process_exit_status = msg.data.n;
+			}
             break;
         case END:
 			msg.error = 0;
@@ -1688,8 +1700,9 @@ int rmonitor_dispatch_msg(void)
             break;
         case CHDIR:
 			msg.error = 0;
-			if(follow_chdir)
+			if(follow_chdir) {
 				p->wd = lookup_or_create_wd(p->wd, msg.data.s);
+			}
             break;
 		case OPEN_INPUT:
 		case OPEN_OUTPUT:
@@ -1752,11 +1765,34 @@ int rmonitor_dispatch_msg(void)
 	if(!rmonitor_check_limits(summary))
 		rmonitor_final_cleanup(SIGTERM);
 
-	if(msg.type == BRANCH || msg.type == END_WAIT || msg.type == END || msg.type == SNAPSHOT) {
+	// find out if messages are urgent:
+	if(msg.type == SNAPSHOT) {
+		// SNAPSHOTs are always urgent
 		return 1;
-	} else {
-		return 0;
 	}
+
+	if(msg.type == END_WAIT || msg.type == END) {
+		if(msg.origin == first_process_pid) {
+			// ENDs from the first process are always urgent.
+			return 1;
+		}
+
+		if(stop_short_running) {
+			// we are stopping all processes, so all ENDs are urgent.
+			return 1;
+		}
+
+		if(msg.end < (msg.start + RESOURCE_MONITOR_SHORT_TIME)) {
+			// for short running processes END_WAIT and END are not urgent.
+			return 0;
+		}
+
+		// ENDs for long running processes are always urgent.
+		return 1;
+	}
+
+	// Any other case is not urgent.
+	return 0;
 }
 
 int wait_for_messages(int interval)
@@ -1956,6 +1992,8 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
+    fprintf(stdout, "%-30s Accurately measure short running processes (adds overhead).\n", "--accurate-short-processes");
+    fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Configuration file for snapshots on file patterns.\n", "--snapshot-events=<file>");
@@ -2098,7 +2136,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_MEASURE_DIR,
 		LONG_OPT_NO_PPRINT,
 		LONG_OPT_SNAPSHOT_FILE,
-		LONG_OPT_SNAPSHOT_WATCH_CONF
+		LONG_OPT_SNAPSHOT_WATCH_CONF,
+		LONG_OPT_STOP_SHORT_RUNNING
 	};
 
     static const struct option long_options[] =
@@ -2118,6 +2157,8 @@ int main(int argc, char **argv) {
 		    {"follow-chdir", no_argument,       0,  LONG_OPT_FOLLOW_CHDIR},
 		    {"measure-dir",  required_argument, 0,  LONG_OPT_MEASURE_DIR},
 		    {"no-pprint",    no_argument,       0,  LONG_OPT_NO_PPRINT},
+
+		    {"accurate-short-processes", no_argument, 0, LONG_OPT_STOP_SHORT_RUNNING},
 
 		    {"with-output-files",      required_argument, 0,  'O'},
 		    {"with-time-series",       no_argument, 0, LONG_OPT_TIME_SERIES},
@@ -2200,6 +2241,9 @@ int main(int argc, char **argv) {
 					exit(RM_MONITOR_ERROR);
 				}
 				break;
+			case LONG_OPT_STOP_SHORT_RUNNING:
+				stop_short_running = 1;
+				break;
 			case LONG_OPT_NO_PPRINT:
 				pprint_summaries = 0;
 				break;
@@ -2272,7 +2316,7 @@ int main(int argc, char **argv) {
     }
 
     write_helper_lib();
-    rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd);
+    rmonitor_helper_init(lib_helper_name, &rmonitor_queue_fd, stop_short_running);
 
 	summary_path = default_summary_name(template_path);
 

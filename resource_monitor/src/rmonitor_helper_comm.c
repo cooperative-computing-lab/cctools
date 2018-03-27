@@ -223,7 +223,7 @@ int rmonitor_client_open_socket(int *fd, struct addrinfo **addr) {
 
  /* We use datagrams to send information to the monitor from the
   * great grandchildren processes */
-int rmonitor_helper_init(char *lib_default_path, int *fd)
+int rmonitor_helper_init(char *lib_default_path, int *fd, int stop_short_running)
 {
 	int  port;
 	char *helper_path = rmonitor_helper_locate(lib_default_path);
@@ -253,6 +253,18 @@ int rmonitor_helper_init(char *lib_default_path, int *fd)
 
 		debug(D_RMON,"setting LD_PRELOAD to %s\n", ld_preload);
 
+		if(stop_short_running) {
+			setenv(RESOURCE_MONITOR_HELPER_STOP_SHORT, "1", 1);
+		}
+
+		/* First process will unset this variable. */
+		setenv(RESOURCE_MONITOR_ROOT_PROCESS, "1", 1);
+
+		/* Each process sets this variable to its start time after a fork,
+		 * except for the first process, which for which we set here. */
+		char *start_time = string_format("%" PRId64, timestamp_get());
+		setenv(RESOURCE_MONITOR_PROCESS_START, start_time, 1);
+		free(start_time);
 
 		setenv("LD_PRELOAD", ld_preload, 1);
 

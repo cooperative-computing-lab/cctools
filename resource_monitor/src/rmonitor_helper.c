@@ -64,6 +64,11 @@
 #define END(msg)   POP_ERRNO(msg) if(msg.type == RX || msg.type == TX) msg.end = timestamp_get(); }
 
 static struct itable *family_of_fd = NULL;
+static uint64_t start_time = 0;
+static uint64_t end_time   = 0;
+
+static int stop_short_running = 0; /* Stop processes that run for less than RESOURCE_MONITOR_SHORT_TIME seconds. */
+static int root_process       = 0;  /* 1 for first process to be monitored. */
 
 #define declare_original_dlsym(name) __typeof__(name) *original_ ## name;
 #define define_original_dlsym(name) original_ ## name = dlsym(RTLD_NEXT, #name);
@@ -119,6 +124,23 @@ void rmonitor_helper_initialize() {
 	define_original_dlsym(open64);
 #endif
 
+	if(!family_of_fd) {
+		family_of_fd = itable_create(8);
+	}
+
+	if(getenv(RESOURCE_MONITOR_ROOT_PROCESS)) {
+		root_process = 1;
+		unsetenv(RESOURCE_MONITOR_ROOT_PROCESS);
+	} else {
+		root_process = 0;
+	}
+
+	if(getenv(RESOURCE_MONITOR_HELPER_STOP_SHORT)) {
+		stop_short_running = 1;
+	} else {
+		stop_short_running = 0;
+	}
+
 	initializing_helper = 0;
 }
 
@@ -137,6 +159,10 @@ pid_t fork()
 
 	if(!pid)
 	{
+		char start_tmp[256];
+		snprintf(start_tmp, 256, "%" PRId64, timestamp_get());
+		setenv(RESOURCE_MONITOR_PROCESS_START, start_tmp, 1);
+
 		struct rmonitor_msg msg;
 		msg.type   = BRANCH;
 
@@ -232,8 +258,9 @@ int close(int fd)
 		return syscall(SYS_close, fd);
 	}
 
-	if(family_of_fd)
+	if(family_of_fd) {
 		itable_remove(family_of_fd, fd);
+	}
 
 	int status = original_close(fd);
 
@@ -347,9 +374,6 @@ int socket(int domain, int type, int protocol)
 		rmonitor_helper_initialize();
 		assert(original_socket);
 	}
-
-	if(!family_of_fd)
-		family_of_fd = itable_create(8);
 
 	fd = original_socket(domain, type, protocol);
 
@@ -555,17 +579,42 @@ void exit_wrapper_preamble(int status)
 
 	debug(D_RMON, "%s from %d.\n", str_msgtype(END_WAIT), getpid());
 
+	char *start_tmp = getenv(RESOURCE_MONITOR_PROCESS_START);
+	start_time = start_tmp ? atoll(start_tmp) : 0;
+	end_time = timestamp_get();
+
 	struct rmonitor_msg msg;
 	msg.type   = END_WAIT;
 	msg.error  = 0;
 	msg.origin = getpid();
 	msg.data.n = status;
+	msg.start  = start_time;
+	msg.end    = end_time;;
 
 	sighandler_t old_handler = signal(SIGCONT, exit_signal_handler);
 
+	int short_process = 0;
+	if(root_process) {
+		// root process is never considered a short running process
+		short_process = 0;
+	} else if(stop_short_running) {
+		// we are stopping all processes, so no process is considered short running
+		short_process = 0;
+	} else if(end_time < (start_time + RESOURCE_MONITOR_SHORT_TIME)) {
+		// process ran for less than RESOURCE_MONITOR_SHORT_TIME, so it is
+		// considered short running.
+		short_process = 1;
+	} else {
+		// anything else is not considered a short running process
+		short_process = 0;
+	}
+
+	// If not short running, stop the process for examination.
 	int blocking_signals = 0;
-	if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
-		blocking_signals = 1;
+	if(!short_process) {
+		if(sigprocmask(SIG_SETMASK, &all_signals, &old_signals) != -1) {
+			blocking_signals = 1;
+		}
 	}
 
 	send_monitor_msg(&msg);
@@ -579,7 +628,6 @@ void exit_wrapper_preamble(int status)
 		signal(SIGCONT, old_handler);
 	}
 
-
 	debug(D_RMON, "Continue with %s: %d.\n", str_msgtype(END_WAIT), getpid());
 }
 
@@ -592,6 +640,8 @@ void end_wrapper_epilogue(void)
 	msg.error  = 0;
 	msg.origin = getpid();
 	msg.data.p = getpid();
+	msg.start  = start_time;
+	msg.end    = end_time;;
 
 	send_monitor_msg(&msg);
 }
