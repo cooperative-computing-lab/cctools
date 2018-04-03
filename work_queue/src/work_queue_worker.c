@@ -2145,6 +2145,8 @@ static void show_help(const char *cmd)
 			"or\n     %s [options] -M projectname\n",
 			cmd, cmd, cmd);
 	printf( "where options are:\n");
+	printf( " %-30s Show version string\n", "-v,--version");
+	printf( " %-30s Show this help screen\n", "-h,--help");
 	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>");
 	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
@@ -2167,8 +2169,8 @@ static void show_help(const char *cmd)
 	printf( " %-30s to a master. (default=%ds)\n", "", init_backoff_interval);
 	printf( " %-30s Set maximum value for backoff interval when worker fails to connect\n", "-b,--max-backoff=<time>");
 	printf( " %-30s to a master. (default=%ds)\n", "", max_backoff_interval);
-	printf( " %-30s Set available disk space threshold (in MB). When exceeded worker will\n", "-z,--disk-threshold=<size>");
-	printf( " %-30s clean up and reconnect. (default=%" PRIu64 "MB)\n", "", disk_avail_threshold);
+	printf( " %-30s Minimum free disk space in MB. When free disk space is less than this value, the\n", "-z,--disk-threshold=<size>");
+	printf( " %-30s worker will clean up and try to reconnect. (default=%" PRIu64 "MB)\n", "", disk_avail_threshold);
 	printf( " %-30s Set available memory size threshold (in MB). When exceeded worker will\n", "--memory-threshold=<size>");
 	printf( " %-30s clean up and reconnect. (default=%" PRIu64 "MB)\n", "", memory_avail_threshold);
 	printf( " %-30s Set architecture string for the worker to report to master instead\n", "-A,--arch=<arch>");
@@ -2176,8 +2178,6 @@ static void show_help(const char *cmd)
 	printf( " %-30s Set operating system string for the worker to report to master instead\n", "-O,--os=<os>");
 	printf( " %-30s of the value in uname (%s).\n", "", os_name);
 	printf( " %-30s Set the location for creating the working directory of the worker.\n", "-s,--workdir=<path>");
-	printf( " %-30s Show version string\n", "-v,--version");
-	printf( " %-30s Set the percent chance a worker will decide to shut down every minute.\n", "--volatility=<chance>");
 	printf( " %-30s Set the maximum bandwidth the foreman will consume in bytes per second. Example: 100M for 100MBps. (default=unlimited)\n", "--bandwidth=<Bps>");
 	printf( " %-30s Set the number of cores reported by this worker.  Set to 0 to have the\n", "--cores=<n>");
 	printf( " %-30s worker automatically measure. (default=%"PRId64")\n", "", manual_cores_option);
@@ -2191,7 +2191,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s docker mode -- run each task with a container based on this docker image.\n", "--docker=<image>");
 	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container based on this docker image.\n", "--docker-preserve=<image>");
 	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<tarball>");
-	printf( " %-30s Show this help screen\n", "-h,--help");
+	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,

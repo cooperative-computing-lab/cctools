@@ -1972,7 +1972,8 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Maximum interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Accurately measure short running processes (adds overhead).\n", "--accurate-short-processes");
     fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Use maxfile with list of var: value pairs for resource limits.\n", "-l,--limits-file=<maxfile>");
@@ -1981,24 +1982,21 @@ static void show_help(const char *cmd)
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Keep the monitored process in foreground (for interactive use).\n", "-f,--child-in-foreground");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Follow the size of processes' current working directories. \n", "--follow-chdir");
-    fprintf(stdout, "%-30s Follow the size of <dir>. If not specified, follow the current directory.\n", "--measure-dir");
-    fprintf(stdout, "%-30s Can be specified multiple times.\n", "");
-    fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Specify filename template for log files (default=resource-pid-<pid>)\n", "-O,--with-output-files=<file>");
     fprintf(stdout, "%-30s Write resource time series to <template>.series\n", "--with-time-series");
     fprintf(stdout, "%-30s Write inotify statistics of opened files to default=<template>.files\n", "--with-inotify");
     fprintf(stdout, "%-30s Include this string verbatim in a line in the summary. \n", "-V,--verbatim-to-summary=<str>");
     fprintf(stdout, "%-30s (Could be specified multiple times.)\n", "");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Do not measure working directory footprint.\n", "--without-disk-footprint");
-    fprintf(stdout, "%-30s Accurately measure short running processes (adds overhead).\n", "--accurate-short-processes");
+    fprintf(stdout, "%-30s Follow the size of <dir>. By default the directory at the start of\n", "--measure-dir=<dir>");
+    fprintf(stdout, "%-30s execution is followed. Can be specified multiple times.\n", "");
+    fprintf(stdout, "%-30s See --without-disk-footprint below.\n", "");
+    fprintf(stdout, "%-30s Do not measure working directory footprint. Overrides --measure-dir and --follow-chdir.\n", "--without-disk-footprint");
+    fprintf(stdout, "\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
     fprintf(stdout, "\n");
-    fprintf(stdout, "%-30s Configuration file for snapshots on file patterns.\n", "--snapshot-events=<file>");
-    fprintf(stdout, "%-30s current resources, and delete <file>. If <file> has a non-empty first\n", "");
-    fprintf(stdout, "%-30s line, it is used as a label for the snapshot.\n", "");
+    fprintf(stdout, "%-30s Configuration file for snapshots on file patterns. (See man page.)\n", "--snapshot-events=<file>");
 }
 
 
@@ -2230,6 +2228,7 @@ int main(int argc, char **argv) {
 				break;
 			case LONG_OPT_NO_DISK_FOOTPRINT:
 				resources_flags->disk = 0;
+				follow_chdir = 0;
 				break;
 			case LONG_OPT_FOLLOW_CHDIR:
 				follow_chdir = 1;
