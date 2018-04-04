@@ -20,7 +20,13 @@
 #include <stdio.h>
 #include <string.h>
 
-static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct batch_task *task){
+static int makeflow_module_sandbox_register(struct makeflow_hook *h, struct list *hooks, struct jx **args)
+{
+	*args = jx_object(NULL);
+	return MAKEFLOW_HOOK_SUCCESS;
+}
+
+static int makeflow_module_sandbox_node_submit( void * instance_struct, struct dag_node *node, struct batch_task *task){
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	char *wrap_name = string_format("./task_%d_sandbox", task->taskid);
 	batch_wrapper_prefix(wrapper, wrap_name);
@@ -86,6 +92,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 
 struct makeflow_hook makeflow_hook_sandbox = {
 	.module_name = "Sandbox",
+	.register_hook = makeflow_module_sandbox_register,
 	.node_submit = makeflow_module_sandbox_node_submit,
 };
 

@@ -14,9 +14,22 @@
 #include "dag_file.h"
 #include "jx.h"
 
-static struct list *shared_fs_list = NULL;
-static struct itable *shared_fs_saved_inputs  = NULL;
-static struct itable *shared_fs_saved_outputs = NULL;
+struct shared_fs_instance {
+	struct list *shared_fs_list;
+	struct itable *shared_fs_saved_inputs;
+	struct itable *shared_fs_saved_outputs;
+};
+
+struct shared_fs_instance *shared_fs_instance_create()
+{
+	struct shared_fs_instance *sf = malloc(sizeof(*sf));
+	sf->shared_fs_list = list_create();
+	sf->shared_fs_saved_inputs  = itable_create(0);
+	sf->shared_fs_saved_outputs = itable_create(0);
+
+	return sf;
+}
+
 
 /*
  * Match a filename (/home/fred) to a path stem (/home).
@@ -34,23 +47,23 @@ static int prefix_match(void *stem, const void *filename) {
  * a shared filesystem, as given by the shared_fs_list.
  * */
 
-static int batch_file_on_sharedfs( const char *filename )
+static int batch_file_on_sharedfs( struct list *shared_fs_list, const char *filename )
 {
 	return !list_iterate(shared_fs_list,prefix_match,filename);
 }
 
-static int create(struct jx *args){
-	shared_fs_list = list_create();
-	shared_fs_saved_inputs  = itable_create(0);
-	shared_fs_saved_outputs = itable_create(0);
+static int create( void ** instance_struct, struct jx *hook_args )
+{
+	struct shared_fs_instance *sf = shared_fs_instance_create();
+	*instance_struct = sf;
 
 	//JX ARRAY ITERATE
-	struct jx *array = jx_lookup(args, "shared_fs_list");
+	struct jx *array = jx_lookup(hook_args, "shared_fs_list");
 	if (array && array->type == JX_ARRAY) {
 		struct jx *item = NULL;
 		while((item = jx_array_shift(array))) {
 			if(item->type == JX_STRING){
-				list_push_head(shared_fs_list, xxstrdup(item->u.string_value));
+				list_push_head(sf->shared_fs_list, xxstrdup(item->u.string_value));
 			} else {
 				debug(D_ERROR|D_MAKEFLOW_HOOK, "Non-string argument passed to Shared FS hook");
 				return MAKEFLOW_HOOK_FAILURE;
@@ -62,18 +75,20 @@ static int create(struct jx *args){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy(){
-	list_free(shared_fs_list);
-	list_delete(shared_fs_list);
-	itable_delete(shared_fs_saved_inputs);
-	itable_delete(shared_fs_saved_outputs);
+static int destroy( void * instance_struct, struct dag *d ){
+	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
+	list_free(sf->shared_fs_list);
+	list_delete(sf->shared_fs_list);
+	itable_delete(sf->shared_fs_saved_inputs);
+	itable_delete(sf->shared_fs_saved_outputs);
+	free(sf);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_file_uses_unsupported_shared_fs( struct dag_node *n, struct dag_file *f)
+static int node_file_uses_unsupported_shared_fs( struct shared_fs_instance *sf, struct dag_node *n, struct dag_file *f)
 {
 	const char *remotename = dag_node_get_remote_name(n, f->filename);
-	if (batch_file_on_sharedfs(f->filename)) {
+	if (batch_file_on_sharedfs(sf->shared_fs_list, f->filename)) {
 		if (remotename){
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Remote renaming for %s is not supported on a shared filesystem",
 					f->filename);
@@ -88,13 +103,13 @@ static int node_file_uses_unsupported_shared_fs( struct dag_node *n, struct dag_
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_files_uses_unsupported_shared_fs( struct dag_node *n, struct list *files)
+static int node_files_uses_unsupported_shared_fs( struct shared_fs_instance *sf, struct dag_node *n, struct list *files)
 {
 	struct dag_file *f;
 	int failed = 0;
 	list_first_item(files);
 	while((f = list_next_item(files))) {
-		int rc = node_file_uses_unsupported_shared_fs(n, f);
+		int rc = node_file_uses_unsupported_shared_fs(sf, n, f);
 		if(rc != MAKEFLOW_HOOK_SUCCESS)
 			failed = 1;
 	}
@@ -103,16 +118,17 @@ static int node_files_uses_unsupported_shared_fs( struct dag_node *n, struct lis
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_check(struct dag *d){
+static int dag_check(void * instance_struct, struct dag *d){
+	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
 	struct dag_node *n;
 	int failed = 0;
 	for(n = d->nodes; n; n = n->next) {
 		if(!batch_queue_supports_feature(makeflow_get_queue(n), "absolute_path")){
-			int rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
+			int rc = node_files_uses_unsupported_shared_fs(sf, n, n->source_files);
 			if(rc != MAKEFLOW_HOOK_SUCCESS)
 				failed = 1;
 
-			rc = node_files_uses_unsupported_shared_fs(n, n->source_files);
+			rc = node_files_uses_unsupported_shared_fs(sf, n, n->source_files);
 			if(rc != MAKEFLOW_HOOK_SUCCESS)
 				failed = 1;
 		}
@@ -122,44 +138,47 @@ static int dag_check(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int batch_submit(struct batch_task *t){
+static int batch_submit( void * instance_struct, struct batch_task *t){
+	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
 	struct batch_file *f = NULL;
 	struct list *saved_inputs = list_create();
 	struct list *saved_outputs = list_create();
 
 	list_first_item(t->input_files);
 	while((f = list_next_item(t->input_files))){
-		if(batch_file_on_sharedfs(f->outer_name)) {
+		if(batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
 			list_remove(t->input_files, f);
 			list_push_tail(saved_inputs, f);
 			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
 		}
 	}
-	itable_insert(shared_fs_saved_inputs, t->taskid, saved_inputs);
+	itable_insert(sf->shared_fs_saved_inputs, t->taskid, saved_inputs);
 
 
 	list_first_item(t->output_files);
 	while((f = list_next_item(t->output_files))){
-		if(batch_file_on_sharedfs(f->outer_name)) {
+		if(batch_file_on_sharedfs(sf->shared_fs_list, f->outer_name)) {
 			list_remove(t->output_files, f);
 			list_push_tail(saved_outputs, f);
 			debug(D_MAKEFLOW_HOOK, "skipping file %s on shared fs\n", f->outer_name);
 		}
 	}
-	itable_insert(shared_fs_saved_outputs, t->taskid, saved_outputs);
+	itable_insert(sf->shared_fs_saved_outputs, t->taskid, saved_outputs);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int batch_retrieve(struct batch_task *t){
+static int batch_retrieve( void * instance_struct, struct batch_task *t){
+	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
+
 	struct batch_file *f = NULL;
-	struct list *saved_inputs = itable_remove(shared_fs_saved_inputs, t->taskid);
-	struct list *saved_outputs = itable_remove(shared_fs_saved_outputs, t->taskid);
+	struct list *saved_inputs = itable_remove(sf->shared_fs_saved_inputs, t->taskid);
+	struct list *saved_outputs = itable_remove(sf->shared_fs_saved_outputs, t->taskid);
 
 	if(saved_inputs){
-		list_first_item(saved_inputs);
-		while((f = list_next_item(saved_inputs))){
-			list_push_tail(t->input_files, f);
-			list_remove(saved_inputs, f);
+	    list_first_item(saved_inputs);
+	    while((f = list_next_item(saved_inputs))){
+	        list_push_tail(t->input_files, f);
+	        list_remove(saved_inputs, f);
 			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_inputs);
@@ -167,9 +186,9 @@ static int batch_retrieve(struct batch_task *t){
 
 	if(saved_outputs){
 		list_first_item(saved_outputs);
-		while((f = list_next_item(saved_outputs))){
-			list_push_tail(t->output_files, f);
-			list_remove(saved_outputs, f);
+	    while((f = list_next_item(saved_outputs))){
+	        list_push_tail(t->output_files, f);
+	        list_remove(saved_outputs, f);
 			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_outputs);

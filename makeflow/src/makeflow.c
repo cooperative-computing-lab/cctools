@@ -742,13 +742,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		list_first_item(n->task->output_files);
 		while((bf = list_next_item(n->task->output_files))) {
 			f = dag_file_lookup_or_create(d, bf->outer_name);
-
-			/* Either the file was created and not confirmed or a hook removed the file. */
-			if(f->state == DAG_FILE_STATE_EXPECT || f->state == DAG_FILE_STATE_DELETE) {
-				makeflow_clean_file(d, remote_queue, f);
-			} else {
-				makeflow_clean_file(d, remote_queue, f);
-			}
+			makeflow_clean_file(d, remote_queue, f);
 		}
 
 		if(task->info->disk_allocation_exhausted) {
@@ -1229,6 +1223,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_HOOK_EXAMPLE,
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_FAIL_DIR,
+		LONG_OPT_FAILURE_HANDLER,
 		LONG_OPT_GC_SIZE,
 		LONG_OPT_LOCAL_CORES,
 		LONG_OPT_LOCAL_MEMORY,
@@ -1265,6 +1260,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_JX_ARGS,
 		LONG_OPT_JX_DEFINE,
 		LONG_OPT_SKIP_FILE_CHECK,
+		LONG_OPT_VC3_EXE,
+		LONG_OPT_VC3_OPT,
 		LONG_OPT_UMBRELLA_BINARY,
 		LONG_OPT_UMBRELLA_LOG_PREFIX,
 		LONG_OPT_UMBRELLA_MODE,
@@ -1303,6 +1300,7 @@ int main(int argc, char *argv[])
 		{"disable-cache", no_argument, 0, LONG_OPT_DISABLE_BATCH_CACHE},
 		{"email", required_argument, 0, 'm'},
 		{"enable_hook_example", no_argument, 0, LONG_OPT_HOOK_EXAMPLE},
+		{"failure-handler", required_argument, 0, LONG_OPT_FAILURE_HANDLER},
 		{"wait-for-files-upto", required_argument, 0, LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME},
 		{"gc", required_argument, 0, 'g'},
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
@@ -1340,6 +1338,8 @@ int main(int argc, char *argv[])
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
+		{"vc3-exe", required_argument, 0, LONG_OPT_VC3_EXE},
+		{"vc3-opt", required_argument, 0, LONG_OPT_VC3_OPT},
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
 		{"working-dir", required_argument, 0, LONG_OPT_WORKING_DIR},
@@ -1492,15 +1492,15 @@ int main(int argc, char *argv[])
 				explicit_local_disk = atoi(optarg);
 				break;
 			case LONG_OPT_MONITOR:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args);
 				jx_insert(hook_args, jx_string("resource_monitor_log_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_MONITOR_EXE:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args);
 				jx_insert(hook_args, jx_string("resource_monitor_exe"), jx_string(optarg));
 				break;
 			case LONG_OPT_MONITOR_INTERVAL:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args);
 				jx_insert(hook_args, jx_string("resource_monitor_interval"), jx_integer(atoi(optarg)));
 				break;
 			case LONG_OPT_MONITOR_MEASURE_DIR:
@@ -1508,15 +1508,15 @@ int main(int argc, char *argv[])
 				jx_insert(hook_args, jx_string("resource_monitor_measure_dir"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_TIME_SERIES:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args);
 				jx_insert(hook_args, jx_string("resource_monitor_enable_time_series"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_OPENED_FILES:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args);
 				jx_insert(hook_args, jx_string("resource_monitor_enable_list_files"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_LOG_NAME:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args);
 				jx_insert(hook_args, jx_string("resource_monitor_log_format"), jx_string(optarg));
 				break;
 			case LONG_OPT_CACHE:
@@ -1607,7 +1607,7 @@ int main(int argc, char *argv[])
 				cache_mode = 0;
 				break;
 			case LONG_OPT_HOOK_EXAMPLE:
-				makeflow_hook_register(&makeflow_hook_example);
+				makeflow_hook_register(&makeflow_hook_example, &hook_args);
 				break;
 			case LONG_OPT_WQ_WAIT_FOR_WORKERS:
 				wq_wait_queue_size = optarg;
@@ -1640,39 +1640,40 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_SHARED_FS:
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
+				makeflow_hook_register(&makeflow_hook_shared_fs, &hook_args);
 				if(!jx_lookup(hook_args, "shared_fs_list"))
 					jx_insert(hook_args, jx_string("shared_fs_list"),jx_array(NULL));
 				jx_array_append(jx_lookup(hook_args, "shared_fs_list"), jx_string(optarg));
 				break;
 			case LONG_OPT_STORAGE_TYPE:
-				makeflow_hook_register(&makeflow_hook_storage_allocation);
+				makeflow_hook_register(&makeflow_hook_storage_allocation, &hook_args);
 				jx_insert(hook_args, jx_string("storage_allocation_type"), jx_integer(atoi(optarg)));
 				break;
 			case LONG_OPT_STORAGE_LIMIT:
-				makeflow_hook_register(&makeflow_hook_storage_allocation);
+				makeflow_hook_register(&makeflow_hook_storage_allocation, &hook_args);
 				jx_insert(hook_args, jx_string("storage_allocation_limit"), jx_integer(string_metric_parse(optarg)));
 				break;
 			case LONG_OPT_STORAGE_PRINT:
-				makeflow_hook_register(&makeflow_hook_storage_allocation);
+				makeflow_hook_register(&makeflow_hook_storage_allocation, &hook_args);
 				jx_insert(hook_args, jx_string("storage_allocation_print"), jx_string(optarg));
 				break;
 			case LONG_OPT_DOCKER:
-				makeflow_hook_register(&makeflow_hook_docker);
+				makeflow_hook_register(&makeflow_hook_docker, &hook_args);
 				jx_insert(hook_args, jx_string("docker_container_image"), jx_string(optarg));
 				break;
 			case LONG_OPT_SKIP_FILE_CHECK:
 				skip_file_check = 1;
 				break;
 			case LONG_OPT_DOCKER_TAR:
-				makeflow_hook_register(&makeflow_hook_docker);
+				makeflow_hook_register(&makeflow_hook_docker, &hook_args);
 				jx_insert(hook_args, jx_string("docker_container_tar"), jx_string(optarg));
 				break;
 			case LONG_OPT_DOCKER_OPT:
-				makeflow_hook_register(&makeflow_hook_docker);
+				makeflow_hook_register(&makeflow_hook_docker, &hook_args);
 				jx_insert(hook_args, jx_string("docker_container_opt"), jx_string(optarg));
 				break;
 			case LONG_OPT_SINGULARITY:
-				makeflow_hook_register(&makeflow_hook_singularity);
+				makeflow_hook_register(&makeflow_hook_singularity, &hook_args);
 				jx_insert(hook_args, jx_string("singularity_container_image"), jx_string(optarg));
 				break;
 			case LONG_OPT_SINGULARITY_OPT:
@@ -1760,7 +1761,7 @@ int main(int argc, char *argv[])
 				save_failure = 0;
 				break;
 			case LONG_OPT_SANDBOX:
-				makeflow_hook_register(&makeflow_hook_sandbox);
+				makeflow_hook_register(&makeflow_hook_sandbox, &hook_args);
 				break;
 			case LONG_OPT_ARGV: {
 				debug(D_MAKEFLOW, "loading argv from %s", optarg);
@@ -1807,13 +1808,13 @@ int main(int argc, char *argv[])
 		fatal("enforcement and Umbrella are mutually exclusive\n");
 	}
 
-	makeflow_hook_register(&makeflow_hook_shared_fs);
+	makeflow_hook_register(&makeflow_hook_shared_fs, &hook_args);
 
 	if(save_failure){
-		makeflow_hook_register(&makeflow_hook_fail_dir);
+		makeflow_hook_register(&makeflow_hook_fail_dir, &hook_args);
 	}
 
-	makeflow_hook_create(hook_args);
+	makeflow_hook_create();
 
 	if((argc - optind) == 1) {
 		if (dagfile) {

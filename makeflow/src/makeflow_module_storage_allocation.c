@@ -28,7 +28,10 @@ int failed_allocation_check = 0;
 /* Flag to indicate a node was skipped to active node dependecies. */
 int failed_dependencies_check = 0;
 
-static int create(struct jx *args){
+static int create( void ** instance_struct, struct jx *args){
+	// There can only be one storage alloc
+	if(storage_allocation) return MAKEFLOW_HOOK_FAILURE;
+
 	if(jx_lookup_string(args, "storage_allocation_print")){
 		storage_print = xxstrdup(jx_lookup_string(args, "storage_allocation_print"));
 		printf("Storage Print = %s\n", storage_print);
@@ -45,12 +48,12 @@ static int create(struct jx *args){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy(){
+static int destroy( void * instance_struct, struct dag *d ){
 	free(storage_print);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_check(struct dag *d){
+static int dag_check( void * instance_struct, struct dag *d){
     uint64_t start = timestamp_get();
     struct dag_node *n = dag_node_create(d, -1);
     n->state = DAG_NODE_STATE_COMPLETE;
@@ -75,7 +78,7 @@ static int dag_check(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_loop(struct dag *d){
+static int dag_loop( void * instance_struct, struct dag *d){
 	if(cleaned_completed_node == 1){
 		cleaned_completed_node = 0;
 		failed_allocation_check = 0;
@@ -85,7 +88,7 @@ static int dag_loop(struct dag *d){
 	return MAKEFLOW_HOOK_END;
 }
 
-static int dag_end(struct dag *d){
+static int dag_end( void * instance_struct, struct dag *d){
 
     if(storage_allocation){
         makeflow_log_alloc_event(d, storage_allocation);
@@ -100,7 +103,7 @@ static int dag_end(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_check(struct dag_node *n, struct batch_queue *q){
+static int node_check( void * instance_struct, struct dag_node *n, struct batch_queue *q){
 
     if(storage_allocation->locked){
         if(!( makeflow_alloc_check_space(storage_allocation, n))){
@@ -117,7 +120,7 @@ static int node_check(struct dag_node *n, struct batch_queue *q){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_submit(struct dag_node *n, struct batch_task *task){
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *task){
     if(makeflow_alloc_commit_space(storage_allocation, n)){
         makeflow_log_alloc_event(n->d, storage_allocation);
     } else if (storage_allocation->locked)  {
@@ -127,7 +130,7 @@ static int node_submit(struct dag_node *n, struct batch_task *task){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_success(struct dag_node *n, struct batch_task *task){
+static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *task){
 	struct dag_file *f = NULL;
 	cleaned_completed_node = 1;
 	
@@ -175,7 +178,7 @@ struct dag *file_find_dag(struct dag_file *f){
 	return d;
 }
 
-static int file_deleted(struct dag_file *f){
+static int file_deleted( void * instance_struct, struct dag_file *f){
 	struct dag *d = file_find_dag(f);
 	if(f->created_by)
 		makeflow_alloc_release_space(storage_allocation, f->created_by, f->actual_size, MAKEFLOW_ALLOC_RELEASE_USED);

@@ -11,12 +11,12 @@
 /*
  * Simple create function that prints out a message.
  */
-static int makeflow_hook_example_create(struct jx *args){
+static int makeflow_hook_example_create(void ** instance_struct, struct jx *args){
 	printf("Hello from module: EXAMPLE.\n");
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int makeflow_hook_example_destroy(struct dag *d){
+static int makeflow_hook_example_destroy(void * instance_struct, struct dag *d){
 	printf("Goodbye from module: EXAMPLE.\n");
 	return MAKEFLOW_HOOK_SUCCESS;
 }

@@ -21,38 +21,55 @@
 
 #define CONTAINER_SINGULARITY_SH "./singularity.wrapper.sh"
 
-char *singularity_image = NULL;
-char *singularity_opt   = NULL;
+struct singularity_instance {
+	char *image;
+	char *opt;
+};
 
-static int create( struct jx *hook_args )
+struct singularity_instance *singularity_instance_create()
 {
+	struct singularity_instance *s = malloc(sizeof(*s));
+	s->image = NULL;
+	s->opt = NULL;
+
+	return s;
+}
+
+static int create( void ** instance_struct, struct jx *hook_args )
+{
+	struct singularity_instance *s = singularity_instance_create();
+	*instance_struct = s;
+
 	if(jx_lookup_string(hook_args, "singularity_container_image")){
-		singularity_image = xxstrdup(jx_lookup_string(hook_args, "singularity_container_image"));	
+		s->image = xxstrdup(jx_lookup_string(hook_args, "singularity_container_image"));	
 	}
 
 	if(jx_lookup_string(hook_args, "singularity_container_options")){
-		singularity_opt = xxstrdup(jx_lookup_string(hook_args, "singularity_container_options"));	
+		s->opt = xxstrdup(jx_lookup_string(hook_args, "singularity_container_options"));	
 	} else {
-		singularity_opt = xxstrdup("");
+		s->opt = xxstrdup("");
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy( struct dag *d)
+static int destroy( void * instance_struct, struct dag *d)
 {
-	free(singularity_image);
-	free(singularity_opt);
+	struct singularity_instance *s = (struct singularity_instance*)instance_struct;
+	free(s->image);
+	free(s->opt);
+	free(s);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_submit(struct dag_node *n, struct batch_task *t){
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t){
+	struct singularity_instance *s = (struct singularity_instance*)instance_struct;
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	batch_wrapper_prefix(wrapper, CONTAINER_SINGULARITY_SH);
 
 	/* Assumes a /disk dir in the image. */
 	char *task_cmd = string_escape_shell(t->command);
-	char *cmd = string_format("singularity exec --home $(pwd) %s %s sh -c %s", singularity_opt, singularity_image, task_cmd);
+	char *cmd = string_format("singularity exec --home $(pwd) %s %s sh -c %s", s->opt, s->image, task_cmd);
 	free(task_cmd);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);
@@ -69,7 +86,7 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 	}
 	free(cmd);
 
-	makeflow_hook_add_input_file(n->d, t, singularity_image, NULL, DAG_FILE_TYPE_GLOBAL);
+	makeflow_hook_add_input_file(n->d, t, s->image, NULL, DAG_FILE_TYPE_GLOBAL);
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }

@@ -104,7 +104,7 @@ FAILURE:
 	return rc;
 }
 
-static int node_success(struct dag_node *n, struct batch_task *task){
+static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *task){
 	struct dag *d = n->d;
 	struct batch_queue *q = makeflow_get_remote_queue();
 
@@ -124,10 +124,9 @@ static int node_success(struct dag_node *n, struct batch_task *task){
 	return rc;
 }
 
-static int node_fail(struct dag_node *n, struct batch_task *task){
+static int node_fail( void * instance_struct, struct dag_node *n, struct batch_task *task){
 	struct batch_file *bf = NULL;
 	struct dag_file *df = NULL;
-	debug(D_MAKEFLOW_HOOK, "Entered failed fail dir");
 	int prep_failed =  makeflow_module_prep_fail_dir(n->d, n, task->queue); 
 	if (prep_failed) { 
 		debug(D_ERROR|D_MAKEFLOW_HOOK, "rule %d failed, cannot move outputs\n", 
