@@ -74,7 +74,7 @@
 
 /**
  * The makeflow hook operations:
-*
+ *
  * Each hook operations corresponds to a transition in the
  * state of a structure in Makeflow. The three main structures
  * that hold state in Makeflow are the DAG, nodes, and files.
@@ -407,8 +407,8 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
 @param args JX object that keeps the args of the current hook. 
 	Should be updated by the registering hook.
 
-NOTE: Check for MAKEFLOW_HOOK_FAILURE as the args pointer will
-now be NULL.
+NOTE: Check for MAKEFLOW_HOOK_FAILURE because if there was a
+failure the args pointer will now be NULL.
 */
 int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args);
 

@@ -176,10 +176,10 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	struct list *saved_outputs = itable_remove(sf->shared_fs_saved_outputs, t->taskid);
 
 	if(saved_inputs){
-	    list_first_item(saved_inputs);
-	    while((f = list_next_item(saved_inputs))){
-	        list_push_tail(t->input_files, f);
-	        list_remove(saved_inputs, f);
+		list_first_item(saved_inputs);
+		while((f = list_next_item(saved_inputs))){
+			list_push_tail(t->input_files, f);
+			list_remove(saved_inputs, f);
 			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_inputs);
@@ -187,9 +187,9 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 
 	if(saved_outputs){
 		list_first_item(saved_outputs);
-	    while((f = list_next_item(saved_outputs))){
-	        list_push_tail(t->output_files, f);
-	        list_remove(saved_outputs, f);
+		while((f = list_next_item(saved_outputs))){
+			list_push_tail(t->output_files, f);
+			list_remove(saved_outputs, f);
 			debug(D_MAKEFLOW_HOOK, "adding skipped file %s on shared fs\n", f->outer_name);
 		}
 		list_delete(saved_outputs);

@@ -41,9 +41,10 @@ static int create( void ** instance_struct, struct jx *args){
 	printf("Storage Limit = %" PRIu64 "\n", storage_limit);
 	int storage_type  = jx_lookup_integer(args, "storage_allocation_type");
 	printf("Storage Type = %d\n", storage_type);
-    if(storage_limit || storage_type != MAKEFLOW_ALLOC_TYPE_NOT_ENABLED){
-        storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1, storage_type);
-    }
+
+	if(storage_limit || storage_type != MAKEFLOW_ALLOC_TYPE_NOT_ENABLED){
+		storage_allocation = makeflow_alloc_create(-1, NULL, storage_limit, 1, storage_type);
+	}
 	
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -54,26 +55,26 @@ static int destroy( void * instance_struct, struct dag *d ){
 }
 
 static int dag_check( void * instance_struct, struct dag *d){
-    uint64_t start = timestamp_get();
-    struct dag_node *n = dag_node_create(d, -1);
-    n->state = DAG_NODE_STATE_COMPLETE;
-    struct dag_node *p;
+	uint64_t start = timestamp_get();
+	struct dag_node *n = dag_node_create(d, -1);
+	n->state = DAG_NODE_STATE_COMPLETE;
+	struct dag_node *p;
 
-    for(p = d->nodes; p; p = p->next) {
-        if(set_size(p->ancestors) == 0) {
-            set_push(n->descendants, p);
-        }
-    }
+	for(p = d->nodes; p; p = p->next) {
+		if(set_size(p->ancestors) == 0) {
+			set_push(n->descendants, p);
+		}
+	}
 
-    dag_node_footprint_calculate(n);
-    if(storage_print){
-        dag_node_footprint_find_largest_residual(n, NULL);
-        dag_node_footprint_print(d, n, storage_print);
-        return MAKEFLOW_HOOK_END;
-    }
-    uint64_t end = timestamp_get();
-    static_analysis += end - start;
-    dag_node_delete(n);
+	dag_node_footprint_calculate(n);
+	if(storage_print){
+		dag_node_footprint_find_largest_residual(n, NULL);
+		dag_node_footprint_print(d, n, storage_print);
+		return MAKEFLOW_HOOK_END;
+	}
+	uint64_t end = timestamp_get();
+	static_analysis += end - start;
+	dag_node_delete(n);
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -90,11 +91,11 @@ static int dag_loop( void * instance_struct, struct dag *d){
 
 static int dag_end( void * instance_struct, struct dag *d){
 
-    if(storage_allocation){
-        makeflow_log_alloc_event(d, storage_allocation);
-        makeflow_log_event(d, "STATIC_ANALYSIS", static_analysis);
-        makeflow_log_event(d, "DYNAMIC_ALLOC", makeflow_alloc_get_dynamic_alloc_time());
-    }
+	if(storage_allocation){
+		makeflow_log_alloc_event(d, storage_allocation);
+		makeflow_log_event(d, "STATIC_ANALYSIS", static_analysis);
+		makeflow_log_event(d, "DYNAMIC_ALLOC", makeflow_alloc_get_dynamic_alloc_time());
+	}
 
 	if(failed_allocation_check || failed_dependencies_check){
 		return MAKEFLOW_HOOK_FAILURE;
@@ -105,28 +106,28 @@ static int dag_end( void * instance_struct, struct dag *d){
 
 static int node_check( void * instance_struct, struct dag_node *n, struct batch_queue *q){
 
-    if(storage_allocation->locked){
-        if(!( makeflow_alloc_check_space(storage_allocation, n))){
+	if(storage_allocation->locked){
+		if(!( makeflow_alloc_check_space(storage_allocation, n))){
 			failed_allocation_check = 1;
-            return MAKEFLOW_HOOK_SKIP;
-        }
+			return MAKEFLOW_HOOK_SKIP;
+		}
 
-        if (!(dag_node_footprint_dependencies_active(n))){
+		if (!(dag_node_footprint_dependencies_active(n))){
 			failed_dependencies_check = 1;
-            return MAKEFLOW_HOOK_SKIP;
-        }
-    }
+			return MAKEFLOW_HOOK_SKIP;
+		}
+	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *task){
-    if(makeflow_alloc_commit_space(storage_allocation, n)){
-        makeflow_log_alloc_event(n->d, storage_allocation);
-    } else if (storage_allocation->locked)  {
-        debug(D_MAKEFLOW_HOOK, "Unable to commit enough space for execution\n");
+	if(makeflow_alloc_commit_space(storage_allocation, n)){
+		makeflow_log_alloc_event(n->d, storage_allocation);
+	} else if (storage_allocation->locked)  {
+		debug(D_MAKEFLOW_HOOK, "Unable to commit enough space for execution\n");
 		return MAKEFLOW_HOOK_FAILURE;
-    }
+	}
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
@@ -134,33 +135,33 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 	struct dag_file *f = NULL;
 	cleaned_completed_node = 1;
 	
-    if(makeflow_alloc_use_space(storage_allocation, n)){
+	if(makeflow_alloc_use_space(storage_allocation, n)){
 		makeflow_log_alloc_event(n->d, storage_allocation);
 	}
 
-    /* Mark source files that have been used by this node */
-    list_first_item(n->source_files);
-    while((f = list_next_item(n->source_files))) {
-        if(f->state == DAG_FILE_STATE_COMPLETE){
-            if(storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
+	/* Mark source files that have been used by this node */
+	list_first_item(n->source_files);
+	while((f = list_next_item(n->source_files))) {
+		if(f->state == DAG_FILE_STATE_COMPLETE){
+			if(storage_allocation->locked && f->type != DAG_FILE_TYPE_OUTPUT)
 				makeflow_clean_file(n->d, makeflow_get_queue(n), f);
 		}
 	}
 
-    /* Delete output files that have no use and are not actual outputs */
-    if(storage_allocation->locked){
-        list_first_item(n->target_files);
+	/* Delete output files that have no use and are not actual outputs */
+	if(storage_allocation->locked){
+		list_first_item(n->target_files);
 		while((f = list_next_item(n->target_files))){
 			if(f->reference_count == 0 && f->type != DAG_FILE_TYPE_OUTPUT)
 				makeflow_clean_file(n->d, makeflow_get_queue(n), f);
 		}
 	}
 
-    if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
-        makeflow_log_alloc_event(n->d, storage_allocation);
-    } else if (storage_allocation->locked) {
-        debug(D_MAKEFLOW_HOOK, "Unable to release space\n");
-    }
+	if(makeflow_alloc_release_space(storage_allocation, n, 0, MAKEFLOW_ALLOC_RELEASE_COMMIT)) {
+		makeflow_log_alloc_event(n->d, storage_allocation);
+	} else if (storage_allocation->locked) {
+		debug(D_MAKEFLOW_HOOK, "Unable to release space\n");
+	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
