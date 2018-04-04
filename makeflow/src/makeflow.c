@@ -1234,8 +1234,10 @@ int main(int argc, char *argv[])
 		LONG_OPT_LOCAL_MEMORY,
 		LONG_OPT_LOCAL_DISK,
 		LONG_OPT_MONITOR,
+		LONG_OPT_MONITOR_EXE,
 		LONG_OPT_MONITOR_INTERVAL,
 		LONG_OPT_MONITOR_LOG_NAME,
+		LONG_OPT_MONITOR_MEASURE_DIR,
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
@@ -1313,8 +1315,10 @@ int main(int argc, char *argv[])
 		{"max-local", required_argument, 0, 'j'},
 		{"max-remote", required_argument, 0, 'J'},
 		{"monitor", required_argument, 0, LONG_OPT_MONITOR},
+		{"monitor-exe", required_argument, 0, LONG_OPT_MONITOR_EXE},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
+		{"monitor-measure-dir", no_argument, 0, LONG_OPT_MONITOR_MEASURE_DIR},
 		{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
 		{"monitor-with-time-series",  no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
 		{"mounts",  required_argument, 0, LONG_OPT_MOUNTS},
@@ -1491,9 +1495,17 @@ int main(int argc, char *argv[])
 				makeflow_hook_register(&makeflow_hook_resource_monitor);
 				jx_insert(hook_args, jx_string("resource_monitor_log_dir"), jx_string(optarg));
 				break;
+			case LONG_OPT_MONITOR_EXE:
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_exe"), jx_string(optarg));
+				break;
 			case LONG_OPT_MONITOR_INTERVAL:
 				makeflow_hook_register(&makeflow_hook_resource_monitor);
 				jx_insert(hook_args, jx_string("resource_monitor_interval"), jx_integer(atoi(optarg)));
+				break;
+			case LONG_OPT_MONITOR_MEASURE_DIR:
+				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				jx_insert(hook_args, jx_string("resource_monitor_measure_dir"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_TIME_SERIES:
 				makeflow_hook_register(&makeflow_hook_resource_monitor);
