@@ -123,7 +123,8 @@ struct makeflow_hook {
 	 * @param args The JX struct that is used in calling env. Used to pass back
 	 *      unique args struct for each instance of hook.
 	 * @return MAKEFLOW_HOOK_SUCCESS if it is to be added, 
-	 *		and MAKEFLOW_HOOK_SKIP if it is to be skipped.
+	 *		   MAKEFLOW_HOOK_SKIP if it is to be skipped, and
+	 *		   MAKEFLOW_HOOK_FAILURE to exit the workflow.
 	 */
 	int (*register_hook) (struct makeflow_hook *hook, struct list *hook_list, struct jx **args);
 
@@ -403,6 +404,11 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
 /** Add/Register makeflow_hook struct in list of hooks.
  Example of use see above.
 @param hook The new hook to register.
+@param args JX object that keeps the args of the current hook. 
+	Should be updated by the registering hook.
+
+NOTE: Check for MAKEFLOW_HOOK_FAILURE as the args pointer will
+now be NULL.
 */
 int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args);
 

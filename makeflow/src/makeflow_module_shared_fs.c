@@ -64,6 +64,7 @@ static int create( void ** instance_struct, struct jx *hook_args )
 		while((item = jx_array_shift(array))) {
 			if(item->type == JX_STRING){
 				list_push_head(sf->shared_fs_list, xxstrdup(item->u.string_value));
+				debug(D_MAKEFLOW_HOOK, "Shared FS added : %s", item->u.string_value);
 			} else {
 				debug(D_ERROR|D_MAKEFLOW_HOOK, "Non-string argument passed to Shared FS hook");
 				return MAKEFLOW_HOOK_FAILURE;

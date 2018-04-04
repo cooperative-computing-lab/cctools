@@ -97,7 +97,8 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 
 		list_push_tail(makeflow_hooks, h);
 	} else if(rc == MAKEFLOW_HOOK_FAILURE){
-		// Not safe, need to think about this
+		/* Args are NULL to prevent other hooks from modifying an
+		 * unintended arg list. */
 		args = NULL;
 		debug(D_ERROR|D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
 	}
