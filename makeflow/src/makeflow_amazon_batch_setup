@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#Copyright (C) 2015- The University of Notre Dame
+#Copyright (C) 2018- The University of Notre Dame
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 #
@@ -57,11 +57,13 @@ if [ $max_cpus -lt $min_cpus ]; then
         exit 143
 fi
 
-if [ -n "$4" ]; then
-	outputfile="$4"
-else
-	outputfile="makeflow_amazon_batch.config"
-fi
+outputfile=${4:-makeflow_amazon_batch.config}
+
+#if [ -n "$4" ]; then
+#	outputfile="$4"
+#else
+#	outputfile="makeflow_amazon_batch.config"
+#fi
 
 if [ -e $outputfile ]; then
 	echo "File: $outputfile already exists! Please cleanup/delete first"

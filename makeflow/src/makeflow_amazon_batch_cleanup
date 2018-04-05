@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#Copyright (C) 2015- The University of Notre Dame
+#Copyright (C) 2018- The University of Notre Dame
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 #
@@ -36,7 +36,8 @@ aws batch update-job-queue --job-queue $queue_name --state DISABLED
 queue_status="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
 queue_state="$(aws --output text --query 'jobQueues[0].state' batch describe-job-queues --job-queues $queue_name)"
 
-while ! [ "$queue_status" == "VALID" -a "$queue_state" != "ENABLED"  ]
+while [ "$queue_status" != "VALID" ] || [ "$queue_state" = "ENABLED" ]
+#while ! [ "$queue_status" == "VALID" -a "$queue_state" != "ENABLED"  ]
 do
 	queue_status="$(aws --output text --query 'jobQueues[0].status' batch describe-job-queues --job-queues $queue_name)"
 	queue_state="$(aws --output text --query 'jobQueues[0].state' batch describe-job-queues --job-queues $queue_name)"
@@ -62,7 +63,8 @@ aws batch update-compute-environment --compute-environment $env_name --state DIS
 env_status="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
 env_state="$(aws --output text --query 'computeEnvironments[0].state' batch describe-compute-environments --compute-environments $env_name)"
 
-while ! [ "$env_status" == "VALID" -a "$env_state" != "ENABLED"  ]
+#while ! [ "$env_status" == "VALID" -a "$env_state" != "ENABLED"  ]
+while [ "$env_status" != "VALID" ] || [ "$env_state" == "ENABLED" ]
 do
 env_status="$(aws --output text --query 'computeEnvironments[0].status' batch describe-compute-environments --compute-environments $env_name)"
 env_state="$(aws --output text --query 'computeEnvironments[0].state' batch describe-compute-environments --compute-environments $env_name)"
@@ -89,7 +91,6 @@ aws ec2 delete-internet-gateway --internet-gateway-id $gateway
 
 
 #delete the subnet
-#echo "THis is the subnet variable value: $ec2_subnet"
 echo "Deleting subnet"
 aws ec2 delete-subnet --subnet-id $ec2_subnet
 
