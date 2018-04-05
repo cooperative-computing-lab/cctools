@@ -17,10 +17,10 @@ EOF
 
 run()
 {
-	eval $(../src/jx2env jx_env.input hello plate.fork.knife.spoon)
+	eval $(../src/jx2env jx_env.input varname=hello othervarname=plate.fork.knife.spoon)
 
-	[ "${hello}" = "goodbye" ] || exit 1
-	[ "${plate_fork_knife_spoon}" = "tea spoon" ] || exit 1
+	[ "${varname}" = "goodbye" ] || exit 1
+	[ "${othervarname}" = "tea spoon" ] || exit 1
 	[ -z ${tag} ] || exit 1
 }
 
