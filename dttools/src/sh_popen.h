@@ -22,7 +22,7 @@ process.
 @param command The command string to execute.
 @return A pointer to a file stream which must be closed with @ref sh_pclose.
 */
-FILE *sh_popen(const char *command);
+FILE *sh_popen(char *command);
 
 
 /** Conclude a sh_popen stream.
@@ -41,6 +41,6 @@ process.
 @param command The command string to execute.
 @return The exit status of the command just executed
 */
-int sh_system(const char* command);
+int sh_system(char* command);
 
 #endif
