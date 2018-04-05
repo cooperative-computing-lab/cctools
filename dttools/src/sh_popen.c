@@ -123,7 +123,7 @@ int sh_system(char* command) {
 			return WEXITSTATUS(pres->status);
 		}
 	} else {
-		fprintf(stderr, "error in forking\n");
+		debug(D_ERROR, "error in forking\n");
 	}
 	return -17;
 
