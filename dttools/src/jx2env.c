@@ -31,15 +31,6 @@ static const struct option long_options[] =
 	{0, 0, 0, 0}
 };
 
-void dots_to_underscores(char *spec) {
-	char *c = strchr(spec, '.');
-
-	while(c) {
-		*c = '_';
-		c = strchr(spec, '.');
-	}
-}
-
 char *value_of_simple(struct jx *j, const char *spec) {
 	int found = 0;
 
@@ -139,9 +130,18 @@ int main(int argc, char **argv) {
 		char *spec = xxstrdup(argv[optind]);
 		optind++;
 
-		char *value = value_of_dotted(j, spec);
+		char *path = strchr(spec, '=');
+		if(!path || strlen(path+1) < 1) {
+			fprintf(stderr, "Malformed specification: %s\n", spec);
+			show_help(argv[0]);
+			exit(1);
+		}
 
-		dots_to_underscores(spec);
+		*path = '\0';
+		path++;
+
+		char *value = value_of_dotted(j, path);
+
 		if(csh) {
 			fprintf(stdout, "setenv %s \"%s\"\n", spec, value); 
 		} else {
