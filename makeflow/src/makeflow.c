@@ -1501,7 +1501,8 @@ int main(int argc, char *argv[])
 				jx_insert(hook_args, jx_string("resource_monitor_interval"), jx_integer(atoi(optarg)));
 				break;
 			case LONG_OPT_MONITOR_MEASURE_DIR:
-				makeflow_hook_register(&makeflow_hook_resource_monitor);
+				if (makeflow_hook_register(&makeflow_hook_resource_monitor, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("resource_monitor_measure_dir"), jx_integer(1));
 				break;
 			case LONG_OPT_MONITOR_TIME_SERIES:
