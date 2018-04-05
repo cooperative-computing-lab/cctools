@@ -98,7 +98,7 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 
 //Using default sampling interval. We may want to add an option
 //to change it.
-char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const struct rmsummary *limits, const char *extra_monitor_options, int debug_output, int time_series, int inotify_stats)
+char *resource_monitor_write_command(const char *monitor_path, const char *template_filename, const struct rmsummary *limits, const char *extra_monitor_options, int debug_output, int time_series, int inotify_stats, const char *measure_dir)
 {
 	buffer_t cmd_builder;
 	buffer_init(&cmd_builder);
@@ -117,6 +117,9 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 
 	if(inotify_stats)
 		buffer_printf(&cmd_builder, " --with-inotify");
+
+	if(measure_dir)
+		buffer_printf(&cmd_builder, " --measure-dir %s", measure_dir);
 
 	if(limits) {
 		if(limits->end > -1)

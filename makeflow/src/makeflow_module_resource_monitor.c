@@ -29,6 +29,7 @@ struct makeflow_monitor {
 	int enable_list_files;
 
 	int interval;
+	char *measure_dir;
 	char *log_dir;
 	char *log_format;
 	char *log_prefix;
@@ -46,6 +47,7 @@ struct makeflow_monitor *makeflow_monitor_create()
 	m->enable_list_files = 0;
 
 	m->interval = 1; // in seconds
+	m->measure_dir = NULL;
 	m->log_dir = NULL;
 	m->log_format = NULL;
 	m->log_prefix = NULL;
@@ -58,6 +60,13 @@ struct makeflow_monitor *makeflow_monitor_create()
 static int create(struct jx *args)
 {
 	monitor = makeflow_monitor_create();
+
+	if (jx_lookup_string(args, "resource_monitor_exe")){
+		monitor->exe = xxstrdup(jx_lookup_string(args, "resource_monitor_exe"));
+	} else {
+		monitor->exe = resource_monitor_locate(NULL);
+	}
+
 	if (jx_lookup_string(args, "resource_monitor_log_dir"))
 		monitor->log_dir = xxstrdup(jx_lookup_string(args, "resource_monitor_log_dir"));
 
@@ -66,6 +75,9 @@ static int create(struct jx *args)
 
 	if(jx_lookup_integer(args, "resource_monitor_interval"))
 		monitor->interval = jx_lookup_integer(args, "resource_monitor_interval");
+
+	if(jx_lookup_integer(args, "resource_monitor_measure_dir"))
+		monitor->measure_dir = xxstrdup("$PWD");
 
 	monitor->enable_time_series = jx_lookup_integer(args, "resource_monitor_enable_time_series");
 	monitor->enable_list_files = jx_lookup_integer(args, "resource_monitor_enable_list_files");
@@ -85,7 +97,6 @@ static int create(struct jx *args)
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 
-	monitor->exe = resource_monitor_locate(NULL);
 	if (!monitor->exe) {
 		debug(D_ERROR|D_MAKEFLOW_HOOK,"Monitor mode was enabled, but could not find resource_monitor in PATH.");
 		return MAKEFLOW_HOOK_FAILURE;
@@ -195,7 +206,8 @@ static int node_submit(struct dag_node *n, struct batch_task *task)
 					extra_options,
 					monitor->enable_debug, 
 					monitor->enable_time_series, 
-					monitor->enable_list_files);
+					monitor->enable_list_files,
+					monitor->measure_dir);
 
 	free(executable);
 	free(extra_options);
