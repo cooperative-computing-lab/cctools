@@ -3,7 +3,7 @@ include ../../rules.mk
 
 LIBRARIES = libbatch_job.a
 
-PROGRAMS = work_queue_factory work_queue_pool 
+PROGRAMS = work_queue_factory work_queue_pool
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
 CHIRP_LIB=../../chirp/src/libchirp.a

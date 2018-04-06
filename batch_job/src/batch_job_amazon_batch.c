@@ -177,8 +177,6 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 	compute_env_name            = (char*)jx_lookup_string(config,"env_name");
 	subnet                      = (char*)jx_lookup_string(config,"subnet");	
 
-	//const char* aws_email = jx_lookup_string(config,"aws_email");
-
 	if(!aws_access_key_id)
 		fatal("credentials file %s does not contain aws_id",config_file);
 	if(!aws_secret_access_key)
