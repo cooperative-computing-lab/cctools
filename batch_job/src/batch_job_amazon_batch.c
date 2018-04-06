@@ -67,7 +67,7 @@ static unsigned int gen_guid(){
 }
 
 static struct jx* run_command(char* cmd){
-	FILE* out = popen(cmd,"r");
+	FILE* out = sh_popen(cmd);
 	if(out == NULL){
 		fatal("fast_popen returned a null FILE* pointer");
 	}
@@ -126,7 +126,7 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 		}
 		debug(D_BATCH,"Submitting file: %s",files_split[i]);
 		char* put_file_command = string_format("%s /usr/bin/time -f \"Submitting File %s for Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
-		int ret = system(put_file_command);
+		int ret = sh_system(put_file_command);
 		if(ret != 0){
 			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",files_split[i],ret);
 			success = 0;
@@ -274,9 +274,9 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 	free(final_cmd);
 	
 	//make executable and put into s3
-	system("chmod +x TEMPFILE.sh");
+	sh_system("chmod +x TEMPFILE.sh");
 	cmd_tmp = string_format("%s /usr/bin/time -f \"Submitting cmd_file Job %s_%u: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp ./TEMPFILE.sh s3://%s/COMAND_FILE_%u.sh",env_var,queue_name,jobid,bucket_name,jobid);
-	system(cmd_tmp);
+	sh_system(cmd_tmp);
 	free(cmd_tmp);
 	remove("TEMPFILE.sh");	
 
@@ -459,7 +459,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 					for(j=0; j<num_done_files; j++){
 						debug(D_BATCH,"Copying over %s",done_files_list[j]);
 						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,done_files_list[j],done_files_list[j]);
-						int outputcode = system(get_from_s3_cmd);
+						int outputcode = sh_system(get_from_s3_cmd);
 						debug(D_BATCH,"output code from calling S3 to pull file %s: %i",done_files_list[j],outputcode);
 						FILE* tmpOut = fopen(done_files_list[j],"r");
 						if(tmpOut){
@@ -521,7 +521,7 @@ static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t j
 	}
 	char* cmd = string_format("%s aws batch terminate-job --job-id %s --reason \"Makeflow Killed\"",env_var,amazon_id);
 	debug(D_BATCH,"Terminating the job: %s\n",cmd);
-	system(cmd);
+	sh_system(cmd);
 	free(cmd);
 	return 0;
 	

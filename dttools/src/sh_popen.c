@@ -59,7 +59,6 @@ FILE* sh_popen(char* command)
 
 		int i;
 
-		close(0);
 		i = dup2(fds[1], STDOUT_FILENO); if(i < 0) perror("Error Dup2 stdout from SH_popen.");
 		i = dup2(fds[1], STDERR_FILENO); if(i < 0) perror("Error Dup2 stderr SH_popen.");
 		close(fds[1]);
