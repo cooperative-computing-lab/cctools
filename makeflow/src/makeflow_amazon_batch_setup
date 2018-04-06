@@ -54,16 +54,10 @@ fi
 if [ $max_cpus -lt $min_cpus ]; then
 	echo "Minimum number of cpus must be less than or equal to maximum number of cpus"
         echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-        exit 143
+        exit 43
 fi
 
 outputfile=${4:-makeflow_amazon_batch.config}
-
-#if [ -n "$4" ]; then
-#	outputfile="$4"
-#else
-#	outputfile="makeflow_amazon_batch.config"
-#fi
 
 if [ -e $outputfile ]; then
 	echo "File: $outputfile already exists! Please cleanup/delete first"
@@ -117,7 +111,6 @@ ec2_vpc="$(aws --output text --query 'Vpc.VpcId' ec2 create-vpc --cidr-block 10.
 echo "created vpc: $ec2_vpc"
 
 aws --output json ec2 modify-vpc-attribute --vpc-id $ec2_vpc --enable-dns-hostnames
-#aws --output json ec2 modify-vpc-attribute --vpc-id $ec2_vpc --enable-dns-support
 
 echo "\"vpc\":\"$ec2_vpc\"," >> $outputfile
 
