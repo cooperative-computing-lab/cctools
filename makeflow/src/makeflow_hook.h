@@ -103,8 +103,6 @@ struct makeflow_hook {
 	 * debug and failure statements.
 	 */
 	const char * module_name;
-	struct jx * args;
-	void * instance_struct;
 
 	/* Register hook.
 	 *

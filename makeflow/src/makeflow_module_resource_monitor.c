@@ -67,11 +67,9 @@ static int resource_monitor_register_hook(struct makeflow_hook *h, struct list *
 	if(tail){
 		list_push_tail(hooks, tail);
 		if(!strcmp(h->module_name, tail->module_name)){
-			*args = tail->args;
 			return MAKEFLOW_HOOK_SKIP;
 		}
 	}
-	*args = jx_object(NULL);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
