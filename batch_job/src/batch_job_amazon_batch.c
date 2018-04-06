@@ -65,8 +65,9 @@ static unsigned int gen_guid(){
 	fclose(ran);
 	return guid.ul;	
 }
+
 static struct jx* run_command(char* cmd){
-	FILE* out = sh_popen(cmd);
+	FILE* out = popen(cmd,"r");
 	if(out == NULL){
 		fatal("fast_popen returned a null FILE* pointer");
 	}
@@ -74,7 +75,7 @@ static struct jx* run_command(char* cmd){
 	if(jx == NULL){
 		fatal("JX parse stream out returned a null jx object");
 	}
-	sh_pclose(out);
+	pclose(out);
 	return jx;
 }
 
@@ -125,7 +126,7 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 		}
 		debug(D_BATCH,"Submitting file: %s",files_split[i]);
 		char* put_file_command = string_format("%s /usr/bin/time -f \"Submitting File %s for Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
-		int ret = sh_system(put_file_command);
+		int ret = system(put_file_command);
 		if(ret != 0){
 			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",files_split[i],ret);
 			success = 0;
@@ -211,7 +212,7 @@ static char* generate_s3_cp_cmds(char* files, char* src, char* dst){
 	int files_split_num = 0;
 	char** files_split;
 	split_comma_list(files, &files_split_num, &files_split);
-	//char* new_cmd=string_format("sleep 0");
+
 	char* new_cmd=malloc(sizeof(char)*1);
         new_cmd[0]='\0';
 	if(files_split_num > 0){
@@ -264,7 +265,7 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 	//add headder
 	char* final_cmd = string_format("#!/bin/sh\n%s",cmd_tmp);
 	free(cmd_tmp);
-	//char* final_cmd = cmd_tmp;	
+
 
 	//write out to file	
 	FILE* tmpfile = fopen("TEMPFILE.sh","w+");
@@ -273,12 +274,11 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 	free(final_cmd);
 	
 	//make executable and put into s3
-	sh_system("chmod +x TEMPFILE.sh");
+	system("chmod +x TEMPFILE.sh");
 	cmd_tmp = string_format("%s /usr/bin/time -f \"Submitting cmd_file Job %s_%u: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp ./TEMPFILE.sh s3://%s/COMAND_FILE_%u.sh",env_var,queue_name,jobid,bucket_name,jobid);
-	sh_system(cmd_tmp);
+	system(cmd_tmp);
 	free(cmd_tmp);
 	remove("TEMPFILE.sh");	
-	//return final_cmd;
 
 }
 
@@ -287,8 +287,6 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	char* env_var = initialized_data.master_env_prefix;
 	//submit the job-def
 	char* tmp = string_format("%s /usr/bin/time -f \"Registering Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name,job_name, properties_string);
-	//free(tmp);
-	//tmp = string_format("/usr/bin/time -f \"Registering Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",job_name,job_name, properties_string);
 	debug(D_BATCH,"Creating the Job Definition: %s",tmp);
         struct jx* jx = run_command(tmp);
 	free(tmp);
@@ -301,8 +299,6 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	
 	//now that we have create a job-definition, we can submit the job.
 	tmp = string_format("%s /usr/bin/time -f \"Submitting Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",env_var,job_name,job_name,queue,job_name);
-	//free(tmp);
-	//tmp = string_format("/usr/bin/time -f \"Submitting Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",job_name,job_name,queue,job_name);
 	debug(D_BATCH,"Submitting the job: %s",tmp);
 	jx = run_command(tmp);
 	free(tmp);
@@ -313,38 +309,55 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	return jaid;
 }
 enum{
-	describe_aws_job_success = 1, //job exists, succeeded
-	describe_aws_job_failed = 0, //job exists, failed
-	describe_aws_job_non_final = -1, //exists, but in non-final state
-	descibe_aws_job_non_exist = -2 //job doesn't exist, should treat as a failure
+	DESCRIBE_AWS_JOB_SUCCESS = 1, //job exists, succeeded
+	DESCRIBE_AWS_JOB_FAILED = 0, //job exists, failed
+	DESCRIBE_AWS_JOB_NON_FINAL = -1, //exists, but in non-final state
+	DESCRIBE_AWS_JOB_NON_EXIST = -2 //job doesn't exist, should treat as a failure
 };
-static int describe_aws_job(char* aws_jobid, char* env_var){
-	//fprintf(stderr,"aws_jobid:%s\n\n",aws_jobid);
-	char* cmd = string_format("%s aws batch describe-jobs --jobs %s",env_var,aws_jobid);
-	free(cmd);
-	cmd = string_format("%s aws batch describe-jobs --jobs %s",env_var,aws_jobid);
+
+static int finished_aws_job_exit_code(char* aws_jobid, char* env_var){
+	char* cmd = string_format("aws batch describe-jobs --jobs %s",aws_jobid);
 	struct jx* jx = run_command(cmd);
 	free(cmd);
-	int succeed = describe_aws_job_non_final; //default status
 	struct jx* jobs_array = jx_lookup(jx,"jobs");
 	if(!jobs_array){
 		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
-		return descibe_aws_job_non_exist;
+		return DESCRIBE_AWS_JOB_NON_EXIST;
 	}
 	struct jx* first_item = jx_array_index(jobs_array,0);
 	if(!first_item){
-		debug(D_BATCH,"Problem wigh given aws_jobid: %s",aws_jobid);
-		return descibe_aws_job_non_exist;
+		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
+		return DESCRIBE_AWS_JOB_NON_EXIST;
+	}
+	int ret = (int)jx_lookup_integer(first_item,"exitCode");
+	jx_delete(jx);
+	return ret;
+}
+
+static int describe_aws_job(char* aws_jobid, char* env_var){
+	char* cmd = string_format("aws batch describe-jobs --jobs %s",aws_jobid);
+	struct jx* jx = run_command(cmd);
+	free(cmd);
+	int succeed = DESCRIBE_AWS_JOB_NON_FINAL; //default status
+	struct jx* jobs_array = jx_lookup(jx,"jobs");
+	if(!jobs_array){
+		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
+		return DESCRIBE_AWS_JOB_NON_EXIST;
+	}
+	struct jx* first_item = jx_array_index(jobs_array,0);
+	if(!first_item){
+		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
+		return DESCRIBE_AWS_JOB_NON_EXIST;
 	}
 	if(strstr((char*)jx_lookup_string(first_item,"status"),"SUCCEEDED")){
-		succeed = describe_aws_job_success;
+		succeed = DESCRIBE_AWS_JOB_SUCCESS;
 	}
 	if(strstr((char*)jx_lookup_string(first_item,"status"),"FAILED")){
-		succeed = describe_aws_job_failed;
+		succeed = DESCRIBE_AWS_JOB_FAILED;
 	}
-	//jx_pretty_print_stream(first_item,stderr);
+
 	//start and stop
-	if(succeed == describe_aws_job_success || succeed == describe_aws_job_failed){	
+	if(succeed == DESCRIBE_AWS_JOB_SUCCESS || succeed == DESCRIBE_AWS_JOB_FAILED){	
 		int64_t created_string = (int64_t) jx_lookup_integer(first_item,"createdAt");
 		int64_t start_string = (int64_t)jx_lookup_integer(first_item,"startedAt");
 		int64_t end_string = (int64_t)jx_lookup_integer(first_item,"stoppedAt");
@@ -365,7 +378,6 @@ static int describe_aws_job(char* aws_jobid, char* env_var){
 static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	char* env_var = amazon_ids.master_env_prefix;
-	fprintf(stderr,"env_var: %s\n",env_var);	
 
 	//so, we have the access keys, now we need to either set up the queues and exec environments, or add them.
 	unsigned int jobid = gen_guid();
@@ -378,7 +390,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	//specs
 	int cpus=1;
 	long int mem=1000;
-	char* img = hash_table_lookup(q->options,"amazon-ami");
+	char* img = hash_table_lookup(q->options,"amazon-batch-img");
 	int disk = 1000;
 	if(resources){
 		cpus = resources->cores;
@@ -388,12 +400,9 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 		mem = mem > 1000? mem:1000;
 		disk = disk > 1000 ? disk : 1000;
 	}
-	clock_t start_t = clock();
 	//upload files to S3
 	upload_input_files_to_s3((char*)extra_input_files,job_name);	
 	upload_cmd_file(bucket_name,(char*)extra_input_files,(char*)extra_output_files,(char*)cmd,jobid);
-	clock_t end_t = clock();
-	//fprintf(stderr,"\n\tTime to Upload Files: %lf\n",(double)(end_t-start_t)/CLOCKS_PER_SEC);
 	
 	//create the fmd string to give to the command
 	char* fmt_cmd = string_format("%s aws s3 cp s3://%s/COMAND_FILE_%u.sh ./ && sh ./COMAND_FILE_%u.sh",env_var,bucket_name,jobid,jobid);	
@@ -401,10 +410,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	//combine all properties together
 	char* properties_string = string_format("{ \\\"image\\\": \\\"%s\\\", \\\"vcpus\\\": %i, \\\"memory\\\": %li, \\\"command\\\": [\\\"sh\\\",\\\"-c\\\",\\\"%s\\\"], \\\"environment\\\":[{\\\"name\\\":\\\"AWS_ACCESS_KEY_ID\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"AWS_SECRET_ACCESS_KEY\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"REGION\\\",\\\"value\\\":\\\"%s\\\"}] }", img,cpus,mem,fmt_cmd,amazon_ids.aws_access_key_id,amazon_ids.aws_secret_access_key,amazon_ids.aws_region);
 	
-	start_t=clock();
 	char* jaid = aws_submit_job(job_name,properties_string);
-	end_t=clock();
-	fprintf(stderr,"\n\tTime to Submit Job: %lf\n",(double)(end_t-start_t)/CLOCKS_PER_SEC);
 
 	itable_insert(amazon_job_ids,jobid,jaid);
 	debug(D_BATCH,"Job %u has amazon id: %s",jobid,jaid);
@@ -426,7 +432,6 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 
 static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
-	//int i=0;
 	//succeeded check
 	int done  = 0;
 	char* env_var = amazon_ids.master_env_prefix;
@@ -437,7 +442,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 		done = describe_aws_job(jaid,env_var);
 		char* jobname = string_format("%s_%u",queue_name,(unsigned int)jobid);
 		unsigned int id = (unsigned int)jobid;
-		if(done == 1){
+		if(done == DESCRIBE_AWS_JOB_SUCCESS){
 			if(itable_lookup(done_jobs,id+1) == NULL){
 				//id is done, returning here
 				debug(D_BATCH,"Inserting id: %u into done_jobs",id);
@@ -454,7 +459,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 					for(j=0; j<num_done_files; j++){
 						debug(D_BATCH,"Copying over %s",done_files_list[j]);
 						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,done_files_list[j],done_files_list[j]);
-						int outputcode = sh_system(get_from_s3_cmd);
+						int outputcode = system(get_from_s3_cmd);
 						debug(D_BATCH,"output code from calling S3 to pull file %s: %i",done_files_list[j],outputcode);
 						FILE* tmpOut = fopen(done_files_list[j],"r");
 						if(tmpOut){
@@ -473,13 +478,13 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_job_amazon.c
 				info->finished = time(0);//get now
 				info->exited_normally=1;
-				info->exit_code=0;//NEED TO FIX EVENTUALLY, and find how to ACTUALLY get the exit code
+				info->exit_code=finished_aws_job_exit_code(jaid,env_var);
 				debug(D_BATCH,"copying over the data to info_out");
 				memcpy(info_out, info, sizeof(struct batch_job_info));
 				free(info);
 				return id;
 			}
-		}else if(done == 0 || done == -2){
+		}else if(done == DESCRIBE_AWS_JOB_FAILED || done == DESCRIBE_AWS_JOB_NON_EXIST){
 			if(itable_lookup(done_jobs,id+1)==NULL){
 				//id is done, returning here
 				itable_insert(done_jobs,id+1,jobname);
@@ -488,9 +493,10 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				debug(D_BATCH,"Failed job: %i",id);
 				
 				struct batch_job_info* info = itable_remove(q->job_table, id);//got from batch_job_amazon.c
-				info->finished = time(0);//get now
+				info->finished = time(0); //get now
 				info->exited_normally=0;
-				info->exit_code=1;//NEED TO FIX EVENTUALLY, and find how to ACTUALLY get the exit code
+				int exc = finished_aws_job_exit_code(jaid,env_var);
+				info->exit_code= exc == 0 ? -1 : exc;
 				memcpy(info_out, info, sizeof(*info));
 				free(info);
 				return id;
@@ -499,7 +505,6 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 			continue;
 		}
 	}
-	//if we get to this point, we should probably clean up and exit....
 	return -1;
 }
 
@@ -516,7 +521,7 @@ static int batch_job_amazon_batch_remove(struct batch_queue *q, batch_job_id_t j
 	}
 	char* cmd = string_format("%s aws batch terminate-job --job-id %s --reason \"Makeflow Killed\"",env_var,amazon_id);
 	debug(D_BATCH,"Terminating the job: %s\n",cmd);
-	sh_system(cmd);
+	system(cmd);
 	free(cmd);
 	return 0;
 	

@@ -47,7 +47,7 @@ static struct batch_queue_module batch_queue_unknown = {
 };
 
 
-#define BATCH_JOB_SYSTEMS  "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, dryrun, lambda, amazon-batch"
+#define BATCH_JOB_SYSTEMS "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, dryrun, lambda, amazon-batch"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_amazon,

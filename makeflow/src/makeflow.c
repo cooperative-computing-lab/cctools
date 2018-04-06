@@ -1098,8 +1098,8 @@ static void show_help_run(const char *cmd)
 	printf("\nBatch System Options:\n");
 	printf("    --amazon-config             Amazon EC2 config file from makeflow_ec2_setup.\n");
 	printf("    --lambda-config             Amazon Lambda config file from makeflow_lambda_setup.\n");
-    printf("    --amazon-batch-img          Specify amazon ECS Image (for use with -T amazon-batch)\n");
-    printf("    --amazon-batch-config       Amazon config file from makeflow_amazon_batch_setup.\n");
+	printf("    --amazon-batch-img          Specify amazon ECS Image (for use with -T amazon-batch)\n");
+	printf("    --amazon-batch-config       Amazon config file from makeflow_amazon_batch_setup.\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
@@ -1265,7 +1265,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_DOCKER_TAR,
 		LONG_OPT_AMAZON_CONFIG,
 		LONG_OPT_LAMBDA_CONFIG,
-		LONG_OPT_AMAZON_AMI,
 		LONG_OPT_AMAZON_BATCH_IMG,
 		LONG_OPT_AMAZON_BATCH_CFG,
 		LONG_OPT_JSON,
@@ -1373,7 +1372,6 @@ int main(int argc, char *argv[])
 		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
 		{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
 		{"lambda-config", required_argument, 0, LONG_OPT_LAMBDA_CONFIG},
-		{"amazon-ami", required_argument, 0, LONG_OPT_AMAZON_AMI},
 		{"amazon-batch-img",required_argument,0,LONG_OPT_AMAZON_BATCH_IMG},
 		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
