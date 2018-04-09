@@ -23,13 +23,13 @@ if [ -z "$1" ]; then
 fi
 
 if [ -z "$2" ]; then
-	echo "Empty number of CPUs requested."
+	echo "Empty number of min CPUs."
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
 	exit 33
 fi
 
 if [ -z "$3" ]; then
-	echo "Empty number of CPUs requested."
+	echo "Empty number of max CPUs."
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
 	exit 34
 fi
