@@ -67,6 +67,7 @@ extern int pfs_force_stream;
 extern int pfs_force_sync;
 extern int pfs_follow_symlinks;
 extern int pfs_enable_small_file_optimizations;
+extern int pfs_no_flock;
 
 extern const char * pfs_initial_working_directory;
 
@@ -1096,6 +1097,7 @@ int pfs_table::flock( int fd, int op )
 {
 	CHECK_FD(fd);
 
+	if (pfs_no_flock) return 0;
 	return pointers[fd]->file->flock(op);
 }
 

@@ -94,6 +94,7 @@ int pfs_session_cache = 0;
 int pfs_use_helper = 0;
 int pfs_checksum_files = 1;
 int pfs_write_rval = 0;
+int pfs_no_flock = 0;
 int pfs_paranoid_mode = 0;
 const char *pfs_write_rval_file = "parrot.rval";
 int pfs_enable_small_file_optimizations = 1;
@@ -170,6 +171,7 @@ enum {
 	LONG_OPT_PID_FIXED,
 	LONG_OPT_STATS_FILE,
 	LONG_OPT_DISABLE_SERVICE,
+	LONG_OPT_NO_FLOCK,
 };
 
 static void get_linux_version(const char *cmd)
@@ -278,6 +280,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Force synchronous disk writes.            (PARROT_FORCE_SYNC)\n", "-Y,--sync-write");
 	printf( " %-30s Enable automatic decompression on .gz files.\n", "-Z,--auto-decompress");
 	printf( " %-30s Disable the given service.\n", "--disable-service");
+	printf( " %-30s Make flock a no-op.\n", "--no-flock");
 	printf("\n");
 	printf("FTP / GridFTP options:\n");
 	printf( " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
@@ -831,6 +834,7 @@ int main( int argc, char *argv[] )
 		{"no-follow-symlinks", no_argument, 0, 'f'},
 		{"no-helper", no_argument, 0, 'H'},
 		{"no-optimize", no_argument, 0, 'D'},
+		{"no-flock", no_argument, 0, LONG_OPT_NO_FLOCK},
 		{"no-set-foreground", no_argument, 0, LONG_OPT_NO_SET_FOREGROUND},
 		{"paranoid", no_argument, 0, 'P'},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
@@ -1110,6 +1114,9 @@ int main( int argc, char *argv[] )
 			if (!hash_table_remove(available_services, optarg)) {
 				fprintf(stderr, "warning: unknown service %s\n", optarg);
 			}
+			break;
+		case LONG_OPT_NO_FLOCK:
+			pfs_no_flock = 1;
 			break;
 		default:
 			show_help(argv[0]);
