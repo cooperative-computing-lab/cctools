@@ -19,19 +19,19 @@ load_fieldJSON()
 if [ -z "$1" ]; then
 	echo "Empty number of CPUs requested."
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-	exit 32
+	exit 1
 fi
 
 if [ -z "$2" ]; then
 	echo "Empty number of min CPUs."
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-	exit 33
+	exit 1
 fi
 
 if [ -z "$3" ]; then
 	echo "Empty number of max CPUs."
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-	exit 34
+	exit 1
 fi
 
 cpus=$1
@@ -42,26 +42,26 @@ time=$(date +%s)
 if [ $cpus -lt $min_cpus ]; then
 	echo "Desired number of cpus must be greater than or equal to minimum number of cpus"
 	echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-        exit 41
+        exit 1
 fi
 
 if [ $cpus -gt $max_cpus ]; then
 	echo "Desired number of cpus must be less than or equal to maximum number of cpus"
         echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-        exit 42
+        exit 1
 fi
 
 if [ $max_cpus -lt $min_cpus ]; then
 	echo "Minimum number of cpus must be less than or equal to maximum number of cpus"
         echo "Correct Ussage: ./makeflow_amazon_batch_setup [desired_num_cpus] [min_number_cpus] [max_number_cpus] (config-output)"
-        exit 43
+        exit 1
 fi
 
 outputfile=${4:-makeflow_amazon_batch.config}
 
 if [ -e $outputfile ]; then
 	echo "File: $outputfile already exists! Please cleanup/delete first"
-	exit 51
+	exit 1
 fi
 
 
@@ -71,20 +71,20 @@ then
 	echo "found aws, moving on to config file check"
 else
 	echo "aws not found in path, please include it"
-	exit 90
+	exit 1
 fi
 
 if [ -f ~/.aws/config ]; then
 	echo "found config file, moving on to credentials file check"
 else
 	echo "aws not configured: please configure before running the script"
-	exit 91
+	exit 11
 fi
 if [ -f ~/.aws/credentials ]; then
 	echo "found credentials file!"
 else
 	echo "aws not configured: please configure before running the script"
-	exit 92
+	exit 1
 fi
 
 if aws batch list-jobs --job-queue HighPriority > /dev/null 2>&1
@@ -92,7 +92,7 @@ then
 	echo "config and credentials configured correctly, proceeding to setup"
 else
 	echo "configuration and credentials files not properly set, please reconfig aws and try again"
-	exit 93
+	exit 1
 fi
 
 #Grabbing the necessary keys
