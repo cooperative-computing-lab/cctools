@@ -124,6 +124,6 @@ int sh_system(char* command) {
 	} else {
 		debug(D_ERROR, "error in forking\n");
 	}
-	return -17;
+	return -1;
 
 }
