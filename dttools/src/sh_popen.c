@@ -14,6 +14,16 @@
 
 static struct itable* process_table = 0;
 
+static void clean_str_array(int size, char*** array){
+	int i=0;
+	for(i=0; i< size; i++){
+		if((*array)[i] != NULL){
+			free((*array)[i]);
+		}
+	}
+	free(*array);
+}
+
 FILE* sh_popen(char* command)
 {
 	pid_t pid;
@@ -22,13 +32,14 @@ FILE* sh_popen(char* command)
 	int fds[2];
 	char* cmd;
 	int result;
-
+	
 	cmd = xxstrdup(command);
 
 	if(string_split_quotes(cmd, &argc, &argv) < 1){
 		debug(D_ERROR,"Empty command to sh_popen");
 		return 0;
 	}
+	clean_str_array(argc, &argv);
 	
 	argv = malloc(sizeof(char*)*4);
 	argv[0]="/bin/sh";
