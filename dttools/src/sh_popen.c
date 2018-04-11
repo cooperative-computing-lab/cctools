@@ -14,16 +14,6 @@
 
 static struct itable* process_table = 0;
 
-static void clean_str_array(int size, char*** array){
-	int i=0;
-	for(i=0; i< size; i++){
-		if((*array)[i] != NULL){
-			free((*array)[i]);
-		}
-	}
-	free(*array);
-}
-
 FILE* sh_popen(char* command)
 {
 	pid_t pid;
@@ -39,7 +29,7 @@ FILE* sh_popen(char* command)
 		debug(D_ERROR,"Empty command to sh_popen");
 		return 0;
 	}
-	clean_str_array(argc, &argv);
+	free(argv); //string_split_quotes doesn't seem to create memory for inner items,
 	
 	argv = malloc(sizeof(char*)*4);
 	argv[0]="/bin/sh";
