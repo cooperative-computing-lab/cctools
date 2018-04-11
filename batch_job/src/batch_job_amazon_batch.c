@@ -107,7 +107,9 @@ static void split_comma_list(char* in, int* size, char*** output){
 static void clean_str_array(int size, char*** array){
 	int i=0;
 	for(i=0; i< size; i++){
-		free((*array)[i]);
+		if((*array)[i] != NULL){
+			free((*array)[i]);
+		}
 	}
 	free(*array);
 }
@@ -125,7 +127,7 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 			continue;
 		}
 		debug(D_BATCH,"Submitting file: %s",files_split[i]);
-		char* put_file_command = string_format("%s /usr/bin/time -f \"Submitting File %s for Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
+		char* put_file_command = string_format("%s aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
 		int ret = sh_system(put_file_command);
 		if(ret != 0){
 			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",files_split[i],ret);
@@ -212,7 +214,7 @@ static char* generate_s3_cp_cmds(char* files, char* src, char* dst){
 	split_comma_list(files, &files_split_num, &files_split);
 
 	char* new_cmd=malloc(sizeof(char)*1);
-        new_cmd[0]='\0';
+    new_cmd[0]='\0';
 	if(files_split_num > 0){
 		char* copy_cmd_prefix = string_format("%s aws s3 cp ", env_var);
 		for(i=0; i<files_split_num; i++){
@@ -266,17 +268,22 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 
 
 	//write out to file	
-	FILE* tmpfile = fopen("TEMPFILE.sh","w+");
+	unsigned int tempuid = gen_guid();
+	char* tmpfile_string = string_format("TEMPFILE-%u.sh",tempuid);
+	FILE* tmpfile = fopen(tmpfile_string,"w+");
 	fwrite(final_cmd,sizeof(char),strlen(final_cmd),tmpfile);
 	fclose(tmpfile);
 	free(final_cmd);
 	
 	//make executable and put into s3
-	sh_system("chmod +x TEMPFILE.sh");
-	cmd_tmp = string_format("%s /usr/bin/time -f \"Submitting cmd_file Job %s_%u: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws s3 cp ./TEMPFILE.sh s3://%s/COMAND_FILE_%u.sh",env_var,queue_name,jobid,bucket_name,jobid);
+	cmd_tmp = string_format("chmod +x %s",tmpfile_string);
 	sh_system(cmd_tmp);
 	free(cmd_tmp);
-	remove("TEMPFILE.sh");	
+	cmd_tmp = string_format("%s aws s3 cp ./TEMPFILE.sh s3://%s/COMAND_FILE_%u.sh",env_var,queue_name,jobid,bucket_name,jobid);
+	sh_system(cmd_tmp);
+	free(cmd_tmp);
+	remove(tmpfile_string);	
+	free(tmpfile_string);
 
 }
 
@@ -284,7 +291,7 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	char* queue = queue_name;
 	char* env_var = initialized_data.master_env_prefix;
 	//submit the job-def
-	char* tmp = string_format("%s /usr/bin/time -f \"Registering Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name,job_name, properties_string);
+	char* tmp = string_format("%s aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name,job_name, properties_string);
 	debug(D_BATCH,"Creating the Job Definition: %s",tmp);
         struct jx* jx = run_command(tmp);
 	free(tmp);
@@ -296,7 +303,7 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	jx_delete(jx);
 	
 	//now that we have create a job-definition, we can submit the job.
-	tmp = string_format("%s /usr/bin/time -f \"Submitting Job %s: %%e\" -a -o 'BatchJobAmazonBatchTimings.txt' aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",env_var,job_name,job_name,queue,job_name);
+	tmp = string_format("%s aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",env_var,job_name,job_name,queue,job_name);
 	debug(D_BATCH,"Submitting the job: %s",tmp);
 	jx = run_command(tmp);
 	free(tmp);
