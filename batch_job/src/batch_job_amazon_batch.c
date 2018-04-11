@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "fast_popen.h"
 #include "sh_popen.h"
+#include "list.h"
 
 
 #include <time.h>
@@ -79,66 +80,46 @@ static struct jx* run_command(char* cmd){
 	return jx;
 }
 
-static void split_comma_list(char* in, int* size, char*** output){
-	*size = 0;
+static struct list* extract_file_names_from_list(char* in){
+	struct list* output = list_create();
 	char* tmp = strdup(in);
 	char* ta = strtok(tmp,",");
 	while(ta != NULL){
-		if(strlen(ta) < 1) continue;
-		*size += 1;
-		ta = strtok(0,",");
-	}
-	
-	*output = malloc(sizeof(char*) * (*size));
-	int i = 0;
-	tmp = strdup(in);
-	ta = strtok(tmp,",");
-	while(ta != NULL){
-		if(strlen(ta) < 1) continue;
-		(*output)[i] = strdup(ta);
-		ta = strtok(0,",");
-		i+=1;
-	}
-	
-	return;
-	
-}
-
-static void clean_str_array(int size, char*** array){
-	int i=0;
-	for(i=0; i< size; i++){
-		if((*array)[i] != NULL){
-			free((*array)[i]);
+		int push_success = list_push_tail(output,strdup(ta));
+		if(!push_success){
+			fatal("Error appending file name to list due to being out of memory");
 		}
+		ta = strtok(0,",");
 	}
-	free(*array);
+	
+	return output;
+	
 }
 
 static int upload_input_files_to_s3(char* files,char* jobname){
-	int i;
 	int success = 1;
-	int files_split_num = 0;//to prevent dirty data
 	char* env_var = initialized_data.master_env_prefix;
-	char** files_split;
-	split_comma_list(files,&files_split_num,&files_split);
-	debug(D_BATCH,"EXTRA INPUT FILES LIST: %s, len: %i",files, files_split_num);
-	for(i=0; i<files_split_num; i++){
-		if(hash_table_lookup(submitted_files,files_split[i]) == &HAS_SUBMITTED_VALUE){
+	struct list* file_list = extract_file_names_from_list(files);
+	debug(D_BATCH,"EXTRA INPUT FILES LIST: %s, len: %i",files, list_size(file_list));
+	list_first_item(file_list);
+	char* cur_file = NULL;
+	while((cur_file = list_next_item(file_list)) != NULL){
+		if(hash_table_lookup(submitted_files,cur_file) == &HAS_SUBMITTED_VALUE){
 			continue;
 		}
-		debug(D_BATCH,"Submitting file: %s",files_split[i]);
-		char* put_file_command = string_format("%s aws s3 cp %s s3://%s/%s ",env_var,files_split[i],jobname,files_split[i],bucket_name,files_split[i]);
+		debug(D_BATCH,"Submitting file: %s",cur_file);
+		char* put_file_command = string_format("%s aws s3 cp %s s3://%s/%s ",env_var,cur_file,bucket_name,cur_file);
 		int ret = sh_system(put_file_command);
 		if(ret != 0){
-			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",files_split[i],ret);
+			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",cur_file,ret);
 			success = 0;
 		}else{
-			debug(D_BATCH,"File Submission: %s SUCCESS return code: %i",files_split[i],ret);
+			debug(D_BATCH,"File Submission: %s SUCCESS return code: %i",cur_file,ret);
 		}
 		//assume everything went well?
-		hash_table_insert(submitted_files,files_split[i],&HAS_SUBMITTED_VALUE);
+		hash_table_insert(submitted_files,cur_file,&HAS_SUBMITTED_VALUE);
 	}
-	clean_str_array(files_split_num,&files_split);
+	list_delete(file_list);
 	return success;
 }
 
@@ -208,44 +189,42 @@ static struct internal_amazon_batch_amazon_ids initialize(struct batch_queue* q)
 
 static char* generate_s3_cp_cmds(char* files, char* src, char* dst){
 	char* env_var = initialized_data.master_env_prefix;
-	int i;
-	int files_split_num = 0;
-	char** files_split;
-	split_comma_list(files, &files_split_num, &files_split);
+	struct list* file_list = extract_file_names_from_list(files);
+	list_first_item(file_list);
 
 	char* new_cmd=malloc(sizeof(char)*1);
     new_cmd[0]='\0';
-	if(files_split_num > 0){
+	if(list_size(file_list)> 0){
 		char* copy_cmd_prefix = string_format("%s aws s3 cp ", env_var);
-		for(i=0; i<files_split_num; i++){
-			char* tmp = string_format("%s %s/%s %s",copy_cmd_prefix, src, files_split[i], dst);
+		char* cur_file = NULL;
+		while((cur_file=list_next_item(file_list)) != NULL){
+			char* tmp = string_format("%s %s/%s %s",copy_cmd_prefix, src, cur_file, dst);
 			char* tmp2 = string_format("%s\n%s\n",new_cmd,tmp);
 			free(new_cmd);
 			free(tmp);
 			new_cmd = tmp2;
 		}
 	}
-	clean_str_array(files_split_num,&files_split);
+	list_delete(file_list);
 	return new_cmd;
 }
 
 static char* chmod_all(char* files){
-	int i;
-	int files_split_num = 0;
-	char** files_split;
-	split_comma_list(files,&files_split_num,&files_split);
+	struct list* file_list = extract_file_names_from_list(files);
+	list_first_item(file_list);
 	char* new_cmd=malloc(sizeof(char)*1);
 	new_cmd[0]='\0';
-	if(files_split_num > 0){
-		for(i=0; i<files_split_num; i++){
-			char* tmp = string_format("chmod +x %s",files_split[i]);
+	char* cur_file = NULL;
+	if(list_size(file_list) > 0){
+		while((cur_file=list_next_item(file_list)) != NULL){
+			char* tmp = string_format("chmod +x %s",cur_file);
 			char* tmp2 = string_format("%s\n%s",new_cmd,tmp);
 			free(new_cmd);
 			free(tmp);
 			new_cmd=tmp2;
 		}
 	}
-	clean_str_array(files_split_num,&files_split);
+	list_delete(file_list);
 	return new_cmd;
 }
 
@@ -279,7 +258,7 @@ static void upload_cmd_file(char* bucket_name, char* input_files, char* output_f
 	cmd_tmp = string_format("chmod +x %s",tmpfile_string);
 	sh_system(cmd_tmp);
 	free(cmd_tmp);
-	cmd_tmp = string_format("%s aws s3 cp ./TEMPFILE.sh s3://%s/COMAND_FILE_%u.sh",env_var,queue_name,jobid,bucket_name,jobid);
+	cmd_tmp = string_format("%s aws s3 cp %s s3://%s/COMAND_FILE_%u.sh",env_var,tmpfile_string,bucket_name,jobid);
 	sh_system(cmd_tmp);
 	free(cmd_tmp);
 	remove(tmpfile_string);	
@@ -291,9 +270,9 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	char* queue = queue_name;
 	char* env_var = initialized_data.master_env_prefix;
 	//submit the job-def
-	char* tmp = string_format("%s aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name,job_name, properties_string);
+	char* tmp = string_format("%s aws batch register-job-definition --job-definition-name %s_def --type container --container-properties \"%s\"",env_var,job_name, properties_string);
 	debug(D_BATCH,"Creating the Job Definition: %s",tmp);
-        struct jx* jx = run_command(tmp);
+    struct jx* jx = run_command(tmp);
 	free(tmp);
 	
 	char* arn = (char*)jx_lookup_string(jx,"jobDefinitionArn");
@@ -303,7 +282,7 @@ static char* aws_submit_job(char* job_name, char* properties_string){
 	jx_delete(jx);
 	
 	//now that we have create a job-definition, we can submit the job.
-	tmp = string_format("%s aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",env_var,job_name,job_name,queue,job_name);
+	tmp = string_format("%s aws batch submit-job --job-name %s --job-queue %s --job-definition %s_def",env_var,job_name,queue,job_name);
 	debug(D_BATCH,"Submitting the job: %s",tmp);
 	jx = run_command(tmp);
 	free(tmp);
@@ -456,27 +435,26 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				
 				//pull files from s3
 				char* output_files = itable_lookup(done_files,id);
-				int num_done_files=0;
-				char** done_files_list;
-				split_comma_list(output_files,&num_done_files,&done_files_list);
-				if(num_done_files > 0){
-					int j = 0;
-					for(j=0; j<num_done_files; j++){
-						debug(D_BATCH,"Copying over %s",done_files_list[j]);
-						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,done_files_list[j],done_files_list[j]);
+				struct list* file_list = extract_file_names_from_list(output_files);
+				if(list_size(file_list)> 0){
+					list_first_item(file_list);
+					char* cur_file = NULL;
+					while((cur_file=list_next_item(file_list)) != NULL){
+						debug(D_BATCH,"Copying over %s",cur_file);
+						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,cur_file,cur_file);
 						int outputcode = sh_system(get_from_s3_cmd);
-						debug(D_BATCH,"output code from calling S3 to pull file %s: %i",done_files_list[j],outputcode);
-						FILE* tmpOut = fopen(done_files_list[j],"r");
+						debug(D_BATCH,"output code from calling S3 to pull file %s: %i",cur_file,outputcode);
+						FILE* tmpOut = fopen(cur_file,"r");
 						if(tmpOut){
-							debug(D_BATCH,"File does indeed exist: %s",done_files_list[j]);
+							debug(D_BATCH,"File does indeed exist: %s",cur_file);
 							fclose(tmpOut);
 						}else{
-							debug(D_BATCH,"File doesn't exist: %s",done_files_list[j]);
+							debug(D_BATCH,"File doesn't exist: %s",cur_file);
 						}
 						free(get_from_s3_cmd);
 					}
 				}
-				clean_str_array(num_done_files,&done_files_list);
+				list_delete(file_list);
 				
 				//Let Makeflow know we're all done!
 				debug(D_BATCH,"Removing the job from the job_table");
