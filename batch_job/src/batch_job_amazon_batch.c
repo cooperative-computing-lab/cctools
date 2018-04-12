@@ -100,7 +100,7 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 	int success = 1;
 	char* env_var = initialized_data.master_env_prefix;
 	struct list* file_list = extract_file_names_from_list(files);
-	debug(D_BATCH,"EXTRA INPUT FILES LIST: %s, len: %i",files, list_size(file_list));
+	debug(D_BATCH,"extra input files list: %s, len: %i",files, list_size(file_list));
 	list_first_item(file_list);
 	char* cur_file = NULL;
 	while((cur_file = list_next_item(file_list)) != NULL){
@@ -108,7 +108,7 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 			continue;
 		}
 		debug(D_BATCH,"Submitting file: %s",cur_file);
-		char* put_file_command = string_format("%s aws s3 cp %s s3://%s/%s ",env_var,cur_file,bucket_name,cur_file);
+		char* put_file_command = string_format("tar -cvf %s.txz %s && %s aws s3 cp %s.txz s3://%s/%s.txz ",cur_file,cur_file,env_var,cur_file,bucket_name,cur_file);
 		int ret = sh_system(put_file_command);
 		if(ret != 0){
 			debug(D_BATCH,"File Submission: %s FAILURE return code: %i",cur_file,ret);
@@ -116,9 +116,14 @@ static int upload_input_files_to_s3(char* files,char* jobname){
 		}else{
 			debug(D_BATCH,"File Submission: %s SUCCESS return code: %i",cur_file,ret);
 		}
+		free(put_file_command);
+		put_file_command = string_format("rm %s.txz",cur_file);
+		sh_system(put_file_command);
+		free(put_file_command);
 		//assume everything went well?
 		hash_table_insert(submitted_files,cur_file,&HAS_SUBMITTED_VALUE);
 	}
+	list_free(file_list);
 	list_delete(file_list);
 	return success;
 }
@@ -198,13 +203,19 @@ static char* generate_s3_cp_cmds(char* files, char* src, char* dst){
 		char* copy_cmd_prefix = string_format("%s aws s3 cp ", env_var);
 		char* cur_file = NULL;
 		while((cur_file=list_next_item(file_list)) != NULL){
-			char* tmp = string_format("%s %s/%s %s",copy_cmd_prefix, src, cur_file, dst);
+			char* tmp;
+			if(strstr(dst,"s3")){
+				tmp = string_format("tar -cvf %s.txz %s && %s %s/%s.txz %s/%s.txz",cur_file,cur_file,copy_cmd_prefix, src, cur_file, dst, cur_file);
+			}else{
+				tmp = string_format("%s %s/%s.txz %s/%s.txz && tar -xvf %s.txz",copy_cmd_prefix, src, cur_file, dst, cur_file, cur_file);
+			}
 			char* tmp2 = string_format("%s\n%s\n",new_cmd,tmp);
 			free(new_cmd);
 			free(tmp);
 			new_cmd = tmp2;
 		}
 	}
+	list_free(file_list);
 	list_delete(file_list);
 	return new_cmd;
 }
@@ -224,6 +235,7 @@ static char* chmod_all(char* files){
 			new_cmd=tmp2;
 		}
 	}
+	list_free(file_list);
 	list_delete(file_list);
 	return new_cmd;
 }
@@ -441,7 +453,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 					char* cur_file = NULL;
 					while((cur_file=list_next_item(file_list)) != NULL){
 						debug(D_BATCH,"Copying over %s",cur_file);
-						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s ./%s",env_var,bucket_name,cur_file,cur_file);
+						char* get_from_s3_cmd = string_format("%s aws s3 cp s3://%s/%s.txz ./%s.txz && tar -xvf %s.txz && rm %s.txz",env_var,bucket_name,cur_file,cur_file, cur_file, cur_file);
 						int outputcode = sh_system(get_from_s3_cmd);
 						debug(D_BATCH,"output code from calling S3 to pull file %s: %i",cur_file,outputcode);
 						FILE* tmpOut = fopen(cur_file,"r");
@@ -454,6 +466,7 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 						free(get_from_s3_cmd);
 					}
 				}
+				list_free(file_list);
 				list_delete(file_list);
 				
 				//Let Makeflow know we're all done!
