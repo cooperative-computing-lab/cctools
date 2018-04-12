@@ -41,7 +41,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 		if(f->inner_name[0] == '/') continue;
 
 		/* Add a cp for each file. Not linking as wq may already have done this. Not moving as it may be local. */
-		cmd = string_format("mkdir -p $(dirname $SANDBOX/%s) && cp %s $SANDBOX/%s", f->inner_name, f->inner_name, f->inner_name);
+		cmd = string_format("mkdir -p $(dirname $SANDBOX/%s) && cp -r %s $SANDBOX/%s", f->inner_name, f->inner_name, f->inner_name);
 		batch_wrapper_pre(wrapper, cmd);
 		free(cmd);
 	}
@@ -61,7 +61,7 @@ static int makeflow_module_sandbox_node_submit(struct dag_node *node, struct bat
 
 		/* Copy out results to expected location. OR TRUE so that lack of one file does not
            prevent other files from being sent back.*/
-		cmd = string_format("mkdir -p $(dirname %s) && cp $SANDBOX/%s %s || true", f->inner_name, f->inner_name, f->inner_name);
+		cmd = string_format("mkdir -p $(dirname %s) && cp -r $SANDBOX/%s %s || true", f->inner_name, f->inner_name, f->inner_name);
 		batch_wrapper_post(wrapper, cmd);
 		free(cmd);
 	}
