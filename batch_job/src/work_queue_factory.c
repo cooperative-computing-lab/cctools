@@ -266,7 +266,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		if(tasks_per_worker > 0) {
 			capacity_weighted = DIV_INT_ROUND_UP(capacity_weighted, tasks_per_worker);
 		}
-		fprintf(stderr, "Weighted Capacity: %d\n", capacity_weighted);
 		//int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int capacity = capacity_weighted;
 		int tasks = tr+tw+tl;
@@ -292,7 +291,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		}
 
 		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
-		fprintf(stderr, "Capacity: %d Need: %d \n",capacity,need);
+		fprintf(stderr, "|capacity: %d |need: %d \n",capacity,need);
 
 		needed_workers += need;
 		masters++;
