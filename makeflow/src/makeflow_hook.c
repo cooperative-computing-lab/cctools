@@ -69,13 +69,12 @@ struct dag_file * makeflow_hook_add_output_file(struct dag *d, struct batch_task
 
 int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 	assert(hook);
-	if (!makeflow_hooks) makeflow_hooks = list_create();
+	if (!makeflow_hooks)     makeflow_hooks     = list_create();
 	if (!makeflow_hook_args) makeflow_hook_args = list_create();
 	if (!makeflow_hook_self) makeflow_hook_self = list_create();
 
 	/* Add hook by default, if it doesn't exists in list of hooks. */
 	int rc = MAKEFLOW_HOOK_SUCCESS;
-	struct jx *new_args = NULL;
 	struct makeflow_hook *h = NULL;
 	struct jx *h_args = NULL;
 	debug(D_MAKEFLOW_HOOK, "Hook %s:trying to register",hook->module_name?hook->module_name:"");
@@ -95,7 +94,7 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 		for (list_seek(cur, 0) && list_seek(acur, 0); 
 			 list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args); 
 			 list_next(cur) && list_next(acur)){
-			if(!strcmp(h->module_name, hook->module_name)){
+			if(h && !strcmp(h->module_name, hook->module_name)){
 				*args = h_args;
 				rc = MAKEFLOW_HOOK_SKIP;
 			}
@@ -105,23 +104,21 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 	}
 
 	if(rc == MAKEFLOW_HOOK_SUCCESS){
-		new_args = jx_object(NULL);
-		if(new_args){
-			*args = new_args;
+		h_args = jx_object(NULL);
+		if(h_args){
+			*args = h_args;
 		}
 
-		void *self = NULL;
-
 		list_push_tail(makeflow_hooks, hook);
-		list_push_tail(makeflow_hook_args, new_args);
-		list_push_tail(makeflow_hooks, self);
+		list_push_tail(makeflow_hook_args, h_args);
+		list_push_tail(makeflow_hook_self, NULL);
 
-		debug(D_MAKEFLOW_HOOK, "Hook %s:registered",h->module_name?h->module_name:"");
+		debug(D_MAKEFLOW_HOOK, "Hook %s:registered",hook->module_name?hook->module_name:"");
 	} else if(rc == MAKEFLOW_HOOK_FAILURE){
 		/* Args are NULL to prevent other hooks from modifying an
 		 * unintended arg list. */
 		args = NULL;
-		debug(D_ERROR|D_MAKEFLOW_HOOK, "Hook %s:register failed",h->module_name?h->module_name:"");
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "Hook %s:register failed",hook->module_name?hook->module_name:"");
 	}
 
 	return rc;
@@ -137,30 +134,31 @@ int makeflow_hook_create(){
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
 	struct makeflow_hook *h;
 	struct jx *args;
-	void *self;
+	void *self = NULL;
 	for (list_seek(cur, 0) && list_seek(acur, 0) && list_seek(scur, 0); 
 		 list_get(cur, (void**)&h) && list_get(acur, (void**)&args) && list_get(scur, &self); 
 		 list_next(cur) && list_next(acur) && list_next(scur)){
 		debug(D_MAKEFLOW_HOOK, "hook %s:initializing",h->module_name);
 		if (h->create){
 			rc = h->create(&self, args);
+			list_set(scur, self);
 		}
 
-		jx_delete(args);
+//		jx_delete(args);
 
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "hook %s:create returned %d",h->module_name, rc);
 			break;
 		}
 	}
-	for ( ; list_get(acur, (void**)&args); list_next(acur)){
-		jx_delete(args);
-	}
+//	for ( ; list_get(acur, (void**)&args); list_next(acur)){
+//		jx_delete(args);
+//	}
 	list_cursor_destroy(cur);
 	list_cursor_destroy(acur);
 	list_cursor_destroy(scur);
 
-	list_delete(makeflow_hook_args);
+//	list_delete(makeflow_hook_args);
 
 	return rc;
 }
@@ -360,8 +358,31 @@ int makeflow_hook_node_abort(struct dag_node *node){
 }
 
 int makeflow_hook_batch_submit(struct batch_task *task){
-	MAKEFLOW_HOOK_CALL(batch_submit, task);
-	return MAKEFLOW_HOOK_SUCCESS;
+	int rc = MAKEFLOW_HOOK_SUCCESS;
+	if (!makeflow_hooks)
+		return rc;
+
+	struct list_cursor *cur = list_cursor_create(makeflow_hooks);
+	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
+	struct makeflow_hook *h;
+	void *self;
+	for (list_seek(cur, 0) && list_seek(scur, 0); 
+		 list_get(cur, (void**)&h) && list_get(scur, &self); 
+		 list_next(cur) && list_next(scur)){
+		if (h->batch_submit)
+			rc = h->batch_submit(self, task);
+
+		if (rc !=MAKEFLOW_HOOK_SUCCESS){
+			debug(D_MAKEFLOW_HOOK, "Hook %s:batch_submit returned %d",h->module_name?h->module_name:"", rc);
+			break;
+		}
+	}
+	list_cursor_destroy(cur);
+	list_cursor_destroy(scur);
+
+	return rc;
+	//MAKEFLOW_HOOK_CALL(batch_submit, task);
+	//return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_batch_retrieve(struct batch_task *task){

@@ -22,7 +22,7 @@ struct shared_fs_instance {
 
 struct shared_fs_instance *shared_fs_instance_create()
 {
-	struct shared_fs_instance *sf = malloc(sizeof(*sf));
+	struct shared_fs_instance *sf = calloc(1, sizeof(*sf));
 	sf->shared_fs_list = list_create();
 	sf->shared_fs_saved_inputs  = itable_create(0);
 	sf->shared_fs_saved_outputs = itable_create(0);
@@ -49,7 +49,11 @@ static int prefix_match(void *stem, const void *filename) {
 
 static int batch_file_on_sharedfs( struct list *shared_fs_list, const char *filename )
 {
-	return !list_iterate(shared_fs_list,prefix_match,filename);
+	assert(shared_fs_list);
+	if(list_size(shared_fs_list) > 0){
+		return !list_iterate(shared_fs_list,prefix_match,filename);
+	}
+	return 0;
 }
 
 static int create( void ** instance_struct, struct jx *hook_args )
@@ -63,7 +67,7 @@ static int create( void ** instance_struct, struct jx *hook_args )
 		struct jx *item = NULL;
 		while((item = jx_array_shift(array))) {
 			if(item->type == JX_STRING){
-				list_push_head(sf->shared_fs_list, xxstrdup(item->u.string_value));
+				list_push_tail(sf->shared_fs_list, xxstrdup(item->u.string_value));
 				debug(D_MAKEFLOW_HOOK, "Shared FS added : %s", item->u.string_value);
 			} else {
 				debug(D_ERROR|D_MAKEFLOW_HOOK, "Non-string argument passed to Shared FS hook");
