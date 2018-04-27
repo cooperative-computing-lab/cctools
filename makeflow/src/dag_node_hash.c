@@ -28,7 +28,7 @@ struct dag_node_hash *dag_node_hash_create(void) {
 }
 
 void dag_node_hash_command(struct dag_node_hash *h, const char *cmd) {
-	assert(h);
+	if (!h) return;
 	assert(cmd);
 	assert(!h->command);
 	assert(!h->makeflow);
