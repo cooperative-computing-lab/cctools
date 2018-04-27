@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include "set.h"
 #include "hash_table.h"
 #include "itable.h"
+#include "sha1.h"
 
 typedef enum {
 	DAG_NODE_STATE_WAITING = 0,
@@ -40,6 +41,7 @@ struct dag_node {
 	int nodeid;              /* The ordinal number as the rule appears in the makeflow file */
 	int linenum;             /* Line number of the node's rule definition */
 	int local_job;           /* Flag: does this node run locally? */
+	unsigned char hash[SHA1_DIGEST_LENGTH];
 
 	struct set *descendants; /* The nodes of which this node is an immediate ancestor */
 	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */

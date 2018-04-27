@@ -44,6 +44,7 @@ See the file COPYING for details.
 #include "dag.h"
 #include "dag_visitors.h"
 #include "dag_resources.h"
+#include "dag_node_hash.h"
 #include "lexer.h"
 #include "buffer.h"
 
@@ -54,17 +55,17 @@ static int dag_parse_make_variable(struct lexer *bk, struct dag_node *n);
 static int dag_parse_make_directive(struct lexer *bk, struct dag_node *n);
 static int dag_parse_make_node(struct lexer *bk);
 static int dag_parse_make_syntax(struct lexer *bk);
-static int dag_parse_make_node_filelist(struct lexer *bk, struct dag_node *n);
-static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n);
-static int dag_parse_make_node_regular_command(struct lexer *bk, struct dag_node *n);
-static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node *n);
+static int dag_parse_make_node_filelist(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h);
+static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h);
+static int dag_parse_make_node_regular_command(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h);
+static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h);
 static int dag_parse_make_export(struct lexer *bk);
 
 int verbose_parsing=0;
 
 static const int parsing_rule_mod_counter = 250;
 
-static int dag_parse_make_node_regular_command(struct lexer *bk, struct dag_node *n)
+static int dag_parse_make_node_regular_command(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h)
 {
 	struct buffer b;
 
@@ -104,6 +105,7 @@ static int dag_parse_make_node_regular_command(struct lexer *bk, struct dag_node
 
 	debug(D_MAKEFLOW_PARSER, "node command=%s", n->command);
 
+	dag_node_hash_command(h, n->command);
 	return 1;
 }
 
@@ -513,7 +515,7 @@ static int dag_parse_make_directive(struct lexer *bk, struct dag_node *n)
 
 
 
-static int dag_parse_make_node_filelist(struct lexer *bk, struct dag_node *n)
+static int dag_parse_make_node_filelist(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h)
 {
 	int before_colon = 1;
 
@@ -556,10 +558,13 @@ static int dag_parse_make_node_filelist(struct lexer *bk, struct dag_node *n)
 			filename = t->lexeme;
 			newname  = rename ? rename->lexeme : NULL;
 
-			if(before_colon)
+			if(before_colon) {
+				dag_node_hash_target(h, filename);
 				dag_node_add_target_file(n, filename, newname);
-			else
+			} else {
+				dag_node_hash_source(h, filename);
 				dag_node_add_source_file(n, filename, newname);
+			}
 
 			lexer_free_token(t);
 
@@ -588,6 +593,7 @@ static int dag_parse_make_node(struct lexer *bk)
 	}
 	lexer_free_token(t);
 
+	struct dag_node_hash *h = dag_node_hash_create();
 	struct dag_node *n;
 	n = dag_node_create(bk->d, bk->line_number);
 
@@ -599,7 +605,7 @@ static int dag_parse_make_node(struct lexer *bk)
 
 	n->category = bk->category;
 
-	dag_parse_make_node_filelist(bk, n);
+	dag_parse_make_node_filelist(bk, n, h);
 
 	bk->environment->node = n;
 
@@ -624,17 +630,19 @@ static int dag_parse_make_node(struct lexer *bk)
 		lexer_report_error(bk, "Rule does not have a command.\n");
 	}
 
-	dag_parse_make_node_command(bk, n);
+	dag_parse_make_node_command(bk, n, h);
 	bk->environment->node = NULL;
 
 	n->next = bk->d->nodes;
 	bk->d->nodes = n;
 	itable_insert(bk->d->node_table, n->nodeid, n);
 
+	dag_node_hash(h, n->hash);
+	debug(D_MAKEFLOW_PARSER, "Rule %d (line %li) hashes to %s", n->nodeid, bk->line_number, sha1_string(n->hash));
 	return 1;
 }
 
-static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
+static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h)
 {
 	struct token *t;
 
@@ -681,11 +689,11 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 
 	if(n->nested_job)
 	{
-		return dag_parse_make_node_nested_makeflow(bk, n);
+		return dag_parse_make_node_nested_makeflow(bk, n, h);
 	}
 	else
 	{
-		return dag_parse_make_node_regular_command(bk, n);
+		return dag_parse_make_node_regular_command(bk, n, h);
 	}
 }
 
@@ -713,7 +721,7 @@ void dag_parse_make_drop_spaces(struct lexer *bk)
  *
  * */
 
-static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
+static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node *n, struct dag_node_hash *h)
 {
 	struct token *t, *start;
 
@@ -765,7 +773,8 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 	dag_parse_make_drop_spaces(bk);
 	lexer_preppend_token(bk, start);
 
-	return dag_parse_make_node_regular_command(bk, n);
+	dag_node_hash_makeflow(h, n->makeflow_dag, n->makeflow_cwd);
+	return dag_parse_make_node_regular_command(bk, n, NULL);
 }
 
 static int dag_parse_make_export(struct lexer *bk)

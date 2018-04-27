@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "dag_node.h"
+#include "dag_node_hash.h"
 #include "dag_variable.h"
 #include "dag_resources.h"
 #include "parser_jx.h"
@@ -104,9 +105,10 @@ static int resources_from_jx(struct hash_table *h, struct jx *j, int nodeid) {
 	return 1;
 }
 
-static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
+static int file_from_jx(struct dag_node *n, struct dag_node_hash *h, int input, struct jx *j) {
 	assert(j);
 	assert(n);
+	assert(h);
 	const char *path = NULL;
 	const char *remote = NULL;
 
@@ -130,15 +132,17 @@ static int file_from_jx(struct dag_node *n, int input, struct jx *j) {
 
 	if (input) {
 		debug(D_MAKEFLOW_PARSER, "Input %s, remote name %s", path, remote ? remote : "NULL");
+		dag_node_hash_source(h, path);
 		dag_node_add_source_file(n, path, remote);
 	} else {
 		debug(D_MAKEFLOW_PARSER, "Output %s, remote name %s", path, remote ? remote : "NULL");
+		dag_node_hash_target(h, path);
 		dag_node_add_target_file(n, path, remote);
 	}
 	return 1;
 }
 
-static int files_from_jx(struct dag_node *n, int inputs, struct jx *j) {
+static int files_from_jx(struct dag_node *n, struct dag_node_hash *h, int inputs, struct jx *j) {
 	if (!j) {
 		debug(D_MAKEFLOW_PARSER, "files missing");
 		return 1;
@@ -152,7 +156,7 @@ static int files_from_jx(struct dag_node *n, int inputs, struct jx *j) {
 	struct jx *item;
 	void *i = NULL;
 	while ((item = jx_iterate_array(j, &i))) {
-		if (!file_from_jx(n, inputs, item)) {
+		if (!file_from_jx(n, h, inputs, item)) {
 			return 0;
 		}
 	}
@@ -165,9 +169,11 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	debug(D_MAKEFLOW_PARSER, "Line %u: Parsing rule", j->line);
 	struct dag_node *n = dag_node_create(d, 0);
 
+	struct dag_node_hash *h = dag_node_hash_create();
+
 	struct jx *inputs = jx_lookup(j, "inputs");
 	debug(D_MAKEFLOW_PARSER, "Parsing inputs");
-	if (!files_from_jx(n, 1, inputs)) {
+	if (!files_from_jx(n, h, 1, inputs)) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
 			"Rule at line %u: Failure parsing inputs",
 			j->line);
@@ -175,7 +181,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	}
 	struct jx *outputs = jx_lookup(j, "outputs");
 	debug(D_MAKEFLOW_PARSER, "Parsing outputs");
-	if (!files_from_jx(n, 0, outputs)) {
+	if (!files_from_jx(n, h, 0, outputs)) {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
 			"Rule at line %u: Failure parsing outputs",
 			j->line);
@@ -194,6 +200,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 
 	if (jx_match_string(command, (char **) &n->command)) {
 		debug(D_MAKEFLOW_PARSER, "command: %s", n->command);
+		dag_node_hash_command(h, n->command);
 	} else if (jx_istype(makeflow, JX_OBJECT)) {
 		const char *path = jx_lookup_string(makeflow, "path");
 		if (!path) {
@@ -213,8 +220,9 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 			debug(D_MAKEFLOW_PARSER,
 				"Sub-Makeflow at line %u: cwd malformed or missing, using process cwd",
 				makeflow->line);
-			n->makeflow_cwd = path_getcwd();
+			n->makeflow_cwd = xxstrdup(".");
 		}
+		dag_node_hash_makeflow(h, n->makeflow_dag, n->makeflow_cwd);
 	} else {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
 			"Rule at line %u: must have a command or submakeflow", j->line);
@@ -275,6 +283,8 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 
 	environment_from_jx(d, n, n->variables, jx_lookup(j, "environment"));
 
+	dag_node_hash(h, n->hash);
+	debug(D_MAKEFLOW_PARSER, "Rule %d (line %u) hashes to %s", n->nodeid, j->line, sha1_string(n->hash));
 	return 1;
 }
 
