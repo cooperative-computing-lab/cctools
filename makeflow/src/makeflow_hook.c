@@ -1,6 +1,8 @@
 #include <assert.h>
+#include <stdarg.h>
 
 #include "debug.h"
+#include "list.h"
 #include "stringtools.h"
 
 #include "batch_job.h"
@@ -18,21 +20,53 @@ struct list * makeflow_hooks     = NULL;
 struct list * makeflow_hook_args = NULL;
 struct list * makeflow_hook_self = NULL;
 
+static void lists_init(int lists, ...)
+{
+	va_list args;
+	struct list_cursor *cur = NULL;
+	va_start(args, lists);
+
+	for(int i = 0; i < lists; i++){
+		cur = va_arg(args, struct list_cursor*);
+		list_seek(cur, 0);
+	}
+
+	va_end(args);
+}
+
+static void lists_next(int lists, ...)
+{
+	va_list args;
+	struct list_cursor *cur = NULL;
+	va_start(args, lists);
+
+	for(int i = 0; i < lists; i++){
+		cur = va_arg(args, struct list_cursor*);
+		list_next(cur);
+	}
+
+	va_end(args);
+}
+
 #define MAKEFLOW_HOOK_CALL(hook_name, ...) do { \
 	int rc = MAKEFLOW_HOOK_SUCCESS; \
+	INT64_T debug_flags = D_MAKEFLOW_HOOK; \
 	if (!makeflow_hooks) \
 		return rc; \
 	struct list_cursor *cur = list_cursor_create(makeflow_hooks); \
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self); \
 	struct makeflow_hook *h; \
 	void *self; \
-	for ((list_seek(cur, 0) && list_seek(scur, 0)) == 1; \
-		 (list_get(cur, (void**)&h) && list_get(scur, &self)) == 1; \
-		 (list_next(cur) && list_next(scur)) == 1){ \
+	for (lists_init(2, cur, scur); \
+		 list_get(cur, (void**)&h) && list_get(scur, &self); \
+		 lists_next(2, cur, scur)){ \
 		if (h->hook_name) \
 			rc = h->hook_name(self, __VA_ARGS__); \
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){ \
-			debug(D_ERROR|D_MAKEFLOW_HOOK,"hook %s:" #hook_name " returned %d",h->module_name?h->module_name:"", rc); \
+			if (rc == MAKEFLOW_HOOK_FAILURE){ \
+				debug_flags = debug_flags|D_ERROR; \
+			} \
+			debug(debug_flags,"hook %s:" #hook_name " returned %d",h->module_name?h->module_name:"", rc); \
 			break; \
 		} \
 	} \
@@ -91,9 +125,9 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 		// Now it will always fully traverse the list to get the last
 		// instance, which is logically the same as the first reverse
 		// instance.
-		for ((list_seek(cur, 0) && list_seek(acur, 0)) == 1; 
-			 (list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args)) == 1; 
-			 (list_next(cur) && list_next(acur)) == 1){
+		for (lists_init(2, cur, acur); 
+			 list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args); 
+			 lists_next(2, cur, acur)){
 			if(h && !strcmp(h->module_name, hook->module_name)){
 				*args = h_args;
 				rc = MAKEFLOW_HOOK_SKIP;
@@ -135,30 +169,23 @@ int makeflow_hook_create(){
 	struct makeflow_hook *h;
 	struct jx *args;
 	void *self = NULL;
-	for (list_seek(cur, 0) && list_seek(acur, 0) && list_seek(scur, 0); 
+	for (lists_init(3, cur, acur, scur); 
 		 list_get(cur, (void**)&h) && list_get(acur, (void**)&args) && list_get(scur, &self); 
-		 list_next(cur) && list_next(acur) && list_next(scur)){
+		 lists_next(3, cur, acur, scur)){
 		debug(D_MAKEFLOW_HOOK, "hook %s:initializing",h->module_name);
 		if (h->create){
 			rc = h->create(&self, args);
 			list_set(scur, self);
 		}
 
-//		jx_delete(args);
-
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "hook %s:create returned %d",h->module_name, rc);
 			break;
 		}
 	}
-//	for ( ; list_get(acur, (void**)&args); list_next(acur)){
-//		jx_delete(args);
-//	}
 	list_cursor_destroy(cur);
 	list_cursor_destroy(acur);
 	list_cursor_destroy(scur);
-
-//	list_delete(makeflow_hook_args);
 
 	return rc;
 }
@@ -169,36 +196,8 @@ int makeflow_hook_destroy(struct dag *d){
 }
 
 int makeflow_hook_dag_check(struct dag *d){
-	int rc = MAKEFLOW_HOOK_SUCCESS;
-	if (!makeflow_hooks)
-		return rc;
-
-	struct list_cursor *cur = list_cursor_create(makeflow_hooks);
-	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
-	struct makeflow_hook *h;
-	void *self;
-	for (list_seek(cur, 0) && list_seek(scur, 0); 
-		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 list_next(cur) && list_next(scur)){
-		if (h->dag_check)
-			rc = h->dag_check(self, d);
-
-		/* If the return is not success return this to Makeflow.
-		 * If it was a failure report this in debugging, if it was something
-		 * else than the system is chosing to exit. A case for this is the
-		 * storage allocation printing function. If not returning FAILURE
-		 * the module should provide a printout for why it is exiting. */
-		if (rc !=MAKEFLOW_HOOK_SUCCESS){
-			if (rc ==MAKEFLOW_HOOK_FAILURE){
-				debug(D_MAKEFLOW_HOOK, "Hook %s:dag_check rejected DAG",h->module_name?h->module_name:"");
-			}
-			break;
-		}
-	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(scur);
-
-	return rc;
+	MAKEFLOW_HOOK_CALL(dag_check, d);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_dag_clean(struct dag *d){
@@ -220,51 +219,29 @@ int makeflow_hook_dag_loop(struct dag *d){
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
 	struct makeflow_hook *h;
 	void *self;
-	for (list_seek(cur, 0) && list_seek(scur, 0); 
+	for (lists_init(2, cur, scur); 
 		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 list_next(cur) && list_next(scur)){
+		 lists_next(2, cur, scur)){
 		if (h->dag_loop) {
 			rc = h->dag_loop(self, d);
 		} else {
 			continue;
 		}
-
+ 
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){
 			debug(D_MAKEFLOW_HOOK, "Hook %s:dag_loop rejected DAG",h->module_name?h->module_name:"");
-			list_cursor_destroy(cur);
-			return rc;
+			break;
 		}
 	}
 	list_cursor_destroy(cur);
-
+ 
 	return rc;
 }
 
 
 int makeflow_hook_dag_end(struct dag *d){
-	int rc = MAKEFLOW_HOOK_SUCCESS;
-	if (!makeflow_hooks)
-		return rc;
-
-	struct list_cursor *cur = list_cursor_create(makeflow_hooks);
-	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
-	struct makeflow_hook *h;
-	void *self;
-	for (list_seek(cur, 0) && list_seek(scur, 0); 
-		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 list_next(cur) && list_next(scur)){
-		if (h->dag_end)
-			rc = h->dag_end(self, d);
-
-		if (rc !=MAKEFLOW_HOOK_SUCCESS){
-			debug(D_MAKEFLOW_HOOK, "Hook %s:dag_end failed dag",h->module_name?h->module_name:"");
-			break;
-		}
-	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(scur);
-
-	return rc;
+	MAKEFLOW_HOOK_CALL(dag_end, d);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_dag_fail(struct dag *d){
@@ -283,29 +260,8 @@ int makeflow_hook_dag_success(struct dag *d){
 }
 
 int makeflow_hook_node_check(struct dag_node *node, struct batch_queue *queue){
-	int rc = MAKEFLOW_HOOK_SUCCESS;
-	if (!makeflow_hooks)
-		return rc;
-
-	struct list_cursor *cur = list_cursor_create(makeflow_hooks);
-	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
-	struct makeflow_hook *h;
-	void *self;
-	for (list_seek(cur, 0) && list_seek(scur, 0); 
-		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 list_next(cur) && list_next(scur)){
-		if (h->node_check)
-			rc = h->node_check(self, node, queue);
-
-		if (rc !=MAKEFLOW_HOOK_SUCCESS){
-			debug(D_MAKEFLOW_HOOK, "Hook %s:node_check rejected Node %d",h->module_name?h->module_name:"", node->nodeid);
-			break;
-		}
-	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(scur);
-
-	return rc;
+	MAKEFLOW_HOOK_CALL(node_check, node, queue);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_node_submit(struct dag_node *node, struct batch_task *task){
@@ -324,32 +280,8 @@ int makeflow_hook_node_success(struct dag_node *node, struct batch_task *task){
 }
 
 int makeflow_hook_node_fail(struct dag_node *node, struct batch_task *task){
-	int hook_return = MAKEFLOW_HOOK_SUCCESS;
-	if (!makeflow_hooks)
-		return hook_return;
-
-	struct list_cursor *cur = list_cursor_create(makeflow_hooks);
-	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
-	struct makeflow_hook *h;
-	void *self;
-	for ((list_seek(cur, 0) && list_seek(scur, 0)); 
-		 (list_get(cur, (void**)&h) && list_get(scur, &self)); 
-		 (list_next(cur) && list_next(scur))){
-		int rc = MAKEFLOW_HOOK_SUCCESS;
-		if (h->node_fail){
-			debug(D_MAKEFLOW_HOOK, "Checking %s\n", h->module_name);
-			rc = h->node_fail(self, node, task);
-		}
-
-		if (rc !=MAKEFLOW_HOOK_SUCCESS){
-			debug(D_MAKEFLOW_HOOK, "Hook %s:node_fail failed Node %d",h->module_name?h->module_name:"", node->nodeid);
-			hook_return = rc;
-		}
-	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(scur);
-
-	return hook_return;
+	MAKEFLOW_HOOK_CALL(node_fail, node, task);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_node_abort(struct dag_node *node){
@@ -358,31 +290,8 @@ int makeflow_hook_node_abort(struct dag_node *node){
 }
 
 int makeflow_hook_batch_submit(struct batch_task *task){
-	int rc = MAKEFLOW_HOOK_SUCCESS;
-	if (!makeflow_hooks)
-		return rc;
-
-	struct list_cursor *cur = list_cursor_create(makeflow_hooks);
-	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
-	struct makeflow_hook *h;
-	void *self;
-	for (list_seek(cur, 0) && list_seek(scur, 0); 
-		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 list_next(cur) && list_next(scur)){
-		if (h->batch_submit)
-			rc = h->batch_submit(self, task);
-
-		if (rc !=MAKEFLOW_HOOK_SUCCESS){
-			debug(D_MAKEFLOW_HOOK, "Hook %s:batch_submit returned %d",h->module_name?h->module_name:"", rc);
-			break;
-		}
-	}
-	list_cursor_destroy(cur);
-	list_cursor_destroy(scur);
-
-	return rc;
-	//MAKEFLOW_HOOK_CALL(batch_submit, task);
-	//return MAKEFLOW_HOOK_SUCCESS;
+	MAKEFLOW_HOOK_CALL(batch_submit, task);
+	return MAKEFLOW_HOOK_SUCCESS;
 }
 
 int makeflow_hook_batch_retrieve(struct batch_task *task){
