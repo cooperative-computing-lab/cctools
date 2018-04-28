@@ -26,9 +26,9 @@ struct list * makeflow_hook_self = NULL;
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self); \
 	struct makeflow_hook *h; \
 	void *self; \
-	for (list_seek(cur, 0) && list_seek(scur, 0); \
-		 list_get(cur, (void**)&h) && list_get(scur, &self); \
-		 list_next(cur) && list_next(scur)){ \
+	for ((list_seek(cur, 0) && list_seek(scur, 0)); \
+		 (list_get(cur, (void**)&h) && list_get(scur, &self)); \
+		 (list_next(cur) && list_next(scur))){ \
 		if (h->hook_name) \
 			rc = h->hook_name(self, __VA_ARGS__); \
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){ \
@@ -332,9 +332,9 @@ int makeflow_hook_node_fail(struct dag_node *node, struct batch_task *task){
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
 	struct makeflow_hook *h;
 	void *self;
-	for (list_seek(cur, 0) && list_seek(scur, 0); 
-		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 list_next(cur) && list_next(scur)){
+	for ((list_seek(cur, 0) && list_seek(scur, 0)); 
+		 (list_get(cur, (void**)&h) && list_get(scur, &self)); 
+		 (list_next(cur) && list_next(scur))){
 		int rc = MAKEFLOW_HOOK_SUCCESS;
 		if (h->node_fail){
 			debug(D_MAKEFLOW_HOOK, "Checking %s\n", h->module_name);
