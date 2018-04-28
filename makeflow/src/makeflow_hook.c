@@ -26,9 +26,9 @@ struct list * makeflow_hook_self = NULL;
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self); \
 	struct makeflow_hook *h; \
 	void *self; \
-	for ((list_seek(cur, 0) && list_seek(scur, 0)); \
-		 (list_get(cur, (void**)&h) && list_get(scur, &self)); \
-		 (list_next(cur) && list_next(scur))){ \
+	for ((list_seek(cur, 0) && list_seek(scur, 0)) == 1; \
+		 (list_get(cur, (void**)&h) && list_get(scur, &self)) == 1; \
+		 (list_next(cur) && list_next(scur)) == 1){ \
 		if (h->hook_name) \
 			rc = h->hook_name(self, __VA_ARGS__); \
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){ \
@@ -91,9 +91,9 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 		// Now it will always fully traverse the list to get the last
 		// instance, which is logically the same as the first reverse
 		// instance.
-		for (list_seek(cur, 0) && list_seek(acur, 0); 
-			 list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args); 
-			 list_next(cur) && list_next(acur)){
+		for ((list_seek(cur, 0) && list_seek(acur, 0)) == 1; 
+			 (list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args)) == 1; 
+			 (list_next(cur) && list_next(acur)) == 1){
 			if(h && !strcmp(h->module_name, hook->module_name)){
 				*args = h_args;
 				rc = MAKEFLOW_HOOK_SKIP;
