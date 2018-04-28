@@ -1143,6 +1143,10 @@ int main(int argc, char *argv[])
 	int explicit_local_memory = 0;
 	int explicit_local_disk = 0;
 
+	/* Set d to NULL to allow for clean exit on failures
+	 * prior to dag creation. */
+	struct dag *d = NULL; 
+
 	char *logfilename = NULL;
 	int port_set = 0;
 	timestamp_t runtime = 0;
@@ -1871,7 +1875,7 @@ int main(int argc, char *argv[])
 		logfilename = string_format("%s.makeflowlog", dagfile);
 
 	printf("parsing %s...\n",dagfile);
-	struct dag *d = dag_from_file(dagfile, dag_syntax, jx_args);
+	d = dag_from_file(dagfile, dag_syntax, jx_args);
 
 	if(!d) {
 		fatal("makeflow: couldn't load %s: %s\n", dagfile, strerror(errno));
