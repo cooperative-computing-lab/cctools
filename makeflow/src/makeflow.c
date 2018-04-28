@@ -445,7 +445,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, struct dag_node *n, struct batch_task *task)
+static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -535,7 +535,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	if (hook_return != MAKEFLOW_HOOK_SKIP){
 		/* Now submit the actual job, retrying failures as needed. */
 
-		n->jobid = makeflow_node_submit_retry(queue, n, task);
+		n->jobid = makeflow_node_submit_retry(queue, task);
 
 		/* Update all of the necessary data structures. */
 		if(n->jobid > 0) {
