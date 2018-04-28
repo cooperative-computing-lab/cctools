@@ -47,7 +47,6 @@ See the file COPYING for details.
 #include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
 #include "makeflow_wrapper_enforcement.h"
-#include "makeflow_archive.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
 #include "makeflow_hook.h"
@@ -173,8 +172,6 @@ static int use_mountfile = 0;
 
 static int should_send_all_local_environment = 0;
 
-static int did_find_archived_job = 0;
-
 /*
 Determines if this is a local job that will consume
 local resources, regardless of the batch queue type.
@@ -272,6 +269,7 @@ static void makeflow_abort_all(struct dag *d)
 }
 
 static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
+static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
 
 /*
 Decide whether to rerun a node based on batch and file system status. The silent
@@ -447,7 +445,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
+static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, struct dag_node *n, struct batch_task *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -457,7 +455,9 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, str
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", task->command);
 
-	makeflow_hook_batch_submit(task);
+	if(makeflow_hook_batch_submit(task) == MAKEFLOW_HOOK_SKIP){
+		return 0;
+	}
 
 	while(1) {
 		if(makeflow_abort_flag) break;
@@ -525,35 +525,23 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 
 	/* This augments the task struct, should be replaced with node_submit in future. */
 	makeflow_node_expand(n, queue, task);
+	n->task = task;
 
-	makeflow_hook_node_submit(n, task);
+	int hook_return = makeflow_hook_node_submit(n, task);
 
 	/* Logs the expectation of output files. */
 	makeflow_log_batch_file_list_state_change(d,task->output_files,DAG_FILE_STATE_EXPECT);
 
-	/* check archiving directory to see if node has already been preserved */
-	/* This does not jive with task yet. Discussion needed on what the goal of archive is (node level or task level). */
-	if (d->should_read_archive && makeflow_archive_is_preserved(d, n, task->command, n->source_files, n->target_files)){
-		printf("node %d already exists in archive, replicating output files\n", n->nodeid);
-
-		/* copy archived files to working directory and update state for node and dag_files */
-		makeflow_archive_copy_preserved_files(d, n, n->target_files);
-		n->state = DAG_NODE_STATE_RUNNING;
-		makeflow_log_batch_file_list_state_change(d,task->output_files, DAG_FILE_STATE_EXISTS);
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
-		did_find_archived_job = 1;
-	} else {
+	if (hook_return != MAKEFLOW_HOOK_SKIP){
 		/* Now submit the actual job, retrying failures as needed. */
 
-		n->jobid = makeflow_node_submit_retry(queue, task);
+		n->jobid = makeflow_node_submit_retry(queue, n, task);
 
 		/* Update all of the necessary data structures. */
-		if(n->jobid >= 0) {
+		if(n->jobid > 0) {
 			/* Not sure if this is necessary/what it does. */
 			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
-
-			n->task = task;
 
 			if(is_local_job(n)) {
 				makeflow_local_resources_subtract(local_resources,n);
@@ -564,10 +552,24 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 			} else {
 				itable_insert(d->remote_job_table, n->jobid, n);
 			}
+		/* Negative jobid results from a failed submit */
 		} else {
-			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+			/* Zero jobid was ignored. This was a bug, as wait only accepts jobids higher than 0 
+			 * so it would perpetually be ignored and sit in the job table and loop infinitely. 
+			 * This does not solve the issue, but we will not add it to the table and try to reap
+			 * it immediately. This only happens if hook_batch_submit returns 0 or the job wasn't
+			 * able to be submitted but didn't fail, so it will either be complete or get
+			 * resubmitted later.*/
+			if (n->jobid == 0) {
+				makeflow_node_complete(d, n, queue, task);
+			} else {
+				makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+				makeflow_failed_flag = 1;
+			}
+			/* In any of the three cases (hook_skipped, not submitted, or failed)
+			 * the nodes task should still be nulled out and deleted. */
+			n->task = NULL;
 			batch_task_delete(task);
-			makeflow_failed_flag = 1;
 		}
 	}
 
@@ -699,10 +701,14 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	struct dag_file *f;
 	int job_failed = 0;
 
-	/* As integration moves forward batch_task will also be passed. */
 	/* This is intended for changes to the batch_task that need no
 		no context from dag_node/dag, such as shared_fs. */
-	makeflow_hook_batch_retrieve(task);
+	int rc = makeflow_hook_batch_retrieve(task);
+	/* Batch Retrieve returns MAKEFLOW_HOOK_RUN if the node was
+	 * run/sidestepped by a hook. Archive is an example. */
+	if(rc == MAKEFLOW_HOOK_RUN){
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+	}
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
 		return;
@@ -781,15 +787,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			}
 		}
 
-		/* store node into archiving directory  */
-		if (d->should_write_to_archive) {
-			printf("archiving node within archiving directory\n");
-			makeflow_archive_populate(d, n, task->command, n->source_files, n->target_files, task->info);
-		}
-
 		/* node_success is after file_complete to allow for the final state of the
 			files to be reflected in the structs. Allows for cleanup or archiving.*/
 		makeflow_hook_node_success(n, task);
+		// Should likely handle MAKEFLOW_HOOK_FAILURE not using fatal...
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
@@ -900,24 +901,17 @@ static void makeflow_run( struct dag *d )
 	}
 
 	while(!makeflow_abort_flag) {
-		did_find_archived_job = 0;
 		makeflow_dispatch_ready_jobs(d);
 		/*
-			We continue the loop under 4 conditions:
+			We continue the loop under 3 general conditions:
 			1. We have local jobs running
 			2. We have remote jobs running
-			3. We have archival jobs to be found (See Note)
-			4. We have cleaned completed jobs to ensure allocated jobs can run
-
-		Note:
- 		Due to the fact that archived jobs are never "run", no local or remote jobs are added
- 		to the remote or local job table if all ready jobs were found within the archive.
- 		Thus makeflow_dispatch_ready_jobs must run at least once more if an archived job was found.
+			3. A Hook determined it needed to loop again 
+				(e.g. Archived Jobs or Cleaned Jobs)
  		*/
 		if(dag_local_jobs_running(d)==0 && 
 			dag_remote_jobs_running(d)==0 && 
-			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END) &&
-			did_find_archived_job == 0)
+			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END))
 			break;
 
 		if(dag_remote_jobs_running(d)) {
@@ -1003,23 +997,6 @@ static void handle_abort(int sig)
 
 	makeflow_abort_flag = 1;
 
-}
-
-static void set_archive_directory_string(char **archive_directory, char *option_arg)
-{
-	if (*archive_directory != NULL) {
-		// need to free archive directory to avoid memory leak since it has already been set once
-		free(*archive_directory);
-	}
-	if (option_arg) {
-		*archive_directory = xxstrdup(option_arg);
-	} else {
-		char *uid = xxmalloc(10);
-		sprintf(uid, "%d",  getuid());
-		*archive_directory = xxmalloc(sizeof(MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY) + 20 * sizeof(char));
-		sprintf(*archive_directory, "%s%s", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, uid);
-		free(uid);
-	}
 }
 
 static void show_help_run(const char *cmd)
@@ -1156,8 +1133,6 @@ int main(int argc, char *argv[])
 	int port_set = 0;
 	timestamp_t runtime = 0;
 	int disable_afs_check = 0;
-	int should_read_archive = 0;
-	int should_write_to_archive = 0;
 	timestamp_t time_completed = 0;
 	const char *work_queue_keepalive_interval = NULL;
 	const char *work_queue_keepalive_timeout = NULL;
@@ -1175,7 +1150,6 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
-	char *archive_directory = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
@@ -1185,6 +1159,7 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	char *k8s_image = NULL;
+	extern struct makeflow_hook makeflow_hook_archive;
 	extern struct makeflow_hook makeflow_hook_docker;
 	extern struct makeflow_hook makeflow_hook_example;
 	extern struct makeflow_hook makeflow_hook_fail_dir;
@@ -1764,17 +1739,28 @@ int main(int argc, char *argv[])
 				k8s_image = xxstrdup(optarg);
 				break;
 			case LONG_OPT_ARCHIVE:
-				should_read_archive = 1;
-				should_write_to_archive = 1;
-				set_archive_directory_string(&archive_directory, optarg);
+				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("archive_read"), jx_integer(1));
+				jx_insert(hook_args, jx_string("archive_write"), jx_integer(1));
+				if(optarg)
+					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_ARCHIVE_READ_ONLY:
-				should_read_archive = 1;
-				set_archive_directory_string(&archive_directory, optarg);
+				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("archive_read"), jx_integer(1));
+				jx_insert(hook_args, jx_string("archive_write"), jx_integer(0));
+				if(optarg)
+					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_ARCHIVE_WRITE_ONLY:
-				should_write_to_archive = 1;
-				set_archive_directory_string(&archive_directory, optarg);
+				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("archive_read"), jx_integer(0));
+				jx_insert(hook_args, jx_string("archive_write"), jx_integer(1));
+				if(optarg)
+					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_SEND_ENVIRONMENT:
 				should_send_all_local_environment = 1;
@@ -2202,10 +2188,6 @@ int main(int argc, char *argv[])
 
 	runtime = timestamp_get();
 
-	d->archive_directory = archive_directory;
-	d->should_read_archive = should_read_archive;
-	d->should_write_to_archive = should_write_to_archive;
-
 	makeflow_run(d);
 
 	if(makeflow_failed_flag == 0 && makeflow_nodes_local_waiting_count(d) > 0) {
@@ -2273,8 +2255,6 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
-
-	free(archive_directory);
 
 	exit(exit_value);
 
