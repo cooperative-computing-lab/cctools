@@ -90,3 +90,10 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files )
     return file_str;
 }
 
+int batch_file_outer_compare(const void *file1, const void *file2) {
+	struct batch_file **f1 = (void *)file1;
+	struct batch_file **f2 = (void *)file2;
+
+	return strcmp((*f1)->outer_name, (*f2)->outer_name);
+}
+

@@ -455,8 +455,15 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 	/* Display the fully elaborated command, just like Make does. */
 	printf("submitting job: %s\n", task->command);
 
-	if(makeflow_hook_batch_submit(task) == MAKEFLOW_HOOK_SKIP){
+	/* Hook Returns:
+	 *  MAKEFLOW_HOOK_SKIP    : Submit is averted by hook
+	 *  HAKEFLOW_HOOK_FAILURE : Hook failed and should not submit
+	 *  MAKEFLOW_HOOK_SUCCESS : Hook was successful and should submit */
+	int rc = makeflow_hook_batch_submit(task);
+	if(rc == MAKEFLOW_HOOK_SKIP){
 		return 0;
+	} else if(rc != MAKEFLOW_HOOK_SUCCESS){
+		return -1;
 	}
 
 	while(1) {
@@ -528,50 +535,43 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	n->task = task;
 
 	int hook_return = makeflow_hook_node_submit(n, task);
+	if (hook_return != MAKEFLOW_HOOK_SUCCESS){
+		makeflow_failed_flag = 1;
+		return;
+	}
 
 	/* Logs the expectation of output files. */
 	makeflow_log_batch_file_list_state_change(d,task->output_files,DAG_FILE_STATE_EXPECT);
 
-	if (hook_return != MAKEFLOW_HOOK_SKIP){
-		/* Now submit the actual job, retrying failures as needed. */
+	int submitted = makeflow_node_submit_retry(queue, task);
 
-		int submitted = makeflow_node_submit_retry(queue, task);
+	/* Update all of the necessary data structures. */
+	if(submitted == 1) {
+		n->jobid = task->jobid;
+		/* Not sure if this is necessary/what it does. */
+		memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 
-		/* Update all of the necessary data structures. */
-		if(submitted) {
-			n->jobid = task->jobid;
-			/* Not sure if this is necessary/what it does. */
-			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
-			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
-
-			if(is_local_job(n)) {
-				makeflow_local_resources_subtract(local_resources,n);
-			}
-
-			if(n->local_job && local_queue) {
-				itable_insert(d->local_job_table, n->jobid, n);
-			} else {
-				itable_insert(d->remote_job_table, n->jobid, n);
-			}
-		/* Negative jobid results from a failed submit */
-		} else {
-			/* Zero jobid was ignored. This was a bug, as wait only accepts jobids higher than 0 
-			 * so it would perpetually be ignored and sit in the job table and loop infinitely. 
-			 * This does not solve the issue, but we will not add it to the table and try to reap
-			 * it immediately. This only happens if hook_batch_submit returns 0 or the job wasn't
-			 * able to be submitted but didn't fail, so it will either be complete or get
-			 * resubmitted later.*/
-			if (task->jobid >= 0) {
-				makeflow_node_complete(d, n, queue, task);
-			} else {
-				makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-				makeflow_failed_flag = 1;
-			}
-			/* In any of the three cases (hook_skipped, not submitted, or failed)
-			 * the nodes task should still be nulled out and deleted. */
-			n->task = NULL;
-			batch_task_delete(task);
+		if(is_local_job(n)) {
+			makeflow_local_resources_subtract(local_resources,n);
 		}
+
+		if(n->local_job && local_queue) {
+			itable_insert(d->local_job_table, n->jobid, n);
+		} else {
+			itable_insert(d->remote_job_table, n->jobid, n);
+		}
+	} else if (submitted == 0) {
+		/* Exited Normally was updated and may have been handled elsewhere (e.g. Archive) */
+		if (task->info->exited_normally) {
+			makeflow_node_complete(d, n, queue, task);
+		}
+	} else {
+		/* Negative submitted results from a failed submit */
+		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+		n->task = NULL;
+		batch_task_delete(task);
+		makeflow_failed_flag = 1;
 	}
 
 	/* Restore old batch job options. */
@@ -613,7 +613,11 @@ static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct r
 	/* If all makeflow checks pass for this node we will 
 	return the result of the hooks, which will be 1 if all pass
 	and 0 if any fail. */
-	return (makeflow_hook_node_check(n, remote_queue) == MAKEFLOW_HOOK_SUCCESS);
+	int rc = makeflow_hook_node_check(n, makeflow_get_queue(n));
+	if(rc == MAKEFLOW_HOOK_FAILURE){
+		makeflow_failed_flag = 1;
+	}
+	return (rc == MAKEFLOW_HOOK_SUCCESS);
 }
 
 int makeflow_nodes_local_waiting_count(const struct dag *d) {
@@ -709,6 +713,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 	 * run/sidestepped by a hook. Archive is an example. */
 	if(rc == MAKEFLOW_HOOK_RUN){
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+	} else if (rc != MAKEFLOW_HOOK_SUCCESS){
+		makeflow_failed_flag = 1;
 	}
 
 	if(n->state != DAG_NODE_STATE_RUNNING)
@@ -718,7 +724,10 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 		makeflow_local_resources_add(local_resources,n);
 	}
 
-	makeflow_hook_node_end(n, task);
+	rc = makeflow_hook_node_end(n, task);
+	if (rc != MAKEFLOW_HOOK_SUCCESS){
+		makeflow_failed_flag = 1;
+	}
 
 	if (task->info->exited_normally && task->info->exit_code == 0) {
 		list_first_item(n->task->output_files);
@@ -784,14 +793,19 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 			f->reference_count+= -1;
 			if(f->reference_count == 0 && f->state == DAG_FILE_STATE_EXISTS){
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_COMPLETE);
-				makeflow_hook_file_complete(f);
+				rc = makeflow_hook_file_complete(f);
+				if (rc != MAKEFLOW_HOOK_SUCCESS){
+					makeflow_failed_flag = 1;
+				}
 			}
 		}
 
 		/* node_success is after file_complete to allow for the final state of the
 			files to be reflected in the structs. Allows for cleanup or archiving.*/
-		makeflow_hook_node_success(n, task);
-		// Should likely handle MAKEFLOW_HOOK_FAILURE not using fatal...
+		rc = makeflow_hook_node_success(n, task);
+		if (rc != MAKEFLOW_HOOK_SUCCESS){
+			makeflow_failed_flag = 1;
+		}
 
 		makeflow_log_state_change(d, n, DAG_NODE_STATE_COMPLETE);
 	}
@@ -1851,7 +1865,9 @@ int main(int argc, char *argv[])
 			goto EXIT_WITH_FAILURE;
 	}
 
-	makeflow_hook_create();
+	int rc = makeflow_hook_create();
+	if(rc != MAKEFLOW_HOOK_SUCCESS)
+		goto EXIT_WITH_FAILURE;
 
 	if((argc - optind) == 1) {
 		if (dagfile) {
@@ -2112,7 +2128,7 @@ int main(int argc, char *argv[])
 		goto EXIT_WITH_FAILURE;
 	}
 
-	int rc = makeflow_hook_dag_check(d);
+	rc = makeflow_hook_dag_check(d);
 	if(rc == MAKEFLOW_HOOK_FAILURE) {
 		goto EXIT_WITH_FAILURE;
 	} else if(rc == MAKEFLOW_HOOK_END) {
@@ -2158,7 +2174,11 @@ int main(int argc, char *argv[])
 	}
 
 	if(clean_mode != MAKEFLOW_CLEAN_NONE) {
-		makeflow_hook_dag_clean(d);
+		rc = makeflow_hook_dag_clean(d);
+		if(rc != MAKEFLOW_HOOK_SUCCESS){
+			debug(D_ERROR, "Failed to clean up makeflow hooks!\n");
+			goto EXIT_WITH_FAILURE;
+		}
 		printf("cleaning filesystem...\n");
 		if(makeflow_clean(d, remote_queue, clean_mode)) {
 			debug(D_ERROR, "Failed to clean up makeflow!\n");
@@ -2173,7 +2193,11 @@ int main(int argc, char *argv[])
 	}
 
 	printf("starting workflow....\n");
-	makeflow_hook_dag_start(d);
+	rc = makeflow_hook_dag_start(d);
+	if(rc != MAKEFLOW_HOOK_SUCCESS){
+		debug(D_ERROR, "Failed dag start hooks");
+		goto EXIT_WITH_FAILURE;
+	}
 
 	port = batch_queue_port(remote_queue);
 	if(work_queue_port_file)

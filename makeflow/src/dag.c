@@ -51,10 +51,6 @@ struct dag *dag_create()
 	d->allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	d->cache_dir = NULL;
 
-	d->archive_directory = NULL;
-	d->should_read_archive = 0;
-	d->should_write_to_archive = 0;
-
 	/* Declare special variables */
 	string_set_insert(d->special_vars, "CATEGORY");
 	string_set_insert(d->special_vars, "SYMBOL");          /* Deprecated alias for CATEGORY */

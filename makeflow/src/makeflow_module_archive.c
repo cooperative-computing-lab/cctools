@@ -166,9 +166,13 @@ static char * generate_task_archive_id(struct archive_instance *a, struct batch_
 		sha1_update(&context, t->command, strlen(t->command));
 		sha1_update(&context, "\0", 1);
 
+		/* Sort inputs for consistent hashing */
+		list_sort(t->input_files, batch_file_outer_compare);
+
 		/* add checksum of the node's input files together */
 		struct list_cursor *cur = list_cursor_create(t->input_files);
 		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+			printf("input file : %s\n", f->outer_name);
 			char * file_id = generate_file_archive_id(a, f);
 			sha1_update(&context, "I", 1);
 			sha1_update(&context, file_id, strlen(file_id));
@@ -177,9 +181,13 @@ static char * generate_task_archive_id(struct archive_instance *a, struct batch_
 		}
 		list_cursor_destroy(cur);
 
+		/* Sort outputs for consistent hashing */
+		list_sort(t->output_files, batch_file_outer_compare);
+
 		/* add checksum of the node's output file names together */
 		cur = list_cursor_create(t->output_files);
 		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+			printf("output file : %s\n", f->outer_name);
 			sha1_update(&context, "O", 1);
 			sha1_update(&context, f->outer_name, strlen(f->outer_name));
 			sha1_update(&context, "\0", 1);
