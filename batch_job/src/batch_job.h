@@ -79,6 +79,8 @@ void batch_job_info_delete(struct batch_job_info *info);
 struct batch_queue *batch_queue_create(batch_queue_type_t type);
 
 /** Submit a batch job.
+ * Note Submit may return 0 as a valid jobid. As of 04/18 wait will not return 0 as a valid jobid. 
+ *  Wait returning 0 indicates there are no waiting jobs in this queue.
 @param q The queue to submit to.
 @param cmdline The command line to execute.  This line will be interpreted by the shell, so it may include output redirection, multiple commands, pipes, and so forth.
 @param input_files A comma separated list of all input files that will be required by the job.  Null pointer is equivalent to empty string.  This must also include the executable and any dependent programs.
@@ -91,6 +93,8 @@ batch_job_id_t batch_job_submit(struct batch_queue *q, const char *cmdline, cons
 
 /** Wait for any batch job to complete.
 Blocks until a batch job completes.
+ * Note Submit may return 0 as a valid jobid. As of 04/18 wait will not return 0 as a valid jobid. 
+ *  Wait returning 0 indicates there are no waiting jobs in this queue.
 @param q The queue to wait on.
 @param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
 @return If greater than zero, indicates the jobid of the completed job.
@@ -101,6 +105,8 @@ batch_job_id_t batch_job_wait(struct batch_queue *q, struct batch_job_info *info
 
 /** Wait for any batch job to complete, with a timeout.
 Blocks until a batch job completes or the current time exceeds stoptime.
+ * Note Submit may return 0 as a valid jobid. As of 04/18 wait will not return 0 as a valid jobid. 
+ *  Wait returning 0 indicates there are no waiting jobs in this queue.
 @param q The queue to wait on.
 @param info Pointer to a @ref batch_job_info structure that will be filled in with the details of the completed job.
 @param stoptime An absolute time at which to stop waiting.  If less than or equal to the current time,
