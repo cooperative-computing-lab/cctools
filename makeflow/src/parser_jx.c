@@ -163,7 +163,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 	assert(j);
 
 	debug(D_MAKEFLOW_PARSER, "Line %u: Parsing rule", j->line);
-	struct dag_node *n = dag_node_create(d, 0);
+	struct dag_node *n = dag_node_create(d, j->line);
 
 	struct jx *inputs = jx_lookup(j, "inputs");
 	debug(D_MAKEFLOW_PARSER, "Parsing inputs");
@@ -192,10 +192,13 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 		return 0;
 	}
 
-	if (jx_match_string(command, (char **) &n->command)) {
-		debug(D_MAKEFLOW_PARSER, "command: %s", n->command);
+	if (jx_istype(command, JX_STRING)) {
+		debug(D_MAKEFLOW_PARSER, "command: %s", command->u.string_value);
+		dag_node_set_command(n, command->u.string_value);
 	} else if (jx_istype(makeflow, JX_OBJECT)) {
 		const char *path = jx_lookup_string(makeflow, "path");
+		const char *cwd = jx_lookup_string(makeflow, "cwd");
+
 		if (!path) {
 			debug(D_MAKEFLOW_PARSER|D_NOTICE,
 				"Sub-Makeflow at line %u: must specify a path",
@@ -203,26 +206,21 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 			return 0;
 		}
 		debug(D_MAKEFLOW_PARSER, "Line %u: Submakeflow at %s", makeflow->line, path);
-		n->nested_job = 1;
-		n->makeflow_dag = xxstrdup(path);
-		const char *cwd = jx_lookup_string(makeflow, "cwd");
+		dag_node_set_submakeflow(n, path, cwd);
 		if (cwd) {
 			debug(D_MAKEFLOW_PARSER, "working directory %s", cwd);
-			n->makeflow_cwd = xxstrdup(cwd);
 		} else {
 			debug(D_MAKEFLOW_PARSER,
 				"Sub-Makeflow at line %u: cwd malformed or missing, using process cwd",
 				makeflow->line);
-			n->makeflow_cwd = path_getcwd();
 		}
 	} else {
 		debug(D_MAKEFLOW_PARSER|D_NOTICE,
 			"Rule at line %u: must have a command or submakeflow", j->line);
 		return 0;
 	}
-	n->next = d->nodes;
-	d->nodes = n;
-	itable_insert(d->node_table, n->nodeid, n);
+
+	dag_node_insert(n);
 
 	n->local_job = jx_lookup_boolean(j, "local_job");
 	if (n->local_job) {

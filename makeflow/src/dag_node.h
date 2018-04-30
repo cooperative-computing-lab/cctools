@@ -99,6 +99,10 @@ struct dag_node_size *dag_node_size_create(struct dag_node *n, uint64_t size);
 void dag_node_add_source_file(struct dag_node *n, const char *filename, const char *remotename);
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
+void dag_node_set_command(struct dag_node *n, const char *cmd);
+void dag_node_set_submakeflow(struct dag_node *n, const char *dag, const char *cwd);
+void dag_node_insert(struct dag_node *n);
+
 uint64_t dag_node_file_list_size(struct list *s);
 uint64_t dag_node_file_set_size(struct set *s);
 

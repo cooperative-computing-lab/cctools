@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "jx.h"
 
+#include <assert.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -81,6 +82,44 @@ void dag_node_delete(struct dag_node *n)
 		rmsummary_delete(n->resources_measured);
 
 	free(n);
+}
+
+void dag_node_set_command(struct dag_node *n, const char *cmd) {
+	assert(n);
+	assert(cmd);
+	assert(!n->command);
+	assert(!n->nested_job);
+	assert(!n->makeflow_dag);
+	assert(!n->makeflow_cwd);
+
+	n->command = xxstrdup(cmd);
+}
+
+void dag_node_set_submakeflow(struct dag_node *n, const char *dag, const char *cwd) {
+	assert(n);
+	assert(dag);
+	assert(!n->command);
+	assert(!n->nested_job);
+	assert(!n->makeflow_dag);
+	assert(!n->makeflow_cwd);
+
+	n->nested_job = 1;
+	n->makeflow_dag = xxstrdup(dag);
+	n->makeflow_cwd = xxstrdup(cwd ? cwd : ".");
+	n->command = string_format(
+			"cd %s && makeflow %s",
+			string_escape_shell(n->makeflow_cwd),
+			string_escape_shell(n->makeflow_dag)
+	);
+}
+
+void dag_node_insert(struct dag_node *n) {
+	assert(n);
+	assert(n->d);
+
+	n->next = n->d->nodes;
+	n->d->nodes = n;
+	itable_insert(n->d->node_table, n->nodeid, n);
 }
 
 const char *dag_node_state_name(dag_node_state_t state)
