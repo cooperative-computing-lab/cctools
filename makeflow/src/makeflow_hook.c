@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <stdarg.h>
 
 #include "debug.h"
 #include "list.h"
@@ -20,34 +19,6 @@ struct list * makeflow_hooks     = NULL;
 struct list * makeflow_hook_args = NULL;
 struct list * makeflow_hook_self = NULL;
 
-static void lists_init(int lists, ...)
-{
-	va_list args;
-	struct list_cursor *cur = NULL;
-	va_start(args, lists);
-
-	for(int i = 0; i < lists; i++){
-		cur = va_arg(args, struct list_cursor*);
-		list_seek(cur, 0);
-	}
-
-	va_end(args);
-}
-
-static void lists_next(int lists, ...)
-{
-	va_list args;
-	struct list_cursor *cur = NULL;
-	va_start(args, lists);
-
-	for(int i = 0; i < lists; i++){
-		cur = va_arg(args, struct list_cursor*);
-		list_next(cur);
-	}
-
-	va_end(args);
-}
-
 #define MAKEFLOW_HOOK_CALL(hook_name, ...) do { \
 	int rc = MAKEFLOW_HOOK_SUCCESS; \
 	INT64_T debug_flags = D_MAKEFLOW_HOOK; \
@@ -57,9 +28,9 @@ static void lists_next(int lists, ...)
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self); \
 	struct makeflow_hook *h; \
 	void *self; \
-	for (lists_init(2, cur, scur); \
+	for (list_seek(cur, 0), list_seek(scur, 0); \
 		 list_get(cur, (void**)&h) && list_get(scur, &self); \
-		 lists_next(2, cur, scur)){ \
+		 list_next(cur), list_next(scur)){ \
 		if (h->hook_name) \
 			rc = h->hook_name(self, __VA_ARGS__); \
 		if (rc !=MAKEFLOW_HOOK_SUCCESS){ \
@@ -125,9 +96,9 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 		// Now it will always fully traverse the list to get the last
 		// instance, which is logically the same as the first reverse
 		// instance.
-		for (lists_init(2, cur, acur); 
+		for (list_seek(cur, 0), list_seek(acur, 0); 
 			 list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args); 
-			 lists_next(2, cur, acur)){
+			 list_next(cur), list_next(acur)){
 			if(h && !strcmp(h->module_name, hook->module_name)){
 				*args = h_args;
 				rc = MAKEFLOW_HOOK_SKIP;
@@ -169,9 +140,9 @@ int makeflow_hook_create(){
 	struct makeflow_hook *h;
 	struct jx *args;
 	void *self = NULL;
-	for (lists_init(3, cur, acur, scur); 
+	for (list_seek(cur, 0), list_seek(acur,  0), list_seek(scur, 0); 
 		 list_get(cur, (void**)&h) && list_get(acur, (void**)&args) && list_get(scur, &self); 
-		 lists_next(3, cur, acur, scur)){
+		 list_next(cur), list_next(acur), list_next(scur)){
 		debug(D_MAKEFLOW_HOOK, "hook %s:initializing",h->module_name);
 		if (h->create){
 			rc = h->create(&self, args);
@@ -219,9 +190,9 @@ int makeflow_hook_dag_loop(struct dag *d){
 	struct list_cursor *scur = list_cursor_create(makeflow_hook_self);
 	struct makeflow_hook *h;
 	void *self;
-	for (lists_init(2, cur, scur); 
+	for (list_seek(cur, 0), list_seek(scur, 0); 
 		 list_get(cur, (void**)&h) && list_get(scur, &self); 
-		 lists_next(2, cur, scur)){
+		 list_next(cur), list_next(scur)){
 		if (h->dag_loop) {
 			rc = h->dag_loop(self, d);
 		} else {
