@@ -91,17 +91,13 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 	if(!(hook->register_hook) || rc == MAKEFLOW_HOOK_SKIP) {
 		struct list_cursor *cur = list_cursor_create(makeflow_hooks);
 		struct list_cursor *acur = list_cursor_create(makeflow_hook_args);
-		// This should be a reverse traversal so that the most recent
-		// hook of the same name is used.
-		// Now it will always fully traverse the list to get the last
-		// instance, which is logically the same as the first reverse
-		// instance.
-		for (list_seek(cur, 0), list_seek(acur, 0); 
+		for (list_seek(cur, -1), list_seek(acur, -1); 
 			 list_get(cur, (void**)&h) && list_get(acur, (void**)&h_args); 
-			 list_next(cur), list_next(acur)){
+			 list_prev(cur), list_prev(acur)){
 			if(h && !strcmp(h->module_name, hook->module_name)){
 				*args = h_args;
 				rc = MAKEFLOW_HOOK_SKIP;
+				break;
 			}
 		}
 		list_cursor_destroy(cur);
@@ -122,7 +118,7 @@ int makeflow_hook_register(struct makeflow_hook *hook, struct jx **args) {
 	} else if(rc == MAKEFLOW_HOOK_FAILURE){
 		/* Args are NULL to prevent other hooks from modifying an
 		 * unintended arg list. */
-		args = NULL;
+		*args = NULL;
 		debug(D_ERROR|D_MAKEFLOW_HOOK, "Hook %s:register failed",hook->module_name?hook->module_name:"");
 	}
 
