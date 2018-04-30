@@ -23,6 +23,8 @@
 
 #define DEFAULT_MONITOR_LOG_FORMAT "resource-rule-%%"
 
+static int instances = 0;
+
 struct makeflow_monitor {
 	int enable_debug;
 	int enable_time_series;
@@ -35,9 +37,9 @@ struct makeflow_monitor {
 	char *log_prefix;
 	char *exe;
 	const char *exe_remote;
-};
 
-struct makeflow_monitor *monitor = NULL;
+	int instance;
+};
 
 struct makeflow_monitor *makeflow_monitor_create()
 {
@@ -54,12 +56,27 @@ struct makeflow_monitor *makeflow_monitor_create()
 	m->exe = NULL;
 	m->exe_remote = NULL;
 
+	m->instance = instances++;
+
 	return m;
 }
 
-static int create(struct jx *args)
+static int resource_monitor_register_hook(struct makeflow_hook *h, struct list *hooks, struct jx **args)
 {
-	monitor = makeflow_monitor_create();
+	struct makeflow_hook *tail = list_pop_tail(hooks);
+	if(tail){
+		list_push_tail(hooks, tail);
+		if(!strcmp(h->module_name, tail->module_name)){
+			return MAKEFLOW_HOOK_SKIP;
+		}
+	}
+	return MAKEFLOW_HOOK_SUCCESS;
+}
+
+static int create(void ** instance_struct, struct jx *args)
+{
+	struct makeflow_monitor *monitor = makeflow_monitor_create();
+	*instance_struct = monitor;
 
 	if (jx_lookup_string(args, "resource_monitor_exe")){
 		monitor->exe = xxstrdup(jx_lookup_string(args, "resource_monitor_exe"));
@@ -107,21 +124,24 @@ static int create(struct jx *args)
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy(struct dag *d)
+static int destroy(void * instance_struct, struct dag *d)
 {
-
+	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	if (monitor->log_prefix)
 		free(monitor->log_prefix);
 
 	if (monitor->exe)
 		free(monitor->exe);
 
+	free(monitor->measure_dir);
+
 	free(monitor);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_start(struct dag *d)
+static int dag_start(void * instance_struct, struct dag *d)
 {
+	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	dag_file_lookup_or_create(d, monitor->exe);
 
 	int result = mkdir(monitor->log_dir, 0777);
@@ -141,7 +161,7 @@ static int dag_start(struct dag *d)
 }
 
 /* Helper function to consistently create prefix. Free returned char *. */
-static char *set_log_prefix(struct dag_node *n)
+static char *set_log_prefix(struct makeflow_monitor *monitor, struct dag_node *n)
 {
 	char *nodeid = string_format("%d", n->nodeid);
 	char *log_prefix = string_replace_percents(monitor->log_prefix, nodeid);
@@ -149,8 +169,9 @@ static char *set_log_prefix(struct dag_node *n)
 	return log_prefix;
 }
 
-static int node_submit(struct dag_node *n, struct batch_task *task)
+static int node_submit(void * instance_struct, struct dag_node *n, struct batch_task *task)
 {
+	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	char *log_name;
 	char *executable = NULL;
 
@@ -170,7 +191,7 @@ static int node_submit(struct dag_node *n, struct batch_task *task)
 		executable = string_format("%s", monitor->exe);
 	}
 
-	char *log_prefix = set_log_prefix(n);
+	char *log_prefix = set_log_prefix(monitor, n);
 
 	// Format and add summary
 	log_name = string_format("%s.summary", log_prefix);
@@ -234,11 +255,11 @@ static int node_submit(struct dag_node *n, struct batch_task *task)
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queue *queue)
+int makeflow_monitor_move_output_if_needed(struct makeflow_monitor *monitor, struct dag_node *n, struct batch_queue *queue)
 {
 	if (!batch_queue_supports_feature(queue, "output_directories")) {
 		struct dag_file *f;
-		char *log_prefix = set_log_prefix(n);
+		char *log_prefix = set_log_prefix(monitor, n);
 		char *output_prefix = xxstrdup(path_basename(log_prefix));
 
 		if (!strcmp(log_prefix, output_prefix)) { // They are in the same location so no move
@@ -296,9 +317,10 @@ int makeflow_monitor_move_output_if_needed(struct dag_node *n, struct batch_queu
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_end(struct dag_node *n, struct batch_task *task)
+static int node_end(void * instance_struct, struct dag_node *n, struct batch_task *task)
 {
-	char *log_prefix = set_log_prefix(n);
+	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
+	char *log_prefix = set_log_prefix(monitor, n);
 	char *output_prefix = NULL;
 	if (batch_queue_supports_feature(makeflow_get_queue(n), "output_directories")) {
 		output_prefix = xxstrdup(log_prefix);
@@ -325,13 +347,13 @@ static int node_end(struct dag_node *n, struct batch_task *task)
 	free(output_prefix);
 	free(summary_name);
 
-	return makeflow_monitor_move_output_if_needed(n, makeflow_get_queue(n));
+	return makeflow_monitor_move_output_if_needed(monitor, n, makeflow_get_queue(n));
 }
 
-static int node_fail(struct dag_node *n, struct batch_task *task)
+static int node_fail(void * instance_struct, struct dag_node *n, struct batch_task *task)
 {
+	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
 	int rc = MAKEFLOW_HOOK_FAILURE;
-	debug(D_MAKEFLOW_HOOK, "Entered failed resource monitor");
 	/* Currently checking the case where either rm ran out of disk or it caught an overflow. Slightly redundant. */
 	if ((task->info->disk_allocation_exhausted) || (task->info->exit_code == RM_OVERFLOW)) {
 		debug(D_MAKEFLOW_HOOK, "rule %d failed because it exceeded the resources limits.\n", n->nodeid);
@@ -348,23 +370,25 @@ static int node_fail(struct dag_node *n, struct batch_task *task)
 		rc = MAKEFLOW_HOOK_SUCCESS;
 	}
 
-	category_allocation_t next = category_next_label(n->category, n->resource_request,
+	if(monitor->instance == instances){
+		category_allocation_t next = category_next_label(n->category, n->resource_request,
 			/* resource overflow */ 1, n->resources_requested, n->resources_measured);
 
-	if (next != CATEGORY_ALLOCATION_ERROR) {
-		debug(D_MAKEFLOW_HOOK, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
-		n->resource_request = next;
-		makeflow_log_state_change(n->d, n, DAG_NODE_STATE_WAITING);
-	} else {
-		debug(D_MAKEFLOW_HOOK, "Rule %d failed to setting new resource allocation.\n", n->nodeid);
+		if (next != CATEGORY_ALLOCATION_ERROR) {
+			debug(D_MAKEFLOW_HOOK, "Rule %d resubmitted using new resource allocation.\n", n->nodeid);
+			n->resource_request = next;
+			makeflow_log_state_change(n->d, n, DAG_NODE_STATE_WAITING);
+		} else {
+			debug(D_MAKEFLOW_HOOK, "Rule %d failed to setting new resource allocation.\n", n->nodeid);
+		}
 	}
-
 	return rc;
 }
 
 struct makeflow_hook makeflow_hook_resource_monitor = {
 		.module_name = "Resource Monitor",
 
+		.register_hook = resource_monitor_register_hook,
 		.create = create,
 		.destroy = destroy,
 

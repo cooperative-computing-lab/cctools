@@ -24,44 +24,61 @@
 
 #define CONTAINER_DOCKER_SH "./docker.wrapper.sh_"
 
-char *docker_image = NULL;
+struct docker_instance {
+	char *image;
+	char *tar;
+	char *opt;
+};
 
-char *docker_tar = NULL;
-
-char *docker_opt = NULL;
-
-static int create( struct jx *hook_args )
+struct docker_instance *docker_instance_create()
 {
+	struct docker_instance *d = malloc(sizeof(*d));
+	d->image = NULL;
+	d->tar = NULL;
+	d->opt = NULL;
+
+	return d;
+}
+
+
+static int create( void ** instance_struct, struct jx *hook_args )
+{
+	struct docker_instance *d = docker_instance_create();
+	*instance_struct = d;
+
 	if(jx_lookup_string(hook_args, "docker_container_image")){
-		docker_image = xxstrdup(jx_lookup_string(hook_args, "docker_container_image"));	
+		d->image = xxstrdup(jx_lookup_string(hook_args, "docker_container_image"));	
 	} else {
 		debug(D_NOTICE|D_MAKEFLOW_HOOK, "Docker hook requires container image name to be specified");
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 
 	if(jx_lookup_string(hook_args, "docker_container_tar")){
-		docker_tar = xxstrdup(jx_lookup_string(hook_args, "docker_container_tar"));	
+		d->tar = xxstrdup(jx_lookup_string(hook_args, "docker_container_tar"));	
 	}
 
 	if(jx_lookup_string(hook_args, "docker_container_opt")){
-		docker_opt = xxstrdup(jx_lookup_string(hook_args, "docker_container_opt"));	
+		d->opt = xxstrdup(jx_lookup_string(hook_args, "docker_container_opt"));	
 	} else {
-		docker_opt = xxstrdup("");
+		d->opt = xxstrdup("");
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy( struct dag *d )
+static int destroy( void * instance_struct, struct dag *d )
 {
-	free(docker_image);
-	free(docker_tar);
-	free(docker_opt);
-
+	struct docker_instance *dock = (struct docker_instance*)instance_struct;
+	if(dock){
+		free(dock->image);
+		free(dock->tar);
+		free(dock->opt);
+		free(dock);
+	}
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_check(struct dag *d){
+static int dag_check( void * instance_struct, struct dag *d){
 	char *cwd = path_getcwd();
 	if(!strncmp(cwd, "/afs", 4)) {
 		fprintf(stderr,"error: The working directory is '%s'\n", cwd);
@@ -75,7 +92,9 @@ static int dag_check(struct dag *d){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int node_submit(struct dag_node *n, struct batch_task *t){
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t){
+	struct docker_instance *d = (struct docker_instance*)instance_struct;
+	
 	struct batch_wrapper *wrapper = batch_wrapper_create();
 	batch_wrapper_prefix(wrapper, CONTAINER_DOCKER_SH);
 
@@ -83,19 +102,19 @@ static int node_submit(struct dag_node *n, struct batch_task *t){
 	batch_wrapper_pre(wrapper, "export CUR_WORK_DIR=$(pwd)");
 	batch_wrapper_pre(wrapper, "export DEFAULT_DIR=/root/worker");
 
-	if (docker_tar == NULL) {
-		char *pull = string_format("flock /tmp/lockfile /usr/bin/docker pull %s", docker_image);
+	if (d->tar == NULL) {
+		char *pull = string_format("flock /tmp/lockfile /usr/bin/docker pull %s", d->image);
 		batch_wrapper_pre(wrapper, pull);
 		free(pull);
 	} else {
-		char *load = string_format("flock /tmp/lockfile /usr/bin/docker load < %s", docker_tar);
+		char *load = string_format("flock /tmp/lockfile /usr/bin/docker load < %s", d->tar);
 		batch_wrapper_pre(wrapper, load);
 		free(load);
-		makeflow_hook_add_input_file(n->d, t, docker_tar, NULL, DAG_FILE_TYPE_GLOBAL);
+		makeflow_hook_add_input_file(n->d, t, d->tar, NULL, DAG_FILE_TYPE_GLOBAL);
 	}
 
 	char *cmd = string_format("docker run --rm -v $CUR_WORK_DIR:$DEFAULT_DIR -w $DEFAULT_DIR %s %s %s", 
-			docker_opt, docker_image, t->command);
+			d->opt, d->image, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);
 
