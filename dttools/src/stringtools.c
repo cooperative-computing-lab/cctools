@@ -24,6 +24,13 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
+int string_compare(const void *p1, const void *p2) {
+	/* The actual arguments to this function are "pointers to
+	 * pointers to char", but strcmp(3) arguments are "pointers
+	 * to char", hence the following cast plus dereference */
+	return strcmp(* (char * const *) p1, * (char * const *) p2);
+}
+
 /*
  * Based on opengroup.org's definition of the Shell Command Language (also gnu's)
  * In section 2.2.3 on Double-Quoted Strings, it indicates you only need to

@@ -15,6 +15,11 @@ See the file COPYING for details.
 
 typedef char *(*string_subst_lookup_t) (const char *name, void *arg);
 
+/** Comparison function for an array of strings.
+ * This is useful with qsort(3) and list_sort().
+ */
+int string_compare(const void *p1, const void *p2);
+
 /** Takes a command string and escapes special characters in the Shell Command
   language. Mallocs space for new string and does not modify original string.
   Characters dollar-sign $, backtick `, backslash \, and double-quote " are
