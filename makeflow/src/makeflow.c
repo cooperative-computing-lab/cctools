@@ -1119,7 +1119,9 @@ static void show_help_run(const char *cmd)
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
 	printf(" --k8s-image=<path>             Container image used by kubernetes.\n");
 	printf(" --sandbox                      Surround node command with sandbox wrapper.\n");
+	printf(" --vc3-builder                  VC3 Builder enabled.\n");
 	printf(" --vc3-exe=<file>               VC3 Builder executable location.\n");
+	printf(" --vc3-log=<file>               VC3 Builder log name.\n");
 	printf(" --vc3-options=<string>         VC3 Builder option string.\n");
 	        /********************************************************************************/
 
@@ -1249,7 +1251,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_STORAGE_PRINT,
 		LONG_OPT_PASSWORD,
 		LONG_OPT_TICKETS,
+		LONG_OPT_VC3,
 		LONG_OPT_VC3_EXE,
+		LONG_OPT_VC3_LOG,
 		LONG_OPT_VC3_OPT,
 		LONG_OPT_VERBOSE_PARSING,
 		LONG_OPT_LOG_VERBOSE_MODE,
@@ -1344,7 +1348,9 @@ int main(int argc, char *argv[])
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
 		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
+		{"vc3-builder", no_argument, 0, LONG_OPT_VC3},
 		{"vc3-exe", required_argument, 0, LONG_OPT_VC3_EXE},
+		{"vc3-log", required_argument, 0, LONG_OPT_VC3_LOG},
 		{"vc3-options", required_argument, 0, LONG_OPT_VC3_OPT},
 		{"version", no_argument, 0, 'v'},
 		{"log-verbose", no_argument, 0, LONG_OPT_LOG_VERBOSE_MODE},
@@ -1786,10 +1792,19 @@ int main(int argc, char *argv[])
 				if (makeflow_hook_register(&makeflow_hook_sandbox, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				break;
+			case LONG_OPT_VC3:
+				if (makeflow_hook_register(&makeflow_hook_vc3_builder, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				break;
 			case LONG_OPT_VC3_EXE:
 				if (makeflow_hook_register(&makeflow_hook_vc3_builder, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("vc3_exe"), jx_string(optarg));
+				break;
+			case LONG_OPT_VC3_LOG:
+				if (makeflow_hook_register(&makeflow_hook_vc3_builder, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("vc3_log"), jx_string(optarg));
 				break;
 			case LONG_OPT_VC3_OPT:
 				if (makeflow_hook_register(&makeflow_hook_vc3_builder, &hook_args) == MAKEFLOW_HOOK_FAILURE)
