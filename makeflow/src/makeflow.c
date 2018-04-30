@@ -445,7 +445,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
+static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -472,7 +472,7 @@ static batch_job_id_t makeflow_node_submit_retry( struct batch_queue *queue, str
 		if(jobid >= 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
 			task->jobid = jobid;
-			return jobid;
+			return 1;
 		}
 
 		fprintf(stderr, "couldn't submit batch job, still trying...\n");
@@ -535,10 +535,11 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	if (hook_return != MAKEFLOW_HOOK_SKIP){
 		/* Now submit the actual job, retrying failures as needed. */
 
-		n->jobid = makeflow_node_submit_retry(queue, task);
+		int submitted = makeflow_node_submit_retry(queue, task);
 
 		/* Update all of the necessary data structures. */
-		if(n->jobid > 0) {
+		if(submitted) {
+			n->jobid = task->jobid;
 			/* Not sure if this is necessary/what it does. */
 			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
@@ -560,7 +561,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 			 * it immediately. This only happens if hook_batch_submit returns 0 or the job wasn't
 			 * able to be submitted but didn't fail, so it will either be complete or get
 			 * resubmitted later.*/
-			if (n->jobid == 0) {
+			if (task->jobid >= 0) {
 				makeflow_node_complete(d, n, queue, task);
 			} else {
 				makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
