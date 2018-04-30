@@ -49,7 +49,7 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files );
 /** Compare function for comparing batch_files based on outer_name.
 @param file1 First file to compare.
 @param file2 Second file to compare.
-@return Alphabetic order of files outer_name's
+@return Relative alphabetic order of files outer_name's
 */ 
 int batch_file_outer_compare(const void *file1, const void *file2);
 
