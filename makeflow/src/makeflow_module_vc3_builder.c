@@ -93,7 +93,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 	/* Assumes a /disk dir in the image. */
 	char *log = string_format("%s_%d", v->log, t->taskid);
 	char *task_cmd = string_escape_shell(t->command);
-	char *cmd = string_format("%s --home $PWD %s %s > %s", executable, v->opt, task_cmd, log);
+	char *cmd = string_format("%s --home $PWD %s -- %s > %s", executable, v->opt, task_cmd, log);
 	makeflow_hook_add_input_file(n->d, t, v->exe, executable, DAG_FILE_TYPE_GLOBAL);
 	makeflow_hook_add_output_file(n->d, t, log, log, DAG_FILE_TYPE_INTERMEDIATE);
 	free(log);
