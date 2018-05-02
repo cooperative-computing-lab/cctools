@@ -90,7 +90,6 @@ The following major problems must be fixed:
 #define MAX_NEW_WORKERS 10
 
 //Capacity of tasks for the master, converted to capacity of workers in Factory
-int wq_capacity = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
@@ -470,8 +469,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_memory);
 	buffer_printf(&B, " %d", s.capacity_disk);
 	buffer_printf(&B, " %d", s.capacity_instantaneous);
-	//buffer_printf(&B, " %d", s.capacity_weighted);
-	buffer_printf(&B, " %d", wq_capacity);
+	buffer_printf(&B, " %d", s.capacity_weighted);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -2277,8 +2275,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
-	//jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
-	jx_insert_integer(j,"capacity_weighted",wq_capacity);
+	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -3248,8 +3245,8 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
 	int capacity_instantaneous = 0;
-	if(!s->capacity_weight) {
-		s->capacity_weight = alpha;
+	if(!q->stats->capacity_weight) {
+		q->stats->capacity_weight = alpha;
 	}
 
 	// Compute the average task properties.
@@ -3261,7 +3258,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		capacity.exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 		capacity.transfer_time = 1;
 
-		s->capacity_weighted = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+		q->stats->capacity_weighted = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 		capacity_instantaneous = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 
 		count = 1;
@@ -3282,14 +3279,11 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
-			//capacity_instantaneous = (int) ceil(((float) tr->exec_time) / (tr->transfer_time + tr->master_time));
-			s->capacity_weighted = wq_capacity;
 			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->master_time));
-			s->capacity_weighted = (int) ceil((s->capacity_weight * (float) capacity_instantaneous) + ((1.0 - s->capacity_weight) * s->capacity_weighted));
-			wq_capacity = s->capacity_weighted;
+			q->stats->capacity_weighted = (int) ceil((q->stats->capacity_weight * (float) capacity_instantaneous) + ((1.0 - q->stats->capacity_weight) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
-			debug(D_WQ, "\nCAPACITY: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, s->capacity_weighted, s->tasks_done, s->workers_connected);
+			debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
 		}
 	}
 
@@ -3300,11 +3294,11 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	// Never go below the default capacity
 	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, capacity.exec_time / (capacity.transfer_time + capacity.master_time));
 
-	s->capacity_tasks  = ratio;
-	s->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
-	s->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
-	s->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
-	s->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
+	q->stats->capacity_tasks  = ratio;
+	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
+	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
+	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
+	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {

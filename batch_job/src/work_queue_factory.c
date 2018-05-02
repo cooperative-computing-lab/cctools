@@ -79,8 +79,8 @@ static int autosize = 0;
 static int worker_timeout = 300;
 static int consider_capacity = 0;
 int capacity_weighted = 0;
-int tr = 0;
-int td= 0;
+int tasks_running = 0;
+int tasks_done = 0;
 
 static char *project_regex = 0;
 static char *submission_regex = 0;
@@ -255,20 +255,20 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
 		const char *owner =  jx_lookup_string(j,"owner");
-		//#const int tr =       jx_lookup_integer(j,"tasks_on_workers");
+		const int td =       jx_lookup_integer(j,"tasks_done");
+		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 		
-		tr = jx_lookup_integer(j,"tasks_on_workers");
-		td = jx_lookup_integer(j,"tasks_done");
-
+		tasks_done = td;
+		tasks_running = tr;
 		capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
-		if(tasks_per_worker > 0) {
-			capacity_weighted = DIV_INT_ROUND_UP(capacity_weighted, tasks_per_worker);
-		}
+		
 		//int capacity = MIN(capacity_weighted, master_workers_capacity(j));
 		int capacity = capacity_weighted;
 		int tasks = tr+tw+tl;
+		debug(D_WQ, "master_workers_capacity: %d", master_workers_capacity(j));
+		debug(D_WQ, "capacity_weighted: %d", capacity_weighted);
 
 		// first assume one task per worker
 		int need;
@@ -281,6 +281,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		// enforce many tasks per worker
 		if(tasks_per_worker > 0) {
 			need = DIV_INT_ROUND_UP(need, tasks_per_worker);
+			capacity = DIV_INT_ROUND_UP(capacity, tasks_per_worker);
 		}
 
 		// consider if tasks declared resources...
@@ -888,7 +889,7 @@ static void mainloop( struct batch_queue *queue )
 			new_workers_needed = 0;
 		}
 
-		debug(D_WQ,"\nCAPACITY: %d %d %d %d %d", capacity_weighted, workers_needed, workers_connected, td, tr);
+		debug(D_WQ,"capacity: %d %d %d %d %d", capacity_weighted, workers_needed, workers_connected, tasks_done, tasks_running);
 		debug(D_WQ,"workers needed: %d",    workers_needed);
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
 		debug(D_WQ,"workers requested: %d", new_workers_needed);
