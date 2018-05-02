@@ -98,7 +98,7 @@ static int dag_parse_make_node_regular_command(struct lexer *bk, struct dag_node
 		lexer_free_token(t);
 	}
 
-	n->command = xxstrdup(buffer_tostring(&b));
+	dag_node_set_command(n, buffer_tostring(&b));
 
 	buffer_free(&b);
 
@@ -627,9 +627,7 @@ static int dag_parse_make_node(struct lexer *bk)
 	dag_parse_make_node_command(bk, n);
 	bk->environment->node = NULL;
 
-	n->next = bk->d->nodes;
-	bk->d->nodes = n;
-	itable_insert(bk->d->node_table, n->nodeid, n);
+	dag_node_insert(n);
 
 	return 1;
 }
@@ -637,6 +635,7 @@ static int dag_parse_make_node(struct lexer *bk)
 static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t;
+	int nested_job = 0;
 
 	//Jump COMMAND token.
 	t = lexer_next_token(bk);
@@ -660,7 +659,7 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 		}
 		else if(strcmp(t->lexeme, "MAKEFLOW") == 0)
 		{
-			n->nested_job = 1;
+			nested_job = 1;
 		}
 		else
 		{
@@ -679,7 +678,7 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 	t = lexer_next_token(bk);
 	lexer_free_token(t);
 
-	if(n->nested_job)
+	if(nested_job)
 	{
 		return dag_parse_make_node_nested_makeflow(bk, n);
 	}
@@ -699,23 +698,11 @@ void dag_parse_make_drop_spaces(struct lexer *bk)
 	}
 }
 
-/* Support for recursive calls to makeflow. A recursive call is indicated in
- * the makeflow file with the following syntax:
- * \tMAKEFLOW some-makeflow-file [working-directory [wrapper]]
- *
- * If wrapper is not given, it defaults to an empty string.
- * If working-directory is not given, it defaults to ".".
- * If makeflow_exe is NULL, it defaults to makeflow
- *
- * The call is then as:
- *
- * cd working-directory && wrapper makeflow_exe some-makeflow-file
- *
- * */
-
 static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node *n)
 {
-	struct token *t, *start;
+	struct token *t;
+	struct token *makeflow_dag;
+	struct token *makeflow_cwd = NULL;
 
 	dag_parse_make_drop_spaces(bk);
 
@@ -723,8 +710,7 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 	t = lexer_next_token(bk);
 
 	if(t->type == TOKEN_LITERAL) {
-		n->makeflow_dag = xxstrdup(t->lexeme);
-		start = t;
+		makeflow_dag = t;
 	} else {
 		lexer_report_error(bk, "At least the name of the Makeflow file should be specified in a recursive call.\n");
 		return 0; // not reached, silences warning
@@ -735,37 +721,22 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 	//Get dag's working directory.
 	t = lexer_peek_next_token(bk);
 	if(t->type == TOKEN_LITERAL) {
-		t = lexer_next_token(bk);
-		n->makeflow_cwd = xxstrdup(t->lexeme);
-		lexer_free_token(t);
-	} else {
-		n->makeflow_cwd = xxstrdup(".");
+		makeflow_cwd = lexer_next_token(bk);
 	}
 
 	dag_parse_make_drop_spaces(bk);
 
-	//Get wrapper's name
-	char *wrapper = NULL;
-	t = lexer_peek_next_token(bk);
-	if(t->type == TOKEN_LITERAL) {
-		wrapper = xxstrdup(t->lexeme);
-		lexer_free_token(t);
-	} else {
-		wrapper = xxstrdup("");
+	t = lexer_next_token(bk);
+	if (!(t && t->type == TOKEN_NEWLINE)) {
+		lexer_report_error(bk, "MAKEFLOW specification does not end with a newline.\n");
 	}
 
-	free(start->lexeme);
-	start->lexeme = string_format("cd %s && %s %s %s",
-							  n->makeflow_cwd,
-							  wrapper,
-							  "makeflow",
-							  n->makeflow_dag);
-	free(wrapper);
+	dag_node_set_submakeflow(n, makeflow_dag->lexeme, makeflow_cwd ? makeflow_cwd->lexeme : NULL);
 
-	dag_parse_make_drop_spaces(bk);
-	lexer_preppend_token(bk, start);
-
-	return dag_parse_make_node_regular_command(bk, n);
+	lexer_free_token(t);
+	lexer_free_token(makeflow_dag);
+	if (makeflow_cwd) lexer_free_token(makeflow_cwd);
+	return 1;
 }
 
 static int dag_parse_make_export(struct lexer *bk)
