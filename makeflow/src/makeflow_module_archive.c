@@ -17,8 +17,6 @@ Update/Migrated to hook: Nick Hazekamp
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
-#include "hash_table.h"
-#include "itable.h"
 #include "list.h"
 #include "set.h"
 #include "sha1.h"
@@ -45,9 +43,7 @@ struct archive_instance {
 	int found_archived_job;
 	char *dir;
 
-	/* Runtime data structs */
-	struct itable *task_ids;
-	struct hash_table *file_ids;
+	/* Runtime data struct */
 	char *source_makeflow;
 };
 
@@ -56,10 +52,6 @@ struct archive_instance *archive_instance_create()
 	struct archive_instance *a = calloc(1,sizeof(*a));
 
 	a->dir = NULL;
-
-	a->task_ids = itable_create(0);
-	a->file_ids = hash_table_create(0,0);
-
 	a->source_makeflow = NULL;
 
 	return a;
@@ -92,10 +84,6 @@ static int destroy( void * instance_struct, struct dag *d)
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 
 	free(a->dir);
-	itable_clear(a->task_ids);
-	itable_delete(a->task_ids);
-	hash_table_clear(a->file_ids);
-	hash_table_delete(a->file_ids);
 	free(a->source_makeflow);
 	free(a);
 	return MAKEFLOW_HOOK_SUCCESS;
@@ -136,71 +124,6 @@ static int dag_loop( void * instance_struct, struct dag *d){
 	return MAKEFLOW_HOOK_END;
 }
 
-/* Return the content based ID for a file.
- * generates the checksum of a file's contents if does not exist */
-static char * generate_file_archive_id(struct archive_instance *a, struct batch_file *f) {
-	if(!hash_table_lookup(a->file_ids, f->outer_name)){
-		unsigned char digest[SHA1_DIGEST_LENGTH];
-		sha1_file(f->outer_name, digest);
-		hash_table_insert(a->file_ids, f->outer_name, xxstrdup(sha1_string(digest)));
-	}	
-	return xxstrdup(hash_table_lookup(a->file_ids, f->outer_name));
-}
-
-/* Return the content based ID for a node.
- * This includes :
- *  command
- *  input files (content)
- *  output files (name) : 
- *	    important addition as changed expected outputs may not 
- *	    be reflected in the command and not present in archive
- *  LATER : environment variables (name:value)
- **/
-static char * generate_task_archive_id(struct archive_instance *a, struct batch_task *t) {
-	if(!itable_lookup(a->task_ids, t->taskid)){
-		struct batch_file *f;
-		unsigned char digest[SHA1_DIGEST_LENGTH];
-
-		sha1_context_t context;
-		sha1_init(&context);
-
-		/* Add command to the archive id */
-		sha1_update(&context, "C", 1);
-		sha1_update(&context, t->command, strlen(t->command));
-		sha1_update(&context, "\0", 1);
-
-		/* Sort inputs for consistent hashing */
-		list_sort(t->input_files, batch_file_outer_compare);
-
-		/* add checksum of the node's input files together */
-		struct list_cursor *cur = list_cursor_create(t->input_files);
-		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-			char * file_id = generate_file_archive_id(a, f);
-			sha1_update(&context, "I", 1);
-			sha1_update(&context, file_id, strlen(file_id));
-			sha1_update(&context, "\0", 1);
-			free(file_id);
-		}
-		list_cursor_destroy(cur);
-
-		/* Sort outputs for consistent hashing */
-		list_sort(t->output_files, batch_file_outer_compare);
-
-		/* add checksum of the node's output file names together */
-		cur = list_cursor_create(t->output_files);
-		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-			sha1_update(&context, "O", 1);
-			sha1_update(&context, f->outer_name, strlen(f->outer_name));
-			sha1_update(&context, "\0", 1);
-		}
-		list_cursor_destroy(cur);
-
-		sha1_final(digest, &context);
-		itable_insert(a->task_ids, t->taskid, xxstrdup(sha1_string(digest)));
-	}
-	return xxstrdup(itable_lookup(a->task_ids, t->taskid));
-}
-
 /* Write the task and run info to the task directory
  *	These files are hardcoded to task_info and run_info
  *
@@ -238,7 +161,7 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		fprintf(fp, "INPUT_FILES : \n");
 		struct list_cursor *cur = list_cursor_create(t->input_files);
 		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-			char *id = generate_file_archive_id(a, f);
+			char *id = batch_file_generate_id(f);
 			fprintf(fp, "\t%s : %s\n", f->outer_name, id);
 			free(id);
 		}
@@ -247,7 +170,7 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		fprintf(fp, "OUTPUT_FILES : \n");
 		cur = list_cursor_create(t->output_files);
 		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-			char *id = generate_file_archive_id(a, f);
+			char *id = batch_file_generate_id(f);
 			fprintf(fp, "\t%s : %s\n", f->outer_name, id);
 			free(id);
 		}
@@ -287,7 +210,7 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
  */
 static int makeflow_archive_file(struct archive_instance *a, struct batch_file *f, char *job_file_archive_path) {
 	/* Generate the file archive id (content based) if does not exist. */
-	char * id = generate_file_archive_id(a, f);
+	char * id = batch_file_generate_id(f);
 	struct stat buf;
 	int rv = 0;
 
@@ -385,7 +308,7 @@ static int makeflow_archive_create_dir(char * prefix, char * name){
  */
 static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n, struct batch_task *t) {
 	/* Generate the task id */
-	char *id = generate_task_archive_id(a, t);
+	char *id = batch_task_generate_id(t);
 	int result = 1;
 
 	/* The archive name is binned by the first 2 characters of the id for compactness */
@@ -476,7 +399,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 static int batch_submit( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
-	char *id = generate_task_archive_id(a, t);
+	char *id = batch_task_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 	debug(D_MAKEFLOW_HOOK, "Checking archive for task %d at %.5s\n", t->taskid, id);
 
@@ -500,7 +423,7 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
 
-	char *id = generate_task_archive_id(a, t);
+	char *id = batch_task_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
 		debug(D_MAKEFLOW_HOOK, "Task %d run was bypassed using archive\n", t->taskid);
