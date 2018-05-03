@@ -124,25 +124,16 @@ static int dag_loop( void * instance_struct, struct dag *d){
 	return MAKEFLOW_HOOK_END;
 }
 
-/* Write the task and run info to the task directory
- *	These files are hardcoded to task_info and run_info
- *
- * task_info :
- *	COMMAND: Tasks command that was run
- *	SRC_COMMAND: Origin node's command for reference
- *	SRC_LINE:  Line of origin node in SRC_MAKEFLOW
- *	SRC_MAKEFLOW:  ID of file for the original Makeflow stored in archive
- *	INPUT_FILES: Alphabetic list of input files checksum IDs
- *	OUTPUT_FILES: Alphabetic list of output file outer_names
- *
- * run_info : 
- *  SUBMITTED : Time task was submitted
- *  STARTED : Time task was started
- *  FINISHED : Time task was completed
- *  EXIT_NORMALLY : 0 if abnormal exit, 1 is normal
- *  EXIT_CODE : Task's exit code
- *  EXIT_SIGNAL : Int value of signal if occurred
+/* Overall structure of an archive unit:
+ * archive_dir --> tasks --> checksum_pre(2 digits) --> checksum --> task_info
+ *            |                                                 |--> run_info
+ *            |                                                 |--> input_files --> file_name(symlink to actual file)
+ *            |                                                 |--> output_files --> file_name(symlink to actual file)
+ *            |--> files --> checksum_pre(2 digits) --> checksum (actual file)
  */
+
+/* Write the task and run info to the task directory
+ *	These files are hardcoded to task_info and run_info */
 static int makeflow_archive_write_task_info(struct archive_instance *a, struct dag_node *n, struct batch_task *t, char *archive_path) {
 
 	struct batch_file *f;
@@ -154,6 +145,14 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create task_info for node %d archive", n->nodeid);
 		return 0;
 	} else {
+/* task_info :
+ *	COMMAND: Tasks command that was run
+ *	SRC_COMMAND: Origin node's command for reference
+ *	SRC_LINE:  Line of origin node in SRC_MAKEFLOW
+ *	SRC_MAKEFLOW:  ID of file for the original Makeflow stored in archive
+ *	INPUT_FILES: Alphabetic list of input files checksum IDs
+ *	OUTPUT_FILES: Alphabetic list of output file outer_names
+ */
 		fprintf(fp, "COMMAND : %s\n", t->command);
 		fprintf(fp, "SRC_COMMAND : %s\n", n->command);
 		fprintf(fp, "SRC_LINE : %d\n", n->linenum);
@@ -187,6 +186,14 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create run_info for node %d archive", n->nodeid);
 		return 0;
 	} else {
+/* run_info : 
+ *  SUBMITTED : Time task was submitted
+ *  STARTED : Time task was started
+ *  FINISHED : Time task was completed
+ *  EXIT_NORMALLY : 0 if abnormal exit, 1 is normal
+ *  EXIT_CODE : Task's exit code
+ *  EXIT_SIGNAL : Int value of signal if occurred
+ */
 		fprintf(fp, "SUBMITTED : %lu\n", t->info->submitted);
 		fprintf(fp, "STARTED : %lu\n", t->info->started);
 		fprintf(fp, "FINISHED : %lu\n", t->info->finished);
@@ -319,8 +326,6 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 	/* We create all the sub directories upfront for convenience */
 	dir_create_error = makeflow_archive_create_dir(archive_directory_path, "/output_files/");
 	dir_create_error += makeflow_archive_create_dir(archive_directory_path, "/input_files/");
-	dir_create_error += makeflow_archive_create_dir(archive_directory_path, "/descendants/");
-	dir_create_error += makeflow_archive_create_dir(archive_directory_path, "/ancestors/");
 
 	if(dir_create_error){
 		result = 0;
