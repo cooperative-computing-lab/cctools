@@ -18,6 +18,9 @@ Update/Migrated to hook: Nick Hazekamp
 #include "create_dir.h"
 #include "debug.h"
 #include "list.h"
+#include "jx.h"
+#include "jx_pretty_print.h"
+#include "path.h"
 #include "set.h"
 #include "sha1.h"
 #include "stringtools.h"
@@ -68,12 +71,32 @@ static int create( void ** instance_struct, struct jx *hook_args )
 		a->dir = string_format("%s%d", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, getuid());
 	}
 
-	if(jx_lookup_integer(hook_args, "archive_read")){
+	if(jx_lookup_boolean(hook_args, "archive_read")){
 		a->read = 1;
 	}
 
-	if(jx_lookup_integer(hook_args, "archive_write")){
+	if(jx_lookup_boolean(hook_args, "archive_write")){
 		a->write = 1;
+	}
+
+	if (!create_dir(a->dir, 0777) && errno != EEXIST){
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create base archiving directory %s: %d %s\n", 
+			a->dir, errno, strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+
+	char *files_dir = string_format("%s/files", a->dir);
+	if (!create_dir(files_dir, 0777) && errno != EEXIST){
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create files archiving directory %s: %d %s\n", 
+			files_dir, errno, strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+
+	char *tasks_dir = string_format("%s/tasks", a->dir);
+	if (!create_dir(tasks_dir, 0777) && errno != EEXIST){
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create tasks archiving directory %s: %d %s\n", 
+			tasks_dir, errno, strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
@@ -97,15 +120,24 @@ static int dag_check( void * instance_struct, struct dag *d){
 	a->source_makeflow = xxstrdup(sha1_string(digest));
 	
 	if (a->write) {
-		char *source_makeflow_file_path = string_format("%s/makeflows/%.2s/%s", a->dir, a->source_makeflow, a->source_makeflow);
-		int success = copy_file_to_file(d->filename, source_makeflow_file_path);
-		free(source_makeflow_file_path);
-		if (!success) {
+		char *source_makeflow_file_dir = string_format("%s/files/%.2s", a->dir, a->source_makeflow);
+		if (!create_dir(source_makeflow_file_dir, 0777) && errno != EEXIST){
+			debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create makeflow archiving directory %s: %d %s\n", 
+				source_makeflow_file_dir, errno, strerror(errno));
+			free(source_makeflow_file_dir);
+			return MAKEFLOW_HOOK_FAILURE;
+		}
+
+		char *source_makeflow_file_path = string_format("%s/%s", source_makeflow_file_dir, a->source_makeflow);
+		if (!copy_file_to_file(d->filename, source_makeflow_file_path)){
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Could not archive source makeflow file %s\n", source_makeflow_file_path);
+			free(source_makeflow_file_path);
 			return MAKEFLOW_HOOK_FAILURE;
 		} else {
 			debug(D_MAKEFLOW_HOOK, "Source makeflow %s stored at %s\n", d->filename, source_makeflow_file_path);
 		}
+		free(source_makeflow_file_dir);
+		free(source_makeflow_file_path);
 	}
 	return MAKEFLOW_HOOK_SUCCESS;
 }
@@ -135,48 +167,69 @@ static int dag_loop( void * instance_struct, struct dag *d){
 /* Write the task and run info to the task directory
  *	These files are hardcoded to task_info and run_info */
 static int makeflow_archive_write_task_info(struct archive_instance *a, struct dag_node *n, struct batch_task *t, char *archive_path) {
-
 	struct batch_file *f;
-	char *task_info = string_format("%s/task_info", archive_path);
 
-	FILE *fp = fopen(task_info, "w");
-	if (fp == NULL) {
-		free(task_info);
-		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create task_info for node %d archive", n->nodeid);
-		return 0;
-	} else {
 /* task_info :
  *	COMMAND: Tasks command that was run
  *	SRC_COMMAND: Origin node's command for reference
  *	SRC_LINE:  Line of origin node in SRC_MAKEFLOW
  *	SRC_MAKEFLOW:  ID of file for the original Makeflow stored in archive
  *	INPUT_FILES: Alphabetic list of input files checksum IDs
- *	OUTPUT_FILES: Alphabetic list of output file outer_names
+ *	OUTPUT_FILES: Alphabetic list of output file inner_names
  */
-		fprintf(fp, "COMMAND : %s\n", t->command);
-		fprintf(fp, "SRC_COMMAND : %s\n", n->command);
-		fprintf(fp, "SRC_LINE : %d\n", n->linenum);
-		fprintf(fp, "SRC_MAKEFLOW : %s\n", a->source_makeflow);
-		fprintf(fp, "INPUT_FILES : \n");
-		struct list_cursor *cur = list_cursor_create(t->input_files);
-		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-			char *id = batch_file_generate_id(f);
-			fprintf(fp, "\t%s : %s\n", f->outer_name, id);
-			free(id);
-		}
-		list_cursor_destroy(cur);
+	struct jx *task_jx = jx_object(NULL);
+	jx_insert(task_jx, jx_string("COMMAND"), jx_string(t->command));
+	jx_insert(task_jx, jx_string("SRC_COMMAND"), jx_string(n->command));
+	jx_insert(task_jx, jx_string("SRC_LINE"), jx_integer(n->linenum));
+	jx_insert(task_jx, jx_string("SRC_MAKEFLOW"), jx_string(a->source_makeflow));
+	struct jx * input_files = jx_object(NULL);
+	struct list_cursor *cur = list_cursor_create(t->input_files);
+	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		char *id = batch_file_generate_id(f);
+		jx_insert(input_files, jx_string(f->inner_name), jx_string(id));
+		free(id);
+	}
+	list_cursor_destroy(cur);
+	jx_insert(task_jx, jx_string("INPUT_FILES"), input_files);
 
-		fprintf(fp, "OUTPUT_FILES : \n");
-		cur = list_cursor_create(t->output_files);
-		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-			char *id = batch_file_generate_id(f);
-			fprintf(fp, "\t%s : %s\n", f->outer_name, id);
-			free(id);
-		}
-		list_cursor_destroy(cur);
+	struct jx * output_files = jx_object(NULL);
+	cur = list_cursor_create(t->output_files);
+	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		char *id = batch_file_generate_id(f);
+		jx_insert(output_files, jx_string(f->inner_name), jx_string(id));
+		free(id);
+	}
+	list_cursor_destroy(cur);
+	jx_insert(task_jx, jx_string("OUTPUT_FILES"), output_files);
+
+	char *task_info = string_format("%s/task_info", archive_path);
+	FILE *fp = fopen(task_info, "w");
+	if (fp == NULL) {
+		free(task_info);
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create task_info for node %d archive", n->nodeid);
+		return 0;
+	} else {
+		jx_pretty_print_stream(task_jx, fp);
 	}
 	fclose(fp);
 	free(task_info);
+	jx_delete(task_jx);
+
+/* run_info : 
+ *  SUBMITTED : Time task was submitted
+ *  STARTED : Time task was started
+ *  FINISHED : Time task was completed
+ *  EXIT_NORMALLY : 0 if abnormal exit, 1 is normal
+ *  EXIT_CODE : Task's exit code
+ *  EXIT_SIGNAL : Int value of signal if occurred
+ */
+	struct jx * run_jx = jx_object(NULL);
+	jx_insert(run_jx, jx_string("SUBMITTED"), jx_integer(t->info->submitted));
+	jx_insert(run_jx, jx_string("STARTED"), jx_integer(t->info->started));
+	jx_insert(run_jx, jx_string("FINISHED"), jx_integer(t->info->finished));
+	jx_insert(run_jx, jx_string("EXIT_NORMAL"), jx_integer(t->info->exited_normally));
+	jx_insert(run_jx, jx_string("EXIT_CODE"), jx_integer(t->info->exit_code));
+	jx_insert(run_jx, jx_string("EXIT_SIGNAL"), jx_integer(t->info->exit_signal));
 
 	task_info = string_format("%s/run_info", archive_path);
 
@@ -186,23 +239,11 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create run_info for node %d archive", n->nodeid);
 		return 0;
 	} else {
-/* run_info : 
- *  SUBMITTED : Time task was submitted
- *  STARTED : Time task was started
- *  FINISHED : Time task was completed
- *  EXIT_NORMALLY : 0 if abnormal exit, 1 is normal
- *  EXIT_CODE : Task's exit code
- *  EXIT_SIGNAL : Int value of signal if occurred
- */
-		fprintf(fp, "SUBMITTED : %lu\n", t->info->submitted);
-		fprintf(fp, "STARTED : %lu\n", t->info->started);
-		fprintf(fp, "FINISHED : %lu\n", t->info->finished);
-		fprintf(fp, "EXIT_NORMAL : %d\n", t->info->exited_normally);
-		fprintf(fp, "EXIT_CODE : %d\n", t->info->exit_code);
-		fprintf(fp, "EXIT_SIGNAL : %d\n", t->info->exit_signal);
+		jx_pretty_print_stream(run_jx, fp);
 	}
 	fclose(fp);
 	free(task_info);
+	jx_delete(run_jx);
 
 	return 1;
 }
@@ -223,10 +264,12 @@ static int makeflow_archive_file(struct archive_instance *a, struct batch_file *
 
 	char * file_archive_dir = string_format("%s/files/%.2s", a->dir, id);
 	char * file_archive_path = string_format("%s/%s", file_archive_dir, id);
+	char * job_file_archive_dir = NULL;
 
 	/* Create the archive path with 2 character prefix. */
 	if (!create_dir(file_archive_dir, 0777) && errno != EEXIST){
-		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create file archiving directory %s\n", file_archive_dir);
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create file archiving directory %s: %d %s\n", 
+			file_archive_dir, errno, strerror(errno));
 		rv = 1;
 		goto FAIL;
 	}
@@ -236,15 +279,30 @@ static int makeflow_archive_file(struct archive_instance *a, struct batch_file *
 		debug(D_MAKEFLOW_HOOK, "file %s already archived at %s", f->outer_name, file_archive_path);
 	/* File did not already exist, store in general file area */
 	} else if (!copy_file_to_file(f->outer_name, file_archive_path)){
-		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not archive output file %s at %s\n",f->outer_name, file_archive_path);
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not archive output file %s at %s: %d %s\n",
+			f->outer_name, file_archive_path, errno, strerror(errno));
 		rv = 1;
 		goto FAIL;
 	}
 
+	/* Create the directory structure for job_file_archive. */
+	job_file_archive_dir = xxstrdup(job_file_archive_path);
+	path_dirname(job_file_archive_path, job_file_archive_dir);
+	if (!create_dir(job_file_archive_dir, 0777) && errno != EEXIST){
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create job file directory %s: %d %s\n", 
+			file_archive_dir, errno, strerror(errno));
+		rv = 1;
+		goto FAIL;
+	}
+
+	free(file_archive_path);
+	file_archive_path = string_format("../../../../files/%.2s/%s", id, id);
+
 	/* Create a symlink to task that used/created this file. */
 	int symlink_failure = symlink(file_archive_path, job_file_archive_path);
 	if (symlink_failure && errno != EEXIST) {
-		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create symlink %s pointing to %s\n", job_file_archive_path, file_archive_path);
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create symlink %s pointing to %s: %d %s\n", 
+			job_file_archive_path, file_archive_path, errno, strerror(errno));
 		rv = 1;
 		goto FAIL;
 	}
@@ -253,6 +311,7 @@ FAIL:
 	free(id);
 	free(file_archive_dir);
 	free(file_archive_path);
+	free(job_file_archive_dir);
 	return rv;
 }
 
@@ -262,7 +321,7 @@ static int makeflow_archive_write_input_files(struct archive_instance *a, struct
 
 	struct list_cursor *cur = list_cursor_create(t->input_files);
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-		char *input_file_path = string_format("%s/input_files/%s", archive_directory_path,  f->outer_name);
+		char *input_file_path = string_format("%s/input_files/%s", archive_directory_path,  f->inner_name);
 		int failed_checksum = makeflow_archive_file(a, f, input_file_path);
 		free(input_file_path);
 		if(failed_checksum){
@@ -280,7 +339,7 @@ static int makeflow_archive_write_output_files(struct archive_instance *a, struc
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-		char *output_file_path = string_format("%s/output_files/%s", archive_directory_path,  f->outer_name);
+		char *output_file_path = string_format("%s/output_files/%s", archive_directory_path,  f->inner_name);
 		int failed_checksum = makeflow_archive_file(a, f, output_file_path);
 		free(output_file_path);
 		if(failed_checksum){
@@ -361,7 +420,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-		char *output_file_path = string_format("%s/output_files/%s",task_path, f->outer_name);
+		char *output_file_path = string_format("%s/output_files/%s",task_path, f->inner_name);
 		int success = copy_file_to_file(output_file_path, f->outer_name);
 		free(output_file_path);
 		if (!success) {
@@ -387,14 +446,16 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-		char *filename = string_format("%s/output_files/%s", task_path, f->outer_name);
+		char *filename = string_format("%s/output_files/%s", task_path, f->inner_name);
 		int file_exists = stat(filename, &buf);
-		free(filename);
 		if (file_exists < 0) {
 			list_cursor_destroy(cur);
-			debug(D_MAKEFLOW_HOOK, "output file %s not found in archive at %s", f->outer_name, task_path);
+			debug(D_MAKEFLOW_HOOK, "output file %s not found in archive at %s: %d %s", 
+				f->outer_name, filename, errno, strerror(errno));
+			free(filename);
 			return 0;
 		}
+		free(filename);
 	}
 	list_cursor_destroy(cur);
 

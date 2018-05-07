@@ -114,8 +114,7 @@ char *batch_wrapper_write(struct batch_wrapper *w, struct batch_task *task) {
 	assert(w);
 	assert(task);
 
-	char *id = batch_task_generate_id(task);
-	char *name = string_format("%s_%.5s", w->prefix ? w->prefix : "./wrapper", id);
+	char *name = string_format("%s_XXXXXX", w->prefix ? w->prefix : "./wrapper");
 	int wrapper_fd = mkstemp(name);
 	if (wrapper_fd == -1) {
 		int saved_errno = errno;

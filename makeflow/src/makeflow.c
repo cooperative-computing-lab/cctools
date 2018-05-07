@@ -1756,24 +1756,24 @@ int main(int argc, char *argv[])
 			case LONG_OPT_ARCHIVE:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
-				jx_insert(hook_args, jx_string("archive_read"), jx_integer(1));
-				jx_insert(hook_args, jx_string("archive_write"), jx_integer(1));
+				jx_insert(hook_args, jx_string("archive_read"), jx_boolean(1));
+				jx_insert(hook_args, jx_string("archive_write"), jx_boolean(1));
 				if(optarg)
 					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_ARCHIVE_READ_ONLY:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
-				jx_insert(hook_args, jx_string("archive_read"), jx_integer(1));
-				jx_insert(hook_args, jx_string("archive_write"), jx_integer(0));
+				jx_insert(hook_args, jx_string("archive_read"), jx_boolean(1));
+				jx_insert(hook_args, jx_string("archive_write"), jx_boolean(0));
 				if(optarg)
 					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_ARCHIVE_WRITE_ONLY:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
-				jx_insert(hook_args, jx_string("archive_read"), jx_integer(0));
-				jx_insert(hook_args, jx_string("archive_write"), jx_integer(1));
+				jx_insert(hook_args, jx_string("archive_read"), jx_boolean(0));
+				jx_insert(hook_args, jx_string("archive_write"), jx_boolean(1));
 				if(optarg)
 					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
