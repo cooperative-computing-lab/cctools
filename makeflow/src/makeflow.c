@@ -1049,9 +1049,10 @@ static void show_help_run(const char *cmd)
 	printf(" -f,--summary-log=<file>        Write summary of workflow to this file at end.\n");
 	        /********************************************************************************/
 	printf("\nData Handling:\n");
-	printf("    --archive=<dir>             Archive job outputs in <dir> for future reuse.\n");
-	printf("    --archive-read=<dir>        Same as --archive, but read-only.\n");
-	printf("    --archive-write=<dir>       Same as --archive, but write-only.\n");
+	printf("    --archive                   Read jobs from and write completed jobs into archive.\n");
+	printf("    --archive-read              Read jobs from archive.\n");
+	printf("    --archive-write             Write jobs into archive.\n");
+	printf("    --archive-dir=<dir>         Base archive directory (default: /tmp/makeflow.archive.USERID).\n");
 	printf(" -A,--disable-afs-check         Disable the check for AFS. (experts only.)\n");
 	printf("    --cache=<dir>               Use this dir to cache downloaded mounted files.\n");
 	printf(" -X,--change-directory=<dir>    Change to <dir> before executing the workflow.\n");
@@ -1274,8 +1275,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_SINGULARITY_OPT,
 		LONG_OPT_SHARED_FS,
 		LONG_OPT_ARCHIVE,
-		LONG_OPT_ARCHIVE_READ_ONLY,
-		LONG_OPT_ARCHIVE_WRITE_ONLY,
+		LONG_OPT_ARCHIVE_DIR,
+		LONG_OPT_ARCHIVE_READ,
+		LONG_OPT_ARCHIVE_WRITE,
 		LONG_OPT_MESOS_MASTER,
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
@@ -1376,9 +1378,10 @@ int main(int argc, char *argv[])
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
 		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
-		{"archive", optional_argument, 0, LONG_OPT_ARCHIVE},
-		{"archive-read", optional_argument, 0, LONG_OPT_ARCHIVE_READ_ONLY},
-		{"archive-write", optional_argument, 0, LONG_OPT_ARCHIVE_WRITE_ONLY},
+		{"archive", no_argument, 0, LONG_OPT_ARCHIVE},
+		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
+		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
+		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
 		{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
@@ -1758,24 +1761,21 @@ int main(int argc, char *argv[])
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("archive_read"), jx_boolean(1));
 				jx_insert(hook_args, jx_string("archive_write"), jx_boolean(1));
-				if(optarg)
-					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
-			case LONG_OPT_ARCHIVE_READ_ONLY:
+			case LONG_OPT_ARCHIVE_DIR:
+				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
+				break;
+			case LONG_OPT_ARCHIVE_READ:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("archive_read"), jx_boolean(1));
-				jx_insert(hook_args, jx_string("archive_write"), jx_boolean(0));
-				if(optarg)
-					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
-			case LONG_OPT_ARCHIVE_WRITE_ONLY:
+			case LONG_OPT_ARCHIVE_WRITE:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
-				jx_insert(hook_args, jx_string("archive_read"), jx_boolean(0));
 				jx_insert(hook_args, jx_string("archive_write"), jx_boolean(1));
-				if(optarg)
-					jx_insert(hook_args, jx_string("archive_dir"), jx_string(optarg));
 				break;
 			case LONG_OPT_SEND_ENVIRONMENT:
 				should_send_all_local_environment = 1;

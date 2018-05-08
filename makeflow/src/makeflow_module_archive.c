@@ -156,6 +156,35 @@ static int dag_loop( void * instance_struct, struct dag *d){
 	return MAKEFLOW_HOOK_END;
 }
 
+static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
+	int rc = 0;
+	struct batch_file *f;
+	struct list_cursor *cur = list_cursor_create(t->input_files);
+	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
+			debug(D_MAKEFLOW_HOOK, 
+				"task %d will not be archived as file %s->%s does not adhere to the sandbox model of execution", 
+				t->taskid, f->outer_name, f->inner_name);
+			rc = 1;
+		}
+	}
+	list_cursor_destroy(cur);
+	
+
+	cur = list_cursor_create(t->output_files);
+	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
+			debug(D_MAKEFLOW_HOOK, 
+				"task %d will not be archived as file %s->%s does not adhere to the sandbox model of execution", 
+				t->taskid, f->outer_name, f->inner_name);
+			rc = 1;
+		}
+	}
+	list_cursor_destroy(cur);
+
+	return rc;
+}
+
 /* Overall structure of an archive unit:
  * archive_dir --> tasks --> checksum_pre(2 digits) --> checksum --> task_info
  *            |                                                 |--> run_info
@@ -438,7 +467,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 	struct batch_file *f;
 	struct stat buf;
 
-	if((stat(task_path, &buf) < 0)){
+	if(makeflow_archive_task_adheres_to_sandbox(t) || (stat(task_path, &buf) < 0)){
 		/* Not helpful unless you know the task number. */
 		debug(D_MAKEFLOW_HOOK, "task %d has not been previously archived at %s", t->taskid, task_path);
 		return 0;
@@ -505,6 +534,11 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	/* store node into archiving directory  */
 	if (a->write) {
+		if(makeflow_archive_task_adheres_to_sandbox(t)){
+			debug(D_ERROR|D_MAKEFLOW_HOOK, "task %d will not be archived", t->taskid);
+			return MAKEFLOW_HOOK_SUCCESS;
+		}
+
 		debug(D_MAKEFLOW_HOOK, "archiving task %d in directory: %s\n",t->taskid, a->dir);
 		int archived = makeflow_archive_task(a, n, t);
 		if(!archived){
