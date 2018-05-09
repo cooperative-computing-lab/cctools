@@ -144,6 +144,11 @@ int master_workers_capacity(struct jx *j) {
 	const int memory = resources->memory;
 	const int disk = resources->disk;
 
+	debug(D_WQ, "capacity_tasks: %d", capacity_tasks);
+	debug(D_WQ, "capacity_cores: %d", capacity_cores);
+	debug(D_WQ, "capacity_memory: %d", capacity_memory);
+	debug(D_WQ, "capacity_disk: %d", capacity_disk);
+
 	// first, assume one task per worker
 	int capacity = capacity_tasks;
 
@@ -263,12 +268,15 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		tasks_done = td;
 		tasks_running = tr;
 		capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
-		
-		//int capacity = MIN(capacity_weighted, master_workers_capacity(j));
-		int capacity = capacity_weighted;
+
+		int capacity = 1;
+		if(consider_capacity) {
+			capacity = capacity_weighted;
+		}
+		else {
+			capacity = MIN(capacity_weighted, master_workers_capacity(j));
+		}
 		int tasks = tr+tw+tl;
-		debug(D_WQ, "master_workers_capacity: %d", master_workers_capacity(j));
-		debug(D_WQ, "capacity_weighted: %d", capacity_weighted);
 
 		// first assume one task per worker
 		int need;
@@ -292,8 +300,6 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		}
 
 		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
-		fprintf(stderr, "|capacity: %d |need: %d \n",capacity,need);
-
 		needed_workers += need;
 		masters++;
 	}
