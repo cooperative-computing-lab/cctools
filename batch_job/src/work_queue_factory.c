@@ -309,8 +309,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			need = MIN(need, capacity);
 		}
 
-		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
-		debug(D_WQ,"capacity: %d %d %d %d %d", capacity, need, count_workers_connected(masters_list), td, tr);
+		debug(D_WQ,"%s %s:%d %s %d %d %d %d %d %d",project,host,port,owner,tasks,capacity,need,count_workers_connected(masters_list),td,tr);
 		needed_workers += need;
 		masters++;
 	}
