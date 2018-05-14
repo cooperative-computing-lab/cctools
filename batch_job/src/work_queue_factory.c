@@ -139,6 +139,7 @@ int master_workers_capacity(struct jx *j) {
 	int capacity_cores   = jx_lookup_integer(j, "capacity_cores");
 	int capacity_memory  = jx_lookup_integer(j, "capacity_memory");
 	int capacity_disk    = jx_lookup_integer(j, "capacity_disk");
+	capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 
 	const int cores = resources->cores;
 	const int memory = resources->memory;
@@ -151,6 +152,10 @@ int master_workers_capacity(struct jx *j) {
 
 	// first, assume one task per worker
 	int capacity = capacity_tasks;
+	//use the capacity model if desired
+	if(consider_capacity) {
+		capacity = capacity_weighted;
+	}
 
 	// then, enforce tasks per worker
 	if(tasks_per_worker > 0) {
@@ -267,15 +272,8 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		
 		tasks_done = td;
 		tasks_running = tr;
-		capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 
-		int capacity = 1;
-		if(consider_capacity) {
-			capacity = capacity_weighted;
-		}
-		else {
-			capacity = MIN(capacity_weighted, master_workers_capacity(j));
-		}
+		int capacity = master_workers_capacity(j);
 		int tasks = tr+tw+tl;
 
 		// first assume one task per worker
