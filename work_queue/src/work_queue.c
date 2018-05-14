@@ -89,8 +89,6 @@ The following major problems must be fixed:
 
 #define MAX_NEW_WORKERS 10
 
-//Capacity of tasks for the master, converted to capacity of workers in Factory
-
 // Result codes for signaling the completion of operations in WQ
 typedef enum {
 	SUCCESS = 0,
