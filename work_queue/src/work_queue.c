@@ -468,7 +468,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_cores);
 	buffer_printf(&B, " %d", s.capacity_memory);
 	buffer_printf(&B, " %d", s.capacity_disk);
-	buffer_printf(&B, " %d", s.capacity_inst);
+	buffer_printf(&B, " %d", s.capacity_instantaneous);
 	buffer_printf(&B, " %d", s.capacity_weighted);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
@@ -2274,7 +2274,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_cores",info.capacity_cores);
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
-	jx_insert_integer(j,"capacity_inst",info.capacity_inst);
+	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 
 	// Add the resources computed from tributary workers.
@@ -3244,7 +3244,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
-	int capacity_inst = 0;
+	int capacity_instantaneous = 0;
 
 	// Compute the average task properties.
 	if(count < 1) {
@@ -3256,7 +3256,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		capacity.transfer_time = 1;
 
 		q->stats->capacity_weighted = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
-		capacity_inst = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+		capacity_instantaneous = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 
 		count = 1;
 	} else {
@@ -3276,8 +3276,8 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 		tr = list_peek_tail(q->task_reports);
 		if(tr->transfer_time > 0) {
-			capacity_inst = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->master_time));
-			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_inst) + ((1.0 - alpha) * q->stats->capacity_weighted));
+			capacity_instantaneous = DIV_INT_ROUND_UP(tr->exec_time, (tr->transfer_time + tr->master_time));
+			q->stats->capacity_weighted = (int) ceil((alpha * (float) capacity_instantaneous) + ((1.0 - alpha) * q->stats->capacity_weighted));
 			time_t ts;
 			time(&ts);
 			debug(D_WQ, "capacity: %lld %"PRId64" %"PRId64" %"PRId64" %d %d %d", (long long) ts, tr->exec_time, tr->transfer_time, tr->master_time, q->stats->capacity_weighted, s->tasks_done, s->workers_connected);
@@ -3299,7 +3299,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
 	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
 	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
-	q->stats->capacity_inst = DIV_INT_ROUND_UP(capacity_inst, 1);
+	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -6338,7 +6338,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_inst capacity_weighted"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
