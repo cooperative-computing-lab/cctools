@@ -128,8 +128,8 @@ static void makeflow_log_sync( struct dag *d, int force )
 
 void makeflow_log_close( struct dag *d )
 {
-	/* In the case where Makeflow exits prior to opening log. */
-	if(!d->logfile) return;
+	/* In the case where Makeflow exits prior to creating the DAG or opening log. */
+	if(!d || !d->logfile) return;
 
 	makeflow_log_sync(d,1);
 	fclose(d->logfile);
@@ -144,8 +144,8 @@ void makeflow_log_started_event( struct dag *d )
 
 void makeflow_log_aborted_event( struct dag *d )
 {
-	/* In the case where Makeflow exits prior to opening log. */
-	if(!d->logfile) return;
+	/* In the case where Makeflow exits prior to creating the DAG or opening log. */
+	if(!d || !d->logfile) return;
 
 	fprintf(d->logfile, "# ABORTED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
@@ -153,8 +153,8 @@ void makeflow_log_aborted_event( struct dag *d )
 
 void makeflow_log_failed_event( struct dag *d )
 {
-	/* In the case where Makeflow exits prior to opening log. */
-	if(!d->logfile) return;
+	/* In the case where Makeflow exits prior to creating the DAG or opening log. */
+	if(!d || !d->logfile) return;
 
 	fprintf(d->logfile, "# FAILED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);
@@ -162,8 +162,8 @@ void makeflow_log_failed_event( struct dag *d )
 
 void makeflow_log_completed_event( struct dag *d )
 {
-	/* In the case where Makeflow exits prior to opening log. */
-	if(!d->logfile) return;
+	/* In the case where Makeflow exits prior to creating the DAG or opening log. */
+	if(!d || !d->logfile) return;
 
 	fprintf(d->logfile, "# COMPLETED %" PRIu64 "\n", timestamp_get());
 	makeflow_log_sync(d,1);

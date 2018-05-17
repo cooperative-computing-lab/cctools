@@ -25,6 +25,7 @@ Update/Migrated to hook: Nick Hazekamp
 #include "sha1.h"
 #include "stringtools.h"
 #include "timestamp.h"
+#include "unlink_recursive.h"
 #include "xxmalloc.h"
 
 #include "batch_job.h"
@@ -129,6 +130,7 @@ static int dag_check( void * instance_struct, struct dag *d){
 		}
 
 		char *source_makeflow_file_path = string_format("%s/%s", source_makeflow_file_dir, a->source_makeflow);
+		free(source_makeflow_file_dir);
 		if (!copy_file_to_file(d->filename, source_makeflow_file_path)){
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Could not archive source makeflow file %s\n", source_makeflow_file_path);
 			free(source_makeflow_file_path);
@@ -136,7 +138,6 @@ static int dag_check( void * instance_struct, struct dag *d){
 		} else {
 			debug(D_MAKEFLOW_HOOK, "Source makeflow %s stored at %s\n", d->filename, source_makeflow_file_path);
 		}
-		free(source_makeflow_file_dir);
 		free(source_makeflow_file_path);
 	}
 	return MAKEFLOW_HOOK_SUCCESS;
@@ -163,7 +164,7 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
 			debug(D_MAKEFLOW_HOOK, 
-				"task %d will not be archived as file %s->%s does not adhere to the sandbox model of execution", 
+				"task %d will not be archived as input file %s->%s does not adhere to the sandbox model of execution", 
 				t->taskid, f->outer_name, f->inner_name);
 			rc = 1;
 		}
@@ -175,7 +176,7 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
 			debug(D_MAKEFLOW_HOOK, 
-				"task %d will not be archived as file %s->%s does not adhere to the sandbox model of execution", 
+				"task %d will not be archived as output file %s->%s does not adhere to the sandbox model of execution", 
 				t->taskid, f->outer_name, f->inner_name);
 			rc = 1;
 		}
@@ -436,12 +437,37 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 		goto FAIL;
 	}
 
-	debug(D_MAKEFLOW_HOOK, "node %d successfully archived", n->nodeid);
+	printf("task %d successfully archived\n", t->taskid);
 
 FAIL:
 	free(archive_directory_path);
 	free(id);
 	return result;
+}
+
+
+/* Remove partial or corrupted archive.
+@return 1 if archive was successful, 0 if archive failed.
+ */
+static int makeflow_archive_remove_task(struct archive_instance *a, struct dag_node *n, struct batch_task *t) {
+	/* Generate the task id */
+	char *id = batch_task_generate_id(t);
+
+	/* The archive name is binned by the first 2 characters of the id for compactness */
+	char *archive_directory_path = string_format("%s/tasks/%.2s/%s", a->dir, id, id);
+	debug(D_MAKEFLOW_HOOK, "removing corrupt archive for task %d at %s", t->taskid, archive_directory_path);
+	free(id);
+
+	if(!unlink_recursive(archive_directory_path)){
+		debug(D_MAKEFLOW_HOOK, "unable to remove corrupt archive for task %d", t->taskid);
+		free(archive_directory_path);
+		return 0;
+	}
+
+	debug(D_MAKEFLOW_HOOK, "corrupt archive for task %d removed", t->taskid);
+
+	free(archive_directory_path);
+	return 1;
 }
 
 int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct batch_task *t, char *task_path ) {
@@ -505,7 +531,7 @@ static int batch_submit( void * instance_struct, struct batch_task *t){
 		makeflow_archive_copy_preserved_files(a, t, task_path);
 		t->info->exited_normally = 1;
 		a->found_archived_job = 1;
-		printf("job %d was pulled from archive\n", t->taskid);
+		printf("task %d was pulled from archive\n", t->taskid);
 		rc = MAKEFLOW_HOOK_SKIP;
 	}
 
@@ -539,10 +565,22 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 			return MAKEFLOW_HOOK_SUCCESS;
 		}
 
+		char *id = batch_task_generate_id(t);
+		char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
+		if(makeflow_archive_is_preserved(a, t, task_path)){
+			free(id);
+			free(task_path);
+			debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive", t->taskid);
+			return MAKEFLOW_HOOK_SUCCESS;
+		}
+		free(id);
+		free(task_path);
+
 		debug(D_MAKEFLOW_HOOK, "archiving task %d in directory: %s\n",t->taskid, a->dir);
 		int archived = makeflow_archive_task(a, n, t);
 		if(!archived){
 			debug(D_MAKEFLOW_HOOK, "unable to archive task %d in directory: %s\n",t->taskid, a->dir);
+			makeflow_archive_remove_task(a, n, t);
 			return MAKEFLOW_HOOK_FAILURE;
 		}
 	}
