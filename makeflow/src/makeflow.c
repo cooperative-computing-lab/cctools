@@ -2195,7 +2195,7 @@ int main(int argc, char *argv[])
 	printf("starting workflow....\n");
 	rc = makeflow_hook_dag_start(d);
 	if(rc != MAKEFLOW_HOOK_SUCCESS){
-		debug(D_ERROR, "Failed dag start hooks");
+		debug(D_ERROR, "Failed DAG start hooks");
 		goto EXIT_WITH_FAILURE;
 	}
 
