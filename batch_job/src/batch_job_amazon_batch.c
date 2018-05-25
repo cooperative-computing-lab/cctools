@@ -76,7 +76,7 @@ static struct jx* run_command(char* cmd){
 	if(jx == NULL){
 		fatal("JX parse stream out returned a null jx object");
 	}
-	pclose(out);
+	sh_pclose(out);
 	return jx;
 }
 
