@@ -64,6 +64,7 @@ See the file COPYING for details.
 #include <sys/wait.h>
 
 #include <mpi.h>
+#include "hash_table.h"
 
 typedef enum {
 	WORKER_MODE_WORKER,
