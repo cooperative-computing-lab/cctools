@@ -2277,6 +2277,7 @@ int main(int argc, char *argv[])
 	if(mpi_rank == 0){ //Master to decide who stays and who doesn't
 		int i;
 		struct hash_table* comps = hash_table_create(0,0);
+		
 		for(i=1; i<mpi_world_size; i++){
 			unsigned len = 0;
 			MPI_Recv(&len,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
