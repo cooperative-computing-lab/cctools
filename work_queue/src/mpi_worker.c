@@ -2274,7 +2274,7 @@ int main(int argc, char *argv[])
 	
 	if(mpi_rank == 0){ //Master to decide who stays and who doesn't
 		int i;
-		
+		struct hash_table* comps = hash_table_create(0,0);
 		for(i=1; i<mpi_world_size; i++){
 			unsigned len = 0;
 			MPI_Recv(&len,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
@@ -2286,8 +2286,34 @@ int main(int argc, char *argv[])
 			char* name = jx_lookup_string(recobj,"name");
 			int rank = jx_lookup_integer(recobj,"rank");
 			
+			if(strstr(procname,name)){ //0 will always be the master on its own comp
+				continue;
+			}
+	
+			if(hash_table_lookup(comps,name) == NULL){
+				hash_table_insert(name,rank);
+			}
 			
-		}	
+			jx_delete(recobj);
+			
+		}
+		for(i=1; i<world_size; i++){
+			hash_table_firstkey(comps);
+			char* key;
+			int value;
+			int sent = 0;
+			while(hash_table_nextkey(comps,&key,(void**)&value)){
+				if(value == i){
+					MPI_Send("LIVE",4,MPI_CHAR,i,0,MPI_COMM_WORLD);
+					sent = 1;
+				}
+			}
+			if(sent == 0){
+				MPI_Send("DIE ",4,MPI_CHAR,i,0,MPI_COMM_WORLD);
+			}
+		}
+		
+		hash_table_delete(comps);
 
 	}else{ //send proc name and num
 		char* sendstr = string_format("{\"name\":\"%s\",\"rank\":%i}",procname,mpi_rank);
