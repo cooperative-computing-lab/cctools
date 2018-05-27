@@ -815,5 +815,13 @@ subscribe to our <a href="http://ccl.cse.nd.edu/software/help.shtml">mailing
 list</a>.
 
 </div>
+
+<h3>MPI</h3>
+WorkQueue can be used as an MPI program as well. When cctools is compiled with MPI enabled, <tt>work_queue_worker</tt> can be called with the additional argument of <tt>--mpi</tt>. This enables it to be ran as an MPI program, operating exactly as <tt>work_queue_worker</tt> normally does. The following is an example:
+
+<code>
+mpiexec -np 120 work_queue_worker --mpi master_location master_port
+</code>
+
 </body>
 </html>
