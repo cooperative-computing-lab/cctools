@@ -65,6 +65,7 @@ See the file COPYING for details.
 
 #include <mpi.h>
 #include "hash_table.h"
+#include "jx_parse.h"
 
 typedef enum {
 	WORKER_MODE_WORKER,
@@ -2292,13 +2293,13 @@ int main(int argc, char *argv[])
 			}
 	
 			if(hash_table_lookup(comps,name) == NULL){
-				hash_table_insert(name,rank);
+				hash_table_insert(comps,name,rank);
 			}
 			
 			jx_delete(recobj);
 			
 		}
-		for(i=1; i<world_size; i++){
+		for(i=1; i<mpi_world_size; i++){
 			hash_table_firstkey(comps);
 			char* key;
 			int value;
@@ -2327,11 +2328,13 @@ int main(int argc, char *argv[])
 		char livedie[10];
 		MPI_Recv(livedie,4,MPI_CHAR,0,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 		if(strstr(livedie,"DIE")){
+			MPI_Finalize();
 			return 0;
 		}else if(strstr(livedie,"LIVE")){
 			//do nothing, continue
 		}else{
 			fprintf(stderr,"livedie string got corrupted, wrong command sent.... %s\n",livedie);
+			MPI_Finalize();
 			return 1;
 		}//corrupted string or something
 	}
