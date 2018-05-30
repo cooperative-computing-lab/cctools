@@ -111,22 +111,6 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	}
 
 	/*
-	Use the basename of the first word in the command line as a name for the job.
-	Re the PBS qsub manpage, the -N name must start with a letter and be <= 15 characters long.
-	Unfortunately, work_queue_worker hits this limit.
-	*/
-
-	char *firstword = strdup(cmd);
-
-	char *end = strchr(firstword, ' ');
-	if(end) *end = 0;
-		
-	char *submit_job_name = strdup(string_front(path_basename(firstword),15));
-	if(!isalpha(submit_job_name[0])) submit_job_name[0] = 'X';
-
-	free(firstword);
-
-	/*
 	Experiment shows that passing environment variables
 	through the command-line doesn't work, due to multiple
 	levels of quote interpretation.  So, we export all
@@ -143,15 +127,35 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	*/
 	setenv("BATCH_JOB_COMMAND", cmd, 1);
 
-	char *command = string_format("%s %s %s '%s' %s %s.wrapper",
+	/*
+	Re the PBS qsub manpage, the -N name must start with a letter and be <= 15 characters long.
+	Unfortunately, work_queue_worker hits this limit.
+
+	Previously, we used the beginning of the command for this.
+	The CRC had a wrapper script around qsub to help fix submission issues,
+	but their wrapper could mis-identify the script and corrupt other files if the submit name matched an existing file.
+	It mistook the the node command for the submission script,
+	and tried to adjust the line endings and add a newline.
+	The script in question happened to be a self-extracting script,
+	so the fixups corrupted the bundled tarball.
+	To make sure we don't run into issues with sloppy command line fixups,
+	we just use an incrementing counter for naming submissions.
+
+	If there are more than 65,535 jobs submitted at once,
+	thei counter could roll over.
+	This shouldn't be an issue.
+
+	TODO change this to the nodeid during a refactor to batch_task
+	*/
+	static uint16_t submit_id = 0;
+
+	char *command = string_format("%s %s %s makeflow%" PRIu16 " %s %s.wrapper",
 		cluster_submit_cmd,
 		cluster_options,
 		cluster_jobname_var,
-		submit_job_name,
+		submit_id++,
 		options ? options : "",
 		cluster_name);
-
-	free(submit_job_name);
 
 	debug(D_BATCH, "%s", command);
 
