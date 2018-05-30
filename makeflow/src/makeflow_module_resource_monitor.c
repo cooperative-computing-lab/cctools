@@ -127,15 +127,16 @@ static int create(void ** instance_struct, struct jx *args)
 static int destroy(void * instance_struct, struct dag *d)
 {
 	struct makeflow_monitor *monitor = (struct makeflow_monitor*)instance_struct;
-	if (monitor->log_prefix)
-		free(monitor->log_prefix);
+	if(monitor){
+		if (monitor->log_prefix)
+			free(monitor->log_prefix);
 
-	if (monitor->exe)
-		free(monitor->exe);
+		if (monitor->exe)
+			free(monitor->exe);
 
-	free(monitor->measure_dir);
-
-	free(monitor);
+		free(monitor->measure_dir);
+		free(monitor);
+	}
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 

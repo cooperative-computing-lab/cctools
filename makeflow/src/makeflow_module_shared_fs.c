@@ -82,10 +82,12 @@ static int create( void ** instance_struct, struct jx *hook_args )
 
 static int destroy( void * instance_struct, struct dag *d ){
 	struct shared_fs_instance *sf = (struct shared_fs_instance*)instance_struct;
-	list_free(sf->shared_fs_list);
-	list_delete(sf->shared_fs_list);
-	itable_delete(sf->shared_fs_saved_inputs);
-	itable_delete(sf->shared_fs_saved_outputs);
+	if(sf){
+		list_free(sf->shared_fs_list);
+		list_delete(sf->shared_fs_list);
+		itable_delete(sf->shared_fs_saved_inputs);
+		itable_delete(sf->shared_fs_saved_outputs);
+	}
 	free(sf);
 	return MAKEFLOW_HOOK_SUCCESS;
 }

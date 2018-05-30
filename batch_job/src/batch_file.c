@@ -5,6 +5,7 @@ See the file COPYING for details.
 */
 
 #include "batch_file.h"
+#include "sha1.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -88,5 +89,24 @@ char * batch_files_to_string(struct batch_queue *queue, struct list *files )
     }
 
     return file_str;
+}
+
+int batch_file_outer_compare(const void *file1, const void *file2) {
+	struct batch_file **f1 = (void *)file1;
+	struct batch_file **f2 = (void *)file2;
+
+	return strcmp((*f1)->outer_name, (*f2)->outer_name);
+}
+
+/* Return the content based ID for a file.
+ * generates the checksum of a file's contents if does not exist */
+char * batch_file_generate_id(struct batch_file *f) {
+	if(!f->hash){
+		unsigned char *hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
+		sha1_file(f->outer_name, hash);
+		f->hash = xxstrdup(sha1_string(hash));
+		free(hash);
+	}	
+	return xxstrdup(f->hash);
 }
 

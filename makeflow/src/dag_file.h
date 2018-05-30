@@ -63,8 +63,7 @@ struct dag_file {
 	char *source;                   /* the source of the file specified in the mountfile, by default is NULL */
 	char *cache_name;               /* the name of a file dependency in the cache, by default is NULL */
 	dag_file_source_t source_type;  /* the type of the source of a dependency */
-	char *archive_id;
-	char *archive_path;
+	char *hash;                     /* the hash computed based on the files contents */
 };
 
 /** Create dag file struct.

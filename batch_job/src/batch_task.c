@@ -8,7 +8,9 @@ See the file COPYING for details.
 #include <errno.h>
 
 #include "batch_task.h"
+#include "batch_file.h"
 #include "batch_wrapper.h"
+#include "sha1.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "debug.h"
@@ -147,6 +149,64 @@ void batch_task_set_command_spec(struct batch_task *t, struct jx *command) {
 	}
 	batch_task_set_command(t, new_command);
 	free(new_command);
+}
+
+/* Return the content based ID for a node.
+ * This includes :
+ *  command
+ *  input files (content)
+ *  output files (name) : 
+ *	    important addition as changed expected outputs may not 
+ *	    be reflected in the command and not present in archive
+ *  LATER : environment variables (name:value)
+ *  returns a string the caller needs to free
+ **/
+char * batch_task_generate_id(struct batch_task *t) {
+	if(t->hash)
+		free(t->hash);
+	unsigned char *hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
+	struct batch_file *f;
+
+	sha1_context_t context;
+	sha1_init(&context);
+
+	/* Add command to the archive id */
+	sha1_update(&context, "C", 1);
+	sha1_update(&context, t->command, strlen(t->command));
+	sha1_update(&context, "\0", 1);
+
+	/* Sort inputs for consistent hashing */
+	list_sort(t->input_files, batch_file_outer_compare);
+
+	/* add checksum of the node's input files together */
+	struct list_cursor *cur = list_cursor_create(t->input_files);
+	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		char * file_id = batch_file_generate_id(f);
+		sha1_update(&context, "I", 1);
+		sha1_update(&context, f->outer_name, strlen(f->outer_name));
+		sha1_update(&context, "C", 1);
+		sha1_update(&context, file_id, strlen(file_id));
+		sha1_update(&context, "\0", 1);
+		free(file_id);
+	}
+	list_cursor_destroy(cur);
+
+	/* Sort outputs for consistent hashing */
+	list_sort(t->output_files, batch_file_outer_compare);
+
+	/* add checksum of the node's output file names together */
+	cur = list_cursor_create(t->output_files);
+	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		sha1_update(&context, "O", 1);
+		sha1_update(&context, f->outer_name, strlen(f->outer_name));
+		sha1_update(&context, "\0", 1);
+	}
+	list_cursor_destroy(cur);
+
+	sha1_final(hash, &context);
+	t->hash = xxstrdup(sha1_string(hash));
+	free(hash);
+	return xxstrdup(t->hash);
 }
 
 /* vim: set noexpandtab tabstop=4: */

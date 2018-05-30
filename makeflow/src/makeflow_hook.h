@@ -366,6 +366,7 @@ typedef enum {
     MAKEFLOW_HOOK_SUCCESS = 0,
     MAKEFLOW_HOOK_FAILURE,
     MAKEFLOW_HOOK_SKIP,
+    MAKEFLOW_HOOK_RUN,
     MAKEFLOW_HOOK_END
 } makeflow_hook_result;
 

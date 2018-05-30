@@ -9,6 +9,7 @@ See the file COPYING for details.
 
 #include "batch_file.h"
 #include "list.h"
+#include "sha1.h"
 #include "jx.h"
 #include "rmsummary.h"
 
@@ -28,6 +29,8 @@ struct batch_task {
 	struct jx *envlist;          /* JSON formatted environment list */ 
 
 	struct batch_job_info *info; /* Stores the info struct created by batch_job. */
+
+	char *hash;                  /* Checksum based on CMD, input contents, and output names. */
 };
 
 /** Create a batch_task struct.
@@ -108,6 +111,14 @@ void batch_task_set_envlist(struct batch_task *t, struct jx *envlist);
 @param info The batch_job_info of the completed task.
 */
 void batch_task_set_info(struct batch_task *t, struct batch_job_info *info);
+
+/** Generate a sha1 hash based on the specified task.
+ Includes Command, Input files contents, Output files names
+ Future improvement should include the Environment
+@param t The batch_task whose checksum will be generated.
+@return Allocated string of the hash, user should free.
+*/
+char * batch_task_generate_id(struct batch_task *t);
 
 #endif
 /* vim: set noexpandtab tabstop=4: */

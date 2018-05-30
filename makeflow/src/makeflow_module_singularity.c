@@ -56,9 +56,11 @@ static int create( void ** instance_struct, struct jx *hook_args )
 static int destroy( void * instance_struct, struct dag *d)
 {
 	struct singularity_instance *s = (struct singularity_instance*)instance_struct;
-	free(s->image);
-	free(s->opt);
-	free(s);
+	if(s){
+		free(s->image);
+		free(s->opt);
+		free(s);
+	}
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 

@@ -8,11 +8,13 @@ See the file COPYING for details.
 #define BATCH_FILE_H
 
 #include "batch_job.h"
+#include "sha1.h"
 #include "list.h"
 
 struct batch_file {
 	char *outer_name;
 	char *inner_name;
+	char *hash;/* Checksum based on contents. */
 };
 
 /** Create batch_file struct.
@@ -46,5 +48,17 @@ char * batch_file_to_string(struct batch_queue *queue, struct batch_file *f );
 */
 char * batch_files_to_string(struct batch_queue *queue, struct list *files );
 
+/** Compare function for comparing batch_files based on outer_name.
+@param file1 First file to compare.
+@param file2 Second file to compare.
+@return Relative alphabetic order of files outer_name's
+*/ 
+int batch_file_outer_compare(const void *file1, const void *file2);
+
+/** Generate a sha1 hash based on the file contents.
+@param f The batch_file whose checksum will be generated.
+@return Allocated string of the hash, user should free.
+*/
+char * batch_file_generate_id(struct batch_file *f);
 
 #endif

@@ -202,7 +202,7 @@ int makeflow_hook_dag_loop(struct dag *d){
 	}
 	list_cursor_destroy(cur);
 	list_cursor_destroy(scur);
- 
+
 	return rc;
 }
 

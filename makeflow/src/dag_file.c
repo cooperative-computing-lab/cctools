@@ -15,7 +15,7 @@ See the file COPYING for details.
 
 struct dag_file * dag_file_create( const char *filename )
 {
-	struct dag_file *f = malloc(sizeof(*f));
+	struct dag_file *f = xxcalloc(1, sizeof(*f));
 	f->filename = xxstrdup(filename);
 	f->needed_by = list_create();
 	f->created_by = 0;
@@ -27,8 +27,6 @@ struct dag_file * dag_file_create( const char *filename )
 	f->source = NULL;
 	f->cache_name = NULL;
 	f->source_type = DAG_FILE_SOURCE_LOCAL;
-	f->archive_id = NULL;
-	f->archive_path = NULL;
 	return f;
 }
 
