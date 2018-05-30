@@ -14,7 +14,7 @@ See the file COPYING for details.
 struct batch_file {
 	char *outer_name;
 	char *inner_name;
-	unsigned char *hash;/* Checksum based on contents. */
+	char *hash;/* Checksum based on contents. */
 };
 
 /** Create batch_file struct.

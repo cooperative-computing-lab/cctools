@@ -102,9 +102,11 @@ int batch_file_outer_compare(const void *file1, const void *file2) {
  * generates the checksum of a file's contents if does not exist */
 char * batch_file_generate_id(struct batch_file *f) {
 	if(!f->hash){
-		f->hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
-		sha1_file(f->outer_name, f->hash);
+		unsigned char *hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
+		sha1_file(f->outer_name, hash);
+		f->hash = xxstrdup(sha1_string(hash));
+		free(hash);
 	}	
-	return xxstrdup(sha1_string(f->hash));
+	return xxstrdup(f->hash);
 }
 

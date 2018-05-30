@@ -30,7 +30,7 @@ struct batch_task {
 
 	struct batch_job_info *info; /* Stores the info struct created by batch_job. */
 
-	unsigned char *hash;         /* Checksum based on CMD, input contents, and output names. */
+	char *hash;                  /* Checksum based on CMD, input contents, and output names. */
 };
 
 /** Create a batch_task struct.

@@ -164,7 +164,7 @@ void batch_task_set_command_spec(struct batch_task *t, struct jx *command) {
 char * batch_task_generate_id(struct batch_task *t) {
 	if(t->hash)
 		free(t->hash);
-	t->hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
+	unsigned char *hash = xxcalloc(1, sizeof(char *)*SHA1_DIGEST_LENGTH);
 	struct batch_file *f;
 
 	sha1_context_t context;
@@ -183,6 +183,8 @@ char * batch_task_generate_id(struct batch_task *t) {
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		char * file_id = batch_file_generate_id(f);
 		sha1_update(&context, "I", 1);
+		sha1_update(&context, f->outer_name, strlen(f->outer_name));
+		sha1_update(&context, "C", 1);
 		sha1_update(&context, file_id, strlen(file_id));
 		sha1_update(&context, "\0", 1);
 		free(file_id);
@@ -201,8 +203,10 @@ char * batch_task_generate_id(struct batch_task *t) {
 	}
 	list_cursor_destroy(cur);
 
-	sha1_final(t->hash, &context);
-	return xxstrdup(sha1_string(t->hash));
+	sha1_final(hash, &context);
+	t->hash = xxstrdup(sha1_string(hash));
+	free(hash);
+	return xxstrdup(t->hash);
 }
 
 /* vim: set noexpandtab tabstop=4: */
