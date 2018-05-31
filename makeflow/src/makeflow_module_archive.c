@@ -134,14 +134,18 @@ static int dag_check( void * instance_struct, struct dag *d){
 			free(source_makeflow_file_dir);
 			return MAKEFLOW_HOOK_FAILURE;
 		}
-
+		// Gets the path of the archive file
 		char *source_makeflow_file_path = string_format("%s/%s", source_makeflow_file_dir, a->source_makeflow);
+		// Frees memory
 		free(source_makeflow_file_dir);
+		// If the file was unable to be copied to the new path
 		if (!copy_file_to_file(d->filename, source_makeflow_file_path)){
+			// Prints out debug error
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Could not archive source makeflow file %s\n", source_makeflow_file_path);
 			free(source_makeflow_file_path);
 			return MAKEFLOW_HOOK_FAILURE;
 		} else {
+			// Print out where it is stored at
 			debug(D_MAKEFLOW_HOOK, "Source makeflow %s stored at %s\n", d->filename, source_makeflow_file_path);
 		}
 		free(source_makeflow_file_path);
@@ -157,7 +161,7 @@ static int dag_loop( void * instance_struct, struct dag *d){
 	Thus makeflow_dispatch_ready_tasks must run at least once more if an archived job was found.
 	*/
 	if(a->found_archived_job == 1){
-		a->found_archived_job = 0;
+		a->found_archifile:///usr/share/doc/HTML/en-US/index.htmlved_job = 0;
 		return MAKEFLOW_HOOK_SUCCESS;
 	}
 	return MAKEFLOW_HOOK_END;
@@ -167,26 +171,34 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
 	int rc = 0;
 	struct batch_file *f;
 	struct list_cursor *cur = list_cursor_create(t->input_files);
+	// Iterate through input files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// If your using an absolute path or trying to get our of a directory using the (..)
 		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
+			// Print out a debug error
 			debug(D_MAKEFLOW_HOOK, 
 				"task %d will not be archived as input file %s->%s does not adhere to the sandbox model of execution", 
 				t->taskid, f->outer_name, f->inner_name);
 			rc = 1;
 		}
 	}
+	// Frees memory of list cursor
 	list_cursor_destroy(cur);
 	
 
 	cur = list_cursor_create(t->output_files);
+	// Iterates through output files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// Same check as input files
 		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
+			// Prints out a debug error
 			debug(D_MAKEFLOW_HOOK, 
 				"task %d will not be archived as output file %s->%s does not adhere to the sandbox model of execution", 
 				t->taskid, f->outer_name, f->inner_name);
 			rc = 1;
 		}
 	}
+	// Frees memory of list cursor
 	list_cursor_destroy(cur);
 
 	return rc;
@@ -356,10 +368,13 @@ static int makeflow_archive_write_input_files(struct archive_instance *a, struct
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->input_files);
+	// Iterate through input files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		char *input_file_path = string_format("%s/input_files/%s", archive_directory_path,  f->inner_name);
+		// Archive each file for inputs
 		int failed_checksum = makeflow_archive_file(a, f, input_file_path);
 		free(input_file_path);
+		// Check to see it was archived correctly
 		if(failed_checksum){
 			list_cursor_destroy(cur);
 			return 0;
@@ -374,8 +389,10 @@ static int makeflow_archive_write_output_files(struct archive_instance *a, struc
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
+	// Iterate through output files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		char *output_file_path = string_format("%s/output_files/%s", archive_directory_path,  f->inner_name);
+		// Archive each file for outputs
 		int failed_checksum = makeflow_archive_file(a, f, output_file_path);
 		free(output_file_path);
 		if(failed_checksum){
@@ -389,9 +406,12 @@ static int makeflow_archive_write_output_files(struct archive_instance *a, struc
 
 /* Using the task prefix, creates the specified directory and checks for failure. */
 static int makeflow_archive_create_dir(char * prefix, char * name){
+	// Creates directory path to be used as string
 	char *tmp_directory_path = string_format("%s%s", prefix, name);
+	// Actually creates directory
 	int created = create_dir(tmp_directory_path, 0777);
 	free(tmp_directory_path);
+	// If new directory is not created
 	if (!created){
 		debug(D_ERROR|D_MAKEFLOW_HOOK,"Could not create archiving directory %s\n", tmp_directory_path);
 		return 1;
@@ -421,7 +441,8 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 	/* We create all the sub directories upfront for convenience */
 	dir_create_error = makeflow_archive_create_dir(archive_directory_path, "/output_files/");
 	dir_create_error += makeflow_archive_create_dir(archive_directory_path, "/input_files/");
-
+	
+	// Checks to see if there was an error creating the directories
 	if(dir_create_error){
 		result = 0;
 		goto FAIL;
@@ -433,11 +454,12 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 		goto FAIL;
 	}
 
-
+	// Create the input files
 	if(!makeflow_archive_write_input_files(a, t, archive_directory_path)){
 		result = 0;
 		goto FAIL;
 	}
+	// Create the output files
 	if(!makeflow_archive_write_output_files(a, t, archive_directory_path)){
 		result = 0;
 		goto FAIL;
@@ -446,6 +468,7 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 	printf("task %d successfully archived\n", t->taskid);
 
 FAIL:
+	// Free all of the memory
 	free(archive_directory_path);
 	free(id);
 	return result;
@@ -480,8 +503,11 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
+	// Iterate through output files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// Gets path of output file		
 		char *output_file_path = string_format("%s/output_files/%s",task_path, f->inner_name);
+		// Copy output file over
 		int success = copy_file_to_file(output_file_path, f->outer_name);
 		free(output_file_path);
 		if (!success) {
@@ -498,7 +524,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task *t, char *task_path) {
 	struct batch_file *f;
 	struct stat buf;
-
+	// If the task does NOT adhere to the sandbox or there is a failure with getting the stat
 	if(makeflow_archive_task_adheres_to_sandbox(t) || (stat(task_path, &buf) < 0)){
 		/* Not helpful unless you know the task number. */
 		debug(D_MAKEFLOW_HOOK, "task %d has not been previously archived at %s", t->taskid, task_path);
@@ -506,11 +532,16 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 	}
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
+	// Iterate through output files making sure they all exist
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// Get path of the output file
 		char *filename = string_format("%s/output_files/%s", task_path, f->inner_name);
-		int file_exists = stat(filename, &buf);
+		// Check the statistics of the output file at the location
+		int file_exists = stat(filename, &buf)
+		// If there is a failure with running stat delete the cursor and free memory
 		if (file_exists < 0) {
 			list_cursor_destroy(cur);
+			// Print debug error
 			debug(D_MAKEFLOW_HOOK, "output file %s not found in archive at %s: %d %s", 
 				f->outer_name, filename, errno, strerror(errno));
 			free(filename);
@@ -518,6 +549,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 		}
 		free(filename);
 	}
+	// Free list cursor memory
 	list_cursor_destroy(cur);
 
 	return 1;
@@ -526,10 +558,11 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 static int batch_submit( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
+	// Generates a hash id for the task
 	char *id = batch_task_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 	debug(D_MAKEFLOW_HOOK, "Checking archive for task %d at %.5s\n", t->taskid, id);
-
+	// If a is in read mode and the archive is preserved (all the output files exist)
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
 		debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive, replicating output files\n", t->taskid);
 
@@ -549,14 +582,18 @@ static int batch_submit( void * instance_struct, struct batch_task *t){
 static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
-
+	
+	// Generates a hash id for the task
 	char *id = batch_task_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
+	// If a is in read mode and the archive is preserved (all the output files exist)
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
+		// Print out debug statement
 		debug(D_MAKEFLOW_HOOK, "Task %d run was bypassed using archive\n", t->taskid);
+		// Bypass task run
 		rc = MAKEFLOW_HOOK_RUN;
 	}
-
+	// Free excess memory
 	free(id);
 	free(task_path);
 	return rc;
@@ -565,15 +602,21 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	/* store node into archiving directory  */
+	// If a is in write mode
 	if (a->write) {
+		// If the task does NOT adhere to the sandbox
 		if(makeflow_archive_task_adheres_to_sandbox(t)){
+			// Print debug error message
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "task %d will not be archived", t->taskid);
 			return MAKEFLOW_HOOK_SUCCESS;
 		}
-
+		
+		// Generates a hash id for the task
 		char *id = batch_task_generate_id(t);
 		char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
+		// If the archive is preserved (all the output files exist)
 		if(makeflow_archive_is_preserved(a, t, task_path)){
+			// Free excess memory
 			free(id);
 			free(task_path);
 			debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive", t->taskid);
@@ -581,7 +624,8 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 		}
 		free(id);
 		free(task_path);
-
+		
+		// Otherwise archive the task
 		debug(D_MAKEFLOW_HOOK, "archiving task %d in directory: %s\n",t->taskid, a->dir);
 		int archived = makeflow_archive_task(a, n, t);
 		if(!archived){
