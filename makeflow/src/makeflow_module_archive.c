@@ -117,14 +117,20 @@ static int dag_check( void * instance_struct, struct dag *d){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 
 	unsigned char digest[SHA1_DIGEST_LENGTH];
+	// Takes hash of filename and stores it in digest
 	sha1_file(d->filename, digest);
+	// Makes a c string copy of your hash address
 	a->source_makeflow = xxstrdup(sha1_string(digest));
-	
+	// If a is in write mode using the -w flag	
 	if (a->write) {
+		// Formats archive file directory
 		char *source_makeflow_file_dir = string_format("%s/files/%.2s", a->dir, a->source_makeflow);
+		// If the directory was not able to be created and directory already exists
 		if (!create_dir(source_makeflow_file_dir, 0777) && errno != EEXIST){
+			// Prints out a debug error
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create makeflow archiving directory %s: %d %s\n", 
 				source_makeflow_file_dir, errno, strerror(errno));
+			// Frees memory for source_makeflow_file_dir
 			free(source_makeflow_file_dir);
 			return MAKEFLOW_HOOK_FAILURE;
 		}
