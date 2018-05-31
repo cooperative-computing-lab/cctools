@@ -570,7 +570,7 @@ struct jx *factory_to_jx(struct list *masters, struct list *foremen, int submitt
 	requested  = requested  > 0 ? requested : 0;
 	to_connect = to_connect > 0 ? to_connect : 0;
 
-
+	jx_insert_integer(j, "workers_submitted", submitted);
 	jx_insert_integer(j, "workers_needed",     needed);
 	jx_insert_integer(j, "workers_requested",  requested);
 	jx_insert_integer(j, "workers_to_connect", to_connect);
