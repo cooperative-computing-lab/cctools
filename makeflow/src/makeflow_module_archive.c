@@ -40,6 +40,8 @@ Update/Migrated to hook: Nick Hazekamp
 
 #define MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY "/tmp/makeflow.archive."
 
+const bool S3 = true;
+
 struct archive_instance {
 	/* User defined values */
 	int read;
@@ -161,7 +163,7 @@ static int dag_loop( void * instance_struct, struct dag *d){
 	Thus makeflow_dispatch_ready_tasks must run at least once more if an archived job was found.
 	*/
 	if(a->found_archived_job == 1){
-		a->found_archifile:///usr/share/doc/HTML/en-US/index.htmlved_job = 0;
+		a->found_archived_job = 0;
 		return MAKEFLOW_HOOK_SUCCESS;
 	}
 	return MAKEFLOW_HOOK_END;
@@ -537,7 +539,7 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 		// Get path of the output file
 		char *filename = string_format("%s/output_files/%s", task_path, f->inner_name);
 		// Check the statistics of the output file at the location
-		int file_exists = stat(filename, &buf)
+		int file_exists = stat(filename, &buf);
 		// If there is a failure with running stat delete the cursor and free memory
 		if (file_exists < 0) {
 			list_cursor_destroy(cur);
@@ -599,6 +601,25 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	return rc;
 }
 
+static int makeflow_archive_s3_task(char *taskID, char *task_path){
+	debug(D_MAKEFLOW_HOOK,"The task ID in s3 archive task is %s",taskID);
+	// Convert directory to a tar.gz file
+	char *tarConvert = string_format("tar -czvf %s.tar.gz %s",taskID,task_path);
+	system(tarConvert);
+	
+	// Add file to the s3 bucket
+	char *tarFile = string_format("%s.tar.gz",taskID);
+	char *addToS3 = string_format("aws s3 cp %s s3://makeflows3archive/%s",tarFile,taskID);
+	system(addToS3);
+	debug(D_MAKEFLOW_HOOK,"GOT TO THIS LINE OF CODE");	
+
+	// Remove extra tar files on local directory
+	char *removeTar = string_format("rm %s",tarFile);
+	system(removeTar);
+
+	return 1;
+}
+
 static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	/* store node into archiving directory  */
@@ -622,9 +643,7 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 			debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive", t->taskid);
 			return MAKEFLOW_HOOK_SUCCESS;
 		}
-		free(id);
-		free(task_path);
-		
+	
 		// Otherwise archive the task
 		debug(D_MAKEFLOW_HOOK, "archiving task %d in directory: %s\n",t->taskid, a->dir);
 		int archived = makeflow_archive_task(a, n, t);
@@ -633,6 +652,17 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 			makeflow_archive_remove_task(a, n, t);
 			return MAKEFLOW_HOOK_FAILURE;
 		}
+		debug(D_MAKEFLOW_HOOK,"The task ID in node_success is %s",id);
+		if(S3){
+			int s3Archived = makeflow_archive_s3_task(id, task_path);
+			if(!s3Archived){
+				debug(D_MAKEFLOW_HOOK, "unable to archive task %d in S3 archive",t->taskid);
+				return MAKEFLOW_HOOK_FAILURE;
+			}
+		}
+
+		free(id);
+		free(task_path);	
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;
