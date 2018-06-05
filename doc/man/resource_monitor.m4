@@ -99,19 +99,19 @@ OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
 OPTION_TRIPLET(-i,interval,n)Maximum interval between observations, in seconds (default=1).
 OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
-OPTION_TRIPLET(-c,sh,str)Read command line from <str>, and execute as '/bin/sh -c <str>'.
+OPTION_TRIPLET(-c,sh,str)Read command line from CODE(str), and execute as '/bin/sh -c CODE(str)'.
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
 OPTION_TRIPLET(-L,limits,string)String of the form `"var: value, var: value\' to specify resource limits. (Could be specified multiple times.)
 OPTION_ITEM(`-f, --child-in-foreground')Keep the monitored process in foreground (for interactive use).
-OPTION_TRIPLET(-O,with-output-files,template)Specify template for log files (default=resource-pid-<pid>).
-OPTION_ITEM(--with-time-series)Write resource time series to <template>.series.
-OPTION_ITEM(--with-inotify)Write inotify statistics of opened files to default=<template>.files.
+OPTION_TRIPLET(-O,with-output-files,template)Specify CODE(template) for log files (default=CODE(resource-pid)).
+OPTION_ITEM(--with-time-series)Write resource time series to CODE(template.series).
+OPTION_ITEM(--with-inotify)Write inotify statistics of opened files to default=CODE(template.files).
 OPTION_TRIPLET(-V,verbatim-to-summary,str)Include this string verbatim in a line in the summary. (Could be specified multiple times.)
-OPTION_ITEM(--measure-dir=<dir>)Follow the size of <dir>. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
+OPTION_ITEM(--measure-dir=dir)Follow the size of dir. By default the directory at the start of execution is followed. Can be specified multiple times. See --without-disk-footprint below.
 OPTION_ITEM(--follow-chdir)Follow processes' current working directories.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint. Overrides --measure-dir.
 OPTION_ITEM(--no-pprint)Do not pretty-print summaries.
-OPTION_ITEM(--snapshot-events=<file>)Configuration file for snapshots on file patterns. See below.
+OPTION_ITEM(--snapshot-events=file)Configuration file for snapshots on file patterns. See below.
 
 
 OPTIONS_END
@@ -155,7 +155,7 @@ The resource_monitor  can be directed to take snapshots of the resources used
 according to the files created by the processes monitored. The typical use of
 monitoring snapshots is to set a watch on a log file, and generate a snapshot
 when a line in the log matches a pattern. To activate the snapshot facility,
-use the command line argument --snapshot-events=<file>, in which <file> is a
+use the command line argument --snapshot-events=CODE(file), in which CODE(file) is a
 JSON-encoded document with the following format:
 
 LONGCODE_BEGIN
@@ -300,9 +300,10 @@ LONGCODE_BEGIN
 }
 LONGCODE_END
 
-A task may be setup to generate a file every time a snapshot is desired. The
+The monitor can also generate a snapshot when a particular file is created. The
 monitor can detected this file, generate a snapshot, and delete the file to get
-ready for the next snapshot:
+ready for the next snapshot. In the following example the monitor takes a
+snapshot everytime the file CODE(please-take-a-snapshot) is created:
 
 LONGCODE_BEGIN
 {
