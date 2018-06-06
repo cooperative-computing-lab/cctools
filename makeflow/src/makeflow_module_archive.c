@@ -337,6 +337,7 @@ static int in_s3_archive(struct archive_instance *a, char *file_name){
 			return 1;
 		}
 	}
+	jx_delete(jxParser);
 	return 0;
 }
 
@@ -629,48 +630,59 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 }
 
 static int makeflow_s3_archive_copy_task_files(struct archive_instance *a, char *id, char *task_path, struct batch_task *t){
-	// Copy tar file from the s3 bucket
-	debug(D_MAKEFLOW_HOOK,"THIS STATEMENT WAS REACHED\n");
-	char *copyTar = string_format("aws s3 cp %s/%s %s/%s",a->s3_dir,id, task_path, id);
-	if(system(copyTar) == -1){
-		free(copyTar);
-		return 0;
-	}
+	char *taskTarFile = string_format("%s/%s",task_path,id);
 	
-	char *extractTar = string_format("tar -xzvf %s/%s -C %s",task_path,id,task_path);
-	if(system(extractTar) == -1){
-		free(extractTar);
-		return 0;
-	}
-
-	struct batch_file *f;
-	struct list_cursor *cur = list_cursor_create(t->output_files);
-        // Iterate through output files
-        for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-          	char *output_file_path = string_format("%s/output_files/%s", task_path,  f->inner_name);	
-		char buf[1024];
-		ssize_t len;
-		// Read what the symlink is actually pointing to
-		if((len = readlink(output_file_path, buf, sizeof(buf)-1)) != -1)
-			buf[len] = '\0';	
-		free(output_file_path);
-		
-		// Grabs the actual name of the file from the buffer
-		char *file_name	= basename(buf); 
-		debug(D_MAKEFLOW_HOOK,"The FILE_NAME  is %s",file_name);	
-		// Check to see if the file was already copied to the /files/ directory
-		char *filePath = string_format("%s/files/%.2s/%s",a->dir,file_name,file_name);	
-		if(in_s3_archive(a,file_name) && access(filePath,R_OK) != 0){
-			debug(D_MAKEFLOW_HOOK,"COPYING  %s to /files/ from the s3 bucket",file_name);
-			// Copy the file to the local archive /files/ directory
-			char *copyLocal = string_format("aws s3 cp %s/%s %s",a->s3_dir,file_name, filePath);
-			if(system(copyLocal) == -1){
-				free(copyLocal);
-				return 0;
-			}	
+	if(access(taskTarFile,R_OK) != 0){
+		// Copy tar file from the s3 bucket
+		debug(D_MAKEFLOW_HOOK,"THIS STATEMENT WAS REACHED\n");
+		char *copyTar = string_format("aws s3 cp %s/%s %s/%s",a->s3_dir,id, task_path, id);
+		if(system(copyTar) == -1){
+			free(copyTar);
+			return 0;
 		}
-		free(filePath);
+		free(copyTar);
+		
+		char *extractTar = string_format("tar -xzvf %s/%s -C %s",task_path,id,task_path);
+		if(system(extractTar) == -1){
+			free(extractTar);
+			return 0;
+		}
+		free(extractTar);
+
+		struct batch_file *f;
+		struct list_cursor *cur = list_cursor_create(t->output_files);
+		// Iterate through output files
+		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+			char *output_file_path = string_format("%s/output_files/%s", task_path,  f->inner_name);	
+			char buf[1024];
+			ssize_t len;
+			// Read what the symlink is actually pointing to
+			if((len = readlink(output_file_path, buf, sizeof(buf)-1)) != -1)
+				buf[len] = '\0';	
+			free(output_file_path);
+			
+			// Grabs the actual name of the file from the buffer
+			char *file_name	= basename(buf); 
+			debug(D_MAKEFLOW_HOOK,"The FILE_NAME  is %s",file_name);	
+			// Check to see if the file was already copied to the /files/ directory
+			char *filePath = string_format("%s/files/%.2s/%s",a->dir,file_name,file_name);	
+			if(in_s3_archive(a,file_name) && access(filePath,R_OK) != 0){
+				debug(D_MAKEFLOW_HOOK,"COPYING  %s to /files/ from the s3 bucket",file_name);
+				// Copy the file to the local archive /files/ directory
+				char *copyLocal = string_format("aws s3 cp %s/%s %s",a->s3_dir,file_name, filePath);
+				if(system(copyLocal) == -1){
+					free(copyLocal);
+					return 0;
+				}
+				free(copyLocal);	
+			}
+			free(filePath);
+		}
+		free(taskTarFile);
+		return 1;
 	}
+	debug(D_MAKEFLOW_HOOK,"TASK already exist in local archive, not downloading from s3 bucket");
+	free(taskTarFile);
 	return 1;
 }
 
@@ -738,8 +750,9 @@ static int makeflow_archive_s3_task(struct archive_instance *a, char *taskID, ch
 	if(system(tarConvert) == -1){
 		free(tarConvert);
 		return 0;
-	}	
-	
+	}
+	free(tarConvert);	
+		
 	// Add file to the s3 bucket
 	char *tarFile = string_format("%s.tar.gz",taskID);
 	char *addToS3 = string_format("aws s3 cp %s %s/%s",tarFile,a->s3_dir,taskID);
@@ -748,6 +761,7 @@ static int makeflow_archive_s3_task(struct archive_instance *a, char *taskID, ch
 		free(addToS3);
 		return 0;
 	}
+	free(addToS3);
 
 	// Remove extra tar files on local directory
 	char *removeTar = string_format("rm %s",tarFile);
@@ -755,11 +769,9 @@ static int makeflow_archive_s3_task(struct archive_instance *a, char *taskID, ch
 		free(removeTar);
 		return 0;
 	}
-
-	free(tarConvert);
 	free(tarFile);
-	free(addToS3);
 	free(removeTar);
+
 	return 1;
 }
 static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *t){
