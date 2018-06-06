@@ -13,12 +13,15 @@ Update/Migrated to hook: Nick Hazekamp
 #include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <assert.h>
+#include <unistd.h>
 
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
 #include "list.h"
 #include "jx.h"
+#include "jx_parse.h"
 #include "jx_pretty_print.h"
 #include "path.h"
 #include "set.h"
@@ -40,7 +43,8 @@ Update/Migrated to hook: Nick Hazekamp
 
 #define MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY "/tmp/makeflow.archive."
 
-const bool S3 = true;
+const int S3 = 1;
+const int S3CHECK = 1;
 
 struct archive_instance {
 	/* User defined values */
@@ -298,6 +302,40 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 	return 1;
 }
 
+/* Check to see if a file is already in the s3 bucket */
+static int in_s3_archive(char *file_name){
+	FILE* file = popen("aws --output json s3api list-objects --bucket makeflows3archive","r");
+	struct jx* jxParser = jx_parse_stream(file);
+	pclose(file);
+	struct jx* jxSearch = jx_lookup(jxParser, "Contents");
+
+	struct jx* item;
+	void* i;
+	// Iterate through jx file looking for key values
+	for(i = NULL; (item = jx_iterate_array(jxSearch, &i));){
+		const char *keyName = jx_lookup_string(item, "Key");
+		assert(keyName != NULL);
+		// See if key value is the same as the file we are looking for
+		if(!strcmp(keyName, file_name)){
+			debug(D_MAKEFLOW_HOOK, "file/task %s already exists in the S3 bucket",file_name);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* Copy a file to the s3 bucket*/
+static int makeflow_archive_s3_file(char *batchID, char *file_path){
+	// Copy to s3 archive
+	char *fileCopy = string_format("aws s3 cp %s s3://makeflows3archive/%s",file_path,batchID);
+	if(system(fileCopy) == -1){
+		free(fileCopy);
+		return 0;
+	}
+	free(fileCopy);
+	return 1;
+}
+
 /* Archive the specified file.
  * This includes several steps:
  *	1. Generate the id
@@ -345,9 +383,26 @@ static int makeflow_archive_file(struct archive_instance *a, struct batch_file *
 		goto FAIL;
 	}
 
+	if(S3){
+		int result = 1;
+		// Check to see if file already exists in the s3 bucket
+		if(S3CHECK){
+			if(!in_s3_archive(id)){
+				result = makeflow_archive_s3_file(id,file_archive_path);
+			}	
+		}
+		else
+			result = makeflow_archive_s3_file(id,file_archive_path);
+		/* Copy file to the s3 bucket*/
+		if(!result){
+			debug(D_ERROR|D_MAKEFLOW_HOOK, "could not copy file %s to s3 bucket: %d %s\n", id, errno, strerror(errno));
+			rv = 1;
+			goto FAIL;
+		}
+	}
 	free(file_archive_path);
 	file_archive_path = string_format("../../../../files/%.2s/%s", id, id);
-
+	
 	/* Create a symlink to task that used/created this file. */
 	int symlink_failure = symlink(file_archive_path, job_file_archive_path);
 	if (symlink_failure && errno != EEXIST) {
@@ -557,6 +612,31 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 	return 1;
 }
 
+static int makeflow_s3_archive_copy_task_files(char *id, char *task_path, batch_task *t){
+	// Copy tar file from the s3 bucket
+	debug(D_MAKEFLOW_HOOK,"THIS STATEMENT WAS REACHED\n");
+	char *copyTar = string_format("aws s3 cp s3://makeflows3archive/%s %s/%s",id, task_path, id);
+	if(system(copyTar) == -1){
+		free(copyTar);
+		return 0;
+	}
+	
+	char *extractTar = string_format("tar -xzvf %s/%s -C %s",task_path,id,task_path);
+	if(system(extractTar) == -1){
+		free(extractTar);
+		return 0;
+	}
+
+	struct batch_file *f;
+	struct list_cursor *cur = list_cursor_create(t->input_files);
+        // Iterate through input files
+        for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+          	char *input_file_path = string_format("%s/input_files/%s", task_path,  f->inner_name);	
+		
+	}
+	return 1;
+}
+
 static int batch_submit( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
@@ -564,6 +644,17 @@ static int batch_submit( void * instance_struct, struct batch_task *t){
 	char *id = batch_task_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 	debug(D_MAKEFLOW_HOOK, "Checking archive for task %d at %.5s\n", t->taskid, id);
+	if(S3){
+		int result = 1;
+		if(in_s3_archive(id))
+			result = makeflow_s3_archive_copy_task_files(id, task_path);
+
+		if(!result){
+			return MAKEFLOW_HOOK_FAILURE;
+		}
+			
+	}
+	
 	// If a is in read mode and the archive is preserved (all the output files exist)
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
 		debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive, replicating output files\n", t->taskid);
@@ -588,6 +679,7 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	// Generates a hash id for the task
 	char *id = batch_task_generate_id(t);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
+	
 	// If a is in read mode and the archive is preserved (all the output files exist)
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
 		// Print out debug statement
@@ -601,25 +693,38 @@ static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	return rc;
 }
 
+/*Compress the task file and copy it to the S3 bucket*/
 static int makeflow_archive_s3_task(char *taskID, char *task_path){
-	debug(D_MAKEFLOW_HOOK,"The task ID in s3 archive task is %s",taskID);
 	// Convert directory to a tar.gz file
-	char *tarConvert = string_format("tar -czvf %s.tar.gz %s",taskID,task_path);
-	system(tarConvert);
+	debug(D_MAKEFLOW_HOOK,"THIS IS THE TASK PATH: %s",task_path);
+	char *tarConvert = string_format("tar -czvf %s.tar.gz -C %s .",taskID,task_path);
+	if(system(tarConvert) == -1){
+		free(tarConvert);
+		return 0;
+	}	
 	
 	// Add file to the s3 bucket
 	char *tarFile = string_format("%s.tar.gz",taskID);
 	char *addToS3 = string_format("aws s3 cp %s s3://makeflows3archive/%s",tarFile,taskID);
-	system(addToS3);
-	debug(D_MAKEFLOW_HOOK,"GOT TO THIS LINE OF CODE");	
+	if(system(addToS3) == -1){
+		free(tarFile);
+		free(addToS3);
+		return 0;
+	}
 
 	// Remove extra tar files on local directory
 	char *removeTar = string_format("rm %s",tarFile);
-	system(removeTar);
+	if(system(removeTar) == -1){
+		free(removeTar);
+		return 0;
+	}
 
+	free(tarConvert);
+	free(tarFile);
+	free(addToS3);
+	free(removeTar);
 	return 1;
 }
-
 static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	/* store node into archiving directory  */
@@ -654,7 +759,14 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 		}
 		debug(D_MAKEFLOW_HOOK,"The task ID in node_success is %s",id);
 		if(S3){
-			int s3Archived = makeflow_archive_s3_task(id, task_path);
+			int s3Archived = 1;
+			// Check to see if the task  is already in the s3 bucket
+			if(S3CHECK){
+				if(!in_s3_archive(id))
+					s3Archived = makeflow_archive_s3_task(id, task_path);
+			}
+			else
+				s3Archived = makeflow_archive_s3_task(id, task_path);
 			if(!s3Archived){
 				debug(D_MAKEFLOW_HOOK, "unable to archive task %d in S3 archive",t->taskid);
 				return MAKEFLOW_HOOK_FAILURE;
