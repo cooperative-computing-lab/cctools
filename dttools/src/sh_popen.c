@@ -115,6 +115,7 @@ int sh_system(char* command) {
 		res = execvp(argv[0], argv);
 		if (res < 0) {
 			debug(D_ERROR,"SH_system past execvp: %s",strerror(errno));
+			_exit(1);
 		}
 	} else if (pid > 0) {//parent
 		struct process_info* pres;
