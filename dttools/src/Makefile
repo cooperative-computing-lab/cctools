@@ -94,6 +94,7 @@ SOURCES = \
     semaphore.c \
 	sha1.c \
 	shell.c \
+	sh_popen.c\
 	sigdef.c \
 	sleeptools.c \
 	sort_dir.c \

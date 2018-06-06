@@ -18,6 +18,7 @@ SOURCES = \
 	batch_wrapper.c \
 	batch_job.c \
 	batch_job_amazon.c \
+	batch_job_amazon_batch.c \
 	batch_job_dryrun.c \
 	$(CHIRP_BATCH) \
 	batch_job_cluster.c \
