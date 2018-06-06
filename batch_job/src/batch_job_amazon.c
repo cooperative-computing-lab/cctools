@@ -16,13 +16,12 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_eval.h"
 #include "jx_export.h"
+#include "semaphore.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
 
 struct batch_job_amazon_info {
 	struct batch_job_info info;
@@ -370,46 +369,6 @@ which acquires and releases a semaphore around file transfers.
 
 static int transfer_semaphore = -1;
 
-static void semaphore_down()
-{
-	if(transfer_semaphore<0) return;
-	struct sembuf buf;
-	buf.sem_num = 0;
-	buf.sem_op = -1;
-	buf.sem_flg = SEM_UNDO;
-	semop(transfer_semaphore,&buf,1);
-}
-
-static void semaphore_up()
-{
-	if(transfer_semaphore<0) return;
-	struct sembuf buf;
-	buf.sem_num = 0;
-	buf.sem_op = 1;
-	buf.sem_flg = SEM_UNDO;
-	semop(transfer_semaphore,&buf,1);
-}
-
-static void semaphore_create()
-{
-	if(transfer_semaphore!=-1) return;
-
-	transfer_semaphore = semget(IPC_PRIVATE,1,0600|IPC_CREAT);
-	if(transfer_semaphore<0) {
-		debug(D_BATCH,"warning: couldn't create transfer semaphore (%s) but will proceed anyway",strerror(errno));
-		return;
-	}
-
-	union semun {
-		int value;
-		struct semid_ds *buf;
-		unsigned short *array;
-	} arg;
-	arg.value = 1;
-	semctl(transfer_semaphore,0,SETVAL,arg);
-}
-
-
 /*
 This function runs as a child process of makeflow and handles
 the execution of one task, after the instance is created.
@@ -476,9 +435,9 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	wait_for_ssh_ready(aws_config,ip_address);
 
 	/* Send each of the input files to the instance. */
-	semaphore_down();
+	semaphore_down(transfer_semaphore);
 	int result = put_files(aws_config,ip_address,extra_input_files);
-	semaphore_up();
+	semaphore_up(transfer_semaphore);
 
 	/*
 	If we fail to send the files, bail out early indicating
@@ -499,9 +458,9 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	int task_result = run_task(aws_config,ip_address,"./makeflow_task_script");
 
 	/* Retreive each of the output files from the instance. */
-	semaphore_down();
+	semaphore_down(transfer_semaphore);
 	get_files(aws_config,ip_address,extra_output_files);
-	semaphore_up();
+	semaphore_up(transfer_semaphore);
 
 	/* 
 	Return the task result regardless of the file fetch;
@@ -527,7 +486,9 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	if(!q->job_table) q->job_table = itable_create(0);
 
 	/* Create the shared transfer semaphore */
-	semaphore_create();
+	if(transfer_semaphore==-1) {
+		transfer_semaphore = semaphore_create(1);
+	}
 
 	const char *config_file = batch_queue_get_option(q,"amazon-config");
 	if(!config_file) fatal("--amazon-config option is required");

@@ -43,6 +43,7 @@ downloaded to the function where they are stored with the "inner" name.
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "nvpair_jx.h"
+#include "semaphore.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -173,7 +174,7 @@ it to finish.  Returns zero on success.
 */
 static int invoke_function( struct lambda_config *config, const char *payload)
 {
-	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' /dev/null >/dev/null", config->function_name, payload);
+	char *cmd = string_format("aws lambda invoke --invocation-type RequestResponse --function-name %s --log-type None --payload '%s' .lambda.output >/dev/null", config->function_name, payload);
 	debug(D_BATCH,"%s",cmd);
 	int r = system(cmd);
 	free(cmd);
@@ -285,6 +286,8 @@ int download_files(struct lambda_config *config, struct jx *file_list )
 	return nfailures;
 }
 
+static int transfer_semaphore = -1;
+
 /*
 Within a child process, invoke the lambda function itself,
 and then download the output files.  It would be better to
@@ -304,7 +307,9 @@ static int batch_job_lambda_subprocess( struct lambda_config *config, const char
 	status = invoke_function(config,payload);
 
 	/* Retrieve the outputs from S3 */
+	semaphore_down(transfer_semaphore);
 	status = download_files(config,output_files);
+	semaphore_up(transfer_semaphore);
 
 	return status;
 }
@@ -316,6 +321,10 @@ a child process, and invoking the subprocess function.
 
 static batch_job_id_t batch_job_lambda_submit(struct batch_queue *q, const char *cmdline, const char *input_file_string, const char *output_file_string, struct jx *envlist, const struct rmsummary *resources)
 {
+	if(transfer_semaphore==-1) {
+		transfer_semaphore = semaphore_create(1);
+	}
+
 	const char *config_file = hash_table_lookup(q->options, "lambda-config");
 	if(!config_file) fatal("--lambda-config option is required");
 
