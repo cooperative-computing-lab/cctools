@@ -1051,6 +1051,7 @@ static void show_help_run(const char *cmd)
 	printf("\nData Handling:\n");
 	printf("    --archive                   Read jobs from and write completed jobs into archive.\n");
 	printf("    --archive-s3=<s3_bucket>    Base s3 bucket name (default: s3://makeflows3archive).\n");
+	printf("    --archive-s3-no-check=<s3_bucket> Don't check for files in s3 bucket before downloading or copying.\n");
 	printf("    --archive-read              Read jobs from archive.\n");
 	printf("    --archive-write             Write jobs into archive.\n");
 	printf("    --archive-dir=<dir>         Base archive directory (default: /tmp/makeflow.archive.USERID).\n");
@@ -1277,6 +1278,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_SHARED_FS,
 		LONG_OPT_ARCHIVE,
 		LONG_OPT_ARCHIVE_S3,
+		LONG_OPT_ARCHIVE_S3_NO_CHECK,
 		LONG_OPT_ARCHIVE_DIR,
 		LONG_OPT_ARCHIVE_READ,
 		LONG_OPT_ARCHIVE_WRITE,
@@ -1382,6 +1384,7 @@ int main(int argc, char *argv[])
 		{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
 		{"archive", no_argument, 0, LONG_OPT_ARCHIVE},
 		{"archive-s3", optional_argument, 0, LONG_OPT_ARCHIVE_S3},
+		{"archive-s3-no-check", optional_argument, 0, LONG_OPT_ARCHIVE_S3_NO_CHECK},
 		{"archive-dir", required_argument, 0, LONG_OPT_ARCHIVE_DIR},
 		{"archive-read", no_argument, 0, LONG_OPT_ARCHIVE_READ},
 		{"archive-write", no_argument, 0, LONG_OPT_ARCHIVE_WRITE},
@@ -1759,6 +1762,10 @@ int main(int argc, char *argv[])
 			case LONG_OPT_K8S_IMG:
 				k8s_image = xxstrdup(optarg);
 				break;
+			case LONG_OPT_ARCHIVE_S3_NO_CHECK:
+				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+                    goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("archive_s3_no_check"), jx_boolean(1));
 			case LONG_OPT_ARCHIVE_S3:
                 if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
                     goto EXIT_WITH_FAILURE;
