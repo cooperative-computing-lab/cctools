@@ -13,12 +13,18 @@ Update/Migrated to hook: Nick Hazekamp
 #include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <assert.h>
+#include <unistd.h>
+#include <libgen.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include "copy_stream.h"
 #include "create_dir.h"
 #include "debug.h"
 #include "list.h"
 #include "jx.h"
+#include "jx_parse.h"
 #include "jx_pretty_print.h"
 #include "path.h"
 #include "set.h"
@@ -39,13 +45,22 @@ Update/Migrated to hook: Nick Hazekamp
 #include "makeflow_hook.h"
 
 #define MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY "/tmp/makeflow.archive."
+#define MAKEFLOW_ARCHIVE_DEFAULT_S3_BUCKET "s3://makeflows3archive"
+
+float total_up_time = 0.0;
+float total_down_time = 0.0;
+float total_s3_check_time = 0.0;
+float total_checksum_time = 0.0;
 
 struct archive_instance {
 	/* User defined values */
 	int read;
 	int write;
 	int found_archived_job;
+	int s3;
+	int s3_check;
 	char *dir;
+	char *s3_dir;
 
 	/* Runtime data struct */
 	char *source_makeflow;
@@ -70,6 +85,25 @@ static int create( void ** instance_struct, struct jx *hook_args )
 		a->dir = xxstrdup(jx_lookup_string(hook_args, "archive_dir"));	
 	} else {
 		a->dir = string_format("%s%d", MAKEFLOW_ARCHIVE_DEFAULT_DIRECTORY, getuid());
+	}
+
+	if(jx_lookup_boolean(hook_args, "archive_s3_no_check")){
+		a->s3_check = 0;
+	}
+	else{
+		a->s3_check = 1;
+	}
+
+	if(jx_lookup_string(hook_args, "archive_s3_arg")){
+		a->s3 = 1;
+		a->s3_dir = xxstrdup(jx_lookup_string(hook_args, "archive_s3_arg"));
+	} 
+	else if(jx_lookup_string(hook_args, "archive_s3_no_arg")) {
+		a->s3 = 1;
+		a->s3_dir = string_format("%s",MAKEFLOW_ARCHIVE_DEFAULT_S3_BUCKET);
+	}
+	else{
+		a->s3 = 0;
 	}
 
 	if(jx_lookup_boolean(hook_args, "archive_read")){
@@ -117,25 +151,35 @@ static int dag_check( void * instance_struct, struct dag *d){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 
 	unsigned char digest[SHA1_DIGEST_LENGTH];
+	// Takes hash of filename and stores it in digest
 	sha1_file(d->filename, digest);
+	// Makes a c string copy of your hash address
 	a->source_makeflow = xxstrdup(sha1_string(digest));
-	
+	// If a is in write mode using the -w flag	
 	if (a->write) {
+		// Formats archive file directory
 		char *source_makeflow_file_dir = string_format("%s/files/%.2s", a->dir, a->source_makeflow);
+		// If the directory was not able to be created and directory already exists
 		if (!create_dir(source_makeflow_file_dir, 0777) && errno != EEXIST){
+			// Prints out a debug error
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "could not create makeflow archiving directory %s: %d %s\n", 
 				source_makeflow_file_dir, errno, strerror(errno));
+			// Frees memory for source_makeflow_file_dir
 			free(source_makeflow_file_dir);
 			return MAKEFLOW_HOOK_FAILURE;
 		}
-
+		// Gets the path of the archive file
 		char *source_makeflow_file_path = string_format("%s/%s", source_makeflow_file_dir, a->source_makeflow);
+		// Frees memory
 		free(source_makeflow_file_dir);
+		// If the file was unable to be copied to the new path
 		if (!copy_file_to_file(d->filename, source_makeflow_file_path)){
+			// Prints out debug error
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "Could not archive source makeflow file %s\n", source_makeflow_file_path);
 			free(source_makeflow_file_path);
 			return MAKEFLOW_HOOK_FAILURE;
 		} else {
+			// Print out where it is stored at
 			debug(D_MAKEFLOW_HOOK, "Source makeflow %s stored at %s\n", d->filename, source_makeflow_file_path);
 		}
 		free(source_makeflow_file_path);
@@ -161,26 +205,34 @@ static int makeflow_archive_task_adheres_to_sandbox( struct batch_task *t ){
 	int rc = 0;
 	struct batch_file *f;
 	struct list_cursor *cur = list_cursor_create(t->input_files);
+	// Iterate through input files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// If your using an absolute path or trying to get our of a directory using the (..)
 		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
+			// Print out a debug error
 			debug(D_MAKEFLOW_HOOK, 
 				"task %d will not be archived as input file %s->%s does not adhere to the sandbox model of execution", 
 				t->taskid, f->outer_name, f->inner_name);
 			rc = 1;
 		}
 	}
+	// Frees memory of list cursor
 	list_cursor_destroy(cur);
 	
 
 	cur = list_cursor_create(t->output_files);
+	// Iterates through output files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// Same check as input files
 		if(path_has_doubledots(f->inner_name) || f->inner_name[0] == '/'){
+			// Prints out a debug error
 			debug(D_MAKEFLOW_HOOK, 
 				"task %d will not be archived as output file %s->%s does not adhere to the sandbox model of execution", 
 				t->taskid, f->outer_name, f->inner_name);
 			rc = 1;
 		}
 	}
+	// Frees memory of list cursor
 	list_cursor_destroy(cur);
 
 	return rc;
@@ -278,6 +330,56 @@ static int makeflow_archive_write_task_info(struct archive_instance *a, struct d
 	return 1;
 }
 
+/* Check to see if a file is already in the s3 bucket */
+static int in_s3_archive(struct archive_instance *a, char *file_name){
+	struct timeval start_time;
+        struct timeval end_time;
+	char *inArchive = string_format("aws s3api head-object --bucket %s --key %s >& /dev/null", a->s3_dir+5, file_name);
+        gettimeofday(&start_time, NULL);
+	if(system(inArchive) != 0){
+		debug(D_MAKEFLOW_HOOK, "file/task %s does not exist in the S3 bucket: %s", file_name, a->s3_dir);
+		gettimeofday(&end_time,NULL);
+                float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+                total_s3_check_time += run_time;
+                debug(D_MAKEFLOW_HOOK," It took %f seconds to check if %s is in %s",run_time, file_name, a->s3_dir);
+                debug(D_MAKEFLOW_HOOK," The total s3 check time is %f second(s)",total_s3_check_time);
+		return 0;
+	}
+	debug(D_MAKEFLOW_HOOK, "file/task %s already exists in the S3 bucket: %s", file_name, a->s3_dir);
+	gettimeofday(&end_time,NULL);
+        float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+        total_s3_check_time += run_time;
+        debug(D_MAKEFLOW_HOOK," It took %f seconds to check if %s is in %s",run_time, file_name, a->s3_dir);
+        debug(D_MAKEFLOW_HOOK," The total s3 check time is %f second(s)",total_s3_check_time);
+	return 1;
+}
+
+/* Copy a file to the s3 bucket*/
+static int makeflow_archive_s3_file(struct archive_instance *a, char *batchID, char *file_path){
+	// Copy to s3 archive
+	struct timeval start_time;
+	struct timeval end_time;
+	gettimeofday(&start_time, NULL);
+	char *fileCopy = string_format("aws s3 cp %s %s/%s",file_path,a->s3_dir,batchID);
+	if(system(fileCopy) != 0){
+		gettimeofday(&end_time,NULL);
+		float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+		total_up_time += run_time;
+		debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to fail uploading to %s",run_time, batchID, a->s3_dir);
+		debug(D_MAKEFLOW_HOOK," The total upload time is %f second(s)",total_up_time);
+		free(fileCopy);
+		return 0;
+	}
+	gettimeofday(&end_time,NULL);
+        float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+	total_up_time += run_time;
+	debug(D_MAKEFLOW_HOOK," It took %f second(s) for %s to upload to %s",run_time, batchID, a->s3_dir);
+	debug(D_MAKEFLOW_HOOK," The total upload time is %f second(s)",total_up_time);
+	
+	free(fileCopy);
+	return 1;
+}
+
 /* Archive the specified file.
  * This includes several steps:
  *	1. Generate the id
@@ -325,9 +427,26 @@ static int makeflow_archive_file(struct archive_instance *a, struct batch_file *
 		goto FAIL;
 	}
 
+	if(a->s3){
+		int result = 1;
+		// Check to see if file already exists in the s3 bucket
+		if(a->s3_check){
+			if(!in_s3_archive(a,id)){
+				result = makeflow_archive_s3_file(a,id,file_archive_path);
+			}	
+		}
+		else
+			result = makeflow_archive_s3_file(a,id,file_archive_path);
+		/* Copy file to the s3 bucket*/
+		if(!result){
+			debug(D_ERROR|D_MAKEFLOW_HOOK, "could not copy file %s to s3 bucket: %d %s\n", id, errno, strerror(errno));
+			rv = 1;
+			goto FAIL;
+		}
+	}
 	free(file_archive_path);
 	file_archive_path = string_format("../../../../files/%.2s/%s", id, id);
-
+	
 	/* Create a symlink to task that used/created this file. */
 	int symlink_failure = symlink(file_archive_path, job_file_archive_path);
 	if (symlink_failure && errno != EEXIST) {
@@ -350,10 +469,13 @@ static int makeflow_archive_write_input_files(struct archive_instance *a, struct
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->input_files);
+	// Iterate through input files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		char *input_file_path = string_format("%s/input_files/%s", archive_directory_path,  f->inner_name);
+		// Archive each file for inputs
 		int failed_checksum = makeflow_archive_file(a, f, input_file_path);
 		free(input_file_path);
+		// Check to see it was archived correctly
 		if(failed_checksum){
 			list_cursor_destroy(cur);
 			return 0;
@@ -368,8 +490,10 @@ static int makeflow_archive_write_output_files(struct archive_instance *a, struc
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
+	// Iterate through output files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
 		char *output_file_path = string_format("%s/output_files/%s", archive_directory_path,  f->inner_name);
+		// Archive each file for outputs
 		int failed_checksum = makeflow_archive_file(a, f, output_file_path);
 		free(output_file_path);
 		if(failed_checksum){
@@ -383,9 +507,12 @@ static int makeflow_archive_write_output_files(struct archive_instance *a, struc
 
 /* Using the task prefix, creates the specified directory and checks for failure. */
 static int makeflow_archive_create_dir(char * prefix, char * name){
+	// Creates directory path to be used as string
 	char *tmp_directory_path = string_format("%s%s", prefix, name);
+	// Actually creates directory
 	int created = create_dir(tmp_directory_path, 0777);
 	free(tmp_directory_path);
+	// If new directory is not created
 	if (!created){
 		debug(D_ERROR|D_MAKEFLOW_HOOK,"Could not create archiving directory %s\n", tmp_directory_path);
 		return 1;
@@ -403,8 +530,15 @@ static int makeflow_archive_create_dir(char * prefix, char * name){
 @return 1 if archive was successful, 0 if archive failed.
  */
 static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n, struct batch_task *t) {
-	/* Generate the task id */
+	struct timeval start_time;
+        struct timeval end_time;
+	// Generates a hash id for the task
+	gettimeofday(&start_time,NULL);
 	char *id = batch_task_generate_id(t);
+	gettimeofday(&end_time,NULL);
+        float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+        total_checksum_time += run_time;
+        debug(D_MAKEFLOW_HOOK," The total checksum time is %f",total_checksum_time);
 	int result = 1;
 
 	/* The archive name is binned by the first 2 characters of the id for compactness */
@@ -415,7 +549,8 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 	/* We create all the sub directories upfront for convenience */
 	dir_create_error = makeflow_archive_create_dir(archive_directory_path, "/output_files/");
 	dir_create_error += makeflow_archive_create_dir(archive_directory_path, "/input_files/");
-
+	
+	// Checks to see if there was an error creating the directories
 	if(dir_create_error){
 		result = 0;
 		goto FAIL;
@@ -427,11 +562,12 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 		goto FAIL;
 	}
 
-
+	// Create the input files
 	if(!makeflow_archive_write_input_files(a, t, archive_directory_path)){
 		result = 0;
 		goto FAIL;
 	}
+	// Create the output files
 	if(!makeflow_archive_write_output_files(a, t, archive_directory_path)){
 		result = 0;
 		goto FAIL;
@@ -440,6 +576,7 @@ static int makeflow_archive_task(struct archive_instance *a, struct dag_node *n,
 	printf("task %d successfully archived\n", t->taskid);
 
 FAIL:
+	// Free all of the memory
 	free(archive_directory_path);
 	free(id);
 	return result;
@@ -474,8 +611,11 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 	struct batch_file *f;
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
+	// Iterate through output files
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// Gets path of output file		
 		char *output_file_path = string_format("%s/output_files/%s",task_path, f->inner_name);
+		// Copy output file over
 		int success = copy_file_to_file(output_file_path, f->outer_name);
 		free(output_file_path);
 		if (!success) {
@@ -492,7 +632,7 @@ int makeflow_archive_copy_preserved_files(struct archive_instance *a, struct bat
 int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task *t, char *task_path) {
 	struct batch_file *f;
 	struct stat buf;
-
+	// If the task does NOT adhere to the sandbox or there is a failure with getting the stat
 	if(makeflow_archive_task_adheres_to_sandbox(t) || (stat(task_path, &buf) < 0)){
 		/* Not helpful unless you know the task number. */
 		debug(D_MAKEFLOW_HOOK, "task %d has not been previously archived at %s", t->taskid, task_path);
@@ -500,11 +640,16 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 	}
 
 	struct list_cursor *cur = list_cursor_create(t->output_files);
+	// Iterate through output files making sure they all exist
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+		// Get path of the output file
 		char *filename = string_format("%s/output_files/%s", task_path, f->inner_name);
+		// Check the statistics of the output file at the location
 		int file_exists = stat(filename, &buf);
+		// If there is a failure with running stat delete the cursor and free memory
 		if (file_exists < 0) {
 			list_cursor_destroy(cur);
+			// Print debug error
 			debug(D_MAKEFLOW_HOOK, "output file %s not found in archive at %s: %d %s", 
 				f->outer_name, filename, errno, strerror(errno));
 			free(filename);
@@ -512,18 +657,117 @@ int makeflow_archive_is_preserved(struct archive_instance *a, struct batch_task 
 		}
 		free(filename);
 	}
+	// Free list cursor memory
 	list_cursor_destroy(cur);
 
+	return 1;
+}
+
+static int makeflow_s3_archive_copy_task_files(struct archive_instance *a, char *id, char *task_path, struct batch_task *t){
+	char *taskTarFile = string_format("%s/%s",task_path,id);
+	// Check to see if the task is already in the local archive so it is not downloaded twice	
+	if(access(taskTarFile,R_OK) != 0){
+		// Copy tar file from the s3 bucket
+		struct timeval start_time;
+		struct timeval end_time;
+		char *copyTar = string_format("aws s3 cp %s/%s %s/%s",a->s3_dir,id, task_path, id);
+		gettimeofday(&start_time,NULL);
+		if(system(copyTar) != 0){
+			gettimeofday(&end_time,NULL);
+                	float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+                	total_down_time += run_time;
+                	debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to fail downloading to %s",run_time, id, a->s3_dir);
+                	debug(D_MAKEFLOW_HOOK," The total download time is %f second(s)",total_down_time);
+			free(copyTar);
+			return 0;
+		}
+		gettimeofday(&end_time,NULL);
+                float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+                total_down_time += run_time;
+                debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to download to %s",run_time, id, a->s3_dir);
+                debug(D_MAKEFLOW_HOOK," The total download time is %f second(s)",total_down_time);
+		free(copyTar);
+		
+		char *extractTar = string_format("tar -xzvf %s/%s -C %s",task_path,id,task_path);
+		if(system(extractTar) == -1){
+			free(extractTar);
+			return 0;
+		}
+		free(extractTar);
+
+		struct batch_file *f;
+		struct list_cursor *cur = list_cursor_create(t->output_files);
+		// Iterate through output files
+		for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
+			char *output_file_path = string_format("%s/output_files/%s", task_path,  f->inner_name);	
+			char buf[1024];
+			ssize_t len;
+			// Read what the symlink is actually pointing to
+			if((len = readlink(output_file_path, buf, sizeof(buf)-1)) != -1)
+				buf[len] = '\0';	
+			free(output_file_path);
+			
+			// Grabs the actual name of the file from the buffer
+			char *file_name	= basename(buf); 
+			debug(D_MAKEFLOW_HOOK,"The FILE_NAME  is %s",file_name);	
+			// Check to see if the file was already copied to the /files/ directory
+			char *filePath = string_format("%s/files/%.2s/%s",a->dir,file_name,file_name);
+			if(access(filePath,R_OK) != 0){
+				debug(D_MAKEFLOW_HOOK,"COPYING  %s to /files/ from the s3 bucket",file_name);
+				// Copy the file to the local archive /files/ directory
+				gettimeofday(&start_time,NULL);
+				char *copyLocal = string_format("aws s3 cp %s/%s %s",a->s3_dir,file_name, filePath);
+				if(system(copyLocal) != 0){
+					gettimeofday(&end_time,NULL);
+                			run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+                			total_down_time += run_time;
+                			debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to fail downloading from %s",run_time, id, a->s3_dir);
+                			debug(D_MAKEFLOW_HOOK," The total download time is %f second(s)",total_down_time);
+					free(copyLocal);
+					return 0;
+				}
+				gettimeofday(&end_time,NULL);
+                		run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+                		total_down_time += run_time;
+                		debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to download from %s",run_time, id, a->s3_dir);
+                		debug(D_MAKEFLOW_HOOK," The total download time is %f second(s)",total_down_time);
+				free(copyLocal);	
+			}
+			
+			free(filePath);
+		}
+		free(taskTarFile);
+		return 1;
+	}
+	debug(D_MAKEFLOW_HOOK,"TASK already exist in local archive, not downloading from s3 bucket");
+	free(taskTarFile);
 	return 1;
 }
 
 static int batch_submit( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
+	struct timeval start_time;
+        struct timeval end_time;
+	// Generates a hash id for the task
+	gettimeofday(&start_time,NULL);
 	char *id = batch_task_generate_id(t);
+	gettimeofday(&end_time,NULL);
+        float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+        total_checksum_time += run_time;
+        debug(D_MAKEFLOW_HOOK," The total checksum time is %f",total_checksum_time);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
 	debug(D_MAKEFLOW_HOOK, "Checking archive for task %d at %.5s\n", t->taskid, id);
-
+	if(a->s3){
+		int result = 1;
+		result = makeflow_s3_archive_copy_task_files(a, id, task_path, t);
+		if(!result){
+			debug(D_MAKEFLOW_HOOK, "unable to copy task files for task %s  from S3 bucket",id);
+		}
+			
+	}
+	
+	// If a is in read mode and the archive is preserved (all the output files exist)
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
 		debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive, replicating output files\n", t->taskid);
 
@@ -543,39 +787,108 @@ static int batch_submit( void * instance_struct, struct batch_task *t){
 static int batch_retrieve( void * instance_struct, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	int rc = MAKEFLOW_HOOK_SUCCESS;
-
+	struct timeval start_time;
+        struct timeval end_time;
+	// Generates a hash id for the task
+	gettimeofday(&start_time,NULL);
 	char *id = batch_task_generate_id(t);
+	gettimeofday(&end_time,NULL);
+        float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+        total_checksum_time += run_time;
+        debug(D_MAKEFLOW_HOOK," The total checksum time is %f",total_checksum_time);
 	char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
+	
+	// If a is in read mode and the archive is preserved (all the output files exist)
 	if(a->read && makeflow_archive_is_preserved(a, t, task_path)){
+		// Print out debug statement
 		debug(D_MAKEFLOW_HOOK, "Task %d run was bypassed using archive\n", t->taskid);
+		// Bypass task run
 		rc = MAKEFLOW_HOOK_RUN;
 	}
-
+	// Free excess memory
 	free(id);
 	free(task_path);
 	return rc;
 }
 
+/*Compress the task file and copy it to the S3 bucket*/
+static int makeflow_archive_s3_task(struct archive_instance *a, char *taskID, char *task_path){
+	// Convert directory to a tar.gz file
+	struct timeval start_time;
+        struct timeval end_time;
+	char *tarConvert = string_format("tar -czvf %s.tar.gz -C %s .",taskID,task_path);
+	if(system(tarConvert) == -1){
+		free(tarConvert);
+		return 0;
+	}
+	free(tarConvert);	
+		
+	// Add file to the s3 bucket
+	char *tarFile = string_format("%s.tar.gz",taskID);
+	char *addToS3 = string_format("aws s3 cp %s %s/%s",tarFile,a->s3_dir,taskID);
+        gettimeofday(&start_time, NULL);
+	if(system(addToS3) != 0){
+		gettimeofday(&end_time,NULL);
+                float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+                total_up_time += run_time;
+                debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to fail uploading to %s",run_time, taskID, a->s3_dir);
+                debug(D_MAKEFLOW_HOOK," The total upload time is %f second(s)",total_up_time);
+		free(tarFile);
+		free(addToS3);
+		return 0;
+	}
+	gettimeofday(&end_time,NULL);
+        float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+        total_up_time += run_time;
+        debug(D_MAKEFLOW_HOOK," It took %f seconds for %s to upload to %s",run_time, taskID, a->s3_dir);
+        debug(D_MAKEFLOW_HOOK," The total upload time is %f second(s)",total_up_time);
+	free(addToS3);
+
+	// Remove extra tar files on local directory
+	char *removeTar = string_format("rm %s",tarFile);
+	if(system(removeTar) == -1){
+		free(removeTar);
+		return 0;
+	}
+	free(tarFile);
+	free(removeTar);
+
+		
+
+	return 1;
+}
 static int node_success( void * instance_struct, struct dag_node *n, struct batch_task *t){
 	struct archive_instance *a = (struct archive_instance*)instance_struct;
 	/* store node into archiving directory  */
+	// If a is in write mode
 	if (a->write) {
+		// If the task does NOT adhere to the sandbox
 		if(makeflow_archive_task_adheres_to_sandbox(t)){
+			// Print debug error message
 			debug(D_ERROR|D_MAKEFLOW_HOOK, "task %d will not be archived", t->taskid);
 			return MAKEFLOW_HOOK_SUCCESS;
 		}
-
+		
+		struct timeval start_time;
+		struct timeval end_time;
+		// Generates a hash id for the task
+		gettimeofday(&start_time,NULL);
 		char *id = batch_task_generate_id(t);
+		gettimeofday(&end_time,NULL);
+		float run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+		total_checksum_time += run_time;
+		debug(D_MAKEFLOW_HOOK," The total checksum time is %f",total_checksum_time);
 		char *task_path = string_format("%s/tasks/%.2s/%s",a->dir, id, id);
+		// If the archive is preserved (all the output files exist)
 		if(makeflow_archive_is_preserved(a, t, task_path)){
+			// Free excess memory
 			free(id);
 			free(task_path);
 			debug(D_MAKEFLOW_HOOK, "Task %d already exists in archive", t->taskid);
 			return MAKEFLOW_HOOK_SUCCESS;
 		}
-		free(id);
-		free(task_path);
-
+	
+		// Otherwise archive the task
 		debug(D_MAKEFLOW_HOOK, "archiving task %d in directory: %s\n",t->taskid, a->dir);
 		int archived = makeflow_archive_task(a, n, t);
 		if(!archived){
@@ -583,6 +896,24 @@ static int node_success( void * instance_struct, struct dag_node *n, struct batc
 			makeflow_archive_remove_task(a, n, t);
 			return MAKEFLOW_HOOK_FAILURE;
 		}
+		debug(D_MAKEFLOW_HOOK,"The task ID in node_success is %s",id);
+		if(a->s3){
+			int s3Archived = 1;
+			// Check to see if the task  is already in the s3 bucket
+			if(a->s3_check){
+				if(!in_s3_archive(a,id))
+					s3Archived = makeflow_archive_s3_task(a,id, task_path);
+			}
+			else
+				s3Archived = makeflow_archive_s3_task(a,id, task_path);
+			if(!s3Archived){
+				debug(D_MAKEFLOW_HOOK, "unable to archive task %s in S3 archive",id);
+				return MAKEFLOW_HOOK_FAILURE;
+			}
+		}
+
+		free(id);
+		free(task_path);	
 	}
 
 	return MAKEFLOW_HOOK_SUCCESS;

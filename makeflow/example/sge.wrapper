@@ -1,0 +1,16 @@
+#!/bin/sh
+#$ -S /bin/sh
+[ -n "${PBS_JOBID}" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`
+logfile=sge.status.${JOB_ID}
+starttime=`date +%s`
+cat > $logfile <<EOF
+start $starttime
+EOF
+
+eval "$BATCH_JOB_COMMAND"
+
+status=$?
+stoptime=`date +%s`
+cat >> $logfile <<EOF
+stop $status $stoptime
+EOF

@@ -1,0 +1,34 @@
+digraph {
+
+node [shape=ellipse,color = green,style = unfilled,fixedsize = false];
+N5 [label="/usr/bin/curl"];
+N4 [label="/usr/bin/convert"];
+N3 [label="/usr/bin/convert"];
+N2 [label="/usr/bin/convert"];
+N1 [label="/usr/bin/convert"];
+N0 [label="/usr/bin/convert"];
+
+node [shape=box,color=blue,style=unfilled,fixedsize=false];
+F1 [label = "capitol.360.jpg"];
+F2 [label = "capitol.270.jpg"];
+F5 [label = "capitol.montage.gif"];
+F0 [label = "capitol.jpg"];
+F3 [label = "capitol.180.jpg"];
+F4 [label = "capitol.90.jpg"];
+
+N5 -> F0;
+F0 -> N4;
+N4 -> F1;
+F0 -> N3;
+N3 -> F2;
+F0 -> N2;
+N2 -> F3;
+F0 -> N1;
+N1 -> F4;
+F1 -> N0;
+F2 -> N0;
+F3 -> N0;
+F4 -> N0;
+F0 -> N0;
+N0 -> F5;
+}
