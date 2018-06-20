@@ -136,13 +136,23 @@ int master_workers_capacity(struct jx *j) {
 	int capacity_cores   = jx_lookup_integer(j, "capacity_cores");
 	int capacity_memory  = jx_lookup_integer(j, "capacity_memory");
 	int capacity_disk    = jx_lookup_integer(j, "capacity_disk");
+	int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
 
 	const int cores = resources->cores;
 	const int memory = resources->memory;
 	const int disk = resources->disk;
 
+	debug(D_WQ, "capacity_tasks: %d", capacity_tasks);
+	debug(D_WQ, "capacity_cores: %d", capacity_cores);
+	debug(D_WQ, "capacity_memory: %d", capacity_memory);
+	debug(D_WQ, "capacity_disk: %d", capacity_disk);
+
 	// first, assume one task per worker
 	int capacity = capacity_tasks;
+	//use the capacity model if desired
+	if(consider_capacity) {
+		capacity = capacity_weighted;
+	}
 
 	// then, enforce tasks per worker
 	if(tasks_per_worker > 0) {
@@ -230,6 +240,24 @@ struct list* do_direct_query( const char *master_host, int master_port )
 	return master_list;
 }
 
+static int count_workers_connected( struct list *masters_list )
+{
+	int connected_workers=0;
+	struct jx *j;
+
+	if(!masters_list) {
+		return connected_workers;
+	}
+
+	list_first_item(masters_list);
+	while((j=list_next_item(masters_list))) {
+		const int workers = jx_lookup_integer(j,"workers");
+		connected_workers += workers;
+	}
+
+	return connected_workers;
+}
+
 /*
 Count up the workers needed in a given list of masters, IGNORING how many
 workers are actually connected.
@@ -252,12 +280,12 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
 		const char *owner =  jx_lookup_string(j,"owner");
+		const int td =       jx_lookup_integer(j,"tasks_done");
 		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
-
-		int capacity_weighted = jx_lookup_integer(j, "capacity_weighted");
-		int capacity = MIN(capacity_weighted, master_workers_capacity(j));
+		
+		int capacity = master_workers_capacity(j);
 		int tasks = tr+tw+tl;
 
 		// first assume one task per worker
@@ -271,6 +299,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		// enforce many tasks per worker
 		if(tasks_per_worker > 0) {
 			need = DIV_INT_ROUND_UP(need, tasks_per_worker);
+			capacity = DIV_INT_ROUND_UP(capacity, tasks_per_worker);
 		}
 
 		// consider if tasks declared resources...
@@ -280,33 +309,13 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			need = MIN(need, capacity);
 		}
 
-		debug(D_WQ,"%s %s:%d %s %d %d %d",project,host,port,owner,tasks,capacity,need);
-
+		debug(D_WQ,"%s %s:%d %s %d %d %d %d %d %d",project,host,port,owner,tasks,capacity,need,count_workers_connected(masters_list),td,tr);
 		needed_workers += need;
 		masters++;
 	}
 
 	return needed_workers;
 }
-
-static int count_workers_connected( struct list *masters_list )
-{
-	int connected_workers=0;
-	struct jx *j;
-
-	if(!masters_list) {
-		return connected_workers;
-	}
-
-	list_first_item(masters_list);
-	while((j=list_next_item(masters_list))) {
-		const int workers = jx_lookup_integer(j,"workers");
-		connected_workers += workers;
-	}
-
-	return connected_workers;
-}
-
 
 static void set_worker_resources_options( struct batch_queue *queue )
 {
