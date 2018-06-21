@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 						optarg);
 					return 1;
 				}
-				tmp = jx_eval(body, NULL);
+				tmp = jx_eval(body, ctx);
 				jx_delete(body);
 				body = tmp;
 				if (jx_istype(body, JX_ERROR)) {
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 					fprintf(stderr, "malformed JX expression\n");
 					return 1;
 				}
-				tmp = jx_eval(body, NULL);
+				tmp = jx_eval(body, ctx);
 				jx_delete(body);
 				if (jx_istype(tmp, JX_ERROR)) {
 					printf("invalid expression\n");
