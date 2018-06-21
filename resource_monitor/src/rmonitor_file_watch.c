@@ -79,6 +79,7 @@ struct rmonitor_file_watch_event *parse_event(const char *fname, struct jx *spec
 
     //defaults:
     e->on_creation = 0;
+    e->on_deletion = 0;
     e->on_truncate = 0;
     e->max_count   = -1;
     e->total_count = 0;
@@ -91,6 +92,7 @@ struct rmonitor_file_watch_event *parse_event(const char *fname, struct jx *spec
     e->max_count   = parse_int(fname,     spec, "count",       -1);
     e->on_pattern  = parse_str(fname,     spec, "on-pattern",  e->on_pattern);
     e->on_creation = parse_boolean(fname, spec, "on-create",   e->on_creation);
+    e->on_deletion = parse_boolean(fname, spec, "on-delete",   e->on_deletion);
     e->on_truncate = parse_boolean(fname, spec, "on-truncate", e->on_truncate);
 
     int error = 0;
@@ -106,6 +108,9 @@ struct rmonitor_file_watch_event *parse_event(const char *fname, struct jx *spec
         if(e->on_creation) {
             defined++;
         }
+        if(e->on_deletion) {
+            defined++;
+        }
         if(e->on_truncate) {
             defined++;
         }
@@ -115,7 +120,7 @@ struct rmonitor_file_watch_event *parse_event(const char *fname, struct jx *spec
 
         if(defined != 1) {
             error = 1;
-            warn(D_RMON | D_NOTICE, "Exactly one of on-create, on-truncate, or on-pattern should be specified for '%s'", fname);
+            warn(D_RMON | D_NOTICE, "Exactly one of on-create, on-delete, on-truncate, or on-pattern should be specified for '%s'", fname);
         }
     }
     
@@ -216,7 +221,9 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
     for(;;) {
 
         int created = 0;
+        int deleted = 0;
         int shrank  = 0;
+
 
         reset_events_counts(f);
 
@@ -227,6 +234,9 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
             }
             f->exists = 1;
         } else {
+            if(f->exists) {
+                deleted = 1;
+            }
             f->exists     = 0;
             f->position   = 0;
             f->last_mtime = 0;
@@ -249,11 +259,18 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
             f->last_mtime = s.st_mtime;
             f->last_size  = s.st_size;
             f->last_ino   = s.st_ino;
+        }
 
-            // count created and shrank events
+        // count created, deleted and shrank events
+        if(created || deleted || shrank) {
             list_first_item(f->events);
             while((e = list_next_item(f->events))) {
                 if(e->on_creation && created) {
+                    e->cycle_count++;
+                    e->total_count++;
+                } 
+
+                if(e->on_deletion && deleted) {
                     e->cycle_count++;
                     e->total_count++;
                 } 
@@ -263,57 +280,57 @@ void rmonitor_watch_file_aux(struct rmonitor_file_watch_info *f) {
                     e->total_count++;
                 }
             }
+        }
 
-            if(f->event_with_pattern) {
-                FILE *fp = fopen(f->filename, "r");
-                if(!fp) {
-                    fatal("Could not open file '%s': %s.", strerror(errno)); 
-                }
+        if(f->exists && f->event_with_pattern) {
+            FILE *fp = fopen(f->filename, "r");
+            if(!fp) {
+                fatal("Could not open file '%s': %s.", strerror(errno)); 
+            }
 
-                f->position = fseek(fp, f->position, SEEK_SET);
-                if(f->position < 0) {
-                    fatal("Could not seek file '%s': %s.", strerror(errno)); 
-                }
+            f->position = fseek(fp, f->position, SEEK_SET);
+            if(f->position < 0) {
+                fatal("Could not seek file '%s': %s.", strerror(errno)); 
+            }
 
-                char *line;
-                while((line = get_line(fp))) {
-                    list_first_item(f->events);
-                    while((e = list_next_item(f->events))) {
-                        if(e->max_count < 0 || e->max_count < e->total_count) { 
-                            if(string_match_regex(line, e->on_pattern)) {
-                                e->cycle_count++;
-                                e->total_count++;
-                            }
+            char *line;
+            while((line = get_line(fp))) {
+                list_first_item(f->events);
+                while((e = list_next_item(f->events))) {
+                    if(e->max_count < 0 || e->max_count < e->total_count) { 
+                        if(string_match_regex(line, e->on_pattern)) {
+                            e->cycle_count++;
+                            e->total_count++;
                         }
                     }
-                    free(line);
                 }
-
-                f->position = ftell(fp);
-                fclose(fp);
+                free(line);
             }
 
-            if(request_snapshot(f) < 0) {
-                fatal("Could not contact resource_monitor.");
-            }
-
-            if(!at_least_one_event_still_active(f)) {
-                debug(D_RMON, "No more active events for '%s'.", f->filename);
-                exit(0);
-            }
-
-            if(f->delete_if_found) {
-                unlink(f->filename);
-
-                f->exists     = 0;
-                f->position   = 0;
-                f->last_size  = 0;
-                f->last_mtime = 0;
-                f->last_ino   = 0;
-            }
-        } else {
-            sleep(1);
+            f->position = ftell(fp);
+            fclose(fp);
         }
+
+        if(request_snapshot(f) < 0) {
+            fatal("Could not contact resource_monitor.");
+        }
+
+        if(!at_least_one_event_still_active(f)) {
+            debug(D_RMON, "No more active events for '%s'.", f->filename);
+            exit(0);
+        }
+
+        if(f->delete_if_found) {
+            unlink(f->filename);
+
+            f->exists     = 0;
+            f->position   = 0;
+            f->last_size  = 0;
+            f->last_mtime = 0;
+            f->last_ino   = 0;
+        }
+
+        sleep(1);
     }
 }
 

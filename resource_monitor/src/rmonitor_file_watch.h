@@ -34,6 +34,7 @@ struct rmonitor_file_watch_event {
     char *label;
 
     int on_creation;
+    int on_deletion;
     int on_truncate;
 
     char *on_pattern;
