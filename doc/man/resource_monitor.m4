@@ -194,6 +194,7 @@ All fields but BOLD(label) are optional.
             label        Name that identifies the snapshot. Only alphanumeric, -,
                          and _ characters are allowed. 
             on-create    Take a snapshot every time the file is created. Default: false
+            on-delete    Take a snapshot every time the file is deleted. Default: false
             on-truncate  Take a snapshot when the file is truncated.    Default: false
             on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
             count        Maximum number of snapshots for this label. Default: -1 (no limit)
