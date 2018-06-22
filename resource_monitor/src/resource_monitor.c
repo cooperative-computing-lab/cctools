@@ -921,7 +921,7 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 
 	tr->cores_avg  = 0;
 	if(tr->wall_time > 0) {
-		tr->cores_avg = (tr->cpu_time * 1000) / tr->wall_time;
+		tr->cores_avg = (tr->cpu_time * 1000.0) / tr->wall_time;
 	}
 
 	tr->max_concurrent_processes = (int64_t) itable_size(processes);
@@ -1192,6 +1192,10 @@ int rmonitor_final_summary()
 
 	if(snapshots && list_size(snapshots) > 0) {
 		add_snapshots();
+	}
+
+	if(summary->wall_time > 0) {
+		summary->cores_avg = (1000.0 * summary->cpu_time) / summary->wall_time;
 	}
 
 	if(log_inotify)

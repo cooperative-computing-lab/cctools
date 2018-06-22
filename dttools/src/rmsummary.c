@@ -610,10 +610,10 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	field_to_json(output, s, memory);
 	field_to_json(output, s, total_processes);
 	field_to_json(output, s, max_concurrent_processes);
-	field_to_json(output, s, cores);
-	field_to_json(output, s, cores_avg);
 	field_to_json(output, s, cpu_time);
 	field_to_json(output, s, wall_time);
+	field_to_json(output, s, cores);
+	field_to_json(output, s, cores_avg);
 	field_to_json(output, s, end);
 	field_to_json(output, s, start);
 
