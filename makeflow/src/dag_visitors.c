@@ -1213,15 +1213,21 @@ struct jx *category_to_json(struct category *c) {
 struct jx *files_to_json(struct list *files, struct itable *remote_names) {
 	struct jx *result = jx_array(NULL);
 	struct dag_file *file;
-	const char *r;
+
 	list_first_item(files);
 	while((file = list_next_item(files))) {
-		struct jx *f = jx_object(NULL);
-		jx_insert(f, jx_string("name"), jx_string(file->filename));
-		if((r = itable_lookup(remote_names, (uintptr_t) file))) {
-			jx_insert(f, jx_string("source"), jx_string(r));
+
+		const char *task_name = file->filename;
+		const char *dag_name = itable_lookup(remote_names,(uintptr_t)file);
+
+		if(dag_name) {
+			struct jx *f = jx_object(NULL);
+			jx_insert(f, jx_string("task_name"),jx_string(task_name));
+			jx_insert(f, jx_string("dag_name"),jx_string(dag_name));
+			jx_array_insert(result, f);
+		} else {
+			jx_array_insert(result,jx_string(task_name));
 		}
-		jx_array_insert(result, f);
 	}
 	return result;
 }
