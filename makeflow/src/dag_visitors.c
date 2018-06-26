@@ -1240,13 +1240,19 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 
 	while(n) {
 		rule = jx_object(NULL);
-		jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
-		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
+		if(n->local_job) {
+			jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
+		}
+		if(strcmp(n->category->name,"default")) {
+			jx_insert(rule, jx_string("category"), jx_string(n->category->name));
+		}
 		jx_insert_unless_empty(rule, jx_string("environment"), variables_to_json(n->variables));
 		jx_insert_unless_empty(rule, jx_string("resources"), resources_to_json(n->resources_requested));
 		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files, n->remote_names));
 		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files, n->remote_names));
-		jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
+		if(n->resource_request!=CATEGORY_ALLOCATION_FIRST) {
+			jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
+		}
 
 		if(n->nested_job) {
 			submakeflow = jx_object(NULL);
