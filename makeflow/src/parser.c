@@ -65,6 +65,7 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 	struct jx *jx_tmp = NULL;
 	struct jx *defines = NULL;
 	struct jx *context = NULL;
+	struct jx *econtext = NULL;
 	struct dag *d = NULL;
 
 	// Initial verification of file existence
@@ -104,7 +105,17 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 
 			context = jx_merge(defines,args,0);
 
-			jx_tmp = jx_eval(dag,context);
+			// Evaluate the context to resolve any shorthands
+			econtext = jx_eval(context,context);
+			if(!econtext) {
+			  fprintf(stderr,"makeflow: error in context definitions:\n");
+				jx_print_stream(context,stderr);
+				printf("\n");
+				return 0;
+			}
+
+			jx_tmp = jx_eval(dag,econtext);
+			jx_delete(context);
 			jx_delete(dag);
 			jx_delete(args);
 			dag = jx_tmp;
