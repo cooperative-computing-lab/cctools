@@ -150,7 +150,7 @@ struct work_queue_task {
 	char *monitor_output_directory;                        /**< Custom output directory for the monitoring output files. If NULL, save to directory from @ref work_queue_enable_monitoring */
 
 	char *monitor_snapshot_file;                          /**< Filename the monitor checks to produce snapshots. */
-	struct list *user_resources;                           /**< User-defined features this task requires. (See work_queue_worker's --feature option.) */
+	struct list *features;                                /**< User-defined features this task requires. (See work_queue_worker's --feature option.) */
 
 	/* deprecated fields */
 	//int total_submissions;                                 /**< @deprecated Use try_count. */
@@ -466,13 +466,13 @@ have similar resources requirements (e.g. for fast abort).
 */
 void work_queue_task_specify_category(struct work_queue_task *t, const char *category);
 
-/** Label the task with a user-defined requirement. The task will only run on a worker that provides (--provides option) such requirement.
+/** Label the task with a user-defined feature. The task will only run on a worker that provides (--feature option) such feature.
 @param q A work queue object.
 @param t A task object.
 @param count The number of resources consumed. If 0, the task does not consume the resource, but the worker still needs to provide it.
-@param category The name of the requirement.
+@param category The name of the feature.
 */
-void work_queue_task_specify_resource(struct work_queue_task *t, const char *name, int64_t count);
+void work_queue_task_specify_feature(struct work_queue_task *t, const char *name, int64_t count);
 
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.

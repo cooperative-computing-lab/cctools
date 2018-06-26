@@ -70,7 +70,7 @@ OPTION_PAIR(--gpus, n)Set the number of GPUs this worker should use. (default=0)
 OPTION_PAIR(--memory, mb)Manually set the amount of memory (in MB) reported by this worker.
 OPTION_PAIR(--disk, mb)Manually set the amount of disk space (in MB) reported by this worker.
 OPTION_PAIR(--wall-time, s)Set the maximum number of seconds the worker may be active.
-OPTION_PAIR(--provides, feature)Specifies a user-defined feature the worker provides.
+OPTION_PAIR(--feature, feature)Specifies a user-defined feature the worker provides.
 OPTION_PAIR(--docker, image) Enable the worker to run each task with a container based on this image.
 OPTION_PAIR(--docker-preserve, image) Enable the worker to run all tasks with a shared container based on this image.
 OPTION_PAIR(--docker-tar, tarball) Load docker image from this tarball.

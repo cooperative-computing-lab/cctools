@@ -2625,15 +2625,16 @@ static work_queue_msg_code_t process_feature( struct work_queue *q, struct work_
 
 	int n = sscanf(line, "feature %s", feature);
 
-	if(n != 1)
+	if(n != 1) {
 		return MSG_FAILURE;
+	}
 
 	if(!w->features)
 		w->features = hash_table_create(4,0);
 
 	url_decode(feature, fdec, WORK_QUEUE_LINE_MAX);
 
-	debug(D_WQ, "FEATURE FOUND: %s\n", fdec);
+	debug(D_WQ, "Feature found: %s\n", fdec);
 
 	hash_table_insert(w->features, fdec, (void **) 1);
 
@@ -3368,36 +3369,19 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	rmsummary_delete(limits);
 
-	if(t->user_resources) {
+	if(t->features) {
 		if(!w->features)
 			return 0;
 
 		char *feature;
-		list_first_item(t->user_resources);
-		while((feature = list_next_item(t->user_resources))) {
+		list_first_item(t->features);
+		while((feature = list_next_item(t->features))) {
 			if(!hash_table_lookup(w->features, feature))
 				return 0;
 		}
 	}
 
 	return ok;
-/*
-	if(w->foreman)
-	{
-		return check_foreman_against_task(q, w, t);
-	}
-	else
-	{
-		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
-		if (!w->foreman && info && info->blacklisted) {
-			return 0;
-		}
-		else
-		{
-			return check_worker_against_task(q, w, t);
-		}
-	}
-*/
 }
 
 static struct work_queue_worker *find_worker_by_files(struct work_queue *q, struct work_queue_task *t)
@@ -4049,12 +4033,12 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	new->command_line = xxstrdup(task->command_line);
   }
 
-  if(task->user_resources) {
-	  new->user_resources = list_create(0);
+  if(task->features) {
+	  new->features = list_create();
 	  char *req;
-	  list_first_item(task->user_resources);
-	  while((req = list_next_item(task->user_resources))) {
-		  list_push_tail(new->user_resources, xxstrdup(req));
+	  list_first_item(task->features);
+	  while((req = list_next_item(task->features))) {
+		  list_push_tail(new->features, xxstrdup(req));
 	  }
   }
 
@@ -4224,10 +4208,10 @@ void work_queue_task_specify_resource(struct work_queue_task *t, const char *nam
 {
 	if(!name)
 		return;
-	if(!t->user_resources)
-		t->user_resources = list_create(0);
+	if(!t->features)
+		t->features = list_create();
 
-	list_push_tail(t->user_resources, xxstrdup(name));
+	list_push_tail(t->features, xxstrdup(name));
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -4736,12 +4720,12 @@ void work_queue_task_delete(struct work_queue_task *t)
 			list_delete(t->env_list);
 		}
 
-		if(t->user_resources) {
+		if(t->features) {
 			char *feature;
-			while((feature=list_pop_tail(t->user_resources))) {
+			while((feature=list_pop_tail(t->features))) {
 				free(feature);
 			}
-			list_delete(t->user_resources);
+			list_delete(t->features);
 		}
 
 		free(t->hostname);

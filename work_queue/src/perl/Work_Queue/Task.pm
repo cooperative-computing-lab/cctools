@@ -58,9 +58,9 @@ sub specify_category {
 	return work_queue_task_specify_category($self->{_task}, $name);;
 }
 
-sub specify_requirement {
+sub specify_feature {
 	my ($self, $name) = @_;
-	return work_queue_task_specify_requirement($self->{_task}, $name);;
+	return work_queue_task_specify_feature($self->{_task}, $name);;
 }
 
 sub clone {
@@ -486,9 +486,9 @@ The name of the category.
 
 =back
 
-=head3 C<specify_requirement>
+=head3 C<specify_feature>
 
-Label the task with the given user-defined requirement. The task will only run on a worker that provides (--provides option) such requirement.
+Label the task with the given user-defined feature. The task will only run on a worker that provides (--feature option) such feature.
 
 =over 12
 
