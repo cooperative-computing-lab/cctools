@@ -398,6 +398,21 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_delete(left);
 			jx_delete(right);
 			return r;
+		} else if(o->type==JX_OP_ADD && left->type==JX_STRING) {
+
+			char *str = jx_print_string(right);
+			jx_delete(right);
+			right = jx_string(str);
+			free(str);
+			/* fall through */
+
+		} else if(o->type==JX_OP_ADD && right->type==JX_STRING) {
+			char *str = jx_print_string(left);
+			jx_delete(left);
+			left = jx_string(str);
+			free(str);
+			/* fall through */
+ 			
 		} else {
 			FAILOP(2, o, left, right, "mismatched types for operator");
 		}
