@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_eval.h"
+#include "jx_print.h"
 #include "getopt_aux.h"
 #include "rmonitor.h"
 #include "path.h"
@@ -54,6 +55,7 @@ See the file COPYING for details.
 #include "parser_jx.h"
 #include "parser.h"
 
+
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
 struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct jx *args)
@@ -61,6 +63,8 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 	FILE *dagfile = NULL;
 	struct jx *dag = NULL;
 	struct jx *jx_tmp = NULL;
+	struct jx *defines = NULL;
+	struct jx *context = NULL;
 	struct dag *d = NULL;
 
 	// Initial verification of file existence
@@ -93,10 +97,18 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 			fclose(dagfile);
 			break;
 		case DAG_SYNTAX_JX: //Evaluates the pending JX Variables from args file
-            jx_tmp = jx_eval(dag, args);
-            jx_delete(dag);
-            jx_delete(args);
-            dag = jx_tmp;
+			// If the dag contains a "define" clause, then add that to the external context
+			defines = jx_lookup(dag,"define");
+			if(!defines) defines = jx_object(0);
+			if(!args) args = jx_object(0);
+
+			context = jx_merge(defines,args,0);
+
+			jx_tmp = jx_eval(dag,context);
+			jx_delete(dag);
+			jx_delete(args);
+			dag = jx_tmp;
+
 		case DAG_SYNTAX_JSON: //Intentional fall-through as JX and JSON both use dag_parse_jx
 			if(!dag_parse_jx(d, dag)){
 				free(d);
