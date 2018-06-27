@@ -22,6 +22,7 @@
 <li><a href=#overview>Overview</a>
 <li><a href=#installing>Installing</a>
 <li><a href=#basic>Basic Usage</a>
+<li><a href=#jx>JX Language</a>
 <li><a href=#monitoring>Monitoring</a>
 <li><a href=#resources>Resources</a>
 <li><a href=#advice>General Advice</a>
@@ -73,7 +74,6 @@
 <ul>
 <li><a href=#language>Language Reference</a>
 <li><a href=#rescat>Resources and Categories</a>
-<li><a href=#json>JSON Format</a>
 <li><a href=#log>Transaction Log</a>
 </ul>
 
@@ -135,16 +135,24 @@ For more complex situations, consult the <a href="install.html">CCTools installa
 
 <a name=basic><h3>Basic Usage</h3></a>
 
-<p>The Makeflow language is very similar to Make.  A Makeflow script consists
-of a set of rules.  Each rule specifies a set of <i>target files</i> to create,
-a set of <i>source files</i> needed to create them, and a <i>command</i> that
+<p>A Makeflow workflow consists of a set of rules.
+Each rule specifies a set of <i>output files</i> to create,
+a set of <i>input files</i> needed to create them, and a <i>command</i> that
 generates the target files from the source files.</p>
 
-<p>Makeflow attempts to generate all of the target files in a script.  It
+<p>Makeflow attempts to generate all of the output files in a workflow.  It
 examines all of the rules and determines which rules must run before others.
 Where possible, it runs commands in parallel to reduce the execution time.</p>
 
-<p>Here is a Makeflow that uses the <tt>convert</tt> utility to make an
+<p>Makeflow suppose two ways of writing a workflow: classic Make and JX.
+Classic Make is very easy to learn and get started, but 
+but can very verbose when writing large workflows.
+The <a href=jx-tutorial.html>JX workflow language</a>
+is a little more complex, but allows for more programmable construction
+of workflows.</p>
+
+<p>Here is an example workflow written in the classic Make language.
+It uses the <tt>convert</tt> utility to make an
 animation.  It downloads an image from the web, creates four variations of the
 image, and then combines them back together into an animation.  The first and
 the last task are marked as LOCAL to force them to run on the controlling
@@ -207,6 +215,41 @@ makeflow -T amazon example.makeflow
 </code>
 
 To learn more about the various batch system options, see the <a href=#batch>Batch System Support</a> section.
+
+<a name=jx><h3>JX Language</h3></a>
+
+<p>
+The classic make language is easy to learn and suitable for many purposes,
+but it can get rather verbose for complex workflows.  Makeflow also supports
+the JX workflow language for expressing workflows in a more programmable
+way.  To give you an idea, here is how to quickly generate one thousand
+simulation jobs using JX:
+</p>
+
+<code>
+{
+  "rules": [
+    {
+      "command": "./simulate.py -n "+N+" > output."+N+".txt",
+      "inputs": [ "simulate.py" ],
+      "outputs": [ "output."+N+".txt" ],
+    } for N in range(1,1000);
+  ]
+}
+</code>
+
+You can use the JX language with Makeflow by simply using the <tt>--jx</tt> argument to any invocation.  For example:
+
+<code>makeflow --jx example.jx -T condor
+</code>
+
+To learn more about JX, please see:
+
+<dir>
+<li> <a href=jx-quick.html>JX Quick Reference</a>
+<li> <a href=jx-tutorial.html>JX Tutorial</a>
+<li> <a href=jx.html>JX Language Reference</a>
+</dir>
 
 <a name=resources><h3>Resources</h3></a>
 
@@ -1240,129 +1283,6 @@ makeflow ...
 <tr><td> simulation </td> <td> 1 </td> <td> 400 </td> <td> 400 </td> </tr>
 <tr><td> analysis </td> <td> 4 </td> <td> 800  (from environment)</td> <td> 600 </td> </tr>
 </table>
-
-<a name=json><h3>JSON Format</h3></a>
-
-<p>Makeflow supports a JSON workflow format in addition to the Make-inspired one.
-To use the JSON workflow format, invoke Makeflow as
-<code>makeflow --json input.json
-</code>
-An example JSON workflow is available <a href="https://github.com/cooperative-computing-lab/cctools/blob/master/makeflow/example/example.json">here</a>.
-This workflow is equivalent to the <tt>convert</tt> example above.
-In general, the Make-style format is easier for humans to read, while the JSON format is simpler to parse and generate.</p>
-
-<p>Makeflow can also evaluate a workflow as <a href="jx.html">JX</a>.
-JX is a superset of JSON, so this evaluation step will leave normal JSON unchanged.
-Invoking Makeflow with the <tt>--jx</tt> option will evaluate the input workflow from JX to JSON before parsing,
-allowing for more compact workflow representations.
-The JSON example above was evaluated from <a href="https://github.com/cooperative-computing-lab/cctools/blob/master/makeflow/example/example.jx">this JX workflow</a>.</p>
-
-<p>All <tt>Object</tt>s are assumed to have <tt>String</tt> keys.
-All keys are optional unless otherwise specified.</p>
-
-<p>A workflow is encoded as a JSON object. Makeflow interprets the following keys.
-All workflow-level keys are optional, though a workflow with no production rules does nothing.</p>
-
-<ul>
-<li><tt>"categories"</tt>: <tt>Object&lt;Category&gt;</tt></li>
-<li><tt>"default_category"</tt>: <tt>String</tt></li>
-<li><tt>"environment"</tt>: <tt>Object&lt;String&gt;</tt></li>
-<li><tt>"rules"</tt>: <tt>Array&lt;Rule&gt;</tt></li>
-</ul>
-
-
-<p>Each rule can specify a category for resource requirements.
-The <tt>"categories"</tt> field defines the categories used in the Makeflow (see the Categories section for details).</p>
-
-<p><tt>"default_category"</tt> is the category used if none is specified for a rule.
-If not provided, the default category is <tt>"default"</tt>.
-This string value <em>SHOULD</em> match one of the keys of the <tt>"categories"</tt> object.
-If there is no corresponding category defined, default values will be filled in.</p>
-
-<p><tt>"environment"</tt> specifies environment variables to be set when executing all rules.</p>
-
-<p><tt>"rules"</tt> is an unordered collection of rules comprising the Makeflow.
-Each entry corresponds to a single rule in the traditional Make style.
-The contents of each <tt>Rule</tt> are discussed in the corresponding section.</p>
-
-<h4>Categories</h4>
-
-<p>A <tt>Category</tt> is encoded as a JSON object with the following keys.</p>
-
-<ul>
-<li><tt>"environment"</tt>: <tt>Object&lt;String&gt;</tt></li>
-<li><tt>"resources"</tt>: <tt>Resources</tt></li>
-</ul>
-
-
-<p><tt>"environment"</tt> gives environment variables to set when executing rules in this category.
-These values override workflow-level environment variables.</p>
-
-<h4>Rules</h4>
-
-<p>A <tt>Rule</tt> is encoded as a JSON object with the following keys.</p>
-
-<ul>
-<li><tt>"inputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
-<li><tt>"outputs"</tt>: <tt>Array&lt;File&gt;</tt></li>
-<li><tt>"command"</tt>: <tt>String</tt></li>
-<li><tt>"local_job"</tt>: <tt>Boolean</tt></li>
-<li><tt>"category"</tt>: <tt>String</tt></li>
-<li><tt>"resources"</tt>: <tt>Resources</tt></li>
-<li><tt>"allocation"</tt>: <tt>String</tt></li>
-<li><tt>"environment"</tt>: <tt>Object&lt;String&gt;</tt></li>
-</ul>
-
-
-<p><tt>"inputs"</tt> and <tt>"outputs"</tt> specify the files required and produced, respectively, by the rule.
-Makeflow will ensure that all inputs either exist or are created before executing the rule.
-After execution finishes, Makeflow will ensure that all outputs really exist.</p>
-
-<p>Every rule requires a <tt>"command"</tt>
-which is a string command to run in a shell.</p>
-
-<p>If <tt>"local_job"</tt> is specified, Makeflow will only execute the rule locally, i.e. on the host where Makeflow is running.
-Local jobs are not scheduled on remote resources such as batch systems.</p>
-
-<p><tt>"category"</tt> specifies the category of a rule for resource allocation purposes.</p>
-
-<p><tt>"resources"</tt> specifies the specific resource requirements of this rule.
-These values override those specified in the rule&rsquo;s category</p>
-
-<p><tt>"allocation"</tt> specifies the rule&rsquo;s allocation policy.
-Allowed values are <tt>&ldquo;first&rdquo;</tt>, <tt>&ldquo;max&rdquo;</tt>, or <tt>&ldquo;error&rdquo;</tt>.</p>
-
-<p><tt>"environment"</tt> specifies environment variables to set before executing the rule.</p>
-
-<h4>Files</h4>
-
-<p>
-A <tt>File</tt> is encoded as a JSON object with the following keys.</p>
-
-<ul>
-<li><tt>"path"</tt>: <tt>String</tt> <em>(required)</em></li>
-<li><tt>"execution_path"</tt>: <tt>String</tt></li>
-</ul>
-
-<p><tt>"path"</tt> gives the local path path to the file.
-<tt>"execution_path"</tt> specifies the path at the execution site.
-See the section on <a href="#details.renaming">remote renaming</a> for details on using this feature.</p>
-
-<h4>Resource Specifications</h4>
-
-<p><tt>Resources</tt> is encoded as a JSON object with the following keys.</p>
-
-<ul>
-<li><tt>"cores"</tt>: <tt>Integer</tt></li>
-<li><tt>"disk"</tt>: <tt>Integer</tt></li>
-<li><tt>"memory"</tt>: <tt>Integer</tt></li>
-<li><tt>"gpus"</tt>: <tt>Integer</tt></li>
-</ul>
-
-
-<p><tt>"cores"</tt> and <tt>"gpus"</tt> give the number of CPU cores and GPUs, respectively, required to execute a rule.
-<tt>"disk"</tt> gives the disk space required, in MB.
-<tt>"memory"</tt> gives the RAM required, in MB.</p>
 
 <a name=log><h3>Transaction Log</h3>
 
