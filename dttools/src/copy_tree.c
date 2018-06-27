@@ -95,7 +95,7 @@ int copy_dir_real(const char *source, const char *target) {
 		return -1;
 	}
 
-	while((entry = readdir(dir)))
+	while((entry = readdir(dir)) != NULL)
 	{
 		char *s = NULL;
 		char *t = NULL;
@@ -116,7 +116,7 @@ int copy_dir_real(const char *source, const char *target) {
 			goto finish;
 		}
 
-		if (copy_direntry(s, t) != 0) {
+		if (copy_direntry(s, t) == -1) {
 			free(s);
 			free(t);
 			goto finish;
