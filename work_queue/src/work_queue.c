@@ -46,6 +46,7 @@ The following major problems must be fixed:
 #include "url_encode.h"
 #include "jx_print.h"
 #include "shell.h"
+#include "pattern.h"
 
 #include "host_disk_info.h"
 
@@ -1080,20 +1081,24 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 
 	work_queue_result_code_t result = SUCCESS; //return success unless something fails below
 
+	char *tmp_remote_path = NULL;
+	char *length_str      = NULL;
+	char *errnum_str      = NULL;
+
 	// Process the recursive file/dir responses as they are sent.
 	while(1) {
 		char line[WORK_QUEUE_LINE_MAX];
-		char tmp_remote_path[WORK_QUEUE_LINE_MAX];
-		int64_t length;
-		int errnum;
+
+		free(tmp_remote_path);
+		free(length_str);
 
 		if(recv_worker_msg_retry(q, w, line, sizeof(line)) == MSG_FAILURE) {
 			result = WORKER_FAILURE;
 			break;
 		}
 
-		if(sscanf(line,"dir %s", tmp_remote_path)==1) {
-			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
+		if(pattern_match(line, "^dir (%S+) (%d+)$", &tmp_remote_path, &length_str) >= 0) {
+			char *tmp_local_name = string_format("%s%s",local_name, (tmp_remote_path + remote_name_len));
 			int result_dir = create_dir(tmp_local_name,0777);
 			if(!result_dir) {
 				debug(D_WQ, "Could not create directory - %s (%s)", tmp_local_name, strerror(errno));
@@ -1102,16 +1107,18 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 				break;
 			}
 			free(tmp_local_name);
-		} else if(sscanf(line,"file %s %"SCNd64, tmp_remote_path, &length)==2) {
-			char *tmp_local_name = string_format("%s%s",local_name,&tmp_remote_path[remote_name_len]);
+		} else if(pattern_match(line, "^file (.+) (%d+)$", &tmp_remote_path, &length_str) >= 0) {
+			int64_t length = strtoll(length_str, NULL, 10);
+			char *tmp_local_name = string_format("%s%s",local_name, (tmp_remote_path + remote_name_len));
 			result = get_file(q,w,t,tmp_local_name,length,total_bytes);
 			free(tmp_local_name);
 			//Return if worker failure. Else wait for end message from worker.
 			if(result == WORKER_FAILURE) break;
-		} else if(sscanf(line,"missing %s %d",tmp_remote_path,&errnum)==2) {
+		} else if(pattern_match(line, "^missing (.+) (%d+)$", &tmp_remote_path, &errnum_str) >= 0) {
 			// If the output file is missing, we make a note of that in the task result,
 			// but we continue and consider the transfer a 'success' so that other
 			// outputs are transferred and the task is given back to the caller.
+			int errnum = atoi(errnum_str);
 			debug(D_WQ, "%s (%s): could not access requested file %s (%s)",w->hostname,w->addrport,remote_name,strerror(errnum));
 			update_task_result(t, WORK_QUEUE_RESULT_OUTPUT_MISSING);
 		} else if(!strcmp(line,"end")) {
@@ -1127,6 +1134,9 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 			break;
 		}
 	}
+
+	free(tmp_remote_path);
+	free(length_str);
 
 	// If we failed to *transfer* the output file, then that is a hard
 	// failure which causes this function to return failure and the task

@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "md5.h"
 #include "disk_alloc.h"
 #include "hash_table.h"
+#include "pattern.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -1420,18 +1421,28 @@ static int handle_master(struct link *master) {
 	char path[WORK_QUEUE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
-	int flags = WORK_QUEUE_NOCACHE;
 	int mode, r, n;
 
 	if(recv_master_message(master, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid,time(0)+active_timeout);
-		} else if((n = sscanf(line, "put %s %" SCNd64 " %o %d", filename, &length, &mode, &flags)) >= 3) {
-			if(path_within_dir(filename, workspace)) {
-				r = do_put(master, filename, length, mode);
-				reset_idle_timer();
+		} else if(string_prefix_is(line, "put ")) {
+			char *f = NULL, *l = NULL, *m = NULL, *g = NULL;
+			if(pattern_match(line, "^put (.+) (%d+) ([0-7]+) (%d+)$", &f, &l, &m, &g) >= 0) {
+				strncpy(filename, f, WORK_QUEUE_LINE_MAX); free(f);
+				length = strtoll(l, 0, 10); free(l);
+				mode   = atoi(m);           free(m);
+				free(g); //flags are not used anymore.
+				
+				if(path_within_dir(filename, workspace)) {
+					r = do_put(master, filename, length, mode);
+					reset_idle_timer();
+				} else {
+					debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+					r = 0;
+				}
 			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+				debug(D_WQ, "Malformed put message.");
 				r = 0;
 			}
 		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
