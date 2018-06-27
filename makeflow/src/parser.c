@@ -40,6 +40,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_eval.h"
+#include "jx_print.h"
 #include "getopt_aux.h"
 #include "rmonitor.h"
 #include "path.h"
@@ -53,6 +54,7 @@ See the file COPYING for details.
 #include "parser_make.h"
 #include "parser_jx.h"
 #include "parser.h"
+
 
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
@@ -93,10 +95,11 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 			fclose(dagfile);
 			break;
 		case DAG_SYNTAX_JX: //Evaluates the pending JX Variables from args file
-            jx_tmp = jx_eval(dag, args);
-            jx_delete(dag);
-            jx_delete(args);
-            dag = jx_tmp;
+			jx_tmp = jx_eval_with_defines(dag,args);
+			jx_delete(dag);
+			jx_delete(args);
+			dag = jx_tmp;
+
 		case DAG_SYNTAX_JSON: //Intentional fall-through as JX and JSON both use dag_parse_jx
 			if(!dag_parse_jx(d, dag)){
 				free(d);
