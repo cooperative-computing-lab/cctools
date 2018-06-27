@@ -19,4 +19,16 @@ If the expression is invalid in some way, an object of type @ref JX_NULL is retu
 */
 struct jx * jx_eval( struct jx *j, struct jx *context );
 
+/** Evaluate an expression with embedded definitions.
+Same as @ref jx_eval, except first looks for a "defines"
+clause and combines that with the context.  Allows an
+expression to have its own bound values, for convenience.
+@param j The expression to evaluate, which may contain a "defines" clause.
+@param context An object in which values will be found.
+@return A newly created result expression, which must be deleted with @ref jx_delete.
+If the expression is invalid in some way, an object of type @ref JX_NULL is returned.
+*/
+struct jx * jx_eval_with_defines( struct jx *j, struct jx* context );
+
+
 #endif

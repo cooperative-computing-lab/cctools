@@ -618,7 +618,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		case JX_SYMBOL: {
 			struct jx *t = jx_lookup(context, j->u.symbol_name);
 			if (t) {
-				result = jx_copy(t);
+				result = jx_eval(t,context);
 				break;
 			} else {
 				struct jx *err = jx_object(NULL);
@@ -640,6 +640,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_STRING:
+		case JX_FUNCTION:
 		case JX_ERROR:
 		case JX_NULL:
 			result = jx_copy(j);
@@ -653,11 +654,26 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		case JX_OPERATOR:
 			result = jx_eval_operator(&j->u.oper, context);
 			break;
-		case JX_FUNCTION:
-			// we should never eval a function body
-			abort();
 	}
 
 	jx_delete(context);
 	return result;
 }
+
+struct jx * jx_eval_with_defines( struct jx *j, struct jx *context )
+{
+	// Find the define clause in j, if it exists.
+	struct jx *defines = jx_lookup(j,"define");
+	if(!defines) defines = jx_object(0);
+	if(!context) context = jx_object(0);
+
+	// Merge the context and defines into mcontext.
+	struct jx *mcontext = jx_merge(defines,context,0);
+
+	// Now use that to evaluate j.
+	struct jx * result = jx_eval(j,mcontext);
+
+	jx_delete(mcontext);
+	return result;
+}
+

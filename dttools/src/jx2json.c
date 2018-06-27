@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	tmp = body;
-	body = jx_eval(body, ctx);
+	body = jx_eval_with_defines(body, ctx);
 	jx_delete(tmp);
 	print_stream(body, stdout);
 	printf("\n");
