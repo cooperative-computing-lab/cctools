@@ -1,0 +1,165 @@
+<style>
+body {
+	font-family: sans;
+}
+
+div.box {
+	border-radius: 25px;
+	border: 2px solid black;
+	background: #eeeeff;
+	padding: 10px;
+	margin: 5px;
+}
+
+h1 {
+	color: #000088;
+}
+
+
+h2 {
+	font-size: 125%;
+	font-weight: bold;
+	margin: 1px;
+	padding: 1px;
+	color: #000088;
+}
+
+pre {
+	font-weight: bold;
+	font-size: 125%;
+}
+
+span.note {
+	font-style: italic;
+	font-weight: normal;
+	font-color: #000088;
+}
+
+
+</style>
+
+<center>
+
+<h1>JX Workflow Language Quick Reference</h2>
+
+<p>
+<a href=makeflow.html>Makeflow</a> | <a href=jx-tutorial.html>JX Tutorial</a> | <a href=jx-quick.html>JX Quick Reference</a> | <a href=jx.html>JX Full Reference</a>
+</p>
+
+<table>
+
+<tr>
+<td colspan=2>
+<div class=box>
+<h2>Workflow</h2>
+<pre>
+{
+   "defines" : {
+      "temp" : 32.5,
+   }
+   "environment" : {
+      "PATH" : "/usr/local/bin:/bin",
+   }
+   "rules" : [
+       <span class=note># Array of rules goes here.</span>
+   ]
+}
+
+</pre>
+</div>
+
+<td>
+<div class=box>
+<h2>Rules</h2>
+<pre>
+{
+   <span class=note># Required elements</span>
+   "command" : "simulation.py calib.dat >output.txt",
+   "inputs" : [ "simulation.py", "calib.dat" ],
+   "outputs" : [ "output.txt" ],
+
+   <span class=note># Optional elements</span>
+   "local_job" : true | false,
+   "resources" : { "cores":4, "memory":8, "disk":16 },
+   "environment" : { ... }
+   "category" : "simulation",
+}
+</pre>
+</div>
+
+<tr>
+<td>
+<div>
+
+<div class=box>
+<h2>Values</h2>
+<pre>
+"string"
+42
+3.14159
+true | false
+
+[ 1, 2, 3 ]
+
+{ "temp" : 32.5,
+  "name" : "fred" }
+</pre>
+</div>
+
+<td>
+<div class=box>
+<h2>Operators</h2>
+<pre>
+a["b"]   func(x)
+* % /
++ -
+== != < <= > >=
+not
+and
+or
+
+<span class=note>expr</span> for x in [1,2,3]
+</pre>
+</div>
+
+<td>
+<div class=box>
+<h2>Functions</h2>
+<pre>
+format( "str: %s int: %d float: %f",
+        "hello", 42, 3.14159 )
+join( array, delim )
+range( start, stop, step )
+ceil( value )
+floor( value )
+basename( path )
+dirname( path )
+escape( string )
+</pre>
+</div>
+
+<tr>
+<td colspan=3>
+<div class=box>
+<h2>Examples</h2>
+<pre>
+<span class=note># Generate an array of 100 files named "output.1.txt", etc...</span>
+[ "output."+x+".txt" for x in range(1,100) ]
+
+<span class=note># Generate one string containing those 100 file names.</span>
+join( [ "output."+x+".txt" for x in range(1,100) ], " ")
+
+<span class=note># Generate five jobs that produce output files alpha.txt, beta.txt, ...</span>
+{
+  command = "simulate.py > "name+".txt",
+  outputs = [ name+".txt" ],
+  inputs = "simulate.py",
+} for N in [ "alpha", "beta", "gamma", "delta", "epsilon" ]
+
+</pre>
+</div>
+
+</table>
+
+</center>
+

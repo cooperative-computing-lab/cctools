@@ -1,0 +1,314 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel="stylesheet" type="text/css" href="manual.css">
+<title>Tutorial: JX Workflow Language</title>
+</head>
+
+<body>
+
+<div id="manual">
+
+<h1>Tutorial: JX Workflow Language</h1>
+
+<center>
+<p>
+<a href=makeflow.html>Makeflow</a> | <a href=jx-tutorial.html>JX Tutorial</a> | <a href=jx-quick.html>JX Quick Reference</a> | <a href=jx.html>JX Full Reference</a>
+</p>
+</center>
+
+<p>
+This is a gentle introduction to the JX workflow language, which
+is the "advanced" language used by the <a href=makeflow.html>Makeflow</a>
+workflow engine.  JX is an extension of standard <a href=http://json.org>JSON</a> expressions, so if you are familiar with those from another language,
+you will find it easy to get started.
+</p>
+
+<p>
+To use these examples, you will first need to install the <a href=makeflow.html>Makeflow</a> workflow engine and ensure that the <tt>makeflow</tt> command
+is in your <tt>PATH</tt>.
+</p>
+
+<h2>Hello World</h2>
+
+<p>
+Let's begin by creating a simple workflow that executes exactly one task,
+which outputs the text "hello world".  Enter the following workflow
+using your favorite text editor and save it into a file called <tt>example.jx</tt>:
+</p>
+
+<code>{
+   "rules": [
+      {
+          "command" : "echo hello world > output.txt",
+          "outputs" : [ "output.txt" ],
+          "inputs" : [ ],
+      }
+   ]
+}
+</code>
+
+<p>
+Now run it locally with the following command:
+</p>
+
+<code>makeflow --jx example.jx
+</code>
+
+<p>
+You should see some output like this:
+</p>
+
+<code>parsing example.jx...
+local resources: 4 cores, 15774 MB memory, 2097151 MB disk
+max running local jobs: 4
+checking example.jx for consistency...
+example.jx has 1 rules.
+starting workflow....
+submitting job: echo hello world > output.txt
+submitted job 29955
+job 29955 completed
+nothing left to do.
+</code>
+
+<p>
+Now examine the file <tt>output.txt</tt> and you should see that it contains "hello world".  Congratulations, you have run your first workflow!
+</p>
+
+<h2>Defining Values</h2>
+
+<p>
+JX allows you to programmatically define elements of your workflow,
+using expressions to substitute in for parts of jobs.  The general
+structure of a workflow is this:
+</p>
+
+<code>{
+   "define": {
+      # symbol definitions go here
+   },
+
+   "rules": [
+      # rules go here
+   ]
+}
+</code>
+
+<p>
+Building on the previous example, suppose that you want to 
+parameterize the message constant called <tt>message</tt>
+To do that, define it in the <tt>define</tt> section, and
+then concatentate <tt>message</tt> into the job, like this:
+</p>
+
+<code>{
+   <b>"define": {
+      "message" : "hello world!"
+   },
+</b>
+   "rules": [
+      {
+          "command" : "echo "<b>+message+</b>" > output.txt",
+          "outputs" : [ "output.txt" ],
+          "inputs" : [ ],
+      }
+   ]
+}
+</code>
+
+To test out this change, first clean the workflow:
+
+<code>makeflow --jx example.jx --clean
+</code>
+
+And then run it again:
+
+<code>makeflow --jx example.jx
+</code>
+
+(For the remainder of the examples in this tutorial, we will assume that you clean the workflow first, and then run it again.)
+
+<h2>Generating Multiple Jobs</h2>
+
+<p>
+A common use of workflows is to drive a large number of simulation
+or analysis codes.  Suppose that you have a custom simulation code
+called <tt>simulate.py</tt> which takes a command line argument
+<tt>-n</tt> and produces its output on the console.
+To run one instance of that simulator, you could do this:
+</p>
+
+<code>{
+   "rules": [
+      {
+         "command" : "./simulate.py -n 1 > output.txt",
+         "inputs" : [ "simulate.py" ],
+         "outputs" : [ "output.txt" ],
+      }
+   ]
+}
+</code>
+
+<p>
+(Note that the simulator code itself is treated as an input file,
+so that the code can be copied to the target execution machine as needed.)
+</p>
+
+<p>
+If you wanted to run three simulations with slightly different arguments,
+you could simply write each one out longhand, giving each one a different
+command line argument and sending output to a different file:
+</p>
+ 
+<code>{
+   "rules": [
+      {
+         "command" : "./simulate.py -n 1 > output.1.txt",
+         "inputs" : [ "simulate.py" ],
+         "outputs" : [ "output.1.txt" ],
+      },
+      {
+         "command" : "./simulate.py -n 2 > output.2.txt",
+         "inputs" : [ "simulate.py" ],
+         "outputs" : [ "output.2.txt" ],
+      },
+      {
+         "command" : "./simulate.py -n 3 > output.3.txt",
+         "inputs" : [ "simulate.py" ],
+         "outputs" : [ "output.3.txt" ],
+      }
+   ]
+}
+
+</code>
+
+But of course that would be tiresome for a large number of jobs.
+Instead, you can write out the job once and use the <tt>for</tt> operator
+(sometimes known as a <i>list comprehension</i>) to generate multiple
+instance of the job:
+
+<code>{
+   "rules": [
+      {
+         "command" : "./simulate.py -n "<b>+N+</b>" > output."<b>+N+</b>".txt",
+         "inputs" : [ "simulate.py" ],
+         "outputs" : [ "output."<b>+N+</b>".txt" ],
+      } <b>for N in [ 1, 2, 3 ]</b>
+   ]
+}
+</code>
+
+Note that the value of <tt>N</tt> is substituted into both the commands
+string and the output list by using the plus sign to indicate string
+concatenation.  If you prefer a more <tt>printf</tt> style, you can
+use the <tt>format()</tt> function to insert values into strings
+into places indicate by percent codes:
+
+<code>{
+   "rules": [
+      {
+         "command" : <b>format("./simulate.py -n %d > output.%d.txt",N,N)</b>
+         "inputs" : [ "simulate.py" ],
+         "outputs" : [ "output."+N+".txt" ],
+      } for N in [ 1, 2, 3 ]
+   ]
+}
+</code>
+
+If you want to preview how these list comprehensions expand into
+individual jobs, use the program <tt>jx2json</tt> to reduce the
+JX program into plain JSON:
+
+<code>
+jx2json example.jx
+</code>
+
+Which should produce output like this:
+
+<code>
+{"rules":[{"command":"./simulate.py -n 1 > output.1.txt","inputs":["simulate.py"],"outputs":["output.1.txt"]},{"command":"./simulate.py -n 2 > output.2.txt","inputs":["simulate.py"],"outputs":["output.2.txt"]},{"command":"./simulate.py -n 3 > output.3.txt","inputs":["simulate.py"],"outputs":["output.3.txt"]}]}
+</code>
+
+<h2>Gather Results</h2>
+
+So far, out example workflow will run three simulations independently.
+But suppose you want the workflow to have a final step which
+runs after all the simulations are complete, to collect the results
+in a single file called <tt>output.all.txt</tt>.  You could
+write it out longhand for three files explicitly:
+
+<code>{
+   "command" : "cat output.1.txt output.2.txt output.3.txt > output.all",
+   "inputs" : [ "output.1.txt", "output.2.txt", "output.3.txt" ],
+   "outputs" : [ "output.all.txt" ],
+}
+</code>
+
+Of course, it would be better to generate the list automatically.
+The list of output files is easy: just generate them using
+a list comprehension.  For example, this expression:
+
+<code>[ "output."+N+".txt" for N in [1,2,3] ]
+</code>
+
+Would evaluate to this array:
+<code>["output.1.txt","output.2.txt","output.3.txt"]
+</code>
+
+The command line string is a little trickier, because we want
+a string containing all of those filenames, rather than the array.
+The <tt>join()</tt> function is used to join an array into a single string.
+For example, this expression:
+
+<code>join(["output.1.txt","output.2.txt","output.3.txt"]," ")
+</code>
+
+Evaluates to this string:
+
+<code>"output.1.txt output.2.txt output.3.txt"
+</code>
+
+We can put all of those bits into a single job, like this:
+
+<code>{
+   "command" : "cat "+join(["output."+N+".txt" for N in [1,2,3]])+" >output.all.txt",
+   "inputs" : [ "output."+N+".txt" for N in [ 1, 2, 3 ] ],
+   "outputs" : [ "output.all.txt" ],
+}
+</code>
+
+That is correct, but it's rather hard to read.  Instead, we can
+make things clearer by factoring out the definition of the list
+and the range to the <tt>define</tt> section of the workflow.
+Putting it all together, we have this:
+
+<code>{
+   "define": {
+      "RANGE" : range(1,3),
+      "FILELIST" : ["output."+N+".txt for N in RANGE],
+   },
+
+   "rules": [
+      {
+        "command" : "./simulate.py -n "+N+" > output."+N+".txt",
+        "inputs" : [ "simulate.py" ],
+        "outputs" : [ "output."+N+".txt" ],
+      } for N in RANGE,
+      {
+        "command" : "cat "+join(FILELIST," ")+" >output.all.txt",
+        "inputs" : [ FILELIST ],
+        "outputs" : [ "output.all.txt" ],
+      }
+   ]
+}
+</code>
+
+</div>
+
+</body>
+
+</html>
+
+
