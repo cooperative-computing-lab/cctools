@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
 <link rel="stylesheet" type="text/css" href="manual.css">
-<title>JX: JSON + Expressions</title>
+<title>JX Reference Manual</title>
 <style type="text/css">
 .command {
     margin: 10px;
@@ -17,13 +17,145 @@
 <body>
 
 <div id="manual">
-<h1 id="jx">JX (JSON + Expressions) Reference Manual<a class="sectionlink" href="#jx" title="Link to this section.">&#x21d7;</a></h1>
+<h1 id="jx">JX Reference Manual<a class="sectionlink" href="#jx" title="Link to this section.">&#x21d7;</a></h1>
 
 <center>
 <p>
 <a href=makeflow.html>Makeflow</a> | <a href=jx-tutorial.html>JX Tutorial</a> | <a href=jx-quick.html>JX Quick Reference</a> | <a href=jx.html>JX Full Reference</a>
 </p>
 </center>
+
+<h2>Overview</h2>
+
+<p>Makeflow allows for workflows to be expressed in pure <a href=http://json.org>JSON</a> or in an extended language known as JX which can be evaluated to produce pure JSON.  This document provides the detailed reference for this language.  If you are just getting started, see the <a href=jx-tutorial.html>JX Tutorial</a> before reading this reference manual.</p>
+
+<h2>JSON Workflow Representation</h2>
+
+<h3>Workflow</h3>
+
+<p>A workflow is encoded as a JSON object with the following keys:</p>
+
+<code>
+{
+    "rules": [ ... ]
+    "define": { ... }
+    "environment": { ... }
+    "categories": { ... }
+    "default_category": &lt;string&gt;
+}
+</code>
+
+<p>Required: <tt>rules</tt> is an unordered collection of rules comprising the workflow.
+Each entry corresponds to a single job to be executed in the workflow, described below.</p>
+
+<p>Optional: The <tt>categories</tt> object defines the categories of related rules, described below.</p>
+
+<p>Optional: <tt>default_category</tt> is the name of the category used if none is specified for a rule.
+If not provided, the default category is <tt>"default"</tt>.
+This string value <em>SHOULD</em> match one of the keys of the <tt>"categories"</tt> object.
+If there is no corresponding category defined, default values will be filled in.</p>
+
+<p><tt>"environment"</tt> specifies environment variables to be set when executing all rules, described below</p>
+
+<h3>Rules</h3>
+
+<p>A <tt>Rule</tt> is encoded as a JSON object with the following keys.</p>
+
+<code> {
+    "command"     : &lt;string&gt;
+    "inputs"      : [ ... ]
+    "outputs"     : [ ... ]
+    "local_job"   : &lt;boolean&gt;
+    "environment" : { ... }
+    "category"    : &lt;string&gt;
+    "resources"   : { ... }
+    "allocation"  : &lt;string&gt;
+}
+</code>
+
+<p>Required: The <tt>command</tt> string gives the Unix command to execute to carry out the job.</p>
+
+<p>Required: The <tt>inputs</tt> and <tt>outputs</tt> arrays list the files required and produced by the command.
+These arrays must be an accurate description of the actual behavior of the command, otherwise the workflow
+cannot operate correctly.  Each entry in the array is described in the Files section below.</p>
+
+<p>Optional: <tt>local_job</tt>, if <tt>true</tt> indicates that the job is best run locally
+by the workflow manager, rather than dispatched to a distributed system.  This is a performance
+hint provided by the end user and not a functional requirement.</p>
+
+<p>Optional: <tt>category</tt> specifies the name of a job category.
+The name given should correspond to the key of a category object in the global workflow object.</p>
+
+<p>Optional: <tt>resources</tt> specifies the specific resource requirements of this job, described below.</p>
+
+<p>Optional: <tt>allocation</tt> specifies the resource allocation policy:
+<ul>
+<li> <tt>first</tt> computes the best "first allocation" based on the prior history of jobs in this category.
+<li> <tt>max</tt> selects the maximum resources observed by any job in this category.
+<li> <tt>error</tt> attempts to execute the job and increases the resources offered if an error results.
+</ul>
+
+<p>Optional: <tt>environment</tt> specifies environment variables, described below.</p>
+
+<h3>Files</h3>
+
+<p>A file is encoded as either a JSON string or a JSON object.  If a file is given
+simply as a string, then the string gives the name of the file in all contexts.
+For example: </p>
+
+<code>"output.txt"
+</code>
+
+<p>If a file is given as an object, then it the object describes the (possibly different)
+names of the file in the DAG (workflow) context and the task context.  The file
+will be renamed as needed when dispatched from the workflow to the task, and vice versa.
+For example:
+</p>
+
+<code> {
+    "dag_name" : "output.5.txt",
+    "task_name" : "output.txt"
+}
+</code>
+
+<h3>Categories</h3>
+
+<p>A <tt>Category</tt> is encoded as a JSON object with the following keys:</p>
+
+<code>{
+   "environment" : { ... }
+   "resources" : { ... }
+}
+</code>
+
+<p>The category describes the environment variables and resource consumption
+all of rules that share that category name.</p>
+
+<h3>Environments</h3>
+
+<p>Environments are encoded as a JSON object where each key/value pair
+describes the name and value of a Unix environment variable.
+An enviroment may be given at the global workflow level, in a category
+description, or in an individual job, where it applies to the corresponding object.
+If the same environment variable appears in multiple places, then the job
+value overrides the category value, and the category value overrides the global value.</p>
+
+<h3>Resources</h3>
+
+<p>Resources are encoded as a JSON object with the following keys:</p>
+
+<code>{
+    "cores" : &lt;integer&gt;,
+    "memory" : &lt;integer&gt;,
+    "disk" : &lt;integer&gt;,
+    "gpus" : &lt;integer&gt;
+}
+</code>
+
+<p>A resource specification may appear in an individual job or in a category description. <tt>"cores"</tt> and <tt>"gpus"</tt> give the number of CPU cores and GPUs, respectively, required to execute a rule. <tt>"disk"</tt> gives the disk space required, in MB. <tt>"memory"</tt> gives the RAM required, in MB.</p>
+
+<h2>JX Expressions</h2>
+
 
 <p>
 JX is a superset of JSON with additional syntax for dynamically generating data.
