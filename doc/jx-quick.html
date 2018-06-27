@@ -48,23 +48,31 @@ span.note {
 
 <table>
 
-<tr>
+<tr valign=top>
 <td colspan=2>
 <div class=box>
 <h2>Workflow</h2>
 <pre>
 {
-   "defines" : {
-      "temp" : 32.5,
-   }
-   "environment" : {
-      "PATH" : "/usr/local/bin:/bin",
-   }
+   <span class=note># Required elements:</span>
    "rules" : [
        <span class=note># Array of rules goes here.</span>
-   ]
+   ],
+   <span class=note># Optional elements:</span>
+   "define" : {
+      "temp" : 32.5,
+   },
+   "environment" : {
+      "PATH" : "/usr/local/bin:/bin",
+   },
+   "categories" : {
+       "simulation" : {
+            "resources" : { ... },
+            "environment" : { ... },
+            "allocation" : "first" | "max" | "error"
+       }
+   }
 }
-
 </pre>
 </div>
 
@@ -74,15 +82,22 @@ span.note {
 <pre>
 {
    <span class=note># Required elements</span>
+
    "command" : "simulation.py calib.dat >output.txt",
    "inputs" : [ "simulation.py", "calib.dat" ],
    "outputs" : [ "output.txt" ],
 
    <span class=note># Optional elements</span>
+
    "local_job" : true | false,
-   "resources" : { "cores":4, "memory":8, "disk":16 },
+   "resources" : {
+       "cores":4,
+       "memory":8,
+       "disk":16
+   },
    "environment" : { ... }
    "category" : "simulation",
+   "allocation" : "first" | "max" | "error"
 }
 </pre>
 </div>
