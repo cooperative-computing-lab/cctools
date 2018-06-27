@@ -603,6 +603,15 @@ value:      "\"\\$(pwd)/\\\"test program\\\" -x \\`date\\`\""
 expression: escape("y\\x")
 value:      "\"y\\\\x\""
 
+expression: "hello "+1+" world"
+value:      "hello 1 world"
+
+expression: true+" maybe "+false
+value:      "true maybe false"
+
+expression: "pi is "+3.14159
+value:      "pi is 3.14159"
+
 expression: Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 value:      Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"}
 
