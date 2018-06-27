@@ -431,6 +431,19 @@ void jx_delete( struct jx *j )
 	free(j);
 }
 
+int jx_isatomic( struct jx *j )
+{
+	switch(j->type) {
+		case JX_BOOLEAN:
+		case JX_STRING:
+		case JX_INTEGER:
+		case JX_DOUBLE:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 int jx_istype( struct jx *j, jx_type_t type )
 {
 	return j && j->type==type;

@@ -340,8 +340,9 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 Type conversion rules:
 Generally, operators are not meant to be applied to unequal types.
 NULL is the result of an operator on two incompatible expressions.
-Exception: When x and y are incompatible types, x==y returns FALSE and x!=y returns TRUE.
 Exception: integers are promoted to doubles as needed.
+Exception: string+x or x+string for atomic types results in converting x to string and concatenating.
+Exception: When x and y are incompatible types, x==y returns FALSE and x!=y returns TRUE.
 Exception: The lookup operation can be "object[string]" or "array[integer]"
 */
 
@@ -398,7 +399,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			jx_delete(left);
 			jx_delete(right);
 			return r;
-		} else if(o->type==JX_OP_ADD && left->type==JX_STRING) {
+		} else if(o->type==JX_OP_ADD && jx_istype(left,JX_STRING) && jx_isatomic(right) ) {
 
 			char *str = jx_print_string(right);
 			jx_delete(right);
@@ -406,7 +407,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			free(str);
 			/* fall through */
 
-		} else if(o->type==JX_OP_ADD && right->type==JX_STRING) {
+		} else if(o->type==JX_OP_ADD && jx_istype(right,JX_STRING) && jx_isatomic(left) ) {
 			char *str = jx_print_string(left);
 			jx_delete(left);
 			left = jx_string(str);

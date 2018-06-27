@@ -209,6 +209,9 @@ struct jx_comprehension *jx_comprehension(const char *variable, struct jx *eleme
 /** Test an expression's type.  @param j An expression. @param type The desired type. @return True if the expression type matches, false otherwise. */
 int jx_istype( struct jx *j, jx_type_t type );
 
+/** Test for an atomic value. @param j An expression.  @return True if the expression is an atomic integer, float, string or boolean. */
+int jx_isatomic( struct jx *j );
+
 /** Test an expression for the boolean value TRUE.  @param j An expression to test.  @return True if the expression is boolean and true. */
 int jx_istrue( struct jx *j );
 
