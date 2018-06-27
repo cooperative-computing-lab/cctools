@@ -22,6 +22,7 @@
 <li><a href=#overview>Overview</a>
 <li><a href=#installing>Installing</a>
 <li><a href=#basic>Basic Usage</a>
+<li><a href=#jx>JX Language</a>
 <li><a href=#monitoring>Monitoring</a>
 <li><a href=#resources>Resources</a>
 <li><a href=#advice>General Advice</a>
@@ -135,16 +136,24 @@ For more complex situations, consult the <a href="install.html">CCTools installa
 
 <a name=basic><h3>Basic Usage</h3></a>
 
-<p>The Makeflow language is very similar to Make.  A Makeflow script consists
-of a set of rules.  Each rule specifies a set of <i>target files</i> to create,
-a set of <i>source files</i> needed to create them, and a <i>command</i> that
+<p>A Makeflow workflow consists of a set of rules.
+Each rule specifies a set of <i>output files</i> to create,
+a set of <i>input files</i> needed to create them, and a <i>command</i> that
 generates the target files from the source files.</p>
 
-<p>Makeflow attempts to generate all of the target files in a script.  It
+<p>Makeflow attempts to generate all of the output files in a workflow.  It
 examines all of the rules and determines which rules must run before others.
 Where possible, it runs commands in parallel to reduce the execution time.</p>
 
-<p>Here is a Makeflow that uses the <tt>convert</tt> utility to make an
+<p>Makeflow suppose two ways of writing a workflow: classic Make and JX.
+Classic Make is very easy to learn and get started, but 
+but can very verbose when writing large workflows.
+The <a href=jx-tutorial.html>JX workflow language</a>
+is a little more complex, but allows for more programmable construction
+of workflows.</p>
+
+<p>Here is an example workflow written in the classic Make language.
+It uses the <tt>convert</tt> utility to make an
 animation.  It downloads an image from the web, creates four variations of the
 image, and then combines them back together into an animation.  The first and
 the last task are marked as LOCAL to force them to run on the controlling
@@ -207,6 +216,56 @@ makeflow -T amazon example.makeflow
 </code>
 
 To learn more about the various batch system options, see the <a href=#batch>Batch System Support</a> section.
+
+<a name=jx><h3>JX Language</h3></a>
+
+
+<p>
+The classic make language is easy to learn and suitable for many purposes,
+but it can get rather verbose for complex workflows.  Makeflow also supports
+the JX workflow language for expressing workflows in a more programmable
+way.  To give you an idea, here is the same "convert" workflow expressed in JX:
+</p>
+
+<code>
+{
+  "define": {
+    "CONVERT":"/usr/bin/convert",
+    "CURL":"/usr/bin/curl",
+    "URL":"http://ccl.cse.nd.edu/images/capitol.jpg",
+    "RANGE":range(0,360,90),
+    "FILELIST": [ format("capitol.%d.jpg",N) for N in RANGE ],
+  },
+  "rules": [
+    {
+      "command": CONVERT+" -delay 10 -loop 0 capitol.jpg "+join(FILELIST," ")+" capitol.anim.gif",
+      "local_job":true,
+      "inputs": [
+        "capitol.jpg",
+        FILELIST,
+	CONVERT,
+      ],
+      "outputs": [ "capitol.anim.gif" ]
+    },    
+
+    {
+      "command":format("%s -swirl %d capitol.jpg capitol.%d.jpg",CONVERT,N,N),
+      "inputs": [ "capitol.jpg", CONVERT ],
+      "outputs": [ format("capitol.%d.jpg",N) ]
+    } for N in RANGE,
+
+    {
+      "command":CURL+" -o capitol.jpg http://ccl.cse.nd.edu/images/capitol.jpg",
+      "local_job":true,
+      "inputs" : [ CURL ],
+      "outputs": [ "capitol.jpg" ]
+    }
+  ]
+}
+</code>
+
+To learn more about JX, please see the <a href=jx-tutorial.html>JX Tutorial</a>
+and <a href=jx-quick.html>JX Quick Reference</a>
 
 <a name=resources><h3>Resources</h3></a>
 
