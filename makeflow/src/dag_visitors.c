@@ -1213,15 +1213,21 @@ struct jx *category_to_json(struct category *c) {
 struct jx *files_to_json(struct list *files, struct itable *remote_names) {
 	struct jx *result = jx_array(NULL);
 	struct dag_file *file;
-	const char *r;
+
 	list_first_item(files);
 	while((file = list_next_item(files))) {
-		struct jx *f = jx_object(NULL);
-		jx_insert(f, jx_string("name"), jx_string(file->filename));
-		if((r = itable_lookup(remote_names, (uintptr_t) file))) {
-			jx_insert(f, jx_string("source"), jx_string(r));
+
+		const char *task_name = file->filename;
+		const char *dag_name = itable_lookup(remote_names,(uintptr_t)file);
+
+		if(dag_name) {
+			struct jx *f = jx_object(NULL);
+			jx_insert(f, jx_string("task_name"),jx_string(task_name));
+			jx_insert(f, jx_string("dag_name"),jx_string(dag_name));
+			jx_array_insert(result, f);
+		} else {
+			jx_array_insert(result,jx_string(task_name));
 		}
-		jx_array_insert(result, f);
 	}
 	return result;
 }
@@ -1234,14 +1240,19 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 
 	while(n) {
 		rule = jx_object(NULL);
-		jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
-		jx_insert(rule, jx_string("category"), jx_string(n->category->name));
-		jx_insert_unless_empty(rule, jx_string("environment"), variables_to_json(n->variables));
+		if(n->resource_request!=CATEGORY_ALLOCATION_FIRST) {
+			jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
+		}
+		if(strcmp(n->category->name,"default")) {
+			jx_insert(rule, jx_string("category"), jx_string(n->category->name));
+		}
 		jx_insert_unless_empty(rule, jx_string("resources"), resources_to_json(n->resources_requested));
-		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files, n->remote_names));
+		jx_insert_unless_empty(rule, jx_string("environment"), variables_to_json(n->variables));
 		jx_insert(rule, jx_string("outputs"), files_to_json(n->target_files, n->remote_names));
-		jx_insert(rule, jx_string("allocation"), category_allocation_to_json(n->resource_request));
-
+		jx_insert(rule, jx_string("inputs"), files_to_json(n->source_files, n->remote_names));
+		if(n->local_job) {
+			jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
+		}
 		if(n->nested_job) {
 			submakeflow = jx_object(NULL);
 			jx_insert(submakeflow, jx_string("path"), jx_string(n->makeflow_dag));
