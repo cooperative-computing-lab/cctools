@@ -169,7 +169,7 @@ join( [ "output."+x+".txt" for x in range(1,100) ], " ")
   command = "simulate.py > "name+".txt",
   outputs = [ name+".txt" ],
   inputs = "simulate.py",
-} for N in [ "alpha", "beta", "gamma", "delta", "epsilon" ]
+} for name in [ "alpha", "beta", "gamma", "delta", "epsilon" ]
 
 </pre>
 </div>
