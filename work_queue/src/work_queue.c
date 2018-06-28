@@ -5693,7 +5693,11 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 	int events = 0;
 
 	// account for time we spend outside work_queue_wait
-	q->stats->time_application += timestamp_get() - q->time_last_wait;
+	if(q->time_last_wait > 0) {
+		q->stats->time_application += timestamp_get() - q->time_last_wait;
+	} else {
+		q->stats->time_application += timestamp_get() - q->stats->time_when_started;
+	}
 
 	print_password_warning(q);
 
