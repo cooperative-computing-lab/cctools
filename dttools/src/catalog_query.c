@@ -6,6 +6,8 @@ See the file COPYING for details.
 */
 
 #include <string.h>
+#include <errno.h>
+
 #include "catalog_query.h"
 #include "http_query.h"
 #include "jx.h"
@@ -243,42 +245,81 @@ char *catalog_query_compress_update(const char *text, unsigned long *data_length
 	}
 }
 
-static int catalog_query_send_update_internal(const char *hosts, const char *text, int fail_if_too_big )
+static int catalog_update_protocol()
 {
-	int sent = 0;
-	unsigned long data_length;
-	const char *next_host = hosts;
-	char *update_data = 0;
-	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
-
-	if (!d) {
-		fatal("could not create datagram port!");
+	const char *protocol = getenv("CATALOG_UPDATE_PROTOCOL");
+	if(!protocol) {
+		return 1;
+	} else if(!strcmp(protocol,"udp")) {
+		return 1;
+	} else if(!strcmp(protocol,"tcp")) {
+		return 0;
+	} else {
+		debug(D_NOTICE,"CATALOG_UPDATE_PROTOCOL=%s but should be 'udp' or 'tcp' intead.",protocol);
+		return 1;
 	}
-	
-	data_length = strlen(text)+1;
+}
 
+static void catalog_update_udp( const char *host, const char *address, int port, const char *text )
+{
+	debug(D_DEBUG, "sending update via udp to %s(%s):%d", host, address, port);
+
+	struct datagram *d = datagram_create(DATAGRAM_PORT_ANY);
+	if(!d) return;
+	datagram_send(d, text, strlen(text), address, port);
+	datagram_delete(d);
+}
+
+
+static int catalog_update_tcp( const char *host, const char *address, int port, const char *text )
+{
+	debug(D_DEBUG, "sending update via tcp to %s(%s):%d", host, address, port);
+
+	time_t stoptime = time(0) + 15;
+	struct link *l = link_connect(address,port,stoptime);
+	if(!l) {
+		debug(D_DEBUG, "failed to connect to %s(%s):%d: %s",host,address,port,strerror(errno));
+		return 0;
+	}
+
+	link_write(l,text,strlen(text),stoptime);
+	link_close(l);
+	return 1;
+}
+
+static int catalog_query_send_update_internal( const char *hosts, const char *text, int fail_if_too_big )
+{
 	size_t compress_limit = 1200;
 	const char *compress_limit_str = getenv("CATALOG_UPDATE_LIMIT");
 	if(compress_limit_str) compress_limit = atoi(compress_limit_str);
 
+	unsigned long data_length = strlen(text);
+	char *update_data = 0;
+	
+	// Ask which protocol should be used.
+	int use_udp = catalog_update_protocol();
+
+	// Decide whether to compress the data.
 	if(strlen(text)<compress_limit) {
+		// Don't bother compressing small updates
 		update_data = strdup(text);
 	} else {
+		// Compress updates above a certain limit.
 		update_data = catalog_query_compress_update(text, &data_length);
-		if(!update_data) {
-			datagram_delete(d);
-			return 0;
-		}
+		if(!update_data) return 0;
 
 		debug(D_DEBUG,"compressed update message from %d to %d bytes",(int)strlen(text),(int)data_length);
 
-		if(data_length>compress_limit && fail_if_too_big) {
+		if(data_length>compress_limit && fail_if_too_big && !use_udp) {
 			debug(D_DEBUG,"compressed update message exceeds limit of %d bytes (CATALOG_UPDATE_LIMIT)",(int)compress_limit);
-			datagram_delete(d);
 			return 0;
 		}
 	}
 
+	int sent = 0;
+	const char *next_host = hosts;
+
+	// Send an update to each catalog in the list...
 	do {
 		char address[DATAGRAM_ADDRESS_MAX];
 		char host[DOMAIN_NAME_MAX];
@@ -286,16 +327,18 @@ static int catalog_query_send_update_internal(const char *hosts, const char *tex
 
 		next_host = parse_hostlist(next_host, host, &port);
 		if (domain_name_cache_lookup(host, address)) {
-			debug(D_DEBUG, "sending update to %s(%s):%d", host, address, port);
-			datagram_send(d, update_data, data_length, address, port);
-			sent++;
+			if(use_udp) {
+				catalog_update_udp( host, address, port, text );
+				sent++;
+			} else {
+				sent += catalog_update_tcp( host, address, port+1, text );
+			}
 		} else {
 			debug(D_DEBUG, "unable to lookup address of host: %s", host);
 		}
 	} while (next_host);
 
 	free(update_data);
-	datagram_delete(d);
 	return sent;
 }
 
