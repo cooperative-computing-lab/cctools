@@ -484,7 +484,8 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 		} else if(jobid<0) {
 			fprintf(stderr, "couldn't submit batch job, still trying...\n");
 		} else if(jobid==0) {
-			fprintf(stderr, "INTERNAL ERROR: %s returned a batch job id of zero!");
+			fprintf(stderr, "INTERNAL ERROR: %s returned a batch job id of zero!",
+				batch_queue_type_to_string(batch_queue_get_type(queue)));
 		}
 
 		if(makeflow_abort_flag) break;
