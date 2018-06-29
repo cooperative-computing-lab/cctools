@@ -5,13 +5,18 @@ See the file COPYING for details.
 */
 
 #include "gpu_info.h"
+#include "stringtools.h"
 
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
+
+
 
 #define GPU_AUTODETECT "cctools_gpu_autodetect"
 
@@ -47,6 +52,30 @@ int gpu_info_get()
 		close(pipefd[0]);
 		return gpu_count;
 	}
+}
+
+char *gpu_name_get()
+{
+	char *gpu_name;	
+	int fd = open("/bin/nvidia-smi", O_RDONLY);
+	if(fd < 0) {
+		fd = close(fd);
+	}
+	else {
+		fd = close(fd);
+		system("nvidia-smi --query-gpu=gpu_name --format=csv,noheader > ./gpu_info.txt");
+		FILE *f = fopen("./gpu_info.txt", "r");
+		char *line = NULL;
+		size_t len = 0;
+    	ssize_t read;
+		if((read = getline(&line, &len, f)) != -1) {
+			gpu_name = string_format("%s", line);
+		}
+		fclose(f);
+		unlink("./gpu_info.txt");
+		free(line);
+	}
+	return gpu_name;
 }
 
 /* vim: set noexpandtab tabstop=4: */

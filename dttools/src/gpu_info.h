@@ -16,6 +16,11 @@ Query gpu properties.
 */
 int gpu_info_get();
 
+/** Get the model name of gpu
+@return Name of gpu
+*/
+char *gpu_name_get();
+
 #endif
 
 /* vim: set noexpandtab tabstop=4: */
