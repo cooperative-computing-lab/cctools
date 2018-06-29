@@ -350,6 +350,12 @@ In the previous example, the category names  <tt>simulate</tt> and
 its <tt>category</tt>. All rules not explicitely labeled with a category belong
 to the <tt>default</tt> category.
 
+The resource specifications are used in two ways:
+
+<ul>
+    <li> A batch job to run a rule is defined using the resource specification. Thus, <tt>makeflow</tt> is able to request the batch system for appropiate resources.
+    <li> When makeflow is run using resource monitoring (<tt>--monitor=...</tt>), if the resource usage of a rule exceeds the resources declared, it is terminated and by default it is not retried. Retries may be activated per category using <tt>"allocation" : "max" | "first"</tt>. With <tt>max</tt>, the rule is retried once using the largest resources available. With <tt>first</tt>, makeflow computes efficient resource allocations as measurements become available, and each task guaranteed to be retried at least once as with <tt>max</tt>. 
+</ul>
 
 </div>
 
