@@ -47,6 +47,12 @@ See the file COPYING for details.
 /* Timeout in communicating with the querying client */
 #define HANDLE_QUERY_TIMEOUT 15
 
+/* Very short timeout to deal with TCP update, which blocks the server. */
+#define HANDLE_TCP_UPDATE_TIMEOUT 5
+
+/* Maximum size of a JX record arriving via TCP is 1MB. */
+#define TCP_PAYLOAD_MAX 1024*1024
+
 /* The table of record, hashed on address:port */
 static struct jx_database *table = 0;
 
@@ -107,13 +113,11 @@ static int outgoing_alarm = 0;
 static int outgoing_timeout = 300;
 static struct list *outgoing_host_list;
 
-/* Buffer for incoming raw data only needs to be as big as a max datagram. */
-static char raw_data[DATAGRAM_PAYLOAD_MAX];
-
 /* Buffer for uncompressed data is 1MB to accommodate expansion. */
 static char data[1024*1024];
 
 struct datagram *update_dgram = 0;
+struct link *update_port = 0;
 
 void shutdown_clean(int sig)
 {
@@ -221,19 +225,11 @@ static void make_hash_key(struct jx *j, char *key)
 	sprintf(key, "%s:%d:%s", addr, port, name);
 }
 
-static void handle_updates(struct datagram *update_port)
+static void handle_update( const char *addr, int port, const char *raw_data, int raw_data_length, const char *protocol )
 {
-	char addr[DATAGRAM_ADDRESS_MAX];
 	char key[LINE_MAX];
-	int port;
 	unsigned long data_length;
-	int raw_data_length;
 	struct jx *j;
-
-	while(1) {
-		raw_data_length = datagram_recv(update_port, raw_data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
-		if(raw_data_length <= 0)
-			return;
 
 		// If the packet starts with Control-Z (0x1A), it is compressed,
 		// so uncompress it to data[].  Otherwise just copy to data[];.
@@ -243,7 +239,7 @@ static void handle_updates(struct datagram *update_port)
 			int success = uncompress((Bytef*)data,&data_length,(const Bytef*)&raw_data[1],raw_data_length-1);
 			if(success!=Z_OK) {
 				debug(D_DEBUG,"warning: %s:%d sent invalid compressed data (ignoring it)\n",addr,port);
-				continue;
+				return;
 			}
 		} else {
 			memcpy(data,raw_data,raw_data_length);
@@ -260,16 +256,16 @@ static void handle_updates(struct datagram *update_port)
 			j = jx_parse_string(data);
 			if(!j) {
 				debug(D_DEBUG,"warning: %s:%d sent invalid JSON data (ignoring it)\n%s\n",addr,port,data);
-				continue;
+				return;
 			}
 			if(!jx_is_constant(j)) {
 				debug(D_DEBUG,"warning: %s:%d sent non-constant JX data (ignoring it)\n%s\n",addr,port,data);
 				jx_delete(j);
-				continue;
+				return;
 			}
 		} else {
 			struct nvpair *nv = nvpair_create();
-			if(!nv) continue;
+			if(!nv) return;
 			nvpair_parse(nv, data);
 			j = nvpair_to_jx(nv);
 			nvpair_delete(nv);
@@ -316,8 +312,57 @@ static void handle_updates(struct datagram *update_port)
 
 		jx_database_insert(table, key, j);
 
-		debug(D_DEBUG, "received udp update from %s", key);
+		debug(D_DEBUG, "received %s update from %s",protocol,key);
+}
+
+/*
+Where possible, we prefer to accept short updates via UDP,
+because these can be accepted quickly in a non-blocking manner.
+*/
+
+static void handle_udp_updates(struct datagram *update_port)
+{
+	char data[DATAGRAM_PAYLOAD_MAX];
+	char addr[DATAGRAM_ADDRESS_MAX];
+	int port;
+
+	while(1) {
+		int result = datagram_recv(update_port, data, DATAGRAM_PAYLOAD_MAX, addr, &port, 0);
+		if(result <= 0)
+			return;
+
+		data[result] = 0;
+		handle_update(addr,port,data,result,"udp");
 	}
+}
+
+/*
+Where necessary, we accept updates via TCP, but they cause
+the server to block, and so we impose a very short timeout on top.
+*/
+
+void handle_tcp_update( struct link *update_port )
+{
+	char data[TCP_PAYLOAD_MAX];
+
+	time_t stoptime = time(0) + HANDLE_TCP_UPDATE_TIMEOUT;
+
+	struct link *l = link_accept(update_port,stoptime);
+	if(!l) return;
+
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+
+	link_address_remote(l,addr,&port);
+
+	int length = link_read(l,data,sizeof(data)-1,stoptime);
+
+	if(length>0) {
+		data[length] = 0;
+		handle_update(addr,port,data,length,"tcp");
+	}
+
+	link_close(l);
 }
 
 static struct jx_table html_headers[] = {
@@ -526,7 +571,7 @@ static void show_help(const char *cmd)
 
 int main(int argc, char *argv[])
 {
-	struct link *link, *list_port = 0;
+	struct link *link, *query_port = 0;
 	signed char ch;
 	time_t current;
 	int is_daemon = 0;
@@ -670,8 +715,8 @@ int main(int argc, char *argv[])
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
-	list_port = link_serve_address(interface, port);
-	if(list_port) {
+	query_port = link_serve_address(interface, port);
+	if(query_port) {
 		/*
 		If a port was chosen automatically, read it back
 		so that the same one can be used for the update port.
@@ -681,7 +726,7 @@ int main(int argc, char *argv[])
 
 		if(port==0) {
 			char addr[LINK_ADDRESS_MAX];
-			link_address_local(list_port,addr,&port);
+			link_address_local(query_port,addr,&port);
 		}
 	} else {
 		if(interface)
@@ -698,12 +743,22 @@ int main(int argc, char *argv[])
 			fatal("couldn't listen on UDP port %d", port);
 	}
 
+	update_port = link_serve_address(interface,port+1);
+	if(!update_port) {
+		if(interface)
+			fatal("couldn't listen on TCP address %s port %d", interface, port+1);
+		else
+			fatal("couldn't listen on TCP port %d", port+1);
+	}
+
 	opts_write_port_file(port_file,port);
 
 	while(1) {
 		fd_set rfds;
-		int ufd = datagram_fd(update_dgram);
-		int lfd = link_fd(list_port);
+		int dfd = datagram_fd(update_dgram);
+		int lfd = link_fd(query_port);
+		int ufd = link_fd(update_port);
+
 		int result, maxfd;
 		struct timeval timeout;
 
@@ -726,11 +781,12 @@ int main(int argc, char *argv[])
 		}
 
 		FD_ZERO(&rfds);
+		FD_SET(dfd, &rfds);
 		FD_SET(ufd, &rfds);
 		if(child_procs_count < child_procs_max) {
 			FD_SET(lfd, &rfds);
 		}
-		maxfd = MAX(ufd, lfd) + 1;
+		maxfd = MAX(ufd,MAX(dfd, lfd)) + 1;
 
 		timeout.tv_sec = 5;
 		timeout.tv_usec = 0;
@@ -739,12 +795,16 @@ int main(int argc, char *argv[])
 		if(result <= 0)
 			continue;
 
+		if(FD_ISSET(dfd, &rfds)) {
+			handle_udp_updates(update_dgram);
+		}
+
 		if(FD_ISSET(ufd, &rfds)) {
-			handle_updates(update_dgram);
+			handle_tcp_update(update_port);
 		}
 
 		if(FD_ISSET(lfd, &rfds)) {
-			link = link_accept(list_port, time(0) + 5);
+			link = link_accept(query_port, time(0) + 5);
 			if(link) {
 				if(fork_mode) {
 					pid_t pid = fork();
