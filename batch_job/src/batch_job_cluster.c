@@ -107,7 +107,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 
 	if(!setup_batch_wrapper(q, cluster_name)) {
 		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
-		return 0;
+		return -1;
 	}
 
 	/*
