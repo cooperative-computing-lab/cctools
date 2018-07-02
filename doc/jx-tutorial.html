@@ -360,7 +360,7 @@ The resource specifications are used in two ways:
 When the resources used by a rule are not known, we recommend to set the
 resource specification to the largest resources available (e.g., the largest
 size possible for a batch job), and add to the category definition the key-value
-<tt>"allocation" : "first"</tt>.  As measurements become available, makeflow
+<tt>"allocation" : "auto"</tt>.  As measurements become available, makeflow
 computes efficient resource allocations to maximize throughput. If a rule fails
 because the computed allocation is too small, it is retried once using the
 maximum resources specified. With this scheme, even when some rules are
