@@ -247,9 +247,9 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 
 	const char *allocation = jx_lookup_string(j, "allocation");
 	if (allocation) {
-		if (!strcmp(allocation, "first")) {
+		if (!strcmp(allocation, "first") || !strcmp(allocation, "auto")) {  // "first" is deprecated
 			debug(D_MAKEFLOW_PARSER,
-				"Rule at line %u: first allocation",
+				"Rule at line %u: auto allocation",
 				j->line);
 			n->resource_request = CATEGORY_ALLOCATION_FIRST;
 		} else if (!strcmp(allocation, "max")) {
@@ -263,7 +263,7 @@ static int rule_from_jx(struct dag *d, struct jx *j) {
 				j->line);
 			n->resource_request = CATEGORY_ALLOCATION_ERROR;
 		} else {
-            report_error(j->line, "one of \"max\", \"first\", or \"error\"", j);
+            report_error(j->line, "one of \"max\", \"auto\", or \"error\"", j);
 			return 0;
 		}
 	}
