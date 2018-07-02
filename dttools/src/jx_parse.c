@@ -557,7 +557,9 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
-		jx_parse_error_a(s,string_format("key \"%s\" must be followed by a colon",p->key->u.string_value));
+		char *pstr = jx_print_string(p->key);
+		jx_parse_error_a(s,string_format("key %s must be followed by a colon",pstr));
+		free(pstr);
 		jx_pair_delete(p);
 		return NULL;
 	}
