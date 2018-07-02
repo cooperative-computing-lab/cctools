@@ -57,8 +57,6 @@ SOURCES = \
 	http_query.c \
 	interfaces_address.c \
 	itable.c \
-	json.c \
-	json_aux.c \
 	jx.c \
 	jx_database.c \
 	jx_getopt.c \

@@ -21,7 +21,7 @@ PROGRAMS_CONFUGA = confuga_adm
 PUBLIC_HEADERS = chirp_global.h chirp_multi.h chirp_reli.h chirp_client.h chirp_stream.h chirp_protocol.h chirp_matrix.h chirp_types.h chirp_recursive.h confuga.h
 SCRIPTS = chirp_audit_cluster chirp_server_hdfs
 SOURCES_CONFUGA = confuga.c confuga_namespace.c confuga_replica.c confuga_node.c confuga_job.c confuga_file.c confuga_gc.c
-SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c
+SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c json.c json_aux.c
 SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_fs_confuga.c chirp_job.c chirp_sqlite.c
 TARGETS = $(PROGRAMS) $(LIBRARIES) bindings
 
