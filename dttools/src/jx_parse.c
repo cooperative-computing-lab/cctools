@@ -119,11 +119,28 @@ void jx_parser_delete( struct jx_parser *p )
 	free(p);
 }
 
-static void jx_parse_error( struct jx_parser *p, const char *str )
+/*
+Record a parse error for later retrieval.
+For clarity to the user, only the first error encountered is saved.
+str should be an allocated string which the parser will free.
+*/
+
+static void jx_parse_error_a( struct jx_parser *p, char *str )
 {
-	free(p->error_string);
-	p->error_string = string_format("line %u: %s", p->line, str);
 	p->errors++;
+	if(!p->error_string) {
+		p->error_string = string_format("line %u: %s", p->line, str);
+	}
+	free(str);
+}
+
+/*
+Same as above, but accepts a constant string that will not be freed.
+*/
+
+static void jx_parse_error_c( struct jx_parser *p, const char *str )
+{
+	jx_parse_error_a(p,strdup(str));
 }
 
 static struct jx *jx_add_lineno(struct jx_parser *p, struct jx *j) {
@@ -189,11 +206,11 @@ static int jx_scan_unicode( struct jx_parser *s )
 			// only accept basic ascii characters
 			return uc;
 		} else {
-			jx_parse_error(s,"unsupported unicode escape string");
+			jx_parse_error_a(s,string_format("unsupported unicode escape string: %s",str));
 			return -1;
 		}
 	} else {
-		jx_parse_error(s,"invalid unicode escape string");
+		jx_parse_error_a(s,string_format("invalid unicode escape string: %s",str));
 		return -1;
 	}
 }
@@ -275,7 +292,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if(c=='=') {
 		char d = jx_getchar(s);
 		if(d=='=') return JX_TOKEN_EQ;
-		jx_parse_error(s,"invalid character: =");
+		jx_parse_error_c(s,"single = must be == instead");
 		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='<') {
 		char d = jx_getchar(s);
@@ -290,19 +307,21 @@ static jx_token_t jx_scan( struct jx_parser *s )
 	} else if (c=='&') {
 		char d = jx_getchar(s);
 		if(d=='&') return JX_TOKEN_C_AND;
-		jx_parse_error(s, "invalid character: &");
+		jx_parse_error_c(s,"single & must be && instead");
 		return JX_TOKEN_PARSE_ERROR;
 	} else if (c=='|') {
 		char d = jx_getchar(s);
 		if(d=='|') return JX_TOKEN_C_OR;
-		jx_parse_error(s, "invalid character: |");
+		jx_parse_error_c(s,"single | must be || instead");
 		return JX_TOKEN_PARSE_ERROR;
 	} else if(c=='\"') {
 		int i;
 		for(i=0;i<MAX_TOKEN_SIZE;i++) {
 			int n = jx_scan_string_char(s);
 			if(n==EOF) {
-				jx_parse_error(s,"missing end quote");
+				if(i>10) i = 10;
+				s->token[i] = 0;
+				jx_parse_error_a(s,string_format("missing end quote: \"%s...",s->token));
 				return JX_TOKEN_PARSE_ERROR;
 			} else if(n==0) {
 				s->token[i] = n;
@@ -311,7 +330,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				s->token[i] = n;
 			}
 		}
-		jx_parse_error(s,"string constant too long");
+		s->token[10] = 0;
+		jx_parse_error_a(s,string_format("string constant too long: \"%s...",s->token));
 		return JX_TOKEN_PARSE_ERROR;
 
 	} else if(c=='(') {
@@ -352,11 +372,11 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				s->double_value = strtod(s->token,&endptr);
 				if(!*endptr) return JX_TOKEN_DOUBLE;
 
-				jx_parse_error(s,"invalid number format");
+				jx_parse_error_a(s,string_format("invalid number format: %s",s->token));
 				return JX_TOKEN_PARSE_ERROR;
 			}
 		}
-		jx_parse_error(s,"integer constant too long");
+		jx_parse_error_a(s,string_format("integer constant too long: %s",s->token));
 		return JX_TOKEN_PARSE_ERROR;
 	} else if(isalpha(c) || c=='_') {
 		s->token[0] = c;
@@ -393,12 +413,12 @@ static jx_token_t jx_scan( struct jx_parser *s )
 				}
 			}
 		}
-		jx_parse_error(s,"symbol too long");
+		jx_parse_error_a(s,string_format("symbol too long: %s",s->token));
 		return JX_TOKEN_PARSE_ERROR;
 	} else {
 		s->token[0] = c;
 		s->token[1] = 0;
-		jx_parse_error(s,"invalid character");
+		jx_parse_error_a(s,string_format("invalid character: %c",c));
 		return JX_TOKEN_PARSE_ERROR;
 	}
 }
@@ -418,20 +438,20 @@ static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s) {
 
 	t = jx_scan(s);
 	if (t != JX_TOKEN_SYMBOL) {
-		jx_parse_error(s, "expected variable for list comprehension");
+		jx_parse_error_a(s, string_format("expected 'for' to be followed by a variable name, not '%s'",s->token));
 		goto FAILURE;
 	}
 	variable = strdup(s->token);
 
 	t = jx_scan(s);
 	if (t != JX_TOKEN_IN) {
-		jx_parse_error(s, "malformed list comprehension (missing `in')");
+		jx_parse_error_a(s,string_format("expected 'for %s' to be followed by 'in', not '%s'",variable,s->token));
 		goto FAILURE;
 	}
 
 	elements = jx_parse(s);
 	if (!elements) {
-		if (!jx_parser_errors(s)) jx_parse_error(s, "EOF while parsing list comprehension");
+		jx_parse_error_a(s, string_format("unexpected EOF following 'for %s'",variable));
 		goto FAILURE;
 	}
 
@@ -439,7 +459,7 @@ static struct jx_comprehension *jx_parse_comprehension(struct jx_parser *s) {
 	if (t == JX_TOKEN_IF) {
 		condition = jx_parse(s);
 		if (!condition) {
-			if (!jx_parser_errors(s)) jx_parse_error(s, "EOF while parsing list comprehension");
+			jx_parse_error_c(s, "unexpected EOF after 'if'" );
 			goto FAILURE;
 		}
 	} else {
@@ -500,7 +520,7 @@ static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
 	} else if(t==rdelim) {
 		i->next = NULL;
 	} else {
-		jx_parse_error(s,"list of items missing a comma or closing delimiter");
+		jx_parse_error_c(s,"list of items missing a comma or closing delimiter");
 		jx_item_delete(i);
 		return NULL;
 	}
@@ -529,7 +549,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	if(s->strict_mode) {
 		if(p->key->type!=JX_STRING) {
-			jx_parse_error(s,"key-value pair must have a string as the key");
+			jx_parse_error_c(s,"key-value pair must have a string as the key");
 			jx_pair_delete(p);
 			return NULL;
 		}
@@ -537,7 +557,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 
 	t = jx_scan(s);
 	if(t!=JX_TOKEN_COLON) {
-		jx_parse_error(s,"key-value pair must be separated by a colon");
+		jx_parse_error_a(s,string_format("key \"%s\" must be followed by a colon",p->key->u.string_value));
 		jx_pair_delete(p);
 		return NULL;
 	}
@@ -561,7 +581,7 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	} else if(t==JX_TOKEN_RBRACE) {
 		p->next = NULL;
 	} else {
-		jx_parse_error(s,"key-value pairs missing a comma or closing brace");
+		jx_parse_error_c(s,"key-value pairs missing a comma or closing brace");
 		jx_pair_delete(p);
 		return NULL;
 	}
@@ -576,7 +596,7 @@ static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist) {
 		if (t == JX_TOKEN_LPAREN) {
 			t = JX_TOKEN_LBRACKET;
 		} else {
-			jx_parse_error(s,"function missing opening parenthesis");
+			jx_parse_error_c(s,"function call missing opening parenthesis");
 			return NULL;
 		}
 	}
@@ -621,7 +641,7 @@ static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist) {
 			return jx_add_lineno(s, jx_null());
 		case JX_TOKEN_SYMBOL: {
 			if(s->strict_mode) {
-				jx_parse_error(s,"symbols are not allowed in strict parsing mode");
+				jx_parse_error_a(s,string_format("unquoted strings (%s) are not allowed in strict parsing mode",s->token));
 				return NULL;
 			}
 			return jx_add_lineno(s, jx_symbol(s->token));
@@ -632,14 +652,16 @@ static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist) {
 
 			t = jx_scan(s);
 			if (t != JX_TOKEN_RPAREN) {
-				jx_parse_error(s, "missing closing parenthesis");
+				jx_parse_error_c(s, "missing closing parenthesis");
 				jx_delete(j);
 				return NULL;
 			}
 			return j;
 		}
 		default: {
-			jx_parse_error(s,"unexpected token");
+			char *str = string_format("unexpected token: %s",s->token);
+			jx_parse_error_c(s,str);
+			free(str);
 			return NULL;
 		}
 	}
@@ -649,7 +671,7 @@ static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist) {
 	should be handled above.  But just in case...
 	*/
 
-	jx_parse_error(s,"parse error");
+	jx_parse_error_c(s,"parse error");
 	return NULL;
 }
 
@@ -767,7 +789,7 @@ static struct jx *jx_parse_postfix(struct jx_parser *s) {
 
 			t = jx_scan(s);
 			if (t != JX_TOKEN_RBRACKET) {
-				jx_parse_error(s, "missing closing bracket");
+				jx_parse_error_c(s, "missing closing bracket");
 				jx_delete(a);
 				jx_delete(b);
 				return NULL;
@@ -818,12 +840,12 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			unsigned line = s->line;
 			struct jx *j = jx_parse_postfix(s);
 			if (!j) {
-				jx_parse_error(s, "error is missing a required field");
+				jx_parse_error_c(s, "error is missing a required field");
 				return NULL;
 			}
 			if (!jx_error_valid(j)) {
 				jx_delete(j);
-				jx_parse_error(s, "invalid error specification");
+				jx_parse_error_c(s, "invalid error specification");
 				return NULL;
 			}
 			j = jx_error(j);
