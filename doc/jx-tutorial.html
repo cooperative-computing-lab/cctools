@@ -305,6 +305,68 @@ Putting it all together, we have this:
 }
 </code>
 
+
+
+<h2>Computational Resources</h2>
+
+JX allows you to specify the number of cores, and the memory and disk sizes a rule requires. To this end, rules are grouped into <i>categories</i>. Rules in the same category are expected to use the same quantity of resources. Following with our example, we have twonatural categories, rules that perform a simulation, and a rule that collects the results:
+
+
+<code>{
+   "define": {
+      "RANGE" : range(1,3),
+      "FILELIST" : ["output."+N+".txt for N in RANGE],
+   },
+
+   "categories": {
+       "simulate":{
+           "resources": {"cores":4, "memory":512, "disk":1024}
+       },
+       "collect":{
+           "resources": {"cores":1, "memory":512, "disk":8192}
+       }
+   },
+
+   "rules": [
+      {
+        "command" : "./simulate.py -n "+N+" > output."+N+".txt",
+        "inputs" : [ "simulate.py" ],
+        "outputs" : [ "output."+N+".txt" ],
+        "category" : "simulate"
+      } for N in RANGE,
+      {
+        "command" : "cat "+join(FILELIST," ")+" >output.all.txt",
+        "inputs" : [ FILELIST ],
+        "outputs" : [ "output.all.txt" ],
+        "category" : "collect"
+      }
+   ]
+}
+</code>
+
+In the previous example, the category names  <tt>simulate</tt> and
+<tt>collect</tt> are arbitrary. Memory and disk are specified in megabytes
+(MB). Note that we both defined <tt>categories</tt> and labeled each rule with
+its <tt>category</tt>. All rules not explicitely labeled with a category belong
+to the <tt>default</tt> category.
+
+The resource specifications are used in two ways:
+
+<ul>
+    <li> A batch job to run a rule is defined using the resource specification. Thus, <tt>makeflow</tt> is able to request the batch system for appropiate resources.
+    <li> When makeflow is run using resource monitoring (<tt>--monitor=...</tt>), if the resource usage of a rule exceeds the resources declared, it is terminated and marked as failed rule.
+</ul>
+
+When the resources used by a rule are not known, we recommend to set the
+resource specification to the largest resources available (e.g., the largest
+size possible for a batch job), and add to the category definition the key-value
+<tt>"allocation" : "first"</tt>.  As measurements become available, makeflow
+computes efficient resource allocations to maximize throughput. If a rule fails
+because the computed allocation is too small, it is retried once using the
+maximum resources specified. With this scheme, even when some rules are
+retried, overall throughput is increased in most cases.
+</ul>
+
 </div>
 
 </body>
