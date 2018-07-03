@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "gpu_info.h"
 #include "stringtools.h"
+#include "get_line.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -56,25 +57,14 @@ int gpu_info_get()
 
 char *gpu_name_get()
 {
-	char *gpu_name;	
-	int fd = open("/bin/nvidia-smi", O_RDONLY);
-	if(fd < 0) {
-		fd = close(fd);
+	FILE *pipe = popen("/bin/nvidia-smi --query-gpu=gpu_name --format=csv,noheader", "r");
+	if(!pipe) {
+		return NULL;
 	}
-	else {
-		fd = close(fd);
-		system("nvidia-smi --query-gpu=gpu_name --format=csv,noheader > ./gpu_info.txt");
-		FILE *f = fopen("./gpu_info.txt", "r");
-		char *line = NULL;
-		size_t len = 0;
-    	ssize_t read;
-		if((read = getline(&line, &len, f)) != -1) {
-			gpu_name = string_format("%s", line);
-		}
-		fclose(f);
-		unlink("./gpu_info.txt");
-		free(line);
-	}
+
+	char *gpu_name = get_line(pipe);
+	fclose(pipe);
+
 	return gpu_name;
 }
 
