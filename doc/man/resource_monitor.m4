@@ -185,19 +185,23 @@ LONGCODE_END
 
 All fields but BOLD(label) are optional. 
 
-            FILENAME:                  Name of a file to watch.
-            from-start:boolean         If FILENAME exits when the monitor starts running, process from line 1. Default: false, as monitored processes may be appending to already existing files.
-            from-start-if-truncated    If FILENAME is truncated, process from line 1. Default: true, to account for log rotations.
-            delete-if-found            Delete FILENAME when found. Default: false
+LIST_BEGIN
+            LIST_ITEM FILENAME:                  Name of a file to watch.
+            LIST_ITEM from-start:boolean         If FILENAME exits when the monitor starts running, process from line 1. Default: false, as monitored processes may be appending to already existing files.
+            LIST_ITEM from-start-if-truncated    If FILENAME is truncated, process from line 1. Default: true, to account for log rotations.
+            LIST_ITEM delete-if-found            Delete FILENAME when found. Default: false
 
-            events:
-            label        Name that identifies the snapshot. Only alphanumeric, -,
+            LIST_ITEM events:
+LIST_BEGIN
+            LIST_ITEM label        Name that identifies the snapshot. Only alphanumeric, -,
                          and _ characters are allowed. 
-            on-create    Take a snapshot every time the file is created. Default: false
-            on-delete    Take a snapshot every time the file is deleted. Default: false
-            on-truncate  Take a snapshot when the file is truncated.    Default: false
-            on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
-            count        Maximum number of snapshots for this label. Default: -1 (no limit)
+            LIST_ITEM on-create    Take a snapshot every time the file is created. Default: false
+            LIST_ITEM on-delete    Take a snapshot every time the file is deleted. Default: false
+            LIST_ITEM on-truncate  Take a snapshot when the file is truncated.    Default: false
+            LIST_ITEM on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
+            LIST_ITEM count        Maximum number of snapshots for this label. Default: -1 (no limit)
+LIST_END
+LIST_END
 
 The snapshots are recorded both in the main resource summary file under the key
 BOLD(snapshots), and as a JSON-encoded document, with the extension
