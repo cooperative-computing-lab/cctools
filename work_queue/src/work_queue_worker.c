@@ -337,9 +337,6 @@ void measure_worker_resources()
 Send a message to the master with user defined features.
 */
 static void send_features(struct link *master) {
-	if(!features)
-		return;
-
 	char *f;
 	void *dummy;
 	hash_table_firstkey(features);
@@ -2296,6 +2293,8 @@ int main(int argc, char *argv[])
 	char *foreman_stats_filename = NULL;
 	char * catalog_hosts = CATALOG_HOST;
 
+	features = hash_table_create(4, 0);
+
 	worker_start_time = time(0);
 
 	set_worker_id();
@@ -2512,9 +2511,6 @@ int main(int argc, char *argv[])
 			break;
 		}
 		case LONG_OPT_FEATURE:
-			if(!features) {
-				features = hash_table_create(4, 0);
-			}
 			hash_table_insert(features, optarg, (void **) 1);
 			break;
 		default:
@@ -2565,11 +2561,9 @@ int main(int argc, char *argv[])
 	}
 
 	//Check GPU name
-	if(features) {
-		char *gpu_name = gpu_name_get();
-		if(gpu_name) {
-			hash_table_insert(features, gpu_name, (void **) 1);
-		}
+	char *gpu_name = gpu_name_get();
+	if(gpu_name) {
+		hash_table_insert(features, gpu_name, (void **) 1);
 	}
 
 	signal(SIGTERM, handle_abort);
