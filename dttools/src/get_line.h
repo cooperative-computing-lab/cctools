@@ -8,6 +8,8 @@ See the file COPYING for details.
 #ifndef __LINEREADER_H__
 #define __LINEREADER_H__
 
+#include <stdio.h>
+
 #define LARGE_LINE_MAX 1048576
 
 /** Read a line of any length from a file.
