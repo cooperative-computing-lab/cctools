@@ -214,6 +214,7 @@ struct work_queue_worker {
 	int  foreman;                             // 0 if regular worker, 1 if foreman
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
+	struct hash_table           *features;
 
 	char *workerid;
 
@@ -286,6 +287,7 @@ static int update_task_result(struct work_queue_task *t, work_queue_result_t new
 static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work_queue_worker *w, const char *line);
 static work_queue_msg_code_t process_queue_status(struct work_queue *q, struct work_queue_worker *w, const char *line, time_t stoptime);
 static work_queue_msg_code_t process_resource(struct work_queue *q, struct work_queue_worker *w, const char *line);
+static work_queue_msg_code_t process_feature(struct work_queue *q, struct work_queue_worker *w, const char *line);
 
 static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplink );
 static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_uplink );
@@ -604,7 +606,6 @@ work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worke
 static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_queue_worker *w, char *line, size_t length )
 {
 	time_t stoptime;
-
 	//If foreman, then we wait until foreman gives the master some attention.
 	if(w->foreman)
 		stoptime = time(0) + q->long_timeout;
@@ -633,6 +634,8 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = MSG_PROCESSED;
 	} else if (string_prefix_is(line, "resource")) {
 		result = process_resource(q, w, line);
+	} else if (string_prefix_is(line, "feature")) {
+		result = process_feature(q, w, line);
 	} else if (string_prefix_is(line, "auth")) {
 		debug(D_WQ|D_NOTICE,"worker (%s) is attempting to use a password, but I do not have one.",w->addrport);
 		result = MSG_FAILURE;
@@ -900,6 +903,10 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	work_queue_resources_delete(w->resources);
 
 	free(w->workerid);
+
+	if(w->features)
+		hash_table_delete(w->features);
+
 	free(w->stats);
 	free(w->hostname);
 	free(w->os);
@@ -2287,7 +2294,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
-	aggregate_workers_resources(q,&r);
+	aggregate_workers_resources(q,&r,NULL);
 	work_queue_resources_add_to_jx(&r,j);
 
 	// If this is a foreman, add the master address and the disk resources
@@ -2617,6 +2624,29 @@ static work_queue_msg_code_t process_resource( struct work_queue *q, struct work
 	} else {
 		return MSG_FAILURE;
 	}
+
+	return MSG_PROCESSED;
+}
+
+static work_queue_msg_code_t process_feature( struct work_queue *q, struct work_queue_worker *w, const char *line )
+{
+	char feature[WORK_QUEUE_LINE_MAX];
+	char fdec[WORK_QUEUE_LINE_MAX];
+
+	int n = sscanf(line, "feature %s", feature);
+
+	if(n != 1) {
+		return MSG_FAILURE;
+	}
+
+	if(!w->features)
+		w->features = hash_table_create(4,0);
+
+	url_decode(feature, fdec, WORK_QUEUE_LINE_MAX);
+
+	debug(D_WQ, "Feature found: %s\n", fdec);
+
+	hash_table_insert(w->features, fdec, (void **) 1);
 
 	return MSG_PROCESSED;
 }
@@ -3349,6 +3379,18 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 
 	rmsummary_delete(limits);
 
+	if(t->features) {
+		if(!w->features)
+			return 0;
+
+		char *feature;
+		list_first_item(t->features);
+		while((feature = list_next_item(t->features))) {
+			if(!hash_table_lookup(w->features, feature))
+				return 0;
+		}
+	}
+
 	return ok;
 }
 
@@ -4001,6 +4043,15 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
 	new->command_line = xxstrdup(task->command_line);
   }
 
+  if(task->features) {
+	  new->features = list_create();
+	  char *req;
+	  list_first_item(task->features);
+	  while((req = list_next_item(task->features))) {
+		  list_push_tail(new->features, xxstrdup(req));
+	  }
+  }
+
   new->input_files  = work_queue_task_file_list_clone(task->input_files);
   new->output_files = work_queue_task_file_list_clone(task->output_files);
   new->env_list     = work_queue_task_env_list_clone(task->env_list);
@@ -4161,6 +4212,16 @@ void work_queue_task_specify_category(struct work_queue_task *t, const char *cat
 		free(t->category);
 
 	t->category = xxstrdup(category ? category : "default");
+}
+
+void work_queue_task_specify_resource(struct work_queue_task *t, const char *name, int64_t count)
+{
+	if(!name)
+		return;
+	if(!t->features)
+		t->features = list_create();
+
+	list_push_tail(t->features, xxstrdup(name));
 }
 
 struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
@@ -4669,6 +4730,14 @@ void work_queue_task_delete(struct work_queue_task *t)
 			list_delete(t->env_list);
 		}
 
+		if(t->features) {
+			char *feature;
+			while((feature=list_pop_tail(t->features))) {
+				free(feature);
+			}
+			list_delete(t->features);
+		}
+
 		free(t->hostname);
 		free(t->host);
 
@@ -4678,7 +4747,6 @@ void work_queue_task_delete(struct work_queue_task *t)
 
 		free(t->monitor_output_directory);
 		free(t->monitor_snapshot_file);
-
 		free(t);
 	}
 }
@@ -6175,7 +6243,7 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 	//info about resources
 	s->bandwidth = work_queue_get_effective_bandwidth(q);
 	struct work_queue_resources r;
-	aggregate_workers_resources(q,&r);
+	aggregate_workers_resources(q,&r,NULL);
 
 	s->total_cores = r.cores.total;
 	s->total_memory = r.memory.total;
@@ -6298,14 +6366,7 @@ void work_queue_get_stats_category(struct work_queue *q, const char *category, s
 	rmsummary_delete(rmax);
 }
 
-/*
-This function is a little roundabout, because work_queue_resources_add
-updates the min and max of each value as it goes.  So, we set total
-to the value of the first item, then use work_queue_resources_add.
-If there are no items, we must manually return zero.
-*/
-
-void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total )
+void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *total, struct hash_table *features)
 {
 	struct work_queue_worker *w;
 	char *key;
@@ -6316,12 +6377,27 @@ void aggregate_workers_resources( struct work_queue *q, struct work_queue_resour
 		return;
 	}
 
+	if(features) {
+		hash_table_clear(features);
+	}
+
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table,&key,(void**)&w)) {
 		if(w->resources->tag < 0)
 			continue;
 
 		work_queue_resources_add(total,w->resources);
+
+		if(features) {
+			if(w->features) {
+				char *key;
+				void *dummy;
+				hash_table_firstkey(w->features);
+				while(hash_table_nextkey(w->features, &key, &dummy)) {
+					hash_table_insert(features, key, (void **) 1);
+				}
+			}
+		}
 	}
 }
 

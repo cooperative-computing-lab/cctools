@@ -18,8 +18,8 @@ This file should not be installed and should only be included by .c files.
 /* 5: added wall_time, end_time messages, for task maximum running time. */
 /* 6: worker only report total, max, and min resources. */
 /* 7: added category message */
-
-#define WORK_QUEUE_PROTOCOL_VERSION 7
+/* 8: worker send feature message. */
+#define WORK_QUEUE_PROTOCOL_VERSION 8
 
 #define WORK_QUEUE_LINE_MAX 4096       /**< Maximum length of a work queue message line. */
 #define WORK_QUEUE_POOL_NAME_MAX 128   /**< Maximum length of a work queue pool name. */

@@ -8,6 +8,7 @@ See the file COPYING for details.
 #include "work_queue_resources.h"
 
 #include "list.h"
+#include "hash_table.h"
 
 struct work_queue_file {
 	work_queue_file_t type;
@@ -23,7 +24,7 @@ struct work_queue_file {
 struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeout, struct link *foreman_uplink, int *foreman_uplink_active);
 
 /* Adds (arithmetically) all the workers resources (cores, memory, disk) */
-void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *r );
+void aggregate_workers_resources( struct work_queue *q, struct work_queue_resources *r, struct hash_table *categories );
 
 /** Enable use of the process module.
 This allows @ref work_queue_wait to call @ref process_pending from @ref process.h, exiting if a process has completed.
