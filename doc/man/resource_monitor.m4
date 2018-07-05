@@ -169,7 +169,7 @@ LONGCODE_BEGIN
                     "label":"EVENT_NAME",
                     "on-create":boolean,
                     "on-truncate":boolean,
-                    "pattern":"REGEXP",
+                    "on-pattern":"REGEXP",
                     "count":integer
                 },
                 {
@@ -274,7 +274,7 @@ LONGCODE_BEGIN
             "events":[
                 {
                     "label":"MY_LOG_LINE",
-                    "pattern":"^.*$"
+                    "on-pattern":"^.*$"
                 }
             ]
         }
@@ -290,15 +290,15 @@ LONGCODE_BEGIN
             "events":[
                 {
                     "label":"started",
-                    "pattern":"^# START"
+                    "on-pattern":"^# START"
                 },
                 {
                     "label":"end-of-start",
-                    "pattern":"^# PROCESSING"
+                    "on-pattern":"^# PROCESSING"
                 }
                 {
                     "label":"end-of-processing",
-                    "pattern":"^# ANALYSIS"
+                    "on-pattern":"^# ANALYSIS"
                 }
             ]
         }
