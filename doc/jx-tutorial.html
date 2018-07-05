@@ -110,7 +110,7 @@ then concatentate <tt>message</tt> into the job, like this:
 </b>
    "rules": [
       {
-          "command" : "echo "<b>+message+</b>" > output.txt",
+          "command" : "echo "<b> + message + </b>" > output.txt",
           "outputs" : [ "output.txt" ],
           "inputs" : [ ],
       }
@@ -192,9 +192,9 @@ instance of the job:
 <code>{
    "rules": [
       {
-         "command" : "./simulate.py -n "<b>+N+</b>" > output."<b>+N+</b>".txt",
+         "command" : "./simulate.py -n "<b> + N + </b>" > output."<b> + N + </b>".txt",
          "inputs" : [ "simulate.py" ],
-         "outputs" : [ "output."<b>+N+</b>".txt" ],
+         "outputs" : [ "output."<b> + N + </b>".txt" ],
       } <b>for N in [ 1, 2, 3 ]</b>
    ]
 }
@@ -211,7 +211,7 @@ into places indicate by percent codes:
       {
          "command" : <b>format("./simulate.py -n %d > output.%d.txt",N,N)</b>
          "inputs" : [ "simulate.py" ],
-         "outputs" : [ "output."+N+".txt" ],
+         "outputs" : [ "output." + N + ".txt" ],
       } for N in [ 1, 2, 3 ]
    ]
 }
@@ -250,7 +250,7 @@ Of course, it would be better to generate the list automatically.
 The list of output files is easy: just generate them using
 a list comprehension.  For example, this expression:
 
-<code>[ "output."+N+".txt" for N in [1,2,3] ]
+<code>[ "output." + N + ".txt" for N in [1,2,3] ]
 </code>
 
 Would evaluate to this array:
@@ -273,8 +273,8 @@ Evaluates to this string:
 We can put all of those bits into a single job, like this:
 
 <code>{
-   "command" : "cat "+join(["output."+N+".txt" for N in [1,2,3]])+" >output.all.txt",
-   "inputs" : [ "output."+N+".txt" for N in [ 1, 2, 3 ] ],
+   "command" : "cat " + join(["output." + N + ".txt" for N in [1,2,3]]) +" > output.all.txt",
+   "inputs" : [ "output." + N + ".txt" for N in [ 1, 2, 3 ] ],
    "outputs" : [ "output.all.txt" ],
 }
 </code>
@@ -287,17 +287,17 @@ Putting it all together, we have this:
 <code>{
    "define": {
       "RANGE" : range(1,3),
-      "FILELIST" : ["output."+N+".txt for N in RANGE],
+      "FILELIST" : ["output." + N + ".txt for N in RANGE],
    },
 
    "rules": [
       {
-        "command" : "./simulate.py -n "+N+" > output."+N+".txt",
+        "command" : "./simulate.py -n " + N + " > output." + N + ".txt",
         "inputs" : [ "simulate.py" ],
-        "outputs" : [ "output."+N+".txt" ],
+        "outputs" : [ "output." + N + ".txt" ],
       } for N in RANGE,
       {
-        "command" : "cat "+join(FILELIST," ")+" >output.all.txt",
+        "command" : "cat " + join(FILELIST," ") + " > output.all.txt",
         "inputs" : [ FILELIST ],
         "outputs" : [ "output.all.txt" ],
       }
@@ -315,7 +315,7 @@ JX allows you to specify the number of cores, and the memory and disk sizes a ru
 <code>{
    "define": {
       "RANGE" : range(1,3),
-      "FILELIST" : ["output."+N+".txt for N in RANGE],
+      "FILELIST" : ["output." + N + ".txt for N in RANGE],
    },
 
    "categories": {
@@ -329,13 +329,13 @@ JX allows you to specify the number of cores, and the memory and disk sizes a ru
 
    "rules": [
       {
-        "command" : "./simulate.py -n "+N+" > output."+N+".txt",
+        "command" : "./simulate.py -n " + N + " > output." + N + ".txt",
         "inputs" : [ "simulate.py" ],
-        "outputs" : [ "output."+N+".txt" ],
+        "outputs" : [ "output." + N + ".txt" ],
         "category" : "simulate"
       } for N in RANGE,
       {
-        "command" : "cat "+join(FILELIST," ")+" >output.all.txt",
+        "command" : "cat " + join(FILELIST," ") + " >output.all.txt",
         "inputs" : [ FILELIST ],
         "outputs" : [ "output.all.txt" ],
         "category" : "collect"
