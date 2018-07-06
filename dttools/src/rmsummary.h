@@ -15,10 +15,11 @@ COPYING for details.
 #include "buffer.h"
 
 /* Environment variables names */
-#define RESOURCES_CORES  "CORES"
-#define RESOURCES_MEMORY "MEMORY"
-#define RESOURCES_DISK   "DISK"
-#define RESOURCES_GPUS   "GPUS"
+#define RESOURCES_CORES     "CORES"
+#define RESOURCES_MEMORY    "MEMORY"
+#define RESOURCES_DISK      "DISK"
+#define RESOURCES_WALL_TIME "WALL_TIME"
+#define RESOURCES_GPUS      "GPUS"
 
 // These fields are defined as signed integers, even though they
 // will only contain positive numbers. This is to conversion to
