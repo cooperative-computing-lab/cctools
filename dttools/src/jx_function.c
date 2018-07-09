@@ -19,21 +19,18 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 
-// FAIL(const char *name, jx_builtin_t b struct jx *args, const char *message)
-#define FAIL(name, b, args, message)                                           \
-	do {                                                                   \
-		int ciuygssd = 6;                                              \
-		struct jx *ebijuaef = jx_object(NULL);                         \
-		jx_insert_integer(ebijuaef, "code", ciuygssd);                 \
-		jx_insert(ebijuaef, jx_string("function"),                     \
-			jx_operator(JX_OP_CALL,                                \
-				jx_function(name, b, NULL, NULL),              \
-				jx_copy(args)));                               \
-		if (args->line)                                                \
-			jx_insert_integer(ebijuaef, "line", args->line);       \
-		jx_insert_string(ebijuaef, "message", message);                \
-		jx_insert_string(ebijuaef, "source", "jx_eval");               \
-		return jx_error(ebijuaef);                                     \
+// FAIL(const char *name, struct jx *args, const char *message)
+#define FAIL(name, args, message) \
+	do { \
+		assert(name); \
+		assert(args); \
+		assert(message); \
+		return jx_error(jx_format( \
+			"function %s on line %d: %s", \
+			name, \
+			args->line, \
+			message \
+		)); \
 	} while (false)
 
 static char *jx_function_format_value(char spec, struct jx *args) {
@@ -133,7 +130,7 @@ FAILURE:
 	jx_delete(args);
 	free(result);
 	free(format);
-	FAIL(funcname, JX_BUILTIN_FORMAT, orig_args, err);
+	FAIL(funcname, orig_args, err);
 }
 
 // see https://docs.python.org/2/library/functions.html#range
@@ -151,12 +148,11 @@ struct jx *jx_function_range(struct jx *args) {
 		case 2: step = 1; break;
 		case 3: break;
 		default:
-			FAIL(funcname, JX_BUILTIN_RANGE, args,
-				"invalid arguments");
+			FAIL(funcname, args, "invalid arguments");
 	}
 
 	if (step == 0)
-		FAIL(funcname, JX_BUILTIN_RANGE, args, "step must be nonzero");
+		FAIL(funcname, args, "step must be nonzero");
 
 	struct jx *result = jx_array(NULL);
 
@@ -232,11 +228,11 @@ struct jx *jx_function_join(struct jx *orig_args) {
 	return j;
 	
 	FAILURE:
-	    jx_delete(args);
-	    jx_delete(list);
-		jx_delete(delimeter);
-		free(result);
-	    FAIL(funcname, JX_BUILTIN_JOIN, orig_args, err);
+	jx_delete(args);
+	jx_delete(list);
+	jx_delete(delimeter);
+	free(result);
+	FAIL(funcname, orig_args, err);
 }
 
 struct jx *jx_function_ceil(struct jx *orig_args) {
@@ -274,9 +270,9 @@ struct jx *jx_function_ceil(struct jx *orig_args) {
 	return result;
 	
 	FAILURE:
-	    jx_delete(args);
-	    jx_delete(val);
-	    FAIL(funcname, JX_BUILTIN_CEIL, orig_args, err);
+	jx_delete(args);
+	jx_delete(val);
+	FAIL(funcname, orig_args, err);
 }
 
 struct jx *jx_function_floor(struct jx *orig_args) {
@@ -314,9 +310,9 @@ struct jx *jx_function_floor(struct jx *orig_args) {
 	return result;
 	
 	FAILURE:
-	    jx_delete(args);
-	    jx_delete(val);
-	    FAIL(funcname, JX_BUILTIN_FLOOR, orig_args, err);
+	jx_delete(args);
+	jx_delete(val);
+	FAIL(funcname, orig_args, err);
 }
 
 
@@ -347,7 +343,7 @@ struct jx *jx_function_basename(struct jx *args) {
 	return result;
 
 	FAILURE:
-	FAIL(funcname, JX_BUILTIN_BASENAME, args, err);
+	FAIL(funcname, args, err);
 }
 
 struct jx *jx_function_dirname(struct jx *args) {
@@ -377,7 +373,7 @@ struct jx *jx_function_dirname(struct jx *args) {
 	return result;
 
 	FAILURE:
-	FAIL(funcname, JX_BUILTIN_DIRNAME, args, err);
+	FAIL(funcname, args, err);
 }
 
 struct jx *jx_function_escape(struct jx *args) {
@@ -407,5 +403,5 @@ struct jx *jx_function_escape(struct jx *args) {
 	return result;
 
 	FAILURE:
-	FAIL(funcname, JX_BUILTIN_ESCAPE, args, err);
+	FAIL(funcname, args, err);
 }
