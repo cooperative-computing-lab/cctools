@@ -22,6 +22,7 @@ typedef enum {
 	JX_TOKEN_INTEGER,
 	JX_TOKEN_DOUBLE,
 	JX_TOKEN_STRING,
+	JX_TOKEN_ERROR,
 	JX_TOKEN_LBRACKET,
 	JX_TOKEN_RBRACKET,
 	JX_TOKEN_LBRACE,
@@ -405,6 +406,8 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_IN;
 				} else if (!strcmp(s->token, "if")) {
 					return JX_TOKEN_IF;
+				} else if(!strcmp(s->token, "Error")) {
+					return JX_TOKEN_ERROR;
 				} else {
 					return JX_TOKEN_SYMBOL;
 				}
@@ -833,6 +836,18 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			j = jx_operator(jx_token_to_operator(t), NULL, j);
 			j->line = line;
 			j->u.oper.line = line;
+			return j;
+		}
+		case JX_TOKEN_ERROR: {
+			unsigned line = s->line;
+			struct jx *j = jx_parse_postfix(s);
+			if (!j) {
+				jx_parse_error(s, "error is missing a required field");
+				return NULL;
+			}
+			j = jx_error(j);
+			j->line = line;
+			j->u.err->line = line;
 			return j;
 		}
 		default: {
