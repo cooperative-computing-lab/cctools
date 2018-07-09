@@ -166,9 +166,9 @@ join( [ "output."+x+".txt" for x in range(1,100) ], " ")
 
 <span class=note># Generate five jobs that produce output files alpha.txt, beta.txt, ...</span>
 {
-  command = "simulate.py > "name+".txt",
-  outputs = [ name+".txt" ],
-  inputs = "simulate.py",
+  "command" : "simulate.py > "name+".txt",
+  "outputs" : [ name+".txt" ],
+  "inputs" : "simulate.py",
 } for name in [ "alpha", "beta", "gamma", "delta", "epsilon" ]
 
 </pre>
