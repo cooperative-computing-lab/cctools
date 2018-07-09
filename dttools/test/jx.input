@@ -261,6 +261,6 @@ escape("y\\x");
 true + " maybe " + false
 "pi is " + 3.141592654
 
-Error{"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"};
+error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"});
 
 #end

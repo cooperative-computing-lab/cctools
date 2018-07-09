@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "stringtools.h"
 #include "buffer.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <stdarg.h>
@@ -44,7 +45,7 @@ struct jx_comprehension *jx_comprehension(const char *variable, struct jx *eleme
 
 static struct jx * jx_create( jx_type_t type )
 {
-	struct jx *j = calloc(1, sizeof(*j));
+	struct jx *j = xxcalloc(1, sizeof(*j));
 	j->type = type;
 	return j;
 }
@@ -136,7 +137,7 @@ struct jx * jx_operator( jx_operator_t type, struct jx *left, struct jx *right )
 
 struct jx * jx_error( struct jx *err )
 {
-	if(!jx_error_valid(err)) return NULL;
+	if(!err) return NULL;
 	struct jx *j = jx_create(JX_ERROR);
 	j->u.err = err;
 	return j;
@@ -707,26 +708,4 @@ const char *jx_iterate_keys(struct jx *j, void **i) {
 struct jx * jx_iterate_values(struct jx *j, void **i) {
 	advance_object_iter(j, i);
 	return jx_get_value(i);
-}
-
-const char *jx_error_name(int code) {
-	switch (code) {
-	case 0: return "undefined symbol";
-	case 1: return "unsupported operator";
-	case 2: return "mismatched types";
-	case 3: return "key not found";
-	case 4: return "range error";
-	case 5: return "arithmetic error";
-	case 6: return "invalid arguments";
-	case 7: return "invalid context";
-	default: return "unknown error";
-	}
-}
-
-int jx_error_valid(struct jx *j) {
-	if (!jx_istype(j, JX_OBJECT)) return 0;
-	if (!jx_istype(jx_lookup(j, "source"), JX_STRING)) return 0;
-	if (!jx_istype(jx_lookup(j, "name"), JX_STRING)) return 0;
-	if (!jx_istype(jx_lookup(j, "message"), JX_STRING)) return 0;
-	return 1;
 }
