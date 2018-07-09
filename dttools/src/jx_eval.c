@@ -22,7 +22,6 @@ See the file COPYING for details.
 	jx_insert(ebidfgds, jx_string("operator"), jx_operator(op->type, left, right)); \
 	if (op->line) jx_insert_integer(ebidfgds, "line", op->line); \
 	jx_insert_string(ebidfgds, "message", message); \
-	jx_insert_string(ebidfgds, "name", jx_error_name(code)); \
 	jx_insert_string(ebidfgds, "source", "jx_eval"); \
 	return jx_error(ebidfgds); \
 } while (false)
@@ -35,7 +34,6 @@ See the file COPYING for details.
 	jx_insert(ekjhgsae, jx_string("index"), jx_copy(index)); \
 	if (index && index->line) jx_insert_integer(ekjhgsae, "line", index->line); \
 	jx_insert_string(ekjhgsae, "message", message); \
-	jx_insert_string(ekjhgsae, "name", jx_error_name(4)); \
 	jx_insert_string(ekjhgsae, "source", "jx_eval"); \
 	return jx_error(ekjhgsae); \
 } while (false)
@@ -48,7 +46,6 @@ See the file COPYING for details.
 	jx_insert(edgibijs, jx_string("key"), jx_copy(key)); \
 	if (key && key->line) jx_insert_integer(edgibijs, "line", key->line); \
 	jx_insert_string(edgibijs, "message", message); \
-	jx_insert_string(edgibijs, "name", jx_error_name(3)); \
 	jx_insert_string(edgibijs, "source", "jx_eval"); \
 	return jx_error(edgibijs); \
 } while (false)
@@ -259,7 +256,6 @@ static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
 		jx_insert(err, jx_string("operator"), jx_operator(JX_OP_LOOKUP, jx_copy(array), jx_copy(slice)));
 		if (array->line) jx_insert_integer(err, "line", array->line);
 		jx_insert_string(err, "message", "only arrays support slicing");
-		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
@@ -329,7 +325,6 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 		jx_insert(err, jx_string("operator"), jx_operator(JX_OP_LOOKUP, jx_copy(left), jx_copy(right)));
 		if (right && right->line) jx_insert_integer(err, "line", right->line);
 		jx_insert_string(err, "message", "invalid type for lookup");
-		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 
@@ -461,7 +456,6 @@ static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehe
 		if (comp->line) jx_insert_integer(err, "line", comp->line);
 		jx_insert_string(
 			err, "message", "list comprehension takes an array");
-		jx_insert_string(err, "name", jx_error_name(2));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_item(jx_error(err), NULL);
 	}
@@ -493,7 +487,6 @@ static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehe
 					jx_insert_integer(err, "line", cond->line);
 				jx_insert_string(err, "message",
 					"list comprehension condition takes a boolean");
-				jx_insert_string(err, "name", jx_error_name(2));
 				jx_insert_string(err, "source", "jx_eval");
 				return jx_item(jx_error(err), NULL);
 			}
@@ -617,7 +610,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		jx_insert_integer(err, "code", code);
 		jx_insert(err, jx_string("context"), context);
 		jx_insert_string(err, "message", "context must be an object");
-		jx_insert_string(err, "name", jx_error_name(code));
 		jx_insert_string(err, "source", "jx_eval");
 		return jx_error(err);
 	}
@@ -646,8 +638,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 					jx_insert_integer(err, "line", j->line);
 				jx_insert_string(
 					err, "message", "undefined symbol");
-				jx_insert_string(
-					err, "name", jx_error_name(code));
 				jx_insert_string(err, "source", "jx_eval");
 				return jx_error(err);
 			}

@@ -170,7 +170,7 @@ struct jx * jx_format( const char *fmt, ... );
 */
 struct jx * jx_symbol( const char *symbol_name );
 
-/** Create a JX_ERROR. @param err The associated data for the error. This object MUST have a string at the "source" key. @return A JX error value, or NULL if "source" is missing. */
+/** Create a JX_ERROR. @param err The associated data for the error. This should be a string description of the error. @return A JX error value. */
 struct jx * jx_error( struct jx *err );
 
 /** Create a JX_FUNCTION. @param params The list of JX_STRING parameter names.
@@ -383,11 +383,5 @@ struct jx *jx_get_value(void **i);
 
 /** Merge an arbitrary number of JX_OBJECTs into a single new one. The constituent objects are not consumed. Objects are merged in the order given, i.e. a key can replace an identical key in a preceding object. The last argument must be NULL to mark the end of the list. @return A merged JX_OBJECT that must be deleted with jx_delete. */
 struct jx *jx_merge(struct jx *j, ...);
-
-/** Get a human-readable name from an error code. @param code The numeric error code to check. */
-const char *jx_error_name(int code);
-
-/** Check if the given JX object has all the required fields for an error. @param j The object to check. */
-int jx_error_valid(struct jx *j);
 
 #endif

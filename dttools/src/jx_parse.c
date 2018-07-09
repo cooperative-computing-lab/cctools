@@ -845,11 +845,6 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				jx_parse_error_c(s, "error is missing a required field");
 				return NULL;
 			}
-			if (!jx_error_valid(j)) {
-				jx_delete(j);
-				jx_parse_error_c(s, "invalid error specification");
-				return NULL;
-			}
 			j = jx_error(j);
 			j->line = line;
 			j->u.err->line = line;

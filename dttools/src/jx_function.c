@@ -32,7 +32,6 @@ See the file COPYING for details.
 		if (args->line)                                                \
 			jx_insert_integer(ebijuaef, "line", args->line);       \
 		jx_insert_string(ebijuaef, "message", message);                \
-		jx_insert_string(ebijuaef, "name", jx_error_name(ciuygssd));   \
 		jx_insert_string(ebijuaef, "source", "jx_eval");               \
 		return jx_error(ebijuaef);                                     \
 	} while (false)
