@@ -75,7 +75,7 @@ struct jx * jx_parse( struct jx_parser *p );
 /** Return number of parse errors.  @param p A parser object.  @return Number of parse errors encountered. */
 int jx_parser_errors( struct jx_parser *p );
 
-/** Return text of parse error. @param p A parser object. @return Error string, if available, null otherwise. */
+/** Return text of first parse error encountered. @param p A parser object. @return Error string, if available, null otherwise. */
 const char *jx_parser_error_string( struct jx_parser *p );
 
 /** Delete a parser.  @param p The parser to delete. */
