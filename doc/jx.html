@@ -148,11 +148,12 @@ value overrides the category value, and the category value overrides the global 
     "cores" : &lt;integer&gt;,
     "memory" : &lt;integer&gt;,
     "disk" : &lt;integer&gt;,
+    "wall-time" : &lt;integer&gt;,
     "gpus" : &lt;integer&gt;
 }
 </code>
 
-<p>A resource specification may appear in an individual job or in a category description. <tt>"cores"</tt> and <tt>"gpus"</tt> give the number of CPU cores and GPUs, respectively, required to execute a rule. <tt>"disk"</tt> gives the disk space required, in MB. <tt>"memory"</tt> gives the RAM required, in MB.</p>
+<p>A resource specification may appear in an individual job or in a category description. <tt>"cores"</tt> and <tt>"gpus"</tt> give the number of CPU cores and GPUs, respectively, required to execute a rule. <tt>"disk"</tt> gives the disk space required, in MB. <tt>"memory"</tt> gives the RAM required, in MB.</p> <tt>"wall-time"</tt> specifies the maximum allowed running time, in seconds.
 
 <h2>JX Expressions</h2>
 

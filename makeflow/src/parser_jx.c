@@ -111,10 +111,10 @@ static int resources_from_jx(struct hash_table *h, struct jx *j, int nodeid) {
 				debug(D_MAKEFLOW_PARSER, "%d gpus", gpus);
 				dag_variable_add_value(RESOURCES_GPUS, h, nodeid, string_format("%d", gpus));
 			}
-		} else if(!strcmp(key, "wall_time")){	
-			int wall_time = jx_lookup_integer(j, "wall_time");
+		} else if(!strcmp(key, "wall-time")){	
+			int wall_time = jx_lookup_integer(j, "wall-time");
 			if (wall_time) {
-				debug(D_MAKEFLOW_PARSER, "%d wall_time", wall_time);
+				debug(D_MAKEFLOW_PARSER, "%d wall-time", wall_time);
 				dag_variable_add_value(RESOURCES_WALL_TIME, h, nodeid, string_format("%d", wall_time));
 			}
 		} else {
