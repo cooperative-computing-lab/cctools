@@ -843,7 +843,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 
 			t = jx_scan(s);
 			if (t != JX_TOKEN_LPAREN) {
-				jx_parse_error(s, "expected parentheses following error()");
+				jx_parse_error_c(s, "expected parentheses following error()");
 				return NULL;
 			}
 
@@ -856,7 +856,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			t = jx_scan(s);
 			if (t != JX_TOKEN_RPAREN) {
 				jx_delete(j);
-				jx_parse_error(s, "expected closing parenthesis for error()");
+				jx_parse_error_c(s, "expected closing parenthesis for error()");
 				return NULL;
 			}
 
