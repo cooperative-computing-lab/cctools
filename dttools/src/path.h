@@ -74,4 +74,11 @@ int path_has_doubledots(const char *s);
  */
 int path_depth(const char *s);
 
+/** Finds if the name of some file is a directory
+@param file_name The directory that will be checked
+@return 1 if readable directory, 0 otherwise
+ */
+int path_is_dir(char *file_name);
+
+
 #endif
