@@ -588,4 +588,17 @@ int path_depth(const char *s) {
 	return r;
 }
 
+/* Return if the name of a file is a directory */
+int path_is_dir(char *file_name){
+	//Grabbed from https://stackoverflow.com/questions/4553012/checking-if-a-file-is-a-directory-or-just-a-file
+	DIR* directory = opendir(file_name);
+
+	if(directory != NULL){
+		closedir(directory);
+		debug(D_MAKEFLOW_HOOK, "%s is a DIRECTORY",file_name);
+		return 1;
+	}
+
+	return 0;
+}
 /* vim: set noexpandtab tabstop=4: */

@@ -90,6 +90,7 @@ install_path="$HOME/cctools"
 build_label=
 build_date=
 
+curl_path="/usr"
 cvmfs_path="/usr"
 fuse_path="/usr"
 globus_path="/usr"
@@ -97,8 +98,8 @@ irods_path="/usr"
 mysql_path="/usr"
 openssl_path="/usr"
 perl_path="/usr"
-python_path="/usr"
 python3_path="/usr"
+python_path="/usr"
 readline_path="/usr"
 swig_path="/usr"
 uuid_path="/usr"
@@ -126,10 +127,11 @@ config_python3_path=auto
 config_readline_path=auto
 config_swig_path=auto
 
+config_curl_path=no
 config_cvmfs_path=no
 config_globus_path=no
-config_openssl_path=no
 config_irods_path=no
+config_openssl_path=no
 config_xrootd_path=no
 
 while [ $# -gt 0 ]
@@ -186,6 +188,10 @@ do
 			else
 				sge_parameters="${sge_parameters}\n\#$ ${arg}"
 			fi
+			;;
+		--with-curl-path)
+			curl_path=${arg}
+			config_curl_path=$(config_X_path ${arg})
 			;;
 		--with-cvmfs-path)
 			cvmfs_path=${arg}
@@ -332,7 +338,8 @@ Where options are:
   --without-system-SYSTEM
 
 Where PACKAGE may be:
-	readline
+	curl
+	cvmfs
 	fuse
 	globus
 	irods
@@ -340,11 +347,11 @@ Where PACKAGE may be:
 	perl
 	python
 	python3
+	readline
+	swig
+	uuid
 	xrootd
 	zlib
-	cvmfs
-	uuid
-	swig
 
 And SYSTEM may be:
 	sand
@@ -810,6 +817,33 @@ then
 else
 	echo "*** skipping readline..."
 fi
+
+if [ $config_curl_path != no ]
+then
+		if library_search curl ${curl_path} || library_search curl /
+		then
+				if [ "${curl_path}" != / -a "${curl_path}" != /usr ]
+				then
+						curl_ccflags="-I${curl_path}/include"
+				fi
+				ccflags="${ccflags} -DHAS_CURL"
+				curl_ldflags="${library_search_result} -lcrypto"
+				curl_avail=yes
+		else
+				if [ $config_curl_path = yes ]
+				then
+
+				echo "*** Sorry, I couldn't find curl in $curl_path"
+				echo "*** Check --with-curl-path and try again."
+				exit 1
+				else
+						echo "*** skipping curl support"
+				fi
+		fi
+else
+	echo "*** skipping curl support"
+fi
+
 
 if [ $BUILD_SYS = DARWIN ]
 then
@@ -1567,6 +1601,10 @@ CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 CCTOOLS_FUSE_AVAILABLE=${fuse_avail}
 CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
 CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
+
+CCTOOLS_CURL_AVAILABLE=${curl_avail}
+CCTOOLS_CURL_LDFLAGS=${curl_ldflags}
+CCTOOLS_CURL_CCFLAGS=${curl_ccflags}
 
 CCTOOLS_GLOBUS_LDFLAGS=${globus_ldflags}
 CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}

@@ -111,7 +111,7 @@ SOURCES = \
 	url_encode.c \
 	username.c \
 	uuid.c \
-	xxmalloc.c
+	xxmalloc.c \
 
 HEADERS_PUBLIC = \
 	auth.h \
@@ -136,10 +136,16 @@ HEADERS_PUBLIC = \
 	md5.h \
 	rmonitor_poll.h \
 	rmsummary.h \
-	timestamp.h
+	timestamp.h \
 
 LIBRARIES = libdttools.a
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
+ifeq ($(CCTOOLS_CURL_AVAILABLE),yes)
+CCTOOLS_EXTERNAL_LINKAGE += $(CCTOOLS_CURL_LDFLAGS) -lssl -lcrypto
+SOURCES += s3_file_io.c
+HEADERS_PUBLIC += s3_file_io.h
+endif
+
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.

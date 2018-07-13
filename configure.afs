@@ -24,7 +24,7 @@ detect_packages()
 
 	PACKAGES_CONFIG=""
         # perl and python taken from host
-	for package in fuse irods mysql python3 globus swig xrootd cvmfs uuid
+	for package in fuse irods mysql python3 globus swig xrootd cvmfs uuid curl
 	do
 	packagepath=$EXTERNAL/${PLATFORM}/$package/cctools-dep
 

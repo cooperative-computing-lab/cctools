@@ -181,7 +181,14 @@ char * batch_task_generate_id(struct batch_task *t) {
 	/* add checksum of the node's input files together */
 	struct list_cursor *cur = list_cursor_create(t->input_files);
 	for(list_seek(cur, 0); list_get(cur, (void**)&f); list_next(cur)) {
-		char * file_id = batch_file_generate_id(f);
+		char * file_id;
+		if(path_is_dir(f->inner_name) == 1){
+			f->hash = batch_file_generate_id_dir(f->outer_name);
+			file_id = xxstrdup(f->hash);
+		}
+		else{
+			file_id = batch_file_generate_id(f);
+		}
 		sha1_update(&context, "I", 1);
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "C", 1);
