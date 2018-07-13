@@ -38,37 +38,39 @@ as json with the maximum values of resource used, a time-series that shows the
 resources used at given time intervals, and a list of files that were opened
 during execution.
 
-The summary file is a JSON document with the following fields. Unless indicated, all fields are integers.
+The summary file is a JSON document with the following fields. Unless
+indicated, all fields are an array with two values, a number that describes the
+measurement, and a string describing the units (e.g.,  CODE([ measurement, "units" ])).
 
 LONGCODE_BEGIN
 command:                  the command line given as an argument
-start:                    microseconds at start of execution, since the epoch
-end:                      microseconds at end of execution, since the epoch
+start:                    time at start of execution, since the epoch
+end:                      time at end of execution, since the epoch
 exit_type:                one of "normal", "signal" or "limit" (a string)
 signal:                   number of the signal that terminated the process
                           Only present if exit_type is signal
 cores:                    maximum number of cores used
-cores_avg:                number of cores as cpu_time/wall_time (a float)
+cores_avg:                number of cores as cpu_time/wall_time
 exit_status:              final status of the parent process
 max_concurrent_processes: the maximum number of processes running concurrently
 total_processes:          count of all of the processes created
-wall_time:                microseconds spent during execution, end - start
-cpu_time:                 user+system time of the execution, in microseconds
-virtual_memory:           maximum virtual memory across all processes, in MB
-memory:                   maximum resident size across all processes, in MB
-swap_memory:              maximum swap usage across all processes, in MB
-bytes_read:               amount of data read from disk, in MB
-bytes_written:            amount of data written to disk, in MB
-bytes_received:           amount of data read from network interfaces, in MB
-bytes_sent:               amount of data written to network interfaces, in MB
-bandwidth:                maximum bandwidth used, in Mbps
+wall_time:                duration of execution, end - start
+cpu_time:                 user+system time of the execution
+virtual_memory:           maximum virtual memory across all processes
+memory:                   maximum resident size across all processes
+swap_memory:              maximum swap usage across all processes
+bytes_read:               amount of data read from disk
+bytes_written:            amount of data written to disk
+bytes_received:           amount of data read from network interfaces
+bytes_sent:               amount of data written to network interfaces
+bandwidth:                maximum bandwidth used
 total_files:              total maximum number of files and directories of
                           all the working directories in the tree
-disk:                     size in MB of all working directories in the tree
-limits_exceeded:          resources over the limit with -l, -L options (JSON)
-peak_times:               seconds from start when a maximum occured (JSON)
+disk:                     size of all working directories in the tree
+limits_exceeded:          resources over the limit with -l, -L options (JSON object)
+peak_times:               seconds from start when a maximum occured (JSON object)
 snapshots:                List of intermediate measurements, identified by
-                          snapshot_name (JSON)
+                          snapshot_name (JSON object)
 LONGCODE_END
 
 The time-series log has a row per time sample. For each row, the columns have the following meaning (all columns are integers):
