@@ -1787,17 +1787,17 @@ int main(int argc, char *argv[])
 #ifdef HAS_CURL
 			case LONG_OPT_ARCHIVE_S3_NO_CHECK:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
-                    goto EXIT_WITH_FAILURE;
+					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("archive_s3_no_check"), jx_boolean(1));
 			case LONG_OPT_ARCHIVE_S3:
-                if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
-                    goto EXIT_WITH_FAILURE;
+				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
 				if(optarg){
 					jx_insert(hook_args, jx_string("archive_s3_arg"), jx_string(xxstrdup(optarg)));
 				}
 				else{
 					jx_insert(hook_args, jx_string("archive_s3_no_arg"), jx_string(""));
-				}			
+				}
 			case LONG_OPT_ARCHIVE:
 				if (makeflow_hook_register(&makeflow_hook_archive, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;

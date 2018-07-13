@@ -112,19 +112,19 @@ int batch_file_outer_compare(const void *file1, const void *file2) {
 char * batch_file_generate_id(struct batch_file *f) {
 	if(check_sums == NULL){
 		check_sums = hash_table_create(0,0);
-        }
+		}
 	char *check_sum_value = hash_table_lookup(check_sums, f->outer_name);
 	if(check_sum_value == NULL){
 		unsigned char hash[SHA1_DIGEST_LENGTH];
 		struct timeval start_time;
-        	struct timeval end_time;
-        
+			struct timeval end_time;
+
 		gettimeofday(&start_time,NULL);
 		int success = sha1_file(f->outer_name, hash);
 		gettimeofday(&end_time,NULL);
-        	double run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
-        	total_checksum_time += run_time;
-        	debug(D_MAKEFLOW_HOOK," The total checksum time is %lf",total_checksum_time);
+			double run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+			total_checksum_time += run_time;
+			debug(D_MAKEFLOW_HOOK," The total checksum time is %lf",total_checksum_time);
 		if(success == 0){
 			debug(D_MAKEFLOW, "Unable to checksum this file: %s", f->outer_name);
 			return NULL;
@@ -145,7 +145,7 @@ char * batch_file_generate_id(struct batch_file *f) {
 char *  batch_file_generate_id_dir(char *file_name){
 	if(check_sums == NULL){
 		check_sums = hash_table_create(0,0);
-	}	
+	}
 	char *check_sum_value = hash_table_lookup(check_sums, file_name);
 	if(check_sum_value == NULL){
 		char *hash_sum = "";
@@ -168,14 +168,14 @@ char *  batch_file_generate_id_dir(char *file_name){
 					else{
 						unsigned char hash[SHA1_DIGEST_LENGTH];
 						struct timeval start_time;
-					        struct timeval end_time;
-						
+							struct timeval end_time;
+
 						gettimeofday(&start_time,NULL);
 						int success = sha1_file(file_path, hash);
 						gettimeofday(&end_time,NULL);
-        					double run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
-        					total_checksum_time += run_time;
-        					debug(D_MAKEFLOW_HOOK," The total checksum time is %lf",total_checksum_time);
+							double run_time = ((end_time.tv_sec*1000000 + end_time.tv_usec) - (start_time.tv_sec*1000000 + start_time.tv_usec)) / 1000000.0;
+							total_checksum_time += run_time;
+							debug(D_MAKEFLOW_HOOK," The total checksum time is %lf",total_checksum_time);
 						if(success == 0){
 							debug(D_MAKEFLOW, "Unable to checksum this file: %s", file_path);
 							free(file_path);

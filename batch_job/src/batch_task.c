@@ -185,10 +185,10 @@ char * batch_task_generate_id(struct batch_task *t) {
 		if(path_is_dir(f->inner_name) == 1){
 			f->hash = batch_file_generate_id_dir(f->outer_name);
 			file_id = xxstrdup(f->hash);
-        }
-        else{
-        	file_id = batch_file_generate_id(f);
-        }
+		}
+		else{
+			file_id = batch_file_generate_id(f);
+		}
 		sha1_update(&context, "I", 1);
 		sha1_update(&context, f->outer_name, strlen(f->outer_name));
 		sha1_update(&context, "C", 1);
