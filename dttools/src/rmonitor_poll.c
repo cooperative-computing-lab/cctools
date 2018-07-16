@@ -238,9 +238,47 @@ uint64_t clicks_to_usecs(uint64_t clicks)
  * Low level resource monitor functions.
  ***/
 
+/***
+ Get children of a process by polling, rather than capturing fork return value
+ is number of children found. The array of pid values is returned in *children.
+ ***/
+int rmonitor_get_children(pid_t pid, uint64_t **children)
+{
+	/* /proc/[pid]/task/[pid]/children */
+
+	char *fchildren_path = string_format("/proc/%d/task/%d/children", pid, pid);
+	FILE *fstat = fopen(fchildren_path, "r");
+
+	if(!fstat) {
+		return 0;
+	}
+
+	int count = 0;
+	int max   = 0;
+	uint64_t child;
+
+	uint64_t *child_list = NULL;
+
+	while(fscanf(fstat, "%" PRIu64, &child) == 1) {
+		count++;
+
+		if(count > max) {
+			max = 2*count;
+			child_list = realloc(child_list, sizeof(pid_t) * max);
+		}
+
+		child_list[count - 1] = child;
+	}
+
+	*children = child_list;
+
+	return count;
+}
+
+
 int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 {
-	/* /dev/proc/[pid]/stat */
+	/* /proc/[pid]/stat */
 
 	uint64_t start_clicks;
 	double uptime;
