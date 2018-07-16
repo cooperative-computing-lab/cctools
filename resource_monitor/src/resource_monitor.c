@@ -1259,23 +1259,24 @@ int ping_process(pid_t pid)
     return (kill(pid, 0) == 0);
 }
 
-void rmonitor_track_process(pid_t pid)
+// if 1 pid was added anew to the tracking table, 0 otherwise (was already there, or could not be added).
+int rmonitor_track_process(pid_t pid)
 {
 	char *newpath;
 	struct rmonitor_process_info *p;
 
 	if(!pid) {
-		return;
+		return 0;
 	}
 
 	if(!ping_process(pid)) {
-		return;
+		return 0;
 	}
 
 	p = itable_lookup(processes, pid);
 
 	if(p) {
-		return;
+		return 0;
 	}
 
 	p = malloc(sizeof(struct rmonitor_process_info));
@@ -1297,6 +1298,8 @@ void rmonitor_track_process(pid_t pid)
 
 	rmonitor_poll_process_once(p);
 	summary->total_processes++;
+
+	return 1;
 }
 
 void rmonitor_untrack_process(uint64_t pid)
@@ -1305,6 +1308,36 @@ void rmonitor_untrack_process(uint64_t pid)
 
 	if(p)
 		p->running = 0;
+}
+
+void rmonitor_add_children_by_polling() {
+
+	uint64_t pid;
+	struct rmonitor_process_info *p;
+	uint64_t *children = NULL;
+
+
+	itable_firstkey(processes);
+	while(itable_nextkey(processes, &pid, (void **) &p)) {
+		if(!p->running) {
+			continue;
+		}
+
+		int n = rmonitor_get_children(pid, &children);
+
+		if(n < 1) {
+			continue;
+		}
+
+		int i;
+		for(i =0; i < n; i++) {
+			if(rmonitor_track_process(children[i])) {
+				debug(D_RMON, "added by polling pid %" PRIu64, children[i]);
+			}
+		}
+
+		free(children);
+	}
 }
 
 void cleanup_zombie(struct rmonitor_process_info *p)
@@ -2061,6 +2094,11 @@ int rmonitor_resources(long int interval /*in seconds */)
 			break;
 
 		wait_for_messages(interval);
+
+		//if monitoring a static executable, this adds children missed by
+		//BRANCH messages.
+		rmonitor_add_children_by_polling();
+
 
 		//cleanup processes which by terminating may have awaken
 		//select.
