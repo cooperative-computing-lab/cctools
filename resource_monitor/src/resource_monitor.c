@@ -181,10 +181,11 @@ int    rmonitor_queue_fd = -1;  /* File descriptor of a datagram socket to which
                                   grandchildren processes report to the monitor. */
 static int rmonitor_inotify_fd = -1;
 
-pid_t  first_process_pid;                 /* pid of the process given at the command line */
+pid_t  first_process_pid;                 /* pid of the process given at the command line. */
 int    first_process_sigchild_status;     /* exit status flags of the process given at the command line */
 int    first_process_already_waited = 0;  /* exit status flags of the process given at the command line */
 int    first_process_exit_status = 0;
+int    first_pid_manually_set    = 0;     /* whether --pid was used */
 
 struct itable *processes;       /* Maps the pid of a process to a unique struct rmonitor_process_info. */
 struct hash_table *wdirs;       /* Maps paths to working directory structures. */
@@ -1550,39 +1551,41 @@ void rmonitor_final_cleanup(int signum)
 
     signal(SIGCHLD, rmonitor_check_child);
 
-    //ask politely to quit
-    itable_firstkey(processes);
-    while(itable_nextkey(processes, &pid, (void **) &p))
-    {
-        debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(signum), signum, pid);
+	if(!first_pid_manually_set) {
+		//ask politely to quit
+		itable_firstkey(processes);
+		while(itable_nextkey(processes, &pid, (void **) &p))
+		{
+			debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(signum), signum, pid);
 
-        kill(pid, signum);
-    }
+			kill(pid, signum);
+		}
 
-	/* wait for processes to cleanup. We wait 5 seconds, but no more than 0.2 seconds at a time. */
-	int count = 25;
-	do{
-		usleep(200000);
-		ping_processes();
-		cleanup_zombies();
-		count--;
-	} while(itable_size(processes) > 0 && count > 0);
+		/* wait for processes to cleanup. We wait 5 seconds, but no more than 0.2 seconds at a time. */
+		int count = 25;
+		do{
+			usleep(200000);
+			ping_processes();
+			cleanup_zombies();
+			count--;
+		} while(itable_size(processes) > 0 && count > 0);
 
-    if(!first_process_already_waited)
-	    rmonitor_check_child(signum);
+		if(!first_process_already_waited)
+			rmonitor_check_child(signum);
 
-    signal(SIGCHLD, SIG_DFL);
+		signal(SIGCHLD, SIG_DFL);
 
-    //we did ask...
-    itable_firstkey(processes);
-    while(itable_nextkey(processes, &pid, (void **) &p))
-    {
-        debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(SIGKILL), SIGKILL, pid);
+		//we did ask...
+		itable_firstkey(processes);
+		while(itable_nextkey(processes, &pid, (void **) &p))
+		{
+			debug(D_RMON, "sending %s(%d) to process %"PRId64".\n", strsignal(SIGKILL), SIGKILL, pid);
 
-        kill(pid, SIGKILL);
+			kill(pid, SIGKILL);
 
-        rmonitor_untrack_process(pid);
-    }
+			rmonitor_untrack_process(pid);
+		}
+	}
 
     cleanup_zombies();
 
@@ -2017,6 +2020,7 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Maximum interval between observations, in seconds. (default=%d)\n", "-i,--interval=<n>", DEFAULT_INTERVAL);
+    fprintf(stdout, "%-30s Track <pid> instead of executing a command line (warning: less precise measurements).\n", "--pid=<pid>");
     fprintf(stdout, "%-30s Accurately measure short running processes (adds overhead).\n", "--accurate-short-processes");
     fprintf(stdout, "%-30s Read command line from <str>, and execute as '/bin/sh -c <str>'\n", "-c,--sh=<str>");
     fprintf(stdout, "\n");
@@ -2184,7 +2188,8 @@ int main(int argc, char **argv) {
 		LONG_OPT_NO_PPRINT,
 		LONG_OPT_SNAPSHOT_FILE,
 		LONG_OPT_SNAPSHOT_WATCH_CONF,
-		LONG_OPT_STOP_SHORT_RUNNING
+		LONG_OPT_STOP_SHORT_RUNNING,
+		LONG_OPT_PID
 	};
 
     static const struct option long_options[] =
@@ -2198,6 +2203,7 @@ int main(int argc, char **argv) {
 		    {"limits",     required_argument, 0, 'L'},
 		    {"limits-file",required_argument, 0, 'l'},
 		    {"sh",         required_argument, 0, 'c'},
+		    {"pid",        required_argument, 0, LONG_OPT_PID},
 
 		    {"verbatim-to-summary",required_argument, 0, 'V'},
 
@@ -2301,6 +2307,17 @@ int main(int argc, char **argv) {
 			case LONG_OPT_SNAPSHOT_WATCH_CONF:
 				snapshot_watch_events_file = xxstrdup(optarg);
 				break;
+			case LONG_OPT_PID:
+				{
+					int64_t p = atoi(xxstrdup(optarg));
+					if(p < 1) {
+						debug(D_FATAL, "Option --pid should be positive integer.");
+						exit(RM_MONITOR_ERROR);
+					}
+					first_pid_manually_set = 1;
+					first_process_pid = (pid_t) p;
+				}
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
@@ -2313,16 +2330,34 @@ int main(int argc, char **argv) {
 		exit(RM_MONITOR_ERROR);
 	}
 
-    rmsummary_debug_report(resources_limits);
+	if(first_pid_manually_set) {
+		if(follow_chdir || hash_table_size(wdirs) > 0 || child_in_foreground) {
+			debug(D_FATAL, "Options --follow-chdir, --measure-dir, and --child-in-foreground cannot be used with --pid.");
+			exit(RM_MONITOR_ERROR);
+		}
+
+		if(optind < argc || sh_cmd_line) {
+			debug(D_FATAL, "A command line cannot be used with --pid.");
+			exit(RM_MONITOR_ERROR);
+		}
+	}
 
 	//this is ugly. if -c given, we should not accept any more arguments.
 	// if not given, we should get the arguments that represent the command line.
-	if((optind < argc && sh_cmd_line) || (optind >= argc && !sh_cmd_line)) {
+	if((optind < argc && sh_cmd_line) || (optind >= argc && !sh_cmd_line && !first_pid_manually_set)) {
 		show_help(argv[0]);
 		return 1;
 	}
 
-	if(sh_cmd_line) {
+	if(first_pid_manually_set) {
+		if(!ping_process(first_process_pid)) {
+			debug(D_FATAL, "Process with pid %d could not be found.", first_process_pid);
+			exit(RM_MONITOR_ERROR);
+		}
+
+		command_line = "# following pid with --pid";
+
+	} else if(sh_cmd_line) {
 		argc = 3;
 		optind = 0;
 
@@ -2353,6 +2388,8 @@ int main(int argc, char **argv) {
 		debug(D_RMON, "command line: %s\n", command_line);
 	}
 
+
+    rmsummary_debug_report(resources_limits);
 
 
     if(getenv(RESOURCE_MONITOR_INFO_ENV_VAR))
@@ -2396,16 +2433,21 @@ int main(int argc, char **argv) {
 		lookup_or_create_wd(NULL, cwd);
 	}
 
-	executable = xxstrdup(argv[optind]);
-
-	if( rmonitor_determine_exec_type(executable) ) {
-		debug(D_FATAL, "Error reading %s.", executable);
-		exit(RM_MONITOR_ERROR);
-	}
-
 	set_snapshot_watch_events();
 
-	spawn_first_process(executable, argv + optind, child_in_foreground);
+	if(first_pid_manually_set > 0) {
+		rmonitor_track_process(first_process_pid);
+	} else {
+		executable = xxstrdup(argv[optind]);
+
+		if( rmonitor_determine_exec_type(executable) ) {
+			debug(D_FATAL, "Error reading %s.", executable);
+			exit(RM_MONITOR_ERROR);
+		}
+
+		spawn_first_process(executable, argv + optind, child_in_foreground);
+	}
+
     rmonitor_resources(interval);
     rmonitor_final_cleanup(SIGTERM);
 

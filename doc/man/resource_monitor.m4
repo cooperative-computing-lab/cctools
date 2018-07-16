@@ -100,6 +100,7 @@ OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By defaul
 OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
 OPTION_TRIPLET(-i,interval,n)Maximum interval between observations, in seconds (default=1).
+OPTION_ITEM(--pid=pid)Track pid instead of executing a command line (warning: less precise measurements).
 OPTION_ITEM(--accurate-short-processes)Accurately measure short running processes (adds overhead).
 OPTION_TRIPLET(-c,sh,str)Read command line from CODE(str), and execute as '/bin/sh -c CODE(str)'.
 OPTION_TRIPLET(-l,limits-file,file)Use maxfile with list of var: value pairs for resource limits.
