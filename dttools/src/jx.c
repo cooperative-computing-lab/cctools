@@ -7,12 +7,17 @@ See the file COPYING for details.
 #include "jx.h"
 #include "stringtools.h"
 #include "buffer.h"
+#include "sha1.h"
+#include "xxmalloc.h"
 
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 struct jx_pair * jx_pair( struct jx *key, struct jx *value, struct jx_pair *next )
 {
@@ -650,6 +655,178 @@ int jx_is_constant( struct jx *j )
 
 	/* not reachable, but some compilers complain. */
 	return 0;
+}
+
+static bool jx_hash_any(unsigned char digest[SHA1_DIGEST_LENGTH], struct jx *j);
+
+static bool jx_hash_null(unsigned char digest[SHA1_DIGEST_LENGTH]) {
+	assert(digest);
+
+	const char *tmp = "n";
+
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+	sha1_final(digest, &ctx);
+
+	return true;
+}
+
+static bool jx_hash_boolean(unsigned char digest[SHA1_DIGEST_LENGTH], int val) {
+	assert(digest);
+
+	char tmp[64];
+	snprintf(tmp, sizeof(tmp), "b%d", !!val);
+
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+	sha1_final(digest, &ctx);
+
+	return true;
+}
+
+static bool jx_hash_integer(unsigned char digest[SHA1_DIGEST_LENGTH], int64_t val) {
+	assert(digest);
+
+	char tmp[64];
+	snprintf(tmp, sizeof(tmp), "i%" PRIi64, val);
+
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+	sha1_final(digest, &ctx);
+
+	return true;
+}
+
+static bool jx_hash_double(unsigned char digest[SHA1_DIGEST_LENGTH], double val) {
+	assert(digest);
+
+	char tmp[64];
+	snprintf(tmp, sizeof(tmp), "d%a", val);
+
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+	sha1_final(digest, &ctx);
+
+	return true;
+}
+
+static bool jx_hash_string(unsigned char digest[SHA1_DIGEST_LENGTH], const char *val) {
+	assert(digest);
+	assert(val);
+
+	const char *tmp = "s";
+
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+	sha1_update(&ctx, val, strlen(val));
+	sha1_final(digest, &ctx);
+
+	return true;
+}
+
+static bool jx_hash_array(unsigned char digest[SHA1_DIGEST_LENGTH], struct jx_item *i) {
+	assert(digest);
+
+	const char *tmp = "a";
+
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+
+	while (i) {
+		unsigned char t[SHA1_DIGEST_LENGTH];
+		if (!jx_hash_any(t, i->value)) return false;
+		sha1_update(&ctx, t, SHA1_DIGEST_LENGTH);
+		i = i->next;
+	}
+
+	sha1_final(digest, &ctx);
+	return true;
+}
+
+struct jx_pair_hash {
+	unsigned char key[SHA1_DIGEST_LENGTH];
+	unsigned char value[SHA1_DIGEST_LENGTH];
+};
+
+static int jx_cmp_pair(const void *a, const void *b, void *ptr) {
+	assert(a);
+	assert(b);
+
+	const struct jx_pair_hash *ja = a;
+	const struct jx_pair_hash *jb = b;
+
+	int keys = memcmp(ja->key, jb->key, SHA1_DIGEST_LENGTH);
+	if (keys != 0) return keys;
+	// It's possible for the same key to appear multiple times in
+	// an object, so use the hash of the value to break ties.
+	// This way the undefined behavior from qsort() is unobservable.
+	return memcmp(ja->value, jb->value, SHA1_DIGEST_LENGTH);
+}
+
+static bool jx_hash_object(unsigned char digest[SHA1_DIGEST_LENGTH], struct jx_pair *p) {
+	assert(digest);
+
+	bool result = false;
+	unsigned length = 0;
+	for (struct jx_pair *q = p; q; q = q->next) ++length;
+
+	struct jx_pair_hash *pairs = xxcalloc(length, sizeof(*pairs));
+	for (unsigned i = 0; i < length; ++i) {
+		assert(p);
+		// JX does not enforce that object keys are strings,
+		// so we have to use the key hashes.
+		if (!jx_hash_any((&pairs[i])->key, p->key)) goto FAIL;
+		if (!jx_hash_any((&pairs[i])->value, p->value)) goto FAIL;
+		p = p->next;
+	}
+
+	qsort_r(pairs, length, sizeof(*pairs), jx_cmp_pair, NULL);
+
+	const char *tmp = "o";
+	sha1_context_t ctx;
+	sha1_init(&ctx);
+	sha1_update(&ctx, tmp, strlen(tmp));
+	for (unsigned i = 0; i < length; ++i) {
+		sha1_update(&ctx, (&pairs[i])->key, SHA1_DIGEST_LENGTH);
+		sha1_update(&ctx, (&pairs[i])->value, SHA1_DIGEST_LENGTH);
+	}
+
+	sha1_final(digest, &ctx);
+	result = true;
+FAIL:
+	free(pairs);
+	return result;
+}
+
+static bool jx_hash_any(unsigned char digest[SHA1_DIGEST_LENGTH], struct jx *j) {
+	assert(digest);
+	assert(j);
+
+	switch (j->type) {
+	case JX_NULL: return jx_hash_null(digest);
+	case JX_BOOLEAN: return jx_hash_boolean(digest, j->u.boolean_value);
+	case JX_INTEGER: return jx_hash_integer(digest, j->u.integer_value);
+	case JX_DOUBLE: return jx_hash_double(digest, j->u.double_value);
+	case JX_STRING: return jx_hash_string(digest, j->u.string_value);
+	case JX_ARRAY: return jx_hash_array(digest, j->u.items);
+	case JX_OBJECT: return jx_hash_object(digest, j->u.pairs);
+	default: return false;
+	}
+}
+
+char *jx_hash(struct jx *j) {
+	assert(j);
+
+	unsigned char digest[SHA1_DIGEST_LENGTH];
+	if (!jx_hash_any(digest, j)) return NULL;
+
+	return xxstrdup(sha1_string(digest));
 }
 
 void jx_export( struct jx *j )

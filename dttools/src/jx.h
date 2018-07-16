@@ -226,6 +226,15 @@ int jx_equals( struct jx *j, struct jx *k );
 /** Get the length of an array. Returns -1 if array is null or not an array. @param array The array to check. */
 int jx_array_length( struct jx *array );
 
+/** Compute a hash for JX structure.
+ * Note that only JSON types are hashable, so be sure any expressions have been evaluated before hashing the structure.
+ * The returned string is safe to print.
+ * The caller must free() the returned string.
+ * @param j The JX structure to hash.
+ * @returns The hash of the JX structure, or NULL if the structure is not hashable.
+ */
+char *jx_hash(struct jx *j);
+
 struct jx_comprehension *jx_comprehension_copy(struct jx_comprehension *c);
 struct jx_item *jx_item_copy(struct jx_item *i);
 struct jx_pair *jx_pair_copy(struct jx_pair *p);
