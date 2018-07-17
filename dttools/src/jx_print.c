@@ -191,8 +191,9 @@ void jx_print_buffer( struct jx *j, buffer_t *b )
 			break;
 		case JX_FUNCTION: buffer_putstring(b, j->u.func.name); break;
 		case JX_ERROR:
-			buffer_putstring(b,"Error");
+			buffer_putstring(b, "error(");
 			jx_print_buffer(j->u.err, b);
+			buffer_putstring(b, ")");
 			break;
 	}
 }

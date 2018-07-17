@@ -28,3 +28,4 @@ worker
 worker_condor_submit
 libforce_halt_enospc.so
 jx_count_obj_test
+jx2env

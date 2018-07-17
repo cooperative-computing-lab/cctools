@@ -406,7 +406,7 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_IN;
 				} else if (!strcmp(s->token, "if")) {
 					return JX_TOKEN_IF;
-				} else if(!strcmp(s->token, "Error")) {
+				} else if(!strcmp(s->token, "error")) {
 					return JX_TOKEN_ERROR;
 				} else {
 					return JX_TOKEN_SYMBOL;
@@ -840,16 +840,26 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		}
 		case JX_TOKEN_ERROR: {
 			unsigned line = s->line;
+
+			t = jx_scan(s);
+			if (t != JX_TOKEN_LPAREN) {
+				jx_parse_error_c(s, "expected parentheses following error()");
+				return NULL;
+			}
+
 			struct jx *j = jx_parse_postfix(s);
 			if (!j) {
-				jx_parse_error_c(s, "error is missing a required field");
+				// error set by deeper level
 				return NULL;
 			}
-			if (!jx_error_valid(j)) {
+
+			t = jx_scan(s);
+			if (t != JX_TOKEN_RPAREN) {
 				jx_delete(j);
-				jx_parse_error_c(s, "invalid error specification");
+				jx_parse_error_c(s, "expected closing parenthesis for error()");
 				return NULL;
 			}
+
 			j = jx_error(j);
 			j->line = line;
 			j->u.err->line = line;
