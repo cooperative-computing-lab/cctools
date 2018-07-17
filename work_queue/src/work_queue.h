@@ -64,7 +64,7 @@ typedef enum {
 	WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION = 2 << 3, /**< The task used more resources than requested **/
 	WORK_QUEUE_RESULT_TASK_TIMEOUT        = 3 << 3, /**< The task ran after the specified (absolute since epoch) end time. **/
 	WORK_QUEUE_RESULT_UNKNOWN             = 4 << 3, /**< The result could not be classified. **/
-	WORK_QUEUE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was neither a task or worker error **/
+	WORK_QUEUE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
 	WORK_QUEUE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
 	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	WORK_QUEUE_RESULT_DISK_ALLOC_FULL     = 8 << 3  /**< The task filled its loop device allocation but needed more space. **/

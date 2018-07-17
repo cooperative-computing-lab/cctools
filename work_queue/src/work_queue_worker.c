@@ -1676,10 +1676,10 @@ static void work_for_master(struct link *master) {
 		 * Mark offending process as RESOURCE_EXHASTION. */
 		enforce_processes_limits();
 
-		/* end running processes if worker resources are exhasusted, and
-		 * marked them as RESOURCE_EXHAUSTION. */
+		/* end running processes if worker resources are exhasusted, and marked
+		 * them as FORSAKEN, so they can be resubmitted somewhere else. */
 		if(!enforce_worker_limits(master)) {
-			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+			finish_running_tasks(WORK_QUEUE_RESULT_FORSAKEN);
 			// finish all tasks, disconnect from master, but don't kill the worker (no abort_flag = 1)
 			break;
 		}
