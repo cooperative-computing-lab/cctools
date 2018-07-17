@@ -1680,6 +1680,8 @@ static void work_for_master(struct link *master) {
 		 * marked them as RESOURCE_EXHAUSTION. */
 		if(!enforce_worker_limits(master)) {
 			finish_running_tasks(WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION);
+			// finish all tasks, disconnect from master, but don't kill the worker (no abort_flag = 1)
+			break;
 		}
 
 		int task_event = 0;
@@ -1716,7 +1718,9 @@ static void work_for_master(struct link *master) {
 		}
 
 
-		if(!ok) break;
+		if(!ok) {
+			break;
+		}
 
 		//Reset idle_stoptime if something interesting is happening at this worker.
 		if(list_size(procs_waiting) > 0 || itable_size(procs_table) > 0 || itable_size(procs_complete) > 0) {
