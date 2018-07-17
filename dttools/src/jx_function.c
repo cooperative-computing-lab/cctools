@@ -12,6 +12,9 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 #include <libgen.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
 
 #include "jx.h"
 #include "jx_match.h"
@@ -374,6 +377,42 @@ struct jx *jx_function_dirname(struct jx *args) {
 
 	FAILURE:
 	FAIL(funcname, args, err);
+}
+
+struct jx *jx_function_listdir(struct jx *args) {
+	assert(args);
+
+	int length = jx_array_length(args);
+	if (length != 1) return jx_error(jx_format(
+		"function listdir on line %d takes one argument, %d given",
+		args->line,
+		length
+	));
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) return jx_error(jx_format(
+		"function listdir on line %d takes a string path",
+		args->line
+	));
+
+	DIR *d = opendir(a->u.string_value);
+	if (!d) return jx_error(jx_format(
+		"function listdir on line %d: %s, %s",
+		args->line,
+		a->u.string_value,
+		strerror(errno)
+	));
+
+	struct jx *out = jx_array(NULL);
+	for (struct dirent *e; (e = readdir(d));) {
+		if (!strcmp(".", e->d_name)) continue;
+		if (!strcmp("..", e->d_name)) continue;
+		jx_array_append(out, jx_string(e->d_name));
+	}
+	closedir(d);
+	return out;
 }
 
 struct jx *jx_function_escape(struct jx *args) {
