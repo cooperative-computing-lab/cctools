@@ -600,6 +600,18 @@ value:      "."
 expression: dirname("..")
 value:      "."
 
+expression: listdir()
+value:      error("function listdir on line 0 takes one argument, 0 given")
+
+expression: listdir(7)
+value:      error("function listdir on line 0 takes a string path")
+
+expression: listdir("-")
+value:      error("function listdir on line 0: -, No such file or directory")
+
+expression: listdir("dir")
+value:      ["a"]
+
 expression: escape("test")
 value:      "\"test\""
 
