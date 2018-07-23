@@ -244,6 +244,11 @@ dirname("/");
 dirname(".");
 dirname("..");
 
+listdir();
+listdir(7);
+listdir("-");
+listdir("dir");
+
 escape("test");
 escape("echo $PATH")
 escape("$(pwd)/\"test program\" -x `date`");
