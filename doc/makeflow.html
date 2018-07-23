@@ -1037,13 +1037,17 @@ Or use a similar command to generate a <a href="http://www.cytoscape.org">Cytosc
 
 <a name=archiving><h3>Archiving Jobs</h3></a>
 
-<p><tt>Makeflow</tt> allows for users to archive the results of each job within a specified archive directory. This is done using the <tt>--archive</tt> option, which by default creates a archiving directory at <tt>/tmp/makeflow.archive.$UID</tt>. Both files and jobs are stored as the workflow executes. <tt>Makeflow</tt> will also check to see if a job has already been archived into the archiving directory, and if so the outputs of the job will be copied to the working directory and the job will skip execution.</p>
+<p><tt>Makeflow</tt> allows for users to archive the results of each job within a specified archive directory. This is done using the <tt>--archive</tt> option, which by default creates an archiving directory at <tt>/tmp/makeflow.archive.$UID</tt>. Both files and jobs are stored as the workflow executes. <tt>Makeflow</tt> will also check to see if a job has already been archived into the archiving directory, and if so the outputs of the job will be copied to the working directory and the job will skip execution.</p>
 
 <code> makeflow --archive example.makeflow </code>
 
 <p> To only write to the archiving directory (and ensure that all nodes will be executed instead), pass <tt>--archive-write</tt>. To only read from the archive and use the outputs of any archived job, pass <tt>--archive-read</tt>. To specify a directory to use for the archiving directory, give an optional argument as shown below </p>
 
 <code> makeflow --archive=/path/to/directory/ example.makeflow</code>
+
+<p> The archive also has an option to upload and download workflow contents from and Amazon Web Services S3 bucket. This is done using the <tt>--archive-s3</tt> option, which by default uploads/downloads from the S3 bucket name <tt>makeflows3archive</tt>. <tt>Makeflow</tt> will also check to see if files have already been uploaded to the S3 bucket so files are not uploaded twice, wasting time. Archiving with Amazon S3 utilizes the same functionality that the regular archive tool uses locally with copying files to and from <tt>/tmp/makeflow.archive.$UID</tt>.
+
+<code> makeflow --archive-s3= Amazon S3 Bucket Name</code> 
 
 <a name=linking><h3>Linking Dependencies</h3></a>
 
