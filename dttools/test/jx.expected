@@ -564,6 +564,15 @@ value:      "usr"
 expression: basename("usr")
 value:      "usr"
 
+expression: basename("file.txt")
+value:      "file.txt"
+
+expression: basename("file.txt",".txt")
+value:      "file"
+
+expression: basename("file.txt",".csv")
+value:      "file.txt"
+
 expression: basename("/")
 value:      "/"
 

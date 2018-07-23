@@ -327,21 +327,37 @@ struct jx *jx_function_basename(struct jx *args) {
 	struct jx *result = NULL;
 
 	int length = jx_array_length(args);
-	if (length != 1){
-		err = "basename takes one argument";
+	if (length < 1){
+		err = "one argument is required";
+		goto FAILURE;
+	}
+	if (length > 2){
+		err = "only two arguments are allowed";
 		goto FAILURE;
 	}
 
-	struct jx *a = jx_array_index(args, 0);
-	assert(a);
+	struct jx *path = jx_array_index(args, 0);
+	assert(path);
+	struct jx *suffix = jx_array_index(args, 1);
 
-	if (!jx_istype(a, JX_STRING)) {
-		err = "basename takes a string";
+	if (!jx_istype(path, JX_STRING)) {
+		err = "path must be a string";
 		goto FAILURE;
 	}
-	char *val = xxstrdup(a->u.string_value);
-	result = jx_string(basename(val));
-	free(val);
+	if (suffix && !jx_istype(suffix, JX_STRING)) {
+		err = "suffix must be a string";
+		goto FAILURE;
+	}
+
+	char *tmp = xxstrdup(path->u.string_value);
+	char *b = basename(tmp);
+	char *s = suffix ? suffix->u.string_value : NULL;
+	if (s && string_suffix_is(b, s)) {
+		result = jx_string(string_front(b, strlen(b) - strlen(s)));
+	} else {
+		result = jx_string(b);
+	}
+	free(tmp);
 
 	return result;
 
