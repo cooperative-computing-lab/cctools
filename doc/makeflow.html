@@ -1045,11 +1045,11 @@ Or use a similar command to generate a <a href="http://www.cytoscape.org">Cytosc
 
 <code> makeflow --archive=/path/to/directory/ example.makeflow</code>
 
-<p> The archive also has an option to upload and download workflow contents from and Amazon Web Services S3 bucket. This is done using the <tt>--archive-s3</tt> option, which by default uploads/downloads from the S3 bucket name <tt>makeflows3archive</tt>. <tt>Makeflow</tt> will also check to see if files have already been uploaded to the S3 bucket so files are not uploaded twice, wasting time. Archiving with Amazon S3 utilizes the same functionality that the regular archive tool uses locally with copying files to and from <tt>/tmp/makeflow.archive.$UID</tt>.
+<p> The archive also has an option to upload and download workflow contents from and Amazon Web Services S3 bucket. This is done using the <tt>--archive-s3</tt> option, which by default uploads/downloads from the S3 bucket name <tt>makeflows3archive</tt>. <tt>Makeflow</tt> will also check to see if files have already been uploaded to the S3 bucket so files are not uploaded twice, wasting time. Archiving with Amazon S3 utilizes the same functionality that the regular archive tool uses locally with copying files to and from <tt>/tmp/makeflow.archive.$UID</tt>. The user will need to make sure that their aws key id and secret key are stored within the credentials file that is provided when you configure AWS. </p>
 
 <code> makeflow --archive-s3= Amazon S3 Bucket Name</code> 
 
-<p> If you do not want to check to see if files exist when uploading you can use the other option <tt>--archive-s3-no-check</tt>, which has the same default S3 bucket and options to change the bucket name.
+<p> If you do not want to check to see if files exist when uploading you can use the other option <tt>--archive-s3-no-check</tt>, which has the same default S3 bucket and options to change the bucket name.</p>
 
 <code> makeflow --archive-s3-no-check= Amazon S3 Bucket Name</code>
 
