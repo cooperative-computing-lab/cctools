@@ -1049,6 +1049,10 @@ Or use a similar command to generate a <a href="http://www.cytoscape.org">Cytosc
 
 <code> makeflow --archive-s3= Amazon S3 Bucket Name</code> 
 
+<p> If you do not want to check to see if files exist when uploading you can use the other option <tt>--archive-s3-no-check</tt>, which has the same default S3 bucket and options to change the bucket name.
+
+<code> makeflow --archive-s3-no-check= Amazon S3 Bucket Name</code>
+
 <a name=linking><h3>Linking Dependencies</h3></a>
 
 <p><tt>Makeflow</tt> provides a tool to collect all of the dependencies for a
