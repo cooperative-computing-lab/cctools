@@ -175,22 +175,7 @@ static int create( void ** instance_struct, struct jx *hook_args )
 	}
 	free(tasks_dir);
 
-    aws_init ();
-    aws_set_debug (0);
-    FILE *fp = popen("grep aws_access_key_id ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
-    char line[256];
-    fgets(line, 255, fp);
-    line[strlen(line)-1] = '\0';
-    aws_set_keyid(line);
-    pclose(fp);
-    FILE *ft = popen("grep aws_secret_access_key ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
-    fgets(line, 255, fp);
-    line[strlen(line)-1] = '\0';
-    aws_set_key(line);
-    pclose(ft);
-
 	s3_set_bucket (a->s3_dir);
-
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
