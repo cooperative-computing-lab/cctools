@@ -80,7 +80,11 @@ struct archive_instance *archive_instance_create()
 }
 
 static int create( void ** instance_struct, struct jx *hook_args )
-{
+{	
+	aws_init ();
+        aws_set_debug (0);
+        char line[256];
+
 	if(s3_files_in_archive == NULL){
 				s3_files_in_archive = hash_table_create(0,0);
 		}
@@ -111,6 +115,32 @@ static int create( void ** instance_struct, struct jx *hook_args )
 	}
 	else{
 		a->s3 = 0;
+	}
+
+	if(jx_lookup_string(hook_args, "s3_hostname")){
+		s3_set_host(xxstrdup(jx_lookup_string(hook_args, "s3_hostname")));
+	}
+
+	if(jx_lookup_string(hook_args, "s3_keyid")){
+		aws_set_keyid(xxstrdup(jx_lookup_string(hook_args, "s3_keyid")));	
+	}
+	else{
+		FILE *fp = popen("grep aws_access_key_id ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
+        	fgets(line, 255, fp);
+        	line[strlen(line)-1] = '\0';
+        	aws_set_keyid(line);
+        	pclose(fp);	
+	}
+
+	if(jx_lookup_string(hook_args, "s3_secretkey")){
+		aws_set_key(xxstrdup(jx_lookup_string(hook_args, "s3_secretkey")));
+	}
+	else{
+		FILE *ft = popen("grep aws_secret_access_key ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
+        	fgets(line, 255, ft);
+        	line[strlen(line)-1] = '\0';
+        	aws_set_key(line);
+        	pclose(ft);
 	}
 
 	if(jx_lookup_boolean(hook_args, "archive_read")){
@@ -144,19 +174,21 @@ static int create( void ** instance_struct, struct jx *hook_args )
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 	free(tasks_dir);
-	aws_init ();
-		aws_set_debug (0);
-	FILE *fp = popen("grep aws_access_key_id ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
-		char line[256];
-		fgets(line, 255, fp);
-	line[strlen(line)-1] = '\0';
-	aws_set_keyid(line);
-		pclose(fp);
-		FILE *ft = popen("grep aws_secret_access_key ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
-		fgets(line, 255, fp);
-	line[strlen(line)-1] = '\0';
-	aws_set_key(line);
-		pclose(ft);
+
+    aws_init ();
+    aws_set_debug (0);
+    FILE *fp = popen("grep aws_access_key_id ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
+    char line[256];
+    fgets(line, 255, fp);
+    line[strlen(line)-1] = '\0';
+    aws_set_keyid(line);
+    pclose(fp);
+    FILE *ft = popen("grep aws_secret_access_key ~/.aws/credentials | cut -d ""="" -f 2 | tr -d ' '","r");
+    fgets(line, 255, fp);
+    line[strlen(line)-1] = '\0';
+    aws_set_key(line);
+    pclose(ft);
+
 	s3_set_bucket (a->s3_dir);
 
 
