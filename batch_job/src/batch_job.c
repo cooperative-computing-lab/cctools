@@ -35,6 +35,9 @@ extern const struct batch_queue_module batch_queue_wq;
 extern const struct batch_queue_module batch_queue_mesos;
 extern const struct batch_queue_module batch_queue_k8s;
 extern const struct batch_queue_module batch_queue_dryrun;
+#ifdef MPI
+extern const struct batch_queue_module batch_queue_mpi;
+#endif
 
 static struct batch_queue_module batch_queue_unknown = {
 	BATCH_QUEUE_TYPE_UNKNOWN, "unknown",
@@ -54,6 +57,9 @@ const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_lambda,
 #ifdef CCTOOLS_WITH_CHIRP
 	&batch_queue_chirp,
+#endif
+#ifdef MPI
+        &batch_queue_mpi,
 #endif
 	&batch_queue_cluster,
 	&batch_queue_condor,

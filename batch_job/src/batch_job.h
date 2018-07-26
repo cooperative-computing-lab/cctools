@@ -17,6 +17,10 @@ See the file COPYING for details.
 #include "jx.h"
 #include "rmsummary.h"
 
+#ifdef MPI
+#include "hash_table.h"
+#endif
+
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
 including Condor, SGE, Work Queue, Xgrid, and local Unix processes.
@@ -49,6 +53,7 @@ typedef enum {
 	BATCH_QUEUE_TYPE_MESOS,               /**< Batch jobs will be sent to Mesos. */
 	BATCH_QUEUE_TYPE_K8S,                 /**< Batch jobs will be sent to kubernetes. */
 	BATCH_QUEUE_TYPE_DRYRUN,              /**< Batch jobs will not actually run. */
+        BATCH_QUEUE_TYPE_MPI,
 	BATCH_QUEUE_TYPE_UNKNOWN = -1         /**< An invalid batch queue type. */
 } batch_queue_type_t;
 
@@ -231,6 +236,28 @@ const char *batch_queue_type_string();
 @return The port number in use, or zero if not applicable.
 */
 int batch_queue_port(struct batch_queue *q);
+
+#ifdef MPI
+/**
+ * The worker function for those makeflow binaries which end up being workers for the master process
+ * @param worldsize How many different processes are running
+ * @param rank This process's rank in the process listing
+ * @param procname This process's processor name
+ * @param procnamelen the length of the processor's name
+ * @return exit code
+ */
+int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int procnamelen);
+/**
+ * Gives the module the hashtables built by rank0 the hashtables of "procname-rank" and "procname-size". Should only be called by the rank 0 process
+ * @param name_rank
+ * @param name_size
+ */
+void batch_job_mpi_give_ranks_sizes(struct hash_table* name_rank, struct hash_table* name_size);
+/**
+ * Called by the Rank 0 process to kill the remaining workers.
+ */
+void batch_job_mpi_kill_workers();
+#endif
 
 #endif
 

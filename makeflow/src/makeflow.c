@@ -65,6 +65,10 @@ See the file COPYING for details.
 #include <string.h>
 #include <stdbool.h>
 
+#ifdef MPI
+#include <mpi.h>
+#endif
+
 /*
 Code organization notes:
 
@@ -1924,6 +1928,94 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
+#ifdef MPI
+        int need_mpi_finalize = 0;
+        if (batch_queue_type == BATCH_QUEUE_TYPE_MPI) {
+            MPI_Init(NULL, NULL);
+            int mpi_world_size;
+            MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
+            int mpi_rank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+            char procname[MPI_MAX_PROCESSOR_NAME];
+            int procnamelen;
+            MPI_Get_processor_name(procname, &procnamelen);
+
+            if (mpi_rank == 0) {
+                need_mpi_finalize = 1;
+
+                struct hash_table* mpi_comps = hash_table_create(0, 0);
+                struct hash_table* mpi_sizes = hash_table_create(0, 0);
+
+                int i;
+
+                for (i = 1; i < mpi_world_size; i++) {
+                    unsigned len = 0;
+                    MPI_Recv(&len, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    char* str = malloc(sizeof (char*)*len + 1);
+                    memset(str, '\0', sizeof (char)*len + 1);
+                    MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+                    struct jx* recobj = jx_parse_string(str);
+                    char* name = jx_lookup_string(recobj, "name");
+                    int rank = jx_lookup_integer(recobj, "rank");
+
+                    if (hash_table_lookup(mpi_comps, name) == NULL) {
+                        hash_table_insert(mpi_comps, name, rank);
+                    }
+                    //for partition sizing
+                    if (hash_table_lookup(mpi_sizes, name) == NULL) {
+                        hash_table_insert(mpi_sizes, name, 1);
+                    } else {
+                        int val = (int) hash_table_lookup(mpi_sizes, name);
+                        hash_table_remove(mpi_sizes, name);
+                        hash_table_insert(mpi_sizes, name, val + 1);
+
+                    }
+
+                    jx_delete(recobj);
+
+                }
+                for (i = 1; i < mpi_world_size; i++) {
+                    hash_table_firstkey(mpi_comps);
+                    char* key;
+                    int value;
+                    int sent = 0;
+                    while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
+                        if (value == i) {
+                            fprintf(stderr, "Telling %i to live\n", value);
+                            char* livemsg = string_format("{\"LIVE\":%i}",(int)hash_table_lookup(mpi_sizes,key));
+                            unsigned livemsgsize = strlen(livemsg);
+                            MPI_Send(livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
+                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+                            sent = 1;
+                            free(livemsg);
+                        }
+                    }
+                    if (sent == 0) {
+                        char* livemsg = string_format("{\"DIE\":%i}",(int)hash_table_lookup(mpi_sizes,key));
+                            unsigned livemsgsize = strlen(livemsg);
+                            MPI_Send(livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
+                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+                            free(livemsg);
+                    }
+                }
+                
+                //now we have the proper iprocesses there with correct num of cores
+                batch_job_mpi_give_ranks_sizes(mpi_comps, mpi_sizes);
+
+
+            } else {
+                return batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
+            }
+
+            //step1: determine if rank 0 or not. 
+            // if rank 0: find out who my workers are, and what their resources are
+            // else:      find out what my resources are, and tell rank 0
+            //Step2: rank 0 determine who gets to live and who gets to die and let them know.
+            //Step3: rank 0 remains normal makeflow. Everyone else is a worker
+        }
+#endif 
+
 	if(!did_explicit_auth)
 		auth_register_all();
 	if(chirp_tickets) {
@@ -2374,7 +2466,7 @@ EXIT_WITH_FAILURE:
 	makeflow_log_close(d);
 
 	exit(exit_value);
-
+        
 	return 0;
 }
 
