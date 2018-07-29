@@ -1940,6 +1940,8 @@ int main(int argc, char *argv[])
             int procnamelen;
             MPI_Get_processor_name(procname, &procnamelen);
 
+			fprintf(stderr,"%i:%s My pid is: %i\n",mpi_rank,procname,getpid());
+
             if (mpi_rank == 0) {
                 need_mpi_finalize = 1;
 
@@ -1982,30 +1984,37 @@ int main(int argc, char *argv[])
                     int sent = 0;
                     while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
                         if (value == i) {
-                            fprintf(stderr, "Telling %i to live\n", value);
-                            char* livemsg = string_format("{\"LIVE\":%i}",(int)hash_table_lookup(mpi_sizes,key));
+                            fprintf(stderr, "Telling %i at %s to live\n", value, key);
+                            int mpi_cores = (int)hash_table_lookup(mpi_sizes,key);
+                            fprintf(stderr,"%i has %i cores!\n",value, mpi_cores);
+                            char* livemsg = string_format("{\"LIVE\":%i}",mpi_cores);
                             unsigned livemsgsize = strlen(livemsg);
-                            MPI_Send(livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
-                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+                            fprintf(stderr,"Lifemsg for %i has been created, now sending\n",value);
+                            MPI_Send(&livemsgsize,1,MPI_UNSIGNED,value,0,MPI_COMM_WORLD);
+                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, value, 0, MPI_COMM_WORLD);
                             sent = 1;
-                            free(livemsg);
+                            fprintf(stderr,"Lifemsg for %i was successfully delivered\n",value);
+                            //free(livemsg);
                         }
                     }
                     if (sent == 0) {
                         char* livemsg = string_format("{\"DIE\":%i}",(int)hash_table_lookup(mpi_sizes,key));
                             unsigned livemsgsize = strlen(livemsg);
-                            MPI_Send(livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
+                            MPI_Send(&livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
                             MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
                             free(livemsg);
                     }
+                    fprintf(stderr,"Msg for %i has been delivered\n",i);
                 }
+                fprintf(stderr,"Msgs have all been sent\n");
                 
                 //now we have the proper iprocesses there with correct num of cores
                 batch_job_mpi_give_ranks_sizes(mpi_comps, mpi_sizes);
 
 
             } else {
-                return batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
+                int batch_job_worker_exit_code = batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
+				fprintf(stderr,"%i:%s exited with code: %i\n",mpi_rank,procname,batch_job_worker_exit_code);
             }
 
             //step1: determine if rank 0 or not. 
@@ -2464,8 +2473,6 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
-
-	free(archive_directory);
         
 #if MPI
         if(need_mpi_finalize ==1){
