@@ -8,6 +8,7 @@
 #include "getopt_aux.h"
 #include "stringtools.h"
 #include "list.h"
+#include "xxmalloc.h"
 #include <unistd.h>
 
 static const struct option long_options[] = {
@@ -80,7 +81,7 @@ static unsigned gen_guid() {
 
 char* generate_job_name() {
     char* guid_s = string_format("%u",gen_guid());
-    int i=0, k=0;
+    size_t i=0, k=0;
     char temp[256];
     memset(temp,'\0',256);
     for(i=0; i<strlen(guid_s); i++){
@@ -95,7 +96,7 @@ char* random_filename() {
 }
 
 int getnum(char* out) {
-    int i = 0, k=0;
+    size_t i = 0, k=0;
     char big[1000];
     memset(big,'\0',1000);
     for (i = 0; i < strlen(out); i++) {
@@ -127,12 +128,12 @@ void create_sge_file(char* fileout, struct jx* options) {
     } else {
         binary = "mpi_worker";
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = jx_lookup_string(options, "workqueue-arguments");
+            workqueue_options = (char*)jx_lookup_string(options, "workqueue-arguments");
         }
     }
     
-    if(jx_lookup_integer(options,"memory") != NULL){
-        workqueue_options = string_format("--memory=%i %s",jx_lookup_integer(options,"memory"),workqueue_options);
+    if(jx_lookup_integer(options,"memory") != 0){
+        workqueue_options = string_format("--memory=%i %s",(int)jx_lookup_integer(options,"memory"),workqueue_options);
     }
     if(jx_lookup_string(options,"disk")!=NULL){
         workqueue_options = string_format("--disk=%s %s",jx_lookup_string(options,"disk"),workqueue_options);
@@ -163,7 +164,7 @@ void create_sge_file(char* fileout, struct jx* options) {
     }
 
     if (jx_lookup_integer(options, "cores-per-worker") != 0) {
-        fprintf(fout, "setenv MPI_WORKER_CORES_PER %i\n", jx_lookup_integer(options, "cores-per-worker"));
+        fprintf(fout, "setenv MPI_WORKER_CORES_PER %i\n", (int)jx_lookup_integer(options, "cores-per-worker"));
         fprintf(fout, "mpirun -npernode 1 %s %s -q %s\n", binary, makeflow_options, workqueue_options);
     } else {
         fprintf(fout, "mpirun -np $NSLOTS %s %s -q %s\n", binary, makeflow_options, workqueue_options);
@@ -178,7 +179,7 @@ void create_slurm_file(char* fileout, struct jx* options) {
     char* binary = "";
     char* makeflow_options = "";
     char* workqueue_options = "";
-    char* cpout = jx_lookup_string(options,"copy-out");
+    char* cpout = (char*)jx_lookup_string(options,"copy-out");
 
     if (jx_lookup_string(options, "makeflow-arguments") != NULL) {
         makeflow_options = string_format("-m \"%s\"", jx_lookup_string(options, "makeflow-arguments"));
@@ -189,12 +190,12 @@ void create_slurm_file(char* fileout, struct jx* options) {
     } else {
         binary = "mpi_worker";
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = jx_lookup_string(options, "workqueue-arguments");
+            workqueue_options = (char*)jx_lookup_string(options, "workqueue-arguments");
         }
     }
     
-    if(jx_lookup_integer(options,"memory") != NULL){
-        workqueue_options = string_format("--memory=%i %s",jx_lookup_integer(options,"memory"),workqueue_options);
+    if(jx_lookup_integer(options,"memory") != 0){
+        workqueue_options = string_format("--memory=%i %s",(int)jx_lookup_integer(options,"memory"),workqueue_options);
     }
     if(jx_lookup_string(options,"disk")!=NULL){
         workqueue_options = string_format("--disk=%s %s",jx_lookup_string(options,"disk"),workqueue_options);
@@ -209,14 +210,14 @@ void create_slurm_file(char* fileout, struct jx* options) {
     fprintf(fout,"#SBATCH --partition=%s\n",jx_lookup_string(options,"mpi-name"));
     
     if (jx_lookup_integer(options, "cores-per-worker") != 0) {
-        fprintf(fout,"#SBATCH --cpus-per-task=%i\n",jx_lookup_integer(options, "cores-per-worker"));
-        workqueue_options = string_format("--cores=%i %s",jx_lookup_integer(options,"cores-per-worker"),workqueue_options);
+        fprintf(fout,"#SBATCH --cpus-per-task=%i\n",(int)jx_lookup_integer(options, "cores-per-worker"));
+        workqueue_options = string_format("--cores=%i %s",(int)jx_lookup_integer(options,"cores-per-worker"),workqueue_options);
     }
     
-    fprintf(fout,"#SBATCH --ntasks=%i\n",jx_lookup_integer(options, "slots"));
+    fprintf(fout,"#SBATCH --ntasks=%i\n",(int)jx_lookup_integer(options, "slots"));
     
     if(jx_lookup_integer(options,"memory") != 0 && jx_lookup_integer(options, "cores-per-worker") != 0){
-        int mem = jx_lookup_integer(options,"memory")/jx_lookup_integer(options, "cores-per-worker");
+        int mem = (int)jx_lookup_integer(options,"memory")/(int)jx_lookup_integer(options, "cores-per-worker");
         fprintf(fout,"#SBATCH --mem-per-cpu=%i\n",mem);
     }
     
@@ -254,12 +255,12 @@ void create_torque_file(char* fileout, struct jx* options) {
     } else {
         binary = "mpi_worker";
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = jx_lookup_string(options, "workqueue-arguments");
+            workqueue_options = (char*)jx_lookup_string(options, "workqueue-arguments");
         }
     }
     
-    if(jx_lookup_integer(options,"memory") != NULL){
-        workqueue_options = string_format("--memory=%i %s",jx_lookup_integer(options,"memory"),workqueue_options);
+    if(jx_lookup_integer(options,"memory") != 0){
+        workqueue_options = string_format("--memory=%i %s",(int)jx_lookup_integer(options,"memory"),workqueue_options);
     }
     if(jx_lookup_string(options,"disk")!=NULL){
         workqueue_options = string_format("--disk=%s %s",jx_lookup_string(options,"disk"),workqueue_options);
@@ -280,10 +281,10 @@ void create_torque_file(char* fileout, struct jx* options) {
     fprintf(fout, "#PBS -V\n"); //pass on submitter's environment
     
     //do all the fun nodes and processes and stuff....
-    fprintf(fout, "#PBS -l nodes=%i\n",jx_lookup_integer(options,"slots"));
+    fprintf(fout, "#PBS -l nodes=%i\n",(int)jx_lookup_integer(options,"slots"));
     fprintf(fout, "#PBS -l ppn=1\n"); //we're going to have to say 1, and if cores-per-worker is set, then we can send it, otherwise, set --cores=0 in the worker settings
     if(jx_lookup_integer(options,"cores-per-worker") != 0){
-        workqueue_options = string_format("--cores=%i",jx_lookup_integer(options,"cores-per-worker"));
+        workqueue_options = string_format("--cores=%i",(int)jx_lookup_integer(options,"cores-per-worker"));
     }else{
         workqueue_options = string_format("--cores=0");
     }
@@ -319,7 +320,7 @@ int main(int argc, char** argv) {
     enum submitter_types type = 0;
     int c;
     struct jx* config = jx_object(NULL);
-    char* username = getlogin();
+    //char* username = getlogin();
     int max_submits = 1;
     int cur_submits = 0;
     struct list* ids = list_create();
@@ -454,7 +455,7 @@ int main(int argc, char** argv) {
                     tmp = string_format("qstat -j %i",*idp);
                     break;
                 default:
-                    tmp = string_format("");
+                    tmp = string_format(" ");
                     break;
             }
             system(tmp);
