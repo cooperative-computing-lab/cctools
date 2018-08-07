@@ -123,6 +123,18 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 		fatal("Expected units of '%s', but got '%s' for '%s'", cf->external_unit, external_unit, field);
 	}
 
+	if(strcmp(field, "cores") == 0) {
+		/* hack to eliminate noise. we do not round up unless more than %10 of
+		 * the additional core is used. */
+
+		double raw   = MAX(1.0, input_number);
+		double floor = trunc(raw);
+
+		if(raw - floor < 0.1) {
+			input_number = floor;
+		}
+	}
+
 	*output_number = (int64_t) ceil(input_number * factor);
 
 	return 1;
@@ -720,7 +732,9 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 
 	if(s->wall_time > 0 && s->cpu_time > 0) {
 		//in millicores
-		s->cores_avg = (s->cpu_time * 1000.0)/s->wall_time;
+		int64_t tmp_output;
+		rmsummary_to_internal_unit("cores_avg", ((double) s->cpu_time)/s->wall_time, &tmp_output, "cores"); 
+		s->cores_avg = tmp_output;
 	}
 
 	return s;

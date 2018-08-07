@@ -331,7 +331,10 @@ int rmonitor_get_loadavg(struct rmonitor_load_info *load)
 		last_minute = -1;
 	}
 
-	load->last_minute = (int64_t) ceil(last_minute * 1000);
+	int64_t tmp_output;
+	rmsummary_to_internal_unit("machine_load", last_minute, &tmp_output, "procs");
+
+	load->last_minute = tmp_output;
 	load->cpus        = load_average_get_cpus();
 
 	return 0;
@@ -757,13 +760,19 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 	tr->end          = usecs_since_epoch();
 	tr->wall_time    = tr->end - tr->start;
 	tr->cpu_time     = p->cpu.accumulated;
-	tr->cores        = -1;
-	tr->cores_avg    = -1;
+	tr->cores        = 0;
+	tr->cores_avg    = 0;
 
 	if(tr->wall_time > 0) {
-		tr->cores     = (int64_t) ceil( ((double) tr->cpu_time)/tr->wall_time);
-		tr->cores_avg = tr->cores;
+
+		int64_t tmp_output;
+		rmsummary_to_internal_unit("cores", ((double) tr->cpu_time)/tr->wall_time, &tmp_output, "cores");
+		tr->cores = tmp_output;
+
+		rmsummary_to_internal_unit("cores_avg", ((double) tr->cpu_time)/tr->wall_time, &tmp_output, "cores");
+		tr->cores_avg = tmp_output;
 	}
+
 
 	tr->max_concurrent_processes = -1;
 	tr->total_processes          = -1;
