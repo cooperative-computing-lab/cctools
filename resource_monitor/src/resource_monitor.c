@@ -857,7 +857,7 @@ struct peak_cores_sample {
 double peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete interval */
+	int64_t max_separation = (60 + 2*interval)*USECOND; /* at least one minute and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
@@ -880,7 +880,7 @@ double peak_cores(int64_t wall_time, int64_t cpu_time) {
 		if(list_size(samples) < 2) {
 			break;
 		}
-		else if( head->wall_time + max_separation*USECOND < tail->wall_time) {
+		else if( head->wall_time + max_separation < tail->wall_time) {
 			list_pop_head(samples);
 			free(head);
 		} else {
@@ -907,7 +907,7 @@ double peak_cores(int64_t wall_time, int64_t cpu_time) {
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time  = usecs_since_epoch() - summary->start;
-	tr->cpu_time   = p->cpu.delta + tr->cpu_time;
+	tr->cpu_time   = p->cpu.accumulated;
 
 	tr->cores = 0;
 	tr->cores_avg = 0;
@@ -915,7 +915,7 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	if(tr->wall_time > 0) {
 		int64_t tmp_output;
 
-		rmsummary_to_internal_unit("cores_avg", peak_cores(tr->wall_time, tr->cpu_time), &tmp_output, "cores");
+		rmsummary_to_internal_unit("cores", peak_cores(tr->wall_time, tr->cpu_time), &tmp_output, "cores");
 		tr->cores= tmp_output;
 
 		rmsummary_to_internal_unit("cores_avg", ((double) tr->cpu_time)/tr->wall_time, &tmp_output, "cores");
