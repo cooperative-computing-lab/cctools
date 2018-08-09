@@ -57,7 +57,7 @@ void initialize_units() {
 
 	conversion_fields = hash_table_create(32, 0);
 
-                                   // name                 internal  external      base       exttoint     inttobase    float_flag
+                                   // name                 internal  external      base       exttoint     inttobase    is-external-float?
 	rmsummary_add_conversion_field("wall_time",                "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
 	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
 	rmsummary_add_conversion_field("start",                    "us",      "us",     "s",       1,        1.0/USECOND,   0);
@@ -82,8 +82,9 @@ void initialize_units() {
 
 void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, const char *base, double exttoint, double inttobase, int float_flag) {
 
-	if(!units_initialized)
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct conversion_field *c = hash_table_lookup(conversion_fields, name);
 	if(c) {
@@ -108,8 +109,10 @@ void rmsummary_add_conversion_field(const char *name, const char *internal, cons
 }
 
 int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *external_unit) {
-	if(!units_initialized)
+
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	double factor = 1;
 
@@ -142,8 +145,9 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 
 double rmsummary_to_external_unit(const char *field, int64_t n) {
 
-	if(!units_initialized)
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
 
@@ -161,8 +165,9 @@ double rmsummary_to_external_unit(const char *field, int64_t n) {
 
 double rmsummary_to_base_unit(const char *field, int64_t n) {
 
-	if(!units_initialized)
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
 
@@ -179,20 +184,30 @@ double rmsummary_to_base_unit(const char *field, int64_t n) {
 }
 
 const char *rmsummary_unit_of(const char *key) {
+
+	if(!units_initialized) {
+		initialize_units();
+	}
+
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
 
 	if(!cf) {
-		return NULL;
+		fatal("There is not a resource named '%s'.", key);
 	}
 
 	return cf->external_unit;
 }
 
 int rmsummary_field_is_float(const char *key) {
+
+	if(!units_initialized) {
+		initialize_units();
+	}
+
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
 
 	if(!cf) {
-		return 0;
+		fatal("There is not a resource named '%s'.", key);
 	}
 
 	return cf->float_flag;
@@ -340,7 +355,7 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->snapshots_count;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 
 	return 0;
@@ -367,7 +382,7 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 		return s->taskid;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 	return NULL;
 }
@@ -498,7 +513,7 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 	return 0;
 }
@@ -543,7 +558,7 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 		return 1;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 	return 0;
 }
@@ -554,8 +569,10 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 	}
 
 struct jx *peak_times_to_json(struct rmsummary *s) {
-	if(!units_initialized)
+
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct jx *output = jx_object(NULL);
 
@@ -596,8 +613,10 @@ struct jx *peak_times_to_json(struct rmsummary *s) {
 	}
 
 struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
-	if(!units_initialized)
+
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct jx *output = jx_object(NULL);
 
