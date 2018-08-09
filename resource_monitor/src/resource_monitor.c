@@ -336,33 +336,23 @@ void parse_limit_string(struct rmsummary *limits, char *str)
 	char *field = string_trim_spaces(pair);
 	char *value = string_trim_spaces(delim + 1);
 
-	int status;
-
-	if(
-			strcmp(field, "start")     == 0 ||
-			strcmp(field, "end")       == 0 ||
-			strcmp(field, "wall_time") == 0 ||
-			strcmp(field, "cpu_time")  == 0
-	  ) {
-		double d;
-		status = string_is_float(value, &d);
-		if(status) {
-			int64_t tmp_output;
-			rmsummary_to_internal_unit(field, d, &tmp_output, "s");  //s to internal unit, most likely microseconds.
-			rmsummary_assign_int_field(limits, field, tmp_output);
-		}
-
-	} else {
-		long long i;
-		status = string_is_integer(value, &i);
-		if(status) {
-			status = rmsummary_assign_int_field(limits, field, i);
-		}
-	}
+	int status = 0;
+	
+	double d;
+	status = string_is_float(value, &d);
 
 	if(!status) {
 		fatal("Invalid limit field '%s' or value '%s'\n", field, value);
 	}
+
+	if(strcmp(field, "start") == 0 || strcmp(field, "end") == 0) {
+		// given in seconds, but we need microseconds.
+		d *= USECOND;
+	}
+
+	int64_t tmp_output;
+	rmsummary_to_internal_unit(field, d, &tmp_output, rmsummary_unit_of(field));
+	rmsummary_assign_int_field(limits, field, tmp_output);
 
 	free(pair);
 }
@@ -909,6 +899,9 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 	tr->wall_time  = usecs_since_epoch() - summary->start;
 	tr->cpu_time   = p->cpu.accumulated;
 
+	tr->start = summary->start;
+	tr->end   = usecs_since_epoch();
+
 	tr->cores = 0;
 	tr->cores_avg = 0;
 
@@ -1044,7 +1037,7 @@ int record_snapshot(struct rmsummary *tr) {
 	FILE *snap_f = fopen(output_file, "w");
 
 	if(!snap_f) {
-		warn(D_WQ, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
+		warn(D_RMON, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
 	} else {
 		jx_pretty_print_stream(j, snap_f);
 		fclose(snap_f);
@@ -1582,7 +1575,7 @@ void rmonitor_final_cleanup(int signum)
 #define over_limit_check(tr, fld)\
 	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
 	{\
-		debug(D_RMON, "Limit " #fld " broken.\n");\
+		warn(D_RMON, "Limit " #fld " broken.\n");\
 		if(!(tr)->limits_exceeded) { (tr)->limits_exceeded = rmsummary_create(-1); }\
 		(tr)->limits_exceeded->fld = resources_limits->fld;\
 	}
@@ -1616,10 +1609,12 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, total_files);
 	over_limit_check(tr, disk);
 
-	if(tr->limits_exceeded)
+	if(tr->limits_exceeded) {
 		return 0;
-	else
+	}
+	else {
 		return 1;
+	}
 }
 
 /***
