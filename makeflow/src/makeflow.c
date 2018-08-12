@@ -67,6 +67,7 @@ See the file COPYING for details.
 
 #ifdef MPI
 #include <mpi.h>
+#include "jx_print.h"
 #endif
 
 /*
@@ -1211,6 +1212,10 @@ int main(int argc, char *argv[])
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
+#ifdef MPI
+        int mpi_cores_per = 0;
+        int mpi_mem_per = 0;
+#endif
 
 	random_init();
 	debug_config(argv[0]);
@@ -1317,6 +1322,10 @@ int main(int argc, char *argv[])
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
+#ifdef MPI
+                LONG_OPT_MPI_CORES,
+                LONG_OPT_MPI_MEM,
+#endif
 	};
 
 	static const struct option long_options_run[] = {
@@ -1429,6 +1438,10 @@ int main(int argc, char *argv[])
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
+#ifdef MPI
+                {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
+                {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
+#endif
 		{0, 0, 0, 0}
 	};
 
@@ -1920,6 +1933,14 @@ int main(int argc, char *argv[])
 				jx_delete(j);
 				break;
 			}
+#ifdef MPI
+                    case LONG_OPT_MPI_CORES:
+                        mpi_cores_per = atoi(optarg);
+                        break;
+                    case LONG_OPT_MPI_MEM:
+                        mpi_mem_per = atoi(optarg);
+                        break;
+#endif
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1960,9 +1981,11 @@ int main(int argc, char *argv[])
                     struct jx* recobj = jx_parse_string(str);
                     char* name = jx_lookup_string(recobj, "name");
                     int rank = jx_lookup_integer(recobj, "rank");
+					
+					fprintf(stderr,"RANK0: got back response: %i at %s\n",rank,name);
 
                     if (hash_table_lookup(mpi_comps, name) == NULL) {
-                        hash_table_insert(mpi_comps, name, rank);
+                        hash_table_insert(mpi_comps, string_format("%s",name), rank);
                     }
                     //for partition sizing
                     if (hash_table_lookup(mpi_sizes, name) == NULL) {
@@ -1974,7 +1997,7 @@ int main(int argc, char *argv[])
 
                     }
 
-                    jx_delete(recobj);
+                    //jx_delete(recobj);
 
                 }
                 for (i = 1; i < mpi_world_size; i++) {
@@ -1983,11 +2006,30 @@ int main(int argc, char *argv[])
                     int value;
                     int sent = 0;
                     while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
+						fprintf(stderr,"hex of key: %p\n",(void*)&key);
+						fprintf(stderr,"Key is char* so it's hex is: %p\n",(void*)key);
                         if (value == i) {
-                            fprintf(stderr, "Telling %i at %s to live\n", value, key);
-                            int mpi_cores = (int)hash_table_lookup(mpi_sizes,key);
+							//when running on cclws11 with 4 cores, key is somehow null....
+                            //fprintf(stderr, "Telling %i at %s to live\n", value, key);
+                            fprintf(stderr,"hex of mpi_comps: %p hex of mpi_sizes: %p\n",(void*)mpi_comps,(void*)mpi_sizes);
+                            int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (int)hash_table_lookup(mpi_sizes,key);
                             fprintf(stderr,"%i has %i cores!\n",value, mpi_cores);
-                            char* livemsg = string_format("{\"LIVE\":%i}",mpi_cores);
+                            struct jx* livemsgjx = jx_object(NULL);
+                            jx_insert_integer(livemsgjx,"LIVE",mpi_cores);
+                            if(mpi_mem_per > 0){
+                                jx_insert_integer(livemsgjx,"MEM",mpi_mem_per);
+                            }
+                            if(working_dir != NULL){
+                                jx_insert_string(livemsgjx,"WORK_DIR",working_dir);
+                            }
+                            char* livemsg = jx_print_string(livemsgjx);
+//                            if(mpi_mem_per == 0){
+//                                livemsg = string_format("{\"LIVE\":%i}",mpi_cores);
+//                            }else if(mpi_work_dir == NULL){
+//                                livemsg = string_format("{\"LIVE\":%i,\"MEM\":%i}",mpi_cores,mpi_mem_per);
+//                            }else{
+//                                livemsg = string_format("{\"LIVE\":%i,\"MEM\":%i,\"WORK_DIR\":%s}",mpi_cores,mpi_mem_per,mpi_work_dir);
+//                            }
                             unsigned livemsgsize = strlen(livemsg);
                             fprintf(stderr,"Lifemsg for %i has been created, now sending\n",value);
                             MPI_Send(&livemsgsize,1,MPI_UNSIGNED,value,0,MPI_COMM_WORLD);

@@ -30,11 +30,13 @@ static const struct option long_options[] = {
     {"disk-location",required_argument,0,'S'},
     {"time-limit",required_argument,0,'t'},
     {"copy-out",required_argument,0,'O'},
+    {"makeflow", no_argument, 0, 'K'},
     {0, 0, 0, 0}
 };
 
 void print_help() {
     printf("usage: mpi_submitter [options]\n");
+    printf(" -K,--makeflow                    Use Makeflow -T mpi instead of mpi_starter or mpi_worker\n");
     printf(" -m,--makeflow-arguments          Options to pass to makeflow master\n");
     printf(" -q,--workqueue-arguments         Options to pass to work_queue_workers\n");
     printf(" -p,--makeflow-port               The port to set the makeflow master to use\n");
@@ -120,26 +122,37 @@ void create_sge_file(char* fileout, struct jx* options) {
     char* workqueue_options = "";
 
     if (jx_lookup_string(options, "makeflow-arguments") != NULL) {
-        makeflow_options = string_format("-m %s", jx_lookup_string(options, "makeflow-arguments"));
+        makeflow_options = string_format("%s", jx_lookup_string(options, "makeflow-arguments"));
         binary = "mpi_starter";
+        if (jx_lookup_integer(options, "use-makeflow-mpi")) {
+            binary = "makeflow -T mpi";
+        }
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
             workqueue_options = string_format("%s", jx_lookup_string(options, "workqueue-arguments"));
         }
     } else {
         binary = "mpi_worker";
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = (char*)jx_lookup_string(options, "workqueue-arguments");
+            workqueue_options = (char*) jx_lookup_string(options, "workqueue-arguments");
         }
     }
     
-    if(jx_lookup_integer(options,"memory") != 0){
-        workqueue_options = string_format("--memory=%i %s",(int)jx_lookup_integer(options,"memory"),workqueue_options);
+    if(jx_lookup_integer(options,"memory") != 0) {
+        workqueue_options = string_format("--memory=%i %s", (int) jx_lookup_integer(options, "memory"), workqueue_options);
+        if (strstr("makeflow -T mpi", binary)) {
+            makeflow_options = string_format("--mpi-memory=%i %s", (int) jx_lookup_integer(options, "memory"), makeflow_options);
+        }
     }
-    if(jx_lookup_string(options,"disk")!=NULL){
-        workqueue_options = string_format("--disk=%s %s",jx_lookup_string(options,"disk"),workqueue_options);
+    if (jx_lookup_string(options, "disk") != NULL) {
+        workqueue_options = string_format("--disk=%s %s", jx_lookup_string(options, "disk"), workqueue_options);
     }
     if(jx_lookup_string(options,"disk-location")!=NULL){
         workqueue_options = string_format("--workdir=%s %s",jx_lookup_string(options,"disk-location"),workqueue_options);
+    }
+    if(jx_lookup_integer(options, "cores-per-worker") != 0){
+        if (strstr("makeflow -T mpi", binary)) {
+            makeflow_options = string_format("--mpi-cores=%i %s", (int) jx_lookup_integer(options, "cores-per-worker"), makeflow_options);
+        }
     }
 
     fprintf(fout, "#!/bin/csh\n\n");
@@ -157,17 +170,23 @@ void create_sge_file(char* fileout, struct jx* options) {
     }
     
     if(strlen(workqueue_options)>0 && !strstr("mpi_worker",binary)){
-        workqueue_options = string_format("\"%s\"",workqueue_options);
+        workqueue_options = string_format("-q \"%s\"",workqueue_options);
     }
-    if(strlen(makeflow_options)>0 && !strstr("mpi_worker",binary)){
-        makeflow_options = string_format("\"%s\"",makeflow_options);
+    if(strlen(makeflow_options)>0 && !(strstr("mpi_worker",binary) || strstr("makeflow -T mpi",binary))){
+        makeflow_options = string_format("-m \"%s\"",makeflow_options);
     }
+    
+    if(strstr("makeflow -T mpi",binary)){
+        workqueue_options = "";
+    }
+    
+    fprintf(stderr,"makeflow options: %s\nworkqueue options: %s\n",makeflow_options,workqueue_options);
 
     if (jx_lookup_integer(options, "cores-per-worker") != 0) {
         fprintf(fout, "setenv MPI_WORKER_CORES_PER %i\n", (int)jx_lookup_integer(options, "cores-per-worker"));
-        fprintf(fout, "mpirun -npernode 1 %s %s -q %s\n", binary, makeflow_options, workqueue_options);
+        fprintf(fout, "mpirun -npernode 1 %s %s %s\n", binary, makeflow_options, workqueue_options);
     } else {
-        fprintf(fout, "mpirun -np $NSLOTS %s %s -q %s\n", binary, makeflow_options, workqueue_options);
+        fprintf(fout, "mpirun -np $NSLOTS %s s %s\n", binary, makeflow_options, workqueue_options);
     }
 
     fclose(fout);
@@ -182,20 +201,26 @@ void create_slurm_file(char* fileout, struct jx* options) {
     char* cpout = (char*)jx_lookup_string(options,"copy-out");
 
     if (jx_lookup_string(options, "makeflow-arguments") != NULL) {
-        makeflow_options = string_format("-m \"%s\"", jx_lookup_string(options, "makeflow-arguments"));
+        makeflow_options = string_format("%s", jx_lookup_string(options, "makeflow-arguments"));
         binary = "mpi_starter";
+        if (jx_lookup_integer(options, "use-makeflow-mpi")) {
+            binary = "makeflow -T mpi";
+        }
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
             workqueue_options = string_format("%s", jx_lookup_string(options, "workqueue-arguments"));
         }
     } else {
         binary = "mpi_worker";
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = (char*)jx_lookup_string(options, "workqueue-arguments");
+            workqueue_options = (char*) jx_lookup_string(options, "workqueue-arguments");
         }
     }
     
     if(jx_lookup_integer(options,"memory") != 0){
         workqueue_options = string_format("--memory=%i %s",(int)jx_lookup_integer(options,"memory"),workqueue_options);
+        if (strstr("makeflow -T mpi", binary)) {
+            makeflow_options = string_format("--mpi-memory=%i %s", (int) jx_lookup_integer(options, "memory"), makeflow_options);
+        }
     }
     if(jx_lookup_string(options,"disk")!=NULL){
         workqueue_options = string_format("--disk=%s %s",jx_lookup_string(options,"disk"),workqueue_options);
@@ -212,6 +237,9 @@ void create_slurm_file(char* fileout, struct jx* options) {
     if (jx_lookup_integer(options, "cores-per-worker") != 0) {
         fprintf(fout,"#SBATCH --cpus-per-task=%i\n",(int)jx_lookup_integer(options, "cores-per-worker"));
         workqueue_options = string_format("--cores=%i %s",(int)jx_lookup_integer(options,"cores-per-worker"),workqueue_options);
+        if (strstr("makeflow -T mpi", binary)) {
+            makeflow_options = string_format("--mpi-cores=%i %s", (int) jx_lookup_integer(options, "cores-per-worker"), makeflow_options);
+        }
     }
     
     fprintf(fout,"#SBATCH --ntasks=%i\n",(int)jx_lookup_integer(options, "slots"));
@@ -230,10 +258,21 @@ void create_slurm_file(char* fileout, struct jx* options) {
         fprintf(fout, "module load %s\n", jx_lookup_string(options, "mpi-module")); //assume this works
     }
     
+    if(strlen(workqueue_options)>0 && !strstr("mpi_worker",binary)){
+        workqueue_options = string_format("-q \"%s\"",workqueue_options);
+    }
+    if(strlen(makeflow_options)>0 && !(strstr("mpi_worker",binary) || strstr("makeflow -T mpi",binary))){
+        makeflow_options = string_format("-m \"%s\"",makeflow_options);
+    }
+    if(strstr("makeflow -T mpi",binary)){
+        workqueue_options = "";
+    }
+    
+    
     if(cpout != NULL){
-        fprintf(fout, "mpirun %s %s -q \"%s\" -c \"%s\"\n", binary, makeflow_options, workqueue_options,cpout);
+        fprintf(fout, "mpirun %s %s %s -c \"%s\"\n", binary, makeflow_options, workqueue_options,cpout);
     }else{
-        fprintf(fout, "mpirun %s %s -q \"%s\"\n", binary, makeflow_options, workqueue_options);
+        fprintf(fout, "mpirun %s %s %s\n", binary, makeflow_options, workqueue_options);
     }
 
     fclose(fout);
@@ -246,16 +285,19 @@ void create_torque_file(char* fileout, struct jx* options) {
     char* makeflow_options = "";
     char* workqueue_options = "";
 
-    if (jx_lookup_string(options, "makeflow-arguments") != NULL) {
-        makeflow_options = string_format("-m %s", jx_lookup_string(options, "makeflow-arguments"));
+   if (jx_lookup_string(options, "makeflow-arguments") != NULL) {
+        makeflow_options = string_format("%s", jx_lookup_string(options, "makeflow-arguments"));
         binary = "mpi_starter";
+        if (jx_lookup_integer(options, "use-makeflow-mpi")) {
+            binary = "makeflow -T mpi";
+        }
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = string_format("-q %s", jx_lookup_string(options, "workqueue-arguments"));
+            workqueue_options = string_format("%s", jx_lookup_string(options, "workqueue-arguments"));
         }
     } else {
         binary = "mpi_worker";
         if (jx_lookup_string(options, "workqueue-arguments") != NULL) {
-            workqueue_options = (char*)jx_lookup_string(options, "workqueue-arguments");
+            workqueue_options = (char*) jx_lookup_string(options, "workqueue-arguments");
         }
     }
     
@@ -284,9 +326,12 @@ void create_torque_file(char* fileout, struct jx* options) {
     fprintf(fout, "#PBS -l nodes=%i\n",(int)jx_lookup_integer(options,"slots"));
     fprintf(fout, "#PBS -l ppn=1\n"); //we're going to have to say 1, and if cores-per-worker is set, then we can send it, otherwise, set --cores=0 in the worker settings
     if(jx_lookup_integer(options,"cores-per-worker") != 0){
-        workqueue_options = string_format("--cores=%i",(int)jx_lookup_integer(options,"cores-per-worker"));
+        workqueue_options = string_format("--cores=%i %s",(int)jx_lookup_integer(options,"cores-per-worker"),workqueue_options);
+        if (strstr("makeflow -T mpi", binary)) {
+            makeflow_options = string_format("--mpi-cores=%i %s", (int) jx_lookup_integer(options, "cores-per-worker"), makeflow_options);
+        }
     }else{
-        workqueue_options = string_format("--cores=0");
+        workqueue_options = string_format("--cores=0 %s",workqueue_options);
     }
     //if(jx_lookup_integer(options,"memory")!=0){
     //    fprintf(fout,"#PBS -l pmem=%imb\n",jx_lookup_integer(options,"memory"));
@@ -297,10 +342,13 @@ void create_torque_file(char* fileout, struct jx* options) {
     }
     
     if(strlen(workqueue_options)>0 && !strstr("mpi_worker",binary)){
-        workqueue_options = string_format("\"%s\"",workqueue_options);
+        workqueue_options = string_format("-q \"%s\"",workqueue_options);
     }
-    if(strlen(makeflow_options)>0 && !strstr("mpi_worker",binary)){
-        makeflow_options = string_format("\"%s\"",makeflow_options);
+    if(strlen(makeflow_options)>0 && !(strstr("mpi_worker",binary) || strstr("makeflow -T mpi",binary))){
+        makeflow_options = string_format("-m \"%s\"",makeflow_options);
+    }
+    if(strstr("makeflow -T mpi",binary)){
+        workqueue_options = "";
     }
     fprintf(fout, "mpirun -npernode 1 -machinefile $PBS_NODEFILE %s %s %s\n", binary, makeflow_options, workqueue_options);
     
@@ -329,7 +377,7 @@ int main(int argc, char** argv) {
     //check if makeflow options -> mpi_starter, else -> mpi_worker
     //submit with SGE or SLURM
 
-    while ((c = getopt_long(argc, argv, "m:q:p:w:W:e:u:n:C:c:T:o:t:O:h", long_options, 0)) != -1) {
+    while ((c = getopt_long(argc, argv, "m:q:p:w:W:e:u:n:C:c:T:o:t:O:M:hK", long_options, 0)) != -1) {
         switch (c) {
             case 'm': //makeflow-options
                 jx_insert_string(config, "makeflow-arguments", xxstrdup(optarg));
@@ -392,6 +440,8 @@ int main(int argc, char** argv) {
             case 'O':
                 jx_insert_string(config,"copy-out",xxstrdup(optarg));
                 break;
+            case 'K':
+                jx_insert_integer(config,"use-makeflow-mpi",1);
             default: //ignore anything not wanted
                 break;
         }
@@ -400,25 +450,26 @@ int main(int argc, char** argv) {
     while (1) {
         if (cur_submits < max_submits) {
             cur_submits += 1;
-            fprintf(stderr,"Submitting a new job\n");
+            fprintf(stderr, "Submitting a new job\n");
             char* filename = random_filename();
-            char* tmp = ""; string_format("qsub %s", filename);
+            char* tmp = "";
+            string_format("qsub %s", filename);
             switch (type) {
                 case slurm:
-					tmp = string_format("sbatch %s", filename);
+                    tmp = string_format("sbatch %s", filename);
                     create_slurm_file(filename, config);
                     break;
                 case torque:
-					tmp = string_format("qsub %s", filename);
+                    tmp = string_format("qsub %s", filename);
                     create_torque_file(filename, config);
                     break;
                 case sge:
-					tmp = string_format("qsub %s", filename);
+                    tmp = string_format("qsub %s", filename);
                     create_sge_file(filename, config);
                     break;
                 default:
-					fprintf(stderr,"You must specify a submission type\n");
-					exit(1);
+                    fprintf(stderr, "You must specify a submission type\n");
+                    exit(1);
                     break;
             }
 
@@ -427,9 +478,9 @@ int main(int argc, char** argv) {
             char outs[1024];
             fgets(outs, 1024, submitret);
             int id = getnum(outs);
-            int* idp = malloc(sizeof(int)*1);
+            int* idp = malloc(sizeof (int)*1);
             *idp = id;
-            fprintf(stderr,"Submitted job: %i\n outs: %s\n",id,outs);
+            fprintf(stderr, "Submitted job: %i\n outs: %s\n", id, outs);
             list_push_tail(ids, (void*) idp);
             free(tmp);
 

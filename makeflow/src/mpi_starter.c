@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
         UINT64_T memtotal;
         UINT64_T memavail;
         host_memory_info_get(&memavail,&memtotal);
-        int mem = ((memtotal/(1024*1024))/cores_total)*cores;//gigabytes
+        int mem = ((memtotal/(1024*1024))/cores_total)*cores;//MB
 
         char* sys_str = string_format("makeflow -T wq --port=%s -d all --local-cores=%i %s", port, ((cores / 2) + 1), makeflow_args);
 
