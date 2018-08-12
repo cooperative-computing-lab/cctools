@@ -186,7 +186,7 @@ void create_sge_file(char* fileout, struct jx* options) {
         fprintf(fout, "setenv MPI_WORKER_CORES_PER %i\n", (int)jx_lookup_integer(options, "cores-per-worker"));
         fprintf(fout, "mpirun -npernode 1 %s %s %s\n", binary, makeflow_options, workqueue_options);
     } else {
-        fprintf(fout, "mpirun -np $NSLOTS %s s %s\n", binary, makeflow_options, workqueue_options);
+        fprintf(fout, "mpirun -np $NSLOTS %s %s %s\n", binary, makeflow_options, workqueue_options);
     }
 
     fclose(fout);
