@@ -60,6 +60,24 @@ struct batch_job_mpi_job {
 	char* outfiles;
 };
 
+union mpi_ccl_guid{
+	char c[8];
+	unsigned int ul;
+};
+
+static unsigned int gen_guid(){
+	FILE* ran = fopen("/dev/urandom","r");
+	if(!ran)
+		fatal("Cannot open /dev/urandom");
+	union mpi_ccl_guid guid;
+	size_t k = fread(guid.c,sizeof(char),8,ran);
+	if(k<8)
+		fatal("couldn't read 8 bytes from /dev/urandom/");
+	fclose(ran);
+	return guid.ul;	
+}
+
+
 void batch_job_mpi_give_ranks_sizes(struct hash_table* nr, struct hash_table* ns) {
     name_rank = nr;
     name_size = ns;
@@ -388,7 +406,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                 //if not, then copy over and link in.
                 char* sandbox = NULL;
                 if(workdir){
-					sandbox = string_format("%s/%i",workdir,mid);
+					sandbox = string_format("%s/%u",workdir,gen_guid());
 					int kr = system(string_format("mkdir %s",sandbox));
 					if(kr != 0) debug(D_BATCH,"%i:%s tried to make sandbox %s: failed: %i\n",rank,procname,sandbox,kr);
 					char* tmp_ta = strdup(inf);
@@ -398,7 +416,6 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
 						if(kr != 0) debug(D_BATCH, "%i:%s failed to copy %s to %s :: %i\n",rank,procname,ta,sandbox,kr);
 						ta = strtok(0,",");
 					}
-					system(string_format("ls %s",sandbox));
 
 				}
                 int jobid = fork();
@@ -420,18 +437,18 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                     }
 					char* endcmd = "";
 					if(sandbox){
-						fprintf(stderr,"%i:%s-FORK:%i we are starting the cmd modification process\n",rank,procname,getpid());
+						//fprintf(stderr,"%i:%s-FORK:%i we are starting the cmd modification process\n",rank,procname,getpid());
 						cmd = string_format("cd %s && %s",sandbox,cmd);
 						//need to cp from workdir to ./
 						char* tmp_da = strdup(outf);
 						char* ta = strtok(tmp_da,",");
 						while(ta != NULL){
-							cmd = string_format("%s && cp -rf %s %s",cmd,ta,cwd);
+							cmd = string_format("%s && cp -rf ./%s %s/%s",cmd,ta,cwd,ta);
 							ta = strtok(0,",");
 						}
 						cmd = string_format("%s && rm -rf %s",cmd,sandbox);
 					}
-					fprintf(stderr,"%i:%s is starting child process with command: %s\n",rank,procname,cmd);
+					//fprintf(stderr,"%i:%s is starting child process with command: %s\n",rank,procname,cmd);
                    //debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command!\n", rank, procname, getpid());
                     execlp("sh", "sh", "-c", cmd, (char *) 0);
                     _exit(127); // Failed to execute the cmd.
