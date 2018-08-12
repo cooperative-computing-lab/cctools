@@ -2020,6 +2020,8 @@ int main(int argc, char *argv[])
                     UINT64_T value;
                     int sent = 0;
                     while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
+						fprintf(stderr,"hex of key: %p\n",(void*)&key);
+						fprintf(stderr,"Key is char* so it's hex is: %p\n",(void*)key);
                         if (value == i) {
                             int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (UINT64_T)hash_table_lookup(mpi_sizes,key);
                             //fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
