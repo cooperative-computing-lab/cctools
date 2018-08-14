@@ -1179,6 +1179,7 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
+	int safe_submit = 0;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
@@ -1253,6 +1254,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
+		LONG_OPT_SAFE_SUBMIT,
 		LONG_OPT_SANDBOX,
 		LONG_OPT_STORAGE_TYPE,
 		LONG_OPT_STORAGE_LIMIT,
@@ -1354,6 +1356,7 @@ int main(int argc, char *argv[])
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
 		{"do-not-save-failed-output", no_argument, 0, LONG_OPT_FAIL_DIR},
+		{"safe-submit-mode", no_argument, 0, LONG_OPT_SAFE_SUBMIT},
 		{"sandbox", no_argument, 0, LONG_OPT_SANDBOX},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
@@ -1856,6 +1859,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;
 				break;
+			case LONG_OPT_SAFE_SUBMIT:
+				safe_submit = 1;
+				break;
 			case LONG_OPT_SANDBOX:
 				if (makeflow_hook_register(&makeflow_hook_sandbox, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
@@ -2109,6 +2115,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
+	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
