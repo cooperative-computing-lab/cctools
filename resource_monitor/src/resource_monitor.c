@@ -336,31 +336,23 @@ void parse_limit_string(struct rmsummary *limits, char *str)
 	char *field = string_trim_spaces(pair);
 	char *value = string_trim_spaces(delim + 1);
 
-	int status;
-
-	if(
-			strcmp(field, "start")     == 0 ||
-			strcmp(field, "end")       == 0 ||
-			strcmp(field, "wall_time") == 0 ||
-			strcmp(field, "cpu_time")  == 0
-	  ) {
-		double d;
-		status = string_is_float(value, &d);
-		if(status) {
-			rmsummary_assign_int_field(limits, field, d*1000000);
-		}
-
-	} else {
-		long long i;
-		status = string_is_integer(value, &i);
-		if(status) {
-			status = rmsummary_assign_int_field(limits, field, i);
-		}
-	}
+	int status = 0;
+	
+	double d;
+	status = string_is_float(value, &d);
 
 	if(!status) {
 		fatal("Invalid limit field '%s' or value '%s'\n", field, value);
 	}
+
+	if(strcmp(field, "start") == 0 || strcmp(field, "end") == 0) {
+		// given in seconds, but we need microseconds.
+		d *= USECOND;
+	}
+
+	int64_t tmp_output;
+	rmsummary_to_internal_unit(field, d, &tmp_output, rmsummary_unit_of(field));
+	rmsummary_assign_int_field(limits, field, tmp_output);
 
 	free(pair);
 }
@@ -852,10 +844,10 @@ struct peak_cores_sample {
 	int64_t cpu_time;
 };
 
-int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
+double peak_cores(int64_t wall_time, int64_t cpu_time) {
 	static struct list *samples = NULL;
 
-	int64_t max_separation = 60 + 2*interval; /* at least one minute and a complete interval */
+	int64_t max_separation = (60 + 2*interval)*USECOND; /* at least one minute and a complete interval */
 
 	if(!samples) {
 		samples = list_create();
@@ -878,7 +870,7 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 		if(list_size(samples) < 2) {
 			break;
 		}
-		else if( head->wall_time + max_separation*USECOND < tail->wall_time) {
+		else if( head->wall_time + max_separation < tail->wall_time) {
 			list_pop_head(samples);
 			free(head);
 		} else {
@@ -898,30 +890,29 @@ int64_t peak_cores(int64_t wall_time, int64_t cpu_time) {
 		 * final summary. */
 		return 1;
 	} else {
-		/* hack to eliminate noise. we do not round up unless more than %10 of
-		 * the additional core is used. */
-
-		double raw   = MAX(1, ((double) diff_cpu)/diff_wall);
-		double floor = trunc(raw);
-
-		if(raw - floor > 0.1) {
-			return (int64_t) ceil(raw);
-		} else {
-			return (int64_t) floor;
-		}
+		return ((double) diff_cpu) / diff_wall;
 	}
 }
 
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time  = usecs_since_epoch() - summary->start;
-	tr->cpu_time   = p->cpu.delta + tr->cpu_time;
+	tr->cpu_time   = p->cpu.accumulated;
 
-	tr->cores      = peak_cores(tr->wall_time, tr->cpu_time);
+	tr->start = summary->start;
+	tr->end   = usecs_since_epoch();
 
-	tr->cores_avg  = 0;
+	tr->cores = 0;
+	tr->cores_avg = 0;
+
 	if(tr->wall_time > 0) {
-		tr->cores_avg = (tr->cpu_time * 1000.0) / tr->wall_time;
+		int64_t tmp_output;
+
+		rmsummary_to_internal_unit("cores", peak_cores(tr->wall_time, tr->cpu_time), &tmp_output, "cores");
+		tr->cores= tmp_output;
+
+		rmsummary_to_internal_unit("cores_avg", ((double) tr->cpu_time)/tr->wall_time, &tmp_output, "cores");
+		tr->cores_avg = tmp_output;
 	}
 
 	tr->max_concurrent_processes = (int64_t) itable_size(processes);
@@ -988,7 +979,11 @@ void rmonitor_log_row(struct rmsummary *tr)
 		fprintf(log_series, " %" PRId64, tr->bytes_received);
 		fprintf(log_series, " %" PRId64, tr->bytes_sent);
 		fprintf(log_series, " %" PRId64, tr->bandwidth);
-		fprintf(log_series, " %04.2lf" PRId64, tr->machine_load / 1000.0);
+
+		{
+			double tmp_output = rmsummary_to_external_unit("machine_load", tr->machine_load);
+			fprintf(log_series, " %04.2lf" PRId64, tmp_output);
+		}
 
 		if(resources_flags->disk)
 		{
@@ -1042,7 +1037,7 @@ int record_snapshot(struct rmsummary *tr) {
 	FILE *snap_f = fopen(output_file, "w");
 
 	if(!snap_f) {
-		warn(D_WQ, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
+		warn(D_RMON, "Could not save snapshots file '%s': %s", output_file, strerror(errno));
 	} else {
 		jx_pretty_print_stream(j, snap_f);
 		fclose(snap_f);
@@ -1195,7 +1190,9 @@ int rmonitor_final_summary()
 	}
 
 	if(summary->wall_time > 0) {
-		summary->cores_avg = (1000.0 * summary->cpu_time) / summary->wall_time;
+		int64_t tmp_output;
+		rmsummary_to_internal_unit("cores_avg", ((double) summary->cpu_time)/summary->wall_time, &tmp_output, "cores");
+		summary->cores_avg = tmp_output;
 	}
 
 	if(log_inotify)
@@ -1429,7 +1426,15 @@ struct rmsummary *rmonitor_final_usage_tree(void)
 
 	/* we do not use peak_cores here, as we may have missed some threads which
 	 * make cpu_time quite jumpy. */
-	tr_usg->cores     = MAX(1, ceil( ((double) tr_usg->cpu_time)/tr_usg->wall_time));
+	
+	if(tr_usg->wall_time > 0) {
+		int64_t tmp_output;
+		rmsummary_to_internal_unit("cores", ((double) tr_usg->cpu_time)/tr_usg->wall_time, &tmp_output, "cores");
+		tr_usg->cores     = tmp_output;
+
+		rmsummary_to_internal_unit("cores_avg", ((double) tr_usg->cpu_time)/tr_usg->wall_time, &tmp_output, "cores");
+		tr_usg->cores_avg = tmp_output;
+	}
 
 	tr_usg->bandwidth      = average_bandwidth(0);
 	tr_usg->bytes_received = total_bytes_rx;
@@ -1570,7 +1575,7 @@ void rmonitor_final_cleanup(int signum)
 #define over_limit_check(tr, fld)\
 	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
 	{\
-		debug(D_RMON, "Limit " #fld " broken.\n");\
+		warn(D_RMON, "Limit " #fld " broken.\n");\
 		if(!(tr)->limits_exceeded) { (tr)->limits_exceeded = rmsummary_create(-1); }\
 		(tr)->limits_exceeded->fld = resources_limits->fld;\
 	}
@@ -1604,10 +1609,12 @@ int rmonitor_check_limits(struct rmsummary *tr)
 	over_limit_check(tr, total_files);
 	over_limit_check(tr, disk);
 
-	if(tr->limits_exceeded)
+	if(tr->limits_exceeded) {
 		return 0;
-	else
+	}
+	else {
 		return 1;
+	}
 }
 
 /***

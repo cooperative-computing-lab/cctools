@@ -57,7 +57,7 @@ void initialize_units() {
 
 	conversion_fields = hash_table_create(32, 0);
 
-                                   // name                 internal  external      base       exttoint     inttobase    float_flag
+                                   // name                 internal  external      base       exttoint     inttobase    is-external-float?
 	rmsummary_add_conversion_field("wall_time",                "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
 	rmsummary_add_conversion_field("cpu_time",                 "us",      "s",      "s",       USECOND,  1.0/USECOND,   1);
 	rmsummary_add_conversion_field("start",                    "us",      "us",     "s",       1,        1.0/USECOND,   0);
@@ -82,8 +82,9 @@ void initialize_units() {
 
 void rmsummary_add_conversion_field(const char *name, const char *internal, const char *external, const char *base, double exttoint, double inttobase, int float_flag) {
 
-	if(!units_initialized)
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct conversion_field *c = hash_table_lookup(conversion_fields, name);
 	if(c) {
@@ -108,8 +109,10 @@ void rmsummary_add_conversion_field(const char *name, const char *internal, cons
 }
 
 int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *output_number, const char *external_unit) {
-	if(!units_initialized)
+
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	double factor = 1;
 
@@ -123,6 +126,18 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 		fatal("Expected units of '%s', but got '%s' for '%s'", cf->external_unit, external_unit, field);
 	}
 
+	if(strcmp(field, "cores") == 0) {
+		/* hack to eliminate noise. we do not round up unless more than %10 of
+		 * the additional core is used. */
+
+		double raw   = MAX(1.0, input_number);
+		double floor = trunc(raw);
+
+		if(raw - floor < 0.1) {
+			input_number = floor;
+		}
+	}
+
 	*output_number = (int64_t) ceil(input_number * factor);
 
 	return 1;
@@ -130,8 +145,9 @@ int rmsummary_to_internal_unit(const char *field, double input_number, int64_t *
 
 double rmsummary_to_external_unit(const char *field, int64_t n) {
 
-	if(!units_initialized)
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
 
@@ -149,8 +165,9 @@ double rmsummary_to_external_unit(const char *field, int64_t n) {
 
 double rmsummary_to_base_unit(const char *field, int64_t n) {
 
-	if(!units_initialized)
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, field);
 
@@ -167,20 +184,30 @@ double rmsummary_to_base_unit(const char *field, int64_t n) {
 }
 
 const char *rmsummary_unit_of(const char *key) {
+
+	if(!units_initialized) {
+		initialize_units();
+	}
+
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
 
 	if(!cf) {
-		return NULL;
+		fatal("There is not a resource named '%s'.", key);
 	}
 
 	return cf->external_unit;
 }
 
 int rmsummary_field_is_float(const char *key) {
+
+	if(!units_initialized) {
+		initialize_units();
+	}
+
 	struct conversion_field *cf = hash_table_lookup(conversion_fields, key);
 
 	if(!cf) {
-		return 0;
+		fatal("There is not a resource named '%s'.", key);
 	}
 
 	return cf->float_flag;
@@ -328,7 +355,7 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->snapshots_count;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 
 	return 0;
@@ -355,7 +382,7 @@ const char *rmsummary_get_char_field(struct rmsummary *s, const char *key) {
 		return s->taskid;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 	return NULL;
 }
@@ -486,7 +513,7 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 		return 1;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 	return 0;
 }
@@ -531,7 +558,7 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 		return 1;
 	}
 
-	fatal("resource summary does not have a '%s' key. This is most likely a CCTools bug.", key);
+	fatal("There is not a resource named '%s'.", key);
 
 	return 0;
 }
@@ -542,8 +569,10 @@ int rmsummary_assign_summary_field(struct rmsummary *s, char *key, struct jx *va
 	}
 
 struct jx *peak_times_to_json(struct rmsummary *s) {
-	if(!units_initialized)
+
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct jx *output = jx_object(NULL);
 
@@ -584,8 +613,10 @@ struct jx *peak_times_to_json(struct rmsummary *s) {
 	}
 
 struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
-	if(!units_initialized)
+
+	if(!units_initialized) {
 		initialize_units();
+	}
 
 	struct jx *output = jx_object(NULL);
 
@@ -720,7 +751,9 @@ struct rmsummary *json_to_rmsummary(struct jx *j) {
 
 	if(s->wall_time > 0 && s->cpu_time > 0) {
 		//in millicores
-		s->cores_avg = (s->cpu_time * 1000.0)/s->wall_time;
+		int64_t tmp_output;
+		rmsummary_to_internal_unit("cores_avg", ((double) s->cpu_time)/s->wall_time, &tmp_output, "cores"); 
+		s->cores_avg = tmp_output;
 	}
 
 	return s;
