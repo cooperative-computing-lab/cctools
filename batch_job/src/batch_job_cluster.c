@@ -121,7 +121,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
 		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
-		cluster_resources = string_format(" -N 1 -c %" PRId64 "%s ", 
+		cluster_resources = string_format(" -N 1 -n %" PRId64 "%s ", 
 			resources->cores ? resources->cores : 1,
 			(resources->memory>0 && mem) ? mem : "");
 		free(mem);
@@ -144,22 +144,6 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
 		return -1;
 	}
-
-	/*
-	Use the basename of the first word in the command line as a name for the job.
-	Re the PBS qsub manpage, the -N name must start with a letter and be <= 15 characters long.
-	Unfortunately, work_queue_worker hits this limit.
-	*/
-
-	char *firstword = strdup(cmd);
-
-	char *end = strchr(firstword, ' ');
-	if(end) *end = 0;
-		
-	char *submit_job_name = strdup(string_front(path_basename(firstword),15));
-	if(!isalpha(submit_job_name[0])) submit_job_name[0] = 'X';
-
-	free(firstword);
 
 	char *cluster_resources = cluster_set_resource_string(q, resources);
 
@@ -212,7 +196,6 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 		cluster_name);
 
 	free(cluster_resources);
-	free(submit_job_name);
 	debug(D_BATCH, "%s", command);
 
 	FILE *file = popen(command, "r");
