@@ -103,6 +103,7 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 static char *cluster_set_resource_string(struct batch_queue *q, const struct rmsummary *resources)
 {
 	char *cluster_resources = NULL;
+	const char *ignore_mem = hash_table_lookup(q->options, "ignore-mem-spec");
 
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
 		char *mem = string_format(",mem=%" PRId64 "mb", resources->memory);
@@ -114,12 +115,15 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		free(mem);
 		free(disk);
 	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
-		char *mem = string_format(" --mem=%" PRId64 "M", resources->memory);
+		char *mem = NULL;
+		if(!strcmp("yes", ignore_mem)){
+			mem = string_format(" --mem=%" PRId64 "M", resources->memory);
+		}
 		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
 		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
 		cluster_resources = string_format(" -N 1 -c %" PRId64 "%s ", 
 			resources->cores ? resources->cores : 1,
-			resources->memory>0 ? mem : "");
+			(resources->memory>0 && mem) ? mem : "");
 		free(mem);
 	}
 	const char *safe_mode = hash_table_lookup(q->options, "safe-submit-mode");

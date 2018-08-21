@@ -1101,6 +1101,8 @@ static void show_help_run(const char *cmd)
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
+	printf("    --safe-submit-mode          Ignores the resources specified on SLURM, TORQUE, and PBS.\n");
+	printf("    --ignore-memory-spec        Exclused the memory specified on SLURM.\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
@@ -1180,6 +1182,7 @@ int main(int argc, char *argv[])
 	char *write_summary_to = NULL;
 	char *s;
 	int safe_submit = 0;
+	int ignore_mem_spec = 0;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
@@ -1243,6 +1246,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_FAIL_DIR,
 		LONG_OPT_GC_SIZE,
+		LONG_OPT_IGNORE_MEM,
 		LONG_OPT_LOCAL_CORES,
 		LONG_OPT_LOCAL_MEMORY,
 		LONG_OPT_LOCAL_DISK,
@@ -1334,6 +1338,7 @@ int main(int argc, char *argv[])
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
 		{"gc-count", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
+		{"ignore-memory-spec", no_argument, 0, LONG_OPT_IGNORE_MEM},
 		{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
 		{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
 		{"local-disk", required_argument, 0, LONG_OPT_LOCAL_DISK},
@@ -1859,6 +1864,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;
 				break;
+			case LONG_OPT_IGNORE_MEM:
+				ignore_mem_spec = 1;
+				break;
 			case LONG_OPT_SAFE_SUBMIT:
 				safe_submit = 1;
 				break;
@@ -2116,6 +2124,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
