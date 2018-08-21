@@ -50,7 +50,7 @@ setup_batch_wrapper creates the wrapper file if necessary,
 returning true on success and false on failure.
 */
 
-static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
+static int setup_batch_wrapper(struct batch_queue *q, const char *sysname, const struct rmsummary *resources)
 {
 	char wrapperfile[PATH_MAX];
 	snprintf(wrapperfile, PATH_MAX, "%s.wrapper", sysname);
@@ -70,6 +70,25 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 
 	if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		fprintf(file, "[ -n \"${SLURM_JOB_ID}\" ] && JOB_ID=`echo ${SLURM_JOB_ID} | cut -d . -f 1`\n");
+
+		if(resources) {
+			if(resources->cores > 0) {
+				fprintf(file, "#SBATCH --cpus-per-task=%" PRId64 "\n", resources->cores);
+			}
+
+			if(resources->memory > 0) {
+				fprintf(file, "#SBATCH --mem=%" PRId64 "\n", resources->memory);
+			}
+
+			/*
+			 // --tmp is only for temporary disk space, so maybe disk for slurm
+			 // is better left unspecified?
+			if(resources->disk > 0) {
+				fprintf(file, "#SBATCH --tmp=%" PRId64 "\n", resources->disk);
+			}
+			*/
+		}
+
 	} else {
 		// Some systems set PBS_JOBID, some set JOBID.
 		fprintf(file, "[ -n \"${PBS_JOBID}\" ] && JOB_ID=`echo ${PBS_JOBID} | cut -d . -f 1`\n");
@@ -105,7 +124,7 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	struct batch_job_info *info;
 	const char *options = hash_table_lookup(q->options, "batch-options");
 
-	if(!setup_batch_wrapper(q, cluster_name)) {
+	if(!setup_batch_wrapper(q, cluster_name, resources)) {
 		debug(D_NOTICE|D_BATCH,"couldn't setup wrapper file: %s",strerror(errno));
 		return -1;
 	}
