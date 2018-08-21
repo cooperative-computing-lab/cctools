@@ -115,13 +115,12 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		free(disk);
 	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		char *mem = string_format(" --mem=%" PRId64 "M", resources->memory);
-		char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
-		cluster_resources = string_format(" -N 1 -c %" PRId64 "%s%s ", 
+		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
+		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
+		cluster_resources = string_format(" -N 1 -c %" PRId64 "%s ", 
 			resources->cores ? resources->cores : 1,
-			resources->memory>0 ? mem : "",
-			resources->disk>0 ? disk  : "");
+			resources->memory>0 ? mem : "");
 		free(mem);
-		free(disk);
 	}
 	const char *safe_mode = hash_table_lookup(q->options, "safe-submit-mode");
 	if(!strcmp("yes", safe_mode))
