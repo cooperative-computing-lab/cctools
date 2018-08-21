@@ -116,7 +116,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		free(disk);
 	} else if(q->type == BATCH_QUEUE_TYPE_SLURM){
 		char *mem = NULL;
-		if(!strcmp("yes", ignore_mem)){
+		if(!strcmp("no", ignore_mem)){
 			mem = string_format(" --mem=%" PRId64 "M", resources->memory);
 		}
 		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting

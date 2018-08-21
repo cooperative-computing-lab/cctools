@@ -1102,7 +1102,7 @@ static void show_help_run(const char *cmd)
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
 	printf("    --safe-submit-mode          Ignores the resources specified on SLURM, TORQUE, and PBS.\n");
-	printf("    --ignore-memory-spec        Exclused the memory specified on SLURM.\n");
+	printf("    --ignore-memory-spec        Excludes the memory specified on SLURM.\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
