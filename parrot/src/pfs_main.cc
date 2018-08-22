@@ -139,6 +139,10 @@ char *stats_file = NULL;
 int parrot_fd_max = -1;
 int parrot_fd_start = -1;
 
+#ifdef HAS_EXT2FS
+pfs_service *pfs_service_ext_init(const char *image);
+#endif
+
 /*
 This process at the very top of the traced tree
 and its final exit status, which we use to determine
@@ -172,6 +176,7 @@ enum {
 	LONG_OPT_STATS_FILE,
 	LONG_OPT_DISABLE_SERVICE,
 	LONG_OPT_NO_FLOCK,
+	LONG_OPT_EXT_IMAGE,
 };
 
 static void get_linux_version(const char *cmd)
@@ -282,6 +287,8 @@ static void show_help( const char *cmd )
 	printf( " %-30s Disable the given service.\n", "--disable-service");
 	printf( " %-30s Make flock a no-op.\n", "--no-flock");
 	printf("\n");
+	printf("Filesystem Options:\n");
+	printf( " %-30s Mount an ext[234] disk image at /ext_n.\n", "--ext-image=<image>");
 	printf("FTP / GridFTP options:\n");
 	printf( " %-30s Enable data channel authentication in GridFTP.\n", "-C,--channel-auth");
 	printf("\n");
@@ -819,8 +826,10 @@ int main( int argc, char *argv[] )
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-level-irods", required_argument, 0, 'I'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"disable-service", required_argument, 0, LONG_OPT_DISABLE_SERVICE},
 		{"dynamic-mounts", no_argument, 0, LONG_OPT_DYNAMIC_MOUNTS },
 		{"env-list", required_argument, 0, 'e'},
+		{"ext-image", required_argument, 0, LONG_OPT_EXT_IMAGE},
 		{"fake-setuid", no_argument, 0, LONG_OPT_FAKE_SETUID},
 		{"gid", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
@@ -838,6 +847,8 @@ int main( int argc, char *argv[] )
 		{"no-set-foreground", no_argument, 0, LONG_OPT_NO_SET_FOREGROUND},
 		{"paranoid", no_argument, 0, 'P'},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
+		{"pid-fixed", no_argument, 0, LONG_OPT_PID_FIXED},
+		{"pid-warp", no_argument, 0, LONG_OPT_PID_WARP},
 		{"proxy", required_argument, 0, 'p'},
 		{"root-checksum", required_argument, 0, 'R'},
 		{"session-caching", no_argument, 0, 'S'},
@@ -850,6 +861,8 @@ int main( int argc, char *argv[] )
 		{"tab-file", required_argument, 0, 'm'},
 		{"tempdir", required_argument, 0, 't'},
 		{"tickets", required_argument, 0, 'i'},
+		{"time-stop", no_argument, 0, LONG_OPT_TIME_STOP},
+		{"time-warp", no_argument, 0, LONG_OPT_TIME_WARP},
 		{"timeout", required_argument, 0, 'T'},
 		{"uid", required_argument, 0, 'U'},
 		{"username", required_argument, 0, 'u'},
@@ -859,11 +872,6 @@ int main( int argc, char *argv[] )
 		{"with-checksums", no_argument, 0, 'K'},
 		{"with-snapshots", no_argument, 0, 'F'},
 		{"work-dir", required_argument, 0, 'w'},
-		{"time-stop", no_argument, 0, LONG_OPT_TIME_STOP},
-		{"time-warp", no_argument, 0, LONG_OPT_TIME_WARP},
-		{"pid-fixed", no_argument, 0, LONG_OPT_PID_FIXED},
-		{"pid-warp", no_argument, 0, LONG_OPT_PID_WARP},
-		{"disable-service", required_argument, 0, LONG_OPT_DISABLE_SERVICE},
 		{0,0,0,0}
 	};
 
@@ -1118,6 +1126,19 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_NO_FLOCK:
 			pfs_no_flock = 1;
 			break;
+		case LONG_OPT_EXT_IMAGE: {
+#ifdef HAS_EXT2FS
+			struct pfs_service *s = pfs_service_ext_init(optarg);
+			if (!s) fatal("failed to load ext image %s", optarg);
+			static unsigned ext_fs_number = 0;
+			char ext_fs_name[128];
+			snprintf(ext_fs_name, sizeof(ext_fs_name), "ext_%u", ext_fs_number++);
+			hash_table_insert(available_services, ext_fs_name, s);
+#else
+			fatal("parrot was not configured with ext2fs support");
+#endif
+			break;
+		}
 		default:
 			show_help(argv[0]);
 			break;
