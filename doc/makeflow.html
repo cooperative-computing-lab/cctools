@@ -410,13 +410,35 @@ For example, to specify that jobs should be submitted to the <tt>devel</tt> queu
 
 <p>Use the <tt>-T pbs</tt> option to submit jobs to the <a href=http://www.arc.ox.ac.uk/content/pbs>Portable Batch System</a> or compatible systems.</p>
 
+<p>This will add the values for cores, memory, and disk. These values will be added onto <tt>qsub</tt> in this format:<br>
+<tt>-l nodes=1:ppn=$CORES,mem=$MEMORY,file=$DISK</tt></p>
+
+<p>To remove resources specification at submission use Makeflow option <tt>--safe-submit-mode</tt>.</p>
+
 <a name=torque><h3>Torque Batch System</h3></a>
 
 <p>Use the <tt>-T torque</tt> option to submit jobs to the <a href==http://www.adaptivecomputing.com/products/open-source/torque>Torque Resource Manager</a> batch system.</p>
 
+<p>This will add the values for cores, memory, and disk. These values will be added onto <tt>qsub</tt> in this format:<br>
+<tt>-l nodes=1:ppn=$CORES,mem=$MEMORY,file=$DISK</tt></p>
+
+<p>To remove resources specification at submission use Makeflow option <tt>--safe-submit-mode</tt>.</p>
+
 <a name=slurm><h3>SLURM - Simple Linux Resource Manager</h3></a>
 
 <p>Use the <tt>-T slurm</tt> option to submit jobs to the <a href=http://slurm.schedmd.com>SLURM</a> batch system.
+
+<p>This will add the values for cores and memory. These values will be added onto <tt>sbatch</tt> in this format:<br>
+<tt>-N 1 -n $CORES --mem=$MEMORY</tt></p>
+
+<p>To remove resources specification at submission use Makeflow option <tt>--safe-submit-mode</tt>.</p>
+
+<p>Disk is not specifies as a shared file system is assumed. The only available disk command line option is
+<tt>--tmp</tt>, which governs temporary disk space. This may have unintended limitations on available machines
+as temporary disk is highly dependent on host site.</p>
+
+<p>Note: Some SLURM sites disallow specifying memory (example Stampede2). To avoid specification errors
+the Makeflow option <tt>--ignore-memory-spec</tt> removes memory from <tt>sbatch</tt>.</p> 
 
 <a name=moab><h3>Moab Scheduler</h3></a>
 
