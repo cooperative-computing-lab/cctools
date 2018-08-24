@@ -134,6 +134,8 @@ config_irods_path=no
 config_openssl_path=no
 config_xrootd_path=no
 
+config_static_libgcc=yes
+
 while [ $# -gt 0 ]
 do
 	opt=$1
@@ -318,6 +320,9 @@ do
 		--tcp-high-port)
 			ccflags="${ccflags} -DTCP_HIGH_PORT_DEFAULT=${arg}"
 			;;
+		--without-static-libgcc)
+			config_static_libgcc=no
+			;;
 		-h | -help | --h | --help)
 			cat <<EOF
 Use: configure [options]
@@ -449,14 +454,22 @@ else
 		echo "no"
 fi
 
+ldflags="${LDFLAGS}"
+
 if [ $BUILD_SYS = LINUX ]
 then
-		ldflags="${LDFLAGS} -Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
-elif [ $BUILD_SYS = DARWIN ]
+		if [ "${config_static_libgcc}" = yes ]
+		then
+				ldflags="${ldflags} -Xlinker -Bstatic -static-libgcc"
+		fi
+		
+		ldflags="${ldflags} -Xlinker -Bdynamic ${link_as_needed}"
+elif [ $BUILD_SYS != DARWIN ]
 then
-		ldflags="${LDFLAGS}"
-else
-		ldflags="${LDFLAGS} -static-libgcc"
+		if [ "${config_static_libgcc}" = yes ]
+		then
+				ldflags="${ldflags} -static-libgcc"
+		fi
 fi
 
 if [ "$optsanitize" = 1 ]; then
