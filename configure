@@ -451,12 +451,12 @@ fi
 
 if [ $BUILD_SYS = LINUX ]
 then
-		ldflags="-Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
+		ldflags="${LDFLAGS} -Xlinker -Bstatic -static-libgcc -Xlinker -Bdynamic ${link_as_needed}"
 elif [ $BUILD_SYS = DARWIN ]
 then
-		ldflags=""
+		ldflags="${LDFLAGS}"
 else
-		ldflags="-static-libgcc"
+		ldflags="${LDFLAGS} -static-libgcc"
 fi
 
 if [ "$optsanitize" = 1 ]; then
