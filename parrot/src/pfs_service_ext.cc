@@ -6,12 +6,6 @@ See the file COPYING for details.
 
 #ifdef HAS_EXT2FS
 
-#include "pfs_service.h"
-
-extern "C" {
-#include "debug.h"
-}
-
 #include <assert.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -31,6 +25,16 @@ extern "C" {
 #ifndef ENOATTR
 #define ENOATTR  EINVAL
 #endif
+
+#include <ext2fs/ext2fs.h>
+#include <com_err.h>
+
+#include "pfs_service.h"
+
+extern "C" {
+	#include "debug.h"
+	#include "xxmalloc.h"
+}
 
 class pfs_file_ext : public pfs_file {
 public:
@@ -128,136 +132,99 @@ public:
 };
 
 class pfs_service_ext: public pfs_service {
+private:
+	ext2_filsys fs;
+	char *path;
+
 public:
-	pfs_service_ext(const char *image) {
+	pfs_service_ext(ext2_filsys handle, const char *img) {
+		fs = handle;
+		path = xxstrdup(img);
+	}
+
+	~pfs_service_ext() {
+		debug(D_EXT, "closing ext fs %s", path);
+		errcode_t rc = ext2fs_close(fs);
+		if (rc != 0) {
+			debug(D_NOTICE, "failed to close ext filesystem at %s: %s", path, error_message(rc));
+		}
+		free(path);
 	}
 
 	virtual pfs_file *open(pfs_name *name, int flags, mode_t mode) {
+		assert(name);
+		debug(D_EXT, "open %s %d %d", name->rest, flags, mode);
 		return NULL;
 	}
 
 	virtual pfs_dir *getdir(pfs_name *name) {
+		assert(name);
+		debug(D_EXT, "getdir %s", name->rest);
 		return NULL;
 	}
 
 	virtual int stat(pfs_name *name, struct pfs_stat *buf) {
+		assert(name);
+		assert(buf);
+		debug(D_EXT, "stat %s", name->rest);
 		return -1;
 	}
 
 	virtual int statfs(pfs_name *name, struct pfs_statfs *buf) {
+		assert(name);
+		assert(buf);
+		debug(D_EXT, "statfs %s", name->rest);
 		return -1;
 	}
 
 	virtual int lstat(pfs_name *name, struct pfs_stat *buf) {
+		assert(name);
+		assert(buf);
+		debug(D_EXT, "lstat %s", name->rest);
 		return -1;
 	}
 
 	virtual int access(pfs_name *name, mode_t mode) {
+		assert(name);
+		debug(D_EXT, "access %s %d", name->rest, mode);
 		return -1;
 	}
 
-	virtual int chmod(pfs_name *name, mode_t mode) {
-		return -1;
-	}
-
-	virtual int chown(pfs_name *name, uid_t uid, gid_t gid) {
-		return -1;
-	}
-
-	virtual int lchown(pfs_name *name, uid_t uid, gid_t gid) {
-		return -1;
-	}
-
-	virtual int truncate(pfs_name *name, pfs_off_t length) {
-		return -1;
-	}
-
-	virtual int utime(pfs_name *name, struct utimbuf *buf) {
-		return -1;
-	}
-
-	virtual int utimens(pfs_name *name, const struct timespec times[2]) {
-		return -1;
-	}
-
-	virtual int lutimens(pfs_name *name, const struct timespec times[2]) {
-		return -1;
-	}
-
-	virtual int unlink(pfs_name *name) {
-		return -1;
-	}
-
-	virtual int rename(pfs_name *oldname, pfs_name *newname) {
+	virtual int readlink(pfs_name *name, char *buf, pfs_size_t bufsiz) {
+		assert(name);
+		assert(buf);
+		debug(D_EXT, "readlink %s", name->rest);
 		return -1;
 	}
 
 	virtual ssize_t getxattr(pfs_name *name, const char *attrname, void *data, size_t size) {
+		assert(name);
+		assert(attrname);
+		assert(data);
+		debug(D_EXT, "getxattr %s %s", name->rest, attrname);
 		return -1;
 	}
 
 	virtual ssize_t lgetxattr(pfs_name *name, const char *attrname, void *data, size_t size) {
+		assert(name);
+		assert(attrname);
+		assert(data);
+		debug(D_EXT, "lgetxattr %s %s", name->rest, attrname);
 		return -1;
 	}
 
 	virtual ssize_t listxattr(pfs_name *name, char *list, size_t size) {
+		assert(name);
+		assert(list);
+		debug(D_EXT, "listxattr %s", name->rest);
 		return -1;
 	}
 
 	virtual ssize_t llistxattr(pfs_name *name, char *list, size_t size) {
+		assert(name);
+		assert(list);
+		debug(D_EXT, "llistxattr %s", name->rest);
 		return -1;
-	}
-
-	virtual int setxattr(pfs_name *name, const char *attrname, const void *data, size_t size, int flags) {
-		return -1;
-	}
-
-	virtual int lsetxattr(pfs_name *name, const char *attrname, const void *data, size_t size, int flags) {
-		return -1;
-	}
-
-	virtual int removexattr(pfs_name *name, const char *attrname) {
-		return -1;
-	}
-
-	virtual int lremovexattr(pfs_name *name, const char *attrname) {
-		return -1;
-	}
-
-	virtual int chdir(pfs_name *name, char *newpath) {
-		return -1;
-	}
-
-	virtual int link(pfs_name *oldname, pfs_name *newname) {
-		return -1;
-	}
-
-	virtual int symlink(const char *linkname, pfs_name *newname) {
-		return -1;
-	}
-
-	virtual int readlink(pfs_name *name, char *buf, pfs_size_t size) {
-		return -1;
-	}
-
-	virtual int mknod(pfs_name *name, mode_t mode, dev_t dev) {
-		return -1;
-	}
-
-	virtual int mkdir(pfs_name *name, mode_t mode) {
-		return -1;
-	}
-
-	virtual int rmdir(pfs_name *name) {
-		return -1;
-	}
-
-	virtual int whoami(pfs_name *name, char *buf, int size) {
-		return -1;
-	}
-
-	virtual pfs_location* locate(pfs_name *name) {
-		return NULL;
 	}
 
 	virtual int is_seekable() {
@@ -271,7 +238,23 @@ public:
 
 pfs_service *pfs_service_ext_init(const char *image) {
 	assert(image);
-	return new pfs_service_ext(image);
+
+	initialize_ext2_error_table();
+	debug(D_EXT, "loading ext image %s", image);
+
+	ext2_filsys fs;
+	errcode_t rc = ext2fs_open(image, 0, 0, 0, unix_io_manager, &fs);
+	if (rc != 0) {
+		fatal("failed to load ext image %s: %s", image, error_message(rc));
+	}
+
+	return new pfs_service_ext(fs, image);
+}
+
+#else
+
+pfs_service *pfs_service_ext_init(const char *image) {
+	fatal("parrot was not configured with ext2fs support");
 }
 
 #endif
