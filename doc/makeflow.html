@@ -411,7 +411,7 @@ For example, to specify that jobs should be submitted to the <tt>devel</tt> queu
 <p>Use the <tt>-T pbs</tt> option to submit jobs to the <a href=http://www.arc.ox.ac.uk/content/pbs>Portable Batch System</a> or compatible systems.</p>
 
 <p>This will add the values for cores, memory, and disk. These values will be added onto <tt>qsub</tt> in this format:<br>
-<tt>-l nodes=1:ppn=$CORES,mem=$MEMORY,file=$DISK</tt></p>
+<tt>-l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb</tt></p>
 
 <p>To remove resources specification at submission use Makeflow option <tt>--safe-submit-mode</tt>.</p>
 
@@ -420,7 +420,7 @@ For example, to specify that jobs should be submitted to the <tt>devel</tt> queu
 <p>Use the <tt>-T torque</tt> option to submit jobs to the <a href==http://www.adaptivecomputing.com/products/open-source/torque>Torque Resource Manager</a> batch system.</p>
 
 <p>This will add the values for cores, memory, and disk. These values will be added onto <tt>qsub</tt> in this format:<br>
-<tt>-l nodes=1:ppn=$CORES,mem=$MEMORY,file=$DISK</tt></p>
+<tt>-l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb</tt></p>
 
 <p>To remove resources specification at submission use Makeflow option <tt>--safe-submit-mode</tt>.</p>
 
@@ -429,7 +429,7 @@ For example, to specify that jobs should be submitted to the <tt>devel</tt> queu
 <p>Use the <tt>-T slurm</tt> option to submit jobs to the <a href=http://slurm.schedmd.com>SLURM</a> batch system.
 
 <p>This will add the values for cores and memory. These values will be added onto <tt>sbatch</tt> in this format:<br>
-<tt>-N 1 -n $CORES --mem=$MEMORY</tt></p>
+<tt>-N 1 -n ${CORES} --mem=${MEMORY}M</tt></p>
 
 <p>To remove resources specification at submission use Makeflow option <tt>--safe-submit-mode</tt>.</p>
 

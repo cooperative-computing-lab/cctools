@@ -109,7 +109,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		char *mem = string_format(",mem=%" PRId64 "mb", resources->memory);
 		char *disk = string_format(",file=%" PRId64 "mb", resources->disk);
 		cluster_resources = string_format(" -l nodes=1:ppn=%" PRId64 "%s%s ", 
-			resources->cores ? resources->cores : 1,
+			resources->cores>0 ? resources->cores : 1,
 			resources->memory>0 ? mem : "",
 			resources->disk>0 ? disk  : "");
 		free(mem);
@@ -122,7 +122,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
 		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
 		cluster_resources = string_format(" -N 1 -n %" PRId64 "%s ", 
-			resources->cores ? resources->cores : 1,
+			resources->cores>0 ? resources->cores : 1,
 			(resources->memory>0 && mem) ? mem : "");
 		free(mem);
 	}
