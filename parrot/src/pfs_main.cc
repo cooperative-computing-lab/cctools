@@ -72,6 +72,8 @@ extern "C" {
 #include <string.h>
 #include <time.h>
 
+#include <vector>
+
 #define SIG_ISSTOP(s) (s == SIGTTIN || s == SIGTTOU || s == SIGSTOP || s == SIGTSTP)
 
 FILE *namelist_file;
@@ -139,9 +141,7 @@ char *stats_file = NULL;
 int parrot_fd_max = -1;
 int parrot_fd_start = -1;
 
-#ifdef HAS_EXT2FS
 pfs_service *pfs_service_ext_init(const char *image);
-#endif
 
 /*
 This process at the very top of the traced tree
@@ -602,6 +602,7 @@ int main( int argc, char *argv[] )
 	int valgrind = 0;
 	int envdebug = 0;
 	int envauth = 0;
+	std::vector<pfs_service *> service_instances;
 
 	random_init();
 	pfs_resolve_init();
@@ -1127,16 +1128,13 @@ int main( int argc, char *argv[] )
 			pfs_no_flock = 1;
 			break;
 		case LONG_OPT_EXT_IMAGE: {
-#ifdef HAS_EXT2FS
 			struct pfs_service *s = pfs_service_ext_init(optarg);
 			if (!s) fatal("failed to load ext image %s", optarg);
 			static unsigned ext_fs_number = 0;
 			char ext_fs_name[128];
 			snprintf(ext_fs_name, sizeof(ext_fs_name), "ext_%u", ext_fs_number++);
 			hash_table_insert(available_services, ext_fs_name, s);
-#else
-			fatal("parrot was not configured with ext2fs support");
-#endif
+			service_instances.push_back(s);
 			break;
 		}
 		default:
@@ -1403,6 +1401,10 @@ int main( int argc, char *argv[] )
 				} while (wait_barrier && pfswait(&p, it->pid, 1));
 			}
 		}
+	}
+
+	for (std::vector<pfs_service *>::iterator it = service_instances.begin(); it != service_instances.end(); ++it) {
+		delete *it;
 	}
 
 	if(pfs_syscall_totals32) {

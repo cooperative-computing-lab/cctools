@@ -133,22 +133,22 @@ public:
 
 class pfs_service_ext: public pfs_service {
 private:
+	char *image;
 	ext2_filsys fs;
-	char *path;
 
 public:
 	pfs_service_ext(ext2_filsys handle, const char *img) {
+		image = strdup(img);
 		fs = handle;
-		path = xxstrdup(img);
 	}
 
 	~pfs_service_ext() {
-		debug(D_EXT, "closing ext fs %s", path);
+		debug(D_EXT, "closing ext fs %s", image);
+		free(image);
 		errcode_t rc = ext2fs_close(fs);
 		if (rc != 0) {
-			debug(D_NOTICE, "failed to close ext filesystem at %s: %s", path, error_message(rc));
+			debug(D_NOTICE, "failed to close ext filesystem at %s: %s", image, error_message(rc));
 		}
-		free(path);
 	}
 
 	virtual pfs_file *open(pfs_name *name, int flags, mode_t mode) {
