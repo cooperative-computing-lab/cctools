@@ -1101,6 +1101,8 @@ static void show_help_run(const char *cmd)
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
+	printf("    --safe-submit-mode          Excludes resources at submission (SLURM, TORQUE, and PBS).\n");
+	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
@@ -1143,7 +1145,7 @@ int main(int argc, char *argv[])
 	char *dagfile = NULL;
 	char *change_dir = NULL;
 	char *batchlogfilename = NULL;
-	const char *batch_submit_options = getenv("BATCH_OPTIONS");
+	const char *batch_submit_options = NULL;
 	makeflow_clean_depth clean_mode = MAKEFLOW_CLEAN_NONE;
 	char *email_summary_to = NULL;
 	int explicit_remote_jobs_max = 0;
@@ -1179,6 +1181,8 @@ int main(int argc, char *argv[])
 	char *work_queue_preferred_connection = NULL;
 	char *write_summary_to = NULL;
 	char *s;
+	int safe_submit = 0;
+	int ignore_mem_spec = 0;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
@@ -1242,6 +1246,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_FILE_CREATION_PATIENCE_WAIT_TIME,
 		LONG_OPT_FAIL_DIR,
 		LONG_OPT_GC_SIZE,
+		LONG_OPT_IGNORE_MEM,
 		LONG_OPT_LOCAL_CORES,
 		LONG_OPT_LOCAL_MEMORY,
 		LONG_OPT_LOCAL_DISK,
@@ -1253,6 +1258,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MONITOR_OPENED_FILES,
 		LONG_OPT_MONITOR_TIME_SERIES,
 		LONG_OPT_MOUNTS,
+		LONG_OPT_SAFE_SUBMIT,
 		LONG_OPT_SANDBOX,
 		LONG_OPT_STORAGE_TYPE,
 		LONG_OPT_STORAGE_LIMIT,
@@ -1332,6 +1338,7 @@ int main(int argc, char *argv[])
 		{"gc-size", required_argument, 0, LONG_OPT_GC_SIZE},
 		{"gc-count", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
+		{"ignore-memory-spec", no_argument, 0, LONG_OPT_IGNORE_MEM},
 		{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
 		{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
 		{"local-disk", required_argument, 0, LONG_OPT_LOCAL_DISK},
@@ -1354,6 +1361,7 @@ int main(int argc, char *argv[])
 		{"retry", no_argument, 0, 'R'},
 		{"retry-count", required_argument, 0, 'r'},
 		{"do-not-save-failed-output", no_argument, 0, LONG_OPT_FAIL_DIR},
+		{"safe-submit-mode", no_argument, 0, LONG_OPT_SAFE_SUBMIT},
 		{"sandbox", no_argument, 0, LONG_OPT_SANDBOX},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
@@ -1856,6 +1864,12 @@ int main(int argc, char *argv[])
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;
 				break;
+			case LONG_OPT_IGNORE_MEM:
+				ignore_mem_spec = 1;
+				break;
+			case LONG_OPT_SAFE_SUBMIT:
+				safe_submit = 1;
+				break;
 			case LONG_OPT_SANDBOX:
 				if (makeflow_hook_register(&makeflow_hook_sandbox, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
@@ -2086,6 +2100,13 @@ int main(int argc, char *argv[])
 		fclose(file);
 	}
 
+	if(!batch_submit_options){
+		batch_submit_options = getenv("BATCH_OPTIONS");
+		if(batch_submit_options){
+			debug(D_MAKEFLOW, "BATCH_OPTIONS pulled from environment: %s", batch_submit_options);
+		}
+	}
+
 	batch_queue_set_logfile(remote_queue, batchlogfilename);
 	batch_queue_set_option(remote_queue, "batch-options", batch_submit_options);
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
@@ -2102,6 +2123,8 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "master-preferred-connection", work_queue_preferred_connection);
 	batch_queue_set_option(remote_queue, "amazon-batch-config",amazon_batch_cfg);
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
+	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
