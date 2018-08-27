@@ -121,7 +121,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
 		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
-		cluster_resources = string_format(" -N 1 -n %" PRId64 "%s ", 
+		cluster_resources = string_format(" -N 1 -n 1 -c %" PRId64 "%s ", 
 			resources->cores>0 ? resources->cores : 1,
 			(resources->memory>0 && mem) ? mem : "");
 		free(mem);
@@ -358,7 +358,7 @@ static int batch_queue_cluster_create (struct batch_queue *q)
 			cluster_name = strdup("slurm");
 			cluster_submit_cmd = strdup("sbatch");
 			cluster_remove_cmd = strdup("scancel");
-			cluster_options = strdup("-D . -o /dev/null -e /dev/null --export=ALL -n 1");
+			cluster_options = strdup("-D . -o /dev/null -e /dev/null --export=ALL");
 			cluster_jobname_var = strdup("-J");
 			break;
 		case BATCH_QUEUE_TYPE_CLUSTER:
