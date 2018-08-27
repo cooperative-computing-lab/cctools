@@ -905,8 +905,6 @@ static void mainloop( struct batch_queue *queue )
 		if(new_workers_needed>0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
 			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
-		} else if(new_workers_needed<0) {
-			debug(D_WQ,"too many workers, will wait for some to exit");
 		} else {
 			debug(D_WQ,"target number of workers is reached.");
 		}
