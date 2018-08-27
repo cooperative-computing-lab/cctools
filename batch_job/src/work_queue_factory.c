@@ -878,19 +878,19 @@ static void mainloop( struct batch_queue *queue )
 		int workers_waiting_to_connect = MAX(0, workers_submitted - workers_connected);
 		int workers_from_elsewhere     = MAX(0, workers_connected - workers_submitted);
 
-		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
-			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
-			new_workers_needed = workers_per_cycle;
+		if(workers_from_elsewhere > 0) {
+			debug(D_WQ,"%d workers already connected from other sources", workers_from_elsewhere);
+			new_workers_needed = MAX(0, new_workers_needed - workers_from_elsewhere);
 		}
 
-		if(workers_per_cycle > 0 && workers_waiting_to_connect > 0) {
+		if(workers_waiting_to_connect > 0) {
 			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_waiting_to_connect);
 			new_workers_needed = MAX(0, new_workers_needed - workers_waiting_to_connect);
 		}
 
-		if(workers_per_cycle > 0 && workers_from_elsewhere > 0) {
-			debug(D_WQ,"%d workers already connected from other sources", workers_from_elsewhere);
-			new_workers_needed = MAX(0, new_workers_needed - workers_from_elsewhere);
+		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
+			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
+			new_workers_needed = workers_per_cycle;
 		}
 
 		debug(D_WQ,"workers needed: %d",    workers_needed);
