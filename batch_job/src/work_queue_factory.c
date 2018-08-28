@@ -874,20 +874,28 @@ static void mainloop( struct batch_queue *queue )
 			workers_needed = workers_min;
 		}
 
-		int new_workers_needed         = MAX(0, workers_needed - workers_submitted);
-		int workers_waiting_to_connect = MAX(0, workers_submitted - workers_connected);
-		int workers_from_elsewhere     = MAX(0, workers_connected - workers_submitted);
+		// if negative, this means we need less workers than the currently
+		// running from this factory.
+		int new_workers_needed = workers_needed - workers_submitted;
 
-		if(workers_from_elsewhere > 0) {
-			debug(D_WQ,"%d workers already connected from other sources", workers_from_elsewhere);
-			new_workers_needed = MAX(0, new_workers_needed - workers_from_elsewhere);
+		// if negative, this means workers external from this factory have
+		// connected.
+		int workers_waiting_to_connect = workers_submitted - workers_connected;
+
+		if(workers_waiting_to_connect < 0) {
+			debug(D_WQ,"%d workers already connected from other sources", -workers_waiting_to_connect);
 		}
 
 		if(workers_waiting_to_connect > 0) {
 			debug(D_WQ,"waiting for %d previously submitted workers to connect", workers_waiting_to_connect);
-			new_workers_needed = MAX(0, new_workers_needed - workers_waiting_to_connect);
 		}
 
+		//abs here because:
+		//if +, we are waiting for workers to connect, thus we don't need to submit as many new ones.
+		//if -, workers connected from other sources, thus we don't need to submit as many new ones.
+		new_workers_needed = new_workers_needed - abs(workers_waiting_to_connect);
+
+		// Always apply workers_per_cycle at the very end
 		if(workers_per_cycle > 0 && new_workers_needed > workers_per_cycle) {
 			debug(D_WQ,"applying maximum workers per cycle of %d",workers_per_cycle);
 			new_workers_needed = workers_per_cycle;
@@ -895,7 +903,7 @@ static void mainloop( struct batch_queue *queue )
 
 		debug(D_WQ,"workers needed: %d",    workers_needed);
 		debug(D_WQ,"workers submitted: %d", workers_submitted);
-		debug(D_WQ,"workers requested: %d", new_workers_needed);
+		debug(D_WQ,"workers requested: %d", MAX(0, new_workers_needed));
 
 		struct jx *j = factory_to_jx(masters_list, foremen_list, workers_submitted, workers_needed, new_workers_needed, workers_connected);
 
@@ -908,9 +916,11 @@ static void mainloop( struct batch_queue *queue )
 
 		update_blacklisted_workers(queue, masters_list);
 
-		if(new_workers_needed>0) {
+		if(new_workers_needed > 0) {
 			debug(D_WQ,"submitting %d new workers to reach target",new_workers_needed);
 			workers_submitted += submit_workers(queue,job_table,new_workers_needed);
+		} else if(new_workers_needed < 0) {
+			debug(D_WQ,"too many workers, will wait for some to exit");
 		} else {
 			debug(D_WQ,"target number of workers is reached.");
 		}
