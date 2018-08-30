@@ -520,8 +520,8 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			pname->is_local = 1;
 		} else if (!strncmp(pname->service_name, "ext_", 4)) {
 			strcpy(pname->rest, tmp);
-			pname->host[0] = '\0';
-			pname->hostport[0] = '\0';
+			strcpy(pname->host, "ext");
+			strcpy(pname->hostport, "ext");
 			pname->port = 0;
 		} else {
 			if(!strcmp(pname->service_name,"multi")) {// if we're dealing with a multivolume, split off at the @
