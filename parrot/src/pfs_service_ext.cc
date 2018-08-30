@@ -405,6 +405,8 @@ pfs_service *pfs_service_ext_init(const char *image) {
 
 pfs_service *pfs_service_ext_init(const char *image) {
 	fatal("parrot was not configured with ext2fs support");
+	// unreachable
+	return NULL;
 }
 
 #endif
