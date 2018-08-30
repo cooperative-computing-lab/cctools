@@ -4,8 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#ifdef HAS_EXT2FS
-
 #include <assert.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -18,24 +16,17 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <dirent.h>
 
-#if defined(HAS_ATTR_XATTR_H)
-#include <attr/xattr.h>
-#elif defined(HAS_SYS_XATTR_H)
-#include <sys/xattr.h>
-#endif
-#ifndef ENOATTR
-#define ENOATTR  EINVAL
-#endif
-
-#include <ext2fs/ext2fs.h>
-#include <com_err.h>
-
 #include "pfs_service.h"
 
 extern "C" {
 	#include "debug.h"
 	#include "xxmalloc.h"
 }
+
+#ifdef HAS_EXT2FS
+
+#include <ext2fs/ext2fs.h>
+#include <com_err.h>
 
 #define LOOKUP_INODE(name, inode, follow, fail) { \
 	errcode_t rc; \
