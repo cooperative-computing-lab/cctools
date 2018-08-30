@@ -26,7 +26,7 @@ extern "C" {
 #ifdef HAS_EXT2FS
 
 #include <ext2fs/ext2fs.h>
-#include <com_err.h>
+#include <et/com_err.h>
 
 #define LOOKUP_INODE(name, inode, follow, fail) { \
 	errcode_t rc; \
