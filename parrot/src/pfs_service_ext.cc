@@ -94,7 +94,6 @@ static int fix_errno(errcode_t rc) {
 		case EXT2_ET_FILE_RO: return EROFS;
 		case EXT2_ET_DIR_EXISTS: return EEXIST;
 		case EXT2_ET_UNIMPLEMENTED: return ENOSYS;
-		case EXT2_ET_FILE_EXISTS: return EEXIST;
 		case EXT2_ET_FILE_TOO_BIG: return EFBIG;
 		default: return EINVAL;
 	}
