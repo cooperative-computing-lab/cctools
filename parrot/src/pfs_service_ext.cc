@@ -217,12 +217,22 @@ public:
 	}
 
 	virtual int flock(int op) {
-		// just noop this
+		// noop
 		return 0;
 	}
 
-	virtual int is_seekable() {
-		return 1;
+	virtual	int fsync() {
+		// noop
+		return 0;
+	}
+
+	virtual pfs_ssize_t get_size() {
+		struct ext2_inode inode_buf;
+
+		debug(D_EXT, "fstat %p", this);
+		READ_INODE(inode, &inode_buf, -1);
+
+		return inode_buf.i_size;
 	}
 };
 
@@ -354,14 +364,7 @@ public:
 
 		debug(D_EXT, "readlink %s", name->rest);
 		LOOKUP_INODE(name->rest, &inode, false, -1);
-
-		errcode_t rc = ext2fs_read_inode(fs, inode, &inode_buf);
-		if (rc == 0) {
-			debug(D_EXT, "read full inode %d", inode);
-		} else {
-			debug(D_EXT, "read full inode %d failed: %s", inode, error_message(rc));
-			return -1;
-		}
+		READ_INODE(inode, &inode_buf, -1);
 
 		if (!S_ISLNK(inode_buf.i_mode)) {
 			errno = EINVAL;
@@ -369,7 +372,7 @@ public:
 		}
 		OPEN_FILE(inode, &file, -1);
 
-		rc = ext2fs_file_read(file, buf, bufsiz, &size);
+		errcode_t rc = ext2fs_file_read(file, buf, bufsiz, &size);
 		if (rc == 0) {
 			debug(D_EXT, "read %u/%" PRIu64 " bytes from file %p", size, bufsiz, file);
 		} else if (rc == EXT2_ET_SHORT_READ) {
@@ -388,10 +391,6 @@ public:
 	}
 
 	virtual int is_seekable() {
-		return 1;
-	}
-
-	virtual int is_local() {
 		return 1;
 	}
 };
