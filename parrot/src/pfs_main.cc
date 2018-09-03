@@ -40,6 +40,7 @@ extern "C" {
 #include "getopt.h"
 #include "int_sizes.h"
 #include "itable.h"
+#include "macros.h"
 #include "md5.h"
 #include "password_cache.h"
 #include "random.h"
@@ -1128,13 +1129,24 @@ int main( int argc, char *argv[] )
 			pfs_no_flock = 1;
 			break;
 		case LONG_OPT_EXT_IMAGE: {
-			struct pfs_service *s = pfs_service_ext_init(optarg);
-			if (!s) fatal("failed to load ext image %s", optarg);
-			static unsigned ext_fs_number = 0;
-			char ext_fs_name[128];
-			snprintf(ext_fs_name, sizeof(ext_fs_name), "ext_%u", ext_fs_number++);
-			hash_table_insert(available_services, ext_fs_name, s);
+			char service[128];
+			char image[PATH_MAX] = {0};
+			char mountpoint[PATH_MAX] = {0};
+			static unsigned ext_no = 0;
+
+			char *split = strchr(optarg, '=');
+			if (!split) fatal("--ext must be specified as IMAGE=MOUNTPOINT");
+			strncpy(image, optarg, MIN((size_t) (split - optarg), sizeof(image) - 1));
+			strncpy(mountpoint, split + 1, sizeof(mountpoint) - 1);
+			if (mountpoint[0] != '/') fatal("mountpoint for ext image %s must be an absolute path", image);
+			struct pfs_service *s = pfs_service_ext_init(image);
+			if (!s) fatal("failed to load ext image %s", image);
+
 			service_instances.push_back(s);
+			snprintf(service, sizeof(service), "/ext_%u", ext_no++);
+			hash_table_insert(available_services, &service[1], s);
+			pfs_resolve_add_entry(mountpoint, service, R_OK|W_OK|X_OK);
+
 			break;
 		}
 		default:
