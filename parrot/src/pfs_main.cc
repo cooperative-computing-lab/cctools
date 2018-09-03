@@ -40,6 +40,7 @@ extern "C" {
 #include "getopt.h"
 #include "int_sizes.h"
 #include "itable.h"
+#include "macros.h"
 #include "md5.h"
 #include "password_cache.h"
 #include "random.h"
@@ -1128,12 +1129,25 @@ int main( int argc, char *argv[] )
 			pfs_no_flock = 1;
 			break;
 		case LONG_OPT_EXT_IMAGE: {
-			struct pfs_service *s = pfs_service_ext_init(optarg);
-			if (!s) fatal("failed to load ext image %s", optarg);
-			static unsigned ext_fs_number = 0;
-			char ext_fs_name[128];
-			snprintf(ext_fs_name, sizeof(ext_fs_name), "ext_%u", ext_fs_number++);
-			hash_table_insert(available_services, ext_fs_name, s);
+			char image[PATH_MAX] = {0};
+			char label[128] = {0};
+			char *split = strchr(optarg, '=');
+			if (split) {
+				strncpy(image, optarg, MIN((size_t) (split - optarg), sizeof(image) - 1));
+				snprintf(label, sizeof(label), "ext_%s", image);
+				strncpy(image, split + 1, sizeof(image) - 1);
+			} else {
+				strcpy(label, "ext");
+				strncpy(image, optarg, sizeof(image) - 1);
+			}
+			if (strchr(label, '/')) fatal("Image label %s may not contain slashes", label);
+			if (hash_table_lookup(available_services, label)) fatal(
+				"Image already mounted at /%s\n"
+				"You might want to specify a different label as --ext LABEL=PATH",
+				label);
+			struct pfs_service *s = pfs_service_ext_init(image);
+			if (!s) fatal("failed to load ext image %s", image);
+			hash_table_insert(available_services, label, s);
 			service_instances.push_back(s);
 			break;
 		}
