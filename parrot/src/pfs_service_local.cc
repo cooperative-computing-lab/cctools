@@ -317,6 +317,7 @@ public:
 
 		flags |= O_NONBLOCK;
 		debug(D_LOCAL,"open %s %d %d",name->rest,flags,(flags&O_CREAT) ? mode : 0);
+RETRY:
 		int fd = ::open64(name->rest,flags|O_NOCTTY,mode);
 		if(fd>=0) {
 			struct stat info;
@@ -327,6 +328,12 @@ public:
 			} else {
 				result = new pfs_file_local(name,fd);
 			}
+		} else if (errno == ENXIO && (flags&(O_WRONLY|O_RDWR)) == O_WRONLY) {
+			// see the section on ENXIO in open(2) and also fifo(7)
+			debug(D_LOCAL, "failed on fifo with no readers, retrying O_RDWR");
+			flags &= ~O_WRONLY;
+			flags |= O_RDWR;
+			goto RETRY;
 		} else {
 			result = 0;
 		}
