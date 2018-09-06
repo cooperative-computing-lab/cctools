@@ -95,5 +95,6 @@ echo ""
 echo "Test Results: ${FAILURE} of ${TOTAL} tests failed (${SKIP} skipped) in ${ELAPSED} seconds."
 echo ""
 
+exit $FAILURE
 
 # vim: set noexpandtab tabstop=4:
