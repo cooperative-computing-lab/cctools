@@ -23,16 +23,7 @@ EOF
 	echo "waiting for master to get ready"
 	wait_for_file_creation master.port 5
 
-	if [ X$FOREMAN = X1 ]
-	then
-		echo "starting foreman"
-		work_queue_worker -d all -o foreman.log -b 1 --foreman -Z foreman.port localhost `cat master.port` --timeout 20 --single-shot &
-		wait_for_file_creation foreman.port 5
-
-		port=`cat foreman.port`
-	else
-		port=`cat master.port`
-	fi
+	port=`cat master.port`
 
 	echo "starting worker"
 	work_queue_worker -d all -o worker.log localhost $port -b 1 --timeout 20 --cores $CORES --memory-threshold 10 --memory 50 --single-shot
@@ -52,12 +43,6 @@ EOF
 				cat master.log
 			fi
 
-			if [ -f foreman.log  ]
-			then
-				echo "foreman log:"
-				cat foreman.log
-			fi
-
 			if [ -f worker.log  ]
 			then
 				echo "worker log:"
@@ -75,7 +60,7 @@ EOF
 
 clean()
 {
-	rm -f master.script master.log master.port foreman.log foreman.port worker.log output.* input.*
+	rm -f master.script master.log master.port worker.log output.* input.*
 }
 
 dispatch "$@"

@@ -19,6 +19,8 @@ if [ -z "$(echo $CCTOOLS_TEST_LOG | sed -n 's:^/.*$:x:p')" ]; then
 	CCTOOLS_TEST_LOG="$(pwd)/${CCTOOLS_TEST_LOG}"
 fi
 export CCTOOLS_TEST_LOG
+export CCTOOLS_TEST_FAIL=${CCTOOLS_TEST_LOG%.log}.fail
+export CCTOOLS_TEST_TMP=${CCTOOLS_TEST_LOG%.log}.tmp
 
 echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 
@@ -63,8 +65,12 @@ for package in ${CCTOOLS_PACKAGES_TEST}; do
 						echo "======== ${script} CLEAN ========"
 						"./${script}" clean
 						exit $result
-					) >> "$CCTOOLS_TEST_LOG" 2>&1
+					) > "$CCTOOLS_TEST_TMP" 2>&1
 					result=$?
+					cat "$CCTOOLS_TEST_TMP" >> "$CCTOOLS_TEST_LOG"
+					if [ "$result" -ne 0 ]; then
+						cat "$CCTOOLS_TEST_TMP" >> "$CCTOOLS_TEST_FAIL"
+					fi
 				fi
 				TEST_STOP_TIME=$(date +%s)
 				TEST_ELAPSED=$(($TEST_STOP_TIME-$TEST_START_TIME))
@@ -95,5 +101,10 @@ echo ""
 echo "Test Results: ${FAILURE} of ${TOTAL} tests failed (${SKIP} skipped) in ${ELAPSED} seconds."
 echo ""
 
+if [ "$FAILURE" -eq 0 ]; then
+	exit 0
+else
+	exit 1
+fi
 
 # vim: set noexpandtab tabstop=4:

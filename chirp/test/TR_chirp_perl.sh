@@ -12,6 +12,7 @@ ticket=my.ticket
 check_needed()
 {
 	test -f ../src/perl/CChirp.so
+	command -v openssl >/dev/null 2>&1
 }
 
 prepare()
