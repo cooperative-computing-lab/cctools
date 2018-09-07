@@ -114,7 +114,7 @@ int pfs_resolve_remove_entry( const char *prefix )
 	while (ns) {
 		if(!strcmp(ns->prefix,prefix)) {
 			unsigned refcount = ns->refcount;
-			struct pfs_mount_entry *e;
+			struct pfs_mount_entry *e = NULL;
 			if (ns->next) {
 				e = ns->next;
 			} else if (ns->parent) {

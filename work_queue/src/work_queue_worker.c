@@ -1429,7 +1429,7 @@ static int handle_master(struct link *master) {
 			if(pattern_match(line, "^put (.+) (%d+) ([0-7]+) (%d+)$", &f, &l, &m, &g) >= 0) {
 				strncpy(filename, f, WORK_QUEUE_LINE_MAX); free(f);
 				length = strtoll(l, 0, 10); free(l);
-				mode   = atoi(m);           free(m);
+				mode   = strtol(m, NULL, 8); free(m);
 				free(g); //flags are not used anymore.
 				
 				if(path_within_dir(filename, workspace)) {
