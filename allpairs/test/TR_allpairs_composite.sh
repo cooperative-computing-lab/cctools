@@ -59,8 +59,8 @@ run()
 
 clean()
 {
-	kill -9 $MASTER_PID
-	kill -9 $WORKER_PID
+	kill -9 $(cat $MASTER_PID)
+	kill -9 $(cat $WORKER_PID)
 
 	cat $WORKER_LOG 1>&2
 
