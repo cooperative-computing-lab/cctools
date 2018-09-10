@@ -1,0 +1,24 @@
+language: c
+
+sudo: required
+services: docker
+
+script: ./travis_build.sh
+after_failure: cat cctools.test.fail
+
+matrix:
+  allow_failures:
+  - env: DOCKER_IMAGE=base/devel
+  include:
+  - os: osx
+    compiler: clang
+  - os: linux
+    compiler: gcc
+  - os: linux
+    compiler: clang
+  - os: linux
+    compiler: gcc
+    env: DOCKER_IMAGE=centos/s2i-base-centos7
+  - os: linux
+    compiler: gcc
+    env: DOCKER_IMAGE=base/devel
