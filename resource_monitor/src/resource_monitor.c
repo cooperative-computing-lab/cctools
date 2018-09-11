@@ -679,7 +679,7 @@ int rmonitor_handle_inotify(void)
 	int urgent = 0;
 
 #if defined(RESOURCE_MONITOR_USE_INOTIFY)
-	struct inotify_event *evdata;
+	struct inotify_event *evdata = NULL;
 	struct rmonitor_file_info *finfo;
 	struct stat fst;
 	char *fname;
