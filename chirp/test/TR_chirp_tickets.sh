@@ -9,6 +9,11 @@ c="./hostport.$PPID"
 
 ticket=my.ticket
 
+check_needed()
+{
+	command -v openssl >/dev/null 2>&1 || return 1
+}
+
 prepare()
 {
 	chirp_start local --auth=ticket
