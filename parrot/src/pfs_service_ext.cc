@@ -394,6 +394,9 @@ pfs_service *pfs_service_ext_init(const char *image) {
 	ext2_filsys fs;
 	errcode_t rc = ext2fs_open(image, 0, 0, 0, unix_io_manager, &fs);
 	if (rc != 0) {
+		if (rc == EXT2_ET_SHORT_READ) {
+			fprintf(stderr, "got short read on %s, could indicate trying to open directory as ext image\n", image);
+		}
 		fatal("failed to load ext image %s: %s", image, error_message(rc));
 	}
 
