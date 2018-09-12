@@ -20,6 +20,7 @@ See the file COPYING for details.
 
 extern "C" {
 	#include "debug.h"
+	#include "macros.h"
 	#include "xxmalloc.h"
 }
 
@@ -119,13 +120,14 @@ static void inode2stat(ext2_ino_t i, struct ext2_inode *b, struct pfs_stat *p) {
 }
 
 static int append_dirents(struct ext2_dir_entry *dirent, int offset, int blocksize, char *buf, void *p) {
-	char name[PATH_MAX];
+	char name[PATH_MAX] = {0};
+	pfs_dir *d = (pfs_dir *) p;
 
 	assert(dirent);
-	assert(p);
+	assert(d);
 
-	pfs_dir *d = (pfs_dir *) p;
-	snprintf(name, dirent->name_len, "%s", dirent->name);
+	size_t name_len = dirent->name_len & ((1<<8) - 1);
+	strncpy(name, dirent->name, MIN(name_len, sizeof(name) - 1));
 	d->append(name);
 
 	return 0;
