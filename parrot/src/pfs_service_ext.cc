@@ -30,12 +30,7 @@ extern "C" {
 #include <et/com_err.h>
 
 #define LOOKUP_INODE(name, inode, follow, fail) { \
-	errcode_t rc; \
-	if (follow) { \
-		rc = ext2fs_namei_follow(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, name, inode); \
-	} else { \
-		rc = ext2fs_namei(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, name, inode); \
-	} \
+	errcode_t rc = lookup_inode(fs, EXT2_ROOT_INO, name, inode, follow); \
 	if (rc == 0) { \
 		debug(D_EXT, "lookup %s -> inode %d", name, *inode); \
 	} else { \
@@ -74,6 +69,9 @@ extern "C" {
 		return fail; \
 	} \
 } while (false)
+
+static errcode_t lookup_inode(ext2_filsys fs, ext2_ino_t cwd, const char *path, ext2_ino_t *inode, bool follow);
+static errcode_t follow_link(ext2_filsys fs, ext2_ino_t cwd, ext2_ino_t inode, ext2_ino_t *out);
 
 static int fix_errno(errcode_t rc) {
 	if (((rc>>8) & ((1<<24) - 1)) == 0) {
@@ -129,6 +127,93 @@ static int append_dirents(struct ext2_dir_entry *dirent, int offset, int blocksi
 	size_t name_len = dirent->name_len & ((1<<8) - 1);
 	strncpy(name, dirent->name, MIN(name_len, sizeof(name) - 1));
 	d->append(name);
+
+	return 0;
+}
+
+static errcode_t follow_link(ext2_filsys fs, ext2_ino_t cwd, ext2_ino_t inode, ext2_ino_t *out) {
+	struct ext2_inode buf;
+	ext2_file_t file;
+	unsigned size;
+	char target[PATH_MAX] = {0};
+
+	assert(out);
+	debug(D_EXT, "follow %d in %d", inode, cwd);
+
+	errcode_t rc = ext2fs_read_inode(fs, inode, &buf);
+	if (rc) return rc;
+	if (!S_ISLNK(buf.i_mode)) {
+		debug(D_EXT, "not a symlink");
+		*out = inode;
+		return 0;
+	}
+
+	rc = ext2fs_file_open(fs, inode, 0, &file);
+	if (rc) return rc;
+	rc = ext2fs_file_read(file, target, sizeof(target) - 1, &size);
+	ext2fs_file_close(file);
+	if (rc == EXT2_ET_SHORT_READ) {
+		debug(D_EXT, "short read, inline link");
+		size = MIN(buf.i_size, sizeof(target) - 1);
+		memcpy(target, buf.i_block, size);
+	} else if (rc) {
+		return rc;
+	}
+
+	return lookup_inode(fs, cwd, target, out, true);
+}
+
+static errcode_t lookup_inode(ext2_filsys fs, ext2_ino_t cwd, const char *path, ext2_ino_t *inode, bool follow) {
+	errcode_t rc;
+
+	assert(path);
+	assert(inode);
+	debug(D_EXT, "lookup %s in %d", path, cwd);
+
+	char tmp[PATH_MAX] = {0};
+	char *current = (char *) &path[0];
+	while (*current == '/') {
+		cwd = EXT2_ROOT_INO;
+		++current;
+	}
+	// handle prefix
+
+	strncpy(tmp, current, sizeof(tmp) - 1);
+	current = &tmp[0];
+	char *last = strrchr(tmp, '/');
+
+	while (last && current < last) {
+		char *split = strchr(current, '/');
+		*split = '\0';
+		debug(D_EXT, "component %s", current);
+
+		ext2_ino_t dir;
+		rc = ext2fs_lookup(fs, cwd, current, strlen(current), NULL, &dir);
+		if (rc) return rc;
+		debug(D_EXT, "\t-> inode %d", dir);
+
+		rc = follow_link(fs, cwd, dir, &dir);
+		if (rc) return rc;
+		debug(D_EXT, "\t-> inode %d", dir);
+
+		cwd = dir;
+		current = split + 1;
+	}
+
+	if (*current == '\0') {
+		*inode = cwd;
+		return 0;
+	}
+
+	debug(D_EXT, "leaf %s", current);
+	ext2_ino_t out;
+	rc = ext2fs_lookup(fs, cwd, current, strlen(current), NULL, &out);
+	if (rc) return rc;
+	debug(D_EXT, "\t-> inode %d", out);
+	if (follow) rc = follow_link(fs, cwd, out, &out);
+	if (rc) return rc;
+	debug(D_EXT, "\t-> inode %d", out);
+	*inode = out;
 
 	return 0;
 }
