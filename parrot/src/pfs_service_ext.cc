@@ -338,7 +338,7 @@ public:
 		struct ext2_inode inode_buf;
 
 		assert(name);
-		if (mode&(O_WRONLY|O_RDWR)) {
+		if (flags&(O_WRONLY|O_RDWR)) {
 			errno = EROFS;
 			return NULL;
 		}
