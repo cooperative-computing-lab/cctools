@@ -7,8 +7,6 @@ script: ./travis_build.sh
 after_failure: cat cctools.test.fail
 
 matrix:
-  allow_failures:
-  - env: DOCKER_IMAGE=base/devel
   include:
   - os: osx
     compiler: clang
@@ -18,7 +16,16 @@ matrix:
     compiler: clang
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=centos/s2i-base-centos7
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos6
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=base/devel
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos7
+  - os: linux
+    compiler: gcc
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04
+  - os: linux
+    compiler: gcc
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-debian9.2
+  - os: linux
+    compiler: gcc
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-opensuse42.3
