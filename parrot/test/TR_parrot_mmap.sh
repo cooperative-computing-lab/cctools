@@ -33,10 +33,12 @@ void dumpmaps (void)
 int main (int argc, char *argv[])
 {
 	int i;
-	void *mappings[65536] = {NULL};
+	int open_max = sysconf(_SC_OPEN_MAX);
+	if (open_max == -1) abort();
+	void **mappings = calloc(open_max + 1, sizeof(*mappings));
 
 	/* Test that we can allocate mmap lots of files without hitting _SC_OPEN_MAX fd limit. */
-	for (i = 0; i < (int)sysconf(_SC_OPEN_MAX)+1; i++) {
+	for (i = 0; i < open_max + 1; i++) {
 		int fd = open("/dev/zero", O_RDWR, S_IRUSR|S_IWUSR);
 		if (fd == -1) {
 			fprintf(stderr, "= -1 [%s] open(...)\n", strerror(errno));

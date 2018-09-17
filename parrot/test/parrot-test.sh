@@ -1,4 +1,5 @@
 parrot() {
+	export PARROT_HELPER=$(readlink -e ../src/libparrot_helper.so)
 	parrot_tmp_debug=$(mktemp ./parrot.debug.XXXXXX)
 	if ! ../src/parrot_run -d all -o "$parrot_tmp_debug" "$@"; then
 		cat "$parrot_tmp_debug"
