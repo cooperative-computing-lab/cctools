@@ -30,7 +30,7 @@ extern "C" {
 #include <et/com_err.h>
 
 #define LOOKUP_INODE(name, inode, follow, fail) { \
-	errcode_t rc = lookup_inode(fs, EXT2_ROOT_INO, name, inode, follow); \
+	errcode_t rc = lookup_inode(fs, mountpoint, EXT2_ROOT_INO, name, inode, follow ? 0 : -1); \
 	if (rc == 0) { \
 		debug(D_EXT, "lookup %s -> inode %d", name, *inode); \
 	} else { \
@@ -70,8 +70,8 @@ extern "C" {
 	} \
 } while (false)
 
-static errcode_t lookup_inode(ext2_filsys fs, ext2_ino_t cwd, const char *path, ext2_ino_t *inode, bool follow);
-static errcode_t follow_link(ext2_filsys fs, ext2_ino_t cwd, ext2_ino_t inode, ext2_ino_t *out);
+static errcode_t lookup_inode(ext2_filsys fs, const char *mountpoint, ext2_ino_t cwd, const char *path, ext2_ino_t *inode, int depth);
+static errcode_t follow_link(ext2_filsys fs, const char *mountpoint, ext2_ino_t cwd, ext2_ino_t inode, ext2_ino_t *out, int depth);
 
 static int fix_errno(errcode_t rc) {
 	if (((rc>>8) & ((1<<24) - 1)) == 0) {
@@ -131,19 +131,20 @@ static int append_dirents(struct ext2_dir_entry *dirent, int offset, int blocksi
 	return 0;
 }
 
-static errcode_t follow_link(ext2_filsys fs, ext2_ino_t cwd, ext2_ino_t inode, ext2_ino_t *out) {
+static errcode_t follow_link(ext2_filsys fs, const char *mountpoint, ext2_ino_t cwd, ext2_ino_t inode, ext2_ino_t *out, int depth) {
 	struct ext2_inode buf;
 	ext2_file_t file;
 	unsigned size;
 	char target[PATH_MAX] = {0};
 
 	assert(out);
-	debug(D_EXT, "follow %d in %d", inode, cwd);
+	// debug(D_EXT, "follow %d in %d", inode, cwd);
+	if (depth > 64) return EXT2_ET_SYMLINK_LOOP;
 
 	errcode_t rc = ext2fs_read_inode(fs, inode, &buf);
 	if (rc) return rc;
 	if (!S_ISLNK(buf.i_mode)) {
-		debug(D_EXT, "not a symlink");
+		// debug(D_EXT, "not a symlink");
 		*out = inode;
 		return 0;
 	}
@@ -153,48 +154,63 @@ static errcode_t follow_link(ext2_filsys fs, ext2_ino_t cwd, ext2_ino_t inode, e
 	rc = ext2fs_file_read(file, target, sizeof(target) - 1, &size);
 	ext2fs_file_close(file);
 	if (rc == EXT2_ET_SHORT_READ) {
-		debug(D_EXT, "short read, inline link");
+		// debug(D_EXT, "short read, inline link");
 		size = MIN(buf.i_size, sizeof(target) - 1);
 		memcpy(target, buf.i_block, size);
 	} else if (rc) {
 		return rc;
 	}
 
-	return lookup_inode(fs, cwd, target, out, true);
+	if (target[0] == '/') {
+		cwd = EXT2_ROOT_INO;
+		const char *m = mountpoint;
+		char *current = &target[0];
+		while (*m != '\0') {
+			if (*m != *current) goto BADLINK;
+			while (*(++m) == '/');
+			while (*(++current) == '/');
+			if (*m == '\0' && *current != '\0' && *(current - 1) != '/') goto BADLINK;
+		}
+		memmove(target, current, strlen(current) + 1);
+		// debug(D_EXT, "stripped to %s", target);
+	}
+
+	return lookup_inode(fs, mountpoint, cwd, target, out, depth + 1);
+BADLINK:
+	debug(D_EXT, "symlinks cannot point out of the image");
+	return EXT2_ET_FILE_NOT_FOUND;
 }
 
-static errcode_t lookup_inode(ext2_filsys fs, ext2_ino_t cwd, const char *path, ext2_ino_t *inode, bool follow) {
+static errcode_t lookup_inode(ext2_filsys fs, const char *mountpoint, ext2_ino_t cwd, const char *path, ext2_ino_t *inode, int depth) {
 	errcode_t rc;
 
 	assert(path);
 	assert(inode);
 	debug(D_EXT, "lookup %s in %d", path, cwd);
 
-	char tmp[PATH_MAX] = {0};
-	char *current = (char *) &path[0];
-	while (*current == '/') {
+	while (*path == '/') {
 		cwd = EXT2_ROOT_INO;
-		++current;
+		++path;
 	}
-	// handle prefix
 
-	strncpy(tmp, current, sizeof(tmp) - 1);
-	current = &tmp[0];
+	char tmp[PATH_MAX] = {0};
+	strncpy(tmp, path, sizeof(tmp) - 1);
+	char *current = &tmp[0];
 	char *last = strrchr(tmp, '/');
 
 	while (last && current < last) {
 		char *split = strchr(current, '/');
 		*split = '\0';
-		debug(D_EXT, "component %s", current);
+		// debug(D_EXT, "component %s", current);
 
 		ext2_ino_t dir;
 		rc = ext2fs_lookup(fs, cwd, current, strlen(current), NULL, &dir);
 		if (rc) return rc;
-		debug(D_EXT, "\t-> inode %d", dir);
+		// debug(D_EXT, "\t-> inode %d", dir);
 
-		rc = follow_link(fs, cwd, dir, &dir);
+		rc = follow_link(fs, mountpoint, cwd, dir, &dir, depth);
 		if (rc) return rc;
-		debug(D_EXT, "\t-> inode %d", dir);
+		// debug(D_EXT, "\t-> inode %d", dir);
 
 		cwd = dir;
 		current = split + 1;
@@ -205,14 +221,14 @@ static errcode_t lookup_inode(ext2_filsys fs, ext2_ino_t cwd, const char *path, 
 		return 0;
 	}
 
-	debug(D_EXT, "leaf %s", current);
+	// debug(D_EXT, "leaf %s", current);
 	ext2_ino_t out;
 	rc = ext2fs_lookup(fs, cwd, current, strlen(current), NULL, &out);
 	if (rc) return rc;
-	debug(D_EXT, "\t-> inode %d", out);
-	if (follow) rc = follow_link(fs, cwd, out, &out);
+	// debug(D_EXT, "\t-> inode %d", out);
+	if (depth >= 0) rc = follow_link(fs, mountpoint, cwd, out, &out, depth);
 	if (rc) return rc;
-	debug(D_EXT, "\t-> inode %d", out);
+	// debug(D_EXT, "\t-> inode %d", out);
 	*inode = out;
 
 	return 0;
@@ -316,17 +332,23 @@ public:
 class pfs_service_ext: public pfs_service {
 private:
 	char *image;
+	char *mountpoint;
 	ext2_filsys fs;
 
 public:
-	pfs_service_ext(ext2_filsys fs, const char *img)
+	pfs_service_ext(ext2_filsys fs, const char *img, const char *m)
 			: fs(fs) {
+		assert(image);
+		assert(m);
+
 		image = strdup(img);
+		mountpoint = strdup(m);
 	}
 
 	~pfs_service_ext() {
 		debug(D_EXT, "closing ext fs %s", image);
 		free(image);
+		free(mountpoint);
 		errcode_t rc = ext2fs_close(fs);
 		if (rc != 0) {
 			debug(D_NOTICE, "failed to close ext filesystem at %s: %s", image, error_message(rc));
@@ -472,7 +494,7 @@ public:
 	}
 };
 
-pfs_service *pfs_service_ext_init(const char *image) {
+pfs_service *pfs_service_ext_init(const char *image, const char *mountpoint) {
 	assert(image);
 
 	initialize_ext2_error_table();
@@ -487,7 +509,7 @@ pfs_service *pfs_service_ext_init(const char *image) {
 		fatal("failed to load ext image %s: %s", image, error_message(rc));
 	}
 
-	return new pfs_service_ext(fs, image);
+	return new pfs_service_ext(fs, image, mountpoint);
 }
 
 #else

@@ -142,7 +142,7 @@ char *stats_file = NULL;
 int parrot_fd_max = -1;
 int parrot_fd_start = -1;
 
-pfs_service *pfs_service_ext_init(const char *image);
+pfs_service *pfs_service_ext_init(const char *image, const char *mountpoint);
 
 /*
 This process at the very top of the traced tree
@@ -1139,7 +1139,7 @@ int main( int argc, char *argv[] )
 			strncpy(image, optarg, MIN((size_t) (split - optarg), sizeof(image) - 1));
 			strncpy(mountpoint, split + 1, sizeof(mountpoint) - 1);
 			if (mountpoint[0] != '/') fatal("mountpoint for ext image %s must be an absolute path", image);
-			struct pfs_service *s = pfs_service_ext_init(image);
+			struct pfs_service *s = pfs_service_ext_init(image, mountpoint);
 			if (!s) fatal("failed to load ext image %s", image);
 
 			service_instances.push_back(s);
