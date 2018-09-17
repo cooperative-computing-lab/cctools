@@ -494,7 +494,12 @@ public:
 	}
 };
 
+#endif
+
 pfs_service *pfs_service_ext_init(const char *image, const char *mountpoint) {
+
+#ifdef HAS_EXT2FS
+
 	assert(image);
 
 	initialize_ext2_error_table();
@@ -510,16 +515,15 @@ pfs_service *pfs_service_ext_init(const char *image, const char *mountpoint) {
 	}
 
 	return new pfs_service_ext(fs, image, mountpoint);
-}
 
 #else
 
-pfs_service *pfs_service_ext_init(const char *image) {
 	fatal("parrot was not configured with ext2fs support");
 	// unreachable
 	return NULL;
-}
 
 #endif
+
+}
 
 /* vim: set noexpandtab tabstop=4: */
