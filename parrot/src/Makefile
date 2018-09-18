@@ -4,7 +4,7 @@ include ../../rules.mk
 EXTERNAL_DEPENDENCIES = ../../ftp_lite/src/libftp_lite.a ../../chirp/src/libchirp.a ../../grow/src/grow.o ../../dttools/src/libdttools.a
 LIBRARIES = libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX) libparrot_client.a
 OBJECTS = $(OBJECTS_PARROT_RUN) parrot_client.o pfs_resolve_mount.o
-OBJECTS_PARROT_RUN = pfs_main.o tracer.o pfs_paranoia.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel.o pfs_sys.o pfs_time.o pfs_table.o pfs_resolve.o pfs_mountfile.o pfs_service.o pfs_file.o pfs_file_cache.o pfs_dir.o pfs_dircache.o pfs_pointer.o pfs_location.o ibox_acl.o pfs_service_local.o pfs_service_http.o pfs_service_grow.o pfs_service_chirp.o pfs_service_multi.o pfs_service_nest.o pfs_service_ftp.o pfs_service_irods.o irods_reli.o pfs_service_hdfs.o pfs_service_bxgrid.o pfs_service_xrootd.o pfs_service_cvmfs.o
+OBJECTS_PARROT_RUN = pfs_main.o tracer.o pfs_paranoia.o pfs_dispatch.o pfs_dispatch64.o pfs_process.o pfs_channel.o pfs_sys.o pfs_time.o pfs_table.o pfs_resolve.o pfs_mountfile.o pfs_service.o pfs_file.o pfs_file_cache.o pfs_dir.o pfs_dircache.o pfs_pointer.o pfs_location.o ibox_acl.o pfs_service_local.o pfs_service_http.o pfs_service_grow.o pfs_service_chirp.o pfs_service_multi.o pfs_service_nest.o pfs_service_ftp.o pfs_service_irods.o irods_reli.o pfs_service_hdfs.o pfs_service_bxgrid.o pfs_service_xrootd.o pfs_service_cvmfs.o pfs_service_ext.o
 PROGRAMS = parrot_run $(UTILITIES)
 HEADERS_PUBLIC = parrot_client.h
 SCRIPTS = parrot_identity_box parrot_run_hdfs parrot_package_run chroot_package_run
@@ -50,7 +50,7 @@ tracer.table.h: syscall_32.tbl
 	cat $< syscall_parrot.tbl | perl tracer.table.pl header 32 > $@
 
 parrot_run: $(OBJECTS_PARROT_RUN) libparrot_client.a
-	$(CCTOOLS_CXX) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_MYSQL_LDFLAGS) $(CCTOOLS_XROOTD_LDFLAGS) $(CCTOOLS_CVMFS_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+	$(CCTOOLS_CXX) -o $@ $(CCTOOLS_INTERNAL_LDFLAGS) $^ $(CCTOOLS_IRODS_LDFLAGS) $(CCTOOLS_MYSQL_LDFLAGS) $(CCTOOLS_XROOTD_LDFLAGS) $(CCTOOLS_CVMFS_LDFLAGS) $(CCTOOLS_EXT2FS_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 parrot_cvmfs_static_run: $(OBJECTS_PARROT_RUN) libparrot_client.a $(CCTOOLS_CVMFS_LDFLAGS) $(EXTERNAL_DEPENDENCIES)
 	$(CCTOOLS_CXX) -static -static-libstdc++ -static-libgcc -o $@ $^ $(CCTOOLS_INTERNAL_LDFLAGS) -Wl,-Bstatic $(CCTOOLS_EXTERNAL_LINKAGE)
@@ -66,6 +66,9 @@ pfs_service_xrootd.o: pfs_service_xrootd.cc
 
 pfs_service_cvmfs.o: pfs_service_cvmfs.cc
 	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_CVMFS_CCFLAGS)
+
+pfs_service_ext.o: pfs_service_ext.cc
+	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_EXT2FS_CCFLAGS)
 
 pfs_service_ftp.o: pfs_service_ftp.cc
 	$(CCTOOLS_CXX) -o $@ -c $(CCTOOLS_INTERNAL_CXXFLAGS) $< $(CCTOOLS_GLOBUS_CCFLAGS)

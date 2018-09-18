@@ -518,6 +518,11 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 			strcpy(pname->hostport,"localhost");
 			strcpy(pname->rest,pname->path);
 			pname->is_local = 1;
+		} else if (!strncmp(pname->service_name, "ext_", 4)) {
+			strcpy(pname->rest, tmp);
+			strcpy(pname->host, "ext");
+			strcpy(pname->hostport, "ext");
+			pname->port = 0;
 		} else {
 			if(!strcmp(pname->service_name,"multi")) {// if we're dealing with a multivolume, split off at the @
 				path_split_multi(tmp,pname->host,pname->rest);

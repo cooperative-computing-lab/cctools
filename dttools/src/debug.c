@@ -106,6 +106,7 @@ static struct flag_info table[] = {
 	{"makeflow_lexer",    D_MAKEFLOW_LEXER},
 	{"makeflow_parser",   D_MAKEFLOW_PARSER},
 	{"makeflow_hook",   D_MAKEFLOW_HOOK},
+	{"ext", D_EXT},
 	{"rmonitor", D_RMON},
 	{"confuga", D_CONFUGA},
 	{"jx", D_JX},
