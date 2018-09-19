@@ -2,7 +2,7 @@
 
 set -ex
 
-COMMAND="./configure --strict && make && make test"
+COMMAND="./configure --strict --with-cvmfs-path /opt/libcvmfs --with-uuid-path /opt/uuid && make && make test"
 
 if [ -z "$DOCKER_IMAGE" ]; then
     eval "$COMMAND"
