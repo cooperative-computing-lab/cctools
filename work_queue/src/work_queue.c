@@ -1092,6 +1092,9 @@ static work_queue_result_code_t get_file_or_directory( struct work_queue *q, str
 		free(tmp_remote_path);
 		free(length_str);
 
+		tmp_remote_path = NULL;
+		length_str      = NULL;
+
 		if(recv_worker_msg_retry(q, w, line, sizeof(line)) == MSG_FAILURE) {
 			result = WORKER_FAILURE;
 			break;
