@@ -91,11 +91,11 @@ choice:
 
 If you are using the C example, compile it like this:
 <div class="code_area"><pre class="code_snip">
-gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm
+gcc work_queue_example.c -o work_queue_example -I${HOME}/cctools/include/cctools -L${HOME}/cctools/lib -lwork_queue -ldttools -lm -lz
 </pre></div>
-If you are using the Python example, set PYTHONPATH to include the Python modules in cctools:
+If you are using the Python example, set PYTHONPATH to include the Python modules in cctools: (You may need to adjust the version number to match your Python.)
 <div class="code_area"><pre class="code_snip">
-export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python2.6/site-packages
+export PYTHONPATH=${PYTHONPATH}:${HOME}/cctools/lib/python2.7/site-packages
 </pre></div>
 If you are using the Perl example, set PERL5LIB to include the Perl modules in cctools:
 <div class="code_area"><pre class="code_snip">
