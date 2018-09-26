@@ -1,11 +1,8 @@
 language: c
-
 sudo: required
 services: docker
-
-script: ./travis_build.sh
+script: "./travis_build.sh"
 after_failure: cat cctools.test.fail
-
 matrix:
   include:
   - os: osx
@@ -29,3 +26,13 @@ matrix:
   - os: linux
     compiler: gcc
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-opensuse42.3
+deploy:
+  provider: releases
+  api_key:
+    secure: Napd/fV+rU9WOEoEivzs+c3J6aW6lciNit+i8a0mNl2o2AxDSa4CAzhmBTVxmsC7R4EPv1ezVJn+0YbWMeiA0chPWfd5MKyd4MQlX+pPgTNWv+kRUtLwptFhxq4xPXZUY+R+HZsXWngsjQ2nIN2xLabKpZzRcvdxkb9wSJXY/9LfKHoNySXOndqW7vRdm7S1Vd3Ry9jd3ipY0reCg4rlEzfymEbfxMNiUL79RqZghjEMPUyLhnwc69M5DF/qSUPsUfTEZZU/JXzv5N1lzsL6mnfXIOGDyeMgnSAnW+AxOtMnpsGCj/lMHY5TcuNPsZrwqkf3/PE0HdMs58Nqi/XOWi3MCvuXmhjvh/3gHiPXTWS1oyJUD27ihaXhTNAXzzIPITqPwyGCc90B+N0DKfE2yNSb5wdHe2i6so6bBoWmllJL7mW8CTSuY+FB5vSvNv81TSOKNi91cVRSVCBwmcpezpO8M63rohU87E4hBFE/1Ngxe6cwKWoFf9bMuzbzjqb7aQF3+laXluvPy9OV80nnI/deDAYK/XakGhW1axRSji/A+cC2ccmwPm3hinP4aUQhEIJDLDdOIFIjWUpG+koxnM+2734g1e9FspaLF6zIEGCkRxrl5SWOqZpnoWvOiQodlBoeRAnk4pcAwV+LQZTbh26j1FoTDliBDA/9d1nbqDc=
+  file: "/tmp/cctools-*.tar.gz"
+  file_glob: true
+  skip_cleanup: true
+  on:
+    repo: trshaffer/cctools
+    tags: true
