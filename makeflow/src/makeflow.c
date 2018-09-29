@@ -2020,8 +2020,6 @@ int main(int argc, char *argv[])
                     UINT64_T value;
                     int sent = 0;
                     while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
-						fprintf(stderr,"hex of key: %p\n",(void*)&key);
-						fprintf(stderr,"Key is char* so it's hex is: %p\n",(void*)key);
                         if (value == i) {
                             int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (UINT64_T)hash_table_lookup(mpi_sizes,key);
                             //fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
@@ -2068,6 +2066,7 @@ int main(int argc, char *argv[])
 				debug(D_BATCH,"%i:%s Starting mpi worker function\n",mpi_rank,procname);
                 int batch_job_worker_exit_code = batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
 				fprintf(stderr,"%i:%s exited with code: %i\n",mpi_rank,procname,batch_job_worker_exit_code);
+				return batch_job_worker_exit_code;
             }
 
         }else{
