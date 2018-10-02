@@ -228,9 +228,9 @@ int main(int argc, char** argv) {
         
         
 
-        char* sys_str = string_format("makeflow -T wq --port=%s -d all --local-cores=%i %s", port, ((cores / 2) + 1), makeflow_args);
+        char* sys_str = string_format("makeflow -T wq --port=%s -d all --local-cores=%i %s", port, 1, makeflow_args);
         if(debug_base != NULL){
-            sys_str = string_format("makeflow -T wq --port=%s -dall --debug-file=%s.makeflow --local-cores=%i %s", port, debug_base, ((cores / 2) + 1), makeflow_args);
+            sys_str = string_format("makeflow -T wq --port=%s -dall --debug-file=%s.makeflow --local-cores=%i %s", port, debug_base, 1, makeflow_args);
         }
         
         int k = 0;
