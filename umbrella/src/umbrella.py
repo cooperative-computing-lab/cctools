@@ -4600,4 +4600,4 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 if __name__ == "__main__":
 	main()
 
-#set sts=4 sw=4 ts=4 expandtab ft=python
+#vim: set sts=4 sw=4 ts=4 expandtab ft=python:
