@@ -15,6 +15,6 @@ else
         -v /tmp:/tmp \
         -w '/root' \
         "$DOCKER_IMAGE" \
-        /bin/sh -c "./configure --strict --prefix $D --with-cvmfs-path /opt/libcvmfs --with-uuid-path /opt/uuid && make install && make test"
+        /bin/sh -c "./configure --strict --prefix $D --with-irods-path /opt/irods/ --with-xrootd-path /opt/xrootd/ --with-uuid-path /opt/uuid/ --with-cvmfs-path /opt/libcvmfs && make install && make test"
     tar -cz -C $(dirname $D) -f $D.tar.gz $(basename $D)
 fi
