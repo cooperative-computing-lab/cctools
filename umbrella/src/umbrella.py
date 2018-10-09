@@ -980,7 +980,7 @@ def parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_fil
         parrot_options = "%s -d all -o %s" % (parrot_options, parrot_log)
 
     if cvmfs_http_proxy and not use_local_cvmfs:
-        user_cmd[0] = "export HTTP_PROXY=%s; %s %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, parrot_path, parrot_options, cwd_setting, user_cmd[0])
+        user_cmd[0] = "export HTTP_PROXY=%s; export PARROT_ALLOW_SWITCHING_CVMFS_REPOSITORIES=yes; %s %s -- /bin/sh -c 'cd  %s; %s'" % (cvmfs_http_proxy, parrot_path, parrot_options, cwd_setting, user_cmd[0])
     else:
         user_cmd[0] = "%s %s -- /bin/sh -c 'cd  %s; %s'" % (parrot_path, parrot_options, cwd_setting, user_cmd[0])
     logging.debug("The parrotized user_cmd: %s" % user_cmd[0])
@@ -2592,9 +2592,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
                     is_cms_cvmfs_app = 1 #cvmfs is needed to deliver cms.cern.ch repo, and the local host has no cvmfs installed.
 
                     if not cvmfs_http_proxy or len(cvmfs_http_proxy) == 0:
-                        cleanup(tempfile_list, tempdir_list)
-                        logging.debug("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
-                        sys.exit("Access CVMFS through Parrot requires the --cvmfs_http_proxy of umbrella to be set.")
+                        cvmfs_http_proxy = "':;DIRECT'"
 
                     #currently, if the logic reaches here, only parrot execution engine is allowed.
                     cvmfs_cms_siteconf_mountpoint = set_cvmfs_cms_siteconf(sandbox_dir)
