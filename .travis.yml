@@ -3,8 +3,8 @@ language: c
 sudo: required
 services: docker
 
-script: ./travis_build.sh
-after_failure: cat cctools.test.fail
+script: "./travis_build.sh"
+after_failure: "cat cctools.test.fail"
 
 matrix:
   include:
@@ -29,3 +29,13 @@ matrix:
   - os: linux
     compiler: gcc
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-opensuse42.3
+deploy:
+  provider: releases
+  file: "/tmp/cctools-*.tar.gz"
+  file_glob: true
+  skip_cleanup: true
+  on:
+    repo: cooperative-computing-lab/cctools
+    tags: true
+  api-key:
+    secure: pVs2jvA+y0NYxjhw7zp6+OLssTxOe0lMwqWGWKOeeDihZMmsYeXJ9Z+oxOghfhbcqEv4TnMsYCBkDGLnlSUplWyDPqu/eW0QuvlPzY5VaqqK9aVw1abgKAp77vddub1kHPPqF2axaYIlor6wrMCkyG2ICwmr0mWX+ISNSspsyHzuEA/0XDOMAzY1QjMd08ASScGLAJxHYecRxnjCrUXiN1nMeh266eWsQmWs9PF+DcpKPB9uMohms0Ei7Kj7wnZOMRLRGwM07EYG6ZkDJTxOdjLkOYQ/xhOSTnWynfyaVK8ZLxOKhoCie7oHEuFQRaO8B96o/ddRI2gosMUMU57/Qj5YtPwnBAxIUpUmxe1eRWOGvAWmRuHUxfVR7ICdSsDc9HFKO22tFJCMShLTm528ASnyMVBF2whncSXiba33phFUNKTcJgCcIzvrKazKUzuHyGJrzpjKWYwHR7ufi0v3MrHROD8LGQ2g03YMKmp7/UrMES335Xs5mLCk7uFWh9kSiGvNrFxkk5hWLtzi3Qz81JiyExxjfl8iUVQyL5gggQnotQH7DGeBALmg3LRuXAT/YOEoaTMCh1nEzt16oifnpp+a1yaqwqtq8EHifqu0g3SkmfzhLO/Xz81qVedJ4rauwW0IFzlU81guclAFRDrTHRmmfTeQehZfKhsnO5ElkEo=
