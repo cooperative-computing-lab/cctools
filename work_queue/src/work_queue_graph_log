@@ -248,7 +248,7 @@ def check_gnuplot_version(gnuplot_cmd):
 
             version = result.group(1)
 
-            if float(version) <= 4.6:
+            if float(version) < 4.6:
                 sys.stderr.write("gnuplot is version %s, at least version 4.6 is required." % (version,))
                 exit(1)
 
