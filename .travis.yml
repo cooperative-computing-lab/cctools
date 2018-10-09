@@ -16,19 +16,19 @@ matrix:
     compiler: clang
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos6
+    env: "DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos6"
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos7
+    env: "DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos7"
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04
+    env: "DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04"
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-debian9.2
+    env: "DOCKER_IMAGE=cclnd/cctools-env:x86_64-debian9.5"
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-opensuse42.3
+    env: "DOCKER_IMAGE=cclnd/cctools-env:x86_64-opensuse42.3"
 deploy:
   provider: releases
   file: "/tmp/cctools-*.tar.gz"
