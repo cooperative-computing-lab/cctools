@@ -43,7 +43,7 @@ run()
 		echo $! > $sand_pid
 		run_local_worker "$sand_port" "$worker_log"
 		wait_for_file_creation $sand_done 30
-		kill $(cat sand_pid) && exit 1
+		kill $(cat $sand_pid) && exit 1
 
 		require_identical_files "$cand" sand_sanity/test.cand.right
 
@@ -54,7 +54,7 @@ run()
 		echo $! > $sand_pid
 		run_local_worker "$sand_port" "$worker_log"
 		wait_for_file_creation $sand_done 30
-		kill $(cat sand_pid) && exit 1  # if we could kill it, then it did not finish the process correctly...
+		kill $(cat $sand_pid) && exit 1  # if we could kill it, then it did not finish the process correctly...
 
 		require_identical_files "$sw_ovl" sand_sanity/test.sw.right
 
@@ -65,7 +65,7 @@ run()
 		echo $! > $sand_pid
 		run_local_worker "$sand_port" "$worker_log"
 		wait_for_file_creation $sand_done 30
-		kill $(cat sand_pid) && exit 1
+		kill $(cat $sand_pid) && exit 1
 
 		require_identical_files "$banded_ovl" sand_sanity/test.banded.right
 

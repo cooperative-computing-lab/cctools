@@ -92,6 +92,7 @@ unless it has the flags D_NOTICE or D_FATAL.  For example, a main program might 
 #define D_CONFUGA  (1LL<<44)  /**< Debug Confuga Storage Cluster */
 #define D_JX       (1LL<<45)  /**< Debug JX */
 #define D_MAKEFLOW_HOOK  (1LL<<46)  /**< Debug makeflow's hook system */
+#define D_EXT      (1LL<<47)  /**< Debug the ext module in Parrot */
 
 /** Debug all remote I/O operations. */
 #define D_REMOTE   (D_HTTP|D_FTP|D_NEST|D_CHIRP|D_DCAP|D_RFIO|D_LFC|D_GFAL|D_MULTI|D_GROW|D_IRODS|D_HDFS|D_BXGRID|D_XROOTD|D_CVMFS)

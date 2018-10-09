@@ -92,6 +92,7 @@ build_date=
 
 curl_path="/usr"
 cvmfs_path="/usr"
+ext2fs_path="/usr"
 fuse_path="/usr"
 globus_path="/usr"
 irods_path="/usr"
@@ -119,6 +120,7 @@ c_only_flags="-std=c99"
 
 config_zlib_path=yes
 
+config_ext2fs_path=auto
 config_fuse_path=auto
 config_mysql_path=auto
 config_perl_path=auto
@@ -198,6 +200,10 @@ do
 		--with-cvmfs-path)
 			cvmfs_path=${arg}
 			config_cvmfs_path=$(config_X_path ${arg})
+			;;
+		--with-ext2fs-path)
+			ext2fs_path=${arg}
+			config_ext2fs_path=$(config_X_path ${arg})
 			;;
 		--with-fuse-path)
 			fuse_path=${arg}
@@ -345,6 +351,7 @@ Where options are:
 Where PACKAGE may be:
 	curl
 	cvmfs
+	ext2fs
 	fuse
 	globus
 	irods
@@ -780,6 +787,32 @@ then
 		fi
 else
 	echo "*** skipping fuse support"
+fi
+
+if [ $config_ext2fs_path != no ]
+then
+		if library_search ext2fs ${ext2fs_path} || library_search ext2fs /
+		then
+				if [ "${ext2fs_path}" != / -a "${ext2fs_path}" != /usr ]
+				then
+						ext2fs_ccflags="-I${ext2fs_path}/include"
+				fi
+				ccflags="${ccflags} -DHAS_EXT2FS"
+				ext2fs_ldflags="${library_search_result} -lcom_err"
+				ext2fs_avail=yes
+		else
+				if [ $config_ext2fs_path = yes ]
+				then
+
+				echo "*** Sorry, I couldn't find ext2fs in $ext2fs_path"
+				echo "*** Check --with-ext2fs-path and try again."
+				exit 1
+				else
+						echo "*** skipping ext2fs support"
+				fi
+		fi
+else
+	echo "*** skipping ext2fs support"
 fi
 
 ##########################################################################
@@ -1610,6 +1643,10 @@ CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
 
 CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
 CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
+
+CCTOOLS_EXT2FS_AVAILABLE=${ext2fs_avail}
+CCTOOLS_EXT2FS_LDFLAGS=${ext2fs_ldflags}
+CCTOOLS_EXT2FS_CCFLAGS=${ext2fs_ccflags}
 
 CCTOOLS_FUSE_AVAILABLE=${fuse_avail}
 CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
