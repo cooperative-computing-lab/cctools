@@ -3,7 +3,7 @@ language: c
 sudo: required
 services: docker
 
-script: "./travis_build.sh"
+script: "./travis.sh"
 after_failure: "cat cctools.test.fail"
 
 matrix:
