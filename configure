@@ -1280,6 +1280,9 @@ then
 	fi
 fi
 
+# Make golang api 
+swig_bindings="$swig_bindings golang"
+
 if [ $found_swig != yes ]
 then
 	swig_bindings=""
