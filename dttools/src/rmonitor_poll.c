@@ -238,9 +238,47 @@ uint64_t clicks_to_usecs(uint64_t clicks)
  * Low level resource monitor functions.
  ***/
 
+/***
+ Get children of a process by polling, rather than capturing fork return value
+ is number of children found. The array of pid values is returned in *children.
+ ***/
+int rmonitor_get_children(pid_t pid, uint64_t **children)
+{
+	/* /proc/[pid]/task/[pid]/children */
+
+	char *fchildren_path = string_format("/proc/%d/task/%d/children", pid, pid);
+	FILE *fstat = fopen(fchildren_path, "r");
+
+	if(!fstat) {
+		return 0;
+	}
+
+	int count = 0;
+	int max   = 0;
+	uint64_t child;
+
+	uint64_t *child_list = NULL;
+
+	while(fscanf(fstat, "%" PRIu64, &child) == 1) {
+		count++;
+
+		if(count > max) {
+			max = 2*count;
+			child_list = realloc(child_list, sizeof(pid_t) * max);
+		}
+
+		child_list[count - 1] = child;
+	}
+
+	*children = child_list;
+
+	return count;
+}
+
+
 int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 {
-	/* /dev/proc/[pid]/stat */
+	/* /proc/[pid]/stat */
 
 	uint64_t start_clicks;
 	double uptime;
@@ -286,7 +324,7 @@ int rmonitor_get_start_time(pid_t pid, uint64_t *start_time)
 
 int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 {
-	/* /dev/proc/[pid]/stat */
+	/* /proc/[pid]/stat */
 
 	uint64_t kernel, user;
 
@@ -342,7 +380,7 @@ int rmonitor_get_loadavg(struct rmonitor_load_info *load)
 
 int rmonitor_get_mem_usage(pid_t pid, struct rmonitor_mem_info *mem)
 {
-	// /dev/proc/[pid]/status:
+	// /proc/[pid]/status:
 
 	FILE *fmem = open_proc_file(pid, "status");
 	if(!fmem)
@@ -434,7 +472,7 @@ static double rmonitor_mem_info_priority(void *item) {
 
 int rmonitor_get_mmaps_usage(pid_t pid, struct hash_table *maps)
 {
-	// /dev/proc/[pid]/smaps:
+	// /proc/[pid]/smaps:
 
 	FILE *fmem = open_proc_file(pid, "smaps");
 	if(!fmem)
@@ -645,7 +683,7 @@ void acc_sys_io_usage(struct rmonitor_io_info *acc, struct rmonitor_io_info *oth
 /* We compute the resident memory changes from mmap files. */
 int rmonitor_get_map_io_usage(pid_t pid, struct rmonitor_io_info *io)
 {
-	/* /dev/proc/[pid]/smaps */
+	/* /proc/[pid]/smaps */
 
 	uint64_t kbytes_resident_accum;
 	uint64_t kbytes_resident;
@@ -732,7 +770,7 @@ void acc_wd_usage(struct rmonitor_wdir_info *acc, struct rmonitor_wdir_info *oth
 
 char *rmonitor_get_command_line(pid_t pid)
 {
-	/* /dev/proc/[pid]/cmdline */
+	/* /proc/[pid]/cmdline */
 
 	FILE *fline = open_proc_file(pid, "cmdline");
 	if(!fline)
