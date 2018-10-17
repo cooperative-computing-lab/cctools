@@ -39,6 +39,7 @@ deploy:
   provider: releases
   file: /tmp/cctools-*.tar.gz
   file_glob: true
+  overwrite: true
   skip_cleanup: true
   on:
     repo: cooperative-computing-lab/cctools
