@@ -9,7 +9,7 @@ after_failure: "cat cctools.test.fail"
 notifications:
   email:
     recipients:
-      - ccl-team-list@nd.edu
+      - cctools-build-list@nd.edu
     on_success: always
     on_failure: always
 
