@@ -228,9 +228,9 @@ int main(int argc, char** argv) {
         
         
 
-        char* sys_str = string_format("makeflow -T wq --port=%s -d all --local-cores=%i %s", port, 1, makeflow_args);
+        char* sys_str = string_format("makeflow -T wq --port=%s -d all --local-cores=%i --local-memory=%i %s", port, 1, mem, makeflow_args);
         if(debug_base != NULL){
-            sys_str = string_format("makeflow -T wq --port=%s -dall --debug-file=%s.makeflow --local-cores=%i %s", port, debug_base, 1, makeflow_args);
+            sys_str = string_format("makeflow -T wq --port=%s -dall --debug-file=%s.makeflow --local-cores=%i --local-memory=%i %s", port, debug_base, 1, mem, makeflow_args);
         }
         
         int k = 0;
@@ -317,9 +317,9 @@ int main(int argc, char** argv) {
         //char* printenvstr = string_format("printenv > rank_%i_env.txt", mpi_rank);
         //system(printenvstr);
 
-        char* sys_str = string_format("work_queue_worker --cores=%i --memory=%i %s %s %s", cores, mem, master_ip, port, workqueue_args);
+        char* sys_str = string_format("work_queue_worker --timeout=86400 --cores=%i --memory=%i %s %s %s", cores, mem, master_ip, port, workqueue_args);
         if(debug_base != NULL){
-            sys_str = string_format("work_queue_worker -d all -o %s.workqueue.%i --cores=%i --memory=%i %s %s %s", debug_base, mpi_rank, cores, mem, master_ip, port, workqueue_args);
+            sys_str = string_format("work_queue_worker --timeout=86400 -d all -o %s.workqueue.%i --cores=%i --memory=%i %s %s %s", debug_base, mpi_rank, cores, mem, master_ip, port, workqueue_args);
         }
         fprintf(stderr, "Rank %i: Starting Worker: %s\n", mpi_rank, sys_str);
         int pid=fork();
