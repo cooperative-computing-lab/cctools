@@ -1992,8 +1992,9 @@ int main(int argc, char *argv[])
                     MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
                     struct jx* recobj = jx_parse_string(str);
-                    char* name = jx_lookup_string(recobj, "name");
-                    UINT64_T rank = jx_lookup_integer(recobj, "rank");
+                    char* name = (char*)jx_lookup_string(recobj, "name");
+                    
+                    UINT64_T* rank = malloc(sizeof(UINT64_T)*1); *rank = jx_lookup_integer(recobj, "rank");
 					
 		    //fprintf(stderr,"RANK0: got back response: %i at %s\n",rank,name);
 
@@ -2002,11 +2003,13 @@ int main(int argc, char *argv[])
                     }
                     //for partition sizing
                     if (hash_table_lookup(mpi_sizes, name) == NULL) {
-                        hash_table_insert(mpi_sizes, name, 1);
+                        UINT64_T* val = malloc(sizeof(UINT64_T)*1); *val = 1;
+                        hash_table_insert(mpi_sizes, name, (void*)val);
                     } else {
-                        UINT64_T val = (int) hash_table_lookup(mpi_sizes, name);
+                        UINT64_T* val = (UINT64_T*) hash_table_lookup(mpi_sizes, name);
+                        *val += 1;
                         hash_table_remove(mpi_sizes, name);
-                        hash_table_insert(mpi_sizes, name, val + 1);
+                        hash_table_insert(mpi_sizes, name, (void*)(val));
 
                     }
 
@@ -2017,11 +2020,12 @@ int main(int argc, char *argv[])
                 for (i = 1; i < mpi_world_size; i++) {
                     hash_table_firstkey(mpi_comps);
                     char* key;
-                    UINT64_T value;
+                    UINT64_T* value;
                     int sent = 0;
                     while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
-                        if (value == i) {
-                            int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (UINT64_T)hash_table_lookup(mpi_sizes,key);
+                        UINT64_T ui = i;
+                        if (*value == ui) {
+                            int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (int)*((UINT64_T*)hash_table_lookup(mpi_sizes,key));
                             //fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
                             struct jx* livemsgjx = jx_object(NULL);
                             jx_insert_integer(livemsgjx,"LIVE",mpi_cores);
@@ -2034,8 +2038,8 @@ int main(int argc, char *argv[])
                             char* livemsg = jx_print_string(livemsgjx);
                             unsigned livemsgsize = strlen(livemsg);
                             //fprintf(stderr,"Lifemsg for %lli has been created, now sending\n",value);
-                            MPI_Send(&livemsgsize,1,MPI_UNSIGNED,value,0,MPI_COMM_WORLD);
-                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, value, 0, MPI_COMM_WORLD);
+                            MPI_Send(&livemsgsize,1,MPI_UNSIGNED,*value,0,MPI_COMM_WORLD);
+                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
                             sent = 1;
                             //fprintf(stderr,"Lifemsg for %lli was successfully delivered\n",value);
                             free(livemsg);
