@@ -1022,7 +1022,7 @@ static void handle_abort(int sig)
 	makeflow_abort_flag = 1;
 
 }
-
+#ifdef CCTOOLS_WITH_MPI
 static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores_per, int mpi_mem_per, char* working_dir){
     struct hash_table* mpi_comps = hash_table_create(0, 0);
                 struct hash_table* mpi_sizes = hash_table_create(0, 0);
@@ -1107,6 +1107,7 @@ static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores_per, int
 
 
 }
+#endif
 
 static void show_help_run(const char *cmd)
 {
