@@ -322,7 +322,13 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+#else
+#include <stdio.h>
+int main(int argc, char** argv){
+    fprintf(stdout,"To use this Program, please configure and compile cctools with MPI.\n");
+}
 
 #endif
+
 
 /* vim: set noexpandtab tabstop=4: */
