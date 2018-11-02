@@ -32,7 +32,7 @@ See the file COPYING for details.
 #include <math.h>
 #include <assert.h>
 
-#ifdef MPI
+#ifdef CCTOOLS_WITH_MPI
 
 #include <mpi.h>
 
@@ -48,25 +48,25 @@ static int gotten_resources = 0;
 static int id = 1;
 
 struct batch_job_mpi_workers_resources {
-    long max_memory;
-    int max_cores;
-    long cur_memory;
-    int cur_cores;
+    int64_t max_memory;
+    int64_t max_cores;
+    int64_t cur_memory;
+    int64_t cur_cores;
 };
 
 struct batch_job_mpi_job {
-    int cores;
-    int mem;
+    int64_t cores;
+    int64_t mem;
     struct batch_job_mpi_workers_resources* comp;
     char* cmd;
-    int id;
+    int64_t id;
     char* env;
     char* infiles;
     char* outfiles;
 };
 
 struct mpi_fit{
-    int rank;
+    int64_t rank;
     double value;
 };
 
@@ -93,7 +93,7 @@ static unsigned int gen_guid() {
     return guid.ul;
 }
 
-void batch_job_mpi_give_ranks_sizes(struct hash_table* nr, struct hash_table* ns) {
+void batch_job_mpi_set_ranks_sizes(struct hash_table* nr, struct hash_table* ns) {
     name_rank = nr;
     name_size = ns;
 }
@@ -101,7 +101,7 @@ void batch_job_mpi_give_ranks_sizes(struct hash_table* nr, struct hash_table* ns
 static void get_resources() {
     gotten_resources = 1;
     char* key;
-    UINT64_T* value;
+    uint64_t* value;
     char* worker_cmd;
     unsigned len;
 
@@ -141,50 +141,40 @@ static void get_resources() {
 
 static int find_fit(struct itable* comps, int req_cores, int req_mem, int job_id) {
     itable_firstkey(comps);
-    UINT64_T key;
+    uint64_t key;
     struct batch_job_mpi_workers_resources* comp;
     
-    struct mpi_fit* blah = calloc(itable_size(comps),sizeof(struct mpi_fit)); //malloc(sizeof(struct mpi_fit) * itable_size(comps));
+    struct mpi_fit* possible_fit_table = calloc(itable_size(comps),sizeof(struct mpi_fit)); //malloc(sizeof(struct mpi_fit) * itable_size(comps));
     int i = 0;
     while (itable_nextkey(comps, &key, (void**) &comp)) {
-        //fprintf(stderr,"RANK0: examinig rank: %lu\n",key);
         //right now is first fit. Might want to try and find worst fit, aka, a fit on the LEAST busy resource
         if (comp->cur_cores - req_cores >= 0 && comp->cur_memory - req_mem >= 0) {
             
-            blah[i].rank = key;
-            blah[i].value = sqrt(pow((comp->cur_cores - req_cores) , 2) + pow((comp->cur_memory - req_mem),2));
+            possible_fit_table[i].rank = key;
+            possible_fit_table[i].value = sqrt(pow((comp->cur_cores - req_cores) , 2) + pow((comp->cur_memory - req_mem),2));
             
             
         }
         i +=1;
     }
-    //fprintf(stderr,"RANK0 sorting fits\n");
-    qsort((void*) blah, itable_size(comps), sizeof(struct mpi_fit), (__compar_fn_t)sort_mpi_struct);
-    //for(i=0; i<itable_size(comps); i++){
-    //    fprintf(stderr,"RANK0: Rank: %i value: %lf\n",blah[i].rank,blah[i].value);
-    //}
-    //fprintf(stderr,"RANK0: Last value: %lf\n",blah[i - 1].value);
-    if (blah[itable_size(comps) - 1].value > 0.0) {
-        int rank = blah[itable_size(comps) - 1].rank;
+    qsort((void*) possible_fit_table, itable_size(comps), sizeof(struct mpi_fit), (__compar_fn_t)sort_mpi_struct);
+    if (possible_fit_table[itable_size(comps) - 1].value > 0.0) {
+        int rank = possible_fit_table[itable_size(comps) - 1].rank;
         //assert(rank != 0);
-        //fprintf(stderr,"RANK0: found a good place for it, rank: %i!\n",rank);
         comp = itable_lookup(comps,rank);
         struct batch_job_mpi_job* job_struct = malloc(sizeof (struct batch_job_mpi_job));
         job_struct->cores = req_cores;
         job_struct->mem = req_mem;
         job_struct->comp = comp;
 
-        //fprintf(stderr,"RANK0 updating worker resources: %p\n",(void*)comp);
         comp->cur_cores -= req_cores;
         comp->cur_memory -= req_mem;
 
-        //fprintf(stderr,"RANK0: inserting into table!\n");
         itable_insert(rank_jobs, job_id, job_struct);
-        //fprintf(stderr,"RANK0: returning the rank!\n");
-        free(blah);
+        free(possible_fit_table);
         return rank;
     }
-    free(blah);
+    free(possible_fit_table);
     return -1;
 }
 
@@ -193,8 +183,8 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
     //some init stuff
     if (!gotten_resources) get_resources();
 
-    int cores_req = resources->cores < 0 ? 1 : resources->cores;
-    int mem_req = resources->memory < 0 ? 1000 : resources->memory;
+    int64_t cores_req = resources->cores < 0 ? 1 : resources->cores;
+    int64_t mem_req = resources->memory < 0 ? 1000 : resources->memory;
 
     //push new job onto the list
     struct batch_job_mpi_job* job = malloc(sizeof (struct batch_job_mpi_job));
@@ -212,7 +202,7 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 
     list_push_tail(jobs, job);
     
-    debug(D_BATCH,"Queued job %i",job->id);
+    debug(D_BATCH,"Queued job %li",job->id);
 
     return job->id;
 }
@@ -220,7 +210,7 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 static batch_job_id_t batch_job_mpi_wait(struct batch_queue * q, struct batch_job_info * info_out, time_t stoptime) {
 
     char* key;
-    UINT64_T* value;
+    uint64_t* value;
     char* str;
     unsigned len;
 
@@ -229,21 +219,20 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue * q, struct batch_jo
     struct batch_job_mpi_job* job;
     while ((job = list_next_item(jobs)) != NULL) {
         int rank_fit = find_fit(rank_res, job->cores, job->mem, job->id);
-        //debug(D_BATCH, "RANK0 Job %i needs %i cores %i mem\n", job->id, job->cores, job->mem);
         if (rank_fit < 0) {
             continue;
         }
-        debug(D_BATCH, "RANK0 Job %i found a fit at %i. It needs %i cores %i mem\n", job->id, rank_fit, job->cores,job->mem);
+        debug(D_BATCH, "RANK0 Job %li found a fit at %i. It needs %li cores %li mem\n", job->id, rank_fit, job->cores,job->mem);
 
         char* tmp = string_escape_shell(job->cmd);
         char* env = job->env != NULL ? job->env : "";
-        char* worker_cmd = string_format("{\"Orders\":\"Execute\",\"CMD\":%s,\"ID\":%i,\"ENV\":%s,\"IN\":\"%s\",\"OUT\":\"%s\"}", tmp, job->id, env, job->infiles, job->outfiles);
+        char* worker_cmd = string_format("{\"Orders\":\"Execute\",\"CMD\":%s,\"ID\":%li,\"ENV\":%s,\"IN\":\"%s\",\"OUT\":\"%s\"}", tmp, job->id, env, job->infiles, job->outfiles);
 
         len = strlen(worker_cmd);
         MPI_Send(&len, 1, MPI_UNSIGNED, rank_fit, 0, MPI_COMM_WORLD);
         MPI_Send(worker_cmd, len, MPI_CHAR, rank_fit, 0, MPI_COMM_WORLD);
         debug(D_BATCH, "RANK0 Sent cmd object string to %i: %s\n", rank_fit, worker_cmd);
-        debug(D_BATCH,"Job %i submitted to worker",job->id);
+        debug(D_BATCH,"Job %li submitted to worker",job->id);
         list_remove(jobs, job);
         
         free(tmp);
@@ -253,7 +242,6 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue * q, struct batch_jo
     }
 
     //See if we have a msg waiting for us using MPI_Iprobe
-    //debug(D_BATCH,"RANK0 looking through our hash table for who has what!\n");
     if(!hash_table_nextkey(name_rank,&key,(void**)&value)) hash_table_firstkey(name_rank);
     while (hash_table_nextkey(name_rank, &key, (void**) &value)) {
         MPI_Status mstatus;
@@ -301,7 +289,6 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue * q, struct batch_jo
 
 
     }
-    //debug(D_BATCH,"RANK0: no jobs to be returned yet. moving on!\n");
     return -1;
 
 
@@ -309,9 +296,9 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue * q, struct batch_jo
 
 static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid) {
     
-    char* worker_cmd = string_format("{\"Orders\":\"Cancel\", \"ID\":\"%i\"}",(int)jobid);
+    char* worker_cmd = string_format("{\"Orders\":\"Cancel\", \"ID\":\"%li\"}",jobid);
     char* key;
-    UINT64_T* value;
+    uint64_t* value;
     hash_table_firstkey(name_rank);
     while (hash_table_nextkey(name_rank, &key, (void**) &value)) {
         unsigned len = strlen(worker_cmd);
@@ -324,7 +311,7 @@ static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid) {
 
 void batch_job_mpi_kill_workers() {
     char* key;
-    UINT64_T* value;
+    uint64_t* value;
     char* worker_cmd;
     hash_table_firstkey(name_rank);
     while (hash_table_nextkey(name_rank, &key, (void**) &value)) {
@@ -340,22 +327,6 @@ static int batch_queue_mpi_create(struct batch_queue *q) {
     batch_queue_set_feature(q, "mpi_job_queue", NULL);
     return 0;
 }
-
-/*static struct list* extract_file_names_from_list(char* in) {
-    struct list* output = list_create();
-    char* tmp = strdup(in);
-    char* ta = strtok(tmp, ",");
-    while (ta != NULL) {
-        int push_success = list_push_tail(output, strdup(ta));
-        if (!push_success) {
-            fatal("Error appending file name to list due to being out of memory");
-        }
-        ta = strtok(0, ",");
-    }
-
-    return output;
-
-}*/
 
 static void mpi_worker_handle_signal(int sig){
     //do nothing, so that way we can kill the children and clean it up
@@ -417,14 +388,13 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
         if (flag) {
             debug(D_BATCH, "%i has orders msg from rank 0\n", rank);
             MPI_Recv(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            //debug(D_BATCH, "%i:%s len of new msg: %u\n", rank, procname, len);
 
             str = malloc(sizeof (char*)*len + 1);
             memset(str, '\0', sizeof (char)*len + 1);
             MPI_Recv(str, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 
-            //debug(D_BATCH, "%i:%s parsing orders object\n", rank, procname);
+            debug(D_BATCH, "%i:%s parsing orders object\n", rank, procname);
             recobj = jx_parse_string(str);
 
             if (strstr(jx_lookup_string(recobj, "Orders"), "Terminate")) {
@@ -438,7 +408,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                 debug(D_BATCH,"Recieved an order to cancel jobs\n");
                 int mid = jx_lookup_integer(recobj, "ID");
                 itable_firstkey(job_ids);
-                UINT64_T pid;
+                uint64_t pid;
                 int* midp;
                 while(itable_nextkey(job_ids,&pid,(void**)&midp)){
                     if(*midp == mid){
@@ -456,11 +426,11 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                 //need to send resources json object
 
                 int cores_total = load_average_get_cpus();
-                UINT64_T memtotal;
-                UINT64_T memavail;
+                uint64_t memtotal;
+                uint64_t memavail;
                 host_memory_info_get(&memavail, &memtotal);
                 int memory = ((memtotal / (1024 * 1024)) / cores_total) * cores; //MB
-                //debug(D_BATCH, "%i:%s cores_total: %i cores: %i memtotal: %u mem_mine: %i\n", rank, procname, cores_total, cores, memtotal, mem);
+                debug(D_BATCH, "%i:%s cores_total: %i cores_mine: %i memtotal: %li mem_mine: %i\n", rank, procname, cores_total, cores, memtotal, mem);
 
                 memory = mem != 0 ? mem : memory;
                 sendstr = string_format("{\"cores\":%i,\"memory\":%i}", cores, memory);
@@ -468,7 +438,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                 MPI_Send(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
                 MPI_Send(sendstr, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
                 free(sendstr);
-                //debug(D_BATCH, "%i:%s Done sending resources to Rank0 \n", rank, procname);
+                debug(D_BATCH, "%i:%s Done sending resources to Rank0 \n", rank, procname);
 
             }
 
@@ -521,7 +491,6 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                     int* midp = malloc(sizeof(int)*1); *midp = mid;
                     itable_insert(job_ids, jobid, midp);
                     itable_insert(job_times, mid, info);
-                    //return jobid;
                 } else if (jobid < 0) {
                     debug(D_BATCH, "%i:%s there was an error that prevented forking: %s\n", rank, procname, strerror(errno));
                     MPI_Finalize();
@@ -531,7 +500,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                         jx_export(env);
                     }
                     if (sandbox) {
-                        //fprintf(stderr,"%i:%s-FORK:%i we are starting the cmd modification process\n",rank,procname,getpid());
+                        debug(D_BATCH,"%i:%s-FORK:%i we are starting the cmd modification process\n",rank,procname,getpid());
                         char* tmp = string_format("cd %s && %s", sandbox, cmd);
                         cmd = tmp;
                         //need to cp from workdir to ./
@@ -547,8 +516,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
                         free(cmd);
                         cmd = tmp;
                     }
-                    //fprintf(stderr,"%i:%s is starting child process with command: %s\n",rank,procname,cmd);
-                    debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command!\n", rank, procname, getpid());
+                    debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command! %s \n", rank, procname, getpid(),cmd);
                     execlp("sh", "sh", "-c", cmd, (char *) 0);
                     _exit(127); // Failed to execute the cmd.
                 }
@@ -583,9 +551,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
         len = strlen(tmp);
         unsigned* len1 = malloc(sizeof (unsigned));
         *len1 = len;
-        //fprintf(stderr,"%i:%s Sending RANK 0 the length of the result string\n",rank,procname);
         MPI_Send(len1, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
-        //fprintf(stderr,"%i:%s Sending Rank 0 the result string\n",rank,procname);
         MPI_Send(tmp, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
         debug(D_BATCH, "%i:%s Sent the result string, freeing memory and continuing loop\n", rank, procname);
         //free(tmp);

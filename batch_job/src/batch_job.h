@@ -17,7 +17,7 @@ See the file COPYING for details.
 #include "jx.h"
 #include "rmsummary.h"
 
-#ifdef MPI
+#ifdef CCTOOLS_WITH_MPI
 #include "hash_table.h"
 #endif
 
@@ -237,7 +237,7 @@ const char *batch_queue_type_string();
 */
 int batch_queue_port(struct batch_queue *q);
 
-#ifdef MPI
+#ifdef CCTOOLS_WITH_MPI
 /**
  * The worker function for those makeflow binaries which end up being workers for the master process
  * @param worldsize How many different processes are running
@@ -252,7 +252,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
  * @param name_rank
  * @param name_size
  */
-void batch_job_mpi_give_ranks_sizes(struct hash_table* name_rank, struct hash_table* name_size);
+void batch_job_mpi_set_ranks_sizes(struct hash_table* name_rank, struct hash_table* name_size);
 /**
  * Called by the Rank 0 process to kill the remaining workers.
  */
