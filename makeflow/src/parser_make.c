@@ -440,7 +440,7 @@ static int dag_parse_make_directive_MAKEFLOW(struct lexer *bk, struct dag_node *
 }
 
 
-static int dag_parse_make_directive_UMBRELA(struct lexer *bk, struct dag_node *n) {
+static int dag_parse_make_directive_UMBRELLA(struct lexer *bk, struct dag_node *n) {
 
 	int result = 0;
 
@@ -497,9 +497,9 @@ static int dag_parse_make_directive(struct lexer *bk, struct dag_node *n)
 	{
 		result = dag_parse_make_directive_SIZE(bk, n);
 	}
-	else if(!strcmp(".UMBRELA", name))
+	else if(!strcmp(".UMBRELLA", name))
 	{
-		result = dag_parse_make_directive_UMBRELA(bk, n);
+		result = dag_parse_make_directive_UMBRELLA(bk, n);
 	}
 	else
 	{
