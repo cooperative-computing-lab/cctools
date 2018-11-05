@@ -129,12 +129,14 @@ INT64_T pfs_write_count = 0;
 
 const char * pfs_cvmfs_repo_arg = 0;
 const char * pfs_cvmfs_config_arg = 0;
+const char * pfs_cvmfs_http_proxy = 0;
 bool pfs_cvmfs_repo_switching = false;
 char pfs_cvmfs_alien_cache_dir[PATH_MAX];
 char pfs_cvmfs_locks_dir[PATH_MAX];
 bool pfs_cvmfs_enable_alien  = true;
 char pfs_cvmfs_option_file[PATH_MAX];
 struct jx *pfs_cvmfs_options = NULL;
+
 
 int pfs_irods_debug_level = 0;
 char *stats_file = NULL;
@@ -596,7 +598,6 @@ int main( int argc, char *argv[] )
 	int c;
 	int chose_auth = 0;
 	char *tickets = NULL;
-	char *http_proxy = NULL;
 	pid_t pid;
 	struct pfs_process *p;
 	char envlist[PATH_MAX] = "";
@@ -983,7 +984,7 @@ int main( int argc, char *argv[] )
 			debug_config_file_size(string_metric_parse(optarg));
 			break;
 		case 'p':
-			http_proxy = xxstrdup(optarg);
+			pfs_cvmfs_http_proxy = xxstrdup(optarg);
 			break;
 		case 'P':
 			pfs_paranoid_mode = 1;
@@ -1215,10 +1216,10 @@ int main( int argc, char *argv[] )
 		fclose(fp);
 	}
 
-	if (http_proxy)
-		setenv("PARROT_HTTP_PROXY", http_proxy, 1);
-
-	http_proxy = (char *)realloc(http_proxy, 0);
+	// if -p not given, check if HTTP_PROXY is set.
+	if(!pfs_cvmfs_http_proxy && getenv("HTTP_PROXY")) {
+		pfs_cvmfs_http_proxy = xxstrdup(getenv("HTTP_PROXY"));
+	}
 
 	if (!create_dir(pfs_temp_dir, S_IRWXU))
 		fatal("could not create directory '%s': %s", pfs_temp_dir, strerror(errno));
