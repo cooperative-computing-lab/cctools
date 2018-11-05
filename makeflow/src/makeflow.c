@@ -1183,6 +1183,7 @@ int main(int argc, char *argv[])
 	char *s;
 	int safe_submit = 0;
 	int ignore_mem_spec = 0;
+	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
@@ -1250,6 +1251,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_LOCAL_CORES,
 		LONG_OPT_LOCAL_MEMORY,
 		LONG_OPT_LOCAL_DISK,
+		LONG_OPT_BATCH_MEM_TYPE,
 		LONG_OPT_MONITOR,
 		LONG_OPT_MONITOR_EXE,
 		LONG_OPT_MONITOR_INTERVAL,
@@ -1339,6 +1341,7 @@ int main(int argc, char *argv[])
 		{"gc-count", required_argument, 0, 'G'},
 		{"help", no_argument, 0, 'h'},
 		{"ignore-memory-spec", no_argument, 0, LONG_OPT_IGNORE_MEM},
+		{"batch-mem-type", required_argument, 0, LONG_OPT_BATCH_MEM_TYPE},
 		{"local-cores", required_argument, 0, LONG_OPT_LOCAL_CORES},
 		{"local-memory", required_argument, 0, LONG_OPT_LOCAL_MEMORY},
 		{"local-disk", required_argument, 0, LONG_OPT_LOCAL_DISK},
@@ -1867,6 +1870,10 @@ int main(int argc, char *argv[])
 			case LONG_OPT_IGNORE_MEM:
 				ignore_mem_spec = 1;
 				break;
+			case LONG_OPT_BATCH_MEM_TYPE:
+				free(batch_mem_type);
+				batch_mem_type = xxstrdup(optarg);
+				break;
 			case LONG_OPT_SAFE_SUBMIT:
 				safe_submit = 1;
 				break;
@@ -2125,6 +2132,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "amazon-batch-img", amazon_batch_img);
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
+	batch_queue_set_option(remote_queue, "mem-type", batch_mem_type);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
