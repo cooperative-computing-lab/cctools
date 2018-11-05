@@ -51,6 +51,8 @@ extern bool pfs_cvmfs_enable_alien;
 extern char pfs_cvmfs_option_file[];
 extern struct jx *pfs_cvmfs_options;
 
+extern char * pfs_cvmfs_http_proxy;
+
 
 static bool cvmfs_configured = false;
 static struct cvmfs_filesystem *cvmfs_active_filesystem = 0;
@@ -614,9 +616,8 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 	f->cvmfs_ctx = NULL;
 #endif
 
-	char *proxy = getenv("PARROT_HTTP_PROXY");
 #if LIBCVMFS_REVISION < 23
-	if( !proxy || !proxy[0] || !strcmp(proxy,"DIRECT") ) {
+	if( !pfs_cvmfs_http_proxy || !pfs_cvmfs_http_proxy[0] || !strcmp(pfs_cvmfs_http_proxy,"DIRECT") ) {
 		if( !strstr(user_options,"proxies=") ) {
 			debug(D_CVMFS|D_NOTICE,"CVMFS requires an http proxy.  None has been configured!");
 			debug(D_CVMFS,"Ignoring configuration of CVMFS repository %s:%s",repo_name,user_options);
@@ -658,8 +659,8 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 
 			pfs_master_timeout,
 			pfs_master_timeout,
-			proxy ? ",proxies=" : "",
-			proxy ? proxy : "",
+			pfs_cvmfs_http_proxy ? ",proxies=" : "",
+			pfs_cvmfs_http_proxy ? pfs_cvmfs_http_proxy : "",
 			&f->subst_offset,
 			user_options);
 #else
@@ -669,8 +670,8 @@ static cvmfs_filesystem *cvmfs_filesystem_create(const char *repo_name, bool wil
 
 			pfs_master_timeout,
 			pfs_master_timeout,
-			proxy ? ",proxies=" : "",
-			proxy ? proxy : "",
+			pfs_cvmfs_http_proxy ? ",proxies=" : "",
+			pfs_cvmfs_http_proxy ? pfs_cvmfs_http_proxy : "",
 			&f->subst_offset,
 			user_options);
 #endif
