@@ -112,13 +112,17 @@ sub task_state {
 }
 
 sub enable_monitoring {
-	my ($self, $summary_file) = @_;
-	return work_queue_enable_monitoring($self->{_work_queue}, $summary_file);
+	my ($self, $dir_name, $watchdog) = @_;
+
+    $watchdog = defined $watchdog ? $watchdog : 1;
+	return work_queue_enable_monitoring($self->{_work_queue}, $dir_name, $watchdog);
 }
 
 sub enable_monitoring_full {
-	my ($self, $dir_name) = @_;
-	return work_queue_enable_monitoring_full($self->{_work_queue}, $dir_name);
+	my ($self, $dir_name, $watchdog) = @_;
+
+    $watchdog = defined $watchdog ? $watchdog : 1;
+	return work_queue_enable_monitoring_full($self->{_work_queue}, $dir_name, $watchdog);
 }
 
 
@@ -485,7 +489,7 @@ A resource name.
 =back
 
 
-=head3 C<enable_monitoring($dir_name)>
+=head3 C<enable_monitoring($dir_name, $watchdog)>
 
 Enables resource monitoring of tasks in the queue, and writes a summary per
 task to the directory given. Additionally, all summaries are consolidate into
@@ -497,9 +501,11 @@ Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
 
 =item dirname    Directory name for the monitor output.
 
+=item watchdog   If non-zero, kill tasks that exhaust their declared resources. (if not given, defaults to 1)
+
 =back
 
-=head3 C<enable_monitoring_full($dir_name)>
+=head3 C<enable_monitoring_full($dir_name, $watchdog)>
 
 As @ref enable_monitoring, but it also generates a time series and a debug
 file.  WARNING: Such files may reach gigabyte sizes for long running tasks.
@@ -509,6 +515,8 @@ Returns 1 on success, 0 on failure (i.e., monitoring was not enabled).
 =over 12
 
 =item dirname    Directory name for the monitor output.
+
+=item watchdog   If non-zero, kill tasks that exhaust their declared resources. (if not given, defaults to 1)
 
 =back
 

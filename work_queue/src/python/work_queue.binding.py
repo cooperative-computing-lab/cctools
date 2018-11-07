@@ -941,8 +941,9 @@ class WorkQueue(_object):
     #
     # @param self 	Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
-    def enable_monitoring(self, dirname):
-        return work_queue_enable_monitoring(self._work_queue, dirname)
+    # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
+    def enable_monitoring(self, dirname = None, watchdog = True):
+        return work_queue_enable_monitoring(self._work_queue, dirname, watchdog)
 
     ## As @ref enable_monitoring, but it also generates a time series and a debug file.
     #  WARNING: Such files may reach gigabyte sizes for long running tasks.
@@ -951,8 +952,9 @@ class WorkQueue(_object):
     #
     # @param self 	Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
-    def enable_monitoring_full(self, dirname):
-        return work_queue_enable_monitoring_full(self._work_queue, dirname)
+    # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
+    def enable_monitoring_full(self, dirname = None, watchdog = True):
+        return work_queue_enable_monitoring_full(self._work_queue, dirname, watchdog)
 
     ##
     # Turn on or off fast abort functionality for a given queue for tasks in
