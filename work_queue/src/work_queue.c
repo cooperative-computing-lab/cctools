@@ -106,7 +106,8 @@ typedef enum {
 typedef enum {
 	MON_DISABLED = 0,
 	MON_SUMMARY  = 1,   /* generate only summary. */
-	MON_FULL     = 2    /* generate summary, series and monitoring debug output. */
+	MON_FULL     = 2,   /* generate summary, series and monitoring debug output. */
+	MON_WATCHDOG = 4    /* kill tasks that exhaust resources */
 } work_queue_monitoring_mode;
 
 typedef enum {
@@ -1445,7 +1446,7 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 	if(t->monitor_output_directory)
 		keep = 1;
 
-	if(q->monitor_mode == MON_FULL && q->monitor_output_directory)
+	if(q->monitor_mode | MON_FULL && q->monitor_output_directory)
 		keep = 1;
 				
 	if(!keep)
@@ -1513,7 +1514,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		read_measured_resources(q, t);
 
 		/* Further, if we got debug and series files, gzip them. */
-		if(q->monitor_mode == MON_FULL)
+		if(q->monitor_mode | MON_FULL)
 			resource_monitor_compress_logs(q, t);
 	}
 
@@ -4912,7 +4913,7 @@ struct work_queue *work_queue_create(int port)
 	return q;
 }
 
-int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory)
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory, int watchdog)
 {
 	if(!q)
 		return 0;
@@ -4954,14 +4955,23 @@ int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_dire
 	q->measured_local_resources = rmonitor_measure_process(getpid());
 	q->monitor_mode = MON_SUMMARY;
 
+	if(watchdog) {
+		q->monitor_mode |= MON_WATCHDOG;
+	}
+
 	return 1;
 }
 
-int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory) {
-	int status = work_queue_enable_monitoring(q, monitor_output_directory);
+int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory, int watchdog) {
+	int status = work_queue_enable_monitoring(q, monitor_output_directory, 1);
 
-	if(status)
+	if(status) {
 		q->monitor_mode = MON_FULL;
+
+		if(watchdog) {
+			q->monitor_mode |= MON_WATCHDOG;
+		}
+	}
 
 	return status;
 }
@@ -5245,7 +5255,7 @@ void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *
 	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 	free(summary);
 
-	if(q->monitor_mode == MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
+	if(q->monitor_mode | MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
 		char *debug  = monitor_file_name(q, t, ".debug");
 		char *series = monitor_file_name(q, t, ".series");
 
@@ -5273,9 +5283,11 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		free(tmp);
 	}
 
-	int extra_files = (q->monitor_mode == MON_FULL);
+	int extra_files = (q->monitor_mode | MON_FULL);
 
-	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
+	struct rmsummary *watch_limits = (q->monitor_mode | MON_WATCHDOG) ? limits : NULL;
+
+	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, watch_limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
 	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
 
 	free(extra_options);

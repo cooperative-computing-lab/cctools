@@ -598,9 +598,10 @@ explicitely given by work_queue_task's monitor_output_file.
 @param monitor_output_dirname The name of the output directory. If NULL,
 summaries are kept only when monitor_output_directory is specify per task, but
 resources_measured from work_queue_task is updated.  @return 1 on success, 0 if
+@param watchdog if not 0, kill tasks that exhaust declared resources.
 monitoring was not enabled.
 */
-int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory);
+int work_queue_enable_monitoring(struct work_queue *q, char *monitor_output_directory, int watchdog);
 
 /** Enables resource monitoring on the give work queue.
 As @ref work_queue_enable_monitoring, but it generates a time series and a
@@ -608,9 +609,10 @@ monitor debug file (WARNING: for long running tasks these files may reach
 gigabyte sizes. This function is mostly used for debugging.) @param q A work
 queue object.
 @param monitor_output_dirname The name of the output directory.
+@param watchdog if not 0, kill tasks that exhaust declared resources.
 @return 1 on success, 0 if monitoring was not enabled.
 */
-int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory);
+int work_queue_enable_monitoring_full(struct work_queue *q, char *monitor_output_directory, int watchdog);
 
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's

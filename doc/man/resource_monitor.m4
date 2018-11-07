@@ -244,7 +244,7 @@ Additionally, it can be run automatically from Work Queue:
 
 LONGCODE_BEGIN
 q = work_queue_create_monitoring(port);
-work_queue_enable_monitoring(q, some-log-dir);
+work_queue_enable_monitoring(q, some-log-dir, /*kill tasks on exhaustion*/ 1);
 LONGCODE_END
 
 wraps every task with the monitor and writes the resulting summaries in
