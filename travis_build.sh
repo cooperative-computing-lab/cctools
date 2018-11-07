@@ -3,7 +3,14 @@
 set -ex
 
 BUILD_ID=$(basename "${TRAVIS_TAG:-${TRAVIS_COMMIT:0:8}}")
-IMAGE_ID=$(basename "${DOCKER_IMAGE:-travis}")
+case "$TRAVIS_OS_NAME" in
+    linux)
+    IMAGE_ID=$(basename "${DOCKER_IMAGE:-travis}")
+    ;;
+    osx)
+    IMAGE_ID="x86_64-osx10.13"
+    ;;
+esac
 D=/tmp/cctools-$BUILD_ID-${IMAGE_ID#cctools-env:}
 
 DEPS_DIR=/opt/vc3/cctools-deps
@@ -17,6 +24,6 @@ done
 make install
 make test
 
-if [ -n "$DOCKER_IMAGE" ]; then
+if [ -n "$DOCKER_IMAGE" ] || [ "$TRAVIS_OS_NAME" = osx ]; then
     tar -cz -C "$(dirname "$D")" -f "$D.tar.gz" "$(basename "$D")"
 fi
