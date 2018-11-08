@@ -1446,7 +1446,7 @@ void resource_monitor_append_report(struct work_queue *q, struct work_queue_task
 	if(t->monitor_output_directory)
 		keep = 1;
 
-	if(q->monitor_mode | MON_FULL && q->monitor_output_directory)
+	if(q->monitor_mode & MON_FULL && q->monitor_output_directory)
 		keep = 1;
 				
 	if(!keep)
@@ -1514,7 +1514,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 		read_measured_resources(q, t);
 
 		/* Further, if we got debug and series files, gzip them. */
-		if(q->monitor_mode | MON_FULL)
+		if(q->monitor_mode & MON_FULL)
 			resource_monitor_compress_logs(q, t);
 	}
 
@@ -5255,7 +5255,7 @@ void work_queue_monitor_add_files(struct work_queue *q, struct work_queue_task *
 	work_queue_task_specify_file(t, summary, RESOURCE_MONITOR_REMOTE_NAME ".summary", WORK_QUEUE_OUTPUT, WORK_QUEUE_NOCACHE);
 	free(summary);
 
-	if(q->monitor_mode | MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
+	if(q->monitor_mode & MON_FULL && (q->monitor_output_directory || t->monitor_output_directory)) {
 		char *debug  = monitor_file_name(q, t, ".debug");
 		char *series = monitor_file_name(q, t, ".series");
 
@@ -5283,9 +5283,9 @@ char *work_queue_monitor_wrap(struct work_queue *q, struct work_queue_worker *w,
 		free(tmp);
 	}
 
-	int extra_files = (q->monitor_mode | MON_FULL);
+	int extra_files = (q->monitor_mode & MON_FULL);
 
-	struct rmsummary *watch_limits = (q->monitor_mode | MON_WATCHDOG) ? limits : NULL;
+	struct rmsummary *watch_limits = (q->monitor_mode & MON_WATCHDOG) ? limits : NULL;
 
 	char *monitor_cmd = resource_monitor_write_command("./" RESOURCE_MONITOR_REMOTE_NAME, RESOURCE_MONITOR_REMOTE_NAME, watch_limits, extra_options, /* debug */ extra_files, /* series */ extra_files, /* inotify */ 0, /* measure_dir */ NULL);
 	char *wrap_cmd  = string_wrap_command(t->command_line, monitor_cmd);
