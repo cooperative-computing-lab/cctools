@@ -2523,15 +2523,16 @@ int main(int argc, char *argv[]) {
 				MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
 				struct jx* recobj = jx_parse_string(str);
-				char* name = jx_lookup_string(recobj, "name");
-				int rank = jx_lookup_integer(recobj, "rank");
+				char* name = (char*)jx_lookup_string(recobj, "name");
+				uint64_t* rank = malloc(sizeof(uint64_t)*1); 
+				*rank = (uint64_t) jx_lookup_integer(recobj, "rank");
 
 				if (strstr(procname, name)) { //0 will always be the master on its own comp
 					continue;
 				}
 
 				if (hash_table_lookup(comps, name) == NULL) {
-					hash_table_insert(comps, name, rank);
+					hash_table_insert(comps, name, (void*)rank);
 				}
 
 				jx_delete(recobj);
