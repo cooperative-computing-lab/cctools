@@ -2270,7 +2270,9 @@ int main(int argc, char *argv[]) {
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_hosts = CATALOG_HOST;
+#ifdef CCTOOLS_WITH_MPI
 	int using_mpi = 0;
+#endif
 
 	features = hash_table_create(4, 0);
 
@@ -2491,9 +2493,11 @@ int main(int argc, char *argv[]) {
 			case LONG_OPT_FEATURE:
 				hash_table_insert(features, optarg, (void **) 1);
 				break;
+#ifdef CCTOOLS_WITH_MPI
 			case LONG_OPT_MPI:
 				using_mpi = 1;
 				break;
+#endif
 			default:
 				show_help(argv[0]);
 				return 1;
