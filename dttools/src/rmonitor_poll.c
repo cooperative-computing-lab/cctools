@@ -261,16 +261,17 @@ int rmonitor_get_children(pid_t pid, uint64_t **children)
 
 	while(fscanf(fstat, "%" PRIu64, &child) == 1) {
 		count++;
-
-		if(count > max) {
+		if(count >= max) {
 			max = 2*count;
-			child_list = realloc(child_list, sizeof(pid_t) * max);
+			child_list = realloc(child_list, max*sizeof(uint64_t));
 		}
 
 		child_list[count - 1] = child;
 	}
 
 	*children = child_list;
+
+	fclose(fstat);
 
 	return count;
 }
