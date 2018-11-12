@@ -106,7 +106,11 @@ char *resource_monitor_write_command(const char *monitor_path, const char *templ
 	if(!monitor_path)
 		fatal("Monitor path should be specified.");
 
+	//useful when debugging (uncomment):
+	//buffer_printf(&cmd_builder, "valgrind  --leak-check=full -- ");
+	
 	buffer_printf(&cmd_builder, "%s --no-pprint", monitor_path);
+
 	buffer_printf(&cmd_builder, " --with-output-files=%s", template_filename);
 
 	if(debug_output)
