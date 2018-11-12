@@ -3,7 +3,7 @@ include ../../../rules.mk
 
 CFLAGS := -I$(realpath ../../../dttools/src) -I$(realpath ../)
 LDFLAGS := $(realpath ../libwork_queue.a) $(realpath ../../../dttools/src/libdttools.a) -lm -lz
-TARGETS = work_queue.go work_queue_example
+TARGETS = work_queue.go
 
 all: $(TARGETS)
 
