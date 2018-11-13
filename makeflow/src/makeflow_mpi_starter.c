@@ -39,8 +39,8 @@ static const struct option long_options[] = {
 };
 
 void print_help() {
-    printf("Use: mpi_starter [options]\n");
-    printf("Basic Opetions:\n");
+    printf("Use: makeflow_mpi_starter [options]\n");
+    printf("Basic Options:\n");
     printf(" -m,--makeflow-arguments       Options to pass to makeflow, such as dagfile, etc\n");
     printf(" -p,--makeflow-port            The port for Makeflow to use when communicating with workers\n");
     printf(" -q,--workqueue-arguments      Options to pass to work_queue_worker\n");
@@ -248,9 +248,6 @@ int main(int argc, char** argv) {
         //free(sys_str);
         //free(master_ipaddr);
 
-        sys_str = string_format("pwd && ls");
-        system(sys_str);
-
         if (cpout != NULL) {
             sys_str = string_format("cp -r `pwd`/* %s", cpout);
             system(sys_str);
@@ -260,6 +257,7 @@ int main(int argc, char** argv) {
         hash_table_delete(sizes);
 
         MPI_Finalize();
+		fprintf(stderr,"Makeflow master thread, this is my k: %i\n",k);
         return k;
 
     } else { //we're a work_queue_worker
@@ -303,8 +301,8 @@ int main(int argc, char** argv) {
                     char **argv;
                     string_split_quotes(sys_str, &argc, &argv);
                     execvp(argv[0], argv);
-                    execlp("sh", "sh", "-c", sys_str, (char*) NULL);
-                    fprintf(stderr, "Oh no, workqueue execlp didn't work...");
+                    fprintf(stderr, "Oh no, workqueue execvp didn't work...");
+					exit(1);
                 }
                 int status_wq;
                 waitpid(workqueue_pid, &status_wq, 0);
