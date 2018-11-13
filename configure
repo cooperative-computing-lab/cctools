@@ -179,8 +179,9 @@ do
 			# example: CFLAGS=-D__MUSL__ CC=musl-gcc ./configure --without-system-{doc,apps} --with-readline-path=no --static
 			optstatic=1
 			;;
-		--mpi)
+		--mpicc)
 			mpi=1
+			mpicc_path=${arg}
 			;;
 		--build-label)
 			build_label=${arg}
@@ -1533,10 +1534,10 @@ fi
 echon "using mpi..."
 if [ "$mpi" = 1 ]
 then
-	echo "yes"
-	ccflags="-DMPI ${ccflags}"
-	ccompiler=mpicc
-	linker=mpicc
+	echo "yes: ${mpicc_path}"
+	ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
+	ccompiler=${mpicc_path}
+	linker=${mpicc_path}
 else
 	echo "no"	
 fi
