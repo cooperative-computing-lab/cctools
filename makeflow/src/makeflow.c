@@ -68,6 +68,7 @@ See the file COPYING for details.
 #ifdef CCTOOLS_WITH_MPI
 #include <mpi.h>
 #include "jx_print.h"
+#include "host_memory_info.h"
 #endif
 
 /*
@@ -1228,6 +1229,11 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs. (def: resource-rule-%%)\n");
+	
+	/********************************************************************************/
+	printf("\nMPI Options:\n");
+	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
+	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1526,8 +1532,8 @@ int main(int argc, char *argv[])
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 #ifdef CCTOOLS_WITH_MPI
-                {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-                {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
+        {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
+        {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
 #endif
 		{0, 0, 0, 0}
 	};
@@ -1701,7 +1707,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'o':
 #ifdef CCTOOLS_WITH_MPI
-                                debug_base_path = xxstrdup(optarg);
+                debug_base_path = xxstrdup(optarg);
 #else
 				debug_config_file(optarg);
 #endif
@@ -2066,6 +2072,13 @@ int main(int argc, char *argv[])
                 need_mpi_finalize = 1;
                 
                 makeflow_mpi_master_setup(mpi_world_size,mpi_cores_per,mpi_mem_per,working_dir);
+				int cores_total = load_average_get_cpus();
+		        uint64_t memtotal;
+       			uint64_t memavail;
+        		host_memory_info_get(&memavail, &memtotal);
+        		int mem = ((memtotal / (1024 * 1024)) / cores_total) * 1;	
+				explicit_local_cores = 1;
+				explicit_local_memory = mem;
 //
 //                struct hash_table* mpi_comps = hash_table_create(0, 0);
 //                struct hash_table* mpi_sizes = hash_table_create(0, 0);
