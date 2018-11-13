@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2018- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifdef CCTOOLS_WITH_MPI
 
 #include <stdlib.h>
@@ -245,8 +251,6 @@ int main(int argc, char** argv) {
             unsigned die = 10;
             MPI_Send(&die, 1, MPI_UNSIGNED, value, 0, MPI_COMM_WORLD);
         }
-        //free(sys_str);
-        //free(master_ipaddr);
 
         if (cpout != NULL) {
             sys_str = string_format("cp -r `pwd`/* %s", cpout);
