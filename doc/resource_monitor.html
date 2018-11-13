@@ -236,7 +236,7 @@ Snapshots are included in the output summary file as an array of JSON objects un
       From Work Queue:
 
 <code>q = work_queue_create(port);
-work_queue_enable_monitoring(q, some-log-file);
+work_queue_enable_monitoring(q, some-log-file, /* kill tasks on exhaustion */ 1);
 </code>
 
       wraps every task with the monitor, and appends all generated

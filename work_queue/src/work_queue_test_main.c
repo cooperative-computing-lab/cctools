@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 
 	if(monitor_flag) {
 		unlink_recursive("work-queue-test-monitor");
-		work_queue_enable_monitoring(q, "work-queue-test-monitor");
+		work_queue_enable_monitoring(q, "work-queue-test-monitor", 1);
 		work_queue_specify_category_mode(q, NULL, WORK_QUEUE_ALLOCATION_MODE_MAX_THROUGHPUT);
 
 		work_queue_specify_transactions_log(q, "work-queue-test-monitor/transactions.log");
