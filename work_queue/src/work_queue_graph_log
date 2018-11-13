@@ -81,11 +81,10 @@ def read_log_entries(file, fields):
 
             total_time = reduce( lambda x,y: x+y, [ delta[m] for m in ['time_status_msgs', 'time_internal', 'time_polling', 'time_send', 'time_receive', 'time_application']])
 
-            # Deal with inaccuracies when measuring time_application
-            if total_time > delta['timestamp']:
-                delta['timestamp'] = total_time
+            # One of time_* may be larger than the given resolution, and here we force everything to the same height
+            delta['timestamp'] = total_time
 
-            res_factor = resolution;
+            res_factor = 100;
             if delta['timestamp'] > 0:
                 record['stack_time_status_msgs'] = res_factor * (delta['time_status_msgs'] / delta['timestamp'])
                 record['stack_time_internal']    = res_factor * (delta['time_internal']    / delta['timestamp']) + record['stack_time_status_msgs']
@@ -321,10 +320,9 @@ if __name__ == '__main__':
         if extension is not (format + '.gnuplot'):
             check_gnuplot_version(gnuplot_cmd)
 
-        file        = open(logname)
-        log_entries = read_log_entries(file, read_fields(file))
-        times       = sort_time(log_entries)
-        file.close()
+        with open(logname) as file:
+            log_entries = read_log_entries(file, read_fields(file))
+            times       = sort_time(log_entries)
 
         plots = {}
         plots['workers'] = WQPlot(x_units = x_units, ylabel = 'workers', range = x_range,
@@ -367,7 +365,7 @@ if __name__ == '__main__':
             fields = ['bytes_sent', 'bytes_received'],
             labels = ['sent', 'received'])
 
-        plots['times-stacked'] = WQPlot(x_units = x_units, y_units = 's', ylabel = 'utilization per time sample (s)', range = x_range, stack = True,
+        plots['times-stacked'] = WQPlot(x_units = x_units, y_units = 's', ylabel = 'utilization per time sample (%)', range = x_range, stack = True,
                 title = 'master time proportions',
                 fields = ['stack_time_other', 'stack_time_application', 'stack_time_receive', 'stack_time_send', 'stack_time_polling', 'stack_time_internal', 'stack_time_status_msgs'],
                 labels = ['other', 'application', 'receive', 'send', 'polling', 'internal', 'status msgs'])
