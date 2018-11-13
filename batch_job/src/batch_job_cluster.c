@@ -104,6 +104,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 {
 	char *cluster_resources = NULL;
 	const char *ignore_mem = hash_table_lookup(q->options, "ignore-mem-spec");
+	const char *mem_type = hash_table_lookup(q->options, "mem-type");
 
 	if(q->type == BATCH_QUEUE_TYPE_TORQUE || q->type == BATCH_QUEUE_TYPE_PBS){
 		char *mem = string_format(",mem=%" PRId64 "mb", resources->memory);
@@ -125,6 +126,15 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 			resources->cores>0 ? resources->cores : 1,
 			(resources->memory>0 && mem) ? mem : "");
 		free(mem);
+	} else if(q->type == BATCH_QUEUE_TYPE_SGE){
+		char *mem = NULL;
+		mem = string_format(" -l %s=%" PRId64 "M", (mem_type ? mem_type : "h_vmem"), resources->memory);
+		// SGE assumes shared FS, ignoring possible disk specification
+		cluster_resources = string_format(" -pe smp %" PRId64 "%s ", 
+			resources->cores>0 ? resources->cores : 1,
+			(resources->memory>0 && mem) ? mem : "");
+		free(mem);
+
 	}
 	const char *safe_mode = hash_table_lookup(q->options, "safe-submit-mode");
 	if(safe_mode && !strcmp("yes", safe_mode))
