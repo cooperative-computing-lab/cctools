@@ -133,7 +133,6 @@ int main(int argc, char** argv) {
             int sent = 0;
             while (hash_table_nextkey(comps, &key, (void**) &value)) {
                 if (value == i) {
-                    fprintf(stderr, "Telling %lli to live\n", value);
                     MPI_Send("LIVE", 4, MPI_CHAR, i, 0, MPI_COMM_WORLD);
                     sent = 1;
                 }
@@ -160,7 +159,6 @@ int main(int argc, char** argv) {
         } else if (strstr(livedie, "LIVE")) {
             //do nothing, continue
         } else {
-            fprintf(stderr, "livedie string got corrupted, wrong command sent.... %s\n", livedie);
             MPI_Finalize();
             return 1;
         }//corrupted string or something
@@ -192,7 +190,6 @@ int main(int argc, char** argv) {
                 break;
             case 'd':
                 debug_base = xxstrdup(optarg);
-                fprintf(stderr, "debug_base: %s\n", debug_base);
                 break;
             default: //ignore anything not wanted
                 break;
@@ -204,10 +201,8 @@ int main(int argc, char** argv) {
         unsigned mia_len = strlen(master_ipaddr);
         long long value;
         char* key;
-        fprintf(stderr, "master ipaddress: %s\n", master_ipaddr);
         hash_table_firstkey(comps);
         while (hash_table_nextkey(comps, &key, (void**) &value)) {
-            fprintf(stderr, "sending my ip to %s rank %lli\n", key, value);
             MPI_Send(&mia_len, 1, MPI_UNSIGNED, value, 0, MPI_COMM_WORLD);
             MPI_Send(master_ipaddr, mia_len, MPI_CHAR, value, 0, MPI_COMM_WORLD);
         }
@@ -235,19 +230,17 @@ int main(int argc, char** argv) {
         host_memory_info_get(&memavail, &memtotal);
         int mem = ((memtotal / (1024 * 1024)) / cores_total) * cores; //MB
 
-        char* sys_str = string_format("makeflow -T wq --port=%s -d all --local-cores=%i --local-memory=%i %s", port, 1, mem, makeflow_args);
+        char* sys_str = string_format("makeflow -T wq --port=%s --local-cores=%i --local-memory=%i %s", port, 1, mem, makeflow_args);
         if (debug_base != NULL) {
             sys_str = string_format("makeflow -T wq --port=%s -dall --debug-file=%s.makeflow --local-cores=%i --local-memory=%i %s", port, debug_base, 1, mem, makeflow_args);
         }
 
         int k = 0;
         k = system(sys_str);
-        fprintf(stderr, "Makeflow has finished! Sending kill to workers\n");
         hash_table_firstkey(comps);
         //char* key1;
         //long long value1;
         while (hash_table_nextkey(comps, &key, (void**) &value)) {
-            fprintf(stderr, "Telling %lli to end worker\n", value);
             unsigned die = 10;
             MPI_Send(&die, 1, MPI_UNSIGNED, value, 0, MPI_COMM_WORLD);
         }
@@ -261,20 +254,15 @@ int main(int argc, char** argv) {
         hash_table_delete(sizes);
 
         MPI_Finalize();
-		fprintf(stderr,"Makeflow master thread, this is my k: %i\n",k);
         return k;
 
     } else { //we're a work_queue_worker
-
-        fprintf(stderr, "Yay, i'm a worker starter, and my procname is: %s\n", procname);
 
         unsigned len = 0;
         MPI_Recv(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         char* master_ip = malloc(sizeof (char*)*len + 1);
         memset(master_ip, '\0', sizeof (char)*len + 1);
         MPI_Recv(master_ip, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        fprintf(stderr, "Here is the master_ipaddr: %s\n", master_ip);
 
         int cores;
         MPI_Recv(&cores, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -284,16 +272,12 @@ int main(int argc, char** argv) {
         UINT64_T memtotal;
         UINT64_T memavail;
         host_memory_info_get(&memavail, &memtotal);
-        fprintf(stderr, "worker: %i memtotal: %lu\n", mpi_rank, memtotal);
         int mem = ((memtotal / (1024 * 1024)) / cores_total) * cores; //gigabytes
-
-        fprintf(stderr, "Calling printenv from worker: %i\n", mpi_rank);
 
         char* sys_str = string_format("work_queue_worker --timeout=86400 --cores=%i --memory=%i %s %s %s", cores, mem, master_ip, port, workqueue_args);
         if (debug_base != NULL) {
             sys_str = string_format("work_queue_worker --timeout=86400 -d all -o %s.workqueue.%i --cores=%i --memory=%i %s %s %s", debug_base, mpi_rank, cores, mem, master_ip, port, workqueue_args);
         }
-        fprintf(stderr, "Rank %i: Starting Worker: %s\n", mpi_rank, sys_str);
         int pid = fork();
         int k = 0;
         if (pid == 0) {
