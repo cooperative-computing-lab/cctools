@@ -364,7 +364,7 @@ void create_torque_file(char* fileout, struct jx* options) {
 }
 
 enum submitter_types {
-    slurm = 1234,
+    slurm,
     sge,
     torque
 };
