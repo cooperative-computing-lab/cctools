@@ -1067,9 +1067,13 @@ Must be called only after the task completes execution.
 
 		$t->resources_measured{cpu_time};
 
-		cores:                     number of cores. Computed as cpu_time/wall_time
+		cores:                     peak number of cores used
 
 		$t->resources_measured{cores};
+
+		cores_avg:                 number of cores computed as cpu_time/wall_time
+
+		$t->resources_measured{cores_avg};
 
 		max_concurrent_processes:  the maximum number of processes running concurrently
 

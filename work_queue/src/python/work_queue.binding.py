@@ -689,7 +689,9 @@ class Task(_object):
     #
     # cpu_time:                  user + system time of the execution
     #
-    # cores:                     number of cores. Computed as cpu_time/wall_time
+    # cores:                     peak number of cores used
+    #
+    # cores_avg:                 number of cores computed as cpu_time/wall_time
     #
     # max_concurrent_processes:  the maximum number of processes running concurrently
     #
@@ -707,7 +709,7 @@ class Task(_object):
     #
     # bytes_received:            number of bytes read from the network
     #
-    # bytes_send:                number of bytes written to the network
+    # bytes_sent:                number of bytes written to the network
     #
     # bandwidth:                 maximum network bits/s (average over one minute)
     #
