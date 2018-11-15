@@ -135,6 +135,7 @@ config_globus_path=no
 config_irods_path=no
 config_openssl_path=no
 config_xrootd_path=no
+config_mpicc_path=no
 
 config_static_libgcc=yes
 
@@ -222,6 +223,9 @@ do
 			;;
 		--irods-flavor)
 			irods_flavor=${arg}
+			;;
+		--with-mpicc-path)
+			config_mpicc_path=${arg}
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
@@ -355,6 +359,7 @@ Where PACKAGE may be:
 	fuse
 	globus
 	irods
+	mpicc
 	mysql
 	perl
 	python
@@ -813,6 +818,38 @@ then
 		fi
 else
 	echo "*** skipping ext2fs support"
+fi
+
+echon "using mpi..."
+if [ "$config_mpicc_path" != no ]
+then
+	if [ $config_mpicc_path = auto ]
+	then
+		$config_mpicc_path=$(which mpicc 2> /dev/null)
+	fi
+
+	if [ -d "$config_mpicc_path/bin" ]
+	then
+		mpicc="$config_mpicc_path/bin/mpicc"
+	elif [ -d "$config_mpicc_path" ]
+	then
+		mpicc="$config_mpicc_path/mpicc"
+	else
+		mpicc="$config_mpicc_path"
+	fi
+
+	if [ ! -x "$mpicc" ]
+	then
+		echo "couldn't find mpicc. please provide the location of the mpicc executable with --with-mpicc-path"
+		exit 1
+	fi
+
+	echo "yes: ${mpicc}"
+	ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
+	ccompiler=${mpicc}
+	linker=${mpicc}
+else
+	echo "no"	
 fi
 
 ##########################################################################
@@ -1526,7 +1563,6 @@ EOF
 
 	rm -f libparrot.test.c libparrot.test
 fi
-
 
 echo "Creating config.mk..."
 
