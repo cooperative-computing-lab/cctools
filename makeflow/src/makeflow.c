@@ -1235,6 +1235,7 @@ static void show_help_run(const char *cmd)
 	printf("\nMPI Options:\n");
 	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
 	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
+    printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create sandbox directory and execute in.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1310,6 +1311,7 @@ int main(int argc, char *argv[])
         int mpi_cores_per = 0;
         int mpi_mem_per = 0;
         char* debug_base_path = NULL;
+        char* mpi_working_dir = NULL;
 #endif
 
 	random_init();
@@ -1421,6 +1423,7 @@ int main(int argc, char *argv[])
 #ifdef CCTOOLS_WITH_MPI
                 LONG_OPT_MPI_CORES,
                 LONG_OPT_MPI_MEM,
+                LONG_OPT_MPI_WORKDIR,
 #endif
 	};
 
@@ -1538,6 +1541,7 @@ int main(int argc, char *argv[])
 #ifdef CCTOOLS_WITH_MPI
         {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
         {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
+        {"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_WORKDIR},
 #endif
 		{0, 0, 0, 0}
 	};
@@ -2039,12 +2043,15 @@ int main(int argc, char *argv[])
 				break;
 			}
 #ifdef CCTOOLS_WITH_MPI
-                    case LONG_OPT_MPI_CORES:
-                        mpi_cores_per = atoi(optarg);
-                        break;
-                    case LONG_OPT_MPI_MEM:
-                        mpi_mem_per = atoi(optarg);
-                        break;
+            case LONG_OPT_MPI_CORES:
+                mpi_cores_per = atoi(optarg);
+                break;
+            case LONG_OPT_MPI_MEM:
+                mpi_mem_per = atoi(optarg);
+                break;
+            case LONG_OPT_MPI_WORKDIR:
+                mpi_working_dir = xxstrdup(optarg);
+                break;
 #endif
 			default:
 				show_help_run(argv[0]);
@@ -2076,7 +2083,7 @@ int main(int argc, char *argv[])
                 }
                 need_mpi_finalize = 1;
                 
-                makeflow_mpi_master_setup(mpi_world_size,mpi_cores_per,mpi_mem_per,working_dir);
+                makeflow_mpi_master_setup(mpi_world_size,mpi_cores_per,mpi_mem_per,mpi_working_dir);
 				int cores_total = load_average_get_cpus();
 		        uint64_t memtotal;
        			uint64_t memavail;
