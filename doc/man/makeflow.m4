@@ -197,6 +197,8 @@ has, and use that as the core count for the worker on that node. Makeflow will t
 on the node, following the following equation BOLD(worker_memory) = (BOLD(total_memory) / BOLD(total_logical_cores)) * BOLD(num_cores_for_worker).
 To override Makeflow sharing memory equally, or setting per-worker cores value, use OPTION_ITEM('--mpi-cores') and OPTION_ITEM('--mpi-memory').
 
+Tasks can also have their own sandbox. To specify the directory for tasks to create their sandbox subdirectory in, use OPTION_ITEM('--mpi-task-working-dir').
+
 SECTION(ENVIRONMENT VARIABLES)
 
 The following environment variables will affect the execution of your
