@@ -84,7 +84,6 @@ include_package_wavefront="wavefront"
 include_package_weaver="weaver"
 
 swig_bindings=""
-workqueue_swig_bindings=""
 
 install_path="$HOME/cctools"
 
@@ -1264,6 +1263,10 @@ then
 			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 			then
 				found_swig=yes
+				if [ `format_version $swig_version` -ge `format_version 2.0.1` ] 
+				then
+					swig_bindings="${swig_bindings} golang"
+				fi
 			else
 				echo "*** Sorry, I need swig >= 1.3.29"
 				echo "*** skipping swig bindings for work queue and chirp"
@@ -1284,8 +1287,6 @@ fi
 if [ $found_swig != yes ]
 then
 	swig_bindings=""
-else
-	workqueue_swig_bindings="$swig_bindings golang"
 fi
 
 library_search_standard()
@@ -1658,7 +1659,6 @@ CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
 CCTOOLS_SWIG_BINDINGS=${swig_bindings}
-CCTOOLS_WORKQUEUE_SWIG_BINDINGS=${workqueue_swig_bindings}
 
 CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
 

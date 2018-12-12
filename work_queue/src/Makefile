@@ -34,18 +34,18 @@ all: $(TARGETS)
 libwork_queue.a: $(OBJECTS_LIBRARY)
 work_queue_test work_queue_test_watch: work_queue_test_main.o
 work_queue_worker: $(OBJECTS_WORKER)
-$(PROGRAMS) $(TEST_PROGRAMS) $(CCTOOLS_WORKQUEUE_SWIG_BINDINGS): libwork_queue.a $(EXTERNAL_DEPENDENCIES)
+$(PROGRAMS) $(TEST_PROGRAMS) $(CCTOOLS_SWIG_BINDINGS): libwork_queue.a $(EXTERNAL_DEPENDENCIES)
 
-bindings: $(CCTOOLS_WORKQUEUE_SWIG_BINDINGS)
-$(CCTOOLS_WORKQUEUE_SWIG_BINDINGS): libwork_queue.a work_queue.i
+bindings: $(CCTOOLS_SWIG_BINDINGS)
+$(CCTOOLS_SWIG_BINDINGS): libwork_queue.a work_queue.i
 	@$(MAKE) -C $@
 
-CCTOOLS_SWIG_BINDINGS_INSTALL = $(CCTOOLS_WORKQUEUE_SWIG_BINDINGS:%=install-%)
+CCTOOLS_SWIG_BINDINGS_INSTALL = $(CCTOOLS_SWIG_BINDINGS:%=install-%)
 install-bindings: $(CCTOOLS_SWIG_BINDINGS_INSTALL)
-$(CCTOOLS_SWIG_BINDINGS_INSTALL): $(CCTOOLS_WORKQUEUE_SWIG_BINDINGS)
+$(CCTOOLS_SWIG_BINDINGS_INSTALL): $(CCTOOLS_SWIG_BINDINGS)
 	@$(MAKE) -C $(@:install-%=%) install
 
-CCTOOLS_SWIG_BINDINGS_CLEAN = $(CCTOOLS_WORKQUEUE_SWIG_BINDINGS:%=clean-%)
+CCTOOLS_SWIG_BINDINGS_CLEAN = $(CCTOOLS_SWIG_BINDINGS:%=clean-%)
 clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
 $(CCTOOLS_SWIG_BINDINGS_CLEAN):
 	@$(MAKE) -C $(@:clean-%=%) clean
@@ -70,4 +70,4 @@ clean: clean-bindings
 
 test: all
 
-.PHONY: all clean install test $(CCTOOLS_WORKQUEUE_SWIG_BINDINGS) bindings $(CCTOOLS_SWIG_BINDINGS_INSTALL) install-bindings $(CCTOOLS_SWIG_BINDINGS_CLEAN) clean-bindings
+.PHONY: all clean install test $(CCTOOLS_SWIG_BINDINGS) bindings $(CCTOOLS_SWIG_BINDINGS_INSTALL) install-bindings $(CCTOOLS_SWIG_BINDINGS_CLEAN) clean-bindings
