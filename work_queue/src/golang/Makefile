@@ -16,6 +16,6 @@ work_queue_example: work_queue_example.go work_queue.go work_queue_wrap.c
 test:
 
 clean:
-	rm work_queue.go work_queue_wrap.c 
+	rm work_queue.go work_queue_wrap.c work_queue_example
 
 install: 
