@@ -2164,8 +2164,6 @@ int main(int argc, char **argv) {
 	snapshot_labels = list_create();
 	snapshot_watch_pids = itable_create(0);
 
-    rmsummary_read_env_vars(resources_limits);
-
     processes = itable_create(0);
     wdirs     = hash_table_create(0,0);
     filesysms = itable_create(0);
