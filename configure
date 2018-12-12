@@ -1263,10 +1263,6 @@ then
 			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 			then
 				found_swig=yes
-				if [ `format_version $swig_version` -ge `format_version 2.0.1` ] 
-				then
-					swig_bindings="${swig_bindings} golang"
-				fi
 			else
 				echo "*** Sorry, I need swig >= 1.3.29"
 				echo "*** skipping swig bindings for work queue and chirp"
@@ -1287,6 +1283,14 @@ fi
 if [ $found_swig != yes ]
 then
 	swig_bindings=""
+else
+	if [ `format_version $swig_version` -ge `format_version 2.0.1` ] 
+	then
+		swig_bindings="${swig_bindings} golang"
+	else
+		echo "*** swig < 2.0.1"
+		echo "*** skipping golang workqueue and chirp support"
+  	fi
 fi
 
 library_search_standard()
