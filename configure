@@ -1284,11 +1284,11 @@ if [ $found_swig != yes ]
 then
 	swig_bindings=""
 else
-	if [ `format_version $swig_version` -ge `format_version 2.0.1` ]
+	if ${swig} -cgo 2>&1 | grep -- '-cgo' > /dev/null
 	then
 		swig_bindings="${swig_bindings} golang"
 	else
-		echo "*** swig < 2.0.1"
+		echo "*** swig -cgo not supported"
 		echo "*** skipping swig Golang bindings for work queue and chirp"
 	fi
 fi
