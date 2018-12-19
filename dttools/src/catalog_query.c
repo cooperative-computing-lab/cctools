@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include "list.h"
 #include "address.h"
 #include "zlib.h"
+#include "macros.h"
 
 struct catalog_query {
 	struct jx *data;
@@ -136,10 +137,17 @@ struct catalog_query *catalog_query_create(const char *hosts, struct jx *filter_
 	struct catalog_host *h;
 	struct list *sorted_hosts = catalog_query_sort_hostlist(hosts);
 
+	int backoff_interval = 1;
+
 	list_first_item(sorted_hosts);
 	while(time(NULL) < stoptime) {
 		if(!(h = list_next_item(sorted_hosts))) {
 			list_first_item(sorted_hosts);
+			sleep(backoff_interval);
+
+			int max_backoff_interval = MAX(0, stoptime - time(NULL));
+			backoff_interval = MIN(backoff_interval * 2, max_backoff_interval);
+
 			continue;
 		}
 		struct jx *j = catalog_query_send_query(h->url, time(NULL) + 5);
