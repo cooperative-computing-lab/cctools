@@ -2065,6 +2065,7 @@ int main(int argc, char *argv[])
         //the code assumes sizeof(void*) == uint64_t
         int need_mpi_finalize = 0;
         if (batch_queue_type == BATCH_QUEUE_TYPE_MPI) {
+			//mpi boilerplate code modified from tutorial at www.mpitutorial.com
             MPI_Init(NULL, NULL);
             int mpi_world_size;
             MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
