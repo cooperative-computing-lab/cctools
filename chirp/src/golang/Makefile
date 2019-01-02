@@ -10,10 +10,12 @@ all: $(TARGETS)
 chirp.go: chirp.i
 	@echo "SWIG chirp.i (golang)"
 	@$(CCTOOLS_SWIG) -go -cgo -intgosize 64 -I../../../dttools/src -I../ chirp.i 
-
-test:
+	@mkdir -p src/chirp
+	@cp chirp.go chirp_wrap.c src/chirp
 
 clean:
 	-rm chirp.go chirp_wrap.c
+	-rm -Rf src/chirp
 
 install: 
+	cp -r src/chirp $(GOPATH)/chirp

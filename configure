@@ -1289,6 +1289,7 @@ fi
 if [ $found_swig != yes ]
 then
 	swig_bindings=""
+else
 	if [ $swig_go = yes ]
 	then
 		swig_bindings="${swig_bindings} golang"
@@ -1296,7 +1297,7 @@ then
 		echo "*** swig golang not supported"
 		echo "*** skipping swig Golang bindings for work queue and chirp"
 	fi
-fi
+fi 
 
 library_search_standard()
 {
