@@ -2152,7 +2152,6 @@ static struct jx * category_to_jx(struct work_queue *q, const char *category) {
 	jx_insert_integer(j, "tasks_done",       s.tasks_done);
 	jx_insert_integer(j, "tasks_failed",     s.tasks_failed);
 	jx_insert_integer(j, "tasks_cancelled",  s.tasks_cancelled);
-	jx_insert_integer(j, "workers_able",     s.workers_able);
 
 	struct rmsummary *largest = largest_waiting_declared_resources(q, c->name);
 
