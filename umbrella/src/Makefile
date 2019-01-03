@@ -15,8 +15,8 @@ umbrella: umbrella.py
 	chmod 755 umbrella
 
 umbrella_helper.html: umbrella.py
-	# pydoc2/pydoc creates a html file, umbrella.html.
-	if which pydoc2; then pydoc2 -w umbrella; elif which pydoc; then pydoc -w umbrella; fi
+	# pydoc creates a html file, umbrella.html.
+	if [ -x "${CCTOOLS_PYDOC}" ]; then ${CCTOOLS_PYDOC} -w umbrella; fi
 	if [ -f umbrella.html ]; then mv umbrella.html umbrella_helper.html; fi
 
 clean:

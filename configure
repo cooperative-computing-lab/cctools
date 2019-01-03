@@ -1546,6 +1546,8 @@ CCTOOLS_PYTHON3_VERSION=${python3_major_version}.${python3_minor_version}
 CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
+CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
+
 CCTOOLS_SWIG_BINDINGS=${swig_bindings}
 
 CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
