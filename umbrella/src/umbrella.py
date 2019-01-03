@@ -1,6 +1,6 @@
-#!/usr/bin/python2
+#! /usr/bin/env python
 
-# All the vanilla python package dependencies of Umbrella can be satisfied by Python 2.6.
+# All the vanilla python package dependencies of Umbrella can be satisfied by a standard installation of Python 2.{6,7} or Python 3.
 """
 Umbrella is a tool for specifying and materializing comprehensive execution environments, from the hardware all the way up to software and data.  A user simply invokes Umbrella with the desired task, and Umbrella determines the minimum mechanism necessary to run the task, whether it be direct execution, a system container, a local virtual machine, or submission to a cloud or grid environment.  We present the overall design of Umbrella and demonstrate its use to precisely execute a high energy physics application and a ray-tracing application across many platforms using a combination of Parrot, Chroot, Docker, VMware, Condor, and Amazon EC2.
 
@@ -46,6 +46,7 @@ Case 3: SITECONF info necessary for CVMFS cms repository access through Parrot. 
         dest = os.path.dirname(sandbox_dir) + "/cache/" + checksum + "/SITECONF"
 """
 
+from __future__ import print_function
 import sys
 from stat import *
 from pprint import pprint
@@ -53,7 +54,6 @@ import subprocess
 import platform
 import re
 import tarfile
-import StringIO
 from optparse import OptionParser
 import os
 import hashlib
@@ -68,13 +68,28 @@ import logging
 import multiprocessing
 import resource
 import tempfile
-import urllib
 import gzip
 import imp
 import socket
 
-if sys.version_info < (2,6,) or sys.version_info >= (3,):
-    sys.exit("Umbrella depends on [python2.6, python3).")
+try:
+    from StringIO import StringIO       # python 2.x
+except ImportError:
+    from io import StringIO             # python 3.x
+
+try:
+    from urllib import urlretrieve         # python 2.x
+except ImportError:
+    from urllib.request import urlretrieve # python 3.x
+
+try:
+    from urllib import urlparse, urlsplit         # python 2.x
+except ImportError:
+    from urllib.parse import urlparse, urlsplit   # python 3.x
+
+
+#if sys.version_info < (2,6,) or sys.version_info >= (3,):
+#    sys.exit("Umbrella depends on [python2.6, python3).")
 
 found_requests = None
 try:
@@ -105,8 +120,6 @@ except ImportError:
 
 s3_url = 'https://s3.amazonaws.com'
 
-import urllib2
-import urlparse
 import json
 
 # cctools binary is hosted at: /afs/crc.nd.edu/group/ccl/web/hep-case-study/parrot
@@ -254,7 +267,7 @@ def url_download(url, dest):
         Otherwise, directly exit.
     """
     logging.debug("Start to download %s to %s ...." % (url, dest))
-    urllib.urlretrieve(url, dest)
+    urlretrieve(url, dest)
 
 def dependency_download(name, url, checksum, checksum_tool, dest, format_remote_storage, action):
     """Download a dependency from the url and verify its integrity.
@@ -272,7 +285,7 @@ def dependency_download(name, url, checksum, checksum_tool, dest, format_remote_
         If the url is a broken link or the integrity of the downloaded data is bad, directly exit.
         Otherwise, return None.
     """
-    print "Download software from %s into the umbrella local cache (%s)" % (url, dest)
+    print("Download software from %s into the umbrella local cache (%s)" % (url, dest))
     logging.debug("Download software from %s into the umbrella local cache (%s)", url, dest)
     dest_dir = os.path.dirname(dest)
     dest_uncompress = dest #dest_uncompress is the path of the uncompressed-version dependency
@@ -498,7 +511,7 @@ def git_dependency_download(repo_url, dest, git_branch, git_commit):
     """
     dest = remove_trailing_slashes(dest)
 
-    scheme, netloc, path, query, fragment = urlparse.urlsplit(repo_url)
+    scheme, netloc, path, query, fragment = urlsplit(repo_url)
     repo_name = os.path.basename(path)
     if repo_name[-4:] == '.git':
         repo_name = repo_name[:-4]
@@ -840,7 +853,7 @@ def env_check(sandbox_dir, sandbox_mode, hardware_platform, cpu_cores, memory_si
     Returns:
         host_linux_distro: the linux distro of the host machine. For Example: redhat6, centos6.
     """
-    print "Execution environment checking ..."
+    print("Execution environment checking ...")
 
     if sandbox_mode not in ["docker", "destructive", "parrot"]:
         cleanup(tempfile_list, tempdir_list)
@@ -1017,7 +1030,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
         None.
     """
 
-    print "Installing software dependencies ..."
+    print("Installing software dependencies ...")
 
     for item in software_spec:
         if name and name != item:
@@ -1085,7 +1098,7 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
     Returns:
         None
     """
-    print "Installing data dependencies ..."
+    print("Installing data dependencies ...")
     for item in data_spec:
         if name and name != item:
             continue
@@ -1805,14 +1818,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
         If critical errors happen, directly exit.
     """
     #sandbox_dir will be the home directory of the sandbox
-    print 'Executing the application ....'
+    print('Executing the application ....')
     return_code = 0
     if not os.path.exists(sandbox_dir):
         os.makedirs(sandbox_dir)
     logging.debug("chdir(%s)", sandbox_dir)
     os.chdir(sandbox_dir) #here, we indeed want to chdir to sandbox_dir, not cwd_setting, to do preparation work like create mountlist file for Parrot.
     #at this point, all the software should be under the cache dir, all the mountpoint of the software should be in mount_dict
-    print "Execution engine: %s" % sandbox_mode
+    print("Execution engine: %s" % sandbox_mode)
     logging.debug("execution engine: %s", sandbox_mode)
     logging.debug("need_separate_rootfs: %d", need_separate_rootfs)
     if sandbox_mode == "destructive":
@@ -1848,7 +1861,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
                 if rc != 0:
                     subprocess_error(cmd, rc, stdout, stderr)
 
-        print "Start executing the user's task: %s" % user_cmd[0]
+        print("Start executing the user's task: %s" % user_cmd[0])
         cmd = "cd %s; %s" % (cwd_setting, user_cmd[0])
         rc, stdout, stderr = func_call_withenv(cmd, env_dict, ["cd"])
         if rc != 0:
@@ -1856,7 +1869,7 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
         return_code = rc
 
         logging.debug("Moving the outputs to the expected locations ...")
-        print "Moving the outputs to the expected locations ..."
+        print("Moving the outputs to the expected locations ...")
         for key in output_f_dict:
             cmd = "mv -f %s %s" % (key, output_f_dict[key])
             rc, stdout, stderr = func_call_withenv(cmd, env_dict, ["mv"])
@@ -1912,14 +1925,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
             #do not enable `-i` and `-t` option of Docker, it will fail when condor execution engine is chosen.
             #to allow the exit code of user_cmd to be transferred back, seperate the user_cmd and the chown command.
             cmd = 'docker run --name %s %s %s -e "PATH=%s" %s %s:%s /bin/sh -c "cd %s; %s"' % (container_name, volume_output, volume_parameters, path_env, other_envs, docker_image_name, os_image_id, cwd_setting, user_cmd[0])
-            print "Start executing the user's task: %s" % cmd
+            print("Start executing the user's task: %s" % cmd)
             return_code, stdout, stderr = func_call(cmd, ["docker", "sh", "cd"])
 
-            print "\n********** STDOUT of the command **********"
-            print stdout
+            print("\n********** STDOUT of the command **********")
+            print(stdout)
 
-            print "\n********** STDERR of the command **********"
-            print stderr
+            print("\n********** STDERR of the command **********")
+            print(stderr)
 
             #docker export container_name > tarball
             if len(new_os_image_dir) > 0:
@@ -1986,14 +1999,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
             if needs_parrotize_user_cmd:
                 parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, parrot_ldso_path, use_local_cvmfs, parrot_log)
 
-            print "Start executing the user's task: %s" % user_cmd[0]
+            print("Start executing the user's task: %s" % user_cmd[0])
             return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["sh"])
 
-            print "\n********** STDOUT of the command **********"
-            print stdout
+            print("\n********** STDOUT of the command **********")
+            print(stdout)
 
-            print "\n********** STDERR of the command **********"
-            print stderr
+            print("\n********** STDERR of the command **********")
+            print(stderr)
 
         else:
             env_dict = os.environ
@@ -2018,14 +2031,14 @@ def workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, outpu
             if needs_parrotize_user_cmd:
                 parrotize_user_cmd(user_cmd, cwd_setting, cvmfs_http_proxy, parrot_mount_file, '', use_local_cvmfs, parrot_log)
 
-            print "Start executing the user's task: %s" % user_cmd[0]
+            print("Start executing the user's task: %s" % user_cmd[0])
             return_code, stdout, stderr = func_call_withenv(user_cmd[0], env_dict, ["sh"])
 
-            print "\n********** STDOUT of the command **********"
-            print stdout
+            print("\n********** STDOUT of the command **********")
+            print(stdout)
 
-            print "\n********** STDERR of the command **********"
-            print stderr
+            print("\n********** STDERR of the command **********")
+            print(stderr)
 
 #       logging.debug("Removing the parrot mountlist file and the parrot submit file from the sandbox")
 #       if os.path.exists(env_dict['PARROT_MOUNT_FILE']):
@@ -2059,7 +2072,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
     if not os.path.exists(sandbox_dir):
         os.makedirs(sandbox_dir)
 
-    print "Checking the validity of the umbrella specification ..."
+    print("Checking the validity of the umbrella specification ...")
     if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
         logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
         (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
@@ -2070,7 +2083,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
 
     condor_submit_path = sandbox_dir + "/condor_task.submit"
 
-    print "Constructing Condor submission file according to the umbrella specification ..."
+    print("Constructing Condor submission file according to the umbrella specification ...")
     transfer_inputs = ''
     new_input_options = ''
     logging.debug("Transform input_list_origin into condor attributes ....")
@@ -2135,13 +2148,13 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
     condor_submit_file.close()
 
     #submit condor job
-    print "Submitting the Condor job ..."
+    print("Submitting the Condor job ...")
     cmd = 'condor_submit ' + condor_submit_path
     rc, stdout, stderr = func_call(cmd, ["condor_submit"])
     if rc != 0:
         subprocess_error(cmd, rc, stdout, stderr)
     #keep tracking whether condor job is done
-    print "Waiting for the job is done ..."
+    print("Waiting for the job is done ...")
     logging.debug("Waiting for the job is done ...")
     cmd = 'condor_wait %s' % condor_log_path
     rc, stdout, stderr = func_call(cmd, ["condor_wait"])
@@ -2157,7 +2170,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
         index2 = content.find(')', index1)
         remote_rc = int(content[(index1 + len(str)):index2])
 
-    print "The exit code of the remote executed umbrella found in the condor log file (%s) is %d!" % (condor_log_path, remote_rc)
+    print("The exit code of the remote executed umbrella found in the condor log file (%s) is %d!" % (condor_log_path, remote_rc))
     logging.debug("The exit code of the remote executed umbrella found in the condor log file (%s) is %d!", condor_log_path, remote_rc)
 
     if remote_rc == 500:
@@ -2170,22 +2183,22 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
         sys.exit("The remote umbrella fails and the exit code is %d." % remote_rc)
 
     logging.debug("the condor jos is done, put the output back into the output directory!")
-    print "the condor jobs is done, put the output back into the output directory!"
+    print("the condor jobs is done, put the output back into the output directory!")
     #check until the condor job is done, post-processing (put the output back into the output directory)
     #the semantics of condor_output_files only supports transferring a dir from the execution node back to the current working dir (here it is condor_output_dir).
     os.rename(condor_output_dir, output_dir)
 
-    print "move condor_stdout, condor_stderr and condor_task.log from sandbox_dir to output_dir."
+    print("move condor_stdout, condor_stderr and condor_task.log from sandbox_dir to output_dir.")
     logging.debug("move condor_stdout, condor_stderr and condor_task.log from sandbox_dir to output_dir.")
     os.rename(sandbox_dir + '/condor_stdout', output_dir + '/condor_stdout')
     os.rename(sandbox_dir + '/condor_stderr', output_dir + '/condor_stderr')
     os.rename(sandbox_dir + '/condor_task.log', output_dir + '/condor_task.log')
 
-    print "Remove the sandbox dir"
+    print("Remove the sandbox dir")
     logging.debug("Remove the sandbox_dir.")
     shutil.rmtree(sandbox_dir)
 
-    print "The output has been put into the output dir: %s" % output_dir
+    print("The output has been put into the output dir: %s" % output_dir)
 
 def decide_instance_type(cpu_cores, memory_size, disk_size, instances):
     """ Compare the required hardware configurations with each instance type, and return the first matched instance type, return 'no' if no matched instance type exist.
@@ -2239,7 +2252,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
         If no errors happen, return None;
         Otherwise, directly exit.
     """
-    print "Checking the validity of the umbrella specification ..."
+    print("Checking the validity of the umbrella specification ...")
     if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
         (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
     else:
@@ -2248,7 +2261,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
 
     # the instance types provided by the Amazon EC2 keep changing. So, the instance type will be provided by the user.
     # The AMI will be provided by the author of the Umbrella spec.
-    print "Obtaining the AMI info from the umbrella specification ..."
+    print("Obtaining the AMI info from the umbrella specification ...")
     name = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 
     if not spec_json["os"].has_key("ec2"):
@@ -2268,7 +2281,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
             sys.exit("Currently the supported Linux distributions are redhat, centos and fedora.\n")
 
     #start the instance and obtain the instance id
-    print "Starting an Amazon EC2 instance ..."
+    print("Starting an Amazon EC2 instance ...")
     instance = launch_ec2_instance(ami, region, ec2_instance_type, ec2_key_pair, ec2_security_group)
     logging.debug("Start the instance and obtain the instance id: %s", instance)
 
@@ -2277,7 +2290,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
     logging.debug("Get the public IP of the instance: %s", public_ip)
 
     #install wget on the instance
-    print "Installing wget on the EC2 instance ..."
+    print("Installing wget on the EC2 instance ...")
     logging.debug("Install wget on the instance")
     #ssh exit code 255: the remote node is down or unavailable
     rc = 300
@@ -2290,11 +2303,11 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
             time.sleep(5)
 
     #python, the python is needed to execute umbrella itself
-    print "Installing python 2.6.9 on the instance ..."
+    print("Installing python 2.6.9 on the instance ...")
     logging.debug("Install python 2.6.9 on the instance.")
     python_name = 'python-2.6.9-%s-%s' % (linux_distro, hardware_platform)
     python_url = "http://ccl.cse.nd.edu/research/data/hep-case-study/python-2.6.9-%s-%s.tar.gz" % (linux_distro, hardware_platform)
-    scheme, netloc, path, query, fragment = urlparse.urlsplit(python_url)
+    scheme, netloc, path, query, fragment = urlsplit(python_url)
     python_url_filename = os.path.basename(path)
     cmd = 'ssh -t -o ConnectionAttempts=5 -o StrictHostKeyChecking=no -o ConnectTimeout=60 -i %s %s@%s \'sudo wget %s && sudo tar zxvf %s\'' % (ssh_key, user_name, public_ip, python_url, python_url_filename)
     rc, stdout, stderr = func_call(cmd, ["ssh"])
@@ -2303,7 +2316,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
         subprocess_error(cmd, rc, stdout, stderr)
 
     #scp umbrella, meta.json and input files to the instance
-    print "Sending the umbrella task to the EC2 instance ..."
+    print("Sending the umbrella task to the EC2 instance ...")
     logging.debug("scp relevant files into the HOME dir of the instance.")
     input_file_string = ''
     for input_file in input_list:
@@ -2361,7 +2374,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
         cvmfs_http_proxy_option = '--cvmfs_http_proxy %s' % cvmfs_http_proxy
 
     #execute the command on the instance
-    print "Executing the user's task on the EC2 instance ..."
+    print("Executing the user's task on the EC2 instance ...")
     logging.debug("Execute the command on the instance ...")
 
     ec2_output_option = ""
@@ -2377,14 +2390,14 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
         terminate_instance(instance)
         subprocess_error(cmd, rc, stdout, stderr)
 
-    print "\n********** STDOUT of the command **********"
-    print stdout
+    print("\n********** STDOUT of the command **********")
+    print(stdout)
 
-    print "\n********** STDERR of the command **********"
-    print stderr
+    print("\n********** STDERR of the command **********")
+    print(stderr)
 
     #postprocessing
-    print "Transferring the output of the user's task from the EC2 instance back to the local machine ..."
+    print("Transferring the output of the user's task from the EC2 instance back to the local machine ...")
     logging.debug("Create a tarball for the output dir on the instance.")
 
     output = '%s %s' % (' '.join(output_f_dict.values()), ' '.join(output_d_dict.values()))
@@ -2414,7 +2427,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
         terminate_instance(instance)
         subprocess_error(cmd, rc, stdout, stderr)
 
-    print "Terminating the EC2 instance ..."
+    print("Terminating the EC2 instance ...")
     terminate_instance(instance)
 
 def obtain_package(spec_json):
@@ -2497,7 +2510,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
     Returns:
         None.
     """
-    print "Checking the validity of the umbrella specification ..."
+    print("Checking the validity of the umbrella specification ...")
     if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
         logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
         (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
@@ -2523,7 +2536,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
             sys.exit("the specification does not provide a concrete OS image, and the OS image of the local machine does not matching the requirement!\n")
         else:
             logging.debug("the specification does not provide a concrete OS image, but the OS image of the local machine matches the requirement!")
-            print "the specification does not provide a concrete OS image, but the OS image of the local machine matches the requirement!\n"
+            print("the specification does not provide a concrete OS image, but the OS image of the local machine matches the requirement!\n")
     else:
         need_separate_rootfs = 1
 
@@ -2531,7 +2544,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
     (pac_name, pac_list) = obtain_package(spec_json)
     if pac_list:
         logging.debug("The spec needs to use %s install packages.", pac_name)
-        print "The spec needs to use %s install packages." % pac_name
+        print("The spec needs to use %s install packages." % pac_name)
         if sandbox_mode in ["parrot"]:
             cleanup(tempfile_list, tempdir_list)
             logging.critical("Installing packages through package managers requires the root authority! Please choose a different sandbox mode (docker or destructive)!")
@@ -2569,7 +2582,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
     if cvmfs_path:
         logging.debug("cvmfs is needed! (%s)", cvmfs_path)
-        print "cvmfs is needed! (%s)" % cvmfs_path
+        print("cvmfs is needed! (%s)" % cvmfs_path)
 
         cvmfs_ready = False
         if need_separate_rootfs:
@@ -2577,16 +2590,16 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
             if os.path.exists(os_cvmfs_path) and os.path.isdir(os_cvmfs_path):
                 cvmfs_ready = True
                 logging.debug("The os image has /cvmfs/cms.cern.ch!")
-                print "The os image has /cvmfs/cms.cern.ch!"
+                print("The os image has /cvmfs/cms.cern.ch!")
 
         if not cvmfs_ready:
             if use_local_cvmfs:
                 logging.debug("Use the cvmfs intalled on the local host")
-                print "Use the cvmfs intalled on the local host"
+                print("Use the cvmfs intalled on the local host")
                 mount_dict[cvmfs_mountpoint] = cvmfs_mountpoint
             else:
                 logging.debug("Parrot will be used to deliver cvmfs")
-                print "Parrot will be used to deliver cvmfs"
+                print("Parrot will be used to deliver cvmfs")
 
                 if cvmfs_path.find("cms.cern.ch") != -1:
                     is_cms_cvmfs_app = 1 #cvmfs is needed to deliver cms.cern.ch repo, and the local host has no cvmfs installed.
@@ -2622,22 +2635,22 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
             new_os_image_dir = "%s/cache/%s/%s" % (os.path.dirname(sandbox_dir), new_os_id, item)
 
             logging.debug("Installing the package into the image (%s), and create a new image: %s ...", os_image_dir, new_os_image_dir)
-            print "Installing the package into the image (%s), and create a new image: %s ..." % (os_image_dir, new_os_image_dir)
+            print("Installing the package into the image (%s), and create a new image: %s ..." % (os_image_dir, new_os_image_dir))
             if os.path.exists(new_os_image_dir) and os.path.isdir(new_os_image_dir):
                 logging.debug("the new os image already exists!")
-                print "the new os image already exists!"
+                print("the new os image already exists!")
                 #use the intermidate os image which has all the dependencies from package manager ready as the os image
                 os_image_dir = new_os_image_dir
                 os_id = new_os_id
                 pass
             else:
                 logging.debug("the new os image does not exist!")
-                print "the new os image does not exist!"
+                print("the new os image does not exist!")
                 new_env_para_dict = {}
 
                 #install dependency specified in the spec_json["package_manager"]["config"] section
                 logging.debug('Install dependency specified in the spec_json["package_manager"]["config"] section.')
-                print 'Install dependency specified in the spec_json["package_manager"]["config"] section.'
+                print('Install dependency specified in the spec_json["package_manager"]["config"] section.')
                 if sandbox_mode == "destructive":
                     software_install(mount_dict, new_env_para_dict, new_sw_sec, meta_json, sandbox_dir, 1, osf_auth)
 
@@ -2650,12 +2663,12 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
 
                     #install dependencies through package managers
                     logging.debug("Create an intermediate OS image with all the dependencies from package managers ready!")
-                    print "Create an intermediate OS image with all the dependencies from package managers ready!"
+                    print("Create an intermediate OS image with all the dependencies from package managers ready!")
                     if workflow_repeat(cwd_setting, sandbox_dir, sandbox_mode, output_f_dict, output_d_dict, input_dict, env_para_dict, pm_cmd, hardware_platform, host_linux_distro, distro_name, distro_version, need_separate_rootfs, os_image_dir, os_id, cvmfs_cms_siteconf_mountpoint, mount_dict, mount_dict, meta_json, new_os_image_dir, cvmfs_http_proxy, needs_parrotize_user_cmd, use_local_cvmfs, parrot_log) != 0:
                         logging.critical("Fails to construct the intermediate OS image!")
                         sys.exit("Fails to construct the intermediate OS image!")
                     logging.debug("Finishing creating the intermediate OS image!")
-                    print "Finishing creating the intermediate OS image!"
+                    print("Finishing creating the intermediate OS image!")
 
                     #use the intermidate os image which has all the dependencies from package manager ready as the os image
                     os_image_dir = new_os_image_dir
@@ -2691,7 +2704,7 @@ def dependency_check(item):
     result = which_exec(item)
     if result == None:
         logging.debug("Failed to find the executable `%s` through $PATH.", item)
-        print "Failed to find the executable `%s` through $PATH." % item
+        print("Failed to find the executable `%s` through $PATH." % item)
         return -1
     else:
         logging.debug("Find the executable `%s` through $PATH.", item)
@@ -2979,7 +2992,7 @@ def abstract_metadata(spec_json, meta_path):
     with open(meta_path, 'w') as f:
         json.dump(metadata, f, indent=4)
         logging.debug("dump the metadata information from the umbrella spec to %s" % meta_path)
-        print "dump the metadata information from the umbrella spec to %s" % meta_path
+        print("dump the metadata information from the umbrella spec to %s" % meta_path)
 
 def needCVMFS(spec_json, meta_json):
     """For each dependency in the spec_json, check whether cvmfs is needed to deliver it.
@@ -3029,14 +3042,14 @@ def cleanup(filelist, dirlist):
     for item in filelist:
         if os.path.exists(item):
             logging.debug("cleanup temporary file: %s", item)
-            print "cleanup temporary file: ", item
+            print("cleanup temporary file: ", item)
             os.remove(item)
 
     #cleanup the temporary dirs
     for item in dirlist:
         if os.path.exists(item):
             logging.debug("cleanup temporary dir: %s", item)
-            print "cleanup temporary dir: ", item
+            print("cleanup temporary dir: ", item)
             shutil.rmtree(item)
 
 def separatize_spec(spec_json, meta_json, target_type):
@@ -3134,7 +3147,7 @@ def json2file(filepath, json_item):
     with open(filepath, 'w') as f:
         json.dump(json_item, f, indent=4)
         logging.debug("dump a json object from the umbrella spec to %s" % filepath)
-        print "dump a json object from the umbrella spec to %s" % filepath
+        print("dump a json object from the umbrella spec to %s" % filepath)
 
 def path_exists(filepath):
     """Check the validity and existence of a file path.
@@ -3184,16 +3197,16 @@ def validate_meta(meta_json):
         Otherwise, None.
     """
     logging.debug("Starting validating the metadata db ....\n")
-    print "Starting validating the metadata db ...."
+    print("Starting validating the metadata db ....")
 
     for name in meta_json:
         for ident in meta_json[name]:
             logging.debug("check for %s with the id of %s ...", name, ident)
-            print "check for %s with the id of %s ..." % (name, ident)
+            print("check for %s with the id of %s ..." % (name, ident))
             attr_check(name, meta_json[name][ident], "source", 1)
 
     logging.debug("Finish validating the metadata db ....\n")
-    print "Finish validating the metadata db successfully!"
+    print("Finish validating the metadata db successfully!")
 
 def validate_spec(spec_json, meta_json = None):
     """Validate a spec_json.
@@ -3207,7 +3220,7 @@ def validate_spec(spec_json, meta_json = None):
         Otherwise, None.
     """
     logging.debug("Starting validating the spec file ....\n")
-    print "Starting validating the spec file ...."
+    print("Starting validating the spec file ....")
 
     #validate the following three sections: hardware, kernel and os.
     env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
@@ -3249,7 +3262,7 @@ def validate_spec(spec_json, meta_json = None):
                         logging.critical("%s in the %s section should have <source> attr!\n", item, sec_name)
                         sys.exit("%s in the %s section should have <source> attr!\n" % (item, sec_name))
     logging.debug("Finish validating the spec file ....\n")
-    print "Finish validating the spec file successfully!"
+    print("Finish validating the spec file successfully!")
 
 def osf_create(username, password, user_id, proj_name, is_public):
     """Create an OSF project, and return the project id.
@@ -3315,7 +3328,7 @@ def osf_upload(username, password, proj_id, source):
     Returns:
         the OSF download url of the uploaded file
     """
-    print "Upload %s to OSF ..." % source
+    print("Upload %s to OSF ..." % source)
     logging.debug("Upload %s to OSF ...",source)
     url="https://files.osf.io/v1/resources/%s/providers/osfstorage/" % proj_id
     payload = {"kind":"file", "name":os.path.basename(source)}
@@ -3347,7 +3360,7 @@ def osf_download(username, password, osf_url, dest):
         logging.critical("\nDownloading private stuff from OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
         sys.exit("\nDownloading private stuff from OSF requires a python package - requests. Please check the installation page of requests:\n\n\thttp://docs.python-requests.org/en/latest/user/install/\n")
 
-    print "Download %s from OSF to %s" % (osf_url, dest)
+    print("Download %s from OSF to %s" % (osf_url, dest))
     logging.debug("Download %s from OSF to %s", osf_url, dest)
     word = 'resources'
     proj_id = osf_url[(osf_url.index(word) + len(word) + 1):(osf_url.index(word) + len(word) + 6)]
@@ -3446,7 +3459,7 @@ def s3_upload(bucket, source, acl):
     Returns:
         link: the link of a s3 object
     """
-    print "Upload %s to S3 ..." % source
+    print("Upload %s to S3 ..." % source)
     logging.debug("Upload %s to S3 ...", source)
 
     key = os.path.basename(source)
@@ -3479,7 +3492,7 @@ def s3_download(link, dest):
         logging.critical("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
         sys.exit("\nUploading umbrella spec dependencies to s3 requires a python package - boto3. Please check the installation page of boto3:\n\n\thttps://boto3.readthedocs.org/en/latest/guide/quickstart.html#installation\n")
 
-    print "Download %s from S3 to %s" % (link, dest)
+    print("Download %s from S3 to %s" % (link, dest))
     logging.debug("Download %s from S3 to %s", link, dest)
     s3 = boto3.resource('s3')
 
@@ -3558,7 +3571,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
     env_para_dict = {}
     global upload_count
 
-    print "Upload the dependencies from the umbrella spec to %s ..." % target_info[0]
+    print("Upload the dependencies from the umbrella spec to %s ..." % target_info[0])
     logging.debug("Upload the dependencies from the umbrella spec to %s ...", target_info[0])
     if spec_json.has_key("os") and spec_json["os"] and spec_json["os"].has_key("id") and spec_json["os"]["id"]:
         os_id = spec_json["os"]["id"]
@@ -3581,7 +3594,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
 
                 if has_source(sources, target_info[0]):
                     logging.debug("The os section already has a url from %s!", target_info[0])
-                    print "The os section already has a url from %s!" % target_info[0]
+                    print("The os section already has a url from %s!" % target_info[0])
                 else:
                     upload_count += 1
                     r3 = dependency_process(item, os_id, action, meta_json, sandbox_dir, osf_auth)
@@ -3616,7 +3629,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
 
                     if has_source(sources, target_info[0]):
                         logging.debug("%s already has a url from %s!", item, target_info[0])
-                        print "%s already has a url from %s!" % (item, target_info[0])
+                        print("%s already has a url from %s!" % (item, target_info[0]))
                         continue
                 else:
                     cleanup(tempfile_list, tempdir_list)
@@ -3661,7 +3674,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
 
                     if has_source(sources, target_info[0]):
                         logging.debug("%s already has a url from %s!", item, target_info[0])
-                        print "%s already has a url from %s!" % (item, target_info[0])
+                        print("%s already has a url from %s!" % (item, target_info[0]))
                         continue
                 else:
                     cleanup(tempfile_list, tempdir_list)
@@ -4041,7 +4054,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
     logging.debug("Check the validity of the command ....")
     if not args:
         logging.critical("You must provide the behavior and the command!")
-        print "You must provide the behavior and the command!\n"
+        print("You must provide the behavior and the command!\n")
         parser.print_help()
         sys.exit(1)
 
@@ -4052,12 +4065,12 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
     behavior_list = ["run", "expand", "filter", "split", "validate", "upload", "build"]
     if behavior not in behavior_list:
         logging.critical("%s is not supported by umbrella!", behavior)
-        print behavior + " is not supported by umbrella!\n"
+        print(behavior + " is not supported by umbrella!\n")
         parser.print_help()
         sys.exit(1)
 
     if len(args) > 1 and args[1] in ['help']:
-        print help_info[behavior]
+        print(help_info[behavior])
         sys.exit(0)
 
     logging.debug("the FQDN of the node: %s", socket.getfqdn())
@@ -4094,7 +4107,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
             if getpass.getuser() != 'root':
                 cleanup(tempfile_list, tempdir_list)
                 logging.critical("You must be root to use the %s sandbox mode.", sandbox_mode)
-                print 'You must be root to use the %s sandbox mode.\n' % (sandbox_mode)
+                print('You must be root to use the %s sandbox mode.\n' % (sandbox_mode))
                 parser.print_help()
                 sys.exit(1)
 
@@ -4132,7 +4145,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
         if not os.path.isfile(spec_path):
             cleanup(tempfile_list, tempdir_list)
             logging.critical("The specification json file (%s) does not exist! Please refer the -c option.", spec_path)
-            print "The specification json file does not exist! Please refer the -c option.\n"
+            print("The specification json file does not exist! Please refer the -c option.\n")
             parser.print_help()
             sys.exit(1)
 
@@ -4177,7 +4190,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
         args[1] = os.path.abspath(args[1])
         if not os.path.exists(os.path.dirname(args[1])):
-            print os.path.dirname(args[1])
+            print(os.path.dirname(args[1]))
             try:
                 os.makedirs(os.path.dirname(args[1]))
             except Exception as e:
@@ -4186,7 +4199,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
                 sys.exit("Fails to create the directory for the <dest.umbrella> (%s)!" % (args[1], e))
 
         if spec_build(spec_json) == 0:
-            print "There is no local dependencies whose metadata info needs to built!"
+            print("There is no local dependencies whose metadata info needs to built!")
         else:
             json2file(args[1], spec_json)
         sys.exit(0)
@@ -4195,7 +4208,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
     output_dirset = set()
     if behavior in ["run"]:
         if not meta_path:
-            print "Trying to build the metadata info for local dependencies ..."
+            print("Trying to build the metadata info for local dependencies ...")
             spec_build(spec_json)
 
         if 'PWD' in env_para_dict:
@@ -4362,7 +4375,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
                     os.close(fd)
                     logging.debug("Creating a temporary file (%s) to hold the metadata file specified by the --meta options!", meta_path)
                 logging.debug("Download metadata database from %s into %s", url, meta_path)
-                print "Download metadata database from %s into %s" % (url, meta_path)
+                print("Download metadata database from %s into %s" % (url, meta_path))
                 url_download(url, meta_path)
             else:
                 logging.debug("Check the metatdata database file: %s", meta_path)
@@ -4554,7 +4567,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
                 osf_upload(options.osf_user, options.osf_pass, osf_proj_id, target_specpath)
             else:
                 logging.debug("All the dependencies has been already inside OSF!")
-                print "All the dependencies has been already inside OSF!"
+                print("All the dependencies has been already inside OSF!")
 
         elif args[1] == "s3":
             if not found_boto3 or not found_botocore:
@@ -4586,7 +4599,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
                 s3_upload(bucket, target_specpath, args[3])
             else:
                 logging.debug("All the dependencies has been already inside S3!")
-                print "All the dependencies has been already inside S3!"
+                print("All the dependencies has been already inside S3!")
 
     cleanup(trim_list(tempfile_list, output_fileset), trim_list(tempdir_list, output_dirset))
     end = datetime.datetime.now()
