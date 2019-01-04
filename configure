@@ -128,8 +128,8 @@ config_swig_path=auto
 
 config_cvmfs_path=no
 config_globus_path=no
-config_openssl_path=no
 config_irods_path=no
+config_openssl_path=no
 config_xrootd_path=no
 
 config_static_libgcc=yes
@@ -996,25 +996,6 @@ then
 		echo "*** skipping python bindings support"
 	fi
 fi
-if [ "$fuse_avail" != yes ]; then
-	echo "grow_fuse requires FUSE"
-fi
-
-# If python is not found, then leave out weaver.
-
-if [ "$python_major_version" = 2 -a "$python_minor_version" -ge 6 ]
-then
-	echo "python version is suitable for umbrella"
-	echo "python version is suitable for prune"
-	echo "python version is suitable for weaver"
-else
-	echo "umbrella requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/umbrella//g'`
-	echo "prune requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/prune//g'`
-	echo "weaver requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/weaver//g'`
-fi
 
 if [ $config_python3_path != no ]
 then
@@ -1053,24 +1034,20 @@ then
 				# python3_ldflags=$(${python3}-config --ldflags) # it includes static libs, so we need:
 				python3_ldflags_file=`mktemp tmp.XXXXXX`
 				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
-from re import search
 from distutils import sysconfig
-
-libname = sysconfig.get_config_var('LDLIBRARY')
-
-libs = []
-
-if not search('^libpython.*\.so.*', libname):
-    libs.append('-L' + sysconfig.get_config_var('LIBPL'))
-
-libs.append('-L' + ' -L'.join(sysconfig.get_config_var('LIBDIR').split()))
-libs.append('-lpython' + sysconfig.get_config_var('LDVERSION'))
-libs.extend(sysconfig.get_config_var('LIBS').split())
-libs.extend(sysconfig.get_config_var('SYSLIBS').split())
-libs.append('-lz')
-libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
-
-print(' '.join(libs))
+flags = ['-I' + sysconfig.get_python_inc(),
+	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
+syscfgflags = sysconfig.get_config_var('CFLAGS')
+if not syscfgflags is None:
+	flags.extend(syscfgflags.split())
+print ' '.join(flags)
+EOF
+			env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
+from distutils import sysconfig
+libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
+if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
+	libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
+print ' '.join(libs)
 EOF
 				python3_ldflags=$(cat $python3_ldflags_file)
 				rm $python3_ldflags_file
@@ -1115,6 +1092,32 @@ EOF
 			echo "*** skipping python3 support"
 		fi
 	fi
+fi
+
+
+if [ "$fuse_avail" != yes ]; then
+	echo "grow_fuse requires FUSE"
+fi
+
+# If python is not found, then leave out weaver.
+
+if [ "$python" = 0 ]
+then
+	echo "python version is suitable for prune"
+	echo "python version is suitable for weaver"
+else
+	packages=`echo ${packages} | sed 's/umbrella//g'`
+	echo "prune requires python >= 2.6"
+	packages=`echo ${packages} | sed 's/prune//g'`
+	echo "weaver requires python >= 2.6"
+	packages=`echo ${packages} | sed 's/weaver//g'`
+fi
+
+if [ "$python" = 0 -o "$python3" = 0 ]
+then
+	echo "python version is suitable for umbrella"
+else
+	echo "umbrella requires python >= 2.6"
 fi
 
 found_swig=no
