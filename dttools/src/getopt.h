@@ -7,7 +7,13 @@ make use of the local implementation.
 */
 
 #if defined(CCTOOLS_OPSYS_DARWIN)
+
+#if defined(CCTOOLS_OSX_GETOPT_FROM_SDK)
+#include </Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/getopt.h>
+#else
 #include </usr/include/getopt.h>
+#endif
+
 #else
 
 /* Declarations for getopt.
