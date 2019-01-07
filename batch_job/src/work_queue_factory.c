@@ -102,6 +102,7 @@ static char *wrapper_input = 0;
 static char *worker_command = 0;
 
 static char *runos_os = 0;
+static char *runos_cctools_nd = "cctools-stable";
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -404,7 +405,7 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(runos_os){
-		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
+		char* vc3_cmd = string_format("./vc3-builder --var CCTOOLS_ND=\"%s\" --require cctools-wq-worker -- %s",runos_cctools_nd,cmd);
 		char* temp = string_format("python %s %s %s",CCTOOLS_RUNOS_PATH,runos_os,vc3_cmd);
 		free(vc3_cmd);
 		free(cmd);
@@ -1021,6 +1022,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_CATALOG,
 		LONG_OPT_ENVIRONMENT_VARIABLE,
 		LONG_OPT_RUN_OS,
+		LONG_OPT_RUN_OS_WORKER_VERSION,
 	};
 
 static const struct option long_options[] = {
@@ -1061,6 +1063,7 @@ static const struct option long_options[] = {
 	{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMAGE},
 	{"k8s-worker-image", required_argument, 0, LONG_OPT_K8S_WORKER_IMAGE},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
+	{"runos-worker-version", required_argument, 0, LONG_OPT_RUN_OS_WORKER_VERSION},
 	{0,0,0,0}
 };
 
@@ -1235,6 +1238,9 @@ int main(int argc, char *argv[])
 				break;
 			case LONG_OPT_RUN_OS:
 				runos_os = xxstrdup(optarg);
+				break;
+			case LONG_OPT_RUN_OS_WORKER_VERSION:
+				runos_cctools_nd = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
