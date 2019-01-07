@@ -45,7 +45,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/runos.py"
+#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/cctools-runos"
 #define CCTOOLS_VC3_BUILDER_PATH "/afs/crc.nd.edu/group/ccl/software/vc3-builder-src/vc3-builder"
 
 typedef enum {
