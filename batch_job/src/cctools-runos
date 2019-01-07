@@ -58,7 +58,6 @@ def write_stderr(lefile, proc, mid, lelock):
                 lelock.release()
 
 
-
 def clean_and_remove(path):
     allthings = os.listdir(path)
     for x in allthings:
@@ -68,19 +67,6 @@ def clean_and_remove(path):
         else:
             os.remove(x)
     return 1
-
-def arr_to_str(arr):
-    s = ""
-    for x in arr:
-        s += ("%s " % x)
-    return s[:-1]
-
-def convert(shlex_list):
-    a = []
-    for x in shlex_list:
-        a.append(str(x))
-    return a
-
 
 def show_help():
     sys.stderr.write("""
@@ -200,7 +186,7 @@ if __name__ == "__main__":
         shutil.copy(worker_executable, tmphome)
 
 
-        cmdwrap = "'cd /worker-home; %s'" % (arr_to_str(cmd))
+        cmdwrap = "'cd /worker-home; " + ' '.join(cmd) + "'"
         newcmd  = ["exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", cmdwrap]
 
         if os.path.isfile("/usr/local/bin/singularity"):
@@ -209,15 +195,12 @@ if __name__ == "__main__":
             newcmd.insert(0, "/usr/bin/singularity")
         else:
             newcmd.insert(0, "singularity")
-        #exitcode = subprocess.call(cmd)
-        #proc = subprocess.Popen(' '.join(newcmd),stdout=subprocess.STDOUT,stderr=subprocess.STDOUT,shell=True)
+
         if switch == False:
             proc = subprocess.Popen(' '.join(newcmd),shell=True)
             proc.wait()
             exitcode = proc.returncode
             clean_and_remove(tmphome)
-            #logfile.write('[runos-%d]ret: %i\n'%(mid,exitcode))
-            #logfile.close()
             exit(exitcode)
         else:   
             logfile.write('[runos-{}]: {}\n'.format(mid,'STARTING'))
@@ -230,18 +213,9 @@ if __name__ == "__main__":
             err_t.start()
             out_t.join()
             err_t.join()
-            #with proc.stdout:
-            #   for line in iter(proc.stdout.readline,b''):
-            #       print(line)
-            #       logfile.write('[runos-%d]out: %s\n'%(mid,line))
-            #(out) = proc.communicate()
             proc.wait()
             exitcode = proc.returncode
             clean_and_remove(tmphome)
-            #print(out)
-            #print(err)
-            #logfile.write('[runos-%d]out: %s\n'%(mid,out))
-            #logfile.write('[runos-%d]err: %s\n'%(mid,err))
             logfile.write('[runos-{}] ret: {}\n'.format(mid,exitcode))
             logfile.close()
             exit(exitcode)  
