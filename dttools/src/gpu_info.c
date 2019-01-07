@@ -57,6 +57,12 @@ int gpu_info_get()
 
 char *gpu_name_get()
 {
+	char *nvidia_cmd = "/bin/nvidia-smi";
+
+	if(access(nvidia_cmd, X_OK) != 0) {
+		return NULL;
+	}
+
 	FILE *pipe = popen("/bin/nvidia-smi --query-gpu=gpu_name --format=csv,noheader", "r");
 	if(!pipe) {
 		return NULL;
