@@ -9,10 +9,12 @@ import os
 import subprocess
 import shlex
 import shutil
+import distutils
 import uuid
 import platform
 import threading
 import getopt
+import re
 
 ######## Configuration
 
@@ -39,21 +41,21 @@ worker_repository = '/afs/crc.nd.edu/group/ccl/software'
 ###### END OF CONFIGURATION
 
 
-def write_stdout(lefile, proc, mid, lelock):
+def write_stdout(lefile, proc, unique_id, lelock):
     with proc.stdout:
         for line in iter(proc.stdout.readline,b''):
             lelock.acquire()
             try:
-                logfile.write('[runos-{}] out: {}\n'.format(mid,line))
+                logfile.write('[runos-{}] stdout: {}'.format(unique_id,line))
             finally:
                 lelock.release()
 
-def write_stderr(lefile, proc, mid, lelock):
+def write_stderr(lefile, proc, unique_id, lelock):
     with proc.stderr:
         for line in iter(proc.stderr.readline,b''):
             lelock.acquire()
             try:
-                logfile.write('[runos-{}] err: {}\n'.format(mid,line))
+                logfile.write('[runos-{}] stderr: {}'.format(unique_id,line))
             finally:
                 lelock.release()
 
@@ -117,6 +119,40 @@ def find_worker_executable(worker_repository, target, worker_version):
     return worker_executable
 
 
+def find_executable(executable, paths = os.environ['PATH']):
+    for path in paths.split(':'):
+        candidate = os.path.join(path, executable)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def get_redhat_release():
+    try:
+        with open('/etc/redhat-release') as f:
+            match = re.search('.*release (?P<major>[0-9])+.*', f.read())
+            if match:
+                return 'redhat' + match.groupdict()['major']
+    except Exception:
+        raise
+        pass
+
+    return 'unknown'
+
+
+def find_sigularity_executable(path_from_opt):
+
+    singularity = path_from_opt
+    if singularity is None:
+        singularity = find_executable('singularity', os.environ.get('PATH', '') + ':/usr/bin:/usr/local/bin') 
+
+    if singularity is None or not (os.path.isfile(singularity) and os.access(singularity, os.X_OK)):
+        sys.stderr.write("could not find a working singularity executable\n")
+        return None
+
+    return singularity
+
+
 if __name__ == "__main__":
 
     target, worker_opts, run_worker, singularity_opt, worker_version, debug_output = parse_command_line_argumets(sys.argv)
@@ -134,84 +170,67 @@ if __name__ == "__main__":
 
     # worker_executable is the path to the correct work_queue_worker
     worker_executable = find_worker_executable(worker_repository, target, worker_version)
-    
-    switch=True
+
+    # singularity_executable is the absolute path to singularity
+    singularity_executable = find_sigularity_executable(singularity_opt)
+
+    # runos instance id to create tmp directory, label log lines, etc.
+    unique_id = str(uuid.uuid4())[:8]
+
     #ensure singularity on computer
     run_native=False
+    if singularity_executable is None:
+        redhat_release = get_redhat_release()
+
+        if redhat_release == target:
+            run_native = True
+        else:
+            sys.stderr.write("singularity is not installed, and the host system '{}' does not match taget '{}'\n".format(redhat_release, target))
+            exit(2)
+
     try:
-        proc = subprocess.Popen('~condor/software/config/get_system_info.sh',stdout=subprocess.PIPE,shell=True)
-        (out, err) = proc.communicate()
-        base = str(platform.dist())
-        if not "has_singularity = true" in out: #no singularity
-            if ('redhat' in base and '6' in base) and ('rhel6' == target or 'osg_el6' == target):
-                run_native = True
-            elif ('redhat' in base and '7' in base) and ('rhel7' == target):
-                run_native = True
-            else:
-                sys.stderr.write("The System doesn't have Singularity Installed, and the target is unrecognized!\n")
-                exit(2)
-
-        #can assume singularity
-        proc2 = subprocess.Popen('singularity exec %s python -c "import platform; print platform.dist()"'%osused,stdout=subprocess.PIPE,shell=True)
-        (imgbase,err2) = proc2.communicate() 
-        if   ('redhat' in base and '6' in base) and (('redhat' in imgbase or 'centos' in imgbase) and '6' in imgbase):
-            run_native = True
-        elif ('redhat' in base and '7' in base) and (('redhat' in imgbase or 'centos' in imgbase) and '7' in imgbase):
-            run_native = True
-    except Exception, e:
-        print e
-        exit(2)
-
-
-    cmd = ['./work_queue_worker'] + worker_opts
-
-    
-    #calling process
-    mid = str(uuid.uuid4())[:8]
-    if run_native and not run_native:
-        exitcode = subprocess.call(cmd)
-        exit(exitcode)
-    else:
-        tmphome = "/tmp/runos_singularity_home-{}".format(mid)
+        tmphome = "/tmp/runos_singularity_home-{}".format(unique_id)
         if not (os.path.isdir(tmphome)):
             os.mkdir(tmphome,0755)
+    except Exception, e:
+        sys.stderr.write("could not create temporary directory {}: {}".format(tmphome), e)
+        sys.exit(3)
 
+    try:
         shutil.copy(worker_executable, tmphome)
+    except Exception, e:
+        sys.stderr.write("could not copy worker executable {} to temporary directory {}: {}".format(worker_executable, tmphome), e)
+        sys.exit(3)
 
 
-        cmdwrap = "'cd /worker-home; " + ' '.join(cmd) + "'"
-        newcmd  = ["exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", cmdwrap]
+    worker_cmdlst = [os.path.join(tmphome, 'work_queue_worker')] + worker_opts
+    
+    if run_native:
+        proc = subprocess.Popen(' '.join(worker_cmdlst), shell=True)
+        proc.wait()
+        exitcode = proc.returncode
+        clean_and_remove(tmphome)
+        exit(exitcode)
+    else:
+        sing_cmd = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", "'" + " ".join(worker_cmdlst) + "'"]
 
-        if os.path.isfile("/usr/local/bin/singularity"):
-            newcmd.insert(0, "/usr/local/bin/singularity")
-        elif os.path.isfile("/usr/bin/singularity"):
-            newcmd.insert(0, "/usr/bin/singularity")
-        else:
-            newcmd.insert(0, "singularity")
+        logfile.write('[runos-{}]: {}\n'.format(unique_id,'STARTING'))
+        logfile.write('[runos-{}] cmd: {}\n'.format(unique_id,' '.join(sing_cmd)))
 
-        if switch == False:
-            proc = subprocess.Popen(' '.join(newcmd),shell=True)
-            proc.wait()
-            exitcode = proc.returncode
-            clean_and_remove(tmphome)
-            exit(exitcode)
-        else:   
-            logfile.write('[runos-{}]: {}\n'.format(mid,'STARTING'))
-            logfile.write('[runos-{}] cmd: {}\n'.format(mid,' '.join(newcmd)))
-            proc = subprocess.Popen(' '.join(newcmd),stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)  
-            lelock = threading.Lock()
-            out_t = threading.Thread(target = write_stdout, args=(logfile, proc, mid, lelock,))
-            err_t = threading.Thread(target = write_stderr, args=(logfile, proc, mid, lelock,))
-            out_t.start()
-            err_t.start()
-            out_t.join()
-            err_t.join()
-            proc.wait()
-            exitcode = proc.returncode
-            clean_and_remove(tmphome)
-            logfile.write('[runos-{}] ret: {}\n'.format(mid,exitcode))
-            logfile.close()
-            exit(exitcode)  
+        proc = subprocess.Popen(' '.join(sing_cmd),stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)  
+        lelock = threading.Lock()
+        out_t = threading.Thread(target = write_stdout, args=(logfile, proc, unique_id, lelock,))
+        err_t = threading.Thread(target = write_stderr, args=(logfile, proc, unique_id, lelock,))
+        out_t.start()
+        err_t.start()
+        out_t.join()
+        err_t.join()
+        proc.wait()
+        exitcode = proc.returncode
+        clean_and_remove(tmphome)
+        logfile.write('[runos-{}] ret: {}\n'.format(unique_id,exitcode))
+        logfile.close()
+        exit(exitcode)  
 
 #vim: set sts=4 sw=4 ts=4 expandtab ft=python:
 
