@@ -203,34 +203,37 @@ if __name__ == "__main__":
         sys.exit(3)
 
 
-    worker_cmdlst = [os.path.join(tmphome, 'work_queue_worker')] + worker_opts
+    worker_cmdlst  = [os.path.join(tmphome, 'work_queue_worker')] + worker_opts
+    worker_command = ' '.join(worker_cmdlst)
+
+    proc = None
     
     if run_native:
-        proc = subprocess.Popen(' '.join(worker_cmdlst), shell=True)
-        proc.wait()
-        exitcode = proc.returncode
-        clean_and_remove(tmphome)
-        exit(exitcode)
+        logfile.write('[runos-{}]: STARTING with native execution\n'.format(unique_id))
+        logfile.write('[runos-{}] cmd: {}\n'.format(unique_id, worker_command))
+        proc = subprocess.Popen(worker_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  
     else:
-        sing_cmd = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", "'" + " ".join(worker_cmdlst) + "'"]
+        sing_cmdlst = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", "'" + " ".join(worker_cmdlst) + "'"]
+        sing_cmdlst.append("'" + worker_command + "'")
+        sing_cmd = ' '.join(sing_cmdlst)
 
-        logfile.write('[runos-{}]: {}\n'.format(unique_id,'STARTING'))
-        logfile.write('[runos-{}] cmd: {}\n'.format(unique_id,' '.join(sing_cmd)))
+        proc = subprocess.Popen(sing_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  
+        logfile.write('[runos-{}]: STARTING with singularity image {}\n'.format(unique_id,osused))
+        logfile.write('[runos-{}] cmd: {}\n'.format(unique_id, sing_cmd))
 
-        proc = subprocess.Popen(' '.join(sing_cmd),stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)  
-        lelock = threading.Lock()
-        out_t = threading.Thread(target = write_stdout, args=(logfile, proc, unique_id, lelock,))
-        err_t = threading.Thread(target = write_stderr, args=(logfile, proc, unique_id, lelock,))
-        out_t.start()
-        err_t.start()
-        out_t.join()
-        err_t.join()
-        proc.wait()
-        exitcode = proc.returncode
-        clean_and_remove(tmphome)
-        logfile.write('[runos-{}] ret: {}\n'.format(unique_id,exitcode))
-        logfile.close()
-        exit(exitcode)  
+    lelock = threading.Lock()
+    out_t = threading.Thread(target = write_stdout, args=(logfile, proc, unique_id, lelock,))
+    err_t = threading.Thread(target = write_stderr, args=(logfile, proc, unique_id, lelock,))
+    out_t.start()
+    err_t.start()
+    out_t.join()
+    err_t.join()
+    proc.wait()
+    exitcode = proc.returncode
+    clean_and_remove(tmphome)
+    logfile.write('[runos-{}] ret: {}\n'.format(unique_id,exitcode))
+    logfile.close()
+    exit(exitcode)  
 
 #vim: set sts=4 sw=4 ts=4 expandtab ft=python:
 
