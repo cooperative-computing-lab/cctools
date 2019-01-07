@@ -12,7 +12,34 @@ import shlex
 import uuid
 import platform
 import threading
-import threading
+
+######## Configuration
+
+#### Directory where images reside. All workers should have reading access to this directory.
+
+image_repository = '/afs/crc.nd.edu/group/ccl/software/runos'
+
+#### Mapping 'Name of OS' to 'image'. 'image' is expected to be a singularity
+#### image in the image_repository directory.
+
+image_of = {
+    'redhat6'  : 'rhel6.img',
+    'redhat7'  : 'rhel7.img',
+}
+
+#### Directory where the workers reside. 
+#### The hierarchy expected is worker_repository/ARCHITECTURE/OS/cctools/CCTOOLS_VERSION/bin/work_queue_worker
+#### ARCHITECTURE will eventually be found automatically. Now it's fixed to x86_64
+#### OS is a reguired command line argument (e.g., redhat7)
+#### CCTOOLS_VERSION is set by the command line argument --worker-version (defaults to 'stable')
+
+worker_repository = '/afs/crc.nd.edu/group/ccl/software'
+
+###### END OF CONFIGURATION
+
+
+
+
 
 def write_stdout(lefile, proc, mid, lelock):
     with proc.stdout:
@@ -69,22 +96,13 @@ if __name__ == "__main__":
         cmd = sys.argv[3:]
         output = sys.argv[1][len('--output='):]
 
-    #finding config file
-    mydir = os.path.dirname(os.path.realpath(__file__))
+
+    # osused is the path to the image for target
     try:
-        cfg = open(mydir+"/"+"runos.cfg","r")
-    except IOError:
-        sys.stderr.write("config file not found at: "+mydir+"/runos.cfg\n")
-        exit(16)
-    oslocs = json.loads(cfg.read())
-    cfg.close()
-    #getting image path
-    try:
-        osused = oslocs[target]
-        osused=osused.replace("$CONFIG_PATH",mydir)
+        osused = os.path.join(image_repository, image_of[target])
     except KeyError:
-        sys.stderr.write("target OS not found in config file\n")
-        exit(18)
+        sys.stderr.write("could not find an image for target os '{}'\n".format(target))
+        exit(1)
     
     #ensure singularity on computer
     run_native=False
