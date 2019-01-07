@@ -59,14 +59,7 @@ def write_stderr(lefile, proc, mid, lelock):
 
 
 def clean_and_remove(path):
-    allthings = os.listdir(path)
-    for x in allthings:
-        if os.path.isdir(x):
-            clean_and_remove(x)
-            os.rmdir(x)
-        else:
-            os.remove(x)
-    return 1
+    return shutil.rmtree(path)
 
 def show_help():
     sys.stderr.write("""
