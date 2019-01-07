@@ -46,7 +46,6 @@ See the file COPYING for details.
 #include <signal.h>
 
 #define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/cctools-runos"
-#define CCTOOLS_VC3_BUILDER_PATH "/afs/crc.nd.edu/group/ccl/software/vc3-builder-src/vc3-builder"
 
 typedef enum {
 	FORMAT_TABLE,
@@ -102,7 +101,7 @@ static char *wrapper_input = 0;
 static char *worker_command = 0;
 
 static char *runos_os = 0;
-static char *runos_cctools_nd = "cctools-stable";
+static char *runos_worker_version = "stable";
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -405,14 +404,9 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(runos_os){
-		char* vc3_cmd = string_format("./vc3-builder --var CCTOOLS_ND=\"%s\" --require cctools-wq-worker -- %s",runos_cctools_nd,cmd);
-		char* temp = string_format("python %s %s %s",CCTOOLS_RUNOS_PATH,runos_os,vc3_cmd);
-		free(vc3_cmd);
+		char* temp = string_format("%s --worker-version %s %s %s", CCTOOLS_RUNOS_PATH, runos_worker_version, runos_os, cmd);
 		free(cmd);
 		cmd = temp;
-		temp = string_format("%s,%s",files,"vc3-builder");
-		free(files);
-		files = temp;
 	}else{
 		char* temp = string_format("%s,%s",files,worker);
 		free(files);
@@ -1240,7 +1234,7 @@ int main(int argc, char *argv[])
 				runos_os = xxstrdup(optarg);
 				break;
 			case LONG_OPT_RUN_OS_WORKER_VERSION:
-				runos_cctools_nd = xxstrdup(optarg);
+				runos_worker_version = xxstrdup(optarg);
 				break;
 			default:
 				show_help(argv[0]);
@@ -1345,16 +1339,6 @@ int main(int argc, char *argv[])
 		free(cmd);
 	}
 	
-	
-	if(runos_os) {
-		cmd = string_format("cp '%s' '%s'",  CCTOOLS_VC3_BUILDER_PATH, scratch_dir);
-		int k = system(cmd);
-		if (k) {
-			fprintf(stderr, "can't copy vc3-builder! Please make sure it's at `%s`. Error code: %i\n",  CCTOOLS_VC3_BUILDER_PATH, k);
-			exit(EXIT_FAILURE);
-		}
-	}
-
 	if(password_file) {
 		cmd = string_format("cp %s %s/pwfile",password_file,scratch_dir);
 		system(cmd);

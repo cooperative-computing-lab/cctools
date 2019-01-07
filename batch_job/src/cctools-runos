@@ -8,6 +8,7 @@ import sys
 import os
 import subprocess
 import shlex
+import shutil
 import uuid
 import platform
 import threading
@@ -130,6 +131,14 @@ def parse_command_line_argumets(argv):
         show_help()
         sys.exit(1)
 
+def find_worker_executable(worker_repository, target, worker_version):
+    worker_executable = os.path.join(worker_repository, 'x86_64', target, 'cctools', worker_version, 'bin', 'work_queue_worker')
+
+    if not (os.path.isfile(worker_executable) and os.access(worker_executable, os.X_OK)):
+        sys.stderr.write("could not find worker executable at '{}'\n".format(worker_executable))
+        exit(1)
+
+    return worker_executable
 
 
 if __name__ == "__main__":
@@ -140,15 +149,17 @@ if __name__ == "__main__":
     if(debug_output):
         logfile = open(debug_output, 'a+')
 
-    switch=True
-
     # osused is the path to the image for target
     try:
         osused = os.path.join(image_repository, image_of[target])
     except KeyError:
         sys.stderr.write("could not find an image for target os '{}'\n".format(target))
         exit(1)
+
+    # worker_executable is the path to the correct work_queue_worker
+    worker_executable = find_worker_executable(worker_repository, target, worker_version)
     
+    switch=True
     #ensure singularity on computer
     run_native=False
     try:
@@ -162,7 +173,8 @@ if __name__ == "__main__":
                 run_native = True
             else:
                 sys.stderr.write("The System doesn't have Singularity Installed, and the target is unrecognized!\n")
-                exit(17)
+                exit(2)
+
         #can assume singularity
         proc2 = subprocess.Popen('singularity exec %s python -c "import platform; print platform.dist()"'%osused,stdout=subprocess.PIPE,shell=True)
         (imgbase,err2) = proc2.communicate() 
@@ -172,7 +184,11 @@ if __name__ == "__main__":
             run_native = True
     except Exception, e:
         print e
-        exit(88)
+        exit(2)
+
+
+    cmd = ['./work_queue_worker'] + worker_opts
+
     
     #calling process
     mid = uuid.uuid4()
@@ -182,11 +198,13 @@ if __name__ == "__main__":
     else:
         tmphome = "/tmp/runos_singularity_home-%d"%mid
         if not (os.path.isdir(tmphome)):
-            os.mkdir(tmphome,0777)
+            os.mkdir(tmphome,0755)
 
-        cmdwrap = "'cd /disk; %s'" % (arr_to_str(cmd))
-        #newcmd  = ["exec","--bind","%s:/disk"%os.getcwd(),"--home","%s:%s"%(tmphome,tmphome),"--bind","/var:/var","--bind","/afs/crc.nd.edu/group/ccl/software:/cclsoftware",osused,"sh","-c",cmdwrap]
-        newcmd  = ["exec","--bind","%s:/disk"%os.getcwd(),"--home","%s:%s"%(tmphome,tmphome),"--bind","/var:/var","--bind","/afs/:/afs",osused,"sh","-c",cmdwrap]
+        shutil.copy(worker_executable, tmphome)
+
+
+        cmdwrap = "'cd /worker-home; %s'" % (arr_to_str(cmd))
+        newcmd  = ["exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", cmdwrap]
 
         if os.path.isfile("/usr/local/bin/singularity"):
             newcmd.insert(0, "/usr/local/bin/singularity")
