@@ -7,11 +7,11 @@
 import sys
 import os
 import subprocess
-import json
 import shlex
 import uuid
 import platform
 import threading
+import getopt
 
 ######## Configuration
 
@@ -76,26 +76,71 @@ def arr_to_str(arr):
     for x in arr:
         s += ("%s " % x)
     return s[:-1]
+
 def convert(shlex_list):
     a = []
     for x in shlex_list:
         a.append(str(x))
     return a
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        sys.stderr.write("Usage: runos (rhel6|rhel7) [arguments ...]\n")
-        exit(2)
-    target = sys.argv[1]
-    cmd = sys.argv[2:]
-    output = 'runos-output.txt'
-    switch=False
-    if '--output=' in sys.argv[1]:
-        switch=True
-        target = sys.argv[2]
-        cmd = sys.argv[3:]
-        output = sys.argv[1][len('--output='):]
 
+def show_help():
+    sys.stderr.write("""
+    Usage:
+        runos [--worker-version VERSION] [--debug-file OUTPUT] [--singularity SINGULARITY-EXEC] --os TARGET_OS --run-worker -- WORKER-ARGUMENTS ...
+
+        or 
+
+        runos [--worker-version VERSION] [--debug-file OUTPUT] [--singularity SINGULARITY-EXEC] --os TARGET_OS COMMAND_TO_RUN COMMAND_ARGUMENTS ...
+
+        where TARGET_OS is one of: {}
+    """.format(', '.join(image_of.keys())))
+
+def parse_command_line_argumets(argv):
+    try:
+        opts, args_left = getopt.getopt(sys.argv[1:], '', ['os=','run-worker', 'worker-version=','debug-file=','singularity='])
+
+        opts_dict = dict(opts)
+        command_opts = args_left
+
+        print(sys.argv)
+        print(args_left)
+        print(opts)
+
+        if not ('--os' in opts_dict.keys()):
+            sys.stderr.write("command line option '--os' is required")
+            show_help()
+            sys.exit(1)
+
+        target           = opts_dict['--os']
+        worker_version   = opts_dict.get('--worker-version', 'stable')
+        debug_output     = opts_dict.get('--debug-file',  None)
+        singularity_opt  = opts_dict.get('--singularity', None)
+        run_worker       = True if '--run-worker' in opts_dict.keys() else False
+
+        if run_worker is False and not command_opts:
+            sys.stderr.write("Either COMMAND_TO_RUN or --run-worker are needed.")
+            show_help()
+            sys.exit(1)
+
+        return (target, run_worker, command_opts, singularity_opt, worker_version, debug_output)
+
+    except Exception:
+        raise
+        show_help()
+        sys.exit(1)
+
+
+
+if __name__ == "__main__":
+
+    target, worker_opts, run_worker, singularity_opt, worker_version, debug_output = parse_command_line_argumets(sys.argv)
+
+    logfile = sys.stderr
+    if(debug_output):
+        logfile = open(debug_output, 'a+')
+
+    switch=True
 
     # osused is the path to the image for target
     try:
@@ -131,8 +176,6 @@ if __name__ == "__main__":
     
     #calling process
     mid = uuid.uuid4()
-    if switch:
-        logfile = open(output,'a+')
     if run_native and not run_native:
         exitcode = subprocess.call(cmd)
         exit(exitcode)
