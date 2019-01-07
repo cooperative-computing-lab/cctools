@@ -39,15 +39,12 @@ worker_repository = '/afs/crc.nd.edu/group/ccl/software'
 ###### END OF CONFIGURATION
 
 
-
-
-
 def write_stdout(lefile, proc, mid, lelock):
     with proc.stdout:
         for line in iter(proc.stdout.readline,b''):
             lelock.acquire()
             try:
-                logfile.write('[runos-%d]out: %s\n'%(mid,line))
+                logfile.write('[runos-{}] out: {}\n'.format(mid,line))
             finally:
                 lelock.release()
 
@@ -56,7 +53,7 @@ def write_stderr(lefile, proc, mid, lelock):
         for line in iter(proc.stderr.readline,b''):
             lelock.acquire()
             try:
-                logfile.write('[runos-%d]err: %s\n'%(mid,line))
+                logfile.write('[runos-{}] err: {}\n'.format(mid,line))
             finally:
                 lelock.release()
 
@@ -191,12 +188,12 @@ if __name__ == "__main__":
 
     
     #calling process
-    mid = uuid.uuid4()
+    mid = str(uuid.uuid4())[:8]
     if run_native and not run_native:
         exitcode = subprocess.call(cmd)
         exit(exitcode)
     else:
-        tmphome = "/tmp/runos_singularity_home-%d"%mid
+        tmphome = "/tmp/runos_singularity_home-{}".format(mid)
         if not (os.path.isdir(tmphome)):
             os.mkdir(tmphome,0755)
 
@@ -223,8 +220,8 @@ if __name__ == "__main__":
             #logfile.close()
             exit(exitcode)
         else:   
-            logfile.write('[runos-%d]: %s\n'%(mid,'STARTING'))
-            logfile.write('[runos-%d]cmd: %s\n'%(mid,' '.join(newcmd)))
+            logfile.write('[runos-{}]: {}\n'.format(mid,'STARTING'))
+            logfile.write('[runos-{}] cmd: {}\n'.format(mid,' '.join(newcmd)))
             proc = subprocess.Popen(' '.join(newcmd),stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True)  
             lelock = threading.Lock()
             out_t = threading.Thread(target = write_stdout, args=(logfile, proc, mid, lelock,))
@@ -245,7 +242,7 @@ if __name__ == "__main__":
             #print(err)
             #logfile.write('[runos-%d]out: %s\n'%(mid,out))
             #logfile.write('[runos-%d]err: %s\n'%(mid,err))
-            logfile.write('[runos-%d]ret: %i\n'%(mid,exitcode))
+            logfile.write('[runos-{}] ret: {}\n'.format(mid,exitcode))
             logfile.close()
             exit(exitcode)  
 
