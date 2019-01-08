@@ -84,10 +84,6 @@ def parse_command_line_argumets(argv):
         opts_dict = dict(opts)
         command_opts = args_left
 
-        print(sys.argv)
-        print(args_left)
-        print(opts)
-
         if not ('--os' in opts_dict.keys()):
             sys.stderr.write("command line option '--os' is required")
             show_help()
@@ -157,7 +153,7 @@ def find_sigularity_executable(path_from_opt):
 
 if __name__ == "__main__":
 
-    target, worker_opts, run_worker, singularity_opt, worker_version, debug_output = parse_command_line_argumets(sys.argv)
+    target, run_worker, command_opts, singularity_opt, worker_version, debug_output = parse_command_line_argumets(sys.argv)
 
     logfile = sys.stderr
     if(debug_output):
@@ -170,8 +166,13 @@ if __name__ == "__main__":
         sys.stderr.write("could not find an image for target os '{}'\n".format(target))
         exit(1)
 
-    # worker_executable is the path to the correct work_queue_worker
-    worker_executable = find_worker_executable(worker_repository, target, worker_version)
+    # executable is the path to the correct work_queue_worker if --run-worker is given
+    executable = None
+    if run_worker:
+        executable = find_worker_executable(worker_repository, target, worker_version)
+    else:
+        executable = command_opts.pop(0)
+
 
     # singularity_executable is the absolute path to singularity
     singularity_executable = find_sigularity_executable(singularity_opt)
@@ -198,25 +199,26 @@ if __name__ == "__main__":
         sys.stderr.write("could not create temporary directory {}: {}".format(tmphome), e)
         sys.exit(3)
 
-    try:
-        shutil.copy(worker_executable, tmphome)
-    except Exception as e:
-        sys.stderr.write("could not copy worker executable {} to temporary directory {}: {}".format(worker_executable, tmphome), e)
-        sys.exit(3)
+    if run_worker:
+        try:
+            shutil.copy(executable, tmphome)
+            executable = os.path.join(tmphome, os.path.basename(executable))   # execute with a path from inside singularity
+        except Exception as e:
+            sys.stderr.write("could not copy worker executable {} to temporary directory {}: {}".format(executable, tmphome), e)
+            sys.exit(3)
 
-
-    worker_cmdlst  = [os.path.join(tmphome, 'work_queue_worker')] + worker_opts
-    worker_command = ' '.join(worker_cmdlst)
+    cmdlst  = [executable] + command_opts
+    command = ' '.join(cmdlst)
 
     proc = None
     
     if run_native:
         logfile.write('[runos-{}]: STARTING with native execution\n'.format(unique_id))
         logfile.write('[runos-{}] cmd: {}\n'.format(unique_id, worker_command))
-        proc = subprocess.Popen(worker_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  
     else:
-        sing_cmdlst = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c", "'" + " ".join(worker_cmdlst) + "'"]
-        sing_cmdlst.append("'" + worker_command + "'")
+        sing_cmdlst = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c"]
+        sing_cmdlst.append("'" + command + "'")
         sing_cmd = ' '.join(sing_cmdlst)
 
         proc = subprocess.Popen(sing_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  

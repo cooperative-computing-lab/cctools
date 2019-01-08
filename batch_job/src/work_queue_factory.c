@@ -404,7 +404,7 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(runos_os){
-		char* temp = string_format("%s --worker-version %s %s %s", CCTOOLS_RUNOS_PATH, runos_worker_version, runos_os, cmd);
+		char* temp = string_format("%s --os %s --worker-version %s --run-worker -- %s", CCTOOLS_RUNOS_PATH, runos_worker_version, runos_os, cmd);
 		free(cmd);
 		cmd = temp;
 	}else{
