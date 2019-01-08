@@ -53,6 +53,8 @@ install:
 	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
+	mkdir -p $(CCTOOLS_INSTALL_DIR)/etc/cctools
+	cp cctools-runos.json $(CCTOOLS_INSTALL_DIR)/etc/cctools
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools
 

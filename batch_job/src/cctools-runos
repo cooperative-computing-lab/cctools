@@ -4,40 +4,39 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
-import sys
+import distutils
+import getopt
+import json
 import os
-import subprocess
+import platform
+import re
 import shlex
 import shutil
-import distutils
+import subprocess
+import sys
 import uuid
-import platform
-import getopt
-import re
 
-######## Configuration
+#### All the following variables are set by reading the configuration file cctools-runos.json
 
 #### Directory where images reside. All workers should have reading access to this directory.
-
-image_repository = '/afs/crc.nd.edu/group/ccl/software/runos'
-
-#### Mapping 'Name of OS' to 'image'. 'image' is expected to be a singularity
-#### image in the image_repository directory.
-
-image_of = {
-    'redhat6'  : 'rhel6.img',
-    'redhat7'  : 'rhel7.img',
-}
+image_repository = None
 
 #### Directory where the workers reside. 
 #### The hierarchy expected is worker_repository/ARCHITECTURE/OS/cctools/CCTOOLS_VERSION/bin/work_queue_worker
 #### ARCHITECTURE will eventually be found automatically. Now it's fixed to x86_64
 #### OS is a reguired command line argument (e.g., redhat7)
 #### CCTOOLS_VERSION is set by the command line argument --worker-version (defaults to 'stable')
+worker_repository = None
 
-worker_repository = '/afs/crc.nd.edu/group/ccl/software'
+#### Mapping 'Name of OS' to 'image'. 'image' is expected to be a singularity
+#### image in the image_repository directory.
+image_of = {}
 
-###### END OF CONFIGURATION
+####
+
+
+#### Original contents of configuration file
+conf_contents = None
 
 
 def clean_and_remove(path):
@@ -46,39 +45,40 @@ def clean_and_remove(path):
 def show_help():
     sys.stderr.write("""
     Usage:
-        runos [--worker-version VERSION] [--debug-file OUTPUT] [--singularity SINGULARITY-EXEC] --os TARGET_OS --run-worker -- WORKER-ARGUMENTS ...
+        runos [--conf CONF] [--debug-file OUTPUT] [--singularity SINGULARITY-EXEC] --os TARGET_OS --worker-version VERSION --run-worker -- WORKER-ARGUMENTS ...
 
         or 
 
-        runos [--worker-version VERSION] [--debug-file OUTPUT] [--singularity SINGULARITY-EXEC] --os TARGET_OS COMMAND_TO_RUN COMMAND_ARGUMENTS ...
-
-        where TARGET_OS is one of: {}
-    """.format(', '.join(image_of.keys())))
+        runos [--conf CONF] [--debug-file OUTPUT] [--singularity SINGULARITY-EXEC] --os TARGET_OS COMMAND_TO_RUN COMMAND_ARGUMENTS ...
+    """)
 
 def parse_command_line_argumets(argv):
     try:
-        opts, args_left = getopt.getopt(sys.argv[1:], '', ['os=','run-worker', 'worker-version=','debug-file=','singularity='])
+        opts, args_left = getopt.getopt(sys.argv[1:], '', ['os=', 'conf=', 'dump-conf', 'run-worker', 'worker-version=','debug-file=','singularity='])
 
         opts_dict = dict(opts)
         command_opts = args_left
 
-        if not ('--os' in opts_dict.keys()):
-            sys.stderr.write("command line option '--os' is required")
-            show_help()
-            sys.exit(1)
+        target          = opts_dict.get('--os', None)
+        worker_version  = opts_dict.get('--worker-version', 'stable')
+        debug_output    = opts_dict.get('--debug-file',  None)
+        singularity_opt = opts_dict.get('--singularity', None)
+        conf            = find_conf_file(opts_dict.get('--conf', None))
+        run_worker      = True if '--run-worker' in opts_dict.keys() else False
+        dump_conf       = True if '--dump-conf' in opts_dict.keys() else False
 
-        target           = opts_dict['--os']
-        worker_version   = opts_dict.get('--worker-version', 'stable')
-        debug_output     = opts_dict.get('--debug-file',  None)
-        singularity_opt  = opts_dict.get('--singularity', None)
-        run_worker       = True if '--run-worker' in opts_dict.keys() else False
+        if not dump_conf:
+            if target is None:
+                sys.stderr.write("command line option '--os' is required")
+                show_help()
+                sys.exit(1)
 
-        if run_worker is False and not command_opts:
-            sys.stderr.write("Either COMMAND_TO_RUN or --run-worker are needed.")
-            show_help()
-            sys.exit(1)
+            if run_worker is False and not command_opts:
+                sys.stderr.write("Either COMMAND_TO_RUN or --run-worker are needed.")
+                show_help()
+                sys.exit(1)
 
-        return (target, run_worker, command_opts, singularity_opt, worker_version, debug_output)
+        return (target, conf, dump_conf, run_worker, command_opts, singularity_opt, worker_version, debug_output)
 
     except Exception:
         raise
@@ -93,6 +93,42 @@ def find_worker_executable(worker_repository, target, worker_version):
         exit(1)
 
     return worker_executable
+
+def find_conf_file(conf_path):
+    base = os.path.dirname(os.path.abspath(__file__))
+
+    if conf_path:
+        return conf_path
+
+    for location in [ '', '../etc/cctools', '../etc' ]:
+        candidate = os.path.join(base, location, 'cctools-runos.json')
+
+        if os.path.isfile(candidate):
+            return candidate
+
+    sys.stderr.write("could not find a configuration file\n")
+    exit(1)
+
+
+def read_configuration(conf_path):
+
+    try:
+        with open(conf_path) as f:
+            raw = f.read()
+            conf_dict = json.loads(raw)
+
+            image_repository  = conf_dict['image-repository']
+            worker_repository = conf_dict['worker-repository']
+            image_of          = conf_dict['images']
+            conf_contents     = raw
+
+            return (image_repository, worker_repository, image_of, conf_contents)
+    except KeyError as e:
+        sys.stderr.write("configuration file {} does not have key {}".format(conf_path, e))
+        exit(1)
+    except Exception as e:
+        sys.stderr.write("error reading configuration file {}: {}".format(conf_path, e))
+        exit(1)
 
 
 def find_executable(executable, paths = os.environ['PATH']):
@@ -131,11 +167,18 @@ def find_sigularity_executable(path_from_opt):
 
 if __name__ == "__main__":
 
-    target, run_worker, command_opts, singularity_opt, worker_version, debug_output = parse_command_line_argumets(sys.argv)
+    target, conf, dump_conf, run_worker, command_opts, singularity_opt, worker_version, debug_output = parse_command_line_argumets(sys.argv)
+
+    image_repository, worker_repository, image_of, conf_contents = read_configuration(conf)
+
+    if(dump_conf):
+        sys.stdout.write(conf_contents)
+        sys.exit(0)
 
     logfile = sys.stderr
     if(debug_output):
         logfile = open(debug_output, 'a+')
+
 
     # osused is the path to the image for target
     try:

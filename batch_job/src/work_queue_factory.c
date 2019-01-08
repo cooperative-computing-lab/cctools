@@ -1055,6 +1055,7 @@ static const struct option long_options[] = {
 	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
 	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
+	{"runos-binary", required_argument, 0, LONG_OPT_RUONS_BINARY},
 	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
@@ -1330,40 +1331,39 @@ int main(int argc, char *argv[])
 	}
 
 	char* cmd;
-	if(worker_command != NULL){
-		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
+	if(!worker_command) {
+		worker_command = path_which("work_queue_worker");
+	}
+
+	cmd = string_format("cp '%s' '%s' 2>/dev/null",worker_command,scratch_dir);
+	if(system(cmd)){
+		fprintf(stderr, "work_queue_factory: Could not stage worker_queue_worker binary. %s\n", cmd);
+		fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH or use --worker-binary.\n");
+		exit(EXIT_FAILURE);
+	}
+	free(cmd);
+
+	if(runos_os) {
+		if(!runos_command) {
+			runos_command = path_which("cctools-runos");
+		}
+
+		cmd = string_format("cp '%s' '%s' 2>/dev/null", runos_command, scratch_dir);
 		if(system(cmd)){
-			fprintf(stderr, "work_queue_factory: Could not access specified worker_queue_worker binary.\n");
+			fprintf(stderr, "work_queue_factory: Could not stage cctools-runos binary.\n");
+			fprintf(stderr, "work_queue_factory: please add cctools-runos to your PATH or use --runos-binary.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
-	} else{
-		cmd = string_format("cp \"$(which work_queue_worker 2>/dev/null)\" '%s'",scratch_dir);
-		if (system(cmd)) {
-			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
+
+		cmd = string_format("%s --dump-conf > %s/cctools-runos.json 2>/dev/null", runos_command, scratch_dir);
+		if(system(cmd)) {
+			fprintf(stderr, "work_queue_factory: Could not stage cctools-runos.json configuration file.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
 	}
 
-	if(runos_os) {
-		if(runos_command != NULL){
-			cmd = string_format("cp '%s' '%s' 2>/dev/null", runos_command, scratch_dir);
-			if(system(cmd)){
-				fprintf(stderr, "work_queue_factory: Could not access specified cctools-runos binary.\n");
-				exit(EXIT_FAILURE);
-			}
-			free(cmd);
-		} else{
-			cmd = string_format("cp \"$(which cctools-runos 2>/dev/null)\" '%s' 2>/dev/null",scratch_dir);
-			if (system(cmd)) {
-				fprintf(stderr, "work_queue_factory: please add cctools-runos to your PATH.\n");
-				exit(EXIT_FAILURE);
-			}
-			free(cmd);
-		}
-	}
-	
 	if(password_file) {
 		cmd = string_format("cp %s %s/pwfile",password_file,scratch_dir);
 		system(cmd);
