@@ -12,7 +12,6 @@ import shutil
 import distutils
 import uuid
 import platform
-import threading
 import getopt
 import re
 
@@ -39,27 +38,6 @@ image_of = {
 worker_repository = '/afs/crc.nd.edu/group/ccl/software'
 
 ###### END OF CONFIGURATION
-
-
-def write_stdout(lefile, proc, unique_id, lelock):
-    with proc.stdout:
-        for line in iter(proc.stdout.readline, b''):
-            lelock.acquire()
-            try:
-                line = bytearray(line).decode('utf-8') #compat between py2 and py3
-                logfile.write('[runos-{}] stdout: {}\n'.format(unique_id,str(line)))
-            finally:
-                lelock.release()
-
-def write_stderr(lefile, proc, unique_id, lelock):
-    with proc.stderr:
-        for line in iter(proc.stderr.readline,b''):
-            lelock.acquire()
-            try:
-                line = bytearray(line).decode('utf-8') #compat between py2 and py3
-                logfile.write('[runos-{}] stderr: {}\n'.format(unique_id,str(line)))
-            finally:
-                lelock.release()
 
 
 def clean_and_remove(path):
@@ -208,35 +186,22 @@ if __name__ == "__main__":
             sys.exit(3)
 
     cmdlst  = [executable] + command_opts
-    command = ' '.join(cmdlst)
 
-    proc = None
-    
-    if run_native:
+    if run_native or True:
         logfile.write('[runos-{}]: STARTING with native execution\n'.format(unique_id))
-        logfile.write('[runos-{}] cmd: {}\n'.format(unique_id, worker_command))
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  
     else:
-        sing_cmdlst = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), "--bind","/var:/var", osused, "sh", "-c"]
-        sing_cmdlst.append("'" + command + "'")
-        sing_cmd = ' '.join(sing_cmdlst)
-
-        proc = subprocess.Popen(sing_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)  
         logfile.write('[runos-{}]: STARTING with singularity image {}\n'.format(unique_id,osused))
-        logfile.write('[runos-{}] cmd: {}\n'.format(unique_id, sing_cmd))
+        sing_cmdlst = [singularity_executable, "exec", "--home", "{}:/worker-home".format(tmphome), osused]
+        cmdlst = sing_cmdlst + cmdlst
 
-    lelock = threading.Lock()
-    out_t = threading.Thread(target = write_stdout, args=(logfile, proc, unique_id, lelock,))
-    err_t = threading.Thread(target = write_stderr, args=(logfile, proc, unique_id, lelock,))
-    out_t.start()
-    err_t.start()
-    out_t.join()
-    err_t.join()
-    proc.wait()
-    exitcode = proc.returncode
+    logfile.write('[runos-{}]: {}\n'.format(unique_id, cmdlst))
+
+    exitcode = subprocess.call(cmdlst, stdout=logfile, stderr=subprocess.STDOUT)
+
     clean_and_remove(tmphome)
     logfile.write('[runos-{}] ret: {}\n'.format(unique_id,exitcode))
     logfile.close()
+
     exit(exitcode)  
 
 #vim: set sts=4 sw=4 ts=4 expandtab ft=python:
