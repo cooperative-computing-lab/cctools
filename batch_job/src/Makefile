@@ -4,6 +4,7 @@ include ../../rules.mk
 LIBRARIES = libbatch_job.a
 
 PROGRAMS = work_queue_factory work_queue_pool
+SCRIPTS  = cctools-runos
 
 ifeq ($(CCTOOLS_CHIRP),chirp)
 CHIRP_LIB=../../chirp/src/libchirp.a
@@ -49,7 +50,7 @@ work_queue_pool: work_queue_factory
 
 install:
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin
+	cp $(PROGRAMS) $(SCRIPTS) $(CCTOOLS_INSTALL_DIR)/bin
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/lib
 	cp $(LIBRARIES) $(CCTOOLS_INSTALL_DIR)/lib
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/include/cctools

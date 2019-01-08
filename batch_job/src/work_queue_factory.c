@@ -45,8 +45,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <signal.h>
 
-#define CCTOOLS_RUNOS_PATH "/afs/crc.nd.edu/group/ccl/software/runos/cctools-runos"
-
 typedef enum {
 	FORMAT_TABLE,
 	FORMAT_LONG
@@ -102,6 +100,7 @@ static char *worker_command = 0;
 
 static char *runos_os = 0;
 static char *runos_worker_version = "stable";
+static char *runos_command = 0;
 
 /* -1 means 'not specified' */
 static struct rmsummary *resources = NULL;
@@ -345,7 +344,7 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	const char *worker = runos_os ? "work_queue_worker" : "./work_queue_worker";
+	const char *worker = runos_os ? "--run-worker -- " : "./work_queue_worker";
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -404,9 +403,13 @@ static int submit_worker( struct batch_queue *queue )
 	}
 	
 	if(runos_os){
-		char* temp = string_format("%s --os %s --worker-version %s --run-worker -- %s", CCTOOLS_RUNOS_PATH, runos_worker_version, runos_os, cmd);
+		char* temp = string_format("./cctools-runos --os %s --worker-version %s %s", runos_os, runos_worker_version, cmd);
 		free(cmd);
 		cmd = temp;
+
+		char *newfiles = string_format("%s,%s",files,"cctools-runos");
+		free(files);
+		files = newfiles;
 	}else{
 		char* temp = string_format("%s,%s",files,worker);
 		free(files);
@@ -1008,6 +1011,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_WRAPPER, 
 		LONG_OPT_WRAPPER_INPUT,
 		LONG_OPT_WORKER_BINARY,
+		LONG_OPT_RUONS_BINARY,
 		LONG_OPT_MESOS_MASTER, 
 		LONG_OPT_MESOS_PATH,
 		LONG_OPT_MESOS_PRELOAD,
@@ -1187,6 +1191,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = strdup(optarg);
 				break;
+			case LONG_OPT_RUONS_BINARY:
+				runos_command = strdup(optarg);
+				break;
 			case 'P':
 				password_file = optarg;
 				break;
@@ -1326,17 +1333,35 @@ int main(int argc, char *argv[])
 	if(worker_command != NULL){
 		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
-			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
+			fprintf(stderr, "work_queue_factory: Could not access specified worker_queue_worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
-	}else{
-		cmd = string_format("cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
+	} else{
+		cmd = string_format("cp \"$(which work_queue_worker 2>/dev/null)\" '%s'",scratch_dir);
 		if (system(cmd)) {
 			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
+	}
+
+	if(runos_os) {
+		if(runos_command != NULL){
+			cmd = string_format("cp '%s' '%s' 2>/dev/null", runos_command, scratch_dir);
+			if(system(cmd)){
+				fprintf(stderr, "work_queue_factory: Could not access specified cctools-runos binary.\n");
+				exit(EXIT_FAILURE);
+			}
+			free(cmd);
+		} else{
+			cmd = string_format("cp \"$(which cctools-runos 2>/dev/null)\" '%s' 2>/dev/null",scratch_dir);
+			if (system(cmd)) {
+				fprintf(stderr, "work_queue_factory: please add cctools-runos to your PATH.\n");
+				exit(EXIT_FAILURE);
+			}
+			free(cmd);
+		}
 	}
 	
 	if(password_file) {
