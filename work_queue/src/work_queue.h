@@ -264,6 +264,13 @@ struct work_queue_stats {
 	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
 
+    double master_load;       /**< In the range of [0,1]. If close to 1, then
+                                the master is at full load and spends most
+                                of its time sending and receiving taks, and
+                                thus cannot accept connections from new
+                                workers. If close to 0, the master is spending
+                                most of its time waiting for something to happen. */
+
 	/**< deprecated fields: */
 	int total_workers_connected;    /**< @deprecated Use workers_connected instead. */
 	int total_workers_joined;       /**< @deprecated Use workers_joined instead. */
