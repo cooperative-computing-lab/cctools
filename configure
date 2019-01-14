@@ -99,8 +99,8 @@ irods_path="/usr"
 mysql_path="/usr"
 openssl_path="/usr"
 perl_path="/usr"
-python3_path="/usr"
 python_path="/usr"
+python3_path="/usr"
 readline_path="/usr"
 swig_path="/usr"
 uuid_path="/usr"
@@ -133,9 +133,9 @@ config_curl_path=no
 config_cvmfs_path=no
 config_globus_path=no
 config_irods_path=no
+config_mpicc_path=no
 config_openssl_path=no
 config_xrootd_path=no
-config_mpicc_path=no
 
 config_static_libgcc=yes
 
@@ -927,18 +927,23 @@ else
 	echo "*** skipping curl support"
 fi
 
+system_includes=/usr/include
 
 if [ $BUILD_SYS = DARWIN ]
 then
-	if [ ! -d "/usr/include" ]
-	then
-		# The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
-		# Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
-		echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
-		echo "*** Please refer to the installation instructions."
-		exit 1
-	fi
+        if [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include" ]
+        then
+                system_includes="/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
+		osx_getopt_from_sdk=yes
+        else
+                # The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
+                # Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
+                echo "*** Sorry, I can't proceed without Mac OS X Command Line Tools."
+                echo "*** Please refer to the installation instructions."
+                exit 1
+        fi
 fi
+
 
 if [ $config_perl_path != no ]
 then
@@ -1100,25 +1105,6 @@ then
 		echo "*** skipping python bindings support"
 	fi
 fi
-if [ "$fuse_avail" != yes ]; then
-	echo "grow_fuse requires FUSE"
-fi
-
-# If python is not found, then leave out weaver.
-
-if [ "$python_major_version" = 2 -a "$python_minor_version" -ge 6 ]
-then
-	echo "python version is suitable for umbrella"
-	echo "python version is suitable for prune"
-	echo "python version is suitable for weaver"
-else
-	echo "umbrella requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/umbrella//g'`
-	echo "prune requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/prune//g'`
-	echo "weaver requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/weaver//g'`
-fi
 
 if [ $config_python3_path != no ]
 then
@@ -1157,24 +1143,20 @@ then
 				# python3_ldflags=$(${python3}-config --ldflags) # it includes static libs, so we need:
 				python3_ldflags_file=`mktemp tmp.XXXXXX`
 				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
-from re import search
 from distutils import sysconfig
-
-libname = sysconfig.get_config_var('LDLIBRARY')
-
-libs = []
-
-if not search('^libpython.*\.so.*', libname):
-    libs.append('-L' + sysconfig.get_config_var('LIBPL'))
-
-libs.append('-L' + ' -L'.join(sysconfig.get_config_var('LIBDIR').split()))
-libs.append('-lpython' + sysconfig.get_config_var('LDVERSION'))
-libs.extend(sysconfig.get_config_var('LIBS').split())
-libs.extend(sysconfig.get_config_var('SYSLIBS').split())
-libs.append('-lz')
-libs.extend(sysconfig.get_config_var('LINKFORSHARED').split())
-
-print(' '.join(libs))
+flags = ['-I' + sysconfig.get_python_inc(),
+	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
+syscfgflags = sysconfig.get_config_var('CFLAGS')
+if not syscfgflags is None:
+	flags.extend(syscfgflags.split())
+print ' '.join(flags)
+EOF
+			env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
+from distutils import sysconfig
+libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
+if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
+	libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
+print ' '.join(libs)
 EOF
 				python3_ldflags=$(cat $python3_ldflags_file)
 				rm $python3_ldflags_file
@@ -1219,6 +1201,32 @@ EOF
 			echo "*** skipping python3 support"
 		fi
 	fi
+fi
+
+
+if [ "$fuse_avail" != yes ]; then
+	echo "grow_fuse requires FUSE"
+fi
+
+# If python is not found, then leave out weaver.
+
+if [ "$python" = 0 ]
+then
+	echo "python version is suitable for prune"
+	echo "python version is suitable for weaver"
+else
+	packages=`echo ${packages} | sed 's/umbrella//g'`
+	echo "prune requires python >= 2.6"
+	packages=`echo ${packages} | sed 's/prune//g'`
+	echo "weaver requires python >= 2.6"
+	packages=`echo ${packages} | sed 's/weaver//g'`
+fi
+
+if [ "$python" = 0 -o "$python3" = 0 ]
+then
+	echo "python version is suitable for umbrella"
+else
+	echo "umbrella requires python >= 2.6"
 fi
 
 found_swig=no
@@ -1362,21 +1370,21 @@ else
 fi
 
 # sqlite3 uses define "HAVE_*"
-optional_function gmtime_r /usr/include/time.h HAVE_GMTIME_R
-optional_function fdatasync /usr/include/unistd.h HAVE_FDATASYNC
-optional_function isnan /usr/include/math.h HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
-optional_function localtime_r /usr/include/time.h HAVE_LOCALTIME_R
-optional_function localtime_s /usr/include/time.h HAVE_LOCALTIME_S
-optional_function openat /usr/include/fcntl.h HAS_OPENAT
-optional_function pread /usr/include/unistd.h HAS_PREAD USE_PREAD
-optional_function pread64 /usr/include/unistd.h USE_PREAD64
-optional_function pwrite /usr/include/unistd.h HAS_PWRITE USE_PWRITE
-optional_function pwrite64 /usr/include/unistd.h USE_PWRITE64
-optional_function strchrnul /usr/include/string.h HAVE_STRCHRNUL
-optional_function strsignal /usr/include/string.h HAS_STRSIGNAL
-optional_function usleep /usr/include/unistd.h HAS_USLEEP HAVE_USLEEP
-optional_function utime /usr/include/utime.h HAS_UTIME HAVE_UTIME
-optional_function utimensat /usr/include/sys/stat.h HAS_UTIMENSAT
+optional_function gmtime_r ${system_includes}/time.h HAVE_GMTIME_R
+optional_function fdatasync ${system_includes}/unistd.h HAVE_FDATASYNC
+optional_function isnan ${system_includes}/math.h HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
+optional_function localtime_r ${system_includes}/time.h HAVE_LOCALTIME_R
+optional_function localtime_s ${system_includes}/time.h HAVE_LOCALTIME_S
+optional_function openat ${system_includes}/fcntl.h HAS_OPENAT
+optional_function pread ${system_includes}/unistd.h HAS_PREAD USE_PREAD
+optional_function pread64 ${system_includes}/unistd.h USE_PREAD64
+optional_function pwrite ${system_includes}/unistd.h HAS_PWRITE USE_PWRITE
+optional_function pwrite64 ${system_includes}/unistd.h USE_PWRITE64
+optional_function strchrnul ${system_includes}/string.h HAVE_STRCHRNUL
+optional_function strsignal ${system_includes}/string.h HAS_STRSIGNAL
+optional_function usleep ${system_includes}/unistd.h HAS_USLEEP HAVE_USLEEP
+optional_function utime ${system_includes}/utime.h HAS_UTIME HAVE_UTIME
+optional_function utimensat ${system_includes}/sys/stat.h HAS_UTIMENSAT
 
 # sqlite3 uses define "HAVE_*"
 
@@ -1532,6 +1540,13 @@ ccflags_append_define \
 	"INSTALL_PATH='\"${install_path}\"'" \
 	"_GNU_SOURCE" \
 	"_REENTRANT"
+
+if [ "${osx_getopt_from_sdk}" = yes ]
+then
+	ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
+fi
+
+
 ccflags_append "$debug_flag"
 ldflags="${ldflags} ${debug_flag}"
 
@@ -1653,6 +1668,8 @@ CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
 CCTOOLS_PYTHON3_VERSION=${python3_major_version}.${python3_minor_version}
 CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
+
+CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
 
 CCTOOLS_SWIG_BINDINGS=${swig_bindings}
 
