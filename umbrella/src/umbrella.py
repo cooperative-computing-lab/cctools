@@ -83,9 +83,9 @@ except ImportError:
     from urllib.request import urlretrieve # python 3.x
 
 try:
-    from urllib import urlparse, urlsplit         # python 2.x
+    from urlparse import urlsplit         # python 2.x
 except ImportError:
-    from urllib.parse import urlparse, urlsplit   # python 3.x
+    from urllib.parse import urlsplit   # python 3.x
 
 
 #if sys.version_info < (2,6,) or sys.version_info >= (3,):
