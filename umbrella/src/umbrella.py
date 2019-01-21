@@ -220,7 +220,7 @@ def which_exec(name):
         If PATH is not set, directly exit.
         Otherwise, returns None.
     """
-    if not os.environ.has_key("PATH"):
+    if 'PATH' not in os.environ.keys():
         cleanup(tempfile_list, tempdir_list)
         logging.critical("The environment variable PATH is not set!")
         sys.exit("The environment variable PATH is not set!")
@@ -362,12 +362,12 @@ def meta_search(meta_json, name, id=None):
         If one item is found in meta_json, return the item, which is a dictionary.
         If no item satisfied the requirement on meta_json, directly exit.
     """
-    if meta_json.has_key(name):
+    if name in meta_json.keys():
         if not id:
             for item in meta_json[name]:
                 return meta_json[name][item]
         else:
-            if meta_json[name].has_key(id):
+            if id in meta_json[name].keys():
                 return meta_json[name][id]
             else:
                 cleanup(tempfile_list, tempdir_list)
@@ -393,7 +393,7 @@ def attr_check(name, item, attr, check_len = 0):
     """
     logging.debug("check the %s attr of the following item:", attr)
     logging.debug(item)
-    if item.has_key(attr):
+    if attr in item.keys():
         if check_len == 1:
             if len(item[attr]) <= 0:
                 cleanup(tempfile_list, tempdir_list)
@@ -560,10 +560,10 @@ def git_dependency_parser(item, repo_url, sandbox_dir):
     logging.debug("This dependency is stored as a git repository: ")
     logging.debug(item)
     git_branch = ''
-    if item.has_key("branch"):
+    if "branch" in item.keys():
         git_branch = item["branch"]
     git_commit = ''
-    if item.has_key("commit"):
+    if "commit" in item.keys():
         git_commit = item["commit"]
     dest = os.path.dirname(sandbox_dir) + "/cache/" + git_commit
     dest = git_dependency_download(repo_url, dest, git_branch, git_commit)
@@ -727,15 +727,15 @@ def env_parameter_init(hardware_spec, kernel_spec, os_spec):
     hardware_platform = attr_check("hardware", hardware_spec, "arch").lower()
 
     cpu_cores = 1
-    if hardware_spec.has_key("cores"):
+    if "cores" in hardware_spec.keys():
         cpu_cores = hardware_spec["cores"].lower()
 
     memory_size = "1GB"
-    if hardware_spec.has_key("memory"):
+    if "memory" in hardware_spec.keys():
         memory_size = hardware_spec["memory"].lower()
 
     disk_size = "1GB"
-    if hardware_spec.has_key("disk"):
+    if "disk" in hardware_spec.keys():
         disk_size = hardware_spec["disk"].lower()
 
     kernel_name = attr_check("kernel", kernel_spec, "name").lower()
@@ -746,7 +746,7 @@ def env_parameter_init(hardware_spec, kernel_spec, os_spec):
     distro_version = attr_check("os", os_spec, "version").lower()
 
     os_id = ''
-    if os_spec.has_key("id"):
+    if "id" in os_spec.keys():
         os_id = os_spec["id"]
 
     index = distro_version.find('.')
@@ -1037,16 +1037,16 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
             continue
         # always first check whether the attribute is set or not inside the umbrella specificiation file.
         id = ''
-        if software_spec[item].has_key('id'):
+        if 'id' in software_spec[item].keys():
             id = software_spec[item]['id']
         mountpoint = ''
-        if software_spec[item].has_key('mountpoint'):
+        if 'mountpoint' in software_spec[item].keys():
             mountpoint = software_spec[item]['mountpoint']
         mount_env = ''
-        if software_spec[item].has_key('mount_env'):
+        if 'mount_env' in software_spec[item].keys():
             mount_env = software_spec[item]['mount_env']
         action = 'unpack'
-        if software_spec[item].has_key('action'):
+        if 'action' in software_spec[item].keys():
             action = software_spec[item]['action'].lower()
 
         if mount_env and not mountpoint:
@@ -1076,7 +1076,7 @@ def software_install(mount_dict, env_para_dict, software_spec, meta_json, sandbo
                 else:
                     mount_dict[mountpoint] = mount_value
 
-                if software_spec[item].has_key('mode'):
+                if 'mode' in software_spec[item].keys():
                     mode = int(software_spec[item]['mode'], 8)
                     os.chmod(mount_value, mode)
                     logging.debug("Change the file mode of `%s` to `%s`", mount_value, oct(mode))
@@ -1103,18 +1103,18 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
         if name and name != item:
             continue
         id = ''
-        if data_spec[item].has_key('id'):
+        if 'id' in data_spec[item].keys():
             id = data_spec[item]['id']
         mountpoint = ''
-        if data_spec[item].has_key('mountpoint'):
+        if 'mountpoint' in data_spec[item].keys():
             mountpoint = data_spec[item]['mountpoint']
             if len(mountpoint) > 0 and mountpoint[0] != '/':
                 mountpoint = cwd_setting + '/' + mountpoint
         mount_env = ''
-        if data_spec[item].has_key('mount_env'):
+        if 'mount_env' in data_spec[item].keys():
             mount_env = data_spec[item]['mount_env']
         action = 'unpack'
-        if data_spec[item].has_key('action'):
+        if 'action' in data_spec[item].keys():
             action = data_spec[item]['action']
 
         if mount_env and not mountpoint:
@@ -1127,7 +1127,7 @@ def data_install(data_spec, meta_json, sandbox_dir, mount_dict, env_para_dict, o
             if mount_env and mountpoint:
                 env_para_dict[mount_env] = mountpoint
 
-            if data_spec[item].has_key('mode'):
+            if 'mode' in data_spec[item].keys():
                 mode = int(data_spec[item]['mode'], 8)
                 os.chmod(mount_value, mode)
                 logging.debug("Change the file mode of `%s` to `%s`", mount_value, oct(mode))
@@ -2073,7 +2073,7 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
         os.makedirs(sandbox_dir)
 
     print("Checking the validity of the umbrella specification ...")
-    if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
+    if "hardware" in spec_json.keys() and spec_json["hardware"] and "kernel" in spec_json.keys() and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
         logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
         (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
     else:
@@ -2253,7 +2253,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
         Otherwise, directly exit.
     """
     print("Checking the validity of the umbrella specification ...")
-    if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
+    if "hardware" in spec_json.keys() and spec_json["hardware"] and "kernel" in spec_json.keys() and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
         (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
     else:
         cleanup(tempfile_list, tempdir_list)
@@ -2264,7 +2264,7 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
     print("Obtaining the AMI info from the umbrella specification ...")
     name = '%s-%s-%s' % (distro_name, distro_version, hardware_platform)
 
-    if not spec_json["os"].has_key("ec2"):
+    if not "ec2" in spec_json["os"].keys():
         logging.debug("To use ec2 execution engine, the os section should have a ec2 subsection providing the AMI, region and user info!")
         sys.exit("To use ec2 execution engine, the os section should have a ec2 subsection providing the AMI, region and user info!")
 
@@ -2440,8 +2440,8 @@ def obtain_package(spec_json):
         if a package list is specified in the spec_json, return the package manager name and a list of the required package name.
         Otherwise, return None
     """
-    if spec_json.has_key("package_manager") and spec_json["package_manager"]:
-        if spec_json["package_manager"].has_key("name") and spec_json["package_manager"].has_key("list"):
+    if "package_manager" in spec_json.keys() and spec_json["package_manager"]:
+        if "name" in spec_json["package_manager"].keys() and spec_json["package_manager"].has_key("list"):
             pac_name = spec_json["package_manager"]["name"]
             pac_str = spec_json["package_manager"]["list"]
             pac_list = pac_str.split()
@@ -2473,7 +2473,7 @@ def cal_new_os_id(sec, old_os_id, pac_list):
     pac_str = ''.join(pac_list)
 
     config_str = ''
-    if sec.has_key("config") and sec["config"]:
+    if "config" in sec.keys() and sec["config"]:
         l = []
         for item in sec["config"]:
             id_attr = sec["config"][item]["id"]
@@ -2511,7 +2511,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
         None.
     """
     print("Checking the validity of the umbrella specification ...")
-    if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
+    if "hardware" in spec_json.keys() and spec_json["hardware"] and "kernel" in spec_json.keys() and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
         logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
         (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
     else:
@@ -2674,7 +2674,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
                     os_image_dir = new_os_image_dir
                     os_id = new_os_id
 
-    if spec_json.has_key("software") and spec_json["software"]:
+    if "software" in spec_json.keys() and spec_json["software"]:
         software_install(mount_dict, env_para_dict, spec_json["software"], meta_json, sandbox_dir, 0, osf_auth)
     else:
         logging.debug("this spec does not have software section!")
@@ -2683,7 +2683,7 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
     sw_mount_dict = dict(mount_dict) #sw_mount_dict will be used later to config the $PATH
     del sw_mount_dict[parrot_path]
 
-    if spec_json.has_key("data") and spec_json["data"]:
+    if "data" in spec_json.keys() and spec_json["data"]:
         data_install(spec_json["data"], meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting)
     else:
         logging.debug("this spec does not have data section!")
@@ -2799,15 +2799,15 @@ def add2spec(item, source_dict, target_dict):
     """
     #item must exist inside target_dict.
     ident = None
-    if source_dict.has_key("checksum"):
+    if "checksum" in source_dict.keys():
         checksum = source_dict["checksum"].lower()
         ident = checksum
-        if not target_dict.has_key("id"):
+        if not "id" in target_dict.keys():
             target_dict["id"] = ident
-        if not target_dict.has_key(checksum):
+        if not checksum in target_dict.keys():
             target_dict["checksum"] = source_dict["checksum"].lower()
 
-    if source_dict.has_key("source"):
+    if "source" in source_dict.keys():
         if len(source_dict["source"]) == 0:
             cleanup(tempfile_list, tempdir_list)
             logging.critical("the source attribute of %s can not be empty!" % item)
@@ -2816,10 +2816,10 @@ def add2spec(item, source_dict, target_dict):
             source = source_dict["source"][0]
 
         #if checksum is not provided in source_dict, the first url in the source section will be set to the ident.
-        if not ident and not target_dict.has_key("id"):
+        if not ident and not "id" in target_dict.keys():
             target_dict["id"] = source
 
-        if not target_dict.has_key("source"):
+        if not "source" in target_dict.keys():
             target_dict["source"] = list(source_dict["source"])
 
     else:
@@ -2827,13 +2827,13 @@ def add2spec(item, source_dict, target_dict):
         logging.critical("%s does not have source attribute in the umbrella metadata database!", item)
         sys.exit("%s does not have source attribute in the umbrella metadata database!" % item)
 
-    if source_dict.has_key("format") and not target_dict.has_key("format"):
+    if "format" in source_dict.keys() and not "format" in target_dict.keys():
         target_dict["format"] = source_dict["format"]
 
-    if source_dict.has_key("size") and not target_dict.has_key("size"):
+    if "size" in source_dict.keys() and not "size" in target_dict.keys():
         target_dict["size"] = source_dict["size"]
 
-    if source_dict.has_key("uncompressed_size") and not target_dict.has_key("uncompressed_size"):
+    if "uncompressed_size" in source_dict.keys() and not "uncompressed_size" in target_dict.keys():
         target_dict["uncompressed_size"] = source_dict["uncompressed_size"]
 
 def add2db(item, source_dict, target_dict):
@@ -2853,16 +2853,16 @@ def add2db(item, source_dict, target_dict):
         target_dict[item] = {}
 
     ident = None
-    if source_dict.has_key("checksum"):
+    if "checksum" in source_dict.keys():
         checksum = source_dict["checksum"].lower()
-        if target_dict[item].has_key(checksum):
+        if checksum in target_dict[item].keys():
             logging.debug("%s has been inside the metadata database!", item)
             return
         ident = checksum
         target_dict[item][ident] = {}
         target_dict[item][ident]["checksum"] = source_dict["checksum"].lower()
 
-    if source_dict.has_key("source"):
+    if "source" in source_dict.keys():
         if len(source_dict["source"]) == 0:
             cleanup(tempfile_list, tempdir_list)
             logging.critical("the source attribute of %s can not be empty!" % item)
@@ -2870,7 +2870,7 @@ def add2db(item, source_dict, target_dict):
         else:
             source = source_dict["source"][0]
 
-        if target_dict[item].has_key(source):
+        if source in target_dict[item].keys():
             logging.debug("%s has been inside the metadata database!", item)
             return
 
@@ -2885,13 +2885,13 @@ def add2db(item, source_dict, target_dict):
         logging.critical("%s does not have source attribute in the umbrella specification!", item)
         sys.exit("%s does not have source attribute in the umbrella specification!" % item)
 
-    if source_dict.has_key("format"):
+    if "format" in source_dict.keys():
         target_dict[item][ident]["format"] = source_dict["format"]
 
-    if source_dict.has_key("size"):
+    if "size" in source_dict.keys():
         target_dict[item][ident]["size"] = source_dict["size"]
 
-    if source_dict.has_key("uncompressed_size"):
+    if "uncompressed_size" in source_dict.keys():
         target_dict[item][ident]["uncompressed_size"] = source_dict["uncompressed_size"]
 
 def prune_attr(dict_item, attr_list):
@@ -2906,7 +2906,7 @@ def prune_attr(dict_item, attr_list):
         None
     """
     for item in attr_list:
-        if dict_item.has_key(item):
+        if item in dict_item.keys():
             del dict_item[item]
 
 def prune_spec(json_object):
@@ -2923,25 +2923,25 @@ def prune_spec(json_object):
     temp_json = dict(json_object)
 
     attr_list = ["source", "checksum", "format", "size", "uncompressed_size"]
-    if temp_json.has_key("os"):
+    if "os" in temp_json.keys():
         os_sec = temp_json["os"]
         if os_sec:
             prune_attr(os_sec, attr_list)
 
-    if temp_json.has_key("package_manager") and temp_json["package_manager"] \
-        and temp_json["package_manager"].has_key("config") and temp_json["package_manager"]["config"]:
+    if "package_manager" in temp_json.keys() and temp_json["package_manager"] \
+        and "config" in temp_json["package_manager"].keys() and temp_json["package_manager"]["config"]:
         pm_config_sec = temp_json["package_manager"]["config"]
         if pm_config_sec:
             for item in pm_config_sec:
                 prune_attr(pm_config_sec[item], attr_list)
 
-    if temp_json.has_key("software"):
+    if "software" in temp_json.keys():
         software_sec = temp_json["software"]
         if software_sec:
             for item in software_sec:
                 prune_attr(software_sec[item], attr_list)
 
-    if temp_json.has_key("data"):
+    if "data" in temp_json.keys():
         data_sec = temp_json["data"]
         if data_sec:
             for item in data_sec:
@@ -2970,20 +2970,20 @@ def abstract_metadata(spec_json, meta_path):
     os_item = os_item.lower()
     add2db(os_item, os_sec, metadata)
 
-    if spec_json.has_key("package_manager") and spec_json["package_manager"] \
-        and spec_json["package_manager"].has_key("config") and spec_json["package_manager"]["config"]:
+    if "package_manager" in spec_json.keys() and spec_json["package_manager"] \
+        and "config" in spec_json["package_manager"].keys() and spec_json["package_manager"]["config"]:
         pm_config_sec = spec_json["package_manager"]["config"]
         if pm_config_sec:
             for item in pm_config_sec:
                 add2db(item, pm_config_sec[item], metadata)
 
-    if spec_json.has_key("software"):
+    if "software" in spec_json.keys():
         software_sec = spec_json["software"]
         if software_sec:
             for item in software_sec:
                 add2db(item, software_sec[item], metadata)
 
-    if spec_json.has_key("data"):
+    if "data" in spec_json.keys():
         data_sec = spec_json["data"]
         if data_sec:
             for item in data_sec:
@@ -3005,10 +3005,10 @@ def needCVMFS(spec_json, meta_json):
         if cvmfs is needed, return the cvmfs url. Otherwise, return None
     """
     for sec_name in ["software", "data", "package_manager"]:
-        if spec_json.has_key(sec_name) and spec_json[sec_name]:
+        if sec_name in spec_json.keys() and spec_json[sec_name]:
             sec = spec_json[sec_name]
             if sec_name == "package_manager":
-                if sec.has_key("config") and sec["config"]:
+                if "config" in sec.keys() and sec["config"]:
                     sec = sec["config"]
                 else:
                     logging.debug("%s does not have config attribute!", sec_name)
@@ -3016,13 +3016,13 @@ def needCVMFS(spec_json, meta_json):
 
             for item in sec:
                 item_id = ""
-                if sec[item].has_key("id") and len(sec[item]["id"]) > 0:
+                if "id" in sec[item].keys() and len(sec[item]["id"]) > 0:
                     item_id = sec[item]["id"]
 
                 mountpoint = sec[item]["mountpoint"]
 
                 result = meta_search(meta_json, item, item_id)
-                if result.has_key("source") and len(result["source"]) > 0:
+                if "source" in result.keys() and len(result["source"]) > 0:
                     url = result["source"][0]
                     if url[:5] == "cvmfs":
                         return (url, mountpoint)
@@ -3083,7 +3083,7 @@ def separatize_spec(spec_json, meta_json, target_type):
     os_item = "%s-%s-%s" % (os_name, os_version, hardware_arch)
     os_item = os_item.lower()
     ident = None
-    if os_sec.has_key("id"):
+    if "id" in os_sec.keys():
         ident = os_sec["id"]
     source = meta_search(meta_json, os_item, ident)
 
@@ -3092,13 +3092,13 @@ def separatize_spec(spec_json, meta_json, target_type):
     if target_type == "meta":
         add2db(os_item, source, metadata)
 
-    if spec_json.has_key("package_manager") and spec_json["package_manager"] \
-        and spec_json["package_manager"].has_key("config") and spec_json["package_manager"]["config"]:
+    if "package_manager" in spec_json.keys() and spec_json["package_manager"] \
+        and "config" in spec_json["package_manager"].keys() and spec_json["package_manager"]["config"]:
         pm_config_sec = spec_json["package_manager"]["config"]
         if pm_config_sec:
             for item in pm_config_sec:
                 ident = None
-                if pm_config_sec[item].has_key("id"):
+                if "id" in pm_config_sec[item].keys():
                     ident = pm_config_sec[item]["id"]
                 source = meta_search(meta_json, item, ident)
                 if target_type == "spec":
@@ -3106,12 +3106,12 @@ def separatize_spec(spec_json, meta_json, target_type):
                 if target_type == "meta":
                     add2db(item, source, metadata)
 
-    if spec_json.has_key("software"):
+    if "software" in spec_json.keys():
         software_sec = spec_json["software"]
         if software_sec:
             for item in software_sec:
                 ident = None
-                if software_sec[item].has_key("id"):
+                if "id" in software_sec[item].keys():
                     ident = software_sec[item]["id"]
                 source = meta_search(meta_json, item, ident)
                 if target_type == "spec":
@@ -3119,12 +3119,12 @@ def separatize_spec(spec_json, meta_json, target_type):
                 if target_type == "meta":
                     add2db(item, source, metadata)
 
-    if spec_json.has_key("data"):
+    if "data" in spec_json.keys():
         data_sec = spec_json["data"]
         if data_sec:
             for item in data_sec:
                 ident = None
-                if data_sec[item].has_key("id"):
+                if "id" in data_sec[item].keys():
                     ident = data_sec[item]["id"]
                 source = meta_search(meta_json, item, ident)
                 if target_type == "spec":
@@ -3226,32 +3226,32 @@ def validate_spec(spec_json, meta_json = None):
     env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
 
     for sec_name in ["software", "data", "package_manager"]:
-        if spec_json.has_key(sec_name) and spec_json[sec_name]:
+        if sec_name in spec_json.keys() and spec_json[sec_name]:
             sec = spec_json[sec_name]
             if sec_name == "package_manager":
-                if sec.has_key("config") and sec["config"]:
+                if "config" in sec.keys() and sec["config"]:
                     sec = sec["config"]
                 else:
                     logging.debug("%s does not have config attribute!", sec_name)
                     break
             for item in sec:
-                if (sec[item].has_key("mountpoint") and sec[item]["mountpoint"]) \
-                        or (sec[item].has_key("mount_env") and sec[item]["mount_env"]):
+                if ("mountpoint" in sec[item].keys() and sec[item]["mountpoint"]) \
+                        or ("mount_env" in sec[item].keys() and sec[item]["mount_env"]):
                     pass
                 else:
                     cleanup(tempfile_list, tempdir_list)
                     logging.critical("%s in the %s section should have either <mountpoint> or <mount_env>!\n", item, sec_name)
                     sys.exit("%s in the %s section should have either <mountpoint> or <mount_env>!\n" % (item, sec_name))
 
-                if sec[item].has_key("source") and len(sec[item]["source"]) > 0:
+                if "source" in sec[item].keys() and len(sec[item]["source"]) > 0:
                     pass
                 else:
                     if meta_json:
                         ident = None
-                        if sec[item].has_key("id"):
+                        if "id" in sec[item].keys():
                             ident = sec[item]["id"]
                         result = meta_search(meta_json, item, ident)
-                        if result.has_key("source") and len(result["source"]) > 0:
+                        if "source" in result.keys() and len(result["source"]) > 0:
                             pass
                         else:
                             cleanup(tempfile_list, tempdir_list)
@@ -3573,10 +3573,10 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
 
     print("Upload the dependencies from the umbrella spec to %s ..." % target_info[0])
     logging.debug("Upload the dependencies from the umbrella spec to %s ...", target_info[0])
-    if spec_json.has_key("os") and spec_json["os"] and spec_json["os"].has_key("id") and spec_json["os"]["id"]:
+    if "os" in spec_json.keys() and spec_json["os"] and "id" in spec_json["os"].keys() and spec_json["os"]["id"]:
         os_id = spec_json["os"]["id"]
 
-        if spec_json.has_key("hardware") and spec_json["hardware"] and spec_json.has_key("kernel") and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
+        if "hardware" in spec_json.keys() and spec_json["hardware"] and "kernel" in spec_json.keys() and spec_json["kernel"] and spec_json.has_key("os") and spec_json["os"]:
             logging.debug("Setting the environment parameters (hardware, kernel and os) according to the specification file ....")
             (hardware_platform, cpu_cores, memory_size, disk_size, kernel_name, kernel_version, linux_distro, distro_name, distro_version, os_id) = env_parameter_init(spec_json["hardware"], spec_json["kernel"], spec_json["os"])
         item = '%s-%s-%s' % (distro_name, distro_version, hardware_platform) #example of item here: redhat-6.5-x86_64
@@ -3585,9 +3585,9 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
         mountpoint = '/'
         action = 'unpack'
 
-        if not spec_json["os"].has_key("upload") or spec_json["os"]["upload"] == True:
-            if spec_json["os"].has_key("source") or attr_check(item, meta_search(meta_json, item, os_id), "source", 1):
-                if spec_json["os"].has_key("source"):
+        if not "upload" in spec_json["os"].keys() or spec_json["os"]["upload"] == True:
+            if "source" in spec_json["os"].keys() or attr_check(item, meta_search(meta_json, item, os_id), "source", 1):
+                if "source" in spec_json["os"].keys():
                     sources = spec_json["os"]["source"]
                 else:
                     sources = meta_search(meta_json, item, os_id)["source"]
@@ -3614,15 +3614,15 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
             logging.debug("the os section has its upload field set to false, ignore uploading it")
 
     for sec_name in ["data"]:
-        if spec_json.has_key(sec_name) and spec_json[sec_name]:
+        if sec_name in spec_json.keys() and spec_json[sec_name]:
             sec = spec_json[sec_name]
             for item in sec:
-                if sec[item].has_key("upload") and sec[item]["upload"] == False:
+                if "upload" in sec[item].keys() and sec[item]["upload"] == False:
                     logging.debug("ignore upload %s becuase its upload field is set to false", item)
                     continue
 
-                if sec[item].has_key("source") or attr_check(item, meta_search(meta_json, item, id), "source", 1):
-                    if sec[item].has_key("source"):
+                if "source" in sec[item].keys() or attr_check(item, meta_search(meta_json, item, id), "source", 1):
+                    if "source" in sec[item].keys():
                         sources = sec[item]["source"]
                     else:
                         sources = meta_search(meta_json, item, id)["source"]
@@ -3652,22 +3652,22 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
                     sec[item]["source"].append("s3+" + s3_url)
 
     for sec_name in ["software", "package_manager"]:
-        if spec_json.has_key(sec_name) and spec_json[sec_name]:
+        if sec_name in spec_json.keys() and spec_json[sec_name]:
             sec = spec_json[sec_name]
             if sec_name == "package_manager":
-                if sec.has_key("config") and sec["config"]:
+                if "config" in sec.keys() and sec["config"]:
                     sec = sec["config"]
                 else:
                     logging.debug("%s does not have config attribute!", sec_name)
                     break
 
             for item in sec:
-                if sec[item].has_key("upload") and sec[item]["upload"] == False:
+                if "upload" in sec[item].keys() and sec[item]["upload"] == False:
                     logging.debug("ignore upload %s becuase its upload field is set to false", item)
                     continue
 
-                if sec[item].has_key("source") or attr_check(item, meta_search(meta_json, item, id), "source", 1):
-                    if sec[item].has_key("source"):
+                if "source" in sec[item].keys() or attr_check(item, meta_search(meta_json, item, id), "source", 1):
+                    if "source" in sec[item].keys():
                         sources = sec[item]["source"]
                     else:
                         sources = meta_search(meta_json, item, id)["source"]
@@ -3684,7 +3684,7 @@ def spec_upload(spec_json, meta_json, target_info, sandbox_dir, cwd_setting, osf
                 upload_count += 1
                 software_install(mount_dict, env_para_dict, sec, meta_json, sandbox_dir, 0, osf_auth, item)
                 #ignore upload resouces from cvmfs
-                if (not sec[item].has_key("mountpoint")) or (not mount_dict.has_key(sec[item]["mountpoint"])) or mount_dict[sec[item]["mountpoint"]] == "":
+                if (not "mountpoint" in sec[item].keys()) or (not sec[item]["mountpoint"] in mount_dict.keys()) or mount_dict[sec[item]["mountpoint"]] == "":
                     continue
 
                 if sec[item]["format"] == "tgz":
@@ -3776,14 +3776,14 @@ def spec_build(spec_json):
         count: the count of dependencies whose metadata have been built.
     """
     count = 0
-    if spec_json.has_key("os") and spec_json["os"]:
+    if "os" in spec_json.keys() and spec_json["os"]:
         count += dep_build(spec_json["os"], "os")
 
     for sec_name in ["data", "software", "package_manager"]:
-        if spec_json.has_key(sec_name) and spec_json[sec_name]:
+        if sec_name in spec_json.keys() and spec_json[sec_name]:
             sec = spec_json[sec_name]
             if sec_name == "package_manager":
-                if sec.has_key("config") and sec["config"]:
+                if "config" in sec.keys() and sec["config"]:
                     sec = sec["config"]
                 else:
                     logging.debug("%s does not have config attribute!", sec_name)
@@ -4014,7 +4014,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
 
     (options, args) = parser.parse_args()
 
-    sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+    #sys.stdout = os.fdopen(sys.stdout.fileno(), 'wb', 0)
 
     logfilename = options.log
     if os.path.exists(logfilename) and not os.path.isfile(logfilename):
@@ -4154,7 +4154,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
             if behavior in ["run"]:
                 user_cmd = args[1:]
                 if len(user_cmd) == 0:
-                    if spec_json.has_key("cmd") and len(spec_json["cmd"]) > 0:
+                    if "cmd" in spec_json.keys() and len(spec_json["cmd"]) > 0:
                         user_cmd.append(spec_json["cmd"])
                     else:
                         user_cmd.append("/bin/sh") #set the user_cmd to be default: /bin/sh
@@ -4162,7 +4162,7 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
                 logging.debug("The user's command is: %s", user_cmd)
 
                 #if the spec file has environ seciton, merge the variables defined in it into env_para_dict
-                if spec_json.has_key("environ") and spec_json["environ"]:
+                if "environ" in spec_json.keys() and spec_json["environ"]:
                     logging.debug("The specification file has environ section, update env_para_dict ....")
                     spec_env = spec_json["environ"]
                     for key in spec_env:
@@ -4295,13 +4295,13 @@ To check the help doc for a specific behavoir, use: %prog <behavior> help""",
                         sys.exit("the output type can only be 'f' or 'd'!")
 
         if len(output_dict) > 0:
-            if spec_json.has_key("output"):
+            if "output" in spec_json.keys():
                 files = []
                 dirs = []
-                if spec_json["output"].has_key("files"):
+                if "files" in spec_json["output"].keys():
                     files = spec_json["output"]["files"]
 
-                if spec_json["output"].has_key("dirs"):
+                if "dirs" in spec_json["output"].keys():
                     dirs = spec_json["output"]["dirs"]
 
                 for key in output_dict.keys():
