@@ -63,6 +63,21 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 
 			if(!deltadb_delete_event(db,key)) break;
 
+		} else if(line[0]=='M') {
+			n = sscanf(line,"M %s %[^\n]",key,value);
+			if(n==2) {
+				jvalue = jx_parse_string(value);
+				if(!jvalue) {
+					corrupt_data(filename,line);
+					continue;
+				}
+			} else {
+				corrupt_data(filename,line);
+				continue;
+			}
+
+			if(!deltadb_merge_event(db,key,jvalue)) break;
+
 		} else if(line[0]=='U') {
 			n=sscanf(line,"U %s %s %[^\n],",key,name,value);
 			if(n!=3) {
