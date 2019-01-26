@@ -277,6 +277,20 @@ static void corrupt_data( const char *filename, const char *line )
 
 }
 
+/* Accept an update object and transfer its fields to a current item. */
+/* Note that if the current key does not exist, the update becomes the new value. */
+
+static void handle_merge( struct jx_database *db, const char *key, struct jx *update )
+{
+	struct jx *current = hash_table_remove(db->table,key);
+	struct jx *merged = jx_merge(update,current);
+
+	hash_table_insert(db->table,key,merged);
+
+	jx_delete(update);
+	jx_delete(current);
+}
+
 /*
 Replay a given log file into the hash table, up to the given snapshot time.
 Returns true if file could be open and played, false otherwise.
@@ -310,6 +324,19 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 				jvalue = jx_parse_string(value);
 				if(jvalue) {
 					hash_table_insert(db->table,key,jvalue);
+				} else {
+					corrupt_data(filename,line);
+				}
+			} else {
+				corrupt_data(filename,line);
+				continue;
+			}
+		} else if(line[0]=='M') {
+			n = sscanf(line,"M %s %[^\n]",key,value);
+			if(n==2) {
+				jvalue = jx_parse_string(value);
+				if(jvalue) {
+					handle_merge(db,key,jvalue);
 				} else {
 					corrupt_data(filename,line);
 				}
