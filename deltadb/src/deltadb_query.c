@@ -288,7 +288,7 @@ int deltadb_merge_event( struct deltadb *db, const char *key, struct jx *update 
 		return 1;
 	}
 
-	struct jx * merged = jx_merge(update,current);
+	struct jx * merged = jx_merge(update,current,0);
 
 	hash_table_insert(db->table,key,merged);
 
