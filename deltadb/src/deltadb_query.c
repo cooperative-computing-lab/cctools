@@ -279,6 +279,32 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 	return 1;
 }
 
+int deltadb_merge_event( struct deltadb *db, const char *key, struct jx *update )
+{
+	struct jx *current = hash_table_remove(db->table,key);
+	if(!current) {
+		/* If the key is not found, it was filtered out; skip the update. */
+		jx_delete(update);
+		return 1;
+	}
+
+	struct jx * merged = jx_merge(update,current);
+
+	hash_table_insert(db->table,key,merged);
+
+	if(display_mode==MODE_STREAM) {
+		display_deferred_time(db);
+		char *str = jx_print_string(update);
+		printf("M %s %s\n",key,str);
+		free(str);
+	}
+
+	jx_delete(update);
+	jx_delete(current);
+
+	return 1;
+}
+
 int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
 {
 	struct jx * jobject = hash_table_lookup(db->table,key);
