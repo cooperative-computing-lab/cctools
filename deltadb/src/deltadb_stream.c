@@ -39,7 +39,8 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
 			if(n==1) {
-				/* backwards compatibility with old log format */				struct nvpair *nv = nvpair_create();
+				/* backwards compatibility with old log format */
+				struct nvpair *nv = nvpair_create();
 				nvpair_parse_stream(nv,stream);
 				jvalue = nvpair_to_jx(nv);
 				nvpair_delete(nv);
