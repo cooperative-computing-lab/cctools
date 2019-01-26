@@ -202,6 +202,9 @@ static void log_create( struct jx_database *db, const char *key, struct jx *j )
 
 static void log_updates( struct jx_database *db, const char *key, struct jx *a, struct jx *b )
 {
+	// u is the object containing the update
+	struct jx *u = jx_object(0);
+
 	// For each item in the old object:
 	// If the new one is different, log an update event.
 	// If the new one is missing, log a remove event.
@@ -221,14 +224,12 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 			if(jx_equals(avalue,bvalue)) {
 				// items match, do nothing.
 			} else {
-				// item changed, print it.
-				char *str = jx_print_string(bvalue);
-				log_message(db,"U %s %s %s\n",key,name,str);
-				free(str);
+				// item changed, include it it.
+				jx_insert(u,jx_string(name),jx_copy(bvalue));
 			}
 		} else {
-			// item was removed.
-			log_message(db,"R %s %s\n",key,name);
+			// item was removed, reflect it with a null
+			jx_insert(u,jx_string(name),jx_null());
 		}
 	}
 
@@ -242,12 +243,16 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 
 		struct jx *avalue = jx_lookup(a,name);
 		if(!avalue) {
-			// item changed, print it.
-			char *str = jx_print_string(bvalue);
-			log_message(db,"U %s %s %s\n",key,name,str);
-			free(str);
+			// item changed, include it.
+			jx_insert(u,jx_string(name),jx_copy(bvalue));
 		}
 	}
+
+	char *str = jx_print_string(u);
+	log_message(db,"M %s %s\n",key,str);
+	free(str);
+
+	jx_delete(u);
 }
 
 /* Log an event indicating an entire object was deleted. */
