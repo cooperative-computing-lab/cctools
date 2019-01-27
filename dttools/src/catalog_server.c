@@ -290,7 +290,20 @@ static void handle_update( const char *addr, int port, const char *raw_data, int
 
 		char name[DOMAIN_NAME_MAX];
 		if(domain_name_cache_lookup_reverse(addr, name)) {
-			jx_insert_string(j, "name", name);
+			/*
+			Special case: Prior bug resulted in multiple name
+			entries in logged data.  When removing the name property,
+			keep looking until all items are removed.
+			*/
+			struct jx *jname = jx_string("name");
+			struct jx *n;
+			while((n=jx_remove(j,jname))) {
+				jx_delete(n);
+			}
+			jx_delete(jname);
+
+			jx_insert_string(j,"name",name);
+	
 		} else if (jx_lookup_string(j, "name") == NULL) {
 			/* If rDNS is unsuccessful, then we use the name reported if given.
 			 * This allows for hostnames that are only valid in the subnet of
