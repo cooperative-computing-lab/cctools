@@ -248,9 +248,12 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 		}
 	}
 
-	char *str = jx_print_string(u);
-	log_message(db,"M %s %s\n",key,str);
-	free(str);
+	// If the update is not empty, log it.
+	if(u->u.pairs) {
+		char *str = jx_print_string(u);
+		log_message(db,"M %s %s\n",key,str);
+		free(str);
+	}
 
 	jx_delete(u);
 }
