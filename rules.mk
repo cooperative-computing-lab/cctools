@@ -32,3 +32,5 @@ endif
 %: %.c
 %: %.cc
 %: %.C
+
+.PRECIOUS: %.o
