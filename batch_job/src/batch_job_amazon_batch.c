@@ -371,6 +371,32 @@ static int describe_aws_job(char* aws_jobid, char* env_var){
 	return succeed;
 }
 
+static char* aws_job_def(char* aws_jobid){
+	char* cmd = string_format("aws batch describe-jobs --jobs %s",aws_jobid);
+	struct jx* jx = run_command(cmd);
+	free(cmd);
+	struct jx* jobs_array = jx_lookup(jx,"jobs");
+	if(!jobs_array){
+		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
+		return NULL;
+	}
+	struct jx* first_item = jx_array_index(jobs_array,0);
+	if(!first_item){
+		debug(D_BATCH,"Problem with given aws_jobid: %s",aws_jobid);
+		return NULL;
+	}
+        char* ret = string_format("%s",(char*)jx_lookup_string(first_item,"jobDefinition"));
+	jx_delete(jx);
+        return ret;
+}
+
+static int del_job_def(char* jobdef){
+    char* cmd = string_format("aws batch deregister-job-definition --job-definition %s",jobdef);
+    int ret = sh_system(cmd);
+    free(cmd);
+    return ret;
+}
+
 static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const char* cmd, const char* extra_input_files, const char* extra_output_files, struct jx* envlist, const struct rmsummary* resources){
 	struct internal_amazon_batch_amazon_ids amazon_ids = initialize(q);
 	char* env_var = amazon_ids.master_env_prefix;
@@ -404,7 +430,7 @@ static batch_job_id_t batch_job_amazon_batch_submit(struct batch_queue* q, const
 	char* fmt_cmd = string_format("%s aws s3 cp s3://%s/COMAND_FILE_%u.sh ./ && sh ./COMAND_FILE_%u.sh",env_var,bucket_name,jobid,jobid);	
 
 	//combine all properties together
-	char* properties_string = string_format("{ \\\"image\\\": \\\"%s\\\", \\\"vcpus\\\": %i, \\\"memory\\\": %li, \\\"command\\\": [\\\"sh\\\",\\\"-c\\\",\\\"%s\\\"], \\\"environment\\\":[{\\\"name\\\":\\\"AWS_ACCESS_KEY_ID\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"AWS_SECRET_ACCESS_KEY\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"REGION\\\",\\\"value\\\":\\\"%s\\\"}] }", img,cpus,mem,fmt_cmd,amazon_ids.aws_access_key_id,amazon_ids.aws_secret_access_key,amazon_ids.aws_region);
+	char* properties_string = string_format("{ \\\"image\\\": \\\"%s\\\", \\\"vcpus\\\": %i, \\\"memory\\\": %li, \\\"privileged\\\":true ,\\\"command\\\": [\\\"sh\\\",\\\"-c\\\",\\\"%s\\\"], \\\"environment\\\":[{\\\"name\\\":\\\"AWS_ACCESS_KEY_ID\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"AWS_SECRET_ACCESS_KEY\\\",\\\"value\\\":\\\"%s\\\"},{\\\"name\\\":\\\"REGION\\\",\\\"value\\\":\\\"%s\\\"}] }", img,cpus,mem,fmt_cmd,amazon_ids.aws_access_key_id,amazon_ids.aws_secret_access_key,amazon_ids.aws_region);
 	
 	char* jaid = aws_submit_job(job_name,properties_string);
 
@@ -478,6 +504,11 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				debug(D_BATCH,"copying over the data to info_out");
 				memcpy(info_out, info, sizeof(struct batch_job_info));
 				free(info);
+                                
+                                char* jobdef = aws_job_def(jaid);
+                                del_job_def(jobdef);
+                                free(jobdef);
+                                
 				return id;
 			}
 		}else if(done == DESCRIBE_AWS_JOB_FAILED || done == DESCRIBE_AWS_JOB_NON_EXIST){
@@ -495,6 +526,11 @@ static batch_job_id_t batch_job_amazon_batch_wait(struct batch_queue *q, struct 
 				info->exit_code= exc == 0 ? -1 : exc;
 				memcpy(info_out, info, sizeof(*info));
 				free(info);
+                                
+                                char* jobdef = aws_job_def(jaid);
+                                del_job_def(jobdef);
+                                free(jobdef);
+                                
 				return id;
 			}
 		}else{

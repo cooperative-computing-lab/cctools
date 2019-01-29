@@ -79,6 +79,7 @@ int main(int argc, char** argv) {
     }
     c = 0;
 
+	//mpi boilerplate code modified from tutorial at www.mpitutorial.com
     MPI_Init(NULL, NULL);
     int mpi_world_size;
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
