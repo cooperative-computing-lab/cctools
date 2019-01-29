@@ -621,27 +621,6 @@ static int jx_pair_is_constant(struct jx_pair *p) {
 		&& jx_pair_is_constant(p->next);
 }
 
-//hot fix for unary + and - with numbers
-static int jx_operator_is_constant(struct jx *j) {
-    if(j->u.oper.type != JX_OP_ADD && j->u.oper.type != JX_OP_SUB) {
-        return 0;
-    }
-
-    if(j->u.oper.left) {
-        return 0;
-    }
-
-    if(!j->u.oper.right) {
-        return 0;
-    }
-
-    if(j->u.oper.right->type != JX_INTEGER && j->u.oper.right->type != JX_DOUBLE) {
-        return 0;
-    }
-
-    return 1;
-}
-
 static int jx_item_is_constant(struct jx_item *i) {
 	if(!i) return 1;
 	if (i->comp) return 0;
@@ -666,9 +645,8 @@ int jx_is_constant( struct jx *j )
 			return jx_pair_is_constant(j->u.pairs);
 		case JX_ERROR:
 		case JX_FUNCTION:
-            return 0;
 		case JX_OPERATOR:
-			return jx_operator_is_constant(j);
+			return 0;
 	}
 
 	/* not reachable, but some compilers complain. */
