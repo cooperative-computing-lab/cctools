@@ -833,9 +833,15 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				// error set by deeper level
 				return NULL;
 			}
-			j = jx_operator(jx_token_to_operator(t), NULL, j);
+			if (t == JX_TOKEN_SUB && jx_istype(j, JX_INTEGER)) {
+				j->u.integer_value *= -1;
+			} else if (t == JX_TOKEN_SUB && jx_istype(j, JX_DOUBLE)) {
+				j->u.double_value *= -1;
+			} else {
+				j = jx_operator(jx_token_to_operator(t), NULL, j);
+				j->u.oper.line = line;
+			}
 			j->line = line;
-			j->u.oper.line = line;
 			return j;
 		}
 		case JX_TOKEN_ERROR: {
