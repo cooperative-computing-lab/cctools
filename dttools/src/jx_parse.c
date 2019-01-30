@@ -833,9 +833,24 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				// error set by deeper level
 				return NULL;
 			}
-			j = jx_operator(jx_token_to_operator(t), NULL, j);
+
+			// For the special case of + or - followed by a numeric literal,
+			// don't create an operator in the AST. This plain-JSON syntax
+			// should result in a constant, so we negate as necessary here
+			// and return just a number.
+			if (t == JX_TOKEN_SUB && jx_istype(j, JX_INTEGER)) {
+				j->u.integer_value *= -1;
+			} else if (t == JX_TOKEN_SUB && jx_istype(j, JX_DOUBLE)) {
+				j->u.double_value *= -1;
+			} else if (t == JX_TOKEN_ADD && jx_istype(j, JX_INTEGER)) {
+				// don't need to do anything here
+			} else if (t == JX_TOKEN_ADD && jx_istype(j, JX_DOUBLE)) {
+				// don't need to do anything here
+			} else {
+				j = jx_operator(jx_token_to_operator(t), NULL, j);
+				j->u.oper.line = line;
+			}
 			j->line = line;
-			j->u.oper.line = line;
 			return j;
 		}
 		case JX_TOKEN_ERROR: {
