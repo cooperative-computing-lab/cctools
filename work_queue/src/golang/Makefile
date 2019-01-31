@@ -22,4 +22,3 @@ clean:
 	-rm -Rf src
 
 install: 
-	cp -r src/work_queue $(GOPATH)/src/work_queue
