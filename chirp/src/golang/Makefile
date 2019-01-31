@@ -18,4 +18,3 @@ clean:
 	-rm -Rf src/chirp
 
 install: 
-	cp -r src/chirp $(GOPATH)/chirp
