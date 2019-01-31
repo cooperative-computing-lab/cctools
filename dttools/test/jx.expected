@@ -336,14 +336,14 @@ value:      [[0,0,0,true],[0,0,0,false],[0,0,1,true],[0,0,1,false],[0,0,2,true],
 expression: list[2]
 value:      300
 
-expression: list[(-1)]
+expression: list[-1]
 value:      300
 
-expression: list[(-3)]
+expression: list[-3]
 value:      100
 
-expression: list[(-10)]
-value:      error("array reference on line 0: index out of range")
+expression: list[-10]
+value:      error("array reference on line 146: index out of range")
 
 expression: list[1:]
 value:      [200,300]
@@ -360,16 +360,16 @@ value:      [100,200,300]
 expression: list[3:2]
 value:      []
 
-expression: list[(-11):3]
+expression: list[-11:3]
 value:      [100,200,300]
 
-expression: list[3:(-11)]
+expression: list[3:-11]
 value:      []
 
-expression: list[1:(-1)]
+expression: list[1:-1]
 value:      [200]
 
-expression: list[(-1):1]
+expression: list[-1:1]
 value:      []
 
 expression: list[0:100]
