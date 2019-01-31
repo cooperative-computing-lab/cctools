@@ -54,7 +54,6 @@ int main( int argc, char *argv[] )
 	char name[LOG_LINE_MAX] = "";
 	char value[LOG_LINE_MAX] = "";
 
-	char lastop = 0;
 	char lastkey[LOG_LINE_MAX] = "";
 
 	struct jx *merge = 0;
@@ -71,7 +70,7 @@ int main( int argc, char *argv[] )
 				// If a merge for a different key is pending, emit it.
 				if(merge && strcmp(key,lastkey) ) {
 					char *str = jx_print_string(merge);
-					fprintf(output,"M %s %s\n",key,str);
+					fprintf(output,"M %s %s\n",lastkey,str);
 					free(str);
 					jx_delete(merge);
 					merge = 0;
@@ -90,7 +89,7 @@ int main( int argc, char *argv[] )
 		} else if(merge) {
 			// Emit the pending merge on any other op.
 			char *str = jx_print_string(merge);
-			fprintf(output,"M %s %s\n",key,str);
+			fprintf(output,"M %s %s\n",lastkey,str);
 			free(str);
 			jx_delete(merge);
 			merge = 0;
@@ -108,8 +107,6 @@ int main( int argc, char *argv[] )
 		} else if(line[0]!='U') {
 			fputs(line,output);
 		}
-
-		lastop = line[0];
 	}
 
 	fclose(input);
