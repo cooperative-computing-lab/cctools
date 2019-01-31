@@ -206,8 +206,8 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 	struct jx *u = jx_object(0);
 
 	// For each item in the old object:
-	// If the new one is different, log an update event.
-	// If the new one is missing, log a remove event.
+	// If the new item is different, add it to an update object.
+	// If the new item is missing, log a remove event.
 
 	struct jx_pair *p;
 	for(p=a->u.pairs;p;p=p->next) {
@@ -224,17 +224,17 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 			if(jx_equals(avalue,bvalue)) {
 				// items match, do nothing.
 			} else {
-				// item changed, include it it.
+				// item changed, include it in the update object.
 				jx_insert(u,jx_string(name),jx_copy(bvalue));
 			}
 		} else {
-			// item was removed, reflect it with a null
-			jx_insert(u,jx_string(name),jx_null());
+			// item was removed, log a remove record instead
+			log_message(db,"R %s %s",key,name);
 		}
 	}
 
 	// For each item in the new object:
-	// If it doesn't exist in the old one, log an update event.
+	// If it doesn't exist in the old one, add it to the update object.
 
 	for(p=b->u.pairs;p;p=p->next) {
 
@@ -248,7 +248,7 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 		}
 	}
 
-	// If the update is not empty, log it.
+	// If the update is not empty, log it as a merge (M) event.
 	if(u->u.pairs) {
 		char *str = jx_print_string(u);
 		log_message(db,"M %s %s\n",key,str);
