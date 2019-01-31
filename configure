@@ -1289,7 +1289,7 @@ then
 fi
 
 swig_go=no
-if [ "$(${swig} --help | grep '\-go')" != "" ]
+if [ "$(${swig} -go --help | grep '\-cgo')" ]
 then
 	swig_go=yes	
 fi

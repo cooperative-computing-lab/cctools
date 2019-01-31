@@ -6,7 +6,7 @@ LDFLAGS := $(realpath ../libwork_queue.a) $(realpath ../../../dttools/src/libdtt
 TARGETS = work_queue.go
 EGDIR = work_queue_example_go
 
-all: $(TARGETS) $(EGDIR)
+all: $(TARGETS)
 
 work_queue.go: work_queue.i
 	@echo "SWIG work_queue.i (golang)"
@@ -20,7 +20,5 @@ $(EGDIR): $(EGDIR)/work_queue_example.go src/work_queue/work_queue.go src/work_q
 clean:
 	-rm work_queue.go work_queue_wrap.c
 	-rm -Rf src
-	-$(MAKE) -C $(EGDIR) clean 
 
 install: 
-	cp -r src/work_queue $(GOPATH)/src/work_queue
