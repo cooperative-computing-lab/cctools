@@ -65,26 +65,30 @@ int main( int argc, char *argv[] )
 
 	while(fgets(line,sizeof(line),input)) {
 		lineno++;
-		int emit_merge = 0;
 
 		if(line[0]=='U') {
 			if(sscanf(line,"U %s %s %[^\n]",key,name,value)==3) {
-				if(lastop=='U' && !strcmp(key,lastkey)) {
-					struct jx *jvalue = jx_parse_string(value);
-					if(!merge) merge = jx_object(0);
-					jx_insert(merge,jx_string(name),jvalue);
-				} else {
-					emit_merge = 1;
+				// If a merge for a different key is pending, emit it.
+				if(merge && strcmp(key,lastkey) ) {
+					char *str = jx_print_string(merge);
+					fprintf(output,"M %s %s\n",key,str);
+					free(str);
+					jx_delete(merge);
+					merge = 0;
 				}
+
+				// Add the current update to the merge.
+				if(!merge) merge = jx_object(0);
+				struct jx *jvalue = jx_parse_string(value);
+				jx_insert(merge,jx_string(name),jvalue);
+
+				// Remember the current key
 				strcpy(lastkey,key);
 			} else {
 				corrupt_data(line,lineno);
 			}
-		} else {
-			emit_merge = 1;
-		}
-
-		if(emit_merge && merge) {
+		} else if(merge) {
+			// Emit the pending merge on any other op.
 			char *str = jx_print_string(merge);
 			fprintf(output,"M %s %s\n",key,str);
 			free(str);
