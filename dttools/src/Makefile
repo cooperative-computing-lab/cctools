@@ -66,6 +66,7 @@ SOURCES = \
 	jx_parse.c \
 	jx_print.c \
 	jx_pretty_print.c \
+	jx_canonicalize.c \
 	jx_table.c \
 	jx_export.c \
 	jx_eval.c \
