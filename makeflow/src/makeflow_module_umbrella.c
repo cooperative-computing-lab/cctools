@@ -29,10 +29,23 @@
 #include "makeflow_hook.h"
 #include "makeflow_log.h"
 
-static char *spec;
-static char *binary;
-static char *log_prefix;
-static char *mode;
+struct umbrella_instance {
+	char *spec;
+	char *binary;
+	char *log_prefix;
+	char *mode;
+};
+
+struct umbrella_instance *umbrella_instance_create()
+{
+	struct umbrella_instance *u = malloc(sizeof(*u));
+	u->spec = NULL;
+	u->binary = NULL;
+	u->log_prefix = NULL;
+	u->mode = NULL;
+
+	return u;
+}
 
 /* Umbrella could feasibly have multiple invocations at
  * different levels, but this is not currently implemented.
@@ -45,10 +58,12 @@ static char *mode;
  * incompatible with Parrot Enforcement. This should be 
  * re-assessed at a later time.
  */
-static int register_hook( struct makeflow_hook *h, struct list *makeflow_hooks ){
+
+static int register_hook(struct makeflow_hook *h, struct list *hooks, struct jx **args)
+{
 	struct makeflow_hook *hook;
-	list_first_item(makeflow_hooks);
-	while((hook = list_next_item(makeflow_hooks))){
+	list_first_item(hooks);
+	while((hook = list_next_item(hooks))){
 		if(hook->module_name){
 			if(!strcmp(hook->module_name, h->module_name)){
 				return MAKEFLOW_HOOK_SKIP;
@@ -61,47 +76,53 @@ static int register_hook( struct makeflow_hook *h, struct list *makeflow_hooks )
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int create( struct jx *hook_args ){
-	if(jx_lookup_string(hook_args, "umbrella_spec")){
-		spec = xxstrdup(jx_lookup_string(hook_args, "umbrella_spec"));	
+static int create( void ** instance_struct, struct jx *hook_args ){
+	struct umbrella_instance *u = umbrella_instance_create();
+	*instance_struct = u;
 
-		debug(D_MAKEFLOW_HOOK, "setting umbrella spec to %s\n", spec);
+	if(jx_lookup_string(hook_args, "umbrella_spec")){
+		u->spec = xxstrdup(jx_lookup_string(hook_args, "umbrella_spec"));	
+		debug(D_MAKEFLOW_HOOK, "setting umbrella spec to %s\n", u->spec);
 	}
 
 	if(jx_lookup_string(hook_args, "umbrella_binary")){
-		binary = xxstrdup(jx_lookup_string(hook_args, "umbrella_binary"));	
-
-		debug(D_MAKEFLOW_HOOK, "setting umbrella binary to %s\n", binary);
+		u->binary = xxstrdup(jx_lookup_string(hook_args, "umbrella_binary"));	
+		debug(D_MAKEFLOW_HOOK, "setting umbrella binary to %s\n", u->binary);
 	}
  
 	if(jx_lookup_string(hook_args, "umbrella_log_prefix")) {
-		log_prefix = string_format("%s.%%", (jx_lookup_string(hook_args, "umbrella_log_prefix")));	
-		debug(D_MAKEFLOW_HOOK, "setting umbrella log_prefix to %s\n", log_prefix);
+		u->log_prefix = string_format("%s.%%", (jx_lookup_string(hook_args, "umbrella_log_prefix")));	
+		debug(D_MAKEFLOW_HOOK, "setting umbrella log_prefix to %s\n", u->log_prefix);
 	}
 
 	if(jx_lookup_string(hook_args, "umbrella_mode")) {
-		mode = xxstrdup(jx_lookup_string(hook_args, "umbrella_mode"));	
+		u->mode = xxstrdup(jx_lookup_string(hook_args, "umbrella_mode"));	
 	} else { 
-		mode = xxstrdup("local");
+		u->mode = xxstrdup("local");
 	}
-	debug(D_MAKEFLOW_HOOK, "setting umbrella mode to %s\n", mode);
+	debug(D_MAKEFLOW_HOOK, "setting umbrella mode to %s\n", u->mode);
 
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int destroy( struct dag *d ){
-	free(spec);
-	free(binary);
-	free(log_prefix);
-	free(mode);
+static int destroy( void * instance_struct, struct dag *d ){
+	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
+	if(u) {
+		free(u->spec);
+		free(u->binary);
+		free(u->log_prefix);
+		free(u->mode);
+		free(u);
+	}
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_check( struct dag *d ){
+static int dag_check( void * instance_struct, struct dag *d ){
+	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
 	struct stat st;
-	if(spec){
-		if(batch_fs_stat(makeflow_get_remote_queue(), spec, &st) == -1) {
-			debug(D_NOTICE, "stat on %s failed: %s\n", spec, strerror(errno));
+	if(u->spec){
+		if(batch_fs_stat(makeflow_get_remote_queue(), u->spec, &st) == -1) {
+			debug(D_NOTICE, "stat on %s failed: %s\n", u->spec, strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
 		}
 		if((st.st_mode & S_IFMT) != S_IFREG) {
@@ -113,9 +134,9 @@ static int dag_check( struct dag *d ){
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 
-	if(binary){
-		if(batch_fs_stat(makeflow_get_remote_queue(), binary, &st) == -1) {
-			debug(D_NOTICE, "stat on %s failed: %s\n", binary, strerror(errno));
+	if(u->binary){
+		if(batch_fs_stat(makeflow_get_remote_queue(), u->binary, &st) == -1) {
+			debug(D_NOTICE, "stat on %s failed: %s\n", u->binary, strerror(errno));
 			return MAKEFLOW_HOOK_FAILURE;
 		}
 		if((st.st_mode & S_IFMT) != S_IFREG) {
@@ -128,11 +149,12 @@ static int dag_check( struct dag *d ){
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
-static int dag_start( struct dag *d ){
+static int dag_start( void * instance_struct, struct dag *d ){
+	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
 	/* If no log_prefix is set use the makeflow name as a starter. */
-	if(!log_prefix){
-		log_prefix = string_format("%s.umbrella.log.", d->filename);
-		debug(D_MAKEFLOW_HOOK, "setting wrapper_umbrella->log_prefix to %s\n", log_prefix);
+	if(!u->log_prefix){
+		u->log_prefix = string_format("%s.umbrella.log.", d->filename);
+		debug(D_MAKEFLOW_HOOK, "setting wrapper_umbrella->log_prefix to %s\n", u->log_prefix);
 	}
 
 	/* This loop exists to pull specs that are specific to each node. */
@@ -172,18 +194,19 @@ char *makeflow_umbrella_print_files(struct list *files, bool is_output) {
 	return result;
 }
 
-static int node_submit(struct dag_node *n, struct batch_task *t)
+static int node_submit( void * instance_struct, struct dag_node *n, struct batch_task *t)
 {
+	struct umbrella_instance *u = (struct umbrella_instance*)instance_struct;
     struct batch_wrapper *wrapper = batch_wrapper_create();
     batch_wrapper_prefix(wrapper, "./umbrella");
 
 	if(n->umbrella_spec){
 		makeflow_hook_add_input_file(n->d, t, n->umbrella_spec, path_basename(n->umbrella_spec), DAG_FILE_TYPE_GLOBAL);
 	} else {
-		makeflow_hook_add_input_file(n->d, t, spec, path_basename(spec), DAG_FILE_TYPE_GLOBAL);
+		makeflow_hook_add_input_file(n->d, t, u->spec, path_basename(u->spec), DAG_FILE_TYPE_GLOBAL);
 	}
 
-	if(binary) makeflow_hook_add_input_file(n->d, t, binary, path_basename(binary), DAG_FILE_TYPE_GLOBAL);
+	if(u->binary) makeflow_hook_add_input_file(n->d, t, u->binary, path_basename(u->binary), DAG_FILE_TYPE_GLOBAL);
 
 	debug(D_MAKEFLOW_HOOK, "input_files: %s\n", batch_files_to_string(makeflow_get_queue(n), t->input_files));
 	char *umbrella_input_opt = makeflow_umbrella_print_files(t->input_files, false);
@@ -193,20 +216,20 @@ static int node_submit(struct dag_node *n, struct batch_task *t)
 	char *umbrella_output_opt = makeflow_umbrella_print_files(t->output_files, true);
 	debug(D_MAKEFLOW_HOOK, "umbrella output opt: %s\n", umbrella_output_opt);
 
-	char *log = string_format("%s%d", log_prefix, n->nodeid);
+	char *log = string_format("%s%d", u->log_prefix, n->nodeid);
 	struct dag_file *log_file = makeflow_hook_add_output_file(n->d, t, log, NULL, DAG_FILE_TYPE_INTERMEDIATE);
 	free(log);
 
 	char *local_binary = NULL;
 	/* If no binary is specified always assume umbrella is in path. */
-	if (!binary) {
+	if (!u->binary) {
 		local_binary = xxstrdup("umbrella");
 	/* If remote rename isn't allowed pass binary as specified locally. */
 	} else if (!batch_queue_supports_feature(makeflow_get_queue(n), "remote_rename")) {
-		local_binary = xxstrdup(binary);
+		local_binary = xxstrdup(u->binary);
 	/* If we have the binary and can remotely rename, use ./binary (usually umbrella). */
 	} else {
-		local_binary = string_format("./%s",path_basename(binary));
+		local_binary = string_format("./%s",path_basename(u->binary));
 	}
 
 	char *local_spec = NULL;
@@ -222,14 +245,14 @@ static int node_submit(struct dag_node *n, struct batch_task *t)
 	} else {
 		/* Use the basename if we can remote rename. */
 		if (!batch_queue_supports_feature(makeflow_get_queue(n), "remote_rename")) {
-			local_spec = xxstrdup(spec);
+			local_spec = xxstrdup(u->spec);
 		} else {
-			local_spec = xxstrdup(path_basename(spec));
+			local_spec = xxstrdup(path_basename(u->spec));
 		}
 	}
 
 	char *cmd = string_format("%s --spec \"%s\" --localdir ./umbrella_test --inputs \"%s\" --output \"%s\" --sandbox_mode \"%s\" --log \"%s\" run \"%s\"", 
-		local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, mode, log_file->filename, t->command);
+		local_binary, local_spec, umbrella_input_opt, umbrella_output_opt, u->mode, log_file->filename, t->command);
 	batch_wrapper_cmd(wrapper, cmd);
 	free(cmd);
 

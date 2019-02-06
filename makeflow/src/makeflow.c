@@ -1812,19 +1812,23 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
-				makeflow_hook_register(&makeflow_hook_umbrella);
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+                    goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_binary"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_LOG_PREFIX:
-				makeflow_hook_register(&makeflow_hook_umbrella);
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+                    goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_log_prefix"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_MODE:
-				makeflow_hook_register(&makeflow_hook_umbrella);
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+                    goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_mode"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_SPEC:
-				makeflow_hook_register(&makeflow_hook_umbrella);
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+                    goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
 			case LONG_OPT_MESOS_MASTER:
 				mesos_master = xxstrdup(optarg);
