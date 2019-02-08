@@ -1140,13 +1140,11 @@ class WorkQueue(object):
     def specify_transactions_log(self, logfile):
         work_queue_specify_transactions_log(self._work_queue, logfile)
 
-
     ##
     # Add a mandatory password that each worker must present.
     #
     # @param self      Reference to the current work queue object.
     # @param password  The password.
-
     def specify_password(self, password):
         return work_queue_specify_password(self._work_queue, password)
 
