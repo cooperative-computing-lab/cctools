@@ -2681,7 +2681,8 @@ def specification_process(spec_json, sandbox_dir, behavior, meta_json, sandbox_m
         software_install(mount_dict, env_para_dict, "", meta_json, sandbox_dir, 0, osf_auth)
 
     sw_mount_dict = dict(mount_dict) #sw_mount_dict will be used later to config the $PATH
-    del sw_mount_dict[parrot_path]
+    if parrot_path:
+	    del sw_mount_dict[parrot_path]
 
     if "data" in spec_json.keys() and spec_json["data"]:
         data_install(spec_json["data"], meta_json, sandbox_dir, mount_dict, env_para_dict, osf_auth, cwd_setting)
@@ -2720,6 +2721,9 @@ def dependency_check_list(item_list):
         If all the executables in the item_list can be found through $PATH, return 0;
         Otherwise, return -1.
     """
+    if item_list is None:
+        return 0
+
     for item in item_list:
         if dependency_check(item) == -1:
             return -1
