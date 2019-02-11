@@ -29,6 +29,14 @@ void corrupt_data( const char *line, int lineno )
 	exit(1);
 }
 
+static void emit_merge( FILE * output, struct jx *merge, const char *lastkey )
+{
+	if(!merge) return;
+	char *str = jx_print_string(merge);
+	fprintf(output,"M %s %s\n",lastkey,str);
+	free(str);
+	jx_delete(merge);
+}
 
 int main( int argc, char *argv[] )
 {
@@ -69,10 +77,7 @@ int main( int argc, char *argv[] )
 			if(sscanf(line,"U %s %s %[^\n]",key,name,value)==3) {
 				// If a merge for a different key is pending, emit it.
 				if(merge && strcmp(key,lastkey) ) {
-					char *str = jx_print_string(merge);
-					fprintf(output,"M %s %s\n",lastkey,str);
-					free(str);
-					jx_delete(merge);
+					emit_merge(output,merge,lastkey);
 					merge = 0;
 				}
 
@@ -87,11 +92,7 @@ int main( int argc, char *argv[] )
 				corrupt_data(line,lineno);
 			}
 		} else if(merge) {
-			// Emit the pending merge on any other op.
-			char *str = jx_print_string(merge);
-			fprintf(output,"M %s %s\n",lastkey,str);
-			free(str);
-			jx_delete(merge);
+			emit_merge(output,merge,lastkey);
 			merge = 0;
 		}
 
@@ -109,6 +110,8 @@ int main( int argc, char *argv[] )
 		}
 	}
 
+	emit_merge(output,merge,lastkey);
+	
 	fclose(input);
 	fclose(output);
 
