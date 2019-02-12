@@ -166,7 +166,7 @@ static struct work_queue_resources * total_resources = 0;
 static struct work_queue_resources * total_resources_last = 0;
 
 static int64_t last_task_received  = 0;
-static int64_t manual_cores_option = 1;
+static int64_t manual_cores_option = 0;
 static int64_t manual_disk_option = 0;
 static int64_t manual_memory_option = 0;
 static int64_t manual_gpus_option = 0;
@@ -2786,7 +2786,7 @@ int main(int argc, char *argv[])
 	total_resources = work_queue_resources_create();
 	total_resources_last = work_queue_resources_create();
 
-	if(manual_cores_option == 0) {
+	if(manual_cores_option < 1) {
 		manual_cores_option = load_average_get_cpus();
 	}
 
