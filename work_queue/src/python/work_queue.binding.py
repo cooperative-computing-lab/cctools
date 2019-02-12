@@ -18,6 +18,11 @@ def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
 
+def specify_debug_log(logfile):
+    set_debug_flag('all')
+    cctools_debug_config_file_size(0)
+    cctools_debug_config_file(logfile)
+
 cctools_debug_config('work_queue_python')
 
 ##
@@ -1097,6 +1102,7 @@ class WorkQueue(_object):
     # @param logfile  Filename.
     def specify_transactions_log(self, logfile):
         work_queue_specify_transactions_log(self._work_queue, logfile)
+
 
     ##
     # Add a mandatory password that each worker must present.
