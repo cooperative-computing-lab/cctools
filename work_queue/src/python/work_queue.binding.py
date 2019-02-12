@@ -1243,6 +1243,14 @@ class WorkQueue(_object):
             return work_queue_blacklist_remove(self._work_queue, host)
 
     ##
+    # Delete file from workers's caches.
+    #
+    # @param self   Reference to the current work queue object.
+    # @param local_name   Name of the file as seen by the master.
+    def invalidate_cache_file(self, local_name):
+        return work_queue_invalidate_cached_file(self._work_queue, local_name, WORK_QUEUE_FILE)
+
+    ##
     # Change keepalive interval for a given queue.
     #
     # @param self     Reference to the current work queue object.
