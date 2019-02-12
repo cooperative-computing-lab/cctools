@@ -252,6 +252,12 @@ sub blacklist_clear {
 	}
 }
 
+sub invalidate_cache_file {
+    my ($self, $local_name) = @_;
+
+    return work_queue_invalidate_cached_file($self->{_work_queue}, $local_name, $WORK_QUEUE_FILE);
+}
+
 sub specify_keepalive_interval {
 	my ($self, $interval) = @_;
 	return work_queue_specify_keepalive_interval($self->{_work_queue}, $interval);
@@ -858,6 +864,22 @@ Remove host from blacklist. Clear all blacklist if host not provided.
 =item host
 
 The of the hostname the host.
+
+=back
+
+=head3 C<invalidate_cache_file>
+
+Delete file from workers's caches.
+
+=over 12
+
+=item self
+
+Reference to the current work queue object.
+
+=item local_name
+
+Name of the file as seen by the master.
 
 =back
 
