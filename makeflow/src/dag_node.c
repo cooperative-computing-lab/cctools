@@ -408,7 +408,6 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 {
 	struct batch_task *task = batch_task_create(queue);
 	task->taskid = n->nodeid;
-
 	batch_task_set_command(task, n->command);
 
 	struct dag_file *f;

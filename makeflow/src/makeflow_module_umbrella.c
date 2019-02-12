@@ -206,8 +206,6 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 		makeflow_hook_add_input_file(n->d, t, u->spec, path_basename(u->spec), DAG_FILE_TYPE_GLOBAL);
 	}
 
-	if(u->binary) makeflow_hook_add_input_file(n->d, t, u->binary, path_basename(u->binary), DAG_FILE_TYPE_GLOBAL);
-
 	debug(D_MAKEFLOW_HOOK, "input_files: %s\n", batch_files_to_string(makeflow_get_queue(n), t->input_files));
 	char *umbrella_input_opt = makeflow_umbrella_print_files(t->input_files, false);
 	debug(D_MAKEFLOW_HOOK, "umbrella input opt: %s\n", umbrella_input_opt);
@@ -215,6 +213,10 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 	debug(D_MAKEFLOW_HOOK, "output_files: %s\n", batch_files_to_string(makeflow_get_queue(n), t->output_files));
 	char *umbrella_output_opt = makeflow_umbrella_print_files(t->output_files, true);
 	debug(D_MAKEFLOW_HOOK, "umbrella output opt: %s\n", umbrella_output_opt);
+
+	// Binary is added after inputs are specified to prevent umbrella being passed into itself
+	// Not always breaking, but allows umbrella executable to be located at absolute path outside of docker
+	if(u->binary) makeflow_hook_add_input_file(n->d, t, u->binary, path_basename(u->binary), DAG_FILE_TYPE_GLOBAL);
 
 	char *log = string_format("%s%d", u->log_prefix, n->nodeid);
 	struct dag_file *log_file = makeflow_hook_add_output_file(n->d, t, log, NULL, DAG_FILE_TYPE_INTERMEDIATE);
