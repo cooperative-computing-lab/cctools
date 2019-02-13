@@ -1035,19 +1035,11 @@ then
 				python3_ldflags_file=`mktemp tmp.XXXXXX`
 				env HOME=/var/empty ${python3} > $python3_ldflags_file <<EOF
 from distutils import sysconfig
-flags = ['-I' + sysconfig.get_python_inc(),
-	 '-I' + sysconfig.get_python_inc(plat_specific=True)]
+flags = ['-I' + sysconfig.get_python_inc(), '-I' + sysconfig.get_python_inc(plat_specific=True)]
 syscfgflags = sysconfig.get_config_var('CFLAGS')
 if not syscfgflags is None:
-	flags.extend(syscfgflags.split())
-print ' '.join(flags)
-EOF
-			env HOME=/var/empty ${python} > $python_ldflags_file <<EOF
-from distutils import sysconfig
-libs = sysconfig.get_config_var('LIBS').split() + sysconfig.get_config_var('SYSLIBS').split()
-if not sysconfig.get_config_var('Py_ENABLE_SHARED'):
-	libs.insert(0, '-L' + sysconfig.get_config_var('LIBPL'))
-print ' '.join(libs)
+    flags.extend(syscfgflags.split())
+print(' '.join(flags))
 EOF
 				python3_ldflags=$(cat $python3_ldflags_file)
 				rm $python3_ldflags_file
