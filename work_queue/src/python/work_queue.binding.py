@@ -787,11 +787,10 @@ class WorkQueue(_object):
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
     # @param catalog    Whether or not to enable catalog mode.
-    # @param exclusive  Whether or not the workers should be exclusive.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, shutdown=False):
         self._shutdown   = shutdown
         self._work_queue = None
         self._stats      = None
