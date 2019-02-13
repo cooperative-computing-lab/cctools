@@ -782,7 +782,7 @@ class WorkQueue(_object):
     # Create a new work queue.
     #
     # @param self       Reference to the current work queue object.
-    # @param port       The port number to listen on. If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
+    # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
     # @param catalog    Whether or not to enable catalog mode.
     # @param exclusive  Whether or not the workers should be exclusive.
@@ -796,10 +796,21 @@ class WorkQueue(_object):
         self._stats_hierarchy = None
         self._task_table = {}
 
+        # if we were given a range ports, rather than a single port to try.
+        lower, upper = None, None
         try:
-            self._work_queue = work_queue_create(port)
+            lower, upper = port
+            specify_port_range(lower, upper)
+            port = 0
+        except TypeError:
+            # if not a range, ignore
+            pass
+        except ValueError:
+            raise ValueError('port should be a single integer, or a sequence of two integers')
+
             self._stats      = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
+            self._work_queue = work_queue_create(port)
             if not self._work_queue:
                 raise Exception('Could not create work_queue on port %d' % port)
 
