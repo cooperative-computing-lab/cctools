@@ -11,10 +11,12 @@ chirp.go: chirp.i
 	@echo "SWIG chirp.i (golang)"
 	@$(CCTOOLS_SWIG) -go -cgo -intgosize 64 -I../../../dttools/src -I../ chirp.i 
 	@mkdir -p src/chirp
+	@mv CChirp.go chirp.go
 	@cp chirp.go chirp_wrap.c src/chirp
 
 clean:
 	-rm chirp.go chirp_wrap.c
 	-rm -Rf src/chirp
 
-install: 
+install:
+	@echo Warning: go chirp module needs to be installed manually.
