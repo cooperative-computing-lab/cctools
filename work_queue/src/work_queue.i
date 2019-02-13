@@ -1,6 +1,9 @@
 /* work_queue.i */
 %module work_queue
 
+/* type is a go keyword. rename it to value_type */
+%rename(value_type) rmsummary_field::type;
+
 %{
 	#include "debug.h"
 	#include "int_sizes.h"

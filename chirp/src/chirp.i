@@ -4,6 +4,9 @@
 /* next is a perl keyword. rename it to next_entry */
 %rename(next_entry) chirp_dirent::next;
 
+/* type is a go keyword. rename it to type_io */
+%rename(type_io) chirp_bulkio::type;
+
 /* silent const char leaking memory, as we do not leak memory */
 %warnfilter(451) chirp_searchstream::current;
 
