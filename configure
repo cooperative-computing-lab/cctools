@@ -1288,10 +1288,24 @@ then
 	fi
 fi
 
+swig_go=no
+if [ "$(${swig} -go --help | grep '\-cgo')" ]
+then
+	swig_go=yes	
+fi
+
 if [ $found_swig != yes ]
 then
 	swig_bindings=""
-fi
+else
+	if [ $swig_go = yes ]
+	then
+		swig_bindings="${swig_bindings} golang"
+	else
+		echo "*** swig golang not supported"
+		echo "*** skipping swig Golang bindings for work queue and chirp"
+	fi
+fi 
 
 library_search_standard()
 {
