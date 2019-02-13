@@ -19,3 +19,4 @@ clean:
 	-rm -Rf src/chirp
 
 install:
+	@echo Warning: go chirp module needs to be installed manually.

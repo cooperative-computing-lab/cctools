@@ -22,3 +22,5 @@ clean:
 	-rm -Rf src
 
 install: 
+	@echo Warning: go work_queue module needs to be installed manually.
+
