@@ -786,11 +786,13 @@ class WorkQueue(_object):
     # @param self       Reference to the current work queue object.
     # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
-    # @param catalog    Whether or not to enable catalog mode.
+    # @param stats_log  The name of a file to write the queue's statistics log.
+    # @param transactions_log  The name of a file to write the queue's transactions log.
+    # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, shutdown=False):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None):
         self._shutdown   = shutdown
         self._work_queue = None
         self._stats      = None
@@ -809,16 +811,23 @@ class WorkQueue(_object):
         except ValueError:
             raise ValueError('port should be a single integer, or a sequence of two integers')
 
+        try:
+            if debug_log:
+                specify_debug_log(debug_log)
             self._stats      = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
             self._work_queue = work_queue_create(port)
             if not self._work_queue:
                 raise Exception('Could not create work_queue on port %d' % port)
 
+            if stats_log:
+                self.specify_log(stats_log)
+
+            if transactions_log:
+                self.specify_transactions_log(transactions_log)
+
             if name:
                 work_queue_specify_name(self._work_queue, name)
-
-            work_queue_specify_master_mode(self._work_queue, catalog)
         except Exception, e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
