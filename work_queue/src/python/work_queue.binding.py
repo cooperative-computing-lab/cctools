@@ -18,6 +18,18 @@ def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
 
+def specify_debug_log(logfile):
+    set_debug_flag('all')
+    cctools_debug_config_file_size(0)
+    cctools_debug_config_file(logfile)
+
+def specify_port_range(low_port, high_port):
+    if low_port >= high_port:
+        raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
+
+    os.environ['TCP_LOW_PORT']  = str(low_port)
+    os.environ['TCP_HIGH_PORT'] = str(high_port)
+
 cctools_debug_config('work_queue_python')
 
 ##
@@ -772,31 +784,50 @@ class WorkQueue(_object):
     # Create a new work queue.
     #
     # @param self       Reference to the current work queue object.
-    # @param port       The port number to listen on. If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
+    # @param port       The port number to listen on. If zero, then a random port is chosen. A range of possible ports (low, hight) can be also specified instead of a single integer.
     # @param name       The project name to use.
-    # @param catalog    Whether or not to enable catalog mode.
-    # @param exclusive  Whether or not the workers should be exclusive.
+    # @param stats_log  The name of a file to write the queue's statistics log.
+    # @param transactions_log  The name of a file to write the queue's transactions log.
+    # @param debug_log  The name of a file to write the queue's debug log.
     # @param shutdown   Automatically shutdown workers when queue is finished. Disabled by default.
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
-    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, catalog=False, exclusive=True, shutdown=False):
+    def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None):
         self._shutdown   = shutdown
         self._work_queue = None
         self._stats      = None
         self._stats_hierarchy = None
         self._task_table = {}
 
+        # if we were given a range ports, rather than a single port to try.
+        lower, upper = None, None
         try:
-            self._work_queue = work_queue_create(port)
+            lower, upper = port
+            specify_port_range(lower, upper)
+            port = 0
+        except TypeError:
+            # if not a range, ignore
+            pass
+        except ValueError:
+            raise ValueError('port should be a single integer, or a sequence of two integers')
+
+        try:
+            if debug_log:
+                specify_debug_log(debug_log)
             self._stats      = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
+            self._work_queue = work_queue_create(port)
             if not self._work_queue:
                 raise Exception('Could not create work_queue on port %d' % port)
 
+            if stats_log:
+                self.specify_log(stats_log)
+
+            if transactions_log:
+                self.specify_transactions_log(transactions_log)
+
             if name:
                 work_queue_specify_name(self._work_queue, name)
-
-            work_queue_specify_master_mode(self._work_queue, catalog)
         except Exception, e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
@@ -1099,6 +1130,7 @@ class WorkQueue(_object):
     # @param logfile  Filename.
     def specify_transactions_log(self, logfile):
         work_queue_specify_transactions_log(self._work_queue, logfile)
+
 
     ##
     # Add a mandatory password that each worker must present.
