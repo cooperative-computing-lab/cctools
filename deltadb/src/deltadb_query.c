@@ -279,6 +279,55 @@ int deltadb_delete_event( struct deltadb *db, const char *key )
 	return 1;
 }
 
+/*
+Merge all the values of the update object into the current object,
+replacing where they exist.  We previously used jx_merge here,
+but the O(n^2) nature of the function and the heavy reliance on
+malloc/free resulted in poor performance.  This function avoids
+many malloc/frees by popping pairs off of the update in order,
+finding matches in current, if needed, and then pushing the pair
+on to the head of the current list.
+*/
+
+static void jx_merge_into( struct jx *current, struct jx *update )
+{
+	while(1) {
+		struct jx_pair *p = update->u.pairs;
+		if(!p) break;
+
+		update->u.pairs = p->next;
+
+		struct jx *oldvalue = jx_remove(current,p->key);
+		if(oldvalue) jx_delete(oldvalue);
+
+		p->next = current->u.pairs;
+		current->u.pairs = p;
+	}
+}
+
+int deltadb_merge_event( struct deltadb *db, const char *key, struct jx *update )
+{
+	struct jx *current = hash_table_lookup(db->table,key);
+	if(!current) {
+		/* If the key is not found, it was filtered out; skip the update. */
+		jx_delete(update);
+		return 1;
+	}
+
+	if(display_mode==MODE_STREAM) {
+		display_deferred_time(db);
+		char *str = jx_print_string(update);
+		printf("M %s %s\n",key,str);
+		free(str);
+	}
+
+	jx_merge_into(current,update);
+
+	jx_delete(update);
+
+	return 1;
+}
+
 int deltadb_update_event( struct deltadb *db, const char *key, const char *name, struct jx *jvalue )
 {
 	struct jx * jobject = hash_table_lookup(db->table,key);

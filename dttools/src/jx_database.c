@@ -202,9 +202,12 @@ static void log_create( struct jx_database *db, const char *key, struct jx *j )
 
 static void log_updates( struct jx_database *db, const char *key, struct jx *a, struct jx *b )
 {
+	// u is the object containing the update
+	struct jx *u = jx_object(0);
+
 	// For each item in the old object:
-	// If the new one is different, log an update event.
-	// If the new one is missing, log a remove event.
+	// If the new item is different, add it to an update object.
+	// If the new item is missing, log a remove event.
 
 	struct jx_pair *p;
 	for(p=a->u.pairs;p;p=p->next) {
@@ -221,19 +224,17 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 			if(jx_equals(avalue,bvalue)) {
 				// items match, do nothing.
 			} else {
-				// item changed, print it.
-				char *str = jx_print_string(bvalue);
-				log_message(db,"U %s %s %s\n",key,name,str);
-				free(str);
+				// item changed, include it in the update object.
+				jx_insert(u,jx_string(name),jx_copy(bvalue));
 			}
 		} else {
-			// item was removed.
-			log_message(db,"R %s %s\n",key,name);
+			// item was removed, log a remove record instead
+			log_message(db,"R %s %s",key,name);
 		}
 	}
 
 	// For each item in the new object:
-	// If it doesn't exist in the old one, log an update event.
+	// If it doesn't exist in the old one, add it to the update object.
 
 	for(p=b->u.pairs;p;p=p->next) {
 
@@ -242,12 +243,19 @@ static void log_updates( struct jx_database *db, const char *key, struct jx *a, 
 
 		struct jx *avalue = jx_lookup(a,name);
 		if(!avalue) {
-			// item changed, print it.
-			char *str = jx_print_string(bvalue);
-			log_message(db,"U %s %s %s\n",key,name,str);
-			free(str);
+			// item changed, include it.
+			jx_insert(u,jx_string(name),jx_copy(bvalue));
 		}
 	}
+
+	// If the update is not empty, log it as a merge (M) event.
+	if(u->u.pairs) {
+		char *str = jx_print_string(u);
+		log_message(db,"M %s %s\n",key,str);
+		free(str);
+	}
+
+	jx_delete(u);
 }
 
 /* Log an event indicating an entire object was deleted. */
@@ -270,6 +278,20 @@ static void corrupt_data( const char *filename, const char *line )
 {
 	debug(D_NOTICE,"corrupt data in %s: %s\n",filename,line);
 
+}
+
+/* Accept an update object and transfer its fields to a current item. */
+/* Note that if the current key does not exist, the update becomes the new value. */
+
+static void handle_merge( struct jx_database *db, const char *key, struct jx *update )
+{
+	struct jx *current = hash_table_remove(db->table,key);
+	struct jx *merged = jx_merge(update,current,0);
+
+	hash_table_insert(db->table,key,merged);
+
+	jx_delete(update);
+	jx_delete(current);
 }
 
 /*
@@ -305,6 +327,19 @@ static int log_replay( struct jx_database *db, const char *filename, time_t snap
 				jvalue = jx_parse_string(value);
 				if(jvalue) {
 					hash_table_insert(db->table,key,jvalue);
+				} else {
+					corrupt_data(filename,line);
+				}
+			} else {
+				corrupt_data(filename,line);
+				continue;
+			}
+		} else if(line[0]=='M') {
+			n = sscanf(line,"M %s %[^\n]",key,value);
+			if(n==2) {
+				jvalue = jx_parse_string(value);
+				if(jvalue) {
+					handle_merge(db,key,jvalue);
 				} else {
 					corrupt_data(filename,line);
 				}

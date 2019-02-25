@@ -39,7 +39,8 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 		if(line[0]=='C') {
 			n = sscanf(line,"C %s %[^\n]",key,value);
 			if(n==1) {
-				/* backwards compatibility with old log format */				struct nvpair *nv = nvpair_create();
+				/* backwards compatibility with old log format */
+				struct nvpair *nv = nvpair_create();
 				nvpair_parse_stream(nv,stream);
 				jvalue = nvpair_to_jx(nv);
 				nvpair_delete(nv);
@@ -61,6 +62,21 @@ int deltadb_process_stream( struct deltadb *db, FILE *stream, time_t starttime, 
 			}
 
 			if(!deltadb_delete_event(db,key)) break;
+
+		} else if(line[0]=='M') {
+			n = sscanf(line,"M %s %[^\n]",key,value);
+			if(n==2) {
+				jvalue = jx_parse_string(value);
+				if(!jvalue) {
+					corrupt_data(filename,line);
+					continue;
+				}
+			} else {
+				corrupt_data(filename,line);
+				continue;
+			}
+
+			if(!deltadb_merge_event(db,key,jvalue)) break;
 
 		} else if(line[0]=='U') {
 			n=sscanf(line,"U %s %s %[^\n],",key,name,value);
