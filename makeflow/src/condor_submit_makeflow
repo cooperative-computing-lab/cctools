@@ -14,7 +14,7 @@ then
 fi
 
 condor_submit << EOF
-universe = local
+universe = scheduler
 cmd = $makeflow
 arguments = -T condor -l makeflow.\$(CLUSTER).makeflowlog -L makeflow.\$(CLUSTER).condorlog $@
 output = makeflow.\$(CLUSTER).output
