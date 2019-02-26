@@ -4,11 +4,11 @@ set -ex
 
 BUILD_ID=$(basename "${TRAVIS_TAG:-${TRAVIS_COMMIT:0:8}}")
 case "$TRAVIS_OS_NAME" in
-    linux)
-    IMAGE_ID=$(basename "${DOCKER_IMAGE:-travis}")
-    ;;
     osx)
     IMAGE_ID="x86_64-osx10.13"
+    ;;
+    *)
+    IMAGE_ID=$(basename "${DOCKER_IMAGE:-travis}")
     ;;
 esac
 D=/tmp/cctools-$BUILD_ID-${IMAGE_ID#cctools-env:}
