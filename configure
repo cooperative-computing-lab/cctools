@@ -1244,6 +1244,7 @@ then
 		if [ -n "$swig" ]
 		then
 			swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
+
 			if [ ! \( "$python_major_version" = 2 -a "$python_minor_version" = 4 \) -a `format_version $swig_version` = `format_version 1.3.29` ]
 			then
 				echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
@@ -1260,6 +1261,7 @@ then
 				echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
 				echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
 				echo "*** skipping swig bindings for work queue and chirp"
+				
 			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 			then
 				found_swig=yes
@@ -1286,6 +1288,12 @@ then
 	swig_go=yes	
 fi
 
+swig_r=no
+if [ "$(${swig} --help | grep '\-r')" ]
+then
+	swig_r=yes	
+fi
+
 if [ $found_swig != yes ]
 then
 	swig_bindings=""
@@ -1296,6 +1304,14 @@ else
 	else
 		echo "*** swig golang not supported"
 		echo "*** skipping swig Golang bindings for work queue and chirp"
+	fi
+
+	if [ $swig_r = yes ]
+	then
+		swig_bindings="${swig_bindings} r"
+	else
+		echo "*** swig r not supported"
+		echo "*** skipping swig r bindings for work queue and chirp"
 	fi
 fi 
 
