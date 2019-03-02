@@ -1289,7 +1289,7 @@ then
 fi
 
 swig_r=no
-if [ "$(${swig} --help | grep '\-r')" ]
+if [ "$(${swig} --help | grep '\-r')" ] && [ "$(which R)" ]
 then
 	swig_r=yes	
 fi
