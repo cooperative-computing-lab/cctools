@@ -1,0 +1,5 @@
+work_queue.R
+work_queue_wrap.c
+work_queue_wrap.o
+work_queue_wrap.so
+.Rhistory
