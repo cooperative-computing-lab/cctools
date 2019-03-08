@@ -1,5 +1,6 @@
 # load work_queue module 
-dyn.load("work_queue_wrap.so")
+dyn.load(paste("work_queue", .Platform$dynlib.ext, sep=""))
+# dyn.load("work_queue.so")
 source("work_queue.R")
 cacheMetaData(1)
 
@@ -33,7 +34,7 @@ default_port <- 9123
 # create a work_queue instance
 wq <- work_queue_create(default_port)
 for (t_inp in args) {
-    t_oup <- paste(t1_inp, ".gz")
+    t_oup <- paste(t_inp, ".gz", sep="")
     t_cmd <- paste("./gzip <", t_inp, ">", t_oup, sep=" ")
     # create task
     t <- work_queue_task_create(t_cmd)
@@ -46,21 +47,21 @@ for (t_inp in args) {
 }
 
 # wait for task to complete
-while(!work_queue_empty()) {
+while(!work_queue_empty(wq)) {
     # Application specific code goes here ...
 
     # work_queue_wait waits at most 5 seconds for some task to return.
-    complete_t <- work_queue_wait(q, 5)
-    complete_t_id <- work_queue_task_taskid_get(complete_t)
-    complete_t_cmd <- work_queue_task_command_line_get(complete_t)
-    complete_t_ret_status <- work_queue_task_return_status_get(complete_t)
-    if (complete_t) {
-        printf("task (id# %d) complete: %s (return code %d)\n", 
-                      complete_t_id, complete_t_cmd, complete_t_ret_status)
-    }
-    if(t->return_status != 0) {
+    complete_t <- work_queue_wait(wq, 5)
+    # complete_t_id <- work_queue_task_taskid_get(complete_t)
+    # complete_t_cmd <- work_queue_task_command_line_get(complete_t)
+    # complete_t_ret_status <- work_queue_task_return_status_get(complete_t)
+    # if (complete_t) {
+    #     printf("task (id# %d) complete: %s (return code %d)\n", 
+    #                   complete_t_id, complete_t_cmd, complete_t_ret_status)
+    # }
+    # if(t->return_status != 0) {
     #  The task failed. Error handling (e.g., resubmit with new parameters) here. 
-    }
+    #}
     work_queue_task_delete(complete_t) 
 }
 
