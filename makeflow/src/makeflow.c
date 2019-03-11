@@ -1121,7 +1121,7 @@ static void show_help_run(const char *cmd)
 	printf("								  outputs: Cleans output files.\n");
 	printf("								  intermediates: Cleans intermediate files.\n");
 	printf("								  cahce: Cleans cache directory.\n");
-	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem\.n");
+	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem.\n");
 	printf(" -o,--debug-file=<file>         Send debugging to this file.\n");
 	printf("    --debug-rotate-max=<bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -T,--batch-type=<type>         Select batch system: %s\n",batch_queue_type_string());
@@ -1170,12 +1170,10 @@ static void show_help_run(const char *cmd)
 	printf("    --storage-limit=<int>       Set storage limit for Makeflow.(default is off)\n");
 	printf("    --storage-type=<type>       Storage limit type(0:MAX|1:MIN|2:OUTPUT|3:OFF)\n");
 	printf("    --storage-print=<file>      Print storage limit calculated by Makeflow.\n");
-	printf("    --tickets=<file>            Specify Chirp tickets.\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
 	printf("\nWork Queue Options:\n");
-    printf("    --allocation                Specify allocation mode (see manual).\n");
 	printf(" -C,--catalog-server=<hst:port> Select alternate catalog server.\n");
 	printf("    --password                  Password file for authenticating workers.\n");
 	printf(" -p,--port=<port>               Port number to use with Work Queue.\n");
@@ -1189,18 +1187,19 @@ static void show_help_run(const char *cmd)
 	printf(" --work-queue-preferred-connection    Preferred connection: by_ip | by_hostname\n");
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
-	printf("    --amazon-config             Amazon EC2 config from makeflow_ec2_setup.\n");
-	printf("    --lambda-config             Lambda config from makeflow_lambda_setup.\n");
-	printf("    --amazon-batch-config       Batch config from makeflow_amazon_batch_setup.\n");
-	printf("    --amazon-batch-img          Specify Amazon ECS Image(Used for amazon-batch)\n");
+	printf("    --amazon-config=<file>      Amazon EC2 config from makeflow_ec2_setup.\n");
+	printf("    --lambda-config=<file>      Lambda config from makeflow_lambda_setup.\n");
+	printf("    --amazon-batch-config=<file>Batch config from makeflow_amazon_batch_setup.\n");
+	printf("    --amazon-batch-img=<img>    Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
-	printf("    --safe-submit-mode          Excludes resources at submission.(SLURM, TORQUE)\n");
+	printf("    --safe-submit-mode          Excludes resources at submission.\n");
+	printf("                                  (SLURM, TORQUE, and PBS)\n");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
-	printf("    --batch-mem-type            Specify memory resource type (SGE).\n");
+	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
@@ -1237,12 +1236,13 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs.(def: resource-rule-%%)\n");
 	printf(" --monitor-measure-dir          Format for monitor logs.(def: resource-rule-%%)\n");
+	printf(" --allocation=<mode>            Specify allocation mode (see manual).\n");
 	
 	/********************************************************************************/
 	printf("\nMPI Options:\n");
 	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
 	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
-    printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create\n");
+	printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create\n");
 	printf("                                  sandbox directory and execute in.\n");
 }
 
@@ -1493,7 +1493,7 @@ int main(int argc, char *argv[])
 		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
 		{"submission-timeout", required_argument, 0, 'S'},
 		{"summary-log", required_argument, 0, 'f'},
-		{"tickets", required_argument, 0, LONG_OPT_TICKETS},
+		{"tickets", required_argument, 0, LONG_OPT_TICKETS}, // Deprecated ?
 		{"vc3-builder", no_argument, 0, LONG_OPT_VC3},
 		{"vc3-exe", required_argument, 0, LONG_OPT_VC3_EXE},
 		{"vc3-log", required_argument, 0, LONG_OPT_VC3_LOG},
