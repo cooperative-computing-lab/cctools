@@ -1117,60 +1117,65 @@ static void show_help_run(const char *cmd)
 	printf("Use: ./makeflow [options] <dagfile>\n");
 	printf("Basic Options:\n");
 	printf(" -c,--clean=<type>              Clean up logfile and all temporary files.\n");
-	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem\n");
+	printf("								  all: Cleans all files but inputs (defualt).\n");
+	printf("								  outputs: Cleans output files.\n");
+	printf("								  intermediates: Cleans intermediate files.\n");
+	printf("								  cahce: Cleans cache directory.\n");
+	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem\.n");
 	printf(" -o,--debug-file=<file>         Send debugging to this file.\n");
 	printf("    --debug-rotate-max=<bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -T,--batch-type=<type>         Select batch system: %s\n",batch_queue_type_string());
-	printf("    --argv=<file>               Include command line arguments from a JSON file.\n");
-	printf(" -v,--version                   Show version string\n");
+	printf("    --argv=<file>               Use command line arguments from a JSON file.\n");
+	printf(" -v,--version                   Show version string.\n");
 	printf(" -h,--help                      Show this help screen.\n");
 	        /********************************************************************************/
 	printf("\nWorkflow Handling:\n");
-	printf(" -a,--advertise                 Advertise workflow status to the global catalog.\n");
+	printf(" -a,--advertise                 Advertise workflow status to catalog.\n");
+	printf(" -l,--makeflow-log=<logfile>    Use this file for the makeflow log.\n");
 	printf(" -L,--batch-log=<logfile>       Use this file for the batch system log.\n");
-	printf(" -m,--email=<email>             Send summary of workflow to this email at end\n");
+	printf(" -m,--email=<email>             Send summary of workflow to this email.\n");
 	printf("    --json                      Use JSON format for the workflow specification.\n");
 	printf("    --jx                        Use JX format for the workflow specification.\n");
-	printf("    --jx-args=<file>            Evaluate the JX input with keys and values in file defined as variables.\n");
-	printf("    --jx-context=<file>         Deprecated. Equivalent to --jx-args.\n");
-	printf("    --jx-define=<VAR>=<EXPR>	Set the JX variable VAR to the JX expression EXPR.\n");
+	printf("    --jx-args=<file>            File defining JX variables for JX workflow.\n");
+	printf("    --jx-define=<VAR>=<EXPR>	Set the JX variable VAR to JX expression EXPR.\n");
 	printf("    --log-verbose               Add node id symbol tags in the makeflow log.\n");
 	printf(" -j,--max-local=<#>             Max number of local jobs to run at once.\n");
 	printf(" -J,--max-remote=<#>            Max number of remote jobs to run at once.\n");
-	printf(" -l,--makeflow-log=<logfile>    Use this file for the makeflow log.\n");
 	printf(" -R,--retry                     Retry failed batch jobs up to 5 times.\n");
 	printf(" -r,--retry-count=<n>           Retry failed batch jobs up to n times.\n");
-	printf("    --send-environment          Send all local environment variables in remote execution.\n");
+	printf("    --send-environment          Send local environment variables for execution.\n");
 	printf(" -S,--submission-timeout=<#>    Time to retry failed batch job submission.\n");
 	printf(" -f,--summary-log=<file>        Write summary of workflow to this file at end.\n");
 	        /********************************************************************************/
 	printf("\nData Handling:\n");
-	printf("    --archive                   Read jobs from and write completed jobs into archive.\n");
-	printf("    --archive-s3=<s3_bucket>    Base s3 bucket name (DEFAULT: makeflows3archive).\n");
-	printf("    --archive-s3-no-check=<s3_bucket> Don't check for files in s3 bucket before uploading.\n");
-	printf("    --s3-hostname=<s3 hostname> Base s3 hostname. Use if using a library similar to AWS S3.\n");
-	printf("    --s3-keyid=<key id>         Access Key for cloud server. Use if using a library similar to AWS S3.\n");
-	printf("    --s3-secretkey=<secret key> Secret Key for cloud server. Use if using a library similar to AWS S3.\n");
+	printf("    --archive                   Archive and retrieve archived jobs from archive.\n");
+	printf("    --archive-s3=<s3_bucket>    Base s3 bucket name (DEFAULT:makeflows3archive).\n");
+	printf("    --archive-s3-no-check=<s3b> Blind upload files to s3 (No existence check).\n");
+	printf("    --s3-hostname=<s3_hostname> Base s3 hostname. Used for AWS S3.\n");
+	printf("    --s3-keyid=<key id>         Access Key for cloud server. Used for AWS S3.\n");
+	printf("    --s3-secretkey=<secret key> Secret Key for cloud server. Used for AWS S3.\n");
+	printf("    --archive-dir=<dir>         Archive directory(/tmp/makeflow.archive.USERID).\n");
 	printf("    --archive-read              Read jobs from archive.\n");
 	printf("    --archive-write             Write jobs into archive.\n");
-	printf("    --archive-dir=<dir>         Base archive directory (default: /tmp/makeflow.archive.USERID).\n");
 	printf(" -A,--disable-afs-check         Disable the check for AFS. (experts only.)\n");
 	printf("    --cache=<dir>               Use this dir to cache downloaded mounted files.\n");
 	printf(" -X,--change-directory=<dir>    Change to <dir> before executing the workflow.\n");
-	printf(" -g,--gc=<type>                 Enable garbage collection. (ref_cnt|on_demand|all)\n");
-	printf("    --gc-size=<int>             Set disk size to trigger GC. (on_demand only)\n");
-	printf(" -G,--gc-count=<int>            Set number of files to trigger GC. (ref_cnt only)\n");
-	printf("    --mounts=<mountfile>        Use this file as a mountlist.\n");
+	printf(" -g,--gc=<type>                 Enable garbage collector.(ref_cnt|on_demand|all)\n");
+	printf("    --gc-size=<int>             Set disk size to trigger GC (on_demand only)\n");
+	printf(" -G,--gc-count=<int>            Set number of files to trigger GC.(ref_cnt only)\n");
+	printf("    --mounts=<mountfile>        Use this file as a mountlist\n");
 	printf("    --skip-file-check           Do not check for file existence before running.\n");
-	printf("    --do-not-save-failed-output Disables moving output of failed nodes to directory.\n"); 
+	printf("    --do-not-save-failed-output Disables saving failed nodes to directory.\n"); 
 	printf("    --shared-fs=<dir>           Assume that <dir> is in a shared filesystem.\n");
-	printf("    --storage-limit=<int>       Set storage limit for Makeflow (default is off)\n");
-	printf("    --storage-type=<type>       Type of storage limit(0:MAX,1:MIN,2:OUTPUT,3:OFF\n");
-	printf("    --storage-print=<file>      Print storage limit calculated by Makeflow\n");
+	printf("    --storage-limit=<int>       Set storage limit for Makeflow.(default is off)\n");
+	printf("    --storage-type=<type>       Storage limit type(0:MAX|1:MIN|2:OUTPUT|3:OFF)\n");
+	printf("    --storage-print=<file>      Print storage limit calculated by Makeflow.\n");
+	printf("    --tickets=<file>            Specify Chirp tickets.\n");
 	printf("    --wait-for-files-upto=<n>   Wait up to <n> seconds for files to be created.\n");
 	printf(" -z,--zero-length-error         Consider zero-length files to be erroneous.\n");
 	        /********************************************************************************/
 	printf("\nWork Queue Options:\n");
+    printf("    --allocation                Specify allocation mode (see manual).\n");
 	printf(" -C,--catalog-server=<hst:port> Select alternate catalog server.\n");
 	printf("    --password                  Password file for authenticating workers.\n");
 	printf(" -p,--port=<port>               Port number to use with Work Queue.\n");
@@ -1184,18 +1189,18 @@ static void show_help_run(const char *cmd)
 	printf(" --work-queue-preferred-connection    Preferred connection: by_ip | by_hostname\n");
 	        /********************************************************************************/
 	printf("\nBatch System Options:\n");
-	printf("    --amazon-config             Amazon EC2 config file from makeflow_ec2_setup.\n");
-	printf("    --lambda-config             Amazon Lambda config file from makeflow_lambda_setup.\n");
-	printf("    --amazon-batch-img          Specify amazon ECS Image (for use with -T amazon-batch)\n");
-	printf("    --amazon-batch-config       Amazon config file from makeflow_amazon_batch_setup.\n");
+	printf("    --amazon-config             Amazon EC2 config from makeflow_ec2_setup.\n");
+	printf("    --lambda-config             Lambda config from makeflow_lambda_setup.\n");
+	printf("    --amazon-batch-config       Batch config from makeflow_amazon_batch_setup.\n");
+	printf("    --amazon-batch-img          Specify Amazon ECS Image(Used for amazon-batch)\n");
 	printf(" -B,--batch-options=<options>   Add these options to all batch submit files.\n");
 	printf("    --disable-cache             Disable batch system caching.\n");
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
-	printf("    --safe-submit-mode          Excludes resources at submission (SLURM, TORQUE, and PBS).\n");
+	printf("    --safe-submit-mode          Excludes resources at submission.(SLURM, TORQUE)\n");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
-	printf("    --batch-mem-type            Specify memory type for resource specification (SGE).\n");
+	printf("    --batch-mem-type            Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
@@ -1226,16 +1231,19 @@ static void show_help_run(const char *cmd)
 
 	printf("\nResource Monitoring Options:\n");
 	printf(" --monitor=<dir>                Enable resource monitor, write logs to <dir>\n");
+	printf(" --monitor-exe=<file>           Specify monitor executable.\n");
 	printf(" --monitor-interval=<#>         Set monitor interval, in seconds. (default: 1s)\n");
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
-	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs. (def: resource-rule-%%)\n");
+	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs.(def: resource-rule-%%)\n");
+	printf(" --monitor-measure-dir          Format for monitor logs.(def: resource-rule-%%)\n");
 	
 	/********************************************************************************/
 	printf("\nMPI Options:\n");
 	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
 	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
-    printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create sandbox directory and execute in.\n");
+    printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create\n");
+	printf("                                  sandbox directory and execute in.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1462,6 +1470,7 @@ int main(int argc, char *argv[])
 		{"monitor-exe", required_argument, 0, LONG_OPT_MONITOR_EXE},
 		{"monitor-interval", required_argument, 0, LONG_OPT_MONITOR_INTERVAL},
 		{"monitor-log-name", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
+		{"monitor-log-fmt", required_argument, 0, LONG_OPT_MONITOR_LOG_NAME},
 		{"monitor-measure-dir", no_argument, 0, LONG_OPT_MONITOR_MEASURE_DIR},
 		{"monitor-with-opened-files", no_argument, 0, LONG_OPT_MONITOR_OPENED_FILES},
 		{"monitor-with-time-series",  no_argument, 0, LONG_OPT_MONITOR_TIME_SERIES},
@@ -1478,7 +1487,7 @@ int main(int argc, char *argv[])
 		{"sandbox", no_argument, 0, LONG_OPT_SANDBOX},
 		{"send-environment", no_argument, 0, LONG_OPT_SEND_ENVIRONMENT},
 		{"shared-fs", required_argument, 0, LONG_OPT_SHARED_FS},
-		{"show-output", no_argument, 0, 'O'},
+		{"show-output", no_argument, 0, 'O'}, // Deprecated
 		{"storage-type", required_argument, 0, LONG_OPT_STORAGE_TYPE},
 		{"storage-limit", required_argument, 0, LONG_OPT_STORAGE_LIMIT},
 		{"storage-print", required_argument, 0, LONG_OPT_STORAGE_PRINT},
@@ -1498,17 +1507,17 @@ int main(int argc, char *argv[])
 		{"umbrella-mode", required_argument, 0, LONG_OPT_UMBRELLA_MODE},
 		{"umbrella-spec", required_argument, 0, LONG_OPT_UMBRELLA_SPEC},
 		{"work-queue-preferred-connection", required_argument, 0, LONG_OPT_PREFERRED_CONNECTION},
-		{"wq-estimate-capacity", no_argument, 0, 'E'},
+		{"wq-estimate-capacity", no_argument, 0, 'E'}, // Deprecated
 		{"wq-fast-abort", required_argument, 0, 'F'},
 		{"wq-keepalive-interval", required_argument, 0, 'u'},
 		{"wq-keepalive-timeout", required_argument, 0, 't'},
 		{"wq-schedule", required_argument, 0, 'W'},
-		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS},
+		{"wq-wait-queue-size", required_argument, 0, LONG_OPT_WQ_WAIT_FOR_WORKERS}, // Not advertised
 		{"wrapper", required_argument, 0, LONG_OPT_WRAPPER},
 		{"wrapper-input", required_argument, 0, LONG_OPT_WRAPPER_INPUT},
 		{"wrapper-output", required_argument, 0, LONG_OPT_WRAPPER_OUTPUT},
 		{"zero-length-error", no_argument, 0, 'z'},
-		{"change-directory", required_argument, 0, 'X'},
+		{"change-directory", required_argument, 0, 'X'}, // Deprecated Still functional not advertised
 		{"docker", required_argument, 0, LONG_OPT_DOCKER},
 		{"docker-tar", required_argument, 0, LONG_OPT_DOCKER_TAR},
 		{"docker-opt", required_argument, 0, LONG_OPT_DOCKER_OPT},
@@ -1518,7 +1527,7 @@ int main(int argc, char *argv[])
 		{"amazon-batch-config",required_argument,0,LONG_OPT_AMAZON_BATCH_CFG},
 		{"json", no_argument, 0, LONG_OPT_JSON},
 		{"jx", no_argument, 0, LONG_OPT_JX},
-		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS},
+		{"jx-context", required_argument, 0, LONG_OPT_JX_ARGS}, // Deprecated
 		{"jx-args", required_argument, 0, LONG_OPT_JX_ARGS},
 		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
