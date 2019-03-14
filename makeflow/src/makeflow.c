@@ -1235,7 +1235,6 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-time-series     Enable monitor time series.\n");
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs.(def: resource-rule-%%)\n");
-	printf(" --monitor-measure-dir          Format for monitor logs.(def: resource-rule-%%)\n");
 	printf(" --allocation=<mode>            Specify allocation mode (see manual).\n");
 	
 	/********************************************************************************/
