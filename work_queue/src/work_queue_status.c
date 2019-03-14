@@ -119,14 +119,19 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Filter results of -Q for masters matching <name>\n", "-M,--project-name<name>");
 	fprintf(stdout, " %-30s List workers connected to the given master.\n", "-W,--workers");
 	fprintf(stdout, " %-30s List tasks of the given master.\n", "-T,--tasks");
-	fprintf(stdout, " %-30s List categories of the given master, size of largest task, and workers that can run it.\n", "-A,--able-workers");
+	fprintf(stdout, " %-30s List categories of the given master, size of\n", "-A,--able-workers");
+	fprintf(stdout, " %-30s largest task, and workers that can run it.\n", "");
 	fprintf(stdout, " %-30s Shows aggregated resources of all masters.\n", "-R,--resources");
-	fprintf(stdout, " %-30s Shows resource capacities of all masters.\n", "--capacity");
+	fprintf(stdout, " %-30s Shows resource capacities of all masters.\n", "   --capacity");
 	fprintf(stdout, " %-30s Long text output.\n", "-l,--verbose");
 	fprintf(stdout, " %-30s Set catalog server to <catalog>. Format: HOSTNAME:PORT\n", "-C,--catalog=<catalog>");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug <flag>");
-	fprintf(stdout, " %-30s Filter results by this expression.\n","   --where=<expr>\n");
+	fprintf(stdout, " %-30s Filter results by this expression.\n", "   --where=<expr>");
 	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", work_queue_status_timeout);
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr,\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s :stdout, :syslog, or :journal)\n", "");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Show work_queue_status version.\n", "-v,--version");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 }
 
@@ -149,6 +154,9 @@ static void work_queue_status_parse_command_line_arguments(int argc, char *argv[
 		{"catalog", required_argument, 0, 'C'},
 		{"debug", required_argument, 0, 'd'},
 		{"timeout", required_argument, 0, 't'},
+		{"debug-file", required_argument, 0, 'o'},
+		{"debug-rotate-max", required_argument, 0, 'O'},
+		{"version", no_argument, 0, 'v'},
 		{"help", no_argument, 0, 'h'},
 		{"where", required_argument, 0, LONG_OPT_WHERE},
 		{0,0,0,0}};
