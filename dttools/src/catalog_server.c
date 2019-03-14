@@ -568,18 +568,26 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Listen only on this network interface.\n", "-I,--interface=<addr>");
 	fprintf(stdout, " %-30s Lifetime of data, in seconds (default is %d)\n", "-l,--lifetime=<secs>", lifetime);
 	fprintf(stdout, " %-30s Log new updates to this file.\n", "-L,--update-log=<file>");
-	fprintf(stdout, " %-30s Maximum number of child processes.  (default is %d)\n", "-m,--max-jobs=<n>",child_procs_max);
-	fprintf(stdout, " %-30s Maximum size of a server to be believed.  (default is any)\n", "-M,--server-size=<size>");
+	fprintf(stdout, " %-30s Maximum number of child processes.\n", "-m,--max-jobs=<n>");
+	fprintf(stdout, " %-30s (default is %d)\n", "", child_procs_max);
+	fprintf(stdout, " %-30s Maximum size of a server to be believed.\n", "-M,--server-size=<size>");
+	fprintf(stdout, " %-30s (default is any)\n", "");
 	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s Rotate debug file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s be :stderr, :stdout, :syslog, or :journal)\n", "");
+	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
+	fprintf(stdout, " %-30s (default 10M, 0 disables)\n", "");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);
 	fprintf(stdout, " %-30s Single process mode; do not work on queries.\n", "-S,--single");
-	fprintf(stdout, " %-30s Maximum time to allow a query process to run.  (default is %ds)\n", "-T,--timeout=<time>",child_procs_timeout);
-	fprintf(stdout, " %-30s Send status updates to this host. (default is %s)\n", "-u,--update-host=<host>", CATALOG_HOST_DEFAULT);
-	fprintf(stdout, " %-30s Send status updates at this interval. (default is 5m)\n", "-U,--update-interval=<time>");
+	fprintf(stdout, " %-30s Maximum time to allow a query process to run.\n", "-T,--timeout=<time>");
+	fprintf(stdout, " %-30s (default is %ds)\n", "", child_procs_timeout);
+	fprintf(stdout, " %-30s Send status updates to this host. (default is\n", "-u,--update-host=<host>");
+	fprintf(stdout, " %-30s %s)\n", "", CATALOG_HOST_DEFAULT);
+	fprintf(stdout, " %-30s Send status updates at this interval.\n", "-U,--update-interval=<time>");
+	fprintf(stdout, " %-30s (default is 5m)\n", "");
 	fprintf(stdout, " %-30s Show version string\n", "-v,--version");
-		fprintf(stdout, " %-30s Select port at random and write it to this file. (default: disabled)\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s Select port at random and write it to\n", "-Z,--port-file=<file>");
+	fprintf(stdout, " %-30s this file. (default: disabled)\n", "");
 }
 
 int main(int argc, char *argv[])
@@ -605,12 +613,12 @@ int main(int argc, char *argv[])
 		{"debug", required_argument, 0, 'd'},
 		{"help", no_argument, 0, 'h'},
 		{"history", required_argument, 0, 'H'},
+		{"interface", required_argument, 0, 'I'},
 		{"lifetime", required_argument, 0, 'l'},
 		{"update-log", required_argument, 0, 'L'},
 		{"max-jobs", required_argument, 0, 'm'},
 		{"server-size", required_argument, 0, 'M'},
 		{"name", required_argument, 0, 'n'},
-		{"interface", required_argument, 0, 'I'},
 		{"debug-file", required_argument, 0, 'o'},
 		{"debug-rotate-max", required_argument, 0, 'O'},
 		{"port", required_argument, 0, 'p'},

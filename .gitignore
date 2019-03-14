@@ -5,6 +5,8 @@
 *.o
 *.swp
 cctools.test.log
+cctools.test.tmp
+cctools.test.fail
 configure.rerun
 config.mk
 *.pyc

@@ -3,3 +3,5 @@ makeflow_analyze
 makeflow_linker
 makeflow_viz
 makeflow_status
+makeflow_mpi_starter
+makeflow_mpi_submitter
