@@ -963,39 +963,42 @@ static void show_help(const char *cmd)
 	printf("where options are:\n");
 	printf(" %-30s Project name of masters to serve, can be a regular expression.\n", "-M,-N,--master-name=<project>");\
 	printf(" %-30s Foremen to serve, can be a regular expression.\n", "-F,--foremen-name=<project>");
-	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
-	printf(" %-30s Batch system type (required). One of: %s\n", "-T,--batch-type=<type>",batch_queue_type_string());
+	printf(" %-30s Catalog server to query for masters (default: %s:%d).\n", "--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
+	printf(" %-30s Batch system type (required). One of:\n", "-T,--batch-type=<type>");
+	printf(" %-30s %s\n","",batch_queue_type_string());
 	printf(" %-30s Add these options to all batch submit files.\n", "-B,--batch-options=<options>");
 	printf(" %-30s Password file for workers to authenticate to master.\n","-P,--password");
 	printf(" %-30s Use configuration file <file>.\n","-C,--config-file=<file>");
-	printf(" %-30s Minimum workers running.  (default=%d)\n", "-w,--min-workers", workers_min);
-	printf(" %-30s Maximum workers running.  (default=%d)\n", "-W,--max-workers", workers_max);
-	printf(" %-30s Maximum number of new workers per %d s.  (less than 1 disables limit, default=%d)\n", "--workers-per-cycle", factory_period, workers_per_cycle);
-	printf(" %-30s Average tasks per worker. (default=one task per core)\n", "--tasks-per-worker");
-	printf(" %-30s Workers abort after this amount of idle time. (default=%d)\n", "-t,--timeout=<time>",worker_timeout);
-	printf(" %-30s Environment variable that should be added to the worker.  (May be specified multiple times)\n", "--env=<variable=value>");
+	printf(" %-30s Minimum workers running (default=%d).\n", "-w,--min-workers", workers_min);
+	printf(" %-30s Maximum workers running (default=%d).\n", "-W,--max-workers", workers_max);
+	printf(" %-30s Maximum number of new workers per %d s (less than 1 disables limit, default=%d).\n", "--workers-per-cycle", factory_period, workers_per_cycle);
+	printf(" %-30s Average tasks per worker (default=one task per core).\n", "--tasks-per-worker");
+	printf(" %-30s Workers abort after this amount of idle time (default=%d).\n", "-t,--timeout=<time>",worker_timeout);
+	printf(" %-30s Environment variable that should be added to the worker (May be specified multiple times).\n", "--env=<variable=value>");
 	printf(" %-30s Extra options that should be added to the worker.\n", "-E,--extra-options=<options>");
 	printf(" %-30s Set the number of cores requested per worker.\n", "--cores=<n>");
 	printf(" %-30s Set the number of GPUs requested per worker.\n", "--gpus=<n>");
 	printf(" %-30s Set the amount of memory (in MB) requested per worker.\n", "--memory=<mb>           ");
 	printf(" %-30s Set the amount of disk (in MB) requested per worker.\n", "--disk=<mb>");
-	printf(" %-30s Automatically size a worker to an available slot (Condor, Mesos and Kubernetes).\n", "--autosize");
-	printf(" %-30s Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).\n", "--condor-requirements");
+	printf(" %-30s Automatically size a worker to an available slot (Condor, Mesos, and Kubernetes).\n", "--autosize");
+	printf(" %-30s Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).\n", "--condor-requirements");
 	printf(" %-30s Exit after no master has been seen in <n> seconds.\n", "--factory-timeout");
-	printf(" %-30s Use this scratch dir for temporary files. (default is /tmp/wq-pool-$uid)\n","-S,--scratch-dir");
+	printf(" %-30s Use this scratch dir for temporary files (default is /tmp/wq-pool-$uid).\n","-S,--scratch-dir");
 	printf(" %-30s Use worker capacity reported by masters.\n","-c,--capacity");
 	printf(" %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	printf(" %-30s Specify Amazon config file (for use with -T amazon)\n", "--amazon-config");
+	printf(" %-30s Specify Amazon config file (for use with -T amazon).\n", "--amazon-config");
 	printf(" %-30s Wrap factory with this command prefix.\n","--wrapper");
 	printf(" %-30s Add this input file needed by the wrapper.\n","--wrapper-input");
-	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos)\n", "--mesos-master");
-	printf(" %-30s Specify path to mesos python library (for use with -T mesos)\n", "--mesos-path");
-	printf(" %-30s Specify the linking libraries for running mesos(for use with -T mesos)\n", "--mesos-preload");
-	printf(" %-30s Specify the container image for using Kubernetes(for use with -T k8s)\n", "--k8s-image");
-	printf(" %-30s Specify the container image that contains work_queue_worker availabe for using Kubernetes(for use with -T k8s)\n", "--k8s-worker-image");
-	printf(" %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
-	printf(" %-30s Specifies the binary of the worker to be used, can either be relative or hard path, and it should accept the same arguments as the default work_queue_worker\n", "--worker-binary=<file>");
-	printf(" %-30s Will make best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS","--runos=<os_img>");
+	printf(" %-30s Specify the host name to mesos master node (for use with -T mesos).\n", "--mesos-master");
+	printf(" %-30s Specify path to mesos python library (for use with -T mesos).\n", "--mesos-path");
+	printf(" %-30s Specify the linking libraries for running mesos (for use with -T mesos).\n", "--mesos-preload");
+	printf(" %-30s Specify the container image for using Kubernetes (for use with -T k8s).\n", "--k8s-image");
+	printf(" %-30s Specify the container image that contains work_queue_worker availabe for using Kubernetes (for use with -T k8s).\n", "--k8s-worker-image");
+	printf(" %-30s Send debugging to this file (can also be :stderr, :stdout, :syslog, or :journal).\n", "-o,--debug-file=<file>");
+	printf(" %-30s Specify the size of the debug file (must use with -o option).\n", "-O,--debug-file-size=<mb>");
+	printf(" %-30s Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.\n", "--worker-binary=<file>");
+	printf(" %-30s Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.\n","--runos=<img>");
+	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
 
@@ -1024,43 +1027,44 @@ enum{   LONG_OPT_CORES = 255,
 	};
 
 static const struct option long_options[] = {
-	{"master-name", required_argument, 0, 'M'},
-	{"foremen-name", required_argument, 0, 'F'},
+	{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
+	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
+	{"batch-options", required_argument, 0, 'B'},
 	{"batch-type", required_argument, 0, 'T'},
-	{"catalog", required_argument, 0, LONG_OPT_CATALOG},
-	{"password", required_argument, 0, 'P'},
-	{"config-file", required_argument, 0, 'C'},
-	{"min-workers", required_argument, 0, 'w'},
-	{"max-workers", required_argument, 0, 'W'},
-	{"workers-per-cycle", required_argument, 0, LONG_OPT_WORKERS_PER_CYCLE},
-	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
-	{"timeout", required_argument, 0, 't'},
-	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
-	{"extra-options", required_argument, 0, 'E'},
-	{"cores",  required_argument,  0,  LONG_OPT_CORES},
-	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
-	{"disk",   required_argument,  0,  LONG_OPT_DISK},
-	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
-	{"scratch-dir", required_argument, 0, 'S' },
 	{"capacity", no_argument, 0, 'c' },
+	{"catalog", required_argument, 0, LONG_OPT_CATALOG},
+	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
+	{"config-file", required_argument, 0, 'C'},
+	{"cores",  required_argument,  0,  LONG_OPT_CORES},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
 	{"debug-file-size", required_argument, 0, 'O'},
-	{"version", no_argument, 0, 'v'},
-	{"help", no_argument, 0, 'h'},
-	{"amazon-config", required_argument, 0, LONG_OPT_AMAZON_CONFIG},
-	{"autosize", no_argument, 0, LONG_OPT_AUTOSIZE},
+	{"disk",   required_argument,  0,  LONG_OPT_DISK},
+	{"env", required_argument, 0, LONG_OPT_ENVIRONMENT_VARIABLE},
+	{"extra-options", required_argument, 0, 'E'},
 	{"factory-timeout", required_argument, 0, LONG_OPT_FACTORY_TIMEOUT},
-	{"condor-requirements", required_argument, 0, LONG_OPT_CONDOR_REQUIREMENTS},
-	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
-	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},
-	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
+	{"foremen-name", required_argument, 0, 'F'},
+	{"gpus",   required_argument,  0,  LONG_OPT_GPUS},
+	{"help", no_argument, 0, 'h'},
+	{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMAGE},
+	{"k8s-worker-image", required_argument, 0, LONG_OPT_K8S_WORKER_IMAGE},
+	{"master-name", required_argument, 0, 'M'},
+	{"max-workers", required_argument, 0, 'W'},
+	{"memory", required_argument,  0,  LONG_OPT_MEMORY},
 	{"mesos-master", required_argument, 0, LONG_OPT_MESOS_MASTER},
 	{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
-	{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMAGE},
-	{"k8s-worker-image", required_argument, 0, LONG_OPT_K8S_WORKER_IMAGE},
+	{"min-workers", required_argument, 0, 'w'},
+	{"password", required_argument, 0, 'P'},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
+	{"scratch-dir", required_argument, 0, 'S' },
+	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
+	{"timeout", required_argument, 0, 't'},
+	{"version", no_argument, 0, 'v'},
+	{"worker-binary", required_argument, 0, LONG_OPT_WORKER_BINARY},
+	{"workers-per-cycle", required_argument, 0, LONG_OPT_WORKERS_PER_CYCLE},
+	{"wrapper",required_argument, 0, LONG_OPT_WRAPPER},
+	{"wrapper-input",required_argument, 0, LONG_OPT_WRAPPER_INPUT},	
 	{0,0,0,0}
 };
 

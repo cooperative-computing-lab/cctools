@@ -46,30 +46,43 @@ SECTION(OPTIONS)
 
 SUBSECTION(Batch Options)
 OPTIONS_BEGIN
-OPTION_TRIPLET(-M,master-name, project)Name of a preferred project. A worker can have multiple preferred projects.
-OPTION_TRIPLET(-T,batch-type, type)Batch system type: local, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, amazon, mesos. (default is local)
-OPTION_PAIR(--catalog, catalog)Set catalog server to PARAM(catalog). Format: HOSTNAME:PORT
-OPTION_TRIPLET(-B,batch-options, options)Add these options to all batch submit files.
-OPTION_TRIPLET(-w,min-workers,workers) Minimum workers running.  (default=5)
-OPTION_TRIPLET(-W,max-workers,workers) Maximum workers running.  (default=100)
-OPTION_PAIR(--workers-per-cycle,workers) Maximum number of new workers per 30 seconds.  ( less than 1 disables limit, default=5)
-OPTION_ITEM(`--autosize')Automatically size a worker to an available slot (Condor and Mesos).
-OPTION_ITEM(-c --capacity) Use worker capacity reported by masters.
-OPTION_TRIPLET(-P,password,file) Password file for workers to authenticate to master.
-OPTION_TRIPLET(-t,timeout,time)Abort after this amount of idle time.
+OPTION_TRIPLET(-M,master-name,project)Project name of masters to serve, can be a regular expression.
+OPTION_TRIPLET(-F,foremen-name,project)Foremen to serve, can be a regular expression.
+OPTION_PAIR(--catalog, catalog)Catalog server to query for masters (default: catalog.cse.nd.edu,backup-catalog.cse.nd.edu:9097).
+OPTION_TRIPLET(-T,batch-type,type)Batch system type (required). One of: local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, lambda, dryrun, amazon-batch
+OPTION_TRIPLET(-B,batch-options,options)Add these options to all batch submit files.
+OPTION_TRIPLET(-P,password,file)Password file for workers to authenticate to master.
 OPTION_TRIPLET(-C,config-file,file)Use the configuration file <file>.
+OPTION_TRIPLET(-w,min-workers,workers)Minimum workers running.  (default=5)
+OPTION_TRIPLET(-W,max-workers,workers)Maximum workers running.  (default=100)
+OPTION_PAIR(--workers-per-cycle,workers)Maximum number of new workers per 30 seconds.  ( less than 1 disables limit, default=5)
+OPTION_PAIR(--tasks-per-worker,workers)Average tasks per worker (default=one task per core).
+OPTION_TRIPLET(-t,timeout,time)Workers abort after this amount of idle time (default=300).
+OPTION_PAIR(--env,variable=value)Environment variable that should be added to the worker (May be specified multiple times).
 OPTION_TRIPLET(-E,extra-options,options)Extra options that should be added to the worker.
-OPTION_PAIR(--condor-requirements, str)Manually set requirements for the workers as condor jobs. May be specified several times, with the expresions and-ed together (Condor only).
-OPTION_TRIPLET(-S,scratch,file)Scratch directory. (default is /tmp/${USER}-workers)
-OPTION_PAIR(--factory-timeout, n)Exit after no master has been seen in <n> seconds.
-OPTION_TRIPLET(-d,debug,flag)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
-OPTION_PAIR(--factory-timeout, #)Set factory timeout to <#> seconds. (off by default) This will cause work queue to exit when their are no masters present after the given number of seconds.
-OPTION_PAIR(--wrapper,Wrap all commands with this prefix.)
-OPTION_PAIR(--wrapper-input,Add this file needed by the wrapper.)
-OPTION_PAIR(--mesos-master, hostname) Specify the host name to mesos master node (for use with -T mesos)
-OPTION_PAIR(--mesos-path, filepath) Specify path to mesos python library (for use with -T mesos)
-OPTION_PAIR(--mesos-preload, library) Specify the linking libraries for running mesos(for use with -T mesos)
+OPTION_PAIR(--cores,n)Set the number of cores requested per worker.
+OPTION_PAIR(--gpus,n)Set the number of GPUs requested per worker.
+OPTION_PAIR(--memory,mb)Set the amount of memory (in MB) requested per worker.
+OPTION_PAIR(--disk,mb)Set the amount of disk (in MB) requested per worker.
+OPTION_ITEM(--autosize)Automatically size a worker to an available slot (Condor, Mesos, and Kubernetes).
+OPTION_ITEM(--condor-requirements)Set requirements for the workers as Condor jobs. May be specified several times with expresions and-ed together (Condor only).
+OPTION_PAIR(--factory-timeout,n)Exit after no master has been seen in <n> seconds.
+OPTION_TRIPLET(-S,scratch-dir,file)Use this scratch dir for temporary files (default is /tmp/wq-pool-$uid).
+OPTION_ITEM(`-c, --capacity')Use worker capacity reported by masters.
+OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
+OPTION_ITEM(--amazon-config)Specify Amazon config file (for use with -T amazon).
+OPTION_ITEM(--wrapper)Wrap factory with this command prefix.
+OPTION_ITEM(--wrapper-input)Add this input file needed by the wrapper.
+OPTION_PAIR(--mesos-master,hostname)Specify the host name to mesos master node (for use with -T mesos).
+OPTION_PAIR(--mesos-path,filepath)Specify path to mesos python library (for use with -T mesos).
+OPTION_PAIR(--mesos-preload,library)Specify the linking libraries for running mesos (for use with -T mesos).
+OPTION_ITEM(--k8s-image)Specify the container image for using Kubernetes (for use with -T k8s).
+OPTION_ITEM(--k8s-worker-image)Specify the container image that contains work_queue_worker availabe for using Kubernetes (for use with -T k8s).
+OPTION_TRIPLET(-o,debug-file,file)Send debugging to this file (can also be :stderr, :stdout, :syslog, or :journal).
+OPTION_TRIPLET(-O,debug-file-size,mb)Specify the size of the debug file (must use with -o option).
+OPTION_PAIR(--worker-binary,file)Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.
+OPTION_PAIR(--runos,img)Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.
+OPTION_ITEM(`-v, --version')Show the version string.
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END
 
