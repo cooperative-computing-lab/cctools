@@ -1029,7 +1029,7 @@ static void show_help_run(const char *cmd)
 	printf("								  outputs: Cleans output files.\n");
 	printf("								  intermediates: Cleans intermediate files.\n");
 	printf("								  cahce: Cleans cache directory.\n");
-	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem\.n");
+	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem.\n");
 	printf(" -o,--debug-file=<file>         Send debugging to this file.\n");
 	printf("    --debug-rotate-max=<bytes>  Rotate debug file once it reaches this size.\n");
 	printf(" -T,--batch-type=<type>         Select batch system: %s\n",batch_queue_type_string());
