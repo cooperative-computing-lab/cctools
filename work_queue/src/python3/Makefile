@@ -7,7 +7,7 @@ CCTOOLS_DYNAMIC_SUFFIX = so
 LOCAL_CCFLAGS = -w -fPIC -DNDEBUG $(CCTOOLS_PYTHON3_CCFLAGS)
 LOCAL_LINKAGE = $(CCTOOLS_PYTHON3_LDFLAGS)
 
-EXTERNAL_DEPENDENCIES = ../libwork_queue.a ../../../dttools/src/libdttools.a
+EXTERNAL_DEPENDENCIES = ../libwork_queue.a ../../../dttools/src/libdttools.a -lz
 WQPYTHONSO = _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX)
 LIBRARIES = $(WQPYTHONSO)
 OBJECTS = work_queue_wrap.o
