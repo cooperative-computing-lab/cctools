@@ -3,7 +3,7 @@
 set -ex
 
 if [ -z "$DOCKER_IMAGE" ]; then
-    ./travis_build.sh
+    .travis/travis_build.sh
 else
     docker run \
         --privileged \
@@ -15,5 +15,5 @@ else
         -e TRAVIS_COMMIT \
         -e DOCKER_IMAGE \
         "$DOCKER_IMAGE" \
-        ./travis_build.sh
+        .travis/travis_build.sh
 fi
