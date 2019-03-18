@@ -1694,6 +1694,7 @@ CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSIO
 CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
 
 CCTOOLS_SWIG_BINDINGS=${swig_bindings}
+CHIRP_SWIG_BINDINGS=$(echo ${swig_bindings} | sed -e 's/ r//g')
 
 CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
 
