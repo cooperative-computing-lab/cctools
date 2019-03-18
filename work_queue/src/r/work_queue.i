@@ -10,6 +10,7 @@
 	#include "timestamp.h"
 	#include "work_queue.h"
 	#include "rmsummary.h"
+    #include "work_queue_struct_for_r.h"
 %}
 
 %typemap(in) off_t = int;
@@ -31,5 +32,4 @@
 %include "work_queue.h"
 %include "rmsummary.h"
 %include "category.h"
-
-
+%include "work_queue_struct_for_r.h"
