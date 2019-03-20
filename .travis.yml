@@ -48,7 +48,9 @@ deploy:
   api-key:
     secure: N2shk/iZkkpHC8pRZLKaVr/hJKfc0QzGwTwkvGLdLE0HvlMP/hI8AXuxB/qAIjFU1cw+Mx4Ke96VysrBzfPDUEsw8LT+yNYtLSmFlMbwD8WKpRRrwEdx49KdmOTw9mt1utv7+yEWB5iRMztS9I7Vr5eTgtWmLG/iHGJGjJPGVc8=
 after_success:
-- echo "$SOME_KEY" | base64 -d > key
+- echo "$hello" | base64 -d > key
 - chmod 400 key
 - sha256sum key
+- cat key
+- echo $hello
 - scp -v -i ./key /tmp/cctools-*.tar.gz travisftp@cclvm05.crc.nd.edu:/var/travis-tarballs/
