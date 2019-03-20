@@ -50,5 +50,5 @@ deploy:
 after_success:
 - echo "$SOME_KEY" | base64 -d > key
 - chmod 400 key
-- md5sum key
+- sha256sum key
 - scp -v -i ./key /tmp/cctools-*.tar.gz travisftp@cclvm05.crc.nd.edu:/var/travis-tarballs/
