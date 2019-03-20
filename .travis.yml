@@ -50,4 +50,4 @@ deploy:
 after_success:
 - echo "$SOME_KEY" | base64 -d > key
 - chmod 400 key
-- scp -i key /tmp/cctools-*.tar.gz travisftp@cclvm05.crc.nd.edu:/var/travis-tarballs/
+- scp -v -i ./key /tmp/cctools-*.tar.gz travisftp@cclvm05.crc.nd.edu:/var/travis-tarballs/
