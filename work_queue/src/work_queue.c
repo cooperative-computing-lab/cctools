@@ -4060,18 +4060,15 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   new->env_list     = work_queue_task_env_list_clone(task->env_list);
 
   if(task->resources_requested) {
-	  new->resources_requested = malloc(sizeof(struct rmsummary));
-	  memcpy(new->resources_requested, task->resources_requested, sizeof(sizeof(struct rmsummary)));
+	  new->resources_requested = rmsummary_copy(task->resources_requested);
   }
 
   if(task->resources_measured) {
-	  new->resources_measured = malloc(sizeof(struct rmsummary));
-	  memcpy(new->resources_measured, task->resources_measured, sizeof(sizeof(struct rmsummary)));
+	  new->resources_measured = rmsummary_copy(task->resources_measured);
   }
 
   if(task->resources_allocated) {
-	  new->resources_allocated = malloc(sizeof(struct rmsummary));
-	  memcpy(new->resources_allocated, task->resources_allocated, sizeof(sizeof(struct rmsummary)));
+	  new->resources_allocated = rmsummary_copy(task->resources_allocated);
   }
 
   if(task->monitor_output_directory) {
