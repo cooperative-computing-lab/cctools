@@ -4035,6 +4035,8 @@ struct work_queue_task *work_queue_task_clone(const struct work_queue_task *task
   struct work_queue_task *new = xxmalloc(sizeof(struct work_queue_task));
   memcpy(new, task, sizeof(*new));
 
+  new->taskid = 0;
+
   //allocate new memory so we don't segfault when original memory is freed.
   if(task->tag) {
 	new->tag = xxstrdup(task->tag);
@@ -5428,6 +5430,27 @@ const char *task_state_str(work_queue_task_state_t task_state) {
 	return str;
 }
 
+static int task_in_terminal_state(struct work_queue *q, struct work_queue_task *t) {
+
+	work_queue_task_state_t state = (uintptr_t) itable_lookup(q->task_state_map, t->taskid);
+
+	switch(state) {
+		case WORK_QUEUE_TASK_READY:
+		case WORK_QUEUE_TASK_RUNNING:
+		case WORK_QUEUE_TASK_WAITING_RETRIEVAL:
+		case WORK_QUEUE_TASK_RETRIEVED:
+			return 0;
+			break;
+		case WORK_QUEUE_TASK_DONE:
+		case WORK_QUEUE_TASK_CANCELED:
+		case WORK_QUEUE_TASK_UNKNOWN:
+			return 1;
+			break;
+	}
+
+	return 0;
+}
+
 const char *task_result_str(work_queue_result_t result) {
 	const char *str;
 
@@ -5545,6 +5568,11 @@ int work_queue_submit_internal(struct work_queue *q, struct work_queue_task *t)
 
 int work_queue_submit(struct work_queue *q, struct work_queue_task *t)
 {
+	if(t->taskid > 0 && !task_in_terminal_state(q, t)) {
+		debug(D_NOTICE|D_WQ, "Task %d has been already submitted. Ignoring new submission.", t->taskid);
+		return 0;
+	}
+
 	t->taskid = q->next_taskid;
 
 	//Increment taskid. So we get a unique taskid for every submit.
