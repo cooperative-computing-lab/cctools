@@ -57,26 +57,15 @@ libconfuga.$(CCTOOLS_DYNAMIC_SUFFIX): $(OBJECTS_CONFUGA) ../../dttools/src/auth_
 chirp_server: $(OBJECTS_SERVER) libconfuga.a
 $(PROGRAMS_CONFUGA): libconfuga.a libchirp.a $(EXTERNAL_DEPENDENCIES)
 $(PROGRAMS_CHIRP): libchirp.a $(EXTERNAL_DEPENDENCIES)
-$(CCTOOLS_SWIG_BINDINGS): libchirp.a $(EXTERNAL_DEPENDENCIES)
 
-bindings: $(CCTOOLS_SWIG_BINDINGS)
-$(CCTOOLS_SWIG_BINDINGS): chirp_swig_wrap.o
-	@$(MAKE) -C $@
+bindings: chirp_swig_wrap.o libchirp.a libconfuga.a $(EXTERNAL_DEPENDENCIES)
+	@$(MAKE) -C bindings
 
-CCTOOLS_SWIG_BINDINGS_INSTALL = $(CCTOOLS_SWIG_BINDINGS:%=install-%)
-install-bindings: $(CCTOOLS_SWIG_BINDINGS_INSTALL)
-$(CCTOOLS_SWIG_BINDINGS_INSTALL): $(CCTOOLS_SWIG_BINDINGS)
-	@$(MAKE) -C $(@:install-%=%) install
-
-CCTOOLS_SWIG_BINDINGS_CLEAN = $(CCTOOLS_SWIG_BINDINGS:%=clean-%)
-clean-bindings: $(CCTOOLS_SWIG_BINDINGS_CLEAN)
-$(CCTOOLS_SWIG_BINDINGS_CLEAN):
-	@$(MAKE) -C $(@:clean-%=%) clean
-
-clean: clean-bindings
+clean:
 	rm -f $(OBJECTS) $(TARGETS)
+	@$(MAKE) -C bindings clean
 
-install: all install-bindings
+install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	if [ -f $(CCTOOLS_INSTALL_DIR)/bin/chirp_server ]; then mv $(CCTOOLS_INSTALL_DIR)/bin/chirp_server $(CCTOOLS_INSTALL_DIR)/bin/chirp_server.old; fi
 	chmod 755 $(SCRIPTS)
@@ -87,7 +76,9 @@ install: all install-bindings
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
 	cp -r ../tools/workflows/ $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
+	@$(MAKE) -C bindings install
 
 test: all
+	@$(MAKE) -C bindings test
 
-.PHONY: all clean install test $(CCTOOLS_SWIG_BINDINGS) bindings $(CCTOOLS_SWIG_BINDINGS_INSTALL) install-bindings $(CCTOOLS_SWIG_BINDINGS_CLEAN) clean-bindings
+.PHONY: all clean install test bindings
