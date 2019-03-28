@@ -60,7 +60,7 @@ sub specify_category {
 
 sub specify_feature {
 	my ($self, $name) = @_;
-	return work_queue_task_specify_feature($self->{_task}, $name);;
+	return work_queue_task_specify_feature($self->{_task}, $name);
 }
 
 sub clone {
