@@ -4216,12 +4216,15 @@ void work_queue_task_specify_category(struct work_queue_task *t, const char *cat
 	t->category = xxstrdup(category ? category : "default");
 }
 
-void work_queue_task_specify_feature(struct work_queue_task *t, const char *name, int64_t count)
+void work_queue_task_specify_feature(struct work_queue_task *t, const char *name)
 {
-	if(!name)
+	if(!name) {
 		return;
-	if(!t->features)
+	}
+
+	if(!t->features) {
 		t->features = list_create();
+	}
 
 	list_push_tail(t->features, xxstrdup(name));
 }

@@ -469,10 +469,9 @@ void work_queue_task_specify_category(struct work_queue_task *t, const char *cat
 /** Label the task with a user-defined feature. The task will only run on a worker that provides (--feature option) such feature.
 @param q A work queue object.
 @param t A task object.
-@param count The number of resources consumed. If 0, the task does not consume the resource, but the worker still needs to provide it.
-@param category The name of the feature.
+@param feature The name of the feature.
 */
-void work_queue_task_specify_feature(struct work_queue_task *t, const char *name, int64_t count);
+void work_queue_task_specify_feature(struct work_queue_task *t, const char *name);
 
 /** Specify the priority of this task relative to others in the queue.
 Tasks with a higher priority value run first. If no priority is given, a task is placed at the end of the ready list, regardless of the priority.
