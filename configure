@@ -944,6 +944,66 @@ then
         fi
 fi
 
+found_swig=no
+if [ $config_swig_path != no ]
+then
+	if [ "$optstatic" = 1 ]
+	then
+		echo "*** buildin statically, skipping swig support"
+	else
+		swig=""
+		if check_file ${swig_path}/bin/swig
+		then
+			swig=${swig_path}/bin/swig
+		else
+			if check_path swig
+			then
+				swig=`which swig`
+			else
+				echo "*** skipping swig bindings for work queue"
+			fi
+		fi
+
+		if [ -n "$swig" ]
+		then
+			swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
+
+			if [ ! \( "$python_major_version" = 2 -a "$python_minor_version" = 4 \) -a `format_version $swig_version` = `format_version 1.3.29` ]
+			then
+				echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
+				echo "*** skipping swig bindings for work queue and chirp"
+			elif [ "$python_dev" = no ]
+			then
+				echo "*** Sorry, Swig needs the develovement files for python (e.g., python-devel, or python-dev)."
+				echo "*** skipping swig bindings for work queue and chirp"
+			elif [ "$python3" != 0 -a `format_version $swig_version` -lt `format_version 2.0.4` ]
+			then
+				# Python 3 requires Swig version >= 2.0.4; cf.
+				# http://sourceforge.net/p/swig/bugs/1104/ and
+				# http://sourceforge.net/p/swig/news/?page=1
+				echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
+				echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
+				echo "*** skipping swig bindings for work queue and chirp"
+				
+			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
+			then
+				found_swig=yes
+			else
+				echo "*** Sorry, I need swig >= 1.3.29"
+				echo "*** skipping swig bindings for work queue and chirp"
+			fi
+		else
+			if [ $config_swig_path = yes ]
+			then
+				echo "*** Sorry, I couldn't find swig in $swig_path"
+				echo "*** Check --with-swig-path and try again."
+				exit 1
+			else
+				echo "*** skipping swig bindings for work queue"
+			fi
+		fi
+	fi
+fi
 
 if [ $config_perl_path != no ]
 then
