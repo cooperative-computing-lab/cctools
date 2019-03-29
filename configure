@@ -103,6 +103,7 @@ perl_path="/usr"
 python_path="/usr"
 python3_path="/usr"
 readline_path="/usr"
+rlang_path="/usr"
 swig_path="/usr"
 uuid_path="/usr"
 xrootd_path="/usr"
@@ -129,6 +130,7 @@ config_perl_path=auto
 config_python_path=auto
 config_python3_path=auto
 config_readline_path=auto
+config_rlang_path=auto
 config_swig_path=auto
 
 config_curl_path=no
@@ -256,6 +258,10 @@ do
 		--with-readline-path)
 			readline_path=${arg}
 			config_readline_path=$(config_X_path ${arg})
+			;;
+		--with-rlang-path)
+			rlang_path=${arg}
+			config_rlang_path=$(config_X_path ${arg})
 			;;
 		--with-swig-path)
 			swig_path=${arg}
@@ -1323,32 +1329,31 @@ then
 	fi
 fi
 
-swig_r=no
-if [ "$(${swig} --help | grep '\-r')" ] && [ "$(which R)" ]
+if [ $config_rlang_path != no ]
 then
-	swig_r=yes	
+	if check_file ${rlang_path}/bin/R
+	then
+		rlang=${rlang_path}/bin/R
+	else
+		rlang=0
+	fi
+
+	if [ $rlang = 0 ]
+	then
+		if [ $config_rlang_path = yes ]
+		then
+			echo "*** Sorry, I couldn't find an R installation in $rlang_path"
+			echo "*** Check --with-rlang-path and try again."
+			exit 1
+		else
+			echo "*** skipping rlang support"
+		fi
+	else
+		swig_bindings="${swig_bindings} rlang"
+	fi
 fi
 
-if [ $found_swig != yes ]
-then
-	swig_bindings=""
-else
-	if [ $swig_go = yes ]
-	then
-		swig_bindings="${swig_bindings} golang"
-	else
-		echo "*** swig golang not supported"
-		echo "*** skipping swig Golang bindings for work queue and chirp"
-	fi
 
-	if [ $swig_r = yes ]
-	then
-		swig_bindings="${swig_bindings} r"
-	else
-		echo "*** swig r not supported"
-		echo "*** skipping swig r bindings for work queue and chirp"
-	fi
-fi 
 
 library_search_standard()
 {
