@@ -10,7 +10,7 @@ all: $(TARGETS)
 
 work_queue.go: work_queue.i
 	@echo "SWIG work_queue.i (golang)"
-	@$(CCTOOLS_SWIG) -go -intgosize 64 -I../../../dttools/src -I../ work_queue.i 
+	@$(CCTOOLS_SWIG) -go -cgo -intgosize 64 -I../../../dttools/src -I../ work_queue.i 
 	@mkdir -p src/work_queue
 	@mv work_queue.go work_queue_wrap.c src/work_queue
 

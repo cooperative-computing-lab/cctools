@@ -121,6 +121,9 @@ static double worker_volatility = 0.0;
 // This can be set by Ctrl-C or by any condition that prevents further progress.
 static int abort_flag = 0;
 
+// If flag is set, then the worker proceeds to finish current running tasks, cleanup and shut down.
+static int drain_flag = 0;
+
 // Record the signal received, to inform the master if appropiate.
 static int abort_signal_received = 0;
 
@@ -1414,6 +1417,8 @@ static void disconnect_master(struct link *master) {
 		released_by_master = 0;
 	} else if(abort_flag) {
 		// Bail out quickly
+	} else if(drain_flag) {
+		debug(D_WQ, "The worker has been drain out");
 	} else {
 		sleep(5);
 	}
@@ -1480,6 +1485,10 @@ static int handle_master(struct link *master) {
 		} else if(!strncmp(line, "exit", 5)) {
 			work_queue_broadcast_message(foreman_q, "exit\n");
 			abort_flag = 1;
+			r = 1;
+		} else if(!strncmp(line, "drain", 6)) {
+			work_queue_broadcast_message(foreman_q, "drain\n");
+			drain_flag = 1;
 			r = 1;
 		} else if(!strncmp(line, "check", 6)) {
 			r = send_keepalive(master, 0);
@@ -1725,6 +1734,10 @@ static void work_for_master(struct link *master) {
 
 
 		if(!ok) {
+			break;
+		}
+		
+		if(drain_flag) {
 			break;
 		}
 
@@ -1980,7 +1993,6 @@ int serve_master_by_hostport_list(struct list *master_addresses) {
 	list_first_item(master_addresses);
 	while((current_master_address = list_next_item(master_addresses))) {
 		result = serve_master_by_hostport(current_master_address->host,current_master_address->port,0);
-
 		if(result) {
 			break;
 		}
@@ -2839,6 +2851,11 @@ int main(int argc, char *argv[])
 
 		if(abort_flag) {
 			debug(D_NOTICE,"stopping: abort signal received");
+			break;
+		}
+		
+		if(drain_flag) {
+			debug(D_NOTICE,"stopping: worker will be drained");
 			break;
 		}
 

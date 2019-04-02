@@ -887,6 +887,12 @@ struct list * work_queue_cancel_all_tasks(struct work_queue *q);
 */
 int work_queue_shut_down_workers(struct work_queue *q, int n);
 
+/** Stop dispatching tasks to workers, which proceeds to complete running tasks, cleanup and shut down normally, on the given host  
+@param q A work queue object.
+@param worker_hashkey the hashkey that identify a worker
+*/
+void work_queue_drain_worker(struct work_queue *q, const char *hostname);
+
 /** Delete a work queue.
 This function should only be called after @ref work_queue_empty returns true.
 @param q A work queue to delete.

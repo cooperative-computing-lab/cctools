@@ -213,6 +213,7 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 	int  foreman;                             // 0 if regular worker, 1 if foreman
+	int  draining_flag;                       // 0 if not, 1 if worker is being drained
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
 	struct hash_table           *features;
@@ -977,6 +978,7 @@ static void add_worker(struct work_queue *q)
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
 	w->foreman = 0;
+	w->draining_flag = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -3344,7 +3346,7 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
-
+	
 	/* worker has no reported any resources yet */
 	if(w->resources->tag < 0)
 		return 0;
@@ -3356,6 +3358,9 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 	if(!w->foreman) {
 		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
 		if (info && info->blacklisted) {
+			return 0;
+		}
+		if (w->draining_flag) {
 			return 0;
 		}
 	}
@@ -6000,6 +6005,24 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	}
 
 	return i;
+}
+
+void work_queue_drain_worker(struct work_queue *q, const char *hostname)
+{
+	char *worker_hashkey = NULL;
+	void *val = NULL;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &worker_hashkey, &val)) {
+		struct work_queue_worker *w = (struct work_queue_worker *)val;
+		if (!strcmp(w->hostname, hostname)) {
+			// send drain message to worker
+			if (!w->draining_flag) {
+				send_worker_msg(q, w, "drain\n");
+				w->draining_flag = 1;
+			}
+		}
+	}
 }
 
 /**
