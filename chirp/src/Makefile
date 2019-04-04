@@ -23,9 +23,9 @@ SCRIPTS = chirp_audit_cluster chirp_server_hdfs
 SOURCES_CONFUGA = confuga.c confuga_namespace.c confuga_replica.c confuga_node.c confuga_job.c confuga_file.c confuga_gc.c
 SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c json.c json_aux.c
 SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_fs_confuga.c chirp_job.c chirp_sqlite.c
-TARGETS = $(PROGRAMS) $(LIBRARIES) bindings
+TARGETS = $(PROGRAMS) $(LIBRARIES)
 
-all: $(TARGETS)
+all: $(TARGETS) bindings
 
 chirp: chirp_tool.o
 ifeq ($(CCTOOLS_STATIC),1)
@@ -59,24 +59,14 @@ $(PROGRAMS_CONFUGA): libconfuga.a libchirp.a $(EXTERNAL_DEPENDENCIES)
 $(PROGRAMS_CHIRP): libchirp.a $(EXTERNAL_DEPENDENCIES)
 $(CCTOOLS_SWIG_CHIRP_BINDINGS): libchirp.a $(EXTERNAL_DEPENDENCIES)
 
-bindings: $(CCTOOLS_SWIG_CHIRP_BINDINGS)
-$(CCTOOLS_SWIG_CHIRP_BINDINGS): chirp_swig_wrap.o
-	@$(MAKE) -C $@
+bindings: chirp_swig_wrap.o libchirp.a libconfuga.a
+	@$(MAKE) -C bindings
 
-CCTOOLS_SWIG_CHIRP_BINDINGS_INSTALL = $(CCTOOLS_SWIG_CHIRP_BINDINGS:%=install-%)
-install-bindings: $(CCTOOLS_SWIG_CHIRP_BINDINGS_INSTALL)
-$(CCTOOLS_SWIG_CHIRP_BINDINGS_INSTALL): $(CCTOOLS_SWIG_CHIRP_BINDINGS)
-	@$(MAKE) -C $(@:install-%=%) install
-
-CCTOOLS_SWIG_CHIRP_BINDINGS_CLEAN = $(CCTOOLS_SWIG_CHIRP_BINDINGS:%=clean-%)
-clean-bindings: $(CCTOOLS_SWIG_CHIRP_BINDINGS_CLEAN)
-$(CCTOOLS_SWIG_CHIRP_BINDINGS_CLEAN):
-	@$(MAKE) -C $(@:clean-%=%) clean
-
-clean: clean-bindings
+clean:
 	rm -f $(OBJECTS) $(TARGETS)
+	@$(MAKE) -C bindings clean
 
-install: all install-bindings
+install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
 	if [ -f $(CCTOOLS_INSTALL_DIR)/bin/chirp_server ]; then mv $(CCTOOLS_INSTALL_DIR)/bin/chirp_server $(CCTOOLS_INSTALL_DIR)/bin/chirp_server.old; fi
 	chmod 755 $(SCRIPTS)
@@ -87,7 +77,9 @@ install: all install-bindings
 	cp $(PUBLIC_HEADERS) $(CCTOOLS_INSTALL_DIR)/include/cctools/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
 	cp -r ../tools/workflows/ $(CCTOOLS_INSTALL_DIR)/share/cctools/chirp/
+	@$(MAKE) -C bindings install
 
 test: all
+	@$(MAKE) -C bindings test
 
-.PHONY: all clean install test $(CCTOOLS_SWIG_CHIRP_BINDINGS) bindings $(CCTOOLS_SWIG_CHIRP_BINDINGS_INSTALL) install-bindings $(CCTOOLS_SWIG_CHIRP_BINDINGS_CLEAN) clean-bindings
+.PHONY: all clean install test bindings

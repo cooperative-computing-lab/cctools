@@ -1671,10 +1671,12 @@ then
 	done
 fi
 
+source_path=$(pwd)
+
 cat <<EOF >>config.mk
 # Generated at `date` by $USER@`uname -n`
 
-CCTOOLS_HOME=$(realpath .)
+CCTOOLS_HOME=${source_path}
 CCTOOLS_INSTALL_DIR=${install_path}
 
 CCTOOLS_PACKAGES=${packages}
