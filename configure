@@ -1659,12 +1659,12 @@ if [ "$found_swig" = yes ]
 then
 	for binding in $swig_bindings
 	do
-		if [ -d work_queue/src/${binding} ]
+		if [ -d work_queue/src/bindings/${binding} ]
 		then
 			swig_workqueue_bindings="$binding $swig_workqueue_bindings"
 		fi
 
-		if [ -d chirp/src/${binding} ]
+		if [ -d chirp/src/bindings/${binding} ]
 		then
 			swig_chirp_bindings="$binding $swig_chirp_bindings"
 		fi
@@ -1674,7 +1674,9 @@ fi
 cat <<EOF >>config.mk
 # Generated at `date` by $USER@`uname -n`
 
+CCTOOLS_HOME=$(realpath .)
 CCTOOLS_INSTALL_DIR=${install_path}
+
 CCTOOLS_PACKAGES=${packages}
 
 CCTOOLS_CC=${CCTOOLS_CC}
