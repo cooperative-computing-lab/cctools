@@ -603,15 +603,16 @@ struct jx  *jx_copy( struct jx *j )
 struct jx *jx_merge(struct jx *j, ...) {
 	va_list ap;
 	va_start (ap, j);
-	struct jx *result = jx_object(NULL);
+	struct jx_pair *result = NULL;
 	for (struct jx *next = j; jx_istype(next, JX_OBJECT); next = va_arg(ap, struct jx *)) {
-		for (struct jx_pair *p = next->u.pairs; p; p = p->next) {
-			jx_delete(jx_remove(result, p->key));
-			jx_insert(result, jx_copy(p->key), jx_copy(p->value));
-		}
+		struct jx_pair *tmp = result;
+		result = jx_pair_copy(next->u.pairs);
+		struct jx_pair **last = &result;
+		while (*last) last = &(*last)->next;
+		*last = tmp;
 	}
 	va_end(ap);
-	return result;
+	return jx_object(result);
 }
 
 static int jx_pair_is_constant(struct jx_pair *p) {
