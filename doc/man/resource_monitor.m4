@@ -15,8 +15,8 @@ argument, and all its descendants.  The monitor works
 'indirectly', that is, by observing how the environment changed
 while a process was running, therefore all the information
 reported should be considered just as an estimate (this is in
-contrast with direct methods, such as ptrace). It has been tested
-in Linux, FreeBSD, and Darwin, and can be used automatically by
+contrast with direct methods, such as ptrace). It works on
+Linux, and can be used automatically by
 CODE(makeflow) and CODE(work queue) applications.
 
 Additionally, the user can specify maximum resource limits in the
