@@ -21,7 +21,7 @@ import binascii
 # Python Client object
 #
 # This class is used to create a chirp client
-class Client:
+class Client(object):
 
     ##
     # Create a new chirp client
@@ -442,7 +442,7 @@ class Client:
 # Python Stat object
 #
 # This class is used to record stat information for files/directories of a chirp server.
-class Stat:
+class Stat(object):
     def __init__(self, path, cstat):
         self._path = path
         self._info = cstat
