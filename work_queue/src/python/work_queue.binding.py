@@ -36,7 +36,7 @@ cctools_debug_config('work_queue_python')
 # Python Task object
 #
 # This class is used to create a task specification.
-class Task(_object):
+class Task(object):
 
     ##
     # Create a new task specification.
@@ -779,7 +779,7 @@ class Task(_object):
 #
 # This class uses a dictionary to map between the task pointer objects and the
 # @ref work_queue::Task.
-class WorkQueue(_object):
+class WorkQueue(object):
     ##
     # Create a new work queue.
     #
