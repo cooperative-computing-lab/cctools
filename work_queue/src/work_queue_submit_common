@@ -57,6 +57,9 @@ show_help_common()
 parse_arguments()
 {
 	echo "" > /dev/null
+
+    # return the number of arguments consumed
+    return 0
 }
 
 parse_arguments_common()
@@ -162,18 +165,9 @@ parse_arguments_common()
 	done
 
 	parse_arguments "$@"
+    consumed=$?
 
-	while [ $# -gt 0 ]
-	do
-		case $1 in
-			-*)
-			;;
-			*)
-			break
-			;;
-		esac
-		shift
-	done
+    shift $consumed
 
 	set_up_master_address $1 $2 $3 $4
 
