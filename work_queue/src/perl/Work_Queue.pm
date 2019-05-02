@@ -11,6 +11,7 @@ package Work_Queue;
 use strict;
 use warnings;
 use Carp qw(croak);
+use Scalar::Util qw(looks_like_number);
 
 use work_queue;
 use Work_Queue::Task;
@@ -25,7 +26,9 @@ sub Work_Queue::new {
 	unshift @_, 'port' if @_ == 1;
 	my %args = @_;
 
-	$args{port} //= $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
+    $args{port} = specify_port_range($args{port});
+
+	set_debug_log(undef, $args{debug_log}) if $args{debug_log};
 
 	my $_work_queue = work_queue::work_queue_create($args{port});
 	croak "Could not create a work queue on port $args{port}" unless $_work_queue;
@@ -44,6 +47,9 @@ sub Work_Queue::new {
 	$q->specify_name($args{name})           if $args{name};
 	$q->specify_master_mode($args{catalog}) if $args{catalog};
 
+    $q->specify_transactions_log($args{transactions_log}) if $args{transactions_log};
+    $q->specify_log($args{stats_log}) if $args{stats_log};
+
 	return $q;
 }
 
@@ -54,17 +60,58 @@ sub DESTROY {
 	return work_queue_delete($self->{_work_queue});
 }
 
-sub set_debug_flag {
-	my $self = shift;
+sub specify_port_range {
+    my $port = shift;
 
-	foreach my $flag (@_) {
-	cctools_debug_flags_set($flag);
-	}
+    unless($port) {
+        return $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
+    }
+
+    if(looks_like_number($port)) {
+        return $port;
+    }
+
+    unless(ref $port eq 'ARRAY') {
+        die "port specified does not look like a number or an array.\n"
+    }
+
+    unless(@{$port} == 2) {
+        die "Invalid port range. Port range should be of the form [lower, upper].\n";
+    }
+
+    my ($lower, $upper) = @{$port};
+
+    if($lower <= $upper) {
+        $ENV{TCP_LOW_PORT}  = $lower;
+        $ENV{TCP_HIGH_PORT} = $upper;
+        return 0;
+    } else {
+        die "[@{[join(',', @{$port})]}] is an invalid range of ports.\n";
+    }
+}
+    
+
+sub set_debug_flag {
+    my $self = shift;
+
+    foreach my $flag (@_) {
+        cctools_debug_flags_set($flag);
+    }
 }
 
 sub set_debug_config_file {
-	my ($self, $filename) = @_;
-	return cctools_debug_config_file($filename);
+    my ($self, $filename) = @_;
+    return cctools_debug_config_file($filename);
+}
+
+sub set_debug_log {
+    # note debug log does not really depend on current queue, as it can be set
+    # before any queue.
+    my ($self, $filename) = @_;
+
+    cctools_debug_flags_set('all');
+    cctools_debug_config_file_size(0);
+    cctools_debug_config_file($filename);
 }
 
 sub name {
@@ -366,7 +413,7 @@ The SWIG-based Perl bindings provide a higher-level interface, such as:
 
 =head3 C<< Work_Queue::new ( $port ) >>
 
-=head3 C<< Work_Queue::new ( port => ..., name => ..., catalog => ..., shutdown => ...) >>
+=head3 C<< Work_Queue::new ( port => ..., name => ..., catalog => ..., shutdown => ..., transactions_log => ..., stats_log => ..., debug_log => ...) >>
 
 Create a new work queue.
 
@@ -374,7 +421,9 @@ Create a new work queue.
 
 =item port
 
-The port number to listen on. If zero is specified, then the default is chosen, and if -1 is specified, a random port is chosen.
+A single number indicating the port number to listen on, or an array of the
+form [lower, upper], which indicates the inclusive range of available ports from which one is chosen at random. If
+not specified, the default 9123 is chosen. If zero, a port is chosen at random.
 
 =item name
 
@@ -383,6 +432,18 @@ The project name to use.
 =item catalog
 
 Whether or not to enable catalog mode.
+
+=item transactions_log
+
+The name of a file to write the queue's transactions log.
+
+=item stats_log
+
+The name of a file to write the queue's statistics log.
+
+=item debug_log
+
+The name of a file to write the queue's debug log.
 
 =item shutdown
 
