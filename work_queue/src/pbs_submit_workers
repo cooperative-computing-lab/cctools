@@ -26,6 +26,8 @@ parse_arguments()
 		cores=1
 	fi
 
+    original_count=$#
+
 	while [ $# -gt 0 ]
 	do
 		case $1 in
@@ -42,6 +44,11 @@ parse_arguments()
 		esac
 		shift
 	done
+
+    current_count=$#
+    consumed=$((original_count - current_count))
+
+    return $consumed
 }
 
 submit_workers_command()

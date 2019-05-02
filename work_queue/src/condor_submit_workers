@@ -12,8 +12,9 @@ fi
 
 show_help()
 {
-	echo "  -r <requirements>        Condor requirements ClassAd."
-	echo "  --autosize               Condor will automatically size the worker to the slot."
+	echo "  -r,--requirements <reqs>  Condor requirements expression."
+	echo "  --autosize                Condor will automatically size the worker to the slot."
+    echo "  --docker-universe <image> Run worker inside <image> using condor's docker universe"
 }
 
 # This dummy requirement inhibits Condor from adding its own Memory expression,
@@ -33,10 +34,12 @@ parse_arguments()
 	# convert disk to kB to make what follows easier, as condor want disk in kB
 	disk=$((disk*1024))
 
+    original_count=$#
+
 	while [ $# -gt 0 ]
 	do
 		case $1 in
-			-r)
+			-r|--requirements)
 			shift
 			requirements="$requirements $1"
 			;;
@@ -47,6 +50,11 @@ parse_arguments()
 				disk="ifThenElse($disk > TotalSlotDisk, $disk, TotalSlotDisk)"
 			;;
 
+            --docker-universe)
+            shift
+            docker_universe="$1"
+            ;;
+
 			*)
 			break
 			;;
@@ -56,6 +64,10 @@ parse_arguments()
 
 	submit_dir=/tmp/${USER}-workers
 
+    current_count=$#
+    consumed=$((original_count - current_count))
+
+    return $consumed
 }
 
 set_up_password_file()
@@ -69,8 +81,19 @@ submit_workers_command()
 	# given is larger than the minimum requested).
 	arguments="--cores \$\$([TARGET.Cpus]) --memory \$\$([TARGET.Memory]) --disk \$\$([TARGET.Disk/1024]) $arguments"
 
-	cat > condor_submit_file <<EOF
+    if [ -n "${docker_universe}" ]
+    then
+        cat > condor_submit_file <<EOF
+universe = docker
+docker_image = ${docker_universe}
+EOF
+    else
+        cat > condor_submit_file <<EOF
 universe = vanilla
+EOF
+    fi
+
+	cat >> condor_submit_file <<EOF
 executable = work_queue_worker
 arguments = $arguments $host $port
 transfer_input_files = ${transfer_input_files}
