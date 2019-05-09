@@ -57,6 +57,9 @@ show_help_common()
 parse_arguments()
 {
 	echo "" > /dev/null
+
+    # return the number of arguments consumed
+    return 0
 }
 
 parse_arguments_common()
@@ -162,18 +165,9 @@ parse_arguments_common()
 	done
 
 	parse_arguments "$@"
+    consumed=$?
 
-	while [ $# -gt 0 ]
-	do
-		case $1 in
-			-*)
-			;;
-			*)
-			break
-			;;
-		esac
-		shift
-	done
+    shift $consumed
 
 	set_up_master_address $1 $2 $3 $4
 
@@ -188,7 +182,7 @@ set_up_master_address()
 {
 	if [ $use_master_name = 0 ]; then
 		if [ $# -ne 3 ] ; then
-			echo "3 arguments (<servername> <port> <num-workers>) are expected while $# are present: \"$@\"." 1>&2
+			echo "3 arguments (<servername> <port> <num-workers>), but found $#: \"$@\"." 1>&2
 			echo "To view the help message, type: $script_name -h" 1>&2
 			exit 1
 		fi
@@ -198,7 +192,7 @@ set_up_master_address()
 	else
 		if [ $# -ne 1 ]
 		then
-			echo "1 argument (<num-workers>) is expected while $# is present: \"$@\"." 1>&2
+			echo "1 argument (<num-workers>) is expected, but found $#: \"$@\"." 1>&2
 			echo "To view the help message, type: $script_name -h" 1>&2
 			exit 1
 		fi
