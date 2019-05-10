@@ -966,7 +966,7 @@ then
 			then
 				swig=`which swig`
 			else
-				echo "*** skipping swig bindings for work queue"
+				echo "*** skipping swig bindings for work queue and chirp"
 			fi
 		fi
 
@@ -1640,10 +1640,32 @@ else
 	CCTOOLS_LD='@echo LINK $@;'"${linker}"
 fi
 
+swig_workqueue_bindings=""
+swig_chirp_bindings=""
+if [ "$found_swig" = yes ]
+then
+	for binding in $swig_bindings
+	do
+		if [ -d work_queue/src/bindings/${binding} ]
+		then
+			swig_workqueue_bindings="$binding $swig_workqueue_bindings"
+		fi
+
+		if [ -d chirp/src/bindings/${binding} ]
+		then
+			swig_chirp_bindings="$binding $swig_chirp_bindings"
+		fi
+	done
+fi
+
+source_path=$(pwd)
+
 cat <<EOF >>config.mk
 # Generated at `date` by $USER@`uname -n`
 
+CCTOOLS_HOME=${source_path}
 CCTOOLS_INSTALL_DIR=${install_path}
+
 CCTOOLS_PACKAGES=${packages}
 
 CCTOOLS_CC=${CCTOOLS_CC}
@@ -1693,6 +1715,8 @@ CCTOOLS_AR=ar
 CCTOOLS_CHIRP=${include_package_chirp}
 
 CCTOOLS_SWIG=${swig}
+CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
+CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
 
 CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
@@ -1719,8 +1743,6 @@ CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
 CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
-
-CCTOOLS_SWIG_BINDINGS=${swig_bindings}
 
 CCTOOLS_SGE_PARAMETERS=$(echo ${sge_parameters} | sed -e 's/\$/\\\$\$/g')
 
