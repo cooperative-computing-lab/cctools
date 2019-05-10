@@ -212,7 +212,11 @@ struct work_queue_worker {
 	char *version;
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
+
 	int  foreman;                             // 0 if regular worker, 1 if foreman
+
+	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
+
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
 	struct hash_table           *features;
@@ -976,7 +980,8 @@ static void add_worker(struct work_queue *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
-	w->foreman = 0;
+	w->foreman  = 0;
+	w->draining = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -3354,6 +3359,10 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		return 0;
 	}
 
+	if(w->draining) {
+		return 0;
+	}
+
 	if(!w->foreman) {
 		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
 		if (info && info->blacklisted) {
@@ -3896,6 +3905,24 @@ static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	return 1;
 }
+
+static int abort_drained_workers(struct work_queue *q) {
+	char *worker_hashkey = NULL;
+	struct work_queue_worker *w = NULL;
+
+	int removed = 0;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void **) &w)) {
+		if(w->draining && itable_size(w->current_tasks) == 0) {
+			removed++;
+			shut_down_worker(q, w);
+		}
+	}
+
+	return removed;
+}
+
 
 //comparator function for checking if a task matches given tag.
 static int tasktag_comparator(void *t, const void *r) {
@@ -5900,9 +5927,10 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		ask_for_workers_updates(q);
 		END_ACCUM_TIME(q, time_status_msgs);
 
-		// If fast abort is enabled, kill off slow workers.
+		// Kill off slow/drained workers.
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result = abort_slow_workers(q);
+		result  = abort_slow_workers(q);
+		result += abort_drained_workers(q);
 		work_queue_blacklist_clear_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
@@ -6001,6 +6029,26 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	}
 
 	return i;
+}
+
+int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag)
+{
+	char *worker_hashkey = NULL;
+	struct work_queue_worker *w = NULL;
+
+	drain_flag = !!(drain_flag);
+
+	int workers_updated = 0;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void *) w)) {
+		if (!strcmp(w->hostname, hostname)) {
+			w->draining = drain_flag;
+			workers_updated++;
+		}
+	}
+
+	return workers_updated;
 }
 
 /**

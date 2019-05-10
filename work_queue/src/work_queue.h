@@ -796,6 +796,16 @@ multiplier.  The value specified here applies only to tasks in the given categor
 */
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
 
+
+/** Set the draining mode per worker hostname.
+	If drain_flag is 0, workers at hostname receive tasks as usual.
+    If drain_flag is not 1, no new tasks are dispatched to workers at hostname,
+    and if empty they are shutdown.
+  @param q A work queue object.
+  @param drain_flag Draining mode.
+  */
+int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag);
+
 /** Turn on or off first-allocation labeling for a given category. By default, only cores, memory, and disk are labeled. Turn on/off other specific resources use @ref work_queue_specify_category_autolabel_resource.
 @param q A work queue object.
 @param category A category name.
