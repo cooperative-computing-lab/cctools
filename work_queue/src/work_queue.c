@@ -1951,13 +1951,11 @@ static int update_task_result(struct work_queue_task *t, work_queue_result_t new
 		/* Upper bits are set, so this is not related to old-style result for
 		 * inputs, outputs, or stdout, so we simply make an update. */
 		t->result = new_result;
-	} else if(t->result & ~(0x7)) {
-
+	} else if(t->result != WORK_QUEUE_RESULT_UNKNOWN && t->result & ~(0x7)) {
 		/* Ignore new result, since we only update for input, output, or
 		 * stdout missing when no other result exists. This is because
 		 * missing inputs/outputs are anyway expected with other kind of
 		 * errors. */
-
 	} else if(new_result == WORK_QUEUE_RESULT_INPUT_MISSING) {
 		/* input missing always appears by itself, so yet again we simply make an update. */
 		t->result = new_result;
@@ -3110,7 +3108,9 @@ static work_queue_result_code_t send_input_files( struct work_queue *q, struct w
 		list_first_item(t->input_files);
 		while((f = list_next_item(t->input_files))) {
 			work_queue_result_code_t result = send_input_file(q,w,t,f);
-			if(result != SUCCESS) return result;
+			if(result != SUCCESS) {
+				return result;
+			}
 		}
 	}
 
