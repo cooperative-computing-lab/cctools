@@ -188,6 +188,17 @@ sub activate_fast_abort_category {
 	return work_queue_activate_fast_abort_category($self->{_work_queue}, $name, $multiplier);
 }
 
+
+sub specify_draining_by_hostname {
+    my ($self, $hostname, $drain_mode) = @_;
+
+    unless(defined $drain_mode) { 
+        $drain_mode ||= 1;
+    }
+
+    return work_queue_specify_draining($self->{_work_queue}, $hostname, $drain_mode);
+}
+
 sub empty {
 	my ($self) = @_;
 	return work_queue_empty($self->{_work_queue});
@@ -643,6 +654,21 @@ fast_abort is deactivated. If less than zero (default), use the fast abort of
 the "default" category.
 
 =back
+
+
+
+=head3 C<specify_draining_by_hostname>
+
+Set draining mode for workers at hostname.
+
+=over12
+
+=item The hostname the host running the workers.
+
+=item If 0, workers at hostname work as usual, else no new tasks are dispatched, and empty workers are shutdown.
+
+=back
+
 
 
 =head3 C<empty>

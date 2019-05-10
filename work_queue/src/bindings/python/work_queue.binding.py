@@ -1009,6 +1009,15 @@ class WorkQueue(object):
         return work_queue_activate_fast_abort_category(self._work_queue, name, multiplier)
 
     ##
+    # Turn on or off draining mode for workers at hostname.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param host       The hostname the host running the workers.
+    # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
+    def specify_draining_by_hostname(self, hostname, drain_mode = True):
+        return work_queue_specify_draining_by_hostname (self._work_queue, hostname, drain_mode)
+
+    ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
     #
     # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
