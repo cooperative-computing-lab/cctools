@@ -1,8 +1,8 @@
-include ../../../config.mk
-include ../../../rules.mk
+include ../../../../config.mk
+include $(CCTOOLS_HOME)/rules.mk
 
-CFLAGS := -I$(realpath ../../../dttools/src) -I$(realpath ../)
-LDFLAGS := $(realpath ../libwork_queue.a) $(realpath ../../../dttools/src/libdttools.a) -lm -lz
+CFLAGS := -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src
+LDFLAGS := $(realpath ../libwork_queue.a) $(CCTOOLS_HOME)/dttools/src/libdttools.a) -lm -lz
 TARGETS = work_queue.go
 EGDIR = work_queue_example_go
 
@@ -10,7 +10,7 @@ all: $(TARGETS)
 
 work_queue.go: work_queue.i
 	@echo "SWIG work_queue.i (golang)"
-	@$(CCTOOLS_SWIG) -go -intgosize 64 -I../../../dttools/src -I../ work_queue.i 
+	@$(CCTOOLS_SWIG) -go -intgosize 64 -I$(CCTOOLS_HOME)/dttools/src -I$(CCTOOLS_HOME)/work_queue/src work_queue.i 
 	@mkdir -p src/work_queue
 	@mv work_queue.go work_queue_wrap.c src/work_queue
 
