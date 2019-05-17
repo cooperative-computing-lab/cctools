@@ -46,6 +46,11 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#ifndef major
+/* glibc 2.26 drops sys/sysmacros.h from sys/types.h, thus we add it here */
+#include <sys/sysmacros.h>
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
