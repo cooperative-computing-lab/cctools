@@ -168,6 +168,7 @@ static int elf_interp(int fd, int set, char *interp)
 				}
 			}
 			CATCH(EINVAL);
+			break;
 		}
 		case ELFCLASS64: {
 			int i;
@@ -205,9 +206,11 @@ static int elf_interp(int fd, int set, char *interp)
 				}
 			}
 			CATCH(EINVAL);
+			break;
 		}
 		default:
 			CATCH(ENOEXEC);
+			break;
 	}
 
 	rc = 0;

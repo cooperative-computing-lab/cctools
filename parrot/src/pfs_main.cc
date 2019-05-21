@@ -1085,6 +1085,7 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_FAKE_SETUID:
 			pfs_fake_setuid = 1;
 			pfs_fake_setgid = 1;
+			break;
 		case LONG_OPT_DYNAMIC_MOUNTS:
 			pfs_allow_dynamic_mounts = 1;
 			break;
