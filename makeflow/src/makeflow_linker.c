@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
+#include "buffer.h"
 #include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -316,30 +317,31 @@ void find_drivers(struct list *d){
 
 void determine_package_structure(struct list *d, char *output_dir){
 	struct dependency *dep;
+
 	list_first_item(d);
-	while((dep = list_next_item(d))){
-		char resolved_path[PATH_MAX];
+	while((dep = list_next_item(d))) {
+		buffer_t resolved_path;
+		buffer_init(&resolved_path);
+
 		if(dep->parent && dep->parent->type != MAKEFLOW && dep->parent->output_path){
-			sprintf(resolved_path, "%s", dep->parent->output_path);
+				buffer_printf(&resolved_path, "%s", dep->parent->output_path);
 		} else {
-			sprintf(resolved_path, "%s", output_dir);
+				buffer_printf(&resolved_path, "%s", output_dir);
 		}
+
 		switch(dep->type){
 			case EXE:
-				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
-				break;
 			case PYTHON:
-				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
-				break;
 			case MAKEFLOW:
-				sprintf(resolved_path, "%s/%s", resolved_path, dep->final_name);
+				buffer_printf(&resolved_path, "/%s", dep->final_name);
 				break;
 			case PERL:
 			default:
 				/* TODO: naming conflicts */
 				break;
 		}
-		dep->output_path = xxstrdup(resolved_path);
+		dep->output_path = xxstrdup(buffer_tostring(&resolved_path));
+		buffer_free(&resolved_path);
 	}
 }
 
