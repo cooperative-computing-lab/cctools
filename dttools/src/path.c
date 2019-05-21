@@ -189,7 +189,7 @@ int path_lookup (char *search_path, const char *exe, char *dest, size_t destlen)
 					struct stat sb;
 					char fn[PATH_MAX];
 					strncpy(fn, s, PATH_MAX);
-					strncat(fn, "/", 1);
+					strcat(fn, "/");
 					strcat(fn, dp->d_name);
 					if( stat(fn, &sb) == 0 && sb.st_mode & (S_IXUSR|S_IFREG) ){
 						strncpy(dest, fn, destlen);

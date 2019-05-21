@@ -356,7 +356,9 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 		return 0;
 	}
 
-	sprintf(full_address, "%s:%d", full_address, port);
+	char *port_str = string_format(":%d", port);
+	strcat(full_address, port_str);
+	free(port_str);
 
 	while(global_catalog[i] != NULL)
 	{
