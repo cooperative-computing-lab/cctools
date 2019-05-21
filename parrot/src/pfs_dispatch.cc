@@ -949,7 +949,7 @@ static void decode_execve( struct pfs_process *p, int entering, INT64_T syscall,
 		strncpy(p->new_logical_name, logical_name, sizeof(p->new_logical_name)-1);
 
 		{
-			char buf[PATH_MAX] = "";
+			char buf[PFS_PATH_MAX] = "";
 			if(pfs_readlink(logical_name, buf, sizeof buf - 1) > 0) {
 				if (buf[0] == '/') {
 					snprintf(p->new_logical_name, sizeof p->new_logical_name, "%s", buf);

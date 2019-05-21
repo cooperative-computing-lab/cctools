@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 	/* We create and dispatch a task for each priority given in the argument list */
 	for(i = 1; i < argc; i++) {
 
-		char infile[256], outfile[256], command[256];
+		char infile[256], outfile[256], command[1024];
 
 		sprintf(outfile, "test/priority/%s", argv[i]);
 		sprintf(infile, "/bin/sleep");

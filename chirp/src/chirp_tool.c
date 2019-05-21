@@ -124,7 +124,7 @@ static void complete_local_path(const char *file, char *full_path)
 {
 	char temp[CHIRP_PATH_MAX];
 	if(file[0] != '/') {
-		sprintf(temp, "%s/%s", current_local_dir, file);
+		string_nformat(temp, sizeof(temp), "%s/%s", current_local_dir, file);
 	} else {
 		strcpy(temp, file);
 	}
@@ -135,7 +135,7 @@ static void complete_remote_path(const char *file, char *full_path)
 {
 	char temp[CHIRP_PATH_MAX];
 	if(file[0] != '/') {
-		sprintf(temp, "%s/%s", current_remote_dir, file);
+		string_nformat(temp, sizeof(temp), "%s/%s", current_remote_dir, file);
 	} else {
 		strcpy(temp, file);
 	}
@@ -846,8 +846,7 @@ static INT64_T do_thirdput(int argc, char **argv)
 	time_t stop, start;
 
 	complete_remote_path(argv[1], full_path);
-	sprintf(remote_path, "/%s", argv[3]);
-
+	string_nformat(remote_path, sizeof(remote_path), "/%s", argv[3]);
 
 	start = time(0);
 	result = chirp_reli_thirdput(current_host, full_path, argv[2], remote_path, stoptime);
@@ -1212,7 +1211,7 @@ int main(int argc, char *argv[])
 	char *temp;
 	int did_explicit_auth = 0;
 	char *tickets = NULL;
-	char prompt[CHIRP_LINE_MAX];
+	char prompt[2*CHIRP_LINE_MAX];
 	char line[CHIRP_LINE_MAX];
 	char **user_argv = 0;
 	int user_argc;
@@ -1301,7 +1300,7 @@ int main(int argc, char *argv[])
 
 	while(1) {
 		if(interactive_mode) {
-			sprintf(prompt, " chirp:%s:%s> ", current_host, current_remote_dir);
+			string_nformat(prompt, sizeof(prompt), " chirp:%s:%s> ", current_host, current_remote_dir);
 		} else {
 			prompt[0] = 0;
 		}

@@ -186,6 +186,7 @@ static INT64_T chirp_fs_confuga_open (const char *path, INT64_T flags, INT64_T m
 			break;
 		case O_RDWR:
 			CATCH(EINVAL);
+			break;
 		default:
 			assert(0);
 	}

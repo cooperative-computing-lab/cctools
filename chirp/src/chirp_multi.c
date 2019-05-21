@@ -107,7 +107,7 @@ struct chirp_volume *chirp_volume_open(const char *volume, time_t stoptime)
 	}
 
 	/* Fetch the filesystem key */
-	sprintf(filename, "%s/key", v->root);
+	string_nformat(filename, sizeof(filename), "%s/key", v->root);
 	result = chirp_reli_getfile_buffer(v->host, filename, &buffer, stoptime);
 	if(result < 0) {
 		debug(D_CHIRP, "couldn't open %s: %s", filename, strerror(errno));
@@ -120,7 +120,7 @@ struct chirp_volume *chirp_volume_open(const char *volume, time_t stoptime)
 	free(buffer);
 
 	/* Fetch the list of hosts */
-	sprintf(filename, "%s/hosts", v->root);
+	string_nformat(filename, sizeof(filename), "%s/hosts", v->root);
 	result = chirp_reli_getfile_buffer(v->host, filename, &buffer, stoptime);
 	if(result < 0) {
 		debug(D_CHIRP, "couldn't open %s: %s", filename, strerror(errno));
@@ -229,7 +229,7 @@ static int chirp_multi_lpath(const char *volume, const char *path, char *lpath, 
 
 	if(!chirp_multi_init(volume, stoptime))
 		return 0;
-	sprintf(lpath, "%s/root/%s", current_volume->root, path);
+	string_nformat(lpath, CHIRP_PATH_MAX, "%s/root/%s", current_volume->root, path);
 	return 1;
 }
 
@@ -264,7 +264,7 @@ static int chirp_multi_update(const char *volume, const char *path, struct file_
 	char buffer[CHIRP_PATH_MAX * 2 + 2];
 	if(!chirp_multi_lpath(volume, path, info->lpath, stoptime))
 		return 0;
-	sprintf(buffer, "%s\n%s\n", info->rhost, info->rpath);
+	string_nformat(buffer, sizeof(buffer), "%s\n%s\n", info->rhost, info->rpath);
 	return chirp_reli_putfile_buffer(current_volume->host, info->lpath, buffer, 0700, strlen(buffer), stoptime);
 }
 
@@ -286,7 +286,7 @@ static struct chirp_file *chirp_multi_create(const char *volume, const char *pat
 		if(!server->prepared) {
 			debug(D_MULTI, "preparing server %s", server->name);
 			char keypath[CHIRP_PATH_MAX];
-			sprintf(keypath, "/%s", current_volume->key);
+			string_nformat(keypath, sizeof(keypath), "/%s", current_volume->key);
 			int result = chirp_reli_mkdir_recursive(server->name, keypath, 0777, stoptime);
 			if(result < 0 && errno != EEXIST) {
 				server->priority += 10;
@@ -298,7 +298,7 @@ static struct chirp_file *chirp_multi_create(const char *volume, const char *pat
 		char cookie[17];
 		strcpy(info.rhost, server->name);
 		string_cookie(cookie, 16);
-		sprintf(info.rpath, "%s/%s", current_volume->key, cookie);
+		string_nformat(info.rpath, sizeof(info.rpath), "%s/%s", current_volume->key, cookie);
 
 		debug(D_MULTI, "create: /multi/%s%s at /chirp/%s/%s", volume, path, info.rhost, info.rpath);
 		if(chirp_multi_update(volume, path, &info, stoptime) < 0)

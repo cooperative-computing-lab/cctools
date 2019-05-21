@@ -60,8 +60,12 @@ int ftp_lite_radix_encode( const unsigned char * inbuf, unsigned char * outbuf, 
 	{
 	case 1:
 		outbuf[j++] = pad;
+		/* falls through */
 	case 2:
 		outbuf[j++] = pad;
+		break;
+	default:
+		break;
 	}
 
 	outbuf[*length = j] = '\0';

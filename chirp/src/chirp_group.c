@@ -43,8 +43,8 @@ int chirp_group_lookup(const char *group, const char *subject)
 
 	int fetch_group = 1;
 
-	sprintf(cachedir, "%s/.__groups", chirp_transient_path);
-	sprintf(cachepath, "%s/%s", cachedir, &group[6]);
+	string_nformat(cachedir,  sizeof(cachedir),  "%s/.__groups", chirp_transient_path);
+	string_nformat(cachepath, sizeof(cachepath), "%s/%s", cachedir, &group[6]);
 
 	if(stat(cachepath, &info) == 0) {
 		int age = time(0) - info.st_mtime;
@@ -54,10 +54,10 @@ int chirp_group_lookup(const char *group, const char *subject)
 	}
 
 	if(fetch_group) {
-		sprintf(url, "%s/%s", chirp_group_base_url, &group[6]);
+		string_nformat(url, sizeof(url), "%s/%s", chirp_group_base_url, &group[6]);
 		debug(D_DEBUG, "fetching group %s from %s", group, url);
 		mkdir(cachedir, 0777);
-		sprintf(line, "curl --silent --insecure --output '%s' %s", cachepath, url);
+		string_nformat(line, sizeof(line), "curl --silent --insecure --output '%s' %s", cachepath, url);
 		if(system(line) != 0) {
 			debug(D_NOTICE, "failed to fetch group using: %s", line);
 			unlink(cachepath);

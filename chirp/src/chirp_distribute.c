@@ -375,9 +375,9 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	//open output file to create cluster file
-	char outRe[50];
+	char outRe[80];
 	sprintf(outRe, "%s/out.txt", home_dir);
-	char clusterFile[50];
+	char clusterFile[80];
 	sprintf(clusterFile, "%s/cluster.txt", home_dir);
 
 

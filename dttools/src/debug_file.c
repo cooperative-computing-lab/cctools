@@ -7,6 +7,7 @@ See the file COPYING for details.
 #include "catch.h"
 #include "debug.h"
 #include "full_io.h"
+#include "stringtools.h"
 #include "path.h"
 
 #include <unistd.h>
@@ -70,7 +71,7 @@ void debug_file_write (INT64_T flags, const char *str)
 		if (rc == 0) {
 			if (info.st_size >= file_size_max) {
 				char old[PATH_MAX];
-				snprintf(old, sizeof(old), "%s.old", file_path);
+				string_nformat(old, sizeof(old), "%s.old", file_path);
 				rename(file_path, old);
 				debug_file_reopen();
 			} else if (info.st_ino != file_stat.st_ino) {
@@ -106,7 +107,7 @@ void debug_file_rename (const char *suffix)
 	if (strlen(file_path)) {
 		char old[PATH_MAX] = "";
 
-		snprintf(old, sizeof(old)-1, "%s.%s", file_path, suffix);
+		string_nformat(old, sizeof(old), "%s.%s", file_path, suffix);
 		rename(file_path, old);
 		debug_file_reopen();
 	}

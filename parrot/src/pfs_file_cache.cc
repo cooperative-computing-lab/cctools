@@ -141,7 +141,9 @@ public:
 	virtual int fstatfs( struct pfs_statfs *buf ) {
 		struct statfs64 lbuf;
 		int result = ::fstatfs64(fd,&lbuf);
-		if(result>=0) COPY_STATFS(lbuf,*buf);
+		if(result>=0){
+				COPY_STATFS(lbuf,*buf);
+		}
 		return result;
 	}
 

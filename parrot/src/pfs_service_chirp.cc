@@ -131,7 +131,9 @@ public:
 		int result;
 		struct chirp_stat cbuf;
 		result = chirp_global_fstat(file,&cbuf,time(0)+pfs_master_timeout);
-		if(result==0) COPY_CSTAT(cbuf,*buf);
+		if(result==0) {
+				COPY_CSTAT(cbuf,*buf);
+		}
 		return result;
 	}
 
@@ -139,7 +141,9 @@ public:
 		int result;
 		struct chirp_statfs cbuf;
 		result = chirp_global_fstatfs(file,&cbuf,time(0)+pfs_master_timeout);
-		if(result==0) COPY_STATFS(cbuf,*buf);
+		if(result==0) {
+				COPY_STATFS(cbuf,*buf);
+		}
 		return result;
 	}
 
@@ -317,7 +321,9 @@ public:
 		int result;
 		struct chirp_statfs cbuf;
 		result = chirp_global_statfs(name->hostport,name->rest,&cbuf,time(0)+pfs_master_timeout);
-		if(result==0) COPY_STATFS(cbuf,*buf);
+		if(result==0) {
+				COPY_STATFS(cbuf,*buf);
+		}
 		return result;
 	}
 
@@ -331,7 +337,9 @@ public:
 			}
 		}
 		result = chirp_global_stat(name->hostport,name->rest,&cbuf,time(0)+pfs_master_timeout); /* BUG: was _lstat */
-		if(result==0) COPY_CSTAT(cbuf,*buf);
+		if(result==0){
+				COPY_CSTAT(cbuf,*buf);
+		}
 		return result;
 	}
 
@@ -343,7 +351,9 @@ public:
 			return 0;
 		}
 		result = chirp_global_lstat(name->hostport,name->rest,&cbuf,time(0)+pfs_master_timeout);
-		if(result==0) COPY_CSTAT(cbuf,*buf);
+		if(result==0){
+				COPY_CSTAT(cbuf,*buf);
+		}
 		return result;
 	}
 

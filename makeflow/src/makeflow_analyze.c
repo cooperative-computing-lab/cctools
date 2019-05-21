@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
 		realpath(bundle_directory, expanded_path);
 
 		char output_makeflow[PATH_MAX];
-		sprintf(output_makeflow, "%s/%s", expanded_path, path_basename(dagfile));
+		string_nformat(output_makeflow, sizeof(output_makeflow), "%s/%s", expanded_path, path_basename(dagfile));
 		if(strcmp(bundle_directory, "*")) {
 			if(create_dir(expanded_path, 0755)) {
 				dag_to_file(d, output_makeflow, bundler_rename);
