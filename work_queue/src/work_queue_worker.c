@@ -1138,6 +1138,7 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 			debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
+		/* falls through */
 	case WORK_QUEUE_FS_PATH:
 		sprintf(cmd, "/bin/cp %s %s", path, cached_filename);
 		if(system(cmd) != 0) {

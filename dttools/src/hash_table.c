@@ -315,6 +315,7 @@ acceptable.  Do NOT use for cryptographic purposes.
 --------------------------------------------------------------------
 */
 
+/* Ignoring implicit-fallthrough warnings, as fallthrough is what we want in the following switch-case */
 static ub4 jenkins_hash(k, length, initval)
 	 register const ub1 *k;	/* the key */
 	 register ub4 length;	/* the length of the key */
@@ -337,28 +338,42 @@ static ub4 jenkins_hash(k, length, initval)
 	switch (len) {		/* all the case statements fall through */
 	case 11:
 		c += ((ub4) k[10] << 24);
+		/* falls through */
 	case 10:
 		c += ((ub4) k[9] << 16);
+		/* falls through */
 	case 9:
-		c += ((ub4) k[8] << 8);
 		/* the first byte of c is reserved for the length */
+		c += ((ub4) k[8] << 8);
+		/* falls through */
 	case 8:
 		b += ((ub4) k[7] << 24);
+		/* falls through */
 	case 7:
 		b += ((ub4) k[6] << 16);
+		/* falls through */
 	case 6:
 		b += ((ub4) k[5] << 8);
+		/* falls through */
 	case 5:
 		b += k[4];
+		/* falls through */
 	case 4:
 		a += ((ub4) k[3] << 24);
+		/* falls through */
 	case 3:
 		a += ((ub4) k[2] << 16);
+		/* falls through */
 	case 2:
 		a += ((ub4) k[1] << 8);
+		/* falls through */
 	case 1:
 		a += k[0];
+		/* falls through */
+	case 0:
+	default:
 		/* case 0: nothing left to add */
+		break;
 	}
 	mix(a, b, c);
    /*-------------------------------------------- report the result */

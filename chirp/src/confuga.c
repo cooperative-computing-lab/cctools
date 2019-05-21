@@ -139,6 +139,7 @@ static void s_url_truncate (sqlite3_context *context, int argc, sqlite3_value **
 	}
 }
 
+
 static int dbupgrade (confuga *C)
 {
 	int rc;
@@ -189,8 +190,8 @@ static int dbupgrade (confuga *C)
 
 			debug(D_DEBUG, "upgrading db to v1");
 			sqlcatchexec(db,SQL);
-			/* fallthrough */
 		}
+				/* falls through */
 		case 1: {
 			static const char SQL[] =
 				"DROP VIEW Confuga.StorageNodeActive;"
@@ -287,8 +288,8 @@ static int dbupgrade (confuga *C)
 
 			debug(D_DEBUG, "upgrading db to v2");
 			sqlcatchexec(db,SQL);
-			/* fallthrough */
 		}
+				/* falls through */
 		default: {
 			static const char SQL[] =
 				"INSERT OR REPLACE INTO Confuga.State (key, value)"

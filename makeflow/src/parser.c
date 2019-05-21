@@ -99,8 +99,9 @@ struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct j
 			jx_delete(dag);
 			jx_delete(args);
 			dag = jx_tmp;
-
-		case DAG_SYNTAX_JSON: //Intentional fall-through as JX and JSON both use dag_parse_jx
+			 //Intentional fall-through as JX and JSON both use dag_parse_jx
+			/* falls through */
+		case DAG_SYNTAX_JSON:
 			if(!dag_parse_jx(d, dag)){
 				free(d);
 				d = NULL;
