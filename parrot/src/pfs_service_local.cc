@@ -13,6 +13,7 @@ extern "C" {
 #include "username.h"
 #include "ibox_acl.h"
 #include "stats.h"
+#include "stringtools.h"
 }
 
 #include <assert.h>
@@ -737,7 +738,7 @@ RETRY:
 		debug(D_LOCAL,"locate %s",name->rest);
 		result = stat(name, &buf);
 		if(result < 0) return 0;
-		snprintf(path, PFS_PATH_MAX, "localhost:dev%" PRId64 ":%s", buf.st_dev, name->path);
+		string_nformat(path, sizeof(path), "localhost:dev%" PRId64 ":%s", buf.st_dev, name->path);
 		loc = new pfs_location();
 		loc->append(path);
 		return loc;

@@ -20,6 +20,7 @@
 
 #include "copy_stream.h"
 #include "debug.h"
+#include "stringtools.h"
 
 const char *namelist;
 const char *packagepath;
@@ -822,7 +823,7 @@ int main(int argc, char *argv[])
 	fclose(namelist_file);
 	fclose(special_file);
 	char special_filename_tmp[PATH_MAX];
-	snprintf(special_filename_tmp, PATH_MAX, "%s%s", special_filename, ".tmp");
+	string_nformat(special_filename_tmp, sizeof(special_filename_tmp), "%s%s", special_filename, ".tmp");
 	char sort_cmd[PATH_MAX * 2];
 	if(snprintf(sort_cmd, PATH_MAX * 2, "sort -u %s>>%s", special_filename, special_filename_tmp) >= 0)
 		system(sort_cmd);

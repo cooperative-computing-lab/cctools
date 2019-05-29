@@ -82,7 +82,7 @@ static int ticket_write(const char *ticket_filename, struct chirp_ticket *ct)
 	char *str;
 	char tmp[CHIRP_PATH_MAX];
 
-	snprintf(tmp, sizeof(tmp), "%s.%d", ticket_filename, (int)getpid());
+	string_nformat(tmp, sizeof(tmp), "%s.%d", ticket_filename, (int)getpid());
 	CHIRP_FILE *tf = cfs_fopen(tmp, "w");
 	if(!tf)
 		return 0;
@@ -250,7 +250,7 @@ static int do_chirp_acl_check(const char *filename, const char *subject, int fla
 			/* If the link is relative, construct a full path */
 
 			if(linkname[0] != '/') {
-				sprintf(temp, "%s/../%s", filename, linkname);
+				string_nformat(temp, sizeof(temp), "%s/../%s", filename, linkname);
 				path_collapse(temp, linkname, 1);
 			}
 
@@ -307,7 +307,7 @@ int chirp_acl_check_recursive(const char *path, const char *subject, int flags)
 					continue;
 				if (dirent->lstatus == 0 && S_ISDIR(dirent->info.cst_mode)) {
 					char subpath[CHIRP_PATH_MAX];
-					snprintf(subpath, sizeof(subpath), "%s/%s", path, dirent->name);
+					string_nformat(subpath, sizeof(subpath), "%s/%s", path, dirent->name);
 					rc = chirp_acl_check_recursive(subpath, subject, flags);
 					if (!rc)
 						break;
@@ -612,8 +612,8 @@ int chirp_acl_set(const char *dirname, const char *subject, int flags, int reset
 		return -1;
 	}
 
-	sprintf(aclname, "%s/%s", dirname, CHIRP_ACL_BASE_NAME);
-	sprintf(newaclname, "%s/%s.%d", dirname, CHIRP_ACL_BASE_NAME, (int) getpid());
+	string_nformat(aclname,    sizeof(aclname),    "%s/%s",    dirname, CHIRP_ACL_BASE_NAME);
+	string_nformat(newaclname, sizeof(newaclname), "%s/%s.%d", dirname, CHIRP_ACL_BASE_NAME, (int) getpid());
 
 	if(reset_acl) {
 		aclfile = cfs_fopen_local("/dev/null", "r");
@@ -694,7 +694,7 @@ CHIRP_FILE *chirp_acl_open( const char *dirname )
 		CHIRP_FILE *file;
 
 		// Open the file and return if found
-		snprintf(aclpath,sizeof(aclpath),"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
+		string_nformat(aclpath,sizeof(aclpath),"%s/%s",dirpath,CHIRP_ACL_BASE_NAME);
 		file = cfs_fopen(aclpath, "r");
 		if(file) return file;
 
@@ -891,7 +891,7 @@ int chirp_acl_init_root(const char *path)
 
 	username_get(username);
 
-	sprintf(aclpath, "%s/%s", path, CHIRP_ACL_BASE_NAME);
+	string_nformat(aclpath, sizeof(aclpath), "%s/%s", path, CHIRP_ACL_BASE_NAME);
 	file = cfs_fopen(aclpath, "w");
 	if(file) {
 		cfs_fprintf(file, "unix:%s %s\n", username, chirp_acl_flags_to_text(CHIRP_ACL_READ | CHIRP_ACL_WRITE | CHIRP_ACL_DELETE | CHIRP_ACL_LIST | CHIRP_ACL_ADMIN));
@@ -915,8 +915,8 @@ int chirp_acl_init_copy(const char *path)
 	if(!cfs->do_acl_check())
 		return 1;
 
-	sprintf(oldpath, "%s/..", path);
-	sprintf(newpath, "%s/%s", path, CHIRP_ACL_BASE_NAME);
+	string_nformat(oldpath, sizeof(oldpath), "%s/..", path);
+	string_nformat(newpath, sizeof(newpath), "%s/%s", path, CHIRP_ACL_BASE_NAME);
 
 	oldfile = chirp_acl_open(oldpath);
 	if(oldfile) {
@@ -976,7 +976,7 @@ int chirp_acl_init_reserve(const char *path, const char *subject)
 	if(newflags == 0)
 		newflags = CHIRP_ACL_READ | CHIRP_ACL_WRITE | CHIRP_ACL_LIST | CHIRP_ACL_DELETE | CHIRP_ACL_ADMIN;
 
-	sprintf(aclpath, "%s/%s", path, CHIRP_ACL_BASE_NAME);
+	string_nformat(aclpath, sizeof(aclpath), "%s/%s", path, CHIRP_ACL_BASE_NAME);
 	file = cfs_fopen(aclpath, "w");
 	if(file) {
 		cfs_fprintf(file, "%s %s\n", subject, chirp_acl_flags_to_text(newflags));

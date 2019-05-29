@@ -507,8 +507,7 @@ public:
 			debug(D_GROW, "open local %s=%d", name->rest, fd);
 			return new pfs_file_grow(name, NULL, fd, d);
 		} else {
-			sprintf(url, "http://%s%s", name->hostport, name->rest);
-
+			string_nformat(url, sizeof(url), "http://%s%s", name->hostport, name->rest);
 			struct link *link = http_query_no_cache(url, "GET", time(0) + pfs_master_timeout);
 			if(link) {
 				debug(D_GROW, "open remote %s=%p", url, link);

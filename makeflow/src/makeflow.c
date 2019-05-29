@@ -1015,7 +1015,7 @@ static void handle_abort(int sig)
 	int fd = open("/dev/tty", O_WRONLY);
 	if (fd >= 0) {
 		char buf[256];
-		snprintf(buf, sizeof(buf), "received signal %d (%s), cleaning up remote jobs and files...\n",sig,strsignal(sig));
+		string_nformat(buf, sizeof(buf), "received signal %d (%s), cleaning up remote jobs and files...\n",sig,strsignal(sig));
 		write(fd, buf, strlen(buf));
 		close(fd);
 	}

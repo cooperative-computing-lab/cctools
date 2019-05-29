@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "md5.h"
 #include "sha1.h"
+#include "stringtools.h"
 
 #include <fnmatch.h>
 
@@ -84,7 +85,7 @@ void cfs_normalize(char url[CHIRP_PATH_MAX])
 		char absolute[PATH_MAX];
 		path_absolute(root, absolute, 0);
 		debug(D_CHIRP, "normalizing url `%s' as `confuga://%s%s'", url, absolute, rest);
-		snprintf(url, CHIRP_PATH_MAX, "confuga://%s%s", absolute, rest);
+		string_nformat(url, CHIRP_PATH_MAX, "confuga://%s%s", absolute, rest);
 	} else {
 		char absolute[PATH_MAX];
 		if(strprfx(url, "file:") || strprfx(url, "local:"))
@@ -533,7 +534,7 @@ INT64_T cfs_basic_rmall(const char *path)
 			while(rc == 0 && (d = cfs->readdir(dir))) {
 				if(strcmp(d->name, ".") != 0 && strcmp(d->name, "..") != 0) {
 					char subpath[PATH_MAX];
-					snprintf(subpath, sizeof(subpath), "%s/%s", path, d->name);
+					string_nformat(subpath, sizeof(subpath), "%s/%s", path, d->name);
 					rc = cfs_basic_rmall(subpath);
 					if(rc == -1) {
 						cfs->closedir(dir);
