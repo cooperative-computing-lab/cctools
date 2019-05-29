@@ -547,7 +547,7 @@ static void handle_query(struct link *query_link)
 		for(i = 0; i < n; i++) {
 			j = array[i];
 			make_hash_key(j, key);
-			sprintf(url, "/detail/%s", key);
+			string_nformat(url, sizeof(url), "/detail/%s", key);
 			jx_export_html_with_link(j, stream, html_headers, "name", url);
 		}
 		jx_export_html_footer(stream, html_headers);

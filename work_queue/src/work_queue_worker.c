@@ -188,9 +188,9 @@ static int max_time_on_measurement  = 3;
 static struct work_queue *foreman_q = NULL;
 
 // docker image name
-static char *img_name = NULL;
-static char container_name[1024];
-static char *tar_fn = NULL;
+static char *img_name       = NULL;
+static char *container_name = NULL;
+static char *tar_fn         = NULL;
 
 // Table of all processes in any state, indexed by taskid.
 // Processes should be created/deleted when added/removed from this table.
@@ -228,7 +228,7 @@ static void send_master_message( struct link *master, const char *fmt, ... )
 
 	va_start(va,fmt);
 
-	sprintf(debug_msg, "tx to master: %s", fmt);
+	string_nformat(debug_msg, sizeof(debug_msg), "tx to master: %s", fmt);
 	va_copy(debug_va, va);
 
 	vdebug(D_WQ, debug_msg, debug_va);
@@ -776,7 +776,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 	int64_t actual, length;
 	int fd;
 
-	sprintf(cached_filename, "cache/%s", filename);
+	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", filename);
 
 	if(stat(cached_filename, &info) != 0) {
 		goto failure;
@@ -793,7 +793,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		while(recursive && (dent = readdir(dir))) {
 			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
 				continue;
-			sprintf(dentline, "%s/%s", filename, dent->d_name);
+			string_nformat(dentline, sizeof(dentline), "%s/%s", filename, dent->d_name);
 			stream_output_item(master, dentline, recursive);
 		}
 
@@ -925,11 +925,11 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			debug(D_WQ,"rx from master: %s",cmd);
 			free(cmd);
 		} else if(sscanf(line,"infile %s %s %d", filename, taskname_encoded, &flags)) {
-			sprintf(localname, "cache/%s", filename);
+			string_nformat(localname, sizeof(localname), "cache/%s", filename);
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_INPUT, flags);
 		} else if(sscanf(line,"outfile %s %s %d", filename, taskname_encoded, &flags)) {
-			sprintf(localname, "cache/%s", filename);
+			string_nformat(localname, sizeof(localname), "cache/%s", filename);
 			url_decode(taskname_encoded, taskname, WORK_QUEUE_LINE_MAX);
 			work_queue_task_specify_file(task, localname, taskname, WORK_QUEUE_OUTPUT, flags);
 		} else if(sscanf(line, "dir %s", filename)) {
@@ -1018,7 +1018,7 @@ static int do_put( struct link *master, char *filename, int64_t length, int mode
 		cur_pos += 2;
 	}
 
-	sprintf(cached_filename, "cache/%s", cur_pos);
+	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
 	if(cur_pos) {
@@ -1050,7 +1050,7 @@ static int file_from_url(const char *url, const char *filename) {
 
 		debug(D_WQ, "Retrieving %s from (%s)\n", filename, url);
 		char command[WORK_QUEUE_LINE_MAX];
-		snprintf(command, WORK_QUEUE_LINE_MAX, "curl -f -o \"%s\" \"%s\"", filename, url);
+		string_nformat(command, sizeof(command), "curl -f -o \"%s\" \"%s\"", filename, url);
 
 	if (system(command) == 0) {
 				debug(D_WQ, "Success, file retrieved from %s\n", url);
@@ -1068,14 +1068,14 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 		link_read(master, url, length, time(0) + active_timeout);
 
 		char cache_name[WORK_QUEUE_LINE_MAX];
-		snprintf(cache_name,WORK_QUEUE_LINE_MAX, "cache/%s", filename);
+		string_nformat(cache_name, sizeof(cache_name), "cache/%s", filename);
 
 		return file_from_url(url, cache_name);
 }
 
 static int do_unlink(const char *path) {
 	char cached_path[WORK_QUEUE_LINE_MAX];
-	sprintf(cached_path, "cache/%s", path);
+	string_nformat(cached_path, sizeof(cached_path), "cache/%s", path);
 	//Use delete_dir() since it calls unlink() if path is a file.
 	if(delete_dir(cached_path) != 0) {
 		struct stat buf;
@@ -1120,7 +1120,7 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 		cur_pos += 2;
 	}
 
-	sprintf(cached_filename, "cache/%s", cur_pos);
+	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
 
 	cur_pos = strrchr(cached_filename, '/');
 	if(cur_pos) {
@@ -1138,15 +1138,16 @@ static int do_thirdget(int mode, char *filename, const char *path) {
 			debug(D_WQ, "Could not thirdget %s, symlink (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
+		/* falls through */
 	case WORK_QUEUE_FS_PATH:
-		sprintf(cmd, "/bin/cp %s %s", path, cached_filename);
+		string_nformat(cmd, sizeof(cmd), "/bin/cp %s %s", path, cached_filename);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdget %s, copy (%s) failed. (%s)\n", filename, path, strerror(errno));
 			return 0;
 		}
 		break;
 	case WORK_QUEUE_FS_CMD:
-		sprintf(cmd, "%s > %s", path, cached_filename);
+		string_nformat(cmd, sizeof(cmd), "%s > %s", path, cached_filename);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdget %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
 			return 0;
@@ -1169,7 +1170,7 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 		cur_pos += 2;
 	}
 
-	sprintf(cached_filename, "cache/%s", cur_pos);
+	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
 
 
 	if(stat(cached_filename, &info) != 0) {
@@ -1196,14 +1197,14 @@ static int do_thirdput(struct link *master, int mode, char *filename, const char
 			}
 			*cur_pos = '/';
 		}
-		sprintf(cmd, "/bin/cp -r %s %s", cached_filename, path);
+		string_nformat(cmd, sizeof(cmd), "/bin/cp -r %s %s", cached_filename, path);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdput %s, copy (%s) failed. (%s)\n", cached_filename, path, strerror(errno));
 			result = 0;
 		}
 		break;
 	case WORK_QUEUE_FS_CMD:
-		sprintf(cmd, "%s < %s", path, cached_filename);
+		string_nformat(cmd, sizeof(cmd), "%s < %s", path, cached_filename);
 		if(system(cmd) != 0) {
 			debug(D_WQ, "Could not thirdput %s, command (%s) failed. (%s)\n", filename, cmd, strerror(errno));
 			result = 0;
@@ -2717,7 +2718,7 @@ int main(int argc, char *argv[])
 		free(os_name); //free the os string obtained from uname
 		os_name = xxstrdup("foreman");
 
-		sprintf(foreman_string, "%s-foreman", argv[0]);
+		string_nformat(foreman_string, sizeof(foreman_string), "%s-foreman", argv[0]);
 		debug_config(foreman_string);
 		foreman_q = work_queue_create(foreman_port);
 
@@ -2751,22 +2752,22 @@ int main(int argc, char *argv[])
 
 	if(container_mode == CONTAINER_MODE_DOCKER && load_from_tar == 1) {
 		char load_cmd[1024];
-		sprintf(load_cmd, "docker load < %s", tar_fn);
+		string_nformat(load_cmd, sizeof(load_cmd), "docker load < %s", tar_fn);
 		system(load_cmd);
 	}
 
 	if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
 		if (load_from_tar == 1) {
 			char load_cmd[1024];
-			sprintf(load_cmd, "docker load < %s", tar_fn);
+			string_nformat(load_cmd, sizeof(load_cmd), "docker load < %s", tar_fn);
 			system(load_cmd);
 		}
 
-		sprintf(container_name, "worker-%d-%d", (int) getuid(), (int) getpid());
+		string_nformat(container_name, sizeof(container_name), "worker-%d-%d", (int) getuid(), (int) getpid());
 		char container_mnt_point[1024];
 		char start_container_cmd[1024];
-		sprintf(container_mnt_point, "%s:%s", workspace, DOCKER_WORK_DIR);
-		sprintf(start_container_cmd, "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DOCKER_WORK_DIR, img_name);
+		string_nformat(container_mnt_point, sizeof(container_mnt_point), "%s:%s", workspace, DOCKER_WORK_DIR);
+		string_nformat(start_container_cmd, sizeof(start_container_cmd), "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DOCKER_WORK_DIR, img_name);
 		system(start_container_cmd);
 	}
 
@@ -2851,11 +2852,11 @@ int main(int argc, char *argv[])
 	}
 
 	if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE || container_mode == CONTAINER_MODE_DOCKER) {
-		char stop_container_cmd[1024];
-		char rm_container_cmd[1024];
+		char stop_container_cmd[WORK_QUEUE_LINE_MAX];
+		char rm_container_cmd[WORK_QUEUE_LINE_MAX];
 
-		sprintf(stop_container_cmd, "docker stop %s", container_name);
-		sprintf(rm_container_cmd, "docker rm %s", container_name);
+		string_nformat(stop_container_cmd, sizeof(stop_container_cmd), "docker stop %s", container_name);
+		string_nformat(rm_container_cmd, sizeof(rm_container_cmd), "docker rm %s", container_name);
 
 		if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
 			//1. stop the container

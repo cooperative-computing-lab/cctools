@@ -50,7 +50,7 @@ static int create_task_directories(struct work_queue_process *p) {
 	free(p->sandbox);
 	p->sandbox = xxstrdup(absolute);
 
-	sprintf(tmpdir_template, "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
+	string_nformat(tmpdir_template, sizeof(tmpdir_template), "%s/cctools-temp-t.%d.XXXXXX", p->sandbox, p->task->taskid);
 	if(mkdtemp(tmpdir_template) == NULL) {
 		return 0;
 	}
@@ -290,14 +290,14 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 			uid_t uid = getuid();
 			char uid_str[MAX_BUFFER_SIZE];
-			sprintf(uid_str, "%d", uid);
+			string_nformat(uid_str, sizeof(uid_str), "%d", uid);
 
 			// Get path to sandbox
 			char curr_wrk_dir[MAX_BUFFER_SIZE];
 			char *wrk_space;
 
 			if((wrk_space = getenv("WORK_QUEUE_SANDBOX")) != NULL) {
-				sprintf(curr_wrk_dir, "%s/%s", wrk_space, p->sandbox);
+				string_nformat(curr_wrk_dir, sizeof(curr_wrk_dir), "%s/%s", wrk_space, p->sandbox);
 			} else {
 				perror("getenv() error");
 			}
@@ -309,10 +309,10 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 				va_end(arg_lst);
 
 				char mnt_flg_val[MAX_BUFFER_SIZE];
-				sprintf(mnt_flg_val, "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
+				string_nformat(mnt_flg_val, sizeof(mnt_flg_val), "%s:%s", curr_wrk_dir, DEFAULT_WORK_DIR);
 				// cmd for running the shell script
 				char run_cmd[SMALL_BUFFER_SIZE];
-				sprintf(run_cmd, "./%s", TMP_SCRIPT);
+				string_nformat(run_cmd, sizeof(run_cmd), "./%s", TMP_SCRIPT);
 
 				execl("/usr/bin/docker", "/usr/bin/docker", "run", "--rm", "-v", mnt_flg_val, "-w", DEFAULT_WORK_DIR, "-u", uid_str, "-m", "1g", img_name, run_cmd, (char *) 0);
 				_exit(127);	// Failed to execute the cmd.
@@ -326,8 +326,8 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 				char sub_proc_sh_fn[MAX_BUFFER_SIZE];
 				char sub_proc_sh_fn_path[MAX_BUFFER_SIZE];
-				sprintf(sub_proc_sh_fn, "tmp_%s.sh", p->sandbox);
-				sprintf(sub_proc_sh_fn_path, "%s/%s", wrk_space, sub_proc_sh_fn);
+				string_nformat(sub_proc_sh_fn, sizeof(sub_proc_sh_fn), "tmp_%s.sh", p->sandbox);
+				string_nformat(sub_proc_sh_fn_path, sizeof(sub_proc_sh_fn_path), "%s/%s", wrk_space, sub_proc_sh_fn);
 
 				FILE *sub_proc_script_fn = fopen(sub_proc_sh_fn_path, "w");
 				fprintf(sub_proc_script_fn, "%s\ncd %s\n./%s", DEFAULT_EXE_APP, p->sandbox, TMP_SCRIPT);
@@ -335,7 +335,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 				chmod(sub_proc_sh_fn_path, 0755);
 
 				char run_sh_fn[MAX_BUFFER_SIZE];
-				sprintf(run_sh_fn, "./%s", sub_proc_sh_fn);
+				string_nformat(run_sh_fn, sizeof(run_sh_fn), "./%s", sub_proc_sh_fn);
 
 				execl("/usr/bin/docker", "/usr/bin/docker", "exec", container_name, run_sh_fn, (char *) 0);
 				_exit(127);	// Failed to execute the cmd.

@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "work_queue.h"
 #include "work_queue_catalog.h"
+#include "work_queue_protocol.h"
 
 #include "cctools.h"
 #include "debug.h"
@@ -348,7 +349,7 @@ void add_child_relation(const char *name, int spaces, char *buffer, size_t max_s
 int find_child_relations(int spaces, const char *host, int port, struct jx_table *headers, time_t stoptime)
 {
 	int i = 0; //global_catalog iterator
-	char full_address[1024];
+	char full_address[WORK_QUEUE_LINE_MAX];
 
 	if(!domain_name_cache_lookup(host, full_address))
 	{
@@ -356,7 +357,9 @@ int find_child_relations(int spaces, const char *host, int port, struct jx_table
 		return 0;
 	}
 
-	sprintf(full_address, "%s:%d", full_address, port);
+	char *port_str = string_format(":%d", port);
+	strcat(full_address, port_str);
+	free(port_str);
 
 	while(global_catalog[i] != NULL)
 	{

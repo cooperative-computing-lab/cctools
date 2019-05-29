@@ -164,10 +164,10 @@ int whole_string_match_regex(const char *text, const char *pattern)
 
 	new_pattern[0] = '\0';
 	if(*pattern != '^')
-		strncat(new_pattern, "^", 1);
-	strncat(new_pattern, pattern, strlen(pattern));
+		strcat(new_pattern, "^");
+	strcat(new_pattern, pattern);
 	if(pattern[strlen(pattern) - 1] != '$')
-		strncat(new_pattern, "$", 1);
+		strcat(new_pattern, "$");
 
 	result = string_match_regex(text, new_pattern);
 	free(new_pattern);

@@ -13,6 +13,7 @@ extern "C" {
 #include "username.h"
 #include "ibox_acl.h"
 #include "stats.h"
+#include "stringtools.h"
 }
 
 #include <assert.h>
@@ -153,7 +154,9 @@ public:
 		struct stat64 lbuf;
 		debug(D_LOCAL,"fstat %d %p",fd,buf);
 		result = ::fstat64(fd,&lbuf);
-		if(result>=0) COPY_STAT(lbuf,*buf);
+		if(result>=0) {
+				COPY_STAT(lbuf,*buf);
+		}
 		END
 	}
 
@@ -163,7 +166,9 @@ public:
 		struct statfs64 lbuf;
 		debug(D_LOCAL,"fstatfs %d %p",fd,buf);
 		result = ::fstatfs64(fd,&lbuf);
-		if(result>=0) COPY_STATFS(lbuf,*buf);
+		if(result>=0){
+				COPY_STATFS(lbuf,*buf);
+		}
 		END
 	}
 
@@ -383,7 +388,9 @@ RETRY:
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		debug(D_LOCAL,"stat %s %p",name->rest,buf);
 		result = ::stat64(name->rest,&lbuf);
-		if(result>=0) COPY_STAT(lbuf,*buf);
+		if(result>=0){
+				COPY_STAT(lbuf,*buf);
+		}
 		END
 	}
 	virtual int statfs( pfs_name *name, struct pfs_statfs *buf ) {
@@ -393,7 +400,9 @@ RETRY:
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		debug(D_LOCAL,"statfs %s %p",name->rest,buf);
 		result = ::statfs64(name->rest,&lbuf);
-		if(result>=0) COPY_STATFS(lbuf,*buf);
+		if(result>=0){
+				COPY_STATFS(lbuf,*buf);
+		}
 		END
 	}
 	virtual int lstat( pfs_name *name, struct pfs_stat *buf ) {
@@ -403,7 +412,9 @@ RETRY:
 		if(!pfs_acl_check(name,IBOX_ACL_LIST)) return -1;
 		debug(D_LOCAL,"lstat %s %p",name->rest,buf);
 		result = ::lstat64(name->rest,&lbuf);
-		if(result>=0) COPY_STAT(lbuf,*buf);
+		if(result>=0){
+				COPY_STAT(lbuf,*buf);
+		}
 		END
 	}
 	virtual int access( pfs_name *name, mode_t mode ) {
@@ -727,7 +738,7 @@ RETRY:
 		debug(D_LOCAL,"locate %s",name->rest);
 		result = stat(name, &buf);
 		if(result < 0) return 0;
-		snprintf(path, PFS_PATH_MAX, "localhost:dev%" PRId64 ":%s", buf.st_dev, name->path);
+		string_nformat(path, sizeof(path), "localhost:dev%" PRId64 ":%s", buf.st_dev, name->path);
 		loc = new pfs_location();
 		loc->append(path);
 		return loc;

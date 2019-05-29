@@ -23,6 +23,7 @@ See the file COPYING for details.
 #include "shell.h"
 #include "sleeptools.h"
 #include "string_array.h"
+#include "stringtools.h"
 #include "url_encode.h"
 #include "xxmalloc.h"
 #include "address.h"
@@ -325,7 +326,7 @@ struct chirp_client *chirp_client_connect_condor(time_t stoptime)
 		return 0;
 	}
 
-	sprintf(hostport, "%s:%d", host, port);
+	string_nformat(hostport, sizeof(hostport), "%s:%d", host, port);
 
 	client = chirp_client_connect(hostport, 0, stoptime);
 	if(!client)
@@ -575,7 +576,7 @@ static int ticket_translate(const char *name, char *ticket_subject)
 		if (status == 0) {
 			/* load the digest */
 			const char *digest = chirp_ticket_digest(buffer_tostring(Bout));
-			sprintf(ticket_subject, "ticket:%s", digest);
+			string_nformat(ticket_subject, CHIRP_LINE_MAX, "ticket:%s", digest);
 		} else {
 			debug(D_CHIRP, "could not create ticket, do you have openssl installed?");
 			errno = ENOSYS;
@@ -746,7 +747,7 @@ INT64_T chirp_client_ticket_create(struct chirp_client * c, char name[CHIRP_PATH
 		debug(D_DEBUG, "shellcode exit status %d; stderr:\n%s", status, buffer_tostring(Berr));
 
 		if (status == 0) {
-			snprintf(name, CHIRP_PATH_MAX, "%s", buffer_tostring(Bout));
+			string_nformat(name, CHIRP_PATH_MAX, "%s", buffer_tostring(Bout));
 		} else {
 			debug(D_CHIRP, "could not create ticket, do you have openssl installed?");
 			errno = ENOSYS;
@@ -948,7 +949,7 @@ INT64_T chirp_client_locate(struct chirp_client * c, const char *path, chirp_loc
 	char location[CHIRP_PATH_MAX];
 	char host[CHIRP_PATH_MAX];
 	sscanf(c->hostport, "%[^:]%*s", host);
-	snprintf(location, CHIRP_PATH_MAX, "%s:%s", host, path);
+	string_nformat(location, sizeof(location), "%s:%s", host, path);
 	callback(location, arg);
 	return 1;
 }

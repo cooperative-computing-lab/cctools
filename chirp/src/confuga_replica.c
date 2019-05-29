@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include "json_aux.h"
 #include "nvpair.h"
 #include "sha1.h"
+#include "stringtools.h"
 
 #include <sys/socket.h>
 
@@ -223,10 +224,12 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	sqlcatch(sqlite3_bind_int64(stmt, 1, sid));
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_ROW);
-	snprintf(host_to.hostport, sizeof(host_to.hostport), "%s", (const char *)sqlite3_column_text(stmt, 0));
-	snprintf(host_to.root, sizeof(host_to.root), "%s", (const char *)sqlite3_column_text(stmt, 1));
-	snprintf(replica_open, sizeof(replica_open), "%s", (const char *)sqlite3_column_text(stmt, 2));
-	snprintf(replica_closed, sizeof(replica_closed), "%s/file/" CONFUGA_FID_PRIFMT, host_to.root, CONFUGA_FID_PRIARGS(fid));
+
+	string_nformat(host_to.hostport, sizeof(host_to.hostport), "%s", (const char *)sqlite3_column_text(stmt, 0));
+	string_nformat(host_to.root, sizeof(host_to.root), "%s", (const char *)sqlite3_column_text(stmt, 1));
+	string_nformat(replica_open, sizeof(replica_open), "%s", (const char *)sqlite3_column_text(stmt, 2));
+	string_nformat(replica_closed, sizeof(replica_closed), "%s/file/" CONFUGA_FID_PRIFMT, host_to.root, CONFUGA_FID_PRIARGS(fid));
+
 	sqlcatchcode(sqlite3_step(stmt), SQLITE_DONE);
 	sqlcatch(sqlite3_finalize(stmt); stmt = NULL);
 
@@ -247,9 +250,10 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 
 		start = time(NULL);
 		fsid = sqlite3_column_int64(stmt, 1);
-		snprintf(host_from.hostport, sizeof(host_from.hostport), "%s", (const char *)sqlite3_column_text(stmt, 2));
-		snprintf(host_from.root, sizeof(host_from.root), "%s", (const char *)sqlite3_column_text(stmt, 3));
-		snprintf(replica_from, sizeof(replica_from), "%s/file/" CONFUGA_FID_PRIFMT, host_from.root, CONFUGA_FID_PRIARGS(fid));
+
+		string_nformat(host_from.hostport, sizeof(host_from.hostport), "%s", (const char *)sqlite3_column_text(stmt, 2));
+		string_nformat(host_from.root, sizeof(host_from.root), "%s", (const char *)sqlite3_column_text(stmt, 3));
+		string_nformat(replica_from, sizeof(replica_from), "%s/file/" CONFUGA_FID_PRIFMT, host_from.root, CONFUGA_FID_PRIARGS(fid));
 
 		result = chirp_reli_thirdput(host_from.hostport, replica_from, host_to.hostport, replica_open, timeout);
 		if (result >= 0) {
@@ -342,9 +346,11 @@ CONFUGA_API int confuga_replica_open (confuga *C, confuga_fid_t fid, confuga_rep
 	sqlcatch(sqlite3_prepare_v2(db, current, -1, &stmt, &current));
 	while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
 		n += 1;
-		snprintf(replica->host.hostport, sizeof(replica->host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 0));
-		snprintf(replica->host.root, sizeof(replica->host.root), "%s", (const char *) sqlite3_column_text(stmt, 1));
-		snprintf(replica->path, sizeof(replica->path), "%s/file/" CONFUGA_FID_PRIFMT, replica->host.root, CONFUGA_FID_PRIARGS(fid));
+
+		string_nformat(replica->host.hostport, sizeof(replica->host.hostport), "%s", (const char *) sqlite3_column_text(stmt, 0));
+		string_nformat(replica->host.root, sizeof(replica->host.root), "%s", (const char *) sqlite3_column_text(stmt, 1));
+		string_nformat(replica->path, sizeof(replica->path), "%s/file/" CONFUGA_FID_PRIFMT, replica->host.root, CONFUGA_FID_PRIARGS(fid));
+
 		replica->stream = chirp_reli_open(replica->host.hostport, replica->path, O_RDONLY, 0, STOPTIME);
 		if (replica->stream) {
 			debug(D_CONFUGA, "opened replica %s/%s", replica->host.hostport, replica->path);

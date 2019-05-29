@@ -1015,7 +1015,7 @@ static void handle_abort(int sig)
 	int fd = open("/dev/tty", O_WRONLY);
 	if (fd >= 0) {
 		char buf[256];
-		snprintf(buf, sizeof(buf), "received signal %d (%s), cleaning up remote jobs and files...\n",sig,strsignal(sig));
+		string_nformat(buf, sizeof(buf), "received signal %d (%s), cleaning up remote jobs and files...\n",sig,strsignal(sig));
 		write(fd, buf, strlen(buf));
 		close(fd);
 	}
@@ -1885,6 +1885,7 @@ int main(int argc, char *argv[])
 				} else {
 					fatal("Allocation mode '%s' is not valid. Use one of: throughput waste fixed");
 				}
+				break;
 			case LONG_OPT_JSON:
 				dag_syntax = DAG_SYNTAX_JSON;
 				break;
@@ -1919,6 +1920,7 @@ int main(int argc, char *argv[])
 			case LONG_OPT_UMBRELLA_SPEC:
 				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
 				makeflow_wrapper_umbrella_set_spec(umbrella, (const char *)xxstrdup(optarg));
+				break;
 			case LONG_OPT_MESOS_MASTER:
 				mesos_master = xxstrdup(optarg);
 				break;

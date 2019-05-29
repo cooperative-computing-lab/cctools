@@ -585,6 +585,7 @@ json_value * json_parse_ex (json_settings * settings,
                         flags &= ~ flag_need_comma;
                         break;
                      }
+                     /* falls through */
 
                   default:
 

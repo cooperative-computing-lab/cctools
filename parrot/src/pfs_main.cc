@@ -794,7 +794,7 @@ int main( int argc, char *argv[] )
 		snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s", s);
 	} else {
 		assert(sys_temp_dir[0]);
-		snprintf(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
+		string_nformat(pfs_temp_dir, sizeof(pfs_temp_dir), "%s/parrot.%d", sys_temp_dir, getuid());
 	}
 
 	s = getenv("PARROT_CVMFS_ALIEN_CACHE");
@@ -802,12 +802,12 @@ int main( int argc, char *argv[] )
 		snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s", s);
 	} else {
 		assert(pfs_temp_dir[0]);
-		snprintf(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s/cvmfs", pfs_temp_dir);
+		string_nformat(pfs_cvmfs_alien_cache_dir, sizeof(pfs_cvmfs_alien_cache_dir), "%s/cvmfs", pfs_temp_dir);
 	}
 
 	s = getenv("PARROT_CVMFS_OPTION_FILE");
 	if (s) {
-		snprintf(pfs_cvmfs_option_file, sizeof(pfs_cvmfs_option_file), "%s", s);
+		string_nformat(pfs_cvmfs_option_file, sizeof(pfs_cvmfs_option_file), "%s", s);
 	} else {
 		memset(pfs_cvmfs_option_file, 0, sizeof(pfs_cvmfs_option_file));
 	}
@@ -1085,6 +1085,7 @@ int main( int argc, char *argv[] )
 		case LONG_OPT_FAKE_SETUID:
 			pfs_fake_setuid = 1;
 			pfs_fake_setgid = 1;
+			break;
 		case LONG_OPT_DYNAMIC_MOUNTS:
 			pfs_allow_dynamic_mounts = 1;
 			break;
@@ -1224,7 +1225,8 @@ int main( int argc, char *argv[] )
 	if (!create_dir(pfs_temp_dir, S_IRWXU))
 		fatal("could not create directory '%s': %s", pfs_temp_dir, strerror(errno));
 
-	snprintf(pfs_temp_per_instance_dir, sizeof(pfs_temp_per_instance_dir), "%s/parrot-instance.XXXXXX", pfs_temp_dir);
+	string_nformat(pfs_temp_per_instance_dir, sizeof(pfs_temp_per_instance_dir), "%s/parrot-instance.XXXXXX", pfs_temp_dir);
+
 	if (mkdtemp(pfs_temp_per_instance_dir) == NULL)
 		fatal("could not create directory '%s': %s", pfs_temp_per_instance_dir, strerror(errno));
 
@@ -1232,7 +1234,8 @@ int main( int argc, char *argv[] )
 	if(!pfs_file_cache) fatal("couldn't setup cache in %s: %s\n",pfs_temp_dir,strerror(errno));
 	file_cache_cleanup(pfs_file_cache);
 
-	snprintf(pfs_cvmfs_locks_dir, sizeof(pfs_cvmfs_locks_dir), "%s/cvmfs_locks_XXXXXX", pfs_temp_per_instance_dir);
+	string_nformat(pfs_cvmfs_locks_dir, sizeof(pfs_cvmfs_locks_dir), "%s/cvmfs_locks_XXXXXX", pfs_temp_per_instance_dir);
+
 	if(mkdtemp(pfs_cvmfs_locks_dir) == NULL)
 		fatal("could not create a cvmfs locks temporary directory: %s", strerror(errno));
 
@@ -1251,8 +1254,10 @@ int main( int argc, char *argv[] )
 
 	{
 		int fd;
+
 		char buf[PATH_MAX];
-		snprintf(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_per_instance_dir);
+		string_nformat(buf, sizeof(buf), "%s/parrot-fd.XXXXXX", pfs_temp_per_instance_dir);
+
 		if (mkdtemp(buf) == NULL)
 			fatal("could not create parrot-fd temporary directory: %s", strerror(errno));
 		fd = open(buf, O_RDONLY|O_DIRECTORY);

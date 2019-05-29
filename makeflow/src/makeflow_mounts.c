@@ -104,6 +104,7 @@ int mount_install_local(const char *source, const char *target, const char *cach
 			debug(D_DEBUG, "copy_symlink from %s to %s failed.\n", source, cache_path);
 			return -1;
 		}
+		break;
 	case FILE_TYPE_DIR:
 		if(copy_dir(source, cache_path)) {
 			debug(D_DEBUG, "copy_dir from %s to %s failed.\n", source, cache_path);

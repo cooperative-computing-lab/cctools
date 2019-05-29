@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	/* We create and dispatch a task for each filename given in the argument list */
 	for(i = 1; i < argc; i++) {
 
-		char infile[256], outfile[256], command[256];
+		char infile[256], outfile[256], command[1024];
 
 		sprintf(infile, "%s", argv[i]);
 		sprintf(outfile, "%s.gz", argv[i]);

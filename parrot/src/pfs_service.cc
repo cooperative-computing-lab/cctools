@@ -434,7 +434,7 @@ void * pfs_service_connect_cache( pfs_name *name )
 	if(!table) table = hash_table_create(0,0);
 
 	if(table) {
-		sprintf(key,"/%s/%s:%d",name->service_name,name->host,name->port);
+		string_nformat(key,sizeof(key),"/%s/%s:%d",name->service_name,name->host,name->port);
 		cxn = hash_table_remove(table,key);
 		if(cxn) return cxn;
 	}
@@ -450,7 +450,7 @@ void pfs_service_disconnect_cache( pfs_name *name, void *cxn, int invalidate )
 	if(!table) table = hash_table_create(0,0);
 
 	if(table && !invalidate) {
-		sprintf(key,"/%s/%s:%d",name->service_name,name->host,name->port);
+		string_nformat(key,sizeof(key),"/%s/%s:%d",name->service_name,name->host,name->port);
 		if(hash_table_lookup(table,key)) {
 			name->service->disconnect(name,cxn);
 		} else {

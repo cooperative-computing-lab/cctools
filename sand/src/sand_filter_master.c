@@ -264,7 +264,7 @@ static void task_submit(struct work_queue *q, int curr_rect_x, int curr_rect_y)
 
 	char rname_x[32];
 	char rname_y[32];
-	char cmd[255];
+	char cmd[1024];
 	char fname_x[255];
 	char fname_y[255];
 	char tag[32];
