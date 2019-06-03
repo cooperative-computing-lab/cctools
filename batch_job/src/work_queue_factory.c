@@ -280,11 +280,10 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const char *host =   jx_lookup_string(j,"name");
 		const int  port =    jx_lookup_integer(j,"port");
 		const char *owner =  jx_lookup_string(j,"owner");
-		const int td =       jx_lookup_integer(j,"tasks_done");
 		const int tr =       jx_lookup_integer(j,"tasks_on_workers");
 		const int tw =       jx_lookup_integer(j,"tasks_waiting");
 		const int tl =       jx_lookup_integer(j,"tasks_left");
-		
+
 		int capacity = master_workers_capacity(j);
 		int tasks = tr+tw+tl;
 
@@ -309,7 +308,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			need = MIN(need, capacity);
 		}
 
-		debug(D_WQ,"%s %s:%d %s %d %d %d %d %d %d",project,host,port,owner,tasks,capacity,need,count_workers_connected(masters_list),td,tr);
+		debug(D_WQ,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tasks,capacity,need,tr);
 		needed_workers += need;
 		masters++;
 	}
