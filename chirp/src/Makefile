@@ -23,9 +23,9 @@ SCRIPTS = chirp_audit_cluster chirp_server_hdfs
 SOURCES_CONFUGA = confuga.c confuga_namespace.c confuga_replica.c confuga_node.c confuga_job.c confuga_file.c confuga_gc.c
 SOURCES_LIBRARY = chirp_global.c chirp_multi.c chirp_recursive.c chirp_reli.c chirp_client.c chirp_matrix.c chirp_stream.c chirp_ticket.c
 SOURCES_SERVER = sqlite3.c chirp_stats.c chirp_thirdput.c chirp_alloc.c chirp_audit.c chirp_acl.c chirp_group.c chirp_filesystem.c chirp_fs_hdfs.c chirp_fs_local.c chirp_fs_local_scheduler.c chirp_fs_chirp.c chirp_fs_confuga.c chirp_job.c chirp_sqlite.c
-TARGETS = $(PROGRAMS) $(LIBRARIES) bindings
+TARGETS = $(PROGRAMS) $(LIBRARIES)
 
-all: $(TARGETS)
+all: $(TARGETS) bindings
 
 chirp: chirp_tool.o
 ifeq ($(CCTOOLS_STATIC),1)
