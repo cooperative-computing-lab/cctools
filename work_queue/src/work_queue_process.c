@@ -270,7 +270,7 @@ pid_t work_queue_process_execute(struct work_queue_process *p, int container_mod
 
 		va_list arg_lst;
 		if(container_mode == NONE) {
-			execlp("sh", "sh", "-c", p->task->command_line, (char *) 0);
+			execl("/bin/sh", "sh", "-c", p->task->command_line, (char *) 0);
 			_exit(127);	// Failed to execute the cmd.
 
 		} else if(container_mode == UMBRELLA) {
