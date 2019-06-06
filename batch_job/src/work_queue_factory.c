@@ -545,7 +545,13 @@ struct jx *master_to_jx(struct jx *m) {
 
 	struct jx *j = jx_object(NULL);
 
-	jx_insert_string(j, "project", jx_lookup_string(m, "project"));
+	const char *project_name = jx_lookup_string(m, "project");
+
+	if(project_name) {
+		jx_insert_string(j, "project", jx_lookup_string(m, "project"));
+	} else {
+		jx_insert_string(j, "project", master_host);
+	}
 
 	if(using_catalog) {
 		jx_insert_string(j, "name", jx_lookup_string(m, "name"));
