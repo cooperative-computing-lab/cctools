@@ -449,12 +449,13 @@ resource requirements in terms of cores, memory, and disk.</p>
 </pre>
 </div>
 
-<p> Note that if no requirements are specified, a task consumes an entire
-worker. If one or more requirements are specified, a task is assumed to consume
-those requirements and the unlabeled resource requirements are assumed to be
-negligible.  For example, if you annotate a task as using 1 core, but don't
-specify its memory or disk requirements, then Work Queue will schedule two such
-tasks to a two-task worker, regardless of their memory or disk usage.
+<p> Note that if no requirements are specified, a task consumes an entire 
+worker. All resource requirements must be specified in order to run multiple tasks
+on a single worker. For example, if you annotate a task as using 1 core, but don't 
+specify its memory or disk requirments, Work Queue will only schedule one task
+to a two-core worker. However, if you annotate the core, memory, and disc requirements
+for a task, Work Queue can schedule two such tasks to a two-task worker, assuming it
+has the available memory and disk requirements for each individual task.
 </p>
 
 <p> You may also use the --cores, --memory, and --disk options when using batch
