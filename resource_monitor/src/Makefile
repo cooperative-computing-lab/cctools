@@ -3,7 +3,7 @@ UNAME := $(shell uname)
 include ../../config.mk
 include ../../rules.mk
 
-LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) librmonitor_helper_f.$(CCTOOLS_DYNAMIC_SUFFIX)
+LIBRARIES = librmonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX) librminimonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX)
 OBJECTS = resource_monitor_pb.o rmonitor_helper_comm.o resource_monitor.o resource_monitor_tools.o rmonitor_helper.o rmonitor_file_watch.o
 
 LOCAL_LINKAGE = ../../dttools/src/libdttools.a
@@ -25,6 +25,9 @@ ifeq ($(CCTOOLS_STATIC),1)
 else
 	$(CCTOOLS_CC) -shared -Wl,-init,rmonitor_helper_initialize -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 endif
+
+librminimonitor_helper.$(CCTOOLS_DYNAMIC_SUFFIX): rminimonitor_helper.o
+	gcc           -shared -Wl,-init,rmonitor_helper_initialize -fPIC $^ -o $@ -ldl $(CCTOOLS_INTERNAL_LDFLAGS) $(LOCAL_LINKAGE) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 piggybacker: piggybacker.o
 

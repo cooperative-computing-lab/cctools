@@ -33,15 +33,15 @@ cctools_debug_config('resource_monitor')
 
 
 # decorator to monitor functions.
-def monitored(limits = None, callback = None):
+def monitored(limits = None, callback = None, interval = 1e6):
     def monitored_inner(func):
-        return functools.partial(monitor_function, limits, callback, func)
+        return functools.partial(monitor_function, limits, callback, interval, func)
     return monitored_inner
 
 # if x = function(*args, **kwargs), returns a function mfun  (x, r) = mfun(*args, **kwargs)
 # where x is the orignal results, and r is the maximum resources consumed.
-def make_monitored(function, limits = None, callback = None):
-    return functools.partial(monitor_function, limits, callback, function)
+def make_monitored(function, limits = None, callback = None, interval = 1e6):
+    return functools.partial(monitor_function, limits, callback, interval, function)
 
 def measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
@@ -86,7 +86,7 @@ def __read_pids_file(pids_file):
             else:
                 rmonitor_minimonitor(MINIMONITOR_REMOVE_PID, -pid)
 
-def __watchman(results_queue, limits, callback, function, args, kwargs):
+def __watchman(results_queue, limits, callback, interval, function, args, kwargs):
     try:
         # child_finished is set when the process running function exits
         child_finished = threading.Event()
@@ -129,7 +129,7 @@ def __watchman(results_queue, limits, callback, function, args, kwargs):
                 else:
                     if callback:
                         callback(resources=resources_now.to_dict(), finished=False, resource_exhaustion=False)
-                child_finished.wait(timeout = 1)
+                child_finished.wait(timeout = interval/1e6)
         except Exception as e:
             fun_proc.terminate()
             fun_proc.join()
@@ -152,16 +152,16 @@ def __watchman(results_queue, limits, callback, function, args, kwargs):
             callback(resources=resources_max.to_dict(), finished=True, resource_exhaustion=resources_max.limits_exceeded is not None)
 
     except Exception as e:
-        cctools_debug(D_FATAL, "error executing function process: {}".format(e))
+        cctools_debug(D_RMON, "error executing function process: {}".format(e))
         results_queue.put({'result': e, 'resources': None, 'resource_exhaustion': False})
 
-def monitor_function(limits, callback, function, *args, **kwargs):
+def monitor_function(limits, callback, interval, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
 
     #__watchman(result_queue, limits, callback, function, args, kwargs)
     #sys
 
-    watchman_proc = multiprocessing.Process(target=__watchman, args=(result_queue, limits, callback, function, args, kwargs))
+    watchman_proc = multiprocessing.Process(target=__watchman, args=(result_queue, limits, callback, interval, function, args, kwargs))
     watchman_proc.start()
     watchman_proc.join()
 

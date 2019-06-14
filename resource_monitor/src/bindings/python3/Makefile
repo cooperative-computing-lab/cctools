@@ -26,9 +26,8 @@ resource_monitor.bindings.py:%.py: ../python/%.py
 	cp $< $@
 	$(CCTOOLS_PYTHON3_2TO3) --nobackups --no-diffs --write $@
 
-
 clean:
-	rm -f $(OBJECTS) $(TARGETS) Python.framework rmonitor_wrap.c *.so *.pyc
+	rm -f $(TARGETS) $(OBJECTS) rmonitor_wrap.c *.so *.pyc
 
 test:
 
