@@ -135,4 +135,6 @@ int rmsummary_field_is_float(const char *key);
 
 struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i);
 
+int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits);
+
 #endif

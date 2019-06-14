@@ -18,6 +18,8 @@ See the file COPYING for details.
 #include "macros.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "load_average.h"
+
 
 #include "rmonitor_poll_internal.h"
 #include "host_memory_info.h"
@@ -73,7 +75,7 @@ void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_
 		acc_sys_io_usage(&acc->io, &p->io);
 		acc_map_io_usage(&acc->io, &p->io);
 	}
-	
+
 	rmonitor_get_loadavg(&acc->load);
 }
 
@@ -917,6 +919,141 @@ struct rmsummary *rmonitor_measure_host(char *path) {
 	rmsummary_read_env_vars(tr);
 
 	return tr;
+}
+
+struct rmsummary *rmonitor_collate_minimonitor(uint64_t start_time, int current_ps, int total_processes, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d) {
+	struct rmsummary *tr = rmsummary_create(-1);
+
+	tr->wall_time  = usecs_since_epoch() - start_time;
+	tr->cpu_time   = p->cpu.accumulated;
+
+	tr->start = start_time;
+	tr->end   = usecs_since_epoch();
+
+	tr->cores = 0;
+
+	if(tr->wall_time > 0) {
+		tr->cores = DIV_INT_ROUND_UP(tr->cpu_time, tr->wall_time);
+	}
+
+	tr->max_concurrent_processes = (int64_t) current_ps;
+	tr->total_processes          = (int64_t) total_processes;
+
+	/* we use max here, as /proc/pid/smaps that fills *m is not always
+	 * available. This causes /proc/pid/status to become a conservative
+	 * fallback. */
+	if(m->resident > 0) {
+		tr->virtual_memory    = (int64_t) m->virtual;
+		tr->memory            = (int64_t) m->resident;
+		tr->swap_memory       = (int64_t) m->swap;
+	}
+	else {
+		tr->virtual_memory    = (int64_t) p->mem.virtual;
+		tr->memory            = (int64_t) p->mem.resident;
+		tr->swap_memory       = (int64_t) p->mem.swap;
+	}
+
+	tr->bytes_read        = (int64_t) p->io.chars_read;
+	tr->bytes_read       += (int64_t) p->io.bytes_faulted;
+	tr->bytes_written     = (int64_t) p->io.chars_written;
+
+	// set in resource_monitor.c from messages of the helper
+	// tr->bytes_received = total_bytes_rx;
+	// tr->bytes_sent     = total_bytes_tx;
+	// tr->bandwidth = average_bandwidth(1);
+
+	tr->total_files = (int64_t) d->files;
+	tr->disk        = (int64_t) DIV_INT_ROUND_UP(d->byte_count, ONE_MEGABYTE);
+
+	tr->machine_load = p->load.last_minute;
+	tr->machine_cpus = p->load.cpus;
+
+	return tr;
+}
+
+struct rmsummary *rmonitor_minimonitor(minimonitor_op op, uint64_t pid) {
+	static struct itable                 *processes = NULL;
+	static struct rmonitor_process_info *p_acc      = NULL;
+	static struct rmonitor_mem_info     *m_acc      = NULL;
+	static struct rmonitor_wdir_info    *d_acc      = NULL;
+
+	static uint64_t first_pid  = 0;
+	static uint64_t start_time = 0;
+	static uint64_t total_processes = 0;
+
+	struct rmsummary *result = NULL;
+
+	if(!processes) {
+		processes = itable_create(0);
+		p_acc     = calloc(1, sizeof(*p_acc)); //Automatic zeroed.
+		m_acc     = calloc(1, sizeof(*m_acc));
+		d_acc     = calloc(1, sizeof(*d_acc));
+	}
+
+	char cwd_link[PATH_MAX];
+	char cwd_org[PATH_MAX];
+
+	struct rmonitor_process_info *p;
+	switch(op) {
+		case MINIMONITOR_RESET:
+			if(processes) {
+				itable_firstkey(processes);
+				while(itable_nextkey(processes, &pid, (void **) &p)) {
+					itable_remove(processes, pid);
+					free(p);
+				}
+				first_pid = 0;
+				total_processes = 0;
+				memset(p_acc, 0, sizeof(*p_acc));
+				memset(m_acc, 0, sizeof(*m_acc));
+				path_disk_size_info_delete_state(d_acc->state);
+			}
+			break;
+		case MINIMONITOR_ADD_PID:
+			p = itable_lookup(processes, pid);
+			if(!p) {
+				p = calloc(1, sizeof(struct rmonitor_process_info));
+				p->pid = pid;
+				itable_insert(processes, p->pid, (void *) p);
+				total_processes++;
+				if(first_pid == 0) {
+					first_pid = pid;
+					if(start_time < 1) {
+						rmonitor_get_start_time(pid, &start_time);
+					}
+
+					snprintf(cwd_link, PATH_MAX, "/proc/%" PRIu64 "/cwd", pid);
+					size_t n = readlink(cwd_link, cwd_org, PATH_MAX - 1);
+					if(n > 0)  {
+						cwd_org[n] = '\0';
+						d_acc->path  = cwd_org;
+						d_acc->state = NULL;
+					}
+				}
+			}
+			break;
+		case MINIMONITOR_REMOVE_PID:
+			p = itable_lookup(processes, pid);
+			if(p) {
+				itable_remove(processes, pid);
+				free(p);
+				if(pid == first_pid) {
+					first_pid = 0;
+				}
+			}
+			break;
+		case MINIMONITOR_MEASURE:
+			if(itable_size(processes) > 0) {
+				rmonitor_poll_all_processes_once(processes, p_acc);
+				rmonitor_poll_maps_once(processes, m_acc);
+				rmonitor_poll_wd_once(d_acc, 1);
+
+				result = rmonitor_collate_minimonitor(start_time, itable_size(processes), total_processes, p_acc, m_acc, d_acc);
+			}
+			break;
+	}
+
+	return result;
 }
 
 /* vim: set noexpandtab tabstop=4: */
