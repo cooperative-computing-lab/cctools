@@ -34,6 +34,5 @@ install: all
 	chmod 755 resource_monitor.py
 	cp resource_monitor.py $(TARGETS) $(CCTOOLS_PYTHON_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp rmonitor_allocations_example.py $(CCTOOLS_INSTALL_DIR)/doc/
 
 
