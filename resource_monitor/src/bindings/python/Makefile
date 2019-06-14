@@ -1,5 +1,5 @@
-include ../../../config.mk
-include ../../../rules.mk
+include ../../../../config.mk
+include $(CCTOOLS_HOME)/rules.mk
 
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
@@ -7,9 +7,9 @@ CCTOOLS_DYNAMIC_SUFFIX = so
 LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON_CCFLAGS)
 LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS)
 
-EXTERNAL_DEPENDENCIES = ../../../dttools/src/libdttools.a
-RMPYTHONSO = _cResourceMonitor.$(CCTOOLS_DYNAMIC_SUFFIX)
-LIBRARIES = $(RMPYTHONSO) cResourceMonitor.py
+EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/dttools/src/libdttools.a
+RMPYTHONSO = _resource_monitor.$(CCTOOLS_DYNAMIC_SUFFIX)
+LIBRARIES = $(RMPYTHONSO) resource_monitor.py
 OBJECTS = rmonitor_wrap.o
 TARGETS = $(LIBRARIES)
 
@@ -17,10 +17,10 @@ all: $(TARGETS)
 
 # The odd symlink in the following rule is necessary to overcome a problem
 # in the framework search path emitted by the Python configuration on macOS.
-rmonitor_wrap.c cResourceMonitor.py: rmonitor.i
+rmonitor_wrap.c resource_monitor.py: rmonitor.i
 	@echo "SWIG rmonitor.i (python)"
-	@$(CCTOOLS_SWIG) -o rmonitor_wrap.c -python -I../../../dttools/src/ rmonitor.i
-	ln -sf /System/Library/Frameworks/Python.framework .
+	@$(CCTOOLS_SWIG) -o rmonitor_wrap.c -python -I$(CCTOOLS_HOME)/dttools/src/ rmonitor.i
+	@cat resource_monitor.bindings.py >> resource_monitor.py
 
 $(RMPYTHONSO): rmonitor_wrap.o $(EXTERNAL_DEPENDENCIES)
 
@@ -31,8 +31,8 @@ test:
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON_PATH)
-	chmod 755 ResourceMonitor.py
-	cp ResourceMonitor.py $(TARGETS) $(CCTOOLS_PYTHON_PATH)/
+	chmod 755 resource_monitor.py
+	cp resource_monitor.py $(TARGETS) $(CCTOOLS_PYTHON_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	cp rmonitor_allocations_example.py $(CCTOOLS_INSTALL_DIR)/doc/
 

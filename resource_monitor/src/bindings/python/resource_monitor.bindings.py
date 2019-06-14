@@ -14,16 +14,183 @@
 #
 # - @ref ResourceMonitor::Category
 
-from cResourceMonitor import *
-
+import functools
+import fcntl
 import math
-
+import multiprocessing
+import os
+import signal
+import struct
+import tempfile
+import threading
+import time
 
 def set_debug_flag(*flags):
     for flag in flags:
         cctools_debug_flags_set(flag)
 
-cctools_debug_config('ResourceMonitorPython')
+cctools_debug_config('resource_monitor')
+
+
+# decorator to monitor functions.
+def monitored(limits = None, callback = None):
+    def monitored_inner(func):
+        return functools.partial(monitor_function, limits, callback, func)
+    return monitored_inner
+
+# if x = function(*args, **kwargs), returns a function mfun  (x, r) = mfun(*args, **kwargs)
+# where x is the orignal results, and r is the maximum resources consumed.
+def make_monitored(function, limits = None, callback = None):
+    return functools.partial(monitor_function, limits, callback, function)
+
+def measure_update_to_peak(pid, old_summary = None):
+    new_summary = rmonitor_measure_process(pid)
+
+    if old_summary is None:
+        return new_summary
+    else:
+        rmsummary_merge_max(old_summary, new_summary)
+        return old_summary
+
+def __child_handler(child_finished, signum, frame):
+    child_finished.set()
+
+def __wrap_function(results, fun, args, kwargs):
+    def fun_wrapper():
+        try:
+            import os
+            import time
+            pid = os.getpid()
+            rm = measure_update_to_peak(pid)
+            start = time.time()
+            result = fun(*args, **kwargs)
+            measure_update_to_peak(pid, rm)
+            setattr(rm, 'wall_time', int((time.time() - start)*1e6))
+            results.put((result, rm))
+        except Exception as e:
+            results.put((e, None))
+    cctools_debug(D_RMON, "function wrapper created")
+    return fun_wrapper
+
+def __read_pids_file(pids_file):
+    fcntl.flock(pids_file, fcntl.LOCK_EX)
+    line = bytearray(pids_file.read())
+    fcntl.flock(pids_file, fcntl.LOCK_UN)
+
+    n = len(line)/4
+    if n > 0:
+        ns = struct.unpack('!' + 'i' * int(n), line)
+        for pid in ns:
+            if pid > 0:
+                rmonitor_minimonitor(MINIMONITOR_ADD_PID, pid)
+            else:
+                rmonitor_minimonitor(MINIMONITOR_REMOVE_PID, -pid)
+
+def __watchman(results_queue, limits, callback, function, args, kwargs):
+    try:
+        # child_finished is set when the process running function exits
+        child_finished = threading.Event()
+        old_handler = signal.signal(signal.SIGCHLD, functools.partial(__child_handler, child_finished))
+
+        # result of function is eventually push into local_results
+        local_results = multiprocessing.Queue()
+
+        # process that runs the original function
+        fun_proc = multiprocessing.Process(target=__wrap_function(local_results, function, args, kwargs))
+
+        # convert limits to the structure the minimonitor accepts
+        if limits:
+            limits = rmsummary.from_dict(limits)
+
+        # pids of processes created by fun_proc (if any) are written to pids_file
+        pids_file = tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', buffering=0)
+        os.environ['CCTOOLS_RESOURCE_MONITOR_PIDS_FILE']=pids_file.name
+
+        cctools_debug(D_RMON, "starting function process")
+        fun_proc.start()
+
+        rmonitor_minimonitor(MINIMONITOR_ADD_PID, fun_proc.pid)
+
+        # resources_now keeps instantaneous measurements, resources_max keeps the maximum seen
+        resources_now = rmonitor_minimonitor(MINIMONITOR_MEASURE, 0)
+        resources_max = rmsummary_copy(resources_now)
+
+        try:
+            while not child_finished.is_set():
+                # register/deregister new processes
+                __read_pids_file(pids_file)
+
+                resources_now = rmonitor_minimonitor(MINIMONITOR_MEASURE, 0)
+                rmsummary_merge_max(resources_max, resources_now)
+
+                rmsummary_check_limits(resources_max, limits);
+                if resources_max.limits_exceeded is not None:
+                    child_finished.set()
+                else:
+                    if callback:
+                        callback(resources=resources_now.to_dict(), finished=False, resource_exhaustion=False)
+                child_finished.wait(timeout = 1)
+        except Exception as e:
+            fun_proc.terminate()
+            fun_proc.join()
+            raise e
+
+        if resources_max.limits_exceeded is not None:
+            fun_proc.terminate()
+            fun_proc.join()
+            results_queue.put({ 'result': None, 'resources': resources_max, 'resource_exhaustion': True})
+        else:
+            fun_proc.join()
+            (fun_result, resources_measured_end) = local_results.get(True, 5)
+            if resources_measured_end is None:
+                raise fun_result
+
+            rmsummary_merge_max(resources_max, resources_measured_end)
+            results_queue.put({ 'result': fun_result, 'resources': resources_max, 'resource_exhaustion': False})
+
+        if callback:
+            callback(resources=resources_max.to_dict(), finished=True, resource_exhaustion=resources_max.limits_exceeded is not None)
+
+    except Exception as e:
+        cctools_debug(D_FATAL, "error executing function process: {}".format(e))
+        results_queue.put({'result': e, 'resources': None, 'resource_exhaustion': False})
+
+def monitor_function(limits, callback, function, *args, **kwargs):
+    result_queue = multiprocessing.Queue()
+
+    #__watchman(result_queue, limits, callback, function, args, kwargs)
+    #sys
+
+    watchman_proc = multiprocessing.Process(target=__watchman, args=(result_queue, limits, callback, function, args, kwargs))
+    watchman_proc.start()
+    watchman_proc.join()
+
+    results = result_queue.get(True, 5)
+
+    if not results['resources']:
+        raise results['result']
+    else:
+        results['resources'] = results['resources'].to_dict()
+
+    if results['resource_exhaustion']:
+        raise ResourceExhaustion(results['resources'], function, args, kwargs)
+
+    return (results['result'], results['resources'])
+
+
+class ResourceExhaustion(Exception):
+    def __init__(self, resources, function, args = None, kwargs = None):
+        self.resources = resources
+        self.function  = function
+        self.args      = args
+        self.kwargs    = kwargs
+
+    def __str__(self):
+        r = self.resources
+        l = r['limits_exceeded']
+        ls = ["{}: {}".format(k, l[k]) for k in l.keys() if (l[k] > -1 and l[k] < r[k])]
+
+        return 'Limits broken: {}'.format(','.join(ls))
 
 ##
 # Class to encapsule all the categories in a workflow.
@@ -46,22 +213,16 @@ class Categories:
         category_tune_bucket_size('category-steady-n-tasks', -1)
 
     ##
-    # Returns a lists of the category categorys.  List sorted lexicographicaly,
+    # Returns a lists of the category categories.  List sorted lexicographicaly,
     # with the exception of @ref self.all_categories_name, which it is always
     # the last entry.
     # @param self                Reference to the current object.
     def category_names(self):
-        categorys = self.categories.keys()
-        categorys.sort( self._cmp_names )
-        return categorys
-
-    def _cmp_names(self, a, b):
-        # like cmp, but send all_categories_name to the last position
-        if a == self.all_categories_name:
-            return  1
-        if b == self.all_categories_name:
-            return -1
-        return cmp(a, b)
+        categories = self.categories.keys()
+        categories.sort()
+        categories.remove(self.all_categories_name)
+        categories.append(self.all_categories_name)
+        return categories
 
     ##
     # Compute and return the first allocations for the given category.
@@ -215,8 +376,8 @@ class Category:
             raise ValueError('No such mode')
 
     def accumulate_summary(self, summary):
-        r = self._dict_to_rmsummary(summary)
-        self.summaries.append(self._rmsummary_to_dict(r))
+        r = rmsummary.from_dict(summary)
+        self.summaries.append(dict(summary))
         category_accumulate_summary(self._cat, r, None)
 
     def retries(self, field, allocation):
@@ -281,54 +442,8 @@ class Category:
             return self.maximum_seen()
         else:
             category_update_first_allocation(self._cat, None)
-            return self._rmsummary_to_dict(self._cat.first_allocation)
+            return resource_monitor.to_dict(self._cat.first_allocation)
 
     def maximum_seen(self):
-        return self._rmsummary_to_dict(self._cat.max_resources_seen)
-
-    def _dict_to_rmsummary(self, pairs):
-        rm = rmsummary_create(-1)
-        for k, v in pairs.iteritems():
-            if k in ['category', 'command', 'taskid']:
-                pass                          # keep it as string
-            elif k in ['start', 'end', 'wall_time', 'cpu_time', 'bandwidth', 'bytes_read', 'bytes_written', 'bytes_sent', 'bytes_received']:
-                v = int(float(v) * 1000000)             # to s->miliseconds, Mb->bytes, Mbs->bps
-            elif k in ['cores_avg']:
-                pass                                    # not yet implemented
-            else:
-                v = int(math.ceil(float(v)))  # to int
-            setattr(rm, k, v)
-        return rm
-
-    def _rmsummary_to_dict(self, rm):
-        if not rm:
-            return None
-
-        d = {}
-
-        for k in ['category', 'command', 'taskid', 'exit_type']:
-            v = getattr(rm, k)
-            if v:
-                d[k] = v
-
-        for k in ['signal', 'exit_status', 'last_error']:
-            v = getattr(rm, k)
-            if v != 0:
-                d[k] = v
-
-        for k in ['total_processes', 'max_concurrent_processes',
-                'virtual_memory', 'memory', 'swap_memory', 
-                'disk', 'total_files',
-                'cores', 'gpus']:
-            v = getattr(rm, k)
-            if v > -1:
-                d[k] = v
-
-        for  k in ['start', 'end', 'cpu_time', 'wall_time',
-                'bandwidth', 'bytes_read', 'bytes_written', 'bytes_received', 'bytes_sent']:
-            v = getattr(rm, k)
-            if v > -1:
-                d[k] = v/1000000.0         # to s, Mbs, MB.
-
-        return d
+        return resource_monitor.to_dict(self._cat.max_resources_seen)
 

@@ -1600,6 +1600,7 @@ fi
 
 swig_workqueue_bindings=""
 swig_chirp_bindings=""
+swig_rmonitor_bindings=""
 if [ "$found_swig" != no ]
 then
 	for binding in $swig_bindings
@@ -1612,6 +1613,11 @@ then
 		if [ -d chirp/src/bindings/${binding} ]
 		then
 			swig_chirp_bindings="$binding $swig_chirp_bindings"
+		fi
+
+		if [ -d resource_monitor/src/bindings/${binding} ]
+		then
+			swig_rmonitor_bindings="$binding $swig_rmonitor_bindings"
 		fi
 	done
 fi
@@ -1675,6 +1681,7 @@ CCTOOLS_CHIRP=${include_package_chirp}
 CCTOOLS_SWIG=${swig}
 CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
 CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
+CCTOOLS_SWIG_RMONITOR_BINDINGS=${swig_rmonitor_bindings}
 
 CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
@@ -1694,7 +1701,7 @@ CCTOOLS_PYTHON2_VERSION=${python_major_version}.${python_minor_version}
 CCTOOLS_PYTHON2_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON2_VERSION)/site-packages
 
 CCTOOLS_PYTHON3=${python3}
-CCTOOLS_PYTHON3_CCFLAGS=${python3_ccflags}
+CCTOOLS_PYTHON3_CCFLAGS=-DNDEBUG ${python3_ccflags}
 CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
 CCTOOLS_PYTHON3_VERSION=${python3_major_version}.${python3_minor_version}
 CCTOOLS_PYTHON3_2TO3=${python3_2to3}
