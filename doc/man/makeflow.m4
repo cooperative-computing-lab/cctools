@@ -58,8 +58,9 @@ OPTION_ITEM(`--send-environment')Send all local environment variables in remote 
 OPTION_PAIR(--wait-for-files-upto, #)Wait for output files to be created upto this many seconds (e.g., to deal with NFS semantics).
 OPTION_TRIPLET(-S, submission-timeout, timeout)Time to retry failed batch job submission. (default is 3600s)
 OPTION_TRIPLET(-T, batch-type, type)Batch system type: local, dryrun, condor, sge, pbs, torque, blue_waters, slurm, moab, cluster, wq, amazon, mesos. (default is local)
-OPTION_PAIR(--safe-submit-spec, #)Excludes resources at submission (SLURM, TORQUE, and PBS)
-OPTION_PAIR(--ignore-memory-spec, #)Excludes memory at submission (SLURM)
+OPTION_ITEM(`--safe-submit-mode')Excludes resources at submission. (SLURM, TORQUE, and PBS)
+OPTION_ITEM(`--ignore-memory-spec')Excludes memory at submission. (SLURM)
+OPTION_ITEM(`--verbose-jobnames')Set the job name based on the command.
 OPTIONS_END
 
 SUBSECTION(JSON/JX Options)

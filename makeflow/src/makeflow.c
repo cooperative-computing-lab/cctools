@@ -94,6 +94,8 @@ an example.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
+extern int batch_job_verbose_jobnames;
+
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 1; // Makeflow fails by default. This is changed at dag start to indicate correct start.
 static int makeflow_submit_timeout = 3600;
@@ -1101,7 +1103,9 @@ static void show_help_run(const char *cmd)
 	printf("    --local-cores=#             Max number of local cores to use.\n");
 	printf("    --local-memory=#            Max amount of local memory (MB) to use.\n");
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
-	printf("    --safe-submit-mode          Excludes resources at submission.(SLURM, TORQUE)\n");
+	printf("    --safe-submit-mode          Excludes resources at submission.\n");
+	printf("                                  (SLURM, TORQUE, and PBS)\n");
+	printf("    --verbose-jobnames          Set the job name based on the command.\n");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --batch-mem-type            Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
@@ -1309,6 +1313,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
+		LONG_OPT_VERBOSE_JOBNAMES,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1418,6 +1423,7 @@ int main(int argc, char *argv[])
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
+		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{0, 0, 0, 0}
 	};
 
@@ -1885,6 +1891,9 @@ int main(int argc, char *argv[])
 				jx_delete(j);
 				break;
 			}
+			case LONG_OPT_VERBOSE_JOBNAMES:
+				batch_job_verbose_jobnames = 1;
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
