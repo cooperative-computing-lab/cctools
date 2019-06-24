@@ -472,6 +472,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_disk);
 	buffer_printf(&B, " %d", s.capacity_instantaneous);
 	buffer_printf(&B, " %d", s.capacity_weighted);
+	buffer_printf(&B, " %f", s.master_load);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -2292,6 +2293,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
+	jx_insert_integer(j,"master_load",info.master_load);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -2380,6 +2382,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
+	jx_insert_double(j,"master_load",info.master_load);
 
 	//resources information the factory needs
 	struct rmsummary *total = total_resources_needed(q);
@@ -3341,6 +3344,21 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
 	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
 	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
+}
+
+void compute_master_load(struct work_queue *q, int task_activity) {
+
+	double alpha = 0.05;
+
+	double load = q->stats->master_load;
+
+	if(task_activity) {
+		load = load * (1 - alpha) + 1 * alpha;
+	} else {
+		load = load * (1 - alpha) + 0 * alpha;
+	}
+
+	q->stats->master_load = load;
 }
 
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
@@ -5827,8 +5845,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-
-
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
 				q->stats->tasks_failed++;
@@ -5841,7 +5857,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			END_ACCUM_TIME(q, time_internal);
 			break;
 		}
-
 
 		 // update catalog if appropriate
 		if(q->name) {
@@ -5862,6 +5877,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// returning and retrieving tasks.
 		}
 
+
 		q->busy_waiting_flag = 0;
 
 		// tasks waiting to be retrieved?
@@ -5871,6 +5887,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// retrieved at least one task
 			events++;
+			compute_master_load(q, 1);
 			continue;
 		}
 
@@ -5881,8 +5898,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// expired at least one task
 			events++;
+			compute_master_load(q, 1);
 			continue;
 		}
+
+		// record that there was not task activity for this iteration
+		compute_master_load(q, 0);
 
 		// tasks waiting to be dispatched?
 		BEGIN_ACCUM_TIME(q, time_send);
@@ -5893,6 +5914,9 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			events++;
 			continue;
 		}
+
+		//we reach here only if no task was neither sent nor received. 
+		compute_master_load(q, 1);
 
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
@@ -6468,7 +6492,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighte master_load"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
