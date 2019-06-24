@@ -73,6 +73,7 @@ OPTION_ITEM(`--ignore-memory-spec')Excludes memory at submission. (SLURM)
 OPTION_PAIR(--batch-mem-type, type)Specify memory resource type. (SGE)
 OPTION_PAIR(--working-dir, dir|url)Working directory for batch system.
 OPTION_ITEM(`--sandbox')Run task in sandbox using bash script and task directory.
+OPTION_ITEM(`--verbose-jobnames')Set the job name based on the command.
 OPTIONS_END
 
 SUBSECTION(JSON/JX Options)
