@@ -434,16 +434,11 @@ struct jx * dag_node_to_jx( struct dag *d, struct dag_node *n, int send_all_loca
 {
 	struct jx *task = jx_object(0);
 
-	jx_insert(task, jx_string("command"), jx_string(n->command));
+	jx_insert(task, jx_string("resources"), rmsummary_to_json(dag_node_dynamic_label(n), 1));
+	jx_insert(task, jx_string("category"), jx_string(n->category->name));
+	jx_insert(task, jx_string("environment"), dag_node_env_create(d, n, send_all_local_env));
 
 	struct dag_file *f = NULL;
-
-	struct jx *inputs = jx_array(0);
-	list_first_item(n->source_files);
-	while((f = list_next_item(n->source_files))) {
-		jx_array_insert(inputs, dag_file_to_jx(f, n));
-	}
-	jx_insert(task, jx_string("inputs"), inputs);
 
 	struct jx *outputs = jx_array(0);
 	list_first_item(n->target_files);
@@ -452,9 +447,14 @@ struct jx * dag_node_to_jx( struct dag *d, struct dag_node *n, int send_all_loca
 	}
 	jx_insert(task, jx_string("outputs"), outputs);
 
-	jx_insert(task, jx_string("environment"), dag_node_env_create(d, n, send_all_local_env));
+	struct jx *inputs = jx_array(0);
+	list_first_item(n->source_files);
+	while((f = list_next_item(n->source_files))) {
+		jx_array_insert(inputs, dag_file_to_jx(f, n));
+	}
+	jx_insert(task, jx_string("inputs"), inputs);
 
-	jx_insert(task, jx_string("resources"), rmsummary_to_json(dag_node_dynamic_label(n), 1));
+	jx_insert(task, jx_string("command"), jx_string(n->command));
 
 	return task;
 }
