@@ -6492,7 +6492,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighte master_load"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted master_load"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
@@ -6503,9 +6503,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 		log_queue_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 		return 1;
-	}
-	else
-	{
+	} else {
 		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
 		return 0;
 	}
