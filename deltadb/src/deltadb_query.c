@@ -41,7 +41,7 @@ struct deltadb {
 	struct list * output_exprs;
 	struct list * reduce_exprs;
 	time_t display_every;
-	time_t last_display;
+	time_t display_next;
 	time_t deferred_time;
 };
 
@@ -372,9 +372,9 @@ int deltadb_time_event( struct deltadb *db, time_t starttime, time_t stoptime, t
 {
 	if(current>stoptime) return 0;
 
-	if(current < (db->last_display + db->display_every)) return 1;
+	if(current < (db->display_next)) return 1;
 
-	db->last_display = current;
+	db->display_next += db->display_every;
 
 	if(display_mode==MODE_STREAM) {
 		db->deferred_time = current;
@@ -671,6 +671,7 @@ int main( int argc, char *argv[] )
 	db->output_exprs = output_exprs;
 	db->reduce_exprs = reduce_exprs;
 	db->display_every = display_every;
+	db->display_next = start_time;
 
 	if(list_size(db->reduce_exprs) && list_size(db->output_exprs) ) {
 		struct deltadb_reduction *r = list_peek_head(db->reduce_exprs);
