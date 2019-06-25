@@ -761,6 +761,12 @@ const struct batch_queue_module batch_queue_mpi = {
 	 batch_fs_mpi_unlink,
 	 },
 };
+#else
+
+void batch_job_mpi_setup( int mpi_cores, int mpi_memory, const char *mpi_task_working_dir ) {
+  fatal("makeflow: mpi support is not enabled: please reconfigure using --with-mpicc-path");
+
+}
 
 #endif
 

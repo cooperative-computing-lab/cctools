@@ -233,11 +233,9 @@ const char *batch_queue_type_string();
 */
 int batch_queue_port(struct batch_queue *q);
 
-#ifdef CCTOOLS_WITH_MPI
 /* Hack: provide a backdoor to allow the MPI module to perform
    some initial setup before the MPI batch queue is created.
 */
 void batch_job_mpi_setup(int mpi_cores, int mpi_memory, const char *mpi_task_working_dir);
-#endif
 
 #endif

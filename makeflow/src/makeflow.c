@@ -1976,17 +1976,10 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
-#ifdef CCTOOLS_WITH_MPI
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
 		batch_job_mpi_setup(mpi_cores,mpi_memory,mpi_task_working_dir);
 	}
-#else
-	/* Silly step to silence compiler error for unused options. */
-	mpi_cores=0;
-	mpi_memory=0;
-	mpi_task_working_dir=0;
-#endif
 
 	if(!did_explicit_auth)
 		auth_register_all();
