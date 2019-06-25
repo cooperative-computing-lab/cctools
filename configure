@@ -135,7 +135,7 @@ config_curl_path=no
 config_cvmfs_path=no
 config_globus_path=no
 config_irods_path=no
-config_mpicc_path=no
+config_mpicc_path=auto
 config_openssl_path=no
 config_xrootd_path=no
 
@@ -231,7 +231,8 @@ do
 			irods_flavor=${arg}
 			;;
 		--with-mpicc-path)
-			config_mpicc_path=${arg}
+			mpicc_path=${arg}
+			config_mpicc_path=$(config_X_path ${arg})
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
@@ -826,36 +827,33 @@ else
 	echo "*** skipping ext2fs support"
 fi
 
-echon "using mpi..."
+echon "checking for mpicc..."
 if [ "$config_mpicc_path" != no ]
 then
 	if [ $config_mpicc_path = auto ]
 	then
-		$config_mpicc_path=$(which mpicc 2> /dev/null)
-	fi
-
-	if [ -d "$config_mpicc_path/bin" ]
-	then
-		mpicc="$config_mpicc_path/bin/mpicc"
-	elif [ -d "$config_mpicc_path" ]
-	then
-		mpicc="$config_mpicc_path/mpicc"
+		if which mpicc 2> /dev/null
+		then
+			mpicc_path=$(which mpicc)
+		else
+			echo "*** skipping mipcc support"
+		fi
 	else
-		mpicc="$config_mpicc_path"
+		if [ -x "$mpicc_path/bin/mpicc" ]
+		then
+			mpicc="$mpicc_path/bin/mpicc"
+			ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
+			ccompiler=${mpicc}
+			linker=${mpicc}
+			echo "mpicc: $mpicc"
+		else 
+			echo "*** Sorry, I couldn't find mpicc in $mpicc_path"
+			echo "*** Check --with-mpicc-path and try again."
+			exit 1
+		fi
 	fi
-
-	if [ ! -x "$mpicc" ]
-	then
-		echo "couldn't find mpicc. please provide the location of the mpicc executable with --with-mpicc-path"
-		exit 1
-	fi
-
-	echo "yes: ${mpicc}"
-	ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
-	ccompiler=${mpicc}
-	linker=${mpicc}
 else
-	echo "no"	
+	echo "no"
 fi
 
 ##########################################################################
