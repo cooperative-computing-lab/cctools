@@ -2070,7 +2070,6 @@ int main(int argc, char *argv[])
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 #ifdef CCTOOLS_WITH_MPI
 	//the code assumes sizeof(void*) == uint64_t
-	int need_mpi_finalize = 0;
 	if(batch_queue_type == BATCH_QUEUE_TYPE_MPI) {
 		MPI_Init(NULL, NULL);
 		int mpi_world_size;
@@ -2083,13 +2082,12 @@ int main(int argc, char *argv[])
 
 		fprintf(stderr, "%i:%s My pid is: %i\n", mpi_rank, procname, getpid());
 
-		if(mpi_rank == 0) {
-			if(debug_base_path != NULL) {
-				char *debug_path = string_format("%s.%i", debug_base_path, mpi_rank);
-				debug_config_file(debug_path);
-			}
-			need_mpi_finalize = 1;
+		if(debug_base_path != NULL) {
+			char *debug_path = string_format("%s.%i", debug_base_path, mpi_rank);
+			debug_config_file(debug_path);
+		}
 
+		if(mpi_rank == 0) {
 			makeflow_mpi_master_setup(mpi_world_size, mpi_cores, mpi_memory, mpi_task_working_dir);
 			int cores_total = load_average_get_cpus();
 			uint64_t memtotal;
@@ -2100,10 +2098,6 @@ int main(int argc, char *argv[])
 			explicit_local_memory = mem;
 
 		} else {
-			if(debug_base_path != NULL) {
-				char *debug_path = string_format("%s.%i", debug_base_path, mpi_rank);
-				debug_config_file(debug_path);
-			}
 			debug(D_BATCH, "%i:%s Starting mpi worker function\n", mpi_rank, procname);
 			int batch_job_worker_exit_code = batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
 			fprintf(stderr, "%i:%s exited with code: %i\n", mpi_rank, procname, batch_job_worker_exit_code);
