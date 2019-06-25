@@ -2565,13 +2565,6 @@ EXIT_WITH_FAILURE:
 
 	makeflow_log_close(d);
         
-#if CCTOOLS_WITH_MPI
-        if(need_mpi_finalize ==1){
-            batch_job_mpi_kill_workers();
-            MPI_Finalize();
-        }
-#endif
-        
 	exit(exit_value);
         
 	return 0;

@@ -328,6 +328,12 @@ static int batch_queue_mpi_create(struct batch_queue *q) {
     return 0;
 }
 
+void batch_queue_mpi_free( struct batch_queue *q )
+{
+	batch_job_mpi_kill_workers();
+	MPI_Finalize();
+}
+
 static void mpi_worker_handle_signal(int sig){
     //do nothing, so that way we can kill the children and clean it up
 }
@@ -564,7 +570,7 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
     return 0;
 }
 
-batch_queue_stub_free(mpi);
+
 batch_queue_stub_port(mpi);
 batch_queue_stub_option_update(mpi);
 
