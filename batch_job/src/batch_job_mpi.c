@@ -347,10 +347,11 @@ static void batch_job_mpi_kill_workers()
 	}
 }
 
-static void batch_queue_mpi_free(struct batch_queue *q)
+static int batch_queue_mpi_free(struct batch_queue *q)
 {
 	batch_job_mpi_kill_workers();
 	MPI_Finalize();
+	return 0;
 }
 
 /*
