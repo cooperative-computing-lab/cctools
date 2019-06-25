@@ -17,10 +17,6 @@ See the file COPYING for details.
 #include "jx.h"
 #include "rmsummary.h"
 
-#ifdef CCTOOLS_WITH_MPI
-#include "hash_table.h"
-#endif
-
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
 including Condor, SGE, Work Queue, Xgrid, and local Unix processes.
@@ -238,27 +234,10 @@ const char *batch_queue_type_string();
 int batch_queue_port(struct batch_queue *q);
 
 #ifdef CCTOOLS_WITH_MPI
-/**
- * The worker function for those makeflow binaries which end up being workers for the master process
- * @param worldsize How many different processes are running
- * @param rank This process's rank in the process listing
- * @param procname This process's processor name
- * @param procnamelen the length of the processor's name
- * @return exit code
- */
-int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int procnamelen);
-/**
- * Gives the module the hashtables built by rank0 the hashtables of "procname-rank" and "procname-size". Should only be called by the rank 0 process
- * @param name_rank
- * @param name_size
- */
-void batch_job_mpi_set_ranks_sizes(struct hash_table* name_rank, struct hash_table* name_size);
-/**
- * Called by the Rank 0 process to kill the remaining workers.
- */
-void batch_job_mpi_kill_workers();
+/* Hack: provide a backdoor to allow the MPI module to perform
+   some initial setup before the MPI batch queue is created.
+*/
+void batch_job_mpi_setup(int mpi_cores, int mpi_memory, const char *mpi_task_working_dir);
 #endif
 
 #endif
-
-/* vim: set noexpandtab tabstop=4: */

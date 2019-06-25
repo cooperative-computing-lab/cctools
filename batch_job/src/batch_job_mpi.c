@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "host_memory_info.h"
 #include "int_sizes.h"
 #include "itable.h"
+#include "hash_table.h"
 #include "list.h"
 #include "timestamp.h"
 #include "xxmalloc.h"
@@ -309,7 +310,7 @@ static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid) {
     return 1;
 }
 
-void batch_job_mpi_kill_workers() {
+static void batch_job_mpi_kill_workers() {
     char* key;
     uint64_t* value;
     char* worker_cmd;
@@ -328,7 +329,7 @@ static int batch_queue_mpi_create(struct batch_queue *q) {
     return 0;
 }
 
-void batch_queue_mpi_free( struct batch_queue *q )
+static void batch_queue_mpi_free( struct batch_queue *q )
 {
 	batch_job_mpi_kill_workers();
 	MPI_Finalize();
@@ -338,7 +339,7 @@ static void mpi_worker_handle_signal(int sig){
     //do nothing, so that way we can kill the children and clean it up
 }
 
-int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int procnamelen) {
+static int batch_job_mpi_worker(int worldsize, int rank, char* procname, int procnamelen) {
 
     if (worldsize < 2) {
         debug(D_BATCH, "Soemthing went terribly wrong.....");
@@ -570,6 +571,128 @@ int batch_job_mpi_worker_function(int worldsize, int rank, char* procname, int p
     return 0;
 }
 
+/*
+Perform the setup unique to the master process, by exchanging
+information with each of the workers to determine their configuration.
+*/
+
+static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mpi_memory, const char *working_dir)
+{
+	struct hash_table *mpi_comps = hash_table_create(0, 0);
+	struct hash_table *mpi_sizes = hash_table_create(0, 0);
+
+	int i;
+
+	for(i = 1; i < mpi_world_size; i++) {
+		unsigned len = 0;
+		MPI_Recv(&len, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		char *str = malloc(sizeof(char *) * len + 1);
+		memset(str, '\0', sizeof(char) * len + 1);
+		MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+		struct jx *recobj = jx_parse_string(str);
+		char *name = (char *) jx_lookup_string(recobj, "name");
+
+		uint64_t *rank = malloc(sizeof(uint64_t) * 1);
+		*rank = jx_lookup_integer(recobj, "rank");
+
+		//fprintf(stderr,"RANK0: got back response: %i at %s\n",rank,name);
+
+		if(hash_table_lookup(mpi_comps, name) == NULL) {
+			hash_table_insert(mpi_comps, string_format("%s", name), rank);
+		}
+		//for partition sizing
+		if(hash_table_lookup(mpi_sizes, name) == NULL) {
+			uint64_t *val = malloc(sizeof(uint64_t) * 1);
+			*val = 1;
+			hash_table_insert(mpi_sizes, name, (void *) val);
+		} else {
+			uint64_t *val = (uint64_t *) hash_table_lookup(mpi_sizes, name);
+			*val += 1;
+			hash_table_remove(mpi_sizes, name);
+			hash_table_insert(mpi_sizes, name, (void *) (val));
+
+		}
+
+		jx_delete(recobj);
+		free(str);
+
+	}
+	for(i = 1; i < mpi_world_size; i++) {
+		hash_table_firstkey(mpi_comps);
+		char *key;
+		uint64_t *value;
+		int sent = 0;
+		while(hash_table_nextkey(mpi_comps, &key, (void **) &value)) {
+			uint64_t ui = i;
+			if(*value == ui) {
+				int cores = mpi_cores != 0 ? mpi_cores : (int) *((uint64_t *) hash_table_lookup(mpi_sizes, key));
+				//fprintf(stderr,"%lli has %i cores!\n", value, cores);
+				struct jx *livemsgjx = jx_object(NULL);
+				jx_insert_integer(livemsgjx, "LIVE", cores);
+				if(mpi_memory > 0) {
+					jx_insert_integer(livemsgjx, "MEM", mpi_memory);
+				}
+				if(working_dir != NULL) {
+					jx_insert_string(livemsgjx, "WORK_DIR", working_dir);
+				}
+				char *livemsg = jx_print_string(livemsgjx);
+				unsigned livemsgsize = strlen(livemsg);
+				//fprintf(stderr,"Lifemsg for %lli has been created, now sending\n",value);
+				MPI_Send(&livemsgsize, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD);
+				MPI_Send(livemsg, livemsgsize, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
+				sent = 1;
+				//fprintf(stderr,"Lifemsg for %lli was successfully delivered\n",value);
+				free(livemsg);
+				jx_delete(livemsgjx);
+			}
+		}
+		if(sent == 0) {
+			char *livemsg = string_format("{\"DIE\":1}");
+			unsigned livemsgsize = strlen(livemsg);
+			MPI_Send(&livemsgsize, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+			MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
+			free(livemsg);
+		}
+		debug(D_BATCH, "Msg for %i has been delivered\n", i);
+	}
+	debug(D_BATCH, "Msgs have all been sent\n");
+
+	//now we have the proper iprocesses there with correct num of cores
+	batch_job_mpi_set_ranks_sizes(mpi_comps, mpi_sizes);
+}
+
+/*
+Common initialization for both master and workers.
+Determine the rank and then (if master) initalize and return,
+or (if worker) continue on to the worker code.
+*/
+
+void batch_job_mpi_setup(int mpi_cores, int mpi_memory, const char *mpi_task_working_dir)
+{
+	int mpi_world_size;
+	int mpi_rank;
+	char procname[MPI_MAX_PROCESSOR_NAME];
+	int procnamelen;
+
+	printf("setting up MPI...\n");
+
+	MPI_Init(NULL, NULL);
+	MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+	MPI_Get_processor_name(procname, &procnamelen);
+
+	debug(D_MPI, "%i:%s My pid is: %i\n", mpi_rank, procname, getpid());
+
+	if(mpi_rank == 0) {
+		printf("MPI master process ready.\n");
+		batch_job_mpi_master_setup(mpi_world_size, mpi_cores, mpi_memory, mpi_task_working_dir);
+	} else {
+		printf("MPI worker process ready.\n");
+		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname, procnamelen);
+		exit(r);
+	}
+}
 
 batch_queue_stub_port(mpi);
 batch_queue_stub_option_update(mpi);
