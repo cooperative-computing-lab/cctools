@@ -12,7 +12,9 @@
 	#include "rmsummary.h"
 %}
 
-%typemap(in) off_t = int;
+/* We compile with -D__LARGE64_FILES, thus off_t is at least 64bit.
+long long int is guaranteed to be at least 64bit. */
+%typemap(in) off_t = long long int;
 
 /* vdebug() takes va_list as arg but SWIG can't wrap such functions. */
 %ignore vdebug;
