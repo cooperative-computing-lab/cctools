@@ -1432,8 +1432,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
 		LONG_OPT_MPI_CORES,
-		LONG_OPT_MPI_MEM,
-		LONG_OPT_MPI_WORKDIR,
+		LONG_OPT_MPI_MEMORY,
+		LONG_OPT_MPI_TASK_WORKING_DIR,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1550,8 +1550,8 @@ int main(int argc, char *argv[])
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
-		{"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_WORKDIR},
+		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
+		{"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_TASK_WORKING_DIR},
 		{0, 0, 0, 0}
 	};
 
@@ -2055,10 +2055,10 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MPI_CORES:
 				mpi_cores = atoi(optarg);
 				break;
-			case LONG_OPT_MPI_MEM:
+			case LONG_OPT_MPI_MEMORY:
 				mpi_memory = atoi(optarg);
 				break;
-			case LONG_OPT_MPI_WORKDIR:
+			case LONG_OPT_MPI_TASK_WORKING_DIR:
 				mpi_task_working_dir = xxstrdup(optarg);
 				break;
 			default:
