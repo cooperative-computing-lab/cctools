@@ -2,7 +2,18 @@
 Copyright (C) 2018- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
- */
+*/
+
+/*
+Implementation of master-worker batch job executor in MPI,
+built by Kyle Sweeney to adapt Makeflow to MPI-only clusters.
+
+This code needs some work:
+- A common pattern is that a JSON object is serialized as a string,
+the length is sent, then the string is sent, where it is deserialized
+on the other side.  This happens very frequently, and should be
+factored out into two compact functions that send and receive JSON via MPI.
+*/
 
 #include "batch_job.h"
 #include "batch_job_internal.h"
@@ -253,6 +264,7 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	//See if we have a msg waiting for us using MPI_Iprobe
 	if(!hash_table_nextkey(name_rank, &key, (void **) &value))
 		hash_table_firstkey(name_rank);
+
 	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
 		MPI_Status mstatus;
 		int flag;
@@ -295,18 +307,12 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 			return job_id;
 
 		}
-
-
-
 	}
 	return -1;
-
-
 }
 
 static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid)
 {
-
 	char *worker_cmd = string_format("{\"Orders\":\"Cancel\", \"ID\":\"%li\"}", jobid);
 	char *key;
 	uint64_t *value;
@@ -318,6 +324,12 @@ static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid)
 		free(worker_cmd);
 	}
 	return 1;
+}
+
+static int batch_queue_mpi_create(struct batch_queue *q)
+{
+	batch_queue_set_feature(q, "mpi_job_queue", NULL);
+	return 0;
 }
 
 static void batch_job_mpi_kill_workers()
@@ -335,17 +347,15 @@ static void batch_job_mpi_kill_workers()
 	}
 }
 
-static int batch_queue_mpi_create(struct batch_queue *q)
-{
-	batch_queue_set_feature(q, "mpi_job_queue", NULL);
-	return 0;
-}
-
 static void batch_queue_mpi_free(struct batch_queue *q)
 {
 	batch_job_mpi_kill_workers();
 	MPI_Finalize();
 }
+
+/*
+Main loop for dedicated worker communicating with master.
+*/
 
 static void mpi_worker_handle_signal(int sig)
 {
