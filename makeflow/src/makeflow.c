@@ -1078,10 +1078,10 @@ static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores, int mpi
 		while(hash_table_nextkey(mpi_comps, &key, (void **) &value)) {
 			uint64_t ui = i;
 			if(*value == ui) {
-				int mpi_cores = mpi_cores != 0 ? mpi_cores : (int) *((uint64_t *) hash_table_lookup(mpi_sizes, key));
-				//fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
+				int cores = mpi_cores != 0 ? mpi_cores : (int) *((uint64_t *) hash_table_lookup(mpi_sizes, key));
+				//fprintf(stderr,"%lli has %i cores!\n", value, cores);
 				struct jx *livemsgjx = jx_object(NULL);
-				jx_insert_integer(livemsgjx, "LIVE", mpi_cores);
+				jx_insert_integer(livemsgjx, "LIVE", cores);
 				if(mpi_memory > 0) {
 					jx_insert_integer(livemsgjx, "MEM", mpi_memory);
 				}
