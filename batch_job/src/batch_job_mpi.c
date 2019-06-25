@@ -13,6 +13,11 @@ This code needs some work:
 the length is sent, then the string is sent, where it is deserialized
 on the other side.  This happens very frequently, and should be
 factored out into two compact functions that send and receive JSON via MPI.
+
+- There are too many redundant data structures.  It would be more
+straightforward to just have an array of structures that describe
+the details of the known workers.
+
 */
 
 #include "batch_job.h"
@@ -107,7 +112,7 @@ static unsigned int gen_guid()
 	return guid.ul;
 }
 
-void batch_job_mpi_set_ranks_sizes(struct hash_table *nr, struct hash_table *ns)
+static void batch_job_mpi_set_ranks_sizes(struct hash_table *nr, struct hash_table *ns)
 {
 	name_rank = nr;
 	name_size = ns;
@@ -709,7 +714,7 @@ void batch_job_mpi_setup(int mpi_cores, int mpi_memory, const char *mpi_task_wor
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	MPI_Get_processor_name(procname, &procnamelen);
 
-	debug(D_MPI, "%i:%s My pid is: %i\n", mpi_rank, procname, getpid());
+	debug(D_BATCH, "%i:%s My pid is: %i\n", mpi_rank, procname, getpid());
 
 	if(mpi_rank == 0) {
 		printf("MPI master process ready.\n");
