@@ -1026,7 +1026,7 @@ static void handle_abort(int sig)
 
 }
 #ifdef CCTOOLS_WITH_MPI
-static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores_per, int mpi_mem_per, char* working_dir){
+static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores, int mpi_memory, char* working_dir){
     struct hash_table* mpi_comps = hash_table_create(0, 0);
                 struct hash_table* mpi_sizes = hash_table_create(0, 0);
 
@@ -1073,12 +1073,12 @@ static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores_per, int
                     while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
                         uint64_t ui = i;
                         if (*value == ui) {
-                            int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (int)*((uint64_t*)hash_table_lookup(mpi_sizes,key));
+                            int mpi_cores = mpi_cores != 0 ? mpi_cores : (int)*((uint64_t*)hash_table_lookup(mpi_sizes,key));
                             //fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
                             struct jx* livemsgjx = jx_object(NULL);
                             jx_insert_integer(livemsgjx,"LIVE",mpi_cores);
-                            if(mpi_mem_per > 0){
-                                jx_insert_integer(livemsgjx,"MEM",mpi_mem_per);
+                            if(mpi_memory > 0){
+                                jx_insert_integer(livemsgjx,"MEM",mpi_memory);
                             }
                             if(working_dir != NULL){
                                 jx_insert_string(livemsgjx,"WORK_DIR",working_dir);
@@ -1318,10 +1318,10 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
 #ifdef CCTOOLS_WITH_MPI
-        int mpi_cores_per = 0;
-        int mpi_mem_per = 0;
+        int mpi_cores = 0;
+        int mpi_memory = 0;
         char* debug_base_path = NULL;
-        char* mpi_working_dir = NULL;
+        char* mpi_task_working_dir = NULL;
 #endif
 
 	random_init();
@@ -2062,13 +2062,13 @@ int main(int argc, char *argv[])
 				break;
 #ifdef CCTOOLS_WITH_MPI
             case LONG_OPT_MPI_CORES:
-                mpi_cores_per = atoi(optarg);
+                mpi_cores = atoi(optarg);
                 break;
             case LONG_OPT_MPI_MEM:
-                mpi_mem_per = atoi(optarg);
+                mpi_memory = atoi(optarg);
                 break;
             case LONG_OPT_MPI_WORKDIR:
-                mpi_working_dir = xxstrdup(optarg);
+                mpi_task_working_dir = xxstrdup(optarg);
                 break;
 #endif
 			default:
@@ -2100,7 +2100,7 @@ int main(int argc, char *argv[])
 			}
 			need_mpi_finalize = 1;
 
-			makeflow_mpi_master_setup(mpi_world_size, mpi_cores_per, mpi_mem_per, mpi_working_dir);
+			makeflow_mpi_master_setup(mpi_world_size, mpi_cores, mpi_memory, mpi_task_working_dir);
 			int cores_total = load_average_get_cpus();
 			uint64_t memtotal;
 			uint64_t memavail;
