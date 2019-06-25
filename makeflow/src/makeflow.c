@@ -1317,12 +1317,12 @@ int main(int argc, char *argv[])
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
-#ifdef CCTOOLS_WITH_MPI
+
         int mpi_cores = 0;
         int mpi_memory = 0;
+	// XXX need to fix up base path with debug file
         char* debug_base_path = NULL;
         char* mpi_task_working_dir = NULL;
-#endif
 
 	random_init();
 	debug_config(argv[0]);
@@ -1431,11 +1431,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
-#ifdef CCTOOLS_WITH_MPI
-                LONG_OPT_MPI_CORES,
-                LONG_OPT_MPI_MEM,
-                LONG_OPT_MPI_WORKDIR,
-#endif
+		LONG_OPT_MPI_CORES,
+		LONG_OPT_MPI_MEM,
+		LONG_OPT_MPI_WORKDIR,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1551,11 +1549,9 @@ int main(int argc, char *argv[])
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
-#ifdef CCTOOLS_WITH_MPI
-        {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-        {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
-        {"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_WORKDIR},
-#endif
+		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
+		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
+		{"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_WORKDIR},
 		{0, 0, 0, 0}
 	};
 
@@ -1727,11 +1723,7 @@ int main(int argc, char *argv[])
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
-#ifdef CCTOOLS_WITH_MPI
-                debug_base_path = xxstrdup(optarg);
-#else
 				debug_config_file(optarg);
-#endif
 				break;
 			case 'p':
 				port_set = 1;
@@ -2060,17 +2052,15 @@ int main(int argc, char *argv[])
 			case LONG_OPT_VERBOSE_JOBNAMES:
 				batch_job_verbose_jobnames = 1;
 				break;
-#ifdef CCTOOLS_WITH_MPI
-            case LONG_OPT_MPI_CORES:
-                mpi_cores = atoi(optarg);
-                break;
-            case LONG_OPT_MPI_MEM:
-                mpi_memory = atoi(optarg);
-                break;
-            case LONG_OPT_MPI_WORKDIR:
-                mpi_task_working_dir = xxstrdup(optarg);
-                break;
-#endif
+			case LONG_OPT_MPI_CORES:
+				mpi_cores = atoi(optarg);
+				break;
+			case LONG_OPT_MPI_MEM:
+				mpi_memory = atoi(optarg);
+				break;
+			case LONG_OPT_MPI_WORKDIR:
+				mpi_task_working_dir = xxstrdup(optarg);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
