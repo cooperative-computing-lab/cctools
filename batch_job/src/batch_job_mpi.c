@@ -8,16 +8,9 @@ See the file COPYING for details.
 Implementation of master-worker batch job executor in MPI,
 built by Kyle Sweeney to adapt Makeflow to MPI-only clusters.
 
-This code needs some work:
-- A common pattern is that a JSON object is serialized as a string,
-the length is sent, then the string is sent, where it is deserialized
-on the other side.  This happens very frequently, and should be
-factored out into two compact functions that send and receive JSON via MPI.
-
 - There are too many redundant data structures.  It would be more
 straightforward to just have an array of structures that describe
 the details of the known workers.
-
 */
 
 #include "batch_job.h"
@@ -270,10 +263,7 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		char *tmp = string_escape_shell(job->cmd);
 		char *env = job->env != NULL ? job->env : "";
 		char *worker_cmd = string_format("{\"Orders\":\"Execute\",\"CMD\":%s,\"ID\":%li,\"ENV\":%s,\"IN\":\"%s\",\"OUT\":\"%s\"}", tmp, job->id, env, job->infiles, job->outfiles);
-
-		len = strlen(worker_cmd);
-		MPI_Send(&len, 1, MPI_UNSIGNED, rank_fit, 0, MPI_COMM_WORLD);
-		MPI_Send(worker_cmd, len, MPI_CHAR, rank_fit, 0, MPI_COMM_WORLD);
+		mpi_send_string(rank_fit,worker_cmd);
 		debug(D_BATCH, "RANK0 Sent cmd object string to %i: %s\n", rank_fit, worker_cmd);
 		debug(D_BATCH, "Job %li submitted to worker", job->id);
 		list_remove(jobs, job);
@@ -294,11 +284,7 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		MPI_Iprobe(*value, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
 			fprintf(stderr, "RANK0 There is a job waiting to be returned from %lu:%s\n", *value, key);
-			MPI_Recv(&len, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			str = malloc(sizeof(char *) * len + 1);
-			memset(str, '\0', sizeof(char) * len + 1);
-			MPI_Recv(str, len, MPI_CHAR, *value, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			struct jx *recobj = jx_parse_string(str);
+			struct jx *recobj = mpi_recv_jx(*value);
 			struct batch_job_info *info = info_out;
 			memset(info, 0, sizeof(*info));
 			timestamp_t start = (timestamp_t) jx_lookup_integer(recobj, "START");
@@ -318,7 +304,6 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 			info->submitted = old_info->submitted;
 			itable_insert(q->job_table, jx_lookup_integer(recobj, "ID"), info);
 
-			free(str);
 			jx_delete(recobj);
 
 			struct batch_job_mpi_job *jobstruct = itable_lookup(rank_jobs, job_id);
@@ -341,11 +326,9 @@ static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid)
 	uint64_t *value;
 	hash_table_firstkey(name_rank);
 	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
-		unsigned len = strlen(worker_cmd);
-		MPI_Send(&len, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD);
-		MPI_Send(worker_cmd, len, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
-		free(worker_cmd);
+		mpi_send_string(*value,worker_cmd);
 	}
+	free(worker_cmd);
 	return 1;
 }
 
@@ -359,15 +342,12 @@ static void batch_job_mpi_kill_workers()
 {
 	char *key;
 	uint64_t *value;
-	char *worker_cmd;
+	char *worker_cmd = string_format("{\"Orders\":\"Terminate\"}");
 	hash_table_firstkey(name_rank);
 	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
-		worker_cmd = string_format("{\"Orders\":\"Terminate\"}");
-		unsigned len = strlen(worker_cmd);
-		MPI_Send(&len, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD);
-		MPI_Send(worker_cmd, len, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
-		free(worker_cmd);
+		mpi_send_string(*value,worker_cmd);
 	}
+	free(worker_cmd);
 }
 
 static int batch_queue_mpi_free(struct batch_queue *q)
@@ -399,21 +379,12 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 
 	//first, send name and rank to MPI master
 	char *sendstr = string_format("{\"name\":\"%s\",\"rank\":%i}", procname, rank);
-	unsigned len = strlen(sendstr);
-	MPI_Send(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
-	MPI_Send(sendstr, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+	mpi_send_string(0,sendstr);
 	free(sendstr);
 
 	debug(D_BATCH, "%i Sent original msg to Rank 0!\n", rank);
 
-	MPI_Recv(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	char *str = malloc(sizeof(char *) * len + 1);
-	memset(str, '\0', sizeof(char) * len + 1);
-	MPI_Recv(str, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-	debug(D_BATCH, "%i recieved the live/die string from rank 0: %s\n", rank, str);
-
-	struct jx *recobj = jx_parse_string(str);
+	struct jx *recobj = mpi_recv_jx(0);
 	int cores;
 	if((cores = (int) jx_lookup_integer(recobj, "LIVE")) == 0) {	//meaning we should die
 		debug(D_BATCH, "%i:%s Being told to die, so doing that\n", rank, procname);
@@ -433,7 +404,6 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 
 	//cleanup before main loop
 	jx_delete(recobj);
-	free(str);
 
 	while(1) {
 		//might want to check MPI_Probe
@@ -441,16 +411,9 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 		int flag;
 		MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
+			recobj = mpi_recv_jx(0);
 			debug(D_BATCH, "%i has orders msg from rank 0\n", rank);
-			MPI_Recv(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-			str = malloc(sizeof(char *) * len + 1);
-			memset(str, '\0', sizeof(char) * len + 1);
-			MPI_Recv(str, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-
 			debug(D_BATCH, "%i:%s parsing orders object\n", rank, procname);
-			recobj = jx_parse_string(str);
 
 			if(strstr(jx_lookup_string(recobj, "Orders"), "Terminate")) {
 				//terminating, meaning we're done!
@@ -489,12 +452,9 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 
 				memory = mem != 0 ? mem : memory;
 				sendstr = string_format("{\"cores\":%i,\"memory\":%i}", cores, memory);
-				len = strlen(sendstr);
-				MPI_Send(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
-				MPI_Send(sendstr, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+				mpi_send_string(0,sendstr);
 				free(sendstr);
 				debug(D_BATCH, "%i:%s Done sending resources to Rank0 \n", rank, procname);
-
 			}
 
 			if(strstr(jx_lookup_string(recobj, "Orders"), "Execute")) {
@@ -580,7 +540,6 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 				}
 			}
 			jx_delete(recobj);
-			free(str);
 		}
 		//before looping again, check for exit
 		int status;
@@ -605,13 +564,9 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 		timestamp_t start = *((timestamp_t *) itable_lookup(starts, i));
 		debug(D_BATCH, "%i:%s Child process %i matching job %i has been found and processes, sending RANK0 the results\n", rank, procname, i, k);
 		char *tmp = string_format("{\"ID\":%i,\"START\":%lu,\"END\":%lu,\"NORMAL\":%i,\"STATUS\":%i,\"SIGNAL\":%i}", k, start, end, jobinfo->exited_normally, jobinfo->exit_code, jobinfo->exit_signal);
-		len = strlen(tmp);
-		unsigned *len1 = malloc(sizeof(unsigned));
-		*len1 = len;
-		MPI_Send(len1, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
-		MPI_Send(tmp, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
+		mpi_send_string(0,tmp);
+		free(tmp);
 		debug(D_BATCH, "%i:%s Sent the result string, freeing memory and continuing loop\n", rank, procname);
-		//free(tmp);
 
 	}
 
@@ -634,19 +589,11 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mp
 	int i;
 
 	for(i = 1; i < mpi_world_size; i++) {
-		unsigned len = 0;
-		MPI_Recv(&len, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		char *str = malloc(sizeof(char *) * len + 1);
-		memset(str, '\0', sizeof(char) * len + 1);
-		MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-		struct jx *recobj = jx_parse_string(str);
+		struct jx *recobj = mpi_recv_jx(i);
 		char *name = (char *) jx_lookup_string(recobj, "name");
 
 		uint64_t *rank = malloc(sizeof(uint64_t) * 1);
 		*rank = jx_lookup_integer(recobj, "rank");
-
-		//fprintf(stderr,"RANK0: got back response: %i at %s\n",rank,name);
 
 		if(hash_table_lookup(mpi_comps, name) == NULL) {
 			hash_table_insert(mpi_comps, string_format("%s", name), rank);
@@ -665,9 +612,8 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mp
 		}
 
 		jx_delete(recobj);
-		free(str);
-
 	}
+
 	for(i = 1; i < mpi_world_size; i++) {
 		hash_table_firstkey(mpi_comps);
 		char *key;
@@ -686,23 +632,14 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mp
 				if(working_dir != NULL) {
 					jx_insert_string(livemsgjx, "WORK_DIR", working_dir);
 				}
-				char *livemsg = jx_print_string(livemsgjx);
-				unsigned livemsgsize = strlen(livemsg);
-				//fprintf(stderr,"Lifemsg for %lli has been created, now sending\n",value);
-				MPI_Send(&livemsgsize, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD);
-				MPI_Send(livemsg, livemsgsize, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
+
+				mpi_send_jx(*value,livemsgjx);
 				sent = 1;
-				//fprintf(stderr,"Lifemsg for %lli was successfully delivered\n",value);
-				free(livemsg);
 				jx_delete(livemsgjx);
 			}
 		}
 		if(sent == 0) {
-			char *livemsg = string_format("{\"DIE\":1}");
-			unsigned livemsgsize = strlen(livemsg);
-			MPI_Send(&livemsgsize, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
-			MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
-			free(livemsg);
+			mpi_send_string(i,"{\"DIE\":1}");
 		}
 		debug(D_BATCH, "Msg for %i has been delivered\n", i);
 	}
