@@ -4,15 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/*
-Implementation of master-worker batch job executor in MPI,
-built by Kyle Sweeney to adapt Makeflow to MPI-only clusters.
-
-- There are too many redundant data structures.  It would be more
-straightforward to just have an array of structures that describe
-the details of the known workers.
-*/
-
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
@@ -25,7 +16,6 @@ the details of the known workers.
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "load_average.h"
-#include <unistd.h>
 #include "host_memory_info.h"
 #include "int_sizes.h"
 #include "itable.h"
@@ -34,6 +24,7 @@ the details of the known workers.
 #include "timestamp.h"
 #include "xxmalloc.h"
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -301,7 +292,6 @@ static void mpi_worker_handle_signal(int sig)
 
 static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int procnamelen)
 {
-
 	if(worldsize < 2) {
 		debug(D_BATCH, "Soemthing went terribly wrong.....");
 	}
@@ -348,14 +338,16 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 			debug(D_BATCH, "%i has orders msg from rank 0\n", rank);
 			debug(D_BATCH, "%i:%s parsing orders object\n", rank, procname);
 
-			if(strstr(jx_lookup_string(recobj, "Orders"), "Terminate")) {
+			const char *order = jx_lookup_string(recobj,"Orders");
+
+			if(!strcmp(order,"Terminate")) {
 				//terminating, meaning we're done!
 				debug(D_BATCH, "%i:%s Being told to terminate, calling finalize and returning\n", rank, procname);
 				MPI_Finalize();
 				return 0;
 			}
 
-			if(strstr(jx_lookup_string(recobj, "Orders"), "Cancel")) {
+			if(!strcmp(order,"Cancel")) {
 				debug(D_BATCH, "Recieved an order to cancel jobs\n");
 				int mid = jx_lookup_integer(recobj, "ID");
 				itable_firstkey(job_ids);
@@ -372,7 +364,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 				}
 			}
 
-			if(strstr(jx_lookup_string(recobj, "Orders"), "Send-Resources")) {
+			if(!strcmp(order,"Send-Resources")) {
 				debug(D_BATCH, "%i:%s sending resources to rank 0!\n", rank, procname);
 				//need to send resources json object
 
@@ -390,7 +382,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 				debug(D_BATCH, "%i:%s Done sending resources to Rank0 \n", rank, procname);
 			}
 
-			if(strstr(jx_lookup_string(recobj, "Orders"), "Execute")) {
+			if(!strcmp(order,"Execute")) {
 				debug(D_BATCH, "%i:%s Executing given command!\n", rank, procname);
 				char *cmd = (char *) jx_lookup_string(recobj, "CMD");
 				int mid = jx_lookup_integer(recobj, "ID");
