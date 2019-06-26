@@ -9,6 +9,7 @@
 #include "dag_node.h"
 #include "dag_file.h"
 #include "jx.h"
+#include "jx_pretty_print.h"
 
 #include <assert.h>
 #include <unistd.h>
@@ -133,6 +134,24 @@ static int node_fail( void * instance_struct, struct dag_node *n, struct batch_t
 					n->nodeid); 
 		return MAKEFLOW_HOOK_FAILURE;
 	}
+
+	/* Dump node info */
+	char *info_path = string_format(FAIL_DIR "/INFO.json", n->nodeid);
+	FILE *info_stream = fopen(info_path, "w");
+	free(info_path);
+	if (!info_stream) {
+		debug(D_MAKEFLOW_HOOK, "Failed to create %s: %s", info_path, strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+	struct jx *info = dag_node_to_jx(n->d, n, 0);
+	if (n->task->info->exited_normally) {
+		jx_insert(info, jx_string("exit_code"), jx_integer(n->task->info->exit_code));
+	} else {
+		jx_insert(info, jx_string("exit_signal"), jx_integer(n->task->info->exit_signal));
+	}
+	jx_pretty_print_stream(info, info_stream);
+	jx_delete(info);
+	fclose(info_stream);
 
 	/* Move temp inputs(wrappers) of failed node. Mark deleted if successful rename. */
 	list_first_item(task->input_files);
