@@ -292,31 +292,29 @@ static void mpi_worker_handle_signal(int sig)
 
 static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int procnamelen)
 {
-	if(worldsize < 2) {
-		debug(D_BATCH, "Soemthing went terribly wrong.....");
-	}
+	/* set up signal handlers to ignore signals */
 
 	signal(SIGINT, mpi_worker_handle_signal);
 	signal(SIGTERM, mpi_worker_handle_signal);
 	signal(SIGQUIT, mpi_worker_handle_signal);
 
-	//first, send name and rank to MPI master
-	char *sendstr = string_format("{\"name\":\"%s\",\"rank\":%i}", procname, rank);
-	mpi_send_string(0,sendstr);
-	free(sendstr);
+	/* measure available local resources */
+	int cores = load_average_get_cpus();
+	uint64_t memtotal, memavail;
+	host_memory_info_get(&memavail, &memtotal);
 
-	debug(D_BATCH, "%i Sent original msg to Rank 0!\n", rank);
+	/* send initial configuration message */
+	struct jx *jmsg = jx_object(0);
+	jx_insert_string(jmsg,"name",procname);
+	jx_insert_integer(jmsg,"rank",rank);
+	jx_insert_integer(jmsg,"cores",cores);
+	jx_insert_integer(jmsg,"memory",memtotal);
 
-	struct jx *recobj = mpi_recv_jx(0);
-	int cores;
-	if((cores = (int) jx_lookup_integer(recobj, "LIVE")) == 0) {	//meaning we should die
-		debug(D_BATCH, "%i:%s Being told to die, so doing that\n", rank, procname);
-		MPI_Finalize();
-		_exit(0);
-	}
-	int mem = (int) jx_lookup_integer(recobj, "MEM");	//since it returns 0 
+	mpi_send_jx(0,jmsg);
+	jx_delete(jmsg);
 
-	char *workdir = jx_lookup_string(recobj, "WORK_DIR") != NULL ? string_format("%s", jx_lookup_string(recobj, "WORK_DIR")) : NULL;	//since NULL if not there
+	// XXX workdir should get come from command line arguments
+	char *workdir = "/tmp/makeflow-mpi";
 	char *cwd = get_current_dir_name();
 
 	debug(D_BATCH, "%i has been told to live and how many cores we have. Creating itables and entering while loop\n", rank);
@@ -325,16 +323,13 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 	struct itable *job_times = itable_create(0);
 	struct itable *starts = itable_create(0);
 
-	//cleanup before main loop
-	jx_delete(recobj);
-
 	while(1) {
 		//might want to check MPI_Probe
 		MPI_Status mstatus;
 		int flag;
 		MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
-			recobj = mpi_recv_jx(0);
+			struct jx *recobj = mpi_recv_jx(0);
 			debug(D_BATCH, "%i has orders msg from rank 0\n", rank);
 			debug(D_BATCH, "%i:%s parsing orders object\n", rank, procname);
 
@@ -362,24 +357,6 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 						break;
 					}
 				}
-			}
-
-			if(!strcmp(order,"Send-Resources")) {
-				debug(D_BATCH, "%i:%s sending resources to rank 0!\n", rank, procname);
-				//need to send resources json object
-
-				int cores_total = load_average_get_cpus();
-				uint64_t memtotal;
-				uint64_t memavail;
-				host_memory_info_get(&memavail, &memtotal);
-				int memory = ((memtotal / (1024 * 1024)) / cores_total) * cores;	//MB
-				debug(D_BATCH, "%i:%s cores_total: %i cores_mine: %i memtotal: %li mem_mine: %i\n", rank, procname, cores_total, cores, memtotal, mem);
-
-				memory = mem != 0 ? mem : memory;
-				sendstr = string_format("{\"cores\":%i,\"memory\":%i}", cores, memory);
-				mpi_send_string(0,sendstr);
-				free(sendstr);
-				debug(D_BATCH, "%i:%s Done sending resources to Rank0 \n", rank, procname);
 			}
 
 			if(!strcmp(order,"Execute")) {
