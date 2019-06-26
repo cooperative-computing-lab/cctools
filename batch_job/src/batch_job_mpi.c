@@ -103,15 +103,16 @@ static void mpi_send_string( int rank, const char *str )
 {
 	unsigned length = strlen(str);
 	MPI_Send(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD);
-	MPI_Send(str, lenth, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
+	MPI_Send(str, length, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
 }
 
 static char * mpi_recv_string( int rank )
 {
 	unsigned length;
-	MPI_Recv(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD);
-	char *str = malloc(length);
-	MPI_Recv(str, lenth, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
+	MPI_Recv(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	char *str = malloc(length+1);
+	MPI_Recv(str, length, MPI_CHAR, rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	str[length] = 0;
 	return str;
 }
 
@@ -130,7 +131,6 @@ static struct jx * mpi_recv_jx( int rank )
 	free(str);
 	return j;
 }
-
 
 static unsigned int gen_guid()
 {
@@ -154,38 +154,23 @@ static void batch_job_mpi_set_ranks_sizes(struct hash_table *nr, struct hash_tab
 static void get_resources()
 {
 	gotten_resources = 1;
+
 	char *key;
-	uint64_t *value;
-	char *worker_cmd;
-	unsigned len;
+	uint64_t *rank;
 
 	rank_res = itable_create(0);
 	rank_jobs = itable_create(0);
 
 	hash_table_firstkey(name_rank);
-	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
-		//ask for resources
-		worker_cmd = string_format("{\"Orders\":\"Send-Resources\"}");
-		len = strlen(worker_cmd);
-		MPI_Send(&len, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD);
-		MPI_Send(worker_cmd, len, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
+	while(hash_table_nextkey(name_rank, &key, (void **) &rank)) {
+		mpi_send_string(*rank,"{\"Orders\":\"Send-Resources\"}");
 
-		//recieve response
-		debug(D_BATCH, "RANK0 Recieved %lu resources\n", *value);
-		MPI_Recv(&len, 1, MPI_UNSIGNED, *value, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		char *str = malloc(sizeof(char *) * len + 1);
-		memset(str, '\0', sizeof(char) * len + 1);
-		MPI_Recv(str, len, MPI_CHAR, *value, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		struct jx *recobj = mpi_recv_jx(*rank);
 
-		//parse response
-		struct jx *recobj = jx_parse_string(str);
 		struct batch_job_mpi_workers_resources *res = malloc(sizeof(struct batch_job_mpi_workers_resources));
 		res->cur_cores = res->max_cores = jx_lookup_integer(recobj, "cores");
 		res->cur_memory = res->max_memory = jx_lookup_integer(recobj, "memory");
-		itable_insert(rank_res, *value, (void *) res);
-
-		free(worker_cmd);
-		free(str);
+		itable_insert(rank_res, *rank, (void *) res);
 		jx_delete(recobj);
 	}
 
