@@ -46,46 +46,44 @@ the details of the known workers.
 
 #include <mpi.h>
 
-static struct hash_table *name_rank;
-static struct hash_table *name_size;
-
-static struct itable *rank_res;
-static struct list *jobs;
-static struct itable *rank_jobs;
-
-static int gotten_resources = 0;
-
-static int id = 1;
-
-struct batch_job_mpi_workers_resources {
-	int64_t max_memory;
-	int64_t max_cores;
-	int64_t cur_memory;
-	int64_t cur_cores;
-};
-
-struct batch_job_mpi_job {
+struct mpi_worker {
+	char *name;
+	int rank;
+	int64_t memory;
 	int64_t cores;
-	int64_t mem;
-	struct batch_job_mpi_workers_resources *comp;
-	char *cmd;
-	int64_t id;
-	char *env;
-	char *infiles;
-	char *outfiles;
+	int64_t avail_memory;
+	int64_t avail_cores;
 };
 
-struct mpi_fit {
-	int64_t rank;
-	double value;
+struct mpi_job {
+	int64_t cores;
+	int64_t memory;
+	struct mpi_worker *worker;
+	const char *cmd;
+	batch_job_id_t jobid;
+	const char *env;
+	const char *infiles;
+	const char *outfiles;
+	time_t submitted;
 };
 
-static int sort_mpi_struct(const void *a, const void *b)
-{
-	struct mpi_fit *mfa = (struct mpi_fit *) a;
-	struct mpi_fit *mfb = (struct mpi_fit *) b;
-	return (mfa->value - mfb->value);
-}
+/* Array of workers and properties, indexed by MPI rank. */
+
+static struct mpi_worker *workers = 0;
+static int nworkers = 0;
+
+/*
+Each job is entered into two data structures:
+job_queue is an ordered queue of ready jobs waiting for a worker.
+job_table is a table of all jobs in any state, indexed by jobid
+*/
+
+static struct list *job_queue = 0;
+static struct itable *job_table = 0;
+
+/* Each job is assigned a unique jobid returned by batch_job_submit. */
+
+static batch_job_id_t jobid = 1;
 
 union mpi_ccl_guid {
 	char c[8];
@@ -138,216 +136,151 @@ static unsigned int gen_guid()
 	return guid.ul;
 }
 
-static void batch_job_mpi_set_ranks_sizes(struct hash_table *nr, struct hash_table *ns)
+static struct mpi_worker * find_worker_for_job(  struct mpi_job *job )
 {
-	name_rank = nr;
-	name_size = ns;
-}
-
-static void get_resources()
-{
-	gotten_resources = 1;
-
-	char *key;
-	uint64_t *rank;
-
-	rank_res = itable_create(0);
-	rank_jobs = itable_create(0);
-
-	hash_table_firstkey(name_rank);
-	while(hash_table_nextkey(name_rank, &key, (void **) &rank)) {
-		mpi_send_string(*rank,"{\"Orders\":\"Send-Resources\"}");
-
-		struct jx *recobj = mpi_recv_jx(*rank);
-
-		struct batch_job_mpi_workers_resources *res = malloc(sizeof(struct batch_job_mpi_workers_resources));
-		res->cur_cores = res->max_cores = jx_lookup_integer(recobj, "cores");
-		res->cur_memory = res->max_memory = jx_lookup_integer(recobj, "memory");
-		itable_insert(rank_res, *rank, (void *) res);
-		jx_delete(recobj);
-	}
-
-	jobs = list_create();
-
-}
-
-static int find_fit(struct itable *comps, int req_cores, int req_mem, int job_id)
-{
-	itable_firstkey(comps);
-	uint64_t key;
-	struct batch_job_mpi_workers_resources *comp;
-
-	struct mpi_fit *possible_fit_table = calloc(itable_size(comps), sizeof(struct mpi_fit));	//malloc(sizeof(struct mpi_fit) * itable_size(comps));
-	int i = 0;
-	while(itable_nextkey(comps, &key, (void **) &comp)) {
-		//right now is first fit. Might want to try and find worst fit, aka, a fit on the LEAST busy resource
-		if(comp->cur_cores - req_cores >= 0 && comp->cur_memory - req_mem >= 0) {
-
-			possible_fit_table[i].rank = key;
-			possible_fit_table[i].value = sqrt(pow((comp->cur_cores - req_cores), 2) + pow((comp->cur_memory - req_mem), 2));
-
-
+	int i;
+	for(i=1;i<nworkers;i++) {	
+		struct mpi_worker *worker = &workers[i];
+		if(job->cores>=worker->avail_cores && job->memory>=worker->avail_memory) {
+			return worker;
 		}
-		i += 1;
 	}
-	qsort((void *) possible_fit_table, itable_size(comps), sizeof(struct mpi_fit), (__compar_fn_t) sort_mpi_struct);
-	if(possible_fit_table[itable_size(comps) - 1].value > 0.0) {
-		int rank = possible_fit_table[itable_size(comps) - 1].rank;
-		//assert(rank != 0);
-		comp = itable_lookup(comps, rank);
-		struct batch_job_mpi_job *job_struct = malloc(sizeof(struct batch_job_mpi_job));
-		job_struct->cores = req_cores;
-		job_struct->mem = req_mem;
-		job_struct->comp = comp;
 
-		comp->cur_cores -= req_cores;
-		comp->cur_memory -= req_mem;
+	return 0;
+}
 
-		itable_insert(rank_jobs, job_id, job_struct);
-		free(possible_fit_table);
-		return rank;
+void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
+{
+	struct jx *j = jx_object(0);
+	jx_insert_string(j,"Orders","Execute");
+	jx_insert_string(j,"CMD",job->cmd);
+	jx_insert_integer(j,"ID",job->jobid);
+	if(job->env) jx_insert_string(j,"ENV",job->env);
+	if(job->infiles) jx_insert_string(j,"IN",job->infiles);
+	if(job->outfiles) jx_insert_string(j,"OUT",job->outfiles);
+
+	mpi_send_jx(worker->rank,j);
+
+	worker->avail_cores -= job->cores;
+	worker->avail_memory -= job->memory;
+	job->worker = worker;
+}
+
+batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct batch_job_info *info )
+{
+	struct jx *j = mpi_recv_jx(worker->rank);
+
+	int jobid = jx_lookup_integer(j, "ID");
+
+	struct mpi_job *job = itable_lookup(job_table,jobid);
+
+	timestamp_t start = (timestamp_t) jx_lookup_integer(j, "START");
+	timestamp_t end = (timestamp_t) jx_lookup_integer(j, "END");
+
+	memset(info,0,sizeof(*info));
+
+	info->submitted = job->submitted;
+	info->started = start / 1000000;
+	info->finished = end / 1000000;
+
+	info->exited_normally = jx_lookup_integer(j,"NORMAL");
+	if(info->exited_normally) {
+		info->exit_code = jx_lookup_integer(j, "STATUS");
+	} else {
+		info->exit_signal = jx_lookup_integer(j, "SIGNAL");
 	}
-	free(possible_fit_table);
-	return -1;
+
+	jx_delete(j);
+
+	worker->avail_cores += job->cores;
+	worker->avail_memory += job->memory;
+
+	return jobid;
 }
 
 static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
+	struct mpi_job *job = malloc(sizeof(*job));
 
-	//some init stuff
-	if(!gotten_resources)
-		get_resources();
-
-	int64_t cores_req = resources->cores < 0 ? 1 : resources->cores;
-	int64_t mem_req = resources->memory < 0 ? 1000 : resources->memory;
-
-	//push new job onto the list
-	struct batch_job_mpi_job *job = malloc(sizeof(struct batch_job_mpi_job));
 	job->cmd = xxstrdup(cmd);
-	job->cores = cores_req;
-	job->mem = mem_req;
-	job->id = id++;
-	job->env = envlist != (struct jx *) NULL ? jx_print_string(envlist) : (char *) NULL;
-	job->infiles = extra_input_files != (char *) NULL ? (char *) extra_input_files : "";
-	job->outfiles = extra_output_files != NULL ? (char *) extra_output_files : "";
-	struct batch_job_info *info = malloc(sizeof(*info));
-	memset(info, 0, sizeof(*info));
-	info->submitted = time(0);
-	itable_insert(q->job_table, job->id, info);
+	job->cores = resources->cores;
+	job->memory = resources->memory;
+	job->env = envlist ? jx_print_string(envlist) : 0;
+	job->infiles = extra_input_files;
+	job->outfiles = extra_output_files;
+	job->jobid = jobid++;
+	job->submitted = time(0);
+	
+	list_push_tail(job_queue,job);
+	itable_insert(job_table,jobid,job);
 
-	list_push_tail(jobs, job);
-
-	debug(D_BATCH, "Queued job %li", job->id);
-
-	return job->id;
+	return job->jobid;
 }
 
-static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job_info *info_out, time_t stoptime)
+static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job_info *info, time_t stoptime)
 {
+	struct mpi_job *job;
+	struct mpi_worker *worker;
 
-	char *key;
-	uint64_t *value;
-	char *str;
-	unsigned len;
+	/* Assign as many jobs as possible to available workers */
 
-	//first iterate through the jobs and see if we can fit ONE of them in the workers
-	list_first_item(jobs);
-	struct batch_job_mpi_job *job;
-	while((job = list_next_item(jobs)) != NULL) {
-		int rank_fit = find_fit(rank_res, job->cores, job->mem, job->id);
-		if(rank_fit < 0) {
-			continue;
+	list_first_item(job_queue);
+	while((job = list_next_item(job_queue))) {
+		worker = find_worker_for_job(job);
+		if(worker) {
+			send_job_to_worker(job,worker);
+			list_remove(job_queue, job);
 		}
-		debug(D_BATCH, "RANK0 Job %li found a fit at %i. It needs %li cores %li mem\n", job->id, rank_fit, job->cores, job->mem);
-
-		char *tmp = string_escape_shell(job->cmd);
-		char *env = job->env != NULL ? job->env : "";
-		char *worker_cmd = string_format("{\"Orders\":\"Execute\",\"CMD\":%s,\"ID\":%li,\"ENV\":%s,\"IN\":\"%s\",\"OUT\":\"%s\"}", tmp, job->id, env, job->infiles, job->outfiles);
-		mpi_send_string(rank_fit,worker_cmd);
-		debug(D_BATCH, "RANK0 Sent cmd object string to %i: %s\n", rank_fit, worker_cmd);
-		debug(D_BATCH, "Job %li submitted to worker", job->id);
-		list_remove(jobs, job);
-
-		free(tmp);
-		free(env);
-		free(worker_cmd);
-		break;
 	}
 
-	//See if we have a msg waiting for us using MPI_Iprobe
-	if(!hash_table_nextkey(name_rank, &key, (void **) &value))
-		hash_table_firstkey(name_rank);
+	/* Probe each of the workers for responses.  */
 
-	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
+	int i;
+	for(i=1;i<nworkers;i++) {
 		MPI_Status mstatus;
-		int flag;
-		MPI_Iprobe(*value, 0, MPI_COMM_WORLD, &flag, &mstatus);
+		int flag=0;
+		MPI_Iprobe(i, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
-			fprintf(stderr, "RANK0 There is a job waiting to be returned from %lu:%s\n", *value, key);
-			struct jx *recobj = mpi_recv_jx(*value);
-			struct batch_job_info *info = info_out;
-			memset(info, 0, sizeof(*info));
-			timestamp_t start = (timestamp_t) jx_lookup_integer(recobj, "START");
-			timestamp_t end = (timestamp_t) jx_lookup_integer(recobj, "END");
-			info->started = start / 1000000;	//because the startex and finished are time_t, not timestamp_t
-			info->finished = end / 1000000;
-			if((info->exited_normally = jx_lookup_integer(recobj, "NORMAL")) == 1) {
-				info->exit_code = jx_lookup_integer(recobj, "STATUS");
-			} else {
-				info->exit_signal = jx_lookup_integer(recobj, "SIGNAL");
-			}
-			int job_id = jx_lookup_integer(recobj, "ID");
-			debug(D_BATCH, "Job %i returned", job_id);
-
-			debug(D_BATCH, "Job %i started %lu and was waited on at %lu", job_id, start, end);
-			struct batch_job_info *old_info = itable_remove(q->job_table, job_id);
-			info->submitted = old_info->submitted;
-			itable_insert(q->job_table, jx_lookup_integer(recobj, "ID"), info);
-
-			jx_delete(recobj);
-
-			struct batch_job_mpi_job *jobstruct = itable_lookup(rank_jobs, job_id);
-			itable_remove(rank_jobs, job_id);
-			struct batch_job_mpi_workers_resources *comp = itable_lookup(rank_res, *value);
-			comp->cur_cores += jobstruct->cores;
-			comp->cur_memory += jobstruct->mem;
-
-			return job_id;
-
+			jobid = receive_result_from_worker(worker,info);
+			return jobid;
 		}
 	}
+
 	return -1;
 }
 
-static int batch_job_mpi_remove(struct batch_queue *q, batch_job_id_t jobid)
+static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
 {
-	char *worker_cmd = string_format("{\"Orders\":\"Cancel\", \"ID\":\"%li\"}", jobid);
-	char *key;
-	uint64_t *value;
-	hash_table_firstkey(name_rank);
-	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
-		mpi_send_string(*value,worker_cmd);
+	struct mpi_job *job = itable_remove(job_table,jobid);
+	if(job) {
+		list_remove(job_queue,job);
+
+		if(job->worker) {
+			char *cmd = string_format("{\"Orders\":\"Cancel\", \"ID\":\"%li\"}", jobid);
+			mpi_send_string(job->worker->rank,cmd);
+			free(cmd);
+		}
+
+		// XXX also free job elements
+		free(job);
 	}
-	free(worker_cmd);
-	return 1;
+
+	return 0;
 }
 
 static int batch_queue_mpi_create(struct batch_queue *q)
 {
-	batch_queue_set_feature(q, "mpi_job_queue", NULL);
+	job_queue = list_create();
+	job_table = itable_create(0);
 	return 0;
 }
 
 static void batch_job_mpi_kill_workers()
 {
-	char *key;
-	uint64_t *value;
-	char *worker_cmd = string_format("{\"Orders\":\"Terminate\"}");
-	hash_table_firstkey(name_rank);
-	while(hash_table_nextkey(name_rank, &key, (void **) &value)) {
-		mpi_send_string(*value,worker_cmd);
+	int i;
+	for(i=1;i<nworkers;i++) {
+		mpi_send_string(i,"{\"Orders\":\"Terminate\"}");
 	}
-	free(worker_cmd);
 }
 
 static int batch_queue_mpi_free(struct batch_queue *q)
@@ -577,76 +510,26 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 }
 
 /*
-Perform the setup unique to the master process, by exchanging
-information with each of the workers to determine their configuration.
+Perform the setup unique to the master process,
+by setting up the table of workers and receiving
+basic resource configuration.
 */
 
 static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mpi_memory, const char *working_dir)
 {
-	struct hash_table *mpi_comps = hash_table_create(0, 0);
-	struct hash_table *mpi_sizes = hash_table_create(0, 0);
-
 	int i;
 
-	for(i = 1; i < mpi_world_size; i++) {
-		struct jx *recobj = mpi_recv_jx(i);
-		char *name = (char *) jx_lookup_string(recobj, "name");
-
-		uint64_t *rank = malloc(sizeof(uint64_t) * 1);
-		*rank = jx_lookup_integer(recobj, "rank");
-
-		if(hash_table_lookup(mpi_comps, name) == NULL) {
-			hash_table_insert(mpi_comps, string_format("%s", name), rank);
-		}
-		//for partition sizing
-		if(hash_table_lookup(mpi_sizes, name) == NULL) {
-			uint64_t *val = malloc(sizeof(uint64_t) * 1);
-			*val = 1;
-			hash_table_insert(mpi_sizes, name, (void *) val);
-		} else {
-			uint64_t *val = (uint64_t *) hash_table_lookup(mpi_sizes, name);
-			*val += 1;
-			hash_table_remove(mpi_sizes, name);
-			hash_table_insert(mpi_sizes, name, (void *) (val));
-
-		}
-
-		jx_delete(recobj);
-	}
+	workers = calloc(mpi_world_size,sizeof(*workers));
 
 	for(i = 1; i < mpi_world_size; i++) {
-		hash_table_firstkey(mpi_comps);
-		char *key;
-		uint64_t *value;
-		int sent = 0;
-		while(hash_table_nextkey(mpi_comps, &key, (void **) &value)) {
-			uint64_t ui = i;
-			if(*value == ui) {
-				int cores = mpi_cores != 0 ? mpi_cores : (int) *((uint64_t *) hash_table_lookup(mpi_sizes, key));
-				//fprintf(stderr,"%lli has %i cores!\n", value, cores);
-				struct jx *livemsgjx = jx_object(NULL);
-				jx_insert_integer(livemsgjx, "LIVE", cores);
-				if(mpi_memory > 0) {
-					jx_insert_integer(livemsgjx, "MEM", mpi_memory);
-				}
-				if(working_dir != NULL) {
-					jx_insert_string(livemsgjx, "WORK_DIR", working_dir);
-				}
-
-				mpi_send_jx(*value,livemsgjx);
-				sent = 1;
-				jx_delete(livemsgjx);
-			}
-		}
-		if(sent == 0) {
-			mpi_send_string(i,"{\"DIE\":1}");
-		}
-		debug(D_BATCH, "Msg for %i has been delivered\n", i);
+		struct mpi_worker *w = &workers[i];
+		struct jx *j = mpi_recv_jx(i);
+		w->name       = strdup(jx_lookup_string(j,"name"));
+		w->rank       = 1;
+		w->memory     = jx_lookup_integer(j,"memory");
+		w->cores      = jx_lookup_integer(j,"cores");
+		jx_delete(j);
 	}
-	debug(D_BATCH, "Msgs have all been sent\n");
-
-	//now we have the proper iprocesses there with correct num of cores
-	batch_job_mpi_set_ranks_sizes(mpi_comps, mpi_sizes);
 }
 
 /*
