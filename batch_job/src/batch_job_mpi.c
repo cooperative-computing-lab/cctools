@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2018- The University of Notre Dame
+Copyright (C) 2019- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -98,6 +98,39 @@ union mpi_ccl_guid {
 	char c[8];
 	unsigned int ul;
 };
+
+static void mpi_send_string( int rank, const char *str )
+{
+	unsigned length = strlen(str);
+	MPI_Send(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD);
+	MPI_Send(str, lenth, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
+}
+
+static char * mpi_recv_string( int rank )
+{
+	unsigned length;
+	MPI_Recv(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD);
+	char *str = malloc(length);
+	MPI_Recv(str, lenth, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
+	return str;
+}
+
+static void mpi_send_jx( int rank, struct jx *j )
+{
+	char *str = jx_print_string(j);
+	mpi_send_string(rank,str);
+	free(str);
+}
+
+static struct jx * mpi_recv_jx( int rank )
+{
+	char *str = mpi_recv_string(rank);
+	if(!str) return 0;
+	struct jx * j = jx_parse_string(str);
+	free(str);
+	return j;
+}
+
 
 static unsigned int gen_guid()
 {
