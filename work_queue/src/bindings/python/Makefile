@@ -4,7 +4,7 @@ include $(CCTOOLS_HOME)/rules.mk
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
-LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON_CCFLAGS)
+LOCAL_CCFLAGS = -fPIC -DNDEBUG -w $(CCTOOLS_PYTHON_CCFLAGS)
 LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS) -lz
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/work_queue/src/libwork_queue.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
