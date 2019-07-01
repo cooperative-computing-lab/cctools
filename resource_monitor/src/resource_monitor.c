@@ -898,7 +898,9 @@ double peak_cores(int64_t wall_time, int64_t cpu_time) {
 void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_mem_info *m, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f)
 {
 	tr->wall_time  = usecs_since_epoch() - summary->start;
-	tr->cpu_time   = p->cpu.accumulated;
+
+	/* using .delta here because if we use .accumulated, then we lose information of processes that already terminated. */
+	tr->cpu_time  += p->cpu.delta;
 
 	tr->start = summary->start;
 	tr->end   = usecs_since_epoch();
@@ -983,7 +985,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 		{
 			double tmp_output = rmsummary_to_external_unit("machine_load", tr->machine_load);
-			fprintf(log_series, " %04.2lf" PRId64, tmp_output);
+			fprintf(log_series, " %04.2lf", tmp_output);
 		}
 
 		if(resources_flags->disk)
