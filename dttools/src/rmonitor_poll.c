@@ -248,6 +248,7 @@ int rmonitor_get_children(pid_t pid, uint64_t **children)
 
 	char *fchildren_path = string_format("/proc/%d/task/%d/children", pid, pid);
 	FILE *fstat = fopen(fchildren_path, "r");
+	free(fchildren_path);
 
 	if(!fstat) {
 		return 0;
