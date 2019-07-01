@@ -313,7 +313,6 @@ static void handle_terminate()
 
 static void handle_cancel( struct jx *msg )
 {
-	debug(D_BATCH, "Recieved an order to cancel jobs\n");
 	int jobid = jx_lookup_integer(msg, "ID");
 
 	uint64_t pid;
@@ -322,28 +321,65 @@ static void handle_cancel( struct jx *msg )
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table, &pid, (void **)&job)) {
 		if(job->jobid==jobid) {
-			debug(D_BATCH, "I have job %i, canceling it\n", jobid);
+			debug(D_BATCH, "killing jobid %d pid %d",jobid,pid);
 			kill(pid, SIGKILL);
+
+			debug(D_BATCH, "waiting for jobid %d pid %d",jobid,pid);
 			int status;
 			waitpid(pid, &status, 0);
 
+			debug(D_BATCH, "killed jobid %d pid %d",jobid,pid);
 			job = itable_remove(job_table,pid);
 			jx_delete(job);
 			break;
 		}
 	}
 
-	debug(D_BATCH,"jobid %d not found!\n",jobid);
+	debug(D_BATCH,"jobid %d not found!",jobid);
 }
 
-void handle_execute( struct jx *msg )
+/*
+For the case where a sandbox directory is used, augment
+the command by prefixing/suffixing with various
+copy commands to move data in and out.
+(This would be better handled by just doing the copy-in
+after the fork, and the copy-in after the job completion.)
+*/
+
+char * create_sandboxed_command( struct jx *job, const char *sandbox )
+{
+	char *tmp;
+
+	// Move into the sandbox directory
+	char *cmd = string_format("cd %s && %s", sandbox, jx_lookup_string(job,"CMD");
+
+	// For each output file, perform a copy out of the sandbox
+	char *file_list = strdup(jx_lookup_string(job,"OUTF"));
+	char *file = strtok(file_list, ",");
+	while(file) {
+		tmp = string_format("%s && cp -rf ./%s %s/%s", cmd, file, cwd, file);
+		free(cmd);
+		cmd = tmp;
+		file = strtok(0, ",");
+	}
+	free(file_list);
+
+	// Finally, remove the sandbox when done.
+	tmp = string_format("%s && rm -rf %s", cmd, sandbox);
+	free(cmd);
+	cmd = tmp;
+
+	 free(cmd);
+}
+
+void handle_execute( struct jx *job )
 {
 	debug(D_BATCH, "%i:%s Executing given command!\n", rank, procname);
-	const char *cmd = jx_lookup_string(msg, "CMD");
-	int mid = jx_lookup_integer(msg, "ID");
-	struct jx *env = jx_lookup(msg, "ENV");
-	const char *inf = jx_lookup_string(msg, "IN");
-	const char *outf = jx_lookup_string(msg, "OUT");
+	const char *cmd = jx_lookup_string(job, "CMD");
+	int mid = jx_lookup_integer(job, "ID");
+	struct jx *env = jx_lookup(job, "ENV");
+	const char *inf = jx_lookup_string(job, "IN");
+	const char *outf = jx_lookup_string(job, "OUT");
 	debug(D_BATCH, "%i:%s The command to execute is: %s and it is job id %i\n", rank, procname, cmd, mid);
 	//If workdir, make a sandbox.
 	//see if input files outside sandbox, and need link in
@@ -397,23 +433,13 @@ void handle_execute( struct jx *msg )
 		if(env) {
 			jx_export(env);
 		}
+
 		if(sandbox) {
-			debug(D_BATCH, "%i:%s-FORK:%i we are starting the cmd modification process\n", rank, procname, getpid());
-			char *tmp = string_format("cd %s && %s", sandbox, cmd);
-			cmd = tmp;
-			//need to cp from workdir to ./
-			char *tmp_da = strdup(outf);
-			char *ta = strtok(tmp_da, ",");
-			while(ta != NULL) {
-				tmp = string_format("%s && cp -rf ./%s %s/%s", cmd, ta, cwd, ta);
-				free(cmd);
-				cmd = tmp;
-				ta = strtok(0, ",");
-			}
-			tmp = string_format("%s && rm -rf %s", cmd, sandbox);
-			free(cmd);
-			cmd = tmp;
+			cmd = create_sandboxed_command( job, sandbox );
+		} else {
+			cmd = jx_lookup_string(job,"CMD");
 		}
+
 		debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command! %s \n", rank, procname, getpid(), cmd);
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
@@ -464,7 +490,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 
 	/* job table contains the jx for each job, indexed by the running pid */
 
-	struct itable *job_table = itable_create(0);
+	job_table = itable_create(0);
 
 	while(1) {
 		MPI_Status mstatus;
@@ -489,6 +515,8 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 		int status;
 		pid_t pid = waitpid(0, &status, WNOHANG);
 		if(pid>0) handle_complete(pid,status);
+
+		// XXX we have a busy waiting problem here...
 	}
 
 	MPI_Finalize();
