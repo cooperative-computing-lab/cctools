@@ -983,7 +983,7 @@ void rmonitor_log_row(struct rmsummary *tr)
 
 		{
 			double tmp_output = rmsummary_to_external_unit("machine_load", tr->machine_load);
-			fprintf(log_series, " %04.2lf" PRId64, tmp_output);
+			fprintf(log_series, " %04.2lf", tmp_output);
 		}
 
 		if(resources_flags->disk)
