@@ -219,8 +219,8 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	while((job = list_next_item(job_queue))) {
 		worker = find_worker_for_job(job);
 		if(worker) {
-			send_job_to_worker(job,worker);
 			list_remove(job_queue, job);
+			send_job_to_worker(job,worker);
 		}
 	}
 
@@ -281,23 +281,13 @@ static int batch_queue_mpi_free(struct batch_queue *q)
 	return 0;
 }
 
-/*
-Main loop for dedicated worker communicating with master.
-*/
-
 static void mpi_worker_handle_signal(int sig)
 {
 	//do nothing, so that way we can kill the children and clean it up
 }
 
-static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int procnamelen)
+static void send_config_message()
 {
-	/* set up signal handlers to ignore signals */
-
-	signal(SIGINT, mpi_worker_handle_signal);
-	signal(SIGTERM, mpi_worker_handle_signal);
-	signal(SIGQUIT, mpi_worker_handle_signal);
-
 	/* measure available local resources */
 	int cores = load_average_get_cpus();
 	uint64_t memtotal, memavail;
@@ -312,166 +302,194 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 
 	mpi_send_jx(0,jmsg);
 	jx_delete(jmsg);
+}
+
+static void handle_terminate()
+{
+	debug(D_BATCH, "%i:%s Being told to terminate, calling finalize and returning\n", rank, procname);
+	MPI_Finalize();
+	exit(0);
+}
+
+static void handle_cancel( struct jx *msg )
+{
+	debug(D_BATCH, "Recieved an order to cancel jobs\n");
+	int jobid = jx_lookup_integer(msg, "ID");
+
+	uint64_t pid;
+	struct jx *job;
+
+	itable_firstkey(job_table);
+	while(itable_nextkey(job_table, &pid, (void **)&job)) {
+		if(job->jobid==jobid) {
+			debug(D_BATCH, "I have job %i, canceling it\n", jobid);
+			kill(pid, SIGKILL);
+			int status;
+			waitpid(pid, &status, 0);
+
+			job = itable_remove(job_table,pid);
+			jx_delete(job);
+			break;
+		}
+	}
+
+	debug(D_BATCH,"jobid %d not found!\n",jobid);
+}
+
+void handle_execute( struct jx *msg )
+{
+	debug(D_BATCH, "%i:%s Executing given command!\n", rank, procname);
+	const char *cmd = jx_lookup_string(msg, "CMD");
+	int mid = jx_lookup_integer(msg, "ID");
+	struct jx *env = jx_lookup(msg, "ENV");
+	const char *inf = jx_lookup_string(msg, "IN");
+	const char *outf = jx_lookup_string(msg, "OUT");
+	debug(D_BATCH, "%i:%s The command to execute is: %s and it is job id %i\n", rank, procname, cmd, mid);
+	//If workdir, make a sandbox.
+	//see if input files outside sandbox, and need link in
+	//if not, then copy over and link in.
+	char *sandbox = NULL;
+	if(workdir != NULL) {
+		debug(D_BATCH, "%i:%s workdir is not null, going to create sandbox! workdir pointer: %p workdir value: %s\n", rank, procname, (void *) workdir, workdir);
+		char *tmp;
+		sandbox = string_format("%s/%u", workdir, gen_guid());
+		tmp = string_format("mkdir %s", sandbox);
+		int kr = system(tmp);
+		if(kr != 0)
+			debug(D_BATCH, "%i:%s tried to make sandbox %s: failed: %i\n", rank, procname, sandbox, kr);
+		free(tmp);
+
+		char *tmp_ta = strdup(inf);
+		char *ta = strtok(tmp_ta, ",");
+		while(ta != NULL) {
+			tmp = string_format("%s/%s", sandbox, ta);
+			kr = link(ta, tmp);
+			free(tmp);
+			if(kr < 0) {
+				tmp = string_format("cp -rf %s %s", ta, sandbox);
+				kr = system(tmp);
+				if(kr != 0)
+					debug(D_BATCH, "%i:%s failed to copy %s to %s :: %i\n", rank, procname, ta, sandbox, kr);
+				free(tmp);
+			}
+			ta = strtok(0, ",");
+		}
+
+	}
+	int jobid = fork();
+	if(jobid > 0) {
+		debug(D_BATCH, "%i:%s In the parent of the fork, the child id is: %i\n", rank, procname, jobid);
+		struct batch_job_info *info = malloc(sizeof(*info));
+		memset(info, 0, sizeof(*info));
+		info->started = time(0);
+		timestamp_t *start = malloc(sizeof(timestamp_t));
+		*start = timestamp_get();
+		itable_insert(starts, jobid, &start);
+		int *midp = malloc(sizeof(int) * 1);
+		*midp = mid;
+		itable_insert(job_ids, jobid, midp);
+		itable_insert(job_times, mid, info);
+	} else if(jobid < 0) {
+		debug(D_BATCH, "%i:%s there was an error that prevented forking: %s\n", rank, procname, strerror(errno));
+		MPI_Finalize();
+		return -1;
+	} else {
+		if(env) {
+			jx_export(env);
+		}
+		if(sandbox) {
+			debug(D_BATCH, "%i:%s-FORK:%i we are starting the cmd modification process\n", rank, procname, getpid());
+			char *tmp = string_format("cd %s && %s", sandbox, cmd);
+			cmd = tmp;
+			//need to cp from workdir to ./
+			char *tmp_da = strdup(outf);
+			char *ta = strtok(tmp_da, ",");
+			while(ta != NULL) {
+				tmp = string_format("%s && cp -rf ./%s %s/%s", cmd, ta, cwd, ta);
+				free(cmd);
+				cmd = tmp;
+				ta = strtok(0, ",");
+			}
+			tmp = string_format("%s && rm -rf %s", cmd, sandbox);
+			free(cmd);
+			cmd = tmp;
+		}
+		debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command! %s \n", rank, procname, getpid(), cmd);
+		execlp("sh", "sh", "-c", cmd, (char *) 0);
+		_exit(127);	// Failed to execute the cmd.
+	}
+}
+
+
+void handle_complete( pid_t pid, int status )
+{{
+	struct jx *job = itable_lookup(job_table,pid);
+	if(!job) {
+		debug(D_BATCH,"%i:%s No job with pid %d found!",rank,procname,pid);
+		return;
+	}
+
+	debug(D_BATCH,"%i:%s jobid %d pid %d has exited",rank,procname,jx_lookup_integer(job,"ID"),pid);
+
+	jx_insert_integer(job,"END",time(0));
+
+	if(WIFEXITED(status)) {
+		jx_insert_integer(job,"NORMAL",1);
+		jx_insert_integer(job,"STATUS",WEXITSTATUS(status));
+	} else {
+		jx_insert_integer(job,"NORMAL",0);
+		jx_insert_integer(job,"SIGNAL",WTERMSIG(status));
+	}
+
+	mpi_send_jx(0,job);
+}
+
+/*
+Main loop for dedicated worker communicating with master.
+*/
+
+static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int procnamelen)
+{
+	/* set up signal handlers to ignore signals */
+
+	signal(SIGINT, mpi_worker_handle_signal);
+	signal(SIGTERM, mpi_worker_handle_signal);
+	signal(SIGQUIT, mpi_worker_handle_signal);
+
+	send_config_message();
 
 	// XXX workdir should get come from command line arguments
 	char *workdir = "/tmp/makeflow-mpi";
 	char *cwd = get_current_dir_name();
 
-	debug(D_BATCH, "%i has been told to live and how many cores we have. Creating itables and entering while loop\n", rank);
+	/* job table contains the jx for each job, indexed by the running pid */
 
-	struct itable *job_ids = itable_create(0);
-	struct itable *job_times = itable_create(0);
-	struct itable *starts = itable_create(0);
+	struct itable *job_table = itable_create(0);
 
 	while(1) {
-		//might want to check MPI_Probe
 		MPI_Status mstatus;
 		int flag;
 		MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
-			struct jx *recobj = mpi_recv_jx(0);
-			debug(D_BATCH, "%i has orders msg from rank 0\n", rank);
-			debug(D_BATCH, "%i:%s parsing orders object\n", rank, procname);
-
-			const char *order = jx_lookup_string(recobj,"Orders");
+			struct jx *msg = mpi_recv_jx(0);
+			const char *order = jx_lookup_string(msg,"Orders");
 
 			if(!strcmp(order,"Terminate")) {
-				//terminating, meaning we're done!
-				debug(D_BATCH, "%i:%s Being told to terminate, calling finalize and returning\n", rank, procname);
-				MPI_Finalize();
-				return 0;
+				handle_terminate();
+			} else if(!strcmp(order,"Cancel")) {
+				handle_cancel(msg);
+			} else if(!strcmp(order,"Execute")) {
+				handle_execute(msg);
+			} else {
+				debug(D_BATCH,"unexpected order: %s",order);
 			}
-
-			if(!strcmp(order,"Cancel")) {
-				debug(D_BATCH, "Recieved an order to cancel jobs\n");
-				int mid = jx_lookup_integer(recobj, "ID");
-				itable_firstkey(job_ids);
-				uint64_t pid;
-				int *midp;
-				while(itable_nextkey(job_ids, &pid, (void **) &midp)) {
-					if(*midp == mid) {
-						debug(D_BATCH, "I have job %i, canceling it\n", mid);
-						kill(pid, SIGINT);
-						int status;
-						waitpid(pid, &status, 0);
-						break;
-					}
-				}
-			}
-
-			if(!strcmp(order,"Execute")) {
-				debug(D_BATCH, "%i:%s Executing given command!\n", rank, procname);
-				char *cmd = (char *) jx_lookup_string(recobj, "CMD");
-				int mid = jx_lookup_integer(recobj, "ID");
-				struct jx *env = jx_lookup(recobj, "ENV");
-				const char *inf = jx_lookup_string(recobj, "IN");
-				const char *outf = jx_lookup_string(recobj, "OUT");
-				debug(D_BATCH, "%i:%s The command to execute is: %s and it is job id %i\n", rank, procname, cmd, mid);
-				//If workdir, make a sandbox.
-				//see if input files outside sandbox, and need link in
-				//if not, then copy over and link in.
-				char *sandbox = NULL;
-				if(workdir != NULL) {
-					debug(D_BATCH, "%i:%s workdir is not null, going to create sandbox! workdir pointer: %p workdir value: %s\n", rank, procname, (void *) workdir, workdir);
-					char *tmp;
-					sandbox = string_format("%s/%u", workdir, gen_guid());
-					tmp = string_format("mkdir %s", sandbox);
-					int kr = system(tmp);
-					if(kr != 0)
-						debug(D_BATCH, "%i:%s tried to make sandbox %s: failed: %i\n", rank, procname, sandbox, kr);
-					free(tmp);
-
-					char *tmp_ta = strdup(inf);
-					char *ta = strtok(tmp_ta, ",");
-					while(ta != NULL) {
-						tmp = string_format("%s/%s", sandbox, ta);
-						kr = link(ta, tmp);
-						free(tmp);
-						if(kr < 0) {
-							tmp = string_format("cp -rf %s %s", ta, sandbox);
-							kr = system(tmp);
-							if(kr != 0)
-								debug(D_BATCH, "%i:%s failed to copy %s to %s :: %i\n", rank, procname, ta, sandbox, kr);
-							free(tmp);
-						}
-						ta = strtok(0, ",");
-					}
-
-				}
-				int jobid = fork();
-				if(jobid > 0) {
-					debug(D_BATCH, "%i:%s In the parent of the fork, the child id is: %i\n", rank, procname, jobid);
-					struct batch_job_info *info = malloc(sizeof(*info));
-					memset(info, 0, sizeof(*info));
-					info->started = time(0);
-					timestamp_t *start = malloc(sizeof(timestamp_t));
-					*start = timestamp_get();
-					itable_insert(starts, jobid, &start);
-					int *midp = malloc(sizeof(int) * 1);
-					*midp = mid;
-					itable_insert(job_ids, jobid, midp);
-					itable_insert(job_times, mid, info);
-				} else if(jobid < 0) {
-					debug(D_BATCH, "%i:%s there was an error that prevented forking: %s\n", rank, procname, strerror(errno));
-					MPI_Finalize();
-					return -1;
-				} else {
-					if(env) {
-						jx_export(env);
-					}
-					if(sandbox) {
-						debug(D_BATCH, "%i:%s-FORK:%i we are starting the cmd modification process\n", rank, procname, getpid());
-						char *tmp = string_format("cd %s && %s", sandbox, cmd);
-						cmd = tmp;
-						//need to cp from workdir to ./
-						char *tmp_da = strdup(outf);
-						char *ta = strtok(tmp_da, ",");
-						while(ta != NULL) {
-							tmp = string_format("%s && cp -rf ./%s %s/%s", cmd, ta, cwd, ta);
-							free(cmd);
-							cmd = tmp;
-							ta = strtok(0, ",");
-						}
-						tmp = string_format("%s && rm -rf %s", cmd, sandbox);
-						free(cmd);
-						cmd = tmp;
-					}
-					debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command! %s \n", rank, procname, getpid(), cmd);
-					execlp("sh", "sh", "-c", cmd, (char *) 0);
-					_exit(127);	// Failed to execute the cmd.
-				}
-			}
-			jx_delete(recobj);
+			jx_delete(msg);
 		}
-		//before looping again, check for exit
+
 		int status;
-		int i = waitpid(0, &status, WNOHANG);
-		if(i == 0) {
-			continue;
-		} else if(i == -1 && errno == ECHILD) {
-			continue;
-		}
-		debug(D_BATCH, "%i:%s Child process %i has returned! looking it up and processing it\n", rank, procname, i);
-		int k = *((int *) itable_lookup(job_ids, i));
-		struct batch_job_info *jobinfo = (struct batch_job_info *) itable_lookup(job_times, k);
-		jobinfo->finished = time(0);
-		timestamp_t end = timestamp_get();
-		if(WIFEXITED(status)) {
-			jobinfo->exited_normally = 1;
-			jobinfo->exit_code = WEXITSTATUS(status);
-		} else if(WIFSIGNALED(status)) {
-			jobinfo->exited_normally = 0;
-			jobinfo->exit_signal = WTERMSIG(status);
-		}
-		timestamp_t start = *((timestamp_t *) itable_lookup(starts, i));
-		debug(D_BATCH, "%i:%s Child process %i matching job %i has been found and processes, sending RANK0 the results\n", rank, procname, i, k);
-		char *tmp = string_format("{\"ID\":%i,\"START\":%lu,\"END\":%lu,\"NORMAL\":%i,\"STATUS\":%i,\"SIGNAL\":%i}", k, start, end, jobinfo->exited_normally, jobinfo->exit_code, jobinfo->exit_signal);
-		mpi_send_string(0,tmp);
-		free(tmp);
-		debug(D_BATCH, "%i:%s Sent the result string, freeing memory and continuing loop\n", rank, procname);
-
+		pid_t pid = waitpid(0, &status, WNOHANG);
+		if(pid>0) handle_complete(pid,status);
 	}
-
 
 	MPI_Finalize();
 
