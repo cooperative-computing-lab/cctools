@@ -76,11 +76,6 @@ static struct itable *job_table = 0;
 
 static batch_job_id_t jobid = 1;
 
-union mpi_ccl_guid {
-	char c[8];
-	unsigned int ul;
-};
-
 static void mpi_send_string( int rank, const char *str )
 {
 	unsigned length = strlen(str);
@@ -112,19 +107,6 @@ static struct jx * mpi_recv_jx( int rank )
 	struct jx * j = jx_parse_string(str);
 	free(str);
 	return j;
-}
-
-static unsigned int gen_guid()
-{
-	FILE *ran = fopen("/dev/urandom", "r");
-	if(!ran)
-		fatal("Cannot open /dev/urandom");
-	union mpi_ccl_guid guid;
-	size_t k = fread(guid.c, sizeof(char), 8, ran);
-	if(k < 8)
-		fatal("couldn't read 8 bytes from /dev/urandom/");
-	fclose(ran);
-	return guid.ul;
 }
 
 static struct mpi_worker * find_worker_for_job(  struct mpi_job *job )
@@ -338,20 +320,38 @@ static void handle_cancel( struct jx *msg )
 	debug(D_BATCH,"jobid %d not found!",jobid);
 }
 
-/*
-For the case where a sandbox directory is used, augment
-the command by prefixing/suffixing with various
-copy commands to move data in and out.
-(This would be better handled by just doing the copy-in
-after the fork, and the copy-in after the job completion.)
-*/
-
-char * create_sandboxed_command( struct jx *job, const char *sandbox )
+int sandbox_create( struct jx *job, const char *sandbox )
 {
+	/*
+	create_dir(sandbox);
+
+	char *file_list = strdup(jx_lookup_string(job,"INF"));
+	char *file = strtok(file_list, ",");
+	while(file) {
+		char *sandbox_name = string_format("%s/%s", sandbox, file);
+		int result = link(file, sandbox_name);
+		if(result<0) {
+			copy_file(file,sandbox_name);
+		       	if(result<0)  != 0) {
+				free(tmp);
+			}
+			file = strtok(0, ",");
+		}
+
+	}
+	*/
+}
+
+int sandbox_commit( struct jx *job, const char *sandbox )
+{
+	/*
 	char *tmp;
 
-	// Move into the sandbox directory
-	char *cmd = string_format("cd %s && %s", sandbox, jx_lookup_string(job,"CMD");
+	char *sandbox = string_format("%s/%u", workdir, gen_guid());
+
+	// Create and move into the sandbox directory
+	char *cmd = string_format("mkdir %s && cd %s && %s", sandbox, sandbox, jx_lookup_string(job,"CMD");
+
 
 	// For each output file, perform a copy out of the sandbox
 	char *file_list = strdup(jx_lookup_string(job,"OUTF"));
@@ -370,79 +370,46 @@ char * create_sandboxed_command( struct jx *job, const char *sandbox )
 	cmd = tmp;
 
 	 free(cmd);
+	*/
 }
 
 void handle_execute( struct jx *job )
 {
-	debug(D_BATCH, "%i:%s Executing given command!\n", rank, procname);
-	const char *cmd = jx_lookup_string(job, "CMD");
-	int mid = jx_lookup_integer(job, "ID");
-	struct jx *env = jx_lookup(job, "ENV");
-	const char *inf = jx_lookup_string(job, "IN");
-	const char *outf = jx_lookup_string(job, "OUT");
-	debug(D_BATCH, "%i:%s The command to execute is: %s and it is job id %i\n", rank, procname, cmd, mid);
-	//If workdir, make a sandbox.
-	//see if input files outside sandbox, and need link in
-	//if not, then copy over and link in.
-	char *sandbox = NULL;
-	if(workdir != NULL) {
-		debug(D_BATCH, "%i:%s workdir is not null, going to create sandbox! workdir pointer: %p workdir value: %s\n", rank, procname, (void *) workdir, workdir);
-		char *tmp;
-		sandbox = string_format("%s/%u", workdir, gen_guid());
-		tmp = string_format("mkdir %s", sandbox);
-		int kr = system(tmp);
-		if(kr != 0)
-			debug(D_BATCH, "%i:%s tried to make sandbox %s: failed: %i\n", rank, procname, sandbox, kr);
-		free(tmp);
+	int jobid = jx_lookup_string(job,"ID");
+	char *sandbox = 0;
 
-		char *tmp_ta = strdup(inf);
-		char *ta = strtok(tmp_ta, ",");
-		while(ta != NULL) {
-			tmp = string_format("%s/%s", sandbox, ta);
-			kr = link(ta, tmp);
-			free(tmp);
-			if(kr < 0) {
-				tmp = string_format("cp -rf %s %s", ta, sandbox);
-				kr = system(tmp);
-				if(kr != 0)
-					debug(D_BATCH, "%i:%s failed to copy %s to %s :: %i\n", rank, procname, ta, sandbox, kr);
-				free(tmp);
-			}
-			ta = strtok(0, ",");
-		}
-
+	const char *workdir = jx_lookup_string(job,"WORKDIR");
+	if(workdir) {
+		sandbox = string_format("%s/job.%d",workdir,jobid);
+		jx_insert_string(job,"SANDBOX",sandbox);
+	} else {
+		sandbox = 0;
 	}
-	int jobid = fork();
-	if(jobid > 0) {
-		debug(D_BATCH, "%i:%s In the parent of the fork, the child id is: %i\n", rank, procname, jobid);
-		struct batch_job_info *info = malloc(sizeof(*info));
-		memset(info, 0, sizeof(*info));
-		info->started = time(0);
-		timestamp_t *start = malloc(sizeof(timestamp_t));
-		*start = timestamp_get();
-		itable_insert(starts, jobid, &start);
-		int *midp = malloc(sizeof(int) * 1);
-		*midp = mid;
-		itable_insert(job_ids, jobid, midp);
-		itable_insert(job_times, mid, info);
-	} else if(jobid < 0) {
+
+	int pid = fork();
+	if(pid > 0) {
+		debug(D_BATCH, "%i:%s created jobid %d pid %d",jobid,pid);
+		itable_insert(job_table,pid,job);
+		jx_insert_integer(job,"START",time(0));
+	} else if(pid < 0) {
 		debug(D_BATCH, "%i:%s there was an error that prevented forking: %s\n", rank, procname, strerror(errno));
 		MPI_Finalize();
-		return -1;
+		exit(1);
 	} else {
 		if(env) {
 			jx_export(env);
 		}
 
 		if(sandbox) {
-			cmd = create_sandboxed_command( job, sandbox );
-		} else {
-			cmd = jx_lookup_string(job,"CMD");
+			sandbox_create(job,sandbox);
+			chdir(sandbox);
 		}
 
-		debug(D_BATCH, "%i:%s CHILD PROCESS:%i starting command! %s \n", rank, procname, getpid(), cmd);
+		const char *cmd = jx_lookup_string(job,"CMD");
+
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
-		_exit(127);	// Failed to execute the cmd.
+		debug(D_BATCH,"%i:%s failed to execute: %s",rank,procname,strerror(errno));
+		_exit(127);
 	}
 }
 
@@ -465,6 +432,11 @@ void handle_complete( pid_t pid, int status )
 	} else {
 		jx_insert_integer(job,"NORMAL",0);
 		jx_insert_integer(job,"SIGNAL",WTERMSIG(status));
+	}
+
+	const char *sandbox = jx_lookup_string(job,"SANDBOX");
+	if(sandbox) {
+		sandbox_commit(job,sandbox);
 	}
 
 	mpi_send_jx(0,job);
