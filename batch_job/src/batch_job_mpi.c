@@ -21,7 +21,6 @@ See the file COPYING for details.
 #include "itable.h"
 #include "hash_table.h"
 #include "list.h"
-#include "timestamp.h"
 #include "xxmalloc.h"
 
 #include <unistd.h>
@@ -147,14 +146,11 @@ batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct bat
 
 	struct mpi_job *job = itable_lookup(job_table,jobid);
 
-	timestamp_t start = (timestamp_t) jx_lookup_integer(j, "START");
-	timestamp_t end = (timestamp_t) jx_lookup_integer(j, "END");
-
 	memset(info,0,sizeof(*info));
 
 	info->submitted = job->submitted;
-	info->started = start / 1000000;
-	info->finished = end / 1000000;
+	info->started = jx_lookup_integer(j,"START");
+	info->finished = jx_lookup_integer(j,"END");
 
 	info->exited_normally = jx_lookup_integer(j,"NORMAL");
 	if(info->exited_normally) {
