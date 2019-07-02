@@ -51,7 +51,7 @@ struct mpi_job {
 	struct mpi_worker *worker;
 	const char *cmd;
 	batch_job_id_t jobid;
-	const char *env;
+	struct jx *env;
 	const char *infiles;
 	const char *outfiles;
 	time_t submitted;
@@ -127,7 +127,7 @@ void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 	jx_insert_string(j,"Orders","Execute");
 	jx_insert_string(j,"CMD",job->cmd);
 	jx_insert_integer(j,"ID",job->jobid);
-	if(job->env) jx_insert_string(j,"ENV",job->env);
+	if(job->env) jx_insert(j,"ENV",job->env);
 	if(job->infiles) jx_insert_string(j,"IN",job->infiles);
 	if(job->outfiles) jx_insert_string(j,"OUT",job->outfiles);
 
@@ -174,7 +174,7 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 	job->cmd = xxstrdup(cmd);
 	job->cores = resources->cores;
 	job->memory = resources->memory;
-	job->env = envlist ? jx_print_string(envlist) : 0;
+	job->env = jx_copy(envlist);
 	job->infiles = extra_input_files;
 	job->outfiles = extra_output_files;
 	job->jobid = jobid++;
@@ -330,7 +330,8 @@ void handle_execute( struct jx *job )
 		MPI_Finalize();
 		exit(1);
 	} else {
-i		if(env) {
+		struct jx *env = jx_lookup(job,"ENV");
+		if(env) {
 			jx_export(env);
 		}
 
