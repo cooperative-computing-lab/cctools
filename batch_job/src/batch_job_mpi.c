@@ -316,71 +316,9 @@ static void handle_cancel( struct jx *msg )
 	debug(D_BATCH,"jobid %d not found!",jobid);
 }
 
-int sandbox_create( struct jx *job, const char *sandbox )
-{
-	/*
-	create_dir(sandbox);
-
-	char *file_list = strdup(jx_lookup_string(job,"INF"));
-	char *file = strtok(file_list, ",");
-	while(file) {
-		char *sandbox_name = string_format("%s/%s", sandbox, file);
-		int result = link(file, sandbox_name);
-		if(result<0) {
-			copy_file(file,sandbox_name);
-		       	if(result<0)  != 0) {
-				free(tmp);
-			}
-			file = strtok(0, ",");
-		}
-
-	}
-	*/
-}
-
-int sandbox_commit( struct jx *job, const char *sandbox )
-{
-	/*
-	char *tmp;
-
-	char *sandbox = string_format("%s/%u", workdir, gen_guid());
-
-	// Create and move into the sandbox directory
-	char *cmd = string_format("mkdir %s && cd %s && %s", sandbox, sandbox, jx_lookup_string(job,"CMD");
-
-
-	// For each output file, perform a copy out of the sandbox
-	char *file_list = strdup(jx_lookup_string(job,"OUTF"));
-	char *file = strtok(file_list, ",");
-	while(file) {
-		tmp = string_format("%s && cp -rf ./%s %s/%s", cmd, file, cwd, file);
-		free(cmd);
-		cmd = tmp;
-		file = strtok(0, ",");
-	}
-	free(file_list);
-
-	// Finally, remove the sandbox when done.
-	tmp = string_format("%s && rm -rf %s", cmd, sandbox);
-	free(cmd);
-	cmd = tmp;
-
-	 free(cmd);
-	*/
-}
-
 void handle_execute( struct jx *job )
 {
 	int jobid = jx_lookup_string(job,"ID");
-	char *sandbox = 0;
-
-	const char *workdir = jx_lookup_string(job,"WORKDIR");
-	if(workdir) {
-		sandbox = string_format("%s/job.%d",workdir,jobid);
-		jx_insert_string(job,"SANDBOX",sandbox);
-	} else {
-		sandbox = 0;
-	}
 
 	int pid = fork();
 	if(pid > 0) {
@@ -392,13 +330,8 @@ void handle_execute( struct jx *job )
 		MPI_Finalize();
 		exit(1);
 	} else {
-		if(env) {
+i		if(env) {
 			jx_export(env);
-		}
-
-		if(sandbox) {
-			sandbox_create(job,sandbox);
-			chdir(sandbox);
 		}
 
 		const char *cmd = jx_lookup_string(job,"CMD");
@@ -430,11 +363,6 @@ void handle_complete( pid_t pid, int status )
 		jx_insert_integer(job,"SIGNAL",WTERMSIG(status));
 	}
 
-	const char *sandbox = jx_lookup_string(job,"SANDBOX");
-	if(sandbox) {
-		sandbox_commit(job,sandbox);
-	}
-
 	mpi_send_jx(0,job);
 }
 
@@ -451,10 +379,6 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 	signal(SIGQUIT, mpi_worker_handle_signal);
 
 	send_config_message();
-
-	// XXX workdir should get come from command line arguments
-	char *workdir = "/tmp/makeflow-mpi";
-	char *cwd = get_current_dir_name();
 
 	/* job table contains the jx for each job, indexed by the running pid */
 
