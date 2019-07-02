@@ -124,12 +124,12 @@ static struct mpi_worker * find_worker_for_job(  struct mpi_job *job )
 void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 {
 	struct jx *j = jx_object(0);
-	jx_insert_string(j,"Orders","Execute");
+	jx_insert_string(j,"Action","Execute");
 	jx_insert_string(j,"CMD",job->cmd);
-	jx_insert_integer(j,"ID",job->jobid);
+	jx_insert_integer(j,"JOBID",job->jobid);
 	if(job->env) jx_insert(j,"ENV",job->env);
-	if(job->infiles) jx_insert_string(j,"IN",job->infiles);
-	if(job->outfiles) jx_insert_string(j,"OUT",job->outfiles);
+	if(job->infiles) jx_insert_string(j,"INFILES",job->infiles);
+	if(job->outfiles) jx_insert_string(j,"OUTFILES",job->outfiles);
 
 	mpi_send_jx(worker->rank,j);
 
@@ -142,7 +142,7 @@ batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct bat
 {
 	struct jx *j = mpi_recv_jx(worker->rank);
 
-	int jobid = jx_lookup_integer(j, "ID");
+	int jobid = jx_lookup_integer(j, "JOBID");
 
 	struct mpi_job *job = itable_lookup(job_table,jobid);
 
@@ -225,7 +225,7 @@ static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
 		list_remove(job_queue,job);
 
 		if(job->worker) {
-			char *cmd = string_format("{\"Orders\":\"Cancel\", \"ID\":\"%li\"}", jobid);
+			char *cmd = string_format("{\"Action\":\"Remove\", \"JOBID\":\"%li\"}", jobid);
 			mpi_send_string(job->worker->rank,cmd);
 			free(cmd);
 		}
@@ -248,7 +248,7 @@ static void batch_job_mpi_kill_workers()
 {
 	int i;
 	for(i=1;i<nworkers;i++) {
-		mpi_send_string(i,"{\"Orders\":\"Terminate\"}");
+		mpi_send_string(i,"{\"Action\":\"Terminate\"}");
 	}
 }
 
@@ -289,9 +289,9 @@ static void handle_terminate()
 	exit(0);
 }
 
-static void handle_cancel( struct jx *msg )
+static void handle_remove( struct jx *msg )
 {
-	int jobid = jx_lookup_integer(msg, "ID");
+	int jobid = jx_lookup_integer(msg, "JOBID");
 
 	uint64_t pid;
 	struct jx *job;
@@ -318,7 +318,7 @@ static void handle_cancel( struct jx *msg )
 
 void handle_execute( struct jx *job )
 {
-	int jobid = jx_lookup_string(job,"ID");
+	int jobid = jx_lookup_string(job,"JOBID");
 
 	int pid = fork();
 	if(pid > 0) {
@@ -352,7 +352,7 @@ void handle_complete( pid_t pid, int status )
 		return;
 	}
 
-	debug(D_BATCH,"%i:%s jobid %d pid %d has exited",rank,procname,jx_lookup_integer(job,"ID"),pid);
+	debug(D_BATCH,"%i:%s jobid %d pid %d has exited",rank,procname,jx_lookup_integer(job,"JOBID"),pid);
 
 	jx_insert_integer(job,"END",time(0));
 
@@ -391,16 +391,16 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 		MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
 			struct jx *msg = mpi_recv_jx(0);
-			const char *order = jx_lookup_string(msg,"Orders");
+			const char *action = jx_lookup_string(msg,"Action");
 
-			if(!strcmp(order,"Terminate")) {
+			if(!strcmp(action,"Terminate")) {
 				handle_terminate();
-			} else if(!strcmp(order,"Cancel")) {
-				handle_cancel(msg);
-			} else if(!strcmp(order,"Execute")) {
+			} else if(!strcmp(action,"Remove")) {
+				handle_remove(msg);
+			} else if(!strcmp(action,"Execute")) {
 				handle_execute(msg);
 			} else {
-				debug(D_BATCH,"unexpected order: %s",order);
+				debug(D_BATCH,"unexpected action: %s",action);
 			}
 			jx_delete(msg);
 		}
