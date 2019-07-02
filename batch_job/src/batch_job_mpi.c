@@ -433,7 +433,7 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mp
 		struct mpi_worker *w = &workers[i];
 		struct jx *j = mpi_recv_jx(i);
 		w->name       = strdup(jx_lookup_string(j,"name"));
-		w->rank       = 1;
+		w->rank       = i;
 		w->memory     = jx_lookup_integer(j,"memory");
 		w->cores      = jx_lookup_integer(j,"cores");
 		jx_delete(j);
