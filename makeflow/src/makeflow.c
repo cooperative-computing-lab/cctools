@@ -1152,8 +1152,6 @@ static void show_help_run(const char *cmd)
 	printf("\nMPI Options:\n");
 	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
 	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
-	printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create\n");
-	printf("                                  sandbox directory and execute in.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1208,7 +1206,6 @@ int main(int argc, char *argv[])
 
 	int mpi_cores = 0;
 	int mpi_memory = 0;
-	const char* mpi_task_working_dir = NULL;
 
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
@@ -1340,7 +1337,6 @@ int main(int argc, char *argv[])
 		LONG_OPT_VERBOSE_JOBNAMES,
 		LONG_OPT_MPI_CORES,
 		LONG_OPT_MPI_MEMORY,
-		LONG_OPT_MPI_TASK_WORKING_DIR,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1458,7 +1454,6 @@ int main(int argc, char *argv[])
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
 		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
-		{"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_TASK_WORKING_DIR},
 		{0, 0, 0, 0}
 	};
 
@@ -1965,9 +1960,6 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MPI_MEMORY:
 				mpi_memory = atoi(optarg);
 				break;
-			case LONG_OPT_MPI_TASK_WORKING_DIR:
-				mpi_task_working_dir = xxstrdup(optarg);
-				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -1978,7 +1970,7 @@ int main(int argc, char *argv[])
 
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
-		batch_job_mpi_setup(mpi_cores,mpi_memory,mpi_task_working_dir);
+		batch_job_mpi_setup(mpi_cores,mpi_memory);
 	}
 
 	if(!did_explicit_auth)

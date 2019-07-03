@@ -423,7 +423,7 @@ by setting up the table of workers and receiving
 basic resource configuration.
 */
 
-static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mpi_memory, const char *working_dir)
+static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int manual_memory )
 {
 	int i;
 
@@ -434,8 +434,8 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int mpi_cores, int mp
 		struct jx *j = mpi_recv_jx(i);
 		w->name       = strdup(jx_lookup_string(j,"name"));
 		w->rank       = i;
-		w->memory     = jx_lookup_integer(j,"memory");
-		w->cores      = jx_lookup_integer(j,"cores");
+		w->memory     = manual_memory ? manual_memorys : jx_lookup_integer(j,"memory");
+		w->cores      = manual_cores ? manual_cores : jx_lookup_integer(j,"cores");
 		jx_delete(j);
 	}
 }
@@ -446,7 +446,7 @@ Determine the rank and then (if master) initalize and return,
 or (if worker) continue on to the worker code.
 */
 
-void batch_job_mpi_setup(int mpi_cores, int mpi_memory, const char *mpi_task_working_dir)
+void batch_job_mpi_setup(int manual_cores, int manual_memory )
 {
 	int mpi_world_size;
 	int mpi_rank;
@@ -464,7 +464,7 @@ void batch_job_mpi_setup(int mpi_cores, int mpi_memory, const char *mpi_task_wor
 
 	if(mpi_rank == 0) {
 		printf("MPI master process ready.\n");
-		batch_job_mpi_master_setup(mpi_world_size, mpi_cores, mpi_memory, mpi_task_working_dir);
+		batch_job_mpi_master_setup(mpi_world_size, manual_cores, manual_memory );
 	} else {
 		printf("MPI worker process ready.\n");
 		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname, procnamelen);
@@ -509,7 +509,7 @@ const struct batch_queue_module batch_queue_mpi = {
 };
 #else
 
-void batch_job_mpi_setup( int mpi_cores, int mpi_memory, const char *mpi_task_working_dir ) {
+void batch_job_mpi_setup( int manual_cores, int manual_memory) {
   fatal("makeflow: mpi support is not enabled: please reconfigure using --with-mpicc-path");
 
 }
