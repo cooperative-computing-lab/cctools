@@ -312,8 +312,8 @@ static int batch_queue_mpi_free(struct batch_queue *q)
 	batch_job_id_t jobid;
 	struct jx *job;
 
-	itable_first_item(job_table);
-	while(itable_next_item(job_table,&jobid,&job)) {
+	itable_firstkey(job_table);
+	while(itable_nextkey(job_table,&jobid,(void**)&job)) {
 		mpi_job_delete(job);
 	}
 
@@ -378,8 +378,8 @@ static void handle_remove( struct jx *msg )
 
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table, &pid, (void **)&job)) {
-		if(job->jobid==jobid) {
-		  debug(D_BATCH, "killing jobid %lld pid %llu",jobid,pid);
+		if(jx_lookup_integer(job,"JOBID")==jobid) {
+			debug(D_BATCH, "killing jobid %lld pid %llu",jobid,pid);
 			kill(pid, SIGKILL);
 
 			debug(D_BATCH, "waiting for jobid %lld pid %llu",jobid,pid);
@@ -409,7 +409,7 @@ void handle_execute( struct jx *job )
 
 	pid_t pid = fork();
 	if(pid > 0) {
-		debug(D_BATCH,"created jobid %d pid %d",jobid,pid);
+		debug(D_BATCH,"created jobid %lld pid %d",jobid,pid);
 		itable_insert(job_table,pid,job);
 		jx_insert_integer(job,"START",time(0));
 	} else if(pid < 0) {
