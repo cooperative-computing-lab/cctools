@@ -379,21 +379,21 @@ static void handle_remove( struct jx *msg )
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table, &pid, (void **)&job)) {
 		if(job->jobid==jobid) {
-			debug(D_BATCH, "killing jobid %d pid %d",jobid,pid);
+		  debug(D_BATCH, "killing jobid %lld pid %llu",jobid,pid);
 			kill(pid, SIGKILL);
 
-			debug(D_BATCH, "waiting for jobid %d pid %d",jobid,pid);
+			debug(D_BATCH, "waiting for jobid %lld pid %llu",jobid,pid);
 			int status;
 			waitpid(pid, &status, 0);
 
-			debug(D_BATCH, "killed jobid %d pid %d",jobid,pid);
+			debug(D_BATCH, "killed jobid %lld pid %llu",jobid,pid);
 			job = itable_remove(job_table,pid);
 			jx_delete(job);
 			break;
 		}
 	}
 
-	debug(D_BATCH,"jobid %d not found!",jobid);
+	debug(D_BATCH,"jobid %lld not found!",jobid);
 }
 
 /*
@@ -407,7 +407,7 @@ void handle_execute( struct jx *job )
 {
 	batch_job_id_t jobid = jx_lookup_string(job,"JOBID");
 
-	int pid = fork();
+	pid_t pid = fork();
 	if(pid > 0) {
 		debug(D_BATCH,"created jobid %d pid %d",jobid,pid);
 		itable_insert(job_table,pid,job);
