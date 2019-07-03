@@ -169,7 +169,7 @@ static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, str
 {
 	struct jx *j = mpi_recv_jx(worker->rank);
 
-	int jobid = jx_lookup_integer(j, "JOBID");
+	batch_job_id_t jobid = jx_lookup_integer(j, "JOBID");
 
 	struct mpi_job *job = itable_lookup(job_table,jobid);
 
@@ -270,7 +270,7 @@ static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
 		list_remove(job_queue,job);
 
 		if(job->worker) {
-			char *cmd = string_format("{\"Action\":\"Remove\", \"JOBID\":\"%li\"}", jobid);
+			char *cmd = string_format("{\"Action\":\"Remove\", \"JOBID\":\"%lld\"}", jobid);
 			mpi_send_string(job->worker->rank,cmd);
 			free(cmd);
 		}
@@ -371,7 +371,7 @@ and if necessary, killing the process and waiting for it.
 
 static void handle_remove( struct jx *msg )
 {
-	int jobid = jx_lookup_integer(msg, "JOBID");
+	batch_job_id_t jobid = jx_lookup_integer(msg, "JOBID");
 
 	uint64_t pid;
 	struct jx *job;
@@ -405,7 +405,7 @@ table with the pid as the key.
 
 void handle_execute( struct jx *job )
 {
-	int jobid = jx_lookup_string(job,"JOBID");
+	batch_job_id_t jobid = jx_lookup_string(job,"JOBID");
 
 	int pid = fork();
 	if(pid > 0) {
@@ -444,7 +444,7 @@ void handle_complete( pid_t pid, int status )
 		return;
 	}
 
-	debug(D_BATCH,"jobid %d pid %d has exited",jx_lookup_integer(job,"JOBID"),pid);
+	debug(D_BATCH,"jobid %lld pid %d has exited",jx_lookup_integer(job,"JOBID"),pid);
 
 	jx_insert_integer(job,"END",time(0));
 
