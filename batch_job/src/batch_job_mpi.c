@@ -335,7 +335,7 @@ Send the initial configuration message from the worker
 that describe the local resources and setup.
 */
 
-static void send_config_message()
+static void send_config_message( int rank, const char *procname )
 {
 	/* measure available local resources */
 	int cores = load_average_get_cpus();
@@ -359,7 +359,7 @@ Terminate the worker process when requested.
 
 static void handle_terminate()
 {
-	debug(D_BATCH, "%i:%s Being told to terminate, calling finalize and returning\n", rank, procname);
+	debug(D_BATCH,"Terminating");
 	MPI_Finalize();
 	exit(0);
 }
@@ -409,11 +409,11 @@ void handle_execute( struct jx *job )
 
 	int pid = fork();
 	if(pid > 0) {
-		debug(D_BATCH, "%i:%s created jobid %d pid %d",jobid,pid);
+		debug(D_BATCH,"created jobid %d pid %d",jobid,pid);
 		itable_insert(job_table,pid,job);
 		jx_insert_integer(job,"START",time(0));
 	} else if(pid < 0) {
-		debug(D_BATCH, "%i:%s there was an error that prevented forking: %s\n", rank, procname, strerror(errno));
+		debug(D_BATCH,"error forking: %s\n",strerror(errno));
 		MPI_Finalize();
 		exit(1);
 	} else {
@@ -425,7 +425,7 @@ void handle_execute( struct jx *job )
 		const char *cmd = jx_lookup_string(job,"CMD");
 
 		execlp("sh", "sh", "-c", cmd, (char *) 0);
-		debug(D_BATCH,"%i:%s failed to execute: %s",rank,procname,strerror(errno));
+		debug(D_BATCH,"failed to execute: %s",strerror(errno));
 		_exit(127);
 	}
 }
@@ -440,11 +440,11 @@ void handle_complete( pid_t pid, int status )
 {
 	struct jx *job = itable_lookup(job_table,pid);
 	if(!job) {
-		debug(D_BATCH,"%i:%s No job with pid %d found!",rank,procname,pid);
+		debug(D_BATCH,"No job with pid %d found!",pid);
 		return;
 	}
 
-	debug(D_BATCH,"%i:%s jobid %d pid %d has exited",rank,procname,jx_lookup_integer(job,"JOBID"),pid);
+	debug(D_BATCH,"jobid %d pid %d has exited",jx_lookup_integer(job,"JOBID"),pid);
 
 	jx_insert_integer(job,"END",time(0));
 
@@ -466,7 +466,7 @@ and MPI_Iprobe -- we need a better solution that can wait for
 both simultaneously.
 */
 
-static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int procnamelen)
+static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 {
 	/* set up signal handlers to ignore signals */
 
@@ -474,7 +474,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int pro
 	signal(SIGTERM, mpi_worker_handle_signal);
 	signal(SIGQUIT, mpi_worker_handle_signal);
 
-	send_config_message();
+	send_config_message(rank,procname);
 
 	/* job table contains the jx for each job, indexed by the running pid */
 
@@ -529,7 +529,7 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 		struct jx *j = mpi_recv_jx(i);
 		w->name       = strdup(jx_lookup_string(j,"name"));
 		w->rank       = i;
-		w->memory     = manual_memory ? manual_memorys : jx_lookup_integer(j,"memory");
+		w->memory     = manual_memory ? manual_memory : jx_lookup_integer(j,"memory");
 		w->cores      = manual_cores ? manual_cores : jx_lookup_integer(j,"cores");
 		jx_delete(j);
 	}
@@ -555,14 +555,14 @@ void batch_job_mpi_setup(int manual_cores, int manual_memory )
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	MPI_Get_processor_name(procname, &procnamelen);
 
-	debug(D_BATCH, "%i:%s My pid is: %i\n", mpi_rank, procname, getpid());
-
 	if(mpi_rank == 0) {
 		printf("MPI master process ready.\n");
 		batch_job_mpi_master_setup(mpi_world_size, manual_cores, manual_memory );
 	} else {
 		printf("MPI worker process ready.\n");
-		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname, procnamelen);
+		procname[procnamelen] = 0;
+		debug_config(string_format("%d:%s",mpi_rank,procname));
+		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname);
 		exit(r);
 	}
 }
