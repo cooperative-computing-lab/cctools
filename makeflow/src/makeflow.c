@@ -40,6 +40,10 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
+#ifndef CCTOOLS_USE_MPI
+#include "mpi.h"
+#endif
+
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
@@ -1227,6 +1231,10 @@ int main(int argc, char *argv[])
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
+#endif
+
+#ifndef CCTOOLS_USE_MPI
+	MPI_Init(&argc,&argv);
 #endif
 
 	random_init();
