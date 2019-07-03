@@ -75,12 +75,16 @@ static struct itable *job_table = 0;
 
 static batch_job_id_t jobid = 1;
 
+/* Send a null-delimited C-string. */
+
 static void mpi_send_string( int rank, const char *str )
 {
 	unsigned length = strlen(str);
 	MPI_Send(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD);
 	MPI_Send(str, length, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
 }
+
+/* Receive a null-delimited C-string; result must be free()d when done. */
 
 static char * mpi_recv_string( int rank )
 {
@@ -92,12 +96,19 @@ static char * mpi_recv_string( int rank )
 	return str;
 }
 
+/* Send a JX object by serializing it to a string and sending it. */
+
 static void mpi_send_jx( int rank, struct jx *j )
 {
 	char *str = jx_print_string(j);
 	mpi_send_string(rank,str);
 	free(str);
 }
+
+/*
+Receive a jx object by receiving a string and parsing it.
+The result must be freed with jx_delete().
+*/
 
 static struct jx * mpi_recv_jx( int rank )
 {
@@ -107,6 +118,11 @@ static struct jx * mpi_recv_jx( int rank )
 	free(str);
 	return j;
 }
+
+/*
+Scan the list of workers and find the first available worker
+with sufficient cores and memory to fit the job.
+*/
 
 static struct mpi_worker * find_worker_for_job(  struct mpi_job *job )
 {
@@ -120,6 +136,11 @@ static struct mpi_worker * find_worker_for_job(  struct mpi_job *job )
 
 	return 0;
 }
+
+/*
+Send a given job to a worker by describing it as a JX
+object, and then note the committed resources at the worker.
+*/
 
 void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 {
@@ -138,7 +159,13 @@ void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 	job->worker = worker;
 }
 
-batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct batch_job_info *info )
+/*
+Receive a result message from the worker, and convert the JX
+representation into a batch_job_info structure.  Returns the
+jobid of the completed job.
+*/
+
+static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct batch_job_info *info )
 {
 	struct jx *j = mpi_recv_jx(worker->rank);
 
@@ -167,6 +194,12 @@ batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, struct bat
 	return jobid;
 }
 
+/*
+Submit an MPI job by converting it into a struct mpi_job
+and adding it to the job_queue and job table.
+Returns a generated jobid for the job.
+*/
+
 static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
 	struct mpi_job *job = malloc(sizeof(*job));
@@ -185,6 +218,13 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 
 	return job->jobid;
 }
+
+/*
+Wait for a job to complete within the given stoptime.
+First assigns jobs to workers, if possible, then waits
+for a response message from a worker.
+XXX Does not correctly deal with the stoptime parameter!
+*/
 
 static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job_info *info, time_t stoptime)
 {
@@ -218,6 +258,11 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	return -1;
 }
 
+/*
+Remove a running job by taking it out of the job_table and job_queue,
+and if necessary, send a remove message to the corresponding worker.
+*/
+
 static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
 {
 	struct mpi_job *job = itable_remove(job_table,jobid);
@@ -244,6 +289,11 @@ static int batch_queue_mpi_create(struct batch_queue *q)
 	return 0;
 }
 
+/*
+Send a message to all workers telling them to exit.
+XXX This would be better implemented as a broadcast.
+*/
+
 static void batch_job_mpi_kill_workers()
 {
 	int i;
@@ -252,8 +302,24 @@ static void batch_job_mpi_kill_workers()
 	}
 }
 
+/*
+Free the queue object by flushing the data structures,
+and killing all workers.
+*/
+
 static int batch_queue_mpi_free(struct batch_queue *q)
 {
+	batch_job_id_t jobid;
+	struct jx *job;
+
+	itable_first_item(job_table);
+	while(itable_next_item(job_table,&jobid,&job)) {
+		mpi_job_delete(job);
+	}
+
+	list_delete(job_queue);
+	itable_delete(job_table);
+
 	batch_job_mpi_kill_workers();
 	MPI_Finalize();
 	return 0;
@@ -263,6 +329,11 @@ static void mpi_worker_handle_signal(int sig)
 {
 	//do nothing, so that way we can kill the children and clean it up
 }
+
+/*
+Send the initial configuration message from the worker
+that describe the local resources and setup.
+*/
 
 static void send_config_message()
 {
@@ -282,12 +353,21 @@ static void send_config_message()
 	jx_delete(jmsg);
 }
 
+/*
+Terminate the worker process when requested.
+*/
+
 static void handle_terminate()
 {
 	debug(D_BATCH, "%i:%s Being told to terminate, calling finalize and returning\n", rank, procname);
 	MPI_Finalize();
 	exit(0);
 }
+
+/*
+Remove the indicated job from the job_table,
+and if necessary, killing the process and waiting for it.
+*/
 
 static void handle_remove( struct jx *msg )
 {
@@ -316,6 +396,13 @@ static void handle_remove( struct jx *msg )
 	debug(D_BATCH,"jobid %d not found!",jobid);
 }
 
+/*
+Execute a job by forking a new process, setting
+up the job environment, and executing the command.
+If successful, the job object is installed in the job
+table with the pid as the key.
+*/
+
 void handle_execute( struct jx *job )
 {
 	int jobid = jx_lookup_string(job,"JOBID");
@@ -343,9 +430,14 @@ void handle_execute( struct jx *job )
 	}
 }
 
+/*
+Handle the completion of a given pid by looking up
+the corresponding job in the job_table, and if found,
+send back a completion message to the master.
+*/
 
 void handle_complete( pid_t pid, int status )
-{{
+{
 	struct jx *job = itable_lookup(job_table,pid);
 	if(!job) {
 		debug(D_BATCH,"%i:%s No job with pid %d found!",rank,procname,pid);
@@ -369,6 +461,9 @@ void handle_complete( pid_t pid, int status )
 
 /*
 Main loop for dedicated worker communicating with master.
+XXX This code busy waits by alternating between waitpid(NOHANG)
+and MPI_Iprobe -- we need a better solution that can wait for
+both simultaneously.
 */
 
 static int batch_job_mpi_worker(int worldsize, int rank, char *procname, int procnamelen)
