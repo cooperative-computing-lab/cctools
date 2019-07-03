@@ -253,7 +253,6 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 Wait for a job to complete within the given stoptime.
 First assigns jobs to workers, if possible, then waits
 for a response message from a worker.
-XXX Does not correctly deal with the stoptime parameter!
 */
 
 static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job_info *info, time_t stoptime)
@@ -272,19 +271,24 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		}
 	}
 
-	/* Probe each of the workers for responses.  */
+	/* Check for incoming completions from workers. */
 
-	int i;
-	for(i=1;i<nworkers;i++) {
+	while(1) {
 		MPI_Status mstatus;
 		int flag=0;
-		debug(D_BATCH,"probing worker %d",i);
-		MPI_Iprobe(i, 0, MPI_COMM_WORLD, &flag, &mstatus);
+		MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
-		  debug(D_BATCH,"message ready from worker %d",i);
-			jobid = receive_result_from_worker(&workers[i],info);
+			debug(D_BATCH,"message ready from worker %d",mstatus.MPI_SOURCE);
+			struct mpi_worker *worker = &workers[mstatus.MPI_SOURCE];
+			jobid = receive_result_from_worker(worker,info);
 			return jobid;
 		}
+
+		/* Return if time has expired. */
+		if(time(0)>stoptime) break;
+
+		/* Otherwise sleep for ~100ms */
+		usleep(100000);
 	}
 
 	return -1;
