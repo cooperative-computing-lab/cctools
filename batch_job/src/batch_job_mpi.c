@@ -113,8 +113,9 @@ The result must be freed with jx_delete().
 static struct jx * mpi_recv_jx( int rank )
 {
 	char *str = mpi_recv_string(rank);
-	if(!str) return 0;
+	if(!str) fatal("failed to receive string from rank %d",rank);
 	struct jx * j = jx_parse_string(str);
+	if(!j) fatal("failed to parse string: %s",str);
 	free(str);
 	return j;
 }
@@ -129,7 +130,7 @@ static struct mpi_worker * find_worker_for_job(  struct mpi_job *job )
 	int i;
 	for(i=1;i<nworkers;i++) {	
 		struct mpi_worker *worker = &workers[i];
-		if(job->cores>=worker->avail_cores && job->memory>=worker->avail_memory) {
+		if(job->cores<=worker->avail_cores && job->memory<=worker->avail_memory) {
 			return worker;
 		}
 	}
@@ -172,6 +173,7 @@ static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, str
 	batch_job_id_t jobid = jx_lookup_integer(j, "JOBID");
 
 	struct mpi_job *job = itable_lookup(job_table,jobid);
+	if(!job) fatal("no job with jobid %lld",jobid);
 
 	memset(info,0,sizeof(*info));
 
@@ -206,6 +208,15 @@ static struct mpi_job * mpi_job_create( const char *cmd, const char *extra_input
 	job->outfiles = strdup(extra_output_files);
 	job->jobid = jobid++;
 	job->submitted = time(0);
+
+	/*
+	If resources are not set, assume at least one core,
+	so as to avoid overcommitting workers.
+	*/
+
+	if(job->cores<=0) job->cores = 1;
+	if(job->memory<=0) job->memory = 0;
+
 	
 	return job;
 }
@@ -232,7 +243,7 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 	struct mpi_job * job = mpi_job_create(cmd,extra_input_files,extra_output_files,envlist,resources);
 
 	list_push_tail(job_queue,job);
-	itable_insert(job_table,jobid,job);
+	itable_insert(job_table,job->jobid,job);
 
 	return job->jobid;
 }
@@ -266,9 +277,11 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	for(i=1;i<nworkers;i++) {
 		MPI_Status mstatus;
 		int flag=0;
+		debug(D_BATCH,"probing worker %d",i);
 		MPI_Iprobe(i, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
-			jobid = receive_result_from_worker(worker,info);
+		  debug(D_BATCH,"message ready from worker %d",i);
+			jobid = receive_result_from_worker(&workers[i],info);
 			return jobid;
 		}
 	}
@@ -293,8 +306,7 @@ static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
 			free(cmd);
 		}
 
-		// XXX also free job elements
-		free(job);
+		mpi_job_delete(job);
 	}
 
 	return 0;
@@ -355,10 +367,13 @@ that describe the local resources and setup.
 
 static void send_config_message( int rank, const char *procname )
 {
+
 	/* measure available local resources */
 	int cores = load_average_get_cpus();
 	uint64_t memtotal, memavail;
 	host_memory_info_get(&memavail, &memtotal);
+	memavail /= MEGA;
+	memtotal /= MEGA;
 
 	/* send initial configuration message */
 	struct jx *jmsg = jx_object(0);
@@ -428,7 +443,7 @@ void handle_execute( struct jx *job )
 	pid_t pid = fork();
 	if(pid > 0) {
 		debug(D_BATCH,"created jobid %lld pid %d",jobid,pid);
-		itable_insert(job_table,pid,job);
+		itable_insert(job_table,pid,jx_copy(job));
 		jx_insert_integer(job,"START",time(0));
 	} else if(pid < 0) {
 		debug(D_BATCH,"error forking: %s\n",strerror(errno));
@@ -501,10 +516,13 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 	while(1) {
 		MPI_Status mstatus;
 		int flag;
+		debug(D_BATCH,"checking for incoming message...");
 		MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
 			struct jx *msg = mpi_recv_jx(0);
 			const char *action = jx_lookup_string(msg,"Action");
+
+			debug(D_BATCH,"got message with action %s",action);
 
 			if(!strcmp(action,"Terminate")) {
 				handle_terminate();
@@ -518,11 +536,15 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 			jx_delete(msg);
 		}
 
+		debug(D_BATCH,"checking for exited child...");
+
 		int status;
 		pid_t pid = waitpid(0, &status, WNOHANG);
 		if(pid>0) handle_complete(pid,status);
 
+		debug(D_BATCH,"sleeping...");
 		// XXX we have a busy waiting problem here...
+		sleep(1);
 	}
 
 	MPI_Finalize();
@@ -541,14 +563,18 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 	int i;
 
 	workers = calloc(mpi_world_size,sizeof(*workers));
+	nworkers = mpi_world_size;
 
 	for(i = 1; i < mpi_world_size; i++) {
+		debug(D_BATCH,"fetching worker info from rank %d",i);
 		struct mpi_worker *w = &workers[i];
 		struct jx *j = mpi_recv_jx(i);
 		w->name       = strdup(jx_lookup_string(j,"name"));
 		w->rank       = i;
 		w->memory     = manual_memory ? manual_memory : jx_lookup_integer(j,"memory");
 		w->cores      = manual_cores ? manual_cores : jx_lookup_integer(j,"cores");
+		w->avail_memory = w->memory;
+		w->avail_cores = w->cores;
 		jx_delete(j);
 	}
 }
@@ -566,9 +592,6 @@ void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manu
 	char procname[MPI_MAX_PROCESSOR_NAME];
 	int procnamelen;
 
-	printf("setting up MPI...\n");
-
-	MPI_Init(NULL, NULL);
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 	MPI_Get_processor_name(procname, &procnamelen);
@@ -581,6 +604,7 @@ void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manu
 		procname[procnamelen] = 0;
 		debug_config(string_format("%d:%s",mpi_rank,procname));
 		debug_config_file(string_format("%s.rank.%d",debug_filename,mpi_rank));
+		debug_reopen();
 		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname);
 		exit(r);
 	}
