@@ -559,7 +559,7 @@ Determine the rank and then (if master) initalize and return,
 or (if worker) continue on to the worker code.
 */
 
-void batch_job_mpi_setup(int manual_cores, int manual_memory )
+void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manual_memory )
 {
 	int mpi_world_size;
 	int mpi_rank;
@@ -580,6 +580,7 @@ void batch_job_mpi_setup(int manual_cores, int manual_memory )
 		printf("MPI worker process ready.\n");
 		procname[procnamelen] = 0;
 		debug_config(string_format("%d:%s",mpi_rank,procname));
+		debug_config_file(string_format("%s.rank.%d",debug_filename,mpi_rank));
 		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname);
 		exit(r);
 	}

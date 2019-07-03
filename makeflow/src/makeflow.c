@@ -1198,6 +1198,7 @@ int main(int argc, char *argv[])
 	char *s;
 	int safe_submit = 0;
 	int ignore_mem_spec = 0;
+	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
@@ -1625,7 +1626,8 @@ int main(int argc, char *argv[])
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
-				debug_config_file(optarg);
+				debug_file_name = optarg;
+				debug_config_file(debug_file_name);
 				break;
 			case 'p':
 				port_set = 1;
@@ -1970,7 +1972,7 @@ int main(int argc, char *argv[])
 
 	/* Perform initial MPI setup prior to creating the batch queue object. */
 	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
-		batch_job_mpi_setup(mpi_cores,mpi_memory);
+		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
 	}
 
 	if(!did_explicit_auth)

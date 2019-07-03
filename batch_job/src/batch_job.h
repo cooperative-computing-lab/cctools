@@ -236,6 +236,6 @@ int batch_queue_port(struct batch_queue *q);
 /* Hack: provide a backdoor to allow the MPI module to perform
    some initial setup before the MPI batch queue is created.
 */
-void batch_job_mpi_setup( int mpi_cores, int mpi_memory );
+void batch_job_mpi_setup( const char *debug_filename, int mpi_cores, int mpi_memory );
 
 #endif
