@@ -49,11 +49,11 @@ struct mpi_job {
 	int64_t cores;
 	int64_t memory;
 	struct mpi_worker *worker;
-	const char *cmd;
+	char *cmd;
 	batch_job_id_t jobid;
 	struct jx *env;
-	const char *infiles;
-	const char *outfiles;
+	char *infiles;
+	char *outfiles;
 	time_t submitted;
 };
 
@@ -194,6 +194,33 @@ static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, str
 	return jobid;
 }
 
+static struct mpi_job * mpi_job_create( const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources )
+{
+	struct mpi_job *job = malloc(sizeof(*job));
+
+	job->cmd = xxstrdup(cmd);
+	job->cores = resources->cores;
+	job->memory = resources->memory;
+	job->env = jx_copy(envlist);
+	job->infiles = strdup(extra_input_files);
+	job->outfiles = strdup(extra_output_files);
+	job->jobid = jobid++;
+	job->submitted = time(0);
+	
+	return job;
+}
+
+static void mpi_job_delete( struct mpi_job *job )
+{
+	if(!job) return;
+
+	free(job->cmd);
+	jx_delete(job->env);
+	free(job->infiles);
+	free(job->outfiles);
+	free(job);
+}
+
 /*
 Submit an MPI job by converting it into a struct mpi_job
 and adding it to the job_queue and job table.
@@ -202,17 +229,8 @@ Returns a generated jobid for the job.
 
 static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
-	struct mpi_job *job = malloc(sizeof(*job));
+	struct mpi_job * job = mpi_job_create(cmd,extra_input_files,extra_output_files,envlist,resources);
 
-	job->cmd = xxstrdup(cmd);
-	job->cores = resources->cores;
-	job->memory = resources->memory;
-	job->env = jx_copy(envlist);
-	job->infiles = extra_input_files;
-	job->outfiles = extra_output_files;
-	job->jobid = jobid++;
-	job->submitted = time(0);
-	
 	list_push_tail(job_queue,job);
 	itable_insert(job_table,jobid,job);
 
