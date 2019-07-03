@@ -148,7 +148,7 @@ void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 	jx_insert_string(j,"Action","Execute");
 	jx_insert_string(j,"CMD",job->cmd);
 	jx_insert_integer(j,"JOBID",job->jobid);
-	if(job->env) jx_insert(j,"ENV",job->env);
+	if(job->env) jx_insert(j,jx_string("ENV"),job->env);
 	if(job->infiles) jx_insert_string(j,"INFILES",job->infiles);
 	if(job->outfiles) jx_insert_string(j,"OUTFILES",job->outfiles);
 
@@ -327,8 +327,8 @@ and killing all workers.
 
 static int batch_queue_mpi_free(struct batch_queue *q)
 {
-	batch_job_id_t jobid;
-	struct jx *job;
+	uint64_t jobid;
+	struct mpi_job *job;
 
 	itable_firstkey(job_table);
 	while(itable_nextkey(job_table,&jobid,(void**)&job)) {
@@ -423,7 +423,7 @@ table with the pid as the key.
 
 void handle_execute( struct jx *job )
 {
-	batch_job_id_t jobid = jx_lookup_string(job,"JOBID");
+	batch_job_id_t jobid = jx_lookup_integer(job,"JOBID");
 
 	pid_t pid = fork();
 	if(pid > 0) {
