@@ -79,17 +79,18 @@ static batch_job_id_t jobid = 1;
 
 static void mpi_send_string( int rank, const char *str )
 {
-	unsigned length = strlen(str);
-	MPI_Send(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD);
-	MPI_Send(str, length, MPI_CHAR, rank, 0, MPI_COMM_WORLD);
+	MPI_Send(str, strlen(str), MPI_CHAR, rank, 0, MPI_COMM_WORLD);
 }
 
 /* Receive a null-delimited C-string; result must be free()d when done. */
 
 static char * mpi_recv_string( int rank )
 {
-	unsigned length;
-	MPI_Recv(&length, 1, MPI_UNSIGNED, rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	unsigned length=0;
+	MPI_Status status;
+
+	MPI_Probe(rank,0,MPI_COMM_WORLD,&status);
+	MPI_Get_count(&status,MPI_CHAR,&length);
 	char *str = malloc(length+1);
 	MPI_Recv(str, length, MPI_CHAR, rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	str[length] = 0;
@@ -494,9 +495,10 @@ void handle_complete( pid_t pid, int status )
 
 /*
 Main loop for dedicated worker communicating with master.
-XXX This code busy waits by alternating between waitpid(NOHANG)
-and MPI_Iprobe -- we need a better solution that can wait for
-both simultaneously.
+Note that there is no clear way to simultaneously wait for
+an MPI message and also wait for a child process to exit.
+When necessary, we alternate between a non-blocking MPI_Probe
+and a non-blocking waitpid(), with a brief sleep in between.
 */
 
 static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
@@ -507,6 +509,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 	signal(SIGTERM, mpi_worker_handle_signal);
 	signal(SIGQUIT, mpi_worker_handle_signal);
 
+	/* send the initial resource information. */
 	send_config_message(rank,procname);
 
 	/* job table contains the jx for each job, indexed by the running pid */
@@ -515,10 +518,23 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 
 	while(1) {
 		MPI_Status mstatus;
-		int flag;
-		debug(D_BATCH,"checking for incoming message...");
-		MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
-		if(flag) {
+		int flag=0;
+		int action_count=0;
+
+		/*
+		If jobs are running, do a non-blocking check for messages.
+		Otherwise, go right to a blocking message receive.
+		*/
+
+		int jobs_running = itable_size(job_table);
+		if(jobs_running>0) {
+			debug(D_BATCH,"checking for incoming message...");
+			MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
+		} else {
+			debug(D_BATCH,"waiting for incoming message...");
+		}
+
+		if(flag || jobs_running==0) {
 			struct jx *msg = mpi_recv_jx(0);
 			const char *action = jx_lookup_string(msg,"Action");
 
@@ -534,17 +550,25 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 				debug(D_BATCH,"unexpected action: %s",action);
 			}
 			jx_delete(msg);
+			action_count++;
 		}
+
+		/* Check for any finished jobs and deal with them. */
 
 		debug(D_BATCH,"checking for exited child...");
 
 		int status;
 		pid_t pid = waitpid(0, &status, WNOHANG);
-		if(pid>0) handle_complete(pid,status);
+		if(pid>0) {
+			handle_complete(pid,status);
+			action_count++;
+		}
 
-		debug(D_BATCH,"sleeping...");
-		// XXX we have a busy waiting problem here...
-		sleep(1);
+		/* If some jobs are running and nothing happened, sleep. */
+		jobs_running = itable_size(job_table);
+		if(action_count==0 && jobs_running) {
+			usleep(100000);
+		}
 	}
 
 	MPI_Finalize();
