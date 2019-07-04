@@ -365,6 +365,10 @@ static int batch_queue_mpi_free(struct batch_queue *q)
 	return 0;
 }
 
+/**********************************/
+/* MPI Worker Process Begins Here */
+/**********************************/
+
 static void mpi_worker_handle_signal(int sig)
 {
 	//do nothing, so that way we can kill the children and clean it up
@@ -375,7 +379,7 @@ Send the initial configuration message from the worker
 that describe the local resources and setup.
 */
 
-static void send_config_message( int rank, const char *procname )
+static void mpi_worker_send_config_message( int rank, const char *procname )
 {
 
 	/* measure available local resources */
@@ -400,7 +404,7 @@ static void send_config_message( int rank, const char *procname )
 Terminate the worker process when requested.
 */
 
-static void handle_terminate()
+static void mpi_worker_handle_terminate()
 {
 	debug(D_BATCH,"terminating");
 	MPI_Finalize();
@@ -412,7 +416,7 @@ Remove the indicated job from the job_table,
 and if necessary, killing the process and waiting for it.
 */
 
-static void handle_remove( struct jx *msg )
+static void mpi_worker_handle_remove( struct jx *msg )
 {
 	batch_job_id_t jobid = jx_lookup_integer(msg, "JOBID");
 
@@ -446,7 +450,7 @@ If successful, the job object is installed in the job
 table with the pid as the key.
 */
 
-void handle_execute( struct jx *job )
+void mpi_worker_handle_execute( struct jx *job )
 {
 	batch_job_id_t jobid = jx_lookup_integer(job,"JOBID");
 	const char *cmd = jx_lookup_string(job,"CMD");
@@ -480,7 +484,7 @@ the corresponding job in the job_table, and if found,
 send back a completion message to the master.
 */
 
-void handle_complete( pid_t pid, int status )
+void mpi_worker_handle_complete( pid_t pid, int status )
 {
 	struct jx *job = itable_lookup(job_table,pid);
 	if(!job) {
@@ -511,7 +515,7 @@ When necessary, we alternate between a non-blocking MPI_Probe
 and a non-blocking waitpid(), with a brief sleep in between.
 */
 
-static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
+static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 {
 	/* set up signal handlers to ignore signals */
 
@@ -520,7 +524,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 	signal(SIGQUIT, mpi_worker_handle_signal);
 
 	/* send the initial resource information. */
-	send_config_message(rank,procname);
+	mpi_worker_send_config_message(rank,procname);
 
 	/* job table contains the jx for each job, indexed by the running pid */
 
@@ -551,11 +555,11 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 			debug(D_BATCH,"got message with action %s",action);
 
 			if(!strcmp(action,"Terminate")) {
-				handle_terminate();
+				mpi_worker_handle_terminate();
 			} else if(!strcmp(action,"Remove")) {
-				handle_remove(msg);
+				mpi_worker_handle_remove(msg);
 			} else if(!strcmp(action,"Execute")) {
-				handle_execute(msg);
+				mpi_worker_handle_execute(msg);
 			} else {
 				debug(D_BATCH,"unexpected action: %s",action);
 			}
@@ -570,7 +574,7 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 		int status;
 		pid_t pid = waitpid(0, &status, WNOHANG);
 		if(pid>0) {
-			handle_complete(pid,status);
+			mpi_worker_handle_complete(pid,status);
 			action_count++;
 		}
 
@@ -639,7 +643,7 @@ void batch_job_mpi_setup( const char *debug_filename, int manual_cores, int manu
 		debug_config(string_format("%d:%s",mpi_rank,procname));
 		debug_config_file(string_format("%s.rank.%d",debug_filename,mpi_rank));
 		debug_reopen();
-		int r = batch_job_mpi_worker(mpi_world_size, mpi_rank, procname);
+		int r = mpi_worker_main_loop(mpi_world_size, mpi_rank, procname);
 		exit(r);
 	}
 }
