@@ -86,12 +86,12 @@ static void mpi_send_string( int rank, const char *str )
 
 static char * mpi_recv_string( int rank )
 {
-	unsigned length=0;
+	int length=0;
 	MPI_Status status;
 
 	MPI_Probe(rank,0,MPI_COMM_WORLD,&status);
 	MPI_Get_count(&status,MPI_CHAR,&length);
-	char *str = malloc(length+1);
+	char *str = xxmalloc(length+1);
 	MPI_Recv(str, length, MPI_CHAR, rank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 	str[length] = 0;
 	return str;
@@ -174,7 +174,11 @@ static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, str
 	batch_job_id_t jobid = jx_lookup_integer(j, "JOBID");
 
 	struct mpi_job *job = itable_lookup(job_table,jobid);
-	if(!job) fatal("no job with jobid %lld",jobid);
+	if(!job) {
+		/* This could happen if there is a race between Cancel and Complete. */
+		debug(D_BATCH,"ignoring unexpected jobid %lld returned from worker %d",jobid,worker->rank);
+		return -1;
+	}
 
 	memset(info,0,sizeof(*info));
 
@@ -266,6 +270,7 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	while((job = list_next_item(job_queue))) {
 		worker = find_worker_for_job(job);
 		if(worker) {
+		  debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,(int)job->cores,(int)job->memory,worker->rank);
 			list_remove(job_queue, job);
 			send_job_to_worker(job,worker);
 		}
@@ -278,10 +283,12 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		int flag=0;
 		MPI_Iprobe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &flag, &mstatus);
 		if(flag) {
-			debug(D_BATCH,"message ready from worker %d",mstatus.MPI_SOURCE);
 			struct mpi_worker *worker = &workers[mstatus.MPI_SOURCE];
 			jobid = receive_result_from_worker(worker,info);
-			return jobid;
+			if(jobid>0) {
+				debug(D_BATCH,"completed job %lld received from worker %d",jobid,worker->rank);
+				return jobid;
+			}
 		}
 
 		/* Return if time has expired. */
@@ -303,9 +310,11 @@ static int batch_job_mpi_remove( struct batch_queue *q, batch_job_id_t jobid )
 {
 	struct mpi_job *job = itable_remove(job_table,jobid);
 	if(job) {
+		debug(D_BATCH,"removing job %lld",jobid);
 		list_remove(job_queue,job);
 
 		if(job->worker) {
+			debug(D_BATCH,"cancelling job %lld on worker %d",jobid,job->worker->rank);
 			char *cmd = string_format("{\"Action\":\"Remove\", \"JOBID\":\"%lld\"}", jobid);
 			mpi_send_string(job->worker->rank,cmd);
 			free(cmd);
@@ -332,6 +341,7 @@ XXX This would be better implemented as a broadcast.
 static void batch_job_mpi_kill_workers()
 {
 	int i;
+	debug(D_BATCH,"killing all mpi workers");
 	for(i=1;i<nworkers;i++) {
 		mpi_send_string(i,"{\"Action\":\"Terminate\"}");
 	}
@@ -397,7 +407,7 @@ Terminate the worker process when requested.
 
 static void handle_terminate()
 {
-	debug(D_BATCH,"Terminating");
+	debug(D_BATCH,"terminating");
 	MPI_Finalize();
 	exit(0);
 }
@@ -444,10 +454,11 @@ table with the pid as the key.
 void handle_execute( struct jx *job )
 {
 	batch_job_id_t jobid = jx_lookup_integer(job,"JOBID");
+	const char *cmd = jx_lookup_string(job,"CMD");
 
 	pid_t pid = fork();
 	if(pid > 0) {
-		debug(D_BATCH,"created jobid %lld pid %d",jobid,pid);
+		debug(D_BATCH,"created jobid %lld pid %d: %s",jobid,pid,cmd);
 		itable_insert(job_table,pid,jx_copy(job));
 		jx_insert_integer(job,"START",time(0));
 	} else if(pid < 0) {
