@@ -289,8 +289,8 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		/* Return if time has expired. */
 		if(time(0)>stoptime) break;
 
-		/* Otherwise sleep for ~100ms */
-		usleep(100000);
+		/* Otherwise sleep for 10ms */
+		usleep(10000);
 	}
 
 	return -1;
@@ -574,10 +574,10 @@ static int batch_job_mpi_worker(int worldsize, int rank, const char *procname )
 			action_count++;
 		}
 
-		/* If some jobs are running and nothing happened, sleep. */
+		/* If some jobs are running and nothing happened, sleep for 10ms. */
 		jobs_running = itable_size(job_table);
 		if(action_count==0 && jobs_running) {
-			usleep(100000);
+			usleep(10000);
 		}
 	}
 
