@@ -40,8 +40,8 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
-#ifndef CCTOOLS_USE_MPI
-#include "mpi.h"
+#ifdef CCTOOLS_WITH_MPI
+#include <mpi.h>
 #endif
 
 #include "makeflow_summary.h"
@@ -1233,7 +1233,7 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
 
-#ifndef CCTOOLS_USE_MPI
+#ifdef CCTOOLS_WITH_MPI
 	MPI_Init(&argc,&argv);
 #endif
 
