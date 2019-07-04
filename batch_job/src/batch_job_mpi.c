@@ -267,7 +267,7 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 			debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,(int)job->cores,(int)job->memory,worker->rank);
 			list_remove(job_queue, job);
 			send_job_to_worker(job,worker);
-			debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,worker->avail_cores,worker->avail_memory);
+			debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,(int)worker->avail_cores,(int)worker->avail_memory);
 		}
 	}
 
