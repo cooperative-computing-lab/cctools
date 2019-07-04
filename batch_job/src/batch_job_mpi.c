@@ -9,19 +9,14 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
-#include "process.h"
 #include "macros.h"
 #include "stringtools.h"
-
-#include "hash_table.h"
 #include "jx.h"
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "load_average.h"
 #include "host_memory_info.h"
-#include "int_sizes.h"
 #include "itable.h"
-#include "hash_table.h"
 #include "list.h"
 #include "xxmalloc.h"
 
@@ -31,8 +26,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
-#include <math.h>
-#include <assert.h>
+#include <sys/wait.h>
 
 #include <mpi.h>
 
