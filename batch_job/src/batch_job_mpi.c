@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#ifdef CCTOOLS_WITH_MPI
+
 #include "batch_job.h"
 #include "batch_job_internal.h"
 #include "debug.h"
@@ -31,8 +33,6 @@ See the file COPYING for details.
 #include <signal.h>
 #include <math.h>
 #include <assert.h>
-
-#ifdef CCTOOLS_WITH_MPI
 
 #include <mpi.h>
 
