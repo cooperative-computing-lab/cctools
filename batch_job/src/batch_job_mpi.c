@@ -270,9 +270,10 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	while((job = list_next_item(job_queue))) {
 		worker = find_worker_for_job(job);
 		if(worker) {
-		  debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,(int)job->cores,(int)job->memory,worker->rank);
+			debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,(int)job->cores,(int)job->memory,worker->rank);
 			list_remove(job_queue, job);
 			send_job_to_worker(job,worker);
+			debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,worker->avail_cores,worker->avail_memory);
 		}
 	}
 
