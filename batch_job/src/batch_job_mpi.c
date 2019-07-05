@@ -33,15 +33,15 @@ See the file COPYING for details.
 struct mpi_worker {
 	char *name;
 	int rank;
-	int64_t memory;
-	int64_t cores;
-	int64_t avail_memory;
-	int64_t avail_cores;
+	int memory;
+	int cores;
+	int avail_memory;
+	int avail_cores;
 };
 
 struct mpi_job {
-	int64_t cores;
-	int64_t memory;
+	int cores;
+	int memory;
 	struct mpi_worker *worker;
 	char *cmd;
 	batch_job_id_t jobid;
@@ -264,10 +264,10 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	while((job = list_next_item(job_queue))) {
 		worker = find_worker_for_job(job);
 		if(worker) {
-			debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,(int)job->cores,(int)job->memory,worker->rank);
+			debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,job->cores,job->memory,worker->rank);
 			list_remove(job_queue, job);
 			send_job_to_worker(job,worker);
-			debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,(int)worker->avail_cores,(int)worker->avail_memory);
+			debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,worker->avail_cores,worker->avail_memory);
 		}
 	}
 
@@ -594,6 +594,17 @@ static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 Perform the setup unique to the master process,
 by setting up the table of workers and receiving
 basic resource configuration.
+
+Note that the goal here is to get one active worker
+per machine that supervises all of the memory and cores
+on that node.  Most MPI implementations will give us
+one MPI rank per core on machine, which is not what
+we want.
+
+To work around this, we note each duplicate rank on
+a system, note it has having no cores and memory,
+and send it a terminate message, leaving one active
+worker per machine.
 */
 
 static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int manual_memory )
@@ -602,6 +613,10 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 
 	workers = calloc(mpi_world_size,sizeof(*workers));
 	nworkers = mpi_world_size;
+
+	const char *prev_name = 0;
+
+	debug(D_BATCH,"rank 0 (master)");
 
 	for(i = 1; i < mpi_world_size; i++) {
 		debug(D_BATCH,"fetching worker info from rank %d",i);
@@ -614,6 +629,16 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 		w->avail_memory = w->memory;
 		w->avail_cores = w->cores;
 		jx_delete(j);
+
+		if(prev_name && !strcmp(w->name,prev_name)) {
+			debug(D_BATCH,"rank %d [merged with %s]",w->rank,w->name);
+			w->avail_memory = 0;
+			w->avail_cores = 0;
+			mpi_send_string(w->rank,"{\"Action\":\"Terminate\"}");
+		} else {
+			debug(D_BATCH,"rank %d (%s) %d cores %d MB memory",w->rank,w->name,w->cores,w->memory);
+			prev_name = w->name;
+		}
 	}
 }
 
