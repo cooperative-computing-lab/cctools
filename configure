@@ -97,6 +97,7 @@ fuse_path="/usr"
 golang_path="/usr"
 globus_path="/usr"
 irods_path="/usr"
+mpi_path="/usr"
 mysql_path="/usr"
 openssl_path="/usr"
 perl_path="/usr"
@@ -135,7 +136,7 @@ config_curl_path=no
 config_cvmfs_path=no
 config_globus_path=no
 config_irods_path=no
-config_mpicc_path=no
+config_mpi_path=no
 config_openssl_path=no
 config_xrootd_path=no
 
@@ -230,8 +231,9 @@ do
 		--irods-flavor)
 			irods_flavor=${arg}
 			;;
-		--with-mpicc-path)
-			config_mpicc_path=${arg}
+		--with-mpi-path)
+			mpi_path=${arg}
+			config_mpi_path=$(config_X_path ${arg})
 			;;
 		--with-mysql-path)
 			mysql_path=${arg}
@@ -365,7 +367,7 @@ Where PACKAGE may be:
 	fuse
 	globus
 	irods
-	mpicc
+	mpi
 	mysql
 	perl
 	python
@@ -414,15 +416,6 @@ if [ "$optstrict" = 1 ]; then
 fi
 
 export HOST_MULTIARCH=$(check_multiarch)
-
-if [ -f config.mk ]; then
-	echo "we are reconfiguring - prepare with make clean..."
-	if make clean; then
-		echo 'make clean - ok'
-	else
-		echo "make clean failed ($?); continuing"
-	fi
-fi
 
 rm -f config.mk
 
@@ -826,36 +819,31 @@ else
 	echo "*** skipping ext2fs support"
 fi
 
-echon "using mpi..."
-if [ "$config_mpicc_path" != no ]
+if [ "$config_mpi_path" != no ]
 then
-	if [ $config_mpicc_path = auto ]
+	if check_file "$mpi_path/bin/mpicc"
 	then
-		$config_mpicc_path=$(which mpicc 2> /dev/null)
+		mpicc="$mpi_path/bin/mpicc"
+	elif check_file "$mpi_path/mpicc"
+	then
+		mpicc="$mpi_path/mpicc"
+	elif check_file "$mpi_path"
+	then
+		mpicc="$mpi_path"
 	fi
 
-	if [ -d "$config_mpicc_path/bin" ]
+	if [ X$mpicc != X ]
 	then
-		mpicc="$config_mpicc_path/bin/mpicc"
-	elif [ -d "$config_mpicc_path" ]
-	then
-		mpicc="$config_mpicc_path/mpicc"
-	else
-		mpicc="$config_mpicc_path"
-	fi
-
-	if [ ! -x "$mpicc" ]
-	then
-		echo "couldn't find mpicc. please provide the location of the mpicc executable with --with-mpicc-path"
+		ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
+		ccompiler=${mpicc}
+		linker=${mpicc}
+	else 
+		echo "*** Sorry, I couldn't find mpicc in $mpi_path"
+		echo "*** Check --with-mpicc-path and try again."
 		exit 1
 	fi
-
-	echo "yes: ${mpicc}"
-	ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
-	ccompiler=${mpicc}
-	linker=${mpicc}
 else
-	echo "no"	
+	echo "*** skipping mpi support"
 fi
 
 ##########################################################################

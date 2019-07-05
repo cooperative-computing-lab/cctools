@@ -40,6 +40,10 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
+#ifdef CCTOOLS_WITH_MPI
+#include <mpi.h>
+#endif
+
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
@@ -64,12 +68,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
-#ifdef CCTOOLS_WITH_MPI
-#include <mpi.h>
-#include "jx_print.h"
-#include "host_memory_info.h"
-#endif
 
 /*
 Code organization notes:
@@ -1025,92 +1023,6 @@ static void handle_abort(int sig)
 	makeflow_abort_flag = 1;
 
 }
-#ifdef CCTOOLS_WITH_MPI
-static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores_per, int mpi_mem_per, char* working_dir){
-    struct hash_table* mpi_comps = hash_table_create(0, 0);
-                struct hash_table* mpi_sizes = hash_table_create(0, 0);
-
-                int i;
-
-                for (i = 1; i < mpi_world_size; i++) {
-                    unsigned len = 0;
-                    MPI_Recv(&len, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    char* str = malloc(sizeof (char*)*len + 1);
-                    memset(str, '\0', sizeof (char)*len + 1);
-                    MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-                    struct jx* recobj = jx_parse_string(str);
-                    char* name = (char*)jx_lookup_string(recobj, "name");
-                    
-                    uint64_t* rank = malloc(sizeof(uint64_t)*1); *rank = jx_lookup_integer(recobj, "rank");
-					
-		    //fprintf(stderr,"RANK0: got back response: %i at %s\n",rank,name);
-
-                    if (hash_table_lookup(mpi_comps, name) == NULL) {
-                        hash_table_insert(mpi_comps, string_format("%s",name), rank);
-                    }
-                    //for partition sizing
-                    if (hash_table_lookup(mpi_sizes, name) == NULL) {
-                        uint64_t* val = malloc(sizeof(uint64_t)*1); *val = 1;
-                        hash_table_insert(mpi_sizes, name, (void*)val);
-                    } else {
-                        uint64_t* val = (uint64_t*) hash_table_lookup(mpi_sizes, name);
-                        *val += 1;
-                        hash_table_remove(mpi_sizes, name);
-                        hash_table_insert(mpi_sizes, name, (void*)(val));
-
-                    }
-
-                    jx_delete(recobj);
-                    free(str);
-
-                }
-                for (i = 1; i < mpi_world_size; i++) {
-                    hash_table_firstkey(mpi_comps);
-                    char* key;
-                    uint64_t* value;
-                    int sent = 0;
-                    while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
-                        uint64_t ui = i;
-                        if (*value == ui) {
-                            int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (int)*((uint64_t*)hash_table_lookup(mpi_sizes,key));
-                            //fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
-                            struct jx* livemsgjx = jx_object(NULL);
-                            jx_insert_integer(livemsgjx,"LIVE",mpi_cores);
-                            if(mpi_mem_per > 0){
-                                jx_insert_integer(livemsgjx,"MEM",mpi_mem_per);
-                            }
-                            if(working_dir != NULL){
-                                jx_insert_string(livemsgjx,"WORK_DIR",working_dir);
-                            }
-                            char* livemsg = jx_print_string(livemsgjx);
-                            unsigned livemsgsize = strlen(livemsg);
-                            //fprintf(stderr,"Lifemsg for %lli has been created, now sending\n",value);
-                            MPI_Send(&livemsgsize,1,MPI_UNSIGNED,*value,0,MPI_COMM_WORLD);
-                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
-                            sent = 1;
-                            //fprintf(stderr,"Lifemsg for %lli was successfully delivered\n",value);
-                            free(livemsg);
-                            jx_delete(livemsgjx);
-                        }
-                    }
-                    if (sent == 0) {
-                        char* livemsg = string_format("{\"DIE\":1}");
-                        unsigned livemsgsize = strlen(livemsg);
-                        MPI_Send(&livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
-                        MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
-                        free(livemsg);
-                    }
-                    debug(D_BATCH,"Msg for %i has been delivered\n",i);
-                }
-                debug(D_BATCH,"Msgs have all been sent\n");
-                
-                //now we have the proper iprocesses there with correct num of cores
-                batch_job_mpi_set_ranks_sizes(mpi_comps, mpi_sizes);
-
-
-}
-#endif
 
 static void show_help_run(const char *cmd)
 {
@@ -1204,6 +1116,8 @@ static void show_help_run(const char *cmd)
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
+	printf("    --mpi-cores=#               Manually set number of cores on each MPI worker. (-T mpi)\n");
+	printf("    --mpi-memory=#              Manually set memory (MB) on each MPI worker. (-T mpi)\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
@@ -1242,10 +1156,6 @@ static void show_help_run(const char *cmd)
 	
 	/********************************************************************************/
 	printf("\nMPI Options:\n");
-	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
-	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
-	printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create\n");
-	printf("                                  sandbox directory and execute in.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1292,11 +1202,16 @@ int main(int argc, char *argv[])
 	char *s;
 	int safe_submit = 0;
 	int ignore_mem_spec = 0;
+	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+
+	int mpi_cores = 0;
+	int mpi_memory = 0;
+
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
 	
@@ -1317,11 +1232,9 @@ int main(int argc, char *argv[])
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
+
 #ifdef CCTOOLS_WITH_MPI
-        int mpi_cores_per = 0;
-        int mpi_mem_per = 0;
-        char* debug_base_path = NULL;
-        char* mpi_working_dir = NULL;
+	MPI_Init(&argc,&argv);
 #endif
 
 	random_init();
@@ -1431,11 +1344,8 @@ int main(int argc, char *argv[])
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
 		LONG_OPT_VERBOSE_JOBNAMES,
-#ifdef CCTOOLS_WITH_MPI
-                LONG_OPT_MPI_CORES,
-                LONG_OPT_MPI_MEM,
-                LONG_OPT_MPI_WORKDIR,
-#endif
+		LONG_OPT_MPI_CORES,
+		LONG_OPT_MPI_MEMORY,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1551,11 +1461,8 @@ int main(int argc, char *argv[])
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
-#ifdef CCTOOLS_WITH_MPI
-        {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-        {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
-        {"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_WORKDIR},
-#endif
+		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
+		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{0, 0, 0, 0}
 	};
 
@@ -1727,11 +1634,8 @@ int main(int argc, char *argv[])
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
-#ifdef CCTOOLS_WITH_MPI
-                debug_base_path = xxstrdup(optarg);
-#else
-				debug_config_file(optarg);
-#endif
+				debug_file_name = optarg;
+				debug_config_file(debug_file_name);
 				break;
 			case 'p':
 				port_set = 1;
@@ -2060,17 +1964,12 @@ int main(int argc, char *argv[])
 			case LONG_OPT_VERBOSE_JOBNAMES:
 				batch_job_verbose_jobnames = 1;
 				break;
-#ifdef CCTOOLS_WITH_MPI
-            case LONG_OPT_MPI_CORES:
-                mpi_cores_per = atoi(optarg);
-                break;
-            case LONG_OPT_MPI_MEM:
-                mpi_mem_per = atoi(optarg);
-                break;
-            case LONG_OPT_MPI_WORKDIR:
-                mpi_working_dir = xxstrdup(optarg);
-                break;
-#endif
+			case LONG_OPT_MPI_CORES:
+				mpi_cores = atoi(optarg);
+				break;
+			case LONG_OPT_MPI_MEMORY:
+				mpi_memory = atoi(optarg);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -2079,53 +1978,10 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
-#ifdef CCTOOLS_WITH_MPI
-        //the code assumes sizeof(void*) == uint64_t
-        int need_mpi_finalize = 0;
-        if (batch_queue_type == BATCH_QUEUE_TYPE_MPI) {
-			//mpi boilerplate code modified from tutorial at www.mpitutorial.com
-            MPI_Init(NULL, NULL);
-            int mpi_world_size;
-            MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
-            int mpi_rank;
-            MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-            char procname[MPI_MAX_PROCESSOR_NAME];
-            int procnamelen;
-            MPI_Get_processor_name(procname, &procnamelen);
-
-            fprintf(stderr,"%i:%s My pid is: %i\n",mpi_rank,procname,getpid());
-
-            if (mpi_rank == 0) {
-                if(debug_base_path != NULL){
-                    char* debug_path = string_format("%s.%i",debug_base_path,mpi_rank);
-                    debug_config_file(debug_path);
-                }
-                need_mpi_finalize = 1;
-                
-                makeflow_mpi_master_setup(mpi_world_size,mpi_cores_per,mpi_mem_per,mpi_working_dir);
-				int cores_total = load_average_get_cpus();
-		        uint64_t memtotal;
-       			uint64_t memavail;
-        		host_memory_info_get(&memavail, &memtotal);
-        		int mem = ((memtotal / (1024 * 1024)) / cores_total) * 1;	
-				explicit_local_cores = 1;
-				explicit_local_memory = mem;
-
-        } else {
-            if (debug_base_path != NULL) {
-                char* debug_path = string_format("%s.%i", debug_base_path, mpi_rank);
-                debug_config_file(debug_path);
-            }
-            debug(D_BATCH, "%i:%s Starting mpi worker function\n", mpi_rank, procname);
-            int batch_job_worker_exit_code = batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
-            fprintf(stderr, "%i:%s exited with code: %i\n", mpi_rank, procname, batch_job_worker_exit_code);
-            return batch_job_worker_exit_code;
-        }
-
-    } else {
-        debug_config_file(debug_base_path);
-    }
-#endif 
+	/* Perform initial MPI setup prior to creating the batch queue object. */
+	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
+		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
+	}
 
 	if(!did_explicit_auth)
 		auth_register_all();
@@ -2576,13 +2432,6 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
-        
-#if CCTOOLS_WITH_MPI
-        if(need_mpi_finalize ==1){
-            batch_job_mpi_kill_workers();
-            MPI_Finalize();
-        }
-#endif
         
 	exit(exit_value);
         
