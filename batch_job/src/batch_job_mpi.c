@@ -284,6 +284,8 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 
 	/* Check for incoming completions from workers. */
 
+	int sleep_time = MIN_SLEEP_TIME;
+
 	while(1) {
 		MPI_Status mstatus;
 		int flag=0;
@@ -300,8 +302,9 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		/* Return if time has expired. */
 		if(time(0)>stoptime) break;
 
-		/* Otherwise sleep for 10 ms */
-		usleep(10000);
+		/* Otherwise sleep for a while */
+		usleep(sleep_time);
+		sleep_time = MIN(sleep_time*2,MAX_SLEEP_TIME);
 	}
 
 	return -1;
