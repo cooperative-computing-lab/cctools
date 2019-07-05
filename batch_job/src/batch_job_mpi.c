@@ -69,6 +69,11 @@ static struct itable *job_table = 0;
 
 static batch_job_id_t jobid = 1;
 
+/* Workers use an exponentially increasing sleep time from 1ms to 100ms. */
+
+#define MIN_SLEEP_TIME 1000
+#define MAX_SLEEP_TIME 100000
+
 /* Send a null-delimited C-string. */
 
 static void mpi_send_string( int rank, const char *str )
@@ -255,8 +260,10 @@ static batch_job_id_t batch_job_mpi_submit(struct batch_queue *q, const char *cm
 
 /*
 Wait for a job to complete within the given stoptime.
-First assigns jobs to workers, if possible, then waits
-for a response message from a worker.
+First assigns jobs to workers, if possible, then wait
+for a response message from a worker.  Since we cannot
+wait for an MPI message with a timeout, use an exponentially
+increasing sleep time.
 */
 
 static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job_info *info, time_t stoptime)
@@ -293,7 +300,7 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 		/* Return if time has expired. */
 		if(time(0)>stoptime) break;
 
-		/* Otherwise sleep for 10ms */
+		/* Otherwise sleep for 10 ms */
 		usleep(10000);
 	}
 
@@ -516,13 +523,15 @@ Main loop for dedicated worker communicating with master.
 Note that there is no clear way to simultaneously wait for
 an MPI message and also wait for a child process to exit.
 When necessary, we alternate between a non-blocking MPI_Probe
-and a non-blocking waitpid(), with a brief sleep in between.
+and a non-blocking waitpid(), with an exponentially increasing
+sleep in between.
 */
 
 static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 {
-	/* set up signal handlers to ignore signals */
+	int sleep_time = MIN_SLEEP_TIME;
 
+	/* set up signal handlers to ignore signals */
 	signal(SIGINT, mpi_worker_handle_signal);
 	signal(SIGTERM, mpi_worker_handle_signal);
 	signal(SIGQUIT, mpi_worker_handle_signal);
@@ -531,7 +540,6 @@ static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 	mpi_worker_send_config_message(rank,procname);
 
 	/* job table contains the jx for each job, indexed by the running pid */
-
 	job_table = itable_create(0);
 
 	while(1) {
@@ -570,8 +578,6 @@ static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 
 		/* Check for any finished jobs and deal with them. */
 
-		debug(D_BATCH,"checking for exited child...");
-
 		int status;
 		pid_t pid = waitpid(0, &status, WNOHANG);
 		if(pid>0) {
@@ -579,10 +585,14 @@ static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 			action_count++;
 		}
 
-		/* If some jobs are running and nothing happened, sleep for 10ms. */
+		/* If some jobs are running and nothing happened, then sleep. */
+
 		jobs_running = itable_size(job_table);
 		if(action_count==0 && jobs_running) {
-			usleep(10000);
+			usleep(sleep_time);
+			sleep_time = MIN(sleep_time*2,MAX_SLEEP_TIME);
+		} else {
+			sleep_time = MIN_SLEEP_TIME;
 		}
 	}
 
