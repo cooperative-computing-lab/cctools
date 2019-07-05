@@ -1116,6 +1116,8 @@ static void show_help_run(const char *cmd)
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
+	printf("    --mpi-cores=#               Manually set number of cores on each MPI worker. (-T mpi)\n");
+	printf("    --mpi-memory=#              Manually set memory (MB) on each MPI worker. (-T mpi)\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
@@ -1154,8 +1156,6 @@ static void show_help_run(const char *cmd)
 	
 	/********************************************************************************/
 	printf("\nMPI Options:\n");
-	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
-	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
 }
 
 int main(int argc, char *argv[])
