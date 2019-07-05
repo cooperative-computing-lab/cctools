@@ -140,6 +140,8 @@ object, and then note the committed resources at the worker.
 
 void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 {
+	debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,job->cores,job->memory,worker->rank);
+
 	struct jx *j = jx_object(0);
 	jx_insert_string(j,"Action","Execute");
 	jx_insert_string(j,"CMD",job->cmd);
@@ -153,6 +155,8 @@ void send_job_to_worker( struct mpi_job *job, struct mpi_worker *worker )
 	worker->avail_cores -= job->cores;
 	worker->avail_memory -= job->memory;
 	job->worker = worker;
+
+	debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,worker->avail_cores,worker->avail_memory);
 }
 
 /*
@@ -191,6 +195,8 @@ static batch_job_id_t receive_result_from_worker( struct mpi_worker *worker, str
 
 	worker->avail_cores += job->cores;
 	worker->avail_memory += job->memory;
+
+	debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,worker->avail_cores,worker->avail_memory);
 
 	return jobid;
 }
@@ -264,10 +270,8 @@ static batch_job_id_t batch_job_mpi_wait(struct batch_queue *q, struct batch_job
 	while((job = list_next_item(job_queue))) {
 		worker = find_worker_for_job(job);
 		if(worker) {
-			debug(D_BATCH,"assigned job %lld (%d cores, %d memory) to worker %d",job->jobid,job->cores,job->memory,worker->rank);
 			list_remove(job_queue, job);
 			send_job_to_worker(job,worker);
-			debug(D_BATCH,"worker %d now has %d cores %d memory available",worker->rank,worker->avail_cores,worker->avail_memory);
 		}
 	}
 
@@ -619,7 +623,6 @@ static void batch_job_mpi_master_setup(int mpi_world_size, int manual_cores, int
 	debug(D_BATCH,"rank 0 (master)");
 
 	for(i = 1; i < mpi_world_size; i++) {
-		debug(D_BATCH,"fetching worker info from rank %d",i);
 		struct mpi_worker *w = &workers[i];
 		struct jx *j = mpi_recv_jx(i);
 		w->name       = strdup(jx_lookup_string(j,"name"));
