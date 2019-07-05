@@ -546,10 +546,7 @@ static int mpi_worker_main_loop(int worldsize, int rank, const char *procname )
 
 		int jobs_running = itable_size(job_table);
 		if(jobs_running>0) {
-			debug(D_BATCH,"checking for incoming message...");
 			MPI_Iprobe(0, 0, MPI_COMM_WORLD, &flag, &mstatus);
-		} else {
-			debug(D_BATCH,"waiting for incoming message...");
 		}
 
 		if(flag || jobs_running==0) {
