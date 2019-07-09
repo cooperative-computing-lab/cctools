@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
 
-DISABLED=$(echo --without-system-{allpairs,parrot,prune,sand,umbrella,wavefront})
+DISABLED=$(echo --without-system-{allpairs,parrot,prune,sand,umbrella,wavefront,weaver})
 
 if [[ $PY3K == 1 ]]; then
     ./configure --prefix ${PREFIX} --with-python3-path ${CONDA_PREFIX} ${DISABLED}
@@ -9,4 +9,3 @@ else
 fi
 
 make && make install
-
