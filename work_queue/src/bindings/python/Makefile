@@ -35,4 +35,4 @@ install: all
 	chmod 755 work_queue_example.py
 	cp work_queue.py work_queue_async.py $(WQPYTHONSO) $(CCTOOLS_PYTHON_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp work_queue_example.py $(CCTOOLS_INSTALL_DIR)/doc/
+
