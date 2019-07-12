@@ -828,7 +828,7 @@ class WorkQueue(object):
 
             if name:
                 work_queue_specify_name(self._work_queue, name)
-        except Exception, e:
+        except Exception as e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
     def __free_queue(self):
@@ -836,9 +836,7 @@ class WorkQueue(object):
             if self._shutdown:
                 self.shutdown_workers(0)
             work_queue_delete(self._work_queue)
-
-    def __exit__(self):
-        self.__free_queue()
+            self._work_queue = None
 
     def __del__(self):
         self.__free_queue()
