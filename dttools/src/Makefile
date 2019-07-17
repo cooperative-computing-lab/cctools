@@ -58,6 +58,7 @@ SOURCES = \
 	interfaces_address.c \
 	itable.c \
 	jx.c \
+	jx_binary.c\
 	jx_database.c \
 	jx_getopt.c \
 	jx_match.c \
