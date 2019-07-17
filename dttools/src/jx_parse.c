@@ -1026,6 +1026,7 @@ int jx_parse_cmd_define(struct jx *jx_args, char *define_stmt) {
 	char *s;
     struct jx *jx_expr = NULL;
 	struct jx *jx_tmp = NULL;
+	struct jx *key = NULL;
 
 	s = strchr(define_stmt, '=');
     if (!s){
@@ -1049,7 +1050,9 @@ int jx_parse_cmd_define(struct jx *jx_args, char *define_stmt) {
 		return 0;
 	}
 
-	jx_insert(jx_args, jx_string(optarg), jx_tmp);
+	key = jx_string(optarg);
+	for (struct jx *r; (r = jx_remove(jx_args, key)); jx_delete(r));
+	jx_insert(jx_args, key, jx_tmp);
 
 	return 1;
 }
