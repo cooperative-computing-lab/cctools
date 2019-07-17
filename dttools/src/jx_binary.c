@@ -7,6 +7,13 @@
 #include <string.h>
 #include <malloc.h>
 
+/*
+Rather than relying on the enumeration in jx.h, we rely
+on a distinct set of values for binary representations,
+since it differs slightly (note TRUE/FALSE/END) and must
+not change, unlike the in-memory enumeration of jx.h
+*/
+
 #define JX_BINARY_NULL 101
 #define JX_BINARY_TRUE 102
 #define JX_BINARY_FALSE 103
@@ -17,34 +24,24 @@
 #define JX_BINARY_OBJECT 108
 #define JX_BINARY_END 109
 
-int jx_binary_write_data( FILE *stream, char *data, int length )
+static int jx_binary_write_data( FILE *stream, char *data, int length )
 {
 	return fwrite(data,length,1,stream);
 }
 
-int jx_binary_write_int64( FILE *stream, int64_t i )
+static int jx_binary_write_int64( FILE *stream, int64_t i )
 {
 	return fwrite(&i,sizeof(i),1,stream);
 }
 
-int jx_binary_write_double( FILE *stream, double d )
+static int jx_binary_write_double( FILE *stream, double d )
 {
 	return fwrite(&d,sizeof(d),1,stream);
 }
 
-int jx_binary_write_byte( FILE *stream, uint8_t data )
+static int jx_binary_write_byte( FILE *stream, uint8_t data )
 {
 	return fwrite(&data,1,1,stream);
-}
-
-int jx_binary_write_pair( FILE *stream, struct jx_pair *p )
-{
-	return jx_binary_write(stream,p->key) && jx_binary_write(stream,p->value);
-}
-
-int jx_binary_write_item( FILE *stream, struct jx_item *i )
-{
-	return jx_binary_write(stream,i->value);
 }
 
 int jx_binary_write( FILE *stream, struct jx *j )
@@ -70,7 +67,7 @@ int jx_binary_write( FILE *stream, struct jx *j )
 			break;
 		case JX_DOUBLE:
 			jx_binary_write_byte(stream,JX_BINARY_DOUBLE);
-			jx_binary_write_int64(stream,j->u.double_value);
+			jx_binary_write_double(stream,j->u.double_value);
 			break;
 		case JX_STRING:
 			jx_binary_write_byte(stream,JX_BINARY_STRING);
@@ -105,27 +102,27 @@ int jx_binary_write( FILE *stream, struct jx *j )
 	return 1;
 }
 
-int jx_binary_read_byte( FILE *stream, uint8_t *data )
+static int jx_binary_read_byte( FILE *stream, uint8_t *data )
 {
 	return fread(data,1,1,stream);
 }
 
-int jx_binary_read_data( FILE *stream, char *data, int length )
+static int jx_binary_read_data( FILE *stream, char *data, int length )
 {
 	return fread(data,length,1,stream);
 }
 
-int jx_binary_read_int64( FILE *stream, int64_t *i )
+static int jx_binary_read_int64( FILE *stream, int64_t *i )
 {
 	return fread(i,sizeof(*i),1,stream);
 }
 
-int jx_binary_read_double( FILE *stream, double *d )
+static int jx_binary_read_double( FILE *stream, double *d )
 {
 	return fread(d,sizeof(*d),1,stream);
 }
 
-struct jx_pair * jx_binary_read_pair( FILE *stream )
+static struct jx_pair * jx_binary_read_pair( FILE *stream )
 {
 	struct jx *a = jx_binary_read(stream);
 	if(!a) return 0;
@@ -139,7 +136,7 @@ struct jx_pair * jx_binary_read_pair( FILE *stream )
 	return jx_pair(a,b,0);
 }
 
-struct jx_item * jx_binary_read_item( FILE *stream )
+static struct jx_item * jx_binary_read_item( FILE *stream )
 {
 	struct jx *a = jx_binary_read(stream);
 	if(!a) return 0;
@@ -199,7 +196,7 @@ struct jx * jx_binary_read( FILE *stream )
 				}
 			}
 			break;
-		case JX_OBJECT:
+		case JX_BINARY_OBJECT:
 			obj = jx_object(0);
 			pair = &obj->u.pairs;
 			while(1) {
@@ -213,11 +210,8 @@ struct jx * jx_binary_read( FILE *stream )
 			break;
 		case JX_BINARY_END:
 			return 0;
-		case JX_OPERATOR:
-		case JX_FUNCTION:
-		case JX_SYMBOL:
-		case JX_ERROR:
-			debug(D_NOTICE,"cannot read out non-constant JX data!");
+		default:
+			debug(D_NOTICE,"unexpected type %d in binary JX data",type);
 			return 0;
 			break;
 	}
