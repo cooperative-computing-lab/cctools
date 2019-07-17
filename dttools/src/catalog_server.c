@@ -13,7 +13,7 @@ See the file COPYING for details.
 #include "getopt.h"
 #include "nvpair.h"
 #include "nvpair_jx.h"
-#include "jx_database.h"
+#include "jx_multi_database.h"
 #include "jx_parse.h"
 #include "jx_print.h"
 #include "jx_table.h"
@@ -54,7 +54,7 @@ See the file COPYING for details.
 #define TCP_PAYLOAD_MAX 1024*1024
 
 /* The table of record, hashed on address:port */
-static struct jx_database *table = 0;
+static struct jx_multi_database *table = 0;
 
 /* An array of jxs used to sort for display */
 static struct jx *array[MAX_TABLE_SIZE];
@@ -167,8 +167,8 @@ static void remove_expired_records()
 	// Run for a minimum of lifetime seconds before cleaning anything up.
 	if((current-starttime)<lifetime ) return;
 
-	jx_database_firstkey(table);
-	while(jx_database_nextkey(table, &key, &j)) {
+	jx_multi_database_firstkey(table);
+	while(jx_multi_database_nextkey(table, &key, &j)) {
 		time_t lastheardfrom = jx_lookup_integer(j,"lastheardfrom");
 
 		int this_lifetime = jx_lookup_integer(j,"lifetime");
@@ -179,7 +179,7 @@ static void remove_expired_records()
 		}
 
 		if( (current-lastheardfrom) > this_lifetime ) {
-				j = jx_database_remove(table,key);
+				j = jx_multi_database_remove(table,key);
 			if(j) jx_delete(j);
 		}
 	}
@@ -316,14 +316,14 @@ static void handle_update( const char *addr, int port, const char *raw_data, int
 		make_hash_key(j, key);
 
 		if(logfile) {
-			if(!jx_database_lookup(table,key)) {
+			if(!jx_multi_database_lookup(table,key)) {
 				jx_print_stream(j,logfile);
 				fprintf(logfile,"\n");
 				fflush(logfile);
 			}
 		}
 
-		jx_database_insert(table, key, j);
+		jx_multi_database_insert(table, key, j);
 
 		debug(D_DEBUG, "received %s update from %s",protocol,key);
 }
@@ -454,8 +454,8 @@ static void handle_query(struct link *query_link)
 	/* load the hash table entries into one big array */
 
 	n = 0;
-	jx_database_firstkey(table);
-	while(jx_database_nextkey(table, &hkey, &j)) {
+	jx_multi_database_firstkey(table);
+	while(jx_multi_database_nextkey(table, &hkey, &j)) {
 		array[n] = j;
 		n++;
 	}
@@ -494,7 +494,7 @@ static void handle_query(struct link *query_link)
 	} else if(sscanf(path, "/detail/%s", key) == 1) {
 		struct jx *j;
 		fprintf(stream, "Content-type: text/html\n\n");
-		j = jx_database_lookup(table, key);
+		j = jx_multi_database_lookup(table, key);
 		if(j) {
 			const char *name = jx_lookup_string(j, "name");
 			if(!name)
@@ -732,7 +732,7 @@ int main(int argc, char *argv[])
 	username_get(owner);
 	starttime = time(0);
 
-	table = jx_database_create(history_dir);
+	table = jx_multi_database_create(history_dir);
 	if(!table)
 		fatal("couldn't create directory %s: %s\n",history_dir,strerror(errno));
 
