@@ -161,8 +161,11 @@ struct jx * jx_integer( jx_int_t integer_value );
 /** Create a JX floating point value. @param double_value A C double precision floating point.  @return a JX double value. */
 struct jx * jx_double( double double_value );
 
-/** Create a JX string value. @param string_value A C string, which will be duplciated via strdup(). @return A JX string value. */
+/** Create a JX string value. @param string_value A C string, which will be duplicated via strdup(). @return A JX string value. */
 struct jx * jx_string( const char *string_value );
+
+/** Create a JX string value without copying (uncommon). @param string_value A C string, which will be *not* be duplicated, but will be freed at object deletion.  @return A JX string value. */
+struct jx * jx_string_nocopy( char *string_value );
 
 /** Create a JX string value using prinf style formatting.  @param fmt A printf-style format string, followed by matching arguments.  @return A JX string value. */
 struct jx * jx_format( const char *fmt, ... );

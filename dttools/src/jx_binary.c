@@ -182,10 +182,10 @@ struct jx * jx_binary_read( FILE *stream )
 			break;
 		case JX_BINARY_STRING:
 			jx_binary_read_int64(stream,&length);
-			// XXX check copy semantics
-			s = malloc(length);
+			s = malloc(length+1);
 			jx_binary_read_data(stream,s,length);
-			return jx_string(s);
+			s[length] = 0;
+			return jx_string_nocopy(s);
 			break;
 		case JX_BINARY_ARRAY:
 			arr = jx_array(0);
