@@ -195,6 +195,7 @@ struct jx * jx_binary_read( FILE *stream )
 					break;
 				}
 			}
+			return arr;
 			break;
 		case JX_BINARY_OBJECT:
 			obj = jx_object(0);
@@ -207,6 +208,7 @@ struct jx * jx_binary_read( FILE *stream )
 					break;
 				}
 			}
+			return obj;
 			break;
 		case JX_BINARY_END:
 			return 0;
