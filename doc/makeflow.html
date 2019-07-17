@@ -376,10 +376,33 @@ locally can be limited with <tt>--max-local</tt>.
 
 <a name=htcondor><h3>HTCondor</h3></a>
 
-<p>Use the <tt>-T condor</tt> option to submit jobs to the <a href=http://research.cs.wisc.edu/htcondor>HTCondor</a> batch system.  (Formerly known as Condor.)</p>
+<p>If running Makeflow directly from the command line, simply use the <tt>-T condor</tt> option to submit jobs to the <a href=http://research.cs.wisc.edu/htcondor>HTCondor</a> batch system.</p>
+
+<p>If you have a long-running workflow, we recommend using <tt>condor_submit_makeflow</tt> like this:
+
+<code>condor_submit_makeflow example.mf
+Submitting example.mf as a background job to HTCondor...
+Submitting job(s).
+1 job(s) submitted to cluster 364.
+Makeflow Output : makeflow.364.output
+Makeflow Error  : makeflow.364.error
+Condor Log      : makeflow.364.condorlog
+</code>
+
+<p>This will cause Makeflow itself to be submitted as a batch job itself,
+so that it can be monitored by HTCondor, allowing you to log out and
+return later to check the status of the workflow.  You will see both
+Makeflow and the jobs it runs in the HTCondor queue:</p>
+
+<code> ID      OWNER            SUBMITTED     RUN_TIME ST PRI SIZE CMD               
+  10.0   dthain          7/17 13:03   0+00:00:05 R  0   1.7  makeflow -T condor
+  11.0   dthain          7/17 13:03   0+00:00:00 I  0   0.0  condor.sh myjob -p 1
+  . . .
+</code>
 
 <p>
-Makeflow will automatically generate a submit file for each job.
+Makeflow will automatically generate a submit file for each job,
+so you don't need to write one.
 However, if you would like to customize the Condor submit file,
 use the <tt>-B</tt> option or <tt>BATCH_OPTIONS</tt> variable
 to specify text to add to the submit file.</p>

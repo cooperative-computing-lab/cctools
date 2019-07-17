@@ -13,7 +13,18 @@ then
 	exit 1
 fi
 
-condor_submit << EOF
+submit=`which condor_submit`
+if [ $? != 0 ]
+then
+	echo "$0: Sorry, I cannot find condor_submit in your PATH."
+	exit 1
+fi
+
+echo "Submitting $@ as a background job to HTCondor..."
+
+tempfile=`mktemp`
+
+condor_submit << EOF > $tempfile
 universe = scheduler
 cmd = $makeflow
 arguments = -T condor -l makeflow.\$(CLUSTER).makeflowlog -L makeflow.\$(CLUSTER).condorlog $@
@@ -23,3 +34,19 @@ log = makeflow.\$(CLUSTER).condorlog
 getenv = true
 queue
 EOF
+
+cat $tempfile
+
+if [ $? = 0 ]
+then
+	jobid=`cat $tempfile | grep -o 'cluster [0-9]\+' | cut -c 9-`
+	echo "Makeflow Output : makeflow.$jobid.output"
+	echo "Makeflow Error  : makeflow.$jobid.error"
+	echo "Condor Log      : makeflow.$jobid.condorlog"
+	rm $tempfile
+	exit 0
+else
+	echo "Job submission failed!"
+	exit 1
+fi
+
