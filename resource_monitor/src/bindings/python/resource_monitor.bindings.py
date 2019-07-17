@@ -33,14 +33,14 @@ cctools_debug_config('resource_monitor')
 
 
 # decorator to monitor functions.
-def monitored(limits = None, callback = None, interval = 1e6):
+def monitored(limits = None, callback = None, interval = 1):
     def monitored_inner(func):
         return functools.partial(monitor_function, limits, callback, interval, func)
     return monitored_inner
 
 # if x = function(*args, **kwargs), returns a function mfun  (x, r) = mfun(*args, **kwargs)
 # where x is the orignal results, and r is the maximum resources consumed.
-def make_monitored(function, limits = None, callback = None, interval = 1e6):
+def make_monitored(function, limits = None, callback = None, interval = 1):
     return functools.partial(monitor_function, limits, callback, interval, function)
 
 def measure_update_to_peak(pid, old_summary = None):
@@ -98,6 +98,9 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
         # process that runs the original function
         fun_proc = multiprocessing.Process(target=__wrap_function(local_results, function, args, kwargs))
 
+        # unique name for this function invocation
+        fun_id = str(hash(json.dumps({'args': args, 'kwargs': kwargs}, sort_keys=True)))
+
         # convert limits to the structure the minimonitor accepts
         if limits:
             limits = rmsummary.from_dict(limits)
@@ -116,7 +119,9 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
         resources_max = rmsummary_copy(resources_now)
 
         try:
+            step = 0
             while not child_finished.is_set():
+                step += 1
                 # register/deregister new processes
                 __read_pids_file(pids_file)
 
@@ -128,8 +133,8 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
                     child_finished.set()
                 else:
                     if callback:
-                        callback(resources=resources_now.to_dict(), finished=False, resource_exhaustion=False)
-                child_finished.wait(timeout = interval/1e6)
+                        callback(fun_id, function.__name__, step, _resources_to_dict(resources_now))
+                child_finished.wait(timeout = interval)
         except Exception as e:
             fun_proc.terminate()
             fun_proc.join()
@@ -149,11 +154,22 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
             results_queue.put({ 'result': fun_result, 'resources': resources_max, 'resource_exhaustion': False})
 
         if callback:
-            callback(resources=resources_max.to_dict(), finished=True, resource_exhaustion=resources_max.limits_exceeded is not None)
+            callback(fun_id, function.__name__, -1, _resources_to_dict(resources_max))
 
     except Exception as e:
         cctools_debug(D_RMON, "error executing function process: {}".format(e))
         results_queue.put({'result': e, 'resources': None, 'resource_exhaustion': False})
+
+def _resources_to_dict(resources):
+    d = resources.to_dict()
+
+    try:
+        if d['wall_time'] > 0:
+            d['cores_avg'] = float(d['cpu_time']) / float(d['wall_time'])
+    except KeyError:
+            d['cores_avg'] = -1
+    return d
+
 
 def monitor_function(limits, callback, interval, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
@@ -170,13 +186,13 @@ def monitor_function(limits, callback, interval, function, *args, **kwargs):
     if not results['resources']:
         raise results['result']
     else:
-        results['resources'] = results['resources'].to_dict()
+        results['resources'] = _resources_to_dict(results['resources'])
 
     if results['resource_exhaustion']:
         raise ResourceExhaustion(results['resources'], function, args, kwargs)
 
-    return (results['result'], results['resources'])
-
+    #return (results['result'], results['resources'])
+    return results['result']
 
 class ResourceExhaustion(Exception):
     def __init__(self, resources, function, args = None, kwargs = None):
