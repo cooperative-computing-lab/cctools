@@ -3,8 +3,8 @@ Now enter expressions:
 expression: 10
 value:      10
 
-expression: 3847.58
-value:      3847.58
+expression: 3847.576
+value:      3847.576
 
 expression: 0.5
 value:      0.5
@@ -241,16 +241,16 @@ expression: a%b
 value:      error("on line 105, true%false: unsupported operator on boolean")
 
 expression: f+g
-value:      3.64159
+value:      3.641592654
 
 expression: f-g
-value:      -2.64159
+value:      -2.641592654
 
 expression: f*g
-value:      1.5708
+value:      1.570796327
 
 expression: f/g
-value:      0.159155
+value:      0.159154943071114
 
 expression: f%g
 value:      0
@@ -283,7 +283,7 @@ expression: x or y
 value:      error("on line 121, 10 or 20: unsupported operator on integer")
 
 expression: (x+y)*(f+g)
-value:      109.248
+value:      109.24777962
 
 expression: 10+20*30
 value:      610
@@ -444,7 +444,7 @@ value:      "2.500000"
 expression: format("%F",3.14)
 value:      "3.140000"
 
-expression: format("%g",9.9e+09)
+expression: format("%g",9900000000)
 value:      "9.9e+09"
 
 expression: format("%G",2.11111e-12)
@@ -630,8 +630,8 @@ value:      "hello 1 world"
 expression: true+" maybe "+false
 value:      "true maybe false"
 
-expression: "pi is "+3.14159
-value:      "pi is 3.14159"
+expression: "pi is "+3.141592654
+value:      "pi is 3.141592654"
 
 expression: error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"})
 value:      error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"})
