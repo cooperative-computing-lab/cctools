@@ -421,7 +421,7 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 
 		batch_task_set_command(task, cmd);
 		batch_task_add_input_file(task,args,args);
-
+		batch_task_add_input_file(task,n->makeflow_dag,n->makeflow_dag);
 		free(cmd);
 	} else {
 		batch_task_set_command(task, n->command);
