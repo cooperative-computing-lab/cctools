@@ -89,65 +89,65 @@ int jx_binary_write( FILE *stream, struct jx *j )
 
 	switch(j->type) {
 		case JX_NULL:
-			jx_binary_write_int8(stream,JX_BINARY_NULL);
+			jx_binary_write_uint8(stream,JX_BINARY_NULL);
 			break;
 		case JX_BOOLEAN:
 			if(j->u.boolean_value) {
-				jx_binary_write_int8(stream,JX_BINARY_TRUE);
+				jx_binary_write_uint8(stream,JX_BINARY_TRUE);
 			} else {
-				jx_binary_write_int8(stream,JX_BINARY_FALSE);
+				jx_binary_write_uint8(stream,JX_BINARY_FALSE);
 			}
 			break;
 		case JX_INTEGER:
 			i = j->u.integer_value;
 			if(i==0) {
-				jx_binary_write_int8(stream,JX_BINARY_INTEGER0);
+				jx_binary_write_uint8(stream,JX_BINARY_INTEGER0);
 			} else if(i>=-128 && i<128) {
-				jx_binary_write_int8(stream,JX_BINARY_INTEGER8);
+				jx_binary_write_uint8(stream,JX_BINARY_INTEGER8);
 				jx_binary_write_int8(stream,i);
 			} else if(i>=-32768 && i<32768) {
-				jx_binary_write_int8(stream,JX_BINARY_INTEGER16);
+				jx_binary_write_uint8(stream,JX_BINARY_INTEGER16);
 				jx_binary_write_int16(stream,i);
 			} else if(i>=-2147483648 && i<2147483648) {
-				jx_binary_write_int8(stream,JX_BINARY_INTEGER32);
+				jx_binary_write_uint8(stream,JX_BINARY_INTEGER32);
 				jx_binary_write_int32(stream,i);
 			} else {
-				jx_binary_write_int8(stream,JX_BINARY_INTEGER64);
+				jx_binary_write_uint8(stream,JX_BINARY_INTEGER64);
 				jx_binary_write_int64(stream,i);
 			}
 			break;
 		case JX_DOUBLE:
-			jx_binary_write_int8(stream,JX_BINARY_DOUBLE);
+			jx_binary_write_uint8(stream,JX_BINARY_DOUBLE);
 			jx_binary_write_double(stream,j->u.double_value);
 			break;
 		case JX_STRING:
 			length = strlen(j->u.string_value);
 			if(length<256) {
-				jx_binary_write_int8(stream,JX_BINARY_STRING8);
+				jx_binary_write_uint8(stream,JX_BINARY_STRING8);
 				jx_binary_write_uint8(stream,length);
 			} else if(length<65536) {
-				jx_binary_write_int8(stream,JX_BINARY_STRING16);
+				jx_binary_write_uint8(stream,JX_BINARY_STRING16);
 				jx_binary_write_uint16(stream,length);
 			} else {
-				jx_binary_write_int8(stream,JX_BINARY_STRING32);
+				jx_binary_write_uint8(stream,JX_BINARY_STRING32);
 				jx_binary_write_uint32(stream,length);
 			}
 			jx_binary_write_data(stream,j->u.string_value,length);
 			break;
 		case JX_ARRAY:
-			jx_binary_write_int8(stream,JX_BINARY_ARRAY);
+			jx_binary_write_uint8(stream,JX_BINARY_ARRAY);
 			for(item=j->u.items;item;item=item->next) {
 				jx_binary_write(stream,item->value);
 			}
-			jx_binary_write_int8(stream,JX_BINARY_END);
+			jx_binary_write_uint8(stream,JX_BINARY_END);
 			break;
 		case JX_OBJECT:
-			jx_binary_write_int8(stream,JX_BINARY_OBJECT);
+			jx_binary_write_uint8(stream,JX_BINARY_OBJECT);
 			for(pair=j->u.pairs;pair;pair=pair->next) {
 				jx_binary_write(stream,pair->key);
 				jx_binary_write(stream,pair->value);
 			}
-			jx_binary_write_int8(stream,JX_BINARY_END);
+			jx_binary_write_uint8(stream,JX_BINARY_END);
 			break;
 		case JX_OPERATOR:
 		case JX_FUNCTION:
@@ -238,7 +238,7 @@ static struct jx * jx_binary_read_string( FILE *stream, uint32_t length )
 
 struct jx * jx_binary_read( FILE *stream )
 {
-	int8_t type;
+	uint8_t type;
 	int8_t i8;
 	int16_t i16;
 	int32_t i32;
@@ -252,7 +252,7 @@ struct jx * jx_binary_read( FILE *stream )
 	struct jx_pair **pair;
 	struct jx_item **item;
 	
-	int result = jx_binary_read_int8(stream,&type);
+	int result = jx_binary_read_uint8(stream,&type);
 	if(!result) return 0;
 
 	printf("got type: %d\n",type);
