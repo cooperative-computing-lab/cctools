@@ -225,13 +225,10 @@ struct jx * jx_binary_read( FILE *stream )
 	switch(type) {
 		case JX_BINARY_NULL:
 			return jx_null();
-			break;
 		case JX_BINARY_TRUE:
 			return jx_boolean(1);
-			break;
 		case JX_BINARY_FALSE:
 			return jx_boolean(0);
-			break;
 		case JX_BINARY_INTEGER0:
 			return jx_integer(0);
 		case JX_BINARY_INTEGER8:
@@ -246,23 +243,18 @@ struct jx * jx_binary_read( FILE *stream )
 		case JX_BINARY_INTEGER64:
 			jx_binary_read_int64(stream,&i64);
 			return jx_integer(i64);
-			break;
 		case JX_BINARY_DOUBLE:
 			jx_binary_read_double(stream,&d);
 			return jx_double(d);
-			break;
 		case JX_BINARY_STRING8:
 			jx_binary_read_int8(stream,&i8);
 			return jx_binary_read_string(stream,i8);
-			break;
 		case JX_BINARY_STRING16:
 			jx_binary_read_int16(stream,&i16);
 			return jx_binary_read_string(stream,i16);
-			break;
 		case JX_BINARY_STRING32:
 			jx_binary_read_int32(stream,&i32);
 			return jx_binary_read_string(stream,i32);
-			break;
 		case JX_BINARY_ARRAY:
 			arr = jx_array(0);
 			item = &arr->u.items;
