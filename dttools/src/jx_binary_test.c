@@ -19,7 +19,7 @@ See the file COPYING for details.
 timestamp_t start = timestamp_get(); \
 xxx \
 timestamp_t end = timestamp_get(); \
-printf( "%s %lu us\n",name,end-start);	\
+printf( "%s %lu us\n",name,(unsigned long)(end-start));	\
 }
 
 
