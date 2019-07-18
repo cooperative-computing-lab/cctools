@@ -610,7 +610,7 @@ expression: listdir("-")
 value:      error("function listdir on line 0: -, No such file or directory")
 
 expression: listdir("dir")
-value:      error("function listdir on line 0: dir, No such file or directory")
+value:      ["a"]
 
 expression: escape("test")
 value:      "\"test\""
