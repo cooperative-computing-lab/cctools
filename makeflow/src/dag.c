@@ -328,7 +328,7 @@ int dag_width_uniform_task(struct dag *d)
 /**
  * Computes the width of the graph
  */
-int dag_width(struct dag *d, int nested_jobs)
+int dag_width(struct dag *d )
 {
 	struct dag_node *n, *parent;
 	struct dag_file *f;
@@ -395,8 +395,6 @@ int dag_width(struct dag *d, int nested_jobs)
 	memset(level_count, 0, level_count_size);
 
 	for(n = d->nodes; n != NULL; n = n->next) {
-		if(nested_jobs && !n->nested_job)
-			continue;
 		level_count[n->level]++;
 	}
 

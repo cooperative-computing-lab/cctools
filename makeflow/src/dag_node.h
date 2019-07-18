@@ -23,6 +23,11 @@ typedef enum {
 	DAG_NODE_STATE_MAX
 } dag_node_state_t;
 
+typedef enum {
+	DAG_NODE_TYPE_COMMAND,
+	DAG_NODE_TYPE_WORKFLOW,
+} dag_node_type_t;
+
 /* struct dag_node implements a linked list of nodes. A dag_node
  * represents a production rule from source files to target
  * files. The actual dag structure is given implicitly by the
@@ -45,9 +50,9 @@ struct dag_node {
 	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;      /* The depth of the ancestor tree for this node */
 
-	int nested_job;            /* Flag: Is this a recursive call to makeflow? */
-	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if nested_job is true. */
-	const char *makeflow_cwd;  /* Working dir of the sub-makeflow to run, if nested_job is true. */
+	dag_node_type_t type;	   /* Is the job a Unix command, workflows, etc. */
+	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
+	const char *makeflow_cwd;  /* Working dir of the sub-makeflow to run, if type is WORKFLOW */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */

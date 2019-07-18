@@ -34,6 +34,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
 
+	n->type = DAG_NODE_TYPE_COMMAND;
 	n->source_files = list_create();
 	n->target_files = list_create();
 
@@ -88,24 +89,24 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	assert(n);
 	assert(cmd);
 	assert(!n->command);
-	assert(!n->nested_job);
 	assert(!n->makeflow_dag);
 	assert(!n->makeflow_cwd);
 
+	n->type = DAG_NODE_TYPE_COMMAND;
 	n->command = xxstrdup(cmd);
 }
 
 void dag_node_set_submakeflow(struct dag_node *n, const char *dag, const char *cwd) {
 	assert(n);
 	assert(dag);
-	assert(!n->command);
-	assert(!n->nested_job);
 	assert(!n->makeflow_dag);
 	assert(!n->makeflow_cwd);
 
-	n->nested_job = 1;
+	n->type = DAG_NODE_TYPE_WORKFLOW;
 	n->makeflow_dag = xxstrdup(dag);
 	n->makeflow_cwd = xxstrdup(cwd ? cwd : ".");
+
+	// XXX materialize this string later, in dag_node_to_batch_job
 	n->command = string_format(
 			"cd %s && makeflow %s",
 			string_escape_shell(n->makeflow_cwd),

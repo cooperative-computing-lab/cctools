@@ -1253,7 +1253,7 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 		if(n->local_job) {
 			jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
 		}
-		if(n->nested_job) {
+		if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 			submakeflow = jx_object(NULL);
 			jx_insert(submakeflow, jx_string("path"), jx_string(n->makeflow_dag));
 			jx_insert(submakeflow, jx_string("cwd"), jx_string(n->makeflow_cwd));

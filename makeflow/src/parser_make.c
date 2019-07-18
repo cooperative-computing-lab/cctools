@@ -635,7 +635,6 @@ static int dag_parse_make_node(struct lexer *bk)
 static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t;
-	int nested_job = 0;
 
 	//Jump COMMAND token.
 	t = lexer_next_token(bk);
@@ -659,7 +658,7 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 		}
 		else if(strcmp(t->lexeme, "MAKEFLOW") == 0)
 		{
-			nested_job = 1;
+			n->type = DAG_NODE_TYPE_WORKFLOW;
 		}
 		else
 		{
@@ -678,12 +677,9 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 	t = lexer_next_token(bk);
 	lexer_free_token(t);
 
-	if(nested_job)
-	{
+	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 		return dag_parse_make_node_nested_makeflow(bk, n);
-	}
-	else
-	{
+	} else {
 		return dag_parse_make_node_regular_command(bk, n);
 	}
 }

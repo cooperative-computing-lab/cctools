@@ -171,7 +171,7 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n)
 {
-	if(n->nested_job){
+	if(n->type==DAG_NODE_TYPE_WORKFLOW){
 		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 		sprintf(command, "%s -c", n->command);
 
@@ -230,7 +230,7 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 	for(n = d->nodes; n; n = n->next) {
 		/* If the node is a Makeflow job, then we should recursively call the *
 		 * clean operation on it. */
-		if(n->nested_job) {
+		if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 			char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
 			sprintf(command, "%s -c", n->command);
 
