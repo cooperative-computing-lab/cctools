@@ -9,7 +9,7 @@
 # propagated to the sub-workflow.
 
 # makeflow must be in the path for the sub-workflow to work:
-export PATH=../src/makeflow:$PATH
+export PATH=`pwd`/../../makeflow/src:$PATH
 
 prepare()
 {
