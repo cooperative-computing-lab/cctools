@@ -10,7 +10,7 @@ See the file COPYING for details.
 
 #include <stdio.h>
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 
 /*
 Rather than relying on the enumeration in jx.h, we rely
