@@ -411,6 +411,7 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 
 		char *cmd = string_format("makeflow -T local %s",n->makeflow_dag);
+		char *oldcmd = 0;
 
 		if(n->makeflow_args) {
 			char args[] = "makeflow.jx.args.XXXXXX";
@@ -419,13 +420,30 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 			jx_print_stream(n->makeflow_args,argsfile);
 			fclose(argsfile);
 
+			oldcmd = cmd;
 			cmd = string_format("%s --jx-args %s --jx",cmd,args);
+			free(oldcmd);
+
 			batch_task_add_input_file(task,args,args);
 		}
 
+		if(n->resources_requested->cores>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-cores %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
 
-		// XXX need to know if it is JX or not.
-		// XXX pass resources down to workflow.
+		if(n->resources_requested->memory>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-memory %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		if(n->resources_requested->disk>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-disk %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
 
 		batch_task_set_command(task, cmd);
 		batch_task_add_input_file(task,n->makeflow_dag,n->makeflow_dag);
