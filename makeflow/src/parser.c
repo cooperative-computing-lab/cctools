@@ -55,7 +55,6 @@ See the file COPYING for details.
 #include "parser_jx.h"
 #include "parser.h"
 
-
 /* Returns a pointer to a new struct dag described by filename. Return NULL on
  * failure. */
 struct dag *dag_from_file(const char *filename, dag_syntax_type format, struct jx *args)

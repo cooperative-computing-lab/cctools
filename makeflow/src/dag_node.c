@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "jx.h"
+#include "jx_print.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -96,7 +97,8 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	n->command = xxstrdup(cmd);
 }
 
-void dag_node_set_workflow(struct dag_node *n, const char *dag, const char *cwd) {
+void dag_node_set_workflow(struct dag_node *n, const char *dag, const char *cwd, struct jx * args )
+{
 	assert(n);
 	assert(dag);
 	assert(!n->makeflow_dag);
@@ -105,13 +107,12 @@ void dag_node_set_workflow(struct dag_node *n, const char *dag, const char *cwd)
 	n->type = DAG_NODE_TYPE_WORKFLOW;
 	n->makeflow_dag = xxstrdup(dag);
 	n->makeflow_cwd = xxstrdup(cwd ? cwd : ".");
+	n->makeflow_args = jx_copy(args);
 
-	// XXX materialize this string later, in dag_node_to_batch_job
-	n->command = string_format(
-			"cd %s && makeflow %s",
-			string_escape_shell(n->makeflow_cwd),
-			string_escape_shell(n->makeflow_dag)
-	);
+	/* Record a placeholder in the command field */
+	/* A usable command will be created at submit time. */
+
+	n->command = xxstrdup(n->makeflow_dag);
 }
 
 void dag_node_insert(struct dag_node *n) {
@@ -409,7 +410,26 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 {
 	struct batch_task *task = batch_task_create(queue);
 	task->taskid = n->nodeid;
-	batch_task_set_command(task, n->command);
+
+	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+		char *args = string_format("makeflow.jx.args.%d",n->nodeid);
+
+		FILE *argsfile = fopen(args,"w");
+		jx_print_stream(n->makeflow_args,argsfile);
+		fclose(argsfile);
+
+		// XXX need to know if it is JX or not.
+		// XXX pass resources down to workflow.
+		char *cmd = string_format("makeflow -T local --jx-args %s --jx %s",args,n->makeflow_dag);
+
+		batch_task_set_command(task, cmd);
+		batch_task_add_input_file(task,args,args);
+
+		free(cmd);
+		free(args);
+	} else {
+		batch_task_set_command(task, n->command);
+	}
 
 	struct dag_file *f;
 	list_first_item(n->source_files);

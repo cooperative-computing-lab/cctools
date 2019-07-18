@@ -727,7 +727,7 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 		lexer_report_error(bk, "MAKEFLOW specification does not end with a newline.\n");
 	}
 
-	dag_node_set_workflow(n, makeflow_dag->lexeme, makeflow_cwd ? makeflow_cwd->lexeme : NULL);
+	dag_node_set_workflow(n, makeflow_dag->lexeme, makeflow_cwd ? makeflow_cwd->lexeme : NULL, 0);
 
 	lexer_free_token(t);
 	lexer_free_token(makeflow_dag);
