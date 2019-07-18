@@ -200,33 +200,27 @@ static int rule_from_jx(struct dag *d, struct jx *j)
 		return 0;
 	}
 
-	struct jx *command = jx_lookup(j, "command");
-	struct jx *workflow = jx_lookup(j, "workflow");
+	const char *command = jx_lookup_string(j, "command");
+	const char *workflow = jx_lookup_string(j, "workflow");
 
 	if(workflow && command) {
 		report_error(j->line, "rule is invalid because it defines both a command and a workflow.", NULL);
 		return 0;
 	}
 
-	if(jx_istype(command, JX_STRING)) {
-		debug(D_MAKEFLOW_PARSER, "command: %s", command->u.string_value);
-		dag_node_set_command(n, command->u.string_value);
-	} else if(jx_istype(workflow, JX_OBJECT)) {
-		const char *path = jx_lookup_string(workflow, "path");
-		const char *cwd = jx_lookup_string(workflow, "cwd");
-		struct jx *args = jx_lookup(workflow, "args");
-
-		if(!path) {
-			report_error(workflow->line, "sub-workflow must specify the \"path\" key.", NULL);
-			return 0;
-		}
-		debug(D_MAKEFLOW_PARSER, "Line %u: sub-workflow at %s", workflow->line, path);
-		dag_node_set_workflow(n, path, cwd, args);
+	if(command) {
+		debug(D_MAKEFLOW_PARSER, "command: %s", command);
+		dag_node_set_command(n,command);
+	} else if(workflow) {
+		const char *cwd = jx_lookup_string(j, "cwd");
+		struct jx *args = jx_lookup(j, "args");
+		debug(D_MAKEFLOW_PARSER, "Line %u: sub-workflow at %s", j->line,workflow);
+		dag_node_set_workflow(n, workflow, cwd, args);
 
 		if(cwd) {
 			debug(D_MAKEFLOW_PARSER, "working directory %s", cwd);
 		} else {
-			debug(D_MAKEFLOW_PARSER, "Sub-workflow at line %u: cwd malformed or missing, using process cwd", workflow->line);
+			debug(D_MAKEFLOW_PARSER, "Sub-workflow at line %u: cwd malformed or missing, using process cwd", j->line);
 		}
 
 	} else {
