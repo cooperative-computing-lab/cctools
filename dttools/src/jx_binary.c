@@ -35,9 +35,24 @@ not change, unlike the in-memory enumeration of jx.h
 #define JX_BINARY_OBJECT 24
 #define JX_BINARY_END 25
 
-static int jx_binary_write_data( FILE *stream, void *data, int length )
+static int jx_binary_write_data( FILE *stream, void *data, unsigned length )
 {
 	return fwrite(data,length,1,stream);
+}
+
+static int jx_binary_write_uint8( FILE *stream, uint8_t i )
+{
+	return jx_binary_write_data(stream,&i,sizeof(i));
+}
+
+static int jx_binary_write_uint16( FILE *stream, uint16_t i )
+{
+	return jx_binary_write_data(stream,&i,sizeof(i));
+}
+
+static int jx_binary_write_uint32( FILE *stream, uint32_t i )
+{
+	return jx_binary_write_data(stream,&i,sizeof(i));
 }
 
 static int jx_binary_write_int8( FILE *stream, int8_t i )
@@ -109,13 +124,13 @@ int jx_binary_write( FILE *stream, struct jx *j )
 			length = strlen(j->u.string_value);
 			if(length<256) {
 				jx_binary_write_int8(stream,JX_BINARY_STRING8);
-				jx_binary_write_int8(stream,length);
+				jx_binary_write_uint8(stream,length);
 			} else if(length<65536) {
 				jx_binary_write_int8(stream,JX_BINARY_STRING16);
-				jx_binary_write_int16(stream,length);
+				jx_binary_write_uint16(stream,length);
 			} else {
 				jx_binary_write_int8(stream,JX_BINARY_STRING32);
-				jx_binary_write_int32(stream,length);
+				jx_binary_write_uint32(stream,length);
 			}
 			jx_binary_write_data(stream,j->u.string_value,length);
 			break;
@@ -146,9 +161,24 @@ int jx_binary_write( FILE *stream, struct jx *j )
 	return 1;
 }
 
-static int jx_binary_read_data( FILE *stream, void *data, int length )
+static int jx_binary_read_data( FILE *stream, void *data, unsigned length )
 {
 	return fread(data,length,1,stream);
+}
+
+static int jx_binary_read_uint8( FILE *stream, uint8_t *i )
+{
+	return jx_binary_read_data(stream,i,sizeof(*i));
+}
+
+static int jx_binary_read_uint16( FILE *stream, uint16_t *i )
+{
+	return jx_binary_read_data(stream,i,sizeof(*i));
+}
+
+static int jx_binary_read_uint32( FILE *stream, uint32_t *i )
+{
+	return jx_binary_read_data(stream,i,sizeof(*i));
 }
 
 static int jx_binary_read_int8( FILE *stream, int8_t *i )
@@ -213,6 +243,9 @@ struct jx * jx_binary_read( FILE *stream )
 	int16_t i16;
 	int32_t i32;
 	int64_t i64;
+	uint8_t u8;
+	uint16_t u16;
+	uint32_t u32;
 	double d;
 	struct jx *arr;
 	struct jx *obj;
@@ -221,6 +254,8 @@ struct jx * jx_binary_read( FILE *stream )
 	
 	int result = jx_binary_read_int8(stream,&type);
 	if(!result) return 0;
+
+	printf("got type: %d\n",type);
 
 	switch(type) {
 		case JX_BINARY_NULL:
@@ -247,14 +282,14 @@ struct jx * jx_binary_read( FILE *stream )
 			jx_binary_read_double(stream,&d);
 			return jx_double(d);
 		case JX_BINARY_STRING8:
-			jx_binary_read_int8(stream,&i8);
-			return jx_binary_read_string(stream,i8);
+			jx_binary_read_uint8(stream,&u8);
+			return jx_binary_read_string(stream,u8);
 		case JX_BINARY_STRING16:
-			jx_binary_read_int16(stream,&i16);
-			return jx_binary_read_string(stream,i16);
+			jx_binary_read_uint16(stream,&u16);
+			return jx_binary_read_string(stream,u16);
 		case JX_BINARY_STRING32:
-			jx_binary_read_int32(stream,&i32);
-			return jx_binary_read_string(stream,i32);
+			jx_binary_read_uint32(stream,&u32);
+			return jx_binary_read_string(stream,u32);
 		case JX_BINARY_ARRAY:
 			arr = jx_array(0);
 			item = &arr->u.items;
