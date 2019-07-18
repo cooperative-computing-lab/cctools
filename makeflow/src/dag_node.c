@@ -96,7 +96,7 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	n->command = xxstrdup(cmd);
 }
 
-void dag_node_set_submakeflow(struct dag_node *n, const char *dag, const char *cwd) {
+void dag_node_set_workflow(struct dag_node *n, const char *dag, const char *cwd) {
 	assert(n);
 	assert(dag);
 	assert(!n->makeflow_dag);
