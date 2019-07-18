@@ -255,8 +255,6 @@ struct jx * jx_binary_read( FILE *stream )
 	int result = jx_binary_read_uint8(stream,&type);
 	if(!result) return 0;
 
-	printf("got type: %d\n",type);
-
 	switch(type) {
 		case JX_BINARY_NULL:
 			return jx_null();
