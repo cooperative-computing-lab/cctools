@@ -409,18 +409,25 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 	task->taskid = n->nodeid;
 
 	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-		char args[] = "makeflow.jx.args.XXXXXX";
-		int fd = mkstemp(args);
-		FILE *argsfile = fdopen(fd,"w");
-		jx_print_stream(n->makeflow_args,argsfile);
-		fclose(argsfile);
+
+		char *cmd = string_format("makeflow -T local %s",n->makeflow_dag);
+
+		if(n->makeflow_args) {
+			char args[] = "makeflow.jx.args.XXXXXX";
+			int fd = mkstemp(args);
+			FILE *argsfile = fdopen(fd,"w");
+			jx_print_stream(n->makeflow_args,argsfile);
+			fclose(argsfile);
+
+			cmd = string_format("%s --jx-args %s --jx",cmd,args);
+			batch_task_add_input_file(task,args,args);
+		}
+
 
 		// XXX need to know if it is JX or not.
 		// XXX pass resources down to workflow.
-		char *cmd = string_format("makeflow -T local --jx-args %s --jx %s",args,n->makeflow_dag);
 
 		batch_task_set_command(task, cmd);
-		batch_task_add_input_file(task,args,args);
 		batch_task_add_input_file(task,n->makeflow_dag,n->makeflow_dag);
 		free(cmd);
 	} else {
