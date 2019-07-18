@@ -409,9 +409,9 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 	task->taskid = n->nodeid;
 
 	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-		char *args = string_format("makeflow.jx.args.%d",n->nodeid);
-
-		FILE *argsfile = fopen(args,"w");
+		char args[] = "makeflow.jx.args.XXXXXX";
+		int fd = mkstemp(args);
+		FILE *argsfile = fdopen(fd,"w");
 		jx_print_stream(n->makeflow_args,argsfile);
 		fclose(argsfile);
 
@@ -423,7 +423,6 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 		batch_task_add_input_file(task,args,args);
 
 		free(cmd);
-		free(args);
 	} else {
 		batch_task_set_command(task, n->command);
 	}
