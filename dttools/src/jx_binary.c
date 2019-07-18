@@ -35,34 +35,34 @@ not change, unlike the in-memory enumeration of jx.h
 #define JX_BINARY_OBJECT 24
 #define JX_BINARY_END 25
 
-static int jx_binary_write_data( FILE *stream, char *data, int length )
+static int jx_binary_write_data( FILE *stream, void *data, int length )
 {
 	return fwrite(data,length,1,stream);
 }
 
-static int jx_binary_write_int8( FILE *stream, int8_t data )
+static int jx_binary_write_int8( FILE *stream, int8_t i )
 {
-	return fwrite(&data,1,1,stream);
+	return jx_binary_write_data(stream,&i,sizeof(i));
 }
 
 static int jx_binary_write_int16( FILE *stream, int16_t i )
 {
-	return fwrite(&i,sizeof(i),1,stream);
+	return jx_binary_write_data(stream,&i,sizeof(i));
 }
 
 static int jx_binary_write_int32( FILE *stream, int32_t i )
 {
-	return fwrite(&i,sizeof(i),1,stream);
+	return jx_binary_write_data(stream,&i,sizeof(i));
 }
 
 static int jx_binary_write_int64( FILE *stream, int64_t i )
 {
-	return fwrite(&i,sizeof(i),1,stream);
+	return jx_binary_write_data(stream,&i,sizeof(i));
 }
 
 static int jx_binary_write_double( FILE *stream, double d )
 {
-	return fwrite(&d,sizeof(d),1,stream);
+	return jx_binary_write_data(stream,&d,sizeof(d));
 }
 
 int jx_binary_write( FILE *stream, struct jx *j )
@@ -146,34 +146,34 @@ int jx_binary_write( FILE *stream, struct jx *j )
 	return 1;
 }
 
-static int jx_binary_read_data( FILE *stream, char *data, int length )
+static int jx_binary_read_data( FILE *stream, void *data, int length )
 {
 	return fread(data,length,1,stream);
 }
 
-static int jx_binary_read_int8( FILE *stream, int8_t *data )
+static int jx_binary_read_int8( FILE *stream, int8_t *i )
 {
-	return fread(data,1,1,stream);
+	return jx_binary_read_data(stream,i,sizeof(*i));
 }
 
-static int jx_binary_read_int16( FILE *stream, int16_t *data )
+static int jx_binary_read_int16( FILE *stream, int16_t *i )
 {
-	return fread(data,1,1,stream);
+	return jx_binary_read_data(stream,i,sizeof(*i));
 }
 
 static int jx_binary_read_int32( FILE *stream, int32_t *i )
 {
-	return fread(i,sizeof(*i),1,stream);
+	return jx_binary_read_data(stream,i,sizeof(*i));
 }
 
 static int jx_binary_read_int64( FILE *stream, int64_t *i )
 {
-	return fread(i,sizeof(*i),1,stream);
+	return jx_binary_read_data(stream,i,sizeof(*i));
 }
 
 static int jx_binary_read_double( FILE *stream, double *d )
 {
-	return fread(d,sizeof(*d),1,stream);
+	return jx_binary_read_data(stream,d,sizeof(*d));
 }
 
 static struct jx_pair * jx_binary_read_pair( FILE *stream )
@@ -198,7 +198,7 @@ static struct jx_item * jx_binary_read_item( FILE *stream )
 	return jx_item(a,0);
 }
 
-struct jx * jx_binary_read_string( FILE *stream, uint32_t length )
+static struct jx * jx_binary_read_string( FILE *stream, uint32_t length )
 {
 	char *s = malloc(length+1);
 	jx_binary_read_data(stream,s,length);
