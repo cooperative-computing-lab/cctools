@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
+Copyright (C) 2019- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -410,33 +410,6 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 			}
 			if(child_node_found) {
 				makeflow_node_force_rerun(rerun_table, d, p);
-			}
-		}
-	}
-}
-
-/*
-Update nested jobs with appropriate number of local jobs
-(total local jobs max / maximum number of concurrent nests).
-*/
-
-static void makeflow_prepare_nested_jobs(struct dag *d)
-{
-	int dag_nested_width = dag_width(d, 1);
-	int update_dag_nests = 1;
-	char *s = getenv("MAKEFLOW_UPDATE_NESTED_JOBS");
-	if(s)
-		update_dag_nests = atoi(s);
-
-	if(dag_nested_width > 0 && update_dag_nests) {
-		dag_nested_width = MIN(dag_nested_width, local_jobs_max);
-		struct dag_node *n;
-		for(n = d->nodes; n; n = n->next) {
-			if(n->nested_job && ((n->local_job && local_queue) || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
-				char *command = xxmalloc(strlen(n->command) + 20);
-				sprintf(command, "%s -j %d", n->command, local_jobs_max / dag_nested_width);
-				free((char *) n->command);
-				n->command = command;
 			}
 		}
 	}
@@ -2204,8 +2177,6 @@ int main(int argc, char *argv[])
 	}
 
 	makeflow_parse_input_outputs(d);
-
-	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
 		chdir(change_dir);
