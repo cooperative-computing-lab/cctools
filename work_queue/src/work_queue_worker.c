@@ -2722,7 +2722,7 @@ int main(int argc, char *argv[])
 
 		if(result) {
 			if(single_shot_mode) {
-				debug(D_NOTICE,"stopping: single shot mode");
+				debug(D_DEBUG,"stopping: single shot mode");
 				break;
 			}
 			backoff_interval = init_backoff_interval;
