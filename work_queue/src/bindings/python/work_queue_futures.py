@@ -10,10 +10,14 @@
 # - @ref work_queue::Task
 
 import work_queue
+import multiprocessing
+import os
+import subprocess
+import sys
 import threading
 import time
 import traceback
-import sys
+
 
 try:
     # from py3
@@ -29,18 +33,28 @@ except ImportError:
 # @ref work_queue_futures::WorkQueueFutures.
 class WorkQueueFutures(object):
     def __init__(self, *args, **kwargs):
-        self._queue = work_queue.WorkQueue(*args, **kwargs)
-        self._thread = threading.Thread(target = self._sync_loop)
 
-        self._stop_queue_event = threading.Event()
-
-        self._tasks_to_submit = ThreadQueue.Queue()
+        local_worker_args = kwargs.get('local_worker', None)
+        if local_worker_args:
+            del kwargs['local_worker']
 
         # calls to synchronous WorkQueueFutures are coordinated with _queue_lock
         self._queue_lock     = threading.Lock()
+        self._stop_queue_event = threading.Event()
+        self._tasks_to_submit = ThreadQueue.Queue()
 
+        self._thread = threading.Thread(target = self._sync_loop)
         self._thread.daemon  = True
+        self._local_worker = None
+
+        self._queue = work_queue.WorkQueue(*args, **kwargs)
+
+        if local_worker_args:
+            self._launch_local_worker(**local_worker_args)
+
         self._thread.start()
+
+
 
     # methods not explicitly defined we route to synchronous WorkQueue, using a lock.
     def __getattr__(self, name):
@@ -56,6 +70,20 @@ class WorkQueueFutures(object):
         else:
             return attr
 
+
+    def _launch_local_worker(self, cores=1, memory=512, disk=10000, executable='work_queue_worker'):
+        args = [executable, '--single-shot', '--cores', cores, '--memory', memory, '--disk', disk, '--timeout', 9000, 'localhost', '-o/dev/null', self.port]
+        args = [str(x) for x in args]
+
+        null = open(os.devnull, 'w')
+        self._local_worker = multiprocessing.Process(target=lambda: subprocess.call(args, stderr=null, stdout=null), daemon=True)
+        self._local_worker.start()
+        time.sleep(1)
+
+        if not self._local_worker.is_alive():
+            raise subprocess.CalledProcessError(cmd = ' '.join(args), returncode=127)
+
+
     ##
     # Submit a task to the queue.
     #
@@ -64,7 +92,6 @@ class WorkQueueFutures(object):
     def submit(self, future_task):
         if isinstance(future_task, FutureTask):
             self._tasks_to_submit.put(future_task, False)
-            return future_task
         else:
             raise TypeError("{} is not a WorkQueue.Task")
 
@@ -94,10 +121,17 @@ class WorkQueueFutures(object):
                 if self._stop_queue_event.is_set():
                     return
 
+                # if the queue is empty, we wait for tasks to be declared for
+                # submission, otherwise _queue.wait return immediately and we
+                # busy-wait
+                submit_timeout = 1
+                if len(active_tasks.keys()) > 0:
+                    submit_timeout = 0
+
                 # do the submits, if any
                 while not self._tasks_to_submit.empty():
                     try:
-                        future_task = self._tasks_to_submit.get(False)
+                        future_task = self._tasks_to_submit.get(True, submit_timeout)
                         if not future_task.cancelled():
                             with self._queue_lock:
                                 taskid = self._queue.submit(future_task)
@@ -114,6 +148,10 @@ class WorkQueueFutures(object):
                         if wq_task:
                             wq_task.set_result_or_exception()
                             del active_tasks[wq_task.id]
+
+                if len(active_tasks.keys()) == 0:
+                    # if queue is empty, wait here so we don't busy-wait
+                    time.sleep(1)
 
             except Exception as e:
                 # on error, we set exception to all the known tasks so that .result() does not block
@@ -136,7 +174,18 @@ class WorkQueueFutures(object):
 
     def _terminate(self):
         self._stop_queue_event.set()
-        self._thread.join()
+
+        try:
+            self._thread.join()
+        except RuntimeError:
+            pass
+
+        if self._local_worker:
+            try:
+                self._local_worker.terminate()
+                self._local_worker.join()
+            except Exception as e:
+                pass
 
     def __del__(self):
         self._terminate()
@@ -243,7 +292,7 @@ class FutureTask(work_queue.Task):
     def set_result_or_exception(self):
         result = self._task.result
         if result == work_queue.WORK_QUEUE_RESULT_SUCCESS and self.return_status == 0:
-            self.set_result(self.output)
+            self.set_result(True)
         else:
             self.set_exception(FutureTaskError(self))
 
