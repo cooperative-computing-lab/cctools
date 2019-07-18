@@ -8,6 +8,9 @@
 # output file output.10.  Then, a clean operation should be 
 # propagated to the sub-workflow.
 
+# makeflow must be in the path for the sub-workflow to work:
+export PATH=../src/makeflow:$PATH
+
 prepare()
 {
 cat > nested.jx << EOF
