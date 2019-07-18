@@ -52,7 +52,6 @@ struct dag_node {
 
 	dag_node_type_t type;	   /* Is the job a Unix command, workflows, etc. */
 	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
-	const char *makeflow_cwd;  /* Working dir of the sub-makeflow to run, if type is WORKFLOW */
 	struct jx *makeflow_args;  /* Arguments to pass to the workflow. */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
@@ -106,7 +105,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
 void dag_node_set_command(struct dag_node *n, const char *cmd);
-void dag_node_set_workflow(struct dag_node *n, const char *dag, const char *cwd, struct jx *args );
+void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx *args );
 void dag_node_insert(struct dag_node *n);
 
 uint64_t dag_node_file_list_size(struct list *s);

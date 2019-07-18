@@ -212,17 +212,9 @@ static int rule_from_jx(struct dag *d, struct jx *j)
 		debug(D_MAKEFLOW_PARSER, "command: %s", command);
 		dag_node_set_command(n,command);
 	} else if(workflow) {
-		const char *cwd = jx_lookup_string(j, "cwd");
 		struct jx *args = jx_lookup(j, "args");
 		debug(D_MAKEFLOW_PARSER, "Line %u: sub-workflow at %s", j->line,workflow);
-		dag_node_set_workflow(n, workflow, cwd, args);
-
-		if(cwd) {
-			debug(D_MAKEFLOW_PARSER, "working directory %s", cwd);
-		} else {
-			debug(D_MAKEFLOW_PARSER, "Sub-workflow at line %u: cwd malformed or missing, using process cwd", j->line);
-		}
-
+		dag_node_set_workflow(n, workflow, args);
 	} else {
 		report_error(j->line, "rule neither defines a command nor a sub-workflow.", NULL);
 		return 0;

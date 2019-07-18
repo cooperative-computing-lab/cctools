@@ -698,7 +698,6 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 {
 	struct token *t;
 	struct token *makeflow_dag;
-	struct token *makeflow_cwd = NULL;
 
 	dag_parse_make_drop_spaces(bk);
 
@@ -714,24 +713,15 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 
 	dag_parse_make_drop_spaces(bk);
 
-	//Get dag's working directory.
-	t = lexer_peek_next_token(bk);
-	if(t->type == TOKEN_LITERAL) {
-		makeflow_cwd = lexer_next_token(bk);
-	}
-
-	dag_parse_make_drop_spaces(bk);
-
 	t = lexer_next_token(bk);
 	if (!(t && t->type == TOKEN_NEWLINE)) {
 		lexer_report_error(bk, "MAKEFLOW specification does not end with a newline.\n");
 	}
 
-	dag_node_set_workflow(n, makeflow_dag->lexeme, makeflow_cwd ? makeflow_cwd->lexeme : NULL, 0);
+	dag_node_set_workflow(n, makeflow_dag->lexeme, 0);
 
 	lexer_free_token(t);
 	lexer_free_token(makeflow_dag);
-	if (makeflow_cwd) lexer_free_token(makeflow_cwd);
 	return 1;
 }
 

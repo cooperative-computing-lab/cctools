@@ -91,22 +91,19 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	assert(cmd);
 	assert(!n->command);
 	assert(!n->makeflow_dag);
-	assert(!n->makeflow_cwd);
 
 	n->type = DAG_NODE_TYPE_COMMAND;
 	n->command = xxstrdup(cmd);
 }
 
-void dag_node_set_workflow(struct dag_node *n, const char *dag, const char *cwd, struct jx * args )
+void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx * args )
 {
 	assert(n);
 	assert(dag);
 	assert(!n->makeflow_dag);
-	assert(!n->makeflow_cwd);
 
 	n->type = DAG_NODE_TYPE_WORKFLOW;
 	n->makeflow_dag = xxstrdup(dag);
-	n->makeflow_cwd = xxstrdup(cwd ? cwd : ".");
 	n->makeflow_args = jx_copy(args);
 
 	/* Record a placeholder in the command field */

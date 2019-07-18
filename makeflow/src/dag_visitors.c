@@ -1236,7 +1236,6 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 	struct jx *result = jx_array(NULL);
 	struct dag_node *n = node;
 	struct jx *rule;
-	struct jx *submakeflow;
 
 	while(n) {
 		rule = jx_object(NULL);
@@ -1254,10 +1253,8 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 			jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
 		}
 		if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-			submakeflow = jx_object(NULL);
-			jx_insert(submakeflow, jx_string("path"), jx_string(n->makeflow_dag));
-			jx_insert(submakeflow, jx_string("cwd"), jx_string(n->makeflow_cwd));
-			jx_insert(rule, jx_string("makeflow"), submakeflow);
+			jx_insert(rule, jx_string("workflow"), jx_string(n->makeflow_dag));
+			jx_insert(rule, jx_string("args"), jx_copy(n->makeflow_args));
 		} else {
 			jx_insert(rule, jx_string("command"), jx_string(n->command));
 		}
