@@ -49,7 +49,6 @@ See the file COPYING for details.
 #include "makeflow_log.h"
 #include "makeflow_wrapper.h"
 #include "makeflow_mounts.h"
-#include "makeflow_wrapper_enforcement.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
 #include "makeflow_hook.h"
@@ -149,8 +148,6 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static char *parrot_path = "./parrot_run";
-
 /*
 Wait upto this many seconds for an output file of a succesfull task
 to appear on the local filesystem (e.g, to deal with NFS
@@ -166,7 +163,6 @@ once weaver/pbui tools are updated.)
 static int log_verbose_mode = 0;
 
 static struct makeflow_wrapper *wrapper = 0;
-static struct makeflow_wrapper *enforcer = 0;
 
 static int catalog_reporting_on = 0;
 
@@ -195,7 +191,6 @@ replacement for monitor file names.
 void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
 {
 	if(wrapper)  makeflow_wrapper_generate_files(task, wrapper->input_files, wrapper->output_files, n, wrapper);
-	if(enforcer) makeflow_wrapper_generate_files(task, enforcer->input_files, enforcer->output_files, n, enforcer);
 }
 
 /*
@@ -211,7 +206,6 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 
 	/* Expand the command according to each of the wrappers */
 	makeflow_wrap_wrapper(task, n, wrapper);
-	makeflow_wrap_enforcer(task, n, enforcer);
 }
 
 /*
@@ -1211,6 +1205,7 @@ int main(int argc, char *argv[])
 	struct jx *hook_args = jx_object(NULL);
 	char *k8s_image = NULL;
 	extern struct makeflow_hook makeflow_hook_docker;
+	extern struct makeflow_hook makeflow_hook_enforcement;
 	extern struct makeflow_hook makeflow_hook_example;
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
@@ -1895,10 +1890,13 @@ int main(int argc, char *argv[])
 				should_send_all_local_environment = 1;
 				break;
 			case LONG_OPT_ENFORCEMENT:
-				if(!enforcer) enforcer = makeflow_wrapper_create();
+				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
 				break;
 			case LONG_OPT_PARROT_PATH:
-				parrot_path = xxstrdup(optarg);
+				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("parrot_path"), jx_string(optarg));
 				break;
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;
@@ -2197,10 +2195,6 @@ int main(int argc, char *argv[])
 
 	if(makeflow_gc_method == MAKEFLOW_GC_SIZE && !batch_queue_supports_feature(remote_queue, "gc_size")) {
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
-	}
-
-	if(enforcer) {
-		makeflow_wrapper_enforcer_init(enforcer, parrot_path);
 	}
 
 	makeflow_parse_input_outputs(d);
