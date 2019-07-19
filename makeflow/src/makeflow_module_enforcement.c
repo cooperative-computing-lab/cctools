@@ -76,7 +76,7 @@ static int create( void ** instance_struct, struct jx *hook_args ){
 	}
 
 	p->local_parrot_path = xxstrdup("parrot_run");
-	p->enforce_prefix = xxstrdup("./enforce_");
+	p->enforce_prefix = xxstrdup("./enforce");
 	p->mountlist_prefix = xxstrdup("mount_");
 	p->tmp_prefix = xxstrdup("tmp_");
 
