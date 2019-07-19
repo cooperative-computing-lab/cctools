@@ -286,7 +286,7 @@ static void corrupt_data( const char *filename, const char *line )
 static void handle_merge( struct jx_database *db, const char *key, struct jx *update )
 {
 	struct jx *current = hash_table_remove(db->table,key);
-	struct jx *merged = jx_merge(update,current,0);
+	struct jx *merged = jx_merge(current, update, NULL);
 
 	hash_table_insert(db->table,key,merged);
 
