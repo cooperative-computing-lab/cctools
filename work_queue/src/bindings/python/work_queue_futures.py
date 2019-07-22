@@ -26,6 +26,59 @@ except ImportError:
     # from py2
     import Queue as ThreadQueue
 
+class Worker(object):
+    def __init__(self, port, executable='work_queue_worker', cores=1, memory=512, disk=1000):
+        self._proc = None
+        self._port = port
+
+        self._executable = executable
+        self._cores      = cores
+        self._memory     = memory
+        self._disk       = disk
+
+        self._permanent_error = None
+
+        self.devnull    = open(os.devnull, 'w')
+
+        self.check_alive()
+
+
+    def check_alive(self):
+        if self._permanent_error is not None:
+            raise Exception(self._permanent_error)
+            return False
+
+        if self._proc and self._proc.is_alive():
+            return True
+
+        if self._proc:
+            self._proc.join()
+            if self._proc.exitcode != 0:
+                self._permanent_error = self._proc.exitcode
+                return False
+
+        return self._launch_worker()
+
+    def _launch_worker(self):
+        args = [self._executable,
+                '--single-shot',
+                '--cores',  self._cores,
+                '--memory', self._memory,
+                '--disk',   self._disk,
+                '--timeout', 300,
+                'localhost',
+                self._port]
+
+        args = [str(x) for x in args]
+
+        self._proc = multiprocessing.Process(target=lambda: subprocess.check_call(args, stderr=self.devnull, stdout=self.devnull), daemon=True)
+        self._proc.start()
+
+        return self.check_alive()
+
+
+
+
 ##
 # Python Work Queue object
 #
@@ -37,6 +90,11 @@ class WorkQueueFutures(object):
         local_worker_args = kwargs.get('local_worker', None)
         if local_worker_args:
             del kwargs['local_worker']
+            if local_worker_args is True:
+                # local_worker_args can be a dictionary of worker options, or
+                # simply 'True' to get the defaults (1 core, 512MB memory,
+                # 1000MB of disk)
+                local_worker_args = {}
 
         # calls to synchronous WorkQueueFutures are coordinated with _queue_lock
         self._queue_lock     = threading.Lock()
@@ -50,7 +108,7 @@ class WorkQueueFutures(object):
         self._queue = work_queue.WorkQueue(*args, **kwargs)
 
         if local_worker_args:
-            self._launch_local_worker(**local_worker_args)
+            self._local_worker = Worker(self.port, **local_worker_args)
 
         self._thread.start()
 
@@ -69,19 +127,6 @@ class WorkQueueFutures(object):
             return method_wrapped
         else:
             return attr
-
-
-    def _launch_local_worker(self, cores=1, memory=512, disk=10000, executable='work_queue_worker'):
-        args = [executable, '--single-shot', '--cores', cores, '--memory', memory, '--disk', disk, '--timeout', 9000, 'localhost', '-o/dev/null', self.port]
-        args = [str(x) for x in args]
-
-        null = open(os.devnull, 'w')
-        self._local_worker = multiprocessing.Process(target=lambda: subprocess.call(args, stderr=null, stdout=null), daemon=True)
-        self._local_worker.start()
-        time.sleep(1)
-
-        if not self._local_worker.is_alive():
-            raise subprocess.CalledProcessError(cmd = ' '.join(args), returncode=127)
 
 
     ##
@@ -148,6 +193,9 @@ class WorkQueueFutures(object):
                         if wq_task:
                             wq_task.set_result_or_exception()
                             del active_tasks[wq_task.id]
+
+                if self._local_worker:
+                    self._local_worker.check_alive()
 
                 if len(active_tasks.keys()) == 0:
                     # if queue is empty, wait here so we don't busy-wait
