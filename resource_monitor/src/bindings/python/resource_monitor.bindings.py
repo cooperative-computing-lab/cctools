@@ -14,8 +14,9 @@
 #
 # - @ref ResourceMonitor::Category
 
-import functools
 import fcntl
+import functools
+import json
 import math
 import multiprocessing
 import os
@@ -33,15 +34,15 @@ cctools_debug_config('resource_monitor')
 
 
 # decorator to monitor functions.
-def monitored(limits = None, callback = None, interval = 1):
-    def monitored_inner(func):
-        return functools.partial(monitor_function, limits, callback, interval, func)
+def monitored(limits = None, callback = None, interval = 1, return_resources = True):
+    def monitored_inner(function):
+        return make_monitored(function, limits, callback, interval, return_resources)
     return monitored_inner
 
 # if x = function(*args, **kwargs), returns a function mfun  (x, r) = mfun(*args, **kwargs)
 # where x is the orignal results, and r is the maximum resources consumed.
-def make_monitored(function, limits = None, callback = None, interval = 1):
-    return functools.partial(monitor_function, limits, callback, interval, function)
+def make_monitored(function, limits = None, callback = None, interval = 1, return_resources = True):
+    return functools.partial(monitor_function, limits, callback, interval, return_resources, function)
 
 def measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
@@ -171,7 +172,7 @@ def _resources_to_dict(resources):
     return d
 
 
-def monitor_function(limits, callback, interval, function, *args, **kwargs):
+def monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
 
     #__watchman(result_queue, limits, callback, function, args, kwargs)
@@ -191,8 +192,10 @@ def monitor_function(limits, callback, interval, function, *args, **kwargs):
     if results['resource_exhaustion']:
         raise ResourceExhaustion(results['resources'], function, args, kwargs)
 
-    #return (results['result'], results['resources'])
-    return results['result']
+    if return_resources:
+        return (results['result'], results['resources'])
+    else:
+        return results['result']
 
 class ResourceExhaustion(Exception):
     def __init__(self, resources, function, args = None, kwargs = None):

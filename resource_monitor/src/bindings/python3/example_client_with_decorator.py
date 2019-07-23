@@ -7,21 +7,22 @@ import resource_monitor
 # monitor callback function example
 # a callback function will be called everytime resources are measured.
 # arguments are:
-# - resources: if finished = False, the instantaneous value of the resources used.
-#              if finished = True,  the maximum value of the resources used.
-# - finished: True/False whether the monitored function has been completed
-# - resources: True/False whether the monitored function exhausted resources
-def send_udp_message(resources, finished, resource_exhaustion):
+# - id:        unique identifier for the function invocation
+# - fun_name:  string with the name of the function
+# - step:      resource sample number (1 for the first, 2 for the second, ..., -1 for the last)
+# - resources: dictionary with resources measured
+def send_udp_message(id, fun_name, step, resources):
     """ Send a UDP message with the results of a measurement. Server implemented in callback_server.py """
     import socket
-    import pickle
+    import json
 
-    print('callback: finished? {}, exhaustion? {}, wall_time: {} s, memory: {} MB'.format(finished, resource_exhaustion, resources['wall_time']/1e6, resources['memory']))
+    finished   = True if step == -1 else False
+    exhaustion = True if resources.get('limits_exceeded', False) else False
 
-    msg = {'finished': finished, 'resource_exhaustion': resource_exhaustion, 'resources': resources}
+    msg = {'id': id, 'function': fun_name, 'finished': finished, 'resource_exhaustion': exhaustion, 'resources': resources}
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.sendto(pickle.dumps(msg), ('localhost', 9800))
+    sock.sendto(json.dumps(msg).encode(), ('localhost', 9800))
 
 
 def my_function(wait_for, buffer_size):
@@ -51,7 +52,6 @@ def my_function_monitored(wait_for, buffer_size):
 
 # alternatively, we could have defined my_function_monitored as:
 # my_function_monitored = resource_monitor.make_monitored(my_function, callback = send_udp_message, interval = 0.5/1e6)
-
 @resource_monitor.monitored(callback = send_udp_message, limits = {'memory': 100, 'wall_time': 10e6})
 def my_function_with_limits(wait_for, buffer_size):
     """
