@@ -1,0 +1,20 @@
+/*
+Copyright (C) 2019- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
+#ifndef ENV_REPLACE_H
+#define ENV_REPLACE_H
+
+/** Takes an infile and replaces all environment variables of the form
+  $[A-Za-z_]+[0-9A-Za-z_]* with the resolved environment using getenv.
+  This updated information is written to outfile.
+  @param infile Input file name that is opens and scanned for variables
+  @param outfile Output file name where resolved contents will be written
+  @return Result value 1 is failure and 0 is success.
+  */
+
+int env_replace( const char *infile, const char *outfile );
+
+#endif
