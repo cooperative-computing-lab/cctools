@@ -216,7 +216,8 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 }
 
 /*
-Consider a node in the dag and convert it into a batch task ready to execute.
+Consider a node in the dag and convert it into a batch task ready to execute,
+with resources environments, and everything prior to calling hooks.
 */
 
 struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue, int full_env_list)
@@ -224,16 +225,27 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	struct batch_task *task = batch_task_create(queue);
 	task->taskid = n->nodeid;
 
-	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+	if(n->type==DAG_NODE_TYPE_COMMAND) {
+
+		/* A plain command just gets a command string. */
+		batch_task_set_command(task, n->command);
+
+	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+
+		/* A sub-workflow must be expanded into a makeflow invocation */
 
 		char *cmd = string_format("makeflow -T local %s",n->workflow_file);
 		char *oldcmd = 0;
+
+		/* Select the workflow language */
 
 		if(n->workflow_is_jx) {
 			oldcmd = cmd;
 			cmd = string_format("%s --jx",cmd);
 			free(oldcmd);
 		}
+
+		/* Generate the workflow arguments file */
 
 		if(n->workflow_args) {
 			char args[] = "makeflow.jx.args.XXXXXX";
@@ -249,6 +261,8 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 			/* Define this file as a temp so it is removed on completion. */
 			makeflow_hook_add_input_file(n->d,task,args,args,DAG_FILE_TYPE_TEMP);
 		}
+
+		/* Add resource controls to the sub-workflow, if known. */
 
 		if(n->resources_requested->cores>0) {
 			oldcmd = cmd;
@@ -272,8 +286,10 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
 		free(cmd);
 	} else {
-		batch_task_set_command(task, n->command);
+		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
 	}
+
+	/* Add all input and output files to the task */
 
 	struct dag_file *f;
 	list_first_item(n->source_files);
@@ -287,7 +303,6 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	}
 
 	batch_task_set_resources(task, dag_node_dynamic_label(n));
-
 	batch_task_set_envlist(task, dag_node_env_create(n->d, n, full_env_list));
 
 	return task;
