@@ -8,6 +8,7 @@
 #include "xxmalloc.h"
 #include "copy_stream.h"
 #include "debug.h"
+#include "envtools.h"
 
 #include "list.h"
 #include "dag.h"
@@ -29,6 +30,8 @@
 struct parrot_enforce_instance {
 	char *parrot_path;
 	char *local_parrot_path;
+	char *envreplace;
+	char *local_envreplace;
 	char *enforce_prefix;
 	char *mountlist_prefix;
 	char *tmp_prefix;
@@ -39,6 +42,8 @@ struct parrot_enforce_instance *parrot_enforce_instance_create()
 	struct parrot_enforce_instance *p = malloc(sizeof(*p));
 	p->parrot_path = NULL;
 	p->local_parrot_path = NULL;
+	p->envreplace = NULL;
+	p->local_envreplace = NULL;
 	p->enforce_prefix = NULL;
 	p->mountlist_prefix = NULL;
 	p->tmp_prefix = NULL;
@@ -69,13 +74,32 @@ static int create( void ** instance_struct, struct jx *hook_args ){
 
 	if(jx_lookup_string(hook_args, "parrot_path")){
 		p->parrot_path = xxstrdup(jx_lookup_string(hook_args, "parrot_path"));
-		debug(D_MAKEFLOW_HOOK, "setting Parrot binary path to %s\n", p->parrot_path);
 	} else {
-		debug(D_NOTICE, "parrot_path must be set for parrot enforcement");
-		return MAKEFLOW_HOOK_FAILURE;
+        char parrot_path[1024];
+        if(!find_executable("parrot_run", "PATH", parrot_path, 1024)) {
+		    debug(D_NOTICE, "parrot_path must be set for parrot enforcement");
+		    return MAKEFLOW_HOOK_FAILURE;
+        } else {
+            p->parrot_path = xxstrdup(parrot_path);
+        }
 	}
+	debug(D_MAKEFLOW_HOOK, "setting Parrot binary path to %s\n", p->parrot_path);
+
+	if(jx_lookup_string(hook_args, "envreplace_path")){
+		p->envreplace = xxstrdup(jx_lookup_string(hook_args, "envreplace_path"));
+	} else {
+        char envreplace[1024];
+        if(!find_executable("envreplace", "PATH", envreplace, 1024)) {
+		    debug(D_NOTICE, "envreplace must be set for parrot enforcement");
+		    return MAKEFLOW_HOOK_FAILURE;
+        } else {
+            p->envreplace = xxstrdup(envreplace);
+        }
+	}
+	debug(D_MAKEFLOW_HOOK, "setting envreplace binary path to %s\n", p->envreplace);
 
 	p->local_parrot_path = xxstrdup("parrot_run");
+	p->local_envreplace = xxstrdup("envreplace");
 	p->enforce_prefix = xxstrdup("./enforce");
 	p->mountlist_prefix = xxstrdup("mount_");
 	p->tmp_prefix = xxstrdup("tmp_");
@@ -88,6 +112,8 @@ static int destroy( void * instance_struct, struct dag *d ){
 	if(p) {
 		free(p->parrot_path);
 		free(p->local_parrot_path);
+		free(p->envreplace);
+		free(p->local_envreplace);
 		free(p->enforce_prefix);
 		free(p->mountlist_prefix);
 		free(p->tmp_prefix);
@@ -120,9 +146,35 @@ static int dag_check( void * instance_struct, struct dag *d ){
 			debug(D_NOTICE, "could not copy parrot: %s -> %s", p->parrot_path, p->local_parrot_path );
 			return MAKEFLOW_HOOK_FAILURE;
 		}
+        dag_file_lookup_or_create(d, p->local_parrot_path);
 	}
 	close(local_parrot);
 	close(host_parrot);
+
+	int host_envreplace = open(p->envreplace, O_RDONLY);
+	if (host_envreplace == -1) {
+		debug(D_NOTICE, "could not open envreplace at `%s': %s", p->envreplace, strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+	fstat(host_envreplace, &st);
+	if (!(st.st_mode & (S_IXUSR|S_IXGRP|S_IXOTH))) {
+		debug(D_NOTICE, "%s is not executable", p->envreplace);
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+	int local_envreplace = open(p->local_envreplace, O_WRONLY|O_CREAT, S_IRWXU);
+	if (local_envreplace == -1) {
+		debug(D_NOTICE, "could not create local copy of envreplace: %s", strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
+	} else {
+		fchmod(local_envreplace, 0755);
+		if (copy_fd_to_fd(host_envreplace, local_envreplace) != st.st_size) {
+			debug(D_NOTICE, "could not copy envreplace: %s -> %s", p->envreplace, p->local_envreplace );
+			return MAKEFLOW_HOOK_FAILURE;
+		}
+        dag_file_lookup_or_create(d, p->local_envreplace);
+	}
+	close(local_envreplace);
+	close(host_envreplace);
 	return MAKEFLOW_HOOK_SUCCESS;
 }
 
@@ -132,13 +184,16 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 	struct batch_wrapper *enforce = batch_wrapper_create();
 	batch_wrapper_prefix(enforce, p->enforce_prefix);
 
+	struct dag_file *df = NULL;
+	makeflow_hook_add_input_file(n->d, t, p->local_parrot_path, p->local_parrot_path, DAG_FILE_TYPE_GLOBAL);
+	makeflow_hook_add_input_file(n->d, t, p->local_envreplace, p->local_envreplace, DAG_FILE_TYPE_GLOBAL);
+
 	char *mountlist_path = string_format("%s%d", p->mountlist_prefix, n->nodeid);
 	char *tmp_path = string_format("%s%d", p->tmp_prefix, n->nodeid);
 
 	/* make an invalid mountfile to send */
-	int mountlist_fd = open(mountlist_path, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
-	FILE *mountlist = NULL;
-	if (mountlist_fd == -1 || (mountlist = fdopen(mountlist_fd, "w")) == NULL) {
+	FILE *mountlist = fopen(mountlist_path, "w");
+	if (mountlist == NULL) {
 		fatal("could not create `%s': %s", mountlist_path, strerror(errno));
 	}
 
@@ -168,7 +223,7 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 	}
 	fclose(mountlist);
 
-	struct dag_file *df = makeflow_hook_add_input_file(n->d, t, mountlist_path, mountlist_path, DAG_FILE_TYPE_TEMP);
+	df = makeflow_hook_add_input_file(n->d, t, mountlist_path, mountlist_path, DAG_FILE_TYPE_TEMP);
 	makeflow_log_file_state_change(n->d, df, DAG_FILE_STATE_EXISTS);
 
 	/* and generate a wrapper script with the current nodeid */
@@ -176,7 +231,9 @@ static int node_submit( void * instance_struct, struct dag_node *n, struct batch
 	batch_wrapper_pre(enforce, prefix);
 	free(prefix);
 
-	batch_wrapper_pre(enforce, "envsubst < $PWD/$MOUNTFILE > $PWD/mount_tmp_file");
+	char *envreplace_cmd = string_format("./%s $PWD/$MOUNTFILE $PWD/mount_tmp_file", p->local_envreplace);
+	batch_wrapper_pre(enforce, envreplace_cmd);
+    free(envreplace_cmd);
 	batch_wrapper_pre(enforce, "mv $PWD/mount_tmp_file $PWD/$MOUNTFILE");
 
 	char *tmp_create = string_format("mkdir -p \"$PWD/%s\"", tmp_path);

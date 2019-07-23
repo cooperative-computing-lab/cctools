@@ -1124,6 +1124,7 @@ static void show_help_run(const char *cmd)
 	printf(" --wrapper-output=<cmd>         Wrapper command produces this output file.\n");
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
+	printf(" --envreplace-path=<path>       Path to envreplace for --enforcement.\n");
 	printf(" --mesos-master=<hostname:port> Mesos master address and port\n");
 	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
@@ -1315,6 +1316,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
+		LONG_OPT_ENVREPLACE,
 		LONG_OPT_SINGULARITY,
 		LONG_OPT_SINGULARITY_OPT,
 		LONG_OPT_SHARED_FS,
@@ -1434,6 +1436,7 @@ int main(int argc, char *argv[])
 		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
+		{"envreplace", no_argument, 0, LONG_OPT_ENVREPLACE},
 		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
 		{"archive", no_argument, 0, LONG_OPT_ARCHIVE},
@@ -1897,6 +1900,11 @@ int main(int argc, char *argv[])
 				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 					goto EXIT_WITH_FAILURE;
 				jx_insert(hook_args, jx_string("parrot_path"), jx_string(optarg));
+				break;
+			case LONG_OPT_ENVREPLACE:
+				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("envreplace_path"), jx_string(optarg));
 				break;
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;

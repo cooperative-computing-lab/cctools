@@ -38,6 +38,7 @@ SOURCES = \
 	dpopen.c \
 	elfheader.c \
 	envtools.c \
+	envreplace.c \
 	fast_popen.c \
 	fd.c \
 	file_cache.c \
@@ -148,7 +149,7 @@ endif
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.
-MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json jx2env
+MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json jx2env envreplace
 PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect cctools_python
