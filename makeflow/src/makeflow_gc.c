@@ -161,14 +161,14 @@ then run the command. */
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n)
 {
 	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-		printf("cleaning sub-workflow %s\n",n->makeflow_dag);
+		printf("cleaning sub-workflow %s\n",n->workflow_file);
 		struct batch_task *task = batch_task_create(queue);
 		task = dag_node_to_batch_task(n,queue,1);
 		char *command = string_format("%s --clean",task->command);
 		printf("%s\n",command);
 		jx_export(task->envlist);
 		system(command);
-		printf("done cleaning sub-workflow %s\n",n->makeflow_dag);
+		printf("done cleaning sub-workflow %s\n",n->workflow_file);
 		free(command);
 		batch_task_delete(task);
 	}

@@ -1253,8 +1253,8 @@ struct jx *dag_nodes_to_json(struct dag_node *node) {
 			jx_insert(rule, jx_string("local_job"), jx_boolean(n->local_job));
 		}
 		if(n->type==DAG_NODE_TYPE_WORKFLOW) {
-			jx_insert(rule, jx_string("workflow"), jx_string(n->makeflow_dag));
-			jx_insert(rule, jx_string("args"), jx_copy(n->makeflow_args));
+			jx_insert(rule, jx_string("workflow"), jx_string(n->workflow_file));
+			jx_insert(rule, jx_string("args"), jx_copy(n->workflow_args));
 		} else {
 			jx_insert(rule, jx_string("command"), jx_string(n->command));
 		}

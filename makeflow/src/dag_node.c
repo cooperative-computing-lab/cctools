@@ -90,7 +90,7 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	assert(n);
 	assert(cmd);
 	assert(!n->command);
-	assert(!n->makeflow_dag);
+	assert(!n->workflow_file);
 
 	n->type = DAG_NODE_TYPE_COMMAND;
 	n->command = xxstrdup(cmd);
@@ -100,16 +100,16 @@ void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx * args
 {
 	assert(n);
 	assert(dag);
-	assert(!n->makeflow_dag);
+	assert(!n->workflow_file);
 
 	n->type = DAG_NODE_TYPE_WORKFLOW;
-	n->makeflow_dag = xxstrdup(dag);
-	n->makeflow_args = jx_copy(args);
+	n->workflow_file = xxstrdup(dag);
+	n->workflow_args = jx_copy(args);
 
 	/* Record a placeholder in the command field */
 	/* A usable command will be created at submit time. */
 
-	n->command = xxstrdup(n->makeflow_dag);
+	n->command = xxstrdup(n->workflow_file);
 }
 
 void dag_node_insert(struct dag_node *n) {
@@ -410,14 +410,14 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 
 	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 
-		char *cmd = string_format("makeflow -T local %s",n->makeflow_dag);
+		char *cmd = string_format("makeflow -T local %s",n->workflow_file);
 		char *oldcmd = 0;
 
-		if(n->makeflow_args) {
+		if(n->workflow_args) {
 			char args[] = "makeflow.jx.args.XXXXXX";
 			int fd = mkstemp(args);
 			FILE *argsfile = fdopen(fd,"w");
-			jx_print_stream(n->makeflow_args,argsfile);
+			jx_print_stream(n->workflow_args,argsfile);
 			fclose(argsfile);
 
 			oldcmd = cmd;
@@ -446,7 +446,7 @@ struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue
 		}
 
 		batch_task_set_command(task, cmd);
-		batch_task_add_input_file(task,n->makeflow_dag,n->makeflow_dag);
+		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
 		free(cmd);
 	} else {
 		batch_task_set_command(task, n->command);

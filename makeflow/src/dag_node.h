@@ -50,9 +50,9 @@ struct dag_node {
 	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;      /* The depth of the ancestor tree for this node */
 
-	dag_node_type_t type;	   /* Is the job a Unix command, workflows, etc. */
-	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
-	struct jx *makeflow_args;  /* Arguments to pass to the workflow. */
+	dag_node_type_t type;	    /* Is the job a Unix command, a workflow, etc. */
+	const char *workflow_file;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
+	struct jx *workflow_args;   /* Arguments to pass to the workflow. */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
