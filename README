@@ -42,4 +42,8 @@ Security, Inc. MD5 Message-Digest Algorithm.
 This product includes public domain code for the
 SHA1 algorithm written by Peter Gutmann, David Ireland,
 and A. M. Kutchman.
+------------------------------------------------------------
+This product includes the source code for the MT19937-64
+Mersenne Twister pseudorandom number generator, written by 
+Makoto Matsumoto and Takuji Nishimura.
 
