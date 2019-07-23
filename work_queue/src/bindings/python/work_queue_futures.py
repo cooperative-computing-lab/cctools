@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 import traceback
-
+import concurrent.futures as futures
 
 try:
     # from py3
@@ -97,12 +97,21 @@ class WorkQueueFutures(object):
                 local_worker_args = {}
 
         # calls to synchronous WorkQueueFutures are coordinated with _queue_lock
-        self._queue_lock     = threading.Lock()
+        self._queue_lock       = threading.Lock()
         self._stop_queue_event = threading.Event()
-        self._tasks_to_submit = ThreadQueue.Queue()
 
-        self._thread = threading.Thread(target = self._sync_loop)
-        self._thread.daemon  = True
+        # set when queue is empty
+        self._join_event = threading.Event()
+
+        self._tasks_to_submit        = ThreadQueue.Queue()
+        self._tasks_before_callbacks = ThreadQueue.Queue()
+
+        self._sync_loop = threading.Thread(target = self._sync_loop)
+        self._sync_loop.daemon  = True
+
+        self._callback_loop = threading.Thread(target = self._callback_loop)
+        self._callback_loop.daemon  = True
+
         self._local_worker = None
 
         self._queue = work_queue.WorkQueue(*args, **kwargs)
@@ -110,8 +119,8 @@ class WorkQueueFutures(object):
         if local_worker_args:
             self._local_worker = Worker(self.port, **local_worker_args)
 
-        self._thread.start()
-
+        self._sync_loop.start()
+        self._callback_loop.start()
 
 
     # methods not explicitly defined we route to synchronous WorkQueue, using a lock.
@@ -157,6 +166,20 @@ class WorkQueueFutures(object):
         else:
             return 0
 
+    def _callback_loop(self):
+        while True:
+            task = None
+            try:
+                task = self._tasks_before_callbacks.get(True)
+                task.set_result_or_exception()
+                self._tasks_before_callbacks.task_done()
+            except Exception as e:
+                err = traceback.format_exc()
+                if task:
+                    task.set_exception(FutureTaskError(t, err))
+                else:
+                    print(err)
+
     def _sync_loop(self):
         # map from taskids to FutureTask objects
         active_tasks = {}
@@ -174,32 +197,33 @@ class WorkQueueFutures(object):
                     submit_timeout = 0
 
                 # do the submits, if any
-                while not self._tasks_to_submit.empty():
+                empty = False
+                while not empty:
                     try:
-                        future_task = self._tasks_to_submit.get(True, submit_timeout)
-                        if not future_task.cancelled():
+                        task = self._tasks_to_submit.get(True, submit_timeout)
+                        if not task.cancelled():
                             with self._queue_lock:
-                                taskid = self._queue.submit(future_task)
-                                future_task._set_queue(self)
-                                active_tasks[future_task.id] = future_task
+                                submit_timeout = 0
+                                taskid = self._queue.submit(task)
+                                task._set_queue(self)
+                                active_tasks[task.id] = task
                         self._tasks_to_submit.task_done()
                     except ThreadQueue.Empty:
-                        pass
+                        empty = True
 
                 # wait for any task
                 with self._queue_lock:
                     if not self._queue.empty():
-                        wq_task = self._queue.wait(1)
-                        if wq_task:
-                            wq_task.set_result_or_exception()
-                            del active_tasks[wq_task.id]
+                        task = self._queue.wait(1)
+                        if task:
+                            self._tasks_before_callbacks.put(task, False)
+                            del active_tasks[task.id]
+
+                if len(active_tasks) == 0 and self._tasks_to_submit.empty():
+                    self._join_event.set()
 
                 if self._local_worker:
                     self._local_worker.check_alive()
-
-                if len(active_tasks.keys()) == 0:
-                    # if queue is empty, wait here so we don't busy-wait
-                    time.sleep(1)
 
             except Exception as e:
                 # on error, we set exception to all the known tasks so that .result() does not block
@@ -211,20 +235,28 @@ class WorkQueueFutures(object):
                         self._tasks_to_submit.task_done()
                     except ThreadQueue.Empty:
                         pass
+                while not self._tasks_before_callbacks.empty():
+                    try:
+                        t = self._tasks_before_callbacks.get(False)
+                        t.set_exception(FutureTaskError(t, err))
+                        self._tasks_before_callbacks.task_done()
+                    except ThreadQueue.Empty:
+                        pass
                 for t in active_tasks.values():
                     t.set_exception(FutureTaskError(t, err))
                 active_tasks.clear()
                 self._stop_queue_event.set()
 
-    def join(self):
-        while not self.empty() and not self._stop_queue_event.is_set():
-            time.sleep(1)
+    def join(self, timeout=None):
+        now = time.time()
+        self._join_event.clear()
+        return self._join_event.wait(timeout)
 
     def _terminate(self):
         self._stop_queue_event.set()
 
         try:
-            self._thread.join()
+            self._sync_loop.join()
         except RuntimeError:
             pass
 
@@ -237,9 +269,6 @@ class WorkQueueFutures(object):
 
     def __del__(self):
         self._terminate()
-
-import threading
-import concurrent.futures as futures
 
 class FutureTask(work_queue.Task):
     def __init__(self, command):
@@ -329,13 +358,13 @@ class FutureTask(work_queue.Task):
             self._callbacks.append(fn)
 
     def _invoke_callbacks(self):
+        self._done_event.set()
         for fn in self._callbacks:
             try:
                 fn(self)
             except Exception as e:
                 sys.stderr.write('Error when executing future object callback:\n')
                 traceback.print_exc()
-
 
     def set_result_or_exception(self):
         result = self._task.result
@@ -352,12 +381,10 @@ class FutureTask(work_queue.Task):
 
     def set_result(self, result):
         self._result = result
-        self._done_event.set()
         self._invoke_callbacks()
 
     def set_exception(self, exception):
         self._exception = exception
-        self._done_event.set()
         self._invoke_callbacks()
 
 
