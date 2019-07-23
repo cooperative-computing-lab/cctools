@@ -158,12 +158,13 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 in which case, we want to construct its full command, add the clean option and
 then run the command. */
 
+extern struct batch_task * makeflow_node_to_task( struct dag_node *node, struct batch_queue *queue, int send_env);
+
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n)
 {
 	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 		printf("cleaning sub-workflow %s\n",n->workflow_file);
-		struct batch_task *task = batch_task_create(queue);
-		task = dag_node_to_batch_task(n,queue,1);
+		struct batch_task *task = makeflow_node_to_task(n,queue,1);
 		char *command = string_format("%s --clean",task->command);
 		printf("%s\n",command);
 		jx_export(task->envlist);

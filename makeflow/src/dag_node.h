@@ -131,6 +131,4 @@ const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n);
 
 void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec);
 
-struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue *queue, int full_env_list);
-
 #endif
