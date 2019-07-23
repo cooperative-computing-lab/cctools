@@ -18,6 +18,7 @@ import threading
 import time
 import traceback
 import concurrent.futures as futures
+import atexit
 
 try:
     # from py3
@@ -72,6 +73,8 @@ class WorkQueueFutures(object):
         self._sync_loop.start()
         self._callback_loop.start()
 
+        atexit.register(self._terminate)
+
 
     # methods not explicitly defined we route to synchronous WorkQueue, using a lock.
     def __getattr__(self, name):
@@ -117,12 +120,15 @@ class WorkQueueFutures(object):
             return 0
 
     def _callback_loop(self):
-        while True:
+        while not self._stop_queue_event.is_set():
+
             task = None
             try:
-                task = self._tasks_before_callbacks.get(True)
+                task = self._tasks_before_callbacks.get(True, 1)
                 task.set_result_or_exception()
                 self._tasks_before_callbacks.task_done()
+            except ThreadQueue.Empty:
+                pass
             except Exception as e:
                 err = traceback.format_exc()
                 if task:
@@ -205,15 +211,15 @@ class WorkQueueFutures(object):
     def _terminate(self):
         self._stop_queue_event.set()
 
-        try:
-            self._sync_loop.join()
-        except RuntimeError:
-            pass
+        for thread in [self._sync_loop, self._callback_loop]:
+            try:
+                thread.join()
+            except RuntimeError:
+                pass
 
         if self._local_worker:
             try:
-                self._local_worker.terminate()
-                self._local_worker.join()
+                self._local_worker.shutdown()
             except Exception as e:
                 pass
 
@@ -370,6 +376,15 @@ class Worker(object):
                 return False
 
         return self._launch_worker()
+
+    def shutdown(self):
+        if not self._proc:
+            return
+
+        if self._proc.is_alive():
+            self._proc.terminate()
+
+        self._proc.join()
 
     def _launch_worker(self):
         args = [self._executable,
