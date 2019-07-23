@@ -28,7 +28,7 @@ and install the software in your home directory:
 ------------------------------------------------------------
 This software package is
 Copyright (c) 2003-2004 Douglas Thain
-Copyright (c) 2005- The University of Notre Dame
+Copyright (c) 2005-2019 The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 ------------------------------------------------------------
@@ -42,9 +42,4 @@ Security, Inc. MD5 Message-Digest Algorithm.
 This product includes public domain code for the
 SHA1 algorithm written by Peter Gutmann, David Ireland,
 and A. M. Kutchman.
-------------------------------------------------------------
-The Glite module of Parrot is Copyright (c) Members of the EGEE Collaboration. 2004.
-See http://eu-egee.org/partners/ for details on the copyright holders.
-For license conditions see the license file or http://eu-egee.org/license.html
-------------------------------------------------------------
 
