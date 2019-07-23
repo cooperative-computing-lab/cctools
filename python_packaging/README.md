@@ -1,5 +1,4 @@
 # Python Packaging Utilities
-============================
 
 The Python packaging utilities allow users to easily analyze their Python scripts and create Conda environments that are specifically built to contain the necessary dependencies required for their application to run. In distributed computing systems such as Work Queue, it is often difficult to maintain homogenous work environments for their Python applications, as the scripts utilize a large number of outside resources at runtime, such as Python interpreters and imported libraries. The Python packaging collection provides three easy-to-use tools that solve this problem, helping users to analyze their Python programs and build the appropriate Conda environments that ensure consistent runtimes within the Work Queue system. 
 
@@ -67,14 +66,16 @@ Once the command completes, the `dependencies.json` file within the current work
 
 Note that system-level modules are not included within the `"modules"` list, as they are automatically installed into Conda virtual environments. Additionally, using a different version of the Python interpreter will result in a different mapping for the `"python"` value within the output file.
 
-### POSSIBLE IMPROVEMENTS
+## POSSIBLE IMPROVEMENTS
 1. Utilize `ModuleFinder` library to get complete list of modules that are used by the Python script
-- Provides more comprehensive list of modules used, including system-level modules
+- Provides more comprehensive list of modules used, including system-level modules, making it redundant
 - Takes longer to run compared to the currently-implemented parsing algorithm
+- More rigorously tested than the parsing algorithm, so it ensures that all modules will be listed
 2. Use `pip freeze` to find all modules that are installed within the machine
 - Instead of seeing if the module is not a system module, just see if it is installed on the machine, but requires that the module be installed on the master machine
-- Also misses cases where a module is installed to the machine, but not by pip
+- Misses cases where a module is installed to the machine, but not by pip
 - The advantage to this option is that `pip freeze` includes versions, so you can add version numbers for module dependencies to get more accurate pip installations into the virtual environment
+- `stdlib_list` library that is in the current implementation requires installation and has not been rigorously tested
 
 
 
@@ -116,13 +117,14 @@ To generate a Conda environment with the Python 3.7.3 interpreter and the `antig
 
 Note that this will also create an `example_venv.tar.gz` environment tarball within the current working directory, which can then be exported to different machines for execution.
 
-### POSSIBLE IMPROVEMENTS
+## POSSIBLE IMPROVEMENTS
 1. Figure out alternative to using `subprocess.call()` to create the Conda environment (perhaps make a Bash script altogether)
 - Most of the execution occurs within the subprocess call, so basically a Bash script, but easier to use Python to parse the JSON file and write to the requirement file
 - Perhaps use a JSON parsing command line utility within Bash script instead, such as `jq`
-- If a Conda environment API for Python is ever created, it would be very useful here
-2. Remove requirement to redirect all output to `/dev/null`
+- If a Conda environment API for Python is ever created, it would be very useful here, as we could remove the subprocess call completely
+2. Remove redirection all output to `/dev/null`
 - All output from the subprocess call is removed for organization purposes, but some commands like `pip install` might be useful for the user to see
+- Removing redirection also makes it much easier to debug
 
 
 
@@ -163,7 +165,7 @@ A Python script `example.py` has been analyzed using `python_package_analyze` an
 
 This will run the `python3 example.py` task string within the activated `example_venv` Conda environment. Note that this command can be performed either locally, on the same machine that analyzed the script and created the environment, or remotely, on a different machine that contains the Conda environment tarball and the `example.py` script.
 
-### POSSIBLE IMPROVEMENTS
+## POSSIBLE IMPROVEMENTS
 1. Do protection checking against dangerous shell commands, as the script runs the command line argument directly
 - The program directly runs the task string that is passed in, which means the user could send a task that is harmful to the worker machine
 - Perhaps WorkQueue already uses protection checking for the task strings, in which case it is not necessary
