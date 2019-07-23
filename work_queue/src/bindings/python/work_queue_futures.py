@@ -26,56 +26,6 @@ except ImportError:
     # from py2
     import Queue as ThreadQueue
 
-class Worker(object):
-    def __init__(self, port, executable='work_queue_worker', cores=1, memory=512, disk=1000):
-        self._proc = None
-        self._port = port
-
-        self._executable = executable
-        self._cores      = cores
-        self._memory     = memory
-        self._disk       = disk
-
-        self._permanent_error = None
-
-        self.devnull    = open(os.devnull, 'w')
-
-        self.check_alive()
-
-
-    def check_alive(self):
-        if self._permanent_error is not None:
-            raise Exception(self._permanent_error)
-            return False
-
-        if self._proc and self._proc.is_alive():
-            return True
-
-        if self._proc:
-            self._proc.join()
-            if self._proc.exitcode != 0:
-                self._permanent_error = self._proc.exitcode
-                return False
-
-        return self._launch_worker()
-
-    def _launch_worker(self):
-        args = [self._executable,
-                '--single-shot',
-                '--cores',  self._cores,
-                '--memory', self._memory,
-                '--disk',   self._disk,
-                '--timeout', 300,
-                'localhost',
-                self._port]
-
-        args = [str(x) for x in args]
-
-        self._proc = multiprocessing.Process(target=lambda: subprocess.check_call(args, stderr=self.devnull, stdout=self.devnull), daemon=True)
-        self._proc.start()
-
-        return self.check_alive()
-
 
 
 
@@ -386,6 +336,57 @@ class FutureTask(work_queue.Task):
     def set_exception(self, exception):
         self._exception = exception
         self._invoke_callbacks()
+
+
+class Worker(object):
+    def __init__(self, port, executable='work_queue_worker', cores=1, memory=512, disk=1000):
+        self._proc = None
+        self._port = port
+
+        self._executable = executable
+        self._cores      = cores
+        self._memory     = memory
+        self._disk       = disk
+
+        self._permanent_error = None
+
+        self.devnull    = open(os.devnull, 'w')
+
+        self.check_alive()
+
+
+    def check_alive(self):
+        if self._permanent_error is not None:
+            raise Exception(self._permanent_error)
+            return False
+
+        if self._proc and self._proc.is_alive():
+            return True
+
+        if self._proc:
+            self._proc.join()
+            if self._proc.exitcode != 0:
+                self._permanent_error = self._proc.exitcode
+                return False
+
+        return self._launch_worker()
+
+    def _launch_worker(self):
+        args = [self._executable,
+                '--single-shot',
+                '--cores',  self._cores,
+                '--memory', self._memory,
+                '--disk',   self._disk,
+                '--timeout', 300,
+                'localhost',
+                self._port]
+
+        args = [str(x) for x in args]
+
+        self._proc = multiprocessing.Process(target=lambda: subprocess.check_call(args, stderr=self.devnull, stdout=self.devnull), daemon=True)
+        self._proc.start()
+
+        return self.check_alive()
 
 
 class FutureTaskError(Exception):
