@@ -7,8 +7,7 @@ This script parses the Python script text to find all `import` and `from` statem
 - Provides more comprehensive list of modules used, including system-level modules
 - Takes longer to run compared to the currently-implemented parsing algorithm
 2. Use `pip freeze` to find all modules that are installed within the machine
-- Instead of seeing if the module is not a system module, just see if it is installed on the machine
-- Requires that the module be installed on the master machine
+- Instead of seeing if the module is not a system module, just see if it is installed on the machine, but requires that the module be installed on the master machine
 - Also misses cases where a module is installed to the machine, but not by pip
 - The advantage to this option is that `pip freeze` includes versions, so you can add version numbers for module dependencies to get more accurate pip installations into the virtual environment
 
@@ -17,8 +16,8 @@ This script parses the Python script text to find all `import` and `from` statem
 This script takes the JSON file created by `python_package_analyze`, parses it, and creates a Conda environment with all necessary dependencies and the appropriate python version inside. It then uses conda_pack to pack the environment into a tarball, overwriting the same environment if necessary.
 
 ### Possible Tune-ups
-1. Figure out alternative to using `subprocess.call()` to create the Conda environment 
-- Most of the execution occurs within the subprocess call, so basically a Bash script, but easy to use Python to parse the JSON file and write to the requirement file
+1. Figure out alternative to using `subprocess.call()` to create the Conda environment (perhaps make a Bash script altogether)
+- Most of the execution occurs within the subprocess call, so basically a Bash script, but easier to use Python to parse the JSON file and write to the requirement file
 - Perhaps use a JSON parsing command line utility within Bash script instead, such as `jq`
 - If a Conda environment API for Python is ever created, it would be very useful here
 2. Remove requirement to redirect all output to `/dev/null`
@@ -34,15 +33,14 @@ This script is a wrapper script for the task to be run, running the task within 
 - The program directly runs the task string that is passed in, which means the user could send a task that is harmful to the worker machine
 - Perhaps WorkQueue already uses protection checking for the task strings, in which case it is not necessary
 
+# HOW TO TEST FUNCTIONALITY
 
-### HOW TO TEST FUNCTIONALITY
-
-Example script to run: `hi.py`
+Desired Python script to run: `hi.py`
 
 1. `./python_package_analyze hi.py output.json`
 - Generates the appropriate JSON file in the current working directory
 2. `./python_package_create output.json venv`
-- Will create a Conda environment in the Conda "envs" folder, and will create a packed tarball of the environment named `venv.tar.gz` in the current working directory
-- To more easily debug, remove the redirected output to /dev/null in the subprocess call to see all output of the environment creation and module installation
-3. `./python_package_run venv "python3 hi.py"
+- Will create a Conda environment in the Conda `envs` folder, and will create a packed tarball of the environment named `venv.tar.gz` in the current working directory
+- To more easily debug, remove the redirected output to `/dev/null` in the subprocess call to see all output of the environment creation and module installation
+3. `./python_package_run venv "python3 hi.py"`
 - Runs the `python3 hi.py` task command within the activated `venv` Conda environment
