@@ -51,7 +51,7 @@ EOF
 
 run()
 {
-	../src/makeflow -d all -Z "$PORT_FILE" toplevel.makeflow
+	../src/makeflow -Z "$PORT_FILE" toplevel.makeflow
 	require_identical_files out.actual out.expected
 }
 
