@@ -40,6 +40,7 @@ typedef enum {
 
 struct dag_node {
 	struct dag *d;           /* Dag this node belongs too. */
+	dag_node_type_t type;	 /* Is the job a Unix command, a workflow, etc. */
 	const char *command;     /* The command line to execute. */
 
 	int nodeid;              /* The ordinal number as the rule appears in the makeflow file */
@@ -50,9 +51,9 @@ struct dag_node {
 	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;      /* The depth of the ancestor tree for this node */
 
-	dag_node_type_t type;	    /* Is the job a Unix command, a workflow, etc. */
 	const char *workflow_file;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
 	struct jx *workflow_args;   /* Arguments to pass to the workflow. */
+	int workflow_is_jx;	    /* True is sub-workflow is jx, false otherwise. */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
@@ -105,7 +106,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
 void dag_node_set_command(struct dag_node *n, const char *cmd);
-void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx *args );
+void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx *args, int is_jx );
 void dag_node_insert(struct dag_node *n);
 
 uint64_t dag_node_file_list_size(struct list *s);

@@ -214,7 +214,7 @@ static int rule_from_jx(struct dag *d, struct jx *j)
 	} else if(workflow) {
 		struct jx *args = jx_lookup(j, "args");
 		debug(D_MAKEFLOW_PARSER, "Line %u: sub-workflow at %s", j->line,workflow);
-		dag_node_set_workflow(n, workflow, args);
+		dag_node_set_workflow(n, workflow, args, 1);
 	} else {
 		report_error(j->line, "rule neither defines a command nor a sub-workflow.", NULL);
 		return 0;

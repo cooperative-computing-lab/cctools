@@ -656,7 +656,7 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 		{
 			n->local_job = 1;
 		}
-		else if(strcmp(t->lexeme, "MAKEFLOW") == 0)
+		else if(strcmp(t->lexeme, "MAKEFLOW") == 0 || strcmp(t->lexeme, "WORKFLOW") )
 		{
 			n->type = DAG_NODE_TYPE_WORKFLOW;
 		}
@@ -718,7 +718,7 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 		lexer_report_error(bk, "MAKEFLOW specification does not end with a newline.\n");
 	}
 
-	dag_node_set_workflow(n, makeflow_dag->lexeme, 0);
+	dag_node_set_workflow(n, makeflow_dag->lexeme, 0, 0);
 
 	lexer_free_token(t);
 	lexer_free_token(makeflow_dag);
