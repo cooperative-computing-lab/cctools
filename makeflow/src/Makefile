@@ -15,6 +15,7 @@ SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch make
 MAKEFLOW_WRAPPERS =  makeflow_mounts.o
 MAKEFLOW_HOOKS = makeflow_hook_example.o
 MAKEFLOW_MODULES = \
+ makeflow_module_basic_wrapper.o\
  makeflow_module_docker.o\
  makeflow_module_enforcement.o\
  makeflow_module_fail_dir.o\
@@ -40,7 +41,7 @@ makeflow makeflow_viz makeflow_analyze makeflow_status: $(OBJECTS)
 
 makeflow_status: makeflow_status.o
 
-makeflow: makeflow_alloc.o makeflow_summary.o makeflow_gc.o makeflow_log.o makeflow_wrapper.o makeflow_catalog_reporter.o makeflow_local_resources.o $(MAKEFLOW_WRAPPERS) makeflow_hook.o $(MAKEFLOW_HOOKS) $(MAKEFLOW_MODULES)
+makeflow: makeflow_alloc.o makeflow_summary.o makeflow_gc.o makeflow_log.o makeflow_catalog_reporter.o makeflow_local_resources.o $(MAKEFLOW_WRAPPERS) makeflow_hook.o $(MAKEFLOW_HOOKS) $(MAKEFLOW_MODULES)
 
 
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)
