@@ -1197,8 +1197,8 @@ int main(int argc, char *argv[])
 				} else {
 					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
-				const char *basename = path_basename(optarg);
-				jx_insert_string(wrapper_inputs, optarg, basename);
+				struct jx *file = jx_string(optarg);
+				jx_array_append(wrapper_inputs, file);
 				break;
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = strdup(optarg);
@@ -1337,26 +1337,24 @@ int main(int argc, char *argv[])
 
 	if(wrapper_input) {
 		struct jx *item;
-		for (void *i = NULL; (item = jx_iterate_array(wrapper_inputs, &i));) {
-			const char *key = jx_get_key(i);
-			const char *value = jx_get_value(i)->u.string_value;
-			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, value);
+		for(void *i = NULL; (item = jx_iterate_array(wrapper_inputs, &i));) {
+			const char *value = item->u.string_value;
+			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
 			int64_t result; 
 			struct stat local_info;
-			fprintf(stderr, "Got file %s for copying at %s\n", key, file_at_scratch_dir);
-			if(lstat(key, &local_info)>=0) {
+			if(lstat(value, &local_info)>=0) {
 				if(S_ISDIR(local_info.st_mode))  {
-					result = copy_dir(key, file_at_scratch_dir);
+					result = copy_dir(value, file_at_scratch_dir);
 				}
 				else {
-					result = copy_file_to_file(key, file_at_scratch_dir);
+					result = copy_file_to_file(value, file_at_scratch_dir);
 				}
 			}
 			else {
-				debug(D_NOTICE, "Cannot stat file %s: %s for copying to factory scratch directory", key, strerror(errno));
+				debug(D_NOTICE, "Cannot stat file %s: %s for copying to factory scratch directory", value, strerror(errno));
 			}
 			if(result < 0) {
-				debug(D_NOTICE, "Cannot copy wrapper input file %s to factory scratch directory", key);
+				debug(D_NOTICE, "Cannot copy wrapper input file %s to factory scratch directory", value);
 			}
 		}
 	}
