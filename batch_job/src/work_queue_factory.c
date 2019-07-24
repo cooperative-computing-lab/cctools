@@ -400,7 +400,7 @@ static int submit_worker( struct batch_queue *queue )
 	if(wrapper_input) {
 		char *newfiles = string_format("%s,%s",files,wrapper_input);
 		free(files);
-		files = newfiles;	
+		files = newfiles;
 	}
 	
 	if(runos_os){
@@ -1340,7 +1340,7 @@ int main(int argc, char *argv[])
 		for(void *i = NULL; (item = jx_iterate_array(wrapper_inputs, &i));) {
 			const char *value = item->u.string_value;
 			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
-			int64_t result; 
+			int64_t result = 0; 
 			struct stat local_info;
 			if(lstat(value, &local_info)>=0) {
 				if(S_ISDIR(local_info.st_mode))  {
