@@ -1436,7 +1436,7 @@ int main(int argc, char *argv[])
 		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
-		{"env_replace", no_argument, 0, LONG_OPT_ENVREPLACE},
+		{"env-replace-path", required_argument, 0, LONG_OPT_ENVREPLACE},
 		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
 		{"archive", no_argument, 0, LONG_OPT_ARCHIVE},
