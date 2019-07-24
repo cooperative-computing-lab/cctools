@@ -12,10 +12,11 @@ SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch make
 
 SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch makeflow_linker_perl_driver makeflow_linker_python_driver makeflow_archive_query mf_mesos_scheduler mf_mesos_executor mf_mesos_setting makeflow_ec2_setup makeflow_ec2_cleanup makeflow_amazon_batch_setup makeflow_amazon_batch_cleanup makeflow_lambda_setup makeflow_lambda_cleanup
 
-MAKEFLOW_WRAPPERS =  makeflow_wrapper_enforcement.o makeflow_mounts.o
+MAKEFLOW_WRAPPERS =  makeflow_mounts.o
 MAKEFLOW_HOOKS = makeflow_hook_example.o
 MAKEFLOW_MODULES = \
  makeflow_module_docker.o\
+ makeflow_module_enforcement.o\
  makeflow_module_fail_dir.o\
  makeflow_module_resource_monitor.o\
  makeflow_module_sandbox.o\

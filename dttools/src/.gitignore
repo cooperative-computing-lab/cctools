@@ -7,6 +7,7 @@ category_test
 chunk_test
 disk_alloc_test
 disk_allocator
+env_replace
 hmac_test
 histogram_test
 int_sizes.h
