@@ -227,6 +227,8 @@ class WorkQueueFutures(object):
         self._terminate()
 
 class FutureTask(work_queue.Task):
+    valid_runtime_envs = ['conda', 'singularity']
+
     def __init__(self, command):
         super(FutureTask, self).__init__(command)
 
@@ -236,6 +238,8 @@ class FutureTask(work_queue.Task):
 
         self._done_event = threading.Event()
         self._callbacks = []
+
+        self._runtime_env_type = None
 
     @property
     def queue(self):
@@ -342,6 +346,26 @@ class FutureTask(work_queue.Task):
     def set_exception(self, exception):
         self._exception = exception
         self._invoke_callbacks()
+
+    def specify_runtime_env(self, type, filename):
+        import _work_queue
+        if type not in FutureTask.valid_runtime_envs:
+            raise FutureTaskError("Runtime '{}' type is not one of {}".format(type, FutureTask.valid_runtime_envs))
+
+        self._runtime_env_type = type
+
+        if type == 'conda':
+            conda_env = 'conda_env.tar.gz'
+            self.specify_input_file(filename, conda_env, cache = True)
+            command = 'mkdir -p conda_env && tar xf {} -C conda_env && source conda_env/bin/activate && {}'.format(conda_env, self.command)
+            _work_queue.work_queue_task_command_line_set(self._task, command)
+        elif type == 'singularity':
+            sin_env = 'sin_env.img'
+            self.specify_input_file(filename, sin_env, cache = True)
+            command = 'singularity exec -B $(pwd):/wq-sandbox --pwd /wq-sandbox {} -- {}'.format(sin_env, self.command)
+            _work_queue.work_queue_task_command_line_set(self._task, command)
+
+
 
 
 class Worker(object):
