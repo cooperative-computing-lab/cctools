@@ -570,6 +570,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	/* Create task from node information */
 	struct batch_task *task = makeflow_node_to_task(n, queue, should_send_all_local_environment);
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
+	n->task = task;
 
 	int hook_return = makeflow_hook_node_submit(n, task);
 	if (hook_return != MAKEFLOW_HOOK_SUCCESS){
