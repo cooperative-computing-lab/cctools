@@ -24,7 +24,6 @@ struct wrapper_instance {
     struct list *output_files;
 
     struct itable *remote_names;
-    struct hash_table *remote_names_inv;
 
     int uses_remote_rename;
 };
@@ -38,7 +37,6 @@ struct wrapper_instance *wrapper_instance_create()
 	w->output_files = list_create();
 
 	w->remote_names = itable_create(0);
-	w->remote_names_inv = hash_table_create(0, 0);
 
 	w->uses_remote_rename = 0;
 
@@ -143,8 +141,6 @@ void wrapper_instance_delete(struct wrapper_instance *w)
 	}
 	itable_delete(w->remote_names);
 
-	hash_table_delete(w->remote_names_inv);
-
 	free(w);
 }
 
@@ -177,7 +173,6 @@ void wrapper_generate_files( struct batch_task *task, struct dag_node *n, struct
 			if(!n->local_job && !itable_lookup(w->remote_names, (uintptr_t) file)){
 				remote = xxstrdup(p+1);
 				itable_insert(w->remote_names, (uintptr_t) file, (void *)remote);
-				hash_table_insert(w->remote_names_inv, remote, (void *)file);
 				makeflow_hook_add_input_file(n->d, task, f, remote, file->type);
 			} else {
 				makeflow_hook_add_output_file(n->d, task, f, NULL, file->type);
@@ -206,7 +201,6 @@ void wrapper_generate_files( struct batch_task *task, struct dag_node *n, struct
 			if(!n->local_job && !itable_lookup(w->remote_names, (uintptr_t) file)){
 				remote = xxstrdup(p+1);
 				itable_insert(w->remote_names, (uintptr_t) file, (void *)remote);
-				hash_table_insert(w->remote_names_inv, remote, (void *)file);
 				makeflow_hook_add_output_file(n->d, task, f, remote, file->type);
 			} else {
 				makeflow_hook_add_output_file(n->d, task, f, NULL, file->type);
