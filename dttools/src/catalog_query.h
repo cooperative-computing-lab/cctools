@@ -20,6 +20,8 @@ Query the global catalog server for server descriptions.
 #define CATALOG_HOST (getenv("CATALOG_HOST") ? getenv("CATALOG_HOST") : CATALOG_HOST_DEFAULT )
 #define CATALOG_PORT (getenv("CATALOG_PORT") ? atoi(getenv("CATALOG_PORT")) : CATALOG_PORT_DEFAULT )
 
+#define CATALOG_RECORD_ID_FIELD "record-id"
+
 /** Create a catalog query.
 Connects to a catalog server, issues a query, and waits for the results.
 The caller may specify a specific catalog host and port.

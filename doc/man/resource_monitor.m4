@@ -115,7 +115,10 @@ OPTION_ITEM(--follow-chdir)Follow processes' current working directories.
 OPTION_ITEM(--without-disk-footprint)Do not measure working directory footprint. Overrides --measure-dir.
 OPTION_ITEM(--no-pprint)Do not pretty-print summaries.
 OPTION_ITEM(--snapshot-events=file)Configuration file for snapshots on file patterns. See below.
-
+OPTION_ITEM(--catalog-record-id=<record-id>)Report measurements to catalog server as <record-id>.
+OPTION_ITEM(--catalog=<catalog>)Use catalog server <catalog>. (default=catalog.cse.nd.edu:9097).\n", "--catalog=<catalog>");
+OPTION_ITEM(--catalog-project=<project>)Set project name of catalog update to <project> (default=<record-id>).
+OPTION_ITEM(--catalog-interval=<interval>)Send update to catalog every <interval> seconds. (default=30).
 
 OPTIONS_END
 
