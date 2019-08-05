@@ -263,4 +263,13 @@ true + " maybe " + false
 
 error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"});
 
+f"str";
+f"";
+f"{infile}";
+f" {x}";
+f"{f}";
+f"test { g} and {y	} ";
+f"{{{f}}}";
+f"{zzzzzzzzzzzzzzzzzzzzzz}";
+
 #end

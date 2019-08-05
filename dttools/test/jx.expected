@@ -636,3 +636,27 @@ value:      "pi is 3.141592654"
 expression: error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"})
 value:      error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"})
 
+expression: f"str"
+value:      "str"
+
+expression: f""
+value:      ""
+
+expression: f"{infile}"
+value:      "mydata"
+
+expression: f" {x}"
+value:      " 10"
+
+expression: f"{f}"
+value:      "0.5"
+
+expression: f"test { g} and {y\t} "
+value:      "test 3.141592654 and 20 "
+
+expression: f"{{{f}}}"
+value:      "{0.5}"
+
+expression: f"{zzzzzzzzzzzzzzzzzzzzzz}"
+value:      error("on line 273: undefined symbol zzzzzzzzzzzzzzzzzzzzzz in template")
+
