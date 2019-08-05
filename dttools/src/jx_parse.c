@@ -55,6 +55,7 @@ typedef enum {
 	JX_TOKEN_FOR,
 	JX_TOKEN_IN,
 	JX_TOKEN_IF,
+	JX_TOKEN_F,
 	JX_TOKEN_PARSE_ERROR,
 	JX_TOKEN_EOF,
 } jx_token_t;
@@ -238,6 +239,40 @@ static int jx_scan_string_char( struct jx_parser *s )
 	}
 }
 
+static int jx_valid_fstring(const char *s) {
+	assert(s);
+
+	while (*s) {
+		if (*s != '{' && *s != '}') {
+			// single string character
+			s++;
+			continue;
+		}
+		if (*s == '{' && *(s+1) == '{') {
+			// quoted opening brace
+			s += 2;
+			continue;
+		}
+		if (*s == '}' && *(s+1) == '}') {
+			// quoted closing brace
+			s += 2;
+			continue;
+		}
+
+		if (*s != '{') return 0; // unmatched closing brace
+		s++;
+		while (isspace(*s)) s++; // eat leading whitespace in expr
+		if (!isalpha(*s) && *s != '_') return 0; // 1st character of ident
+		s++;
+		while (isalnum(*s) || *s == '_') s++; // rest of ident
+		while (isspace(*s)) s++; // eat trailing whitepspace in expr
+		if (*s != '}') return 0; // unexpected stuff
+		s++;
+	}
+
+	return 1;
+}
+
 static void jx_unscan( struct jx_parser *s, jx_token_t t )
 {
 	s->putback_token = t;
@@ -408,6 +443,17 @@ static jx_token_t jx_scan( struct jx_parser *s )
 					return JX_TOKEN_IF;
 				} else if(!strcmp(s->token, "error")) {
 					return JX_TOKEN_ERROR;
+				} else if (!strcmp(s->token, "f") || !strcmp(s->token, "F")) {
+					// f is not a reserved word and should be a valid identifier
+					// in expression contexts. It only has special interpretation
+					// immediately before a string literal.
+					c = jx_getchar(s);
+					jx_ungetchar(s,c);
+					if (c == '\"') {
+						return JX_TOKEN_F;
+					} else {
+						return JX_TOKEN_SYMBOL;
+					}
 				} else {
 					return JX_TOKEN_SYMBOL;
 				}
@@ -697,6 +743,7 @@ int jx_operator_precedence( jx_operator_t t )
 		case JX_OP_MOD:	return 1;
 		case JX_OP_LOOKUP: return 0;
 		case JX_OP_CALL: return 0;
+		case JX_OP_F: return 0;
 		default:	return 0;
 	}
 }
@@ -723,6 +770,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 		case JX_TOKEN_C_NOT:return JX_OP_NOT;
 		case JX_TOKEN_LBRACKET:	return JX_OP_LOOKUP;
 		case JX_TOKEN_LPAREN: return JX_OP_CALL;
+		case JX_TOKEN_F: return JX_OP_F;
 		default:		return JX_OP_INVALID;
 	}
 }
@@ -730,6 +778,7 @@ static jx_operator_t jx_token_to_operator( jx_token_t t )
 static bool jx_operator_is_unary(jx_operator_t op) {
 	switch(op) {
 		case JX_OP_NOT: return true;
+		case JX_OP_F: return true;
 		default: return false;
 	}
 }
@@ -826,6 +875,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_SUB:
 		case JX_TOKEN_ADD:
 		case JX_TOKEN_C_NOT:
+		case JX_TOKEN_F:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
 			struct jx *j = jx_parse_postfix(s);
@@ -851,6 +901,17 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				j->u.oper.line = line;
 			}
 			j->line = line;
+
+			if (j->u.oper.type == JX_OP_F) {
+				// JX_TOKEN_F *must* be followed by a string follows
+				assert(jx_istype(j->u.oper.right, JX_STRING));
+				if (!jx_valid_fstring(j->u.oper.right->u.string_value)) {
+					jx_parse_error_c(s, "invalid f-string: each expression must be a single identifier");
+					jx_delete(j);
+					return NULL;
+				}
+			}
+
 			return j;
 		}
 		case JX_TOKEN_ERROR: {

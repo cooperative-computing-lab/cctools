@@ -8,11 +8,13 @@ See the file COPYING for details.
 #include "debug.h"
 #include "jx_function.h"
 #include "jx_print.h"
+#include "buffer.h"
 
 #include <assert.h>
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
+#include <ctype.h>
 
 // FAILOP(jx_operator *op, struct jx *left, struct jx *right, const char *message)
 // left, right, and message are evaluated exactly once
@@ -323,6 +325,93 @@ static struct jx * jx_eval_lookup( struct jx *left, struct jx *right )
 	}
 }
 
+static struct jx *jx_eval_fstring(struct jx_operator *o, struct jx *j, struct jx *ctx) {
+	assert(o);
+	assert(j);
+	assert(o->type == JX_OP_F);
+	assert(jx_istype(j, JX_STRING));
+	assert(j->u.string_value);
+
+	struct jx *message = NULL;
+	char *s = j->u.string_value;
+	struct jx *out = NULL;
+	buffer_t buf;
+	buffer_t var;
+	buffer_init(&buf);
+	buffer_init(&var);
+
+	while (*s) {
+		if (*s != '{' && *s != '}') {
+			buffer_putlstring(&buf, s, 1);
+			s++;
+			continue;
+		}
+		if (*s == '{' && *(s+1) == '{') {
+			buffer_putliteral(&buf, "{");
+			s += 2;
+			continue;
+		}
+		if (*s == '}' && *(s+1) == '}') {
+			buffer_putliteral(&buf, "}");
+			s += 2;
+			continue;
+		}
+
+		if (*s != '{') goto FAIL;
+		s++;
+		while (isspace(*s)) s++;
+		if (!isalpha(*s) && *s != '_') goto FAIL;
+		buffer_putlstring(&var, s, 1);
+		s++;
+		while (isalnum(*s) || *s == '_') {
+			buffer_putlstring(&var, s, 1);
+			s++;
+		}
+		while (isspace(*s)) s++;
+		if (*s != '}') goto FAIL;
+		s++;
+		struct jx *k = jx_lookup(ctx, buffer_tostring(&var));
+		if (!k) {
+			message = jx_format(
+				"on line %d: undefined symbol %s in template",
+				o->line, buffer_tostring(&var));
+			goto FAIL;
+		}
+		switch (k->type) {
+			case JX_INTEGER:
+			case JX_DOUBLE:
+				jx_print_buffer(k, &buf);
+				break;
+			case JX_STRING:
+				buffer_putstring(&buf, k->u.string_value);
+				break;
+			default:
+				message = jx_format(
+					"on line %d: cannot format %s in template",
+					o->line, buffer_tostring(&var));
+				goto FAIL;
+		}
+		buffer_rewind(&var, 0);
+	}
+	out = jx_string(buffer_tostring(&buf));
+	goto DONE;
+
+FAIL:
+	if (!message) {
+		struct jx *t = jx_operator(o->type, NULL, jx_copy(j));
+		s = jx_print_string(t);
+		message = jx_format("on line %d, %s: %s", o->line, s,
+			"invalid f-string: each expression must be a single identifier");
+		jx_delete(t);
+		free(s);
+	}
+	out = jx_error(message);
+DONE:
+	buffer_free(&buf);
+	buffer_free(&var);
+	return out;
+}
+
 /*
 Type conversion rules:
 Generally, operators are not meant to be applied to unequal types.
@@ -404,6 +493,12 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		} else {
 			FAILOP(o, left, right, "mismatched types for operator");
 		}
+	}
+
+	if (o->type == JX_OP_F) {
+		assert(!left);
+		result = jx_eval_fstring(o, right, context);
+		goto DONE;
 	}
 
 	switch(right->type) {
