@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
+Copyright (C) 2019- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -30,6 +30,7 @@ See the file COPYING for details.
 #include "jx_match.h"
 #include "jx_parse.h"
 #include "jx_getopt.h"
+#include "jx_print.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -209,6 +210,99 @@ static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue,
 }
 
 /*
+Consider a node in the dag and convert it into a batch task ready to execute,
+with resources environments, and everything prior to calling hooks.
+*/
+
+struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue, int full_env_list)
+{
+	struct batch_task *task = batch_task_create(queue);
+	task->taskid = n->nodeid;
+
+	if(n->type==DAG_NODE_TYPE_COMMAND) {
+
+		/* A plain command just gets a command string. */
+		batch_task_set_command(task, n->command);
+
+	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+
+		/* A sub-workflow must be expanded into a makeflow invocation */
+
+		char *cmd = string_format("makeflow -T local %s",n->workflow_file);
+		char *oldcmd = 0;
+
+		/* Select the workflow language */
+
+		if(n->workflow_is_jx) {
+			oldcmd = cmd;
+			cmd = string_format("%s --jx",cmd);
+			free(oldcmd);
+		}
+
+		/* Generate the workflow arguments file */
+
+		if(n->workflow_args) {
+			char args[] = "makeflow.jx.args.XXXXXX";
+			int fd = mkstemp(args);
+			FILE *argsfile = fdopen(fd,"w");
+			jx_print_stream(n->workflow_args,argsfile);
+			fclose(argsfile);
+
+			oldcmd = cmd;
+			cmd = string_format("%s --jx-args %s",cmd,args);
+			free(oldcmd);
+
+			/* Define this file as a temp so it is removed on completion. */
+			makeflow_hook_add_input_file(n->d,task,args,args,DAG_FILE_TYPE_TEMP);
+		}
+
+		/* Add resource controls to the sub-workflow, if known. */
+
+		if(n->resources_requested->cores>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-cores %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		if(n->resources_requested->memory>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-memory %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		if(n->resources_requested->disk>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-disk %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		batch_task_set_command(task, cmd);
+		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
+		free(cmd);
+	} else {
+		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
+	}
+
+	/* Add all input and output files to the task */
+
+	struct dag_file *f;
+	list_first_item(n->source_files);
+	while((f = list_next_item(n->source_files))){
+		batch_task_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+	}
+
+	list_first_item(n->target_files);
+	while((f = list_next_item(n->target_files))){
+		batch_task_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+	}
+
+	batch_task_set_resources(task, dag_node_dynamic_label(n));
+	batch_task_set_envlist(task, dag_node_env_create(n->d, n, full_env_list));
+
+	return task;
+}
+
+/*
 Abort one job in a given batch queue.
 */
 
@@ -226,7 +320,7 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 
 	/* Create generic task if one does not exist. This occurs in log recovery. */
 	if(!n->task){
-		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
 		/* This augments the task struct, should be replaced with hook in future. */
 		makeflow_node_expand(n, q, n->task);
@@ -263,6 +357,8 @@ static void makeflow_abort_all(struct dag *d)
 		makeflow_abort_job(d,n,remote_queue,jobid,"remote");
 	}
 }
+
+/* A few forward prototypes to handle mutually-recursive definitions. */
 
 static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
@@ -360,7 +456,7 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 
 	if(!n->task){
-		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
 		/* This augments the task struct, should be replaced with hook in future. */
 		makeflow_node_expand(n, makeflow_get_queue(n), n->task);
@@ -404,33 +500,6 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 			}
 			if(child_node_found) {
 				makeflow_node_force_rerun(rerun_table, d, p);
-			}
-		}
-	}
-}
-
-/*
-Update nested jobs with appropriate number of local jobs
-(total local jobs max / maximum number of concurrent nests).
-*/
-
-static void makeflow_prepare_nested_jobs(struct dag *d)
-{
-	int dag_nested_width = dag_width(d, 1);
-	int update_dag_nests = 1;
-	char *s = getenv("MAKEFLOW_UPDATE_NESTED_JOBS");
-	if(s)
-		update_dag_nests = atoi(s);
-
-	if(dag_nested_width > 0 && update_dag_nests) {
-		dag_nested_width = MIN(dag_nested_width, local_jobs_max);
-		struct dag_node *n;
-		for(n = d->nodes; n; n = n->next) {
-			if(n->nested_job && ((n->local_job && local_queue) || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
-				char *command = xxmalloc(strlen(n->command) + 20);
-				sprintf(command, "%s -j %d", n->command, local_jobs_max / dag_nested_width);
-				free((char *) n->command);
-				n->command = command;
 			}
 		}
 	}
@@ -527,7 +596,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	}
 
 	/* Create task from node information */
-	struct batch_task *task = dag_node_to_batch_task(n, queue, should_send_all_local_environment);
+	struct batch_task *task = makeflow_node_to_task(n, queue, should_send_all_local_environment);
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
 
 	/* This augments the task struct, should be replaced with node_submit in future. */
@@ -2206,8 +2275,6 @@ int main(int argc, char *argv[])
 	}
 
 	makeflow_parse_input_outputs(d);
-
-	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
 		chdir(change_dir);

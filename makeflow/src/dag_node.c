@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "xxmalloc.h"
 #include "jx.h"
+#include "jx_print.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -34,6 +35,7 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 	n->nodeid = d->nodeid_counter++;
 	n->variables = hash_table_create(0, 0);
 
+	n->type = DAG_NODE_TYPE_COMMAND;
 	n->source_files = list_create();
 	n->target_files = list_create();
 
@@ -88,29 +90,27 @@ void dag_node_set_command(struct dag_node *n, const char *cmd) {
 	assert(n);
 	assert(cmd);
 	assert(!n->command);
-	assert(!n->nested_job);
-	assert(!n->makeflow_dag);
-	assert(!n->makeflow_cwd);
+	assert(!n->workflow_file);
 
+	n->type = DAG_NODE_TYPE_COMMAND;
 	n->command = xxstrdup(cmd);
 }
 
-void dag_node_set_submakeflow(struct dag_node *n, const char *dag, const char *cwd) {
+void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx * args, int is_jx )
+{
 	assert(n);
 	assert(dag);
-	assert(!n->command);
-	assert(!n->nested_job);
-	assert(!n->makeflow_dag);
-	assert(!n->makeflow_cwd);
+	assert(!n->workflow_file);
 
-	n->nested_job = 1;
-	n->makeflow_dag = xxstrdup(dag);
-	n->makeflow_cwd = xxstrdup(cwd ? cwd : ".");
-	n->command = string_format(
-			"cd %s && makeflow %s",
-			string_escape_shell(n->makeflow_cwd),
-			string_escape_shell(n->makeflow_dag)
-	);
+	n->type = DAG_NODE_TYPE_WORKFLOW;
+	n->workflow_file = xxstrdup(dag);
+	n->workflow_args = jx_copy(args);
+	n->workflow_is_jx = is_jx;
+
+	/* Record a placeholder in the command field */
+	/* A usable command will be created at submit time. */
+
+	n->command = xxstrdup(n->workflow_file);
 }
 
 void dag_node_insert(struct dag_node *n) {
@@ -402,30 +402,6 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n) {
 	return category_dynamic_task_max_resources(n->category, n->resources_requested, n->resource_request);
-}
-
-struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue *queue, int full_env_list)
-{
-	struct batch_task *task = batch_task_create(queue);
-	task->taskid = n->nodeid;
-	batch_task_set_command(task, n->command);
-
-	struct dag_file *f;
-	list_first_item(n->source_files);
-	while((f = list_next_item(n->source_files))){
-		batch_task_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
-	}
-
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))){
-		batch_task_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
-	}
-
-	batch_task_set_resources(task, dag_node_dynamic_label(n));
-
-	batch_task_set_envlist(task, dag_node_env_create(n->d, n, full_env_list));
-
-	return task;
 }
 
 /* Return JX object containing cmd, inputs, outputs, env, and resources. */

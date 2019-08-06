@@ -62,7 +62,14 @@ If there is no corresponding category defined, default values will be filled in.
 <p>A <tt>Rule</tt> is encoded as a JSON object with the following keys.</p>
 
 <code> {
+    # To describe a single Unix command:
     "command"     : &lt;string&gt;
+
+    # To describe a sub-workflow:
+    "workflow"    : &lt;string&gt;
+    "args"        : { ... }
+
+    # Common to both commands and sub-workflows:
     "inputs"      : [ ... ]
     "outputs"     : [ ... ]
     "local_job"   : &lt;boolean&gt;
@@ -70,10 +77,16 @@ If there is no corresponding category defined, default values will be filled in.
     "category"    : &lt;string&gt;
     "resources"   : { ... }
     "allocation"  : &lt;string&gt;
+
 }
 </code>
 
-<p>Required: The <tt>command</tt> string gives the Unix command to execute to carry out the job.</p>
+<p>Required: The rule must either state a <tt>command</tt>, which is a single
+Unix program to run, or a <tt>workflow</tt> which names another workflow to
+be run as a sub-job.</p>
+
+<p>Optional: <tt>args</tt> gives arguments in JSON format to be passed to
+a sub-workflow, which can be used within expressions in that workflow</p>
 
 <p>Required: The <tt>inputs</tt> and <tt>outputs</tt> arrays list the files required and produced by the command.
 These arrays must be an accurate description of the actual behavior of the command, otherwise the workflow
