@@ -886,8 +886,7 @@ then
 				# http://sourceforge.net/p/swig/news/?page=1
 				echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
 				echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
-				echo "*** skipping swig bindings for work queue and chirp"
-				
+				found_swig=old
 			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
 			then
 				found_swig=yes
@@ -1135,7 +1134,12 @@ EOF
 					python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
 				fi
 
-				swig_bindings="$swig_bindings python3"
+				if [ ${found_swig} = old ]
+				then
+					echo "*** Sorry, for Python3 swig 2.0.4 is required."
+				else
+					swig_bindings="$swig_bindings python3"
+				fi
 			else
 				python3=0
 			fi
@@ -1526,7 +1530,7 @@ fi
 
 swig_workqueue_bindings=""
 swig_chirp_bindings=""
-if [ "$found_swig" = yes ]
+if [ "$found_swig" != no ]
 then
 	for binding in $swig_bindings
 	do
