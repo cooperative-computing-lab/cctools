@@ -561,6 +561,28 @@ they are evaluated from left to right.
 </code></pre>
 </p>
 
+<h2 id="fstrings">F-strings<a class="sectionlink" href="#fstrings" title="Link to this section.">&#x21d7;</a></h2>
+
+<p>
+Python-style f-strings offer a concise way to build strings based on variables.
+F-strings are represented as string literals prefixed with <tt>f</tt>.
+Curly braces <tt>{ }</tt> indicate points where variables should be substituted.
+For exmaple,
+<pre><code>f"./process.py -n {N} -o {OUTPUT}.{N}.dat"</code></pre>
+</p>
+Here the variables <tt>N</tt> and <tt>OUTPUT</tt> are substituted in where they appear.
+Unlike in Python, f-strings in JX may not substitute arbitrary expressions;
+only variable names are allowed.
+For more powerful string formatting, see the <a href="#functions"><tt>format()</tt> function</a>.
+To include a literal <tt>{</tt> or <tt>}</tt> in an f-string, quote by doubling it.
+For example, suppose <tt>OUTPUT</tt> is a JX variable containing <tt>"file.dat"</tt>.
+<pre><code>f"./run -m ${{MODE}} > {OUTPUT}"
+=> "./run -m ${MODE} file.dat" </code></pre>
+The JX variable <tt>OUTPUT</tt> is substituted in, while the double braces are not evaluated as expressions.
+Thus they will be interpreted by the shell to insert sh variable <tt>$MODE</tt> at runtime.
+</p>
+
+
 <h2 id="errors">Errors<a class="sectionlink" href="#errors" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
