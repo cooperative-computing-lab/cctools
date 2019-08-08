@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "hash_table.h"
 #include "copy_stream.h"
+#include "copy_tree.h"
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
@@ -1080,6 +1081,7 @@ int main(int argc, char *argv[])
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
+	struct jx *wrapper_inputs = jx_array(NULL);
 
 	//Environment variable handling
 	char *ev = NULL;
@@ -1195,6 +1197,8 @@ int main(int argc, char *argv[])
 				} else {
 					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
+				struct jx *file = jx_string(optarg);
+				jx_array_append(wrapper_inputs, file);
 				break;
 			case LONG_OPT_WORKER_BINARY:
 				worker_command = strdup(optarg);
@@ -1329,6 +1333,18 @@ int main(int argc, char *argv[])
 	if(!create_dir(scratch_dir,0777)) {
 		fprintf(stderr,"work_queue_factory: couldn't create %s: %s",scratch_dir,strerror(errno));
 		return 1;
+	}
+
+	if(wrapper_input) {
+		struct jx *item;
+		for(void *i = NULL; (item = jx_iterate_array(wrapper_inputs, &i));) {
+			const char *value = item->u.string_value;
+			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
+			int result = copy_direntry(value, file_at_scratch_dir); 
+			if(result < 0) {
+				debug(D_NOTICE, "Cannot copy wrapper input file %s to factory scratch directory", value);
+			}
+		}
 	}
 
 	char* cmd;

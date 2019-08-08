@@ -23,6 +23,15 @@ int copy_dir(const char *source, const char *target);
  */
 int copy_symlink(const char *source, const char *target);
 
+/* copy_direntry copies the source dir or file into target. Like 'cp -r source target'.
+ * @param source: the source directory/file, which must be an existing directory/file.
+ * @param target: the target directory/file
+ * @return zero on success, non-zero on failure.
+ * If target does not exist, create the dir target and copy all the entries under the source dir into the target dir;
+ * If target exists, create a sub-dir basename(source) under target, and copy all the entries under the source dir into target/basename(source).
+ */
+int copy_direntry(const char *source, const char *target);
+
 /* Only copy regular files, directories, and symlinks. */
 typedef enum {
 	FILE_TYPE_REG,
