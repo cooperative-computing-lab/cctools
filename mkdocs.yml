@@ -1,1 +1,6 @@
-site_name: My Docs
+site_name: CCTools Documentation
+nav:
+    - Home: index.md
+    - About: about.md
+
+theme: readthedocs

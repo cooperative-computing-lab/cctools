@@ -10,3 +10,4 @@ cctools.test.fail
 configure.rerun
 config.mk
 *.pyc
+site/
