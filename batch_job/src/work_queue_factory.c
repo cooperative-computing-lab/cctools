@@ -1341,20 +1341,6 @@ int main(int argc, char *argv[])
 			const char *value = item->u.string_value;
 			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
 			int result = copy_direntry(value, file_at_scratch_dir); 
-			/*
-			struct stat local_info;
-			if(lstat(value, &local_info)>=0) {
-				if(S_ISDIR(local_info.st_mode))  {
-					result = copy_dir(value, file_at_scratch_dir);
-				}
-				else {
-					result = copy_file_to_file(value, file_at_scratch_dir);
-				}
-			}
-			else {
-				debug(D_NOTICE, "Cannot stat file %s: %s for copying to factory scratch directory", value, strerror(errno));
-			}
-			*/
 			if(result < 0) {
 				debug(D_NOTICE, "Cannot copy wrapper input file %s to factory scratch directory", value);
 			}
