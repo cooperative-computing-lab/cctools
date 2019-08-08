@@ -660,3 +660,27 @@ value:      "{0.5}"
 expression: f"{zzzzzzzzzzzzzzzzzzzzzz}"
 value:      error("on line 273: undefined symbol zzzzzzzzzzzzzzzzzzzzzz in template")
 
+expression: f"{"
+value:      error("on line 274: unterminated expression in fstring")
+
+expression: f"}"
+value:      error("on line 275: unmatched } in template")
+
+expression: f"{}"
+value:      error("on line 276: invalid f-string; each expression must be a single identifier")
+
+expression: f"{x y}"
+value:      error("on line 277: invalid f-string; each expression must be a single identifier")
+
+expression: f"{x+y}"
+value:      error("on line 278: invalid f-string; each expression must be a single identifier")
+
+expression: f"{12}"
+value:      error("on line 279: invalid f-string; each expression must be a single identifier")
+
+expression: f"f}"
+value:      error("on line 280: unmatched } in template")
+
+expression: f"{f"
+value:      error("on line 281: unterminated expression in fstring")
+

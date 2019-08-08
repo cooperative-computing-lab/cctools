@@ -239,40 +239,6 @@ static int jx_scan_string_char( struct jx_parser *s )
 	}
 }
 
-static int jx_valid_fstring(const char *s) {
-	assert(s);
-
-	while (*s) {
-		if (*s != '{' && *s != '}') {
-			// single string character
-			s++;
-			continue;
-		}
-		if (*s == '{' && *(s+1) == '{') {
-			// quoted opening brace
-			s += 2;
-			continue;
-		}
-		if (*s == '}' && *(s+1) == '}') {
-			// quoted closing brace
-			s += 2;
-			continue;
-		}
-
-		if (*s != '{') return 0; // unmatched closing brace
-		s++;
-		while (isspace(*s)) s++; // eat leading whitespace in expr
-		if (!isalpha(*s) && *s != '_') return 0; // 1st character of ident
-		s++;
-		while (isalnum(*s) || *s == '_') s++; // rest of ident
-		while (isspace(*s)) s++; // eat trailing whitepspace in expr
-		if (*s != '}') return 0; // unexpected stuff
-		s++;
-	}
-
-	return 1;
-}
-
 static void jx_unscan( struct jx_parser *s, jx_token_t t )
 {
 	s->putback_token = t;
@@ -903,13 +869,9 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 			j->line = line;
 
 			if (j->u.oper.type == JX_OP_F) {
-				// JX_TOKEN_F *must* be followed by a string follows
+				// JX_TOKEN_F *must* be followed by a string.
+				// The scanner should never emit this token otherwise.
 				assert(jx_istype(j->u.oper.right, JX_STRING));
-				if (!jx_valid_fstring(j->u.oper.right->u.string_value)) {
-					jx_parse_error_c(s, "invalid f-string: each expression must be a single identifier");
-					jx_delete(j);
-					return NULL;
-				}
 			}
 
 			return j;

@@ -271,5 +271,13 @@ f"{f}";
 f"test { g} and {y	} ";
 f"{{{f}}}";
 f"{zzzzzzzzzzzzzzzzzzzzzz}";
+f"{";
+f"}";
+f"{}";
+f"{x y}";
+f"{x+y}";
+f"{12}";
+f"f}";
+f"{f";
 
 #end

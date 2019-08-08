@@ -341,33 +341,42 @@ static struct jx *jx_eval_fstring(struct jx_operator *o, struct jx *j, struct jx
 	buffer_init(&var);
 
 	while (*s) {
+		// regular character
 		if (*s != '{' && *s != '}') {
 			buffer_putlstring(&buf, s, 1);
 			s++;
 			continue;
 		}
+		// quoted {
 		if (*s == '{' && *(s+1) == '{') {
 			buffer_putliteral(&buf, "{");
 			s += 2;
 			continue;
 		}
+		// quoted }
 		if (*s == '}' && *(s+1) == '}') {
 			buffer_putliteral(&buf, "}");
 			s += 2;
 			continue;
 		}
 
-		if (*s != '{') goto FAIL;
+		// got to here, so must be an expression
+		if (*s != '{') {
+			message = jx_format(
+				"on line %d: unmatched } in template",
+				o->line);
+			goto FAIL;
+		}
 		s++;
-		while (isspace(*s)) s++;
+		while (isspace(*s)) s++; // eat leading whitespace
 		if (!isalpha(*s) && *s != '_') goto FAIL;
-		buffer_putlstring(&var, s, 1);
+		buffer_putlstring(&var, s, 1); // copy identifier to buffer
 		s++;
 		while (isalnum(*s) || *s == '_') {
 			buffer_putlstring(&var, s, 1);
 			s++;
 		}
-		while (isspace(*s)) s++;
+		while (isspace(*s)) s++; // eat trailing whitespace
 		if (*s != '}') goto FAIL;
 		s++;
 		struct jx *k = jx_lookup(ctx, buffer_tostring(&var));
@@ -398,12 +407,13 @@ static struct jx *jx_eval_fstring(struct jx_operator *o, struct jx *j, struct jx
 
 FAIL:
 	if (!message) {
-		struct jx *t = jx_operator(o->type, NULL, jx_copy(j));
-		s = jx_print_string(t);
-		message = jx_format("on line %d, %s: %s", o->line, s,
-			"invalid f-string: each expression must be a single identifier");
-		jx_delete(t);
-		free(s);
+		if (*s == 0) {
+			message = jx_format("on line %d: %s", o->line,
+				"unterminated expression in fstring");
+		} else {
+			message = jx_format("on line %d: %s", o->line,
+				"invalid f-string; each expression must be a single identifier");
+		}
 	}
 	out = jx_error(message);
 DONE:
