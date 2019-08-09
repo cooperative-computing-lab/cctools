@@ -1,5 +1,7 @@
 # Chirp User's Manual
 
+* [The Chirp Protocol](chirp_protocol.html)
+
 **Last edited: January 2014**
 
 Chirp is Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The

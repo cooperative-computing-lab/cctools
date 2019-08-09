@@ -1,57 +1,5 @@
 # Makeflow User's Manual
 
-Makeflow is Copyright (C) 2017- The University of Notre Dame. This software is
-distributed under the GNU General Public License. See the file COPYING for
-details.
-
-## Table of Contents
-
-  * Introduction
-    * Overview
-    * Installing
-    * Basic Usage
-    * JX Language
-    * Monitoring
-    * Resources
-    * General Advice
-  * Batch Systems
-    * Local
-    * HTCondor
-    * SGE/OGE/UGE
-    * PBS
-    * Torque
-    * SLURM
-    * MPI Makeflow
-    * Moab
-    * Mesos
-    * Amazon EC2
-    * Amazon Lambda
-    * Generic Cluster
-  * Using Work Queue
-    * Overview
-    * Port Numbers
-    * Project Names
-    * Setting a Password
-  * Container Environments
-    * Docker
-    * Singularity
-    * Umbrella
-    * Wrapper Commands
-  * Advanced Features
-    * Shared File Systems
-    * NFS Consistency Delay
-    * Mounting Remote Files
-    * Garbage Collection
-    * Visualization
-    * Linking Dependencies
-    * Archiving Jobs
-  * Technical Reference
-    * Language Reference
-    * Resources and Categories
-    * Transaction Log 
-
-## Introduction
-
 ### Overview
 
 Makeflow is a **workflow engine** for large scale distributed computing. It
@@ -1219,4 +1167,11 @@ Each file state line records the state change and time:
     4. delete 
   * **filename** \- the file name given in the rule specification of Makeflow.
   * **timestamp** \- the unix time (in microseconds) when this line is written to the log file. 
+
+
+## Further Information
+
+Makeflow is Copyright (C) 2017- The University of Notre Dame. This software is
+distributed under the GNU General Public License. See the file COPYING for
+details.
 
