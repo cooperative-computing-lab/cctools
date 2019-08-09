@@ -123,21 +123,41 @@ HEADERS_PUBLIC = \
 	auth_kerberos.h \
 	auth_ticket.h \
 	auth_unix.h \
+	bitmap.h \
 	buffer.h \
 	category.h \
+	cctools.h \
 	copy_tree.h \
+	compat-at.h \
 	debug.h \
+	delete_dir.h \
+	envtools.h \
+	fast_popen.h \
+	full_io.h \
+	getopt.h \
+	getopt_aux.h \
 	hash_table.h \
 	histogram.h \
+	host_memory_info.h \
 	http_query.h \
 	int_sizes.h \
+	itable.h \
 	jx.h \
 	jx_match.h \
 	link.h \
+	list.h \
+	load_average.h \
 	md5.h \
+	macros.h \
+	path.h \
 	rmonitor_poll.h \
 	rmsummary.h \
+	stringtools.h \
+	text_array.h \
+	text_list.h \
 	timestamp.h \
+	unlink_recursive.h \
+	xxmalloc.h \
 
 LIBRARIES = libdttools.a
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
