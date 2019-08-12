@@ -1,0 +1,5 @@
+{"tag": "one"} {"tag": "two"}
+
+{"tag": "three", "other": {"tag": "not-four"}}
+{"tag": "four"}
+
