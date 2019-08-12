@@ -4,10 +4,11 @@
 
 Makeflow is a **workflow engine** for large scale distributed computing. It
 accepts a specification of a large amount of work to be performed, and runs it
-on remote machines in parallel where possible. In addition, Makeflow is fault-
-tolerant, so you can use it to coordinate very large tasks that may run for
-days or weeks in the face of failures. Makeflow is designed to be similar to
-**Make** , so if you can write a Makefile, then you can write a Makeflow.
+on remote machines in parallel where possible. In addition, Makeflow is
+fault-tolerant, so you can use it to coordinate very large tasks that may run
+for days or weeks in the face of failures. Makeflow is designed to be similar
+to **Make** , so if you can write a Makefile, then you can write a
+Makeflow.
 
 Makeflow makes it easy to move a large amount of work from one facility to
 another. After writing a workflow, you can test it out on your local laptop,
@@ -28,19 +29,38 @@ cloud services (Amazon EC2 or Lambda) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
 
-### Installing
+### Getting started
+
+#### Installing
 
 Makeflow is part of the [Cooperating Computing
 Tools](http://ccl.cse.nd.edu/software), which is easy to install. In most
 cases, you can just build from source and install in your home directory like
-this: `git clone https://github.com/cooperative-computing-lab/cctools cctools-
-source cd cctools-source ./configure make make install ` Then, set your path
-to include the appropriate directory. If you use `bash`, do this: `export
-PATH=${HOME}/cctools/bin:$PATH ` Or if you use `tcsh`, do this: `setenv PATH
-${HOME}/cctools/bin:$PATH ` For more complex situations, consult the [CCTools
-installation instructions](install.html).
+this: 
 
-### Basic Usage
+```sh
+$ git clone https://github.com/cooperative-computing-lab/cctools cctools-source
+$ cd cctools-source
+$ ./configure make make install
+```
+
+Then, set your path to include the appropriate directory. If you use `bash`, do
+this:
+
+```sh
+$ export PATH=${HOME}/cctools/bin:$PATH
+```
+
+Or if you use `tcsh`, do this:
+
+```csh
+$ setenv PATH ${HOME}/cctools/bin:$PATH
+```
+
+For more complex situations, consult the [CCTools installation
+instructions](install.html).
+
+#### Basic Usage
 
 A Makeflow workflow consists of a set of rules. Each rule specifies a set of
 _output files_ to create, a set of _input files_ needed to create them, and a
@@ -62,17 +82,29 @@ creates four variations of the image, and then combines them back together
 into an animation. The first and the last task are marked as LOCAL to force
 them to run on the controlling machine.
 
-`CURL=/usr/bin/curl CONVERT=/usr/bin/convert
-URL=http://ccl.cse.nd.edu/images/capitol.jpg capitol.anim.gif: capitol.jpg
-capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg $CONVERT LOCAL
-$CONVERT -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg
-capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg
-capitol.anim.gif capitol.90.jpg: capitol.jpg $CONVERT $CONVERT -swirl 90
-capitol.jpg capitol.90.jpg capitol.180.jpg: capitol.jpg $CONVERT $CONVERT
--swirl 180 capitol.jpg capitol.180.jpg capitol.270.jpg: capitol.jpg $CONVERT
-$CONVERT -swirl 270 capitol.jpg capitol.270.jpg capitol.360.jpg: capitol.jpg
-$CONVERT $CONVERT -swirl 360 capitol.jpg capitol.360.jpg capitol.jpg: $CURL
-LOCAL $CURL -o capitol.jpg $URL `
+```make
+CURL="/usr/bin/curl"
+CONVERT="/usr/bin/convert"
+URL="http://ccl.cse.nd.edu/images/capitol.jpg"
+
+capitol.anim.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg $(CONVERT)
+    LOCAL $(CONVERT) -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.anim.gif
+    
+capitol.90.jpg: capitol.jpg $(CONVERT)
+    $(CONVERT) -swirl 90 capitol.jpg capitol.90.jpg
+    
+capitol.180.jpg: capitol.jpg $(CONVERT)
+    $(CONVERT) -swirl 180 capitol.jpg capitol.180.jpg
+    
+capitol.270.jpg: capitol.jpg $(CONVERT)
+    $(CONVERT) -swirl 270 capitol.jpg capitol.270.jpg
+    
+capitol.360.jpg: capitol.jpg $(CONVERT)
+    $(CONVERT) -swirl 360 capitol.jpg capitol.360.jpg
+    
+capitol.jpg: $(CURL)
+    LOCAL $(CURL) -o capitol.jpg $(URL)
+```
 
 (Note that Makeflow differs from Make in a few subtle ways, you can learn
 about those in the Language Reference below.)
@@ -80,25 +112,40 @@ about those in the Language Reference below.)
 To try out the example above, copy and paste it into a file named
 `example.makeflow`. To run it on your local machine:
 
-`makeflow example.makeflow`
+```sh
+$ makeflow example.makeflow
+```
 
-Note that if you run it a second time, nothing will happen, because all of the
-files are built:
+Note that if you run it a second time you will get the message:
 
-`makeflow example.makeflow makeflow: nothing left to do `
+`makeflow: nothing left to do`
+
+as all of the files are already built.
+
 
 Use the `--clean` option to clean everything up before trying it again:
 
-`makeflow --clean example.makeflow`
+```sh
+$ makeflow --clean example.makeflow
+```
 
 If you have access to a batch system like Condor, SGE, or Torque, or a cloud
 service provider like Amazon, you can direct Makeflow to run your jobs there
 by using the `-T` option:
 
-`makeflow -T condor example.makeflow or makeflow -T sge example.makeflow or
-makeflow -T torque example.makeflow or makeflow -T amazon example.makeflow ...
-` To learn more about the various batch system options, see the Batch System
+```sh
+$ makeflow -T condor example.makeflow
+
+$ makeflow -T sge example.makeflow
+
+$ makeflow -T torque example.makeflow
+
+$ makeflow -T amazon example.makeflow
+```
+
+To learn more about the various batch system options, see the Batch System
 Support section.
+
 
 ### JX Language
 
@@ -108,15 +155,22 @@ workflow language for expressing workflows in a more programmable way. To give
 you an idea, here is how to quickly generate one thousand simulation jobs
 using JX:
 
-` { "rules": [ { "command": "./simulate.py -n "+N+" > output."+N+".txt",
-"inputs": [ "simulate.py" ], "outputs": [ "output."+N+".txt" ], } for N in
-range(1,1000) ] } ` You can use the JX language with Makeflow by simply using
-the `--jx` argument to any invocation. For example: `makeflow --jx example.jx
--T condor ` To learn more about JX, please see:
+```json
+{
+    "rules": [
+        {
+            "command": "./simulate.py -n "+N+" > output."+N+".txt",
+            "inputs": [ "simulate.py" ], "outputs": [ "output."+N+".txt" ],
+        } for N in range(1,1000)
+    ]
+}
+```
 
-* [JX Quick Reference](jx-quick.html)
-* [JX Tutorial](jx-tutorial.html)
-* [JX Language Reference](jx.html)
+You can use the JX language with Makeflow by simply using
+the `--jx` argument to any invocation. For example: `makeflow --jx example.jx -T condor`
+
+Learn more about JX [here](../jx).
+
 
 ### Resources
 
@@ -126,8 +180,14 @@ variables CORES, MEMORY (in MB), and DISK (in MB) ahead of each job. Makeflow
 will translate this information as needed to the underlying batch system. For
 example:
 
-`CORES=4 MEMORY=1024 DISK=4000 output.txt: input.dat analyze input.dat >
-output.txt `
+```make
+CORES=4
+MEMORY=1024
+DISK=4000
+
+output.txt: input.dat
+    analyze input.dat > output.txt
+```
 
 ### Monitoring
 
@@ -137,22 +197,35 @@ workflow as it runs. Makeflow itself creates a transaction log
 runs, tracking how many are idle, running, complete, and so forth. These tools
 can read the transaction log and summarize the workflow:
 
-  1. `makeflow_monitor` reads the transaction log and produceds a continuous display that shows the overall time and progress through the workflow: `makeflow example.makeflow & makeflow_monitor example.makeflow.makeflowlog `
-  2. `makeflow_graph_log` will read the transaction log, and produce a timeline graph showing the number of jobs ready, running, and complete over time: `makeflow example.makeflow & makeflow_graph_log example.makeflow.makeflowlog example.png `
-  3. `makeflow_viz` will display the workflow in graphical form, so that you can more easily understand the structure and dependencies. (Read more about Visualization) 
+  - `makeflow_monitor` reads the transaction log and produceds a continuous
+  display that shows the overall time and progress through the workflow:
+```sh
+$ makeflow example.makeflow
+$ makeflow_monitor example.makeflow.makeflowlog
+```
+
+  - `makeflow_graph_log` will read the transaction log, and produce a timeline
+    graph showing the number of jobs ready, running, and complete over time:
+```sh
+$ makeflow example.makeflow
+$ makeflow_graph_log example.makeflow.makeflowlog example.png
+```
+
+  - `makeflow_viz` will display the workflow in graphical form, so that you can
+    more easily understand the structure and dependencies. Read more about
+    [Visualization](index.md#Visualization).
 
 In addition, if you give the workflow a "project name" with the `-N` option,
 it will report its status to the [catalog server](catalog.html) once per
 minute. The `makeflow_status` command will query the catalog and summarize
 your currently running workloads, like this:
 
+```sh
+OWNER      PROJECT              JOBS   WAIT    RUN   COMP   ABRT   FAIL   TYPE
+alfred     simulation           2263   2258      1      4      0      0 condor
+betty      analysis             2260      1      1   2258      0      0     wq
+```
     
-    
-    OWNER      PROJECT              JOBS   WAIT    RUN   COMP   ABRT   FAIL   TYPE
-    alfred     simulation           2263   2258      1      4      0      0 condor
-    betty      analysis             2260      1      1   2258      0      0     wq
-    
-
 ### General Advice
 
 A few key bits of advice address the most common problems encountered when
@@ -217,19 +290,29 @@ option to submit jobs to the [HTCondor](http://research.cs.wisc.edu/htcondor)
 batch system.
 
 If you have a long-running workflow, we recommend using
-`condor_submit_makeflow` like this: `condor_submit_makeflow example.mf
-Submitting example.mf as a background job to HTCondor... Submitting job(s). 1
-job(s) submitted to cluster 364. Makeflow Output : makeflow.364.output
-Makeflow Error : makeflow.364.error Condor Log : makeflow.364.condorlog `
+`condor_submit_makeflow` like this:
+
+```sh
+$ condor_submit_makeflow example.mf
+
+Submitting example.mf as a background job to HTCondor...
+Submitting job(s). 1 job(s) submitted to cluster 364.
+Makeflow Output : makeflow.364.output
+Makeflow Error : makeflow.364.error
+Condor Log : makeflow.364.condorlog
+```
 
 This will cause Makeflow itself to be submitted as a batch job itself, so that
 it can be monitored by HTCondor, allowing you to log out and return later to
 check the status of the workflow. You will see both Makeflow and the jobs it
 runs in the HTCondor queue:
 
-` ID OWNER SUBMITTED RUN_TIME ST PRI SIZE CMD 10.0 dthain 7/17 13:03
-0+00:00:05 R 0 1.7 makeflow -T condor 11.0 dthain 7/17 13:03 0+00:00:00 I 0
-0.0 condor.sh myjob -p 1 . . . `
+```table
+ID   OWNER  SUBMITTED   RUN_TIME    ST  PRI SIZE CMD
+10.0 dthain 7/17 13:03  0+00:00:05  R   0   1.7  makeflow -T condor
+11.0 dthain 7/17 13:03  0+00:00:00  I   0   0.0  condor.sh myjob -p 1
+...
+```
 
 Makeflow will automatically generate a submit file for each job, so you don't
 need to write one. However, if you would like to customize the Condor submit
@@ -239,7 +322,9 @@ to the submit file.
 For example, if you want to add `Requirements` and `Rank` lines to your Condor
 submit files, add this to your Makeflow:
 
-`BATCH_OPTIONS = Requirements = (Memory>1024)`
+```make
+BATCH_OPTIONS="Requirements = (Memory>1024)"
+```
 
 ### UGE - Univa Grid Engine / OGE - Open Grid Engine / SGE - Sun Grid Engine
 
@@ -251,7 +336,10 @@ As above, Makeflow will automatically generate `qsub` commands. Use the `-B`
 option or `BATCH_OPTIONS` variable to specify text to add to the command line.
 For example, to specify that jobs should be submitted to the `devel` queue:
 
-`BATCH_OPTIONS = -q devel`
+```make
+BATCH_OPTIONS="-q devel"
+```
+
 
 ### PBS - Portable Batch System
 
@@ -260,10 +348,13 @@ System](http://www.arc.ox.ac.uk/content/pbs) or compatible systems.
 
 This will add the values for cores, memory, and disk. These values will be
 added onto `qsub` in this format:  
-`-l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb`
 
-To remove resources specification at submission use Makeflow option `--safe-
-submit-mode`.
+```sh
+-l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb`
+```
+
+To remove resources specification at submission use the Makeflow option `--safe-submit-mode`.
+
 
 ### Torque Batch System
 
@@ -273,10 +364,13 @@ system.
 
 This will add the values for cores, memory, and disk. These values will be
 added onto `qsub` in this format:  
-`-l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb`
 
-To remove resources specification at submission use Makeflow option `--safe-
-submit-mode`.
+```make
+-l nodes=1:ppn=${CORES},mem=${MEMORY}mb,file=${DISK}mb
+```
+
+To remove resources specification at submission use Makeflow option `--safe-submit-mode`.
+
 
 ### SLURM - Simple Linux Resource Manager
 
@@ -285,10 +379,12 @@ Use the `-T slurm` option to submit jobs to the
 
 This will add the values for cores and memory. These values will be added onto
 `sbatch` in this format:  
-`-N 1 -n ${CORES} --mem=${MEMORY}M`
 
-To remove resources specification at submission use Makeflow option `--safe-
-submit-mode`.
+```sh
+-N 1 -n ${CORES} --mem=${MEMORY}M
+```
+
+To remove resources specification at submission use Makeflow option `--safe-submit-mode`.
 
 Disk is not specifies as a shared file system is assumed. The only available
 disk command line option is `--tmp`, which governs temporary disk space. This
@@ -319,23 +415,21 @@ consult your local documentation on how to set up access to your MPI compiler,
 typically named `mpicc`. Then, configure and build Makeflow using the `--with-
 mpi-path` option, like this:
 
-    
-    
-    git clone http://github.com/cooperative-computing-lab/cctools cctools-src
-    cd cctools-src
-    ./configure --with-mpi-path `which mpicc` --prefix $HOME/cctools
-    make clean
-    make install
-    export PATH=$HOME/cctools/bin:$PATH
-    
+```sh
+$ git clone http://github.com/cooperative-computing-lab/cctools cctools-src
+$ cd cctools-src
+$ ./configure --with-mpi-path `which mpicc` --prefix $HOME/cctools
+$ make clean
+$ make install
+$ export PATH=$HOME/cctools/bin:$PATH
+```
 
 You can test this configuration locally at small scale using `mpirun`. For
 example, to run makeflow on four MPI nodes:
 
-    
-    
-    mpirun -np 4 makeflow -T mpi example.makeflow
-    
+```sh
+$ mpirun -np 4 makeflow -T mpi example.makeflow
+```
 
 Then, consult your local documentation on how to submit an MPI job to your
 cluster. This varies considerably between sites, but here is a typical example
@@ -343,12 +437,13 @@ of a script for a system that uses a `qsub` style interface and `modules` for
 loading software:
 
     
-    
-    #!/bin/bash
-    #$ -pe mpi 48
-    module load ompi
-    mpirun -np $NSLOTS makeflow -T mpi example.makeflow
-    
+```sh
+#!/bin/bash
+#$ -pe mpi 48
+module load ompi
+mpirun -np $NSLOTS makeflow -T mpi example.makeflow
+```
+
 
 ### Mesos
 
@@ -365,8 +460,10 @@ For example, here is the command to run Makeflow on a Mesos cluster that has
 the master listening on port 5050 of localhost, with a user specified python
 library:
 
-`makeflow -T mesos --mesos-master localhost:5050 --mesos-path
-/path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ... `
+```sh
+$ makeflow -T mesos --mesos-master localhost:5050 --mesos-path /path/to/mesos-0.26.0/lib/python2.6/site-packages example.makeflow ...
+```
+
 
 ### Kubernetes
 
@@ -374,14 +471,16 @@ Makeflow can be run on [Kubernetes](https://kubernetes.io/) cluster. To run
 Makeflow with Kuberenetes, give the batch mode via `-T k8s` and indicate the
 desired Docker image with the `--k8s-image` option. The Kubernetes mode is
 depend on kubectl, before starting Makeflow, make sure kubectl has been
-[installed and correctly set
-up](https://kubernetes.io/docs/tasks/tools/install-kubectl/) to access the
+[installed and correctly set up](https://kubernetes.io/docs/tasks/tools/install-kubectl/) to access the
 desired Kubernetes cluster.
 
 Following is an example of running Makeflow on a Kuberenetes cluster using
 centos image.
 
-` makeflow -T k8s --k8s-image "centos" example.makeflow `
+```sh
+$ makeflow -T k8s --k8s-image "centos" example.makeflow
+```
+
 
 ### Amazon Web Services
 
@@ -391,23 +490,55 @@ run on the virtual machine, and then the virtual machine will be destroyed.
 
 You will need to do some one-time setup first:
 
-* Create an account with [Amazon Web Services](http://aws.amazon.com), and test it out by creating and deleting some virtual machines manually. 
-* Install the [AWS Command Line Interace](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) on the machine where you will run Makeflow. 
-* Add the `aws` command to your PATH, run `aws configure` and enter your AWS Access Key ID, your AWS Secret Access Key, and your preferred region name. (The keys can be obtained from the AWS web page by going to your profile menu, selecting "My Security Credentials" and then "Access Keys". You may need to create a new access key.)  Before proceeding, test that the command-line tool is working by entering: `aws ec2 describe-hosts ` Which should display: `{ "Hosts": [] } ` Now you are ready to use Makeflow with Amazon. Before running a workflow, use the `makeflow_ec2_setup` command, which will setup a virtual private cluster, security group, keypairs, and other necessary details, and store the necessary information into `my.config`. Give the name of the default [Amazon Machine Image (AMI)](https://console.aws.amazon.com/ec2/v2/home?#Images) you wish to use as the second argument: `makeflow_ec2_setup my.config ami-343a694f ` Then, run `makeflow` with the `-T amazon` option and `--amazon-config my.config` to use the configuration you just created. You can run multiple workflows using a single configuration. `makeflow -T amazon --amazon-config my.config example.makeflow ... ` When you are done, destroy the configuration with this command: `makeflow_ec2_cleanup my.config `
+1. Create an account with [Amazon Web Services](http://aws.amazon.com), and test it out by creating and deleting some virtual machines manually. 
 
-Makeflow selects the virtual machine instance type automatically by
-translating the job resources into an appropriate instance type of the `c4` or
-`m4` category. For example, a job requiring CORES=2 and MEMORY=8000 will be
+* Install the [AWS Command Line Interace](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) on the machine where you will run Makeflow. 
+
+* Add the `aws` command to your PATH.
+
+* Run `aws configure` and enter your AWS Access Key ID, your AWS Secret Access Key, and your preferred region name. (The keys can be obtained from the AWS web page by going to your profile menu, selecting "My Security Credentials" and then "Access Keys". You may need to create a new access key.)
+
+* Test that the command-line tool is working by entering: `aws ec2 describe-hosts ` Which should display: `{ "Hosts": [] }`
+
+Now you are ready to use Makeflow with Amazon. Before running a workflow, use
+the `makeflow_ec2_setup` command, which will setup a virtual private cluster,
+security group, keypairs, and other necessary details, and store the necessary
+information into `my.config`.
+
+Give the name of the default [Amazon Machine Image (AMI)](https://console.aws.amazon.com/ec2/v2/home?#Images) you wish to
+use as the second argument:
+
+```sh
+$ makeflow_ec2_setup my.config ami-343a694f
+```
+
+and then
+
+```sh
+$ makeflow -T amazon --amazon-config my.config ...
+```
+
+to use the configuration you just created. You can run multiple workflows using
+a single configuration.  When you are done, destroy the configuration with this
+command: `makeflow_ec2_cleanup my.config `
+
+Makeflow selects the virtual machine instance type automatically by translating
+the job resources into an appropriate instance type of the `c4` or `m4`
+category. For example, a job requiring `CORES=2` and `MEMORY=8000` will be
 placed into an `m4.large` instance type. If you do not specify any resources
 for a job, then it will be placed into a `t2.micro` instance, which has very
-limited performance. To get good performance, you should label your jobs with
-the appropriate `CORES` and `MEMORY`.
+limited performance. To get good performance, you should label your jobs
+with the appropriate `CORES` and `MEMORY`.
 
 You can override the choice of virtual machine instance type, as well as the
 choice of virtual machine image (AMI) within the Makeflow on a job-by-job
 basis by setting the `AMAZON_INSTANCE_TYPE` and `AMAZON_AMI` environment
-variables within the Makeflow file. For example: ` export
-AMAZON_INSTANCE_TYPE=m4.4xlarge export AMAZON_AMI=ami-343a694f `
+variables within the Makeflow file. For example:
+
+```sh
+$ export AMAZON_INSTANCE_TYPE=m4.4xlarge export AMAZON_AMI=ami-343a694f
+```
+
 
 ### Amazon Lambda
 
@@ -419,26 +550,26 @@ appropriate roles, buckets, and functions needed to use Amazon Lambda. The
 names of these items will be stored in a config file named on the command
 line:
 
-    
-    
-    makeflow_lambda_setup my.config
-    
+```sh
+$ makeflow_lambda_setup my.config
+```
 
 Then, you may use `makeflow` normally, indicating `lambda` as the batch type,
 and passing in the configuration file with the `--lambda-config` option:
 
     
-    
-    makeflow -T lambda --lambda-config my.config example.makeflow ...
-    
+```sh
+$ makeflow -T lambda --lambda-config my.config example.makeflow ...
+```
 
 You may run multiple workflows in this fashion. When you are ready to clean up
 the associated state in Amazon, run `makeflow_lambda_cleanup` and pass in the
 configuration file:
 
     
-    
-    makeflow_lambda_cleanup my.config
+```sh    
+$ makeflow_lambda_cleanup my.config
+```
     
 
 ### Generic Cluster Submission
@@ -455,30 +586,32 @@ cluster.
 
 To configure a custom driver, set the following environment variables:
 
-  * BATCH_QUEUE_CLUSTER_NAME: The name of the cluster, used in debugging messages and as the name for the wrapper script.
-  * BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND: The submit command for the cluster (such as qsub or msub)
-  * BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS: The command-line arguments that must be passed to the submit command. This string should end with the argument used to set the name of the task (usually -N).
-  * BATCH_QUEUE_CLUSTER_REMOVE_COMMAND: The delete command for the cluster (such as qdel or mdel)
+  * `BATCH_QUEUE_CLUSTER_NAME` The name of the cluster, used in debugging messages and as the name for the wrapper script.
+  * `BATCH_QUEUE_CLUSTER_SUBMIT_COMMAND` The submit command for the cluster (such as qsub or msub)
+  * `BATCH_QUEUE_CLUSTER_SUBMIT_OPTIONS` The command-line arguments that must be passed to the submit command. This string should end with the argument used to set the name of the task (usually -N).
+  * `BATCH_QUEUE_CLUSTER_REMOVE_COMMAND` The delete command for the cluster (such as qdel or mdel)
 
-These will be used to construct a task submission for each makeflow rule that
-consists of:
+These will be used to construct a task submission for each makeflow rule that consists of:
 
-`$SUBMIT_COMMAND $SUBMIT_OPTIONS $CLUSTER_NAME.wrapper "<rule commandline>"`
+```sh
+$SUBMIT_COMMAND $SUBMIT_OPTIONS $CLUSTER_NAME.wrapper "<rule commandline>"
+```
 
 The wrapper script is a shell script that reads the command to be run as an
 argument and handles bookkeeping operations necessary for Makeflow.
+
 
 ## Using Work Queue
 
 ### Overview
 
-As described so far, Makeflow translates each job in the workflow into a
-single submission to the target batch system. This works well as long as each
-job is relatively long running and doesn't perform a large amount of I/O.
-However, if each job is relatively short, the workflow may run very slowly,
-because it can take 30 seconds or more for the batch system to start an
-individual job. If common files are needed by each job, they may end up being
-transferred to the same node multiple times.
+As described so far, Makeflow translates each job in the workflow into a single
+submission to the target batch system. This works well as long as each job is
+relatively long running and does not perform a large amount of I/O.  However, if
+each job is relatively short, the workflow may run very slowly, because it can
+take 30 seconds or more for the batch system to start an individual job. If
+common files are needed by each job, they may end up being transferred to the
+same node multiple times.
 
 To get around these limitations, we provide the [Work
 Queue](http://ccl.cse.nd.edu/software/workqueue</a) system. The basic idea is
@@ -491,20 +624,31 @@ jobs.
 To begin, let's assume that you are logged into the head node of your cluster,
 called `head.cluster.edu` Run Makeflow in Work Queue mode like this:
 
-`makeflow -T wq example.makeflow`
+```sh
+$ makeflow -T wq example.makeflow
+```
 
 Then, submit 10 worker processes to Condor like this:
 
-`condor_submit_workers head.cluster.edu 9123 10 Submitting job(s)..........
-Logging submit event(s).......... 10 job(s) submitted to cluster 298. `
+```sh
+$ condor_submit_workers head.cluster.edu 9123
+
+10 Submitting job(s)..........
+Logging submit event(s)..........
+10 job(s) submitted to cluster 298.
+```
 
 Or, submit 10 worker processes to SGE like this:
 
-`sge_submit_workers head.cluster.edu 9123 10`
+```sh
+$ sge_submit_workers head.cluster.edu 9123 10
+```
 
 Or, you can start workers manually on any other machine you can log into:
 
-`work_queue_worker head.cluster.edu 9123`
+```sh
+$ work_queue_worker head.cluster.edu 9123
+```
 
 Once the workers begin running, Makeflow will dispatch multiple tasks to each
 one very quickly. If a worker should fail, Makeflow will retry the work
@@ -517,8 +661,7 @@ will automatically exit.
 
 Note that `condor_submit_workers` and `sge_submit_workers`, are simple shell
 scripts, so you can edit them directly if you would like to change batch
-options or other details. Please refer to [ Work Queue manual
-](workqueue.html) for more details.
+options or other details. Please refer to [Work Queue manual ](../work_queue) for more details.
 
 ### Port Numbers
 
@@ -528,43 +671,51 @@ available on your system. You can change the default port via the `-p` option.
 For example, if you want the master to listen on port 9567 by default, you can
 run the following command:
 
-`makeflow -T wq -p 9567 example.makeflow`
+```sh
+$ makeflow -T wq -p 9567 example.makeflow
+```
 
 ### Project Names
 
-If you don't like using port numbers, an easier way to match workers to
+If you do not like using port numbers, an easier way to match workers to
 masters is to use a project name. You can give each master a project name with
 the -N option.
 
-`makeflow -T wq -N MyProject example.makeflow `
+```sh
+$ makeflow -T wq -N MyProject example.makeflow
+```
 
-The -N option gives the master a project name called 'MyProject', and will
-cause it to advertise its information such as the project name, running
-status, hostname and port number, to a [catalog server](catalog.html). Then a
-worker can simply identify the workload by its project name.
+The -N option gives the master a project name called `MyProject`, and will
+cause it to advertise its information such as the project name, running status,
+hostname and port number, to a default globally available catalog server. Then
+a worker can simply identify the workload by its project name.
 
-To start a worker that automatically finds MyProject's master via the default
+To start a worker that automatically finds the master named __MyProject__ via the default
 catalog server:
 
-`work_queue_worker -N MyProject`
+```sh
+$ work_queue_worker -N MyProject
+```
 
-You can also give multiple -N options to a worker. The worker will find out
+You can also give multiple `-N` options to a worker. The worker will find out
 which ones of the specified projects are running from the catalog server and
 randomly select one to work for. When one project is done, the worker would
 repeat this process. Thus, the worker can work for a different master without
-being stopped and given the different master's hostname and port. An example
+being stopped and given the different hostname and port of the master. An example
 of specifying multiple projects:
 
-`work_queue_worker -N proj1 -N proj2 -N proj3`
+```sh
+$ work_queue_worker -N proj1 -N proj2 -N proj3
+```
 
 In addition to creating a project name using the -N option, this will also
 trigger automatic reporting to the designated catalog server. The Port and
 Server address are taken from the environment variables **CATALOG_HOST** and
 **CATALOG_PORT**. If either variable is not set, then the addresses
-"catalog.cse.nd.edu,backup-catalog.cse.nd.edu" and port 9097 will be used.
+`catalog.cse.nd.edu,backup-catalog.cse.nd.edu` and port `9097` will be used.
 
 It is also easy to run your own catalog server, if you prefer. For more
-details, see the [Catalog Server Manual](catalog.html).
+details, see the [Catalog Server Manual](../catalog).
 
 ### Setting a Password
 
@@ -573,8 +724,10 @@ this, select any password and write it to a file called `mypwfile`. Then, run
 Makeflow and each worker with the `--password` option to indicate the password
 file:
 
-`makeflow **--password** mypwfile ... work_queue_worker **--password**
-mypwfile ... `
+```sh
+$ makeflow --password mypwfile ...
+$ work_queue_worker **--password** mypwfile ...
+```
 
 ## Container Environments
 
@@ -585,7 +738,7 @@ the container, loading (or linking) the input files into the container,
 running the job, extracting the output files, and deleting the container.
 
 Note that container specification is independent of batch system selection.
-For example, if you select HTCondor execution with ` -T condor` and Docker
+For example, if you select HTCondor execution with `-T condor` and Docker
 support with `--docker`, then Makeflow will submit HTCondor batch jobs, each
 consisting of an invocation of `docker` to run the job. You can switch to any
 combination of batch system and container technology that you like.
@@ -626,11 +779,19 @@ binary. Using this mode, each rule will be converted into an Umbrella job, and
 the specified Umbrella specification and binary will be added into the input
 file list of a job.
 
-To test makeflow with umbrella using local execution engine: `makeflow
---umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella
-example.makeflow ` To test makeflow with umbrella using wq execution engine:
-`makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec
-convert_S.umbrella example.makeflow `
+To test makeflow with umbrella using local execution engine:
+
+```sh
+$ makeflow --umbrella-binary
+$ $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+```
+
+To test makeflow with umbrella using wq execution engine:
+
+```sh
+$ makeflow -T wq --umbrella-binary
+$ $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
+```
 
 To run each makeflow rule as an Umbrella job, the `--umbrella-spec` must be
 specified. However, the `--umbrella-binary` option is optional: when it is
@@ -652,11 +813,13 @@ You can also specify an Umbrella specification for a group of rule(s) in the
 Makefile by putting the following directives before the rule(s) you want to
 apply the Umbrella spec to:
 
-` .MAKEFLOW CATEGORY 1 .UMBRELLA SPEC convert_S.umbrella `
+```make
+.MAKEFLOW CATEGORY 1 .UMBRELLA SPEC convert_S.umbrella
+```
 
 In this case, the specified Umbrella spec will be applied to all the following
-rules until a new ".MAKEFLOW CATEGORY ..." directive is declared. All the
-rules before the first ".MAKEFLOW CATEGORY ..." directive will use the
+rules until a new `.MAKEFLOW CATEGORY ...` directive is declared. All the
+rules before the first `.MAKEFLOW CATEGORY ...` directive will use the
 Umbrella spec specified by the `--umbrella-spec` option. If the `--umbrella-
 spec` option is not specified, these rules will run without being wrapped by
 Umbrella.
@@ -681,12 +844,16 @@ to the wrapper command.
 For example, suppose that you wish to shell builtin command `time` to every
 rule in the workflow. Instead of modifying the workflow, run it like this:
 
-`makeflow --wrapper 'time -p' example.makeflow`
+```sh
+$ makeflow --wrapper 'time -p' example.makeflow
+```
 
 Since the preceding wrapper did not specify where to substitute the command,
 it is equivalent to
 
-`makeflow --wrapper 'time -p /bin/sh -c []' example.makeflow`
+```sh
+$ makeflow --wrapper 'time -p /bin/sh -c []' example.makeflow
+```
 
 This way, if a single rule specifies multiple commands, the wrapper will time
 _all_ of them.
@@ -695,34 +862,54 @@ The square brackets and the default behavior of running commands in a shell
 were added because Makeflow allows a rule to run multiple commands. The curly
 braces simply perform text substitution, so for example
 
-`makeflow --wrapper 'env -i {}' example.makeflow` does not work correctly if
-multiple commands are specified. `target_1: source_1 command_1; command_2;
-command_3` will be executed as `env -i command_1; command_2; command_3`
+```sh
+$ makeflow --wrapper 'env -i {}' example.makeflow
+```
 
-Notice that only `command_1`'s environment will be cleared; subsequent
-commands are not affected. Thus this wrapper should be given as
+does not work correctly if multiple commands are specified. For example:
 
-`makeflow --wrapper 'env -i /bin/sh -c []' example.makeflow` or more
-succinctly as `makeflow --wrapper 'env -i' example.makeflow`
+```make
+target_1: source_1
+    command_1; command_2; command_3
+```
+
+will be executed as `env -i command_1; command_2; command_3`, which it is
+likely not what you want.  Notice that only `command_1`'s environment will be
+cleared; subsequent commands are not affected. Thus this wrapper should be
+given as
+
+```sh
+$ makeflow --wrapper 'env -i /bin/sh -c []' example.makeflow
+```
+
+or more succinctly as 
+
+```sh
+$ makeflow --wrapper 'env -i' example.makeflow
+```
 
 Suppose you want to apply `strace` to every rule, to obtain system call
 traces. Since every rule would have to have its own output file for the trace,
 you could indicate output files like this:
 
-`makeflow --wrapper 'strace -o trace.%%' --wrapper-output 'trace.%%'
-example.makeflow`
+```sh
+$ makeflow --wrapper 'strace -o trace.%%' --wrapper-output 'trace.%%' example.makeflow
+```
 
 Suppose you want to wrap every command with a script that would set up an
 appropriate Java environment. You might write a script called `setupjava.sh`
 like this:
 
-`#!/bin/sh export JAVA_HOME=/opt/java-9.8.3.6.7 export
-PATH=${JAVA_HOME}/bin:$PATH echo "using java in $JAVA_HOME" exec "$@" `
+```sh
+#!/bin/sh export JAVA_HOME=/opt/java-9.8.3.6.7 export
+PATH=${JAVA_HOME}/bin:$PATH echo "using java in $JAVA_HOME" exec "$@"
+```
 
 And then invoke Makeflow like this:
 
-`makeflow --wrapper ./setupjava.sh --wrapper-input setupjava.sh
-example.makeflow`
+```sh
+$ makeflow --wrapper ./setupjava.sh --wrapper-input setupjava.sh example.makeflow
+```
 
 ## Advanced Features
 
@@ -742,7 +929,9 @@ transferred.
 For example, if you use NFS to access the `/home` and `/software` directories
 on your cluster, then invoke makeflow like this:
 
-`makeflow --shared-fs /home --shared-fs /software example.makeflow ... `
+```sh
+$ makeflow --shared-fs /home --shared-fs /software example.makeflow ...
+```
 
 ### NFS Consistency Delay
 
@@ -771,13 +960,19 @@ location.
 
 Here is an example of a mountfile:
 
-`curl /usr/bin/curl convert ../bin/convert data/file1 /home/bob/input1 1.root
-http://myresearch.org/1.root `
+```sh
+curl        /usr/bin/curl
+convert     ../bin/convert
+data/file1  /home/bob/input1
+1.root      http://myresearch.org/1.root
+```
 
 Then, simply execute Makeflow with the `--mounts` option to apply the desred
 mountfile:
 
-`makeflow --mounts my.mountfile example.makeflow ... `
+```sh
+$ makeflow --mounts my.mountfile example.makeflow ...
+```
 
 Before execution, Makeflow first parses each line of the mountfile when the
 `--mounts` option is set, and copies the specified dependency from the
@@ -789,7 +984,9 @@ and so on) of each dependencies specified in the mountfile into its log.
 To cleanup a makeflow together with the local cache and all the links created
 due to the mountfile:
 
-`makeflow -c example.makeflow`
+```sh
+$ makeflow -c example.makeflow
+```
 
 By default, makeflow creates a unique directory under the current working
 directory to hold all the dependencies introduced by the mountfile. This
@@ -798,7 +995,9 @@ location can be adjusted with the `--cache-dir` option.
 To only cleanup the local cache and all the links created due to the
 mountfile:
 
-`makeflow -ccache example.makeflow`
+```sh
+$ makeflow -ccache example.makeflow
+```
 
 To limit the behavoir of a makeflow inside the current working directory, the
 `target` field should satisfy the following requirements:
@@ -853,11 +1052,15 @@ system is below a given threshold.
 
 To activate reference count garbage collection:
 
-`makeflow -gref_cnt`
+```sh
+$ makeflow -gref_cnt
+```
 
 To activate on-demand garbage collection, with a threshold of 500MB:
 
-`makeflow -gon_demand -G500000000`
+```sh
+$ makeflow -gon_demand -G500000000
+```
 
 ### Visualization
 
@@ -866,23 +1069,29 @@ as its progress over time. `makeflow_viz` can be used to convert a Makeflow
 into a file that can be displayed by [Graphviz DOT](http://www.graphviz.org)
 tools like this:
 
-`makeflow_viz -D dot example.makeflow > example.dot dot -Tgif < example.dot >
-example.gif `
+```sh
+$ makeflow_viz -D dot example.makeflow > example.dot
+$ dot -Tgif < example.dot > example.gif
+```
 
 Or use a similar command to generate a [Cytoscape](http://www.cytoscape.org)
 input file. (This will also create a Cytoscape `style.xml` file.)
 
-`makeflow_viz -D cyto example.makeflow > example.xgmml`
+```sh
+$ makeflow_viz -D cyto example.makeflow > example.xgmml
+```
 
 To observe how a makeflow runs over time, use `makeflow_graph_log` to convert
 a log file into a timeline that shows the number of tasks ready, running, and
 complete over time:
 
-`makeflow_graph_log example.makeflowlog example.png`
+```sh
+$ makeflow_graph_log example.makeflowlog example.png
+```
 
 ### Archiving Jobs
 
-`Makeflow` allows for users to archive the results of each job within a
+**Makeflow** allows for users to archive the results of each job within a
 specified archive directory. This is done using the `--archive` option, which
 by default creates an archiving directory at `/tmp/makeflow.archive.$UID`.
 Both files and jobs are stored as the workflow executes. `Makeflow` will also
@@ -890,7 +1099,9 @@ check to see if a job has already been archived into the archiving directory,
 and if so the outputs of the job will be copied to the working directory and
 the job will skip execution.
 
-` makeflow --archive example.makeflow `
+```sh
+$ makeflow --archive example.makeflow
+```
 
 To only write to the archiving directory (and ensure that all nodes will be
 executed instead), pass `--archive-write`. To only read from the archive and
@@ -898,7 +1109,9 @@ use the outputs of any archived job, pass `--archive-read`. To specify a
 directory to use for the archiving directory, give an optional argument as
 shown below
 
-` makeflow --archive=/path/to/directory/ example.makeflow`
+```sh
+$ makeflow --archive=/path/to/directory/ example.makeflow
+```
 
 The archive also has an option to upload and download workflow contents from
 and Amazon Web Services S3 bucket. This is done using the `--archive-s3`
@@ -911,21 +1124,25 @@ archive tool uses locally with copying files to and from
 key id and secret key are stored within the credentials file that is provided
 when you configure AWS.
 
-` makeflow --archive-s3= Amazon S3 Bucket Name`
+```sh
+$ makeflow --archive-s3= Amazon S3 Bucket Name
+```
 
 If you do not want to check to see if files exist when uploading you can use
 the other option `--archive-s3-no-check`, which has the same default S3 bucket
 and options to change the bucket name.
 
-` makeflow --archive-s3-no-check= Amazon S3 Bucket Name`
+```sh
+$ makeflow --archive-s3-no-check= Amazon S3 Bucket Name
+```
 
 ### Linking Dependencies
 
-`Makeflow` provides a tool to collect all of the dependencies for a given
+**Makeflow** provides a tool to collect all of the dependencies for a given
 workflow into one directory. By collecting all of the input files and programs
 contained in a workflow it is possible to run the workflow on other machines.
 
-Currently, `Makeflow` copies all of the files specified as dependencies by the
+Currently, **Makeflow** copies all of the files specified as dependencies by the
 rules in the makeflow file, including scripts and data files. Some of the
 files not collected are dynamically linked libraries, executables not listed
 as dependencies (`python`, `perl`), and configuration files (`mail.rc`).
@@ -940,7 +1157,9 @@ are renamed when copied into the bundle:
 
 Example usage:
 
-`makeflow_analyze -b some_output_directory example.makeflow`
+```sh
+$ makeflow_analyze -b some_output_directory example.makeflow
+```
 
 ## Technical Reference
 
@@ -956,19 +1175,25 @@ requires and creates** , including any custom executables. This is because
 Makeflow requires all these information to construct the environment for a
 remote job. For example, suppose that you have written a simulation program
 called `mysim.exe` that reads `calib.data` and then produces and output file.
-The following rule won't work, because it doesn't inform Makeflow what files
+The following rule won't work, because it doesn't inform Makeflow what input files
 are neded to execute the simulation:
 
-`# This is an incorrect rule. output.txt: ./mysim.exe -c calib.data -o
-output.txt `
+```make
+# This is an incorrect rule:
+output.txt:
+    ./mysim.exe -c calib.data -o output.txt
+```
 
 However, the following is correct, because the rule states all of the files
-needed to run the simulation. Makeflow will use this information to construct
+needed to run the simulation. **Makeflow** will use this information to construct
 a batch job that consists of `mysim.exe` and `calib.data` and uses it to
 produce `output.txt`:
 
-`# This is a correct rule. output.txt: mysim.exe calib.data ./mysim.exe -c
-calib.data -o output.txt `
+```make
+# This is a correct rule.
+output.txt: mysim.exe calib.data
+    ./mysim.exe -c calib.data -o output.txt
+```
 
 Note that when a directory is specified as an input dependency, it means that
 the command relies on the directory and all of its contents. So, if you have a
@@ -977,9 +1202,9 @@ then simply give the name of that directory.
 
 #### No Phony Rules
 
-For a similar reason, you cannot have "phony" rules that don't actually create
+For a similar reason, you cannot have "phony" rules that do not actually create
 the specified files. For example, it is common practice to define a `clean`
-rule in Make that deletes all derived files. This doesn't make sense in
+rule in Make that deletes all derived files. This does not make sense in
 Makeflow, because such a rule does not actually create a file named `clean`.
 Instead use the `-c` option as shown above.
 
@@ -1009,10 +1234,18 @@ can be achieved by defining the variables after the rule's requirements, but
 before the rule's command, and prepending the name of the variable with `@`,
 as follows:
 
-`SOME_VARIABLE=original_value target_1: source_1 command_1 target_2: source_2
-@SOME_VARIABLE=local_value_for_2 command_2 target_3: source_3 command_3 ` In
-this example, SOME_VARIABLE has the value 'original_value' for rules 1 and 3,
-and the value 'local_value_for_2' for rule 2.
+```make
+SOME_VARIABLE=original_value
+target_1: source_1
+    command_1
+    
+target_2: source_2
+    SOME_VARIABLE=local_value_for_2
+    command_2 target_3: source_3 command_3
+```
+
+In this example, SOME_VARIABLE has the value `original_value` for rules 1 and
+3, and the value `local_value_for_2` for rule 2.
 
 #### Environment Variables
 
@@ -1021,8 +1254,11 @@ workflow. Makeflow will communicate explicitly named environment variables to
 remote batch systems, where they will override whatever local setting is
 present. For example, suppose you want to modify the PATH for every job in the
 makeflow: `export PATH=/opt/tools/bin:${PATH}` If no value is given, then the
-current value of the environment variable is passed along to the job: `export
-USER`
+current value of the environment variable is passed along to the job, as in:
+
+```make
+export USER
+```
 
 #### Remote File Renaming⇗
 
@@ -1034,13 +1270,18 @@ Queue, Condor, and Amazon batch system.
 For example, `local_name->remote_name` indicates that the file `local_name` is
 called `remote_name` in the remote system. Consider the following example:
 
-`b.out: a.in myprog LOCAL myprog a.in > b.out c.out->out: a.in->in1 b.out
-myprog->prog prog in1 b.out > out `
+```make
+b: a myprog
+    LOCAL myprog a > b
+    
+c->out: a->in1 b myprog->prog
+    prog in1 b > out
+```
 
 The first rule runs locally, using the executable `myprog` and the local file
-`a.in` to locally create `b.out`. The second rule runs remotely, but the
-remote system expects `a.in` to be named `in1`, `c.out`, to be named `out` and
-so on. Note that we did not need to rename the file `b.out`. Without remote
+`a` to locally create `b`. The second rule runs remotely, but the
+remote system expects `a` to be named `in1`, `c`, to be named `out` and
+so on. Note we did not need to rename the file `b`. Without remote
 file renaming, we would have to create either a symbolic link, or a copy of
 the files with the expected correct names.
 
@@ -1063,24 +1304,60 @@ and jobs in the same category have the same cores, memory, and disk
 requirements.
 
 Job categories and resources are specified with variables. Jobs are assigned
-to the category named in the value of the variable CATEGORY. Likewise, the
-values of the variables CORES, MEMORY (in MB), and DISK (in MB) describe the
-resources requirements for the category specified in CATEGORY.
+to the category named in the value of the variable `CATEGORY`. Likewise, the
+values of the variables `CORES`, `MEMORY` (in MB), and `DISK` (in MB) describe the
+resources requirements for the category specified in `CATEGORY`.
 
 Jobs without an explicit category are assigned to `default`. Jobs in the
 default category get their resource requirements from the value of the
-environment variables CORES, MEMORY, and DISK.
+environment variables `CORES`, `MEMORY`, and `DISK`.
 
-Consider the following example: ` # These tasks are assigned to the category
-preprocessing. # MEMORY and CORES are read from the environment, if defined.
-CATEGORY="preprocessing" DISK=500 one: src cmd two: src cmd # These tasks have
-the category "simulation". Note that now CORES, MEMORY, and DISK are
-specified. CATEGORY="simulation" CORES=1 MEMORY=400 DISK=400 three: src cmd
-four: src cmd # Another category switch. MEMORY is read from the environment.
-CATEGORY="analysis" CORES=4 DISK=600 five: src cmd ` `export MEMORY=800
-makeflow ... `
+Consider the following example:
 
-#### Resources Specified
+```make
+# These tasks are assigned to the category preprocessing.
+# MEMORY and CORES are read from the environment, if defined.
+
+CATEGORY="preprocessing"
+DISK=500
+
+one: src
+    cmd
+
+two: src
+    cmd
+    
+# These tasks have the category "simulation". Note that now CORES, MEMORY, and
+# DISK are specified.
+
+CATEGORY="simulation"
+CORES=1
+MEMORY=400
+DISK=400
+
+three: src
+    cmd
+
+four: src
+    cmd
+    
+# Another category switch. MEMORY is read from the environment.
+CATEGORY="analysis"
+CORES=4
+DISK=600
+
+five: src
+    cmd
+```
+
+Setting the `MEMORY` in the environment as
+
+```sh
+$ export MEMORY=800
+$ makeflow ...
+```
+
+we get the following resources assignments per category:
 
 Category| Cores| Memory (MB)| Disk (MB)  
 ---|---|---|---  
@@ -1088,6 +1365,7 @@ preprocessing  |  (unspecified)  |  800 (from environment)  |  500
 simulation  |  1  |  400  |  400  
 analysis  |  4  |  800 (from environment) |  600  
   
+
 ### Transaction Log
 
 As Makeflow runs, it creates a _transaction log_ that records the details of
@@ -1101,49 +1379,25 @@ The transaction log serves several purposes:
   2. **Cleanup.** The ` --clean` option relies on the transaction log to quickly determine exactly which files have been created and which jobs have been submitted, so that they can be quickly and precisely deleted and removed. (There is no need to create a `clean` rule by hand, as you would in traditional Make.) 
   3. **Monitoring.** Tools like ` makeflow_monitor` and `makeflow_graph_log` read the transaction log to determine the current state of the workflow and display it to the user. 
 
-A sample transaction log might look like this:
-
-`# STARTED 1435251570723463 # 1 capitol.jpg 1435251570725086 1435251570725528
-5 1 17377 5 1 0 0 0 6 # 2 capitol.jpg 1435251570876426 1435251570876486 5 2
-17377 5 0 1 0 0 6 # 1 capitol.360.jpg 1435251570876521 1435251570876866 4 1
-17379 4 1 1 0 0 6 # 1 capitol.270.jpg 1435251570876918 1435251570877166 3 1
-17380 3 2 1 0 0 6 # 2 capitol.270.jpg 1435251570984114 1435251570984161 3 2
-17380 3 1 2 0 0 6 # 1 capitol.180.jpg 1435251570984199 1435251570984533 2 1
-17383 2 2 2 0 0 6 # 2 capitol.360.jpg 1435251571003847 1435251571003923 4 2
-17379 2 1 3 0 0 6 # 1 capitol.90.jpg 1435251571003969 1435251571004476 1 1
-17384 1 2 3 0 0 6 # 2 capitol.180.jpg 1435251571058319 1435251571058369 2 2
-17383 1 1 4 0 0 6 # 2 capitol.90.jpg 1435251571094157 1435251571094214 1 2
-17384 1 0 5 0 0 6 # 1 capitol.anim.gif 1435251571094257 1435251571094590 0 1
-17387 0 1 5 0 0 6 # 2 capitol.anim.gif 1435251575980215 # 3 capitol.360.jpg
-1435251575980270 # 3 capitol.270.jpg 1435251575980288 # 3 capitol.180.jpg
-1435251575980303 # 3 capitol.90.jpg 1435251575980319 # 3 capitol.jpg
-1435251575980334 1435251575980350 0 2 17387 0 0 6 0 0 6 # COMPLETED
-1435251575980391 `
-
 Each line in the log file represents a single action taken on a single rule in
 the workflow. For simplicity, rules are numbered from the beginning of the
 Makeflow, starting with zero. Each line contains the following items:
 
-`timestamp task_id new_state job_id tasks_waiting tasks_running tasks_complete
-tasks_failed tasks_aborted task_id_counter`
-
-Which are defined as follows:
-
   * **timestamp** \- the unix time (in microseconds) when this line is written to the log file. 
-  * **task_id** \- the id of this n. 
-  * **new_state** \- a integer represents the new state this task (whose id is in the task_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
+  * **task id** \- the id of this n. 
+  * **new state** \- a integer represents the new state this task (whose id is in the task_id column) has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
     0. waiting 
     1. running 
     2. complete 
     3. failed 
     4. aborted 
-  * **job_id** \- the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
-  * **tasks_waiting** \- the number of tasks are waiting to be executed.
-  * **tasks_running** \- the number of tasks are being executed.
-  * **tasks_complete** \- the number of tasks has been completed.
-  * **tasks_failed** \- the number of tasks has failed.
-  * **tasks_aborted** \- the number of tasks has been aborted.
-  * **task_id_counter** \- total number of tasks in this Makeflow
+  * **job id** \- the underline execution system is a batch system, such as Condor or SGE, the job id would be the job id assigned by the batch system when the task was sent to the batch system for execution.
+  * **tasks waiting** \- the number of tasks are waiting to be executed.
+  * **tasks running** \- the number of tasks are being executed.
+  * **tasks complete** \- the number of tasks has been completed.
+  * **tasks failed** \- the number of tasks has failed.
+  * **tasks aborted** \- the number of tasks has been aborted.
+  * **task id_counter** \- total number of tasks in this Makeflow
 
 In addition, lines starting with a pound sign are comments and contain
 additional high-level information that can be safely ignored. The transaction
@@ -1155,18 +1409,57 @@ Aside from the high-level information, file states are also recorded in the
 log. This allows for tracking files throughout the workflow execution. This
 information is shown starting with the `#`:
 
-`# new_state filename timestamp`
+`# FILE timestamp filename state size`
+
 
 Each file state line records the state change and time:
 
-  * **new_state** \- the integer represents the new state this file has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
+  * **timestamp** \- the unix time (in microseconds) when this line is written to the log file. 
+  * **filename** \- the file name given in the rule specification of Makeflow.
+  * **state** \- the integer represents the new state this file has just entered. The value of the integer ranges from 0 to 4 and the states they are representing are:
     0. unknown 
     1. expect 
     2. exists 
     3. complete 
     4. delete 
-  * **filename** \- the file name given in the rule specification of Makeflow.
-  * **timestamp** \- the unix time (in microseconds) when this line is written to the log file. 
+  * **size** \- the file size in bytes, either on disk (states 2,3), or hinted (states 0,1).
+
+
+```sh
+# FILE 1559838621414397 example.makeflow.wqlog 1 0
+# FILE 1559838621415289 example.makeflow.wqlog.tr 1 0
+# STARTED 1559838621415323
+# FILE 1559838621416244 capitol.jpg 1 1073741824
+1559838621416490 5 1 30122 5 1 0 0 0 6
+# FILE 1559838621624487 capitol.jpg 2 51274
+1559838621624514 5 2 30122 5 0 1 0 0 6
+# FILE 1559838621624543 capitol.360.jpg 1 1073741824
+1559838621624608 4 1 1 4 1 1 0 0 6
+# FILE 1559838621624629 capitol.270.jpg 1 1073741824
+1559838621624660 3 1 2 3 2 1 0 0 6
+# FILE 1559838621624678 capitol.180.jpg 1 1073741824
+1559838621624709 2 1 3 2 3 1 0 0 6
+# FILE 1559838621624726 capitol.90.jpg 1 1073741824
+1559838621624759 1 1 4 1 4 1 0 0 6
+# FILE 1559838913507186 capitol.90.jpg 2 61932
+1559838913508280 1 2 4 1 3 2 0 0 6
+# FILE 1559838913520062 capitol.360.jpg 2 70522
+1559838913520082 4 2 1 1 2 3 0 0 6
+# FILE 1559838913530803 capitol.270.jpg 2 68097
+1559838913530814 3 2 2 1 1 4 0 0 6
+# FILE 1559838913541134 capitol.180.jpg 2 64756
+1559838913541145 2 2 3 1 0 5 0 0 6
+# FILE 1559838913541173 capitol.montage.gif 1 1073741824
+1559838913541257 0 1 5 0 1 5 0 0 6
+# FILE 1559838914959866 capitol.montage.gif 2 913771
+# FILE 1559838914959878 capitol.360.jpg 3 70522
+# FILE 1559838914959886 capitol.270.jpg 3 68097
+# FILE 1559838914959893 capitol.180.jpg 3 64756
+# FILE 1559838914959900 capitol.90.jpg 3 61932
+# FILE 1559838914959907 capitol.jpg 3 51274
+1559838914959916 0 2 5 0 0 6 0 0 6
+# COMPLETED 1559838914959929
+```
 
 
 ## Further Information
@@ -1174,4 +1467,6 @@ Each file state line records the state change and time:
 Makeflow is Copyright (C) 2017- The University of Notre Dame. This software is
 distributed under the GNU General Public License. See the file COPYING for
 details.
+
+Last modified: August 2019
 
