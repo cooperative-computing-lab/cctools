@@ -41,6 +41,8 @@
   distributed file system and as a platform for execution of scientific
   workflows with full data locality for all job dependencies.
 
+- [**Catalog Server**](catalog)
+
 
 ## Further Information
 

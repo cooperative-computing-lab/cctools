@@ -11,10 +11,11 @@ running. Catalog updates are sent via UDP, and the catalog server exposes a
 JSON interface to view status and make queries.
 
 By default, the cctools software makes use of the central catalog server (and
-backup) at Notre Dame:
+automatic backup) at Notre Dame:
 
-[catalog.cse.nd.edu:9097](http://catalog.cse.nd.edu:9097) |  [backup-
-catalog.cse.nd.edu:9097](http://backup-catalog.cse.nd.edu:9097)
+[catalog.cse.nd.edu:9097](http://catalog.cse.nd.edu:9097)
+
+[backup- catalog.cse.nd.edu:9097](http://backup-catalog.cse.nd.edu:9097)
 
 The default view for a catalog server is a human-readable HTML summary.
 Machine-readable data is also available as JSON, text, XML, or ClassAds. Many
@@ -24,7 +25,7 @@ space, cctools version, etc. Work Queue masters also advertise their projects
 through the catalog. When a worker starts, it can query the catalog to
 automatically discover a master to contact.
 
-## Specifying Catalog Servers⇗
+## Specifying Catalog Servers
 
 Many of the tools accept command line arguments or environment variables to
 specify the catalog server(s) to use. The catalog host is specified as a comma
@@ -33,11 +34,10 @@ If no port is specified, the value of the environment variable `CATALOG_PORT`
 is used, or the default of port 9097. If no catalog server is given on the
 command line, the `CATALOG_HOST` environment variable is used. If that is
 unset, the default of `catalog.cse.nd.edu,backup-catalog.cse.nd.edu` This
-could be written more verbosely as `catalog.cse.nd.edu:9097,backup-
-catalog.cse.nd.edu:9097` assuming the catalog port was not set in the
+could be written more verbosely as `catalog.cse.nd.edu:9097,backup-catalog.cse.nd.edu:9097` assuming the catalog port was not set in the
 environment.
 
-## Querying Catalog Servers⇗
+## Querying Catalog Servers
 
 There are several ways to query a catalog server. If you are querying
 specifically for Chirp servers or Work Queue applications, then use the
@@ -47,18 +47,24 @@ display fields specific for those uses.
 To view all kinds of records in raw JSON format, use the `catalog_query` tool.
 This can be used to simply dump all records in JSON format:
 
-`catalog_query`
+```sh
+catalog_query
+```
 
 Or, use the `--where` option to show only records matching an expression. (The
 expression must be quoted to protect it from the shell.)
 
 For example, to show all records of catalog servers:
 
-`catalog_query --where 'type=="catalog"'`
+```sh
+catalog_query --where 'type=="catalog"'
+```
 
 Or to show all chirp servers with more than 4 cpus:
 
-`catalog_query --where 'type=="chirp" && cpus > 4'`
+```sh
+catalog_query --where 'type=="chirp" && cpus > 4'
+```
 
 When any of these tools are configured with multiple servers, the program will
 try each in succession until receiving an answer. If no servers give valid
@@ -69,7 +75,7 @@ servers that were down will not be tried unless every other server is non-
 responsive. If in this scenario the previously down server answers the query,
 it will be marked as up again and used with normal priority in future queries.
 
-## Updating Catalog Servers⇗
+## Updating Catalog Servers
 
 When any program is sending catalog updates, it will examine the environment
 and/or configuration options to get a list of catalog servers in use. Updates
@@ -82,10 +88,20 @@ program to construct a custom message and send it to the catalog server. To do
 so, create a file containing a valid JSON object with the desired properties,
 and then run `catalog_update`. For example:
 
-`**cat > update.json << EOF** { "color" : "red", "active" : true, "size": 1200
-} EOF **catalog_update --catalog catalog.cse.nd.edu --file update.json** `
+```json
+cat > update.json << EOF
+{
+    "color" : "red",
+    "active" : true,
+    "size": 1200
+}
+EOF
+```
+```sh
+catalog_update --catalog catalog.cse.nd.edu --file update.json
+```
 
-The ` catalog_update` will insert into the object some additional basic
+The `catalog_update` will insert into the object some additional basic
 information about the node, such as the operating system, load average, and so
 forth. When the update is received at the catalog server the name, address,
 and port of the sender will be automatically overwritten, so it is not
@@ -101,22 +117,25 @@ environment variable **CATALOG_COMPRESS_UPDATES** to **on**.
 
 Examples  
 CSH:  
-`**setenv CATALOG_COMPRESS_UPDATES on**`
+```csh
+setenv CATALOG_COMPRESS_UPDATES on
+```
 
 Bash:  
-`**export CATALOG_COMPRESS_UPDATES=on**`
+```sh
+export CATALOG_COMPRESS_UPDATES=on
+```
 
 By default, catalog updates are sent via the UDP protocol, which is fast and
 efficient for small ( <1KB) messages. If you have large messages or unusual
 networking conditions, you can alternatively send catalog updates via TCP
 instead. To do this, set the following environment variable:
+    
+```sh
+CATALOG_UPDATE_PROTOCOL=tcp
+```
 
-    
-    
-    CATALOG_UPDATE_PROTOCOL=tcp
-    
-
-## Running a Catalog Server⇗
+## Running a Catalog Server
 
 You may want to establish your own catalog server. This can be useful for
 keeping your systems logically distinct from the main storage pool, but can
@@ -129,13 +148,21 @@ published via HTTP on port 9097 of the catalog machine.
 For example, suppose that you wish to run a catalog server on a machine named
 `dopey` and a Chirp server on a machine named `sneezy`:
 
-`dopey$ catalog_server ... sneezy$ chirp_server -u dopey [more options] `
+```sh
+dopey$ catalog_server ...
+
+sneezy$ chirp_server -u dopey [more options]
+```
 
 Finally, point your web browser to: `http://dopey:9097`
 
 Or, set an environment variable and use Parrot:
 
-`$ setenv CATALOG_HOST dopey $ parrot_run tcsh $ ls /chirp `
+```bash
+$ export CATALOG_HOST=dopey
+$ parrot_run bash
+$ ls /chirp
+```
 
 And you will see [something like this.](http://catalog.cse.nd.edu:9097) You
 may easily run multiple catalogs for either scalability or fault tolerance.
@@ -146,3 +173,5 @@ commas, e.g. `$ chirp_server -u 'dopey,happy:9000,grumpy'`
 continuously and are automatically restarted after an upgrade, consider using
 [Watchdog](watchdog.html).)
 
+
+__Last Modified: August 2019__
