@@ -213,7 +213,7 @@ $ makeflow_graph_log example.makeflow.makeflowlog example.png
 
   - `makeflow_viz` will display the workflow in graphical form, so that you can
     more easily understand the structure and dependencies. Read more about
-    [Visualization](index.md#Visualization).
+    [Visualization](#visualization).
 
 In addition, if you give the workflow a "project name" with the `-N` option,
 it will report its status to the [catalog server](catalog.html) once per
