@@ -26,7 +26,7 @@
   file, or it can be used as a library to track the execution of [Python
   functions](python api).
 
-- [**Parrot User**](parrot) is a transparent user-level virtual filesystem that
+- [**Parrot**](parrot) is a transparent user-level virtual filesystem that
   allows any ordinary program to be attached to many different remote storage
   systems, including HDFS, iRODS, Chirp, and FTP. 
 

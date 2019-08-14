@@ -1,0 +1,40 @@
+#! /usr/bin/env python
+
+# locate_file script
+# Prints the absolute path of the file corresponding to its argument.
+
+import sys
+import random
+
+
+sites = {
+    'CA': '/anonftp/mirror.csclub.uwaterloo.ca/gnu',
+    'EU': '/anonftp/ftp.mirror.nl/pub/mirror/gnu',
+    'default': '/anonftp/ftp.gnu.org'
+}
+
+def where_am_i():
+    # figure out the site closest to our geographical location
+    # ... ... ...
+    # (mock with random choice)
+    location = random.choice(sites.keys())
+
+    return location
+
+if __name__ == '__main__':
+    try:
+        filename = ''
+
+        if len(sys.argv) > 1:
+            filename = sys.argv[1]
+        
+        location = where_am_i()
+        location = 'default'
+        site     = sites[location]
+
+        print('{}/{}'.format(site, filename))
+
+    except Exception as e:
+        raise e
+        print('')
+
