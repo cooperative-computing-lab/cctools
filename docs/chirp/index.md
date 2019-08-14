@@ -1,20 +1,7 @@
 # Chirp User's Manual
 
-* [The Chirp Protocol](chirp_protocol.html)
 
-**Last edited: January 2014**
-
-Chirp is Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The
-University of Notre Dame.  
-All rights reserved.  
-This software is distributed under the GNU General Public License.  
-See the file COPYING for details.
-
-**Please use the following citation for Chirp in a scientific publication:**
-
-  * Douglas Thain, Christopher Moretti, and Jeffrey Hemmes, [Chirp: A Practical Global Filesystem for Cluster and Grid Computing](http://www.cse.nd.edu/~dthain/papers/chirp-jgc.pdf), _Journal of Grid Computing_ , Springer, 2008. DOI: 10.1007/s10723-008-9100-5. (The original is available on <http://www.springerlink.com>.)
-
-## Overview⇗
+## Overview
 
 Chirp is a system for performing input and output across the Internet. Using
 Chirp, an ordinary user can share storage space and data with friends and
@@ -36,25 +23,46 @@ space allocation, and more. However, each of these features must be explicitly
 enabled, so you don't have to worry about them if all you want is simple
 storage access. Read on below for more details.
 
-Begin by [installing the
-cctools](http://ccl.cse.nd.edu/software/manuals/install.html) on your system.
+## Getting Started
+
+Begin by [installing the cctools](http://ccl.cse.nd.edu/software/manuals/install.html) on your system.
 When you are ready, proceed below.
 
-## Running a Chirp Server⇗
+### Running a Chirp Server
 
 Running a Chirp server is easy. You may run a Chirp server as any ordinary
 user, and you do **not** need to install the software or even run the programs
 as root. To run a Chirp server, you must do three things: pick a storage
 directory, run the server, and then adjust the access control.
 
-  1. **Pick a storage directory.** The Chirp server will only allow access to the directory that you choose. It could be a scratch directory, your home directory, or even your filesystem root. For now, let's store everything in a temporary directory: `/tmp/mydata`
-  2. **Run the server.** Simply run ` chirp_server` and direct it to your storage directory: `$ chirp_server -r /tmp/mydata &`
-  3. **Adjust the access control.** When first started, the Chirp server will allow access only to YOU from the same host. You will probably want to change this to allow access to other people and hosts. To adjust the access control, use the ` chirp` tool and the `setacl` command to set the access control list. For example, to also allow other hosts in your domain to read and write the server: `$ chirp localhost chirp:localhost:/> setacl . hostname:*.mydomain.edu write`
+- **Pick a storage directory.** The Chirp server will only allow access to the
+  directory that you choose. It could be a scratch directory, your home
+  directory, or even your filesystem root. For now, let's store everything in a
+  temporary directory: `/tmp/mydata`
+
+- **Run the server.** Run `chirp_server` and direct it to your storage directory:
+
+```sh
+$ chirp_server -r /tmp/mydata &
+```
+
+- *Adjust the access control.** When first started, the Chirp server will allow
+  access only to YOU from the same host. You will probably want to change this
+  to allow access to other people and hosts. To adjust the access control, use
+  the ` chirp` tool and the `setacl` command to set the access control list.
+  For example, to also allow other hosts in your domain to read and write the
+  server:
+  
+```sh
+$ chirp localhost
+chirp:localhost:/>
+chirp:localhost:/> setacl . hostname:*.mydomain.edu write
+```
 
 Now that you have a server running on one machine, let's use some tools to
 move data to and from your server.
 
-## Accessing Chirp Servers⇗
+## Accessing Chirp Servers
 
 The easiest way to access Chirp servers is by using a tool called
 **[Parrot](http://ccl.cse.nd.edu/software/parrot)**. Parrot is a personal
@@ -62,16 +70,25 @@ virtual filesystem: it "speaks" remote I/O operations on behalf of ordinary
 programs. For example, you can use Parrot with your regular shell to list and
 access Chirp servers like so:
 
-` $ parrot_run tcsh $ cd /chirp $ ls angband.somewhere.edu:9094
-dustpuppy.somewhere.edu:9094 peanuts.somewhere.edu:9094 ... $ cd
-/chirp/peanuts.somewhere.edu $ cp /tmp/bigfile . $ ls -la total 804 drwx------
-2 fred users 4096 Sep 10 12:40 . drwx------ 2 fred users 4096 Sep 10 12:40 ..
--rw-r--r-- 1 fred users 104857600 Sep 10 12:57 bigfile -rw-r--r-- 1 fred users
-147 Sep 10 12:39 hosts $ parrot_getacl unix:fred rwlda hostname:hedwig rl ...
-`
+```sh
+$ parrot_run bash
+$ cd /chirp
+$ ls angband.somewhere.edu:9094 dustpuppy.somewhere.edu:9094 peanuts.somewhere.edu:9094 ...
+$ cd /chirp/peanuts.somewhere.edu
+$ cp /tmp/bigfile .
+$ ls -la
 
-(If you are having difficulting accessing your server, have a look at
-"debugging hints" below.)
+total 804
+drwx------ 2 fred users 4096      Sep 10 12:40 .
+drwx------ 2 fred users 4096      Sep 10 12:40 ..
+-rw-r--r-- 1 fred users 104857600 Sep 10 12:57 bigfile
+-rw-r--r-- 1 fred users 147       Sep 10 12:39 hosts
+
+$ parrot_getacl unix:fred rwlda hostname:hedwig rl ...
+```
+
+If you are having difficulting accessing your server, have a look at
+[debugging hints](#debugging-advice) below.
 
 Parrot is certainly the most convenient way to access storage, but it has some
 limitations: it only works on Linux, and it imposes some performance penalty.
@@ -79,46 +96,61 @@ limitations: it only works on Linux, and it imposes some performance penalty.
 You can also attach to Chirp filesystems by using the FUSE package to attach
 Chirp as a kernel filesystem module. Unlike Parrot, this requires superuser
 privileges to install the FUSE package, but will likely work more reliably on
-a larger number of programs. You can do this with either [Linux
-FUSE](http://fuse.sourceforge.net) or
+a larger number of programs. You can do this with either [Linux FUSE](http://fuse.sourceforge.net) or
 [MacFuse](http://code.google.com/p/macfuse). Once you have downloaded and
 installed FUSE, simply run `chirp_fuse` with the name of a directory on which
 the filesystem should be mounted. For example:
 
-`$ mkdir /tmp/chirp $ chirp_fuse /tmp/chirp $ cd /tmp/chirp $ ls -la total
-9742 dr-xr-xr-x 0 fred users 6697 Feb 22 13:54 albus.cse.nd.edu:9094 dr-xr-
-xr-x 0 fred users 6780 Feb 22 13:54 aluminum.helios.nd.edu:9094 dr-xr-xr-x 0
-fred users 27956 Feb 22 13:54 angband.cse.nd.edu:9094 dr-xr-xr-x 0 fred users
-6466 Feb 22 13:54 angelico.helios.nd.edu:9094 ... `
+```sh
+$ mkdir /tmp/chirp
+$ chirp_fuse /tmp/chirp
+$ cd /tmp/chirp
+$ ls -la
+total 9742
+dr-xr-xr-x 0 fred users 6697  Feb 22 13:54 albus.cse.nd.edu:9094
+dr-xr-xr-x 0 fred users 6780  Feb 22 13:54 aluminum.helios.nd.edu:9094
+dr-xr-xr-x 0 fred users 27956 Feb 22 13:54 angband.cse.nd.edu:9094
+dr-xr-xr-x 0 fred users 6466  Feb 22 13:54 angelico.helios.nd.edu:9094
+```
 
 For more portable, explicit control of a Chirp server, use the Chirp command
 line tool. This allows you to connect to a server, copy files, and manage
 directories, much like an FTP client:
 
-`$ chirp ... chirp::> open myhost.somewhere.edu chirp:myhost.somewhere.edu:/>
-put /tmp/bigfile file /tmp/bigfile -> /bigfile (11.01 MB/s)
-chirp:myhost.somewhere.edu:/> ls -la dir 4096 . Fri Sep 10 12:40:27 2004 dir
-4096 .. Fri Sep 10 12:40:27 2004 file 147 hosts Fri Sep 10 12:39:54 2004 file
-104857600 bigfile Fri Sep 10 12:53:21 2004 chirp:myhost.somewhere.edu:/> `
+```sh
+$ chirp
+chirp::> open myhost.somewhere.edu
+chirp:myhost.somewhere.edu:/> put /tmp/bigfile file
+/tmp/bigfile -> /bigfile (11.01 MB/s)
+chirp:myhost.somewhere.edu:/> ls -la
+dir  4096      .       Fri Sep 10 12:40:27 2018
+dir  4096      ..      Fri Sep 10 12:40:27 2018
+file 147       hosts   Fri Sep 10 12:39:54 2018
+file 104857600 bigfile Fri Sep 10 12:53:21 2018
+chirp:myhost.somewhere.edu:/>
+```
 
 In scripts, you may find it easier to use the standalone commands `chirp_get`
 and `chirp_put`, which move single files to and from a Chirp server. These
 commands also allow for streaming data, which can be helpful in a shell
-pipeline. Also, the -f option to both commands allows you to follow a file,
+pipeline. Also, the `-f` option to both commands allows you to follow a file,
 much like the Unix `tail` command:
 
-`$ tar cvzf archive.tar.gz ~/mydata $ chirp_put archive.tar.gz
-myhost.somewhere.edu archive.tar.gz $ ... $ chirp_get myhost.somewhere.edu
-archive.tar.gz - | tar xvzf $ ... $ chirp_get -f myhost.somewhere.edu logfile
-- |& less $  `
+```sh
+$ tar cvzf archive.tar.gz ~/mydata
+$ chirp_put archive.tar.gz myhost.somewhere.edu archive.tar.gz
+
+$ chirp_get myhost.somewhere.edu archive.tar.gz - | tar xv
+
+$ chirp_get -f myhost.somewhere.edu logfile - |& less
+```
 
 You can also write programs that access the Chirp C interface directly. This
 interface is relatively self explanatory: programs written to use this library
 may perform explicit I/O operations in a manner very similar to Unix. For more
-information, see the [HOWTO: Write Code that Uses
-Chirp](http://ccl.cse.nd.edu/software/howto/code.shtml)
+information, see the [HOWTO: Write Code that Uses Chirp](http://ccl.cse.nd.edu/software/howto/code.shtml)
 
-## Finding Chirp Servers⇗
+## Finding Chirp Servers
 
 Now that you know how to run and use Chirp servers, you will need a way to
 keep track of all of the servers that are available for use. For this purpose,
@@ -131,37 +163,40 @@ itself known to the storage catalog every five minutes. The catalog server
 records and reports all Chirp servers that it knows about, but will discard
 servers that have not reported for fifteen minutes.
 
-If you **do not** want your servers to report to a catalog, then run them with
-this option:
+If you **do not** want your servers to report to a catalog, then run them
+setting the option `-u` to `-`:
 
-` $ chirp_server -u -`
+```sh
+$ chirp_server -u -
+```
 
 Alternatively, you may establish your own catalog server. See [Catalog
 Servers](catalog.html) for details.
 
-## Security⇗
+## Security
 
-Now that you have an idea how Chirp can be used, let's discuss security in
-more detail. Different sites require different levels of security and
+Different sites require different levels of security and
 different technological methods of enforcing security. For these reasons,
 Chirp has a very flexible security system that allows for a range of tools and
 policies from simple address checks to Kerberos authentiation.
 
 Security really has two aspects: authentication and authorization.
-Authentication deals with the question "Who are you?" Once your identity has
-been established, then authorization deals with the question "What are you
-allowed to do?" Let's deal with each in turn.
+Authentication deals with the question __Who are you?__ Once your identity has
+been established, then authorization deals with the question __What are you
+allowed to do?__:
 
-### Authentication⇗
+### Authentication
 
 Chirp supports the following authentication schemes:
 
-**Type**|  **Summary**|  **Regular User?**|  **Root?** | | |  (non-root)|
-(root) | kerberos |  Centralized private key system|  no |  yes (host cert) |
+|**Type**|  **Summary**| **Regular User?**|  **Root?** |
+|----|----|----|----|
+| | | (non-root)| (root) |
+| kerberos |  Centralized private key system|  no |  yes (host cert) |
 globus |  Distributed public key system|  yes (user cert) |  yes (host cert) |
-unix |  Authenticate with local unix user ids. |  yes |  yes | hostname |
-Reverse DNS lookup |  yes |  yes | address |  Identify by IP address |  yes |
-yes
+unix |  Authenticate with local unix user ids. |  yes |  yes |
+| hostname | Reverse DNS lookup |  yes |  yes |
+| address |  Identify by IP address |  yes | yes |
 
 The Chirp tools will attempt all of the authentication types that are known
 and available in the order above until one works. For example, if you have
@@ -192,7 +227,7 @@ Take note that Chirp considers all of the subjects as different identities,
 although some of them might correspond to the same person in varying
 circumstances.
 
-### Authorization⇗
+### Authorization
 
 Once Chirp has authenticated your identity, you are logged into a server.
 However, when you attempt to read or manipulate files on a server, Chirp
@@ -203,77 +238,94 @@ Every directory in a Chirp server has an ACL, much like filesystems such as as
 AFS or NTFS. To see the ACL for a directory, use the Chirp tool and the `
 getacl` command:
 
-`chirp:host.mydomain.edu:/> getacl unix:dthain rwlda hostname:*.mydomain.edu
-rwl `
+```sh
+chirp:host.mydomain.edu:/> getacl
+unix:dthain rwlda hostname:*.mydomain.edu rwl
+```
 
 Or, if you are using Parrot, you can use `parrot_getacl` to examine ACLs in
 the same way:
 
-`$ parrot_run tcsh $ cd /chirp/host.mydomain.edu $ parrot_getacl unix:dthain
-rwlda hostname:*.mydomain.edu rwl `
+```sh
+$ parrot_run bash
+$ cd /chirp/host.mydomain.edu
+$ parrot_getacl
+unix:dthain rwlda hostname:*.mydomain.edu rwl
+```
 
 This ACL indicates that the subject `unix:dthain` has five access rights,
 while the subject pattern `hostname:*.mydomain.edu` has only three access
 rights. The access rights are as follows:
 
-| **r** |  \- The subject may read items in the directory. | **w** |  \- The
-subject may write items in the directory. | **l** |  \- The subject may list
-the directory contents. | **d** |  \- The subject may delete items in the
-directory. | **p** |  \- The subject may put new files into the directory. |
-**a** |  \- The subject may administer the directory, including changing the
-ACL. | **x** |  \- The subject may execute programs in the directory. | **v**
-|  \- The subject may reserve a directory.
+| | |
+|---|---|
+| **r** | The subject may read items in the directory. |
+| **w** | The subject may write items in the directory. |
+| **l** | The subject may list the directory contents. |
+| **d** | The subject may delete items in the directory. |
+| **p** | The subject may put new files into the directory. |
+| **a** | The subject may administer the directory, including changing the ACL. |
+| **x** | The subject may execute programs in the directory. |
+| **v** | The subject may reserve a directory. |
 
 Access rights often come in combinations, so there are a few aliases for your
 convenience:
 
-| **read** |  \- alias for **rl**  
-| **write** |  \- alias for **rwld**  
-| **admin** |  \- alias for **rwlda**  
-| **none** |  \- delete the entry  
+| | |
+|---|---|
+| **read** |  alias for **rl**  
+| **write** | alias for **rwld**  
+| **admin** | alias for **rwlda**  
+| **none** |  delete the entry  
 
 To change an access control list on a directory, use the `setacl` command in
 the Chirp command line tool:
 
-`chirp:host.mydomain.edu:/> setacl / kerberos:dthain@nd.edu write
-chirp:host.mydomain.edu:/> getacl unix:dthain rwlda hostname:*.mydomain.edu
-rwl kerberos:dthain@nd.edu rwld `
+```sh
+chirp:host.mydomain.edu:/> setacl / kerberos:dthain@nd.edu write
+chirp:host.mydomain.edu:/> getacl
+unix:dthain rwlda hostname:*.mydomain.edu rwl kerberos:dthain@nd.edu rwld
+```
 
 Note that for subject names that contain spaces, you should simply substitute
-underscores. For example, if your subject name is `/O=Univ of
-Somewhere/CN=Fred Flint`, then you might issue a `setacl` command like this:
+underscores. For example, if your subject name is `/O=Univ of Somewhere/CN=Fred Flint`, then you might issue a `setacl` command like this:
 
-`chirp:host.mydomain.edu:/> setacl / /O=Univ_of_Somewhere/CN=Fred_Flint rwlda`
+```sh
+chirp:host.mydomain.edu:/> setacl / /O=Univ_of_Somewhere/CN=Fred_Flint rwlda
+```
 
 Or, you can accomplish the same thing using `parrot_setacl` inside of Parrot:
 
-`$ parrot_run tcsh $ cd /chirp/host.mydomain.edu $ parrot_setacl .
-/O=Univ_of_Somewhere/CN=Fred_Flint rwlda `
+```sh
+$ parrot_run bash
+$ cd /chirp/host.mydomain.edu $ parrot_setacl . /O=Univ_of_Somewhere/CN=Fred_Flint rwlda
+```
 
 The meaning of ACLs is fairly obvious, but there are few subtleties you should
 know:
 
-**Rights are generally inherited.** When a new directory is created, it
-automatically gets the ACL of its parent. Exception: read about the
-**reserve** right below.
+- **Rights are generally inherited.** When a new directory is created, it
+  automatically gets the ACL of its parent. Exception: read about the
+  **reserve** right below.
 
-**Rights are generally not hierarchical.** In order to access a directory, you
-only need the appropriate permissions on _that_ directory. For example, if you
-have permission to write to ` /data/x/y/z`, you do **not** need any other
-permissions on ` /data`, `/data/x` and so forth. Of course, it may be
-difficult to discover a deep directory without rights on the parents, but you
-can still access it.
+- **Rights are generally not hierarchical.** In order to access a directory,
+  you only need the appropriate permissions on _that_ directory. For example,
+  if you have permission to write to ` /data/x/y/z`, you do **not** need any
+      other permissions on ` /data`, `/data/x` and so forth. Of course, it may
+      be difficult to discover a deep directory without rights on the parents,
+      but you can still access it.
 
-**The delete right is absolute.** If you have permission to delete a
-directory, then you are able to delete the _entire_ subtree that it contains,
-regardless of any other ACLs underneath.
+- **The delete right is absolute.** If you have permission to delete a
+  directory, then you are able to delete the _entire_ subtree that it contains,
+  regardless of any other ACLs underneath.
 
-Note that it is possible to use Chirp to export an existing directory tree
-without manually populating every directory with ACLs. Simply create an ACL in
-an external file, and then use the -A option to tell the Chirp server to use
-that file as the default ACL.
+!!! note
+    It is possible to use Chirp to export an existing directory tree without
+    manually populating every directory with ACLs. Simply create an ACL in an
+    external file, and then use the -A option to tell the Chirp server to use
+    that file as the default ACL.
 
-### Reservation⇗
+### Reservation
 
 The **v - reserve** right is an important concept that deserves its own
 discussion.
@@ -301,8 +353,11 @@ storage, but doesn't want them messing up his existing data. So, Fred uses the
 Chirp tool to give the list ( **l** ) and reserve ( **v** ) rights to anyone
 calling from any machine in his organization:
 
-`chirp:bigwig:/> setacl / hostname:*.somewhere.edu lv(rwlda) chirp:bigwig:/>
-getacl / unix:fred rwlda hostname:*.somewhere.edu lv(rwlda) `
+```sh
+chirp:bigwig:/> setacl / hostname:*.somewhere.edu lv(rwlda)
+chirp:bigwig:/> getacl /
+unix:fred rwlda hostname:*.somewhere.edu lv(rwlda)
+```
 
 Now, any user calling from anywhere in `somewhere.edu` can access this server.
 But, all that any user can do is issue `ls` or `mkdir` in the root directory.
@@ -310,30 +365,39 @@ For example, suppose that Betty logs into this server from
 `ws1.somewhere.edu`. She can not modify the root directory, but she can create
 her own directory:
 
-`chirp:bigwig:/> mkdir /mydata`
+```sh
+chirp:bigwig:/> mkdir /mydata
+```
 
 And, in the new directory, `ws1.somewhere.edu` can do anything, including edit
 the access control. Here is the new ACL for `/mydata`:
 
-`chirp:bigwig:/> getacl /mydata hostname:ws1.somewhere.edu rwlda `
+```sh
+chirp:bigwig:/> getacl /mydata
+hostname:ws1.somewhere.edu rwlda
+```
 
 If Betty wants to authenticate with Globus credentials from here on, she can
 change the access control as follows:
 
-`chirp:bigwig:/> setacl /mydata globus:/O=Univ_of_Somewhere/CN=Betty rwla`
+```sh
+chirp:bigwig:/> setacl /mydata globus:/O=Univ_of_Somewhere/CN=Betty rwla
+```
 
 And, the new acl will look as follows:
 
-`chirp:bigwig:/> getacl /mydata hostname:ws1.somewhere.edu rwlda
-globus:/O=Univ_of_Somewhere/CN=Betty rwla `
+```sh
+chirp:bigwig:/> getacl /mydata
+hostname:ws1.somewhere.edu rwlda globus:/O=Univ_of_Somewhere/CN=Betty rwla
+```
 
-### Simple Group Management⇗
+### Simple Group Management
 
 Chirp currently supports a simple group management system based on files.
 Create a directory on your local filesystem in which to store the groups. Each
 file in the directory will have the name of the desired groups, and contain a
 list of the members of the group in plain text format. Then, give your Chirp
-server the -G argument to indicate the URL of the group directory. Once the
+server the `-G` argument to indicate the URL of the group directory. Once the
 groups are defined, you can refer to them in access control lists using the
 `group:` prefix.
 
@@ -341,58 +405,63 @@ For example, suppose you wish to have two groups named `group:students` and
 `group:faculty`. You could define the groups in the `/data/groups` directory
 as follows:
 
-`/data/groups/students: unix:astudent unix:bstudent /data/groups/faculty:
-unix:aprof unix:bprof `
+```sh
+/data/groups/students: unix:astudent unix:bstudent
+/data/groups/faculty: unix:aprof unix:bprof
+```
 
 Then, run the chirp server with the option `-G file:///data/groups`. (Notice
 the URL syntax.) Then, to make a directory `/homework` that is readable by
 students and writable by faculty, do this:
 
-`chirp:bigwig:/> mkdir /homework chirp:bigwig:/> setacl /homework
-group:students rl chirp:bigwig:/> setacl /homework group:faculty rwld `
+```sh
+chirp:bigwig:/> mkdir /homework
+chirp:bigwig:/> setacl /homework group:students rl
+chirp:bigwig:/> setacl /homework group:faculty rwld
+```
 
 If the groups are to be shared among many Chirp servers, place the group
 directory on a web server and refer to it via an `http` URL.
 
-### Notes on Authentication⇗
+### Notes on Authentication
 
 Each of the authentication types has a few things you should know:
 
-**Kerberos:** The server will attempt to use the Kerberos identity of the host
-it is run on. (i.e. host/coral.cs.wisc.edu@CS.WISC.EDU) Thus, it must be run
-as the superuser in order to access its certificates. Once authentication is
-complete, there is no need for the server to keep its root access, so it will
-change to any unprivileged user that you like. Use the ` -i` option to select
-the userid.
+- **Kerberos:** The server will attempt to use the Kerberos identity of the
+  host it is run on. (i.e. host/coral.cs.wisc.edu@CS.WISC.EDU) Thus, it must be
+  run as the superuser in order to access its certificates. Once authentication
+  is complete, there is no need for the server to keep its root access, so it
+  will change to any unprivileged user that you like. Use the ` -i` option to
+  select the userid.
 
-**Globus:** The server and client will attempt to perform client
-authentication using the Grid Security Infrastructure (GSI)> Both sides will
-load either user or host credentials, depending on what is available. If the
-server is running as an ordinary user, then you must give a it a proxy
-certificate with grid-proxy-init. Or, the server can be run as root and will
-use host certificates in the usual place.
+- **Globus:** The server and client will attempt to perform client
+  authentication using the Grid Security Infrastructure (GSI)> Both sides will
+  load either user or host credentials, depending on what is available. If the
+  server is running as an ordinary user, then you must give a it a proxy
+  certificate with grid-proxy-init. Or, the server can be run as root and will
+  use host certificates in the usual place.
 
-**Unix:** This method makes use of a challenge-response in the local Unix
-filesystem to determine the client's Unix identity. It assumes that both
-machines share the same conception of the user database and have a common
-directory which they can read and write. By default, the server will pick a
-filename in /tmp, and challenge the client to create that file. If it can,
-then the server will examine the owner of the file to determine the client's
-username. Naturally, /tmp will only be available to clients on the same
-machine. However, if a shared filesystem directory is available, give that to
-the chirp server via the -c option. Then, any authorized client of the
-filesystem can authenticate to the server. For example, at Notre Dame, we use
-**-c /afs/nd.edu/user37/ccl/software/rendezvous** to authenticate via our AFS
-distributed file system.
+- **Unix:** This method makes use of a challenge-response in the local Unix
+  filesystem to determine the client's Unix identity. It assumes that both
+  machines share the same conception of the user database and have a common
+  directory which they can read and write. By default, the server will pick a
+  filename in /tmp, and challenge the client to create that file. If it can,
+  then the server will examine the owner of the file to determine the client's
+  username. Naturally, /tmp will only be available to clients on the same
+  machine. However, if a shared filesystem directory is available, give that to
+  the chirp server via the -c option. Then, any authorized client of the
+  filesystem can authenticate to the server. For example, at Notre Dame, we use
+  **-c /afs/nd.edu/user37/ccl/software/rendezvous** to authenticate via our AFS
+  distributed file system.
 
-**Hostname:** The server will rely on a reverse DNS lookup to establish the
-fully-qualified hostname of the calling client. The second field gives the
-hostname to be accepted. It may contain an asterisk as a wildcard. The third
-field is ignored. The fourth field is then used to select an appropriate local
-username.
+- **Hostname:** The server will rely on a reverse DNS lookup to establish the
+  fully-qualified hostname of the calling client. The second field gives the
+  hostname to be accepted. It may contain an asterisk as a wildcard. The third
+  field is ignored. The fourth field is then used to select an appropriate
+  local username.
 
-**Address:** Like "hostname" authentication, except the server simply looks at
-the client's IP address.
+- **Address:** Like "hostname" authentication, except the server simply looks
+  at the client's IP address.
 
 By default, Chirp and/or Parrot will attempt every authentication type knows
 until one succeeds. If you wish to restrict or re-order the authentication
@@ -400,9 +469,13 @@ types used, give one or more **-a** options to the client, naming the
 authentication types to be used, in order. For example, to attempt only
 hostname and kerberos authentication, in that order:
 
-` $ chirp -a hostname -a kerberos`
+```sh
+$ chirp -a hostname -a kerberos
+```
 
-## Advanced Topic: Cluster Management⇗
+## Advanced Topics
+
+### Cluster Management
 
 Several tools are available for managing a large cluster of Chirp servers.
 
@@ -423,13 +496,16 @@ and **A** rights on any directory on that server.
 When managing a large system with many users, it is important to keep track of
 what users are employing the cluster, and how much space they have consumed.
 We refer to this as **auditing** the cluster. To audit a single node, use the
-` audit` command of the Chirp tool. This produces a listing of all users of a
+`audit` command of the Chirp tool. This produces a listing of all users of a
 single host. (You must have the `A` right in the root directory of the server
 to run this command.) For example:
 
-`$ chirp ccl01.cse.nd.edu audit FILES DIRS DATA OWNER 82842 27 5.0 GB
-globus:/O=UnivNowhere/CN=Fred 6153 607 503.4 MB unix:fred 2 2 200.3 MB
-hostname:laptop.nowhere.edu 12 2 3.9 MB unix:betty `
+```sh
+$ chirp ccl01.cse.nd.edu audit
+FILES DIRS      DATA    OWNER
+82842   27    5.0 GB    globus:/O=UnivNowhere/CN=Fred
+ 6153  607  503.4 MB    unix:fred 2 2 200.3 MB hostname:laptop.nowhere.edu 12 2 3.9 MB unix:betty
+```
 
 To audit an entire cluster, run the `chirp_audit_cluster` tool. This will
 extract the current list of hosts from your catalog, run an audit on all hosts
@@ -446,13 +522,23 @@ is much faster than running `cp` or `chirp put` directly. For example, this
 will copy the `/database` directory from host `server.nd.edu` to all hosts in
 your cluster:
 
-`$ chirp_distribute server.nd.edu /database `chirp_status -s``
+```sh
+# First we get a list of all the chirp hosts in the cluster:
+ALL_CHIRP_HOSTS=$(chirp_status -s)
 
-Another common problem is cleaning up data that has been copied this way. To
+# Then we use chirp_distribute to copy /database to all the hosts found:
+$ chirp_distribute server.nd.edu /database $ALL_CHIRP_HOSTS
+```
+
+Another common pattern is cleaning up data that has been copied this way. To
 delete, simply run `chirp_distribute` again with the `-X` option and the same
-arguments.
+arguments, that is:
 
-## Advanced Topic: Space Management⇗
+```sh
+$ chirp_distribute -X server.nd.edu /database $ALL_CHIRP_HOSTS
+```
+
+### Space Management
 
 When multiple users share a common storage space, there is the danger that one
 aggressive user can accidentally (or deliberately) consume all available
@@ -482,14 +568,16 @@ from consuming more than 1GB; it is also a _guarantee_ that other users of the
 server will not be able to steal the space. Such allocations may also be
 subdivided by using ` mkalloc` to create sub-directories.
 
-Note: Users employing Parrot can also use the `parrot_mkalloc` and
-`parrot_lsalloc` commands in ordinary scripts to achieve the same effect.
+!!! note
+    Users employing Parrot can also use the `parrot_mkalloc` and
+    `parrot_lsalloc` commands in ordinary scripts to achieve the same effect.
 
 To examine an allocation, use the `lsalloc` command.
 
 To destroy an allocation, simply delete the corresponding directory.
 
-## Advanced Topic: Ticket Authentication⇗
+
+### Ticket Authentication
 
 Often a user will want to access a Chirp server storing files for cluster
 computing jobs but will have difficulty accessing it securely without
@@ -505,8 +593,9 @@ system which is convenient and simple to setup.
 
 To start, users may create a ticket for authentication using:
 
-`$ chirp <host:port> ticket_create -output myticket.ticket -subject unix:user
--bits 1024 -duration 86400 / rl /foo rwl`
+```sh
+$ chirp <host:port> ticket_create -output myticket.ticket -subject unix:USER -bits 1024 -duration 86400 / rl /foo rwl
+```
 
 This command performs multiple tasks in three stages:
 
@@ -518,8 +607,8 @@ ticket.
 
 Once the ticket is created, it is registered with the Chirp server with a
 validity period in seconds defined by the duration option (86400, or a day).
-The ` -subject unix:user` switch allows the user to set the ticket for another
-user; however, only the **chirp_server** superuser (-P) may set tickets for
+The `-subject unix:USER` switch allows the user to set the ticket for another
+user with unix id USER; however, only the **chirp_server** superuser (-P) may set tickets for
 any subject. For regular users, the -subject option is unnecessary as it is by
 default the subject you possess when registering the ticket. Users who
 authenticate using this ticket in the future will become this subject with
@@ -541,7 +630,7 @@ directory inherit the **rwl** mask. We emphasize that the ACL mask does not
 give rights but limits them. If the user that registers a ticket has no rights
 in a directory, then neither will the ticket authenticated user.
 
-### Authenticating with a ticket⇗
+#### Authenticating with a ticket
 
 To authenticate using a ticket, it can be as simple as including the ticket
 file with your job. Tickets that follow the **ticket.MD5SUM** template are
@@ -551,12 +640,16 @@ of ticket filenames in either the **CHIRP_CLIENT_TICKETS** environment
 variable or via the **-i <tickets>** option. Tickets are tried in the order
 they are specified.
 
-`$ chirp <host:port>`
+```sh
+$ chirp <host:port>
+```
 
 The above command will try ticket authentication as a last resort but will use
 tickets it finds in the current directory following the template.
 
-`$ chirp -a ticket -i file.ticket <host:port>`
+```sh
+$ chirp -a ticket -i file.ticket <host:port>
+```
 
 The above command forces ticket authentication and only uses the
 **file.ticket** ticket to authenticate.
@@ -574,14 +667,16 @@ rejected outright by openssl when given a 64 byte challenge to sign. Chirp
 will not authenticate or use smaller challenge sizes if openssl rejects the
 ticket.
 
-### Manually Registering a Ticket⇗
+#### Manually Registering a Ticket
 
 A ticket is only useful when registered with a server. The ticket_create
 command does this for you automatically but you may also wish to register the
 ticket with multiple servers. To do this, you can manually register a ticket
-that is already created by using the ` ticket_register` command:
+that is already created by using the `ticket_register` command:
 
-`$ chirp <host:port> ticket_register myticket.ticket unix:user 86400`
+```sh
+$ chirp <host:port> ticket_register myticket.ticket unix:user 86400
+```
 
 The first argument to `ticket_register` is the name of the ticket, followed by
 the subject, and finally the ticket duration. The second option (the subject)
@@ -589,14 +684,16 @@ is optional. As described earlier, specifying the subject allows you to
 register a ticket with a user other than yourself. This is only possible if
 you are authenticated with the server as the super user.
 
-### Modifying the Rights of a Ticket⇗
+#### Modifying the Rights of a Ticket
 
 You may use the `ticket_modify` command to change the rights a ticket has in a
 directory. You are restricted to giving rights to a ticket you already
 possess. Recall, however, that the rights are actually a mask that are
 logically ANDed with the rights the user has at the time.
 
-`$ chirp <host:port> ticket_modify myticket.ticket / rl`
+```sh
+$ chirp <host:port> ticket_modify myticket.ticket / rl
+```
 
 The above command changes the ACL mask of `myticket.ticket` to `rl` in the
 root directory.
@@ -604,21 +701,26 @@ root directory.
 A ticket identifier as returned by `ticket_list` may also be used instead of a
 ticket filename.
 
-### Deleting a Ticket⇗
+
+#### Deleting a Ticket
 
 Deleting a ticket unregisters the ticket with the server. Additionally, the
 ticket on the client is deleted.
 
-`$ chirp <host:port> ticket_delete myticket.ticket`
+```sh
+$ chirp <host:port> ticket_delete myticket.ticket
+```
 
 A ticket identifier as returned by `ticket_list` may also be used instead of a
 ticket filename.
 
-### Listing the Registered Tickets on the Server⇗
+### Listing the Registered Tickets on the Server
 
 To list the tickets registered on a server, use the `ticket_list` command:
 
-`$ chirp <host:port> ticket_list unix:user`
+```sh
+$ chirp <host:port> ticket_list unix:user
+```
 
 The subject argument instructs the command to fetch all the tickets belonging
 to the user. You may also use `ticket_list all` to list all the tickets of all
@@ -626,12 +728,15 @@ users on the server. The latter command is only executable by the Chirp super
 user. The output is a list of tickets identifiers. You can query information
 about a ticket using these identifiers with the `ticket_get` command.
 
-### Getting a Registered Ticket's Information from the Server⇗
+
+#### Getting the Information of a Registered Ticket from the Server
 
 To check the status of a ticket on a server, you may use the `ticket_get`
 command:
 
-`$ chirp <host:port> ticket_get myticket.ticket`
+```sh
+$ chirp <host:port> ticket_get myticket.ticket
+```
 
 So long as you own the ticket or are authenticated as the super user, the
 server will return to you information associated with the ticket. The ticket
@@ -644,18 +749,24 @@ public key of the ticket, the time left until the ticket expires in seconds,
 and a variable number of directory and ACL masks. For example, we might have
 the following output:
 
-`$ chirp host:port ticket_get myticket.ticket unix:pdonnel3
+```sh
+$ chirp host:port ticket_get myticket.ticket
+unix:pdonnel3
 LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlHZk1BMEdDU3FHU0liM0RRRUJBUVVBQTRHTkFEQ0Jp
 UUtCZ1FEZVoyZWxKYXdlcHBHK0J4SFlaMmlmWFIzNAovU3RhUElta0lmeit4TDZxN21wS2lnMDJQZ2Z5
 emdKRWFjMk50NzJrUlBpOEJWYWdkOHdvSGhWc25YZ1YvNjFPCjVkaG13STNLYWRlYjNUbkZXUUo3bFhh
 anhmVTZZR1hXb2VNY1BsdjVQUWloWm8yWmFXTUUvQVA4WUtnVVphdXcKelI2RkdZWGd6N2RGZzR6Yk9R
-SURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo= 5993 / rl /foo rwl `
+SURBUUFCCi0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=
+5993
+/ rl /foo rwl
+```
 
-Note that the base64 encoded public key above is wrapped to fit an 80
-character width for this manual. In the actual output, the public key is on
-one line. All of the information is new-line-delimited.
+Note that the base64 encoded public key above is wrapped to fit an 80 character
+width for this manual. In the actual output, the public key is on one line. All
+of the information is new-line-delimited.
 
-## Advanced Topic: HDFS Backend Storage for Chirp⇗
+
+### HDFS Backend Storage for Chirp
 
 The Chirp server is able to bind to backend filesystems besides the local
 filesystem. In particular, it is able to act as a frontend for the Hadoop HDFS
@@ -666,28 +777,32 @@ have any Hadoop or Java (version) dependencies.
 
 To run a Chirp server as a frontend to your HDFS filesystem, you will need to
 install the `libhdfs-devel` package and then set several environment variables
-which describe your Hadoop installation. JAVA_HOME and HADOOP_HOME
+which describe your Hadoop installation. `JAVA_HOME` and `HADOOP_HOME`
 LIBHDFS_PATH should be set to indicate the location of the libhdfs library.
 Common values for the Cloudera Hadoop installation would be this:
 
 `setenv JAVA_HOME /usr/lib/jvm/java-openjdk setenv HADOOP_HOME /usr/lib/hadoop
 setenv LIBHDFS_PATH /usr/lib64/libhdfs.so ` Then, start `chirp_server` and
-indicate the root storage directory in HDFS with `-r` like this: `$
-chirp_server -r hdfs://headnode.hadoop.domain.edu/mydata ...`
+indicate the root storage directory in HDFS with `-r` like this:
+
+```sh
+$ chirp_server -r hdfs://headnode.hadoop.domain.edu/mydata ...other arguments...
+```
 
 By default, chirp will use whatever default replication factor is defined by
 HDFS (typically 3). To change the replication factor of a single file, use the
 `chirp setrep` or `parrot_setrep` commands. A path of `&&&` will set the
 replication factor for all new files created in that session.
 
-### Temporary Local Storage⇗
+#### Temporary Local Storage
 
 Chirp allows you to setup a location to place temporary files such as those
 for caching groups, and other items. You can set this using the `-y path`.
 This allows for faster access, POSIX semantics, and less load on HDFS. By
 default, Chirp assumes the current directory for temporary storage.
 
-### Limitations⇗
+
+#### Limitations
 
 Chirp tries to preserve POSIX filesystem semantics where possible despite HDFS
 violating certain assumptions. For example, random writes are not possible for
@@ -699,30 +814,33 @@ have the execute bit set.
 Chirp also does not allow using the thirdput command or user space management
 (`-F`) when using HDFS as a backend.
 
-## Advanced Topic: Job Execution on Chirp⇗
+
+### Job Execution on Chirp
 
 As of version 4.2.0, Chirp supports job execution. Jobs run using executables
 and files located on the Chirp server. Each job description sent to the Chirp
 server provides a _binding_ of each file the job requires to a local namespace
 (a sandbox).
 
-To support the new job interface, Chirp has the following new RPC:
+To support the new job interface, Chirp has the following new RPCs:
 
-`<integer result> = **job_create** <JSON-encoded job description> <integer
-result> = **job_commit** <JSON-encoded array of job IDs> <JSON-encoded array
-of statuses> = **job_status** <JSON-encoded array of job IDs> <JSON-encoded
-array of statuses> = **job_wait** <job ID> <timeout> <integer result> =
-**job_reap** <JSON-encoded array of job IDs> <integer result> = **job_kill**
-<JSON-encoded array of job IDs> `
+```sh
+                <integer result> = **job_create** <JSON-encoded job description>
+                <integer result> = **job_commit** <JSON-encoded array of job IDs>
+<JSON-encoded array of statuses> = **job_status** <JSON-encoded array of job IDs>
+<JSON-encoded array of statuses> = **job_wait** <job ID> <timeout>
+                <integer result> = **job_reap** <JSON-encoded array of job IDs>
+                <integer result> = **job_kill** <JSON-encoded array of job IDs>
+```
 
-As usual, these RPC may be sent through the Chirp client command line tool or
-through the C API.
+As usual, these RPCs may be sent through the Chirp client command line tool or through the C API.
 
-To enable job execution on a Chirp server, the `--jobs` switch must be passed.
 
-### Creating a Job⇗
+!!! note
+    To enable job execution on a Chirp server, the `--jobs` switch must be passed.
 
-`<integer result> = **job_create** <JSON-encoded job description>`
+
+#### Creating a Job
 
 To create a job, you need the usual attributes of an executable to run, the
 arguments to pass to the executable, any environment variables to add, and any
@@ -734,47 +852,125 @@ task_path` while the name in the server namespace is labeled `serv_path`.
 **Files are bound in the task namespace at job start and job end, for inputs
 and outputs, respectively.**
 
-#### Example 1⇗
+##### Example 1
 
-`{ "executable": "/bin/sh", "arguments": [ "sh", "-c", "echo Hello, world! >
-my.output" ], "files": [ { "task_path": "my.output", "serv_path":
-"/users/pdonnel3/my.0.output", "type": "OUTPUT" } ] } `
+[my-first-job.json](my-first-job.json)
+```json
+my-first-job.json:
+{
+    "executable": "/bin/sh",
+    "arguments": [ "sh", "-c", "echo Hello, world! > my.output" ],
+    "files": [
+                {
+                    "task_path": "my.output",
+                    "serv_path": "/some/directory/my.0.output",
+                    "type": "OUTPUT"
+                }
+            ]
+}
+```
 
-Notice that the first argument is `"sh"`. This argument corresponds to
-`argv[0]` in a regular POSIX application.
+!!! note
+    Notice that the first argument is `"sh"`. This argument corresponds to
+    `argv[0]` in a regular POSIX application.
 
-Additionally, the output file is explicitly marked as an `OUTPUT`. This file
-is bound into the server namespace at task completion.
+!!! note
+    Additionally, the output file is explicitly marked as an `OUTPUT`. This
+    file is bound into the server namespace at task completion.
 
-#### Example 2 -- Two Inputs⇗
+This job can be created from the command line as follows:
 
-`{ "executable": "/bin/tar", "arguments": [ "tar", "-cf", "archive.tar", "a",
-"b" ], "files": [ { "task_path": "a", "serv_path": "/users/pdonnel3/a.txt",
-"type": "INPUT", "binding": "LINK" }, { "task_path": "b", "serv_path":
-"/users/pdonnel3/b.txt", "type": "INPUT", "binding": "LINK" }, { "task_path":
-"archive.tar", "serv_path": "/users/pdonnel3/archive.tar", "type": "OUTPUT",
-"binding": "LINK" } ] } `
+```sh
+# We make sure the appropiate directories exist:
+$ chirp <host:port> mkdir -p /some/directory
+
+# Create the job. It prints the job-id when the job is succesfully created:
+# <integer result> = **job_create** <JSON-encoded job description>
+
+$ chirp <host:port> job_create "$(cat my-first-job.json)"
+1
+```
+
+##### Example 2 -- Two Inputs
+
+[job-with-two-inputs.json](job-with-two-inputs.json)
+```json
+{
+    "executable": "/bin/tar",
+    "arguments": [ "tar", "-cf", "archive.tar", "a", "b" ],
+    "files": [
+                {
+                    "task_path": "a",
+                    "serv_path": "/users/btovar/a.txt",
+                    "type": "INPUT",
+                    "binding": "LINK"
+                },
+                {
+                    "task_path": "b",
+                    "serv_path": "/users/btovar/b.txt",
+                    "type": "INPUT",
+                    "binding": "LINK"
+                },
+                { "task_path": "archive.tar",
+                  "serv_path": "/users/btovar/archive.tar",
+                  "type": "OUTPUT",
+                  "binding": "LINK"
+                }
+            ]
+}
+```
 
 Here, each file is bound using hard links to the file located on the server.
 This type of access is fast as the server does not need make a copy. You may
 also bind files as `COPY` if necessary. `LINK` is the default.
 
-#### Example 3 -- Using custom executable.⇗
+```sh
+# Create the job:
+$ chirp <host:port> job_create "$(cat job-with-two-inputs.json)"
+2
+```
+
+##### Example 3 -- Using custom executable
 
 Often, you will have a script or executable which is present on the Chirp
 server which you want to execute directly. To do this, bind the executable as
 you would any other file and give a relative (task) path for the `executable`
 job attribute:
 
-`{ "executable": "./myscript.sh", "arguments": [ "myscript", "b", ], "files":
-[ { "task_path": "myscript.sh", "serv_path": "/users/pdonnel3/myscript.sh",
-"type": "INPUT", "binding": "LINK" }, { "task_path": "output.txt",
-"serv_path": "/users/pdonnel3/output.txt", "type": "OUTPUT", "binding": "LINK"
-} ] } `
+In this example [my-custom-exec.sh](my-custom-exec.sh), takes as first argument
+the name of a file to print its output. 
 
-### Committing (to Start) a Job⇗
+[job-with-custom-exec.json](job-with-custom-exec.json)
+```json
+{
+    "executable": "./my-custom-exec.sh",
+    "arguments": [ "my-custom-exec.sh", "output.txt" ],
+    "files": [
+                {
+                    "task_path": "my-custom-exec.sh",
+                    "serv_path": "/some/directory/my-custom-exec.sh",
+                    "type": "INPUT",
+                    "binding": "LINK" },
+                {
+                    "task_path": "output.txt",
+                    "serv_path": "/some/directory/output.txt",
+                    "type": "OUTPUT",
+                    "binding": "LINK"
+                }
+            ]
+}
+```
 
-`<integer result> = **job_commit** <JSON-encoded array of job IDs>`
+```sh
+# Make sure that myscript.sh is in the correct location:
+$ chirp <host:port> put my-custom-exec.sh /some/directory/my-custom-exec.sh
+
+$ chirp <host:port> job_create "$(cat job-with-custom-exec.sh)"
+4
+```
+
+
+#### Committing (to Start) a Job
 
 Chirp uses two-phase commit for creating a job. This serves to protect against
 orphan jobs which become lost because a client or the server lose a
@@ -783,126 +979,147 @@ connection.
 To commit a job, pass a JSON-encoded array of job identifiers to the
 `job_commit` RPC. For example:
 
-`$ chirp host:port job_commit '[1, 2]'`
+```sh
+# <integer result> = **job_commit** <JSON-encoded array of job IDs>
 
-will commit jobs `1` and `2`.
+$ chirp host:port job_commit '[1, 2, 4]'
+```
+
+will commit jobs `1`, `2`, and `4`.
 
 Once a job is committed, the Chirp server is free to schedule and execute the
 job. You may query the status of the job to see if it has begun executing or
 wait for the job to finish.
 
-### Querying the Status of a Job⇗
 
-`<JSON-encoded array of statuses> = **job_status** <JSON-encoded array of job
-IDs>`
+#### Querying the Status of a Job
 
 At any point in a job's lifetime, you may query its status. Status information
 is JSON-encoded and holds all job metadata.
 
-#### Example 1 -- Status of Create Example 1⇗
+#### Example 1 -- Status of Example 1
 
-`$ chirp host:port job_status '[1]' [ { "id":1, "error":null,
-"executable":"\/bin\/sh", "exit_code":null, "exit_status":null,
-"exit_signal":null, "priority":1, "status":"CREATED",
-"subject":"unix:pdonnel3", "time_commit":null, "time_create":"2014-02-04
-23:32:02", "time_error":null, "time_finish":null, "time_kill":null,
-"time_start":null, "time_reap":null, "arguments":[ "sh", "-c", "echo Hello,
-world! > my.output" ], "environment":{ }, "files":[ {
-"serv_path":"\/users\/pdonnel3\/my.0.output", "task_path":"my.output",
-"type":"OUTPUT", "binding":"LINK" } ] } ] `
+```sh
+# <JSON-encoded array of statuses> = **job_status** <JSON-encoded array of job IDs>
 
-After we commit the job, we get this status:
+$ chirp host:port job_status '[1]'
+[
+  {
+    "id": 1,
+    "error": null,
+    "executable": "/bin/sh",
+    "exit_code": 0,
+    "exit_status": "EXITED",
+    "exit_signal": null,
+    "priority": 1,
+    "status": "FINISHED",
+    "subject": "unix:btovar",
+    "tag": "(unknown)",
+    "time_commit": 1565793785,
+    "time_create": 1565793785,
+    "time_error": null,
+    "time_finish": 1565793785,
+    "time_kill": null,
+    "time_start": 1565793785,
+    "time_reap": null,
+    "arguments": [
+      "sh",
+      "-c",
+      "echo Hello, world! > my.output"
+    ],
+    "environment": {},
+    "files": [
+      {
+        "binding": "LINK",
+        "serv_path": "/some/directory/my.0.output",
+        "size": 14,
+        "tag": null,
+        "task_path": "my.output",
+        "type": "OUTPUT"
+      }
+    ]
+  }
+]
+```
 
-`$ chirp host:port job_commit '[1]' $ chirp host:port job_status '[1]' [ {
-"id":1, "error":null, "executable":"\/bin\/sh", "exit_code":null,
-"exit_status":null, "exit_signal":null, "priority":1, "status":"COMMITTED",
-"subject":"unix:pdonnel3", "time_commit":"2014-02-05 01:18:39",
-"time_create":"2014-02-04 23:32:02", "time_error":null, "time_finish":null,
-"time_kill":null, "time_start":null, "time_reap":null, "arguments":[ "sh",
-"-c", "echo Hello, world! > my.output" ], "environment":{ }, "files":[ {
-"serv_path":"\/users\/pdonnel3\/my.0.output", "task_path":"my.output",
-"type":"OUTPUT", "binding":"LINK" } ] } ] `
+You can get the status of a job at any time, that is, before commit, during execution, and on completion. However, this RPC does not help
+with waiting for one or more jobs to finish. For that, we use the `job_wait`
+RPC discussed next.
 
-After a short time, we can again get the job's status to see that it failed:
 
-`$ chirp host:port job_status '[1]' [ { "id":1, "error":"No such file or
-directory", "executable":"\/bin\/sh", "exit_code":null, "exit_status":null,
-"exit_signal":null, "priority":1, "status":"ERRORED",
-"subject":"unix:pdonnel3", "time_commit":"2014-02-05 01:18:39",
-"time_create":"2014-02-04 23:32:02", "time_error":"2014-02-05 01:18:39",
-"time_finish":null, "time_kill":null, "time_start":null, "time_reap":null,
-"arguments":[ "sh", "-c", "echo Hello, world! > my.output" ], "environment":{
-}, "files":[ { "serv_path":"\/users\/pdonnel3\/my.0.output",
-"task_path":"my.output", "type":"OUTPUT", "binding":"LINK" } ] } ] `
+#### Waiting for a Job to Terminate
 
-This is caused by `/users/pdonnel3` directory not existing. If we create this
-directory:
+Use `job_wait` to wait for a job to finish. This will give you the status
+information of jobs which have completed and have a `status` of `FINISHED`,
+`KILLED`, or `ERRORED`.
 
-`$ chirp host:port mkdir -p /users/pdonnel3`
+`job_wait` takes a job identifier argument which matches jobs in the following
+way:
 
-#### Retrying Create Example 1⇗
-
-`$ chirp host:port mkdir -p /users/pdonnel3 $ chirp host:port job_create '{
-"executable": "/bin/sh", "arguments": [ "sh", "-c", "echo Hello, world! >
-my.output" ], "files": [ { "task_path": "my.output", "serv_path":
-"/users/pdonnel3/my.0.output", "type": "OUTPUT" } ] }' **4** $ chirp host:port
-job_commit '[4]' $ sleep 1 $ chirp host:port job_status '[4]' [ [ { "id":4,
-"error":null, "executable":"\/bin\/sh", "exit_code":0, "exit_status":"EXITED",
-"exit_signal":null, "priority":1, "status":"FINISHED",
-"subject":"unix:batrick", "time_commit":"2014-02-05 01:26:15",
-"time_create":"2014-02-05 01:25:58", "time_error":null,
-"time_finish":"2014-02-05 01:26:15", "time_kill":null,
-"time_start":"2014-02-05 01:26:15", "time_reap":null, "arguments":[ "sh",
-"-c", "echo Hello, world! > my.output" ], "environment":{ }, "files":[ {
-"serv_path":"\/users\/pdonnel3\/my.0.output", "task_path":"my.output",
-"type":"OUTPUT", "binding":"LINK" } ] } ] ] $ chirp host:port cat
-/users/pdonnel3/my.0.output Hello, world! `
-
-Again, you can get the status of a job at any time. However, this RPC does not
-help with waiting for one or more jobs to finish. For that, we use the
-`job_wait` RPC discussed next.
-
-### Waiting for a Job to Terminate⇗
-
-`<JSON-encoded array of statuses> = **job_wait** <job ID> <timeout>`
-
-Use the `job_wait` RPC to wait for a job to finish. This will give you the
-status information of jobs which have completed and have a `status` of
-`FINISHED`, `KILLED`, or `ERRORED`.
-
-`job_wait` takes an job identifier argument which matches jobs in the
-following way:
-
-| `0` | Match all jobs for the current user.  
----|---  
-`X > 0` | Match job with id equal to `X`.  
-`X < 0` | Match job with id **greater than** ` abs(X)`.  
+|   |   |
+|---|---|  
+| **0** | Match all jobs for the current user.  
+|**X > 0** | Match job with id equal to **X**.  
+|**X < 0** | Match job with id greater than ** abs(X)**.  
   
 `job_wait` is essentially `job_status` except the RPC blocks until a job
-matches the above condition or the `timeout` is exceeded.
+matches the above condition or the `timeout` is exceeded:
 
-Unlike the regular UNIX wait system call, Chirp's `job_wait` does not reap a
-job you wait for. You must do that through the `job_reap` RPC discussed next.
+```sh
+# <JSON-encoded array of statuses> = **job_wait** <job ID> <timeout>
 
-### Reaping a Finished Job⇗
 
-`<integer result> = **job_reap** <JSON-encoded array of job IDs>`
+# wait 10 seconds for any job to finish:
+$ chirp host:port job_wait 0 10
+
+# wait indefinitely for job_wait 1 to finish:
+$ chirp host:port job_wait 1
+[{"id":1,"error":null,"executable":"\/bin\/sh","exit_code":0,"exit_status":"EXITED",...]
+
+# wait 10 seconds for any job with id greater than 500 to finish:
+$ chirp host:port job_wait -500 10
+[]
+
+# Note the empty array above, which indicates that no such job finished in the
+# given timeout.
+```
+
+!!! note 
+    Unlike the regular UNIX wait system call, Chirp's `job_wait` does not reap a
+    job you wait for. You must do that through the `job_reap` RPC discussed next.
+
+
+#### Reaping a Finished Job
 
 Similar in intent to `job_commit`, `job_reap` notifies the Chirp server that
 your application has logged the termination of the job. This allows the Chirp
 server to reap the job. The side-effect of this operation is future calls to
 `job_wait` will not include the reaped jobs.
 
-### Killing a Job⇗
+```sh
+# <integer result> = **job_reap** <JSON-encoded array of job IDs>
 
-`<integer result> = **job_kill** <JSON-encoded array of job IDs>`
+# Reap jobs 1, 2, and 4:
+$ chirp host:port job_reap '[1, 2, 4]'
+```
+
+
+#### Killing a Job
 
 `job_kill` informs the Chirp server to kill a job. Any job which has not
 reached a terminal state (`FINISHED`, `KILLED`, or `ERRORED`) will immediately
 be moved to the `KILLED` state. If the job is running, the internal Chirp
 scheduler will also terminate the job at its convenience.
 
-### Chirp Jobs on AFS⇗
+```sh
+#<integer result> = **job_kill** <JSON-encoded array of job IDs>`
+
+# Kill jobs 1 and 2
+$ chirp host:port job_kill '[1, 2]'
+```
+
+
+### Chirp Jobs on AFS
 
 On the AFS file system, Chirp job execution will not work with `LINK` file
 bindings. This is due to limitations in AFS preventing hard links across
@@ -910,7 +1127,8 @@ directories. For this reason we recommend against using AFS as the backing
 storage for Chirp (`--root`). If you must use AFS, the `COPY` binding should
 work.
 
-## Debugging Advice⇗
+
+## Debugging Advice
 
 Debugging a distributed system can be quite difficult because of the sheer
 number of hosts involved and the mass of information to be collected. If you
@@ -926,21 +1144,44 @@ on **both** the client and server that you are operating. For example, if you
 are having trouble getting Parrot to connect to a Chirp server, then run both
 as follows:
 
-` $ chirp_server -d all [more options] ... $ parrot_run -d all tcsh `
+```sh
+$ chirp_server -d all [more options] ...
+$ parrot_run -d all bash
+```
 
 Of course, this is likely to show way more information than you will be able
 to process. Instead, turn on a debugging flags selectively. For example, if
 you are having a problem with authentication, just show those messages with
 `-d auth` on both sides.
 
-There are a large number of debugging flags. Currently, the choices are:
-syscall notice channel process resolve libcall tcp dns auth local http ftp
-nest chirp dcap rfio cache poll remote summary debug time pid all. When
-debugging problems with Chirp and Parrot, we recommend selectively using `-d
-chirp`, `-d tcp`, `-d auth`, and `-d libcall` as needed.
+When debugging problems with Chirp and Parrot, we recommend selectively using
+`-d chirp`, `-d tcp`, `-d auth`, and `-d libcall` as needed.
 
-## Confuga⇗
+
+## Further Information
+
+### The Chirp Protocol
+
+[The Chirp Protocol](chirp_protocol.md)
+
+
+
+### Confuga
 
 Confuga is an active storage cluster file system harnessing Chirp. To learn
 more about it, please see the [Confuga manual](confuga.html).
 
+
+
+### Please use the following citation for Chirp in a scientific publication
+
+  * Douglas Thain, Christopher Moretti, and Jeffrey Hemmes,[Chirp: A Practical Global Filesystem for Cluster and Grid Computing](http://www.cse.nd.edu/~dthain/papers/chirp-jgc.pdf), _Journal of Grid Computing_ , Springer, 2008. DOI: 10.1007/s10723-008-9100-5. (The original is available on <http://www.springerlink.com>.)
+
+
+Chirp is Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005-
+The University of Notre Dame. All rights reserved.
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+
+
+__Last edited: August 2019__

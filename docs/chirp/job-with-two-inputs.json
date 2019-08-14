@@ -1,0 +1,24 @@
+{
+    "executable": "/bin/tar",
+    "arguments": [ "tar", "-cf", "archive.tar", "a", "b" ],
+    "files": [
+                {
+                    "task_path": "a",
+                    "serv_path": "/some/directory/a.txt",
+                    "type": "INPUT",
+                    "binding": "LINK"
+                },
+                {
+                    "task_path": "b",
+                    "serv_path": "/some/directory/b.txt",
+                    "type": "INPUT",
+                    "binding": "LINK"
+                },
+                { "task_path": "archive.tar",
+                  "serv_path": "/some/directory/archive.tar",
+                  "type": "OUTPUT",
+                  "binding": "LINK"
+                }
+            ]
+}
+
