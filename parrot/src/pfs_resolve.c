@@ -221,8 +221,7 @@ static pfs_resolve_t mount_entry_check( const char *logical_name, const char *pr
 		} else if(!strcmp(redirect,"ENOENT")) {
 			result = PFS_RESOLVE_ENOENT;
 		} else if(!strcmp(redirect,"LOCAL")) {
-			strcpy(physical_name,logical_name);
-			result = PFS_RESOLVE_CHANGED;
+			result = PFS_RESOLVE_LOCAL;
 		} else if(!strncmp(redirect,"resolver:",9)) {
 			result = pfs_resolve_external(logical_name,prefix,&redirect[9],physical_name);
 		} else if(!strncmp(redirect,"lcache:",7) &&
@@ -358,6 +357,7 @@ static pfs_resolve_t pfs_resolve_ns( struct pfs_mount_entry *ns, const char *log
 	}
 
 	switch(result) {
+		case PFS_RESOLVE_LOCAL:
 		case PFS_RESOLVE_UNCHANGED:
 			strcpy(physical_name,logical_name);
 			break;

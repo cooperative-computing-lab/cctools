@@ -3675,6 +3675,7 @@ int pfs_dispatch_prepexe (struct pfs_process *p, char exe[PATH_MAX], const char 
 		case PFS_RESOLVE_CHANGED:
 			debug(D_DEBUG, "%s: interpreter %s resolve changed to %s", __func__, path, ldso_resolved_path);
 			break;
+		case PFS_RESOLVE_LOCAL:
 		case PFS_RESOLVE_UNCHANGED:
 			debug(D_DEBUG, "%s: interpreter %s resolve unchanged", __func__, path);
 			/* XXX This access skips mounts and other PFS redirections. */
