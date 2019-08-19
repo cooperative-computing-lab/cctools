@@ -1,0 +1,13 @@
+{ 
+    "define":{
+                "message" : "hello world!"
+             },
+    "rules": [
+                {
+                    "command": "/bin/echo " +message+ " > output-from-define.txt",
+                    "outputs": [ "output-from-define.txt" ],
+                    "inputs":  [ ],
+                }
+             ]
+}
+

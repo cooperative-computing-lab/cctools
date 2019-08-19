@@ -1,26 +1,20 @@
-
-
-
-
 # JX Workflow Language
 
 ## Getting Started
 
-  * [JX Tutorial](jx-tutorial)  
+  * [JX Tutorial](../jx-tutorial)  
 
 ## Quick Reference
 
-  * [JX Quick Reference](jx-quick)  
+  * [JX Quick Reference](../jx-quick)  
 
 
 ## JX Reference Manual
 
-[Makeflow](makeflow.html) | [JX Tutorial](jx-tutorial.html) | [JX Quick
-Reference](jx-quick.html) | [JX Full Reference](jx.html)
 
 ### Overview
 
-Makeflow allows for workflows to be expressed in pure [JSON](http://json.org)
+[Makeflow](../../makeflow) allows for workflows to be expressed in pure [JSON](http://json.org)
 or in an extended language known as JX which can be evaluated to produce pure
 JSON. This document provides the detailed reference for this language. If you
 are just getting started, see the [JX Tutorial](jx-tutorial.html) before
