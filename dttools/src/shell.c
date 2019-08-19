@@ -39,7 +39,7 @@ static int execute (const char *cmd, const char * const env[], int in[2], int ou
 		CATCHUNIX(putenv((char *)env[i]));
 	}
 
-	CATCHUNIX(execlp("sh", "sh", "-c", cmd, NULL));
+	CATCHUNIX(execlp("/bin/sh", "sh", "-c", cmd, NULL));
 
 	rc = 0;
 	goto out;
