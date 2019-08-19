@@ -1,18 +1,6 @@
 # JX Workflow Language
 
-## Getting Started
-
-  * [JX Tutorial](../jx-tutorial)  
-
-## Quick Reference
-
-  * [JX Quick Reference](../jx-quick)  
-
-
-## JX Reference Manual
-
-
-### Overview
+## Overview
 
 [Makeflow](../../makeflow) allows for workflows to be expressed in pure [JSON](http://json.org)
 or in an extended language known as JX which can be evaluated to produce pure
@@ -20,9 +8,9 @@ JSON. This document provides the detailed reference for this language. If you
 are just getting started, see the [JX Tutorial](jx-tutorial.html) before
 reading this reference manual.
 
-### JSON Workflow Representation
+## JSON Workflow Representation
 
-#### Workflow
+### Workflow
 
 A workflow is encoded as a JSON object with the following keys:
 
@@ -48,7 +36,7 @@ A workflow is encoded as a JSON object with the following keys:
 |[**categories**](#categories)| no  | Rules are grouped into categories. Rules inside a category are run with the same [environment variables values](#environments), and the same resource requirements.
 |default_category | no | Name of the category used if none is specified for a rule. <br>If there is no corresponding category defined, default values will be filled in. If not provided, the default category is `"default"`.
 
-#### Rules
+### Rules
 
 There are two types of rules. The first type describes single commands, and the second describes sub-workflows. 
 
@@ -104,7 +92,7 @@ single command, but it replaces the key `command` with keys `workflow` and
 | environment | no | Specifies [environment variables](#environments).
 
 
-#### Files
+### Files
 
 A file is encoded as either a JSON string or a JSON object. If a file is given
 simply as a string, then the string gives the name of the file in all
@@ -127,7 +115,7 @@ to the task, and vice versa. For example:
 ```
 
 
-#### Categories
+### Categories
 
 A **category** is encoded as a JSON object with the following keys:
 
@@ -144,7 +132,7 @@ The category describes the [environment variables](#environments) and
 category name.
 
 
-#### Environments
+### Environments
 
 Environments are encoded as a JSON object where each key/value pair describes
 the name and value of a Unix environment variable:
@@ -164,7 +152,7 @@ job value overrides the category value, and the category value overrides the
 global value.
 
 
-#### Resources
+### Resources
 
 Resources are encoded as a JSON object with the following keys:
 
@@ -186,7 +174,7 @@ required, in MB. `"memory"` gives the RAM required, in MB.
 `"wall-time"` specifies the maximum allowed running time, in seconds.
 
 
-### JX Expressions
+## JX Expressions
 
 JX is a superset of JSON with additional syntax for dynamically generating
 data. The use case in mind when designing JX was writing job descriptions for
@@ -283,7 +271,7 @@ left to right in order of precedence. From highest to lowest precedence,
 |or
 
 
-#### Lookup
+### Lookup
 
 >     A[B] -> C    where A is <array> and B is <integer>,
 >                     or A is <object> and B is <string>
@@ -310,11 +298,11 @@ range(10)[3:7]
 => [3, 4, 5, 6]
 ```
     
-#### Concatenation
+### Concatenation
 
 >     A + A -> A    where A is <string>, or <array>
 
-#### Arithmetic operators
+### Arithmetic operators
 
 >     A + A -> A    (addition)
 >     A - A -> A    (subtraction)
@@ -326,13 +314,13 @@ range(10)[3:7]
 Division and modulo by zero generate an error.
 
 
-#### Logic operators
+### Logic operators
 
 >     <boolean> and <boolean> -> <boolean>    (conjunction)
 >     <boolean> or  <boolean> -> <boolean>    (disjunction)
 
 
-#### Comparison operators
+### Comparison operators
 
 >     A == B -> <boolean>                     (equality)
 >     A != B -> <boolean>                     (inequality)
@@ -505,7 +493,6 @@ braces.
 ```json
 Error{
   "source": "jx_eval",
-  "name": "undefined symbol",
   "message": "undefined symbol",
   "context": {
     "outfile": "results",
@@ -531,12 +518,11 @@ Error{
 ```
 
 
-All errors _MUST_ include some special keys with string values:
+All errors _MUST_ include these keys with string values:
 
 | Required error keys | |
 |-|-|
 source  | Indicates where the error comes from, and the structure of the additional data.
-name    | The general category of the error, e.g. "syntax error" or "timed out"
 message | Some human-readable details about the conditions of the error.
 
 Errors from "jx_eval" have some additional keys, described below, to aid in
@@ -545,23 +531,17 @@ error data.
 
 #### JX Errors
 
-Errors produced during evaluation of a JX structure include these keys and values:
+The following errors may produced by jx_eval.
 
-| | |
+|message|description|
 |-|-|
-source  | `"jx_eval"`
-code    | A numeric identifier for the type of error.
-
-The following codes and names are used by jx_eval.
-
-|code|name|description|
-|-|-|-|
-0 | `"undefined symbol"`     | The given symbol was not present in the evaluation context.<br>This error includes two additional keys:<ul><li>`"symbol"`: the symbol not found.<li> `"context"`: the evaluation context</ul>
-1 | `"unsupported operator"` | The operator cannot be applied to the type given.<br>This error also includes:<ul><li>`"operator"`: the operator that caused the error, as well as its operands.</ul>
-2 | `"mismatched types"`     | The binary operator can only be applied to operands of the same type.<br>This error also includes:<ul><li>`"operator"`: the operator that caused the error, as well as its operands.</ul>
-3 | `"key not found"`        | Object lookup failed because the given object does not contain the requested key. <br>This error includes two additional keys:<ul><li>`"key"`: the key not found.<li> `"object"`: the object being looked up.</ul>
-4 | `"range error"`          | Array lookup failed because the requested index is outside the given array's bounds.<br>This error includes two additional keys:<ul><li>`"index"`: the index not found.<li> `"array"`: the array being looked up.</ul>
-5 | `"arithmetic error"`     | The operands are outside the given arithmetic operator's range.<br>This error also includes:<ul><li>`"operator"`: the operator that caused the error, as well as its operands.</ul>
-6 | `"invalid arguments"`    | The function arguments are not valid for the given function. <br>This error includes one additional argument:<ul><li>`"function"`: a string with the name of the function as well as its arguments.
+undefined symbol     | The given symbol was not present in the evaluation context.
+unsupported operator | The operator cannot be applied to the type given.
+mismatched types     | The binary operator was applied to operands of incompatible types.
+key not found        | Object lookup failed because the given object does not contain the requested key.
+range error          | Array lookup failed because the requested index is outside the given array's bounds.
+arithmetic error     | The operands are outside the given arithmetic operator's range.
+division by zero     | Some arithmetic operation resulted in a division by zero.
+invalid arguments    | The function arguments are not valid for the given function.
 
 

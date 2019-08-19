@@ -1,4 +1,13 @@
+## Getting Started
 
-[Reference](jx)
-[Tutorial](jx-tutorial)
-[Cheat-sheet](jx-quick)
+  * [JX Tutorial](jx-tutorial)  
+
+## Quick Reference
+
+  * [JX Quick Reference](jx-quick)  
+
+## Complete Reference
+
+  * [JX Quick Reference](jx)
+
+
