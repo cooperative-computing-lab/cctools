@@ -67,7 +67,6 @@ case "$BUILD_CPU" in
 	;;
 esac
 
-include_package_allpairs="allpairs"
 include_package_apps="apps"
 include_package_chirp="chirp"
 include_package_deltadb="deltadb"
@@ -78,9 +77,7 @@ include_package_makeflow="makeflow"
 include_package_parrot="parrot"
 include_package_prune="prune"
 include_package_resource_monitor="resource_monitor"
-include_package_sand="sand"
 include_package_umbrella="umbrella"
-include_package_wavefront="wavefront"
 include_package_weaver="weaver"
 
 swig_bindings=""
@@ -282,22 +279,8 @@ do
 				exit 1
 			fi
 			;;
-		--without-system-sand)
-			include_package_sand=""
-			if [ $include_package_allpairs != "" ]
-			then
-				echo "*** skipping system 'allpairs' because of dependencies"
-				include_package_allpairs=""
-			fi
-			;;
 		--without-system-apps)
 			include_package_apps=""
-			;;
-		--without-system-allpairs)
-			include_package_allpairs=""
-			;;
-		--without-system-wavefront)
-			include_package_wavefront=""
 			;;
 		--without-system-makeflow)
 			include_package_makeflow=""
@@ -379,9 +362,6 @@ Where PACKAGE may be:
 	zlib
 
 And SYSTEM may be:
-	sand
-	allpairs
-	wavefront
 	makeflow
 	ftp-lite
 	chirp
@@ -1513,7 +1493,7 @@ then
 fi
 
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_sand} ${include_package_allpairs} ${include_package_wavefront} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
