@@ -311,7 +311,7 @@ static batch_job_id_t batch_job_k8s_submit (struct batch_queue *q, const char *c
 
 		char *job_id_str = string_format("%d", job_id);
 
-		execlp("/bin/bash", "bash", k8s_script_file_name, "create", pod_id, job_id_str, 
+		execlp("/bin/sh", "sh", k8s_script_file_name, "create", pod_id, job_id_str, 
 				extra_input_files, cmd, extra_output_files, (char *) NULL);
 		_exit(127);
 
@@ -359,7 +359,7 @@ static int batch_job_k8s_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 		char *cmd = string_format("kubectl delete pods %s", pod_id);
 
-		execlp("/bin/bash", "bash", "-c", cmd, (char *) 0);
+		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
 		_exit(errno);
 
     }
@@ -624,7 +624,7 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 
 					} else if (pid == 0) {
 
-						execlp("/bin/bash", "bash", k8s_script_file_name, "exec", curr_pod_id, curr_job_id, 
+						execlp("/bin/sh", "sh", k8s_script_file_name, "exec", curr_pod_id, curr_job_id, 
 								curr_k8s_job_info->extra_input_files, curr_k8s_job_info->cmd, 
 								curr_k8s_job_info->extra_output_files, (char *) NULL);
 						_exit(127);

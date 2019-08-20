@@ -486,7 +486,7 @@ void mpi_worker_handle_execute( struct jx *job )
 
 		const char *cmd = jx_lookup_string(job,"CMD");
 
-		execlp("sh", "sh", "-c", cmd, (char *) 0);
+		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
 		debug(D_BATCH,"failed to execute: %s",strerror(errno));
 		_exit(127);
 	}
