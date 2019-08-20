@@ -16,7 +16,8 @@ typedef enum {
 	PFS_RESOLVE_CHANGED,
 	PFS_RESOLVE_DENIED,
 	PFS_RESOLVE_ENOENT,
-	PFS_RESOLVE_FAILED
+	PFS_RESOLVE_FAILED,
+	PFS_RESOLVE_LOCAL,
 } pfs_resolve_t;
 
 struct pfs_mount_entry {
