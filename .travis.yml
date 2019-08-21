@@ -7,6 +7,12 @@ addons:
 
 script: ./travis.sh
 after_failure: cat cctools.test.fail
+
+notifications:
+  email:
+    on_success: always
+    on_failure: always
+
 matrix:
   include:
   - os: osx
