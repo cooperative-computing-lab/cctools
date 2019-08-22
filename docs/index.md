@@ -41,6 +41,13 @@
   distributed file system and as a platform for execution of scientific
   workflows with full data locality for all job dependencies.
 
+- [**Umbrella**](umbrella) is a tool for specifying and materializing execution
+  environments, from the hardware all the way up to software and data. Umbrella
+  parses a task specification and determines the minimum mechanism necessary to
+  run it. It downloads missing dependencies, and executes the application
+  through the available minimal mechanism, which may be direct execution, a
+  system container, a virtual machine, or submissions to a cloud and cluster environments.
+
 - [**Catalog Server**](catalog)
 
 
