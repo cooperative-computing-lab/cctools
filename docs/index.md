@@ -36,6 +36,11 @@
   conveniently. When combined with Parrot, Chirp allows users to create custom
   wide-area distributed filesystems. 
 
+- [**Catalog Server**](catalog)
+
+
+## Technical Previews
+
 - [**Confuga**](confuga) is an active storage cluster file system designed for
   executing DAG-structured scientific workflows. It is used as a collaborative
   distributed file system and as a platform for execution of scientific
@@ -48,7 +53,12 @@
   through the available minimal mechanism, which may be direct execution, a
   system container, a virtual machine, or submissions to a cloud and cluster environments.
 
-- [**Catalog Server**](catalog)
+- [**Prune**](prune) Prune is a system for executing and precisely preserving
+  scientific workflows to ensure reproducibility.  Every task to be executed in
+  a workflow is wrapped in a functional interface and coupled with a strictly
+  defined environment.
+
+
 
 
 ## Further Information
