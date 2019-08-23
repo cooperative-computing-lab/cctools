@@ -185,7 +185,7 @@ Work Queue master:
 
 `condor_submit_workers -N prune_census_example 10`
 
-See the [Work Queue Manual](workqueue.html) for more information on ways to
+See the [Work Queue Manual](../workqueue) for more information on ways to
 assign workers to execute tasks in the workflow.
 
 (The hep.wq.py script, in the hep example folder, runs the HEP workflow using

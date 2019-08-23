@@ -171,7 +171,7 @@ $ chirp_server -u -
 ```
 
 Alternatively, you may establish your own catalog server. See [Catalog
-Servers](catalog.html) for details.
+Servers](../catalog) for details.
 
 ## Security
 
@@ -450,8 +450,9 @@ Each of the authentication types has a few things you should know:
   username. Naturally, /tmp will only be available to clients on the same
   machine. However, if a shared filesystem directory is available, give that to
   the chirp server via the -c option. Then, any authorized client of the
-  filesystem can authenticate to the server. For example, at Notre Dame, we use
-  **-c /afs/nd.edu/user37/ccl/software/rendezvous** to authenticate via our AFS
+  filesystem can authenticate to the server.
+  For example, at Notre Dame, we use
+  `-c /afs/group/ccl/software/rendezvous` to authenticate via our AFS
   distributed file system.
 
 - **Hostname:** The server will rely on a reverse DNS lookup to establish the
@@ -1169,7 +1170,7 @@ When debugging problems with Chirp and Parrot, we recommend selectively using
 ### Confuga
 
 Confuga is an active storage cluster file system harnessing Chirp. To learn
-more about it, please see the [Confuga manual](confuga.html).
+more about it, please see the [Confuga manual](../confuga).
 
 
 

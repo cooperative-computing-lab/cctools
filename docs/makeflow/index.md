@@ -58,7 +58,7 @@ $ setenv PATH ${HOME}/cctools/bin:$PATH
 ```
 
 For more complex situations, consult the [CCTools installation
-instructions](install.html).
+instructions](../install).
 
 #### Basic Usage
 
@@ -72,7 +72,7 @@ Where possible, it runs commands in parallel to reduce the execution time.
 
 Makeflow suppose two ways of writing a workflow: classic Make and JX. Classic
 Make is very easy to learn and get started, but but can very verbose when
-writing large workflows. The [JX workflow language](jx-tutorial.html) is a
+writing large workflows. The [JX workflow language](../jx/jx-tutorial.md) is a
 little more complex, but allows for more programmable construction of
 workflows.
 
@@ -216,7 +216,7 @@ $ makeflow_graph_log example.makeflow.makeflowlog example.png
     [Visualization](#visualization).
 
 In addition, if you give the workflow a "project name" with the `-N` option,
-it will report its status to the [catalog server](catalog.html) once per
+it will report its status to the [catalog server](../catalog) once per
 minute. The `makeflow_status` command will query the catalog and summarize
 your currently running workloads, like this:
 

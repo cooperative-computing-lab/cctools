@@ -30,7 +30,7 @@ status page](http://ccl.cse.nd.edu/software/workqueue/status).
 Work Queue is part of the [Cooperating Computing
 Tools](http://ccl.cse.nd.edu/software). The CCTools package can be downloaded
 from [this web page](http://ccl.cse.nd.edu/software/download). Follow the
-[installation instructions](install.html) to setup CCTools required for running
+[installation instructions](../install) to setup CCTools required for running
 Work Queue. The documentation for the full set of features of the Work Queue
 API can be viewed from either within the CCTools package or
 [here](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
@@ -437,7 +437,7 @@ catalog server. Work Queue workers that are provided with the master's project
 name query the catalog server to find the hostname and port of the master with
 the given project name. So, to utilize this feature, the master must be
 specified to run in the `WORK_QUEUE_MASTER_MODE_CATALOG`. See [Catalog
-Servers](catalog.html) for details on specifying catalog servers.
+Servers](../catalog) for details on specifying catalog servers.
 
 For example, to have a Work Queue master advertise its project name as
 `myproject`, add the following code snippet after creating the queue:

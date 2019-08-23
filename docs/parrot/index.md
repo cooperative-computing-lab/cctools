@@ -48,7 +48,7 @@ our [forum](http://ccl.cse.nd.edu/community/forum) and bugs to our
 
 Parrot is distributed as part of the [Cooperative Computing
 Tools](http://ccl.cse.nd.edu/software). To install, please read the [cctools
-installation instructions](install.html).
+installation instructions](../install).
 
 ## Examples
 
@@ -114,7 +114,7 @@ currently supported services:
 /hdfs/namenode:port/path| Hadoop Distributed File System (HDFS)| [more info](http://hadoop.apache.org/common/docs/current/hdfs_user_guide.html) |
 /xrootd/host:port/path| XRootD/Scalla Distributed Storage System (xrootd)| [more info](http://project-arda-dev.web.cern.ch/project-arda- dev/xrootd/site/index.html) |
 /cvmfs/grid.cern.ch/path| CernVM-FS| [more info](http://cernvm.cern.ch/portal/filesystem) |
-/chirp/target.cs.wisc.edu/path| Chirp Storage System| included + [more info](chirp.html)
+/chirp/target.cs.wisc.edu/path| Chirp Storage System| included + [more info](../chirp)
 
 The following protocols have been supported in the past, but are not currently
 in active use.
@@ -632,8 +632,8 @@ additional advantages over plain HTTP:
 
 ### iRODS
 
-To use Parrot with [iRODS](irods.org), you must first follow the [special
-build instructions](install.html#irods).
+To use Parrot with [iRODS](http://www.irods.org), you must first follow the [special
+build instructions](../install).
 
 Then, use the `iinit` command to log into the desired iRODS service, and
 verify that you are connected with the `ils` command. If those work, then you
@@ -818,7 +818,7 @@ items in the current directory. Now, suppose that `MyFriend` wants to allow
 `Freddy` read access to the same directory. Simply edit the ACL file to read:
 `MyFriend rwlxa Freddy rl ` Identity boxing and ACLs are particularly useful
 when using distributed storage. You can read more about ACLs and identity
-boxing in the [Chirp](chirp.html) manual.
+boxing in the [Chirp](../chirp) manual.
 
 ## 64-Bit Support
 

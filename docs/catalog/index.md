@@ -171,7 +171,7 @@ commas, e.g. `$ chirp_server -u 'dopey,happy:9000,grumpy'`
 
 (Hint: If you want to ensure that your chirp and catalog servers run
 continuously and are automatically restarted after an upgrade, consider using
-[Watchdog](watchdog.html).)
+[Watchdog](../watchdog).)
 
 
 __Last Modified: August 2019__

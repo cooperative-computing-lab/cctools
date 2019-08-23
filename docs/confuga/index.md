@@ -18,7 +18,7 @@ head node.
 
 A Confuga cluster can be setup as an ordinary user or maintained as a dedicated
 service within the cluster. The head node and storage nodes run the
-[Chirp](chirp.html) file system service. Users may interact with Confuga using
+[Chirp](../chirp) file system service. Users may interact with Confuga using
 Chirp's client toolset [chirp(1)](../chirp), [Parrot](../parrot), or
 [Makeflow](../makeflow).
 
@@ -181,7 +181,7 @@ $ chirp localhost:9000 get /capitol.montage.gif
 $ display ./capitol.montage.gif
 ```
 
-You can also achieve the same thing using [Parrot](parrot.html):
+You can also achieve the same thing using [Parrot](../parrot):
 
 ```sh
 $ parrot_run display /chirp/localhost:9000/capitol.montage.gif
@@ -298,7 +298,7 @@ authenticate with its storage nodes.
 
 Lastly, Confuga handles the details of storage node to storage node
 authentication. This is done using Chirp's [ticket authentication
-mechanism.](../chirp.html#ticket-authentication) You as a user do not need to
+mechanism.](../chirp#ticket-authentication) You as a user do not need to
 do anything special to get this working beyond enabling ticket authentication (`--auth=ticket`) on
 each storage node.
 
@@ -307,7 +307,7 @@ each storage node.
 Confuga offers the same strong authorization system as Chirp. This includes
 per-directory access control lists (ACL). For information on authorization
 controls in Chirp, please see the [Authorization
-section](chirp.html#security) in the Chirp manual.
+section](../chirp#security) in the Chirp manual.
 
 ## Debugging
 
@@ -333,7 +333,7 @@ $ makeflow --batch-type=chirp \
 ### AFS
 
 Storage nodes used by Confuga must [not use AFS as their backing
-storage](chirp.html#jobs.afs). Confuga requires use of the Chirp job `LINK`
+storage](../chirp#chirp-jobs-on-afs). Confuga requires use of the Chirp job `LINK`
 file binding. For this reason, it cannot use Chirp servers running with
 `--root` on AFS.
 

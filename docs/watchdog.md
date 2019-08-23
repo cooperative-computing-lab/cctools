@@ -25,7 +25,8 @@ cluster, these actions are taken with an exponential backoff and a random
 factor.
 
 **watchdog** is recommended for running the [chirp and catalog
-servers](chirp.html) found elsewhere in this package.
+servers](../chirp) found elsewhere in this package.
+
 
 ## Invocation⇗
 
