@@ -1,6 +1,6 @@
 # Cooperative Computing Tools Documentation
 
-**[Getting Started](install.html)**
+**[Getting Started](install)**
 
 ## Components
 
