@@ -7,9 +7,9 @@ All rights reserved.
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.
 
-## Introduction⇗
+## Introduction
 
-[![](images/wavefront_small.gif)](wavefront_large.gif) |
+[![](images/wavefront_small.gif)](images/wavefront_large.gif) |
 
 Wavefront( array R[x,0], array R[0,y], function F(x,y,d) )  
 returns matrix R where  
@@ -47,7 +47,7 @@ mymachine.somewhere.edu 9123` in which 9123 is the default port for Work Queue
 applications. Work Queue provides convenient alternatives to launch many
 workers simultaneously for different batch systems (e.g. condor), which are
 explained in the section **Project names** in the [ Work Queue manual
-](workqueue.html). Wavefront will check for a few error conditions, and then
+](../work_queue). Wavefront will check for a few error conditions, and then
 start to run, showing progress on the console like this: `# elapsed time :
 waiting jobs / running jobs / complete jobs (percent complete) 0 : 0 / 1 / 0
 (%0.00) 5 : 0 / 2 / 1 (%1.23) 10 : 0 / 3 / 3 (%3.70) 16 : 0 / 4 / 6 (%7.41) 21
@@ -70,7 +70,7 @@ all cells at once, so some must wait. Also note that the wave does not need to
 run synchronously: cells may begin to compute as soon as their dependencies
 are satisfied.
 
-## For More Information⇗
+## For More Information
 
 For the latest information about Wavefront, please visit our [web
 site](http://ccl.cse.nd.edu/software/wavefront) and subscribe to our [mailing

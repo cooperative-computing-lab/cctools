@@ -8,7 +8,7 @@ markdown_extensions:
         permalink: True
     - admonition
 
-docs_dir: docs
-site_dir: site
+docs_dir: doc/manuals
+site_dir: doc/mkdocs-site
 
 theme: readthedocs

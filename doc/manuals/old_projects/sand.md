@@ -7,7 +7,7 @@ All rights reserved.
 This software is distributed under the GNU General Public License.  
 See the file COPYING for details.
 
-## Overview⇗
+## Overview
 
 SAND is a set of modules for accelerating genome assembly and other
 bioinformatics tasks. Using the [Work
@@ -20,9 +20,9 @@ Assembler, or can be used as a standalone tool by advanced users.
 SAND is part of the [Cooperating Computing
 Tools](http://ccl.cse.nd.edu/software). You can download the CCTools from
 [this web page](http://ccl.cse.nd.edu/software/download), follow the
-[installation instructions](install.html), and you are ready to go.
+[installation instructions](../install), and you are ready to go.
 
-## Using SAND with the Celera Assembler⇗
+## Using SAND with the Celera Assembler
 
 If you are already using the Celera Assembler version 5.4, you can easily
 switch to using SAND to accelerate assemblies by using our modified
@@ -81,7 +81,7 @@ available, so you can either run another master with the same workers, remove
 them from the batch system, or wait for them to expire. If you do nothing for
 15 minutes, they will automatically exit.
 
-## SAND in More Detail⇗
+## SAND in More Detail
 
 This section explains the two SAND modules in more detail, if you would like
 to tune the performance or use them independently of Celera. We assume that
@@ -121,7 +121,7 @@ Done Time | Loaded Loaded | Speedup 0 | 0 0 | 0 0 0 0 0.00 | 0 0 | 0.00 8 | 0
 (`.ovl`) file that can be fed into the final stages of your assembler to
 complete the consensus step.
 
-## Tuning Suggestions⇗
+## Tuning Suggestions
 
 * As a rule of thumb, a single task should take a minute or two. If tasks are much longer than that, it becomes more difficult to measure progress and recover from failures. If tasks are much shorter than that, the overhead of managing the tasks becomes excessive. Use the `-n` parameter to increase or decrease the size of tasks. 
 * When using banded alignment (the default), the `-q` match quality parameter has a significant effect on speed. A higher quality threshhold will consider more alignments, but take longer and produce more output. 
@@ -138,7 +138,7 @@ complete the consensus step.
 * K-Seqs Loaded indicates the number of sequences loaded into memory (in thousands). 
 * Speedup is the approximate speed of the distributed framework, relative to one processor. 
 
-## For More Information⇗
+## For More Information
 
 For the latest information about SAND, please visit our [web
 site](http://ccl.cse.nd.edu/software/sand) and subscribe to our [mailing

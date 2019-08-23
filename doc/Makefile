@@ -63,7 +63,6 @@ install: all
 	if [ -f man/chirp.html ]; then cp man/*.html $(CCTOOLS_INSTALL_DIR)/doc/man; fi
 	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi
 	if [ -d api ]; then cp -rp api $(CCTOOLS_INSTALL_DIR)/doc; fi
-	if [ -d images ]; then cp images/* $(CCTOOLS_INSTALL_DIR)/doc/images; fi
 
 test:
 
