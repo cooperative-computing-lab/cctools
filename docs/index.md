@@ -39,7 +39,9 @@
 - [**Catalog Server**](catalog)
 
 
-## Technical Previews
+## Technical Previews and Example Applications
+
+- [**AWE**](awe)
 
 - [**Confuga**](confuga) is an active storage cluster file system designed for
   executing DAG-structured scientific workflows. It is used as a collaborative
