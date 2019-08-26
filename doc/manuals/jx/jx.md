@@ -1,4 +1,4 @@
-# JX Workflow Language
+# JX Workflow Language Reference
 
 ## Overview
 
