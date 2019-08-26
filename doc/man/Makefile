@@ -17,17 +17,20 @@ htmlpages: ${HTMLFILES}
 manpages: ${ZIPFILES}
 
 html/%.html: m4/%.m4
+	mkdir -p html
 	m4 -DHTML ${CCTOOLS_M4_ARGS} $< > $@
 
 man/%.1: m4/%.m4
+	mkdir -p man
 	m4 -DMAN ${CCTOOLS_M4_ARGS} $< > $@
 
 man/%.gz: man/%.1
+	mkdir -p man
 	gzip < $< > $@
 
 txt/%.txt: man/%.1
+	mkdir -p txt
 	nroff -man $< > $@
-
 
 install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
