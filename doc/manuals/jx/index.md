@@ -19,6 +19,6 @@ higher-level application.
 
 ## Complete Reference
 
-  * [JX Quick Reference](jx)
+  * [JX Complete Reference](jx)
 
 
