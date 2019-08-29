@@ -120,6 +120,7 @@ typedef enum {
 	JX_BUILTIN_DIRNAME,
 	JX_BUILTIN_LISTDIR,
 	JX_BUILTIN_ESCAPE,
+	JX_BUILTIN_TEMPLATE,
 } jx_builtin_t;
 
 struct jx_function {

@@ -460,3 +460,11 @@ struct jx *jx_function_escape(struct jx *args) {
 	FAILURE:
 	FAIL(funcname, args, err);
 }
+
+
+struct jx *jx_function_template(struct jx *args, struct jx *ctx) {
+	assert(args);
+	assert(ctx);
+
+	return jx_null();
+}
