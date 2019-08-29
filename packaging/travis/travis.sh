@@ -1,19 +1,23 @@
-#!/bin/bash
+#! /bin/bash
 
 set -ex
 
+# Find cctools src directory
+CCTOOLS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
+
 if [ -z "$DOCKER_IMAGE" ]; then
-    ./travis_build.sh
+    ${CCTOOLS_SRC}/packaging/travis/travis_build.sh
 else
     docker run \
         --privileged \
         --ulimit nofile=65536 \
-        -v "$(pwd):/root" \
+        -v "${CCTOOLS_SRC}:/root" \
         -v /tmp:/tmp \
         -w /root \
         -e TRAVIS_TAG \
         -e TRAVIS_COMMIT \
         -e DOCKER_IMAGE \
         "$DOCKER_IMAGE" \
-        ./travis_build.sh
+        ./packaging/travis/travis_build.sh
 fi
+
