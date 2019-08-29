@@ -1,0 +1,33 @@
+#! /bin/bash
+
+set -xe
+
+# Save the dir from which the script was called
+ORG_DIR=$(pwd)
+
+# Find cctools src directory
+CCTOOLS_SRC=$(readlink -m $(dirname "${BASH_SOURCE[0]}")/../..)
+
+# Ensure we end up in the directory we started regardless of how the script
+# ends.
+function finish {
+    cd ${ORG_DIR}
+}
+trap finish EXIT
+
+
+# dependencies to be included statically in parrot live in /opt/vc3 in the
+# container images.
+DEPS_DIR=/opt/vc3/cctools-deps
+DEPS=$(/bin/ls "$DEPS_DIR" || true)
+DEP_ARGS=""
+for dep in $DEPS; do
+    DEP_ARGS="$DEP_ARGS --with-$dep-path $DEPS_DIR/$dep"
+done
+
+cd ${CCTOOLS_SRC}
+
+./configure --strict $DEP_ARGS "$@"
+make install
+make test
+
