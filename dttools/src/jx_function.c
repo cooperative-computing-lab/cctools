@@ -581,6 +581,7 @@ struct jx *jx_function_template(struct jx *args, struct jx *ctx) {
 		if (!jx_istype(overrides, JX_OBJECT)) {
 			FAIL(funcname, args, "overrides must be an object");
 		}
+		/* Else falls through. */
 	case 1:
 		if (!jx_istype(template, JX_STRING)) {
 			FAIL(funcname, args, "template must be a string");
