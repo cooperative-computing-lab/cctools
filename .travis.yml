@@ -5,7 +5,7 @@ addons:
   homebrew:
     packages: swig
 
-script: "./travis.sh"
+script: "./packaging/travis/travis.sh"
 after_failure: "cat cctools.test.fail"
 
 notifications:
