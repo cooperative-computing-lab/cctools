@@ -134,12 +134,8 @@ $command_for{centos} = 'yum install -y';
 $versions_of{fedora} = [ qw{ 30  } ];
 $command_for{fedora} = 'dnf install -y';
 
-$versions_of{ubuntu} = [ qw{ 18.04  } ];
-$command_for{ubuntu} = 'apt-get install -y';
-
 $versions_of{debian} = [ qw{ 9.9 } ];
-$command_for{debian} = $command_for{ubuntu};
-
+$command_for{debian} = 'apt-get install -y';
 
 # e.g., $package_for{distro}{version}{dependency} == 'package'
 my %package_for;
@@ -233,10 +229,12 @@ $extras_for{fedora}{default}      = [ ];
 
 $preinstall_for{fedora}{default}  = [ ];
 
-$postinstall_for{fedora}{default} = [ ];
+$postinstall_for{fedora}{default} = [
+	@{$builder},
+];
 
-########## UBUNTU ########## 
-$package_for{ubuntu}{default} = {
+########## debian ########## 
+$package_for{debian}{default} = {
 bzip2                    => 'bzip2',
 cc                       => 'gcc',
 cmake                    => 'cmake',
@@ -278,13 +276,13 @@ xrootd                   => [],             # from builder
 zlib                     => 'libz-dev',
 };
 
-$extras_for{ubuntu}{default} = ['tzdata', 'locales', 'libssl-dev'];
+$extras_for{debian}{default} = ['tzdata', 'locales', 'libssl-dev'];
 
-$preinstall_for{ubuntu}{default} = [
+$preinstall_for{debian}{default} = [
 	"apt-get update"
 ];
 		
-$postinstall_for{ubuntu}{default} = [
+$postinstall_for{debian}{default} = [
 	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
 	'/usr/sbin/locale-gen',
 	'apt-get clean',
@@ -297,16 +295,6 @@ $postinstall_for{ubuntu}{default} = [
 	# @{$irods},
 	# @{$xrootd}
 ];
-
-########## DEBIAN ##########
-$package_for{debian}{default}     = { %{$package_for{ubuntu}{default}} };
-
-$extras_for{debian}{default}      = [ @{$extras_for{ubuntu}{default}} ];
-
-$preinstall_for{debian}{default}  = [ @{$preinstall_for{ubuntu}{default}} ];
-
-$postinstall_for{debian}{default} = [ @{$postinstall_for{ubuntu}{default}} ];
-
 
 ########## ALL ##########
 
