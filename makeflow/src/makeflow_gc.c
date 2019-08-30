@@ -16,7 +16,6 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "makeflow_log.h"
-#include "makeflow_wrapper.h"
 #include "makeflow_gc.h"
 
 #include <assert.h>

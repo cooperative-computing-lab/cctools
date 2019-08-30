@@ -48,7 +48,6 @@ See the file COPYING for details.
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
-#include "makeflow_wrapper.h"
 #include "makeflow_mounts.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
@@ -163,8 +162,6 @@ once weaver/pbui tools are updated.)
 */
 static int log_verbose_mode = 0;
 
-static struct makeflow_wrapper *wrapper = 0;
-
 static int catalog_reporting_on = 0;
 
 static char *mountfile = NULL;
@@ -181,32 +178,6 @@ local resources, regardless of the batch queue type.
 static int is_local_job( struct dag_node *n )
 {
 	return n->local_job || batch_queue_type==BATCH_QUEUE_TYPE_LOCAL;
-}
-
-/*
-Generates file list for node based on node files, wrapper
-input files, and monitor input files. Relies on %% nodeid
-replacement for monitor file names.
-*/
-
-void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
-{
-	if(wrapper)  makeflow_wrapper_generate_files(task, wrapper->input_files, wrapper->output_files, n, wrapper);
-}
-
-/*
-Expand a dag_node into a text list of input files,
-output files, and a command, by applying all wrappers
-and settings.  Used at both job submission and completion
-to obtain identical strings.
-*/
-
-static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct batch_task *task )
-{
-	makeflow_generate_files(n, task);
-
-	/* Expand the command according to each of the wrappers */
-	makeflow_wrap_wrapper(task, n, wrapper);
 }
 
 /*
@@ -322,8 +293,8 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	if(!n->task){
 		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
-		/* This augments the task struct, should be replaced with hook in future. */
-		makeflow_node_expand(n, q, n->task);
+		/* Hooks are not applied. This should only happen in log recovery.
+		   If files were created in previous runs they are logged, orphaned, and cleaned. */
 	}
 
 	/* Clean all files associated with task, includes node and hook files. */
@@ -458,8 +429,10 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	if(!n->task){
 		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
-		/* This augments the task struct, should be replaced with hook in future. */
-		makeflow_node_expand(n, makeflow_get_queue(n), n->task);
+		/* Hooks may need to be applied for proper clean-up. Not currently
+		   done as most files will be regenerated. Global file may persist
+		   until the until the task is completed again if there were
+		   partial files. Wrapper expansion was removed. */
 	}
 
 	// Clean up things associated with this node
@@ -571,8 +544,7 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 
 /*
 Submit a node to the appropriate batch system, after materializing
-the necessary list of input and output files, and applying all
-wrappers and options.
+the necessary list of input and output files, and applying all options.
 */
 
 static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
@@ -598,9 +570,6 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	/* Create task from node information */
 	struct batch_task *task = makeflow_node_to_task(n, queue, should_send_all_local_environment);
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
-
-	/* This augments the task struct, should be replaced with node_submit in future. */
-	makeflow_node_expand(n, queue, task);
 	n->task = task;
 
 	int hook_return = makeflow_hook_node_submit(n, task);
@@ -945,7 +914,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next) {
 
-		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
+		if(itable_size(n->remote_names) > 0){
 			if(n->local_job) {
 				debug(D_ERROR, "Remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d (line %d).\n", n->nodeid, n->linenum);
 				error = 1;
@@ -1274,6 +1243,7 @@ int main(int argc, char *argv[])
 	
 	struct jx *hook_args = jx_object(NULL);
 	char *k8s_image = NULL;
+	extern struct makeflow_hook makeflow_hook_basic_wrapper;
 	extern struct makeflow_hook makeflow_hook_docker;
 	extern struct makeflow_hook makeflow_hook_enforcement;
 	extern struct makeflow_hook makeflow_hook_example;
@@ -1785,16 +1755,25 @@ int main(int argc, char *argv[])
 				log_verbose_mode = 1;
 				break;
 			case LONG_OPT_WRAPPER:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				makeflow_wrapper_add_command(wrapper, optarg);
+				if (makeflow_hook_register(&makeflow_hook_basic_wrapper, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				if(!jx_lookup(hook_args, "wrapper_command"))
+					jx_insert(hook_args, jx_string("wrapper_command"),jx_array(NULL));
+				jx_array_append(jx_lookup(hook_args, "wrapper_command"), jx_string(optarg));
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				makeflow_wrapper_add_input_file(wrapper, optarg);
+				if (makeflow_hook_register(&makeflow_hook_basic_wrapper, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				if(!jx_lookup(hook_args, "wrapper_input"))
+					jx_insert(hook_args, jx_string("wrapper_input"),jx_array(NULL));
+				jx_array_append(jx_lookup(hook_args, "wrapper_input"), jx_string(optarg));
 				break;
 			case LONG_OPT_WRAPPER_OUTPUT:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				makeflow_wrapper_add_output_file(wrapper, optarg);
+				if (makeflow_hook_register(&makeflow_hook_basic_wrapper, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				if(!jx_lookup(hook_args, "wrapper_output"))
+					jx_insert(hook_args, jx_string("wrapper_output"),jx_array(NULL));
+				jx_array_append(jx_lookup(hook_args, "wrapper_output"), jx_string(optarg));
 				break;
 			case LONG_OPT_SHARED_FS:
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
@@ -2435,10 +2414,6 @@ EXIT_WITH_FAILURE:
 
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
-
-	if(wrapper){
-		makeflow_wrapper_delete(wrapper);
-	}
 
 	int exit_value;
 	if(makeflow_abort_flag) {
