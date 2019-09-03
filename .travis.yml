@@ -5,7 +5,7 @@ addons:
   homebrew:
     packages: swig
 
-script: "./travis.sh"
+script: "./packaging/travis/travis.sh"
 after_failure: "cat cctools.test.fail"
 
 notifications:
@@ -30,13 +30,7 @@ matrix:
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-centos7
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04
-  - os: linux
-    compiler: gcc
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-debian9.9
-  - os: linux
-    compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-opensuse42.3
   - os: linux
     compiler: gcc
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-fedora30

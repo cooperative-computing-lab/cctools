@@ -13,17 +13,13 @@ case "$TRAVIS_OS_NAME" in
 esac
 D=/tmp/cctools-$BUILD_ID-${IMAGE_ID#cctools-env:}
 
-DEPS_DIR=/opt/vc3/cctools-deps
-DEPS=$(/bin/ls "$DEPS_DIR" || true)
-DEP_ARGS=""
-for dep in $DEPS; do
-    DEP_ARGS="$DEP_ARGS --with-$dep-path $DEPS_DIR/$dep"
-done
 
-./configure --strict --prefix "$D" $DEP_ARGS
-make install
-make test
+# Find cctools src directory, so we can call the configure script
+CCTOOLS_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../.. && pwd)"
+
+"${CCTOOLS_SRC}"/packaging/scripts/configure-from-image --prefix "${D}"
 
 if [ -n "$DOCKER_IMAGE" ] || [ "$TRAVIS_OS_NAME" = osx ]; then
     tar -cz -C "$(dirname "$D")" -f "$D.tar.gz" "$(basename "$D")"
 fi
+
