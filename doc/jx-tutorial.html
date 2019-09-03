@@ -202,14 +202,14 @@ instance of the job:
 
 Note that the value of <tt>N</tt> is substituted into both the commands
 string and the output list by using the plus sign to indicate string
-concatenation.  If you prefer a more <tt>printf</tt> style, you can
-use the <tt>format()</tt> function to insert values into strings
-into places indicate by percent codes:
+concatenation.  If you prefer a more compact style, you can
+use the <tt>template()</tt> function to insert values into strings
+into places indicate by curly braces:
 
 <code>{
    "rules": [
       {
-         "command" : <b>format("./simulate.py -n %d > output.%d.txt",N,N)</b>
+         "command" : <b>template("./simulate.py -n {N} > output.{N}.txt")</b>
          "inputs" : [ "simulate.py" ],
          "outputs" : [ "output."+N+".txt" ],
       } for N in [ 1, 2, 3 ]
