@@ -636,3 +636,78 @@ value:      "pi is 3.141592654"
 expression: error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"})
 value:      error({"source":"jx_eval","op":10+[1],"line":409,"file":"jx_eval.c","message":"mismatched types for operator","name":"TypeError"})
 
+expression: template()
+value:      error("function template on line 0: template string is required")
+
+expression: template(2)
+value:      error("function template on line 0: template must be a string")
+
+expression: template(2,{})
+value:      error("function template on line 0: template must be a string")
+
+expression: template("str",2)
+value:      error("function template on line 0: overrides must be an object")
+
+expression: template("str",{},0)
+value:      error("function template on line 0: at most two arguments are allowed")
+
+expression: template("str")
+value:      "str"
+
+expression: template("")
+value:      ""
+
+expression: template("{infile}")
+value:      "mydata"
+
+expression: template(" {x}")
+value:      " 10"
+
+expression: template("{f}")
+value:      "0.5"
+
+expression: template("test { g} and {y\t} ")
+value:      "test 3.141592654 and 20 "
+
+expression: template("{{{f}}}")
+value:      "{0.5}"
+
+expression: template("{zzzzzzzzzzzzzzzzzzzzzz}")
+value:      error("function template on line 278: undefined symbol in template")
+
+expression: template("{")
+value:      error("function template on line 279: unterminated template expression")
+
+expression: template("}")
+value:      error("function template on line 280: unmatched } in template")
+
+expression: template("{}")
+value:      error("function template on line 281: invalid template; each expression must be a single identifier")
+
+expression: template("{x y}")
+value:      error("function template on line 282: invalid template; each expression must be a single identifier")
+
+expression: template("{x+y}")
+value:      error("function template on line 283: invalid template; each expression must be a single identifier")
+
+expression: template("{12}")
+value:      error("function template on line 284: invalid template; each expression must be a single identifier")
+
+expression: template("f}")
+value:      error("function template on line 285: unmatched } in template")
+
+expression: template("{f")
+value:      error("function template on line 286: unterminated template expression")
+
+expression: template("{f}",{"f":"ok"})
+value:      "ok"
+
+expression: template("{f} {q}",{"q":"ok"})
+value:      "0.5 ok"
+
+expression: template("{q}",{"f":"ok"})
+value:      error("function template on line 289: undefined symbol in template")
+
+expression: template("bad {object}")
+value:      error("function template on line 290: cannot format expression in template")
+

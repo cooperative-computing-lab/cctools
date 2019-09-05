@@ -15,6 +15,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <dirent.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include "jx.h"
 #include "jx_match.h"
@@ -459,4 +460,134 @@ struct jx *jx_function_escape(struct jx *args) {
 
 	FAILURE:
 	FAIL(funcname, args, err);
+}
+
+static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx *overrides) {
+	const char *funcname = "template";
+
+	assert(template);
+	assert(ctx);
+	assert(jx_istype(template, JX_STRING));
+	assert(jx_istype(ctx, JX_OBJECT));
+	assert(!overrides || jx_istype(overrides, JX_OBJECT));
+
+	const char *message = NULL;
+	char *s = template->u.string_value;
+
+	buffer_t buf;
+	buffer_t var;
+	buffer_init(&buf);
+	buffer_init(&var);
+
+	while (*s) {
+		// regular character
+		if (*s != '{' && *s != '}') {
+			buffer_putlstring(&buf, s, 1);
+			s++;
+			continue;
+		}
+		// quoted {
+		if (*s == '{' && *(s+1) == '{') {
+			buffer_putliteral(&buf, "{");
+			s += 2;
+			continue;
+		}
+		// quoted }
+		if (*s == '}' && *(s+1) == '}') {
+			buffer_putliteral(&buf, "}");
+			s += 2;
+			continue;
+		}
+
+		// got to here, so must be an expression
+		if (*s != '{') {
+			message = "unmatched } in template";
+			goto FAIL;
+		}
+		s++;
+		while (isspace(*s)) s++; // eat leading whitespace
+
+		if (*s == 0) {
+			message = "unterminated template expression";
+			goto FAIL;
+		}
+		if (!isalpha(*s) && *s != '_') {
+			message = "invalid template; each expression must be a single identifier";
+			goto FAIL;
+		}
+		buffer_putlstring(&var, s, 1); // copy identifier to buffer
+		s++;
+		while (isalnum(*s) || *s == '_') {
+			buffer_putlstring(&var, s, 1);
+			s++;
+		}
+		while (isspace(*s)) s++; // eat trailing whitespace
+
+		if (*s == 0) {
+			message = "unterminated template expression";
+			goto FAIL;
+		}
+		if (*s != '}') {
+			message = "invalid template; each expression must be a single identifier";
+			goto FAIL;
+		}
+		s++;
+		struct jx *k = jx_lookup(overrides, buffer_tostring(&var));
+		if (!k) {
+			k = jx_lookup(ctx, buffer_tostring(&var));
+		}
+		if (!k) {
+			message = "undefined symbol in template";
+			goto FAIL;
+		}
+		switch (k->type) {
+			case JX_INTEGER:
+			case JX_DOUBLE:
+				jx_print_buffer(k, &buf);
+				break;
+			case JX_STRING:
+				buffer_putstring(&buf, k->u.string_value);
+				break;
+			default:
+				message = "cannot format expression in template";
+				goto FAIL;
+		}
+		buffer_rewind(&var, 0);
+	}
+
+FAIL:
+	buffer_free(&buf);
+	buffer_free(&var);
+	if (message) {
+		FAIL(funcname, template, message);
+	}
+	return jx_string(buffer_tostring(&buf));
+}
+
+struct jx *jx_function_template(struct jx *args, struct jx *ctx) {
+	assert(args);
+	assert(ctx);
+	assert(jx_istype(args, JX_ARRAY));
+	assert(jx_istype(ctx, JX_OBJECT));
+
+	const char *funcname = "template";
+	struct jx *template = jx_array_index(args, 0);
+	struct jx *overrides = jx_array_index(args, 1);
+
+	switch (jx_array_length(args)) {
+	case 0:
+		FAIL(funcname, args, "template string is required");
+	case 2:
+		if (!jx_istype(overrides, JX_OBJECT)) {
+			FAIL(funcname, args, "overrides must be an object");
+		}
+		/* Else falls through. */
+	case 1:
+		if (!jx_istype(template, JX_STRING)) {
+			FAIL(funcname, args, "template must be a string");
+		}
+		return expand_template(template, ctx, overrides);
+	default:
+		FAIL(funcname, args, "at most two arguments are allowed");
+	}
 }

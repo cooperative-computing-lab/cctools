@@ -549,6 +549,31 @@ JX's format function could be written in Python as follows.
 </code></pre>
 </p>
 
+<blockquote>
+<pre><code>template(A[, B]) -&gt; String
+</code></pre>
+
+<p>where A = String and B = Object</p>
+</blockquote>
+
+<p>
+Replaces format placeholders in the given string.
+This function is based on Python's sting formatting capabilities.
+Variable names enclosed in curly braces are looked up in the current context.
+Suppose that the ID variable is defined as 10.
+<pre><code>template("file{ID}.txt")
+= "file10.txt"
+</code></pre>
+
+It's also possible to specify values directly within the template expression.
+The optional second argument is an object consisting of name-value pairs to use in addition to the local context.
+This allows overriding defined variables and writing complex expressions.
+Suppose that the variable N is defined as 48.
+<pre><code>
+template("SM{PLATE}_{ID}.sam", {"PLATE": "10001", "ID": N/2 - 1})
+= "SM10001_23.sam"
+</code></pre>
+
 <h2 id="comprehensions">Comprehensions<a class="sectionlink" href="#comprehensions" title="Link to this section.">&#x21d7;</a></h2>
 
 <p>
