@@ -46,6 +46,10 @@ LIST_ITEM(CODE(BOLD(owner)) This is user who sent the update.)
 LIST_END
 OPTIONS_END
 
+The field CODE(name) is intended to give a human-readable name to a service or
+application which accepts incoming connections at CODE(port).
+
+
 SECTION(ENVIRONMENT VARIABLES)
 
 LIST_BEGIN

@@ -127,6 +127,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 
 #include "buffer.h"
+#include "catalog_query.h"
 #include "cctools.h"
 #include "copy_stream.h"
 #include "create_dir.h"
@@ -145,6 +146,8 @@ See the file COPYING for details.
 #include "xxmalloc.h"
 #include "elfheader.h"
 #include "domain_name_cache.h"
+#include "uuid.h"
+#include "random.h"
 
 #include "rmonitor.h"
 #include "rmonitor_poll_internal.h"
@@ -234,6 +237,18 @@ struct list *snapshots = NULL;          /* list of snapshots, as json objects. *
 struct list *snapshot_labels = NULL;    /* list of labels for current snapshot. */
 
 struct itable *snapshot_watch_pids;     /* pid of all processes watching files for snapshots. */
+
+
+char *catalog_task_readable_name = NULL;
+char *catalog_uuid    = NULL;
+char *catalog_hosts   = NULL;
+char *catalog_project = NULL;
+char *catalog_owner   = NULL;
+
+uint64_t catalog_interval = 0;
+uint64_t catalog_last_update_time = 0;
+
+int64_t catalog_interval_default = 30;
 
 /***
  * Utility functions (open log files, proc files, measure time)
@@ -329,7 +344,8 @@ void parse_limit_string(struct rmsummary *limits, char *str)
 	char *delim = strchr(pair, ':');
 
 	if(!delim) {
-		fatal("Missing ':' in '%s'\n", str);
+		debug(D_FATAL, "Missing ':' in '%s'\n", str);
+		exit(RM_MONITOR_ERROR);
 	}
 
 	*delim = '\0';
@@ -343,7 +359,8 @@ void parse_limit_string(struct rmsummary *limits, char *str)
 	status = string_is_float(value, &d);
 
 	if(!status) {
-		fatal("Invalid limit field '%s' or value '%s'\n", field, value);
+		debug(D_FATAL, "Invalid limit field '%s' or value '%s'\n", field, value);
+		exit(RM_MONITOR_ERROR);
 	}
 
 	if(strcmp(field, "start") == 0 || strcmp(field, "end") == 0) {
@@ -373,7 +390,8 @@ void add_verbatim_field(const char *str) {
 	char *delim = strchr(pair, ':');
 
 	if(!delim) {
-		fatal("Missing ':' in '%s'\n", str);
+		debug(D_FATAL, "Missing ':' in '%s'\n", str);
+		exit(RM_MONITOR_ERROR);
 	}
 
 	*delim = '\0';
@@ -460,6 +478,38 @@ int rmonitor_determine_exec_type(const char *executable) {
 
 	return 0;
 }
+
+int send_catalog_update(struct rmsummary *s, int force) {
+
+	if(!catalog_task_readable_name) {
+		return 1;
+	}
+
+	if(!force && (timestamp_get() < catalog_last_update_time + catalog_interval * USECOND)) {
+		return 1;
+	}
+
+	struct jx *j = rmsummary_to_json(s, /* all, not only resources */ 0);
+
+	jx_insert_string(j, "type",    "task");
+	jx_insert_string(j, "uuid",    catalog_uuid);
+	jx_insert_string(j, "owner",   catalog_owner);
+	jx_insert_string(j, "task",    catalog_task_readable_name);
+	jx_insert_string(j, "project", catalog_project);
+
+	char *str = jx_print_string(j);
+
+	debug(D_RMON, "Sending resources snapshot to catalog server(s) at %s ...", catalog_hosts);
+	int status = catalog_query_send_update_conditional(catalog_hosts, str);
+
+	free(str);
+	jx_delete(j);
+
+	catalog_last_update_time = timestamp_get();
+
+	return status;
+}
+
 
 
 /***
@@ -1598,6 +1648,8 @@ void rmonitor_final_cleanup(int signum)
 
     status = rmonitor_final_summary();
 
+	send_catalog_update(summary, 1);
+
 	fclose(log_summary);
 
     if(log_series)
@@ -2043,6 +2095,10 @@ static void show_help(const char *cmd)
     fprintf(stdout, "%-30s See --without-disk-footprint below.\n", "");
     fprintf(stdout, "%-30s Do not measure working directory footprint. Overrides --measure-dir and --follow-chdir.\n", "--without-disk-footprint");
     fprintf(stdout, "\n");
+    fprintf(stdout, "%-30s Report measurements to catalog server with \"task\"=<task-name>.\n", "--catalog-task-name=<name>");
+    fprintf(stdout, "%-30s Set project name of catalog update to <project> (default=<task-name>).\n", "--catalog-project=<project>");
+    fprintf(stdout, "%-30s Use catalog server <catalog>. (default=catalog.cse.nd.edu:9094).\n", "--catalog=<catalog>");
+    fprintf(stdout, "%-30s Send update to catalog every <interval> seconds. (default=%" PRId64 ").\n", "--catalog-interval=<interval>", catalog_interval_default);
     fprintf(stdout, "\n");
     fprintf(stdout, "%-30s Do not pretty-print summaries.\n", "--no-pprint");
     fprintf(stdout, "\n");
@@ -2101,6 +2157,8 @@ int rmonitor_resources(long int interval /*in seconds */)
 			snapshot = calloc(1, sizeof(*snapshot));
 			snapshot->start = usecs_since_epoch();
 		}
+
+		send_catalog_update(resources_now, 0);
 
 		//If no more process are alive, break out of loop.
 		if(itable_size(processes) < 1)
@@ -2189,6 +2247,10 @@ int main(int argc, char **argv) {
 		LONG_OPT_SNAPSHOT_FILE,
 		LONG_OPT_SNAPSHOT_WATCH_CONF,
 		LONG_OPT_STOP_SHORT_RUNNING,
+		LONG_OPT_CATALOG_TASK_READABLE_NAME,
+		LONG_OPT_CATALOG_SERVER,
+		LONG_OPT_CATALOG_PROJECT,
+		LONG_OPT_CATALOG_INTERVAL,
 		LONG_OPT_PID
 	};
 
@@ -2220,6 +2282,11 @@ int main(int argc, char **argv) {
 
 		    {"snapshot-file",   required_argument, 0, LONG_OPT_SNAPSHOT_FILE},
 		    {"snapshot-events", required_argument, 0, LONG_OPT_SNAPSHOT_WATCH_CONF},
+
+		    {"catalog-task-name", required_argument, 0, LONG_OPT_CATALOG_TASK_READABLE_NAME},
+		    {"catalog",           required_argument, 0, LONG_OPT_CATALOG_SERVER},
+		    {"catalog-project",   required_argument, 0, LONG_OPT_CATALOG_PROJECT},
+		    {"catalog-interval",  required_argument, 0, LONG_OPT_CATALOG_INTERVAL},
 
 		    {0, 0, 0, 0}
 	    };
@@ -2302,7 +2369,8 @@ int main(int argc, char **argv) {
 				pprint_summaries = 0;
 				break;
 			case LONG_OPT_SNAPSHOT_FILE:
-				fatal("This option has been replaced with --snapshot-events. Please consult the manual of resource_monitor.");
+				debug(D_FATAL, "This option has been replaced with --snapshot-events. Please consult the manual of resource_monitor.");
+				exit(RM_MONITOR_ERROR);
 				break;
 			case LONG_OPT_SNAPSHOT_WATCH_CONF:
 				snapshot_watch_events_file = xxstrdup(optarg);
@@ -2318,6 +2386,21 @@ int main(int argc, char **argv) {
 					first_process_pid = (pid_t) p;
 				}
 				break;
+			case LONG_OPT_CATALOG_TASK_READABLE_NAME:
+				catalog_task_readable_name = xxstrdup(optarg);
+				break;
+			case LONG_OPT_CATALOG_SERVER:
+				catalog_hosts = xxstrdup(optarg);
+				break;
+			case LONG_OPT_CATALOG_PROJECT:
+				catalog_project = xxstrdup(optarg);
+				break;
+			case LONG_OPT_CATALOG_INTERVAL:
+				catalog_interval = atoi(optarg);
+				if(catalog_interval < 1) {
+					debug(D_FATAL, "--catalog-interval cannot be less than 1.");
+				}
+				break;
 			default:
 				show_help(argv[0]);
 				return 1;
@@ -2325,7 +2408,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if( follow_chdir && hash_table_size(wdirs) > 0) {
+	if(follow_chdir && hash_table_size(wdirs) > 0) {
 		debug(D_FATAL, "Options --follow-chdir and --measure-dir as mutually exclusive.");
 		exit(RM_MONITOR_ERROR);
 	}
@@ -2341,6 +2424,44 @@ int main(int argc, char **argv) {
 			exit(RM_MONITOR_ERROR);
 		}
 	}
+
+	if(catalog_task_readable_name) {
+
+		random_init();
+		cctools_uuid_t *uuid = malloc(sizeof(*uuid));
+		cctools_uuid_create(uuid);
+		catalog_uuid = xxstrdup(uuid->str);
+		free(uuid);
+
+		char *tmp = getenv("USER");
+		if(tmp) {
+			catalog_owner = xxstrdup(tmp);
+		} else {
+			catalog_owner = "unknown";
+		}
+
+		if(!catalog_hosts) {
+			catalog_hosts = xxstrdup(CATALOG_HOST);
+		}
+
+		if(!catalog_project) {
+			catalog_project = xxstrdup(catalog_task_readable_name);
+		}
+
+		if(catalog_interval < 1) {
+			catalog_interval = catalog_interval_default;
+		}
+
+		if(catalog_interval < interval) {
+			warn(D_RMON, "catalog update interval (%" PRId64 ") is less than measurements interval (%" PRId64 "). Using the latter.");
+			catalog_interval = interval;
+		}
+
+	} else if (catalog_hosts || catalog_project || catalog_interval) {
+		debug(D_FATAL, "Options --catalog, --catalog-project, and --catalog-interval cannot be used without --catalog-task-name.");
+		exit(RM_MONITOR_ERROR);
+	}
+
 
 	//this is ugly. if -c given, we should not accept any more arguments.
 	// if not given, we should get the arguments that represent the command line.
@@ -2397,7 +2518,8 @@ int main(int argc, char **argv) {
         debug(D_NOTICE, "using upstream monitor. executing: %s\n", command_line);
         execlp("/bin/sh", "sh", "-c", command_line, (char *) NULL);
         //We get here only if execlp fails.
-        fatal("error executing %s: %s\n", command_line, strerror(errno));
+        debug(D_FATAL, "error executing %s: %s\n", command_line, strerror(errno));
+		exit(RM_MONITOR_ERROR);
     }
 
     write_helper_lib();

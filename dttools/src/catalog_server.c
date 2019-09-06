@@ -209,7 +209,7 @@ static void update_all_catalogs()
 
 static void make_hash_key(struct jx *j, char *key)
 {
-	const char *name, *addr;
+	const char *name, *addr, *uuid;
 	int port;
 
 	addr = jx_lookup_string(j, "address");
@@ -222,7 +222,13 @@ static void make_hash_key(struct jx *j, char *key)
 	if(!name)
 		name = "unknown";
 
-	sprintf(key, "%s:%d:%s", addr, port, name);
+	uuid = jx_lookup_string(j, "uuid");
+	sprintf(key, "%s:%d:%s%s%.128s",
+			addr,
+			port,
+			name,
+			uuid ? ":" : "",
+			uuid ? uuid : "");
 }
 
 static void handle_update( const char *addr, int port, const char *raw_data, int raw_data_length, const char *protocol )
