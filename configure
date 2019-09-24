@@ -1224,7 +1224,7 @@ then
 	fi
 fi
 
-if [ $found_swig != yes ]
+if [ $found_swig = no ]
 then
 	swig_bindings=""
 fi
