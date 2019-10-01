@@ -31,7 +31,7 @@ run()
 
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
 
-	(cd ../src/bindings/perl ./chirp_perl_example.pl $hostport $ticket)
+	PERL5LIB=$(pwd)/../src/bindings/perl ../src/bindings/perl/chirp_perl_example.pl $hostport $ticket
 
 	return 0
 }

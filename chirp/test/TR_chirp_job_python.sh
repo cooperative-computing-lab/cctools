@@ -32,7 +32,7 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/python/chirp_jobs_python_example.py $hostport ../src/python/my_script.sh
+	../src/bindings/python/chirp_jobs_python_example.py $hostport ../src/bindings/python/my_script.sh
 
 	return 0
 }
