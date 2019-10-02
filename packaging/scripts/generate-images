@@ -85,13 +85,6 @@ my $e2fsprogs = [
 ];
 
 
-# using builder to provide at least version 3.
-my $swig = [
-	'cd /opt/vc3/utils',
-	'./vc3-builder --make-jobs=4 --require swig -- ln -s \$VC3_ROOT_SWIG /opt/vc3/cctools-deps/swig',
-];
-
-
 # using builder to provide .a library
 my $mysql = [
 	'cd /opt/vc3/utils',
@@ -180,7 +173,7 @@ python                   => ['python-devel', 'python-setuptools', 'python-tools'
 python3					 => [],				# from epel
 readline                 => 'readline-devel',
 strace                   => 'strace',
-swig                     => [],  # version >= 3, from builder
+swig                     => 'swig',
 troff                    => 'groff',
 unzip                    => 'unzip',
 vim                      => 'vim',
@@ -273,7 +266,7 @@ pkg_config               => 'pkg-config',
 python                   => ['python-dev', 'python-setuptools'],
 python3                  => ['python3-dev', 'python3-setuptools'],
 readline                 => 'libreadline-dev',
-swig                     => ['swig'],  # not from builder, pcre does not compile with g++6
+swig                     => 'swig',
 strace                   => 'strace',
 troff                    => 'groff',
 unzip                    => 'unzip',
