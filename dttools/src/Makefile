@@ -160,7 +160,11 @@ HEADERS_PUBLIC = \
 	xxmalloc.h \
 
 LIBRARIES = libdttools.a
+
+ifneq ($(CCTOOLS_STATIC),1)
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
+endif
+
 ifeq ($(CCTOOLS_CURL_AVAILABLE),yes)
 CCTOOLS_EXTERNAL_LINKAGE += $(CCTOOLS_CURL_LDFLAGS) -lssl -lcrypto
 SOURCES += s3_file_io.c

@@ -62,6 +62,12 @@ my $builder = [
 	'chmod 755 ./vc3-builder',
 ];
 
+my $musl = [
+	'cd /opt/vc3/utils',
+	'./vc3-builder --make-jobs=4 --require musl -- ln -s \$VC3_ROOT_MUSL /opt/vc3/cctools-deps/musl',
+	'./vc3-builder --make-jobs=4 --require musl-zlib -- ln -s \$VC3_ROOT_MUSL_ZLIB /opt/vc3/cctools-deps/musl-zlib',
+];
+
 my $cvmfs = [
 	'cd /opt/vc3/utils',
 	'./vc3-builder --make-jobs=4 --require uuid -- ln -s \$VC3_ROOT_UUID /opt/vc3/cctools-deps/uuid',
@@ -163,6 +169,7 @@ libattr                  => 'libattr-devel',
 libffi                   => 'libffi',
 lsb_release              => 'lsb-release',
 m4                       => 'm4',
+musl					 => [],             # from builder
 mysql                    => [],             # from builder
 ncurses                  => 'ncurses-devel',
 openssl                  => ['openssl', 'openssl-devel'],
@@ -199,7 +206,7 @@ $preinstall_for{centos}{default} = [
 $postinstall_for{centos}{default} = [
 	'yum -y clean all',
 	@{$builder},
-	@{$swig},
+	@{$musl},
 	@{$fuse},
 	@{$e2fsprogs},
 	@{$cvmfs},
@@ -231,6 +238,7 @@ $preinstall_for{fedora}{default}  = [ ];
 
 $postinstall_for{fedora}{default} = [
 	@{$builder},
+	@{$musl},
 ];
 
 ########## debian ########## 
@@ -288,10 +296,10 @@ $postinstall_for{debian}{default} = [
 	'apt-get clean',
 
 	@{$builder},
+	@{$musl},
 	@{$fuse},
 	@{$cvmfs},
 	# do not compile with g++6:
-	# @{$swig},
 	# @{$irods},
 	# @{$xrootd}
 ];
