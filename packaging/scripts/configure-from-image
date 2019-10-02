@@ -27,7 +27,29 @@ done
 
 cd ${CCTOOLS_SRC}
 
+if [[ -d /opt/vc3/cctools-deps ]]
+then
+    # compile work_queue binaries statically
+    [[ -f config.mk ]] && make clean
+    CFLAGS=-D__MUSL__ CC=/opt/vc3/cctools-deps/musl/bin/musl-gcc LD=/opt/vc3/cctools-deps/musl/bin/musl-gcc ./configure --without-system-{doc,apps,chirp} --with-readline-path=no --static  --with-zlib-path=/opt/vc3/cctools-deps/musl-zlib "$@"
+    (cd dttools/src && make)
+    (cd work_queue/src && make)
+    (cp work_queue/src/work_queue_{worker,status,example} .)
+    STATIC_WORKER=1
+fi
+
+# compile everything
 ./configure --strict $DEP_ARGS "$@"
+[[ -f config.mk ]] && make clean
+make
+
+if [[ "${STATIC_WORKER}" = 1 ]]
+then
+    # set the static binaries for test and installation
+    mv work_queue_{worker,status,example} work_queue/src
+    touch work_queue/src/work_queue_{worker,status,example}
+fi
+
 make install
 make test
 
