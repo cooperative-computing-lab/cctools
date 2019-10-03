@@ -1662,51 +1662,6 @@ void rmonitor_final_cleanup(int signum)
     exit(status);
 }
 
-#define over_limit_check(tr, fld)\
-	if(resources_limits->fld > -1 && (tr)->fld > 0 && resources_limits->fld - (tr)->fld < 0)\
-	{\
-		warn(D_RMON, "Limit " #fld " broken.\n");\
-		if(!(tr)->limits_exceeded) { (tr)->limits_exceeded = rmsummary_create(-1); }\
-		(tr)->limits_exceeded->fld = resources_limits->fld;\
-	}
-
-/* return 0 means above limit, 1 means limist ok */
-int rmonitor_check_limits(struct rmsummary *tr)
-{
-	tr->limits_exceeded = NULL;
-
-	/* Consider errors as resources exhausted. Used for ENOSPC, ENFILE, etc. */
-	if(tr->last_error)
-		return 0;
-
-	if(!resources_limits)
-		return 1;
-
-	over_limit_check(tr, start);
-	over_limit_check(tr, end);
-	over_limit_check(tr, cores);
-	over_limit_check(tr, wall_time);
-	over_limit_check(tr, cpu_time);
-	over_limit_check(tr, max_concurrent_processes);
-	over_limit_check(tr, total_processes);
-	over_limit_check(tr, virtual_memory);
-	over_limit_check(tr, memory);
-	over_limit_check(tr, swap_memory);
-	over_limit_check(tr, bytes_read);
-	over_limit_check(tr, bytes_written);
-	over_limit_check(tr, bytes_received);
-	over_limit_check(tr, bytes_sent);
-	over_limit_check(tr, total_files);
-	over_limit_check(tr, disk);
-
-	if(tr->limits_exceeded) {
-		return 0;
-	}
-	else {
-		return 1;
-	}
-}
-
 /***
  * Functions that communicate with the helper library,
  * (un)tracking resources as messages arrive.
@@ -1863,7 +1818,7 @@ int rmonitor_dispatch_msg(void)
 
 	summary->last_error = msg.error;
 
-	if(!rmonitor_check_limits(summary))
+	if(!rmsummary_check_limits(summary, resources_limits))
 		rmonitor_final_cleanup(SIGTERM);
 
 	// find out if messages are urgent:
@@ -2135,8 +2090,9 @@ int rmonitor_resources(long int interval /*in seconds */)
 		rmonitor_poll_all_processes_once(processes, p_acc);
 		rmonitor_poll_maps_once(processes, m_acc);
 
-		if(resources_flags->disk)
+		if(resources_flags->disk) {
 			rmonitor_poll_all_wds_once(wdirs, d_acc, MAX(1, interval/(MAX(1, hash_table_size(wdirs)))));
+		}
 
 		// rmonitor_fss_once(f); disabled until statfs fs id makes sense.
 
@@ -2145,8 +2101,9 @@ int rmonitor_resources(long int interval /*in seconds */)
 		rmonitor_find_max_tree(snapshot, resources_now);
 		rmonitor_log_row(resources_now);
 
-		if(!rmonitor_check_limits(summary))
+		if(!rmsummary_check_limits(summary, resources_limits)) {
 			rmonitor_final_cleanup(SIGTERM);
+		}
 
 		release_waiting_processes();
 

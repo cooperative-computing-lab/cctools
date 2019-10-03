@@ -132,7 +132,7 @@ Logs a debugging message, if the given flags are active.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void debug(INT64_T flags, const char *fmt, ...)
+void debug(int64_t flags, const char *fmt, ...)
 #ifndef SWIG
 __attribute__ (( format(printf,2,3) ))
 #endif
@@ -145,7 +145,7 @@ Logs a debugging message, if the given flags are active, using a va_list instead
 @param args A va_list containing the arguments.
 */
 
-void vdebug(INT64_T flags, const char *fmt, va_list args);
+void vdebug(int64_t flags, const char *fmt, va_list args);
 
 /** Emit a warning message.
 Logs a warning message, regardless of if given flags are active.
@@ -153,7 +153,7 @@ Logs a warning message, regardless of if given flags are active.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
 */
 
-void warn(INT64_T flags, const char *fmt, ...);
+void warn(int64_t flags, const char *fmt, ...);
 
 /** Emit a fatal debugging message and terminate with SIGTERM.
 Displays a printf-style message, and then forcibly exits the program.
@@ -168,7 +168,7 @@ Logs a warning message, regardless of if given flags are active.
 @param flags Any of the standard debugging flags OR-ed together.
 @param fmt A printf-style formatting string, followed by the necessary arguments.
   */
-void notice(INT64_T flags, const char *fmt, ...);
+void notice(int64_t flags, const char *fmt, ...);
 
 /** Initialize the debugging system.
 Must be called before any other calls take place.
@@ -223,7 +223,7 @@ Clear all currently set flags, so that no output will occur.
 @see debug_flags_set
 */
 
-INT64_T debug_flags_clear(void);
+int64_t debug_flags_clear(void);
 
 /** Set name of flag combination
 Sets the string value associated with flag.  This is normally used to set the <tt>D_USER</tt> user flag as so: <tt>debug_set_flag_name(D_USER, "my-application");</tt>.
@@ -231,12 +231,12 @@ Sets the string value associated with flag.  This is normally used to set the <t
 @param name New name to associate with flag.
 */
 
-void debug_set_flag_name(INT64_T flag, const char *name);
+void debug_set_flag_name(int64_t flag, const char *name);
 
 /** Restore debug flags.
 @param flags flags to set
 */
-void debug_flags_restore(INT64_T flags);
+void debug_flags_restore(int64_t flags);
 
 /** Rename debug file with given suffix.
 @param suffix Suffix of saved log.

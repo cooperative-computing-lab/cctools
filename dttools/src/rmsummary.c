@@ -1059,18 +1059,24 @@ struct rmsummary *rmsummary_copy(const struct rmsummary *src)
 	if(d->limits_exceeded) { dl = d->limits_exceeded->field; }\
 	if(s->limits_exceeded) { sl = s->limits_exceeded->field; }\
 	if(sf >= df) {\
-		if(sf > -1 && !d->limits_exceeded) { d->limits_exceeded = rmsummary_create(-1);}\
-		d->limits_exceeded->field = sl < 0 ? -1 : MAX(sl, dl);\
+		if(sf > -1) {\
+			if(!d->limits_exceeded) {\
+				d->limits_exceeded = rmsummary_create(-1);\
+			}\
+			d->limits_exceeded->field = sl < 0 ? -1 : MAX(sl, dl);\
+		}\
 	}\
 }
 
 static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 {
-	if(!dest || !src)
+	if(!dest || !src) {
 		return;
+	}
 
-	if(!dest->limits_exceeded && !src->limits_exceeded)
+	if(!dest->limits_exceeded && !src->limits_exceeded) {
 		return;
+	}
 
 	merge_limit(dest, src, max_concurrent_processes);
 	merge_limit(dest, src, total_processes);
@@ -1100,6 +1106,17 @@ static int64_t max_field(int64_t d, int64_t s)
 	return (d > s) ? d : s;
 }
 
+/* Select the min of the fields, ignoring negative numbers */
+static int64_t min_field(int64_t d, int64_t s)
+{
+	if(d < 0 || s < 0) {
+		return MAX(-1, MAX(s, d)); /* return at least -1. treat -1 as undefined.*/
+	} else {
+		return MIN(s, d);
+	}
+}
+
+
 void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 {
 	if(!dest || !src)
@@ -1118,8 +1135,12 @@ void rmsummary_merge_max(struct rmsummary *dest, const struct rmsummary *src)
 
 #define max_op_w_time(dest, src, field)\
 	if((dest)->field < (src)->field) {\
+		printf("%s, %" PRId64 "  %" PRId64 "\n", #field, (dest)->field, (src)->field);\
 		(dest)->field = (src)->field;\
 		(dest)->peak_times->field = (dest)->wall_time;\
+	}\
+	if((dest)->field > -1 && (dest)->peak_times->field < 0) {\
+		(dest)->peak_times->field = 0;\
 	}
 
 void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *src)
@@ -1130,10 +1151,13 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	if(!dest->peak_times)
 		dest->peak_times = rmsummary_create(-1);
 
-	rmsummary_apply_op(dest, src, max_field, start);
-	rmsummary_apply_op(dest, src, max_field, end);
-	rmsummary_apply_op(dest, src, max_field, wall_time);
+	rmsummary_apply_op(dest, src, min_field, start);
+	dest->peak_times->start = dest->start;
 
+	rmsummary_apply_op(dest, src, max_field, end);
+	dest->peak_times->end = dest->end;
+
+	max_op_w_time(dest, src, wall_time);
 	max_op_w_time(dest, src, max_concurrent_processes);
 	max_op_w_time(dest, src, total_processes);
 	max_op_w_time(dest, src, cpu_time);
@@ -1151,16 +1175,6 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	max_op_w_time(dest, src, machine_cpus);
 	max_op_w_time(dest, src, machine_load);
 	max_op_w_time(dest, src, fs_nodes);
-}
-
-/* Select the min of the fields, ignoring negative numbers */
-static int64_t min_field(int64_t d, int64_t s)
-{
-	if(d < 0 || s < 0) {
-		return MAX(-1, MAX(s, d)); /* return at least -1. treat -1 as undefined.*/
-	} else {
-		return MIN(s, d);
-	}
 }
 
 void rmsummary_merge_min(struct rmsummary *dest, const struct rmsummary *src)
@@ -1335,6 +1349,54 @@ struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i) {
 
 	return s->snapshots[i];
 }
+
+#define over_limit_check(measured, limits, fld)\
+	if((limits)->fld > -1 && (measured)->fld > 0 && (limits)->fld - (measured)->fld < 0)\
+	{\
+		warn(D_RMON, "Limit " #fld " broken: %" PRId64 " > %" PRId64 "\n", (measured)->fld, (limits)->fld);\
+		if(!(measured)->limits_exceeded) { (measured)->limits_exceeded = rmsummary_create(-1); }\
+		(measured)->limits_exceeded->fld = limits->fld;\
+	}
+
+/* return 0 means above limit, 1 means limist ok */
+int rmsummary_check_limits(struct rmsummary *measured, struct rmsummary *limits)
+{
+	measured->limits_exceeded = NULL;
+
+	/* Consider errors as resources exhausted. Used for ENOSPC, ENFILE, etc. */
+	if(measured->last_error) {
+		return 0;
+	}
+
+	if(!limits) {
+		return 1;
+	}
+
+	over_limit_check(measured, limits, start);
+	over_limit_check(measured, limits, end);
+	over_limit_check(measured, limits, cores);
+	over_limit_check(measured, limits, wall_time);
+	over_limit_check(measured, limits, cpu_time);
+	over_limit_check(measured, limits, max_concurrent_processes);
+	over_limit_check(measured, limits, total_processes);
+	over_limit_check(measured, limits, virtual_memory);
+	over_limit_check(measured, limits, memory);
+	over_limit_check(measured, limits, swap_memory);
+	over_limit_check(measured, limits, bytes_read);
+	over_limit_check(measured, limits, bytes_written);
+	over_limit_check(measured, limits, bytes_received);
+	over_limit_check(measured, limits, bytes_sent);
+	over_limit_check(measured, limits, total_files);
+	over_limit_check(measured, limits, disk);
+
+	if(measured->limits_exceeded) {
+		return 0;
+	}
+	else {
+		return 1;
+	}
+}
+
 
 
 
