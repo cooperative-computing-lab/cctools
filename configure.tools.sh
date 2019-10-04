@@ -203,11 +203,14 @@ library_search_normal()
 		basedir=$2
 	fi
 
-	# If we are running on a 64-bit platform, then the native libraries
-	# for compiling will be found in /lib64, if it exists.  The files in
-	# /lib are compatibilities libraries for 32-bit.
+	# If we are running on a 64-bit platform outside conda, then the native
+	# libraries for compiling will be found in /lib64, if it exists.  The files
+	# in /lib are compatibilities libraries for 32-bit.
 
-	if [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
+	if [ -n "${CONDA_PREFIX}" ] && [ "${CONDA_PREFIX}" = "${basedir}" ]
+	then
+		libdir=${basedir}/lib
+	elif [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
 	then
 		libdir=$basedir/lib64
 	elif [ -d $basedir/lib ]
