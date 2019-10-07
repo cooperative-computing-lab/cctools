@@ -333,14 +333,14 @@ optional_include()
 {
 	header="$1"
 	shift
-
+	
 	echon "checking for header ${header}..."
 
 cat > .configure.tmp.c << EOF
 #include <stdlib.h>
 #include <${header}>
 EOF
-	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
+	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
 		echo yes
 		rm -f .configure.tmp.c .configure.tmp.out
 		ccflags_append_define "$@"
@@ -359,7 +359,7 @@ optional_library()
 
 	echon "checking for library ${library}..."
 
-	if echo 'int main;' | gcc -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
+	if echo 'int main;' | ${CC:-gcc} -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
 		echo yes
 		ccflags_append_define "$@"
 		return 0
@@ -380,7 +380,7 @@ optional_library_function()
 
 	echon "checking for library function ${f}..."
 
-	gcc -o /dev/null -x c - "-l${l}" >/dev/null 2>/dev/null <<EOF
+	${CC:-gcc} -o /dev/null -x c - "-l${l}" >/dev/null 2>/dev/null <<EOF
 #include <stdlib.h>
 #include <${h}>
 
