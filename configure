@@ -266,7 +266,7 @@ do
 			;;
 		--without-system-sand)
 			include_package_sand=""
-			if [ $include_package_allpairs != "" ]
+			if [ "$include_package_allpairs" != "" ]
 			then
 				echo "*** skipping system 'allpairs' because of dependencies"
 				include_package_allpairs=""
