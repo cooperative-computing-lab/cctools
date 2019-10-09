@@ -1,7 +1,7 @@
 
 changequote([,])
 
-define(HEADER,[#] $1(1) Manual Page)dnl
+define(HEADER,[#] $1(1))dnl
 define(SECTION,[##] $1)dnl
 define(SUBSECTION,[###] $1)dnl
 define(SUBSUBSECTION,[####] $1)dnl
@@ -11,7 +11,7 @@ changequote
 define(PARA,)dnl
 define(LINK,[$1]($2))dnl
 define(MANUAL,LINK($1,$2))dnl
-define(MANPAGE,LINK($1($2),$1.html))dnl
+define(MANPAGE,LINK($1($2),$1.md))dnl
 define(BOLD,**$1**)dnl
 define(ITALIC,_$1_)dnl
 define(CODE,**$1**)dnl
@@ -35,4 +35,4 @@ define(OPTIONS_END,LIST_END)
 define(LONGCODE_BEGIN,changequote([,])[changequote([,])```changequote]changequote)
 define(LONGCODE_END,changequote([,])[changequote([,])```changequote]changequote)
 
-define(FOOTER,)dnl
+define(FOOTER,CCTools CCTOOLS_VERSION released on CCTOOLS_RELEASE_DATE)dnl
