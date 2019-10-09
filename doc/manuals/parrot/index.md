@@ -850,18 +850,18 @@ For the latest information on Parrot, visit the home page:
 An exhaustive list of all options and commands can be found in the manual
 pages:
 
-* [parrot_run](../man_pages/parrot_run.html)
-* [parrot_run_hdfs](../man_pages/parrot_run_hdfs.html)
-* [parrot_cp](../man_pages/parrot_cp.html)
-* [parrot_md5](../man_pages/parrot_md5.html)
-* [parrot_getacl](../man_pages/parrot_getacl.html)
-* [parrot_setacl](../man_pages/parrot_setacl.html)
-* [parrot_mkalloc](../man_pages/parrot_mkalloc.html)
-* [parrot_lsalloc](../man_pages/parrot_lsalloc.html)
-* [parrot_locate](../man_pages/parrot_locate.html)
-* [parrot_timeout](../man_pages/parrot_timeout.html)
-* [parrot_whoami](../man_pages/parrot_whoami.html)
-* [parrot_mount](../man_pages/parrot_mount.html)
+* [parrot_run](../man_pages/parrot_run.md)
+* [parrot_run_hdfs](../man_pages/parrot_run_hdfs.md)
+* [parrot_cp](../man_pages/parrot_cp.md)
+* [parrot_md5](../man_pages/parrot_md5.md)
+* [parrot_getacl](../man_pages/parrot_getacl.md)
+* [parrot_setacl](../man_pages/parrot_setacl.md)
+* [parrot_mkalloc](../man_pages/parrot_mkalloc.md)
+* [parrot_lsalloc](../man_pages/parrot_lsalloc.md)
+* [parrot_locate](../man_pages/parrot_locate.md)
+* [parrot_timeout](../man_pages/parrot_timeout.md)
+* [parrot_whoami](../man_pages/parrot_whoami.md)
+* [parrot_mount](../man_pages/parrot_mount.md)
 
 
 ### Please use the following citation for Parrot in a scientific publication
