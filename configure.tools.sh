@@ -248,7 +248,7 @@ library_search_normal()
 	# we will end up with a path that has two slashes, which
 	# means something unintended in Windows
 
-	if [ $basedir = / ]
+	if [ "$basedir" = / ]
 	then
 		basedir=
 	fi
