@@ -89,6 +89,39 @@ check_path ()
 	return 1
 }
 
+check_library_static() {
+	local libdir
+	local library
+
+	library="lib$1.a"
+	libdir="$2"
+
+	if check_file "$libdir/$library"
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+check_library_dynamic() {
+	local library
+	local libdir
+
+	library="$1"
+	libdir="$2"
+
+	echon "checking for lib$1 in $2..."
+
+	if echo 'int main;' | ${CC:-gcc} -o /dev/null -x c - "-L${libdir}" "-l${library}" >/dev/null 2>/dev/null; then
+		echo "yes"
+		return 0
+	else
+		echo "no"
+		return 1
+	fi
+}
+
 check_function()
 {
 	echon "checking for $1 in $2..."
@@ -184,10 +217,13 @@ library_search_multiarch()
 
 library_search_normal()
 {
+	local lib
 	local basedir
 	local libdir
-	local dynamic_suffix
-	local arch
+
+	lib="$1"
+	basedir="$2"
+	subdir="$3"
 
 	# Must clear out any previous values from the global
 	library_search_result=""
@@ -196,11 +232,9 @@ library_search_normal()
 	# we will end up with a path that has two slashes, which
 	# means something unintended in Windows
 
-	if [ $2 = / ]
+	if [ $basedir = / ]
 	then
 		basedir=
-	else
-		basedir=$2
 	fi
 
 	# If we are running on a 64-bit platform outside conda, then the native
@@ -220,21 +254,11 @@ library_search_normal()
 		libdir=$basedir
 	fi
 
-	# Darwin uses dylib for dynamic libraries, other platforms use .so
-
-	if [ $BUILD_SYS = DARWIN ]
-	then
-		dynamic_suffix=dylib
-	else
-		dynamic_suffix=so
-	fi
-
 	# If a third argument is given, it means libraries are found in
 	# a subdirectory of lib, such as "mysql".
-
-	if [ -n "$3" -a -d "$libdir/$3" ]
+	if [ -n "$subdir" ]
 	then
-		libdir="$libdir/$3"
+		libdir="$libdir/$subdir"
 	fi
 
 	# Now check for the library file in all of the known places,
@@ -242,24 +266,22 @@ library_search_normal()
 
 	if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
 	then
-		if check_file $libdir/lib$1.a
+		if check_library_static "$lib" "$libdir"
 		then
-			library_search_result="$libdir/lib$1.a"
+			library_search_result="$libdir/lib${lib}.a"
 			return 0
 		fi
 	fi
 
 	if [ $library_search_mode != require_static ]
 	then
-		if check_file $libdir/lib$1.$dynamic_suffix
+		if check_library_dynamic "$lib" "$libdir"
 		then
-			# If this is not a standard library directory, add it to the library search path.
-			# (Adding standard directories to the path has unintended effects.)
-			if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
+			if [ "$libdir" != /lib -a "$libdir" != /lib64 -a "$libdir" != /usr/lib -a "$libdir" != /usr/lib64 ]
 			then
-				library_search_result="-L$libdir -l$1"
+				library_search_result="-L${libdir} -l${lib}"
 			else
-				library_search_result="-l$1"
+				library_search_result="-l${lib}"
 			fi
 
 			if [ $BUILD_SYS = DARWIN ]
@@ -273,9 +295,9 @@ library_search_normal()
 
 	if [ $library_search_mode = prefer_dynamic ]
 	then
-		if check_file $libdir/lib$1.a
+		if check_library_static "$lib" "$libdir"
 		then
-			library_search_result="$libdir/lib$1.a"
+			library_search_result="$libdir/lib${lib}.a"
 			return 0
 		fi
 	fi
