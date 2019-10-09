@@ -1124,7 +1124,7 @@ EOF
 fi
 fi
 
-if [ $python_dev = no ]
+if [ "$python_dev" = no ]
 then
 	if [ $config_python_path = yes ]
 	then
