@@ -1,6 +1,10 @@
-# Man pages
+# Man Pages
 
-**Makeflow User's Manual**
+These pages contain a brief synopsis of every command,
+for reference purposes.  Please see the user manuals
+for a broader discussion of how each tool is used.
+
+## Makeflow
 
   * [makeflow(1)](man_pages/makeflow.md)
   * [makeflow_status(1)](man_pages/makeflow_status.md)
@@ -14,7 +18,7 @@
   * [makeflow_ec2_cleanup(1)](man_pages/makeflow_ec2_cleanup.md)
   * [condor_submit_makeflow(1)](man_pages/condor_submit_makeflow.md)
 
-**Work Queue**
+## Work Queue
 
   * [work_queue_worker(1)](man_pages/work_queue_worker.md)
   * [work_queue_status(1)](man_pages/work_queue_status.md)
@@ -26,19 +30,18 @@
   * [pbs_submit_workers(1)](man_pages/pbs_submit_workers.md)
   * [torque_submit_workers(1)](man_pages/torque_submit_workers.md)
 
-**Resource Monitor**
+## Resource Monitor
 
   * [resource_monitor(1)](man_pages/resource_monitor.md)
 
-**Catalog Server**
+## Catalog Server
 
   * [catalog_server(1)](man_pages/catalog_server.md)
   * [catalog_update(1)](man_pages/catalog_update.md)
   * [catalog_query(1)](man_pages/catalog_query.md)
   * [deltadb_query(1)](man_pages/deltadb_query.md)
 
-  
-**Parrot**
+## Parrot
 
   * [parrot_run(1)](man_pages/parrot_run.md)
   * [parrot_cp(1)](man_pages/parrot_cp.md)
@@ -56,8 +59,8 @@
   * [parrot_mount(1)](man_pages/parrot_mount.md)
   * [parrot_namespace(1)](man_pages/parrot_namespace.md)
 
-**Chirp User**
-
+## Chirp File System
+ 
   * [chirp(1)](man_pages/chirp.md)
   * [chirp_status(1)](man_pages/chirp_status.md)
   * [chirp_fuse(1)](man_pages/chirp_fuse.md)
@@ -70,7 +73,7 @@
   * [chirp_server_hdfs(1)](man_pages/chirp_server_hdfs.md)
   * [The Chirp Protocol](chirp/chirp_protocol.md)
 
-**Confuga**
+## Confuga File System
 
   * [confuga(1)](man_pages/confuga.md)
 

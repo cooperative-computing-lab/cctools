@@ -1,6 +1,6 @@
 # Makeflow User's Manual
 
-### Overview
+## Overview
 
 Makeflow is a **workflow engine** for large scale distributed computing. It
 accepts a specification of a large amount of work to be performed, and runs it
@@ -29,9 +29,9 @@ cloud services (Amazon EC2 or Lambda) and container environments like Docker
 and Singularity. Details for each of those systems are given in the Batch
 System Support section.
 
-### Getting started
+## Getting Started
 
-#### Installing
+### Installing
 
 Makeflow is part of the [Cooperating Computing
 Tools](http://ccl.cse.nd.edu/software), which is easy to install. In most
@@ -60,7 +60,7 @@ $ setenv PATH ${HOME}/cctools/bin:$PATH
 For more complex situations, consult the [CCTools installation
 instructions](../install).
 
-#### Basic Usage
+### Basic Usage
 
 A Makeflow workflow consists of a set of rules. Each rule specifies a set of
 _output files_ to create, a set of _input files_ needed to create them, and a
@@ -254,7 +254,7 @@ For the latest information about Makeflow, please visit our [web
 site](http://ccl.cse.nd.edu/software/makeflow) and subscribe to our [mailing
 list](http://ccl.cse.nd.edu/software) for more information.
 
-## Batch Systems
+## Batch System Support
 
 Makeflow supports a wide variety of batch systems. Use `makeflow --help` to
 see the current list supported. Generally speaking, simply run Makeflow with
