@@ -830,14 +830,11 @@ else
 	echo "*** skipping readline..."
 fi
 
-system_includes=/usr/include
-
 if [ $BUILD_SYS = DARWIN ]
 then
         if [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include" ]
         then
-			system_includes="/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
-			osx_getopt_from_sdk=yes
+			ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
         else
                 # The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
                 # Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
@@ -1306,21 +1303,21 @@ else
 fi
 
 # sqlite3 uses define "HAVE_*"
-optional_function gmtime_r ${system_includes}/time.h HAVE_GMTIME_R
-optional_function fdatasync ${system_includes}/unistd.h HAVE_FDATASYNC
-optional_function isnan ${system_includes}/math.h HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
-optional_function localtime_r ${system_includes}/time.h HAVE_LOCALTIME_R
-optional_function localtime_s ${system_includes}/time.h HAVE_LOCALTIME_S
-optional_function openat ${system_includes}/fcntl.h HAS_OPENAT
-optional_function pread ${system_includes}/unistd.h HAS_PREAD USE_PREAD
-optional_function pread64 ${system_includes}/unistd.h USE_PREAD64
-optional_function pwrite ${system_includes}/unistd.h HAS_PWRITE USE_PWRITE
-optional_function pwrite64 ${system_includes}/unistd.h USE_PWRITE64
-optional_function strchrnul ${system_includes}/string.h HAVE_STRCHRNUL
-optional_function strsignal ${system_includes}/string.h HAS_STRSIGNAL
-optional_function usleep ${system_includes}/unistd.h HAS_USLEEP HAVE_USLEEP
-optional_function utime ${system_includes}/utime.h HAS_UTIME HAVE_UTIME
-optional_function utimensat ${system_includes}/sys/stat.h HAS_UTIMENSAT
+optional_function gmtime_r    time.h     HAVE_GMTIME_R
+optional_function fdatasync   unistd.h   HAVE_FDATASYNC
+optional_function isnan       math.h     HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
+optional_function localtime_r time.h     HAVE_LOCALTIME_R
+optional_function localtime_s time.h     HAVE_LOCALTIME_S
+optional_function openat      fcntl.h    HAS_OPENAT
+optional_function pread       unistd.h   HAS_PREAD USE_PREAD
+optional_function pread64     unistd.h   USE_PREAD64
+optional_function pwrite      unistd.h   HAS_PWRITE USE_PWRITE
+optional_function pwrite64    unistd.h   USE_PWRITE64
+optional_function strchrnul   string.h   HAVE_STRCHRNUL
+optional_function strsignal   string.h   HAS_STRSIGNAL
+optional_function usleep      unistd.h   HAS_USLEEP HAVE_USLEEP
+optional_function utime       utime.h    HAS_UTIME HAVE_UTIME
+optional_function utimensat   sys/stat.h HAS_UTIMENSAT
 
 # sqlite3 uses define "HAVE_*"
 
@@ -1477,12 +1474,6 @@ ccflags_append_define \
 	"INSTALL_PATH='\"${install_path}\"'" \
 	"_GNU_SOURCE" \
 	"_REENTRANT"
-
-if [ "${osx_getopt_from_sdk}" = yes ]
-then
-	ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
-fi
-
 
 ccflags_append "$debug_flag"
 ldflags="${ldflags} ${debug_flag}"
