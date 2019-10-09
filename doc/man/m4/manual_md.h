@@ -14,8 +14,8 @@ define(MANUAL,LINK($1,$2))dnl
 define(MANPAGE,LINK($1($2),$1.html))dnl
 define(BOLD,**$1**)dnl
 define(ITALIC,_$1_)dnl
+define(CODE,**$1**)dnl
 
-define(CODE,changequote([,])[changequote([,])`$1`changequote]changequote)
 
 define(LIST_BEGIN,)
 define(LIST_ITEM,- $1)
