@@ -48,20 +48,28 @@ chirp_distribute server1.somewhere.edu /mydata server2.somewhere.edu server3.som
 LONGCODE_END
 
 To replicate a directory from server1 to  all available Chirp server(s) in Chirp catalog using BOLD(chirp_distribute) and BOLD(chirp_status):
-changequote(<!,!>)
+
 LONGCODE_BEGIN
+changequote(<!,!>)
 chirp_distribute server1.somewhere.edu /mydata \`chirp_status -s\`
+changequote
 LONGCODE_END
 
 To replicate a directory from server1 to  all available Chirp server(s) in Chirp catalog using BOLD(chirp_distribute) and BOLD(chirp_status). However stop when reach 100 copies with -N option:
 LONGCODE_BEGIN
+changequote(<!,!>)
 chirp_distribute -N 100 server1.somewhere.edu /mydata \`chirp_status -s\`
+changequote
 LONGCODE_END
 
 To clean up replicated data using BOLD(chirp_distribute) using -X option:
 LONGCODE_BEGIN
+changequote(<!,!>)
 chirp_distribute -X server1.somewhere.edu /mydata \`chirp_status -s\`
+changequote
 LONGCODE_END
+
+
 SECTION(COPYRIGHT)
 
 COPYRIGHT_BOILERPLATE
