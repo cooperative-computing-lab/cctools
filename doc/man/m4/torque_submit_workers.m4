@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(torque_submit_workers)dnl
+HEADER(torque_submit_workers)
 
 SECTION(NAME)
 BOLD(torque_submit_workers) - submit work_queue_worker to a Torque cluster.

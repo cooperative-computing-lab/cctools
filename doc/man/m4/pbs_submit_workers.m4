@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(pbs_submit_workers)dnl
+HEADER(pbs_submit_workers)
 
 SECTION(NAME)
 BOLD(pbs_submit_workers) - submit work_queue_worker to a PBS cluster.

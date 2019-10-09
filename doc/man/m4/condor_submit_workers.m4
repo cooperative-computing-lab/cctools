@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(condor_submit_workers)dnl
+HEADER(condor_submit_workers)
 
 SECTION(NAME)
 BOLD(condor_submit_workers) - submit work_queue_worker to the Condor grid.

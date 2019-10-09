@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(parrot_package_run)dnl
+HEADER(parrot_package_run)
 
 SECTION(NAME)
 BOLD(parrot_package_run) - repeat a program within the package with the help of CODE(parrot_run)

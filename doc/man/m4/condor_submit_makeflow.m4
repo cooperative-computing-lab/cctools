@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(condor_submit_makeflow)dnl
+HEADER(condor_submit_makeflow)
 
 SECTION(NAME)
 BOLD(condor_submit_makeflow) - submit workflow to HTCondor batch system

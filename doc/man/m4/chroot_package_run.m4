@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(chroot_package_run)dnl
+HEADER(chroot_package_run)
 
 SECTION(NAME)
 BOLD(chroot_package_run) - repeat a program within the package with the help of CODE(chroot)

@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(parrot_package_create)dnl
+HEADER(parrot_package_create)
 
 SECTION(NAME)
 BOLD(parrot_package_create) - generate a package based on the accessed files and the preserved environment variables

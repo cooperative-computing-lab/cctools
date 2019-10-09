@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(parrot_run)dnl
+HEADER(parrot_run)
 
 SECTION(NAME)
 BOLD(parrot_run) - run a program in the Parrot virtual file system

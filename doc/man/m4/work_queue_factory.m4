@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(work_queue_factory)dnl
+HEADER(work_queue_factory)
 
 SECTION(NAME)
 BOLD(work_queue_factory) - maintain a pool of Work Queue workers on a batch system.

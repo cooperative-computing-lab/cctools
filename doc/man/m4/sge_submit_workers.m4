@@ -1,5 +1,5 @@
 include(manual.h)dnl
-HEADER(sge_submit_workers)dnl
+HEADER(sge_submit_workers)
 
 SECTION(NAME)
 BOLD(sge_submit_workers) - submit work_queue_worker to a SUN Grid Engine (SGE).
