@@ -25,19 +25,32 @@ work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py
 
 $(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)
 
+<<<<<<< HEAD
 work_queue.binding.py work_queue_futures.py work_queue_example.py work_queue_futures_example.py: %.py: ../python/%.py
+=======
+work_queue.binding.py work_queue_async.py work_queue_async_example.py: %.py: ../python/%.py
+>>>>>>> 2c5752b7b2bfb1c4d867a2bf353d089bd5701868
 	cp $< $@
 	$(CCTOOLS_PYTHON3_2TO3) --nobackups --no-diffs --write $@
 
 test:
 
 clean:
+<<<<<<< HEAD
 	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.binding.py work_queue_futures.py work_queue_example.py  work_queue_futures_example.py work_queue.py work_queue_wrap.c *.pyc
 
 install: all
 	mkdir -p $(CCTOOLS_PYTHON3_PATH)
 	chmod 755 work_queue.py
 	cp work_queue.py work_queue_futures.py _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(CCTOOLS_PYTHON3_PATH)/
+=======
+	rm -f $(OBJECTS) $(TARGETS) Python.framework work_queue.binding.py work_queue_async.py work_queue_async_example.py work_queue.py work_queue_wrap.c *.pyc
+
+install: all
+	mkdir -p $(CCTOOLS_PYTHON3_PATH)
+	chmod 755 work_queue.py work_queue_example.py
+	cp work_queue.py work_queue_async.py _work_queue.$(CCTOOLS_DYNAMIC_SUFFIX) $(CCTOOLS_PYTHON3_PATH)/
+>>>>>>> 2c5752b7b2bfb1c4d867a2bf353d089bd5701868
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	cp work_queue_example.py work_queue_futures_example.py $(CCTOOLS_INSTALL_DIR)/doc/
 

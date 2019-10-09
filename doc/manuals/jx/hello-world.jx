@@ -1,0 +1,10 @@
+{
+    "rules": [
+                {
+                    "command" : "/bin/echo hello world > output.txt",
+                    "outputs" : [ "output.txt" ],
+                    "inputs"  : [ ]
+                }
+            ]
+}
+
