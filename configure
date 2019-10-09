@@ -1422,7 +1422,7 @@ fi
 
 if check_path m4
 then
-	cctools_doctargets="${cctools_doctargets} htmlpages"
+	cctools_doctargets="${cctools_doctargets} htmlpages mdpages"
 	if check_path nroff
 	then
 		cctools_doctargets="${cctools_doctargets} manpages"

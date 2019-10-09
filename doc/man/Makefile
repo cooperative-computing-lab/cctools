@@ -2,6 +2,7 @@ include ../../config.mk
 
 SOURCES=${shell find m4 -type f -name '*.m4' -print}
 
+MDFILES   = ${SOURCES:m4/%.m4=md/%.md}
 HTMLFILES = ${SOURCES:m4/%.m4=html/%.html}
 TXTFILES  = ${SOURCES:m4/%.m4=txt/%.txt}
 PDFFILES  = ${SOURCES:m4/%.m4=pdf/%.pdf}
@@ -12,9 +13,15 @@ all: ${CCTOOLS_DOCTARGETS}
 
 apipages:
 
+mdpages: ${MDFILES}
+
 htmlpages: ${HTMLFILES}
 
 manpages: ${ZIPFILES}
+
+md/%.md: m4/%.m4
+	mkdir -p md
+	m4 -DMD ${CCTOOLS_M4_ARGS} $< > $@
 
 html/%.html: m4/%.m4
 	mkdir -p html
@@ -42,6 +49,6 @@ install: all
 test:
 
 clean:
-	rm -rf $(HTMLFILES) $(MANFILES) $(ZIPFILES) *~
+	rm -rf $(HTMLFILES) $(MANFILES) $(ZIPFILES) $(MDFILES) *~
 
 .PHONY: all clean install test
