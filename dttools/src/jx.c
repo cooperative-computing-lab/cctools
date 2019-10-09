@@ -65,8 +65,13 @@ struct jx * jx_symbol( const char *symbol_name )
 struct jx * jx_string( const char *string_value )
 {
 	assert(string_value);
+	return jx_string_nocopy(strdup(string_value));
+}
+
+struct jx * jx_string_nocopy( char *string_value )
+{
 	struct jx *j = jx_create(JX_STRING);
-	j->u.string_value = strdup(string_value);
+	j->u.string_value = string_value;
 	return j;
 }
 
@@ -603,16 +608,15 @@ struct jx  *jx_copy( struct jx *j )
 struct jx *jx_merge(struct jx *j, ...) {
 	va_list ap;
 	va_start (ap, j);
-	struct jx_pair *result = NULL;
+	struct jx *result = jx_object(NULL);
 	for (struct jx *next = j; jx_istype(next, JX_OBJECT); next = va_arg(ap, struct jx *)) {
-		struct jx_pair *tmp = result;
-		result = jx_pair_copy(next->u.pairs);
-		struct jx_pair **last = &result;
-		while (*last) last = &(*last)->next;
-		*last = tmp;
+		for (struct jx_pair *p = next->u.pairs; p; p = p->next) {
+			jx_delete(jx_remove(result, p->key));
+			jx_insert(result, jx_copy(p->key), jx_copy(p->value));
+		}
 	}
 	va_end(ap);
-	return jx_object(result);
+	return result;
 }
 
 static int jx_pair_is_constant(struct jx_pair *p) {

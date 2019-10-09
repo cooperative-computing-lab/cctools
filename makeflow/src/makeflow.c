@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2008- The University of Notre Dame
+Copyright (C) 2019- The University of Notre Dame
 This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
@@ -30,6 +30,7 @@ See the file COPYING for details.
 #include "jx_match.h"
 #include "jx_parse.h"
 #include "jx_getopt.h"
+#include "jx_print.h"
 #include "create_dir.h"
 #include "sha1.h"
 
@@ -40,13 +41,14 @@ See the file COPYING for details.
 #include "parser.h"
 #include "parser_jx.h"
 
+#ifdef CCTOOLS_WITH_MPI
+#include <mpi.h>
+#endif
+
 #include "makeflow_summary.h"
 #include "makeflow_gc.h"
 #include "makeflow_log.h"
-#include "makeflow_wrapper.h"
-#include "makeflow_wrapper_umbrella.h"
 #include "makeflow_mounts.h"
-#include "makeflow_wrapper_enforcement.h"
 #include "makeflow_catalog_reporter.h"
 #include "makeflow_local_resources.h"
 #include "makeflow_hook.h"
@@ -64,12 +66,6 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
-#ifdef CCTOOLS_WITH_MPI
-#include <mpi.h>
-#include "jx_print.h"
-#include "host_memory_info.h"
-#endif
 
 /*
 Code organization notes:
@@ -99,6 +95,8 @@ an example.
 */
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
+
+extern int batch_job_verbose_jobnames;
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 1; // Makeflow fails by default. This is changed at dag start to indicate correct start.
@@ -150,8 +148,6 @@ static int skip_file_check = 0;
 
 static int cache_mode = 1;
 
-static char *parrot_path = "./parrot_run";
-
 /*
 Wait upto this many seconds for an output file of a succesfull task
 to appear on the local filesystem (e.g, to deal with NFS
@@ -165,10 +161,6 @@ SYMBOLs are category labels (SYMBOLs should be deprecated
 once weaver/pbui tools are updated.)
 */
 static int log_verbose_mode = 0;
-
-static struct makeflow_wrapper *wrapper = 0;
-static struct makeflow_wrapper *enforcer = 0;
-static struct makeflow_wrapper_umbrella *umbrella = 0;
 
 static int catalog_reporting_on = 0;
 
@@ -189,33 +181,96 @@ static int is_local_job( struct dag_node *n )
 }
 
 /*
-Generates file list for node based on node files, wrapper
-input files, and monitor input files. Relies on %% nodeid
-replacement for monitor file names.
+Consider a node in the dag and convert it into a batch task ready to execute,
+with resources environments, and everything prior to calling hooks.
 */
 
-void makeflow_generate_files( struct dag_node *n, struct batch_task *task )
+struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue, int full_env_list)
 {
-	if(wrapper)  makeflow_wrapper_generate_files(task, wrapper->input_files, wrapper->output_files, n, wrapper);
-	if(enforcer) makeflow_wrapper_generate_files(task, enforcer->input_files, enforcer->output_files, n, enforcer);
-	if(umbrella) makeflow_wrapper_generate_files(task, umbrella->wrapper->input_files, umbrella->wrapper->output_files, n, umbrella->wrapper);
-}
+	struct batch_task *task = batch_task_create(queue);
+	task->taskid = n->nodeid;
 
-/*
-Expand a dag_node into a text list of input files,
-output files, and a command, by applying all wrappers
-and settings.  Used at both job submission and completion
-to obtain identical strings.
-*/
+	if(n->type==DAG_NODE_TYPE_COMMAND) {
 
-static void makeflow_node_expand( struct dag_node *n, struct batch_queue *queue, struct batch_task *task )
-{
-	makeflow_generate_files(n, task);
+		/* A plain command just gets a command string. */
+		batch_task_set_command(task, n->command);
 
-	/* Expand the command according to each of the wrappers */
-	makeflow_wrap_wrapper(task, n, wrapper);
-	makeflow_wrap_enforcer(task, n, enforcer);
-	makeflow_wrap_umbrella(task, n, umbrella, queue);
+	} else if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+
+		/* A sub-workflow must be expanded into a makeflow invocation */
+
+		char *cmd = string_format("makeflow -T local %s",n->workflow_file);
+		char *oldcmd = 0;
+
+		/* Select the workflow language */
+
+		if(n->workflow_is_jx) {
+			oldcmd = cmd;
+			cmd = string_format("%s --jx",cmd);
+			free(oldcmd);
+		}
+
+		/* Generate the workflow arguments file */
+
+		if(n->workflow_args) {
+			char args[] = "makeflow.jx.args.XXXXXX";
+			int fd = mkstemp(args);
+			FILE *argsfile = fdopen(fd,"w");
+			jx_print_stream(n->workflow_args,argsfile);
+			fclose(argsfile);
+
+			oldcmd = cmd;
+			cmd = string_format("%s --jx-args %s",cmd,args);
+			free(oldcmd);
+
+			/* Define this file as a temp so it is removed on completion. */
+			makeflow_hook_add_input_file(n->d,task,args,args,DAG_FILE_TYPE_TEMP);
+		}
+
+		/* Add resource controls to the sub-workflow, if known. */
+
+		if(n->resources_requested->cores>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-cores %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		if(n->resources_requested->memory>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-memory %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		if(n->resources_requested->disk>0) {
+			oldcmd = cmd;
+			cmd = string_format("%s --local-disk %d",cmd,(int)n->resources_requested->cores);
+			free(oldcmd);
+		}
+
+		batch_task_set_command(task, cmd);
+		batch_task_add_input_file(task,n->workflow_file,n->workflow_file);
+		free(cmd);
+	} else {
+		fatal("invalid job type %d in dag node (%s)",n->type,n->command);
+	}
+
+	/* Add all input and output files to the task */
+
+	struct dag_file *f;
+	list_first_item(n->source_files);
+	while((f = list_next_item(n->source_files))){
+		batch_task_add_input_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+	}
+
+	list_first_item(n->target_files);
+	while((f = list_next_item(n->target_files))){
+		batch_task_add_output_file(task, f->filename, dag_node_get_remote_name(n, f->filename));
+	}
+
+	batch_task_set_resources(task, dag_node_dynamic_label(n));
+	batch_task_set_envlist(task, dag_node_env_create(n->d, n, full_env_list));
+
+	return task;
 }
 
 /*
@@ -236,10 +291,10 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 
 	/* Create generic task if one does not exist. This occurs in log recovery. */
 	if(!n->task){
-		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
-		/* This augments the task struct, should be replaced with hook in future. */
-		makeflow_node_expand(n, q, n->task);
+		/* Hooks are not applied. This should only happen in log recovery.
+		   If files were created in previous runs they are logged, orphaned, and cleaned. */
 	}
 
 	/* Clean all files associated with task, includes node and hook files. */
@@ -273,6 +328,8 @@ static void makeflow_abort_all(struct dag *d)
 		makeflow_abort_job(d,n,remote_queue,jobid,"remote");
 	}
 }
+
+/* A few forward prototypes to handle mutually-recursive definitions. */
 
 static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
@@ -370,10 +427,12 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 	}
 
 	if(!n->task){
-		n->task = dag_node_to_batch_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
-		/* This augments the task struct, should be replaced with hook in future. */
-		makeflow_node_expand(n, makeflow_get_queue(n), n->task);
+		/* Hooks may need to be applied for proper clean-up. Not currently
+		   done as most files will be regenerated. Global file may persist
+		   until the until the task is completed again if there were
+		   partial files. Wrapper expansion was removed. */
 	}
 
 	// Clean up things associated with this node
@@ -414,33 +473,6 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 			}
 			if(child_node_found) {
 				makeflow_node_force_rerun(rerun_table, d, p);
-			}
-		}
-	}
-}
-
-/*
-Update nested jobs with appropriate number of local jobs
-(total local jobs max / maximum number of concurrent nests).
-*/
-
-static void makeflow_prepare_nested_jobs(struct dag *d)
-{
-	int dag_nested_width = dag_width(d, 1);
-	int update_dag_nests = 1;
-	char *s = getenv("MAKEFLOW_UPDATE_NESTED_JOBS");
-	if(s)
-		update_dag_nests = atoi(s);
-
-	if(dag_nested_width > 0 && update_dag_nests) {
-		dag_nested_width = MIN(dag_nested_width, local_jobs_max);
-		struct dag_node *n;
-		for(n = d->nodes; n; n = n->next) {
-			if(n->nested_job && ((n->local_job && local_queue) || batch_queue_type == BATCH_QUEUE_TYPE_LOCAL)) {
-				char *command = xxmalloc(strlen(n->command) + 20);
-				sprintf(command, "%s -j %d", n->command, local_jobs_max / dag_nested_width);
-				free((char *) n->command);
-				n->command = command;
 			}
 		}
 	}
@@ -512,8 +544,7 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 
 /*
 Submit a node to the appropriate batch system, after materializing
-the necessary list of input and output files, and applying all
-wrappers and options.
+the necessary list of input and output files, and applying all options.
 */
 
 static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
@@ -537,11 +568,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	}
 
 	/* Create task from node information */
-	struct batch_task *task = dag_node_to_batch_task(n, queue, should_send_all_local_environment);
+	struct batch_task *task = makeflow_node_to_task(n, queue, should_send_all_local_environment);
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
-
-	/* This augments the task struct, should be replaced with node_submit in future. */
-	makeflow_node_expand(n, queue, task);
 	n->task = task;
 
 	int hook_return = makeflow_hook_node_submit(n, task);
@@ -886,7 +914,7 @@ static int makeflow_check_batch_consistency(struct dag *d)
 
 	for(n = d->nodes; n; n = n->next) {
 
-		if(itable_size(n->remote_names) > 0 || (wrapper && wrapper->uses_remote_rename)){
+		if(itable_size(n->remote_names) > 0){
 			if(n->local_job) {
 				debug(D_ERROR, "Remote renaming is not supported with -Tlocal or LOCAL execution. Rule %d (line %d).\n", n->nodeid, n->linenum);
 				error = 1;
@@ -1023,92 +1051,6 @@ static void handle_abort(int sig)
 	makeflow_abort_flag = 1;
 
 }
-#ifdef CCTOOLS_WITH_MPI
-static void makeflow_mpi_master_setup(int mpi_world_size, int mpi_cores_per, int mpi_mem_per, char* working_dir){
-    struct hash_table* mpi_comps = hash_table_create(0, 0);
-                struct hash_table* mpi_sizes = hash_table_create(0, 0);
-
-                int i;
-
-                for (i = 1; i < mpi_world_size; i++) {
-                    unsigned len = 0;
-                    MPI_Recv(&len, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    char* str = malloc(sizeof (char*)*len + 1);
-                    memset(str, '\0', sizeof (char)*len + 1);
-                    MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-                    struct jx* recobj = jx_parse_string(str);
-                    char* name = (char*)jx_lookup_string(recobj, "name");
-                    
-                    uint64_t* rank = malloc(sizeof(uint64_t)*1); *rank = jx_lookup_integer(recobj, "rank");
-					
-		    //fprintf(stderr,"RANK0: got back response: %i at %s\n",rank,name);
-
-                    if (hash_table_lookup(mpi_comps, name) == NULL) {
-                        hash_table_insert(mpi_comps, string_format("%s",name), rank);
-                    }
-                    //for partition sizing
-                    if (hash_table_lookup(mpi_sizes, name) == NULL) {
-                        uint64_t* val = malloc(sizeof(uint64_t)*1); *val = 1;
-                        hash_table_insert(mpi_sizes, name, (void*)val);
-                    } else {
-                        uint64_t* val = (uint64_t*) hash_table_lookup(mpi_sizes, name);
-                        *val += 1;
-                        hash_table_remove(mpi_sizes, name);
-                        hash_table_insert(mpi_sizes, name, (void*)(val));
-
-                    }
-
-                    jx_delete(recobj);
-                    free(str);
-
-                }
-                for (i = 1; i < mpi_world_size; i++) {
-                    hash_table_firstkey(mpi_comps);
-                    char* key;
-                    uint64_t* value;
-                    int sent = 0;
-                    while (hash_table_nextkey(mpi_comps, &key, (void**) &value)) {
-                        uint64_t ui = i;
-                        if (*value == ui) {
-                            int mpi_cores = mpi_cores_per != 0 ? mpi_cores_per : (int)*((uint64_t*)hash_table_lookup(mpi_sizes,key));
-                            //fprintf(stderr,"%lli has %i cores!\n", value, mpi_cores);
-                            struct jx* livemsgjx = jx_object(NULL);
-                            jx_insert_integer(livemsgjx,"LIVE",mpi_cores);
-                            if(mpi_mem_per > 0){
-                                jx_insert_integer(livemsgjx,"MEM",mpi_mem_per);
-                            }
-                            if(working_dir != NULL){
-                                jx_insert_string(livemsgjx,"WORK_DIR",working_dir);
-                            }
-                            char* livemsg = jx_print_string(livemsgjx);
-                            unsigned livemsgsize = strlen(livemsg);
-                            //fprintf(stderr,"Lifemsg for %lli has been created, now sending\n",value);
-                            MPI_Send(&livemsgsize,1,MPI_UNSIGNED,*value,0,MPI_COMM_WORLD);
-                            MPI_Send(livemsg, livemsgsize, MPI_CHAR, *value, 0, MPI_COMM_WORLD);
-                            sent = 1;
-                            //fprintf(stderr,"Lifemsg for %lli was successfully delivered\n",value);
-                            free(livemsg);
-                            jx_delete(livemsgjx);
-                        }
-                    }
-                    if (sent == 0) {
-                        char* livemsg = string_format("{\"DIE\":1}");
-                        unsigned livemsgsize = strlen(livemsg);
-                        MPI_Send(&livemsgsize,1,MPI_UNSIGNED,i,0,MPI_COMM_WORLD);
-                        MPI_Send(livemsg, livemsgsize, MPI_CHAR, i, 0, MPI_COMM_WORLD);
-                        free(livemsg);
-                    }
-                    debug(D_BATCH,"Msg for %i has been delivered\n",i);
-                }
-                debug(D_BATCH,"Msgs have all been sent\n");
-                
-                //now we have the proper iprocesses there with correct num of cores
-                batch_job_mpi_set_ranks_sizes(mpi_comps, mpi_sizes);
-
-
-}
-#endif
 
 static void show_help_run(const char *cmd)
 {
@@ -1198,9 +1140,12 @@ static void show_help_run(const char *cmd)
 	printf("    --local-disk=#              Max amount of local disk (MB) to use.\n");
 	printf("    --safe-submit-mode          Excludes resources at submission.\n");
 	printf("                                  (SLURM, TORQUE, and PBS)\n");
+	printf("    --verbose-jobnames          Set the job name based on the command.\n");
 	printf("    --ignore-memory-spec        Excludes memory at submission (SLURM).\n");
 	printf("    --batch-mem-type=<type>     Specify memory resource type (SGE).\n");
 	printf("    --working-dir=<dir|url>     Working directory for the batch system.\n");
+	printf("    --mpi-cores=#               Manually set number of cores on each MPI worker. (-T mpi)\n");
+	printf("    --mpi-memory=#              Manually set memory (MB) on each MPI worker. (-T mpi)\n");
 	        /********************************************************************************/
 	printf("\nContainers and Wrappers:\n");
 	printf(" --docker=<image>               Run each task using the named Docker image.\n");
@@ -1217,6 +1162,7 @@ static void show_help_run(const char *cmd)
 	printf(" --wrapper-output=<cmd>         Wrapper command produces this output file.\n");
 	printf(" --enforcement                  Enforce access to only named inputs/outputs.\n");
 	printf(" --parrot-path=<path>           Path to parrot_run for --enforcement.\n");
+	printf(" --env-replace-path=<path>      Path to env_replace for --enforcement.\n");
 	printf(" --mesos-master=<hostname:port> Mesos master address and port\n");
 	printf(" --mesos-path=<path>            Path to mesos python2 site-packages.\n");
 	printf(" --mesos-preload=<path>         Path to libraries needed by Mesos.\n");
@@ -1236,13 +1182,6 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs.(def: resource-rule-%%)\n");
 	printf(" --allocation=<mode>            Specify allocation mode (see manual).\n");
-	
-	/********************************************************************************/
-	printf("\nMPI Options:\n");
-	printf(" --mpi-cores=<val>              Set Number of cores each worker should use.\n");
-	printf(" --mpi-memory=<val>             Set amount of memory each worker has to use.\n");
-	printf(" --mpi-task-working-dir=<val>   Set the path where all tasks will create\n");
-	printf("                                  sandbox directory and execute in.\n");
 }
 
 int main(int argc, char *argv[])
@@ -1289,17 +1228,24 @@ int main(int argc, char *argv[])
 	char *s;
 	int safe_submit = 0;
 	int ignore_mem_spec = 0;
+	char *debug_file_name = 0;
 	char *batch_mem_type = NULL;
 	category_mode_t allocation_mode = CATEGORY_ALLOCATION_MODE_FIXED;
 	char *mesos_master = "127.0.0.1:5050/";
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
+
+	int mpi_cores = 0;
+	int mpi_memory = 0;
+
 	dag_syntax_type dag_syntax = DAG_SYNTAX_MAKE;
 	struct jx *jx_args = jx_object(NULL);
 	
 	struct jx *hook_args = jx_object(NULL);
 	char *k8s_image = NULL;
+	extern struct makeflow_hook makeflow_hook_basic_wrapper;
 	extern struct makeflow_hook makeflow_hook_docker;
+	extern struct makeflow_hook makeflow_hook_enforcement;
 	extern struct makeflow_hook makeflow_hook_example;
 	extern struct makeflow_hook makeflow_hook_fail_dir;
 	/* Using fail directories is on by default */
@@ -1309,16 +1255,15 @@ int main(int argc, char *argv[])
 	extern struct makeflow_hook makeflow_hook_shared_fs;
 	extern struct makeflow_hook makeflow_hook_singularity;
 	extern struct makeflow_hook makeflow_hook_storage_allocation;
+	extern struct makeflow_hook makeflow_hook_umbrella;
 	extern struct makeflow_hook makeflow_hook_vc3_builder;
 
 #ifdef HAS_CURL
 	extern struct makeflow_hook makeflow_hook_archive;
 #endif
+
 #ifdef CCTOOLS_WITH_MPI
-        int mpi_cores_per = 0;
-        int mpi_mem_per = 0;
-        char* debug_base_path = NULL;
-        char* mpi_working_dir = NULL;
+	MPI_Init(&argc,&argv);
 #endif
 
 	random_init();
@@ -1410,6 +1355,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_ALLOCATION_MODE,
 		LONG_OPT_ENFORCEMENT,
 		LONG_OPT_PARROT_PATH,
+		LONG_OPT_ENVREPLACE,
 		LONG_OPT_SINGULARITY,
 		LONG_OPT_SINGULARITY_OPT,
 		LONG_OPT_SHARED_FS,
@@ -1427,11 +1373,9 @@ int main(int argc, char *argv[])
 		LONG_OPT_MESOS_PRELOAD,
 		LONG_OPT_SEND_ENVIRONMENT,
 		LONG_OPT_K8S_IMG,
-#ifdef CCTOOLS_WITH_MPI
-                LONG_OPT_MPI_CORES,
-                LONG_OPT_MPI_MEM,
-                LONG_OPT_MPI_WORKDIR,
-#endif
+		LONG_OPT_VERBOSE_JOBNAMES,
+		LONG_OPT_MPI_CORES,
+		LONG_OPT_MPI_MEMORY,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1531,6 +1475,7 @@ int main(int argc, char *argv[])
 		{"jx-define", required_argument, 0, LONG_OPT_JX_DEFINE},
 		{"enforcement", no_argument, 0, LONG_OPT_ENFORCEMENT},
 		{"parrot-path", required_argument, 0, LONG_OPT_PARROT_PATH},
+		{"env-replace-path", required_argument, 0, LONG_OPT_ENVREPLACE},
 		{"singularity", required_argument, 0, LONG_OPT_SINGULARITY},
 		{"singularity-opt", required_argument, 0, LONG_OPT_SINGULARITY_OPT},
 		{"archive", no_argument, 0, LONG_OPT_ARCHIVE},
@@ -1546,11 +1491,9 @@ int main(int argc, char *argv[])
 		{"mesos-path", required_argument, 0, LONG_OPT_MESOS_PATH},
 		{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 		{"k8s-image", required_argument, 0, LONG_OPT_K8S_IMG},
-#ifdef CCTOOLS_WITH_MPI
-        {"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
-        {"mpi-memory", required_argument,0, LONG_OPT_MPI_MEM},
-        {"mpi-task-working-dir",required_argument,0,LONG_OPT_MPI_WORKDIR},
-#endif
+		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
+		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
+		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
 		{0, 0, 0, 0}
 	};
 
@@ -1722,11 +1665,8 @@ int main(int argc, char *argv[])
 				catalog_reporting_on = 1; //set to true
 				break;
 			case 'o':
-#ifdef CCTOOLS_WITH_MPI
-                debug_base_path = xxstrdup(optarg);
-#else
-				debug_config_file(optarg);
-#endif
+				debug_file_name = optarg;
+				debug_config_file(debug_file_name);
 				break;
 			case 'p':
 				port_set = 1;
@@ -1815,16 +1755,25 @@ int main(int argc, char *argv[])
 				log_verbose_mode = 1;
 				break;
 			case LONG_OPT_WRAPPER:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				makeflow_wrapper_add_command(wrapper, optarg);
+				if (makeflow_hook_register(&makeflow_hook_basic_wrapper, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				if(!jx_lookup(hook_args, "wrapper_command"))
+					jx_insert(hook_args, jx_string("wrapper_command"),jx_array(NULL));
+				jx_array_append(jx_lookup(hook_args, "wrapper_command"), jx_string(optarg));
 				break;
 			case LONG_OPT_WRAPPER_INPUT:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				makeflow_wrapper_add_input_file(wrapper, optarg);
+				if (makeflow_hook_register(&makeflow_hook_basic_wrapper, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				if(!jx_lookup(hook_args, "wrapper_input"))
+					jx_insert(hook_args, jx_string("wrapper_input"),jx_array(NULL));
+				jx_array_append(jx_lookup(hook_args, "wrapper_input"), jx_string(optarg));
 				break;
 			case LONG_OPT_WRAPPER_OUTPUT:
-				if(!wrapper) wrapper = makeflow_wrapper_create();
-				makeflow_wrapper_add_output_file(wrapper, optarg);
+				if (makeflow_hook_register(&makeflow_hook_basic_wrapper, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				if(!jx_lookup(hook_args, "wrapper_output"))
+					jx_insert(hook_args, jx_string("wrapper_output"),jx_array(NULL));
+				jx_array_append(jx_lookup(hook_args, "wrapper_output"), jx_string(optarg));
 				break;
 			case LONG_OPT_SHARED_FS:
 				if (optarg[0] != '/') fatal("Shared fs must be specified as an absolute path");
@@ -1906,20 +1855,24 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case LONG_OPT_UMBRELLA_BINARY:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_binary(umbrella, (const char *)xxstrdup(optarg));
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("umbrella_binary"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_LOG_PREFIX:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_log_prefix(umbrella, (const char *)xxstrdup(optarg));
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("umbrella_log_prefix"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_MODE:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_mode(umbrella, (const char *)xxstrdup(optarg));
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("umbrella_mode"), jx_string(optarg));
 				break;
 			case LONG_OPT_UMBRELLA_SPEC:
-				if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-				makeflow_wrapper_umbrella_set_spec(umbrella, (const char *)xxstrdup(optarg));
+				if (makeflow_hook_register(&makeflow_hook_umbrella, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("umbrella_spec"), jx_string(optarg));
 				break;
 			case LONG_OPT_MESOS_MASTER:
 				mesos_master = xxstrdup(optarg);
@@ -1988,10 +1941,18 @@ int main(int argc, char *argv[])
 				should_send_all_local_environment = 1;
 				break;
 			case LONG_OPT_ENFORCEMENT:
-				if(!enforcer) enforcer = makeflow_wrapper_create();
+				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
 				break;
 			case LONG_OPT_PARROT_PATH:
-				parrot_path = xxstrdup(optarg);
+				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("parrot_path"), jx_string(optarg));
+				break;
+			case LONG_OPT_ENVREPLACE:
+				if (makeflow_hook_register(&makeflow_hook_enforcement, &hook_args) == MAKEFLOW_HOOK_FAILURE)
+					goto EXIT_WITH_FAILURE;
+				jx_insert(hook_args, jx_string("env_replace_path"), jx_string(optarg));
 				break;
 			case LONG_OPT_FAIL_DIR:
 				save_failure = 0;
@@ -2052,17 +2013,15 @@ int main(int argc, char *argv[])
 				jx_delete(j);
 				break;
 			}
-#ifdef CCTOOLS_WITH_MPI
-            case LONG_OPT_MPI_CORES:
-                mpi_cores_per = atoi(optarg);
-                break;
-            case LONG_OPT_MPI_MEM:
-                mpi_mem_per = atoi(optarg);
-                break;
-            case LONG_OPT_MPI_WORKDIR:
-                mpi_working_dir = xxstrdup(optarg);
-                break;
-#endif
+			case LONG_OPT_VERBOSE_JOBNAMES:
+				batch_job_verbose_jobnames = 1;
+				break;
+			case LONG_OPT_MPI_CORES:
+				mpi_cores = atoi(optarg);
+				break;
+			case LONG_OPT_MPI_MEMORY:
+				mpi_memory = atoi(optarg);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -2071,53 +2030,10 @@ int main(int argc, char *argv[])
 
 	cctools_version_debug(D_MAKEFLOW_RUN, argv[0]);
 
-#ifdef CCTOOLS_WITH_MPI
-        //the code assumes sizeof(void*) == uint64_t
-        int need_mpi_finalize = 0;
-        if (batch_queue_type == BATCH_QUEUE_TYPE_MPI) {
-			//mpi boilerplate code modified from tutorial at www.mpitutorial.com
-            MPI_Init(NULL, NULL);
-            int mpi_world_size;
-            MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
-            int mpi_rank;
-            MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-            char procname[MPI_MAX_PROCESSOR_NAME];
-            int procnamelen;
-            MPI_Get_processor_name(procname, &procnamelen);
-
-            fprintf(stderr,"%i:%s My pid is: %i\n",mpi_rank,procname,getpid());
-
-            if (mpi_rank == 0) {
-                if(debug_base_path != NULL){
-                    char* debug_path = string_format("%s.%i",debug_base_path,mpi_rank);
-                    debug_config_file(debug_path);
-                }
-                need_mpi_finalize = 1;
-                
-                makeflow_mpi_master_setup(mpi_world_size,mpi_cores_per,mpi_mem_per,mpi_working_dir);
-				int cores_total = load_average_get_cpus();
-		        uint64_t memtotal;
-       			uint64_t memavail;
-        		host_memory_info_get(&memavail, &memtotal);
-        		int mem = ((memtotal / (1024 * 1024)) / cores_total) * 1;	
-				explicit_local_cores = 1;
-				explicit_local_memory = mem;
-
-        } else {
-            if (debug_base_path != NULL) {
-                char* debug_path = string_format("%s.%i", debug_base_path, mpi_rank);
-                debug_config_file(debug_path);
-            }
-            debug(D_BATCH, "%i:%s Starting mpi worker function\n", mpi_rank, procname);
-            int batch_job_worker_exit_code = batch_job_mpi_worker_function(mpi_world_size, mpi_rank, procname, procnamelen);
-            fprintf(stderr, "%i:%s exited with code: %i\n", mpi_rank, procname, batch_job_worker_exit_code);
-            return batch_job_worker_exit_code;
-        }
-
-    } else {
-        debug_config_file(debug_base_path);
-    }
-#endif 
+	/* Perform initial MPI setup prior to creating the batch queue object. */
+	if(batch_queue_type==BATCH_QUEUE_TYPE_MPI) {
+		batch_job_mpi_setup(debug_file_name ? debug_file_name : "debug", mpi_cores,mpi_memory);
+	}
 
 	if(!did_explicit_auth)
 		auth_register_all();
@@ -2129,13 +2045,7 @@ int main(int argc, char *argv[])
 	}
 
 	// REGISTER HOOKS HERE
-	if (enforcer && umbrella) {
-		fatal("enforcement and Umbrella are mutually exclusive\n");
-	}
-
-	if (makeflow_hook_register(&makeflow_hook_shared_fs, &hook_args) == MAKEFLOW_HOOK_FAILURE)
-		goto EXIT_WITH_FAILURE;
-
+	/* This is intended for hooks that are on by default. */
 	if(save_failure){
 		if (makeflow_hook_register(&makeflow_hook_fail_dir, &hook_args) == MAKEFLOW_HOOK_FAILURE)
 			goto EXIT_WITH_FAILURE;
@@ -2343,40 +2253,7 @@ int main(int argc, char *argv[])
 		makeflow_gc_method = MAKEFLOW_GC_ALL;
 	}
 
-	/* Set dag_node->umbrella_spec */
-	if(!clean_mode) {
-		struct dag_node *cur;
-		cur = d->nodes;
-		while(cur) {
-			struct dag_variable_lookup_set s = {d, cur->category, cur, NULL};
-			char *spec = NULL;
-			spec = dag_variable_lookup_string("SPEC", &s);
-			if(spec) {
-				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the makefile ...\n", cur->nodeid);
-				dag_node_set_umbrella_spec(cur, xxstrdup(spec));
-			} else if(umbrella && umbrella->spec) {
-				debug(D_MAKEFLOW_RUN, "setting dag_node->umbrella_spec (rule %d) from the --umbrella_spec option ...\n", cur->nodeid);
-				dag_node_set_umbrella_spec(cur, umbrella->spec);
-			}
-			free(spec);
-			cur = cur->next;
-		}
-
-		debug(D_MAKEFLOW_RUN, "makeflow_wrapper_umbrella_preparation...\n");
-		// When the user specifies umbrella specs in a makefile, but does not use any `--umbrella...` option,
-		// an umbrella wrapper was created to hold the default values for umbrella-related setttings such as
-		// log_prefix and default umbrella execution engine.
-		if(!umbrella) umbrella = makeflow_wrapper_umbrella_create();
-		makeflow_wrapper_umbrella_preparation(umbrella, d);
-	}
-
-	if(enforcer) {
-		makeflow_wrapper_enforcer_init(enforcer, parrot_path);
-	}
-
 	makeflow_parse_input_outputs(d);
-
-	makeflow_prepare_nested_jobs(d);
 
 	if (change_dir)
 		chdir(change_dir);
@@ -2538,10 +2415,6 @@ EXIT_WITH_FAILURE:
 	if(write_summary_to || email_summary_to)
 		makeflow_summary_create(d, write_summary_to, email_summary_to, runtime, time_completed, argc, argv, dagfile, remote_queue, makeflow_abort_flag, makeflow_failed_flag );
 
-	if(wrapper){
-		makeflow_wrapper_delete(wrapper);
-	}
-
 	int exit_value;
 	if(makeflow_abort_flag) {
 		makeflow_hook_dag_abort(d);
@@ -2568,13 +2441,6 @@ EXIT_WITH_FAILURE:
 		batch_queue_delete(local_queue);
 
 	makeflow_log_close(d);
-        
-#if CCTOOLS_WITH_MPI
-        if(need_mpi_finalize ==1){
-            batch_job_mpi_kill_workers();
-            MPI_Finalize();
-        }
-#endif
         
 	exit(exit_value);
         

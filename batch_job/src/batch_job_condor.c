@@ -176,8 +176,12 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 			fprintf(file, "request_disk = %" PRId64 "\n", disk);
 	}
 
-	if(options)
-		fprintf(file, "%s\n", options);
+	if(options) {
+		char *opt_expanded = malloc(2 * strlen(options) + 1);
+		string_replace_backslash_codes(options, opt_expanded);
+		fprintf(file, "%s\n", opt_expanded);
+		free(opt_expanded);
+	}
 
 	fprintf(file, "queue\n");
 	fclose(file);

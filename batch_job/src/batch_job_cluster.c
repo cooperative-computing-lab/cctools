@@ -28,6 +28,8 @@ static char * cluster_remove_cmd = NULL;
 static char * cluster_options = NULL;
 static char * cluster_jobname_var = NULL;
 
+int batch_job_verbose_jobnames = 0;
+
 /*
 Principle of operation:
 Each batch job that we submit uses a wrapper file.
@@ -195,16 +197,33 @@ static batch_job_id_t batch_job_cluster_submit (struct batch_queue * q, const ch
 	TODO change this to the nodeid during a refactor to batch_task
 	*/
 	static uint16_t submit_id = 0;
+	char *jobname;
 
-	char *command = string_format("%s %s %s %s makeflow%" PRIu16 " %s %s.wrapper",
+	if (batch_job_verbose_jobnames) {
+		char *firstword = strdup(cmd);
+
+		char *end = strchr(firstword, ' ');
+		if (end) *end = 0;
+
+		jobname = strdup(string_front(path_basename(firstword), 15));
+		if (jobname[0] != 0 && !isalpha(jobname[0])) jobname[0] = 'X';
+
+		free(firstword);
+	} else {
+		jobname = string_format("makeflow%" PRIu16, submit_id);
+	}
+	submit_id++;
+
+	char *command = string_format("%s %s %s %s %s %s %s.wrapper",
 		cluster_submit_cmd,
 		cluster_resources,
 		cluster_options,
 		cluster_jobname_var,
-		submit_id++,
+		jobname,
 		options ? options : "",
 		cluster_name);
 
+	free(jobname);
 	free(cluster_resources);
 	debug(D_BATCH, "%s", command);
 

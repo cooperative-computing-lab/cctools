@@ -9,6 +9,7 @@ See the file COPYING for details.
 #include "batch_job.h"
 #include "hash_table.h"
 #include "copy_stream.h"
+#include "copy_tree.h"
 #include "debug.h"
 #include "domain_name_cache.h"
 #include "envtools.h"
@@ -344,7 +345,13 @@ static void set_worker_resources_options( struct batch_queue *queue )
 static int submit_worker( struct batch_queue *queue )
 {
 	char *cmd;
-	const char *worker = runos_os ? "work_queue_worker" : "./work_queue_worker";
+	char *worker;
+
+	if(runos_os || k8s_worker_image) {
+		worker = xxstrdup("work_queue_worker");
+	} else {
+		worker = string_format("./%s", worker_command);
+	}
 
 	if(using_catalog) {
 		cmd = string_format(
@@ -359,9 +366,6 @@ static int submit_worker( struct batch_queue *queue )
 		);
 	}
 	else {
-		if(k8s_worker_image) {
-			worker = "work_queue_worker";
-		} 
 		cmd = string_format(
 		"%s %s %d -t %d -C '%s' -d all -o worker.log %s %s %s",
 		worker,
@@ -382,8 +386,8 @@ static int submit_worker( struct batch_queue *queue )
 		free(cmd);
 		cmd = newcmd;
 	}
-	
-	char *files = NULL;	
+
+	char *files = NULL;
 	if(!k8s_worker_image) {
 		files = string_format("work_queue_worker");
 	} else {
@@ -401,7 +405,7 @@ static int submit_worker( struct batch_queue *queue )
 		free(files);
 		files = newfiles;
 	}
-	
+
 	if(runos_os){
 		char* vc3_cmd = string_format("./vc3-builder --require cctools-statics -- %s",cmd);
 		char* temp = string_format("python %s %s %s",CCTOOLS_RUNOS_PATH,runos_os,vc3_cmd);
@@ -418,6 +422,8 @@ static int submit_worker( struct batch_queue *queue )
 	}
 
 	debug(D_WQ,"submitting worker: %s",cmd);
+
+	free(worker);
 
 	return batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
 }
@@ -1080,6 +1086,7 @@ int main(int argc, char *argv[])
 	char *mesos_path = NULL;
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
+	struct jx *wrapper_inputs = jx_array(NULL);
 
 	//Environment variable handling
 	char *ev = NULL;
@@ -1195,9 +1202,11 @@ int main(int argc, char *argv[])
 				} else {
 					wrapper_input = string_format("%s,%s",wrapper_input,optarg);
 				}
+				struct jx *file = jx_string(optarg);
+				jx_array_append(wrapper_inputs, file);
 				break;
 			case LONG_OPT_WORKER_BINARY:
-				worker_command = strdup(optarg);
+				worker_command = xxstrdup(optarg);
 				break;
 			case 'P':
 				password_file = optarg;
@@ -1331,24 +1340,39 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if(wrapper_input) {
+		struct jx *item;
+		for(void *i = NULL; (item = jx_iterate_array(wrapper_inputs, &i));) {
+			const char *value = item->u.string_value;
+			const char *file_at_scratch_dir = string_format("%s/%s", scratch_dir, path_basename(value));
+			int result = copy_direntry(value, file_at_scratch_dir); 
+			if(result < 0) {
+				debug(D_NOTICE, "Cannot copy wrapper input file %s to factory scratch directory", value);
+			}
+		}
+	}
+
 	char* cmd;
 	if(worker_command != NULL){
 		cmd = string_format("cp '%s' '%s'",worker_command,scratch_dir);
 		if(system(cmd)){
-			fprintf(stderr, "work_queue_factory: Could not Access specified worker_queue_worker binary.\n");
+			fprintf(stderr, "work_queue_factory: Could not Access specified worker binary.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
+		char *tmp = xxstrdup(path_basename(worker_command));
+		free(worker_command);
+		worker_command = tmp;
 	}else{
-		cmd = string_format("cp \"$(which work_queue_worker)\" '%s'",scratch_dir);
+		worker_command = xxstrdup("work_queue_worker");
+		cmd = string_format("cp \"$(which %s)\" '%s'",worker_command,scratch_dir);
 		if (system(cmd)) {
 			fprintf(stderr, "work_queue_factory: please add work_queue_worker to your PATH.\n");
 			exit(EXIT_FAILURE);
 		}
 		free(cmd);
 	}
-	
-	
+
 	if(runos_os) {
 		cmd = string_format("cp '%s' '%s'",  CCTOOLS_VC3_BUILDER_PATH, scratch_dir);
 		int k = system(cmd);

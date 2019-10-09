@@ -258,6 +258,12 @@ library_search_normal()
 			else
 				library_search_result="-l$1"
 			fi
+
+			if [ $BUILD_SYS = DARWIN ]
+			then
+				library_search_result="${library_search_result} -rpath $libdir"
+			fi
+
 			return 0
 		fi
 	fi

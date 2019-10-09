@@ -9,6 +9,7 @@
 #include "dag_node.h"
 #include "dag_file.h"
 #include "jx.h"
+#include "jx_pretty_print.h"
 
 #include <assert.h>
 #include <unistd.h>
@@ -76,6 +77,36 @@ int makeflow_module_move_fail_file(struct dag *d, struct dag_node *n, struct bat
 	return MAKEFLOW_HOOK_FAILURE;
 }
 
+/* Attempt to link input files into fail dir. Do not fail on failed link. */
+int makeflow_module_link_fail_file(struct dag *d, struct dag_node *n, struct batch_queue *q, struct dag_file *f) {
+	assert(d);
+	assert(n);
+	assert(q);
+	assert(f);
+
+	char *failout = string_format( FAIL_DIR "/%s", n->nodeid, f->filename);
+	struct dag_file *o = makeflow_module_lookup_fail_dir(d, q, failout);
+	if (o) {
+		if(f->state == DAG_FILE_STATE_DELETE){
+			debug(D_MAKEFLOW_HOOK, "File %s has already been deleted by another hook",f->filename);
+			return MAKEFLOW_HOOK_SUCCESS;
+		}
+
+		if (symlink(f->filename, o->filename) < 0) {
+			debug(D_MAKEFLOW_HOOK, "Failed to link %s -> %s: %s",
+					f->filename, o->filename, strerror(errno));
+		} else {
+			debug(D_MAKEFLOW_HOOK, "Linked %s -> %s",
+					f->filename, o->filename);
+			return MAKEFLOW_HOOK_SUCCESS;
+		}
+	} else {
+		fprintf(stderr, "Skipping link %s -> %s", f->filename, failout);
+	}
+	free(failout);
+	return MAKEFLOW_HOOK_SUCCESS;
+}
+
 int makeflow_module_prep_fail_dir(struct dag *d, struct dag_node *n, struct batch_queue *q) {
 	assert(d);
 	assert(n);
@@ -134,12 +165,32 @@ static int node_fail( void * instance_struct, struct dag_node *n, struct batch_t
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 
+	/* Dump node info */
+	char *info_path = string_format(FAIL_DIR "/INFO.json", n->nodeid);
+	FILE *info_stream = fopen(info_path, "w");
+	free(info_path);
+	if (!info_stream) {
+		debug(D_MAKEFLOW_HOOK, "Failed to create %s: %s", info_path, strerror(errno));
+		return MAKEFLOW_HOOK_FAILURE;
+	}
+	struct jx *info = dag_node_to_jx(n->d, n, 0);
+	if (n->task->info->exited_normally) {
+		jx_insert(info, jx_string("exit_code"), jx_integer(n->task->info->exit_code));
+	} else {
+		jx_insert(info, jx_string("exit_signal"), jx_integer(n->task->info->exit_signal));
+	}
+	jx_pretty_print_stream(info, info_stream);
+	jx_delete(info);
+	fclose(info_stream);
+
 	/* Move temp inputs(wrappers) of failed node. Mark deleted if successful rename. */
 	list_first_item(task->input_files);
 	while((bf = list_next_item(task->input_files))) {
 		df = dag_file_lookup_or_create(n->d, bf->outer_name);
 		if(df->type == DAG_FILE_TYPE_TEMP) {
 			makeflow_module_move_fail_file(n->d, n, makeflow_get_queue(n), df);
+		} else {
+			makeflow_module_link_fail_file(n->d, n, makeflow_get_queue(n), df);
 		}
 	}
 

@@ -2,6 +2,6 @@ __pycache__
 _work_queue.so
 Python.framework
 work_queue.py
-work_queue.binding.py3*
-work_queue_example.py3*
+work_queue.binding.py*
+work_queue_example.py*
 work_queue_wrap.*

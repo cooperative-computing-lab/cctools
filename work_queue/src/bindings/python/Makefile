@@ -33,6 +33,6 @@ test:
 install: all
 	mkdir -p $(CCTOOLS_PYTHON_PATH)
 	chmod 755 work_queue_example.py
-	cp work_queue.py $(WQPYTHONSO) $(CCTOOLS_PYTHON_PATH)/
+	cp work_queue.py work_queue_futures.py $(WQPYTHONSO) $(CCTOOLS_PYTHON_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
-	cp work_queue_example.py $(CCTOOLS_INSTALL_DIR)/doc/
+

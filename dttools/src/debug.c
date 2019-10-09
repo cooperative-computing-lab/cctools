@@ -23,29 +23,29 @@ See the file COPYING for details.
 
 #include <stdio.h>
 
-extern void debug_stderr_write (INT64_T flags, const char *str);
-extern void debug_stdout_write (INT64_T flags, const char *str);
+extern void debug_stderr_write (int64_t flags, const char *str);
+extern void debug_stdout_write (int64_t flags, const char *str);
 
-extern void debug_file_write (INT64_T flags, const char *str);
+extern void debug_file_write (int64_t flags, const char *str);
 extern void debug_file_size (off_t size);
 extern int debug_file_path (const char *path);
 extern void debug_file_rename (const char *suffix);
 extern int debug_file_reopen (void);
 
 #ifdef HAS_SYSLOG_H
-extern void debug_syslog_write (INT64_T flags, const char *str);
+extern void debug_syslog_write (int64_t flags, const char *str);
 extern void debug_syslog_config (const char *name);
 #endif
 
 #ifdef HAS_SYSTEMD_JOURNAL_H
-extern void debug_journal_write (INT64_T flags, const char *str);
+extern void debug_journal_write (int64_t flags, const char *str);
 #endif
 
 
-static void (*debug_write) (INT64_T flags, const char *str) = debug_stderr_write;
+static void (*debug_write) (int64_t flags, const char *str) = debug_stderr_write;
 static pid_t (*debug_getpid) (void) = getpid;
 static char debug_program_name[PATH_MAX];
-static INT64_T debug_flags = D_NOTICE|D_ERROR|D_FATAL;
+static int64_t debug_flags = D_NOTICE|D_ERROR|D_FATAL;
 
 static char *terminal_path = "/dev/tty";
 static FILE *terminal_f    = NULL;
@@ -53,7 +53,7 @@ static int   terminal_available = 1;
 
 struct flag_info {
 	const char *name;
-	INT64_T flag;
+	int64_t flag;
 };
 
 static struct flag_info table[] = {
@@ -153,7 +153,7 @@ void debug_flags_print(FILE * stream)
 	}
 }
 
-void debug_set_flag_name(INT64_T flag, const char *name)
+void debug_set_flag_name(int64_t flag, const char *name)
 {
 	struct flag_info *i;
 
@@ -165,7 +165,7 @@ void debug_set_flag_name(INT64_T flag, const char *name)
 	}
 }
 
-static const char *debug_flags_to_name(INT64_T flags)
+static const char *debug_flags_to_name(int64_t flags)
 {
 	struct flag_info *i;
 
@@ -177,7 +177,7 @@ static const char *debug_flags_to_name(INT64_T flags)
 	return "debug";
 }
 
-static void do_debug(INT64_T flags, const char *fmt, va_list args)
+static void do_debug(int64_t flags, const char *fmt, va_list args)
 {
 	buffer_t B;
 	char ubuf[1<<16];
@@ -225,7 +225,7 @@ static void do_debug(INT64_T flags, const char *fmt, va_list args)
 	buffer_free(&B);
 }
 
-void debug(INT64_T flags, const char *fmt, ...)
+void debug(int64_t flags, const char *fmt, ...)
 {
 	if(flags & debug_flags) {
 		va_list args;
@@ -237,7 +237,7 @@ void debug(INT64_T flags, const char *fmt, ...)
 	}
 }
 
-void vdebug(INT64_T flags, const char *fmt, va_list args)
+void vdebug(int64_t flags, const char *fmt, va_list args)
 {
 	if(flags & debug_flags) {
 		int save_errno = errno;
@@ -246,7 +246,7 @@ void vdebug(INT64_T flags, const char *fmt, va_list args)
 	}
 }
 
-void warn(INT64_T flags, const char *fmt, ...)
+void warn(int64_t flags, const char *fmt, ...)
 {
 	va_list args;
 
@@ -257,7 +257,7 @@ void warn(INT64_T flags, const char *fmt, ...)
 	errno = save_errno;
 }
 
-void notice(INT64_T flags, const char *fmt, ...)
+void notice(int64_t flags, const char *fmt, ...)
 {
 	va_list args;
 
@@ -348,14 +348,14 @@ void debug_config_getpid (pid_t (*getpidf)(void))
 	debug_getpid = getpidf;
 }
 
-INT64_T debug_flags_clear()
+int64_t debug_flags_clear()
 {
-	INT64_T result = debug_flags;
+	int64_t result = debug_flags;
 	debug_flags = 0;
 	return result;
 }
 
-void debug_flags_restore(INT64_T fl)
+void debug_flags_restore(int64_t fl)
 {
 	debug_flags = fl;
 }

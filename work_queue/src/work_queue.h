@@ -264,6 +264,13 @@ struct work_queue_stats {
 	int64_t min_memory;       /**< The smallest memory size in MB observed among the connected workers. */
 	int64_t min_disk;         /**< The smallest disk space in MB observed among the connected workers. */
 
+    double master_load;       /**< In the range of [0,1]. If close to 1, then
+                                the master is at full load and spends most
+                                of its time sending and receiving taks, and
+                                thus cannot accept connections from new
+                                workers. If close to 0, the master is spending
+                                most of its time waiting for something to happen. */
+
 	/**< deprecated fields: */
 	int total_workers_connected;    /**< @deprecated Use workers_connected instead. */
 	int total_workers_joined;       /**< @deprecated Use workers_joined instead. */
@@ -795,6 +802,16 @@ multiplier.  The value specified here applies only to tasks in the given categor
 @returns 0 if activated, 1 if deactivated.
 */
 int work_queue_activate_fast_abort_category(struct work_queue *q, const char *category, double multiplier);
+
+
+/** Set the draining mode per worker hostname.
+	If drain_flag is 0, workers at hostname receive tasks as usual.
+    If drain_flag is not 1, no new tasks are dispatched to workers at hostname,
+    and if empty they are shutdown.
+  @param q A work queue object.
+  @param drain_flag Draining mode.
+  */
+int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag);
 
 /** Turn on or off first-allocation labeling for a given category. By default, only cores, memory, and disk are labeled. Turn on/off other specific resources use @ref work_queue_specify_category_autolabel_resource.
 @param q A work queue object.

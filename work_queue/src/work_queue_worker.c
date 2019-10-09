@@ -66,12 +66,6 @@ See the file COPYING for details.
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
-#ifdef CCTOOLS_WITH_MPI
-#include <mpi.h>
-#include "hash_table.h"
-#include "jx_parse.h"
-#endif
-
 typedef enum {
 	WORKER_MODE_WORKER,
 	WORKER_MODE_FOREMAN
@@ -2236,7 +2230,6 @@ static void show_help(const char *cmd)
 	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container based on this docker image.\n", "--docker-preserve=<image>");
 	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<tarball>");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
-	printf("%-30s Initialize as MPI programs (requires being built with --with-mpicc-path in cctools configuration).\n", "--mpi");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2244,7 +2237,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
 	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_MPI};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2289,7 +2282,6 @@ static const struct option long_options[] = {
 	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
 	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
-	{"mpi",                 no_argument,        0, LONG_OPT_MPI},
 	{0,0,0,0}
 };
 
@@ -2305,10 +2297,6 @@ int main(int argc, char *argv[])
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_hosts = CATALOG_HOST;
-
-#ifdef CCTOOLS_WITH_MPI
-	int using_mpi = 0;
-#endif
 
 	features = hash_table_create(4, 0);
 
@@ -2530,11 +2518,6 @@ int main(int argc, char *argv[])
 		case LONG_OPT_FEATURE:
 			hash_table_insert(features, optarg, (void **) 1);
 			break;
-#ifdef CCTOOLS_WITH_MPI
-			case LONG_OPT_MPI:
-				using_mpi = 1;
-				break;
-#endif
 		default:
 			show_help(argv[0]);
 			return 1;
@@ -2542,91 +2525,6 @@ int main(int argc, char *argv[])
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
-
-#ifdef CCTOOLS_WITH_MPI
-	//to move into an init function
-	
-	if (using_mpi == 1) {
-		//mpi boilerplate code modified from tutorial at www.mpitutorial.com
-		MPI_Init(NULL, NULL);
-		int mpi_world_size;
-		MPI_Comm_size(MPI_COMM_WORLD, &mpi_world_size);
-		int mpi_rank;
-		MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-		char procname[MPI_MAX_PROCESSOR_NAME];
-		int procnamelen;
-		MPI_Get_processor_name(procname, &procnamelen);
-
-		if (mpi_rank == 0) { //Master to decide who stays and who doesn't
-			int i;
-			struct hash_table* comps = hash_table_create(0, 0);
-
-			for (i = 1; i < mpi_world_size; i++) {
-				unsigned len = 0;
-				MPI_Recv(&len, 1, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-				char* str = malloc(sizeof (char*)*len + 1);
-				memset(str, '\0', sizeof (char)*len + 1);
-				MPI_Recv(str, len, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-				struct jx* recobj = jx_parse_string(str);
-				char* name = (char*)jx_lookup_string(recobj, "name");
-				uint64_t* rank = malloc(sizeof(uint64_t)*1); 
-				*rank = (uint64_t) jx_lookup_integer(recobj, "rank");
-
-				if (strstr(procname, name)) { //0 will always be the master on its own comp
-					continue;
-				}
-
-				if (hash_table_lookup(comps, name) == NULL) {
-					hash_table_insert(comps, name, (void*)rank);
-				}
-
-				jx_delete(recobj);
-
-			}
-			for (i = 1; i < mpi_world_size; i++) {
-				hash_table_firstkey(comps);
-				char* key;
-				int value;
-				int sent = 0;
-				while (hash_table_nextkey(comps, &key, (void**) &value)) {
-					if (value == i) {
-						MPI_Send("LIVE", 4, MPI_CHAR, i, 0, MPI_COMM_WORLD);
-						sent = 1;
-					}
-				}
-				if (sent == 0) {
-					MPI_Send("DIE ", 4, MPI_CHAR, i, 0, MPI_COMM_WORLD);
-				}
-			}
-
-			hash_table_delete(comps);
-
-		} else { //send proc name and num
-			char* sendstr = string_format("{\"name\":\"%s\",\"rank\":%i}", procname, mpi_rank);
-			unsigned len = strlen(sendstr);
-			MPI_Send(&len, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
-			MPI_Send(sendstr, len, MPI_CHAR, 0, 0, MPI_COMM_WORLD);
-
-			free(sendstr);
-			//get if live or die
-			char livedie[10];
-			MPI_Recv(livedie, 4, MPI_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			if (strstr(livedie, "DIE")) {
-				MPI_Finalize();
-				return 0;
-			} else if (strstr(livedie, "LIVE")) {
-				//do nothing, continue
-			} else {
-				fprintf(stderr, "livedie string got corrupted, wrong command sent.... %s\n", livedie);
-				MPI_Finalize();
-				return 1;
-			}//corrupted string or something
-		}
-	}
-
-#endif
-
 
 	// for backwards compatibility with the old syntax for specifying a worker's project name
 	if(worker_mode != WORKER_MODE_FOREMAN && foreman_name) {
@@ -2824,7 +2722,7 @@ int main(int argc, char *argv[])
 
 		if(result) {
 			if(single_shot_mode) {
-				debug(D_NOTICE,"stopping: single shot mode");
+				debug(D_DEBUG,"stopping: single shot mode");
 				break;
 			}
 			backoff_interval = init_backoff_interval;
@@ -2868,13 +2766,6 @@ int main(int argc, char *argv[])
 	}
 
 	workspace_delete();
-
-#ifdef CCTOOLS_WITH_MPI
-	if (using_mpi == 1) {
-		MPI_Finalize();
-	}
-
-#endif
 
 	return 0;
 }

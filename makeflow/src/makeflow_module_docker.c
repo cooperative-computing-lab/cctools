@@ -49,7 +49,7 @@ static int create( void ** instance_struct, struct jx *hook_args )
 	if(jx_lookup_string(hook_args, "docker_container_image")){
 		d->image = xxstrdup(jx_lookup_string(hook_args, "docker_container_image"));	
 	} else {
-		debug(D_NOTICE|D_MAKEFLOW_HOOK, "Docker hook requires container image name to be specified");
+		debug(D_ERROR|D_MAKEFLOW_HOOK, "Docker hook requires container image name to be specified");
 		return MAKEFLOW_HOOK_FAILURE;
 	}
 

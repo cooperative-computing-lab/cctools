@@ -62,7 +62,14 @@ If there is no corresponding category defined, default values will be filled in.
 <p>A <tt>Rule</tt> is encoded as a JSON object with the following keys.</p>
 
 <code> {
+    # To describe a single Unix command:
     "command"     : &lt;string&gt;
+
+    # To describe a sub-workflow:
+    "workflow"    : &lt;string&gt;
+    "args"        : { ... }
+
+    # Common to both commands and sub-workflows:
     "inputs"      : [ ... ]
     "outputs"     : [ ... ]
     "local_job"   : &lt;boolean&gt;
@@ -70,10 +77,16 @@ If there is no corresponding category defined, default values will be filled in.
     "category"    : &lt;string&gt;
     "resources"   : { ... }
     "allocation"  : &lt;string&gt;
+
 }
 </code>
 
-<p>Required: The <tt>command</tt> string gives the Unix command to execute to carry out the job.</p>
+<p>Required: The rule must either state a <tt>command</tt>, which is a single
+Unix program to run, or a <tt>workflow</tt> which names another workflow to
+be run as a sub-job.</p>
+
+<p>Optional: <tt>args</tt> gives arguments in JSON format to be passed to
+a sub-workflow, which can be used within expressions in that workflow</p>
 
 <p>Required: The <tt>inputs</tt> and <tt>outputs</tt> arrays list the files required and produced by the command.
 These arrays must be an accurate description of the actual behavior of the command, otherwise the workflow
@@ -535,6 +548,31 @@ JX's format function could be written in Python as follows.
     return spec % tuple(args)
 </code></pre>
 </p>
+
+<blockquote>
+<pre><code>template(A[, B]) -&gt; String
+</code></pre>
+
+<p>where A = String and B = Object</p>
+</blockquote>
+
+<p>
+Replaces format placeholders in the given string.
+This function is based on Python's sting formatting capabilities.
+Variable names enclosed in curly braces are looked up in the current context.
+Suppose that the ID variable is defined as 10.
+<pre><code>template("file{ID}.txt")
+= "file10.txt"
+</code></pre>
+
+It's also possible to specify values directly within the template expression.
+The optional second argument is an object consisting of name-value pairs to use in addition to the local context.
+This allows overriding defined variables and writing complex expressions.
+Suppose that the variable N is defined as 48.
+<pre><code>
+template("SM{PLATE}_{ID}.sam", {"PLATE": "10001", "ID": N/2 - 1})
+= "SM10001_23.sam"
+</code></pre>
 
 <h2 id="comprehensions">Comprehensions<a class="sectionlink" href="#comprehensions" title="Link to this section.">&#x21d7;</a></h2>
 

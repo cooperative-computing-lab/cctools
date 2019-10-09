@@ -58,7 +58,7 @@ static batch_job_id_t batch_job_local_submit (struct batch_queue *q, const char 
 		 * bash which does not do this when invoked as sh.)
 		 */
 
-		execlp("sh", "sh", "-c", cmd, (char *) 0);
+		execlp("/bin/sh", "sh", "-c", cmd, (char *) 0);
 		_exit(127);	// Failed to execute the cmd.
 	}
 	return -1;

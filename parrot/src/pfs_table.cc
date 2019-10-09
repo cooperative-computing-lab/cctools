@@ -45,6 +45,7 @@ extern "C" {
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/sysmacros.h>
 
 #ifndef major
 /* glibc 2.26 drops sys/sysmacros.h from sys/types.h, thus we add it here */
@@ -516,6 +517,9 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 		char tmp[PFS_PATH_MAX];
 		path_split(pname->path,pname->service_name,tmp);
 		pname->service = pfs_service_lookup(pname->service_name);
+		if (result == PFS_RESOLVE_LOCAL) {
+			pname->service = NULL;
+		}
 		if(!pname->service) {
 			pname->service = pfs_service_lookup_default();
 			strcpy(pname->service_name,"local");

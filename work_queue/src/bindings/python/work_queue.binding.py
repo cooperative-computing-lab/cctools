@@ -828,7 +828,7 @@ class WorkQueue(object):
 
             if name:
                 work_queue_specify_name(self._work_queue, name)
-        except Exception, e:
+        except Exception as e:
             raise Exception('Unable to create internal Work Queue structure: %s' % e)
 
     def __free_queue(self):
@@ -836,9 +836,7 @@ class WorkQueue(object):
             if self._shutdown:
                 self.shutdown_workers(0)
             work_queue_delete(self._work_queue)
-
-    def __exit__(self):
-        self.__free_queue()
+            self._work_queue = None
 
     def __del__(self):
         self.__free_queue()
@@ -1009,6 +1007,15 @@ class WorkQueue(object):
         return work_queue_activate_fast_abort_category(self._work_queue, name, multiplier)
 
     ##
+    # Turn on or off draining mode for workers at hostname.
+    #
+    # @param self       Reference to the current work queue object.
+    # @param host       The hostname the host running the workers.
+    # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
+    def specify_draining_by_hostname(self, hostname, drain_mode = True):
+        return work_queue_specify_draining_by_hostname (self._work_queue, hostname, drain_mode)
+
+    ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
     #
     # Returns 0 if there are tasks remaining in the system, 1 if the system is "empty".
@@ -1131,13 +1138,11 @@ class WorkQueue(object):
     def specify_transactions_log(self, logfile):
         work_queue_specify_transactions_log(self._work_queue, logfile)
 
-
     ##
     # Add a mandatory password that each worker must present.
     #
     # @param self      Reference to the current work queue object.
     # @param password  The password.
-
     def specify_password(self, password):
         return work_queue_specify_password(self._work_queue, password)
 

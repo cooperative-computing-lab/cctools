@@ -49,11 +49,7 @@ static struct batch_queue_module batch_queue_unknown = {
 	{NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 };
 
-#ifdef CCTOOLS_WITH_MPI
-#define BATCH_JOB_SYSTEMS "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, lambda, dryrun, amazon-batch, mpi"
-#else
-#define BATCH_JOB_SYSTEMS "local, wq, condor, sge, torque, mesos, k8s, moab, slurm, chirp, amazon, lambda, dryrun, amazon-batch"
-#endif
+#define BATCH_JOB_SYSTEMS "local, wq, condor, sge, torque, moab, mpi, slurm, chirp, amazon, amazon-batch, lambda, mesos, k8s, dryrun"
 
 const struct batch_queue_module * const batch_queue_modules[] = {
 	&batch_queue_amazon,

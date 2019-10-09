@@ -183,7 +183,7 @@ static int new_value
    ((int) (i - cur_line_begin))
 
 #define whitespace \
-   case '\n': ++ cur_line;  cur_line_begin = i; \
+   case '\n': ++ cur_line;  cur_line_begin = i; /* falls through */ \
    case ' ': case '\t': case '\r'
 
 #define string_add(b)  \

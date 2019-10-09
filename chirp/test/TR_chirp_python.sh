@@ -33,7 +33,7 @@ run()
 
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
 
-	../src/python/chirp_python_example.py $hostport $ticket
+	../src/bindings/python/chirp_python_example.py $hostport $ticket
 
 	return 0
 }

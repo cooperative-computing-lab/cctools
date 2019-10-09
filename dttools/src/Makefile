@@ -38,6 +38,7 @@ SOURCES = \
 	dpopen.c \
 	elfheader.c \
 	envtools.c \
+	env_replace.c \
 	fast_popen.c \
 	fd.c \
 	file_cache.c \
@@ -58,6 +59,7 @@ SOURCES = \
 	interfaces_address.c \
 	itable.c \
 	jx.c \
+	jx_binary.c\
 	jx_database.c \
 	jx_getopt.c \
 	jx_match.c \
@@ -121,21 +123,41 @@ HEADERS_PUBLIC = \
 	auth_kerberos.h \
 	auth_ticket.h \
 	auth_unix.h \
+	bitmap.h \
 	buffer.h \
 	category.h \
+	cctools.h \
 	copy_tree.h \
+	compat-at.h \
 	debug.h \
+	delete_dir.h \
+	envtools.h \
+	fast_popen.h \
+	full_io.h \
+	getopt.h \
+	getopt_aux.h \
 	hash_table.h \
 	histogram.h \
+	host_memory_info.h \
 	http_query.h \
 	int_sizes.h \
+	itable.h \
 	jx.h \
 	jx_match.h \
 	link.h \
+	list.h \
+	load_average.h \
 	md5.h \
+	macros.h \
+	path.h \
 	rmonitor_poll.h \
 	rmsummary.h \
+	stringtools.h \
+	text_array.h \
+	text_list.h \
 	timestamp.h \
+	unlink_recursive.h \
+	xxmalloc.h \
 
 LIBRARIES = libdttools.a
 PRELOAD_LIBRARIES = libforce_halt_enospc.so
@@ -148,12 +170,12 @@ endif
 OBJECTS = $(SOURCES:%.c=%.o)
 
 #separate, because catalog_query has a slightly different order of linking.
-MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json jx2env
+MOST_PROGRAMS = catalog_update catalog_server watchdog disk_allocator jx2json jx2env env_replace
 PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect cctools_python
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test jx_binary_test
 
 all: $(TARGETS) catalog_query
 

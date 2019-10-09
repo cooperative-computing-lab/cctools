@@ -21,10 +21,6 @@ $ makeflow --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrell
 To test makeflow with umbrella using wq execution engine:
 $ makeflow -T wq --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
 
-To test the case when `--wrapper` and `--umbrella-spec|binary` are used at the same time:
-$ makeflow --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
-$ makeflow -T wq --wrapper 'time -p /bin/sh -c []'  --umbrella-binary $(which umbrella) --umbrella-spec convert_S.umbrella example.makeflow
-
 To test makefile with umbrella (without a default umbrella spec):
 $ makeflow example_in_makefile.makeflow
 

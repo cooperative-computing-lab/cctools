@@ -10,17 +10,21 @@ OBJECTS = dag.o dag_node_footprint.o dag_node.o dag_file.o dag_variable.o dag_vi
 PROGRAMS = makeflow makeflow_viz makeflow_analyze makeflow_linker makeflow_status makeflow_mpi_submitter makeflow_mpi_starter
 SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch makeflow_linker_perl_driver makeflow_linker_python_driver makeflow_archive_query mf_mesos_scheduler mf_mesos_executor mf_mesos_setting makeflow_ec2_setup makeflow_ec2_cleanup makeflow_lambda_setup makeflow_lambda_cleanup
 
-MAKEFLOW_WRAPPERS = makeflow_wrapper_enforcement.o makeflow_wrapper_umbrella.o makeflow_mounts.o
 SCRIPTS = condor_submit_makeflow makeflow_graph_log makeflow_monitor starch makeflow_linker_perl_driver makeflow_linker_python_driver makeflow_archive_query mf_mesos_scheduler mf_mesos_executor mf_mesos_setting makeflow_ec2_setup makeflow_ec2_cleanup makeflow_amazon_batch_setup makeflow_amazon_batch_cleanup makeflow_lambda_setup makeflow_lambda_cleanup
+
+MAKEFLOW_WRAPPERS =  makeflow_mounts.o
 MAKEFLOW_HOOKS = makeflow_hook_example.o
 MAKEFLOW_MODULES = \
+ makeflow_module_basic_wrapper.o\
  makeflow_module_docker.o\
+ makeflow_module_enforcement.o\
  makeflow_module_fail_dir.o\
  makeflow_module_resource_monitor.o\
  makeflow_module_sandbox.o\
  makeflow_module_shared_fs.o\
  makeflow_module_singularity.o\
  makeflow_module_storage_allocation.o\
+ makeflow_module_umbrella.o\
  makeflow_module_vc3_builder.o\
 
 ifeq ($(CCTOOLS_CURL_AVAILABLE),yes)
@@ -37,7 +41,7 @@ makeflow makeflow_viz makeflow_analyze makeflow_status: $(OBJECTS)
 
 makeflow_status: makeflow_status.o
 
-makeflow: makeflow_alloc.o makeflow_summary.o makeflow_gc.o makeflow_log.o makeflow_wrapper.o makeflow_catalog_reporter.o makeflow_local_resources.o $(MAKEFLOW_WRAPPERS) makeflow_hook.o $(MAKEFLOW_HOOKS) $(MAKEFLOW_MODULES)
+makeflow: makeflow_alloc.o makeflow_summary.o makeflow_gc.o makeflow_log.o makeflow_catalog_reporter.o makeflow_local_resources.o $(MAKEFLOW_WRAPPERS) makeflow_hook.o $(MAKEFLOW_HOOKS) $(MAKEFLOW_MODULES)
 
 
 $(PROGRAMS): $(EXTERNAL_DEPENDENCIES)

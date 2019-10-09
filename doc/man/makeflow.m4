@@ -73,6 +73,7 @@ OPTION_ITEM(`--ignore-memory-spec')Excludes memory at submission. (SLURM)
 OPTION_PAIR(--batch-mem-type, type)Specify memory resource type. (SGE)
 OPTION_PAIR(--working-dir, dir|url)Working directory for batch system.
 OPTION_ITEM(`--sandbox')Run task in sandbox using bash script and task directory.
+OPTION_ITEM(`--verbose-jobnames')Set the job name based on the command.
 OPTIONS_END
 
 SUBSECTION(JSON/JX Options)
@@ -206,6 +207,7 @@ OPTION_PAIR(--wrapper-input,file) Wrapper command requires this input file. This
 OPTION_PAIR(--wrapper-output,file) Wrapper command requires this output file. This option may be specified more than once, defining an array of outputs. Additionally, each job executing a recipe has a unique integer identifier that replaces occurrences BOLD(%%) in BOLD(file).
 OPTION_ITEM(`--enforcement')Use Parrot to restrict access to the given inputs/outputs.
 OPTION_PAIR(--parrot-path,path)Path to parrot_run executable on the host system.
+OPTION_PAIR(--env-replace-path,path)Path to env_replace executable on the host system.
 OPTION_ITEM(`--skip-file-check')Do not check for file existence before running.
 OPTION_ITEM(`--do-not-save-failed-output')Disable saving failed nodes to directory for later analysis.
 OPTION_PAIR(--shared-fs,dir)Assume the given directory is a shared filesystem accessible at all execution sites.

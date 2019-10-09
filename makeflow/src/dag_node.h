@@ -23,6 +23,11 @@ typedef enum {
 	DAG_NODE_STATE_MAX
 } dag_node_state_t;
 
+typedef enum {
+	DAG_NODE_TYPE_COMMAND,
+	DAG_NODE_TYPE_WORKFLOW,
+} dag_node_type_t;
+
 /* struct dag_node implements a linked list of nodes. A dag_node
  * represents a production rule from source files to target
  * files. The actual dag structure is given implicitly by the
@@ -35,6 +40,7 @@ typedef enum {
 
 struct dag_node {
 	struct dag *d;           /* Dag this node belongs too. */
+	dag_node_type_t type;	 /* Is the job a Unix command, a workflow, etc. */
 	const char *command;     /* The command line to execute. */
 
 	int nodeid;              /* The ordinal number as the rule appears in the makeflow file */
@@ -45,9 +51,9 @@ struct dag_node {
 	struct set *ancestors;   /* The nodes of which this node is an immediate descendant */
 	int ancestor_depth;      /* The depth of the ancestor tree for this node */
 
-	int nested_job;            /* Flag: Is this a recursive call to makeflow? */
-	const char *makeflow_dag;  /* Name of the sub-makeflow to run, if nested_job is true. */
-	const char *makeflow_cwd;  /* Working dir of the sub-makeflow to run, if nested_job is true. */
+	const char *workflow_file;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
+	struct jx *workflow_args;   /* Arguments to pass to the workflow. */
+	int workflow_is_jx;	    /* True is sub-workflow is jx, false otherwise. */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
 	struct hash_table *remote_names_inv;/* Mapping from remote filenames to dag_file representing the local file. */
@@ -100,7 +106,7 @@ void dag_node_add_source_file(struct dag_node *n, const char *filename, const ch
 void dag_node_add_target_file(struct dag_node *n, const char *filename, const char *remotename);
 
 void dag_node_set_command(struct dag_node *n, const char *cmd);
-void dag_node_set_submakeflow(struct dag_node *n, const char *dag, const char *cwd);
+void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx *args, int is_jx );
 void dag_node_insert(struct dag_node *n);
 
 uint64_t dag_node_file_list_size(struct list *s);
@@ -124,7 +130,5 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 const struct rmsummary *dag_node_dynamic_label(const struct dag_node *n);
 
 void dag_node_set_umbrella_spec(struct dag_node *n, const char *umbrella_spec);
-
-struct batch_task *dag_node_to_batch_task(struct dag_node *n, struct batch_queue *queue, int full_env_list);
 
 #endif

@@ -16,7 +16,6 @@ See the file COPYING for details.
 
 #include "dag.h"
 #include "makeflow_log.h"
-#include "makeflow_wrapper.h"
 #include "makeflow_gc.h"
 
 #include <assert.h>
@@ -55,21 +54,6 @@ static int directory_low_disk( const char *path, uint64_t size )
 		return avail <= size;
 
 	return 0;
-}
-
-/*
-For a given dag node, export all variables into the environment.
-This is currently only used when cleaning a makeflow recurisvely,
-and would be better handled by invoking batch_job_local.
-*/
-
-static void makeflow_node_export_variables( struct dag *d, struct dag_node *n )
-{
-	struct jx *j = dag_node_env_create(d,n,0);
-	if(j) {
-		jx_export(j);
-		jx_delete(j);
-	}
 }
 
 /* Prepare the dag for garbage collection by identifying which files may or may not be gcd. */
@@ -169,16 +153,24 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 	return 0;
 }
 
+/* Clean an individual node.  This only applies if the node itself is a workflow,
+in which case, we want to construct its full command, add the clean option and
+then run the command. */
+
+extern struct batch_task * makeflow_node_to_task( struct dag_node *node, struct batch_queue *queue, int send_env);
+
 void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_node *n)
 {
-	if(n->nested_job){
-		char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
-		sprintf(command, "%s -c", n->command);
-
-		/* XXX this should use the batch job interface for consistency */
-		makeflow_node_export_variables(d, n);
+	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
+		printf("cleaning sub-workflow %s\n",n->workflow_file);
+		struct batch_task *task = makeflow_node_to_task(n,queue,1);
+		char *command = string_format("%s --clean",task->command);
+		printf("%s\n",command);
+		jx_export(task->envlist);
 		system(command);
+		printf("done cleaning sub-workflow %s\n",n->workflow_file);
 		free(command);
+		batch_task_delete(task);
 	}
 }
 
@@ -226,19 +218,10 @@ int makeflow_clean(struct dag *d, struct batch_queue *queue, makeflow_clean_dept
 		dag_mount_clean(d);
 	}
 
+	/* clean each of the node-specific state. */
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
-		/* If the node is a Makeflow job, then we should recursively call the *
-		 * clean operation on it. */
-		if(n->nested_job) {
-			char *command = xxmalloc(sizeof(char) * (strlen(n->command) + 4));
-			sprintf(command, "%s -c", n->command);
-
-			/* XXX this should use the batch job interface for consistency */
-			makeflow_node_export_variables(d, n);
-			system(command);
-			free(command);
-		}
+		makeflow_clean_node(d,queue,n);
 	}
 
 	return 0;

@@ -36,6 +36,7 @@
 <li><a href=#pbs>PBS</a>
 <li><a href=#torque>Torque</a>
 <li><a href=#slurm>SLURM</a>
+<li><a href=#mpi>MPI Makeflow</a>
 <li><a href=#moab>Moab</a>
 <li><a href=#mesos>Mesos</a>
 <li><a href=#ec2>Amazon EC2</a>
@@ -57,12 +58,6 @@
 <li><a href=#singularity>Singularity</a>
 <li><a href=#umbrella>Umbrella</a>
 <li><a href=#wrapper>Wrapper Commands</a>
-</ul>
-
-<li><a href=#mpi>Running in an MPI Environment</a>
-<ul>
-<li><a href=#makeflow-mpi>Running Makeflow as an MPI Job</a>
-<li><a href=#mpi-starter>Running Makeflow and WorkQueue as an MPI Job</a>
 </ul>
 
 <li><a href=#advanced>Advanced Features</a>
@@ -284,7 +279,7 @@ running, complete, and so forth.  These tools can read the transaction
 log and summarize the workflow:
 
 <ol>
-<li> <tt>makeflow_monitor</tt> reads the transaction log and produceds a continuous
+<li> <tt>makeflow_monitor</tt> reads the transaction log and produces a continuous
 display that shows the overall time and progress through the workflow:
 <code>makeflow example.makeflow & makeflow_monitor example.makeflow.makeflowlog
 </code>
@@ -381,10 +376,33 @@ locally can be limited with <tt>--max-local</tt>.
 
 <a name=htcondor><h3>HTCondor</h3></a>
 
-<p>Use the <tt>-T condor</tt> option to submit jobs to the <a href=http://research.cs.wisc.edu/htcondor>HTCondor</a> batch system.  (Formerly known as Condor.)</p>
+<p>If running Makeflow directly from the command line, simply use the <tt>-T condor</tt> option to submit jobs to the <a href=http://research.cs.wisc.edu/htcondor>HTCondor</a> batch system.</p>
+
+<p>If you have a long-running workflow, we recommend using <tt>condor_submit_makeflow</tt> like this:
+
+<code>condor_submit_makeflow example.mf
+Submitting example.mf as a background job to HTCondor...
+Submitting job(s).
+1 job(s) submitted to cluster 364.
+Makeflow Output : makeflow.364.output
+Makeflow Error  : makeflow.364.error
+Condor Log      : makeflow.364.condorlog
+</code>
+
+<p>This will cause Makeflow itself to be submitted as a batch job itself,
+so that it can be monitored by HTCondor, allowing you to log out and
+return later to check the status of the workflow.  You will see both
+Makeflow and the jobs it runs in the HTCondor queue:</p>
+
+<code> ID      OWNER            SUBMITTED     RUN_TIME ST PRI SIZE CMD               
+  10.0   dthain          7/17 13:03   0+00:00:05 R  0   1.7  makeflow -T condor
+  11.0   dthain          7/17 13:03   0+00:00:00 I  0   0.0  condor.sh myjob -p 1
+  . . .
+</code>
 
 <p>
-Makeflow will automatically generate a submit file for each job.
+Makeflow will automatically generate a submit file for each job,
+so you don't need to write one.
 However, if you would like to customize the Condor submit file,
 use the <tt>-B</tt> option or <tt>BATCH_OPTIONS</tt> variable
 to specify text to add to the submit file.</p>
@@ -449,6 +467,51 @@ the Makeflow option <tt>--ignore-memory-spec</tt> removes memory from <tt>sbatch
 <a name=moab><h3>Moab Scheduler</h3></a>
 
 <p>Use the <tt>-T moab</tt> option to submit jobs to the Moab scheduler or compatible systems.</p>
+
+<a name=mpi><h3>MPI Makeflow</h3></a>
+
+<p>
+An alternate method of using Makeflow on an HPC system is to submit Makeflow itself
+as one large parallel job.  Makeflow will then use the MPI (Message Passing Interface)
+to communicate between nodes and dispatch each task in the workflow to nodes as needed.
+The entire "job" will return when the workflow is complete.  This mode assumes that
+there exists a shared parallel filesystem mounted across all nodes in the system.
+</p>
+
+<p>
+To use this option, Makeflow must be built from source to take advantage of
+the specialized MPI compilers and libraries available on your machine.
+First, consult your local documentation on how to set up access to your MPI
+compiler, typically named <tt>mpicc</tt>.  Then, configure and build Makeflow
+using the <tt>--with-mpi-path</tt> option, like this:
+</p>
+
+<pre>
+git clone http://github.com/cooperative-computing-lab/cctools cctools-src
+cd cctools-src
+./configure --with-mpi-path `which mpicc` --prefix $HOME/cctools
+make clean
+make install
+export PATH=$HOME/cctools/bin:$PATH
+</pre>
+
+You can test this configuration locally at small scale using <tt>mpirun</tt>.
+For example, to run makeflow on four MPI nodes:
+
+<pre>
+mpirun -np 4 makeflow -T mpi example.makeflow
+</pre>
+
+Then, consult your local documentation on how to submit an MPI job to your cluster.
+This varies considerably between sites, but here is a typical example of a script
+for a system that uses a <tt>qsub</tt> style interface and <tt>modules</tt> for loading software:
+
+<pre>
+#!/bin/bash
+#$ -pe mpi 48
+module load ompi
+mpirun -np $NSLOTS makeflow -T mpi example.makeflow
+</pre>
 
 <a name=mesos><h3>Mesos</h3></a>
 
@@ -886,27 +949,6 @@ exec "$@"
 
 <code>makeflow --wrapper ./setupjava.sh --wrapper-input setupjava.sh example.makeflow</code>
 
-<a name=mpi><h2>Running in an MPI Environment</h2></a>
-
-If you have access to an MPI cluster, Makeflow and CCTools can also take advantage of these systems. First, CCTools needs to be configured and built with <tt>mpicc</tt>. Once done, there are two methods
-for employing Makeflow and CCTools with MPI: directly running Makeflow as and MPI Job, and Makeflow+WorkQueue as an MPI Job.
-
-<a name=makeflow-mpi><h3>Running Makeflow as an MPI Job</h3></a>
-If cctools and Makeflow has been configured and built with <tt>mpicc</tt>, then Makeflow can be ran as an MPI program by passing Makeflow and all of its arguments as arguments to <tt>mpirun</tt> or <tt>mpiexec</tt>. An example of using it as such looks like 
-<code>mpirun -np 120 makeflow -T mpi example.makeflow</code> 
-As the example shows, <tt>-T mpi</tt> is necessary to inform Makeflow that is is being ran as an mpi program. When doing so, Makeflow will count how many processes report back to the master/RANK0 process on each node, and use that as how many cores exist on each node. A single process on each node is then ran as the worker process, with RANK0 acting as the master process, dispatching jobs and acting as Makeflow usually does. Each worker will then share its memory fairly amongst all logical cores and the number of cores Makeflow measures that it gets to use on each node. This is done by following the equation <tt> worker_memory = (total_memory / total_logical_cores) * cores_for_worker</tt>. To overrite these options, use the commands <tt>--mpi-cores=NUM --mpi-memory=NUM</tt> to set the number of cores each worker should use, and how much memory each worker gets to use.
-Calling <tt>mpirun makeflow -T mpi</tt> can also be done in your batch system's submission script, or other methods of submitting an MPI job.
-
-<a name=mpi-starter><h3>Running Makeflow and WorkQueue as an MPI Job</h3></a>
-An alternative way of using Makeflow with MPI is to couple it with WorkQueue and submit both as an MPI job. You can do this by using <tt>makeflow_mpi_starter</tt>. This allows the user to submit a single program which will start Makeflow on the Rank0 process, and WorkQueue workers on all of the nodes. It behaves the same way as using Makeflow as an MPI program does in partitioning cores and memory on the workers. using it is very simple, as seen here:
-
-<code>
-mpiexec -np 120 makeflow_mpi_starter -m "-r 10 example.makeflow" -q "" -p 9000
-</code>
-
-In the above code, we turn on retries for failed jobs for Makeflow, setting the maximum number of retries to 10. We don't pass anything to WorkQueue, and we set the port for Makeflow to 9000. This method can be a helpful way to take advantage of both WorkQueue while using an MPI partition, when using Makeflow. Because we are passing the arguments of <tt>-m</tt> and <tt>-q</tt> directly to Makeflow and WorkQueue respectively, you can overwrite the core and memory partitioning by using the normal commands for Makeflow and WorkQueue (e.g. <tt>--local-cores=1</tt> and <tt>--cores=10</tt>).
-
-Just like the previous use case, this can also be used as the command in your batch system's submission script, or other method of submitting an MPI job.
 <a name=advanced><h2>Advanced Features</h2></a>
 
 <a name=shared><h3>Shared File Systems</h3></a>

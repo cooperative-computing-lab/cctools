@@ -212,7 +212,11 @@ struct work_queue_worker {
 	char *version;
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
+
 	int  foreman;                             // 0 if regular worker, 1 if foreman
+
+	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
+
 	struct work_queue_stats     *stats;
 	struct work_queue_resources *resources;
 	struct hash_table           *features;
@@ -472,6 +476,7 @@ static void log_queue_stats(struct work_queue *q)
 	buffer_printf(&B, " %d", s.capacity_disk);
 	buffer_printf(&B, " %d", s.capacity_instantaneous);
 	buffer_printf(&B, " %d", s.capacity_weighted);
+	buffer_printf(&B, " %f", s.master_load);
 
 	buffer_printf(&B, " %" PRId64, s.total_cores);
 	buffer_printf(&B, " %" PRId64, s.total_memory);
@@ -976,7 +981,8 @@ static void add_worker(struct work_queue *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
-	w->foreman = 0;
+	w->foreman  = 0;
+	w->draining = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
 	w->current_tasks = itable_create(0);
@@ -2292,6 +2298,7 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
+	jx_insert_integer(j,"master_load",info.master_load);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -2380,6 +2387,7 @@ static struct jx * queue_lean_to_jx( struct work_queue *q, struct link *foreman_
 	jx_insert_integer(j,"capacity_memory",info.capacity_memory);
 	jx_insert_integer(j,"capacity_disk",info.capacity_disk);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
+	jx_insert_double(j,"master_load",info.master_load);
 
 	//resources information the factory needs
 	struct rmsummary *total = total_resources_needed(q);
@@ -3343,6 +3351,21 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
 }
 
+void compute_master_load(struct work_queue *q, int task_activity) {
+
+	double alpha = 0.05;
+
+	double load = q->stats->master_load;
+
+	if(task_activity) {
+		load = load * (1 - alpha) + 1 * alpha;
+	} else {
+		load = load * (1 - alpha) + 0 * alpha;
+	}
+
+	q->stats->master_load = load;
+}
+
 static int check_hand_against_task(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t) {
 
 	/* worker has no reported any resources yet */
@@ -3350,6 +3373,10 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		return 0;
 
 	if(w->resources->workers.total < 1) {
+		return 0;
+	}
+
+	if(w->draining) {
 		return 0;
 	}
 
@@ -3895,6 +3922,24 @@ static int shut_down_worker(struct work_queue *q, struct work_queue_worker *w)
 
 	return 1;
 }
+
+static int abort_drained_workers(struct work_queue *q) {
+	char *worker_hashkey = NULL;
+	struct work_queue_worker *w = NULL;
+
+	int removed = 0;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void **) &w)) {
+		if(w->draining && itable_size(w->current_tasks) == 0) {
+			removed++;
+			shut_down_worker(q, w);
+		}
+	}
+
+	return removed;
+}
+
 
 //comparator function for checking if a task matches given tag.
 static int tasktag_comparator(void *t, const void *r) {
@@ -5827,8 +5872,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-
-
 			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
 				q->stats->tasks_failed++;
@@ -5841,7 +5884,6 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			END_ACCUM_TIME(q, time_internal);
 			break;
 		}
-
 
 		 // update catalog if appropriate
 		if(q->name) {
@@ -5862,6 +5904,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			// returning and retrieving tasks.
 		}
 
+
 		q->busy_waiting_flag = 0;
 
 		// tasks waiting to be retrieved?
@@ -5871,6 +5914,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// retrieved at least one task
 			events++;
+			compute_master_load(q, 1);
 			continue;
 		}
 
@@ -5881,8 +5925,12 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(result) {
 			// expired at least one task
 			events++;
+			compute_master_load(q, 1);
 			continue;
 		}
+
+		// record that there was not task activity for this iteration
+		compute_master_load(q, 0);
 
 		// tasks waiting to be dispatched?
 		BEGIN_ACCUM_TIME(q, time_send);
@@ -5894,14 +5942,18 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 			continue;
 		}
 
+		//we reach here only if no task was neither sent nor received. 
+		compute_master_load(q, 1);
+
 		// send keepalives to appropriate workers
 		BEGIN_ACCUM_TIME(q, time_status_msgs);
 		ask_for_workers_updates(q);
 		END_ACCUM_TIME(q, time_status_msgs);
 
-		// If fast abort is enabled, kill off slow workers.
+		// Kill off slow/drained workers.
 		BEGIN_ACCUM_TIME(q, time_internal);
-		result = abort_slow_workers(q);
+		result  = abort_slow_workers(q);
+		result += abort_drained_workers(q);
 		work_queue_blacklist_clear_by_time(q, time(0));
 		END_ACCUM_TIME(q, time_internal);
 		if(result) {
@@ -6000,6 +6052,26 @@ int work_queue_shut_down_workers(struct work_queue *q, int n)
 	}
 
 	return i;
+}
+
+int work_queue_specify_draining_by_hostname(struct work_queue *q, const char *hostname, int drain_flag)
+{
+	char *worker_hashkey = NULL;
+	struct work_queue_worker *w = NULL;
+
+	drain_flag = !!(drain_flag);
+
+	int workers_updated = 0;
+
+	hash_table_firstkey(q->worker_table);
+	while(hash_table_nextkey(q->worker_table, &worker_hashkey, (void *) w)) {
+		if (!strcmp(w->hostname, hostname)) {
+			w->draining = drain_flag;
+			workers_updated++;
+		}
+	}
+
+	return workers_updated;
 }
 
 /**
@@ -6468,7 +6540,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 			// bandwidth:
 			" bytes_sent bytes_received bandwidth"
 			// resources:
-			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted"
+			" capacity_tasks capacity_cores capacity_memory capacity_disk capacity_instantaneous capacity_weighted master_load"
 			" total_cores total_memory total_disk"
 			" committed_cores committed_memory committed_disk"
 			" max_cores max_memory max_disk"
@@ -6479,9 +6551,7 @@ int work_queue_specify_log(struct work_queue *q, const char *logfile)
 		log_queue_stats(q);
 		debug(D_WQ, "log enabled and is being written to %s\n", logfile);
 		return 1;
-	}
-	else
-	{
+	} else {
 		debug(D_NOTICE | D_WQ, "couldn't open logfile %s: %s\n", logfile, strerror(errno));
 		return 0;
 	}

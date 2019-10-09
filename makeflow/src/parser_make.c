@@ -635,7 +635,6 @@ static int dag_parse_make_node(struct lexer *bk)
 static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 {
 	struct token *t;
-	int nested_job = 0;
 
 	//Jump COMMAND token.
 	t = lexer_next_token(bk);
@@ -657,9 +656,9 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 		{
 			n->local_job = 1;
 		}
-		else if(strcmp(t->lexeme, "MAKEFLOW") == 0)
+		else if(strcmp(t->lexeme, "MAKEFLOW") == 0 || strcmp(t->lexeme, "WORKFLOW") )
 		{
-			nested_job = 1;
+			n->type = DAG_NODE_TYPE_WORKFLOW;
 		}
 		else
 		{
@@ -678,12 +677,9 @@ static int dag_parse_make_node_command(struct lexer *bk, struct dag_node *n)
 	t = lexer_next_token(bk);
 	lexer_free_token(t);
 
-	if(nested_job)
-	{
+	if(n->type==DAG_NODE_TYPE_WORKFLOW) {
 		return dag_parse_make_node_nested_makeflow(bk, n);
-	}
-	else
-	{
+	} else {
 		return dag_parse_make_node_regular_command(bk, n);
 	}
 }
@@ -702,7 +698,6 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 {
 	struct token *t;
 	struct token *makeflow_dag;
-	struct token *makeflow_cwd = NULL;
 
 	dag_parse_make_drop_spaces(bk);
 
@@ -718,24 +713,15 @@ static int dag_parse_make_node_nested_makeflow(struct lexer *bk, struct dag_node
 
 	dag_parse_make_drop_spaces(bk);
 
-	//Get dag's working directory.
-	t = lexer_peek_next_token(bk);
-	if(t->type == TOKEN_LITERAL) {
-		makeflow_cwd = lexer_next_token(bk);
-	}
-
-	dag_parse_make_drop_spaces(bk);
-
 	t = lexer_next_token(bk);
 	if (!(t && t->type == TOKEN_NEWLINE)) {
 		lexer_report_error(bk, "MAKEFLOW specification does not end with a newline.\n");
 	}
 
-	dag_node_set_submakeflow(n, makeflow_dag->lexeme, makeflow_cwd ? makeflow_cwd->lexeme : NULL);
+	dag_node_set_workflow(n, makeflow_dag->lexeme, 0, 0);
 
 	lexer_free_token(t);
 	lexer_free_token(makeflow_dag);
-	if (makeflow_cwd) lexer_free_token(makeflow_cwd);
 	return 1;
 }
 
