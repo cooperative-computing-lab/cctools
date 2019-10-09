@@ -673,7 +673,7 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 
 	/* Now fork a new process to actually execute the task and wait for completion.*/
 
-	batch_job_id_t jobid = fork
+	batch_job_id_t jobid = fork();
 	if(jobid > 0) {
 		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
 		itable_insert(q->job_table, jobid, info);
