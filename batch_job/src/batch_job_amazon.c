@@ -1,9 +1,3 @@
- /*
-Copyright (C) 2017- The University of Notre Dame
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-*/
-
 #include "batch_job_internal.h"
 #include "process.h"
 #include "batch_job.h"
@@ -78,6 +72,7 @@ static struct aws_instance_type aws_instance_table[] =
 	{64,262144,"m4.16xlarge"},
 	{0,0,0}
 };
+
 
 /*
 Select an instance type that is larger than or equal to
@@ -177,6 +172,68 @@ static struct jx * aws_describe_instance( struct aws_config *c, const char *inst
 }
 
 /*
+Get the state of multiple EC2 instances of a given type, on success returns the state as a string that must be freed.  On failure, return zero.
+*/
+
+static struct jx * aws_describe_instances_of_type( const char *instance_type, const char *ami )
+{
+	char *str = string_format("aws ec2 describe-instances --filters Name=image-id,Values=%s Name=instance-type,Values=%s Name=tag:makeflow_status,Values=idle\n",
+		ami,
+		instance_type
+	);
+	// TODO: DEBUG
+	debug(D_BATCH,"aws_describe_instances_of_type: %s", str);
+	struct jx *j = json_command(str);
+	free(str);
+	return j;
+}
+
+/*
+	Modify the tag of a given EC2 instance id, on success returns one.  On failure, return zero.
+*/
+
+static int modify_instance_tag( const char *instance_id, char *makeflow_status )
+{
+
+	debug(D_BATCH,"modifying tag of instance_id: %s\n", instance_id);
+	char *str = string_format("aws ec2 create-tags --resources %s --tags Key=makeflow_status,Value=%s",
+		instance_id,
+		makeflow_status
+	);
+	struct jx *j = json_command(str);
+	free(str);
+	if (!j) {
+		return 0;
+	}
+	jx_delete(j);
+	return 1;
+}
+
+/*
+	check the tag of a given EC2 instance id, on success returns one.  On failure, return zero.
+*/
+
+static int check_instance_tag( const char *instance_id, char *makeflow_status )
+{
+
+	debug(D_BATCH,"check instance tag %s of instance_id: %s\n", makeflow_status, instance_id);
+	// TODO
+	char *str = string_format("aws ec2 describe-instances --instance-ids %s --filters Name=tag:makeflow_status,Values=%s",
+		instance_id,
+		makeflow_status
+	);
+	struct jx *j = json_command(str);
+	free(str);
+	if (!j) {
+		debug(D_BATCH,"check_instance_tag %s of instance_id: %s did not find\n", makeflow_status, instance_id);
+		return 0;
+	}
+	jx_delete(j);
+	debug(D_BATCH,"check_instance_tag %s of instance_id: %s found\n", makeflow_status, instance_id);
+	return 1;
+}
+
+/*
 Terminate an EC2 instance.  If termination is successfully applied, return true, otherwise return false.
 */
 
@@ -185,12 +242,35 @@ static int aws_terminate_instance( struct aws_config *c, const char *instance_id
 	char *str = string_format("aws ec2 terminate-instances --instance-ids %s --output json",instance_id);
 	struct jx *jresult = json_command(str);
 	if(jresult) {
+		str = string_format("aws ec2 delete-tags --resources %s",instance_id);
+		jresult = json_command(str);
 		jx_delete(jresult);
-		printf("deleted virtual machine instance %s\n",instance_id);
+		debug(D_BATCH,"deleted virtual machine instance %s\n",instance_id);
 		return 1;
 	} else {
 		return 0;
 	}
+}
+
+// TODO: DEBUG
+static int aws_terminate_idle_instance( struct aws_config *c, const char *instance_id )
+{
+	// wait 30 seconds
+	// check instance type (maybe job type)
+	//  if so Terminate return 1s
+	//	if not return 1
+	//  failure return 0
+	debug(D_BATCH,"aws__instance: %s going to sleep for 30s\n", instance_id);
+	// wait 30 seconds
+	// TODO
+	sleep(5);
+
+	// check instance type (maybe job type)
+	if (check_instance_tag(instance_id, "idle")){
+		debug(D_BATCH,"aws__instance: terminating idle instance %s\n", instance_id);
+		return aws_terminate_instance(c, instance_id);
+	}
+	return 1;
 }
 
 /*
@@ -302,7 +382,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem. 
+		may be necessary to debug the problem.
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -356,12 +436,60 @@ static const char * get_instance_state_name( struct jx *j )
 	return jx_lookup_string(j,"Name");
 }
 
+static const char * get_idle_instance_id( struct jx *j )
+{
+	j = jx_lookup(j,"Reservations");
+	if(!j || j->type!=JX_ARRAY || !j->u.items) return 0;
+
+	j = j->u.items->value;
+	if(!j) return 0;
+
+	j = jx_lookup(j,"Instances");
+	if(!j || j->type!=JX_ARRAY || !j->u.items) return 0;
+
+	j=j->u.items->value;
+	if(!j) return 0;
+	// TODO: DEBUG
+	debug(D_BATCH,"get_idle_instance_id found instance id in jxparsing %s \n", jx_lookup_string(j,"InstanceId"));
+	return jx_lookup_string(j,"InstanceId");
+}
+
+static const char * idle_instance_type_id( const char *instance_type, const char *ami ){
+
+	// TODO: DEBUG
+	debug(D_BATCH,"idle_instance_type_id\n");
+	struct jx *j = aws_describe_instances_of_type(instance_type, ami);
+	if(!j) {
+		return 0;
+	}
+
+	// TODO: DEBUG
+	debug(D_BATCH,"idle_instance_type_id2\n");
+	const char* instance_id = get_idle_instance_id(j);
+
+	// TODO: DEBUG
+	debug(D_BATCH,"idle_instance_type_id: returning idle instance id %s \n", instance_id);
+
+	if (!instance_id){
+		jx_delete(j);
+		return 0;
+	} else {
+		char* return_instance_id = strdup(instance_id);
+		jx_delete(j);
+		// TODO: DEBUG
+		debug(D_BATCH,"idle_instance_type_id: returning idle instance id %s \n", return_instance_id);
+		return return_instance_id;
+	}
+}
+
+
+
 /*
 We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want 
+be created.  On the other hand, we don't want
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -382,6 +510,9 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 {
 	char *ip_address = 0;
 
+	// TODO: reset makeflow_status
+	// printf("batch_job_amazon_subprocess modify_instance_tag occupied for instance %s\n", instance_id);
+
 	/*
 	Put the instance ID into the log file, so that output from
 	different concurrent instances can be disentangled.
@@ -397,7 +528,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-	
+
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -462,7 +593,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/* 
+	/*
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
@@ -476,6 +607,7 @@ the setting up of an instance and the sending of input files are done sequential
 within batch_job_amazon_submit.  Once the inputs are successfully sent, we fork
 a process in order to execute the desired task, and await its completion.
 */
+
 
 static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char *cmd, const char *extra_input_files, const char *extra_output_files, struct jx *envlist, const struct rmsummary *resources)
 {
@@ -496,41 +628,52 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	static struct aws_config * aws_config = 0;
 	if(!aws_config) aws_config = aws_config_load(config_file);
 
+
 	const char *instance_type = jx_lookup_string(envlist,"AMAZON_INSTANCE_TYPE");
 	if(!instance_type) {
 		instance_type = aws_instance_select(resources->cores,resources->memory,resources->disk);
 		if(!instance_type) {
+			// TODO: DEBUG
 			printf("Couldn't find suitable instance type for job with CORES=%d, MEMORY=%d, DISK=%d\n",(int)resources->cores,(int)resources->memory,(int)resources->disk);
 			printf("You can choose one manually with AMAZON_INSTANCE_TYPE.\n");
 			return -1;
 		}
 	}
-
 	const char *ami = jx_lookup_string(envlist,"AMAZON_AMI");
 	if(!ami) ami = aws_config->ami;
 
-	/* Create a new instance and return its unique ID. */
-	char *instance_id = aws_create_instance(aws_config,instance_type,ami);
+	const char *instance_id = idle_instance_type_id( instance_type, ami );
 	if(!instance_id) {
-		debug(D_BATCH,"aws_create_instance failed");
-		sleep(1);
-		return -1;
+  	/* Create a new instance and return its unique ID. */
+		printf("creating instance\n");
+  	instance_id = aws_create_instance(aws_config,instance_type,ami);
+    if(!instance_id) {
+      debug(D_BATCH,"aws_create_instance failed");
+      sleep(1);
+      return -1;
+    }
+		debug(D_BATCH,"created instance %s",instance_id);
+  } else
+	{
+		debug(D_BATCH,"picked up running instance %s",instance_id);
+		// TODO: DEBUG
+		debug(D_BATCH,"batch_job_amazon_submit modify instance tag to occupied, modify for instance %s \n", instance_id);
+		modify_instance_tag(instance_id, "occupied");
 	}
-
-	debug(D_BATCH,"created instance %s",instance_id);
 
 	/* Create a new object describing the job */
 
 	struct batch_job_amazon_info *info = malloc(sizeof(*info));
 	memset(info,0,sizeof(*info));
 	info->aws_config = aws_config;
- 	info->instance_id = instance_id;
+ 	// info->instance_id = instance_id;
+	info->instance_id = strdup(instance_id);
 	info->info.submitted = time(0);
 	info->info.started = time(0);
 
 	/* Now fork a new process to actually execute the task and wait for completion.*/
 
-	batch_job_id_t jobid = fork();
+	batch_job_id_t jobid = fork
 	if(jobid > 0) {
 		debug(D_BATCH, "started process %" PRIbjid ": %s", jobid, cmd);
 		itable_insert(q->job_table, jobid, info);
@@ -540,6 +683,7 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 		free(info);
 		return -1;
 	} else {
+
 		/*
 		Set signals to default behavior, otherwise we get
 		competing behavior in the forked process.
@@ -589,9 +733,13 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 			int jobid = p->pid;
 			free(p);
 
-			/* Now destroy the instance */
 
-			aws_terminate_instance(i->aws_config,i->instance_id);
+			debug(D_BATCH,"batch_job_amazon_wait modify_instance_tag idle for instance %s\n", i->instance_id);
+			modify_instance_tag(i->instance_id, "idle");
+
+			debug(D_BATCH,"enter batch_job_wait\n");
+			/* TODO: check in 30 seconds if the instance is still idle with same job, terminate instance */
+			aws_terminate_idle_instance(i->aws_config,i->instance_id);
 
 			/* And clean up the object. */
 
@@ -622,10 +770,10 @@ static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 		debug(D_BATCH, "runaway process %" PRIbjid "?\n", jobid);
 		return 0;
 	}
-
+	debug(D_BATCH,"enter batch_job_remove\n");
 	kill(jobid,SIGKILL);
 
-	aws_terminate_instance(info->aws_config,info->instance_id);
+	aws_terminate_idle_instance(info->aws_config,info->instance_id);
 
 	debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
 	struct process_info *p = process_waitpid(jobid,0);
