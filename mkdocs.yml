@@ -1,29 +1,24 @@
 site_name: CCTools Documentation
 
 nav:
-    - CCTools:
-        - Getting Started: 'install/'
+    - Getting Started:
         - About: 'about.md'
-        - Makeflow:
-            - Introduction: 'makeflow/'
-            - JX Workflow Language:
-                - Introduction: 'jx/'
-                - 'jx/jx-quick.md'
-                - 'jx/jx-tutorial.md'
-                - 'jx/jx.md'
-        - Work Queue: 'work_queue/' 
-        - Parrot: 'parrot/'
-        - Chirp: 'chirp/'
-        - Resource Monitor: 'resource_monitor/'
-        - Techinical Previews:
-            - AWE: 'awe/'
-            - Confuga: 'confuga/'
-            - Umbrella: 'umbrella/'
-            - Prune: 'prune/'
-    - Technical Information:
+        - Installation: 'install/index.md'
+    - Software:
+        - Makeflow: 'makeflow/index.md'
+        - Work Queue: 'work_queue/index.md' 
+        - Resource Monitor: 'resource_monitor/index.md'
+        - Parrot: 'parrot/index.md'
+        - Chirp: 'chirp/index.md'
+        - Catalog Server: 'catalog/index.md'
+    - Research Prototypes:
+        - AWE: 'awe/'
+        - Confuga: 'confuga/'
+        - Umbrella: 'umbrella/'
+        - Prune: 'prune/'
+    - Reference:
         - Man Pages: 'man_pages.md'
-        - Catalog Server: 'catalog/'
-        - Network Configuration: 'network/'
+        - Network Configuration: 'network/index.md'
 
 
 markdown_extensions:
