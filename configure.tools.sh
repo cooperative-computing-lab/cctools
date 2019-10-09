@@ -253,70 +253,65 @@ library_search_normal()
 		basedir=
 	fi
 
-	# If we are running on a 64-bit platform outside conda, then the native
-	# libraries for compiling will be found in /lib64, if it exists.  The files
-	# in /lib are compatibilities libraries for 32-bit.
-
-	if [ -n "${CONDA_PREFIX}" ] && [ "${CONDA_PREFIX}" = "${basedir}" ]
-	then
-		libdir=${basedir}/lib
-	elif [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
-	then
-		libdir=$basedir/lib64
-	elif [ -d $basedir/lib ]
-		then
-		libdir=$basedir/lib
-	else
-		libdir=$basedir
-	fi
-
-	# If a third argument is given, it means libraries are found in
-	# a subdirectory of lib, such as "mysql".
 	if [ -n "$subdir" ]
 	then
-		libdir="$libdir/$subdir"
+		$subdir = "/$subdir"
+	fi
+
+	arch_dirs="${basedir}/lib ${basedir}"
+
+	# If we are running on a 64-bit platform, then give preference to 
+	# libraries in /lib64.
+
+	if [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
+	then
+		arch_dirs="${basedir}/lib64 ${arch_dirs}"
 	fi
 
 	# Now check for the library file in all of the known places,
 	# and add it to the link line as appropriate for the type and platform.
 
-	if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
-	then
-		if check_library_static "$lib" "$libdir"
+	for arch_dir in $arch_dirs
+	do
+		libdir="$arch_dir$subdir"
+		if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
 		then
-			library_search_result="$libdir/lib${lib}.a"
-			return 0
-		fi
-	fi
-
-	if [ $library_search_mode != require_static ]
-	then
-		if check_library_dynamic "$lib" "$libdir"
-		then
-			if [ "$libdir" != /lib -a "$libdir" != /lib64 -a "$libdir" != /usr/lib -a "$libdir" != /usr/lib64 ]
+			if check_library_static "$lib" "$libdir"
 			then
-				library_search_result="-L${libdir} -l${lib}"
-			else
-				library_search_result="-l${lib}"
+				library_search_result="$libdir/lib${lib}.a"
+				return 0
 			fi
-
-			if [ $BUILD_SYS = DARWIN ]
-			then
-				library_search_result="${library_search_result} -rpath $libdir"
-			fi
-
-			return 0
 		fi
-	fi
 
-	if [ $library_search_mode = prefer_dynamic ]
-	then
-		if check_library_static "$lib" "$libdir"
+		if [ $library_search_mode != require_static ]
 		then
-			library_search_result="$libdir/lib${lib}.a"
-			return 0
+			if check_library_dynamic "$lib" "$libdir"
+			then
+				if [ "$libdir" != /lib -a "$libdir" != /lib64 -a "$libdir" != /usr/lib -a "$libdir" != /usr/lib64 ]
+				then
+					library_search_result="-L${libdir} -l${lib}"
+				else
+					library_search_result="-l${lib}"
+				fi
+
+				if [ $BUILD_SYS = DARWIN ]
+				then
+					library_search_result="${library_search_result} -rpath $libdir"
+				fi
+
+				return 0
+			fi
 		fi
-	fi
+
+		if [ $library_search_mode = prefer_dynamic ]
+		then
+			if check_library_static "$lib" "$libdir"
+			then
+				library_search_result="$libdir/lib${lib}.a"
+				return 0
+			fi
+		fi
+	done
 
 	return 1
 }
