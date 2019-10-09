@@ -1,4 +1,4 @@
-# The JX Language
+# The JX Workflow Language
 
 JX (JSON eXtended) is a language for expressing workflows that allows for easy
 manipulations to the structure and partitioning of a workflow.
