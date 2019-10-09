@@ -124,13 +124,29 @@ check_library_dynamic() {
 
 check_function()
 {
-	echon "checking for $1 in $2..."
-	if grep $1 $2 >/dev/null 2>&1
-	then
-		echo "yes"
+	local func
+	local header
+
+	name="$1"
+	header="$2"
+
+	echon "checking for $name in $header..."
+
+cat > .configure.tmp.c << EOF
+#include <stdlib.h>
+#include <${header}>
+int main(int argc, char **argv) {
+	${name};
+	return 0;
+}
+EOF
+	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
+		echo yes
+		rm -f .configure.tmp.c .configure.tmp.out
 		return 0
 	else
-		echo "no"
+		echo no
+		rm -f .configure.tmp.c .configure.tmp.out
 		return 1
 	fi
 }
