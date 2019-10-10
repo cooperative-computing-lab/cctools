@@ -2,7 +2,7 @@ include ../config.mk
 
 all: ${CCTOOLS_DOCTARGETS}
 
-htmlpages manpages:
+htmlpages manpages mdpages:
 	$(MAKE) -C man $@
 
 apiperl: api/html/work_queue_perl.html api/html/work_queue_task_perl.html api/html/chirp_client_perl.html api/html/chirp_stat_perl.html
