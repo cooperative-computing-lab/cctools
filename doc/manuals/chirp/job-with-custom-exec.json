@@ -1,0 +1,18 @@
+{
+    "executable": "./my-custom-exec.sh",
+    "arguments": [ "my-custom-exec.sh", "output.txt" ],
+    "files": [
+                {
+                    "task_path": "my-custom-exec.sh",
+                    "serv_path": "/some/directory/my-custom-exec.sh",
+                    "type": "INPUT",
+                    "binding": "LINK" },
+                {
+                    "task_path": "output.txt",
+                    "serv_path": "/some/directory/output.txt",
+                    "type": "OUTPUT",
+                    "binding": "LINK"
+                }
+            ]
+}
+
