@@ -25,13 +25,11 @@ status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
 ## Getting Started
 
-## Installing Work Queue
+### Installing
 
-Work Queue is part of the [Cooperating Computing
-Tools](http://ccl.cse.nd.edu/software). The CCTools package can be downloaded
-from [this web page](http://ccl.cse.nd.edu/software/download). Follow the
-[installation instructions](../install) to setup CCTools required for running
-Work Queue. The documentation for the full set of features of the Work Queue
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+
+The documentation for the full set of features of the Work Queue
 API can be viewed from either within the CCTools package or
 [here](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
 [here](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).
@@ -488,8 +486,7 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
     
-
-## Running Multiple Tasks per Worker
+## Task Resources
 
 Unless otherwise specified, Work Queue assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.
@@ -1036,18 +1033,12 @@ The statistics available are:
 | 
 | master_load;       | In the range of [0,1]. If close to 1, then the master is at full load and spends most of its time sending and receiving taks, and thus cannot accept connections from new workers. If close to 0, the master is spending most of its time waiting for something to happen.
 
+## Further Information
 
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
+## Copyright
 
-## For More Information
-
-For the latest information about Work Queue, please visit our [web
-site](http://ccl.cse.nd.edu/software/workqueue) and subscribe to our [mailing
-list](http://ccl.cse.nd.edu/software/help.shtml).
-
-Work Queue is Copyright (C) 2016- The University of Notre Dame. All rights
-reserved. This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-
-Last modified: August 2019
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.
 

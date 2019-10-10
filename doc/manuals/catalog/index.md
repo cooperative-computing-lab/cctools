@@ -173,5 +173,11 @@ commas, e.g. `$ chirp_server -u 'dopey,happy:9000,grumpy'`
 continuously and are automatically restarted after an upgrade, consider using
 [Watchdog](../watchdog).)
 
+## Further Information
 
-__Last Modified: August 2019__
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+
+## Copyright
+
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.

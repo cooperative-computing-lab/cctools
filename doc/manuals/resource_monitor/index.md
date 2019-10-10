@@ -26,12 +26,10 @@ limits.
 In systems that support it, **resource_monitor** wraps some libc functions to
 obtain a better estimate of the resources used.
 
-## Installation
+### Installing
 
-The **resource_monitor** is included in the **current development version** of
-[CCTools](http://ccl.cse.nd.edu/software/downloadfiles.php). For
-installation, please follow these
-[instructions.](../install)
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+
 
 ## Running resource_monitor
 
@@ -344,16 +342,11 @@ when_to_transfer_output = on_exit
 log = condor.matlab.logfile queue
 ```
 
-## For More Information
+## Further Information
 
-For a more detailed description, please visit the man page
-[resource_monitor](http://ccl.cse.nd.edu/software/manuals/man/resource_monitor.html).  
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-For the latest information about **resource_monitor** please subscribe to our
-[mailing list](http://ccl.cse.nd.edu/software).
+## Copyright
 
-**resource_monitor** is Copyright (C) 2013 The University of Notre Dame.  
-All rights reserved.  
-This software is distributed under the GNU General Public License.  
-
-**Last edited: August 2019**
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.

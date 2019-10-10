@@ -4,22 +4,23 @@ nav:
     - Getting Started:
         - About: 'about.md'
         - Installation: 'install/index.md'
+        - Getting Help: 'help.md'
     - Software:
         - Makeflow: 'makeflow/index.md'
         - Work Queue: 'work_queue/index.md' 
+        - JX Language: 'jx/index.md'
         - Resource Monitor: 'resource_monitor/index.md'
         - Parrot: 'parrot/index.md'
         - Chirp: 'chirp/index.md'
         - Catalog Server: 'catalog/index.md'
     - Research Prototypes:
-        - AWE: 'awe/'
-        - Confuga: 'confuga/'
-        - Umbrella: 'umbrella/'
-        - Prune: 'prune/'
+        - AWE: 'awe/index.md'
+        - Confuga: 'confuga/index.md'
+        - Umbrella: 'umbrella/index.md'
+        - Prune: 'prune/index.md'
     - Reference:
         - Man Pages: 'man_pages.md'
         - Network Configuration: 'network/index.md'
-
 
 markdown_extensions:
     - toc:

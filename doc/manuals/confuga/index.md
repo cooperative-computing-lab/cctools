@@ -193,7 +193,7 @@ $ parrot_run display /chirp/localhost:9000/capitol.montage.gif
 ### Running Storage Nodes
 
 Confuga uses regular Chirp servers as storage nodes. Each storage node is
-added to the cluster using the [confuga_adm(1)](../man_pages/confuga_adm.html).
+added to the cluster using the [confuga_adm(1)](../man_pages/confuga_adm.md).
 command. All storage node Chirp servers must be run with:
 
   * Ticket authentication enabled (`--auth=ticket`). Remember by default all authentication mechanisms are enabled.
@@ -212,7 +212,7 @@ should be the case.
 ### Confuga Options
 
 A Chirp server acting as the Confuga head node uses normal
-[chirp_server(1)](../man_pages/chirp_server.html) options. In order to run the Chirp
+[chirp_server(1)](../man_pages/chirp_server.md) options. In order to run the Chirp
 server as the Confuga head node, use the `--root` switch with the Confuga URI.
 You must also enable job execution with the `--jobs` switch.
 
@@ -228,7 +228,7 @@ The primary option is documented below.
 
   * `auth=method` Enable this method for Head Node to Storage Node authentication. The default is to enable all available authentication mechanisms.
 
-Please refer to Confuga's man page [confuga(1)](../man_pages/confuga.html) for a
+Please refer to Confuga's man page [confuga(1)](../man_pages/confuga.md) for a
 complete and up-to-date listing of Confuga's options.
 
 ## Executing Jobs
@@ -290,7 +290,7 @@ The head node is accessed by clients just like a regular Chirp server.
 Therefore, you authenticate with Confuga in the [same way as
 Chirp](../chirp#security). You may enable authentication
 mechanisms on the head node using the `--auth` switch, documented in
-[chirp_server(1)](../man_pages/chirp_server.html).
+[chirp_server(1)](../man_pages/chirp_server.md).
 
 Head node authentication with storage nodes is controlled via the `auth`
 Confuga option. Confuga will uses these authentication mechanisms to

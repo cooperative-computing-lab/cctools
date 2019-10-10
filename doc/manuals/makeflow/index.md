@@ -33,32 +33,7 @@ System Support section.
 
 ### Installing
 
-Makeflow is part of the [Cooperating Computing
-Tools](http://ccl.cse.nd.edu/software), which is easy to install. In most
-cases, you can just build from source and install in your home directory like
-this: 
-
-```sh
-$ git clone https://github.com/cooperative-computing-lab/cctools cctools-source
-$ cd cctools-source
-$ ./configure make make install
-```
-
-Then, set your path to include the appropriate directory. If you use `bash`, do
-this:
-
-```sh
-$ export PATH=${HOME}/cctools/bin:$PATH
-```
-
-Or if you use `tcsh`, do this:
-
-```csh
-$ setenv PATH ${HOME}/cctools/bin:$PATH
-```
-
-For more complex situations, consult the [CCTools installation
-instructions](../install).
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Basic Usage
 
@@ -1461,12 +1436,12 @@ Each file state line records the state change and time:
 # COMPLETED 1559838914959929
 ```
 
-
 ## Further Information
 
-Makeflow is Copyright (C) 2017- The University of Notre Dame. This software is
-distributed under the GNU General Public License. See the file COPYING for
-details.
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-Last modified: August 2019
+## Copyright
+
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.
 
