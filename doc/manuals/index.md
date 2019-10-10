@@ -4,7 +4,7 @@
 
 - **[About](about.md)**
 - **[Installation](install)**
-- **[Getting Help](help.md)**
+- **[Getting Help](help)**
 
 ## Software Components
 

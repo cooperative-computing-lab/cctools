@@ -175,7 +175,7 @@ continuously and are automatically restarted after an upgrade, consider using
 
 ## Further Information
 
-For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

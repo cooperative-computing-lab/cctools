@@ -33,7 +33,7 @@ System Support section.
 
 ### Installing
 
-See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Basic Usage
 
@@ -1438,7 +1438,7 @@ Each file state line records the state change and time:
 
 ## Further Information
 
-For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

@@ -27,7 +27,7 @@ status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
 ### Installing
 
-See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
 
 The documentation for the full set of features of the Work Queue
 API can be viewed from either within the CCTools package or
@@ -1035,7 +1035,7 @@ The statistics available are:
 
 ## Further Information
 
-For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

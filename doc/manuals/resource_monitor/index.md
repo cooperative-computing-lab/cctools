@@ -28,7 +28,7 @@ obtain a better estimate of the resources used.
 
 ### Installing
 
-See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
 
 
 ## Running resource_monitor
@@ -344,7 +344,7 @@ log = condor.matlab.logfile queue
 
 ## Further Information
 
-For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 
