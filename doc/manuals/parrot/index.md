@@ -46,7 +46,7 @@ our [forum](http://ccl.cse.nd.edu/community/forum) and bugs to our
 
 ### Installing
 
-See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
 
 ## Examples
 
@@ -864,7 +864,7 @@ Douglas Thain and Miron Livny, [Parrot: An Application Environment for Data-Inte
 
 ## Further Information
 
-For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 

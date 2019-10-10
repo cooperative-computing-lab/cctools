@@ -27,7 +27,7 @@ storage access. Read on below for more details.
 
 ### Installing
 
-See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
+See the [Installation Instructions](../install) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Running a Chirp Server
 
@@ -1183,7 +1183,7 @@ Please use the following citation for Chirp in a scientific publication:
 
 ## Further Information
 
-For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
+For more information, please see [Getting Help](../help) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
 ## Copyright
 
