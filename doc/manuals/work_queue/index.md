@@ -486,8 +486,7 @@ Your job 153099 ("worker.sh") has been submitted
 ...
 ```
     
-
-## Running Multiple Tasks per Worker
+## Task Resources
 
 Unless otherwise specified, Work Queue assumes that a single task runs on a
 single worker at a time, and a single worker occupies an entire machine.

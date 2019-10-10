@@ -383,8 +383,6 @@ $ parrot_run -M /gnu=resolver:/path/to/locate_file -- ls /gnu/pub
 Now, if you attempt to access files under /gnu, Parrot will execute
 `locate_file` and access the data stored there.
 
-
-
 ## Mount Namespaces
 
 Mount entries in Parrot are organized into hierarchical, reference counted
@@ -445,7 +443,9 @@ changes to mounts, `parrot_namespace` should work as a drop-in replacement for
 available for `parrot_run`. By always using `parrot_namespace`, the user need
 not be concerned with whether Parrot is already running.
 
-## Record Accessed Files and Environment Variables
+## Packaging Dependencies
+
+### Recording Dependencies
 
 To figure out the underlying file dependencies and execution environment,
 Parrot allows you to record the names of all the accessed files during the
@@ -467,7 +467,7 @@ The format of list.txt is **filename|system-call-type** , such as
 `usr/bin/ls|stat`, which means the file `/usr/bin/ls` is accessed using the
 `stat` system call.
 
-## Generate a Package based on the Accessed Files
+### Creating a Package
 
 After recording the accessed files of one program with the help of the
 **\--name-list** parameter of ` parrot_run` and the environment variables with
@@ -497,7 +497,7 @@ After executing this command, all the new dependencies mentioned in
 **envlist1** , will also be added into **/tmp/package** with the name
 specified by the **\--new-env** option.
 
-## Repeat one Program within the Package
+### Running a Package
 
 Once a package is generated with the help of `parrot_package_create`, we can
 use `parrot_package_run` to repeat the program within the package.
@@ -536,8 +536,9 @@ package with the **\--env-list** option.
 $ parrot_package_run -env-list /tmp/package/envlist1 --package-path /tmp/package ls -al
 ```
 
+## Optimizing File Copies
 
-## Reflink (reference link) Copy
+### Reflink (reference link) Copy
 
 Parrot can take advantage of the reflink feature (added in coreutils 7.5) when
 using ` cp`. To use this feature, invoke `cp` as `$ cp --reflink foo bar` This
@@ -551,7 +552,7 @@ As of coreutils 8.24, `mv` will automatically attempt a reflink copy when
 moving files across mount points. Parrot's reflink feature allows e.g. `mv`ing
 a file into a tmpfs like `/tmp` with minimal overhead.
 
-## More Efficient Copies with `parrot_cp`
+### Parrot Native File Copies
 
 If you are using Parrot to copy lots of files across the network, you may see
 better performance using the `parrot_cp` tool. This program looks like an
@@ -571,7 +572,7 @@ $ cp -rR /chirp/server.nd.edu/joe /tmp/joe
 If run outside of Parrot, `parrot_cp` will operate as an ordinary `cp` without
 any performance gain or loss.
 
-## Notes on Protocols
+## File Access Protocols
 
 ### HTTP Proxy Servers
 
@@ -832,7 +833,7 @@ Parrot supports 64 bit programs and processors in the following combinations:
 |YES |  NO  |  Parrot for 32-bit X86 CPU <br> Pentium, Xeon, Athlon, Sempron  
 |YES |  YES |  Parrot for 64-bit X86_64 CPU <br> Opteron, Athlon64, Turion64, Sempron64  
   
-## parrot inside docker
+## A Note on Docker
 
 Docker by default blocks ptrace, the system call on which parrot relies. To
 run parrot inside docker, the container needs to be started using the
