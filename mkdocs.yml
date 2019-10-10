@@ -4,6 +4,7 @@ nav:
     - Getting Started:
         - About: 'about.md'
         - Installation: 'install/index.md'
+        - Getting Help: 'help.md'
     - Software:
         - Makeflow: 'makeflow/index.md'
         - Work Queue: 'work_queue/index.md' 
