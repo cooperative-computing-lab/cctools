@@ -33,32 +33,7 @@ System Support section.
 
 ### Installing
 
-Makeflow is part of the [Cooperating Computing
-Tools](http://ccl.cse.nd.edu/software), which is easy to install. In most
-cases, you can just build from source and install in your home directory like
-this: 
-
-```sh
-$ git clone https://github.com/cooperative-computing-lab/cctools cctools-source
-$ cd cctools-source
-$ ./configure make make install
-```
-
-Then, set your path to include the appropriate directory. If you use `bash`, do
-this:
-
-```sh
-$ export PATH=${HOME}/cctools/bin:$PATH
-```
-
-Or if you use `tcsh`, do this:
-
-```csh
-$ setenv PATH ${HOME}/cctools/bin:$PATH
-```
-
-For more complex situations, consult the [CCTools installation
-instructions](../install).
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Basic Usage
 

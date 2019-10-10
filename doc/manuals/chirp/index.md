@@ -25,8 +25,9 @@ storage access. Read on below for more details.
 
 ## Getting Started
 
-Begin by [installing the cctools](http://ccl.cse.nd.edu/software/manuals/install.html) on your system.
-When you are ready, proceed below.
+### Installing
+
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, Make sure to set your `PATH` appropriately.
 
 ### Running a Chirp Server
 

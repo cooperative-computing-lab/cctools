@@ -26,12 +26,10 @@ limits.
 In systems that support it, **resource_monitor** wraps some libc functions to
 obtain a better estimate of the resources used.
 
-## Installation
+### Installing
 
-The **resource_monitor** is included in the **current development version** of
-[CCTools](http://ccl.cse.nd.edu/software/downloadfiles.php). For
-installation, please follow these
-[instructions.](../install)
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+
 
 ## Running resource_monitor
 

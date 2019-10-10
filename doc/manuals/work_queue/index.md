@@ -25,13 +25,11 @@ status page](http://ccl.cse.nd.edu/software/workqueue/status).
 
 ## Getting Started
 
-## Installing Work Queue
+### Installing
 
-Work Queue is part of the [Cooperating Computing
-Tools](http://ccl.cse.nd.edu/software). The CCTools package can be downloaded
-from [this web page](http://ccl.cse.nd.edu/software/download). Follow the
-[installation instructions](../install) to setup CCTools required for running
-Work Queue. The documentation for the full set of features of the Work Queue
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
+
+The documentation for the full set of features of the Work Queue
 API can be viewed from either within the CCTools package or
 [here](http://ccl.cse.nd.edu/software/manuals/api/html/work__queue_8h.html) and
 [here](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceWorkQueuePython.html).

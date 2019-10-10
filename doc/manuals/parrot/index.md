@@ -44,15 +44,13 @@ Like any software, Parrot is bound to have some bugs. Please post questions to
 our [forum](http://ccl.cse.nd.edu/community/forum) and bugs to our
 [issue tracker](https://github.com/cooperative-computing-lab/cctools/issues).
 
-## Installation
+### Installing
 
-Parrot is distributed as part of the [Cooperative Computing
-Tools](http://ccl.cse.nd.edu/software). To install, please read the [cctools
-installation instructions](../install).
+See the [Installation Instructions](install.md) for the Cooperative Computing Tools package.  Then, make sure to set your `PATH` appropriately.
 
 ## Examples
 
-To use Parrot, you simply use the `parrot` command followed by any other Unix
+To use Parrot, you simply use the `parrot_run` command followed by any other Unix
 program.  Of course, it can be clumsy to
 put `parrot_run` before every command you run, so try starting a shell with
 Parrot already loaded:
