@@ -13,10 +13,10 @@ nav:
         - Chirp: 'chirp/index.md'
         - Catalog Server: 'catalog/index.md'
     - Research Prototypes:
-        - AWE: 'awe/'
-        - Confuga: 'confuga/'
-        - Umbrella: 'umbrella/'
-        - Prune: 'prune/'
+        - AWE: 'awe/index.md'
+        - Confuga: 'confuga/index.md'
+        - Umbrella: 'umbrella/index.md'
+        - Prune: 'prune/index.md'
     - Reference:
         - Man Pages: 'man_pages.md'
         - Network Configuration: 'network/index.md'
