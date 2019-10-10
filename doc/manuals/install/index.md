@@ -65,6 +65,8 @@ $ make install
 
 ## Install via Spack
 
+[Spack](https://spack.io/) is package manager that gives users the ability to build coexisting packages with multiple versions, configurations, platforms, and compilers, all on the same machine.
+
 To install the latest release of CCTools using Spack:
 
 ```sh
