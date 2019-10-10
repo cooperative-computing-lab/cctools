@@ -1667,11 +1667,11 @@ CCTOOLS_STATIC=${optstatic}
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
 CCTOOLS_DYNAMIC_FLAG=${cctools_dynamic_flag}
 
-CC=\$(CCTOOLS_CC)
+CC=${ccompiler}
 CCFLAGS=\$(CCTOOLS_CCFLAGS)
-LD=\$(CCTOOLS_LD)
+LD=${linker}
 LDFLAGS=\$(CCTOOLS_LDFLAGS)
-CXX=\$(CCTOOLS_CXX)
+CXX=${cxxcompiler}
 CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 
 CCTOOLS_AR=ar
