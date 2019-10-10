@@ -6,7 +6,7 @@ exe="path_extension.test"
 
 prepare()
 {
-	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
+	${CC} -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none -I ../src ../src/libdttools.a -lm <<EOF
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
