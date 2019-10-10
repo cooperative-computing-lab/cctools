@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export CC=${CC:-gcc}
+
 # Tests sometimes chdir, so we get the full path now. `pwd` is annoying to portable.
 WORK_QUEUE_WORKER=$(cd "$(dirname "$0")/../../work_queue/src/"; pwd)/work_queue_worker
 
