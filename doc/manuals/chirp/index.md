@@ -1175,15 +1175,17 @@ more about it, please see the [Confuga manual](../confuga).
 
 
 
-### Please use the following citation for Chirp in a scientific publication
+## Citation
 
-  * Douglas Thain, Christopher Moretti, and Jeffrey Hemmes,[Chirp: A Practical Global Filesystem for Cluster and Grid Computing](http://www.cse.nd.edu/~dthain/papers/chirp-jgc.pdf), _Journal of Grid Computing_ , Springer, 2008. DOI: 10.1007/s10723-008-9100-5. (The original is available on <http://www.springerlink.com>.)
+Please use the following citation for Chirp in a scientific publication:
 
+- Douglas Thain, Christopher Moretti, and Jeffrey Hemmes,[Chirp: A Practical Global Filesystem for Cluster and Grid Computing](http://www.cse.nd.edu/~dthain/papers/chirp-jgc.pdf), _Journal of Grid Computing_ , Springer, 2008. DOI: 10.1007/s10723-008-9100-5. (The original is available on <http://www.springerlink.com>.)
 
-Chirp is Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005-
-The University of Notre Dame. All rights reserved.
-This software is distributed under the GNU General Public License.
-See the file COPYING for details.
+## Further Information
 
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-__Last edited: August 2019__
+## Copyright
+
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.

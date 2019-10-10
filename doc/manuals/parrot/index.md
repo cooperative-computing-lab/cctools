@@ -839,11 +839,7 @@ run parrot inside docker, the container needs to be started using the
 `--security-opt seccomp=unconfined` command line argument. For example: `
 docker run --security-opt seccomp=unconfined MY-DOCKER-IMAGE `
 
-## For More Information
-
-For the latest information on Parrot, visit the home page:
-
-* [Parrot Home Page](http://ccl.cse.nd.edu/software/parrot)
+## Man Pages
 
 An exhaustive list of all options and commands can be found in the manual
 pages:
@@ -861,16 +857,15 @@ pages:
 * [parrot_mount](../man_pages/parrot_mount.md)
 
 
-### Please use the following citation for Parrot in a scientific publication
+## Citation
 
 Douglas Thain and Miron Livny, [Parrot: An Application Environment for Data-Intensive Computing](http://www.cse.nd.edu/~dthain/papers/parrot-scpe.pdf), Scalable Computing: Practice and Experience, Volume 6, Number 3, Pages 9--18, 2005.
 
+## Further Information
 
-Parrot is Copyright (C) 2003-2004 Douglas Thain and Copyright (C) 2005- The
-University of Notre Dame.  All rights reserved.  This software is distributed
-under the GNU General Public License.  See the file COPYING for details.
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-__Last edited: August 2019__
+## Copyright
 
-
-
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.

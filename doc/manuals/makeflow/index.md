@@ -1436,12 +1436,12 @@ Each file state line records the state change and time:
 # COMPLETED 1559838914959929
 ```
 
-
 ## Further Information
 
-Makeflow is Copyright (C) 2017- The University of Notre Dame. This software is
-distributed under the GNU General Public License. See the file COPYING for
-details.
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
-Last modified: August 2019
+## Copyright
+
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.
 

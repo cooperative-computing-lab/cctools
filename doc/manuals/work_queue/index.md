@@ -1034,18 +1034,12 @@ The statistics available are:
 | 
 | master_load;       | In the range of [0,1]. If close to 1, then the master is at full load and spends most of its time sending and receiving taks, and thus cannot accept connections from new workers. If close to 0, the master is spending most of its time waiting for something to happen.
 
+## Further Information
 
+For more information, please see [Getting Help](help.md) or visit the [Cooperative Computing Lab](http://ccl.cse.nd.edu) website.
 
+## Copyright
 
-## For More Information
-
-For the latest information about Work Queue, please visit our [web
-site](http://ccl.cse.nd.edu/software/workqueue) and subscribe to our [mailing
-list](http://ccl.cse.nd.edu/software/help.shtml).
-
-Work Queue is Copyright (C) 2016- The University of Notre Dame. All rights
-reserved. This software is distributed under the GNU General Public License.
-See the file COPYING for details.
-
-Last modified: August 2019
+CCTools is Copyright (C) 2019- The University of Notre Dame. This software is distributed under the GNU General Public License Version 2. See the file COPYING for
+details.
 
