@@ -112,7 +112,7 @@ xrootd_arch=auto
 
 ccompiler=${CC:-gcc}
 cxxcompiler=${CXX:-g++}
-linker="${LD:-${ccompiler}}"
+linker="${ccompiler}"
 
 ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
 c_only_flags="-std=c99"
