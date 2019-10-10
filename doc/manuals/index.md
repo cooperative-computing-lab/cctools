@@ -1,6 +1,10 @@
 # Cooperative Computing Tools Documentation
 
-**[Installation Instructions](install)**
+## Getting Started
+
+- **[About](about.md)**
+- **[Installation](install)**
+- **[Getting Help](help.md)**
 
 ## Software Components
 
@@ -60,7 +64,7 @@
 
 ## Reference Information
 
-[**Networking Configuration**](network)
+- [**Networking Configuration**](network)
 
-[**Man Pages**](man_pages.md)
+- [**Man Pages**](man_pages.md)
 
