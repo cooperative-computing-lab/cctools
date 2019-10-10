@@ -6,7 +6,7 @@ exe="hmac_test.test"
 
 prepare()
 {
-	gcc -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
+	${CC} -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -I ../src/ -x c - -x none ../src/libdttools.a -lm <<EOF
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
