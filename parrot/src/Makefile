@@ -31,11 +31,11 @@ libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
 
 lib64/libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
 	mkdir -p lib64
-	gcc -m64 -shared -fPIC $< -o $@
+	${CCTOOLS_CC} -m64 -shared -fPIC $< -o $@
 
 lib/libparrot_helper.$(CCTOOLS_DYNAMIC_SUFFIX): parrot_helper.c
 	mkdir -p lib
-	gcc -m32 -shared -fPIC $< -o $@
+	${CCTOOLS_CC} -m32 -shared -fPIC $< -o $@
 
 tracer.table64.c: syscall_64.tbl
 	cat $< syscall_parrot.tbl | perl tracer.table.pl table 64 > $@
