@@ -6,7 +6,7 @@ exe="$0.test"
 
 prepare()
 {
-	gcc -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
+	${CC} -I../src/ -g $CCTOOLS_TEST_CCFLAGS -o "$exe" -x c - -x none ../src/libdttools.a -lm <<EOF
 #include "create_dir.h"
 #include "debug.h"
 #include "unlink_recursive.h"
