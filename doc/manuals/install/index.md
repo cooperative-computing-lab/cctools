@@ -63,6 +63,26 @@ $ make install
     Remember to export PATH, PYTHONPATH, and PERL5LIB accordingly.
 
 
+## Install via Spack
+
+To install the latest release of CCTools using Spack:
+
+```sh
+spack install cctools
+```
+
+Use the following command to locate the CCTools directory: 
+
+```sh
+spack find -p cctools 
+```
+
+Finally, update your PATH variable to point to the CCTools installation.
+
+```sh
+export PATH=$PATH:<PATH_TO_CCTOOLS>/bin
+```
+
 ## Install From Git Repository
 
 Instead of installing from the source of the current released version, you can
