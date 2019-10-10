@@ -20,7 +20,7 @@ nav:
     - Reference:
         - Man Pages: 'man_pages.md'
         - Network Configuration: 'network/index.md'
-
+        - JX Language: 'jx/index.md'
 
 markdown_extensions:
     - toc:

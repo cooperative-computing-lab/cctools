@@ -851,7 +851,6 @@ An exhaustive list of all options and commands can be found in the manual
 pages:
 
 * [parrot_run](../man_pages/parrot_run.md)
-* [parrot_run_hdfs](../man_pages/parrot_run_hdfs.md)
 * [parrot_cp](../man_pages/parrot_cp.md)
 * [parrot_md5](../man_pages/parrot_md5.md)
 * [parrot_getacl](../man_pages/parrot_getacl.md)

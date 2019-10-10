@@ -64,7 +64,12 @@
 
 ## Reference Information
 
+- [**Man Pages**](man_pages.md)
+
+- [**JX Workflow Language**](jx)
+
+- [**Chirp Protocol Specification**](chirp/chirp_protocol.md)
+
 - [**Networking Configuration**](network)
 
-- [**Man Pages**](man_pages.md)
 

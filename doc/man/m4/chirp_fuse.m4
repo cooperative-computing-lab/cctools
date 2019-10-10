@@ -11,7 +11,7 @@ SECTION(DESCRIPTION)
 
 PARA
 You can attach to a Chirp filesystems by using the FUSE package to attach Chirp
-as a kernel filesystem module. Unlike MANPAGE(parrot,1), this requires
+as a kernel filesystem module. Unlike MANPAGE(parrot_run,1), this requires
 superuser privileges to install the FUSE package, but will likely work more
 reliably on a larger number of programs and environments. Using FUSE allows for
 transparent access to a Chirp server via the local filesystem. This allows user

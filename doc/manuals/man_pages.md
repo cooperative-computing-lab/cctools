@@ -25,14 +25,19 @@ for a broader discussion of how each tool is used.
   * [work_queue_graph_log(1)](man_pages/work_queue_graph_log.md)
   * [work_queue_factory(1)](man_pages/work_queue_factory.md)
 
+### Worker Submission Scripts
+
   * [condor_submit_workers(1)](man_pages/condor_submit_workers.md)
   * [sge_submit_workers(1)](man_pages/sge_submit_workers.md)
   * [pbs_submit_workers(1)](man_pages/pbs_submit_workers.md)
   * [torque_submit_workers(1)](man_pages/torque_submit_workers.md)
+  * [slurm_submit_workers(1)](man_pages/slurm_submit_workers.md)
 
 ## Resource Monitor
 
   * [resource_monitor(1)](man_pages/resource_monitor.md)
+  * [resource_monitor_histograms(1)](man_pages/resource_monitor_histograms.md)
+  * [resource_monitor_visualizer(1)](man_pages/resource_monitor_visualizer.md)
 
 ## Catalog Server
 
