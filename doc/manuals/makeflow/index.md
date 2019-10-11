@@ -319,7 +319,7 @@ BATCH_OPTIONS="-q devel"
 ### PBS - Portable Batch System
 
 Use the `-T pbs` option to submit jobs to the [Portable Batch
-System](http://www.arc.ox.ac.uk/content/pbs) or compatible systems.
+System](https://en.wikipedia.org/wiki/Portable_Batch_System) or compatible systems.
 
 This will add the values for cores, memory, and disk. These values will be
 added onto `qsub` in this format:  
@@ -589,7 +589,7 @@ common files are needed by each job, they may end up being transferred to the
 same node multiple times.
 
 To get around these limitations, we provide the [Work
-Queue](http://ccl.cse.nd.edu/software/workqueue</a) system. The basic idea is
+Queue](../work_queue) system. The basic idea is
 to submit a number of persistent "worker" processes to an existing batch
 system. Makeflow communicates directly with the workers to quickly dispatch
 jobs and cache data, rather than interacting with the underlying batch system.
