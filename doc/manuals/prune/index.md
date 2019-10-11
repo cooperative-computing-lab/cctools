@@ -165,7 +165,7 @@ $ python hep.py
 ## Prune Example Workflow: U.S. Census
 
 The U.S. Census workflow demonstrates the scalability of Prune by using [Work
-Queue](../workqueue/) to execute the workflow in a distributed manner, rather
+Queue](../work_queue/) to execute the workflow in a distributed manner, rather
 than only executing with the local machine. The included census data is a
 small simulation of a real census, but could be applied to the real U.S.
 Censuses if available.
@@ -185,7 +185,7 @@ Work Queue master:
 
 `condor_submit_workers -N prune_census_example 10`
 
-See the [Work Queue Manual](../workqueue) for more information on ways to
+See the [Work Queue Manual](../work_queue) for more information on ways to
 assign workers to execute tasks in the workflow.
 
 (The hep.wq.py script, in the hep example folder, runs the HEP workflow using

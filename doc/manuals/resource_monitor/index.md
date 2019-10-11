@@ -8,7 +8,7 @@ descendants. The monitor works *indirectly*, that is, by observing how the
 environment changed while a process was running, therefore all the information
 reported should be considered just as an estimate (this is in contrast with
 direct methods, such as ptrace). It works on Linux, and can be used in stand-
-alone mode, or automatically with [makeflow](../makeflow) and [work queue](../workqueue) applications.
+alone mode, or automatically with [makeflow](../makeflow) and [work queue](../work_queue) applications.
 
 **resource_monitor** generates up to three log files: a JSON encoded summary
 file with the maximum values of resource used and the time they occurred, a

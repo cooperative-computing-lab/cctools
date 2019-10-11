@@ -33,7 +33,7 @@ We are a research group funded by the National Science Foundation and
 the Department of Energy to design, evaluate, and deploy software systems
 that enable new discoveries in many fields of science and engineering.
 We thrive on helping people to succeed, so if you have a challenging
-problem or just want to exchange ideas, then please [get in touch](help) --
+problem or just want to exchange ideas, then please [get in touch](help.md) --
 we are eager to work with you.
 
 This work has been sponsored in part by the National Science Foundation via grants OAC-1931348 (CSSI 2019-2022), OAC-1642409 (SI2 2016-2019), OAC-1148330 (SI2 2013-2016), and CNS-0453229 (CAREER 2007-2012)

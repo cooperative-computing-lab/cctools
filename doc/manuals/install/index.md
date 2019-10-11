@@ -88,7 +88,7 @@ install them separately:
 * [Perl](https://www.perl.org)
 * [CVMFS](https://cvmfs.readthedocs.io/en/stable/cpt-quickstart.html)
 * [FUSE](http://fuse.sourceforge.net)
-* [iRODS](http://www.irods.org) (version 4.0.3) 
+* [iRODS](http://irods.org) (version 4.0.3) 
 * [Globus](http://www.globus.org) (version 5.0.3) 
 * [Hadoop](http://hadoop.apache.org)
 * [xRootD](http://xrootd.slac.stanford.edu)
