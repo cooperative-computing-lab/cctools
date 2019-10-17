@@ -22,7 +22,15 @@ done
 
 ./configure --strict --prefix "$D" $DEP_ARGS
 make install
-make test
+
+if ! make test
+then
+    cat cctools.test.fail
+    exit 1
+else
+    exit 0
+fi
+
 
 if [ -n "$DOCKER_IMAGE" ] || [ "$TRAVIS_OS_NAME" = osx ]; then
     tar -cz -C "$(dirname "$D")" -f "$D.tar.gz" "$(basename "$D")"
