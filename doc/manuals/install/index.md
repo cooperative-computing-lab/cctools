@@ -7,6 +7,40 @@ enable large scale distributed computing on systems such as clusters, clouds,
 and grids. These tools are commonly used in fields of science and engineering
 that rely on large amounts of computing.
 
+
+CCTools can be installed on linux and Mac OSX.
+
+
+
+## Install from Conda
+
+!!! warning
+    Deployment using **conda** is under active development.
+
+If you need a personal installation of **CCTools**, say for your laptop, or an
+account in your campus cluster, the easiest way to install **CCTools** is using the
+**conda** package manager. To check that you have conda install, in a terminal try:
+
+```sh
+$ conda list
+```
+
+If it fails, then you need to install either
+[miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install)
+or [anaconda](https://docs.anaconda.com/anaconda/install). Miniconda is a
+__light__ version of anaconda, and we recommend it as it is much faster to
+install. We also recommend installing the versions for `Python 3.7`, but
+**CCTools** will also work with the `Python 2.7` version.
+
+With `conda` command available, install **CCTools** with:
+
+```sh
+$ conda install -y -c cclnd cctools
+```
+
+And that's it! You can test your setup following the instructions [here](#testing-your-installation).
+
+
 ## Install from Binary Tarball
 
 Binary packages are available for several operating systems at the [download
