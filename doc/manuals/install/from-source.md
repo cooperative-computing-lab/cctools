@@ -11,11 +11,36 @@ $ tar zxf cctools-*-source.tar.gz
 $ cd cctools-*-source
 $ ./configure
 $ make
+
+# by default, CCTools is installed at ~/cctools. See below to change this default.
 $ make install
 ```
 
-!!! note
-    After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as for [binary tarball installations](index.md#install-from-binary-tarball)
+After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as follows:
+
+First determine the `python` and `perl` versions you are using:
+
+```sh
+# Note: your output may vary according to your python version.
+$ python -c 'from sys import version_info; print("{}.{}".format(version_info.major, version_info.minor))'
+3.7
+
+# Note: your output may vary according to your perl version.
+$ perl -e 'print("$^V\n")'
+5.16.3
+```
+
+Now we update the environment variables with the values we found:
+
+```sh
+$ export PATH=~/cctools/bin:$PATH
+
+# Change 3.7 to the python version you found above.
+$ export PYTHONPATH=~/cctools/lib/python3.7/site-packages:${PYTHONPATH}
+
+# Change 5.16.3 to the perl version you found above.
+$ export PERL5LIB=~/cctools/lib/perl5/site_perl/5.16.3:${PERL5LIB}
+```
 
 !!! warning
     If you need to compile CCTools with **python** or **perl** support, you
@@ -28,7 +53,8 @@ $ make install
 !!! note
     If you need to install CCTools in a directory different from
     `${HOME}/cctools`, you can use `./configure --prefix /some/desired/dir`.
-    Remember to export PATH, PYTHONPATH, and PERL5LIB accordingly.
+    Remember to export PATH, PYTHONPATH, and PERL5LIB as above, but changing
+    `~/cctools` to the directory of your choosing.
 
 
 ## Install From Git Repository
