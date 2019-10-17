@@ -39,8 +39,9 @@ can directly build the latest version from our git repository:
 ```sh
 $ git clone https://github.com/cooperative-computing-lab/cctools cctools-source
 $ cd cctools-source
-
-# ...and follow the same ./configure and make steps as above
+$ ./configure
+$ make
+$ make install
 ```
 
 
