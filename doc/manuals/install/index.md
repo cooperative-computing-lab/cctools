@@ -78,31 +78,6 @@ cctools` everytime you want to use **CCTools**.
 Once this command finished, you can test your installation following the
 instructions [here](#testing-your-installation).
 
-
-## Install from Binary Tarball
-
-Binary packages are available for several operating systems at the [download
-page](http://ccl.cse.nd.edu/software/download) Simply unpack the tarball
-in any directory that you like, and then add the `bin` directory to your path.
-
-For example, to install CCTools for RHEL7 / CentOS7 in your home directory in a directory
-called `cctools`:
-
-```sh
-$ mkdir ~/cctools
-$ tar -C ~/cctools --strip-components=1 -xf cctools-*-centos7-x86_64.tar.gz
-$ export PATH=~/cctools/bin:$PATH
-
-# configure for python 3.6
-$ export PYTHONPATH=~/cctools/lib/python3.6/site-packages:${PYTHONPATH}
-
-# configure for python 2.7 (only one of python2 or python3 should be added to PYTHONPATH):
-$ export PYTHONPATH=~/cctools/lib/python2.7/site-packages:${PYTHONPATH}
-
-# configure for perl5 5.16.3
-$ export PERL5LIB=~/cctools/lib/perl5/site_perl/5.16.3:${PERL5LIB}
-```
-
 ## Install From Source
 
 To install from source, please follow the instructions [here](from-source.md).
@@ -127,9 +102,7 @@ $ perl -MWork_Queue -e 'print("$Work_Queue::WORK_QUEUE_DEFAULT_PORT\n")'
 ```
 
 If the above commands fail, please make sure that you follow one (and only one!)
-of the methods above. Remember that for installations from source you need
-[swig](http://www.swig.org) at compile time, and that for source and tarball
-binary installations you need to set your `PYTHONPATH` and `PERL5LIB` variables appropriately.
+of the methods above. 
 
 You can test the availability of *CCTools** commands with:
 
@@ -140,10 +113,12 @@ makeflow version X.Y.Z...
 ...(output trimmed)...
 ```
 
-If this command fails, and you are installing from source or a binary tarball,
-please remember to set your `PATH` variable appropriately. For **conda** and
-**spack** installation you should not need to manually set any of these
-variables.
+!!! warning
+    Remember that for installations from source you need [swig](http://www.swig.org) at compile time, and to set
+    the environment variables `PATH`, `PYTHONPATH` and `PERL5LIB` appropriately, as explained [here.](from-source.md#using-the-official-released-version)
+
+    For **conda** and **spack** installation you should not need to manually
+    set any of these variables.
 
 
 # License
