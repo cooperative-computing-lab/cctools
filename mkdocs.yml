@@ -24,9 +24,9 @@ nav:
 
 markdown_extensions:
     - toc:
+    - admonition
 
 permalink: True
-    - admonition
 
 docs_dir: doc/manuals
 site_dir: doc/mkdocs-site
