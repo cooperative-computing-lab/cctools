@@ -64,10 +64,19 @@ Once spack is installed, install **CCTools** with:
 $ spack install cctools
 ```
 
-Once this command finished, you can test your installation following the instructions [here](#testing-your-installation).
+To use **CCTools**, you need to load it into the spack environment with:
 
-!!! warning
-    With the current spack installation, it is necessary to set the variables `PATH`, `PYTHONPATH` and `PERL5LIB` as for [binary installs](#install-from-binary-tarball). These should not be needed in the near future. Meanwhile, you can use `spack find -p cctools` to find the location of **CCTools** and update `PATH`, `PYTHONPATH`, and `PERL5LIB` accordingly.
+```sh
+$ spack load cctools
+
+# Warning! This command currently fails.
+```
+
+You only need to do `spack install` once, but you will need `spack load
+cctools` everytime you want to use **CCTools**.
+
+Once this command finished, you can test your installation following the
+instructions [here](#testing-your-installation).
 
 
 ## Install from Binary Tarball
