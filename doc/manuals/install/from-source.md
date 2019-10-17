@@ -7,8 +7,8 @@ page](http://ccl.cse.nd.edu/software/download). And follow this recipe while
 logged in as any ordinary user:
 
 ```sh
-$ tar -C ~/cctools --strip-components=1 -xf cctools-*-source.tar.gz
-
+$ tar zxf cctools-*-source.tar.gz
+$ cd cctools-*-source
 $ ./configure
 $ make
 $ make install
