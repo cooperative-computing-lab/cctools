@@ -220,6 +220,37 @@ versions before 10.9, you will need to first install Xcode. Xcode can be found
 in the App Store or on the installation disk.
 
 
+## Testing your installation
+
+You can test that the python and perl modules are available with:
+
+```sh
+$ python -c 'import work_queue; print(work_queue.WORK_QUEUE_DEFAULT_PORT)'
+9123
+
+$ perl -MWork_Queue -e 'print("$Work_Queue::WORK_QUEUE_DEFAULT_PORT\n")'
+9123
+```
+
+If the above commands fail, please make sure that you follow one (and only one!)
+of the methods above. Remember that for installations from source you need
+[swig](http://www.swig.org) at compile time, and that for source and tarball
+binary installations you need to set your `PYTHONPATH` and `PERL5LIB` variables appropriately.
+
+You can test the availability of *CCTools** commands with:
+
+```sh
+$ makeflow --version
+
+makeflow version X.Y.Z...
+...(output trimmed)...
+```
+
+If this command fails, and you are installing from source or a binary tarball,
+please remember to set your `PATH` variable appropriately. For **conda** and
+**spack** installation you should not need to manually set any of these
+variables.
+
 
 # License
 
