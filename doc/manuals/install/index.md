@@ -40,6 +40,35 @@ $ conda install -y -c cclnd cctools
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
 
+## Install from spack
+
+!!! warning
+    Deployment using **spack** is under active development.
+
+Alternatively, you can install **CCTools** using the [spack.io](www.spack.org)
+package manager. Spack will compile **CCTools** for you, and it is recommended
+for HPC sites for which a conda installation is not available, or which have
+special software stack requirements (such as specially compiled python versions).
+
+First you need to check that the `spack` command is available. In a terminal type:
+
+```sh
+spack help
+```
+
+If this command fails, then please install spack following the instructions [here.](https://spack.io)
+
+Once spack is installed, install **CCTools** with:
+
+```sh
+spack install cctools
+```
+
+Once this command finished, you can test your installation following the instructions [here](#testing-your-installation).
+
+!!! warning
+    With the current spack installation, it is necessary to set the variables `PATH`, `PYTHONPATH` and `PERL5LIB` as for [binary installs](#install-from-binary-tarball). These should not be needed in the near future. Meanwhile, you can use `spack find -p cctools` to find the location of **CCTools** and update `PATH`, `PYTHONPATH`, and `PERL5LIB` accordingly.
+
 
 ## Install from Binary Tarball
 
