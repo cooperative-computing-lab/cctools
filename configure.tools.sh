@@ -253,9 +253,14 @@ library_search_normal()
 		basedir=
 	fi
 
+	# If a third argument is given, it is interpreted as a subdirectory where
+	# the libraries might be. Useful when several architectures live in the
+	# same basedir.
 	if [ -n "$subdir" ]
 	then
-		$subdir = "/$subdir"
+		subdir="/$subdir"
+	else
+		subdir=""
 	fi
 
 	arch_dirs="${basedir}/lib ${basedir}"
@@ -273,7 +278,13 @@ library_search_normal()
 
 	for arch_dir in $arch_dirs
 	do
+		# check if the subdirectory exists
 		libdir="$arch_dir$subdir"
+		if [ ! -d "$libdir" ]
+		then
+			libdir="$arch_dir"
+		fi
+
 		if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
 		then
 			if check_library_static "$lib" "$libdir"
