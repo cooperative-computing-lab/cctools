@@ -24,11 +24,13 @@ export CCTOOLS_TEST_TMP=${CCTOOLS_TEST_LOG%.log}.tmp
 
 echo "[$(date)] Testing on $(uname -a)." > "$CCTOOLS_TEST_LOG"
 
-# we need cctools_python in the path.
-PATH="$(pwd)/dttools/src:$PATH"
 # we need resource_monitor in the path.
 PATH="$(pwd)/resource_monitor/src:$PATH"
 export PATH
+
+export CCTOOLS_PYTHON2=$(grep "^CCTOOLS_PYTHON2=" config.mk | cut -d = -f 2)
+export CCTOOLS_PYTHON3=$(grep "^CCTOOLS_PYTHON3=" config.mk | cut -d = -f 2)
+export CCTOOLS_PERL=$(grep "^CCTOOLS_PERL=" config.mk | cut -d = -f 2)
 
 export PYTHONPATH="$(pwd)/chirp/src/python:$(pwd)/work_queue/src/python:$PYTHONPATH"
 export PERL5LIB="$(pwd)/chirp/src/perl:$(pwd)/work_queue/src/perl:$PERL5LIB"
