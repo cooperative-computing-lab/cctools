@@ -89,15 +89,64 @@ check_path ()
 	return 1
 }
 
-check_function()
-{
-	echon "checking for $1 in $2..."
-	if grep $1 $2 >/dev/null 2>&1
+check_library_static() {
+	local libdir
+	local library
+
+	library="lib$1.a"
+	libdir="$2"
+
+	if check_file "$libdir/$library"
 	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+check_library_dynamic() {
+	local library
+	local libdir
+
+	library="$1"
+	libdir="$2"
+
+	echon "checking for lib$1 in $2..."
+
+	if echo 'int main;' | ${CC:-gcc} -o /dev/null -x c - "-L${libdir}" "-l${library}" >/dev/null 2>/dev/null; then
 		echo "yes"
 		return 0
 	else
 		echo "no"
+		return 1
+	fi
+}
+
+check_function()
+{
+	local func
+	local header
+
+	name="$1"
+	header="$2"
+
+	echon "checking for $name in $header..."
+
+cat > .configure.tmp.c << EOF
+#include <stdlib.h>
+#include <${header}>
+int main(int argc, char **argv) {
+	${name};
+	return 0;
+}
+EOF
+	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
+		echo yes
+		rm -f .configure.tmp.c .configure.tmp.out
+		return 0
+	else
+		echo no
+		rm -f .configure.tmp.c .configure.tmp.out
 		return 1
 	fi
 }
@@ -184,10 +233,13 @@ library_search_multiarch()
 
 library_search_normal()
 {
+	local lib
 	local basedir
 	local libdir
-	local dynamic_suffix
-	local arch
+
+	lib="$1"
+	basedir="$2"
+	subdir="$3"
 
 	# Must clear out any previous values from the global
 	library_search_result=""
@@ -196,86 +248,81 @@ library_search_normal()
 	# we will end up with a path that has two slashes, which
 	# means something unintended in Windows
 
-	if [ $2 = / ]
+	if [ "$basedir" = / ]
 	then
 		basedir=
-	else
-		basedir=$2
 	fi
 
-	# If we are running on a 64-bit platform, then the native libraries
-	# for compiling will be found in /lib64, if it exists.  The files in
-	# /lib are compatibilities libraries for 32-bit.
+	# If a third argument is given, it is interpreted as a subdirectory where
+	# the libraries might be. Useful when several architectures live in the
+	# same basedir.
+	if [ -n "$subdir" ]
+	then
+		subdir="/$subdir"
+	else
+		subdir=""
+	fi
+
+	arch_dirs="${basedir}/lib ${basedir}"
+
+	# If we are running on a 64-bit platform, then give preference to 
+	# libraries in /lib64.
 
 	if [ $BUILD_CPU = X86_64 -a -d $2/lib64 ]
 	then
-		libdir=$basedir/lib64
-	elif [ -d $basedir/lib ]
-		then
-		libdir=$basedir/lib
-	else
-		libdir=$basedir
-	fi
-
-	# Darwin uses dylib for dynamic libraries, other platforms use .so
-
-	if [ $BUILD_SYS = DARWIN ]
-	then
-		dynamic_suffix=dylib
-	else
-		dynamic_suffix=so
-	fi
-
-	# If a third argument is given, it means libraries are found in
-	# a subdirectory of lib, such as "mysql".
-
-	if [ -n "$3" -a -d "$libdir/$3" ]
-	then
-		libdir="$libdir/$3"
+		arch_dirs="${basedir}/lib64 ${arch_dirs}"
 	fi
 
 	# Now check for the library file in all of the known places,
 	# and add it to the link line as appropriate for the type and platform.
 
-	if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
-	then
-		if check_file $libdir/lib$1.a
+	for arch_dir in $arch_dirs
+	do
+		# check if the subdirectory exists
+		libdir="$arch_dir$subdir"
+		if [ ! -d "$libdir" ]
 		then
-			library_search_result="$libdir/lib$1.a"
-			return 0
+			libdir="$arch_dir"
 		fi
-	fi
 
-	if [ $library_search_mode != require_static ]
-	then
-		if check_file $libdir/lib$1.$dynamic_suffix
+		if [ $library_search_mode = prefer_static -o $library_search_mode = require_static ]
 		then
-			# If this is not a standard library directory, add it to the library search path.
-			# (Adding standard directories to the path has unintended effects.)
-			if [ $libdir != /lib -a $libdir != /lib64 -a $libdir != /usr/lib -a $libdir != /usr/lib64 ]
+			if check_library_static "$lib" "$libdir"
 			then
-				library_search_result="-L$libdir -l$1"
-			else
-				library_search_result="-l$1"
+				library_search_result="$libdir/lib${lib}.a"
+				return 0
 			fi
-
-			if [ $BUILD_SYS = DARWIN ]
-			then
-				library_search_result="${library_search_result} -rpath $libdir"
-			fi
-
-			return 0
 		fi
-	fi
 
-	if [ $library_search_mode = prefer_dynamic ]
-	then
-		if check_file $libdir/lib$1.a
+		if [ $library_search_mode != require_static ]
 		then
-			library_search_result="$libdir/lib$1.a"
-			return 0
+			if check_library_dynamic "$lib" "$libdir"
+			then
+				if [ "$libdir" != /lib -a "$libdir" != /lib64 -a "$libdir" != /usr/lib -a "$libdir" != /usr/lib64 ]
+				then
+					library_search_result="-L${libdir} -l${lib}"
+				else
+					library_search_result="-l${lib}"
+				fi
+
+				if [ $BUILD_SYS = DARWIN ]
+				then
+					library_search_result="${library_search_result} -rpath $libdir"
+				fi
+
+				return 0
+			fi
 		fi
-	fi
+
+		if [ $library_search_mode = prefer_dynamic ]
+		then
+			if check_library_static "$lib" "$libdir"
+			then
+				library_search_result="$libdir/lib${lib}.a"
+				return 0
+			fi
+		fi
+	done
 
 	return 1
 }
@@ -330,14 +377,14 @@ optional_include()
 {
 	header="$1"
 	shift
-
+	
 	echon "checking for header ${header}..."
 
 cat > .configure.tmp.c << EOF
 #include <stdlib.h>
 #include <${header}>
 EOF
-	if gcc .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
+	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
 		echo yes
 		rm -f .configure.tmp.c .configure.tmp.out
 		ccflags_append_define "$@"
@@ -356,7 +403,7 @@ optional_library()
 
 	echon "checking for library ${library}..."
 
-	if echo 'int main;' | gcc -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
+	if echo 'int main;' | ${CC:-gcc} -o /dev/null -x c - "-l${library}" >/dev/null 2>/dev/null; then
 		echo yes
 		ccflags_append_define "$@"
 		return 0
@@ -377,7 +424,7 @@ optional_library_function()
 
 	echon "checking for library function ${f}..."
 
-	gcc -o /dev/null -x c - "-l${l}" >/dev/null 2>/dev/null <<EOF
+	${CC:-gcc} -o /dev/null -x c - "-l${l}" >/dev/null 2>/dev/null <<EOF
 #include <stdlib.h>
 #include <${h}>
 

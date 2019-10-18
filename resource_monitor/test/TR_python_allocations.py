@@ -6,7 +6,7 @@ export $(grep CCTOOLS_PYTHON2= ../../config.mk)
 
 check_needed()
 {
-		[ -f ../src/python/_cResourceMonitor.so ]     || return 1
+		[ -f ../src/bindings/python/_cResourceMonitor.so ] || return 1
 
 		export PYTHONPATH=$(pwd)/../src/python
 		${CCTOOLS_PYTHON2} -c "import ResourceMonitor" || return 1
@@ -23,7 +23,7 @@ prepare()
 run()
 {
 	export PYTHONPATH=$(pwd)/../src/python
-	${CCTOOLS_PYTHON2} ../src/python/rmonitor_allocations_example.py
+	${CCTOOLS_PYTHON2} ../src/bindings/python/rmonitor_allocations_example.py
 }
 
 clean()
