@@ -1,5 +1,4 @@
-#!/usr/bin/env cctools_python
-# CCTOOLS_PYTHON_VERSION 2.7 2.6 2.5 2.4 3
+#!/usr/bin/env python
 
 import sys
 
