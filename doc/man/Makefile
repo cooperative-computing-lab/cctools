@@ -49,6 +49,6 @@ install: all
 test:
 
 clean:
-	rm -rf $(HTMLFILES) $(MANFILES) $(ZIPFILES) $(MDFILES) *~
+	rm -rf $(HTMLFILES) $(MANFILES) $(ZIPFILES) *~
 
 .PHONY: all clean install test
