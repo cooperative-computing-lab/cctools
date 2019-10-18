@@ -1353,7 +1353,7 @@ struct rmsummary *rmsummary_get_snapshot(const struct rmsummary *s, int i) {
 #define over_limit_check(measured, limits, fld)\
 	if((limits)->fld > -1 && (measured)->fld > 0 && (limits)->fld - (measured)->fld < 0)\
 	{\
-		warn(D_RMON, "Limit " #fld " broken: %" PRId64 " > %" PRId64 "\n", (measured)->fld, (limits)->fld);\
+		debug(D_DEBUG, "Limit " #fld " broken: %" PRId64 " > %" PRId64 "\n", (measured)->fld, (limits)->fld);\
 		if(!(measured)->limits_exceeded) { (measured)->limits_exceeded = rmsummary_create(-1); }\
 		(measured)->limits_exceeded->fld = limits->fld;\
 	}
