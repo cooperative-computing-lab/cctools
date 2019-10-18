@@ -9,6 +9,8 @@ c="./hostport.$PPID"
 
 ticket=my.ticket
 
+perl=${CCTOOLS_PERL}
+
 check_needed()
 {
 	test -f ../src/bindings/perl/CChirp.so
@@ -17,6 +19,8 @@ check_needed()
 
 prepare()
 {
+	[ -n "$perl" ] || return 1
+
 	chirp_start local --auth=ticket
 	echo "$hostport" > "$c"
 	return 0
@@ -31,7 +35,7 @@ run()
 
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
 
-	PERL5LIB=$(pwd)/../src/bindings/perl ../src/bindings/perl/chirp_perl_example.pl $hostport $ticket
+	PERL5LIB="$(pwd)/../src/bindings/perl" ${perl} ../src/bindings/perl/chirp_perl_example.pl $hostport $ticket
 
 	return 0
 }
