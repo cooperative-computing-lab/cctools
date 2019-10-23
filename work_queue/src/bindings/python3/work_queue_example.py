@@ -1,5 +1,4 @@
-#!/usr/bin/env cctools_python
-# CCTOOLS_PYTHON_VERSION 3 2.7
+#!/usr/bin/env python
 
 # Copyright (c) 2010- The University of Notre Dame.
 # This software is distributed under the GNU General Public License.
@@ -16,8 +15,6 @@ import sys
 
 # Main program
 if __name__ == '__main__':
-  port = WORK_QUEUE_DEFAULT_PORT
-
   if len(sys.argv) < 2:
     print("work_queue_example <file1> [file2] [file3] ...")
     print("Each file given on the command line will be compressed using a remote worker.")
@@ -40,7 +37,7 @@ if __name__ == '__main__':
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = WorkQueue(port)
+      q = WorkQueue(port = WORK_QUEUE_DEFAULT_PORT)
   except:
       print("Instantiation of Work Queue failed!")
       sys.exit(1)

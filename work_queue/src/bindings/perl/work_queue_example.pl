@@ -30,10 +30,9 @@ my $gzip_path = find_executable('gzip') || die "Could not find gzip anywhere in 
 # been used by another program, you can try setting port = 0 to use an
 # available port.
 
-my $port = $Work_Queue::WORK_QUEUE_DEFAULT_PORT;
-my $q    = Work_Queue->new($port) || die "Instantiation of Work Queue failed! ($!)\n";
+my $q = Work_Queue->new(port => $Work_Queue::WORK_QUEUE_DEFAULT_PORT) || die "Instantiation of Work Queue failed! ($!)\n";
 
-print "listening on port $port...\n";
+print "listening on port @{[$q->port]}...\n";
 
 # We create and dispatch a task for each filename given in the argument list
 for my $infile (@ARGV) {
