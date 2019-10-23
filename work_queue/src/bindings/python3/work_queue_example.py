@@ -16,8 +16,6 @@ import sys
 
 # Main program
 if __name__ == '__main__':
-  port = WORK_QUEUE_DEFAULT_PORT
-
   if len(sys.argv) < 2:
     print("work_queue_example <file1> [file2] [file3] ...")
     print("Each file given on the command line will be compressed using a remote worker.")
@@ -40,7 +38,7 @@ if __name__ == '__main__':
   # been used by another program, you can try setting port = 0 to use an
   # available port.
   try:
-      q = WorkQueue(port)
+      q = WorkQueue(port = WORK_QUEUE_DEFAULT_PORT)
   except:
       print("Instantiation of Work Queue failed!")
       sys.exit(1)
