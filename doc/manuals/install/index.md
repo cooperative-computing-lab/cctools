@@ -12,7 +12,7 @@ CCTools can be installed on linux and Mac OSX.
 
 
 
-## Install from Conda
+## Install from Conda (Linux only)
 
 !!! warning
     Deployment using **conda** is under active development.
@@ -35,7 +35,7 @@ install. We also recommend installing the versions for `Python 3.7`, but
 With `conda` command available, install **CCTools** with:
 
 ```sh
-$ conda install -y -c cclnd cctools
+$ conda install -y -c conda-forge ndcctools
 ```
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
@@ -101,8 +101,9 @@ $ perl -MWork_Queue -e 'print("$Work_Queue::WORK_QUEUE_DEFAULT_PORT\n")'
 9123
 ```
 
-If the above commands fail, please make sure that you follow one (and only one!)
-of the methods above. 
+If the above commands fail, please make sure that you follow one (and only
+one!) of the methods above. For example, if you are using a conda installation,
+make sure that your PYTHONPATH is unset.
 
 You can test the availability of *CCTools** commands with:
 
@@ -118,7 +119,7 @@ makeflow version X.Y.Z...
     the environment variables `PATH`, `PYTHONPATH` and `PERL5LIB` appropriately, as explained [here.](from-source.md#using-the-official-released-version)
 
     For **conda** and **spack** installation you should not need to manually
-    set any of these variables.
+    set any of these variables, and in fact setting them may produce errors.
 
 
 # License
