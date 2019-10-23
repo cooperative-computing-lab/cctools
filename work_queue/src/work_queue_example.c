@@ -22,7 +22,6 @@ int main(int argc, char *argv[])
 {
 	struct work_queue *q;
 	struct work_queue_task *t;
-	int port = WORK_QUEUE_DEFAULT_PORT;
 	int taskid;
 	int i;
 	char *gzip_path;
@@ -52,11 +51,11 @@ int main(int argc, char *argv[])
 	}
 
 	/* We create the tasks queue using the default port. If this port is
-	 * already been used by another program, you can try setting port = 0 to
-	 * use an available port.  */
-	q = work_queue_create(port);
+	 * already been used by another program, you can try changing the argument
+	 * to work_queue_create to 0 to use an available port.  */
+	q = work_queue_create(WORK_QUEUE_DEFAULT_PORT);
 	if(!q) {
-		printf("couldn't listen on port %d: %s\n", port, strerror(errno));
+		printf("couldn't create queue: %s\n", strerror(errno));
 		return 1;
 	}
 	printf("listening on port %d...\n", work_queue_port(q));
