@@ -3247,6 +3247,11 @@ Keep a list of reports equal to the number of workers connected.
 Used for computing queue capacity below.
 */
 
+static void task_report_delete(struct work_queue_task_report *tr) {
+	rmsummary_delete(tr->resources);
+	free(tr);
+}
+
 static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 {
 	struct work_queue_task_report *tr;
@@ -3272,7 +3277,7 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 
 	while(list_size(q->task_reports) >= count) {
 	  tr = list_pop_head(q->task_reports);
-	  free(tr);
+	  task_report_delete(tr);
 	}
 
 	resource_monitor_append_report(q, t);
@@ -5186,7 +5191,11 @@ void work_queue_delete(struct work_queue *q)
 
 		hash_table_delete(q->workers_with_available_results);
 
-		list_free(q->task_reports);
+		struct work_queue_task_report *tr;
+		list_first_item(q->task_reports);
+		while((tr = list_next_item(q->task_reports))) {
+			task_report_delete(tr);
+		}
 		list_delete(q->task_reports);
 
 		free(q->stats);
