@@ -3258,17 +3258,18 @@ static void add_task_report(struct work_queue *q, struct work_queue_task *t)
 	struct work_queue_stats s;
 	work_queue_get_stats(q, &s);
 
+	if(!t->resources_allocated) {
+		return;
+	}
+
 	// Create a new report object and add it to the list.
 	tr = calloc(1, sizeof(struct work_queue_task_report));
 
 	tr->transfer_time = (t->time_when_commit_end - t->time_when_commit_start) + (t->time_when_done - t->time_when_retrieval);
 	tr->exec_time     = t->time_workers_execute_last;
 	tr->master_time   = (((t->time_when_done - t->time_when_commit_start) - tr->transfer_time) - tr->exec_time);
-	if(!t->resources_allocated) {
-		return;
-	}
+	tr->resources     = rmsummary_copy(t->resources_allocated);
 
-	tr->resources = rmsummary_copy(t->resources_allocated);
 	list_push_tail(q->task_reports, tr);
 
 	// Trim the list, but never below its previous size.
@@ -3290,11 +3291,9 @@ and the summary of master activity.
 
 static void compute_capacity(const struct work_queue *q, struct work_queue_stats *s)
 {
-	struct work_queue_task_report capacity;
-	bzero(&capacity, sizeof(capacity));
+	struct work_queue_task_report *capacity = calloc(1, sizeof(*capacity));
+	capacity->resources = rmsummary_create(0);
 
-	capacity.resources = rmsummary_create(0);
-	
 	struct work_queue_task_report *tr;
 	double alpha = 0.05;
 	int count = list_size(q->task_reports);
@@ -3302,12 +3301,12 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 
 	// Compute the average task properties.
 	if(count < 1) {
-		capacity.resources->cores  = 1;
-		capacity.resources->memory = 512;
-		capacity.resources->disk   = 1024;
+		capacity->resources->cores  = 1;
+		capacity->resources->memory = 512;
+		capacity->resources->disk   = 1024;
 
-		capacity.exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
-		capacity.transfer_time = 1;
+		capacity->exec_time     = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
+		capacity->transfer_time = 1;
 
 		q->stats->capacity_weighted = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
 		capacity_instantaneous = WORK_QUEUE_DEFAULT_CAPACITY_TASKS;
@@ -3317,14 +3316,14 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		// Sum up the task reports available.
 		list_first_item(q->task_reports);
 		while((tr = list_next_item(q->task_reports))) {
-			capacity.transfer_time += tr->transfer_time;
-			capacity.exec_time     += tr->exec_time;
-			capacity.master_time   += tr->master_time;
+			capacity->transfer_time += tr->transfer_time;
+			capacity->exec_time     += tr->exec_time;
+			capacity->master_time   += tr->master_time;
 
 			if(tr->resources) {
-				capacity.resources->cores  += tr->resources ? tr->resources->cores  : 1;
-				capacity.resources->memory += tr->resources ? tr->resources->memory : 512;
-				capacity.resources->disk   += tr->resources ? tr->resources->disk   : 1024;
+				capacity->resources->cores  += tr->resources ? tr->resources->cores  : 1;
+				capacity->resources->memory += tr->resources ? tr->resources->memory : 512;
+				capacity->resources->disk   += tr->resources ? tr->resources->disk   : 1024;
 			}
 		}
 
@@ -3338,22 +3337,24 @@ static void compute_capacity(const struct work_queue *q, struct work_queue_stats
 		}
 	}
 
-	capacity.transfer_time = MAX(1, capacity.transfer_time);
-	capacity.exec_time     = MAX(1, capacity.exec_time);
-	capacity.master_time   = MAX(1, capacity.master_time);
+	capacity->transfer_time = MAX(1, capacity->transfer_time);
+	capacity->exec_time     = MAX(1, capacity->exec_time);
+	capacity->master_time   = MAX(1, capacity->master_time);
 
-	debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity.exec_time);
-	debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity.transfer_time);
-	debug(D_WQ, "capacity.master_time: %lld", (long long) capacity.master_time);
+	debug(D_WQ, "capacity.exec_time: %lld", (long long) capacity->exec_time);
+	debug(D_WQ, "capacity.transfer_time: %lld", (long long) capacity->transfer_time);
+	debug(D_WQ, "capacity.master_time: %lld", (long long) capacity->master_time);
 
 	// Never go below the default capacity
-	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity.exec_time, (capacity.transfer_time + capacity.master_time)));
+	int64_t ratio = MAX(WORK_QUEUE_DEFAULT_CAPACITY_TASKS, DIV_INT_ROUND_UP(capacity->exec_time, (capacity->transfer_time + capacity->master_time)));
 
 	q->stats->capacity_tasks  = ratio;
-	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity.resources->cores  * ratio, count);
-	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity.resources->memory * ratio, count);
-	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity.resources->disk   * ratio, count);
+	q->stats->capacity_cores  = DIV_INT_ROUND_UP(capacity->resources->cores  * ratio, count);
+	q->stats->capacity_memory = DIV_INT_ROUND_UP(capacity->resources->memory * ratio, count);
+	q->stats->capacity_disk   = DIV_INT_ROUND_UP(capacity->resources->disk   * ratio, count);
 	q->stats->capacity_instantaneous = DIV_INT_ROUND_UP(capacity_instantaneous, 1);
+
+	task_report_delete(capacity);
 }
 
 void compute_master_load(struct work_queue *q, int task_activity) {
