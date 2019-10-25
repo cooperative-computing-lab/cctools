@@ -6721,6 +6721,7 @@ static void write_transaction_worker_resources(struct work_queue *q, struct work
 
 	write_transaction(q, buffer_tostring(&B));
 
+	rmsummary_delete(s);
 	buffer_free(&B);
 	free(rjx);
 }
