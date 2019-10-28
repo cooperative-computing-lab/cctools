@@ -1019,6 +1019,9 @@ then
 					perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
 				fi
 
+				# Remove -lperl, as it is not needed for swig, and it causes trouble if libperl is not compiled with -fPIC, as in conda.
+				perl_ldflags=`echo ${perl_ldflags} | sed 's/-lperl//g'`
+
 				swig_bindings="$swig_bindings perl"
 			else
 				perl=0
