@@ -551,7 +551,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-
+		
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -616,7 +616,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/* 
+	/*
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
