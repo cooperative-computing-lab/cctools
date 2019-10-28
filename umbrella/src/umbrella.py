@@ -2110,23 +2110,16 @@ def condor_process(spec_path, spec_json, spec_path_basename, meta_path, sandbox_
 
     logging.debug("The full path of umbrella is: %s" % umbrella_fullpath)
 
-    #find cctools_python
-    cmd = 'which cctools_python'
-    rc, stdout, stderr = func_call(cmd, ["which"])
-    if rc != 0:
-        subprocess_error(cmd, rc, stdout, stderr)
-    cctools_python_path = stdout[:-1]
-
     condor_submit_file = open(condor_submit_path, "w+")
     condor_submit_file.write('universe = vanilla\n')
-    condor_submit_file.write('executable = %s\n' % cctools_python_path)
+    condor_submit_file.write('executable = %s\n' % '/usr/bin/python')
     if cvmfs_http_proxy:
         condor_submit_file.write('arguments = "./umbrella -s local --spec %s --cvmfs_http_proxy %s --meta %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, cvmfs_http_proxy, os.path.basename(meta_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
     else:
         condor_submit_file.write('arguments = "./umbrella -s local --spec %s --meta %s -l condor_umbrella -i \'%s\' -o %s --log condor_umbrella.log run \'%s\'"\n' % (spec_path_basename, os.path.basename(meta_path), new_input_options, os.path.basename(condor_output_dir), user_cmd[0]))
 #   condor_submit_file.write('PostCmd = "echo"\n')
 #   condor_submit_file.write('PostArguments = "$?>%s/condor_rc"\n' % os.path.basename(condor_output_dir))
-    condor_submit_file.write('transfer_input_files = %s, %s, %s, %s%s\n' % (cctools_python_path, umbrella_fullpath, meta_path, spec_path, transfer_inputs))
+    condor_submit_file.write('transfer_input_files = %s, %s, %s%s\n' % (umbrella_fullpath, meta_path, spec_path, transfer_inputs))
     condor_submit_file.write('transfer_output_files = %s, condor_umbrella.log\n' % os.path.basename(condor_output_dir))
     condor_submit_file.write('transfer_output_remaps = "condor_umbrella.log=%s"\n' % condorlog_path)
 
@@ -2359,14 +2352,6 @@ def ec2_process(spec_path, spec_json, meta_option, meta_path, ssh_key, ec2_key_p
             new_input_options = new_input_options[:-1]
         new_input_options += "'"
         logging.debug("The new_input_options of Umbrella: %s", new_input_options) #--inputs option
-
-    #find cctools_python
-    cmd = 'which cctools_python'
-    rc, stdout, stderr = func_call(cmd, ["which"])
-    if rc != 0:
-        terminate_instance(instance)
-        subprocess_error(cmd, rc, stdout, stderr)
-    cctools_python_path = stdout[:-1]
 
     #cvmfs_http_proxy
     cvmfs_http_proxy_option = ''
