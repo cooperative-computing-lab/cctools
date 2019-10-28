@@ -139,10 +139,13 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 
 	}
 	const char *safe_mode = hash_table_lookup(q->options, "safe-submit-mode");
-	if(safe_mode && !strcmp("yes", safe_mode))
+	if(safe_mode && !strcmp("yes", safe_mode)) {
 		free(cluster_resources);
-	if(!cluster_resources)
+		cluster_resources = NULL;
+	}
+	if(!cluster_resources) {
 		cluster_resources = xxstrdup("");
+	}
 	return cluster_resources;
 }
 

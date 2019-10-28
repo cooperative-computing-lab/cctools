@@ -8,17 +8,17 @@ set -e
 c="./hostport.$PPID"
 cr="./root.$PPID"
 
+python=${CCTOOLS_PYTHON2}
 
 check_needed()
 {
-	[ -f ../src/python/_CChirp.so ] || return 1
-	python=$(cctools_python -n 3 2.7 2.6)
-	[ -n "$python" ] || return 1
-	${python} -c "import json; import Chirp"
+	[ -f ../src/bindings/python/_CChirp.so ] || return 1
 }
 
 prepare()
 {
+	[ -n "$python" ] || return 1
+
 	chirp_start local --auth=unix --jobs --job-concurrency=2
 	echo "$hostport" > "$c"
 	echo "$root" > "$cr"
@@ -32,7 +32,7 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	../src/bindings/python/chirp_jobs_python_example.py $hostport ../src/bindings/python/my_script.sh
+	PYTHONPATH=../src/bindings/python ${python} ../src/bindings/python/chirp_jobs_python_example.py $hostport ../src/bindings/python/my_script.sh
 
 	return 0
 }

@@ -87,24 +87,7 @@ install_path="$HOME/cctools"
 build_label=
 build_date=
 
-curl_path="/usr"
-cvmfs_path="/usr"
-ext2fs_path="/usr"
-fuse_path="/usr"
-golang_path="/usr"
-globus_path="/usr"
-irods_path="/usr"
-mpi_path="/usr"
-mysql_path="/usr"
-openssl_path="/usr"
-perl_path="/usr"
-python_path="/usr"
-python3_path="/usr"
-readline_path="/usr"
-swig_path="/usr"
-uuid_path="/usr"
-xrootd_path="/usr"
-zlib_path="/usr"
+base_root="/usr"
 
 globus_flavor=auto
 irods_flavor=auto
@@ -194,6 +177,9 @@ do
 				sge_parameters="${sge_parameters}\n\#$ ${arg}"
 			fi
 			;;
+		--with-base-dir)
+			base_root=${arg}
+			;;
 		--with-curl-path)
 			curl_path=${arg}
 			config_curl_path=$(config_X_path ${arg})
@@ -273,7 +259,7 @@ do
 			;;
 		--with-zlib-path)
 			zlib_path=${arg}
-			if [ "$zlib_path" = 'no' ];
+			if [ "$zlib_path" = no ]
 			then
 				echo "*** zlib is not optional"
 				exit 1
@@ -340,6 +326,7 @@ Where options are:
   --xrootd-arch        <arch>
   --tcp-low-port       <port>
   --tcp-high-port      <port>
+  --with-base-dir      <dir>   (where to find system libraries, default is /usr)
   --with-PACKAGE-path  <path>
   --without-system-SYSTEM
 
@@ -489,6 +476,8 @@ echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --glo
 
 if [ $config_globus_path != no ]
 then
+	globus_path=${globus_path:-${base_root}}
+
 	config_openssl_path=yes
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
@@ -540,6 +529,7 @@ fi
 
 if [ $config_irods_path != no ]
 then
+	irods_path=${irods_path:-${base_root}}
 	if [ "$irods_flavor" = auto -o "$irods_flavor" = 4 ]
 	then
 		irods_flavor=auto
@@ -634,9 +624,11 @@ fi
 
 if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
 then
+	mysql_path=${mysql_path:-${base_root}}
+
 	mysql_ldflags="${library_search_result}"
 
-	if [ ${mysql_path} != /usr ]
+	if [ "${mysql_path}" != "${base_root}" ]
 	then
 		mysql_ccflags="-I${mysql_path}/include"
 	fi
@@ -672,6 +664,8 @@ fi
 
 if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
 then
+	xrootd_path=${xrootd_path:-${base_root}}
+
 	if [ "$xrootd_arch" = auto ]
 	then
 		if [ "$BUILD_CPU" = X86_64 ]
@@ -711,6 +705,7 @@ fi
 
 if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
 then
+	cvmfs_path=${cvmfs_path:-${base_root}}
 	config_openssl_path=yes
 
 	ccflags="${ccflags} -DHAS_CVMFS"
@@ -749,9 +744,10 @@ fi
 
 if [ $config_fuse_path != no ]
 then
+		fuse_path=${fuse_path:-${base_root}}
 		if library_search fuse ${fuse_path} || library_search fuse /
 		then
-				if [ "${fuse_path}" != / -a "${fuse_path}" != /usr ]
+				if [ "${fuse_path}" != / -a "${fuse_path}" != ${base_root} ]
 				then
 						fuse_ccflags="-I${fuse_path}/include"
 				fi
@@ -834,9 +830,10 @@ library_search_mode=prefer_dynamic
 
 if [ $config_readline_path != no ] && library_search readline ${readline_path}
 then
+	readline_path=${readline_path:-${base_root}}
 	external_libraries="${external_libraries} ${library_search_result}"
 
-	if [ ${readline_path} != /usr ]
+	if [ "${readline_path}" != "${base_root}" ]
 	then
 		ccflags="${ccflags} -I${readline_path}/include"
 	fi
@@ -877,6 +874,7 @@ fi
 
 if [ $config_curl_path != no ]
 then
+		curl_path=${curl_path:-${base_root}}
 		if library_search curl ${curl_path} || library_search curl /
 		then
 				if [ "${curl_path}" != / -a "${curl_path}" != /usr ]
@@ -901,14 +899,11 @@ else
 	echo "*** skipping curl support"
 fi
 
-system_includes=/usr/include
-
 if [ $BUILD_SYS = DARWIN ]
 then
         if [ -d "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include" ]
         then
-                system_includes="/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include"
-		osx_getopt_from_sdk=yes
+			ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
         else
                 # The version of getopt.h packaged in cctools appears to cause a SIGBUS on Darwin.
                 # Mac OS X Command Line Tools need to be installed to obtain a getopt.h that works.
@@ -921,6 +916,7 @@ fi
 found_swig=no
 if [ $config_swig_path != no ]
 then
+	swig_path=${swig_path:-${base_root}}
 	if [ "$optstatic" = 1 ]
 	then
 		echo "*** buildin statically, skipping swig support"
@@ -980,6 +976,7 @@ fi
 
 if [ $config_perl_path != no ]
 then
+	perl_path=${perl_path:-${base_root}}
 	if check_file ${perl_path}/bin/perl
 	then
 		perl=${perl_path}/bin/perl
@@ -1047,18 +1044,19 @@ fi
 python=0    #to be set to the python path
 if [ $config_python_path != no ]
 then
+	python_path=${python_path:-${base_root}}
 	if [ -n "$PYTHON" ] && check_file ${PYTHON}
-then
-	python=${PYTHON}
-elif check_file ${python_path}/bin/python2
-then
-	python=${python_path}/bin/python2
-elif check_file ${python_path}/bin/python
-then
-	python=${python_path}/bin/python
-else
-	python=0
-fi
+	then
+		python=${PYTHON}
+	elif check_file ${python_path}/bin/python2
+	then
+		python=${python_path}/bin/python2
+	elif check_file ${python_path}/bin/python
+	then
+		python=${python_path}/bin/python
+	else
+		python=0
+	fi
 
 if [ $python != 0 ]
 then
@@ -1127,7 +1125,7 @@ EOF
 fi
 fi
 
-if [ $python_dev = no ]
+if [ "$python_dev" = no ]
 then
 	if [ $config_python_path = yes ]
 	then
@@ -1141,6 +1139,7 @@ fi
 
 if [ $config_python3_path != no ]
 then
+	python3_path=${python3_path:-${base_root}}
 	if [ -n "$PYTHON3" ] && check_file ${PYTHON3}
 	then
 		python3=${PYTHON3}
@@ -1261,6 +1260,7 @@ fi
 
 if [ $config_golang_path != no ]
 then
+	golang_path=${golang_path:-${base_root}}
 	if check_file ${golang_path}/bin/go
 	then
 		golang=${golang_path}/bin/go
@@ -1311,6 +1311,8 @@ library_search_standard()
 
 if [ $config_openssl_path != no ]
 then
+	openssl_path=${openssl_path:-${base_root}}
+
 	if ! library_search_standard ssl $openssl_path
 	then
 		echo "*** Couldn't find libssl"
@@ -1327,9 +1329,9 @@ then
 fi
 
 # from glibc:
-library_search_standard resolv /usr
-library_search_standard socket /usr
-library_search_standard nsl /usr
+library_search_standard resolv ${base_root}
+library_search_standard socket ${base_root}
+library_search_standard nsl ${base_root}
 
 # Finally, add in standard system libraries found everywhere
 
@@ -1343,10 +1345,11 @@ then
 	external_libraries="${external_libraries} -ldl"
 fi
 
+zlib_path=${zlib_path:-${base_root}}
 if library_search z ${zlib_path}
 then
 	external_libraries="${external_libraries} ${library_search_result}"
-	if [ "$zlib_path" != /usr ]
+	if [ "$zlib_path" != "${base_root}" ]
 	then
 		ccflags="${ccflags} -I${zlib_path}/include"
 		ldflags="${ldflags} -L${zlib_path}/lib"
@@ -1377,21 +1380,21 @@ else
 fi
 
 # sqlite3 uses define "HAVE_*"
-optional_function gmtime_r ${system_includes}/time.h HAVE_GMTIME_R
-optional_function fdatasync ${system_includes}/unistd.h HAVE_FDATASYNC
-optional_function isnan ${system_includes}/math.h HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
-optional_function localtime_r ${system_includes}/time.h HAVE_LOCALTIME_R
-optional_function localtime_s ${system_includes}/time.h HAVE_LOCALTIME_S
-optional_function openat ${system_includes}/fcntl.h HAS_OPENAT
-optional_function pread ${system_includes}/unistd.h HAS_PREAD USE_PREAD
-optional_function pread64 ${system_includes}/unistd.h USE_PREAD64
-optional_function pwrite ${system_includes}/unistd.h HAS_PWRITE USE_PWRITE
-optional_function pwrite64 ${system_includes}/unistd.h USE_PWRITE64
-optional_function strchrnul ${system_includes}/string.h HAVE_STRCHRNUL
-optional_function strsignal ${system_includes}/string.h HAS_STRSIGNAL
-optional_function usleep ${system_includes}/unistd.h HAS_USLEEP HAVE_USLEEP
-optional_function utime ${system_includes}/utime.h HAS_UTIME HAVE_UTIME
-optional_function utimensat ${system_includes}/sys/stat.h HAS_UTIMENSAT
+optional_function gmtime_r    time.h     HAVE_GMTIME_R
+optional_function fdatasync   unistd.h   HAVE_FDATASYNC
+optional_function isnan       math.h     HAS_ISNAN HAVE_ISNAN SQLITE_HAVE_ISNAN
+optional_function localtime_r time.h     HAVE_LOCALTIME_R
+optional_function localtime_s time.h     HAVE_LOCALTIME_S
+optional_function openat      fcntl.h    HAS_OPENAT
+optional_function pread       unistd.h   HAS_PREAD USE_PREAD
+optional_function pread64     unistd.h   USE_PREAD64
+optional_function pwrite      unistd.h   HAS_PWRITE USE_PWRITE
+optional_function pwrite64    unistd.h   USE_PWRITE64
+optional_function strchrnul   string.h   HAVE_STRCHRNUL
+optional_function strsignal   string.h   HAS_STRSIGNAL
+optional_function usleep      unistd.h   HAS_USLEEP HAVE_USLEEP
+optional_function utime       utime.h    HAS_UTIME HAVE_UTIME
+optional_function utimensat   sys/stat.h HAS_UTIMENSAT
 
 # sqlite3 uses define "HAVE_*"
 
@@ -1406,6 +1409,7 @@ optional_include inttypes.h    HAS_INTTYPES_H HAVE_INTTYPES_H
 optional_include stdint.h      HAS_STDINT_H HAVE_STDINT_H
 optional_include sys/statfs.h  HAS_SYS_STATFS_H
 optional_include sys/statvfs.h HAS_SYS_STATVFS_H
+optional_include sys/vfs.h     HAS_SYS_VFS_H
 optional_include syslog.h      HAS_SYSLOG_H
 
 #if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
@@ -1547,12 +1551,6 @@ ccflags_append_define \
 	"INSTALL_PATH='\"${install_path}\"'" \
 	"_GNU_SOURCE" \
 	"_REENTRANT"
-
-if [ "${osx_getopt_from_sdk}" = yes ]
-then
-	ccflags_append_define CCTOOLS_OSX_GETOPT_FROM_SDK
-fi
-
 
 ccflags_append "$debug_flag"
 ldflags="${ldflags} ${debug_flag}"
