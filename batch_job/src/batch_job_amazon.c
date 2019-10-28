@@ -101,6 +101,7 @@ the desired amount of cores, memory, and disk.  Return
 the name of the instance, if one exists, otherwise null.
 */
 
+
 static const char * aws_instance_select( int cores, int memory, int disk )
 {
 	struct aws_instance_type *i;
@@ -187,8 +188,7 @@ int push_back_idle_instance(struct idle_instance* instance){
 }
 
 /*
-Erase an idle instance of the right size from the list,
-returing its instance_id
+Erase an idle instance of the right size from the list, returing its instance_id
 */
 
 static const char * fetch_idle_instance(const char* instance_type){
@@ -272,8 +272,10 @@ static char * aws_create_instance( struct aws_config *c, const char *instance_ty
 	}
 
 	char *result = strdup(id);
+
 	jx_delete(jresult);
 	free(str);
+
 	printf("created virtual machine instance %s type %s image %s\n",result,instance_type,ami);
 	return result;
 }
@@ -614,7 +616,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/*
+	/* 
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
