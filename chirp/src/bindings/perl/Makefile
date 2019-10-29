@@ -1,8 +1,6 @@
 include ../../../../config.mk
 include $(CCTOOLS_HOME)/rules.mk
 
-PERL_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
-
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 # Perl also defines some HAS_* stuff so we need to undefine those too.
 LOCAL_CCFLAGS = -w -UHAS_USLEEP -UHAS_ISNAN -UHAS_UTIME -fPIC -Wno-unused-value -Wno-unused-variable $(CCTOOLS_PERL_CCFLAGS)
@@ -28,11 +26,10 @@ clean:
 test: all
 
 install: all
-	mkdir -p $(PERL_INSTALL_DIR)
-	cp $(LIBRARIES)       $(PERL_INSTALL_DIR)/
-	mkdir -p              $(PERL_INSTALL_DIR)/Chirp
-	cp Chirp/Client.pm $(PERL_INSTALL_DIR)/Chirp
-	cp Chirp/Stat.pm   $(PERL_INSTALL_DIR)/Chirp
+	mkdir -p $(CCTOOLS_PERL_PATH)/Chirp
+	cp $(LIBRARIES)       $(CCTOOLS_PERL_PATH)/
+	cp Chirp/Client.pm $(CCTOOLS_PERL_PATH)/Chirp
+	cp Chirp/Stat.pm   $(CCTOOLS_PERL_PATH)/Chirp
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	chmod 755 chirp_perl_example.pl
 	cp chirp_perl_example.pl $(CCTOOLS_INSTALL_DIR)/doc/
