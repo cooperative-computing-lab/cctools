@@ -1022,6 +1022,13 @@ then
 				# Remove -lperl, as it is not needed for swig, and it causes trouble if libperl is not compiled with -fPIC, as in conda.
 				perl_ldflags=`echo ${perl_ldflags} | sed 's/-lperl//g'`
 
+				if [ "${CONDA_BUILD}" = 1 ]
+				then
+					perl_install_dir="site_perl"
+				else
+					perl_install_dir="perl5/site_perl"
+				fi
+
 				swig_bindings="$swig_bindings perl"
 			else
 				perl=0
@@ -1688,6 +1695,7 @@ CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
 CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
 CCTOOLS_PERL_VERSION=${perl_version}
+CCTOOLS_PERL_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/${perl_install_dir}/\$(CCTOOLS_PERL_VERSION)
 
 CCTOOLS_PYTHON=\$(CCTOOLS_PYTHON2)
 CCTOOLS_PYTHON_CCFLAGS=\$(CCTOOLS_PYTHON2_CCFLAGS)
