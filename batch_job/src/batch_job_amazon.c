@@ -746,11 +746,11 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 			int jobid = p->pid;
 			free(p);
 
-			/* Now destroy instances according to timestamps */
-			terminate_expired_instances(i->aws_config, 30);
-
-			/* current edit: instead of destroying, mark them idle and push to list */
+			/* Mark instance idle and push to list */
 			push_back_aws_instance(record_aws_instance(i->instance_id, i->instance_type));
+
+			/* Now destroy other instances from the list according to timestamps */
+                        terminate_expired_instances(i->aws_config, 30);
 
 			/* And clean up the object. */
 
@@ -768,8 +768,8 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 /*
 To kill an amazon job, we look up the details of the job,
-kill the local ssh process forcibly, and then terminate
-the Amazon instance.
+kill the local ssh process forcibly, and then we save
+the Amazon instance and delete other expired instances.
 */
 
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
@@ -784,8 +784,8 @@ static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 	kill(jobid,SIGKILL);
 
-	terminate_expired_instances(info->aws_config, 5);
 	push_back_aws_instance(record_aws_instance(info->instance_id, info->instance_type));
+	terminate_expired_instances(info->aws_config, 30);
 
 	debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
 	struct process_info *p = process_waitpid(jobid,0);
