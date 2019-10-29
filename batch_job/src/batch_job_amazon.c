@@ -143,7 +143,7 @@ static int instance_type_less_or_equal(struct aws_instance *instance, const char
 	} else {
 		struct aws_instance_type *instance_1 = aws_instance_lookup(instance->instance_type);
 		struct aws_instance_type *instance_2 = aws_instance_lookup(type_2);
-		if (!instance_1 || !instance2) {
+		if (!instance_1 || !instance_2) {
 			return 0;
 		}
 		if (instance_1->cores<=instance_2->cores && instance_1->memory<=instance_2->memory){
@@ -171,7 +171,7 @@ static int push_back_aws_instance(struct aws_instance* instance){
 	if (!instance_list) {
 		instance_list = list_create();
 	}
-	list_push_tail(instance_list, instance))
+	list_push_tail(instance_list, instance);
 	debug(D_BATCH,"added idle instance %s to the list, current list count is %d\n", instance->instance_id, list_size(instance_list));
 	return 1;
 }
@@ -453,7 +453,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem.
+		may be necessary to debug the problem. 
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -512,7 +512,7 @@ We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want
+be created.  On the other hand, we don't want 
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -548,7 +548,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-
+	
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -613,7 +613,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/*
+	/* 
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
