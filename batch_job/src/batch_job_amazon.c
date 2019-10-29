@@ -137,13 +137,15 @@ On fitting (cores and memory of type 1 instance <= type 2)
 return 1, otherwise return null
 */
 
-static int compare_instance_type(struct aws_instance* instance, const char* type_2){
-	const char *type_1 = strdup(instance->instance_type);
-	if(strcmp(type_1,type_2) == 0){
+static int instance_type_less_or_equal(struct aws_instance *instance, const char *type_2){
+	if(strcmp(instance->instance_type,type_2) == 0){
 		return 1;
 	} else {
-		struct aws_instance_type *instance_1 = aws_instance_lookup(type_1);
+		struct aws_instance_type *instance_1 = aws_instance_lookup(instance->instance_type);
 		struct aws_instance_type *instance_2 = aws_instance_lookup(type_2);
+		if (!instance_1 || !instance2) {
+			return 0;
+		}
 		if (instance_1->cores<=instance_2->cores && instance_1->memory<=instance_2->memory){
 			return 1;
 		}
@@ -169,13 +171,9 @@ static int push_back_aws_instance(struct aws_instance* instance){
 	if (!instance_list) {
 		instance_list = list_create();
 	}
-	if (list_push_tail(instance_list, instance)){
-		debug(D_BATCH,"added idle instance %s to the list, current list count is %d\n", instance->instance_id, list_size(instance_list));
-		return 1;
-	} else {
-		debug(D_BATCH,"failed to add idle instance %s to the list, potentially due to out of memory\n",instance->instance_id);
-		return 0;
-	}
+	list_push_tail(instance_list, instance))
+	debug(D_BATCH,"added idle instance %s to the list, current list count is %d\n", instance->instance_id, list_size(instance_list));
+	return 1;
 }
 
 /* Remove aws_instance from local list and return its instance id */
@@ -208,7 +206,7 @@ static const char * fetch_aws_instance(const char* instance_type){
 		debug(D_BATCH,"idle instance list empty\n");
 		return 0;
 	}
-	struct aws_instance *i = list_find(instance_list, (list_op_t) compare_instance_type, instance_type);
+	struct aws_instance *i = list_find(instance_list, (list_op_t) instance_type_less_or_equal, instance_type);
 	if (!i){
 		debug(D_BATCH,"could not find idle instance of type %s in the list\n", instance_type);
 		return 0;
@@ -455,7 +453,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem. 
+		may be necessary to debug the problem.
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -514,7 +512,7 @@ We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want 
+be created.  On the other hand, we don't want
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -550,7 +548,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-	
+
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -615,7 +613,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/* 
+	/*
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
@@ -750,7 +748,7 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 			push_back_aws_instance(record_aws_instance(i->instance_id, i->instance_type));
 
 			/* Now destroy other instances from the list according to timestamps */
-                        terminate_expired_instances(i->aws_config, 30);
+			terminate_expired_instances(i->aws_config, 30);
 
 			/* And clean up the object. */
 
