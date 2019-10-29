@@ -82,6 +82,7 @@ OPTION_TRIPLET(-o,debug-file,file)Send debugging to this file (can also be :stde
 OPTION_TRIPLET(-O,debug-file-size,mb)Specify the size of the debug file (must use with -o option).
 OPTION_PAIR(--worker-binary,file)Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.
 OPTION_PAIR(--runos,img)Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.
+OPTION_ITEM(--run-factory-as-master)Force factory to run itself as a work queue master.
 OPTION_ITEM(`-v, --version')Show the version string.
 OPTION_ITEM(`-h, --help')Show this screen.
 OPTIONS_END

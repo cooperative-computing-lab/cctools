@@ -104,6 +104,7 @@ remove all running workers before exiting.
 - **-O --debug-file-size <mb>** Specify the size of the debug file (must use with -o option).
 - **--worker-binary file** Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.
 - **--runos img** Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.
+- **--run-factory-as-master** Force factory to run itself as a work queue master.
 - **-v, --version** Show the version string.
 - **-h, --help** Show this screen.
 
