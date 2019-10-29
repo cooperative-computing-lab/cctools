@@ -455,7 +455,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem.
+		may be necessary to debug the problem. 
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
