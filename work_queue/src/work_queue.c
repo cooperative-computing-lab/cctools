@@ -6598,13 +6598,21 @@ static void write_transaction_task(struct work_queue *q, struct work_queue_task 
 			/* do not add any info */
 	} else if(state == WORK_QUEUE_TASK_RETRIEVED || state == WORK_QUEUE_TASK_DONE) {
 		buffer_printf(&B, " %s ", task_result_str(t->result));
+		buffer_printf(&B, " %d ", t->return_status);
 
 		if(t->resources_measured) {
 			if(t->result == WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION) {
 				rmsummary_print_buffer(&B, t->resources_measured->limits_exceeded, 1);
 				buffer_printf(&B, " ");
 			}
+			else {
+				// no limits broken, thus printing an empty dictionary
+				buffer_printf(&B, " {} ");
+			}
 			rmsummary_print_buffer(&B, t->resources_measured, 1);
+		} else {
+			// no resources measured, one empty dictionary for limits broken, other for resources.
+			buffer_printf(&B, " {} {}");
 		}
 	} else {
 		struct work_queue_worker *w = itable_lookup(q->worker_task_map, t->taskid);
@@ -6752,7 +6760,7 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING category-name {FIRST_RESOURCES|MAX_RESOURCES} resources-requested\n");
 		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RUNNING worker-address {FIRST_RESOURCES|MAX_RESOURCES} resources-given\n");
 		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid {RETRIEVED|DONE} {SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION limits-exceeded} [resources-measured]\n\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid {RETRIEVED|DONE} {SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION} {exit-code} {limits-exceeded} {resources-measured}\n\n");
 
 		write_transaction(q, "MASTER START");
 		return 1;
