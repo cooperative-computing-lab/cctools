@@ -178,9 +178,19 @@ require_file ()
 	fi
 }
 
-require_path ()
+optional_path ()
 {
 	if check_path $1
+	then
+		return 0
+	else
+		return 1
+	fi
+}
+
+require_path ()
+{
+	if optional_path $1
 	then
 		return 0
 	else

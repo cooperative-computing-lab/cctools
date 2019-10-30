@@ -387,8 +387,14 @@ export HOST_MULTIARCH=$(check_multiarch)
 rm -f config.mk
 
 require_path ${ccompiler}
-require_path ${cxxcompiler}
 require_gnu_make
+
+if ! optional_path ${cxxcompiler}
+then
+	echo "*** could not find a C++ compiler, skipping parrot support"
+	include_package_parrot=""
+fi
+
 
 # Lots of warnings are enabled by default, but several are too strict
 # and crop up in third-party code, so we disable those checks.
