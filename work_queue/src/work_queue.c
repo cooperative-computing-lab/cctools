@@ -119,6 +119,13 @@ typedef enum {
 	WORKER_DISCONNECT_FAILURE
 } worker_disconnect_reason;
 
+typedef enum {
+	WORKER_TYPE_UNKNOWN = 1,
+	WORKER_TYPE_WORKER  = 2,
+	WORKER_TYPE_STATUS  = 4,
+	WORKER_TYPE_FOREMAN = 8
+} worker_type;
+
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
@@ -347,20 +354,21 @@ static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total,
 	return r;
 }
 
-//Returns count of workers that have identified themselves.
-static int known_workers(struct work_queue *q) {
+//Returns count of workers according to type
+static int count_workers(struct work_queue *q, int type) {
 	struct work_queue_worker *w;
 	char* id;
-	int known_workers = 0;
+
+	int count = 0;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown")){
-			known_workers++;
+		if(w->type & type) {
+			count++;
 		}
 	}
 
-	return known_workers;
+	return count;
 }
 
 //Returns count of workers that are available to run tasks.
