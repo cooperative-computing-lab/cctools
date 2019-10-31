@@ -413,9 +413,9 @@ static void log_queue_stats(struct work_queue *q)
 
 	work_queue_get_stats(q, &s);
 
-	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
+	debug(D_WQ, "workers connections -- known: %d, connecting: %d, available: %d.",
 			s.workers_connected,
-			s.workers_connected - s.workers_init,
+			s.workers_init,
 			available_workers(q));
 
 	if(!q->logfile)
@@ -933,7 +933,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	/* update the largest worker seen */
 	find_max_worker(q);
 
-	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
+	debug(D_WQ, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
 }
 
 static int release_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -6043,7 +6043,7 @@ int work_queue_hungry(struct work_queue *q)
 
 	//i = 1.1 * number of current workers
 	//i-ready = # of tasks to queue to re-reach the status quo.
-	int i = (1.1 * hash_table_size(q->worker_table));
+	int i = 1.1 * count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
 
 	return MAX(i - ready, 0);
 }
@@ -6346,13 +6346,11 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	memcpy(s, qs, sizeof(*s));
 
-	int known = known_workers(q);
-
 	//info about workers
-	s->workers_connected = hash_table_size(q->worker_table);
-	s->workers_init      = s->workers_connected - known;
+	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
+	s->workers_init      = count_workers(q, WORK_QUEUE_TASK_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
-	s->workers_idle      = known - s->workers_busy;
+	s->workers_idle      = s->workers_connected - s->workers_busy;
 	// s->workers_able computed below.
 
 	//info about tasks
