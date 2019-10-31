@@ -897,7 +897,9 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	q->stats->workers_removed++;
+	if(w->type == WORKER_TYPE_WORKER || w->type == WORKER_TYPE_FOREMAN) {
+		q->stats->workers_removed++;
+	}
 
 	write_transaction_worker(q, w, 1, reason);
 
@@ -1008,9 +1010,6 @@ static void add_worker(struct work_queue *q)
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
-	q->stats->workers_joined++;
-
-	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 
 	return;
 }
@@ -1703,11 +1702,16 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 		w->type = WORKER_TYPE_WORKER;
 	}
 
+	q->stats->workers_joined++;
+	debug(D_WQ, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
+
+
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 
 	if(cctools_version_cmp(CCTOOLS_VERSION, w->version) != 0) {
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
+
 
 	return MSG_PROCESSED;
 }
@@ -2524,10 +2528,6 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
-
-	//do not count a status connection as a worker
-	q->stats->workers_joined--;
-	q->stats->workers_removed--;
 
 	if(sscanf(line, "%[^_]_status", request) != 1) {
 		return MSG_FAILURE;
