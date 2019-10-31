@@ -5764,7 +5764,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-/* return number of workers lost */
+/* return number of workers that failed */
 static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	BEGIN_ACCUM_TIME(q, time_polling);
@@ -5805,12 +5805,12 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
-	int workers_removed = 0;
+	int workers_failed = 0;
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
 			if(handle_worker(q, q->poll_table[i].link) == WORKER_FAILURE) {
-				workers_removed++;
+				workers_failed++;
 			}
 		}
 	}
@@ -5828,7 +5828,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	END_ACCUM_TIME(q, time_status_msgs);
 
-	return workers_removed;
+	return workers_failed;
 }
 
 
