@@ -2520,6 +2520,8 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 	struct jx *a = jx_array(NULL);
 
+	target->type = WORKER_TYPE_STATUS;
+
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
 
