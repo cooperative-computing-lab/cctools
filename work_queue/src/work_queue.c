@@ -220,7 +220,7 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 
-	int  foreman;                             // 0 if regular worker, 1 if foreman
+	worker_type type;                         // unknown, regular worker, status worker, foreman
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 
@@ -533,7 +533,7 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	debug(D_WQ, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
 
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(w->foreman)
+	if(w->type == WORKER_TYPE_FOREMAN)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -621,7 +621,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 {
 	time_t stoptime;
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(w->foreman)
+	if(w->type == WORKER_TYPE_FOREMAN)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -742,7 +742,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 
 	int timeout = length / tolerable_transfer_rate;
 
-	if(w->foreman) {
+	if(w->type == WORKER_TYPE_FOREMAN) {
 		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
 		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
@@ -989,7 +989,7 @@ static void add_worker(struct work_queue *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
-	w->foreman  = 0;
+	w->type = WORKER_TYPE_UNKNOWN;
 	w->draining = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
@@ -1698,7 +1698,9 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 
 	if(!strcmp(w->os, "foreman"))
 	{
-		w->foreman = 1;
+		w->type = WORKER_TYPE_FOREMAN;
+	} else {
+		w->type = WORKER_TYPE_WORKER;
 	}
 
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
@@ -3180,7 +3182,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	long long cmd_len = strlen(command_line);
 	send_worker_msg(q,w, "cmd %lld\n", (long long) cmd_len);
-	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->foreman ? q->long_timeout : q->short_timeout));
+	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
 
@@ -3394,7 +3396,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		return 0;
 	}
 
-	if(!w->foreman) {
+	if(w->type != WORKER_TYPE_FOREMAN) {
 		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
 		if (info && info->blacklisted) {
 			return 0;
@@ -3911,7 +3913,7 @@ static int abort_slow_workers(struct work_queue *q)
 
 		if(runtime >= (average_task_time * multiplier)) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
-			if(w && !w->foreman)
+			if(w && (w->type == WORKER_TYPE_WORKER))
 			{
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
@@ -4732,7 +4734,7 @@ void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char
 		if(!hash_table_lookup(w->current_files, filename))
 			continue;
 
-		if(w->foreman) {
+		if(w->type == WORKER_TYPE_FOREMAN) {
 			send_worker_msg(q, w, "invalidate-file %s\n", filename);
 		}
 
@@ -6425,7 +6427,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->foreman)
+		if(w->type == WORKER_TYPE_FOREMAN)
 		{
 			accumulate_stat(s, w->stats, workers_joined);
 			accumulate_stat(s, w->stats, workers_removed);
