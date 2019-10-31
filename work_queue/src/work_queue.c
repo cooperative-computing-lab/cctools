@@ -119,6 +119,13 @@ typedef enum {
 	WORKER_DISCONNECT_FAILURE
 } worker_disconnect_reason;
 
+typedef enum {
+	WORKER_TYPE_UNKNOWN = 1,
+	WORKER_TYPE_WORKER  = 2,
+	WORKER_TYPE_STATUS  = 4,
+	WORKER_TYPE_FOREMAN = 8
+} worker_type;
+
 // Threshold for available disk space (MB) beyond which files are not received from worker.
 static uint64_t disk_avail_threshold = 100;
 
@@ -213,7 +220,7 @@ struct work_queue_worker {
 	char addrport[WORKER_ADDRPORT_MAX];
 	char hashkey[WORKER_HASHKEY_MAX];
 
-	int  foreman;                             // 0 if regular worker, 1 if foreman
+	worker_type type;                         // unknown, regular worker, status worker, foreman
 
 	int  draining;                            // if 1, worker does not accept anymore tasks. It is shutdown if no task running.
 
@@ -347,20 +354,21 @@ static int64_t overcommitted_resource_total(struct work_queue *q, int64_t total,
 	return r;
 }
 
-//Returns count of workers that have identified themselves.
-static int known_workers(struct work_queue *q) {
+//Returns count of workers according to type
+static int count_workers(struct work_queue *q, int type) {
 	struct work_queue_worker *w;
 	char* id;
-	int known_workers = 0;
+
+	int count = 0;
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &id, (void**)&w)) {
-		if(strcmp(w->hostname, "unknown")){
-			known_workers++;
+		if(w->type & type) {
+			count++;
 		}
 	}
 
-	return known_workers;
+	return count;
 }
 
 //Returns count of workers that are available to run tasks.
@@ -405,9 +413,9 @@ static void log_queue_stats(struct work_queue *q)
 
 	work_queue_get_stats(q, &s);
 
-	debug(D_WQ, "workers status -- total: %d, active: %d, available: %d.",
+	debug(D_WQ, "workers connections -- known: %d, connecting: %d, available: %d.",
 			s.workers_connected,
-			s.workers_connected - s.workers_init,
+			s.workers_init,
 			available_workers(q));
 
 	if(!q->logfile)
@@ -525,7 +533,7 @@ static int send_worker_msg( struct work_queue *q, struct work_queue_worker *w, c
 	debug(D_WQ, "tx to %s (%s): %s", w->hostname, w->addrport, buffer_tostring(B));
 
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(w->foreman)
+	if(w->type == WORKER_TYPE_FOREMAN)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -613,7 +621,7 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 {
 	time_t stoptime;
 	//If foreman, then we wait until foreman gives the master some attention.
-	if(w->foreman)
+	if(w->type == WORKER_TYPE_FOREMAN)
 		stoptime = time(0) + q->long_timeout;
 	else
 		stoptime = time(0) + q->short_timeout;
@@ -734,7 +742,7 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 
 	int timeout = length / tolerable_transfer_rate;
 
-	if(w->foreman) {
+	if(w->type == WORKER_TYPE_FOREMAN) {
 		// A foreman must have a much larger minimum timeout, b/c it does not respond immediately to the master.
 		timeout = MAX(q->foreman_transfer_timeout,timeout);
 	} else {
@@ -889,7 +897,9 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 
 	debug(D_WQ, "worker %s (%s) removed", w->hostname, w->addrport);
 
-	q->stats->workers_removed++;
+	if(w->type == WORKER_TYPE_WORKER || w->type == WORKER_TYPE_FOREMAN) {
+		q->stats->workers_removed++;
+	}
 
 	write_transaction_worker(q, w, 1, reason);
 
@@ -923,7 +933,7 @@ static void remove_worker(struct work_queue *q, struct work_queue_worker *w, wor
 	/* update the largest worker seen */
 	find_max_worker(q);
 
-	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
+	debug(D_WQ, "%d workers connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
 }
 
 static int release_worker(struct work_queue *q, struct work_queue_worker *w)
@@ -981,7 +991,7 @@ static void add_worker(struct work_queue *q)
 	w->os = strdup("unknown");
 	w->arch = strdup("unknown");
 	w->version = strdup("unknown");
-	w->foreman  = 0;
+	w->type = WORKER_TYPE_UNKNOWN;
 	w->draining = 0;
 	w->link = link;
 	w->current_files = hash_table_create(0, 0);
@@ -1000,9 +1010,6 @@ static void add_worker(struct work_queue *q)
 	link_to_hash_key(link, w->hashkey);
 	sprintf(w->addrport, "%s:%d", addr, port);
 	hash_table_insert(q->worker_table, w->hashkey, w);
-	q->stats->workers_joined++;
-
-	debug(D_WQ, "%d workers are connected in total now", hash_table_size(q->worker_table));
 
 	return;
 }
@@ -1690,14 +1697,21 @@ static work_queue_msg_code_t process_workqueue(struct work_queue *q, struct work
 
 	if(!strcmp(w->os, "foreman"))
 	{
-		w->foreman = 1;
+		w->type = WORKER_TYPE_FOREMAN;
+	} else {
+		w->type = WORKER_TYPE_WORKER;
 	}
+
+	q->stats->workers_joined++;
+	debug(D_WQ, "%d workers are connected in total now", count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN));
+
 
 	debug(D_WQ, "%s (%s) running CCTools version %s on %s (operating system) with architecture %s is ready", w->hostname, w->addrport, w->version, w->os, w->arch);
 
 	if(cctools_version_cmp(CCTOOLS_VERSION, w->version) != 0) {
 		debug(D_DEBUG, "Warning: potential worker version mismatch: worker %s (%s) is version %s, and master is version %s", w->hostname, w->addrport, w->version, CCTOOLS_VERSION);
 	}
+
 
 	return MSG_PROCESSED;
 }
@@ -2510,12 +2524,10 @@ static work_queue_msg_code_t process_queue_status( struct work_queue *q, struct 
 
 	struct jx *a = jx_array(NULL);
 
+	target->type = WORKER_TYPE_STATUS;
+
 	free(target->hostname);
 	target->hostname = xxstrdup("QUEUE_STATUS");
-
-	//do not count a status connection as a worker
-	q->stats->workers_joined--;
-	q->stats->workers_removed--;
 
 	if(sscanf(line, "%[^_]_status", request) != 1) {
 		return MSG_FAILURE;
@@ -3172,7 +3184,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 
 	long long cmd_len = strlen(command_line);
 	send_worker_msg(q,w, "cmd %lld\n", (long long) cmd_len);
-	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->foreman ? q->long_timeout : q->short_timeout));
+	link_putlstring(w->link, command_line, cmd_len, /* stoptime */ time(0) + (w->type == WORKER_TYPE_FOREMAN ? q->long_timeout : q->short_timeout));
 	debug(D_WQ, "%s\n", command_line);
 	free(command_line);
 
@@ -3386,7 +3398,7 @@ static int check_hand_against_task(struct work_queue *q, struct work_queue_worke
 		return 0;
 	}
 
-	if(!w->foreman) {
+	if(w->type != WORKER_TYPE_FOREMAN) {
 		struct blacklist_host_info *info = hash_table_lookup(q->worker_blacklist, w->hostname);
 		if (info && info->blacklisted) {
 			return 0;
@@ -3903,7 +3915,7 @@ static int abort_slow_workers(struct work_queue *q)
 
 		if(runtime >= (average_task_time * multiplier)) {
 			w = itable_lookup(q->worker_task_map, t->taskid);
-			if(w && !w->foreman)
+			if(w && (w->type == WORKER_TYPE_WORKER))
 			{
 				debug(D_WQ, "Removing worker %s (%s): takes too long to execute the current task - %.02lf s (average task execution time by other workers is %.02lf s)", w->hostname, w->addrport, runtime / 1000000.0, average_task_time / 1000000.0);
 				work_queue_blacklist_add_with_timeout(q, w->hostname, wq_option_blacklist_slow_workers_timeout);
@@ -4724,7 +4736,7 @@ void work_queue_invalidate_cached_file_internal(struct work_queue *q, const char
 		if(!hash_table_lookup(w->current_files, filename))
 			continue;
 
-		if(w->foreman) {
+		if(w->type == WORKER_TYPE_FOREMAN) {
 			send_worker_msg(q, w, "invalidate-file %s\n", filename);
 		}
 
@@ -5752,7 +5764,7 @@ struct work_queue_task *work_queue_wait(struct work_queue *q, int timeout)
 	return work_queue_wait_internal(q, timeout, NULL, NULL);
 }
 
-/* return number of workers lost */
+/* return number of workers that failed */
 static int poll_active_workers(struct work_queue *q, int stoptime, struct link *foreman_uplink, int *foreman_uplink_active)
 {
 	BEGIN_ACCUM_TIME(q, time_polling);
@@ -5793,12 +5805,12 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	BEGIN_ACCUM_TIME(q, time_status_msgs);
 
-	int workers_removed = 0;
+	int workers_failed = 0;
 	// Then consider all existing active workers
 	for(i = j; i < n; i++) {
 		if(q->poll_table[i].revents) {
 			if(handle_worker(q, q->poll_table[i].link) == WORKER_FAILURE) {
-				workers_removed++;
+				workers_failed++;
 			}
 		}
 	}
@@ -5816,7 +5828,7 @@ static int poll_active_workers(struct work_queue *q, int stoptime, struct link *
 
 	END_ACCUM_TIME(q, time_status_msgs);
 
-	return workers_removed;
+	return workers_failed;
 }
 
 
@@ -6031,7 +6043,7 @@ int work_queue_hungry(struct work_queue *q)
 
 	//i = 1.1 * number of current workers
 	//i-ready = # of tasks to queue to re-reach the status quo.
-	int i = (1.1 * hash_table_size(q->worker_table));
+	int i = 1.1 * count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
 
 	return MAX(i - ready, 0);
 }
@@ -6334,13 +6346,11 @@ void work_queue_get_stats(struct work_queue *q, struct work_queue_stats *s)
 
 	memcpy(s, qs, sizeof(*s));
 
-	int known = known_workers(q);
-
 	//info about workers
-	s->workers_connected = hash_table_size(q->worker_table);
-	s->workers_init      = s->workers_connected - known;
+	s->workers_connected = count_workers(q, WORKER_TYPE_WORKER | WORKER_TYPE_FOREMAN);
+	s->workers_init      = count_workers(q, WORK_QUEUE_TASK_UNKNOWN);
 	s->workers_busy      = workers_with_tasks(q);
-	s->workers_idle      = known - s->workers_busy;
+	s->workers_idle      = s->workers_connected - s->workers_busy;
 	// s->workers_able computed below.
 
 	//info about tasks
@@ -6417,7 +6427,7 @@ void work_queue_get_stats_hierarchy(struct work_queue *q, struct work_queue_stat
 
 	hash_table_firstkey(q->worker_table);
 	while(hash_table_nextkey(q->worker_table, &key, (void **) &w)) {
-		if(w->foreman)
+		if(w->type == WORKER_TYPE_FOREMAN)
 		{
 			accumulate_stat(s, w->stats, workers_joined);
 			accumulate_stat(s, w->stats, workers_removed);
