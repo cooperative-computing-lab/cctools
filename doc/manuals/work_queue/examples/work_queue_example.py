@@ -1,1 +1,1 @@
-../../../../work_queue/src/bindings/python3/work_queue_example.py
+../../../../work_queue/src/bindings/python/work_queue_example.py
