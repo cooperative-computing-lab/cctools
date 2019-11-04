@@ -24,8 +24,7 @@ nav:
 
 markdown_extensions:
     - toc:
-
-permalink: True
+        permalink: True
     - admonition
 
 docs_dir: doc/manuals
