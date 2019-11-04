@@ -6260,6 +6260,9 @@ int work_queue_tune(struct work_queue *q, const char *name, double value)
 	} else if(!strcmp(name, "short-timeout")) {
 		q->short_timeout = MAX(1, (int)value);
 
+	} else if(!strcmp(name, "long-timeout")) {
+		q->long_timeout = MAX(1, (int)value);
+
 	} else if(!strcmp(name, "category-steady-n-tasks")) {
 		category_tune_bucket_size("category-steady-n-tasks", (int) value);
 
