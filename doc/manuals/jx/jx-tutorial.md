@@ -1,7 +1,7 @@
 # Tutorial: JX Workflow Language
 
 This is a gentle introduction to the [JX workflow language](jx.md), which is the
-"advanced" language used by the [Makeflow](../makeflow) workflow engine. JX
+"advanced" language used by the [Makeflow](../../makeflow) workflow engine. JX
 is an extension of standard [JSON](http://json.org) expressions, so if you are
 familiar with those from another language, you will find it easy to get
 started.
