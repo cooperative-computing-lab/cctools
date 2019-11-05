@@ -2,17 +2,19 @@
 # under the GNU General Public License.
 # See the file COPYING for details.
 #
-## @package ResourceMonitorPython
+## @package resource_monitor
 #
-# Python Work Queue bindings.
+# Python resource_monitor bindings.
 #
 # The objects and methods provided by this package correspond to the native
 # C API in @ref category.h, rmonitor_poll.h, and rmsummary.h
 #
 # The SWIG-based Python bindings provide a higher-level interface that
-# revolves around the following object:
+# revolves around the following function/decorator and objects:
 #
-# - @ref ResourceMonitor::Category
+# - @ref resource_monitor::monitored
+# - @ref resource_monitor::ResourceExhaustion
+# - @ref resource_monitor::Category
 
 import fcntl
 import functools
@@ -33,18 +35,115 @@ def set_debug_flag(*flags):
 cctools_debug_config('resource_monitor')
 
 
-# decorator to monitor functions.
+##
+# Create a monitored version of a function.
+# It can be used as a decorator, or called by itself.
+#
+# @param limits     Dictionary of resource limits to set. Available limits are:
+# - wall_time:                 time spent during execution (microseconds)
+# - cpu_time:                  user + system time of the execution (microseconds)
+# - cores:                     peak number of cores used
+# - cores_avg:                 number of cores computed as cpu_time/wall_time
+# - max_concurrent_processes:  the maximum number of processes running concurrently
+# - total_processes:           count of all of the processes created
+# - virtual_memory:            maximum virtual memory across all processes (megabytes)
+# - memory:                    maximum resident size across all processes (megabytes)
+# - swap_memory:               maximum swap usage across all processes (megabytes)
+# - bytes_read:                number of bytes read from disk
+# - bytes_written:             number of bytes written to disk
+# - bytes_received:            number of bytes read from the network
+# - bytes_sent:                number of bytes written to the network
+# - bandwidth:                 maximum network bits/s (average over one minute)
+# - total_files:               total maximum number of files and directories of all the working directories in the tree
+# - disk:                      size of all working directories in the tree (megabytes)
+#
+# @param callback Function to call every time a measurement is done. The arguments given to the function are
+# - id:   Unique identifier for the function and its arguments.
+# - name: Name of the original function.
+# - step: Measurement step. It is -1 for the last measurement taken.
+# - resources: Current resources measured.
+# @param interval Maximum time in seconds between measurements.
+# @param return_resources Whether to modify the return value of the function to a tuple of the original result and a dictionary with the final measurements.
+# @code
+# # Decorating a function:
+# @monitored()
+# def my_sum_a(lst):
+#   return sum(lst)
+#
+# @monitored(return_resources = False, callback = lambda id, name, step, res: print('memory used', res['memory']))
+# def my_sum_b(lst):
+#   return sum(lst)
+#
+# >>> (result_a, resources) = my_sum_a([1,2,3])
+# >>> print(result, resources['memory'])
+# 6, 66
+# 
+# >>> result_b = my_sum_b([1,2,3]) 
+# memory used: 66
+#
+# >>> assert(result_a == result_b)
+# 
+#
+# # Wrapping the already defined function 'sum', adding limits:
+# my_sum_monitored = monitored(limits = {'memory': 1024})(sum)
+# try:
+#   # original_result = sum(...)
+#   (original_result, resources_used) = my_sum_monitored(...)
+# except ResourceExhaustion as e:
+#   print(e)
+#   ...
+# 
+# # Defining a function with a callback and a decorator.
+# # In this example, we record the time series of resources used:
+# import multiprocessing
+# results_series = multiprocessing.Queue()
+#
+# def my_callback(id, name, step, resources):
+#     results_series.put((step, resources))
+#
+# @monitored(callback = my_callback, return_resources = False):
+# def my_function(...):
+#   ...
+#
+# result = my_function(...)
+# 
+# # print the time series
+# while not results_series.empty():
+#     try:
+#         step, resources = results_series.get(False)
+#         print(step, resources)
+#     except multiprocessing.Empty:
+#         pass
+# @endcode
 def monitored(limits = None, callback = None, interval = 1, return_resources = True):
     def monitored_inner(function):
-        return make_monitored(function, limits, callback, interval, return_resources)
+        return functools.partial(__monitor_function, limits, callback, interval, return_resources, function)
     return monitored_inner
 
-# if x = function(*args, **kwargs), returns a function mfun  (x, r) = mfun(*args, **kwargs)
-# where x is the orignal results, and r is the maximum resources consumed.
-def make_monitored(function, limits = None, callback = None, interval = 1, return_resources = True):
-    return functools.partial(monitor_function, limits, callback, interval, return_resources, function)
 
-def measure_update_to_peak(pid, old_summary = None):
+##
+# Exception raised when a function goes over the resources limits
+class ResourceExhaustion(Exception):
+    ##
+    # @param self                Reference to the current object.
+    # @param resources           Dictionary of the resources measured at the time of the exhaustion.
+    # @param function            Function that caused the exhaustion.
+    # @param args                List of positional arguments to function that caused the exhaustion.
+    # @param kwargs              Dictionary of keyword arguments to function that caused the exhaustion.
+    def __init__(self, resources, function, args = None, kwargs = None):
+        self.resources = resources
+        self.function  = function
+        self.args      = args
+        self.kwargs    = kwargs
+
+    def __str__(self):
+        r = self.resources
+        l = r['limits_exceeded']
+        ls = ["{}: {}".format(k, l[k]) for k in l.keys() if (l[k] > -1 and l[k] < r[k])]
+
+        return 'Limits broken: {}'.format(','.join(ls))
+
+def __measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
 
     if old_summary is None:
@@ -62,10 +161,10 @@ def __wrap_function(results, fun, args, kwargs):
             import os
             import time
             pid = os.getpid()
-            rm = measure_update_to_peak(pid)
+            rm = __measure_update_to_peak(pid)
             start = time.time()
             result = fun(*args, **kwargs)
-            measure_update_to_peak(pid, rm)
+            __measure_update_to_peak(pid, rm)
             setattr(rm, 'wall_time', int((time.time() - start)*1e6))
             results.put((result, rm))
         except Exception as e:
@@ -172,11 +271,8 @@ def _resources_to_dict(resources):
     return d
 
 
-def monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
+def __monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
-
-    #__watchman(result_queue, limits, callback, function, args, kwargs)
-    #sys
 
     watchman_proc = multiprocessing.Process(target=__watchman, args=(result_queue, limits, callback, interval, function, args, kwargs))
     watchman_proc.start()
@@ -197,20 +293,6 @@ def monitor_function(limits, callback, interval, return_resources, function, *ar
     else:
         return results['result']
 
-class ResourceExhaustion(Exception):
-    def __init__(self, resources, function, args = None, kwargs = None):
-        self.resources = resources
-        self.function  = function
-        self.args      = args
-        self.kwargs    = kwargs
-
-    def __str__(self):
-        r = self.resources
-        l = r['limits_exceeded']
-        ls = ["{}: {}".format(k, l[k]) for k in l.keys() if (l[k] > -1 and l[k] < r[k])]
-
-        return 'Limits broken: {}'.format(','.join(ls))
-
 ##
 # Class to encapsule all the categories in a workflow.
 #
@@ -220,8 +302,8 @@ class ResourceExhaustion(Exception):
 # print cs.first_allocation(mode = 'throughput', category = 'some_category')
 # @endcode
 #
-
 class Categories:
+
     ##
     # Create an empty set of categories.
     # @param self                Reference to the current object.
