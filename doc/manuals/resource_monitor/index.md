@@ -436,6 +436,20 @@ def send_udp_message(id, fun_name, step, resources):
 @resource_monitor.monitored(callback = send_udp_message, interval = 5, return_resources = False)
 def my_function_monitored(...):
     ...
+
+my_function_monitored(...)
+
+# in another script, run the server as:
+import socket
+import pickle
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+sock.bind(('localhost', 9800))
+
+while True:
+    data, addr = sock.recvfrom(1024)
+    print("message: ", pickle.loads(data))
 ```
 
 !!! warning
