@@ -7,8 +7,11 @@ the process created by the command given as an argument, and all its
 descendants. The monitor works *indirectly*, that is, by observing how the
 environment changed while a process was running, therefore all the information
 reported should be considered just as an estimate (this is in contrast with
-direct methods, such as ptrace). It works on Linux, and can be used in stand-
-alone mode, or automatically with [makeflow](../makeflow) and [work queue](../work_queue) applications.
+direct methods, such as ptrace). It works on Linux, and it can be used in three ways:
+
+- Stand alone mode, directly calling the `resource_monitor` executable.
+- Activating the monitoring modes of [makeflow](../makeflow) and [work queue](../work_queue) applications.
+- As a [python module](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceresource__monitor.html) to monitor single function evaluations.
 
 **resource_monitor** generates up to three log files: a JSON encoded summary
 file with the maximum values of resource used and the time they occurred, a
@@ -341,6 +344,132 @@ should_transfer_files = yes
 when_to_transfer_output = on_exit
 log = condor.matlab.logfile queue
 ```
+
+## Monitoring functions in python
+
+With the `resource_monitor` [python
+module](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceresource__monitor.html)
+python module, function evaluations can be monitored with resource limits
+enforcement.
+
+To monitor already defined functions, use the `monitored` function. This
+creates a new function that returns a tuple of the original result, and a
+dictionary of the resources used:
+
+```python
+import resource_monitor
+
+def my_sum(a,b):
+    return a + b
+
+my_sum_monitored = resource_monitor.monitored()(my_sum)
+
+original_result = my_sum(1,2)
+
+(monitored_result, resources) = my_sum_monitored(1,2)
+print('function used ' + str(resources['cores']) + ' cores')
+
+assert(original_result, monitored_result)
+```
+
+Or more directly, use it as decorator:
+```python
+import resource_monitor
+
+@resource_monitor.monitored()
+def my_sum_decorated(a,b):
+    return a + b
+
+(monitored_result, resources) = my_sum_decorated(1,2)
+```
+
+With the function `resource_monitor.monitored`, we can specify resource limits
+to be enforced. For example, if we simply want to enforce for a function not to
+use for more than a megabyte of memory:
+
+```python
+import resource_monitor
+
+@resource_monitor.monitored(limits = 'memory': 1024, return_resources = False)
+def my_sum_limited(a,b):
+    return a + b
+
+try:
+    # Note that since we used return_resources = False, the return value of the
+    # function is not modified:
+    x = my_sum_limited(1,2)
+except resource_monitor.ResourceExhaustion as e:
+    print(e.resources.limits_exceeded)
+```
+
+For a list of all the resources that can be monitored and enforced, please consult the documentation of the [module](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceresource__monitor.html).
+
+
+Further, a function callback can be specified. This callback will be executed
+at each measurement. As an example, we can use a callback to send messages to a
+server with the resources measured:
+
+```python
+import resource_monitor
+
+# monitor callback function example
+# a callback function will be called everytime resources are measured.
+# arguments are:
+# - id:        unique identifier for the function invocation
+# - fun_name:  string with the name of the function
+# - step:      resource sample number (1 for the first, 2 for the second, ..., -1 for the last)
+# - resources: dictionary with resources measured
+def send_udp_message(id, fun_name, step, resources):
+    """ Send a UDP message with the results of a measurement. """
+    import socket
+    import json
+
+    finished   = True if step == -1 else False
+    exhaustion = True if resources.get('limits_exceeded', False) else False
+
+    msg = {'id': id, 'function': fun_name, 'finished': finished, 'resource_exhaustion': exhaustion, 'resources': resources}
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.sendto(json.dumps(msg).encode(), ('localhost', 9800))
+
+# Create the monitored function addint the callback. Also, set the interval measurements to 5s, instead of the default 1s
+@resource_monitor.monitored(callback = send_udp_message, interval = 5, return_resources = False)
+def my_function_monitored(...):
+    ...
+```
+
+!!! warning
+    The monitored function and the callback are executed in a different process
+    from the calling environment. This means that they cannot modify variables
+    from the calling environment.
+
+For example, the following will not work as you may expect:
+
+```python
+# Note: This code does not work!!!
+
+import resource_monitor
+
+function_has_run = False
+resources_series = []
+
+def my_callback(id, fun_name, step, resources):
+    resources_series.append(resources)
+
+@resource_monitor.monitored(callback = my_callback):
+def my_function():
+    function_has_run = True
+
+my_function()
+
+# here function_has_run is still False, resources_series is [].
+```
+
+Please see an example
+[here](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceresource__monitor.html)
+that shows how to construct a time series of the resources, and makes it
+available to the calling environment.
+
 
 ## Further Information
 
