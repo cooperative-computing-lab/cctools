@@ -1320,13 +1320,18 @@ class WorkQueue(object):
     #
     # @param self  Reference to the current work queue object.
     # @param name  The name fo the parameter to tune. Can be one of following:
-    #              - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
-    #              - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
-    #              - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=300)
-    #              - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
-    #              - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
-    #              - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
-    #              - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
+    # - "asynchrony-multiplier" Treat each worker as having (actual_cores * multiplier) total cores. (default = 1.0)
+    # - "asynchrony-modifier" Treat each worker as having an additional "modifier" cores. (default=0)
+    # - "min-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a worker. (default=10)
+    # - "foreman-transfer-timeout" Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
+    # - "transfer-outlier-factor" Transfer that are this many times slower than the average will be aborted.  (default=10x)
+    # - "default-transfer-rate" The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
+    # - "fast-abort-multiplier" Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
+    # - "keepalive-interval" Set the minimum number of seconds to wait before sending new keepalive checks to workers. (default=300)
+    # - "keepalive-timeout" Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
+    # - "short-timeout" Set the minimum timeout when sending a brief message to a single worker. (default=5s)
+    # - "long-timeout" Set the minimum timeout when sending a brief message to a foreman. (default=1h)
+    # - "category-steady-n-tasks" Set the number of tasks considered when computing category buckets.
     # @param value The value to set the parameter to.
     # @return 0 on succes, -1 on failure.
     #
