@@ -16,7 +16,30 @@ $ make
 $ make install
 ```
 
-After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as follows:
+!!! note
+    After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+
+
+## Install From Git Repository
+
+Instead of installing from the source of the current released version, you can
+can directly build the latest version from our git repository:
+
+```sh
+$ git clone https://github.com/cooperative-computing-lab/cctools cctools-source
+$ cd cctools-source
+$ ./configure
+$ make
+$ make install
+```
+
+!!! note
+    After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+
+
+## Setting Your Environment
+
+If you installed **CCTools** from a source tarball, from github, or from a binary tarball, you will need to set some environment variables. This is not needed if you installed **CCTools** from conda or spack.
 
 First determine the `python` and `perl` versions you are using:
 
@@ -56,19 +79,6 @@ $ export PERL5LIB=~/cctools/lib/perl5/site_perl/5.16.3:${PERL5LIB}
     Remember to export PATH, PYTHONPATH, and PERL5LIB as above, but changing
     `~/cctools` to the directory of your choosing.
 
-
-## Install From Git Repository
-
-Instead of installing from the source of the current released version, you can
-can directly build the latest version from our git repository:
-
-```sh
-$ git clone https://github.com/cooperative-computing-lab/cctools cctools-source
-$ cd cctools-source
-$ ./configure
-$ make
-$ make install
-```
 
 
 ## Special Cases
@@ -192,6 +202,10 @@ called `cctools`:
 ```sh
 $ tar xvf cctools-*-centos7-x86_64.tar.gz
 ```
+
+!!! note
+    After unpackaging the tarball you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+
 
 
 
