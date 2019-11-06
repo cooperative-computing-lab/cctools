@@ -27,7 +27,7 @@ or C   ([example](work_queue/examples/work_queue_example.c)|[api](http://ccl.cse
   and can optionally enforce limits on each resource. The monitor can be
   compiled to a single executable that is easily deployed to track executable
   file, or it can be used as a library to track the execution of [Python
-  functions](python api).
+  functions](http://ccl.cse.nd.edu/software/manuals/api/html/namespaceresource__monitor.html).
 
 - [**Parrot**](parrot) is a transparent user-level virtual filesystem that
   allows any ordinary program to be attached to many different remote storage
