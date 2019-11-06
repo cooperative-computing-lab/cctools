@@ -1,35 +1,24 @@
 /** @mainpage CCTools API Documentation
 
-This is the internal reference manual for the CCTools code,
+This is the API reference manual for the CCTools code,
 which includes Makeflow, Work Queue, Parrot, Chirp and other software.
 
-Like most API documentation, it is not entirely complete:
-this documentation focuses on the most stable and commonly
-used modules; not all experimental components are fully covered.
+If you are writing a Work Queue master program, start here:
 
-<h2>Build Structure</h2>
+- @ref work_queue.h
 
-These are the primary code modules:
+If you are writing a program to submit jobs to arbitrary batch systems,
+including Work Queue, HTCondor, Amazon EC2, etc. start here:
 
-- dttools - General support library of data structures and utilities used widely across the code.  Before writing any new code, please browse this library to make sure that what you want doesn't already exist.  Several sub-elements of this library are particularly important, and perhaps should be broken off into their own modules:
-    - jx - A C implementation of JSON with eXpressions used throughout the code for configuration and data interchange.
-    - catalog_server - A server used to track and report runnning processes globally.  Records data into @ref jx_database.h that can be queried out by deltadb.
-- batch_job - Abstract interface to submitting jobs to a variety of batch systems, such as HTCondor, UGE, Amazon, etc.
-- work_queue - A master-worker framework for executing large numbers of jobs in a distributed system.  Note that the client library is implemented in work_queue.c, while the worker is implemented in work_queue_worker.c
-- makeflow - A workflow system for sequencing large numbers of jobs with dependencies into a batch system.
-- resource_monitor - A library and tool for tracking the resources consumed by individual jobs.
-- chirp - A user-level distributed file system with access controls and resource management.
-- parrot - A user-level virtual file system for connecting applications to remote storage.
-- deltadb - A time-oriented database for tracking and querying services.  Note that this is the query interface to the database created by @ref jx_database.h
+- @ref batch_job.h
 
-At the top level, a custom configure script examines the build environment and then constructs a file config.mk which contains the appropriate build settings.  The top-level Makefile then builds the software in each selected module, where the Makefile includes the config.mk from the top level.
+If you are writing a programs to access the Chirp filesystem, start here:
 
-<h2>Code Familiarization</h2>
+- @ref chirp_reli.h
+- @ref chirp_recursive.h
+- @ref chirp_stream.h
 
-Before writing any new code, it is recommended that you familiarize yourself with
-the low-level modules in dttools that are widely used throughout the project.
-These handle a lot of little issues that you might not have considered (like IPV6 support)
-and make the rest of the code more compact and clear.
+There are a number of other support modules that implement debugging, communication, and data structures.  The most commonly used are:
 
 - Data Structures:
    - @ref list.h
@@ -48,17 +37,6 @@ and make the rest of the code more compact and clear.
    - @ref copy_stream.h
    - @ref copy_tree.h
 
-If you are writing programs to submit jobs to Work Queue, Condor, or other systems, start here:
-
-- @ref work_queue.h
-- @ref batch_job.h
-
-If you are writing programs to access Chirp, start here:
-
-- @ref chirp_reli.h
-- @ref chirp_recursive.h
-- @ref chirp_stream.h
-
 Or, you can browse all documented modules in the package:
 
 - <b><a href="files.html">See All Modules</a></b>
@@ -67,6 +45,4 @@ For more information about using and installing CCTools:
 
 - <a href="http://ccl.cse.nd.edu/software">CCTools Software</a>
 - <a href="http://ccl.cse.nd.edu/software/manuals">CCTools User Manuals</a>
-- <a href="http://ccl.cse.nd.edu/software/howto">CCTools HOWTO Manuals</a>
-
 */
