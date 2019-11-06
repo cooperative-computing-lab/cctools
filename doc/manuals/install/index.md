@@ -123,7 +123,7 @@ makeflow version X.Y.Z...
 
 !!! warning
     Remember that for installations from source you need [swig](http://www.swig.org) at compile time, and to set
-    the environment variables `PATH`, `PYTHONPATH` and `PERL5LIB` appropriately, as explained [here.](from-source.md#using-the-official-released-version)
+    the environment variables `PATH`, `PYTHONPATH` and `PERL5LIB` appropriately, as explained [here.](from-source.md#setting-your-environment)
 
     For **conda** and **spack** installation you should not need to manually
     set any of these variables, and in fact setting them may produce errors.

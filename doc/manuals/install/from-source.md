@@ -1,6 +1,6 @@
 # Installing CCTools from source
 
-## Using the official released version
+### Using the official released version...
 
 Download a source package from the [download
 page](http://ccl.cse.nd.edu/software/download). And follow this recipe while
@@ -16,11 +16,7 @@ $ make
 $ make install
 ```
 
-!!! note
-    After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
-
-
-## Install From Git Repository
+### ...or from the git repository
 
 Instead of installing from the source of the current released version, you can
 can directly build the latest version from our git repository:
@@ -33,8 +29,24 @@ $ make
 $ make install
 ```
 
+!!! warning
+    If you need to compile CCTools with **python** or **perl** support, you
+    need [SWIG](http://www.swig.org) somewhere in your system. Follow the
+    [instructions below.](#python-and-perl).
+
+    SWIG is only needed for compilation, and it is no longer needed in the
+    binaries produced.
+    
 !!! note
     After installation, you will need to set the environment variables `PATH`, `PYTHONPATH`, and `PERL5LIB` as explained [here.](#setting-your-environment)
+
+!!! note
+    If you need to install CCTools in a directory different from
+    `${HOME}/cctools`, you can use `./configure --prefix /some/desired/dir`.
+    Remember to export `PATH`, `PYTHONPATH`, and `PERL5LIB` as above, but changing
+    `~/cctools` to the directory of your choosing.
+
+
 
 
 ## Setting Your Environment
@@ -64,21 +76,6 @@ $ export PYTHONPATH=~/cctools/lib/python3.7/site-packages:${PYTHONPATH}
 # Change 5.16.3 to the perl version you found above.
 $ export PERL5LIB=~/cctools/lib/perl5/site_perl/5.16.3:${PERL5LIB}
 ```
-
-!!! warning
-    If you need to compile CCTools with **python** or **perl** support, you
-    need [SWIG](http://www.swig.org) somewhere in your system. Follow the
-    [instructions below.](#python-and-perl).
-
-    SWIG is only needed for compilation, and it is no longer needed in the
-    binaries produced.
-    
-!!! note
-    If you need to install CCTools in a directory different from
-    `${HOME}/cctools`, you can use `./configure --prefix /some/desired/dir`.
-    Remember to export PATH, PYTHONPATH, and PERL5LIB as above, but changing
-    `~/cctools` to the directory of your choosing.
-
 
 
 ## Special Cases
