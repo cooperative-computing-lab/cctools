@@ -89,6 +89,11 @@ cctools-source), to propose a bug fix, or if you need to add a driver support
 to **parrot** not normally included in the **conda** installation, such as
 CVMFS, or iRODS.
 
+## Install from Binary Tarball
+
+Binary packages are available for several operating systems. Please follow the instructions [here](from-source.md#install-from-binary-tarball).
+
+
 ## Testing Your Installation
 
 You can test that the python and perl modules are available with:

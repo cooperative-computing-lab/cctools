@@ -179,3 +179,19 @@ the instructions in the "Installing From Source" section above. For OS X
 versions before 10.9, you will need to first install Xcode. Xcode can be found
 in the App Store or on the installation disk.
 
+
+## Install from Binary Tarball
+
+Binary packages are available for several operating systems at the [download
+page](http://ccl.cse.nd.edu/software/download) Simply unpack the tarball
+in any directory that you like, and then add the `bin` directory to your path.
+
+For example, to install CCTools for RHEL7 / CentOS7 in your home directory in a directory
+called `cctools`:
+
+```sh
+$ tar xvf cctools-*-centos7-x86_64.tar.gz
+```
+
+
+
