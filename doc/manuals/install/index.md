@@ -8,14 +8,11 @@ and grids. These tools are commonly used in fields of science and engineering
 that rely on large amounts of computing.
 
 
-CCTools can be installed on linux and Mac OSX.
+**CCTools** can be installed on Linux and Mac.
 
 
 
-## Install from Conda (Linux only)
-
-!!! warning
-    Deployment using **conda** is under active development.
+## Install from Conda
 
 If you need a personal installation of **CCTools**, say for your laptop, or an
 account in your campus cluster, the easiest way to install **CCTools** is using the
@@ -29,8 +26,10 @@ If it fails, then you need to install either
 [miniconda](https://docs.conda.io/projects/conda/en/latest/user-guide/install)
 or [anaconda](https://docs.anaconda.com/anaconda/install). Miniconda is a
 __light__ version of anaconda, and we recommend it as it is much faster to
-install. We also recommend installing the versions for `Python 3.7`, but
-**CCTools** will also work with the `Python 2.7` version.
+install. We also recommend installing the versions for `Python 3.7`
+
+!!! warning
+    On Mac, the available from conda **CCTools** does not work with `Python 2.7` or with `perl`. For such case, please compile **CCTools** from [source](#from-source.md).
 
 With `conda` command available, install **CCTools** with:
 
@@ -40,12 +39,13 @@ $ conda install -y -c conda-forge ndcctools
 
 And that's it! You can test your setup following the instructions [here](#testing-your-installation).
 
+
 ## Install from Spack
 
 !!! warning
-    Deployment using **spack** is under active development.
+    Deployment using **spack** is under active development and not currently available.
 
-Alternatively, you can install **CCTools** using the [spack.io](www.spack.org)
+Alternatively, you can install **CCTools** using the [spack.io](https://www.spack.org)
 package manager. Spack will compile **CCTools** for you, and it is recommended
 for HPC sites for which a conda installation is not available, or which have
 special software stack requirements (such as specially compiled python versions).
@@ -62,6 +62,8 @@ Once spack is installed, install **CCTools** with:
 
 ```sh
 $ spack install cctools
+
+# Warning! This command currently fails.
 ```
 
 To use **CCTools**, you need to load it into the spack environment with:
