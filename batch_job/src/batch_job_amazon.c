@@ -25,10 +25,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
-#include <unistd.h>
-#include <stdio.h>
-#include <limits.h>
-
 struct batch_job_amazon_info {
 	struct batch_job_info info;
 	struct aws_config *aws_config;
@@ -462,7 +458,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem.
+		may be necessary to debug the problem. 
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -521,7 +517,7 @@ We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want
+be created.  On the other hand, we don't want 
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -557,7 +553,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-
+	
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
