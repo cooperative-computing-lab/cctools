@@ -5,7 +5,7 @@
 [Makeflow](../../makeflow) allows for workflows to be expressed in pure [JSON](http://json.org)
 or in an extended language known as JX which can be evaluated to produce pure
 JSON. This document provides the detailed reference for this language. If you
-are just getting started, see the [JX Tutorial](jx-tutorial) before
+are just getting started, see the [JX Tutorial](../jx-tutorial) before
 reading this reference manual.
 
 ## JSON Workflow Representation

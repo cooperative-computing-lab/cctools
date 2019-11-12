@@ -1009,6 +1009,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify the size of the debug file (must use with -o option).\n", "-O,--debug-file-size=<mb>");
 	printf(" %-30s Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.\n","--runos=<img>");
+	printf(" %-30s Force factory to run itself as a work queue master.\n","--run-factory-as-master");
 	printf(" %-30s Show the version string.\n", "-v,--version");
 	printf(" %-30s Show this screen.\n", "-h,--help");
 }
@@ -1034,6 +1035,7 @@ enum{   LONG_OPT_CORES = 255,
 		LONG_OPT_K8S_WORKER_IMAGE,
 		LONG_OPT_CATALOG,
 		LONG_OPT_ENVIRONMENT_VARIABLE,
+		LONG_OPT_RUN_AS_MASTER,
 		LONG_OPT_RUN_OS,
 	};
 
@@ -1067,6 +1069,7 @@ static const struct option long_options[] = {
 	{"mesos-preload", required_argument, 0, LONG_OPT_MESOS_PRELOAD},
 	{"min-workers", required_argument, 0, 'w'},
 	{"password", required_argument, 0, 'P'},
+	{"run-factory-as-master", no_argument, 0, LONG_OPT_RUN_AS_MASTER},
 	{"runos", required_argument, 0, LONG_OPT_RUN_OS},
 	{"scratch-dir", required_argument, 0, 'S' },
 	{"tasks-per-worker", required_argument, 0, LONG_OPT_TASKS_PER_WORKER},
@@ -1087,6 +1090,9 @@ int main(int argc, char *argv[])
 	char *mesos_preload = NULL;
 	char *k8s_image = NULL;
 	struct jx *wrapper_inputs = jx_array(NULL);
+
+	// --run-factory-as-master and -Twq should be used together.
+	int run_as_master = 0;
 
 	//Environment variable handling
 	char *ev = NULL;
@@ -1251,6 +1257,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_CATALOG:
 				catalog_host = xxstrdup(optarg);
 				break;
+			case LONG_OPT_RUN_AS_MASTER:
+				run_as_master = 1;
+				break;
 			case LONG_OPT_RUN_OS:
 				runos_os = xxstrdup(optarg);
 				break;
@@ -1258,6 +1267,16 @@ int main(int argc, char *argv[])
 				show_help(argv[0]);
 				return EXIT_FAILURE;
 		}
+	}
+
+	if(batch_queue_type == BATCH_QUEUE_TYPE_WORK_QUEUE && !run_as_master) {
+		fprintf(stderr, "work_queue_factory: batch system 'wq' specified, but you most likely want 'local'.\n");
+		fprintf(stderr, "work_queue_factory: use --run-factory-as-master if you know what you are doing.\n");
+		exit(EXIT_FAILURE);
+	} else if(batch_queue_type != BATCH_QUEUE_TYPE_WORK_QUEUE && run_as_master) {
+		fprintf(stderr, "work_queue_factory: --run-factory-as-master can only be used with -Twq.\n");
+		fprintf(stderr, "work_queue_factory: you most likely want -Tlocal instead.\n");
+		exit(EXIT_FAILURE);
 	}
 
 	if(config_file) {
@@ -1293,7 +1312,7 @@ int main(int argc, char *argv[])
 		show_help(argv[0]);
 		exit(1);
 	}
-	
+
 	cctools_version_debug(D_DEBUG, argv[0]);
 
 	if(batch_queue_type == BATCH_QUEUE_TYPE_UNKNOWN) {

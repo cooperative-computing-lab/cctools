@@ -19,7 +19,7 @@ See the file COPYING for details.
 
 /** @file batch_job.h Batch job submission.
 This module implements batch job submission to multiple systems,
-including Condor, SGE, Work Queue, Xgrid, and local Unix processes.
+including local processes, HTCondor, Work Queue, SGE, PBS, Amazon EC2, and others.
 This simplifies the construction
 of parallel abstractions that need a simple form of parallel process execution.
 */

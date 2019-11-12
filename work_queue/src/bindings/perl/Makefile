@@ -1,8 +1,6 @@
 include ../../../../config.mk
 include $(CCTOOLS_HOME)/rules.mk
 
-PERL_INSTALL_DIR = $(CCTOOLS_INSTALL_DIR)/lib/perl5/site_perl/$(CCTOOLS_PERL_VERSION)
-
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
 # Perl also defines some HAS_* stuff so we need to undefine those too.
 LOCAL_CCFLAGS = -w -UHAS_USLEEP -UHAS_ISNAN -UHAS_UTIME -fPIC -Wno-unused-value -Wno-unused-variable $(CCTOOLS_PERL_CCFLAGS)
@@ -28,11 +26,10 @@ clean:
 test: all
 
 install: all
-	mkdir -p $(PERL_INSTALL_DIR)
-	cp $(LIBRARIES)       $(PERL_INSTALL_DIR)/
-	mkdir -p              $(PERL_INSTALL_DIR)/Work_Queue
-	cp Work_Queue.pm      $(PERL_INSTALL_DIR)
-	cp Work_Queue/Task.pm $(PERL_INSTALL_DIR)/Work_Queue
+	mkdir -p $(CCTOOLS_PERL_PATH)/Work_Queue
+	cp $(LIBRARIES)       $(CCTOOLS_PERL_PATH)/
+	cp Work_Queue.pm      $(CCTOOLS_PERL_PATH)
+	cp Work_Queue/Task.pm $(CCTOOLS_PERL_PATH)/Work_Queue
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	chmod 755 work_queue_example.pl
 	cp work_queue_example.pl $(CCTOOLS_INSTALL_DIR)/doc/

@@ -1035,6 +1035,14 @@ Set the minimum number of seconds to wait for files to be transferred to or from
 
 Set the minimum number of seconds to wait for files to be transferred to or from a foreman. (default=3600)
 
+=item "transfer-outlier-factor"
+
+Transfer that are this many times slower than the average will be aborted.  (default=10x)
+
+=item "default-transfer-rate"
+
+The assumed network bandwidth used until sufficient data has been collected.  (1MB/s)
+
 =item "fast-abort-multiplier"
 
 Set the multiplier of the average task time at which point to abort; if negative or zero fast_abort is deactivated. (default=0)
@@ -1048,6 +1056,18 @@ Set the minimum number of seconds to wait before sending new keepalive checks to
 Set the minimum number of seconds to wait for a keepalive response from worker before marking it as dead. (default=30)
 
 =item value The value to set the parameter to.
+
+=item "short-timeout"
+
+Set the minimum timeout when sending a brief message to a single worker. (default=5s)
+
+=item "long-timeout"
+
+Set the minimum timeout when sending a brief message to a foreman. (default=1h)
+
+=item "category-steady-n-tasks"
+
+Set the number of tasks considered when computing category buckets.
 
 =back
 

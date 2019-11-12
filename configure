@@ -387,8 +387,14 @@ export HOST_MULTIARCH=$(check_multiarch)
 rm -f config.mk
 
 require_path ${ccompiler}
-require_path ${cxxcompiler}
 require_gnu_make
+
+if ! optional_path ${cxxcompiler}
+then
+	echo "*** could not find a C++ compiler, skipping parrot support"
+	include_package_parrot=""
+fi
+
 
 # Lots of warnings are enabled by default, but several are too strict
 # and crop up in third-party code, so we disable those checks.
@@ -1017,6 +1023,16 @@ then
 				then
 					perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
 					perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
+				fi
+
+				# Remove -lperl, as it is not needed for swig, and it causes trouble if libperl is not compiled with -fPIC, as in conda.
+				perl_ldflags=`echo ${perl_ldflags} | sed 's/-lperl//g'`
+
+				if [ "${CONDA_BUILD}" = 1 ]
+				then
+					perl_install_dir="site_perl"
+				else
+					perl_install_dir="perl5/site_perl"
 				fi
 
 				swig_bindings="$swig_bindings perl"
@@ -1685,6 +1701,7 @@ CCTOOLS_PERL=${perl}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
 CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
 CCTOOLS_PERL_VERSION=${perl_version}
+CCTOOLS_PERL_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/${perl_install_dir}/\$(CCTOOLS_PERL_VERSION)
 
 CCTOOLS_PYTHON=\$(CCTOOLS_PYTHON2)
 CCTOOLS_PYTHON_CCFLAGS=\$(CCTOOLS_PYTHON2_CCFLAGS)
