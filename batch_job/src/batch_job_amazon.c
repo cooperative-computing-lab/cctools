@@ -18,12 +18,16 @@ See the file COPYING for details.
 #include "jx_export.h"
 #include "semaphore.h"
 #include "list.h"
-
+#include "timestamp.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+
+#include <unistd.h>
+#include <stdio.h>
+#include <limits.h>
 
 struct batch_job_amazon_info {
 	struct batch_job_info info;
@@ -296,13 +300,18 @@ static struct jx * aws_describe_instance( struct aws_config *c, const char *inst
 Terminate an EC2 instance.  If termination is successfully applied, return true, otherwise return false.
 */
 
-static int aws_terminate_instance( struct aws_config *c, const char *instance_id )
+static int aws_terminate_instance( struct batch_queue * q, struct aws_config *c, const char *instance_id )
 {
 	char *str = string_format("aws ec2 terminate-instances --instance-ids %s --output json",instance_id);
 	struct jx *jresult = json_command(str);
 	if(jresult) {
 		jx_delete(jresult);
 		printf("deleted virtual machine instance %s\n",instance_id);
+		FILE *fp;
+		const char *config_file = batch_queue_get_option(q,"amazon-config");
+		fp = fopen(config_file, "a");
+		fprintf(fp, "TERMINATE %s %" PRIu64 "\n", instance_id, timestamp_get());
+		fclose(fp);
 		return 1;
 	} else {
 		return 0;
@@ -322,7 +331,7 @@ static int aws_instance_expire( struct aws_instance *i, int *timediff )
 Recursively delete expired idle instances based on difftime and timestamp
 */
 
-static int terminate_expired_instances( struct aws_config *c, const int timediff )
+static int terminate_expired_instances( struct batch_queue * q, struct aws_config *c, const int timediff )
 {
 	const int *timediff_p;
 	timediff_p = &timediff;
@@ -338,7 +347,7 @@ static int terminate_expired_instances( struct aws_config *c, const int timediff
 	struct aws_instance *i = list_find(instance_list, (list_op_t) aws_instance_expire, timediff_p);
 	while (i != NULL){
 		const char *instance_id = aws_instance_delete(i);
-		aws_terminate_instance(c, instance_id);
+		aws_terminate_instance(q, c, instance_id);
 		i = list_find(instance_list, (list_op_t) aws_instance_expire, timediff_p);
 	}
 	return 1;
@@ -453,7 +462,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem. 
+		may be necessary to debug the problem.
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -512,7 +521,7 @@ We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want 
+be created.  On the other hand, we don't want
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -548,7 +557,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-	
+
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -613,7 +622,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/* 
+	/*
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
@@ -671,7 +680,18 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
       sleep(1);
       return -1;
     }
+		FILE *fp;
+		fp = fopen(config_file, "a");
+		fprintf(fp, "CREATE %s %" PRIu64 "\n", instance_id, timestamp_get());
+		fclose(fp);
   }
+	else {
+		FILE *fp;
+		fp = fopen(config_file, "a");
+		fprintf(fp, "REUSE %s %" PRIu64 "\n", instance_id, timestamp_get());
+		fclose(fp);
+	}
+
 
 	/* Create a new object describing the job */
 
@@ -748,8 +768,7 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 			push_back_aws_instance(record_aws_instance(i->instance_id, i->instance_type));
 
 			/* Now destroy other instances from the list according to timestamps */
-			terminate_expired_instances(i->aws_config, 30);
-
+			terminate_expired_instances(q, i->aws_config, 30);
 			/* And clean up the object. */
 
 			free(i);
@@ -783,7 +802,7 @@ static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 	kill(jobid,SIGKILL);
 
 	push_back_aws_instance(record_aws_instance(info->instance_id, info->instance_type));
-	terminate_expired_instances(info->aws_config, 30);
+	terminate_expired_instances(q, info->aws_config, 30);
 
 	debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
 	struct process_info *p = process_waitpid(jobid,0);
