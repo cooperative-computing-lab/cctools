@@ -89,7 +89,7 @@ int master_port = 0;
 int using_catalog = 0;
 
 static char *extra_worker_args=0;
-static const char *resource_args=0;
+static char *resource_args=0;
 static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
@@ -338,7 +338,9 @@ static void set_worker_resources_options( struct batch_queue *queue )
 		}
 	}
 
+	free(resource_args);
 	resource_args = xxstrdup(buffer_tostring(&b));
+
 	buffer_free(&b);
 }
 
