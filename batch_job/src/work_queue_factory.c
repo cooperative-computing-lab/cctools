@@ -1459,6 +1459,7 @@ int main(int argc, char *argv[])
 
 	}
 
+	jx_delete(wrapper_inputs);
 	batch_queue_delete(queue);
 
 	return 0;
