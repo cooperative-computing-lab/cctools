@@ -425,9 +425,14 @@ static int submit_worker( struct batch_queue *queue )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
+
+	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
+
+	free(cmd);
+	free(files);
 	free(worker);
 
-	return batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
+	return status;
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
