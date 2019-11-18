@@ -28,8 +28,9 @@ nav:
 
 markdown_extensions:
     - toc:
-        permalink: True
     - admonition
+
+permalink: True
 
 docs_dir: doc/manuals
 site_dir: doc/mkdocs-site
