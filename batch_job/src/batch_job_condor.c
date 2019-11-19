@@ -65,13 +65,11 @@ static char *blacklisted_expression(struct batch_queue *q) {
 	char *sep = "";
 	char *hostname;
 
-	buffer_printf(&b, "(");
 	while((hostname = strsep(&blist, " "))) {
 		buffer_printf(&b, "%s(machine != \"%s\")", sep, hostname);
 
 		sep = " && ";
 	}
-	buffer_printf(&b, ")");
 
 	char *result = xxstrdup(buffer_tostring(&b));
 
