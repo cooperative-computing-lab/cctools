@@ -89,7 +89,7 @@ int master_port = 0;
 int using_catalog = 0;
 
 static char *extra_worker_args=0;
-static const char *resource_args=0;
+static char *resource_args=0;
 static int abort_flag = 0;
 static const char *scratch_dir = 0;
 static const char *password_file = 0;
@@ -338,7 +338,9 @@ static void set_worker_resources_options( struct batch_queue *queue )
 		}
 	}
 
+	free(resource_args);
 	resource_args = xxstrdup(buffer_tostring(&b));
+
 	buffer_free(&b);
 }
 
@@ -423,9 +425,14 @@ static int submit_worker( struct batch_queue *queue )
 
 	debug(D_WQ,"submitting worker: %s",cmd);
 
+
+	int status = batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
+
+	free(cmd);
+	free(files);
 	free(worker);
 
-	return batch_job_submit(queue,cmd,files,"output.log",batch_env,resources);
+	return status;
 }
 
 static void update_blacklisted_workers( struct batch_queue *queue, struct list *masters_list ) {
@@ -1457,6 +1464,7 @@ int main(int argc, char *argv[])
 
 	}
 
+	jx_delete(wrapper_inputs);
 	batch_queue_delete(queue);
 
 	return 0;
