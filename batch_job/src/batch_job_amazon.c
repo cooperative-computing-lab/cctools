@@ -25,10 +25,6 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
-#include <unistd.h>
-#include <stdio.h>
-#include <limits.h>
-
 struct batch_job_amazon_info {
 	struct batch_job_info info;
 	struct aws_config *aws_config;
