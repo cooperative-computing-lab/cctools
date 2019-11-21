@@ -479,7 +479,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem.
+		may be necessary to debug the problem. 
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -538,7 +538,7 @@ We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want
+be created.  On the other hand, we don't want 
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -574,7 +574,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-
+	
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -639,7 +639,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 	get_files(aws_config,ip_address,extra_output_files);
 	semaphore_up(transfer_semaphore);
 
-	/*
+	/* 
 	Return the task result regardless of the file fetch;
 	makeflow will figure out which files were actually produced
 	and then do the right thing.
@@ -690,7 +690,7 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	const char *instance_id = fetch_aws_instance(instance_type);
 	if(!instance_id) {
   	/* Create a new instance and return its unique ID. */
-		printf("creating instance\n");
+	printf("creating instance\n");
   	instance_id = aws_create_instance(aws_config,instance_type,ami);
     if(!instance_id) {
       debug(D_BATCH,"aws_create_instance failed");
