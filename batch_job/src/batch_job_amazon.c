@@ -25,6 +25,10 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <errno.h>
 
+#include <unistd.h>
+#include <stdio.h>
+#include <limits.h>
+
 struct batch_job_amazon_info {
 	struct batch_job_info info;
 	struct aws_config *aws_config;
@@ -116,7 +120,8 @@ static const char * aws_instance_select( int cores, int memory, int disk )
 }
 
 /*
-Lookup aws_instance_type given instance type name
+Lookup aws_instance_type given instance type name.
+On failure, return zero.
 */
 
 static struct aws_instance_type * aws_instance_lookup(const char *instance_type)
@@ -134,7 +139,7 @@ static struct aws_instance_type * aws_instance_lookup(const char *instance_type)
 /*
 Compare if instance of type 1 does fit in instance of type 2.
 On fitting (cores and memory of type 1 instance <= type 2)
-return 1, otherwise return null
+return 1, otherwise return 0
 */
 
 static int instance_type_less_or_equal(struct aws_instance *instance, const char *type_2){
@@ -162,6 +167,18 @@ static struct aws_instance * record_aws_instance(const char *instance_id, const 
 }
 
 /*
+Write instance_state, instance_id, and timestamp to the aws_config file.
+*/
+
+static int log_instance_state( const char* instance_id, const char* config_file, const char* instance_state ) {
+	FILE *fp;
+	fp = fopen(config_file, "a");
+	fprintf(fp, "%s %s %" PRIu64 "\n", instance_state, instance_id, timestamp_get());
+	fclose(fp);
+	return 1;
+}
+
+/*
 Push an idle instance to the end of the list
 return 0 on error and 1 on success
 */
@@ -176,7 +193,11 @@ static int push_back_aws_instance(struct aws_instance* instance){
 	return 1;
 }
 
-/* Remove aws_instance from local list and return its instance id */
+/*
+Remove aws_instance from local list and return its instance id
+On failure, return zero.
+*/
+
 static const char * aws_instance_delete( struct aws_instance* i )
 {
 	const char *instance_id = strdup(i->instance_id);
@@ -193,6 +214,7 @@ static const char * aws_instance_delete( struct aws_instance* i )
 
 /*
 Erase an idle instance of the right size from the list, returing its instance_id
+On failure, return zero.
 */
 
 static const char * fetch_aws_instance(const char* instance_type){
@@ -303,11 +325,10 @@ static int aws_terminate_instance( struct batch_queue * q, struct aws_config *c,
 	if(jresult) {
 		jx_delete(jresult);
 		printf("deleted virtual machine instance %s\n",instance_id);
-		FILE *fp;
+
 		const char *config_file = batch_queue_get_option(q,"amazon-config");
-		fp = fopen(config_file, "a");
-		fprintf(fp, "TERMINATE %s %" PRIu64 "\n", instance_id, timestamp_get());
-		fclose(fp);
+		const char *instance_state = "TERMINATE";
+		log_instance_state(instance_id, config_file, instance_state);
 		return 1;
 	} else {
 		return 0;
@@ -458,7 +479,7 @@ static void get_files( struct aws_config *aws_config, const char *ip_address, co
 		}
 		/*
 		In the case of failure, keep going b/c the other output files
-		may be necessary to debug the problem. 
+		may be necessary to debug the problem.
 		*/
 		get_file(aws_config,ip_address,f,remotename);
 		f = strtok(0,",");
@@ -517,7 +538,7 @@ We use a shared SYSV sempahore here in order to
 manage file transfer concurrency.  On one hand,
 we want multiple subprocesses running at once,
 so that we don't wait long times for images to
-be created.  On the other hand, we don't want 
+be created.  On the other hand, we don't want
 multiple file transfers going on at once.
 So, each job is managed by a separate subprocess
 which acquires and releases a semaphore around file transfers.
@@ -553,7 +574,7 @@ static int batch_job_amazon_subprocess( struct aws_config *aws_config, const cha
 			debug(D_BATCH,"unable to get instance state");
 			continue;
 		}
-	
+
 		const char * state = get_instance_state_name(j);
 		if(!state) {
 			debug(D_BATCH,"state is not set, keep trying...");
@@ -676,16 +697,12 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
       sleep(1);
       return -1;
     }
-		FILE *fp;
-		fp = fopen(config_file, "a");
-		fprintf(fp, "CREATE %s %" PRIu64 "\n", instance_id, timestamp_get());
-		fclose(fp);
+		const char *instance_state = "CREATE";
+		log_instance_state(instance_id, config_file, instance_state);
   }
 	else {
-		FILE *fp;
-		fp = fopen(config_file, "a");
-		fprintf(fp, "REUSE %s %" PRIu64 "\n", instance_id, timestamp_get());
-		fclose(fp);
+		const char *instance_state = "REUSE";
+		log_instance_state(instance_id, config_file, instance_state);
 	}
 
 
