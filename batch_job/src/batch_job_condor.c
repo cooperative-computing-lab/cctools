@@ -65,13 +65,11 @@ static char *blacklisted_expression(struct batch_queue *q) {
 	char *sep = "";
 	char *hostname;
 
-	buffer_printf(&b, "(");
 	while((hostname = strsep(&blist, " "))) {
 		buffer_printf(&b, "%s(machine != \"%s\")", sep, hostname);
 
 		sep = " && ";
 	}
-	buffer_printf(&b, ")");
 
 	char *result = xxstrdup(buffer_tostring(&b));
 
@@ -128,11 +126,11 @@ static batch_job_id_t batch_job_condor_submit (struct batch_queue *q, const char
 	char *bexp = blacklisted_expression(q);
 
 	if(c_req && bexp) {
-		fprintf(file, "requirements = %s && %s\n", c_req, bexp);
+		fprintf(file, "requirements = (%s) && (%s)\n", c_req, bexp);
 	} else if(c_req) {
-		fprintf(file, "requirements = %s\n", c_req);
+		fprintf(file, "requirements = (%s)\n", c_req);
 	} else if(bexp) {
-		fprintf(file, "requirements = %s\n", bexp);
+		fprintf(file, "requirements = (%s)\n", bexp);
 	}
 
 	if(bexp)
