@@ -1,6 +1,9 @@
 #ifndef WORK_QUEUE_JSON_H
 #define WORK_QUEUE_JSON_H
 
+#include "work_queue.h"
+#include "jx.h"
+
 int is_in(const char* str, char* a[]);
 
 int validate_json(struct jx *json, char** a);
