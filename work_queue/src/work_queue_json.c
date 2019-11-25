@@ -42,18 +42,21 @@ char* t[] = { "tag", "command_line", "worker_selection_algorithm", "output", "in
             "total_bytes_transferred", "time_app_delay"};
 
 
-int is_in(const char* str, char* a[])
+int is_in(const char* str, char** a)
 {
 
-    int length = sizeof(a) / sizeof(char);
+    char** ptr = a;
 
-    int i;
-    for (i=0; i < length; i++){
-        
-        if (!strcmp(a[i], str)) { return 1; }
+    while(*ptr != 0){
+
+        if(!strcmp(*ptr, str)){
+            return 1;
+        }
+
+        ptr++;
 
     }
-
+    
     return 0;
 
 }
