@@ -1,6 +1,3 @@
-#ifndef WORK_QUEUE_JSON_H
-#define WORK_QUEUE_JSON_H
-
 #include "work_queue_json.h"
 #include "jx_parse.h"
 #include "jx_print.h"
@@ -10,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-char* wq[] = {"name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "master_link", 
+static const char* work_queue_properties[] = {"name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "master_link", 
             "poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
             "worker_blacklist", "worker_task_map", "categories", "workers_with_available_results",
             "stats", "stats_measure", "stats_disconnected_workers", "time_last_wait", 
@@ -24,7 +21,7 @@ char* wq[] = {"name", "port", "priority", "num_tasks_left", "next_taskid", "work
             "monitor_summary_filename", "monitor_exe", "measured_local_resources",
             "current_max_worker", "password", "bandwidth"};
 
-char* t[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", 
+static const char* work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", 
             "output_files", "env_list", "taskid", "return_status", "result", "host", "hostname",
             "category", "resource_request", "priority", "max_retries", "try_count", 
             "exhausted_attempts", "time_when_submitted", "time_when_done", 
@@ -42,10 +39,10 @@ char* t[] = { "tag", "command_line", "worker_selection_algorithm", "output", "in
             "total_bytes_transferred", "time_app_delay"};
 
 
-int is_in(const char* str, char** a)
+static int is_in(const char* str, const char** array)
 {
 
-    char** ptr = a;
+    const char** ptr = array;
 
     while(*ptr != 0){
 
@@ -61,7 +58,7 @@ int is_in(const char* str, char** a)
 
 }
 
-int validate_json(struct jx *json, char** a){
+static int validate_json(struct jx *json, const char** array){
 
     //iterate over the keys in a JX_OBJECT
     void *j = NULL;
@@ -69,7 +66,7 @@ int validate_json(struct jx *json, char** a){
 
     while (key != NULL) {
 
-        if(!is_in(key, a)){
+        if(!is_in(key, array)){
             return 1;
         }
 
@@ -81,7 +78,7 @@ int validate_json(struct jx *json, char** a){
 
 }
 
-int specify_files(int input, struct jx *files, struct work_queue_task *task){
+static int specify_files(int input, struct jx *files, struct work_queue_task *task){
 
     void *i = NULL;
     struct jx *arr = jx_iterate_array(files, &i);
@@ -136,15 +133,18 @@ int specify_files(int input, struct jx *files, struct work_queue_task *task){
 /* WQTCREATE
  * takes in a JSON string and returns a work_queue struct
  */
-struct work_queue_task* work_queue_task_json_create(char* str){
+struct work_queue_task* work_queue_task_json_create(const char* str){
 
     char *command_line;
     struct jx *input_files, *output_files;
 
     struct jx *json = jx_parse_string(str); 
+    if(!json){
+        return NULL;
+    }
 
     //validate json
-    if(validate_json(json, t)){
+    if(validate_json(json, work_queue_task_properties)){
         return NULL;
     }
 
@@ -202,16 +202,19 @@ struct work_queue_task* work_queue_task_json_create(char* str){
 /* WQCREATE
  * takes in a JSON string and returns a work_queue struct
  */
-struct work_queue* work_queue_json_create(char* str){
+struct work_queue* work_queue_json_create(const char* str){
 
 
     int port=0, priority=0;
     char *name;
 
     struct jx* json = jx_parse_string(str);
+    if(!json){
+        return NULL;
+    }
 
     //validate json
-    if(validate_json(json, wq)){
+    if(validate_json(json, work_queue_properties)){
         return NULL;
     }
 
@@ -266,7 +269,7 @@ struct work_queue* work_queue_json_create(char* str){
 /* SUBMIT
  *
  */
-int work_queue_json_submit(struct work_queue *q, char* str){
+int work_queue_json_submit(struct work_queue *q, const char* str){
 
     struct work_queue_task * task;
 
@@ -280,5 +283,3 @@ int work_queue_json_submit(struct work_queue *q, char* str){
     }
 
 }
-
-#endif

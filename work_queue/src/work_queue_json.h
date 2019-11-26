@@ -4,16 +4,10 @@
 #include "work_queue.h"
 #include "jx.h"
 
-int is_in(const char* str, char* a[]);
+struct work_queue_task* work_queue_task_json_create(const char* str);
 
-int validate_json(struct jx *json, char** a);
+struct work_queue* work_queue_json_create(const char* str);
 
-int specify_files(int input, struct jx *files, struct work_queue_task *task);
-
-struct work_queue_task* work_queue_task_json_create(char* str);
-
-struct work_queue* work_queue_json_create(char* str);
-
-int work_queue_json_submit(struct work_queue *q, char* str);
+int work_queue_json_submit(struct work_queue *q, const char* str);
 
 #endif
