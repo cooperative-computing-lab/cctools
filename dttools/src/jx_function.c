@@ -597,17 +597,9 @@ struct jx *jx_function_len(struct jx *args){
 	assert(args);
     assert(jx_istype(args, JX_ARRAY));
 	const char *funcname = "len";
-    void *i;
     
-    if(args->type != JX_ARRAY){
-        FAIL(funcname, args, "not an array");
-    }
-
-    struct jx* item = jx_iterate_array(args, &i);
-
-    if(args->type != JX_ARRAY){
-        FAIL(funcname, args, "not an array");
-    }
+    struct jx* item = jx_iterate_array(args, 0);
+    assert(jx_istype(item, JX_ARRAY));
 
     int length = jx_array_length(item);
 

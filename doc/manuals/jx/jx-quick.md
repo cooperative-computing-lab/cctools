@@ -107,6 +107,7 @@ expr for x in [1,2,3]
     basename( path )
     dirname( path )
     escape( string )
+    len( array )
 ```
 
 </td>
