@@ -1,7 +1,8 @@
 #include "work_queue_json.h"
+
+#include "jx.h"
 #include "jx_parse.h"
 #include "jx_print.h"
-#include "work_queue.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -281,5 +282,28 @@ int work_queue_json_submit(struct work_queue *q, const char* str){
     else{
         return -1;
     }
+
+}
+
+/* WAIT
+ *
+ */
+char* work_queue_json_wait(struct work_queue *q, int timeout){
+
+    char *task;
+    struct jx *j;
+    struct jx_pair *command_line, *taskid, *return_status;
+
+    struct work_queue_task *t = work_queue_wait(q, timeout);
+
+    command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
+    taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
+    return_status = jx_pair(jx_string("return_status"), jx_integer(t->return_status), taskid);
+    
+    j = jx_object(return_status);
+
+    task = jx_print_string(j);
+
+    return task;    
 
 }

@@ -11,9 +11,8 @@ char * workqueue = "{ \"name\" : \"cami_wq\" , \"port\" : 1234 }";
 int main(int argc, char* argv[]){
 
     struct work_queue *q;
-    struct work_queue_task *t;
     int taskid;
-    char *task;
+    char *task, *t;
     size_t len = 0;
     ssize_t read;
 
@@ -53,17 +52,9 @@ int main(int argc, char* argv[]){
 
 	while(!work_queue_empty(q)) {
 
-		t = work_queue_wait(q, 20);
+		t = work_queue_json_wait(q, 20);
 
-		if(t) {
-			printf("task (id# %d) complete: %s (return code %d)\n", t->taskid, t->command_line, t->return_status);
-
-            if(t->return_status != 0){
-                
-            }
-
-			work_queue_task_delete(t);
-		}
+        printf("%s\n", t);
 
 	}
 
