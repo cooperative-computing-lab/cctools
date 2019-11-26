@@ -201,6 +201,7 @@ static struct jx *jx_eval_call(
 		case JX_BUILTIN_LISTDIR: return jx_function_listdir(args);
 		case JX_BUILTIN_ESCAPE: return jx_function_escape(args);
 		case JX_BUILTIN_TEMPLATE: return jx_function_template(args, ctx);
+        case JX_BUILTIN_LEN: return jx_function_len(args);
 		case JX_BUILTIN_LAMBDA: {
 			assert(func->u.func.params);
 
@@ -605,6 +606,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	jx_eval_add_builtin(context, "listdir", JX_BUILTIN_LISTDIR);
 	jx_eval_add_builtin(context, "escape", JX_BUILTIN_ESCAPE);
 	jx_eval_add_builtin(context, "template", JX_BUILTIN_TEMPLATE);
+	jx_eval_add_builtin(context, "len", JX_BUILTIN_LEN);
 
 	switch(j->type) {
 		case JX_SYMBOL: {
