@@ -605,3 +605,5 @@ struct jx *jx_function_len(struct jx *args){
 	return jx_integer(length);
 
 }
+
+/* vim: set noexpandtab tabstop=4: */
