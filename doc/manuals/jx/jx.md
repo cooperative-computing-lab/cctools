@@ -469,7 +469,7 @@ template("SM{PLATE}_{ID}.sam", {"PLATE": "10001", "ID": N/2 - 1})
 
 >       len([1,2,3]) -> Integer
 
-len() returns the length when passed in an array. This function is
+len() returns the length when passed in an array and errors when not an array. This function is
 based on Python's own len() function.
 
 ```python
