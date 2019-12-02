@@ -121,6 +121,7 @@ typedef enum {
 	JX_BUILTIN_LISTDIR,
 	JX_BUILTIN_ESCAPE,
 	JX_BUILTIN_TEMPLATE,
+    JX_BUILTIN_LEN
 } jx_builtin_t;
 
 struct jx_function {
@@ -390,3 +391,5 @@ struct jx *jx_get_value(void **i);
 struct jx *jx_merge(struct jx *j, ...);
 
 #endif
+
+/*vim: set noexpandtab tabstop=4: */

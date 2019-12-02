@@ -591,3 +591,19 @@ struct jx *jx_function_template(struct jx *args, struct jx *ctx) {
 		FAIL(funcname, args, "at most two arguments are allowed");
 	}
 }
+
+struct jx *jx_function_len(struct jx *args){
+
+	assert(args);
+	assert(jx_istype(args, JX_ARRAY));
+
+	struct jx* item = jx_array_index(args, 0);
+	assert(jx_istype(item, JX_ARRAY));
+
+	int length = jx_array_length(item);
+
+	return jx_integer(length);
+
+}
+
+/*vim: set noexpandtab tabstop=4: */
