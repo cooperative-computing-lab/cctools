@@ -597,7 +597,7 @@ struct jx *jx_function_len(struct jx *args){
 	assert(args);
 	assert(jx_istype(args, JX_ARRAY));
 
-	struct jx* item = jx_iterate_array(args, 0);
+	struct jx* item = jx_array_index(args, 0);
 	assert(jx_istype(item, JX_ARRAY));
 
 	int length = jx_array_length(item);
@@ -606,4 +606,4 @@ struct jx *jx_function_len(struct jx *args){
 
 }
 
-/* vim: set noexpandtab tabstop=4: */
+/*vim: set noexpandtab tabstop=4: */
