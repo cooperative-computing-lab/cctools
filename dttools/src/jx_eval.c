@@ -663,3 +663,4 @@ struct jx * jx_eval_with_defines( struct jx *j, struct jx *context )
 	return result;
 }
 
+/*vim: set noexpandtab tabstop=4: */
