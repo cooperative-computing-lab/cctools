@@ -87,9 +87,13 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
     while (arr != NULL){
         
         char *local, *remote;
-        int flags;
+        struct jx_pair* flag;
         void *k = NULL;
         void *v = NULL;
+        int cache = 1;
+        int nocache = 0;
+        int watch = 16;
+        int flags = 0;
 
         const char *key = jx_iterate_keys(arr, &k);
         struct jx *value = jx_iterate_values(arr, &v);
@@ -97,17 +101,42 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
         while (key != NULL){
 
 
-            if (!strcmp(key, "local")){
+            if (!strcmp(key, "local_name")){
                 local = value->u.string_value;
             }
-            else if (!strcmp(key, "remote")){
+            else if (!strcmp(key, "remote_name")){
                 remote = value->u.string_value;
             }
             else if (!strcmp(key, "flags")){
-                flags = value->u.integer_value;
+                flag = value->u.pairs;
+                while(flag){
+                    char *flag_key = flag->key->u.string_value;
+                    bool flag_value = flag->value->u.boolean_value;
+                    if (!strcmp(flag_key, "WORK_QUEUE_NOCACHE")){
+                        if (flag_value){
+                            flags |= nocache;
+                        }
+                    }
+                    else if (!strcmp(flag_key, "WORK_QUEUE_CACHE")){
+                        if (flag_value){
+                            flags |= cache;
+                        }
+                    }
+                    else if (!strcmp(flag_key, "WORK_QUEUE_WATCH")){
+                        if (flag_value){
+                            flags |= watch;
+                        }
+                    }
+                    else{
+                        printf("KEY ERROR: %s not valid", flag_key);
+                        return 1;
+                    }
+                    flag = flag->next;
+                }
             }
             else{
-                printf("%s\n",value->u.string_value);
+                printf("KEY ERROR: %s not valid", key);
+                return 1;
             }
 
             key = jx_iterate_keys(arr, &k);
@@ -280,7 +309,7 @@ char* work_queue_json_wait(struct work_queue *q, int timeout){
 
     char *task;
     struct jx *j;
-    struct jx_pair *command_line, *taskid, *return_status, *tag, *output;
+    struct jx_pair *command_line, *taskid, *return_status, *tag, *output, *result;
 
     struct work_queue_task *t = work_queue_wait(q, timeout);
 

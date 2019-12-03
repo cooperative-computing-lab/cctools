@@ -29,9 +29,12 @@ Once returned, it is safe to re-submit the same take object via
 @param str A JSON description of a task. 
 
 { "command_line" : <i>string</i> , "output_files" : <i>array of objects with one object per output file</i> -> 
-[ { "local" : <i>string</i> , "remote" : <i>string</i> , "flags" : <i>integer</i> } ] , "input _files" : 
-<i>array of objects with one object per input file</i> -> [ { "local" : <i>string</i> , "remote" : 
-<i>string</i> , "flags" : <i>integer</i> } ] , "tag" : <i>string</i> }
+[ { "local_name" : <i>string</i> , "remote_name" : <i>string</i> , "flags" : <i>object</i> -> { 
+"WORK_QUEUE_CACHE" : <i>boolean</i> , "WORK_QUEUE_NOCACHE" : <i>boolean</i> , "WORK_QUEUE_WATCH" : 
+<i>boolean</i> } } ] , "input _files" : <i>array of objects with one object per input file</i> -> [ { 
+"local_name" : <i>string</i> , "remote_name" : <i>string</i> , "flags" : <i>object</i> -> { "WORK_QUEUE_CACHE" : 
+<i>boolean</i> , "WORK_QUEUE_NOCACHE" : <i>boolean</i> , "WORK_QUEUE_WATCH" : <i>boolean</i> } } ] , 
+"tag" : <i>string</i> }
 
 @return An integer taskid assigned to the submitted task.
 */
