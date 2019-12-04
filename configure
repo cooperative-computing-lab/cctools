@@ -1260,7 +1260,6 @@ then
 	echo "python version is suitable for prune"
 	echo "python version is suitable for weaver"
 else
-	packages=`echo ${packages} | sed 's/umbrella//g'`
 	echo "prune requires python >= 2.6"
 	packages=`echo ${packages} | sed 's/prune//g'`
 	echo "weaver requires python >= 2.6"
@@ -1271,6 +1270,7 @@ if [ "$python" = 0 -o "$python3" = 0 ]
 then
 	echo "python version is suitable for umbrella"
 else
+	packages=`echo ${packages} | sed 's/umbrella//g'`
 	echo "umbrella requires python >= 2.6"
 fi
 
