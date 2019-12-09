@@ -105,7 +105,7 @@ timestamp - the unix time (in microseconds) when this line is written to the log
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
 
-void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent );
+void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent );
 
 /*
 To balance between performance and consistency, we sync the log every 60 seconds
@@ -436,13 +436,12 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 	int silent = 0;
 	if(clean_mode != MAKEFLOW_CLEAN_NONE)
 		silent = 1;
-	// Decide rerun tasks
+
+	// Decide what tasks must be reset
 	if(!first_run) {
-		struct itable *rerun_table = itable_create(0);
 		for(n = d->nodes; n; n = n->next) {
-			makeflow_node_decide_rerun(rerun_table, d, n, silent);
+			makeflow_node_decide_reset(d, n, silent);
 		}
-		itable_delete(rerun_table);
 	}
 
 	//Update file reference counts from nodes in log

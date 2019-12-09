@@ -341,90 +341,40 @@ static void makeflow_abort_all(struct dag *d)
 
 /* A few forward prototypes to handle mutually-recursive definitions. */
 
-static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
+static void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent );
 static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
 
 /*
-Decide whether to rerun a node based on batch and file system status. The silent
+Decide whether to reset a node based on batch and file system status. The silent
 option was added for to prevent confusing debug output when in clean mode. When
 clean_mode is not NONE we silence the node reseting output.
 */
 
-void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent)
+void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent )
 {
-	struct dag_file *f;
-
-	if(itable_lookup(rerun_table, n->nodeid))
-		return;
-
-	// Below are a bunch of situations when a node has to be rerun.
-
-	// If a job was submitted to Condor, then just reconnect to it.
-	if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-		// Reconnect the Condor jobs
+	if(n->state == DAG_NODE_STATE_WAITING) {
+		// The job hasn't run yet, nothing to do.	
+	} else if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+		// It's a Condor job and still out there in the batch system, so note that and keep going.
 		if(!silent) fprintf(stderr, "rule still running: %s\n", n->command);
 		itable_insert(d->remote_job_table, n->jobid, n);
-
-		// Otherwise, we cannot reconnect to the job, so rerun it
 	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
+		// Otherwise, we cannot reconnect to the job, so rerun it
 		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
-		goto rerun;
+		makeflow_node_reset(d,n,silent);
+	} else if(n->state==DAG_NODE_STATE_COMPLETE) {
+		// The job succeeded, so nothing more to do.
 	}
-	// Rerun if an input file has been updated since the last execution.
-	list_first_item(n->source_files);
-	while((f = list_next_item(n->source_files))) {
-		if(dag_file_should_exist(f)) {
-			continue;
-		} else {
-			if(!f->created_by) {
-				if(!silent) fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
-				exit(1);
-			} else {
-				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
-				if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE) {
-					continue;
-				}
-				goto rerun;
-			}
-		}
-	}
-
-	// Rerun if an output file is missing.
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))) {
-		if(dag_file_should_exist(f))
-			continue;
-		/* If output file is missing, but node completed and file was gc'ed, then avoid rerunning. */
-		if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE)
-			continue;
-		goto rerun;
-	}
-
-	// Do not rerun this node
-	return;
-
-	  rerun:
-	makeflow_node_force_rerun(rerun_table, d, n);
 }
 
 /*
 Reset all state to cause a node to be re-run.
 */
 
-void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
+void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent )
 {
-	struct dag_node *p;
-	struct dag_file *f1;
-	struct dag_file *f2;
-	int child_node_found;
+	/* If the node is running, remove the corresponding job. */
 
-	if(itable_lookup(rerun_table, n->nodeid))
-		return;
-
-	// Mark this node as having been rerun already
-	itable_insert(rerun_table, n->nodeid, n);
-
-	// Remove running batch jobs
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job && local_queue) {
 			batch_job_remove(local_queue, n->jobid);
@@ -435,6 +385,8 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		}
 	}
 
+	/* If necessary, generate a complete task description */
+
 	if(!n->task){
 		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
 
@@ -444,39 +396,46 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		   partial files. Wrapper expansion was removed. */
 	}
 
-	// Clean up things associated with this node
+	/* Reset the state associated with the task and the node */
+
 	makeflow_clean_task(d,remote_queue,n->task);
 	makeflow_clean_node(d,remote_queue,n);
+
+	/* Put the node back to the waiting state. */
+
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
-	// For each parent node, rerun it if input file was garbage collected
-	list_first_item(n->source_files);
-	while((f1 = list_next_item(n->source_files))) {
-		if(dag_file_should_exist(f1))
-			continue;
+	/*
+	Reset each descendant of this node as well.
+	Note that the recursive behavior is self-limiting b/c each
+	reset node is put into the WAITING state, and WAITING
+	nodes are not reset.
+	*/
 
-		p = f1->created_by;
-		if(p) {
-			makeflow_node_force_rerun(rerun_table, d, p);
-			f1->reference_count += 1;
-		}
-	}
+	/* This is an expensive traversal, and could be improved. */
 
-	// For each child node, rerun it
+	/* For each of my output files... */
+	struct dag_file *f;
 	list_first_item(n->target_files);
-	while((f1 = list_next_item(n->target_files))) {
-		for(p = d->nodes; p; p = p->next) {
-			child_node_found = 0;
+	while((f = list_next_item(n->target_files))) {
 
+		/* For each node in the dag... */
+		struct dag_node *p;
+		for(p = d->nodes; p; p = p->next) {
+
+			/* Skip nodes that don't need resetting. */
+			if(p->state!=DAG_NODE_STATE_WAITING) continue;
+
+			/* For each file in that node... */
+			struct dag_file *pf;
 			list_first_item(p->source_files);
-			while((f2 = list_next_item(n->source_files))) {
-				if(!strcmp(f1->filename, f2->filename)) {
-					child_node_found = 1;
+			while((pf = list_next_item(n->source_files))) {
+
+				/* If it matches my output, reset that node. */ 
+				if(!strcmp(f->filename, pf->filename)) {
+					makeflow_node_reset(d,p,silent);
 					break;
 				}
-			}
-			if(child_node_found) {
-				makeflow_node_force_rerun(rerun_table, d, p);
 			}
 		}
 	}
