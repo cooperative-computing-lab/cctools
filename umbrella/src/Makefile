@@ -15,9 +15,7 @@ umbrella: umbrella.py
 	chmod 755 umbrella
 
 umbrella_helper.html: umbrella.py
-	# pydoc creates a html file, umbrella.html.
-	if [ -x "${CCTOOLS_PYDOC}" ]; then ${CCTOOLS_PYDOC} -w umbrella; fi
-	if [ -f umbrella.html ]; then mv umbrella.html umbrella_helper.html; fi
+	@if $(CCTOOLS_PYDOC) -w umbrella > /dev/null 2>&1; then mv umbrella.html umbrella_helper.html; else echo Could not create $@; fi
 
 clean:
 	rm -f $(OBJECTS) $(TARGETS)
