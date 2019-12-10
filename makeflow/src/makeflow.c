@@ -317,7 +317,7 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 Reset all state to cause a node to be re-run.
 */
 
-void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent )
+void makeflow_node_reset( struct dag *d, struct dag_node *n )
 {
 	/* If the node is running, remove the corresponding job. */
 
@@ -367,7 +367,7 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent )
 
 				/* If it matches my output, reset that node. */ 
 				if(!strcmp(f->filename, pf->filename)) {
-					makeflow_node_reset(d,p,silent);
+					makeflow_node_reset(d,p);
 					break;
 				}
 			}
@@ -392,7 +392,7 @@ void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent )
 	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
 		// Otherwise, we cannot reconnect to the job, so rerun it
 		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
-		makeflow_node_reset(d,n,silent);
+		makeflow_node_reset(d,n);
 	} else if(n->state==DAG_NODE_STATE_COMPLETE) {
 		// The job succeeded, so nothing more to do.
 	}
