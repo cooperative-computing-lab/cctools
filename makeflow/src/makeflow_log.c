@@ -394,6 +394,8 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 			free(line);
 		}
 		fclose(d->logfile);
+	} else {
+		printf("creating new log file %s...\n",filename);
 	}
 
 	d->logfile = fopen(filename, "a");
