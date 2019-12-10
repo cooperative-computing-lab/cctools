@@ -213,18 +213,12 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		/* Generate the workflow arguments file */
 
 		if(n->workflow_args) {
-			char args[] = "makeflow.jx.args.XXXXXX";
-			int fd = mkstemp(args);
-			FILE *argsfile = fdopen(fd,"w");
-			jx_print_stream(n->workflow_args,argsfile);
-			fclose(argsfile);
-
 			oldcmd = cmd;
-			cmd = string_format("%s --jx-args %s",cmd,args);
+			cmd = string_format("%s --jx-args %s",cmd,n->workflow_args_file);
 			free(oldcmd);
 
 			/* Define this file as a temp so it is removed on completion. */
-			makeflow_hook_add_input_file(n->d,task,args,args,DAG_FILE_TYPE_TEMP);
+			makeflow_hook_add_input_file(n->d,task,n->workflow_args_file,n->workflow_args_file,DAG_FILE_TYPE_TEMP);
 		}
 
 		/* Add resource controls to the sub-workflow, if known. */

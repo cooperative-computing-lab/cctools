@@ -53,6 +53,7 @@ struct dag_node {
 
 	const char *workflow_file;  /* Name of the sub-makeflow to run, if type is WORKFLOW */
 	struct jx *workflow_args;   /* Arguments to pass to the workflow. */
+	char *workflow_args_file;   /* Automatically generated temporary file to write workflow_args to disc. */
 	int workflow_is_jx;	    /* True is sub-workflow is jx, false otherwise. */
 
 	struct itable *remote_names;        /* Mapping from struct *dag_files to remotenames (char *) */
