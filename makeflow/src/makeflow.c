@@ -779,32 +779,41 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 }
 
 /*
-Check the dag for all input files that should exist
-before anything starts running.
+Check the dag for all files that should exist,
+whether a-prior, or from a prior run that was logged.
 */
 
-static int makeflow_check(struct dag *d)
+static int makeflow_check_files(struct dag *d)
 {
 	struct stat buf;
 	struct dag_file *f;
 	char *name;
 	int error = 0;
 
-	if(skip_file_check) return 1;
-
-	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
-
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 
-		if(!f->created_by && !f->source) {
-			if(batch_fs_stat(remote_queue, f->filename, &buf)<0) {
-				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-				error++;
+		if(dag_file_should_exist(f)) {
+			int result = batch_fs_stat(remote_queue, f->filename, &buf );
+			if(dag_file_is_source(f)) {
+				if(result<0) {
+					fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
+					error++;
+				}
+			} else {
+				if(result<0) {
+					fprintf(stderr, "makeflow: %s was logged as created, but does not exist now.\n", f->filename);
+					makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+					error++;
+				} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+					fprintf(stderr, "makeflow: %s was logged as created, but has been modified by someone else (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
+					makeflow_clean_file(d, remote_queue, f);
+					makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+					error++;
+				}
 			}
 		}
 	}
-
 	if(error) {
 		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", error);
 		return 0;
@@ -2200,8 +2209,8 @@ int main(int argc, char *argv[])
 
 	printf("checking %s for consistency...\n",dagfile);
 
-	if(!makeflow_check(d)) {
-		goto EXIT_WITH_FAILURE;
+	if(!skip_file_check && !makeflow_check_files(d)) {
+			goto EXIT_WITH_FAILURE;
 	}
 
 	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
@@ -2224,7 +2233,7 @@ int main(int argc, char *argv[])
 	/* In case when the user uses --cache option to specify the mount cache dir and the log file also has
 	 * a cache dir logged, these two dirs must be the same. Otherwise exit.
 	 */
-	if(makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check )) {
+	if(makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode )) {
 		goto EXIT_WITH_FAILURE;
 	}
 
