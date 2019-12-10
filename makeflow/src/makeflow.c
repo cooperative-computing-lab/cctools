@@ -2427,6 +2427,19 @@ EXIT_WITH_FAILURE:
 		exit_value = EXIT_SUCCESS;
 	}
 
+	/* delete all jx args files. We do this here are some of these files may be created in clean mode. */
+	{
+		struct dag_node *n;
+		uint64_t key;
+		itable_firstkey(d->node_table);
+		while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+			if(n->workflow_args_file) {
+				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", n->workflow_args_file);
+				unlink(n->workflow_args_file);
+			}
+		}
+	}
+
 	makeflow_hook_destroy(d);
 
 	/* Batch queues are removed after hooks are destroyed to allow for file clean up on related files. */
