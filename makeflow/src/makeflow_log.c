@@ -416,6 +416,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 
 	/*
 	Verify that each file logged as created still exists.
+	If not, reset the state of the file.
 	*/
 
 	if(!first_run && !skip_file_check) {
@@ -436,25 +437,32 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 		}
 	}
 
-	int silent = 0;
-	if(clean_mode != MAKEFLOW_CLEAN_NONE)
-		silent = 1;
+	/*
+	If this is not the first attempt at running, then
+	scan for nodes that are running, failed, or aborted,
+	and reset them to a waiting state to be retried.
+	*/
 
-	// Decide what tasks must be reset
 	if(!first_run) {
+		printf("checking for old running or failed jobs...\n");
+		int silent = clean_mode != MAKEFLOW_CLEAN_NONE;
 		for(n = d->nodes; n; n = n->next) {
 			makeflow_node_decide_reset(d, n, silent);
 		}
 	}
 
-	//Update file reference counts from nodes in log
+	/*
+	To bring garbage collection up to date, decrement
+	file reference counts for every node that is complete.
+	*/
+
 	for(n = d->nodes; n; n = n->next) {
 		if(n->state == DAG_NODE_STATE_COMPLETE)
 		{
 			struct dag_file *f;
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)))
-				f->reference_count += -1;
+				f->reference_count--;
 		}
 	}
 
