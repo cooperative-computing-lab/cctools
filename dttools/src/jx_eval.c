@@ -588,11 +588,13 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 {
 	struct jx *result = NULL;
 	if (!j) return NULL;
-	if (context) {
-		context = jx_copy(context);
-	} else {
+
+    int new_context = 0;
+	if (!context) {
 		context = jx_object(NULL);
+        new_context = 1;
 	}
+
 	if (!jx_istype(context, JX_OBJECT)) {
 		return jx_error(jx_string("context must be an object"));
 	}
@@ -642,7 +644,10 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			break;
 	}
 
-	jx_delete(context);
+    if(new_context) {
+        jx_delete(context);
+    }
+
 	return result;
 }
 
