@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #include <sys/stat.h>
 
@@ -66,7 +67,8 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	}
 	fchmod(fileno(file), 0755);
 
-	char *path = getenv("PWD");
+	char path[PATH_MAX];
+	getcwd(path, PATH_MAX);
 
 	fprintf(file, "#!/bin/sh\n");
 	fprintf(file, "#$ -S /bin/sh\n");
