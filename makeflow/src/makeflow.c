@@ -341,31 +341,7 @@ static void makeflow_abort_all(struct dag *d)
 
 /* A few forward prototypes to handle mutually-recursive definitions. */
 
-static void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent );
 static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
-
-/*
-Decide whether to reset a node based on batch and file system status. The silent
-option was added for to prevent confusing debug output when in clean mode. When
-clean_mode is not NONE we silence the node reseting output.
-*/
-
-void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent )
-{
-	if(n->state == DAG_NODE_STATE_WAITING) {
-		// The job hasn't run yet, nothing to do.	
-	} else if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-		// It's a Condor job and still out there in the batch system, so note that and keep going.
-		if(!silent) fprintf(stderr, "rule still running: %s\n", n->command);
-		itable_insert(d->remote_job_table, n->jobid, n);
-	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
-		// Otherwise, we cannot reconnect to the job, so rerun it
-		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
-		makeflow_node_reset(d,n,silent);
-	} else if(n->state==DAG_NODE_STATE_COMPLETE) {
-		// The job succeeded, so nothing more to do.
-	}
-}
 
 /*
 Reset all state to cause a node to be re-run.
@@ -438,6 +414,29 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent )
 				}
 			}
 		}
+	}
+}
+
+/*
+Decide whether to reset a node based on batch and file system status. The silent
+option was added for to prevent confusing debug output when in clean mode. When
+clean_mode is not NONE we silence the node reseting output.
+*/
+
+void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent )
+{
+	if(n->state == DAG_NODE_STATE_WAITING) {
+		// The job hasn't run yet, nothing to do.	
+	} else if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+		// It's a Condor job and still out there in the batch system, so note that and keep going.
+		if(!silent) fprintf(stderr, "rule still running: %s\n", n->command);
+		itable_insert(d->remote_job_table, n->jobid, n);
+	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
+		// Otherwise, we cannot reconnect to the job, so rerun it
+		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
+		makeflow_node_reset(d,n,silent);
+	} else if(n->state==DAG_NODE_STATE_COMPLETE) {
+		// The job succeeded, so nothing more to do.
 	}
 }
 
