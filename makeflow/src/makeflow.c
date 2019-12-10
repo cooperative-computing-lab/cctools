@@ -779,37 +779,29 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 }
 
 /*
-Check the dag for consistency, and emit errors if input dependencies, etc are missing.
+Check the dag for all input files that should exist
+before anything starts running.
 */
 
 static int makeflow_check(struct dag *d)
 {
 	struct stat buf;
-	struct dag_node *n;
 	struct dag_file *f;
+	char *name;
 	int error = 0;
 
 	if(skip_file_check) return 1;
 
 	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
-	for(n = d->nodes; n; n = n->next) {
-		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files))) {
-			if(f->created_by) {
-				continue;
-			}
+	hash_table_firstkey(d->files);
+	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 
-			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
-				continue;
+		if(!f->created_by && !f->source) {
+			if(batch_fs_stat(remote_queue, f->filename, &buf)<0) {
+				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
+				error++;
 			}
-
-			if(f->source) {
-				continue;
-			}
-
-			fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-			error++;
 		}
 	}
 
