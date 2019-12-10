@@ -789,6 +789,8 @@ static int makeflow_check(struct dag *d)
 	struct dag_file *f;
 	int error = 0;
 
+	if(skip_file_check) return 1;
+
 	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
 
 	for(n = d->nodes; n; n = n->next) {
@@ -798,7 +800,7 @@ static int makeflow_check(struct dag *d)
 				continue;
 			}
 
-			if(skip_file_check || batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
+			if(batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
 				continue;
 			}
 
@@ -2205,6 +2207,7 @@ int main(int argc, char *argv[])
 	}
 
 	printf("checking %s for consistency...\n",dagfile);
+
 	if(!makeflow_check(d)) {
 		goto EXIT_WITH_FAILURE;
 	}
