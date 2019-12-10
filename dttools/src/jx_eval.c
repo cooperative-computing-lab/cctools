@@ -571,13 +571,7 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 	struct jx *result = NULL;
 	if (!j) return NULL;
 
-    int new_context = 0;
-	if (!context) {
-		context = jx_object(NULL);
-        new_context = 1;
-	}
-
-	if (!jx_istype(context, JX_OBJECT)) {
+	if (context && !jx_istype(context, JX_OBJECT)) {
 		return jx_error(jx_string("context must be an object"));
 	}
 
@@ -613,10 +607,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			result = jx_eval_operator(&j->u.oper, context);
 			break;
 	}
-
-    if(new_context) {
-        jx_delete(context);
-    }
 
 	return result;
 }

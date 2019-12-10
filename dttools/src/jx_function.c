@@ -466,9 +466,8 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 	const char *funcname = "template";
 
 	assert(template);
-	assert(ctx);
 	assert(jx_istype(template, JX_STRING));
-	assert(jx_istype(ctx, JX_OBJECT));
+	assert(!ctx || jx_istype(ctx, JX_OBJECT));
 	assert(!overrides || jx_istype(overrides, JX_OBJECT));
 
 	const char *message = NULL;
@@ -566,9 +565,8 @@ FAIL:
 
 struct jx *jx_function_template(struct jx *args, struct jx *ctx) {
 	assert(args);
-	assert(ctx);
 	assert(jx_istype(args, JX_ARRAY));
-	assert(jx_istype(ctx, JX_OBJECT));
+	assert(!ctx || jx_istype(ctx, JX_OBJECT));
 
 	const char *funcname = "template";
 	struct jx *template = jx_array_index(args, 0);
