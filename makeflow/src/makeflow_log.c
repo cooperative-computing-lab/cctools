@@ -262,6 +262,56 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 	makeflow_log_sync(d,0);
 }
 
+/*
+Dump the dag structure into the log file in comment formats.
+This is used by some tools (such as Weaver) for debugging
+assistance.
+*/
+
+void makeflow_log_dag_structure( struct dag *d )
+{
+	struct dag_file *f;
+	struct dag_node *n, *p;
+
+	for(n = d->nodes; n; n = n->next) {
+		/* Record node information to log */
+		fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
+
+		/* Record the node category to the log */
+		fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->name);
+		fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->name);   /* also write the SYMBOL as alias of CATEGORY, deprecated. */
+
+		/* Record node parents to log */
+		fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
+			p = f->created_by;
+			if(p)
+				fprintf(d->logfile, "\t%d", p->nodeid);
+		}
+		fputc('\n', d->logfile);
+
+		/* Record node inputs to log */
+		fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
+			fprintf(d->logfile, "\t%s", f->filename);
+		}
+		fputc('\n', d->logfile);
+
+		/* Record node outputs to log */
+		fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
+		list_first_item(n->target_files);
+		while( (f = list_next_item(n->target_files)) ) {
+			fprintf(d->logfile, "\t%s", f->filename);
+		}
+		fputc('\n', d->logfile);
+
+		/* Record translated command to log */
+		fprintf(d->logfile, "# COMMAND\t%d\t%s\n", n->nodeid, n->command);
+	}
+}
+
 /** The clean_mode variable was added so that we could better print out error messages
  * apply in the situation. Currently only used to silence node rerun checking.
  */
@@ -357,47 +407,8 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 	}
 
 	if(first_run && verbose_mode) {
-		struct dag_file *f;
-		struct dag_node *p;
-		for(n = d->nodes; n; n = n->next) {
-			/* Record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
-
-			/* Record the node category to the log */
-			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->name);
-			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->name);   /* also write the SYMBOL as alias of CATEGORY, deprecated. */
-
-			/* Record node parents to log */
-			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
-			list_first_item(n->source_files);
-			while( (f = list_next_item(n->source_files)) ) {
-				p = f->created_by;
-				if(p)
-					fprintf(d->logfile, "\t%d", p->nodeid);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record node inputs to log */
-			fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
-			list_first_item(n->source_files);
-			while( (f = list_next_item(n->source_files)) ) {
-				fprintf(d->logfile, "\t%s", f->filename);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record node outputs to log */
-			fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
-			list_first_item(n->target_files);
-			while( (f = list_next_item(n->target_files)) ) {
-				fprintf(d->logfile, "\t%s", f->filename);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record translated command to log */
-			fprintf(d->logfile, "# COMMAND\t%d\t%s\n", n->nodeid, n->command);
-		}
+		makeflow_log_dag_structure(d);
 	}
-
 
 	dag_count_states(d);
 
