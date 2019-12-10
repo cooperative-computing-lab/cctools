@@ -400,7 +400,7 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n, int silent )
 		for(p = d->nodes; p; p = p->next) {
 
 			/* Skip nodes that don't need resetting. */
-			if(p->state!=DAG_NODE_STATE_WAITING) continue;
+			if(p->state==DAG_NODE_STATE_WAITING) continue;
 
 			/* For each file in that node... */
 			struct dag_file *pf;
