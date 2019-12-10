@@ -297,10 +297,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 				} else if(file_state == DAG_FILE_STATE_DELETE){
 					d->deleted_files += 1;
 				}
-				free(line);
-				continue;
-			}
-			if(sscanf(line, "# CACHE %" SCNu64 " %s", &previous_completion_time, cache_dir) == 2) {
+			} else if(sscanf(line, "# CACHE %" SCNu64 " %s", &previous_completion_time, cache_dir) == 2) {
 				/* if the user specifies a cache dir using --cache dir, ignore the info from the log file */
 				if(!d->cache_dir) {
 					d->cache_dir = xxstrdup(cache_dir);
@@ -315,10 +312,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 						return -1;
 					}
 				}
-				free(line);
-				continue;
-			}
-			if(sscanf(line, "# MOUNT %" SCNu64 " %s %s %s %d", &previous_completion_time, file, source, cache_name, &type) == 5) {
+			} else if(sscanf(line, "# MOUNT %" SCNu64 " %s %s %s %d", &previous_completion_time, file, source, cache_name, &type) == 5) {
 				f = dag_file_lookup_or_create(d, file);
 
 				if(!f->source) {
@@ -333,28 +327,21 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 						return -1;
 					}
 				}
-				free(line);
-				continue;
-			}
-			if(line[0] == '#') {
-				free(line);
-				continue;
-			}
-			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
+			} else if(line[0] == '#') {
+				/* Ignore any other comment lines */
+			} else if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
 				n = itable_lookup(d->node_table, nodeid);
 				if(n) {
 					n->state = state;
 					n->jobid = jobid;
 					/* Log timestamp is in microseconds, we need seconds for diff. */
 					n->previous_completion = (time_t) (previous_completion_time / 1000000);
-					free(line);
-					continue;
 				}
+			} else {
+				fprintf(stderr, "makeflow: %s appears to be corrupted on line %d\n", filename, linenum);
+				exit(1);
 			}
-
-			fprintf(stderr, "makeflow: %s appears to be corrupted on line %d\n", filename, linenum);
 			free(line);
-			exit(1);
 		}
 		fclose(d->logfile);
 	}
