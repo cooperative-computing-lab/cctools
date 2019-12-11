@@ -826,7 +826,7 @@ static int makeflow_check_files(struct dag *d)
 		}
 	}
 	if(errors) {
-		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", error);
+		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", errors);
 		return 0;
 	} else {
 		return 1;
