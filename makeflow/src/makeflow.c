@@ -780,33 +780,52 @@ static int makeflow_check_files(struct dag *d)
 	struct stat buf;
 	struct dag_file *f;
 	char *name;
-	int error = 0;
+	int errors = 0;
+
+	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
 
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 
 		if(dag_file_should_exist(f)) {
+
 			int result = batch_fs_stat(remote_queue, f->filename, &buf );
 			if(dag_file_is_source(f)) {
 				if(result<0) {
 					fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-					error++;
+					errors++;
 				}
 			} else {
+				int do_reset_file = 0;
+
 				if(result<0) {
 					fprintf(stderr, "makeflow: %s was logged as created, but does not exist now.\n", f->filename);
-					makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
-					error++;
+					do_reset_file = 1;
 				} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
 					fprintf(stderr, "makeflow: %s was logged as created, but has been modified by someone else (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
+					do_reset_file = 1;
+				} else {
+					do_reset_file = 0;
+				}
+
+				if(do_reset_file) {
 					makeflow_clean_file(d, remote_queue, f);
 					makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
-					error++;
+
+					/* For each node that consumes the file... */
+					struct dag_node *p;
+					list_first_item(f->needed_by);
+					while((p = list_next_item(f->needed_by))) {
+
+						/* Reset that node and its descendants */
+						makeflow_node_reset(d,p);
+					}
 				}
+
 			}
 		}
 	}
-	if(error) {
+	if(errors) {
 		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", error);
 		return 0;
 	} else {
