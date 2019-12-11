@@ -1,3 +1,9 @@
+/*
+Copyright (C) 2019- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #ifndef WORK_QUEUE_JSON_H
 #define WORK_QUEUE_JSON_H
 
@@ -18,7 +24,7 @@ port stored in <b>WORK_QUEUE_PORT</b> is used if available. If it isn't, or
 and <b>WORK_QUEUE_HIGH_PORT</b> (1024 and 32767 by default) is chosen.
 @return A new work queue, or null if it could not be created. 
  */
-struct work_queue* work_queue_json_create(const char* str);
+struct work_queue *work_queue_json_create(const char *str);
 
 /** Submit a task to a queue.
 Once a task is submitted to a queue, it is not longer under the user's 
@@ -38,7 +44,7 @@ Once returned, it is safe to re-submit the same take object via
 
 @return An integer taskid assigned to the submitted task.
 */
-int work_queue_json_submit(struct work_queue *q, const char* str);
+int work_queue_json_submit(struct work_queue *q, const char *str);
 
 /** Wait for a task to complete.
 @param q A work queue object.
@@ -54,6 +60,6 @@ child process). Return string should be freed using free().
 <i>integer</i> , "return_status" : <i>integer</i> , "result" : <i>integer</i> }
 
 */
-char* work_queue_json_wait(struct work_queue *q, int timeout);
+char *work_queue_json_wait(struct work_queue *q, int timeout);
 
 #endif
