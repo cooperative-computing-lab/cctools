@@ -319,6 +319,10 @@ Reset all state to cause a node to be re-run.
 
 void makeflow_node_reset( struct dag *d, struct dag_node *n )
 {
+	/* Nothing to do if the node is still waiting. */
+
+	if(n->state==DAG_NODE_STATE_WAITING) return;
+
 	/* If the node is running, remove the corresponding job. */
 
 	if(n->state == DAG_NODE_STATE_RUNNING) {
@@ -346,31 +350,18 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n )
 	nodes are not reset.
 	*/
 
-	/* This is an expensive traversal, and could be improved. */
-
 	/* For each of my output files... */
 	struct dag_file *f;
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
 
-		/* For each node in the dag... */
+		/* For each node that consumes the file... */
 		struct dag_node *p;
-		for(p = d->nodes; p; p = p->next) {
+		list_first_item(f->needed_by);
+		while((p = list_next_item(f->needed_by))) {
 
-			/* Skip nodes that don't need resetting. */
-			if(p->state==DAG_NODE_STATE_WAITING) continue;
-
-			/* For each file in that node... */
-			struct dag_file *pf;
-			list_first_item(p->source_files);
-			while((pf = list_next_item(n->source_files))) {
-
-				/* If it matches my output, reset that node. */ 
-				if(!strcmp(f->filename, pf->filename)) {
-					makeflow_node_reset(d,p);
-					break;
-				}
-			}
+			/* Reset that node and its descendants */
+			makeflow_node_reset(d,p);
 		}
 	}
 }
@@ -780,7 +771,8 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 
 /*
 Check the dag for all files that should exist,
-whether a-prior, or from a prior run that was logged.
+whether provided by the user, or created by 
+a prior run that was logged.
 */
 
 static int makeflow_check_files(struct dag *d)
