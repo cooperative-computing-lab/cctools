@@ -1030,7 +1030,7 @@ static void show_help_run(const char *cmd)
 	printf("								  all: Cleans all files but inputs (defualt).\n");
 	printf("								  outputs: Cleans output files.\n");
 	printf("								  intermediates: Cleans intermediate files.\n");
-	printf("								  cahce: Cleans cache directory.\n");
+	printf("								  cache: Cleans cache directory.\n");
 	printf(" -d,--debug=<subsystem>         Enable debugging for this subsystem.\n");
 	printf(" -o,--debug-file=<file>         Send debugging to this file.\n");
 	printf("    --debug-rotate-max=<bytes>  Rotate debug file once it reaches this size.\n");
