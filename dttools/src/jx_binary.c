@@ -150,7 +150,6 @@ int jx_binary_write( FILE *stream, struct jx *j )
 			jx_binary_write_uint8(stream,JX_BINARY_END);
 			break;
 		case JX_OPERATOR:
-		case JX_FUNCTION:
 		case JX_SYMBOL:
 		case JX_ERROR:
 			debug(D_NOTICE,"cannot write out non-constant JX data!");

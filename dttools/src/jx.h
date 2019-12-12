@@ -49,7 +49,6 @@ typedef enum {
 	JX_ARRAY,    /**< array containing values */
 	JX_OBJECT,   /**< object containing key-value pairs */
 	JX_OPERATOR, /**< operator on multiple values. */
-	JX_FUNCTION, /**< function definition */
 	JX_ERROR,    /**< indicates failed evaluation */
 } jx_type_t;
 
@@ -109,29 +108,6 @@ struct jx_operator {
 	struct jx *right;
 };
 
-typedef enum {
-	JX_BUILTIN_LAMBDA,
-	JX_BUILTIN_RANGE,
-	JX_BUILTIN_FORMAT,
-	JX_BUILTIN_JOIN,
-	JX_BUILTIN_CEIL,
-	JX_BUILTIN_FLOOR,
-	JX_BUILTIN_BASENAME,
-	JX_BUILTIN_DIRNAME,
-	JX_BUILTIN_LISTDIR,
-	JX_BUILTIN_ESCAPE,
-	JX_BUILTIN_TEMPLATE,
-    JX_BUILTIN_LEN
-} jx_builtin_t;
-
-struct jx_function {
-	char *name;
-	unsigned line;
-	struct jx_item *params;
-	struct jx *body;
-	jx_builtin_t builtin;
-};
-
 /** JX value representing any expression type. */
 
 struct jx {
@@ -146,7 +122,6 @@ struct jx {
 		struct jx_item *items;  /**< value of @ref JX_ARRAY */
 		struct jx_pair *pairs;  /**< value of @ref JX_OBJECT */
 		struct jx_operator oper; /**< value of @ref JX_OPERATOR */
-		struct jx_function func; /**< value of @ref JX_FUNCTION */
 		struct jx *err;  /**< error value of @ref JX_ERROR */
 	} u;
 };
@@ -178,12 +153,6 @@ struct jx * jx_symbol( const char *symbol_name );
 
 /** Create a JX_ERROR. @param err The associated data for the error. This should be a string description of the error. @return A JX error value. */
 struct jx * jx_error( struct jx *err );
-
-/** Create a JX_FUNCTION. @param params The list of JX_STRING parameter names.
- * @param body The function body to evaluate. @returns A JX function definition.
- */
-struct jx *jx_function(const char *name, jx_builtin_t op,
-	struct jx_item *params, struct jx *body);
 
 /** Create a JX array.  @param items A linked list of @ref jx_item values.  @return A JX array. */
 struct jx * jx_array( struct jx_item *items );

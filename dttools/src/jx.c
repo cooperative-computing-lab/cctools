@@ -148,17 +148,6 @@ struct jx * jx_error( struct jx *err )
 	return j;
 }
 
-struct jx *jx_function(const char *name, jx_builtin_t op,
-	struct jx_item *params, struct jx *body) {
-	assert(name);
-	struct jx *j = jx_create(JX_FUNCTION);
-	j->u.func.name = strdup(name);
-	j->u.func.params = params;
-	j->u.func.body = body;
-	j->u.func.builtin = op;
-	return j;
-}
-
 struct jx * jx_arrayv( struct jx *value, ... )
 {
 	va_list args;
@@ -425,11 +414,6 @@ void jx_delete( struct jx *j )
 			jx_delete(j->u.oper.left);
 			jx_delete(j->u.oper.right);
 			break;
-		case JX_FUNCTION:
-			free(j->u.func.name);
-			jx_item_delete(j->u.func.params);
-			jx_delete(j->u.func.body);
-			break;
 		case JX_ERROR:
 			jx_delete(j->u.err);
 			break;
@@ -512,11 +496,6 @@ int jx_equals( struct jx *j, struct jx *k )
 			return j->u.oper.type == k->u.oper.type
 				&& jx_equals(j->u.oper.left,k->u.oper.right)
 				&& jx_equals(j->u.oper.right,j->u.oper.right);
-		case JX_FUNCTION:
-			return !strcmp(j->u.func.name, k->u.func.name)
-				&& jx_item_equals(
-					   j->u.func.params, k->u.func.params)
-				&& jx_equals(j->u.func.body, k->u.func.body);
 		case JX_ERROR:
 			return jx_equals(j->u.err, k->u.err);
 	}
@@ -591,11 +570,6 @@ struct jx  *jx_copy( struct jx *j )
 		case JX_OPERATOR:
 			c = jx_operator(j->u.oper.type, jx_copy(j->u.oper.left), jx_copy(j->u.oper.right));
 			break;
-		case JX_FUNCTION:
-			c = jx_function(j->u.func.name, j->u.func.builtin,
-				jx_item_copy(j->u.func.params),
-				jx_copy(j->u.func.body));
-			break;
 		case JX_ERROR:
 			c = jx_error(jx_copy(j->u.err));
 			break;
@@ -649,7 +623,6 @@ int jx_is_constant( struct jx *j )
 		case JX_OBJECT:
 			return jx_pair_is_constant(j->u.pairs);
 		case JX_ERROR:
-		case JX_FUNCTION:
 		case JX_OPERATOR:
 			return 0;
 	}
