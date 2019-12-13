@@ -312,6 +312,7 @@ static void makeflow_abort_all(struct dag *d)
 /* A few forward prototypes to handle mutually-recursive definitions. */
 
 static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
+static void makeflow_node_reset_by_file( struct dag *d, struct dag_file *f );
 
 /*
 Reset all state to cause a node to be re-run.
@@ -354,17 +355,26 @@ void makeflow_node_reset( struct dag *d, struct dag_node *n )
 	struct dag_file *f;
 	list_first_item(n->target_files);
 	while((f = list_next_item(n->target_files))) {
-
-		/* For each node that consumes the file... */
-		struct dag_node *p;
-		list_first_item(f->needed_by);
-		while((p = list_next_item(f->needed_by))) {
-
-			/* Reset that node and its descendants */
-			makeflow_node_reset(d,p);
-		}
+		/* Reset all nodes that consume that file. */
+		makeflow_node_reset_by_file(d,f);
 	}
 }
+
+/*
+Reset all nodes that consume file f.
+*/
+
+static void makeflow_node_reset_by_file( struct dag *d, struct dag_file *f )
+{
+	/* For each node that consumes the file... */
+	struct dag_node *n;
+	list_first_item(f->needed_by);
+	while((n = list_next_item(f->needed_by))) {
+		/* Reset that node and its descendants */
+		makeflow_node_reset(d,n);
+	}
+}
+
 
 /*
 Decide whether to reset a node based on batch and file system status. The silent
@@ -796,35 +806,27 @@ static int makeflow_check_files(struct dag *d)
 					errors++;
 				}
 			} else {
-				int do_reset_file = 0;
-
 				if(result<0) {
-					fprintf(stderr, "makeflow: %s was logged as created, but does not exist now.\n", f->filename);
-					do_reset_file = 1;
-				} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
-					fprintf(stderr, "makeflow: %s was logged as created, but has been modified by someone else (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
-					do_reset_file = 1;
-				} else {
-					do_reset_file = 0;
-				}
-
-				if(do_reset_file) {
-					makeflow_clean_file(d, remote_queue, f);
+					fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else deleted it!\n", f->filename);
 					makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+					makeflow_node_reset(d,f->created_by);
 
-					/* For each node that consumes the file... */
-					struct dag_node *p;
-					list_first_item(f->needed_by);
-					while((p = list_next_item(f->needed_by))) {
-
-						/* Reset that node and its descendants */
-						makeflow_node_reset(d,p);
+				} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+					fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else modified it!\n",f->filename);
+					int modified_files_should_be_destroyed = 1;
+					if(modified_files_should_be_destroyed) {
+						makeflow_clean_file(d, remote_queue, f);
+						makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+						makeflow_node_reset(d,f->created_by);
+					} else {
+						makeflow_node_reset_by_file(d,f);
 					}
 				}
 
 			}
 		}
 	}
+
 	if(errors) {
 		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", errors);
 		return 0;
