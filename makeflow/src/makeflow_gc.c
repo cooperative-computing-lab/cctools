@@ -83,6 +83,8 @@ void makeflow_parse_input_outputs( struct dag *d )
 		/* add collect_list, for sink_files that should be removed */
 		string_split_quotes(input_list, &argc, &argv);
 		for(i = 0; i < argc; i++) {
+			// skip empty strings
+			if(!argv[i][0]) continue;
 			d->completed_files += 1;
 			f = dag_file_lookup_or_create(d, argv[i]);
 			set_insert(d->inputs, f);
