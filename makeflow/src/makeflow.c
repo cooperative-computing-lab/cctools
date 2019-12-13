@@ -797,32 +797,32 @@ static int makeflow_check_files(struct dag *d)
 	hash_table_firstkey(d->files);
 	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
 
-		if(dag_file_should_exist(f)) {
+		/* Skip special files that are not connected to the DAG nodes. */
+		if(!f->created_by && !list_size(f->needed_by)) continue;
 
-			int result = batch_fs_stat(remote_queue, f->filename, &buf );
-			if(dag_file_is_source(f)) {
-				if(result<0) {
-					fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-					errors++;
-				}
-			} else {
-				if(result<0) {
-					fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else deleted it!\n", f->filename);
-					makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
-					makeflow_node_reset(d,f->created_by);
+		/* Skip any file that should not exist yet. */
+		if(!dag_file_should_exist(f)) continue;
 
-				} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
-					fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else modified it!\n",f->filename);
-					int modified_files_should_be_destroyed = 1;
-					if(modified_files_should_be_destroyed) {
-						makeflow_clean_file(d, remote_queue, f);
-						makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
-						makeflow_node_reset(d,f->created_by);
-					} else {
-						makeflow_node_reset_by_file(d,f);
-					}
-				}
+		/* Check for the presence of the file. */
+		int result = batch_fs_stat(remote_queue, f->filename, &buf );
 
+		if(dag_file_is_source(f)) {
+			/* Source files must exist before running */
+			if(result<0) {
+				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
+				errors++;
+			}
+		} else {
+			/* Intermediate files can be re-created as needed. */
+			if(result<0) {
+				fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else deleted it!\n", f->filename);
+				/* Recreate the file by running it's parent. */
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+				makeflow_node_reset(d,f->created_by);
+			} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+				fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else modified it!\n",f->filename);
+				/* Recreate descendants by resetting all nodes that consume this file. */
+				makeflow_node_reset_by_file(d,f);
 			}
 		}
 	}
@@ -2222,10 +2222,6 @@ int main(int argc, char *argv[])
 
 	printf("checking %s for consistency...\n",dagfile);
 
-	if(!skip_file_check && !makeflow_check_files(d)) {
-			goto EXIT_WITH_FAILURE;
-	}
-
 	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
 		goto EXIT_WITH_FAILURE;
 	}
@@ -2248,6 +2244,14 @@ int main(int argc, char *argv[])
 	 */
 	if(makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode )) {
 		goto EXIT_WITH_FAILURE;
+	}
+
+	if(skip_file_check) {
+		printf("skipping file checks.");
+	} else {
+		if(!makeflow_check_files(d)) {
+			goto EXIT_WITH_FAILURE;
+		}
 	}
 
 	/* This check must happen after makeflow_log_recover which may load the cache_dir info into d->cache_dir.
@@ -2289,6 +2293,7 @@ int main(int argc, char *argv[])
 
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
+			unlink(batchlogfilename);
 		}
 
 		goto EXIT_WITH_SUCCESS;
