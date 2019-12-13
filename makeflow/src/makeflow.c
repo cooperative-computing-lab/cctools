@@ -791,6 +791,7 @@ static int makeflow_check_files(struct dag *d)
 	struct dag_file *f;
 	char *name;
 	int errors = 0;
+	int warnings = 0;
 
 	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
 
@@ -809,26 +810,31 @@ static int makeflow_check_files(struct dag *d)
 		if(dag_file_is_source(f)) {
 			/* Source files must exist before running */
 			if(result<0) {
-				fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
+				printf("error: %s does not exist, and is not created by any rule.\n", f->filename);
 				errors++;
 			}
 		} else {
 			/* Intermediate files can be re-created as needed. */
 			if(result<0) {
-				fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else deleted it!\n", f->filename);
-				/* Recreate the file by running it's parent. */
+				/* Recreate the file by running its parent. */
+				printf("warning: %s was previously created by makeflow, but someone else deleted it!\n", f->filename);
 				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
 				makeflow_node_reset(d,f->created_by);
+				warnings++;
 			} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
-				fprintf(stderr, "makeflow: %s was previously created by makeflow, but someone else modified it!\n",f->filename);
 				/* Recreate descendants by resetting all nodes that consume this file. */
+				printf("warning: %s was previously created by makeflow, but someone else modified it!\n",f->filename);
 				makeflow_node_reset_by_file(d,f);
+				warnings++;
 			}
 		}
 	}
 
+	if(errors>0 || warnings>0) {
+		printf("found %d errors and %d warnings during consistency check.\n", errors,warnings);
+	}
+
 	if(errors) {
-		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", errors);
 		return 0;
 	} else {
 		return 1;
