@@ -140,7 +140,7 @@ int makeflow_clean_file( struct dag *d, struct batch_queue *queue, struct dag_fi
 	makeflow_hook_file_clean(f);
 
 	if(batch_fs_unlink(queue, f->filename) == 0) {
-		debug(D_MAKEFLOW_RUN, "File deleted %s\n", f->filename);
+		printf("deleted %s\n",f->filename);
 		d->total_file_size -= f->actual_size;
 		makeflow_log_file_state_change(d, f, DAG_FILE_STATE_DELETE);
 		makeflow_hook_file_deleted(f);
