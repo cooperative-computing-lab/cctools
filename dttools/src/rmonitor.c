@@ -53,16 +53,28 @@ char *resource_monitor_locate(const char *path_from_cmdline)
 
 	debug(D_RMON,"locating resource monitor executable...\n");
 
-	debug(D_RMON,"trying executable from path provided at command line.\n");
-	monitor_path = resource_monitor_check_path(path_from_cmdline, NULL);
-	if(monitor_path)
-		return monitor_path;
+	if(path_from_cmdline) {
+		debug(D_RMON,"trying executable from path provided at command line.\n");
+		monitor_path = resource_monitor_check_path(path_from_cmdline, NULL);
+		if(monitor_path) {
+			return monitor_path;
+		}
 
-	debug(D_RMON,"trying executable from $%s.\n", RESOURCE_MONITOR_ENV_VAR);
+		// if path given explicitely, then return as not found.
+		return NULL;
+	}
+
 	test_path = getenv(RESOURCE_MONITOR_ENV_VAR);
-	monitor_path = resource_monitor_check_path(test_path, NULL);
-	if(monitor_path)
-		return monitor_path;
+	if(test_path) {
+		debug(D_RMON,"trying executable from $%s.\n", RESOURCE_MONITOR_ENV_VAR);
+		monitor_path = resource_monitor_check_path(test_path, NULL);
+		if(monitor_path) {
+			return monitor_path;
+		}
+
+		// if env var given explicitely, then return as not found.
+		return NULL;
+	}
 
 	debug(D_RMON,"trying executable at local directory.\n");
 	//LD_CONFIG version.
