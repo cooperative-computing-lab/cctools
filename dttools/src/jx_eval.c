@@ -183,57 +183,48 @@ static struct jx *jx_eval_array(struct jx_operator *op, struct jx *left, struct 
 	}
 }
 
-static struct jx *jx_eval_call(
-	struct jx *func, struct jx *args, struct jx *ctx) {
+static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx) {
 	assert(func);
-	assert(func->type == JX_FUNCTION);
 	assert(args);
 	assert(args->type == JX_ARRAY);
 
-	switch (func->u.func.builtin) {
-		case JX_BUILTIN_RANGE: return jx_function_range(args);
-		case JX_BUILTIN_FORMAT: return jx_function_format(args);
-		case JX_BUILTIN_JOIN: return jx_function_join(args);
-		case JX_BUILTIN_CEIL: return jx_function_ceil(args);
-		case JX_BUILTIN_FLOOR: return jx_function_floor(args);
-		case JX_BUILTIN_BASENAME: return jx_function_basename(args);
-		case JX_BUILTIN_DIRNAME: return jx_function_dirname(args);
-		case JX_BUILTIN_LISTDIR: return jx_function_listdir(args);
-		case JX_BUILTIN_ESCAPE: return jx_function_escape(args);
-		case JX_BUILTIN_TEMPLATE: return jx_function_template(args, ctx);
-		case JX_BUILTIN_LAMBDA: {
-			assert(func->u.func.params);
-
-			ctx = jx_copy(ctx);
-			if (!ctx) ctx = jx_object(NULL);
-			assert(ctx->type == JX_OBJECT);
-
-			struct jx_item *p = func->u.func.params;
-			struct jx_item *a = args->u.items;
-			while (p->value) {
-				assert(p->value->type == JX_SYMBOL);
-				if (a) {
-					jx_insert(ctx,
-						jx_string(p->value->u
-								  .symbol_name),
-						jx_copy(a->value));
-					a = a->next;
-				} else {
-					jx_insert(ctx,
-						jx_string(p->value->u
-								  .symbol_name),
-						jx_null());
-				}
-				p = p->next;
-			}
-
-			struct jx *j = jx_eval(func->u.func.body, ctx);
-			jx_delete(ctx);
-			return j;
-		}
+	if (!jx_istype(func, JX_SYMBOL)) {
+		jx_error(jx_format(
+			"on line %d, unknown function: %s",
+			func->line,
+			func->u.symbol_name
+		));
 	}
-	// invalid function, so bail out
-	abort();
+
+	if (!strcmp(func->u.symbol_name, "range")) {
+		return jx_function_range(args);
+	} else if (!strcmp(func->u.symbol_name, "format")) {
+		return jx_function_format(args);
+	} else if (!strcmp(func->u.symbol_name, "join")) {
+		return jx_function_join(args);
+	} else if (!strcmp(func->u.symbol_name, "ceil")) {
+		return jx_function_ceil(args);
+	} else if (!strcmp(func->u.symbol_name, "floor")) {
+		return jx_function_floor(args);
+	} else if (!strcmp(func->u.symbol_name, "basename")) {
+		return jx_function_basename(args);
+	} else if (!strcmp(func->u.symbol_name, "dirname")) {
+		return jx_function_dirname(args);
+	} else if (!strcmp(func->u.symbol_name, "listdir")) {
+		return jx_function_listdir(args);
+	} else if (!strcmp(func->u.symbol_name, "escape")) {
+		return jx_function_escape(args);
+	} else if (!strcmp(func->u.symbol_name, "template")) {
+		return jx_function_template(args, ctx);
+	} else if (!strcmp(func->u.symbol_name, "len")) {
+		return jx_function_len(args);
+	} else {
+		return jx_error(jx_format(
+			"on line %d, unknown function: %s",
+			func->line,
+			func->u.symbol_name
+		));
+	}
 }
 
 static struct jx *jx_eval_slice(struct jx *array, struct jx *slice) {
@@ -338,18 +329,23 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 {
 	if(!o) return 0;
 
-	struct jx *left = jx_eval(o->left,context);
-	struct jx *right = jx_eval(o->right,context);
-	struct jx *result;
+	struct jx *left = NULL;
+	struct jx *right = NULL;
+	struct jx *result = NULL;
 
-	if (jx_istype(left, JX_ERROR)) {
-		result = left;
-		left = NULL;
-		goto DONE;
-	}
+	right = jx_eval(o->right,context);
 	if (jx_istype(right, JX_ERROR)) {
 		result = right;
 		right = NULL;
+		goto DONE;
+	}
+
+	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, right, context);
+
+	left = jx_eval(o->left,context);
+	if (jx_istype(left, JX_ERROR)) {
+		result = left;
+		left = NULL;
 		goto DONE;
 	}
 
@@ -379,11 +375,6 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 			} else {
 				r = jx_eval_lookup(left, right);
 			}
-			jx_delete(left);
-			jx_delete(right);
-			return r;
-		} else if (o->type == JX_OP_CALL) {
-			struct jx *r = jx_eval_call(left, right, context);
 			jx_delete(left);
 			jx_delete(right);
 			return r;
@@ -575,36 +566,14 @@ static struct jx *jx_check_errors(struct jx *j)
 	}
 }
 
-static void jx_eval_add_builtin(
-	struct jx *ctx, const char *name, jx_builtin_t b) {
-	if (!jx_lookup(ctx, name)) {
-		jx_insert(
-			ctx, jx_string(name), jx_function(name, b, NULL, NULL));
-	}
-}
-
 struct jx * jx_eval( struct jx *j, struct jx *context )
 {
 	struct jx *result = NULL;
 	if (!j) return NULL;
-	if (context) {
-		context = jx_copy(context);
-	} else {
-		context = jx_object(NULL);
-	}
-	if (!jx_istype(context, JX_OBJECT)) {
+
+	if (context && !jx_istype(context, JX_OBJECT)) {
 		return jx_error(jx_string("context must be an object"));
 	}
-	jx_eval_add_builtin(context, "range", JX_BUILTIN_RANGE);
-	jx_eval_add_builtin(context, "format", JX_BUILTIN_FORMAT);
-	jx_eval_add_builtin(context, "join", JX_BUILTIN_JOIN);
-	jx_eval_add_builtin(context, "ceil", JX_BUILTIN_CEIL);
-	jx_eval_add_builtin(context, "floor", JX_BUILTIN_FLOOR);
-	jx_eval_add_builtin(context, "basename", JX_BUILTIN_BASENAME);
-	jx_eval_add_builtin(context, "dirname", JX_BUILTIN_DIRNAME);
-	jx_eval_add_builtin(context, "listdir", JX_BUILTIN_LISTDIR);
-	jx_eval_add_builtin(context, "escape", JX_BUILTIN_ESCAPE);
-	jx_eval_add_builtin(context, "template", JX_BUILTIN_TEMPLATE);
 
 	switch(j->type) {
 		case JX_SYMBOL: {
@@ -624,7 +593,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 		case JX_BOOLEAN:
 		case JX_INTEGER:
 		case JX_STRING:
-		case JX_FUNCTION:
 		case JX_ERROR:
 		case JX_NULL:
 			result = jx_copy(j);
@@ -640,7 +608,6 @@ struct jx * jx_eval( struct jx *j, struct jx *context )
 			break;
 	}
 
-	jx_delete(context);
 	return result;
 }
 
@@ -661,3 +628,4 @@ struct jx * jx_eval_with_defines( struct jx *j, struct jx *context )
 	return result;
 }
 
+/*vim: set noexpandtab tabstop=4: */

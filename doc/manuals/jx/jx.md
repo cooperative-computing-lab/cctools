@@ -441,14 +441,15 @@ def format(spec, *args):
 
 #### template
 
->    template(A[,B]) -> String
->    where A = String and B = Object
+>       template(A[,B]) -> String
+>       where A = String and B = Object
 
 template() replaces format placeholders in the given string.
 This function is based on Python's sting formatting capabilities.
 Variable names enclosed in curly braces are looked up in the current context.
 Suppose that the ID variable is defined as 10.
-<pre><code>
+
+
 ```python
 template("file{ID}.txt")
 = "file10.txt"
@@ -463,6 +464,19 @@ Suppose that the variable N is defined as 48.
 template("SM{PLATE}_{ID}.sam", {"PLATE": "10001", "ID": N/2 - 1})
 = "SM10001_23.sam"
 ```
+
+#### len
+
+>       len([1,2,3]) -> Integer
+
+len() returns the length when passed in an array and errors when not an array. This function is
+based on Python's own len() function.
+
+```python
+len([1,2,3])
+= 3
+```
+
 
 ### Comprehensions
 
