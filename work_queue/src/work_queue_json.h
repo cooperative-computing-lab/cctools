@@ -62,4 +62,12 @@ child process). Return string should be freed using free().
 */
 char *work_queue_json_wait(struct work_queue *q, int timeout);
 
+
+/** Remove a task from the queue.
+@param q A work queue object.
+@param taskid The id of the task to be removed from the queue.
+@return A JSON description of the removed task. 
+*/
+char *work_queue_json_remove(struct work_queue *q, int taskid);
+
 #endif

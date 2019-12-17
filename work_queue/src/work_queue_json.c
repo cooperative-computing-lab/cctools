@@ -315,13 +315,37 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 	return_status = jx_pair(jx_string("return_status"), jx_integer(t->return_status), taskid);
 	result = jx_pair(jx_string("result"), jx_integer(t->result), return_status);
 
-    if (t->output){
+	if(t->output) {
 		output = jx_pair(jx_string("output"), jx_string(t->output), result);
 	} else {
 		output = jx_pair(jx_string("output"), jx_string(""), result);
 	}
 
 	j = jx_object(output);
+
+	task = jx_print_string(j);
+
+	return task;
+
+}
+
+char *work_queue_json_remove(struct work_queue *q, int taskid)
+{
+
+	char *task;
+	struct jx *j;
+	struct jx_pair *command_line, taskid;
+
+	struct work_queue_task *t = work_queue_cancel_by_taskid(q, taskid);
+
+	if(!t) {
+		return NULL;
+	}
+
+	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
+	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
+
+	j = jx_object(taskid);
 
 	task = jx_print_string(j);
 
