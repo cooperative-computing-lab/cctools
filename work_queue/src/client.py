@@ -1,33 +1,34 @@
 import sys
-import socket
+from json_server import WorkQueueServer
 
 def main():
 
+    q = WorkQueueServer()
+
     #connect to server
-    s = socket.socket()
-    port = 2345
-    s.connect(('127.0.0.1', port))
+    q.connect('127.0.0.1', port)
   
     #read in tasks and submit requests
-    fs = open("tasks.txt", "r")
-    for request in fs.readlines():
+    f = open("tasks.txt", "r")
 
-        s.send(request.encode())
-        print(s.recv(1024))
+    tasks = 0
+    for task in f.readlines():
+        response = q.submit(task)
+        print(response)
 
+        tasks += 1
 
-    #submit X wait requests
-    fw = open("waits.txt", "r")
-    for request in fw.readlines():
+    #close file
+    f.close()
 
-        s.send(request.encode())
-        print(s.recv(4096))
+    #submit wait requests
+    for task in range(tasks):
+        response = q.wait(10)
+        print(response)
 
     #disconnect
-    fs.close()
-    fw.close()
-    s.close()
-    
+    response  = q.disconnect()
+    print(response)
 
 
 if __name__ == "__main__":
