@@ -334,7 +334,7 @@ char *work_queue_json_remove(struct work_queue *q, int id)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, taskid;
+	struct jx_pair *command_line, *taskid;
 
 	struct work_queue_task *t = work_queue_cancel_by_taskid(q, id);
 
