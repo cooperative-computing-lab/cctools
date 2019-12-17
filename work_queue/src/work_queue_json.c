@@ -306,7 +306,7 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 
 	char *task;
 	struct jx *j;
-	struct jx_pair *command_line, *taskid, *return_status, *tag, *output, *result;
+	struct jx_pair *command_line, *taskid, *return_status, *output, *result;
 
 	struct work_queue_task *t = work_queue_wait(q, timeout);
 
@@ -315,11 +315,10 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 	return_status = jx_pair(jx_string("return_status"), jx_integer(t->return_status), taskid);
 	result = jx_pair(jx_string("result"), jx_integer(t->result), return_status);
 
-	if(t->tag) {
-		tag = jx_pair(jx_string("tag"), jx_string(t->tag), result);
-		output = jx_pair(jx_string("output"), jx_string(t->output), tag);
-	} else {
+    if (t->output){
 		output = jx_pair(jx_string("output"), jx_string(t->output), result);
+	} else {
+		output = jx_pair(jx_string("output"), jx_string(""), result);
 	}
 
 	j = jx_object(output);
