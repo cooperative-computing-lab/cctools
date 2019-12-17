@@ -6,7 +6,7 @@ def main():
     q = WorkQueueServer()
 
     #connect to server
-    q.connect('127.0.0.1', port)
+    q.connect('127.0.0.1', 2345)
   
     #read in tasks and submit requests
     f = open("tasks.txt", "r")
