@@ -38,8 +38,15 @@ then
     STATIC_WORKER=1
 fi
 
+# disable perl bindings in osx (to compile as we do in conda)
+perl_option=''
+if [[ "${TRAVIS_OS_NAME}" = osx ]]
+then
+    perl_option='--with-perl-path no'
+fi
+
 # compile everything
-./configure --strict $DEP_ARGS "$@"
+./configure --strict $DEP_ARGS ${perl_option} "$@"
 [[ -f config.mk ]] && make clean
 make
 
