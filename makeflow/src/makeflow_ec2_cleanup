@@ -1,56 +1,96 @@
-#!/bin/sh
+#!/usr/bin/env python
 
-if [ "$#" -ne 1 ]; then
-	echo "use: $0 <config-file>"
-	exit 1
-fi
+import json
+import sys
+import os
+import uuid
+import subprocess
+import time
 
-CONFIG_FILE=$1
+set_of_instances = set()
+instance_state_code_terminate = 48
 
-echo "Loading config file $config..."
-if [ ! -f $CONFIG_FILE ]
-then
-	echo "$0: config file $CONFIG_FILE not found"
-	exit 1
-fi
+if __name__ == "__main__":
 
-fetch_field()
-{
-	grep $1 $CONFIG_FILE | cut -d " " -f 2
-}
+    if len(sys.argv) != 2:
+		print("use: {} <config-file>").format(sys.argv[0])
+		exit(1)
 
-KEYPAIR_NAME=`fetch_field keypair_name`
-SECURITY_GROUP_ID=`fetch_field security_group`
-SUBNET=`fetch_field subnet`
-ROUTE_TABLE=`fetch_field route_table`
-GATEWAY=`fetch_field gateway`
-VPC=`fetch_field vpc`
+    CONFIG_FILE=sys.argv[1].rstrip()
+    print("Loading config file {}...".format(CONFIG_FILE))
 
-echo -n "Checking for aws command in PATH..."
-if which aws >/dev/null 2>&1
-then
-        echo "ok"
-else
-        echo "failed"
-        echo "$0: \"aws\" command must be in your path to use this script."
-        exit 1
-fi
+    if not os.path.isfile(CONFIG_FILE):
+        print("{}: config file {} not found").format(sys.argv[0], CONFIG_FILE)
+        exit(1)
 
-echo "Deleting keypair $KEYPAIR_NAME..."
-aws ec2 delete-key-pair --key-name $KEYPAIR_NAME && rm -f ${KEYPAIR_NAME}.pem
+    f = open(CONFIG_FILE,'r')
+    for line in f.readlines():
+        words = line.split()
+        if words[0] == 'vpc':
+            VPC = words[1]
+        if words[0] == 'subnet':
+            SUBNET = words[1]
+        if words[0] == 'gateway':
+            GATEWAY = words[1]
+        if words[0] == 'security_group_id':
+            SECURITY_GROUP_ID = words[1]
+        if words[0] == 'keypair_name':
+            KEYPAIR_NAME = words[1]
+        if words[0] == 'CREATE':
+            set_of_instances.add(words[1])
+        if words[0] == 'TERMINATE':
+            set_of_instances.discard(words[1])
 
-#echo "Deleting security group $SECURITY_GROUP_ID"
-#aws ec2 delete-security-group --group-id $SECURITY_GROUP_ID
+    # assign values
+    print("Checking for aws command in PATH...")
+    if not os.system("which aws >/dev/null 2>&1"):
+        print("okay")
+    else:
+        print("failed")
+        print("{}: The \"aws\" command must be in your path to use this script.").format(sys.argv[0])
+        exit(1)
 
-echo "Deleting internet gateway $GATEWAY..."
-aws ec2 detach-internet-gateway --internet-gateway-id $GATEWAY --vpc-id $VPC
-aws ec2 delete-internet-gateway --internet-gateway-id $GATEWAY
+    #remove idle instances
+    for INSTANCE_ID in set_of_instances:
+        if(os.system("aws ec2 terminate-instances --instance-ids {}".format(INSTANCE_ID))):
+            print("deleted virtual machine instance {}").format(INSTANCE_ID)
+            # record deleted
 
-echo "Deleting subnet $SUBNET..."
-aws ec2 delete-subnet --subnet-id $SUBNET
+    # remain in a loop to check if instances are deleted or no longer exist
+    while set_of_instances:
+        non_terminated_instances = set()
 
-echo "Deleting virtual private cluster $VPC..."
-aws ec2 delete-vpc --vpc-id $VPC
+        describe_instance_cmd = "aws ec2 describe-instances"
+        describe_instance_proc = subprocess.Popen(describe_instance_cmd, stdout=subprocess.PIPE, shell=True)
+        describe_instance_json = describe_instance_proc.stdout.read()
+        describe_instance_array = json.loads(describe_instance_json.rstrip())
+        
+        #TODO: update CLI query to avoid unexpected cleanup bugs.
 
-echo "Done!"
+        if len(describe_instance_array['Reservations']) > 0:
+            for instances in describe_instance_array['Reservations'][0]['Instances']:
+                if instances['State']['Code'] != instance_state_code_terminate:
+                    non_terminated_instances.add(instances['InstanceId'])
 
+        set_of_instances = set_of_instances.intersection(non_terminated_instances)
+
+        time.sleep(10)
+
+    # TODO: update VPC dependency cleanup
+    print("Deleting keypair {}...").format(KEYPAIR_NAME)
+    os.system("aws ec2 delete-key-pair --key-name {}".format(KEYPAIR_NAME))
+    os.system("rm {}.pem".format(KEYPAIR_NAME))
+
+    # print("Deleting security group {}").format(SECURITY_GROUP_ID)
+    # os.system("aws ec2 delete-security-group --group-id {}").format(SECURITY_GROUP_ID)
+
+    print("Deleting internet gateway {}...".format(GATEWAY))
+    os.system("aws ec2 detach-internet-gateway --internet-gateway-id {} --vpc-id {}".format(GATEWAY, VPC))
+
+    print("Deleting subnet {}...".format(SUBNET))
+    os.system("aws ec2 delete-subnet --subnet-id {}".format(SUBNET))
+
+    print("Deleting virtual private cluster {}...".format(VPC))
+    os.system("aws ec2 delete-vpc --vpc-id {}".format(VPC))
+
+    print("Done!")
