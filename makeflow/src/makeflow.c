@@ -99,10 +99,17 @@ an example.
 /*
 Flags to control the basic behavior of the Makeflow main loop. 
 */
+enum job_submit_status {
+	JOB_SUBMISSION_HOOK_FAILURE = -1,
+	JOB_SUBMISSION_SKIPPED,
+	JOB_SUBMISSION_SUBMITTED,
+	JOB_SUBMISSION_ABORTED,
+	JOB_SUBMISSION_TIMEOUT
+};
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 1; // Makeflow fails by default. This is changed at dag start to indicate correct start.
-static int makeflow_submit_timeout = 3600;
+static int makeflow_submit_timeout = 32; // in seconds
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = 5;
 
@@ -479,7 +486,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
+static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -495,13 +502,15 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 	 *  MAKEFLOW_HOOK_SUCCESS : Hook was successful and should submit */
 	int rc = makeflow_hook_batch_submit(task);
 	if(rc == MAKEFLOW_HOOK_SKIP){
-		return 0;
+		return JOB_SUBMISSION_SKIPPED;
 	} else if(rc != MAKEFLOW_HOOK_SUCCESS){
-		return -1;
+		return JOB_SUBMISSION_HOOK_FAILURE;
 	}
 
 	while(1) {
-		if(makeflow_abort_flag) break;
+		if(makeflow_abort_flag) {
+			break;
+		}
 
 		/* This will eventually be replaced by submit (queue, task )... */
 		char *input_files  = batch_files_to_string(queue, task->input_files);
@@ -518,7 +527,7 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 		if(jobid > 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
 			task->jobid = jobid;
-			return 1;
+			return JOB_SUBMISSION_SUBMITTED;
 		} else if(jobid<0) {
 			fprintf(stderr, "couldn't submit batch job, still trying...\n");
 		} else if(jobid==0) {
@@ -526,19 +535,20 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 				batch_queue_type_to_string(batch_queue_get_type(queue)));
 		}
 
-		if(makeflow_abort_flag) break;
-
-		if(time(0) > stoptime) {
-			fprintf(stderr, "unable to submit job after %d seconds!\n", makeflow_submit_timeout);
+		if(makeflow_abort_flag) {
 			break;
 		}
 
+		if(time(0) > stoptime) {
+			fprintf(stderr, "unable to submit job after %d seconds!\n", makeflow_submit_timeout);
+			return JOB_SUBMISSION_TIMEOUT;
+		}
+
 		sleep(waittime);
-		waittime *= 2;
-		if(waittime > 60) waittime = 60;
+		waittime = MIN(makeflow_submit_timeout, waittime * 2);
 	}
 
-	return 0;
+	return JOB_SUBMISSION_ABORTED;
 }
 
 
@@ -581,35 +591,44 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	/* Logs the expectation of output files. */
 	makeflow_log_batch_file_list_state_change(d,task->output_files,DAG_FILE_STATE_EXPECT);
 
-	int submitted = makeflow_node_submit_retry(queue, task);
+	enum job_submit_status submitted = makeflow_node_submit_retry(queue, task);
 
 	/* Update all of the necessary data structures. */
-	if(submitted == 1) {
-		n->jobid = task->jobid;
-		/* Not sure if this is necessary/what it does. */
-		memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+	switch(submitted) {
+		case JOB_SUBMISSION_HOOK_FAILURE:
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+			n->task = NULL;
+			batch_task_delete(task);
+			makeflow_failed_flag = 1;
+			break;
+		case JOB_SUBMISSION_SKIPPED:
+			/* Exited Normally was updated and may have been handled elsewhere (e.g. Archive) */
+			if (task->info->exited_normally) {
+				makeflow_node_complete(d, n, queue, task);
+			}
+			break;
+		case JOB_SUBMISSION_SUBMITTED:
+			n->jobid = task->jobid;
+			/* Not sure if this is necessary/what it does. */
+			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 
-		if(is_local_job(n)) {
-			makeflow_local_resources_subtract(local_resources,n);
-		}
+			if(is_local_job(n)) {
+				makeflow_local_resources_subtract(local_resources,n);
+			}
 
-		if(n->local_job && local_queue) {
-			itable_insert(d->local_job_table, n->jobid, n);
-		} else {
-			itable_insert(d->remote_job_table, n->jobid, n);
-		}
-	} else if (submitted == 0) {
-		/* Exited Normally was updated and may have been handled elsewhere (e.g. Archive) */
-		if (task->info->exited_normally) {
-			makeflow_node_complete(d, n, queue, task);
-		}
-	} else {
-		/* Negative submitted results from a failed submit */
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		n->task = NULL;
-		batch_task_delete(task);
-		makeflow_failed_flag = 1;
+			if(n->local_job && local_queue) {
+				itable_insert(d->local_job_table, n->jobid, n);
+			} else {
+				itable_insert(d->remote_job_table, n->jobid, n);
+			}
+			break;
+		case JOB_SUBMISSION_ABORTED:
+			/* do nothing, as node was aborted before it was submitted. */
+			break;
+		case JOB_SUBMISSION_TIMEOUT:
+			/* do nothing, and let other rules to be waited/submitted. */
+			break;
 	}
 
 	/* Restore old batch job options. */
@@ -665,6 +684,18 @@ int makeflow_nodes_local_waiting_count(const struct dag *d) {
 	struct dag_node *n;
 	for(n = d->nodes; n; n = n->next) {
 		if(n->state == DAG_NODE_STATE_WAITING && is_local_job(n))
+			count++;
+	}
+
+	return count;
+}
+
+int makeflow_nodes_remote_waiting_count(const struct dag *d) {
+	int count = 0;
+
+	struct dag_node *n;
+	for(n = d->nodes; n; n = n->next) {
+		if(n->state == DAG_NODE_STATE_WAITING && !is_local_job(n))
 			count++;
 	}
 
@@ -985,8 +1016,10 @@ static void makeflow_run( struct dag *d )
  		*/
 		if(dag_local_jobs_running(d)==0 && 
 			dag_remote_jobs_running(d)==0 && 
-			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END))
+			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END) &&
+			makeflow_nodes_remote_waiting_count(d) == 0) {
 			break;
+		}
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
