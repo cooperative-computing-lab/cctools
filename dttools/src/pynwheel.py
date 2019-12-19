@@ -140,6 +140,7 @@ def daemon_server():
             connection.close()
         # Fork child process to eval file
         pid = os.fork()
+        childProcExit = 0
         if pid == 0:
             copy_fds(msg, fds)
             sys.argv = [message_from_client["file"]] 
@@ -151,10 +152,15 @@ def daemon_server():
             compiled_source = compile(read_source, message_from_client['file'], 'exec')
             eval(compiled_source, globals(), locals())
             source.close()
-            exit(0)
+            exit(2)
         else:
-            childProcExit = os.waitpid(pid, 0)
-        connection.send(str.encode("ACK"))
+            holder, childProcExit = os.waitpid(pid, 0)
+        if os.WIFEXITED(childProcExit):
+            childProcExit = os.WEXITSTATUS(childProcExit)
+        final_return_msg = struct.pack('!i', childProcExit)
+        print(childProcExit)
+
+        connection.send(final_return_msg)
         connection.close()
 
 ##########################################################
@@ -235,10 +241,12 @@ if __name__ == "__main__":
             exit(1)
         sock.sendall(message)
 
-        second_ack = recv_msg_from_client(sock, sys.getsizeof("ACK".encode()))
-        if second_ack.decode() != "ACK":
+        second_ack = recv_msg_from_client(sock, sys.getsizeof(struct.pack('!i', 3)))
+        second_ack = struct.unpack('!i', second_ack)[0]
+        if second_ack != 0:
+            print(second_ack)
             print("Client: Failed to receive ACK from server for second message", file=sys.stderr)
             sock.close()
-            exit(1)
+            exit(second_ack)
     finally:
         sock.close()
