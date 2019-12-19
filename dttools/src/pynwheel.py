@@ -257,6 +257,7 @@ if __name__ == "__main__":
             elif first_ack == 3:
                 print("Server: Failed to pack ACK message for client", file=sys.stderr)
             sock.close()
+            final_exit_value = 1
             exit(1)
         sock.sendall(message)
         second_ack = recv_msg_from_client(sock, sys.getsizeof(msg_sz))
@@ -269,6 +270,7 @@ if __name__ == "__main__":
             elif second_ack == 6:
                 print("Server: Failed to open client file and/or import imports", file=sys.stderr)
             sock.close()
+            final_exit_value = 1
             exit(1)
         sock.sendall(message)
 
