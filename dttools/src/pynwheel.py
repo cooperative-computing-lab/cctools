@@ -123,21 +123,32 @@ def daemon_server():
     sock.listen(1)
     while True:
         connection, client_address = sock.accept()
+        check_value = 0
         try:
             # 1) Connect to proper FDs
             msg, fds = recv_fds(connection, 100, 4)
+            check_value = 1
             # 2) Recv the expected message size through a packet
             message_size = recv_msg_from_client(connection, sys.getsizeof(struct.pack('!i', 1)))
+            check_value = 2
             message_size = struct.unpack('!i', message_size)[0]
+            check_value = 3
             # 3) Send ACK for receiving message size
-            connection.sendall("ACK".encode())
+            connection.send(struct.pack('!i', 8))
+            check_value = 4
             # 4) Recv message from client
             message_from_client = recv_msg_from_client(connection, message_size)
+            check_value = 5
             message_from_client = json.loads(message_from_client.decode())
+            check_value = 6
             read_imports(message_from_client['file'])
+            check_value = 7
         except:
-            connection.send(str.encode("ERR"))
+            connection.send(struct.pack('!i', check_value))
             connection.close()
+            continue
+        connection.send(struct.pack('!i', check_value))
+        
         # Fork child process to eval file
         pid = os.fork()
         childProcExit = 0
@@ -152,13 +163,12 @@ def daemon_server():
             compiled_source = compile(read_source, message_from_client['file'], 'exec')
             eval(compiled_source, globals(), locals())
             source.close()
-            exit(2)
+            exit(0)
         else:
             holder, childProcExit = os.waitpid(pid, 0)
         if os.WIFEXITED(childProcExit):
             childProcExit = os.WEXITSTATUS(childProcExit)
         final_return_msg = struct.pack('!i', childProcExit)
-        print(childProcExit)
 
         connection.send(final_return_msg)
         connection.close()
@@ -227,6 +237,7 @@ if __name__ == "__main__":
             except:
                 sock.close()
     # Server now exists and is connected to
+    final_exit_value = 0
     try:
         #send FDs to be copied by server
         send_fds(sock, str.encode("stdin, stdout, stderr"))
@@ -234,19 +245,35 @@ if __name__ == "__main__":
         message = str.encode(args_json)
         msg_sz = struct.pack('!i', sys.getsizeof(message))
         sock.send(msg_sz)
-        first_ack = recv_msg_from_client(sock, sys.getsizeof("ACK".encode()))
-        if first_ack.decode() != "ACK":
-            print("Client: Failed to receive ACK from server for first message", file=sys.stderr)
+        first_ack = recv_msg_from_client(sock, sys.getsizeof(msg_sz))
+        first_ack = struct.unpack('!i', first_ack)[0]
+        if first_ack != 8:
+            if first_ack == 0:
+                print("Server: Failed to receive FDs from client", file=sys.stderr)
+            elif first_ack == 1:
+                print("Server: Failed to receive message size from client", file=sys.stderr)
+            elif first_ack == 2:
+                print("Server: Failed to unpack message size", file=sys.stderr)
+            elif first_ack == 3:
+                print("Server: Failed to pack ACK message for client", file=sys.stderr)
+            sock.close()
+            exit(1)
+        sock.sendall(message)
+        second_ack = recv_msg_from_client(sock, sys.getsizeof(msg_sz))
+        second_ack = struct.unpack('!i', second_ack)[0]
+        if second_ack != 7:
+            if second_ack == 4:
+                print("Server: Failed to receive JSON message from client", file=sys.stderr)
+            elif second_ack == 5:
+                print("Server: Failed to load JSON from client", file=sys.stderr)
+            elif second_ack == 6:
+                print("Server: Failed to open client file and/or import imports", file=sys.stderr)
             sock.close()
             exit(1)
         sock.sendall(message)
 
-        second_ack = recv_msg_from_client(sock, sys.getsizeof(struct.pack('!i', 3)))
-        second_ack = struct.unpack('!i', second_ack)[0]
-        if second_ack != 0:
-            print(second_ack)
-            print("Client: Failed to receive ACK from server for second message", file=sys.stderr)
-            sock.close()
-            exit(second_ack)
+        third_ack = recv_msg_from_client(sock, sys.getsizeof(msg_sz))
+        final_exit_value = struct.unpack('!i', third_ack)[0]
     finally:
         sock.close()
+    exit(final_exit_value)
