@@ -61,7 +61,6 @@ static int environment_from_jx(struct dag *d, struct dag_node *n, struct hash_ta
 		const char *key;
 		void *i = NULL;
 		while ((key = jx_iterate_keys(env, &i))) {
-			key = xxstrdup(key);
 			const char *value;
 			debug(D_MAKEFLOW_PARSER, "export %s", key);
 			if ((value = jx_lookup_string(env, key))) {
