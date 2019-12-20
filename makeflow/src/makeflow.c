@@ -340,7 +340,10 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	}
 
 	batch_task_set_resources(task, dag_node_dynamic_label(n));
-	batch_task_set_envlist(task, dag_node_env_create(n->d, n, should_send_all_local_environment) );
+
+	struct jx *env = dag_node_env_create(n->d, n, should_send_all_local_environment);
+	batch_task_set_envlist(task, env);
+	jx_delete(env);
 
 	return task;
 }
