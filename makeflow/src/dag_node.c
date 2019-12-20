@@ -405,6 +405,7 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 		if(value) {
 			jx_insert(object,jx_string(key),jx_string(value));
 			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
+			free(value);
 		}
 	}
 
