@@ -105,7 +105,7 @@ timestamp - the unix time (in microseconds) when this line is written to the log
 These event types indicate that the workflow as a whole has started or completed in the indicated manner.
 */
 
-void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent );
+void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent );
 
 /*
 To balance between performance and consistency, we sync the log every 60 seconds
@@ -262,17 +262,68 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 	makeflow_log_sync(d,0);
 }
 
-/** The clean_mode variable was added so that we could better print out error messages
- * apply in the situation. Currently only used to silence node rerun checking.
- */
-int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode, int skip_file_check)
+/*
+Dump the dag structure into the log file in comment formats.
+This is used by some tools (such as Weaver) for debugging
+assistance.
+*/
+
+void makeflow_log_dag_structure( struct dag *d )
 {
-	char *line, *name, file[MAX_BUFFER_SIZE];
+	struct dag_file *f;
+	struct dag_node *n, *p;
+
+	for(n = d->nodes; n; n = n->next) {
+		/* Record node information to log */
+		fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
+
+		/* Record the node category to the log */
+		fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->name);
+		fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->name);   /* also write the SYMBOL as alias of CATEGORY, deprecated. */
+
+		/* Record node parents to log */
+		fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
+			p = f->created_by;
+			if(p)
+				fprintf(d->logfile, "\t%d", p->nodeid);
+		}
+		fputc('\n', d->logfile);
+
+		/* Record node inputs to log */
+		fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
+		list_first_item(n->source_files);
+		while( (f = list_next_item(n->source_files)) ) {
+			fprintf(d->logfile, "\t%s", f->filename);
+		}
+		fputc('\n', d->logfile);
+
+		/* Record node outputs to log */
+		fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
+		list_first_item(n->target_files);
+		while( (f = list_next_item(n->target_files)) ) {
+			fprintf(d->logfile, "\t%s", f->filename);
+		}
+		fputc('\n', d->logfile);
+
+		/* Record translated command to log */
+		fprintf(d->logfile, "# COMMAND\t%d\t%s\n", n->nodeid, n->command);
+	}
+}
+
+/*
+Recover the state of the workflow so far by reading back the state
+from the log file, if it exists.  (If not, create a new log.)
+*/
+
+int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode )
+{
+	char *line, file[MAX_BUFFER_SIZE];
 	int nodeid, state, jobid, file_state;
 	int first_run = 1;
 	struct dag_node *n;
 	struct dag_file *f;
-	struct stat buf;
 	timestamp_t previous_completion_time;
 	uint64_t size;
 
@@ -297,10 +348,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 				} else if(file_state == DAG_FILE_STATE_DELETE){
 					d->deleted_files += 1;
 				}
-				free(line);
-				continue;
-			}
-			if(sscanf(line, "# CACHE %" SCNu64 " %s", &previous_completion_time, cache_dir) == 2) {
+			} else if(sscanf(line, "# CACHE %" SCNu64 " %s", &previous_completion_time, cache_dir) == 2) {
 				/* if the user specifies a cache dir using --cache dir, ignore the info from the log file */
 				if(!d->cache_dir) {
 					d->cache_dir = xxstrdup(cache_dir);
@@ -315,10 +363,7 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 						return -1;
 					}
 				}
-				free(line);
-				continue;
-			}
-			if(sscanf(line, "# MOUNT %" SCNu64 " %s %s %s %d", &previous_completion_time, file, source, cache_name, &type) == 5) {
+			} else if(sscanf(line, "# MOUNT %" SCNu64 " %s %s %s %d", &previous_completion_time, file, source, cache_name, &type) == 5) {
 				f = dag_file_lookup_or_create(d, file);
 
 				if(!f->source) {
@@ -333,30 +378,25 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 						return -1;
 					}
 				}
-				free(line);
-				continue;
-			}
-			if(line[0] == '#') {
-				free(line);
-				continue;
-			}
-			if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
+			} else if(line[0] == '#') {
+				/* Ignore any other comment lines */
+			} else if(sscanf(line, "%" SCNu64 " %d %d %d", &previous_completion_time, &nodeid, &state, &jobid) == 4) {
 				n = itable_lookup(d->node_table, nodeid);
 				if(n) {
 					n->state = state;
 					n->jobid = jobid;
 					/* Log timestamp is in microseconds, we need seconds for diff. */
 					n->previous_completion = (time_t) (previous_completion_time / 1000000);
-					free(line);
-					continue;
 				}
+			} else {
+				fprintf(stderr, "makeflow: %s appears to be corrupted on line %d\n", filename, linenum);
+				exit(1);
 			}
-
-			fprintf(stderr, "makeflow: %s appears to be corrupted on line %d\n", filename, linenum);
 			free(line);
-			exit(1);
 		}
 		fclose(d->logfile);
+	} else {
+		printf("creating new log file %s...\n",filename);
 	}
 
 	d->logfile = fopen(filename, "a");
@@ -370,89 +410,42 @@ int makeflow_log_recover(struct dag *d, const char *filename, int verbose_mode, 
 	}
 
 	if(first_run && verbose_mode) {
-		struct dag_file *f;
-		struct dag_node *p;
-		for(n = d->nodes; n; n = n->next) {
-			/* Record node information to log */
-			fprintf(d->logfile, "# NODE\t%d\t%s\n", n->nodeid, n->command);
-
-			/* Record the node category to the log */
-			fprintf(d->logfile, "# CATEGORY\t%d\t%s\n", n->nodeid, n->category->name);
-			fprintf(d->logfile, "# SYMBOL\t%d\t%s\n", n->nodeid, n->category->name);   /* also write the SYMBOL as alias of CATEGORY, deprecated. */
-
-			/* Record node parents to log */
-			fprintf(d->logfile, "# PARENTS\t%d", n->nodeid);
-			list_first_item(n->source_files);
-			while( (f = list_next_item(n->source_files)) ) {
-				p = f->created_by;
-				if(p)
-					fprintf(d->logfile, "\t%d", p->nodeid);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record node inputs to log */
-			fprintf(d->logfile, "# SOURCES\t%d", n->nodeid);
-			list_first_item(n->source_files);
-			while( (f = list_next_item(n->source_files)) ) {
-				fprintf(d->logfile, "\t%s", f->filename);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record node outputs to log */
-			fprintf(d->logfile, "# TARGETS\t%d", n->nodeid);
-			list_first_item(n->target_files);
-			while( (f = list_next_item(n->target_files)) ) {
-				fprintf(d->logfile, "\t%s", f->filename);
-			}
-			fputc('\n', d->logfile);
-
-			/* Record translated command to log */
-			fprintf(d->logfile, "# COMMAND\t%d\t%s\n", n->nodeid, n->command);
-		}
+		makeflow_log_dag_structure(d);
 	}
 
+	/*
+	Count up the current number of nodes in the WAITING, COMPLETED, etc, states.
+	*/
 
 	dag_count_states(d);
 
-	// Check for log consistency
-	if(!first_run && !skip_file_check) {
-		hash_table_firstkey(d->files);
-		while(hash_table_nextkey(d->files, &name, (void **) &f)) {
-			if(dag_file_should_exist(f) && !dag_file_is_source(f) && !(batch_fs_stat(queue, f->filename, &buf) >= 0)){
-				fprintf(stderr, "makeflow: %s is reported as existing, but does not exist.\n", f->filename);
-				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
-				continue;
-			}
-			if(S_ISDIR(buf.st_mode))
-				continue;
-			if(dag_file_should_exist(f) && !dag_file_is_source(f) && difftime(buf.st_mtime, f->creation_logged) > 0) {
-				fprintf(stderr, "makeflow: %s is reported as existing, but has been modified (%" SCNu64 " ,%" SCNu64 ").\n", f->filename, (uint64_t)buf.st_mtime, (uint64_t)f->creation_logged);
-				makeflow_clean_file(d, queue, f);
-				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
-			}
-		}
-	}
 
-	int silent = 0;
-	if(clean_mode != MAKEFLOW_CLEAN_NONE)
-		silent = 1;
-	// Decide rerun tasks
+	/*
+	If this is not the first attempt at running, then
+	scan for nodes that are running, failed, or aborted,
+	and reset them to a waiting state to be retried.
+	*/
+
 	if(!first_run) {
-		struct itable *rerun_table = itable_create(0);
+		printf("checking for old running or failed jobs...\n");
+		int silent = clean_mode != MAKEFLOW_CLEAN_NONE;
 		for(n = d->nodes; n; n = n->next) {
-			makeflow_node_decide_rerun(rerun_table, d, n, silent);
+			makeflow_node_decide_reset(d, n, silent);
 		}
-		itable_delete(rerun_table);
 	}
 
-	//Update file reference counts from nodes in log
+	/*
+	To bring garbage collection up to date, decrement
+	file reference counts for every node that is complete.
+	*/
+
 	for(n = d->nodes; n; n = n->next) {
 		if(n->state == DAG_NODE_STATE_COMPLETE)
 		{
 			struct dag_file *f;
 			list_first_item(n->source_files);
 			while((f = list_next_item(n->source_files)))
-				f->reference_count += -1;
+				f->reference_count--;
 		}
 	}
 

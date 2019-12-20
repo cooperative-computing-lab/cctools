@@ -24,7 +24,7 @@ run()
 {
 	echo $test_dir
 	cd $test_dir
-	./makeflow -g ref_cnt -G 1 -d all collect.makeflow
+	./makeflow -g ref_cnt -G 1 -j 1 collect.makeflow
 	if [ $? -eq 0 ]; then
 		exec diff -w ../$test_output _collect.7
 	else

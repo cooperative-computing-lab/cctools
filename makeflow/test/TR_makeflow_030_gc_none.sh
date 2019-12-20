@@ -23,7 +23,7 @@ EOF
 run()
 {
 	cd $test_dir
-	./makeflow -g none -d all collect.makeflow
+	./makeflow -g none -j 1 collect.makeflow
 	if [ $? -eq 0 ]; then
 		exec diff -w ../$test_output _collect.7
 	else
