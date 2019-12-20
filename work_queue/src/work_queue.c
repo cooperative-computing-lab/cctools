@@ -1414,6 +1414,10 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	if(t->resources_measured) {
 		rmsummary_assign_char_field(t->resources_measured, "category", t->category);
 		t->return_status = t->resources_measured->exit_status;
+	} else {
+		/* if no resources were measured, then we don't overwrite the return
+		 * status, and mark the task as with error from monitoring. */
+			update_task_result(t, WORK_QUEUE_RESULT_RMONITOR_ERROR);
 	}
 
 	free(summary);
