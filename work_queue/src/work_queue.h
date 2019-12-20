@@ -67,7 +67,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_FORSAKEN            = 5 << 3, /**< The task failed, but it was not a task error **/
 	WORK_QUEUE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
 	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
-	WORK_QUEUE_RESULT_DISK_ALLOC_FULL     = 8 << 3  /**< The task filled its loop device allocation but needed more space. **/
+	WORK_QUEUE_RESULT_DISK_ALLOC_FULL     = 8 << 3, /**< The task filled its loop device allocation but needed more space. **/
+	WORK_QUEUE_RESULT_RMONITOR_ERROR      = 9 << 3  /**< The task failed because the monitor did not produce a summary report. **/
 } work_queue_result_t;
 
 typedef enum {
