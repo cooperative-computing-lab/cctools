@@ -16,18 +16,6 @@ See the file COPYING for details.
 #include <sys/param.h>
 #include <sys/mount.h>
 
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
-#endif
-
-#ifdef HAS_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-
-#ifdef HAS_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-
 int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 {
 #ifdef CCTOOLS_OPSYS_SUNOS
