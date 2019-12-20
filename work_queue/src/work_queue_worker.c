@@ -1814,6 +1814,15 @@ static int workspace_create() {
 	}
 
 	printf( "work_queue_worker: creating workspace %s\n", workspace);
+
+#ifdef ST_NOEXEC
+	if(check_disk_flags(workdir, ST_NOEXEC)) {
+		warn(D_NOTICE, "Workspace directory '%s' is on a filesystem mounted as 'noexec'.\n", workspace);
+		warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
+		warn(D_NOTICE, "Use the --workdir command line switch to change where the workspace is created.\n");
+	}
+#endif
+
 	if(!create_dir(workspace,0777)) {
 		return 0;
 	}
