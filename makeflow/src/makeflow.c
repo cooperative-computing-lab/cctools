@@ -96,13 +96,20 @@ an example.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
-extern int batch_job_verbose_jobnames;
+/*
+Flags to control the basic behavior of the Makeflow main loop. 
+*/
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 1; // Makeflow fails by default. This is changed at dag start to indicate correct start.
 static int makeflow_submit_timeout = 3600;
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = 5;
+
+/*
+Garbage Collection (GC) controls when and where intermediate
+files are cleaned up, so as to minimize disk space consumption.
+*/
 
 /* makeflow_gc_method indicates the type of garbage collection
  * indicated by the user. Refer to makeflow_gc.h for specifics */
@@ -116,37 +123,72 @@ static int makeflow_gc_barrier = 1;
 /* Determines next gc_barrier to make checks less frequent with large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
 
+/*
+Makeflow manages two queues of jobs.
+The remote_queue represents the cluster or distributed system
+in which jobs are run in parallel.  The local_queue represents
+local execution via Unix processes.
+*/
+
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-struct batch_queue * makeflow_get_remote_queue(){
-	return remote_queue;
-}
-
-struct batch_queue * makeflow_get_local_queue(){
-	return local_queue;
-}
-
-struct batch_queue * makeflow_get_queue(struct dag_node *n){
-	if(n->local_job && local_queue) {
-		return local_queue;
-	} else {
-		return remote_queue;
-	}
-}
+/*
+The local_resources describes the total CPU, RAM, DISK
+available to run local jobs, so that the machine is not
+over-subscribed.
+*/
 
 static struct rmsummary *local_resources = 0;
+
+/*
+local_jobs_max and remote_jobs_max describe manual limits
+set on the number of jobs, so that a million-node workflow
+doesn't instantly become a million jobs on the queue unless
+the user takes some positive steps to that effect.
+*/
 
 static int local_jobs_max = 1;
 static int remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 
+/*
+The project name and manual port number chosen for the 
+Work Queue configuration.  A port number of zero indicates
+any available port.
+*/
+
+
 static char *project = NULL;
 static int port = 0;
+
+/*
+Check the size of files after creation.
+This option doesn't seem to do much.
+*/
+
 static int output_len_check = 0;
+
+/*
+If enabled, do not check the filesystem for expected files
+before starting the dag, instead proceed under optimistic assumptions.
+*/
+
 static int skip_file_check = 0;
 
+/*
+Enable caching within the underlying batch system.
+In the case of Work Queue, this caches immutable files on the workers.
+*/
+
 static int cache_mode = 1;
+
+/*
+Hack: Enable batch job feature to pass detailed name to batch system.
+Would be better implemented as a batch system feature.
+*/
+
+extern int batch_job_verbose_jobnames;
 
 /*
 Wait upto this many seconds for an output file of a succesfull task
@@ -162,13 +204,49 @@ once weaver/pbui tools are updated.)
 */
 static int log_verbose_mode = 0;
 
+/*
+Send periodic reports of type "makeflow" to the catalog
+server, viewable by the makeflow_status command. 
+*/
+
 static int catalog_reporting_on = 0;
+
+/*
+Options related to the "mounting" of external data
+files at the DAG level.
+*/
 
 static char *mountfile = NULL;
 static char *mount_cache = NULL;
 static int use_mountfile = 0;
 
+/*
+If enabled, then all environment variables are sent
+from the submission site to the job execution site.
+*/
+
 static int should_send_all_local_environment = 0;
+
+struct batch_queue * makeflow_get_remote_queue(){
+	return remote_queue;
+}
+
+struct batch_queue * makeflow_get_local_queue(){
+	return local_queue;
+}
+
+/*
+Gives the queue associated with a job, taking into
+account the LOCAL flag in the node.
+*/
+
+struct batch_queue * makeflow_get_queue(struct dag_node *n){
+	if(n->local_job && local_queue) {
+		return local_queue;
+	} else {
+		return remote_queue;
+	}
+}
 
 /*
 Determines if this is a local job that will consume
