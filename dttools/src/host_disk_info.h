@@ -31,4 +31,13 @@ int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total);
 */
 int check_disk_space_for_filesize(char *path, INT64_T file_size, UINT64_T disk_avail_threshold);
 
+
+/** Return whether the file system where path resides was mounted with particular flags.
+@param path A filename of the disk to be measured.
+@param flags Mount flags to test, such as (ST_NOEXEC | ST_RDONLY). For valid flags see statfs(2).
+@return 0 if at least one mount flag is not set, otherwise 1.
+*/
+
+int check_disk_flags(const char *path, unsigned int flags);
+
 #endif
