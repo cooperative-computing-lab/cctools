@@ -95,7 +95,7 @@ int main(){
             if (!read){
                 error = "Error reading from client";
                 reply(client, "error", error, id);
-                break;
+                continue;
             }
     
             jsonrpc = jx_parse_string(message);
@@ -135,7 +135,7 @@ int main(){
             //submit or wait
             if (!strcmp(method, "submit")){
                 
-                task = jx_print_string(val);
+                task = val->u.string_value;
     
                 taskid = work_queue_json_submit(q, task);
     

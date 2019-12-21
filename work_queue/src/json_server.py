@@ -1,4 +1,5 @@
 import socket
+import json
 
 class WorkQueueServer:
 
@@ -7,7 +8,7 @@ class WorkQueueServer:
         self.id = 1
 
     def connect(self, address, port):
-        self.socket.connect(address, port)
+        self.socket.connect((address, port))
 
     def submit(self, task):
         request = {
@@ -18,7 +19,9 @@ class WorkQueueServer:
         }
 
         request = json.dumps(request)
-        self.socket.send(request.encode())
+
+        request += "\n"
+        self.socket.send(request)
 
         response = self.socket.recv(1024)
 
@@ -35,9 +38,10 @@ class WorkQueueServer:
         }
 
         request = json.dumps(request)
+        request += '\n'
         self.socket.send(request.encode())
 
-        response = self.socket.recv(1024)
+        response = self.socket.recv(4096)
 
         self.id += 1
 
@@ -52,6 +56,7 @@ class WorkQueueServer:
         }
 
         request = json.dumps(request)
+        request += '\n'
         self.socket.send(request.encode())
 
         response = self.socket.recv(1024)
@@ -69,6 +74,7 @@ class WorkQueueServer:
         }
 
         request = json.dumps(request)
+        request += '\n'
         self.socket.send(request.encode())
 
         response = self.socket.recv(1024)
