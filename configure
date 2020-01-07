@@ -596,47 +596,49 @@ fi
 report_detection irods "${irods_avail}" "${config_irods_path}" "${irods_path}"
 
 
-if [ $config_mysql_path != no ] && library_search mysqlclient ${mysql_path} mysql
+mysql_avail=no
+if [ $config_mysql_path != no ]
 then
+	mysql_avail=yes
 	mysql_path=${mysql_path:-${base_root}}
-
-	mysql_ldflags="${library_search_result}"
-
-	if [ "${mysql_path}" != "${base_root}" ]
+	if library_search mysqlclient ${mysql_path} mysql
 	then
-		mysql_ccflags="-I${mysql_path}/include"
-	fi
+		mysql_ldflags="${library_search_result}"
 
-	ccflags="${ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+		if [ "${mysql_path}" != "${base_root}" ]
+		then
+			mysql_ccflags="-I${mysql_path}/include"
+		fi
+
+		mysql_ccflags="${mysql_ccflags} -DHAS_MYSQL -DHAS_BXGRID"
+	else
+		mysql_avail=no
+	fi
 
 	# It seems that the various versions move around the key include file,
 	# so we check for it in several places here.
-
 	if [ -f ${mysql_path}/include/mysql.h ]
 	then
-		ccflags="${ccflags} -DHAS_MYSQL_H"
-	fi
-
-	if [ -f ${mysql_path}/include/mysql/mysql.h ]
+		mysql_ccflags="${mysql_ccflags} -DHAS_MYSQL_H"
+	elif [ -f ${mysql_path}/include/mysql/mysql.h ]
 	then
-		ccflags="${ccflags} -DHAS_MYSQL_MYSQL_H"
-	fi
-
-	# When mysql is enabled, we also need ssl
-	config_openssl_path=yes
-
-else
-	if [ $config_mysql_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find MySQL in $mysql_path"
-		echo "*** Check --with-mysql-path and try again."
-		exit 1
+		mysql_ccflags="${mysql_ccflags} -DHAS_MYSQL_MYSQL_H"
 	else
-		echo "*** skipping mysql support"
+		mysql_avail=no
+	fi
+
+	if [ "${mysql_avail}" = yes ]
+	then
+		# mysql needs openssl
+		config_openssl_path=yes
 	fi
 fi
 
-if [ $config_xrootd_path != no ] && check_file ${xrootd_path}/include/xrootd/XrdVersion.hh
+report_detection mysql "${mysql_avail}" "${config_mysql_path}" "${mysql_path}"
+
+
+xrootd_avail=no
+if [ $config_xrootd_path != no ]
 then
 	xrootd_path=${xrootd_path:-${base_root}}
 
@@ -1708,6 +1710,7 @@ CCTOOLS_IRODS_AVAILABLE=${irods_avail}
 CCTOOLS_IRODS_LDFLAGS=${irods_ldflags}
 CCTOOLS_IRODS_CCFLAGS=${irods_ccflags}
 
+CCTOOLS_MYSQL_AVAILABLE=${mysql_avail}
 CCTOOLS_MYSQL_LDFLAGS=${mysql_ldflags}
 CCTOOLS_MYSQL_CCFLAGS=${mysql_ccflags}
 
