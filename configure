@@ -701,8 +701,10 @@ fi
 report_detection uuid "${uuid_avail}" "${config_uuid_path}" "${uuid_path}"
 
 
+fuse_avail=no
 if [ $config_fuse_path != no ]
 then
+	fuse_avail=yes
 	fuse_path=${fuse_path:-${base_root}}
 	if library_search fuse ${fuse_path} || library_search fuse /
 	then
@@ -710,47 +712,39 @@ then
 		then
 			fuse_ccflags="-I${fuse_path}/include"
 		fi
-		ccflags="${ccflags} -DHAS_FUSE"
-		fuse_ldflags="${library_search_result}"
-		fuse_avail=yes
-	elif [ $config_fuse_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
-		echo "*** Check --with-fuse-path and try again."
-		exit 1
+		fuse_ldflags="-DHAS_FUSE ${library_search_result}"
 	else
-		echo "*** skipping fuse support as it could not be automatically detected."
+		fuse_avail=no
 	fi
-else
-	echo "*** fuse support explicitely disabled."
 fi
 
+report_detection fuse "${fuse_avail}" "${config_fuse_path}" "${fuse_path}"
+
+
+ext2fs_avail=no
 if [ $config_ext2fs_path != no ]
 then
-		if library_search ext2fs ${ext2fs_path} || library_search ext2fs /
+	ext2fs_avail=yes
+	ext2fs_path=${ext2fs_path:-${base_root}}
+	if [ "${fuse_avail}" = no ]
+	then
+		echo "*** ext2fs support requires fuse"
+		ext2fs_avail=no
+	elif library_search ext2fs ${ext2fs_path} || library_search ext2fs /
+	then
+		if [ "${ext2fs_path}" != / -a "${ext2fs_path}" != /usr ]
 		then
-				if [ "${ext2fs_path}" != / -a "${ext2fs_path}" != /usr ]
-				then
-						ext2fs_ccflags="-I${ext2fs_path}/include"
-				fi
-				ccflags="${ccflags} -DHAS_EXT2FS"
-				ext2fs_ldflags="${library_search_result} -lcom_err"
-				ext2fs_avail=yes
-		else
-				if [ $config_ext2fs_path = yes ]
-				then
-
-				echo "*** Sorry, I couldn't find ext2fs in $ext2fs_path"
-				echo "*** Check --with-ext2fs-path and try again."
-				exit 1
-				else
-						echo "*** skipping ext2fs support"
-				fi
+			ext2fs_ccflags="-I${ext2fs_path}/include"
 		fi
-else
-	echo "*** skipping ext2fs support"
+		ext2fs_ldflags="-DHAS_EXT2FS ${library_search_result} -lcom_err"
+	fi
 fi
 
+report_detection ext2fs "${ext2fs_avail}" "${config_ext2fs_path}" "${ext2fs_path}"
+
+
+mpi_avail=no
+mpi_exe=""
 if [ "$config_mpi_path" != no ]
 then
 	if check_file "$mpi_path/bin/mpicc"
