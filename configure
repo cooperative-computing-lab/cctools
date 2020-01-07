@@ -120,6 +120,7 @@ config_globus_path=no
 config_irods_path=no
 config_mpi_path=no
 config_openssl_path=no
+config_uuid_path=no
 config_xrootd_path=no
 
 config_static_libgcc=yes
@@ -665,70 +666,69 @@ fi
 report_detection xrootd "${xrootd_avail}" "${config_xrootd_path}" "${xrootd_path}"
 
 
-if [ $config_cvmfs_path != no ] && check_file ${cvmfs_path}/include/libcvmfs.h
+cvmfs_avail=no
+if [ $config_cvmfs_path != no ]
 then
+	cvmfs_avail=yes
 	cvmfs_path=${cvmfs_path:-${base_root}}
-	config_openssl_path=yes
-
-	ccflags="${ccflags} -DHAS_CVMFS"
-	cvmfs_ccflags="-I${cvmfs_path}/include"
-
-	if library_search cvmfs ${cvmfs_path}
+	if check_file ${cvmfs_path}/include/libcvmfs.h && library_search cvmfs ${cvmfs_path}
 	then
+		cvmfs_ccflags="-DHAS_CVMFS -I${cvmfs_path}/include"
 		cvmfs_ldflags="${library_search_result}"
 	else
-		echo "*** Couldn't find $library in ${cvmfs_path}"
-		exit 1
-	fi
-
-	cvmfs_version=$(sed -n 's/^#define LIBCVMFS_VERSION \+\([0-9]\+\)/\1/p' ${cvmfs_path}/include/libcvmfs.h)
-	if [ $cvmfs_version -gt 1 ]
-	then
-		if library_search uuid $uuid_path
-		then
-			cvmfs_ldflags="${cvmfs_ldflags} ${library_search_result}"
-		else
-			echo "*** Couldn't find libuuid"
-			echo "*** Check --with-uuid-path and try again."
-			exit 1
-		fi
-	fi
-else
-	if [ $config_cvmfs_path = yes ]
-	then
-		echo "*** Sorry, I couldn't find cvmfs in ${cvmfs_path}"
-		echo "*** Check --with-cvmfs-path and try again."
-		exit 1
-	else
-		echo "*** skipping cvmfs support"
+		cvmfs_avail=no
 	fi
 fi
 
+if [ "${cvmfs_avail}" = yes ]
+then
+	# cvmfs needs openssl and uuid
+	config_openssl_path=yes
+	config_uuid_path=yes
+fi
+
+report_detection cvmfs "${cvmfs_avail}" "${config_cvmfs_path}" "${cvmfs_path}"
+
+
+# uuid only needed for cvmfs, thus we never use 'auto', only 'yes'
+uuid_avail=no
+if [ "${config_uuid_path}" = yes ]
+then
+	uuid_avail=yes
+	uuid_path=${uuid_path:-${base_root}}
+	if library_search uuid $uuid_path
+	then
+		cvmfs_ldflags="${cvmfs_ldflags} ${library_search_result}"
+	else
+		uuid_avail=no
+	fi
+fi
+
+report_detection uuid "${uuid_avail}" "${config_uuid_path}" "${uuid_path}"
+
+
 if [ $config_fuse_path != no ]
 then
-		fuse_path=${fuse_path:-${base_root}}
-		if library_search fuse ${fuse_path} || library_search fuse /
+	fuse_path=${fuse_path:-${base_root}}
+	if library_search fuse ${fuse_path} || library_search fuse /
+	then
+		if [ "${fuse_path}" != / -a "${fuse_path}" != ${base_root} ]
 		then
-				if [ "${fuse_path}" != / -a "${fuse_path}" != ${base_root} ]
-				then
-						fuse_ccflags="-I${fuse_path}/include"
-				fi
-				ccflags="${ccflags} -DHAS_FUSE"
-				fuse_ldflags="${library_search_result}"
-				fuse_avail=yes
-		else
-				if [ $config_fuse_path = yes ]
-				then
-
-				echo "*** Sorry, I couldn't find Fuse in $fuse_path"
-				echo "*** Check --with-fuse-path and try again."
-				exit 1
-				else
-						echo "*** skipping fuse support"
-				fi
+			fuse_ccflags="-I${fuse_path}/include"
 		fi
+		ccflags="${ccflags} -DHAS_FUSE"
+		fuse_ldflags="${library_search_result}"
+		fuse_avail=yes
+	elif [ $config_fuse_path = yes ]
+	then
+		echo "*** Sorry, I couldn't find Fuse in $fuse_path"
+		echo "*** Check --with-fuse-path and try again."
+		exit 1
+	else
+		echo "*** skipping fuse support as it could not be automatically detected."
+	fi
 else
-	echo "*** skipping fuse support"
+	echo "*** fuse support explicitely disabled."
 fi
 
 if [ $config_ext2fs_path != no ]
@@ -1704,6 +1704,7 @@ CCTOOLS_XROOTD_AVAILABLE=${xrootd_avail}
 CCTOOLS_XROOTD_LDFLAGS=${xrootd_ldflags}
 CCTOOLS_XROOTD_CCFLAGS=${xrootd_ccflags}
 
+CCTOOLS_CVMFS_AVAILABLE=${cvmfs_avail}
 CCTOOLS_CVMFS_LDFLAGS=${cvmfs_ldflags}
 CCTOOLS_CVMFS_CCFLAGS=${cvmfs_ccflags}
 
