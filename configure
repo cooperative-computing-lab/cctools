@@ -482,18 +482,16 @@ then
 	fi
 fi
 
-echo "using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
-
+globus_avail=no
 if [ $config_globus_path != no ]
 then
 	globus_path=${globus_path:-${base_root}}
+	globus_avail=yes  # assume yes until not found
 
-	config_openssl_path=yes
 	if check_file ${globus_path}/include/${globus_flavor}/globus_common.h
 	then
-		ccflags="${ccflags} -DHAS_GLOBUS_GSS"
-		globus_ccflags="-I${globus_path}/include -I${globus_path}/include/${globus_flavor}"
-		#ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		echo "*** using a globus flavor of '$globus_flavor' (if this is wrong, use the --globus-flavor argument)"
+		globus_ccflags="-DHAS_GLOBUS_GSS -I${globus_path}/include -I${globus_path}/include/${globus_flavor}"
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
 			if library_search ${library}_${globus_flavor} ${globus_path}
@@ -503,9 +501,7 @@ then
 		done
 	elif check_file ${globus_path}/include/globus/globus_common.h
 	then
-		ccflags="${ccflags} -DHAS_GLOBUS_GSS"
-		globus_ccflags="-I${globus_path}/lib/globus/include -I${globus_path}/include/globus"
-		#ldflags="${ldflags} -L${globus_path}/lib64 -L${globus_path}/lib"
+		globus_ccflags="-DHAS_GLOBUS_GSS -I${globus_path}/lib/globus/include -I${globus_path}/include/globus"
 		for library in globus_gss_assist globus_gssapi_gsi globus_gsi_proxy_core globus_gsi_credential globus_gsi_callback globus_oldgaa globus_gsi_sysconfig globus_gsi_cert_utils globus_openssl globus_openssl_error globus_callout globus_proxy_ssl globus_common ltdl
 		do
 			if library_search $library ${globus_path}
@@ -514,18 +510,25 @@ then
 			fi
 		done
 	else
-		if [ $config_globus_path = yes ]
-		then
-			echo "*** Sorry, I couldn't find Globus in $globus_path"
-			echo "*** Check --with-globus-path and try again."
-			exit 1
-		else
-			echo "*** skipping globus support"
-		fi
+		# not found
+		globus_avail=no
 	fi
-else
-	echo "*** skipping globus support"
+
+	if [ "${globus_avail}" = yes ]
+	then
+		# globus needs openssl
+		config_openssl_path=yes
+	fi
 fi
+
+if [ "${globus_avail}" = yes ]
+then
+	# globus needs openssl
+	config_globus_path=yes
+fi
+
+report_detection globus "${globus_avail}" "${config_globus_path}" "${globus_path}"
+
 
 # irods 4.0 moved all its source to the iRODS subdirectory
 # if auto, we try in this order: 4.2 (4.0,4.1) 3
@@ -1764,6 +1767,7 @@ CCTOOLS_CURL_AVAILABLE=${curl_avail}
 CCTOOLS_CURL_LDFLAGS=${curl_ldflags}
 CCTOOLS_CURL_CCFLAGS=${curl_ccflags}
 
+CCTOOLS_GLOBUS_AVAILABLE=${globus_avail}
 CCTOOLS_GLOBUS_LDFLAGS=${globus_ldflags}
 CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}
 
