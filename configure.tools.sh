@@ -682,4 +682,27 @@ config_X_path()
 	fi
 }
 
+report_detection()
+{
+	package=$1
+	available=$2
+	required=$3
+	path_tried=$4
+
+	if [ "${available}" = yes ]
+	then
+		echo "compiling with ${package} support"
+	elif [ "${required}" = no ]
+	then
+		echo "${package} support explicitely disabled"
+	elif [ "${required}" = yes ]
+	then
+		echo "*** Sorry, I couldn't find ${package} in ${path_tried}"
+		echo "*** Check --with-${package}-path and try again"
+		exit 1
+	else
+		echo "skipping ${package} support as it could not be automatically detected"
+	fi
+}
+
 # vim: set noexpandtab tabstop=4:
