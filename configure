@@ -513,12 +513,6 @@ then
 	fi
 fi
 
-if [ "${globus_avail}" = yes ]
-then
-	# globus needs openssl
-	config_globus_path=yes
-fi
-
 report_detection globus "${globus_avail}" "${config_globus_path}" "${globus_path}"
 
 
@@ -1281,29 +1275,33 @@ library_search_standard()
 }
 
 
+openssl_avail=no
 if [ $config_openssl_path != no ]
 then
+	openssl_avail=yes
 	openssl_path=${openssl_path:-${base_root}}
 
 	if ! library_search_standard ssl $openssl_path
 	then
 		echo "*** Couldn't find libssl"
-		echo "*** Check --with-openssl-path and try again."
-		exit 1
+		openssl_avail=no
 	fi
 
 	if ! library_search_standard crypto $openssl_path
 	then
 		echo "*** Couldn't find libcrypto"
-		echo "*** Check --with-openssl-path and try again."
-		exit 1
+		openssl_avail=no
 	fi
 fi
+
+report_detection openssl "${openssl_avail}" "${config_openssl_path}" "${openssl_path}"
+
 
 # from glibc:
 library_search_standard resolv ${base_root}
 library_search_standard socket ${base_root}
 library_search_standard nsl ${base_root}
+
 
 # Finally, add in standard system libraries found everywhere
 
