@@ -1162,10 +1162,11 @@ then
 
 	if [ "${python3_avail}" = yes ]
 	then
-		swig_bindings="$swig_bindings python3 python"
+		swig_bindings="$swig_bindings python3"
 
-		# 2to3 need soon to be removed, so we don't check much for it right now.
-		python3_2to3=$(dirname ${python3_exe})/bin/2to3
+		# 2to3 need soon to be removed, so we don't check much for it
+		# to force compliance, we use cp instead of a conversion
+		python3_2to3=$(dirname ${python3_exe})/2to3
 	fi
 fi
 
@@ -1404,6 +1405,10 @@ then
 	then
 		echo "grow cannot currently be build statically".
 		include_package_grow=""
+	fi
+
+	if [ "$fuse_avail" != yes ]; then
+		echo "grow_fuse requires FUSE"
 	fi
 fi
 
