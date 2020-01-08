@@ -75,10 +75,11 @@ include_package_ftplite="ftp_lite"
 include_package_grow="grow"
 include_package_makeflow="makeflow"
 include_package_parrot="parrot"
-include_package_prune="prune"
 include_package_resource_monitor="resource_monitor"
-include_package_umbrella="umbrella"
-include_package_weaver="weaver"
+
+include_package_umbrella=
+include_package_weaver=
+include_package_prune=
 
 swig_bindings=""
 
