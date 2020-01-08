@@ -61,15 +61,17 @@ check_file ()
 
 check_path ()
 {
-	echon "checking for $1..."
+	echon "checking for executable $1..."
 
 	local check_path_var=$1
 	if [ "${check_path_var}" != "${check_path_var#/}" ]
 	then
-		if check_file $check_path_var
+		if [ -f "${check_path_var}" -a -x "${check_path_var}" ]
 		then
+			echo "yes"
 			return 0
 		else
+			echo "no"
 			return 1
 		fi
 	fi
@@ -77,17 +79,33 @@ check_path ()
 	IFS=":"
 	for dir in $PATH
 	do
-		if [ -x $dir/$1 ]
+		if [ -f $dir/$1 -a -x $dir/$1 ]
 		then
-			echo "$dir/$1"
+			echo $dir/$1
 			IFS=" "
 			return 0
 		fi
 	done
-	echo "not found"
+	echo "no"
 	IFS=" "
 	return 1
 }
+
+search_file_executable() {
+	executable_search_result=""
+	for candidate in "$@"
+	do
+		if check_path ${candidate}
+		then
+			executable_search_result=$(which ${candidate})
+			return 0
+		fi
+	done
+
+	return 1
+}
+
+
 
 check_library_static() {
 	local libdir
