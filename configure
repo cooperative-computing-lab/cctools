@@ -102,6 +102,10 @@ c_only_flags="-std=c99"
 
 config_zlib_path=yes
 
+# config_PACKAGE_path possible values:
+# no   -> exclude from configuration
+# yes  -> include in configuration, and only from PACKAGE_path. If not found, exit with error.
+# auto -> include in configuration if found in standard locations. If not found, exclude from configuration.
 config_ext2fs_path=auto
 config_fuse_path=auto
 config_golang_path=auto
