@@ -106,7 +106,6 @@ config_zlib_path=yes
 # auto -> include in configuration if found in standard locations. If not found, exclude from configuration.
 config_ext2fs_path=auto
 config_fuse_path=auto
-config_golang_path=auto
 config_mysql_path=auto
 config_perl_path=auto
 config_python_path=auto    # for python2 or python3, version automatically detected
@@ -115,6 +114,7 @@ config_python3_path=auto
 config_readline_path=auto
 config_swig_path=auto
 
+config_golang_path=no
 config_curl_path=no
 config_cvmfs_path=no
 config_globus_path=no
@@ -876,6 +876,7 @@ fi
 ### version requirements for swig:
 # at least version 1.3.29 for python 2.4--2.7
 # at least version 2.0.4  for python 3.0--
+# at least version 4.0 for golang 1.5--
 
 swig_avail=no
 swig_exe=""
@@ -1170,73 +1171,35 @@ fi
 report_detection python3 "${python3_avail}" "${config_python3_path}" "${python3_path}"
 
 
-
-if [ "$fuse_avail" != yes ]; then
-	echo "grow_fuse requires FUSE"
-fi
-
-# If python is not found, then leave out weaver.
-
-if [ "$python" = 0 ]
-then
-	echo "python version is suitable for prune"
-	echo "python version is suitable for weaver"
-else
-	echo "prune requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/prune//g'`
-	echo "weaver requires python >= 2.6"
-	packages=`echo ${packages} | sed 's/weaver//g'`
-fi
-
-if [ "$python" = 0 -o "$python3" = 0 ]
-then
-	echo "python version is suitable for umbrella"
-else
-	packages=`echo ${packages} | sed 's/umbrella//g'`
-	echo "umbrella requires python >= 2.6"
-fi
-
+golang_avail=no
+golang_exe=""
 if [ $config_golang_path != no ]
 then
+	golang_avail=yes
 	golang_path=${golang_path:-${base_root}}
-	if check_file ${golang_path}/bin/go
-	then
-		golang=${golang_path}/bin/go
-	else
-		golang=0
-	fi
 
-	if [ $golang = 0 ]
+	if [ "${swig_avail}" = no ]
 	then
-		if [ $config_golang_path = yes ]
-		then
-			echo "*** Sorry, I couldn't find a go installation in $golang_path"
-			echo "*** Check --with-golang-path and try again."
-			exit 1
-		else
-			echo "*** skipping golang support"
-		fi
+		echo "*** swig is needed for golang support"
+		golang_avail=no
+	elif [ $(format_version ${swig_version}) -lt $(format_version 4.0) ]
+	then
+		echo "*** swig version ${swig_version} is older than 4.0, disabling golang support"
+		golang_avail=no
+	elif [ "${config_golang_path}" = auto ] && search_file_executable go
+	then
+		golang_exe=${executable_search_result}
+	elif search_file_executable ${golang_path}{,/bin/go,go}
+	then
+		golang_exe=${executable_search_result}
 	else
-		if [ $found_swig = yes ] && [ "$(${swig} -go --help | grep '\-cgo')" ]
-		then
-			swig_bindings="${swig_bindings} golang"
-		else
-			if [ $config_golang_path = yes ]
-			then
-				echo "*** Sorry, the swig installation does not support golang"
-				echo "*** Check --with-swig-path and try again."
-				exit 1
-			else
-				echo "*** skipping golang support"
-			fi
-		fi
+		golang_avail=no
 	fi
 fi
 
-if [ ${swig_avail} = no ]
-then
-	swig_bindings=""
-fi
+report_detection golang "${golang_avail}" "${config_golang_path}" "${golang_path}"
+
+
 
 library_search_standard()
 {
