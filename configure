@@ -1262,10 +1262,12 @@ then
 		ldflags="${ldflags} -L${zlib_path}/lib"
 	fi
 else
+	# zlib is a hard requirement, thus we immediately exit if we can't find it.
 	echo "*** Sorry, I couldn't find zlib in $zlib_path"
 	echo "*** Check --with-zlib-path and try again."
 	exit 1
 fi
+
 
 if [ "$optstatic" = 1 ]
 then
