@@ -747,30 +747,31 @@ mpi_avail=no
 mpi_exe=""
 if [ "$config_mpi_path" != no ]
 then
-	if check_file "$mpi_path/bin/mpicc"
+	mpi_avail=yes
+	mpi_path=${mpi_path:-${base_root}}
+
+	if [ "${config_mpi_path}" = auto ] && search_file_executable mpicc
 	then
-		mpicc="$mpi_path/bin/mpicc"
-	elif check_file "$mpi_path/mpicc"
+		mpi_exe=${executable_search_result}
+	elif search_file_executable ${mpi_path}{,/bin/mpicc,/mpicc}
 	then
-		mpicc="$mpi_path/mpicc"
-	elif check_file "$mpi_path"
-	then
-		mpicc="$mpi_path"
+		mpi_exe=${executable_search_result}
+	else
+		mpi_avail=no
 	fi
 
-	if [ X$mpicc != X ]
+	if [ "${mpi_avail}" = yes ]
 	then
-		ccflags="-DCCTOOLS_WITH_MPI ${ccflags}"
-		ccompiler=${mpicc}
-		linker=${mpicc}
-	else 
-		echo "*** Sorry, I couldn't find mpicc in $mpi_path"
-		echo "*** Check --with-mpicc-path and try again."
-		exit 1
+		ccflags="-DCCTOOLS_WITH_MPI"
+		ccompiler=${mpi_exe}
+		linker=${mpi_exe}
+	else
+		mpi_avail=no
 	fi
-else
-	echo "*** skipping mpi support"
 fi
+
+report_detection mpi "${mpi_avail}" "${config_mpi_path}" "${mpi_path}"
+
 
 ##########################################################################
 # SWITCH BACK TO DYNAMIC LINKING FOR COMMON SYSTEM LIBRARIES
@@ -1707,6 +1708,10 @@ CCTOOLS_EXT2FS_CCFLAGS=${ext2fs_ccflags}
 CCTOOLS_FUSE_AVAILABLE=${fuse_avail}
 CCTOOLS_FUSE_LDFLAGS=${fuse_ldflags}
 CCTOOLS_FUSE_CCFLAGS=${fuse_ccflags}
+
+CCTOOLS_MPI_AVAILABLE=${mpi_avail}
+CCTOOLS_MPI_LDFLAGS=${mpi_ldflags}
+CCTOOLS_MPI_CCFLAGS=${mpi_ccflags}
 
 CCTOOLS_CURL_AVAILABLE=${curl_avail}
 CCTOOLS_CURL_LDFLAGS=${curl_ldflags}
