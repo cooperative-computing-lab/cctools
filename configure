@@ -902,82 +902,80 @@ fi
 report_detection swig "${swig_avail}" "${config_swig_path}" "${swig_path}"
 
 
+perl_avail=no
+perl_exe=""
+perl_version=""
 if [ $config_perl_path != no ]
 then
+	perl_avail=yes
 	perl_path=${perl_path:-${base_root}}
-	if check_file ${perl_path}/bin/perl
+	if [ "${swig_avail}" = no ]
 	then
-		perl=${perl_path}/bin/perl
+		echo "*** swig is needed for perl support"
+		perl_avail=no
+	elif [ "${config_perl_path}" = auto ] && search_file_executable perl
+	then
+		perl_exe=${executable_search_result}
+	elif search_file_executable ${perl_path}{,/bin/perl}
+	then
+		perl_exe=${executable_search_result}
 	else
-		perl=0
+		perl_avail=no
 	fi
 
-	if [ $perl != 0 ]
+	if [ "${perl_avail}" = yes ]
 	then
-		perl_version=`${perl} -e 'printf "%vd\n",$^V;'`
+		perl_version=$(${perl_exe} -e 'printf "%vd\n",$^V;' 2> /dev/null)
 		if [ $? = 0 ]
 		then
 			echo "perl version is ${perl_version}"
 		else
-			perl=0
+			perl_avail=no
 		fi
 	fi
 
-	if [ $perl != 0 ]
+	# check that the perl core module to ask for correct compilation flags is
+	# available
+	if "${perl_exe}" -e 'eval { require ExtUtils::Embed }; $@ ? exit(1) : exit(0)'
 	then
-
-		if perl -e 'eval { require ExtUtils::Embed }; $@ ? exit(1) : exit(0)'
-		then
-			perl_ccflags=`${perl} -MExtUtils::Embed -e ccopts`
-			perl_ldflags=`${perl} -MExtUtils::Embed -e ldopts`
-
-			if [ $? = 0 ]
-			then
-				# On OSX, the ExtUtils::Embed options contain options
-				# to generate triple-fat binaries, which fails when
-				# we attempt to bring in our thin binaries.
-
-				# To avoid this problem, remove all of the -arch XXX
-				# arguments, so that the compiler produces the default,
-				# which will be compatible with the other objects we compile.
-
-				if [ ${BUILD_SYS} = DARWIN ]
-				then
-					perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
-					perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
-				fi
-
-				# Remove -lperl, as it is not needed for swig, and it causes trouble if libperl is not compiled with -fPIC, as in conda.
-				perl_ldflags=`echo ${perl_ldflags} | sed 's/-lperl//g'`
-
-				if [ "${CONDA_BUILD}" = 1 ]
-				then
-					perl_install_dir="site_perl"
-				else
-					perl_install_dir="perl5/site_perl"
-				fi
-
-				swig_bindings="$swig_bindings perl"
-			else
-				perl=0
-			fi
-		else
-			perl=0
-		fi
+		perl_ccflags=$(${perl_exe} -MExtUtils::Embed -e ccopts)
+		perl_ldflags=$(${perl_exe} -MExtUtils::Embed -e ldopts)
+	else
+		echo "*** perl core module ExtUtils::Embed is not available"
+		perl_avail=no
 	fi
 
-	if [ $perl = 0 ]
+	if [ "${perl_avail}" = yes -a "${BUILD_SYS}" = DARWIN ]
 	then
-		if [ $config_perl_path = yes ]
+		# On OSX, the ExtUtils::Embed options contain options
+		# to generate triple-fat binaries, which fails when
+		# we attempt to bring in our thin binaries.
+
+		# To avoid this problem, remove all of the -arch XXX
+		# arguments, so that the compiler produces the default,
+		# which will be compatible with the other objects we compile.
+		perl_ccflags=`echo ${perl_ccflags} | sed 's/-arch [^ ]* *//g'`
+		perl_ldflags=`echo ${perl_ldflags} | sed 's/-arch [^ ]* *//g'`
+	fi
+
+	if [ "${perl_avail}" = yes ]
+	then
+		# Remove -lperl, as it is not needed for swig, and it causes trouble if libperl is not compiled with -fPIC, as in conda.
+		perl_ldflags=`echo ${perl_ldflags} | sed 's/-lperl//g'`
+
+		if [ "${CONDA_BUILD}" = 1 ]
 		then
-			echo "*** Sorry, I couldn't find the perl libraries in $perl_path"
-			echo "*** Check --with-perl-path and try again."
-			exit 1
+			perl_install_dir="site_perl"
 		else
-			echo "*** skipping perl support"
+			perl_install_dir="perl5/site_perl"
 		fi
+
+		swig_bindings="$swig_bindings perl"
 	fi
 fi
+
+report_detection perl "${perl_avail}" "${config_perl_path}" "${perl_path}"
+
 
 python=0    #to be set to the python path
 if [ $config_python_path != no ]
@@ -1625,7 +1623,8 @@ CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
 CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
 CCTOOLS_SWIG_RMONITOR_BINDINGS=${swig_rmonitor_bindings}
 
-CCTOOLS_PERL=${perl}
+CCTOOLS_PERL_AVAILABLE=${perl_avail}
+CCTOOLS_PERL=${perl_exe}
 CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
 CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
 CCTOOLS_PERL_VERSION=${perl_version}
