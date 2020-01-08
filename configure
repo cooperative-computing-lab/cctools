@@ -779,49 +779,58 @@ report_detection mpi "${mpi_avail}" "${config_mpi_path}" "${mpi_path}"
 library_search_mode=prefer_dynamic
 ##########################################################################
 
-if [ $config_readline_path != no ] && library_search readline ${readline_path}
+readline_avail=no
+if [ $config_readline_path != no ]
 then
+	readline_avail=yes
 	readline_path=${readline_path:-${base_root}}
-	external_libraries="${external_libraries} ${library_search_result}"
 
-	if [ "${readline_path}" != "${base_root}" ]
+	if library_search readline ${readline_path}
 	then
-		ccflags="${ccflags} -I${readline_path}/include"
-	fi
+		external_libraries="${external_libraries} ${library_search_result}"
 
-	ccflags="${ccflags} -DHAS_LIBREADLINE"
+		if [ "${readline_path}" != "${base_root}" ]
+		then
+			ccflags="${ccflags} -I${readline_path}/include"
+		fi
 
-	# We rely on the --as-needed flag to figure out what dynamic
-	# libraries are actually used by each executable.
-	# However, libreadline doesn't properly specify a dependency
-	# on ncurses, termcap, and history, so we must force them to link.
+		ccflags="${ccflags} -DHAS_LIBREADLINE"
 
-	if [ $BUILD_SYS = LINUX ]
-	then
-		# Remove the -lreadline that was added by "library_search readline" above
-		external_libraries=`echo $external_libraries | sed "s/-lreadline//"`
+		# We rely on the --as-needed flag to figure out what dynamic
+		# libraries are actually used by each executable.
+		# However, libreadline doesn't properly specify a dependency
+		# on ncurses, termcap, and history, so we must force them to link.
 
-		# Put the readline flags in a separate variable to be used only where needed.
-		cctools_readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
+		if [ $BUILD_SYS = LINUX ]
+		then
+			# Remove the -lreadline that was added by "library_search readline" above
+			external_libraries=`echo $external_libraries | sed "s/-lreadline//"`
+
+			# Put the readline flags in a separate variable to be used only where needed.
+			readline_ldflags="-lreadline ${link_no_as_needed} -lncurses -lhistory ${link_as_needed}"
+		else
+			if library_search ncurses ${readline_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
+
+			if library_search termcap ${readline_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
+
+			if library_search history ${readline_path}
+			then
+				external_libraries="${external_libraries} ${library_search_result}"
+			fi
+		fi
 	else
-		if library_search ncurses ${readline_path}
-		then
-			external_libraries="${external_libraries} ${library_search_result}"
-		fi
-
-		if library_search termcap ${readline_path}
-		then
-			external_libraries="${external_libraries} ${library_search_result}"
-		fi
-
-		if library_search history ${readline_path}
-		then
-			external_libraries="${external_libraries} ${library_search_result}"
-		fi
+		readline_avail=no
 	fi
-else
-	echo "*** skipping readline..."
 fi
+
+report_detection readline "${readline_avail}" "${config_readline_path}" "${readline_path}"
+
 
 if [ $config_curl_path != no ]
 then
@@ -1623,8 +1632,6 @@ CCTOOLS_STATIC_LINKAGE = ${static_libraries}
 
 CCTOOLS_LDFLAGS = -L\$(CCTOOLS_INSTALL_DIR)/lib \$(CCTOOLS_BASE_LDFLAGS)
 
-CCTOOLS_READLINE_LDFLAGS=${cctools_readline_ldflags}
-
 CCTOOLS_STATIC=${optstatic}
 
 CCTOOLS_DYNAMIC_SUFFIX=${cctools_dynamic_suffix}
@@ -1640,6 +1647,9 @@ CXXFLAGS=\$(CCTOOLS_CXXFLAGS)
 CCTOOLS_AR=ar
 
 CCTOOLS_CHIRP=${include_package_chirp}
+
+CCTOOLS_READLINE_AVAILABLE=${readline_avail}
+CCTOOLS_READLINE_LDFLAGS=${readline_ldflags}
 
 CCTOOLS_SWIG=${swig}
 CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
