@@ -146,7 +146,12 @@ check_function()
 	local header
 
 	name="$1"
-	header="$2"
+	shift
+
+	header="$1"
+	shift
+
+	compiler_options="$@"
 
 	echon "checking for $name in $header..."
 
@@ -158,7 +163,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 EOF
-	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o > .configure.tmp.out 2>&1; then
+	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o ${compiler_options} > .configure.tmp.out 2>&1; then
 		echo yes
 		rm -f .configure.tmp.c .configure.tmp.out
 		return 0
