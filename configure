@@ -832,32 +832,26 @@ fi
 report_detection readline "${readline_avail}" "${config_readline_path}" "${readline_path}"
 
 
+curl_avail=no
 if [ $config_curl_path != no ]
 then
-		curl_path=${curl_path:-${base_root}}
-		if library_search curl ${curl_path} || library_search curl /
+	curl_avail=yes
+	curl_path=${curl_path:-${base_root}}
+	if library_search curl ${curl_path} || library_search curl /
+	then
+		if [ "${curl_path}" != / -a "${curl_path}" != /usr ]
 		then
-				if [ "${curl_path}" != / -a "${curl_path}" != /usr ]
-				then
-						curl_ccflags="-I${curl_path}/include"
-				fi
-				ccflags="${ccflags} -DHAS_CURL"
-				curl_ldflags="${library_search_result} -lcrypto"
-				curl_avail=yes
-		else
-				if [ $config_curl_path = yes ]
-				then
-
-				echo "*** Sorry, I couldn't find curl in $curl_path"
-				echo "*** Check --with-curl-path and try again."
-				exit 1
-				else
-						echo "*** skipping curl support"
-				fi
+			curl_ccflags="-I${curl_path}/include"
 		fi
-else
-	echo "*** skipping curl support"
+		ccflags="${ccflags} -DHAS_CURL"
+		curl_ldflags="${library_search_result} -lcrypto"
+	else
+		curl_avail=no
+	fi
 fi
+
+report_detection curl "${curl_avail}" "${config_curl_path}" "${curl_path}"
+
 
 if [ $BUILD_SYS = DARWIN ]
 then
