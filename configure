@@ -867,66 +867,40 @@ then
         fi
 fi
 
-found_swig=no
+
+### version requirements for swig:
+# at least version 1.3.29 for python 2.4--2.7
+# at least version 2.0.4  for python 3.0--
+
+swig_avail=no
+swig_exe=""
+swig_version=""
 if [ $config_swig_path != no ]
 then
+	swig_avail=yes
 	swig_path=${swig_path:-${base_root}}
 	if [ "$optstatic" = 1 ]
 	then
 		echo "*** buildin statically, skipping swig support"
+		swig_avail=no
+	elif [ "${config_swig_path}" = auto ] && search_file_executable ${SWIG} swig
+	then
+		swig_exe="${executable_search_result}"
+	elif search_file_executable ${swig_path}{,/bin/swig,/swig}
+	then
+		swig_exe="${executable_search_result}"
 	else
-		swig=""
-		if check_file ${swig_path}/bin/swig
-		then
-			swig=${swig_path}/bin/swig
-		else
-			if check_path swig
-			then
-				swig=`which swig`
-			else
-				echo "*** skipping swig bindings for work queue and chirp"
-			fi
-		fi
+		swig_avail=no
+	fi
 
-		if [ -n "$swig" ]
-		then
-			swig_version=`${swig} -version | grep -i version | awk '{print $3}'`
-
-			if [ ! \( "$python_major_version" = 2 -a "$python_minor_version" = 4 \) -a `format_version $swig_version` = `format_version 1.3.29` ]
-			then
-				echo "*** Sorry, Swig 1.3.29 does not work with Python $python_version."
-				echo "*** skipping swig bindings for work queue and chirp"
-			elif [ "$python_dev" = no ]
-			then
-				echo "*** Sorry, Swig needs the develovement files for python (e.g., python-devel, or python-dev)."
-				echo "*** skipping swig bindings for work queue and chirp"
-			elif [ "$python3" != 0 -a `format_version $swig_version` -lt `format_version 2.0.4` ]
-			then
-				# Python 3 requires Swig version >= 2.0.4; cf.
-				# http://sourceforge.net/p/swig/bugs/1104/ and
-				# http://sourceforge.net/p/swig/news/?page=1
-				echo "*** Sorry, Swig $swig_version does not work with Python 3 version $python3_version."
-				echo "*** Specifically, Swig >= 2.0.4 is needed for Python 3 support."
-				found_swig=old
-			elif [ `format_version $swig_version` -ge `format_version 1.3.29` ]
-			then
-				found_swig=yes
-			else
-				echo "*** Sorry, I need swig >= 1.3.29"
-				echo "*** skipping swig bindings for work queue and chirp"
-			fi
-		else
-			if [ $config_swig_path = yes ]
-			then
-				echo "*** Sorry, I couldn't find swig in $swig_path"
-				echo "*** Check --with-swig-path and try again."
-				exit 1
-			else
-				echo "*** skipping swig bindings for work queue"
-			fi
-		fi
+	if [ "${swig_avail}" = yes ]
+	then
+		swig_version=$(${swig_exe} -version | grep -i version | awk '{print $3}')
 	fi
 fi
+
+report_detection swig "${swig_avail}" "${config_swig_path}" "${swig_path}"
+
 
 if [ $config_perl_path != no ]
 then
@@ -1259,7 +1233,7 @@ then
 	fi
 fi
 
-if [ $found_swig = no ]
+if [ ${swig_avail} = no ]
 then
 	swig_bindings=""
 fi
@@ -1567,7 +1541,7 @@ fi
 swig_workqueue_bindings=""
 swig_chirp_bindings=""
 swig_rmonitor_bindings=""
-if [ "$found_swig" != no ]
+if [ "$swig_avail" = yes ]
 then
 	for binding in $swig_bindings
 	do
@@ -1645,7 +1619,8 @@ CCTOOLS_CHIRP=${include_package_chirp}
 CCTOOLS_READLINE_AVAILABLE=${readline_avail}
 CCTOOLS_READLINE_LDFLAGS=${readline_ldflags}
 
-CCTOOLS_SWIG=${swig}
+CCTOOLS_SWIG_AVAILABLE=${swig_avail}
+CCTOOLS_SWIG=${swig_exe}
 CCTOOLS_SWIG_WORKQUEUE_BINDINGS=${swig_workqueue_bindings}
 CCTOOLS_SWIG_CHIRP_BINDINGS=${swig_chirp_bindings}
 CCTOOLS_SWIG_RMONITOR_BINDINGS=${swig_rmonitor_bindings}
