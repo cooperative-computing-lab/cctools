@@ -1168,6 +1168,19 @@ fi
 
 report_detection python3 "${python3_avail}" "${config_python3_path}" "${python3_path}"
 
+# python_test_exec is the python executable to use in make test
+# preference is given to python3
+python_test_exec=""
+python_test_dir=""
+if [ "${python3_avail}" = yes ]
+then
+	python_test_exec=${python3_exe}
+	python_test_dir=python3
+elif [ "${python2_avail}"  = yes ]
+then
+	python_test_exec=${python2_exe}
+	python_test_dir=python2
+fi
 
 golang_avail=no
 golang_exe=""
@@ -1598,6 +1611,9 @@ CCTOOLS_PERL_CCFLAGS=${perl_ccflags}
 CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
 CCTOOLS_PERL_VERSION=${perl_version}
 CCTOOLS_PERL_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/${perl_install_dir}/\$(CCTOOLS_PERL_VERSION)
+
+CCTOOLS_PYTHON_TEST_EXEC=${python_test_exec}
+CCTOOLS_PYTHON_TEST_DIR=${python_test_dir}
 
 CCTOOLS_PYTHON2_AVAILABLE=${python2_avail}
 CCTOOLS_PYTHON2=${python2_exe}
