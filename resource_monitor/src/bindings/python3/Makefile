@@ -22,7 +22,7 @@ rmonitor_wrap.c resource_monitor.py: rmonitor.i resource_monitor.bindings.py
 
 $(RMPYTHONSO): rmonitor_wrap.o $(EXTERNAL_DEPENDENCIES)
 
-resource_monitor.bindings.py:%.py: ../python/%.py
+resource_monitor.bindings.py:%.py: ../python2/%.py
 	cp $< $@
 	$(CCTOOLS_PYTHON3_2TO3) --nobackups --no-diffs --write $@
 

@@ -28,7 +28,7 @@ chirp_wrap.c CChirp.py: chirp.i chirp.binding.py
 
 $(CHIRPPYTHONSO): $(OBJECTS) $(EXTERNAL_DEPENDENCIES)
 
-chirp.binding.py: %.py: ../python/%.py
+chirp.binding.py: %.py: ../python2/%.py
 	    cp $< $@
 		    $(CCTOOLS_PYTHON3_2TO3) --nobackups --no-diffs --write $@
 

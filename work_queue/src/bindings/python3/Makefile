@@ -25,7 +25,7 @@ work_queue_wrap.c work_queue.py: work_queue.i work_queue.binding.py
 
 $(WQPYTHONSO): work_queue_wrap.o $(EXTERNAL_DEPENDENCIES)
 
-work_queue.binding.py work_queue_futures.py work_queue_example.py work_queue_futures_example.py: %.py: ../python/%.py
+work_queue.binding.py work_queue_futures.py work_queue_example.py work_queue_futures_example.py: %.py: ../python2/%.py
 	cp $< $@
 	$(CCTOOLS_PYTHON3_2TO3) --nobackups --no-diffs --write $@
 

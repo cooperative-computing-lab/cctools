@@ -1088,7 +1088,7 @@ then
 	if [ "${python2_avail}" = yes ]
 	then
 		# to change to python2
-		swig_bindings="$swig_bindings python"
+		swig_bindings="$swig_bindings python2"
 	fi
 fi
 
