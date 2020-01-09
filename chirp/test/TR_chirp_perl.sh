@@ -13,14 +13,12 @@ perl=${CCTOOLS_PERL}
 
 check_needed()
 {
-	test -f ../src/bindings/perl/CChirp.so
+	[ -n "${perl}" ] || return 1
 	command -v openssl >/dev/null 2>&1
 }
 
 prepare()
 {
-	[ -n "$perl" ] || return 1
-
 	chirp_start local --auth=ticket
 	echo "$hostport" > "$c"
 	return 0
