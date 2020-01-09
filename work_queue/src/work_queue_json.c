@@ -120,26 +120,25 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 				while(flag) {
 					char *flag_key = flag->key->u.string_value;
 					bool flag_value = flag->value->u.boolean_value;
-					if(!strcmp(flag_key, "WORK_QUEUE_NOCACHE")) {
-						if(flag_value) {
-							flags |= nocache;
-						}
-					} else if(!strcmp(flag_key, "WORK_QUEUE_CACHE")) {
+					if(!strcmp(flag_key, "cache")) {
 						if(flag_value) {
 							flags |= cache;
-						}
-					} else if(!strcmp(flag_key, "WORK_QUEUE_WATCH")) {
+						} 
+                        else {
+                            flags |= nocache;
+                        }
+					} else if(!strcmp(flag_key, "watch")) {
 						if(flag_value) {
 							flags |= watch;
 						}
 					} else {
-						printf("KEY ERROR: %s not valid", flag_key);
+						printf("KEY ERROR: %s not valid\n", flag_key);
 						return 1;
 					}
 					flag = flag->next;
 				}
 			} else {
-				printf("KEY ERROR: %s not valid", key);
+				printf("KEY ERROR: %s not valid\n", key);
 				return 1;
 			}
 
@@ -309,6 +308,10 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 	struct jx_pair *command_line, *taskid, *return_status, *output, *result;
 
 	struct work_queue_task *t = work_queue_wait(q, timeout);
+
+    if(!t){
+        return NULL;
+    }
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
 	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);

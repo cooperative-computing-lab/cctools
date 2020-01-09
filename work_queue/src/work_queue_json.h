@@ -36,11 +36,10 @@ Once returned, it is safe to re-submit the same take object via
 
 { "command_line" : <i>string</i> , "output_files" : <i>array of objects with one object per output file</i> -> 
 [ { "local_name" : <i>string</i> , "remote_name" : <i>string</i> , "flags" : <i>object</i> -> { 
-"WORK_QUEUE_CACHE" : <i>boolean</i> , "WORK_QUEUE_NOCACHE" : <i>boolean</i> , "WORK_QUEUE_WATCH" : 
+"cache" : <i>boolean</i> , "watch" : 
 <i>boolean</i> } } ] , "input _files" : <i>array of objects with one object per input file</i> -> [ { 
-"local_name" : <i>string</i> , "remote_name" : <i>string</i> , "flags" : <i>object</i> -> { "WORK_QUEUE_CACHE" : 
-<i>boolean</i> , "WORK_QUEUE_NOCACHE" : <i>boolean</i> , "WORK_QUEUE_WATCH" : <i>boolean</i> } } ] , 
-"tag" : <i>string</i> }
+"local_name" : <i>string</i> , "remote_name" : <i>string</i> , "flags" : <i>object</i> -> { "cache" : 
+<i>boolean</i> , "watch" : <i>boolean</i> } } ] }
 
 @return An integer taskid assigned to the submitted task.
 */

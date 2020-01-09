@@ -1,3 +1,7 @@
+#Copyright (C) 2020- The University of Notre Dame
+#This software is distributed under the GNU General Public License.
+#See the file COPYING for details.
+
 import socket
 import json
 
@@ -7,8 +11,47 @@ class WorkQueueServer:
         self.socket = socket.socket()
         self.id = 1
 
+    def send_recv(self, request):
+        request = json.dumps(request)
+        request += "\n"
+        self.send(request)
+
+        response = self.recv()
+
+        self.id += 1
+
+        return response
+
     def connect(self, address, port):
         self.socket.connect((address, port))
+
+    def send(self, msg):
+        length = len(msg)
+
+        total = 0
+        sent = 0
+        while total < length:
+            sent = self.socket.send(msg[sent:])
+            if sent == 0:
+                print("connection closed")
+            total += sent
+
+    def recv(self):
+        response = self.socket.recv(4096)
+        length = ''
+        for t in response:
+            if t != '{':
+                length += t
+            else:
+                break
+
+        response = response[len(length):]
+        length = int(length)
+
+        while len(response) < length:
+            response += self.socket.rec(4096)
+        
+        return response
 
     def submit(self, task):
         request = {
@@ -18,16 +61,7 @@ class WorkQueueServer:
             "params" : task
         }
 
-        request = json.dumps(request)
-
-        request += "\n"
-        self.socket.send(request)
-
-        response = self.socket.recv(1024)
-
-        self.id += 1
-
-        return response
+        return self.send_recv(request)
 
     def wait(self, timeout):
         request = {
@@ -37,15 +71,7 @@ class WorkQueueServer:
             "params" : timeout
         }
 
-        request = json.dumps(request)
-        request += '\n'
-        self.socket.send(request.encode())
-
-        response = self.socket.recv(4096)
-
-        self.id += 1
-
-        return response
+        return self.send_recv(request)
 
     def remove(self, taskid):
         request = {
@@ -55,15 +81,7 @@ class WorkQueueServer:
             "params" : taskid
         }
 
-        request = json.dumps(request)
-        request += '\n'
-        self.socket.send(request.encode())
-
-        response = self.socket.recv(1024)
-
-        self.id += 1
-
-        return response
+        return self.send_recv(request)
 
     def disconnect(self):
         request = {
@@ -73,11 +91,7 @@ class WorkQueueServer:
             "params" : None
         }
 
-        request = json.dumps(request)
-        request += '\n'
-        self.socket.send(request.encode())
-
-        response = self.socket.recv(1024)
+        response = self.send_recv(request)
 
         self.socket.close()
 

@@ -1,22 +1,36 @@
+/*
+Copyright (C) 2020- The University of Notre Dame
+This software is distributed under the GNU General Public License.
+See the file COPYING for details.
+*/
+
 #include "work_queue_json.h"
 #include "link.h"
 #include "jx.h"
 #include "jx_print.h"
 #include "jx_parse.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#define SERVER_PORT 2345
+#define WQ_PORT 1234
+
 char * workqueue = "{ \"name\" : \"server_wq\" , \"port\" : 1234 }";
+int timeout = 25;
 
 void reply(struct link *client, char *method, char* message, int id){
 
-    struct jx_pair *jsonrpc, *result, *idd;
-    struct jx *j;
-    char *response;
-    time_t t;
+    struct jx_pair *result;
 
-    idd = jx_pair(jx_string("id"), jx_integer(id), NULL);
+    int len = strlen(message);
+    char buffer[BUFSIZ];
+
+    sprintf(buffer, "%d", len);
+
+    struct jx_pair *idd = jx_pair(jx_string("id"), jx_integer(id), NULL);
 
     if(!strcmp(method, "error")){
         result = jx_pair(jx_string("error"), jx_string(message), idd);
@@ -25,14 +39,19 @@ void reply(struct link *client, char *method, char* message, int id){
         result = jx_pair(jx_string("result"), jx_string(message), idd);
     }
         
-    jsonrpc = jx_pair(jx_string("jsonrpc"), jx_string("2.0"), result);
+    struct jx_pair *jsonrpc = jx_pair(jx_string("jsonrpc"), jx_string("2.0"), result);
 
-    j = jx_object(jsonrpc);
+    struct jx *j = jx_object(jsonrpc);
 
-    response = jx_print_string(j);
+    char *response = jx_print_string(j);
 
-    t = time(NULL);
-    link_write(client, response, strlen(response), t + 10);
+    strcat(buffer, response);
+
+    ssize_t written = link_write(client, buffer, strlen(buffer), time(NULL)+timeout);
+
+    while (written < 0){
+       written = link_write(client, buffer, strlen(buffer), time(NULL)+timeout); 
+    }
 
     jx_delete(j);
 
@@ -40,15 +59,7 @@ void reply(struct link *client, char *method, char* message, int id){
 
 int main(){
 
-    const char *key;
-    char *error;
     char message[BUFSIZ];
-    time_t t;
-    void *k = NULL, *v = NULL;
-    char *method, *task;
-    struct jx *val, *value, *jsonrpc;
-    ssize_t read;
-    int timeout, taskid, id=-1;
 
         //create work queue
         struct work_queue* q = work_queue_json_create(workqueue);
@@ -64,16 +75,14 @@ int main(){
         work_queue_cancel_all_tasks(q);       
 
         //wait for client to connect
-        struct link* client = link_serve(2345);
+        struct link* client = link_serve(SERVER_PORT);
     
         if (!client){
-            printf("Could not serve on port 2345\n");
+            printf("Could not serve on port %d\n", SERVER_PORT);
             return 1;
         }
     
-        t = time(NULL);
-    
-        client = link_accept(client, t + 100);
+        client = link_accept(client, time(NULL)+timeout);
     
         if (!client){
             printf("Could not accept connection\n");
@@ -84,32 +93,38 @@ int main(){
         while (true){
     
             //reset
-            error = NULL;
-            id = -1;
+            char *error = NULL;
+            int id = -1;
     
             //receive message
-            t = time(NULL);
+            ssize_t read = link_readline(client, message, BUFSIZ, time(NULL)+timeout);
     
-            read = link_readline(client, message, BUFSIZ, t + 10);
-    
+            //if server cannot read message from client, break connection
             if (!read){
                 error = "Error reading from client";
                 reply(client, "error", error, id);
-                continue;
+                link_close(client);
+                break;
             }
     
-            jsonrpc = jx_parse_string(message);
+            struct jx *jsonrpc = jx_parse_string(message);
     
+            //if server cannot parse JSON string, break connection
             if (!jsonrpc){
                 error = "Could not parse JSON string";
                 reply(client, "error", error, id);
-                continue;
+                link_close(client);
+                break;
             }
     
             //iterate over the object: get method and task description
-            key = jx_iterate_keys(jsonrpc, &k);
-            value = jx_iterate_values(jsonrpc, &v);
+            void *k = NULL, *v = NULL;
+            const char *key = jx_iterate_keys(jsonrpc, &k);
+            struct jx *value = jx_iterate_values(jsonrpc, &v);
     
+            char *method;
+            struct jx *val;
+
             while (key){
                 
                 if (!strcmp(key, "method")){
@@ -125,6 +140,8 @@ int main(){
                 else if (strcmp(key, "jsonrpc")){
                     error = "unrecognized parameter";
                     reply(client, "error", error, id);
+                    link_close(client);
+                    break;
                 }
     
                 key = jx_iterate_keys(jsonrpc, &k);
@@ -135,14 +152,13 @@ int main(){
             //submit or wait
             if (!strcmp(method, "submit")){
                 
-                task = val->u.string_value;
+                char *task = val->u.string_value;
     
-                taskid = work_queue_json_submit(q, task);
+                int taskid = work_queue_json_submit(q, task);
     
                 if (taskid < 0){
                     error = "Could not submit task";
                     reply(client, "error", error, id);
-                    continue;
                 }
                 
                 reply(client, method, "Task submitted successfully.", id);
@@ -150,10 +166,9 @@ int main(){
             }
             else if (!strcmp(method, "wait")){
     
-                timeout = val->u.integer_value;
+                int time_out = val->u.integer_value;
     
-                task = 0;
-                task = work_queue_json_wait(q, timeout);
+                char *task = work_queue_json_wait(q, time_out);
     
                 if (!task){
                     error = "timeout reached with no task returned";
@@ -164,9 +179,9 @@ int main(){
     
             }
             else if (!strcmp(method, "remove")){
-                taskid = val->u.integer_value;
+                int taskid = val->u.integer_value;
     
-                task = work_queue_json_remove(q, taskid);
+                char *task = work_queue_json_remove(q, taskid);
                 if (!task){
                     error = "task not able to be removed from queue";
                     reply(client, "error", error, id);
@@ -189,6 +204,8 @@ int main(){
             jx_delete(jsonrpc);
     
         }
+    
+        link_close(client);
     
     }
 
