@@ -270,7 +270,7 @@ class FutureTask(work_queue.Task):
 
     def result(self, timeout=None):
         if self.cancelled():
-            raise CancelledError
+            raise futures.CancelledError
 
         # wait for task to be done event if not done already
         self._done_event.wait(timeout)
@@ -286,7 +286,7 @@ class FutureTask(work_queue.Task):
 
     def exception(self, timeout=None):
         if self.cancelled():
-            raise CancelledError
+            raise futures.CancelledError
 
         self._done_event.wait(timeout)
 
