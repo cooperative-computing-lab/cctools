@@ -1,1 +1,4 @@
-../python3/my_script.sh
+#! /bin/sh
+
+sleep 1
+echo Hello $1 > my.output

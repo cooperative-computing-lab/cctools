@@ -8,7 +8,8 @@ set -e
 c="./hostport.$PPID"
 cr="./root.$PPID"
 
-python=${CCTOOLS_PYTHON_TEST}
+python=${CCTOOLS_PYTHON_TEST_EXEC}
+python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
 check_needed()
 {
@@ -30,9 +31,9 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	base=../src/bindings/python${CCTOOLS_PYTHON_TEST_VERSION}
+	base=$(pwd)/../src/bindings/${python_dir}
 
-	PYTHONPATH=../src/bindings/python${CCTOOLS_PYTHON_TEST_VERSION} ${python} ../src/bindings/python/chirp_jobs_python_example.py $hostport ../src/bindings/python/my_script.sh
+	PYTHONPATH=${base} ${python} ${base}/chirp_jobs_python_example.py $hostport ${base}/my_script.sh
 
 	return 0
 }

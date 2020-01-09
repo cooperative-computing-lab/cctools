@@ -3,12 +3,7 @@
 import sys
 import os
 
-try:
-    import Chirp
-except ImportError:
-    print('Could not find Chirp module. Please set PYTHONPATH accordingly.')
-    sys.exit(1)
-
+import Chirp
 
 def write_some_file(filename='bar.txt'):
     message  = '''

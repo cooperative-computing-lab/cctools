@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-
-try:
-    import Chirp
-except ImportError:
-    print('Could not find Chirp module. Please set PYTHONPATH accordingly.')
-    sys.exit(1)
+import Chirp
 
 def make_job(job_number):
     job = { 'executable' : './my_script',
