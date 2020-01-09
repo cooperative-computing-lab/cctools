@@ -340,7 +340,10 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	}
 
 	batch_task_set_resources(task, dag_node_dynamic_label(n));
-	batch_task_set_envlist(task, dag_node_env_create(n->d, n, should_send_all_local_environment) );
+
+	struct jx *env = dag_node_env_create(n->d, n, should_send_all_local_environment);
+	batch_task_set_envlist(task, env);
+	jx_delete(env);
 
 	return task;
 }
@@ -501,12 +504,16 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 		if(makeflow_abort_flag) break;
 
 		/* This will eventually be replaced by submit (queue, task )... */
+		char *input_files  = batch_files_to_string(queue, task->input_files);
+		char *output_files = batch_files_to_string(queue, task->output_files);
 		jobid = batch_job_submit(queue,
 								task->command,
-								batch_files_to_string(queue, task->input_files),
-								batch_files_to_string(queue, task->output_files),
+								input_files,
+								output_files,
 								task->envlist,
 								task->resources);
+		free(input_files);
+		free(output_files);
 
 		if(jobid > 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
