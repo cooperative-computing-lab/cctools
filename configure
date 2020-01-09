@@ -1677,6 +1677,33 @@ CCTOOLS_GLOBUS_CCFLAGS=${globus_ccflags}
 export CCTOOLS_TEST_CCFLAGS=${test_ccflags}
 EOF
 
+echo""
+echo "Optional external systems configured:"
+echo""
+
+echo "General libraries"
+printf "%-15s %3s\n" curl ${curl_avail}
+printf "%-15s %3s\n" ext2fs ${ext2fs_avail}
+printf "%-15s %3s\n" fuse ${fuse_avail}
+printf "%-15s %3s\n" readline ${readline_avail}
+printf "%-15s %3s\n" "makeflow mpi" ${mpi_avail}
+
+echo ""
+echo "Language support:"
+printf "%-15s %3s\n" swig ${swig_avail}
+printf "%-15s %3s\n" golang ${golang_avail}
+printf "%-15s %3s\n" perl ${perl_avail}
+printf "%-15s %3s\n" python2 ${python2_avail}
+printf "%-15s %3s\n" python3 ${python3_avail}
+
+echo ""
+echo "External support configured for parrot:"
+printf "%-15s %3s\n" cvmfs ${cvmfs_avail}
+printf "%-15s %3s\n" globus ${globus_avail}
+printf "%-15s %3s\n" irods ${irods_avail}
+printf "%-15s %3s\n" mysql ${mysql_avail}
+printf "%-15s %3s\n" xrootd ${xrootd_avail}
+
 echo ""
 echo "To re-configure, type './configure.rerun'"
 echo "To build, type '${MAKE}'"
