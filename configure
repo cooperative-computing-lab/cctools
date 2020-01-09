@@ -1163,10 +1163,6 @@ then
 	if [ "${python3_avail}" = yes ]
 	then
 		swig_bindings="$swig_bindings python3"
-
-		# 2to3 need soon to be removed, so we don't check much for it
-		# to force compliance, we use cp instead of a conversion
-		python3_2to3=$(dirname ${python3_exe})/2to3
 	fi
 fi
 
@@ -1615,7 +1611,6 @@ CCTOOLS_PYTHON3=${python3_exe}
 CCTOOLS_PYTHON3_CCFLAGS=-DNDEBUG ${python3_ccflags}
 CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
 CCTOOLS_PYTHON3_VERSION=${python3_version}
-CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
 CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
