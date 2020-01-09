@@ -557,7 +557,7 @@ Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all options.
 */
 
-static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
+static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
 	struct batch_queue *queue = makeflow_get_queue(n);
 
@@ -585,7 +585,7 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	int hook_return = makeflow_hook_node_submit(n, task);
 	if (hook_return != MAKEFLOW_HOOK_SUCCESS){
 		makeflow_failed_flag = 1;
-		return;
+		return JOB_SUBMISSION_HOOK_FAILURE;
 	}
 
 	/* Logs the expectation of output files. */
@@ -636,6 +636,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		batch_queue_set_option(queue, "batch-options", previous_batch_options);
 		free(previous_batch_options);
 	}
+
+	return submitted;
 }
 
 static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
@@ -710,14 +712,33 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
 
+	/* When submitting to an external queue if there are no resources
+	 * available, such as vms in amazon, then the submission fails with a
+	 * timeout. When this occurs, submission_timeout is set to 1, and only
+	 * local jobs are tried for submission. Batch jobs are tried again the next
+	 * time makeflow_dispatch_ready_jobs is called. This allows batch_job_wait
+	 * to be called in-between, which may free some batch resources and allow
+	 * job submissions that do not timeout.
+	 */
+	int submission_timeout = 0;
+
 	for(n = d->nodes; n; n = n->next) {
 		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max) {
 			break;
 		}
 
 		const struct rmsummary *resources = dag_node_dynamic_label(n);
+
 		if(makeflow_node_ready(d, n, resources)) {
-			makeflow_node_submit(d, n, resources);
+			if(is_local_job(n) || !submission_timeout) {
+				enum job_submit_status status = makeflow_node_submit(d, n, resources);
+
+				if(status == JOB_SUBMISSION_ABORTED) {
+					break;
+				} else if(status == JOB_SUBMISSION_TIMEOUT) {
+					submission_timeout = 1;
+				}
+			}
 		}
 	}
 }
