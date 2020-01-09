@@ -38,7 +38,7 @@ clean:
 test:
 
 install: all
-	mkdir -p $(CCTOOLS_PYTHON_PATH)
-	cp chirp.py $(CHIRPPYTHONSO) $(CCTOOLS_PYTHON_PATH)/
+	mkdir -p $(CCTOOLS_PYTHON3_PATH)
+	cp Chirp.py $(CHIRPPYTHONSO) $(CCTOOLS_PYTHON3_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 

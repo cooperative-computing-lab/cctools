@@ -4,8 +4,8 @@ include $(CCTOOLS_HOME)/rules.mk
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
-LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
+LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON2_CCFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON2_LDFLAGS) $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_EXTERNAL_LINKAGE)
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/chirp/src/libchirp.a $(CCTOOLS_HOME)/dttools/src/libdttools.a
 CHIRPPYTHONSO = _CChirp.$(CCTOOLS_DYNAMIC_SUFFIX)
@@ -34,7 +34,7 @@ clean:
 test:
 
 install: all
-	mkdir -p $(CCTOOLS_PYTHON_PATH)
-	cp Chirp.py $(CHIRPPYTHONSO) $(CCTOOLS_PYTHON_PATH)/
+	mkdir -p $(CCTOOLS_PYTHON2_PATH)
+	cp Chirp.py $(CHIRPPYTHONSO) $(CCTOOLS_PYTHON2_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 	cp chirp_python_example.py $(CCTOOLS_INSTALL_DIR)/doc/
