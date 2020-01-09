@@ -2,25 +2,26 @@
 
 . ../../dttools/test/test_runner_common.sh
 
-python=${CCTOOLS_PYTHON3}
+python=${CCTOOLS_PYTHON_TEST_EXEC}
+python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
 check_needed()
 {
-		[ -f ../src/bindings/python3/_resource_monitor.so ] || return 1
+		[ -n "${python}" ] || return 1
 
 		exit 0
 }
 
 prepare()
 {
-	[ -n "$python" ] || return 1
-
 	exit 0
 }
 
 run()
 {
-	PYTHONPATH=$(pwd)/../src/bindings/python3 ${CCTOOLS_PYTHON3} ../src/bindings/python3/example_simple_limit.py
+	base=../src/bindings/${python_dir}
+
+	PYTHONPATH=${base} ${python} ${base}/example_simple_limit.py
 }
 
 clean()
