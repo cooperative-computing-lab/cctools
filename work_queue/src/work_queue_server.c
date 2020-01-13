@@ -68,21 +68,21 @@ int main(){
             printf("Could not create work_queue\n");
             return 1;
         }
+        
+        //wait for client to connect
+        struct link* port = link_serve(SERVER_PORT);
+
+        if (!port){
+            printf("Could not serve on port %d\n", SERVER_PORT);
+            return 1;
+        }
  
     while(true){
     
         //clear work queue
         work_queue_cancel_all_tasks(q);       
 
-        //wait for client to connect
-        struct link* client = link_serve(SERVER_PORT);
-    
-        if (!client){
-            printf("Could not serve on port %d\n", SERVER_PORT);
-            return 1;
-        }
-    
-        client = link_accept(client, time(NULL)+timeout);
+        struct link* client = link_accept(port, time(NULL)+timeout);
     
         if (!client){
             printf("Could not accept connection\n");
