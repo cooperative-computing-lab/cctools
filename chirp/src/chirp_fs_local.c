@@ -45,8 +45,8 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
-	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
+#ifdef CCTOOLS_OPSYS_DARWIN
+/* Darwin has 64-bit I/O by default */
 #	define stat64 stat
 #	define fstat64 fstat
 #	define ftruncate64 ftruncate

@@ -93,7 +93,7 @@ ccompiler=${CC:-gcc}
 cxxcompiler=${CXX:-g++}
 linker="${ccompiler}"
 
-ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra"
+ccflags="${CFLAGS} -D__EXTENSIONS__ -D_LARGEFILE64_SOURCE -D__LARGE64_FILES -Wall -Wextra -fPIC"
 c_only_flags="-std=c99"
 
 config_zlib_path=yes
@@ -406,18 +406,6 @@ do
 		ccflags="${ccflags} -W$flag"
 	fi
 done
-
-# Cygwin has some compiler oddities.
-# 1 - Sloppy definitions of the ctype.h functions cause spurious warnings
-# about char -> int conversions.
-# 2 - All code is PIC by default, and adding the flag causes more warnings.
-
-if [ ${BUILD_SYS} = CYGWIN ]
-then
-	ccflags="${ccflags} -Wno-char-subscripts"
-else
-	ccflags="${ccflags} -fPIC"
-fi
 
 #
 # Currently, we rely on the linker --as-needed flag to sort out
@@ -1278,11 +1266,8 @@ fi
 if [ "$optstatic" = 1 ]
 then
 	static_libraries="../../dttools/src/libdttools.a ${zlib_path}/lib/libz.a"
-elif [ ${BUILD_SYS} != CYGWIN ]
-then
-	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
 else
-	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lm"
+	external_libraries="${external_libraries} -lstdc++ -lpthread -lz -lc -lm"
 fi
 
 if [ $BUILD_SYS = DARWIN ]

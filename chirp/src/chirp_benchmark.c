@@ -15,9 +15,6 @@ See the file COPYING for details.
 #include <unistd.h>
 
 #include <sys/stat.h>
-#ifndef CCTOOLS_OPSYS_CYGWIN
-#include <sys/syscall.h>
-#endif
 #include <sys/time.h>
 
 #include <errno.h>

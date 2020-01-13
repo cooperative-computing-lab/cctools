@@ -40,7 +40,7 @@ See the file COPYING for details.
 #ifdef HAS_SYS_STATVFS_H
 #	include <sys/statvfs.h>
 #endif
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
+#ifdef CCTOOLS_OPSYS_DARWIN
 #	include <sys/mount.h>
 #	include <sys/param.h>
 #	define statfs64 statfs
@@ -52,7 +52,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+#ifdef CCTOOLS_OPSYS_DARWIN
 	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
 #	define stat64 stat
 #	define fstat64 fstat

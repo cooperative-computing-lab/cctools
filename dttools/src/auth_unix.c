@@ -96,7 +96,7 @@ static void make_challenge_path(char *path)
 	debug(D_AUTH, "unix: challenge path is %s", path);
 }
 
-#if CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_CYGWIN
+#ifdef CCTOOLS_OPSYS_DARWIN
 
 /*
 Darwin does not have fgetpwent in libc,

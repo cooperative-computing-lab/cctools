@@ -32,7 +32,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+#ifdef CCTOOLS_OPSYS_DARWIN
 	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
 #	define stat64 stat
 #	define fstat64 fstat
