@@ -131,10 +131,6 @@ struct passwd *fgetpwent(FILE * file)
 static struct passwd *auth_get_passwd_from_uid(uid_t uid)
 {
 	if(alternate_passwd_file[0]) {
-#ifdef CCTOOLS_OPSYS_DRAGONFLY
-		debug(D_AUTH, "unix: couldn't open %s: %s", alternate_passwd_file, strerror(errno));
-		return 0;
-#else
 		struct passwd *p;
 		FILE *file;
 
@@ -156,7 +152,6 @@ static struct passwd *auth_get_passwd_from_uid(uid_t uid)
 			debug(D_AUTH, "unix: couldn't open %s: %s", alternate_passwd_file, strerror(errno));
 			return 0;
 		}
-#endif
 	} else {
 		return getpwuid(uid);
 	}

@@ -1241,10 +1241,7 @@ then
 	external_libraries="${external_libraries} -lrt"
 fi
 
-if [ $BUILD_SYS != FREEBSD ] || [ $BUILD_SYS != DRAGONFLY ]
-then
-	external_libraries="${external_libraries} -ldl"
-fi
+external_libraries="${external_libraries} -ldl"
 
 zlib_path=${zlib_path:-${base_root}}
 if library_search z ${zlib_path}
