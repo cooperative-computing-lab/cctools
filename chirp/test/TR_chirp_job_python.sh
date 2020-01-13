@@ -8,17 +8,16 @@ set -e
 c="./hostport.$PPID"
 cr="./root.$PPID"
 
-python=${CCTOOLS_PYTHON2}
+python=${CCTOOLS_PYTHON_TEST_EXEC}
+python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
 check_needed()
 {
-	[ -f ../src/bindings/python/_CChirp.so ] || return 1
+	[ -n "${python}" ] || return 1
 }
 
 prepare()
 {
-	[ -n "$python" ] || return 1
-
 	chirp_start local --auth=unix --jobs --job-concurrency=2
 	echo "$hostport" > "$c"
 	echo "$root" > "$cr"
@@ -32,7 +31,9 @@ run()
 	fi
 	hostport=$(cat "$c")
 
-	PYTHONPATH=../src/bindings/python ${python} ../src/bindings/python/chirp_jobs_python_example.py $hostport ../src/bindings/python/my_script.sh
+	base=$(pwd)/../src/bindings/${python_dir}
+
+	PYTHONPATH=${base} ${python} ${base}/chirp_jobs_python_example.py $hostport ${base}/my_script.sh
 
 	return 0
 }

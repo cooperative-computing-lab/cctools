@@ -1088,7 +1088,7 @@ then
 	if [ "${python2_avail}" = yes ]
 	then
 		# to change to python2
-		swig_bindings="$swig_bindings python"
+		swig_bindings="$swig_bindings python2"
 	fi
 fi
 
@@ -1163,15 +1163,24 @@ then
 	if [ "${python3_avail}" = yes ]
 	then
 		swig_bindings="$swig_bindings python3"
-
-		# 2to3 need soon to be removed, so we don't check much for it
-		# to force compliance, we use cp instead of a conversion
-		python3_2to3=$(dirname ${python3_exe})/2to3
 	fi
 fi
 
 report_detection python3 "${python3_avail}" "${config_python3_path}" "${python3_path}"
 
+# python_test_exec is the python executable to use in make test
+# preference is given to python3
+python_test_exec=""
+python_test_dir=""
+if [ "${python3_avail}" = yes ]
+then
+	python_test_exec=${python3_exe}
+	python_test_dir=python3
+elif [ "${python2_avail}"  = yes ]
+then
+	python_test_exec=${python2_exe}
+	python_test_dir=python2
+fi
 
 golang_avail=no
 golang_exe=""
@@ -1603,11 +1612,8 @@ CCTOOLS_PERL_LDFLAGS=${perl_ldflags}
 CCTOOLS_PERL_VERSION=${perl_version}
 CCTOOLS_PERL_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/${perl_install_dir}/\$(CCTOOLS_PERL_VERSION)
 
-CCTOOLS_PYTHON=\$(CCTOOLS_PYTHON2)
-CCTOOLS_PYTHON_CCFLAGS=\$(CCTOOLS_PYTHON2_CCFLAGS)
-CCTOOLS_PYTHON_LDFLAGS=\$(CCTOOLS_PYTHON2_LDFLAGS)
-CCTOOLS_PYTHON_VERSION=\$(CCTOOLS_PYTHON2_VERSION)
-CCTOOLS_PYTHON_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON_VERSION)/site-packages
+CCTOOLS_PYTHON_TEST_EXEC=${python_test_exec}
+CCTOOLS_PYTHON_TEST_DIR=${python_test_dir}
 
 CCTOOLS_PYTHON2_AVAILABLE=${python2_avail}
 CCTOOLS_PYTHON2=${python2_exe}
@@ -1621,7 +1627,6 @@ CCTOOLS_PYTHON3=${python3_exe}
 CCTOOLS_PYTHON3_CCFLAGS=-DNDEBUG ${python3_ccflags}
 CCTOOLS_PYTHON3_LDFLAGS=${python3_ldflags}
 CCTOOLS_PYTHON3_VERSION=${python3_version}
-CCTOOLS_PYTHON3_2TO3=${python3_2to3}
 CCTOOLS_PYTHON3_PATH=\$(CCTOOLS_INSTALL_DIR)/lib/python\$(CCTOOLS_PYTHON3_VERSION)/site-packages
 
 CCTOOLS_PYDOC=$(which pydoc 2> /dev/null || which pydoc2 2> /dev/null || which pydoc3 > /dev/null)
