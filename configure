@@ -62,9 +62,6 @@ case "$BUILD_CPU" in
 	POWER\ MACINTOSH)
 	BUILD_CPU=POWERPC
 	;;
-	SUN4V)
-	BUILD_CPU=SPARC
-	;;
 esac
 
 include_package_apps="apps"
@@ -1442,18 +1439,6 @@ do
 	fi
 done
 
-
-# We always compile with debugging enabled,
-# however on Solaris, the -g option results in a different
-# debugging format that causes linking errors in getopt code.
-
-if [ $BUILD_SYS = SUNOS ]
-then
-	debug_flag="-gstabs+"
-else
-	debug_flag="-g"
-fi
-
 ccflags_append_define \
 	"BUILD_DATE='\"$BUILD_DATE\"'" \
 	"BUILD_HOST='\"$BUILD_HOST\"'" \
@@ -1474,8 +1459,9 @@ ccflags_append_define \
 	"_GNU_SOURCE" \
 	"_REENTRANT"
 
-ccflags_append "$debug_flag"
-ldflags="${ldflags} ${debug_flag}"
+debug_flags="-g"
+ccflags_append "$debug_flags"
+ldflags="${ldflags} ${debug_flags}"
 
 if [ X$include_package_parrot = "Xparrot" ]
 then

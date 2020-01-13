@@ -40,12 +40,6 @@ See the file COPYING for details.
 #	define statfs64 statfs
 #	define fstatfs64 fstatfs
 #	define fstatat64 fstatat
-#elif defined(CCTOOLS_OPSYS_SUNOS)
-	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
-#	define statfs statvfs
-#	define fstatfs fstatvfs
-#	define statfs64 statvfs64
-#	define fstatfs64 fstatvfs64
 #endif
 
 #ifdef CCTOOLS_OPSYS_DARWIN

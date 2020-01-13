@@ -44,9 +44,6 @@ See the file COPYING for details.
 #	include <sys/mount.h>
 #	include <sys/param.h>
 #	define statfs64 statfs
-#elif CCTOOLS_OPSYS_SUNOS
-#	define statfs statvfs
-#	define statfs64 statvfs64
 #endif
 
 #include <assert.h>
@@ -63,12 +60,6 @@ See the file COPYING for details.
 #	define statfs64 statfs
 #	define fstatfs64 fstatfs
 #	define fstatat64 fstatat
-#elif defined(CCTOOLS_OPSYS_SUNOS)
-	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
-#	define statfs statvfs
-#	define fstatfs fstatvfs
-#	define statfs64 statvfs64
-#	define fstatfs64 fstatvfs64
 #endif
 
 #define TICKET_REFRESH (6*60*60)
