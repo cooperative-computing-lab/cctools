@@ -42,7 +42,8 @@ START_TIME=$(date +%s)
 for package in ${CCTOOLS_PACKAGES_TEST}; do
 	if [ -d "${package}/test" ]; then
 		cd "./${package}/test"
-		for script in TR_*; do
+		#for script in TR_*; do
+		for script in TR_*w*python*; do
 			if [ -x "$script" ]; then
 				printf "%-66s" "--- Testing ${package}/test/${script} ... "
 				TEST_START_TIME=$(date +%s)
