@@ -1030,7 +1030,7 @@ then
 
 	if [ "${python2_avail}" = yes ]
 	then
-		python2_version=$(${python2_exe} -c 'import sys; print("{}.{}".format(sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
+		python2_version=$(${python2_exe} -c 'import sys; print("%d.%d" % (sys.version_info[0],sys.version_info[1]))' 2> /dev/null)
 
 		if [ -z "${python2_version}" ]
 		then
