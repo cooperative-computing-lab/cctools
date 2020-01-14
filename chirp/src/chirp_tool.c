@@ -43,7 +43,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD
+#ifdef CCTOOLS_OPSYS_DARWIN
 #define fopen64 fopen
 #define open64 open
 #define lseek64 lseek

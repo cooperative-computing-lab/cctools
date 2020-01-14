@@ -6,7 +6,7 @@ See the file COPYING for details.
 
 #include "host_memory_info.h"
 
-#if defined(CCTOOLS_OPSYS_LINUX) || defined(CCTOOLS_OPSYS_SUNOS)
+#if defined(CCTOOLS_OPSYS_LINUX)
 
 #include <unistd.h>
 

@@ -1,4 +1,4 @@
-#if defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_FREEBSD)
+#if defined(CCTOOLS_OPSYS_DARWIN)
   #include <sys/param.h>
   #include <sys/mount.h>
   #include <sys/resource.h>
