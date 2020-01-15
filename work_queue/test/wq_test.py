@@ -62,26 +62,26 @@ def result_to_string(result):
 
 def report_task(task, expected_result, expected_exit_code, expected_outpus=None):
     error = False
-    print("\nTask '{}' report:".format(t.command))
+    print("\nTask '{command}' report:".format(command=t.command))
     if not task:
         error = True
         print("It was not completed by a worker.")
     else:
-        print("result: {}".format(result_to_string(t.result)))
-        print("exit code: {}".format(t.return_status))
+        print("result: {result}".format(result=result_to_string(t.result)))
+        print("exit code: {status}".format(status=t.return_status))
         if t.output:
-            print("stderr:\n+++\n{}---".format(t.output))
+            print("stderr:\n+++\n{stderr}---".format(stderr=t.output))
         if task.result != expected_result:
             error = True
-            print("Should have finished with result '{}', but got '{}'.".format(result_to_string(expected_result), result_to_string(task.result)))
+            print("Should have finished with result '{result}', but got '{real}'.".format(result=result_to_string(expected_result), real=result_to_string(task.result)))
         elif task.return_status != expected_exit_code:
             error = True
-            print("Should have finished with exit_code {}, but got {}.".format(str(expected_exit_code), str(task.return_status)))
+            print("Should have finished with exit_code {status}, but got {real}.".format(status=str(expected_exit_code), real=str(task.return_status)))
         elif expected_outpus:
             for out in expected_outpus:
                 if not path.isfile(out):
                     error = True
-                    print("Should have created file {} but did not.".format(out))
+                    print("Should have created file {output} but did not.".format(output=out))
         else:
             print("Completed as expected.")
     if error:
@@ -114,13 +114,13 @@ os.chmod(path.join(test_dir, exec_file), stat.S_IRWXU)
 q = wq.WorkQueue(0)
 
 with open(port_file, 'w') as f:
-    print('Writing port {} to file {}'.format(q.port, port_file))
+    print('Writing port {port} to file {file}'.format(port=q.port, file=port_file))
     f.write(str(q.port))
 
 # simple task
 # define a task, sending stderr to console, and stdout to output
 output = output_file()
-t = wq.Task("./{} {} 2>&1 > {}".format(exec_file, input_file, output))
+t = wq.Task("./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
 t.specify_input_file(path.join(test_dir, exec_file), exec_file)
 t.specify_input_file(path.join(test_dir, input_file), input_file)
 t.specify_output_file(path.join(test_dir, output), output)
@@ -131,7 +131,7 @@ report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
 # same simple task, but now we send the directory as an input
 output = output_file()
-t = wq.Task("cd {} && ./{} {} 2>&1 > {}".format('my_dir', exec_file, input_file, output))
+t = wq.Task("cd my_dir && ./{exe} {input} 2>&1 > {output}".format(exe=exec_file, input=input_file, output=output))
 t.specify_directory(test_dir, 'my_dir', recursive=True)
 t.specify_output_file(path.join(test_dir, output), path.join('my_dir', output))
 
@@ -142,7 +142,7 @@ report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, output)])
 
 # we bring back the outputs from a directory:
 output = output_file()
-t = wq.Task("mkdir outs && ./{} {} 2>&1 > outs/{}".format(exec_file, input_file, output))
+t = wq.Task("mkdir outs && ./{exe} {input} 2>&1 > outs/{output}".format(exe=exec_file, input=input_file, output=output))
 t.specify_input_file(path.join(test_dir, exec_file), exec_file)
 t.specify_input_file(path.join(test_dir, input_file), input_file)
 t.specify_directory(path.join(test_dir, 'outs'), 'outs', type = wq.WORK_QUEUE_OUTPUT)
@@ -152,7 +152,7 @@ t = q.wait(5)
 report_task(t, wq.WORK_QUEUE_RESULT_SUCCESS, 0, [path.join(test_dir, 'outs', output)])
 
 # should fail because the 'executable' cannot be executed:
-t = wq.Task("./{}".format(input_file))
+t = wq.Task("./{input}".format(input=input_file))
 t.specify_input_file(path.join(test_dir, input_file), input_file)
 
 q.submit(t)
@@ -176,7 +176,7 @@ report_task(t, wq.WORK_QUEUE_RESULT_INPUT_MISSING, -1)
 
 # should fail because an output file was not created:
 output = output_file()
-t = wq.Task("./{} {} 2>&1".format(exec_file, input_file))
+t = wq.Task("./{exe} {input} 2>&1".format(exe=exec_file, input=input_file))
 t.specify_input_file(path.join(test_dir, exec_file), exec_file)
 t.specify_input_file(path.join(test_dir, input_file), input_file)
 t.specify_output_file(path.join(test_dir, output), output)
