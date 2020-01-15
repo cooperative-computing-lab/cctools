@@ -139,9 +139,9 @@ class ResourceExhaustion(Exception):
     def __str__(self):
         r = self.resources
         l = r['limits_exceeded']
-        ls = ["{}: {}".format(k, l[k]) for k in list(l.keys()) if (l[k] > -1 and l[k] < r[k])]
+        ls = ["{limit}: {value}".format(limit=k, value=l[k]) for k in list(l.keys()) if (l[k] > -1 and l[k] < r[k])]
 
-        return 'Limits broken: {}'.format(','.join(ls))
+        return 'Limits broken: {limits}'.format(limits=','.join(ls))
 
 def __measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
@@ -264,7 +264,7 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
             callback(fun_id, function.__name__, -1, _resources_to_dict(resources_max))
 
     except Exception as e:
-        cctools_debug(D_RMON, "error executing function process: {}".format(e))
+        cctools_debug(D_RMON, "error executing function process: {err}".format(err=e))
         results_queue.put({'result': e, 'resources': None, 'resource_exhaustion': False})
 
 def _resources_to_dict(resources):
