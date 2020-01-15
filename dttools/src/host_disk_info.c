@@ -16,18 +16,6 @@ See the file COPYING for details.
 #include <sys/param.h>
 #include <sys/mount.h>
 
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
-#endif
-
-#ifdef HAS_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-
-#ifdef HAS_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-
 int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 {
 	int result;
@@ -62,6 +50,24 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 	}
 
 	return 1;
+}
+
+int check_disk_flags(const char *path, unsigned int flags) {
+#ifdef CCTOOLS_OPSYS_SUNOS
+	/* for sunos assume always true. */
+	return 1;
+#else
+	int result;
+	struct statfs s;
+
+	result = statfs(path, &s);
+	if(result < 0) {
+		/* on error, assume false */
+		return 0;
+	}
+
+	return (s.f_flags & flags) == flags;
+#endif
 }
 
 
