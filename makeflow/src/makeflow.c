@@ -596,18 +596,21 @@ static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_nod
 	/* Update all of the necessary data structures. */
 	switch(submitted) {
 		case JOB_SUBMISSION_HOOK_FAILURE:
+			debug(D_MAKEFLOW_RUN, "node %d could not be submitted because of a hook failure.", n->nodeid);
 			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
 			n->task = NULL;
 			batch_task_delete(task);
 			makeflow_failed_flag = 1;
 			break;
 		case JOB_SUBMISSION_SKIPPED:
+			debug(D_MAKEFLOW_RUN, "node %d was not submitted because it was already handled.", n->nodeid);
 			/* Exited Normally was updated and may have been handled elsewhere (e.g. Archive) */
 			if (task->info->exited_normally) {
 				makeflow_node_complete(d, n, queue, task);
 			}
 			break;
 		case JOB_SUBMISSION_SUBMITTED:
+			debug(D_MAKEFLOW_RUN, "node %d was successfully submitted.", n->nodeid);
 			n->jobid = task->jobid;
 			/* Not sure if this is necessary/what it does. */
 			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
@@ -625,8 +628,10 @@ static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_nod
 			break;
 		case JOB_SUBMISSION_ABORTED:
 			/* do nothing, as node was aborted before it was submitted. */
+			debug(D_MAKEFLOW_RUN, "node %d was not submitted because workflow was aborted.", n->nodeid);
 			break;
 		case JOB_SUBMISSION_TIMEOUT:
+			debug(D_MAKEFLOW_RUN, "node %d submission timed-out, retrying later.", n->nodeid);
 			/* do nothing, and let other rules to be waited/submitted. */
 			break;
 	}
@@ -736,6 +741,7 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 				if(status == JOB_SUBMISSION_ABORTED) {
 					break;
 				} else if(status == JOB_SUBMISSION_TIMEOUT) {
+					debug(D_MAKEFLOW_RUN, "batch submissions are timing-out. Only submitting local jobs for the rest of this cycle.");
 					submission_timeout = 1;
 				}
 			}
