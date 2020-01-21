@@ -471,7 +471,7 @@ You will need to do some one-time setup first:
 
 * Add the `aws` command to your PATH.
 
-* Run `aws configure` and enter your AWS Access Key ID, your AWS Secret Access Key, and your preferred region name. (The keys can be obtained from the AWS web page by going to your profile menu, selecting "My Security Credentials" and then "Access Keys". You may need to create a new access key.)
+* Run `aws configure` and enter your AWS Access Key ID, your AWS Secret Access Key, your preferred region name and json output format. (The keys can be obtained from the AWS web page by going to your profile menu, selecting "My Security Credentials" and then "Access Keys". You may need to create a new access key.)
 
 * Test that the command-line tool is working by entering: `aws ec2 describe-hosts ` Which should display: `{ "Hosts": [] }`
 
@@ -494,8 +494,10 @@ $ makeflow -T amazon --amazon-config my.config ...
 ```
 
 to use the configuration you just created. You can run multiple workflows using
-a single configuration.  When you are done, destroy the configuration with this
-command: `makeflow_ec2_cleanup my.config `
+a single configuration.  Intances are reused between makeflow jobs.
+
+When you are done, terminate created instances and destroy 
+the configuration with this command: `makeflow_ec2_cleanup my.config `
 
 Makeflow selects the virtual machine instance type automatically by translating
 the job resources into an appropriate instance type of the `c4` or `m4`
