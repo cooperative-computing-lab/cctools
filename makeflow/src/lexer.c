@@ -25,7 +25,7 @@
 #define CHAR_EOF 26		// ASCII for EOF
 
 #define LITERAL_LIMITS  "\\\"'$#\n\t \032"
-#define SYNTAX_LIMITS  LITERAL_LIMITS  ",.-(){},[]<>=+!?/"
+#define SYNTAX_LIMITS  LITERAL_LIMITS  ",.-(){},[]<>=+!?/:"
 #define FILENAME_LIMITS LITERAL_LIMITS  ":-"
 
 #define WHITE_SPACE          " \t"
