@@ -1414,6 +1414,10 @@ void read_measured_resources(struct work_queue *q, struct work_queue_task *t) {
 	if(t->resources_measured) {
 		rmsummary_assign_char_field(t->resources_measured, "category", t->category);
 		t->return_status = t->resources_measured->exit_status;
+	} else {
+		/* if no resources were measured, then we don't overwrite the return
+		 * status, and mark the task as with error from monitoring. */
+			update_task_result(t, WORK_QUEUE_RESULT_RMONITOR_ERROR);
 	}
 
 	free(summary);
@@ -1573,6 +1577,31 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 			t->resource_request = next;
 			change_task_state(q, t, WORK_QUEUE_TASK_READY);
 			return;
+		}
+	}
+
+	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
+		switch(t->return_status) {
+			case(126):
+				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
+				warn(D_WQ, "This usually means that the task's command is not an executable,\n");
+				warn(D_WQ, "or that the worker's scratch directory is on a no-exec partition.\n");
+				break;
+			case(127):
+				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
+				warn(D_WQ, "This usually means that the task's command could not be found, or that\n");
+				warn(D_WQ, "it uses a shared library not available at the worker, or that\n");
+				warn(D_WQ, "it uses a version of the glibc different than the one at the worker.\n");
+				break;
+			case(139):
+				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
+				warn(D_WQ, "This usually means that the task's command had a segmentation fault,\n");
+				warn(D_WQ, "either because it has a memory access error (segfault), or because\n");
+				warn(D_WQ, "it uses a version of a shared library different from the one at the worker.\n");
+				break;
+			default:
+				break;
 		}
 	}
 

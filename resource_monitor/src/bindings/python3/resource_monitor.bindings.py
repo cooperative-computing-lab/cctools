@@ -139,9 +139,9 @@ class ResourceExhaustion(Exception):
     def __str__(self):
         r = self.resources
         l = r['limits_exceeded']
-        ls = ["{}: {}".format(k, l[k]) for k in l.keys() if (l[k] > -1 and l[k] < r[k])]
+        ls = ["{limit}: {value}".format(limit=k, value=l[k]) for k in list(l.keys()) if (l[k] > -1 and l[k] < r[k])]
 
-        return 'Limits broken: {}'.format(','.join(ls))
+        return 'Limits broken: {limits}'.format(limits=','.join(ls))
 
 def __measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
@@ -206,7 +206,14 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
             limits = rmsummary.from_dict(limits)
 
         # pids of processes created by fun_proc (if any) are written to pids_file
-        pids_file = tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', buffering=0)
+        pids_file = None
+        try:
+            # try python3 version first, which gets the 'buffering' keyword argument
+            pids_file=tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', buffering=0)
+        except TypeError:
+            # on error try python2, which gets the 'bufsize' keyword argument
+            pids_file=tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', bufsize=0)
+
         os.environ['CCTOOLS_RESOURCE_MONITOR_PIDS_FILE']=pids_file.name
 
         cctools_debug(D_RMON, "starting function process")
@@ -257,7 +264,7 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
             callback(fun_id, function.__name__, -1, _resources_to_dict(resources_max))
 
     except Exception as e:
-        cctools_debug(D_RMON, "error executing function process: {}".format(e))
+        cctools_debug(D_RMON, "error executing function process: {err}".format(err=e))
         results_queue.put({'result': e, 'resources': None, 'resource_exhaustion': False})
 
 def _resources_to_dict(resources):
@@ -319,7 +326,7 @@ class Categories:
     # the last entry.
     # @param self                Reference to the current object.
     def category_names(self):
-        categories = self.categories.keys()
+        categories = list(self.categories.keys())
         categories.sort()
         categories.remove(self.all_categories_name)
         categories.append(self.all_categories_name)

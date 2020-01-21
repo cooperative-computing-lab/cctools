@@ -116,7 +116,7 @@ if __name__ == "__main__":
 	
 
 	print("Creating {} with all the details...".format(CONFIG_FILE))
-	print("WARNING: the absolute path of your keypair is assigned to this config file: {}".format(KEYPAIR_PATH))
+	#print("WARNING: the absolute path of your keypair is assigned to this config file: {}".format(KEYPAIR_PATH))
 	config_f = open(CONFIG_FILE,"w")
 	config_f.write("vpc {}\n".format(vpc_id))
 	config_f.write("subnet {}\n".format(subnet_id))
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 	config_f.write("route_table {}\n".format(route_table_id))
 	config_f.write("security_group_id {}\n".format(security_group_id))
 	config_f.write("security_group_name {}\n".format(SECURITY_GROUP_NAME))
-	config_f.write("keypair_name {}\n".format(KEYPAIR_PATH))
+	config_f.write("keypair_name {}\n".format(KEYPAIR_NAME))
 	config_f.write("ami {}\n".format(IMAGE_NAME))
 	config_f.close()
 

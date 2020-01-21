@@ -6,210 +6,252 @@
 
 """ Makeflow monitor """
 
-from collections import deque
+from collections import deque, namedtuple
 from optparse import OptionParser
-from time import sleep, time, ctime as time_ctime
 
+import time
 import os
 import sys
 
-# Constants
+NodeEvent     = namedtuple('NodeEvent', 'timestamp nodeid state jobid tasks_waiting tasks_running tasks_complete tasks_failed tasks_aborted tasks_total')
 
-MF_STATES = ['waiting', 'running', 'complete', 'failed', 'aborted']
+class MakeflowInfo:
+    max_history_len = 250
 
-MF_LOG_TIME	 = 0
-MF_LOG_NODE_ID	 = 1
-MF_LOG_NEW_STATE = 2
-MF_LOG_JOB_ID	 = 3
-MF_LOG_WAITING	 = 4
-MF_LOG_RUNNING	 = 5
-MF_LOG_COMPLETE	 = 6
-MF_LOG_FAILED	 = 7
-MF_LOG_ABORTED	 = 8
-MF_LOG_TOTAL	 = 9
+    def __init__(self, filename):
+        self.filename = filename
+        self.reset_state()
 
-MF_MAX_HISTORY_LENGTH = 250
+    def reset_state(self):
+        self.last_position = 0
+        self.history = deque(maxlen = MakeflowInfo.max_history_len)
+        self.start = None
+        self.end   = None
+        self.reason_end = None
+        self.tasks_total    = 0
+        self.tasks_complete = 0
+        self.tasks_aborted  = 0
+        self.tasks_failed   = 0
+        self.tasks_waiting  = 0
+        self.tasks_running  = 0
 
-# MakeflowLog Parser
-
-def parse_makeflow_stream(log_stream, parse_dag = False, makeflow = None):
-    if makeflow is None:
-        makeflow = {}
-
-    if 'history' in makeflow:
-        history = makeflow['history']
-    else:
-        history = deque(maxlen = MF_MAX_HISTORY_LENGTH)
-
-    if 'prev_stream_pos' in makeflow:
-        log_stream.seek(makeflow['prev_stream_pos'], os.SEEK_SET)
-
-    slist = None
-    for line in log_stream:
-        if line.startswith('#'):
-            slist = line.split()
-            if slist[1] in ['STARTED']:
-                makeflow['start_time'] = int(slist[2])/1000000.0
-                makeflow['finished']   = None
-            elif slist[1] in ['FAILED', 'ABORTED', 'COMPLETED']:
-                makeflow['finished'] = slist[1]
-                makeflow['elapsed_time'] = int(slist[2])/1000000.0 - makeflow['start_time']
-                makeflow['average_task_rate'] = makeflow['total'] / makeflow['elapsed_time']
-            continue
-        else:
-            slist = map(int, line.split())
-
-        if 'start_time' not in makeflow:
-            makeflow['start_time'] = slist[MF_LOG_TIME]/1000000.0
-
-        history.append((slist[MF_LOG_COMPLETE], slist[MF_LOG_TIME]/1000000.0))
-
-        for s, i in zip(MF_STATES, range(MF_LOG_WAITING, MF_LOG_TOTAL)):
-            makeflow[s] = slist[i]
-
-        makeflow['total'] = slist[MF_LOG_TOTAL]
-        makeflow['last_event'] = slist
-
-    if 'start_time' in makeflow and not makeflow['finished']:
-        start_time = makeflow['start_time']
-        if slist is None:
-            current_time = time()
-        else:
-            current_time = float(slist[MF_LOG_TIME])/1000000.0
-
-        makeflow['elapsed_time']     = current_time - start_time
-        makeflow['percent_complete'] = float(makeflow['complete']) / float(makeflow['total'])
-        try:
-            makeflow['average_task_rate'] = float(makeflow['complete']) / float(makeflow['elapsed_time'])
-        except ZeroDivisionError:
-            makeflow['average_task_rate'] = 0
-
-        try:
-            if len(history) >= MF_MAX_HISTORY_LENGTH / 2:
-                makeflow['current_task_rate']   = float(history[-1][0] - history[0][0]) / float(history[-1][1] - history[0][1])
-                makeflow['estimated_time_left'] = (makeflow['total'] - makeflow['complete']) / makeflow['current_task_rate']
+    def record_event(self, label, timestamp):
+        if label == 'STARTED':
+            self.reset_state()
+            self.start      = timestamp
+        elif label in ['ABORTED', 'FAILED']:
+            self.end        = timestamp
+            self.reason_end = label.lower()
+        elif label == 'COMPLETED':
+            self.end        = timestamp
+            if self.tasks_failed > 0:
+                self.reason_end = 'failed'
             else:
-                makeflow['current_task_rate']   = 0
-                makeflow['estimated_time_left'] = (makeflow['total'] - makeflow['complete']) / makeflow['average_task_rate']
+                self.reason_end = 'completed'
+
+    def started(self):
+        return self.start is not None
+
+    def finished(self):
+        return self.end is not None
+
+    @property
+    def elapsed_time(self):
+        if not self.started():
+            return 0
+
+        current_time = self.end
+        if not current_time:
+            current_time = time.time()
+
+        return current_time - self.start
+
+    @property
+    def percent_complete(self):
+        try:
+            return float(self.tasks_complete) / self.tasks_total
         except ZeroDivisionError:
-            makeflow['estimated_time_left'] = None
+            return 1.0
 
-    makeflow['prev_stream_pos'] = log_stream.tell()
-    makeflow['history']  = history
+    def add_node_event(self, event):
+        self.history.append(event)
+        self.tasks_total    = event.tasks_total
+        self.tasks_complete = event.tasks_complete
+        self.tasks_aborted  = event.tasks_aborted
+        self.tasks_failed   = event.tasks_failed
+        self.tasks_waiting  = event.tasks_waiting
+        self.tasks_running  = event.tasks_running
 
-    return makeflow
-
-def parse_makeflowlog(log_path, parse_dag = False):
-    makeflow = None
-    with open(log_path, 'r') as log_stream:
-        makeflow = parse_makeflow_stream(log_stream, parse_dag)
-    return makeflow
-
-# Emit text output
-
-def emit_text(makeflow, field_width=13, progress_width=55):
-    tlist = [()]
-
-    tlist.append(('makeflow', makeflow['log_path']))
-
-    if 'start_time' not in makeflow:
-        tlist.append(('status', 'waiting for events...'))
-    elif makeflow['finished']:
-        tlist.append(('status', 'finished: %s' % makeflow['finished']))
-        tlist.append(('time',
-                      ', '.join(['start: '   + time_ctime(makeflow['start_time']),
-                                 'elapsed: ' + time_format(makeflow['elapsed_time'])])))
-        tlist.append(('tasks/minute',
-                      'average: %0.2f' % (makeflow['average_task_rate'] * 60.0)))
-    else:
-        progress_bars = int(progress_width * makeflow['percent_complete']) - 1
-        progress_text = str('=' * progress_bars + '>').ljust(progress_width)
-
-        tlist.append(('status',
-                      '[%s] %0.2f %%' % (progress_text, makeflow['percent_complete'] * 100.0)))
-        tlist.append(('time',
-                      ', '.join(['start: '   + time_ctime(makeflow['start_time']),
-                                 'elapsed: ' + time_format(makeflow['elapsed_time']),
-                                 'left: '    + time_format(makeflow['estimated_time_left'])])))
-        tlist.append(('tasks/minute',
-                      ', '.join(['current: %0.2f' % (makeflow['current_task_rate'] * 60.0),
-                                 'average: %0.2f' % (makeflow['average_task_rate'] * 60.0)])))
-        tlist.append(('tasks',
-                      ', '.join(['%s: %d' % (s, makeflow[s]) for s in MF_STATES + ['total']])))
-
-    for m in tlist:
-        if m:
-            field   = str(m[0].title() + ':').rjust(field_width)
-            message = str(m[1])
-            print field, message
+    @property
+    def tasks_total(self):
+        if self.last_node_event:
+            return self.last_node_event.tasks_total
         else:
-            print
+            return 0
 
-# Emitter table
+    @property
+    def tasks_complete(self):
+        if self.last_node_event:
+            return self.last_node_event.tasks_complete
+        else:
+            return 0
 
-EMITTER_TABLE = {
-    'text' : emit_text,
-}
+    @property
+    def average_task_rate(self):
+        try:
+            return float(self.tasks_complete) / self.elapsed_time
+        except ZeroDivisionError:
+            return 0
+
+    @property
+    def current_task_rate(self):
+        if len(self.history) > 1:
+            oldest_event = self.history[0]
+            newest_event = self.history[-1]
+
+            try:
+                return float(newest_event.tasks_complete - oldest_event.tasks_complete) / (newest_event.timestamp - oldest_event.timestamp)
+            except ZeroDivisionError:
+                return self.average_task_rate
+        else:
+            return self.average_task_rate
+
+    @property
+    def estimated_time_left(self):
+        try:
+            return float(self.tasks_total - self.tasks_complete) / self.current_task_rate
+        except ZeroDivisionError:
+            return None
+
+    def next_lines(self):
+        try:
+            with open(self.filename, 'r') as log_stream:
+                # if log shrank, assume it comes from a new makeflow execution
+                log_stream.seek(0, os.SEEK_END)
+                if log_stream.tell() < self.last_position:
+                    self.reset_state()
+                log_stream.seek(self.last_position, os.SEEK_SET)
+                for line in log_stream:
+                    self.last_position = log_stream.tell()
+                    yield line
+        except IOError as e:
+            sys.stderr.write('unable to open {log}: {error}\n'.format(log=self.filename, error=e))
+            self.reset_state()
+
+
+    def parse_workflow_event(self, line):
+        try:
+            args = line.split() # (comment sign) (timestamp) (event label) (...other...)
+            timestamp = int(args[2])/1000000
+            label     = args[1]
+            self.record_event(label, timestamp)
+        except ValueError as e:
+            sys.stderr.write('invalid timestamp value: {line}: {error}\n'.format(line=line, error=e))
+        except IndexError as e:
+            sys.stderr.write('line not of the form: # EVENT_LABEL timestamp ...etc...: {line}\n'.format(line=line))
+
+    def parse_node_event(self, line):
+        try:
+            args  = [int(x) for x in line.split()]
+            # timestamp to seconds
+            args[0] /= 1000000
+            event = NodeEvent(*args) 
+            self.add_node_event(event)
+        except (TypeError, ValueError, IndexError) as e:
+            sys.stderr.write('invalid line: {line}: {error}\n'.format(line=line, error=e))
+
+    def parse_line(self, line):
+        line = line.strip()
+        if line == '':
+            return
+        if line.startswith('#'):
+            return self.parse_workflow_event(line)
+
+        return self.parse_node_event(line)
+
+    def parse_new_lines(self):
+        for line in self.next_lines():
+            self.parse_line(line)
+
+    def emit_text(self, field_width=13, progress_width=55):
+        tlist = [()]
+        tlist.append(('makeflow', self.filename))
+
+        if not self.started():
+            tlist.append(('status', 'waiting for events...'))
+        elif self.finished():
+            tlist.append(('status', 'finished: {reason}'.format(reason=self.reason_end)))
+            tlist.append(('time',
+                          ', '.join(['start: '   + time.ctime(self.start),
+                                     'elapsed: ' + time_format(self.elapsed_time)])))
+            tlist.append(('tasks/minute',
+                          'average: %0.2f' % (self.average_task_rate * 60.0)))
+        else:
+            progress_bars = int(progress_width * self.percent_complete) - 1
+            progress_text = str('=' * progress_bars + '>').ljust(progress_width)
+
+            tlist.append(('status',
+                          '[%s] %0.2f %%' % (progress_text, self.percent_complete * 100.0)))
+            tlist.append(('time',
+                          ', '.join(['start: '   + time.ctime(self.start),
+                                     'elapsed: ' + time_format(self.elapsed_time),
+                                     'left: '    + time_format(self.estimated_time_left)])))
+            tlist.append(('tasks/minute',
+                          ', '.join(['current: %0.2f' % (self.current_task_rate * 60.0),
+                                     'average: %0.2f' % (self.average_task_rate * 60.0)])))
+
+            tlist.append(('tasks',
+                          ', '.join(['%s: %d' % x for x in [('waiting',  self.tasks_waiting),
+                                                            ('running',  self.tasks_running),
+                                                            ('complete', self.tasks_complete),
+                                                            ('failed',   self.tasks_failed),
+                                                            ('aborted',  self.tasks_aborted),
+                                                            ('total',    self.tasks_total)]])))
+
+        for m in tlist:
+            if m:
+                field   = str(m[0].title() + ':').rjust(field_width)
+                message = str(m[1])
+                print field, message
+            else:
+                print
 
 # Monitor makeflows
-
 def monitor_makeflows(log_paths, options):
-    makeflows = []
-    for lp in log_paths:
-        makeflows.append({'log_path': lp, 'finished': False, 'percent_complete': 0.0, 'total': float('+infinity')})
+    makeflows = [ MakeflowInfo(log) for log in log_paths ]
 
     while makeflows:
         os.system('clear')
 
         next_makeflows = []
         for makeflow in makeflows:
-            try:
-                with open(makeflow['log_path'], 'r') as log_stream:
-                    parse_makeflow_stream(log_stream, options.parse_dag, makeflow)
-            except IOError as e:
-                print >>sys.stderr, 'unable to open %s: %s' % (makeflow['log_path'], str(e))
-                continue
-            except ValueError as e:
-                print >>sys.stderr, 'unable to parse %s: %s' % (makeflow['log_path'], str(e))
-                continue
+            makeflow.parse_new_lines()
 
-            if (options.hide_finished and makeflow['finished']) or \
-                float(makeflow['total']) < options.min_tasks:
-                continue
+        if options.sort:
+            makeflows = sorted(makeflows, key = lambda mf: mf.percent_complete)
 
-            try:
-                options.emitter(makeflow)
-            except KeyError as e:
-                print >>sys.stderr, 'unable to emit %s: missing %s' % (makeflow['log_path'], str(e))
-            finally:
+        try:
+            if not (makeflow.finished() and options.hide_finished):
+                makeflow.emit_text()
                 next_makeflows.append(makeflow)
+        except Exception as e:
+            sys.stderr.write('unable to emit {log}: {error}\n'.format(log=makeflow.filename, error=e))
 
         makeflows = next_makeflows
 
-        if options.sort:
-            makeflows = sorted(makeflows, key = lambda mf: mf['percent_complete'])
+        time.sleep(options.timeout)
 
-        sleep(options.timeout)
-
-    print >>sys.stderr, 'No makeflowlogs to monitor...'
+    sys.stderr.write('No makeflowlogs to monitor...')
 
 # Parse command line options
 
 def parse_command_line_options():
     parser = OptionParser('%prog [options] <makeflowlog> ...')
-
-    parser.add_option('-f', dest = 'format', action = 'store',
-        help = 'Output format to emit.', metavar = 'format', default = 'text')
     parser.add_option('-t', dest = 'timeout', action = 'store',
-        help = 'Timeout for reading the logs.', metavar = 'seconds',
-        type = 'float', default = 1.0)
-    parser.add_option('-m', dest = 'min_tasks', action = 'store',
-        help = 'Mininum number of tasks.', metavar = 'minimum',
-        type = 'float', default = 0)
+                      help = 'Interval of time when polling the logs.', metavar = 'seconds',
+                      type = 'float', default = 1.0)
     parser.add_option('-S', dest = 'sort', action = 'store_true',
         help = 'Sort logs by progress.', default = False)
-    parser.add_option('-P', dest = 'parse_dag', action = 'store_true',
-        help = 'Parse dag for node information.', default = False)
     parser.add_option('-H', dest = 'hide_finished', action = 'store_true',
         help = 'Hide finished makeflows.', default = False)
 
@@ -218,11 +260,6 @@ def parse_command_line_options():
     if not args:
         parser.print_help()
         sys.exit(1)
-
-    if options.format not in EMITTER_TABLE:
-        print >>sys.stderr, 'invalid format specified:', options.format
-
-    options.emitter = EMITTER_TABLE[options.format]
 
     return args, options
 

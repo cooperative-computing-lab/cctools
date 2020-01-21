@@ -29,7 +29,6 @@ git
 gmake
 gtar
 image_magick
-irods
 libattr
 libffi
 lsb_release
@@ -157,7 +156,6 @@ git                      => 'git',
 gmake                    => 'make',
 gtar                     => 'tar',
 image_magick             => 'ImageMagick',
-irods                    => [],             # from builder
 libattr                  => 'libattr-devel',
 libffi                   => 'libffi',
 lsb_release              => 'lsb-release',
@@ -205,7 +203,6 @@ $postinstall_for{centos}{default} = [
 	@{$cvmfs},
 	@{$mysql},
 	@{$xrootd},
-	@{$irods},
 ];
 
 $postinstall_for{centos}{6} = [
@@ -252,7 +249,6 @@ git                      => 'git',
 gmake                    => 'make',
 gtar                     => 'tar',
 image_magick             => 'imagemagick',
-irods                    => [],             # from builder
 libattr                  => 'attr-dev',
 libffi                   => 'libffi-dev',
 lsb_release              => 'lsb-release',
@@ -293,7 +289,6 @@ $postinstall_for{debian}{default} = [
 	@{$fuse},
 	@{$cvmfs},
 	# do not compile with g++6:
-	# @{$irods},
 	# @{$xrootd}
 ];
 

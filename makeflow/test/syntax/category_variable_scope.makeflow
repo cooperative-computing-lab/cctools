@@ -1,5 +1,5 @@
-MAKEFLOW_INPUTS=""
-MAKEFLOW_OUTPUTS="out_rule_1 out_rule_2a out_rule_2b out_rule_3"
+MAKEFLOW_INPUTS=
+MAKEFLOW_OUTPUTS=out_rule_1 out_rule_2a out_rule_2b out_rule_3
 
 .MAKEFLOW CATEGORY one
 out_rule_1:

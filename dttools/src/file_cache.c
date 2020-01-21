@@ -26,7 +26,7 @@ See the file COPYING for details.
 
 /* Cygwin does not have 64-bit I/O, while Darwin has it by default. */
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+#ifdef CCTOOLS_OPSYS_DARWIN
 #define fstat64 fstat
 #define stat64 stat
 #define open64 open

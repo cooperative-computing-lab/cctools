@@ -7,7 +7,7 @@
 #include <netdb.h>
 
 #ifndef SOCKLEN_T
-#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(CCTOOLS_OPSYS_AIX) || defined(__MUSL__)
+#if defined(__GLIBC__) || defined(CCTOOLS_OPSYS_DARWIN) || defined(__MUSL__)
 #define SOCKLEN_T socklen_t
 #else
 #define SOCKLEN_T int

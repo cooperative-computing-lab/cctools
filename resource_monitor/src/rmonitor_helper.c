@@ -48,15 +48,6 @@
 
 #define BUFFER_MAX 1024
 
-// XXX This is a quick hack to get through the build on Cygwin.
-// It appears thaqt RTLD_NEXT does not exist on Cygwin.
-// Can this module work on that operating system?
-
-#if defined(CCTOOLS_OPSYS_CYGWIN) && !defined(RTLD_NEXT)
-#define RTLD_NEXT 0
-#endif
-
-
 #define PUSH_ERRNO { int last_errno = errno; errno = 0;
 #define POP_ERRNO(msg) msg.error = errno; if(!errno){ errno = last_errno; } }
 

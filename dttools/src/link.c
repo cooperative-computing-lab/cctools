@@ -491,14 +491,9 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 	link_window_configure(link);
 
-	/* sadly, cygwin does not do non-blocking connect correctly */
-#ifdef CCTOOLS_OPSYS_CYGWIN
-	if(!link_nonblocking(link, 0))
+	if(!link_nonblocking(link, 1)) {
 		goto failure;
-#else
-	if(!link_nonblocking(link, 1))
-		goto failure;
-#endif
+	}
 
 	debug(D_TCP, "connecting to %s port %d", addr, port);
 
@@ -521,9 +516,6 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 		// If the remote address is valid, we are connected no matter what.
 		if(link_address_remote(link, link->raddr, &link->rport)) {
 			debug(D_TCP, "made connection to %s port %d", link->raddr, link->rport);
-#ifdef CCTOOLS_OPSYS_CYGWIN
-			link_nonblocking(link, 1);
-#endif
 			return link;
 		}
 

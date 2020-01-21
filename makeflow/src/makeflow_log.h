@@ -36,7 +36,7 @@ void makeflow_log_gc_event( struct dag *d, int collected, timestamp_t elapsed, i
 void makeflow_log_close(struct dag *d );
 
 /* return 0 on success, return non-zero on failure. */
-int makeflow_log_recover( struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode, int skip_file_check );
+int makeflow_log_recover( struct dag *d, const char *filename, int verbose_mode, struct batch_queue *queue, makeflow_clean_depth clean_mode );
 
 /* write the info of a dependency specified in the mountfile into the logging system
  * @param d: a dag structure

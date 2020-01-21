@@ -17,6 +17,8 @@ See the file COPYING for details.
 #include "jx_eval.h"
 #include "jx_export.h"
 #include "semaphore.h"
+#include "list.h"
+#include "timestamp.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -27,6 +29,7 @@ struct batch_job_amazon_info {
 	struct batch_job_info info;
 	struct aws_config *aws_config;
 	char *instance_id;
+	char *instance_type;
 };
 
 struct aws_instance_type {
@@ -41,6 +44,19 @@ struct aws_config {
 	const char *security_group_id;
 	const char *keypair_name;
 };
+
+
+struct aws_instance {
+	const char *instance_id;
+	const char *instance_type;
+	time_t last_occupied_time;
+};
+
+/*
+local list of instances keep track of idle instances for future re-use
+*/
+
+struct list *instance_list = NULL;
 
 static struct aws_config * aws_config_load( const char *filename )
 {
@@ -92,11 +108,129 @@ static const char * aws_instance_select( int cores, int memory, int disk )
 
 	for(i=aws_instance_table;i->name;i++) {
 		if(cores<=i->cores && memory<=i->memory) {
-			debug(D_BATCH,"job requiring CORES=%d MEMORY=%d matches instance type %s",cores,memory,i->name);
+			debug(D_BATCH,"job requiring CORES=%d MEMORY=%d matches instance type %s\n",cores,memory,i->name);
 			return i->name;
 		}
 	}
 	return 0;
+}
+
+/*
+Lookup aws_instance_type given instance type name.
+On failure, return zero.
+*/
+
+static struct aws_instance_type * aws_instance_lookup(const char *instance_type)
+{
+	struct aws_instance_type *i;
+	for(i=aws_instance_table;i->name;i++) {
+		if(strcmp(instance_type, i->name) == 0) {
+			return i;
+		}
+	}
+	debug(D_BATCH,"instance type %s not found in instance type table\n", instance_type);
+	return 0;
+}
+
+/*
+Compare if instance of type 1 does fit in instance of type 2.
+On fitting (cores and memory of type 1 instance <= type 2)
+return 1, otherwise return 0
+*/
+
+static int instance_type_less_or_equal(struct aws_instance *instance, const char *type_2){
+	if(strcmp(instance->instance_type,type_2) == 0){
+		return 1;
+	} else {
+		struct aws_instance_type *instance_1 = aws_instance_lookup(instance->instance_type);
+		struct aws_instance_type *instance_2 = aws_instance_lookup(type_2);
+		if (!instance_1 || !instance_2) {
+			return 0;
+		}
+		if (instance_1->cores<=instance_2->cores && instance_1->memory<=instance_2->memory){
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static struct aws_instance * record_aws_instance(const char *instance_id, const char *instance_type){
+	struct aws_instance *i = malloc(sizeof(*i));
+	i->instance_id = instance_id;
+	i->instance_type = instance_type;
+	i->last_occupied_time = time(0);
+	return i;
+}
+
+/*
+Write instance_state, instance_id, and timestamp to the aws_config file.
+*/
+
+static int log_instance_state( const char* instance_id, const char* config_file, const char* instance_state ) {
+	FILE *fp;
+	fp = fopen(config_file, "a");
+	fprintf(fp, "%s %s %" PRIu64 "\n", instance_state, instance_id, timestamp_get());
+	fclose(fp);
+	return 1;
+}
+
+/*
+Push an idle instance to the end of the list
+return 0 on error and 1 on success
+*/
+
+static int push_back_aws_instance(struct aws_instance* instance){
+
+	if (!instance_list) {
+		instance_list = list_create();
+	}
+	list_push_tail(instance_list, instance);
+	debug(D_BATCH,"added idle instance %s to the list, current list count is %d\n", instance->instance_id, list_size(instance_list));
+	return 1;
+}
+
+/*
+Remove aws_instance from local list and return its instance id
+On failure, return zero.
+*/
+
+static const char * aws_instance_delete( struct aws_instance* i )
+{
+	const char *instance_id = strdup(i->instance_id);
+	if (list_remove(instance_list, i)){
+		free(i);
+		debug(D_BATCH,"delete idle instance %s from list, %d idle instances left \n", instance_id, list_size(instance_list));
+		return instance_id;
+	}
+	else {
+		debug(D_BATCH,"failde to delete idle instance %s from list\n", instance_id);
+		return 0;
+	}
+}
+
+/*
+Erase an idle instance of the right size from the list, returing its instance_id
+On failure, return zero.
+*/
+
+static const char * fetch_aws_instance(const char* instance_type){
+
+	if (!instance_list){
+		debug(D_BATCH,"idle instance list has not been created\n");
+		return 0;
+	}
+	debug(D_BATCH,"entering fetch_aws_instance, current list count is %d\n", list_size(instance_list));
+	if (list_size(instance_list) == 0){
+		debug(D_BATCH,"idle instance list empty\n");
+		return 0;
+	}
+	struct aws_instance *i = list_find(instance_list, (list_op_t) instance_type_less_or_equal, instance_type);
+	if (!i){
+		debug(D_BATCH,"could not find idle instance of type %s in the list\n", instance_type);
+		return 0;
+	}
+	const char *instance_id = aws_instance_delete(i);
+	return instance_id;
 }
 
 /*
@@ -180,17 +314,56 @@ static struct jx * aws_describe_instance( struct aws_config *c, const char *inst
 Terminate an EC2 instance.  If termination is successfully applied, return true, otherwise return false.
 */
 
-static int aws_terminate_instance( struct aws_config *c, const char *instance_id )
+static int aws_terminate_instance( struct batch_queue * q, struct aws_config *c, const char *instance_id )
 {
 	char *str = string_format("aws ec2 terminate-instances --instance-ids %s --output json",instance_id);
 	struct jx *jresult = json_command(str);
 	if(jresult) {
 		jx_delete(jresult);
 		printf("deleted virtual machine instance %s\n",instance_id);
+
+		const char *config_file = batch_queue_get_option(q,"amazon-config");
+		const char *instance_state = "TERMINATE";
+		log_instance_state(instance_id, config_file, instance_state);
 		return 1;
 	} else {
 		return 0;
 	}
+}
+
+static int aws_instance_expire( struct aws_instance *i, int *timediff )
+{
+	if (difftime(i->last_occupied_time, time(0)) >= *timediff) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+/*
+Recursively delete expired idle instances based on difftime and timestamp
+*/
+
+static int terminate_expired_instances( struct batch_queue * q, struct aws_config *c, const int timediff )
+{
+	const int *timediff_p;
+	timediff_p = &timediff;
+	if (!instance_list){
+		debug(D_BATCH,"idle instance list has not been created\n");
+		return 0;
+	}
+	debug(D_BATCH,"entering aws_terminate_aws_instance, current list count is %d\n", list_size(instance_list));
+	if (list_size(instance_list) == 0){
+		debug(D_BATCH,"idle instance list empty\n");
+		return 0;
+	}
+	struct aws_instance *i = list_find(instance_list, (list_op_t) aws_instance_expire, timediff_p);
+	while (i != NULL){
+		const char *instance_id = aws_instance_delete(i);
+		aws_terminate_instance(q, c, instance_id);
+		i = list_find(instance_list, (list_op_t) aws_instance_expire, timediff_p);
+	}
+	return 1;
 }
 
 /*
@@ -509,22 +682,33 @@ static batch_job_id_t batch_job_amazon_submit(struct batch_queue *q, const char 
 	const char *ami = jx_lookup_string(envlist,"AMAZON_AMI");
 	if(!ami) ami = aws_config->ami;
 
-	/* Create a new instance and return its unique ID. */
-	char *instance_id = aws_create_instance(aws_config,instance_type,ami);
+	/* Before create a new instance, fetch to see if an idle instance exists */
+	const char *instance_id = fetch_aws_instance(instance_type);
 	if(!instance_id) {
-		debug(D_BATCH,"aws_create_instance failed");
-		sleep(1);
-		return -1;
+  	/* Create a new instance and return its unique ID. */
+	printf("creating instance\n");
+  	instance_id = aws_create_instance(aws_config,instance_type,ami);
+    if(!instance_id) {
+      debug(D_BATCH,"aws_create_instance failed");
+      sleep(1);
+      return -1;
+    }
+		const char *instance_state = "CREATE";
+		log_instance_state(instance_id, config_file, instance_state);
+  }
+	else {
+		const char *instance_state = "REUSE";
+		log_instance_state(instance_id, config_file, instance_state);
 	}
 
-	debug(D_BATCH,"created instance %s",instance_id);
 
 	/* Create a new object describing the job */
 
 	struct batch_job_amazon_info *info = malloc(sizeof(*info));
 	memset(info,0,sizeof(*info));
 	info->aws_config = aws_config;
- 	info->instance_id = instance_id;
+ 	info->instance_id = strdup(instance_id);
+	info->instance_type = strdup(instance_type);
 	info->info.submitted = time(0);
 	info->info.started = time(0);
 
@@ -589,10 +773,11 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 			int jobid = p->pid;
 			free(p);
 
-			/* Now destroy the instance */
+			/* Mark instance idle and push to list */
+			push_back_aws_instance(record_aws_instance(i->instance_id, i->instance_type));
 
-			aws_terminate_instance(i->aws_config,i->instance_id);
-
+			/* Now destroy other instances from the list according to timestamps */
+			terminate_expired_instances(q, i->aws_config, 30);
 			/* And clean up the object. */
 
 			free(i);
@@ -609,8 +794,8 @@ static batch_job_id_t batch_job_amazon_wait (struct batch_queue * q, struct batc
 
 /*
 To kill an amazon job, we look up the details of the job,
-kill the local ssh process forcibly, and then terminate
-the Amazon instance.
+kill the local ssh process forcibly, and then we save
+the Amazon instance and delete other expired instances.
 */
 
 static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
@@ -625,7 +810,8 @@ static int batch_job_amazon_remove (struct batch_queue *q, batch_job_id_t jobid)
 
 	kill(jobid,SIGKILL);
 
-	aws_terminate_instance(info->aws_config,info->instance_id);
+	push_back_aws_instance(record_aws_instance(info->instance_id, info->instance_type));
+	terminate_expired_instances(q, info->aws_config, 30);
 
 	debug(D_BATCH, "waiting for process %" PRIbjid, jobid);
 	struct process_info *p = process_waitpid(jobid,0);
