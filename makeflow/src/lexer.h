@@ -108,6 +108,8 @@ struct lexer
 
 	char *linetext;   //This member will be removed once the new lexer is integrated.
 
+    int keep_quotes;  //When reading commands, do not drop " or '.
+
 	int depth;        //Levels of substitutions. Only depth=0 has stream != NULL.
 };
 
