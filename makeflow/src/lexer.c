@@ -820,6 +820,12 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 			continue;
 		}
 
+		//drop empty strings
+		if(t->lexeme[0] == '\0') {
+			lexer_free_token(t);
+			continue;
+		}
+
 		prev = list_pop_tail(tmp);
 
 		if(!prev) {
