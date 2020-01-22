@@ -58,26 +58,26 @@ into an animation. The first and the last task are marked as LOCAL to force
 them to run on the controlling machine.
 
 ```make
-CURL="/usr/bin/curl"
-CONVERT="/usr/bin/convert"
+CURL=/usr/bin/curl
+CONVERT=/usr/bin/convert
 URL="http://ccl.cse.nd.edu/images/capitol.jpg"
 
-capitol.anim.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg $(CONVERT)
+capitol.anim.gif: capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg
     LOCAL $(CONVERT) -delay 10 -loop 0 capitol.jpg capitol.90.jpg capitol.180.jpg capitol.270.jpg capitol.360.jpg capitol.270.jpg capitol.180.jpg capitol.90.jpg capitol.anim.gif
     
-capitol.90.jpg: capitol.jpg $(CONVERT)
+capitol.90.jpg: capitol.jpg
     $(CONVERT) -swirl 90 capitol.jpg capitol.90.jpg
     
-capitol.180.jpg: capitol.jpg $(CONVERT)
+capitol.180.jpg: capitol.jpg
     $(CONVERT) -swirl 180 capitol.jpg capitol.180.jpg
     
-capitol.270.jpg: capitol.jpg $(CONVERT)
+capitol.270.jpg: capitol.jpg
     $(CONVERT) -swirl 270 capitol.jpg capitol.270.jpg
     
-capitol.360.jpg: capitol.jpg $(CONVERT)
+capitol.360.jpg: capitol.jpg
     $(CONVERT) -swirl 360 capitol.jpg capitol.360.jpg
     
-capitol.jpg: $(CURL)
+capitol.jpg:
     LOCAL $(CURL) -o capitol.jpg $(URL)
 ```
 
