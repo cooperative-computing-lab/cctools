@@ -1,0 +1,10 @@
+
+MAKEFLOW_INPUTS=input/hello
+MAKEFLOW_OUTPUTS=mydir
+
+FILES=A B
+
+# This rule should generate files A, B, A B, C, D, and E.
+# Contents of file A B should be: A B 'A B' $(FILES)
+$(FILES) "$(FILES)" "C" 'D' E:
+    /bin/echo A > A; /bin/echo B > B; /bin/echo C > C; /bin/echo D > D; /bin/echo E > E; /bin/echo $(FILES) \\\'$(FILES)\\\' '$(FILES)' > "$(FILES)"

@@ -461,7 +461,7 @@ int lexer_read_literal(struct lexer * lx)
 
 struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_marker)
 {
-	const char end_markers[8] = { end_marker, '$', '\\', '"', '\'', '#', CHAR_EOF ,0};
+	const char end_markers[8] = { end_marker, '$', '\\', '"', '\'', '#', 0};
 
 	int count = 0;
 	do {
