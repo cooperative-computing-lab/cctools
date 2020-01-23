@@ -435,11 +435,17 @@ int lexer_read_literal_quoted(struct lexer * lx)
 	if(c != '\'')
 		lexer_report_error(lx, "Missing opening quote.\n");
 
-	lexer_add_to_lexeme(lx, lexer_next_char(lx));	/* Add first ' */
+	lexer_next_char(lx); //skip opening '
+	if(lx->keep_quotes) {
+		lexer_add_to_lexeme(lx, '\'');	/* Add first if needed ' */
+	}
 
 	int count = lexer_read_escaped_until(lx, "'");
 
-	lexer_add_to_lexeme(lx, lexer_next_char(lx));	/* Add second ' */
+	lexer_next_char(lx); //skip closing '
+	if(lx->keep_quotes) {
+		lexer_add_to_lexeme(lx, '\'');	/* Add closing if needed ' */
+	}
 
 	return count;
 }
@@ -629,13 +635,21 @@ struct list *lexer_read_expandable_recursive(struct lexer *lx, char end_marker, 
 			lexer_read_literal(lx);
 			list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
 		} else if(c == '"' && opened == 0) {
-				lexer_add_to_lexeme(lx, lexer_next_char(lx));
-				list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));     // Add first "
+				lexer_next_char(lx); //skip first "
+				if(lx->keep_quotes) {
+					//if reading command, add opening quotes back
+					lexer_add_to_lexeme(lx, '"');
+					list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
+				}
 				tokens = list_splice(tokens, lexer_read_expandable_recursive(lx, '"', 1));
-				lexer_add_to_lexeme(lx, '"');
-				list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));     // Add closing "
-				if(end_marker == '"')
+				if(lx->keep_quotes) {
+					//if reading command, add closing quotes back
+					lexer_add_to_lexeme(lx, '"');
+					list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
+				}
+				if(end_marker == '"') {
 					return tokens;
+				}
 		} else if(c == '#' && end_marker != '"') {
 			lexer_discard_comments(lx);
 		} else if(c == end_marker) {
@@ -766,9 +780,9 @@ struct token *lexer_read_file(struct lexer *lx)
 		return lexer_read_substitution(lx);
 		break;
 	case '\'':
-		lexer_add_to_lexeme(lx, '\'');
+		lx->keep_quotes = 0;
 		lexer_read_literal_quoted(lx);
-		lexer_add_to_lexeme(lx, '\'');
+		lx->keep_quotes = 1;
 		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
 	case '-':
@@ -918,9 +932,7 @@ struct token *lexer_read_command_argument(struct lexer *lx)
 		return lexer_pack_token(lx, TOKEN_IO_REDIRECT);
 		break;
 	case '\'':
-		lexer_add_to_lexeme(lx, '\'');
 		lexer_read_literal(lx);
-		lexer_add_to_lexeme(lx, '\'');
 		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
 	default:
@@ -1268,6 +1280,8 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 	lx->eof = 0;
 
 	lx->depth = 0;
+
+	lx->keep_quotes = 1; // Keep " and ', unless expanding file specifications
 
 	lx->lexeme = calloc(BUFFER_CHUNK_SIZE, sizeof(char));
 	lx->lexeme_size = 0;
