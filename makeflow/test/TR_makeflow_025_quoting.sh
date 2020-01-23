@@ -10,17 +10,24 @@ prepare()
 	cd $test_dir
 	ln -sf ../../src/makeflow .
 	ln -sf ../syntax/quotes.01.makeflow
-cat > A.expected <<'EOF'
-A
+
+for letter in A B C D E F G 
+do
+	/bin/echo ${letter} > ${letter}.expected
+done
+
+cat > C\ D.expected <<'EOF'
+C D 'C D' "C D"
 EOF
 
-cat > B.expected <<'EOF'
-B
+cat > H\ I.expected <<'EOF'
+H I
 EOF
 
-cat > A\ B.expected <<'EOF'
-A B 'A B' $(FILES)
+cat > J\ K.expected <<'EOF'
+J K
 EOF
+
 	exit 0
 }
 
@@ -30,12 +37,13 @@ run()
 	./makeflow -j 1 quotes.01.makeflow
 
 	if [ $? -eq 0 ]; then
-		diff -w A.expected A  || exit 1
-		diff -w B.expected B  || exit 1
-		diff -w A\ B.expected A\ B || exit 1
-	else
-		exit 1
+		for file in A B C D E F G "C D" "H I" "J K"
+		do
+			diff -w "${file}".expected "${file}" || exit 1
+		done
 	fi
+
+	exit 0
 }
 
 clean()
