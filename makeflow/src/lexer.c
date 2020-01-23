@@ -785,6 +785,12 @@ struct token *lexer_read_file(struct lexer *lx)
 		lx->keep_quotes = 1;
 		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
+	case '"':
+		lx->keep_quotes = 0;
+		struct token *q = lexer_read_expandable(lx, '"');
+		lx->keep_quotes = 1;
+		return q;
+		break;
 	case '-':
 		if(lexer_peek_remote_rename_syntax(lx)) {
 			lexer_next_char(lx);	/* Jump -> */
