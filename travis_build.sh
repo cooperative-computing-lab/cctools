@@ -20,7 +20,13 @@ for dep in $DEPS; do
     DEP_ARGS="$DEP_ARGS --with-$dep-path $DEPS_DIR/$dep"
 done
 
-./configure --strict --prefix "$D" $DEP_ARGS
+WITH_PERL=
+if [ "$TRAVIS_OS_NAME" = osx ]
+then
+    WITH_PERL="--with-perl-path no"
+fi
+
+./configure --strict --prefix "$D" $DEP_ARGS $WITH_PERL
 make install
 
 if ! make test
