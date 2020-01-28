@@ -1815,14 +1815,6 @@ static int workspace_create() {
 
 	printf( "work_queue_worker: creating workspace %s\n", workspace);
 
-#ifdef ST_NOEXEC
-	if(check_disk_flags(workdir, ST_NOEXEC)) {
-		warn(D_NOTICE, "Workspace directory '%s' is on a filesystem mounted as 'noexec'.\n", workspace);
-		warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
-		warn(D_NOTICE, "Use the --workdir command line switch to change where the workspace is created.\n");
-	}
-#endif
-
 	if(!create_dir(workspace,0777)) {
 		return 0;
 	}
@@ -1832,6 +1824,46 @@ static int workspace_create() {
 	workspace = xxstrdup(absolute);
 
 	return 1;
+}
+
+/*
+Create a test script and try to execute.
+With this we check the scratch directory allows file execution.
+*/
+static int workspace_check() {
+	int error = 0; /* set 1 on error */
+	char *fname = string_format("%s/test.sh", workspace);
+
+	FILE *file = fopen(fname, "w");
+	if(!file) {
+		warn(D_NOTICE, "Could not write to %s", workspace);
+		error = 1;
+	} else {
+		fprintf(file, "#!/bin/sh\nexit 0\n");
+		fclose(file);
+		chmod(fname, 0755);
+
+		int exit_status = system(fname);
+
+		if(WIFEXITED(exit_status) && WEXITSTATUS(exit_status) == 126) {
+			/* Note that we do not set status=1 on 126, as the executables may live ouside workspace. */
+			warn(D_NOTICE, "Could not execute a test script in the workspace directory '%s'.", workspace);
+			warn(D_NOTICE, "Is the filesystem mounted as 'noexec'?\n");
+			warn(D_NOTICE, "Unless the task command is an absolute path, the task will fail with exit status 126.\n");
+		} else if(!WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0) {
+			error = 1;
+		}
+	}
+
+	unlink(fname);
+	free(fname);
+
+	if(error) {
+		warn(D_NOTICE, "The workspace %s could not be used.\n", workspace);
+		warn(D_NOTICE, "Use the --workdir command line switch to change where the workspace is created.\n");
+	}
+
+	return !error;
 }
 
 /*
@@ -2595,6 +2627,10 @@ int main(int argc, char *argv[])
 	if(!workspace_create()) {
 		fprintf(stderr, "work_queue_worker: failed to setup workspace at %s.\n", workspace);
 		exit(1);
+	}
+
+	if(!workspace_check()) {
+		return 1;
 	}
 
 	// set $WORK_QUEUE_SANDBOX to workspace.
