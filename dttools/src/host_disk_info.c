@@ -53,10 +53,11 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 }
 
 int check_disk_flags(const char *path, unsigned int flags) {
-#ifdef CCTOOLS_OPSYS_SUNOS
-	/* for sunos assume always true. */
-	return 1;
-#else
+
+/* Some struct statfs do not include the field s.f_flags.
+ * Here we conditionally compile if one of such known flags was defined.
+ */
+#ifdef HAS_STATFS_F_FLAGS
 	int result;
 	struct statfs s;
 
@@ -67,6 +68,8 @@ int check_disk_flags(const char *path, unsigned int flags) {
 	}
 
 	return (s.f_flags & flags) == flags;
+#else
+	return 1;
 #endif
 }
 
