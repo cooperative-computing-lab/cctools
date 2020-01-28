@@ -174,6 +174,40 @@ EOF
 	fi
 }
 
+check_facility()
+{
+	local name
+	local compiler_options
+	local define
+
+	name="$1"
+	shift
+
+	compiler_options="$1"
+	shift
+
+	define="$1"
+	shift
+
+	echon "checking for $name..."
+
+cat > .configure.tmp.c << EOF
+#include <stdlib.h>
+$@
+EOF
+
+	if ${CC:-gcc} .configure.tmp.c -c -o .configure.tmp.o ${compiler_options} > .configure.tmp.out 2>&1; then
+		echo yes
+		ccflags_append_define ${define}
+		rm -f .configure.tmp.c .configure.tmp.out
+		return 0
+	else
+		echo no
+		rm -f .configure.tmp.c .configure.tmp.out
+		return 1
+	fi
+}
+
 check_compiler_flag()
 {
 	echon "checking if ${ccompiler} supports $1..."
