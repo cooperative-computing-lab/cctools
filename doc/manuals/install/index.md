@@ -42,9 +42,6 @@ And that's it! You can test your setup following the instructions [here](#testin
 
 ## Install from Spack
 
-!!! warning
-    Deployment using **spack** is under active development and not currently available.
-
 Alternatively, you can install **CCTools** using the [spack.io](https://www.spack.org)
 package manager. Spack will compile **CCTools** for you, and it is recommended
 for HPC sites for which a conda installation is not available, or which have
@@ -62,16 +59,12 @@ Once spack is installed, install **CCTools** with:
 
 ```sh
 $ spack install cctools
-
-# Warning! This command currently fails.
 ```
 
 To use **CCTools**, you need to load it into the spack environment with:
 
 ```sh
 $ spack load cctools
-
-# Warning! This command currently fails.
 ```
 
 You only need to do `spack install` once, but you will need `spack load
