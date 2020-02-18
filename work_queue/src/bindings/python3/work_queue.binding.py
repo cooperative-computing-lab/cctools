@@ -13,6 +13,12 @@
 
 import copy
 import os
+import json
+import errno
+import tempfile
+import subprocess
+import distutils.spawn
+
 
 def set_debug_flag(*flags):
     for flag in flags:
@@ -1363,6 +1369,158 @@ class WorkQueue(object):
             del self._task_table[task_pointer.taskid]
             return task
         return None
+
+
+class Factory(object):
+    """Launch a Work Queue factory.
+
+    The command line arguments for `work_queue_factory` can be set for a
+    factory object (with dashes replaced with underscores). Creating a factory
+    object does not immediately launch it, so this is a good time to configure
+    the resources, number of workers, etc. Factory objects function as Python
+    context managers, so to indicate that a set of commands should be run with
+    a factory running, wrap them in a `with` statement. The factory will be
+    cleaned up automtically at the end of the block. You can also make
+    config changes to the factory while it is running. As an example,
+
+        # normal WQ setup stuff
+        workers = work_queue.Factory("sge", "myproject") 
+        workers.cores = 4
+        with workers:
+            # submit some tasks
+            workers.max_workers = 300
+            # got a pile of tasks, allow more workers
+        # any additional cleanup steps on the master
+    """
+
+    _command_line_options = [
+        "amazon-config",
+        "autosize",
+        "batch-options",
+        "capacity",
+        "catalog",
+        "condor-requirements",
+        "config-file",
+        "cores",
+        "debug",
+        "debug-file",
+        "debug-file-size",
+        "disk",
+        "env",
+        "extra-options",
+        "factory-timeout",
+        "foremen-name",
+        "gpus",
+        "k8s-image",
+        "k8s-worker-image",
+        "max-workers",
+        "memory",
+        "mesos-master",
+        "mesos-path",
+        "mesos-preload",
+        "min-workers",
+        "password",
+        "run-factory-as-master",
+        "runos",
+        "scratch-dir",
+        "tasks-per-worker",
+        "timeout",
+        "workers-per-cycle",
+        "wrapper",
+        "wrapper-input",
+    ]
+
+    def __init__(
+            self, batch_type, master_name,
+            factory_binary=None, worker_binary=None,
+            log_file=os.devnull):
+        """Create a factory with the given batch_type and master name.
+
+        If factory_binary or worker_binary is not
+        specified, $PATH will be searched.
+        """
+        self._batch_type = batch_type
+        self._master_name = master_name
+        self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
+        self._worker_binary = self._find_exe(worker_binary, 'work_queue_worker')
+        self._opts = {}
+        self._config_file = None
+        self._factory_proc = None
+        self._log_file = log_file
+
+    def _find_exe(self, path, default):
+        if path is None:
+            out = distutils.spawn.find_executable(default)
+        else:
+            out = path
+        if out is None or not os.access(out, os.F_OK):
+            raise OSError(
+                errno.ENOENT,
+                'Command not found',
+                out or default)
+        if not os.access(out, os.X_OK):
+            raise OSError(
+                errno.EPERM,
+                os.strerror(errno.EPERM),
+                out)
+        return os.path.abspath(out)
+
+
+    def __getattr__(self, name):
+        name = name.replace('_', '-')
+        if not name in Factory._command_line_options:
+            raise AttributeError("{} is not a supported option".format(name)) 
+        return object.__getattribute__(self, '_opts').get(name)
+
+    def __setattr__(self, name, value):
+        opt_name = name.replace('_', '-')
+        if opt_name in Factory._command_line_options:
+            self._opts[opt_name] = value
+            self._write_config()
+        elif name[0] == '_':
+            # only allow underscored fields, so invalid options to
+            # work_queue_factory are a hard error
+            object.__setattr__(self, name, value)
+        else:
+            raise AttributeError("{} is not a supported option".format(name)) 
+
+    def __enter__(self):
+        if self._factory_proc is not None:
+            raise RuntimeError('Factory was already started')
+        (tmp, self._config_file) = tempfile.mkstemp(
+            prefix='wq-factory-config-',
+            suffix='.json')
+        os.close(tmp)
+        self._write_config()
+        logfd = open(self._log_file, 'a')
+        devnull = open(os.devnull, 'w')
+        self._factory_proc = subprocess.Popen([self._factory_binary,
+            '--batch-type', self._batch_type,
+            '--worker-binary', self._worker_binary,
+            '--master-name', self._master_name,
+            '--config-file', self._config_file],
+            stdin=devnull,
+            stdout=logfd,
+            stderr=logfd)
+        devnull.close()
+        logfd.close()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._factory_proc is None:
+            raise RuntimeError('Factory not yet started')
+        self._factory_proc.terminate()
+        self._factory_proc.wait()
+        self._factory_proc = None
+        os.unlink(self._config_file)
+        self._config_file = None
+
+    def _write_config(self):
+        if self._config_file is None:
+            return
+        with open(self._config_file, 'w') as f:
+            json.dump(self._opts, f, indent=4)
+
 
 def rmsummary_snapshots(self):
     if self.snapshots_count < 1:
