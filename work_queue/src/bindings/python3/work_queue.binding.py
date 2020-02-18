@@ -1397,6 +1397,7 @@ class Factory(object):
         "amazon-config",
         "autosize",
         "batch-options",
+        "batch-type",
         "capacity",
         "catalog",
         "condor-requirements",
@@ -1414,6 +1415,7 @@ class Factory(object):
         "k8s-image",
         "k8s-worker-image",
         "max-workers",
+        "master-name",
         "memory",
         "mesos-master",
         "mesos-path",
@@ -1425,9 +1427,29 @@ class Factory(object):
         "scratch-dir",
         "tasks-per-worker",
         "timeout",
+        "worker-binary",
         "workers-per-cycle",
         "wrapper",
         "wrapper-input",
+    ]
+
+    # subset of command line options that can be written to the configuration
+    # file, and therefore they can be changed once the factory is running.
+    _config_file_options = [
+        "autosize",
+        "capacity",
+        "cores",
+        "disk",
+        "factory-timeout",
+        "foremen-name",
+        "master-name",
+        "max-workers",
+        "memory",
+        "min-workers",
+        "tasks-per-worker",
+        "timeout",
+        "workers-per-cycle",
+        "condor-requirements",
     ]
 
     def __init__(
@@ -1439,14 +1461,18 @@ class Factory(object):
         If factory_binary or worker_binary is not
         specified, $PATH will be searched.
         """
-        self._batch_type = batch_type
-        self._master_name = master_name
-        self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
-        self._worker_binary = self._find_exe(worker_binary, 'work_queue_worker')
-        self._opts = {}
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
+
+        self._opts = {}
+
+        self._opts['batch-type']    = batch_type
+        self._opts['master-name']   = master_name
+        self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
+
+        self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
+
 
     def _find_exe(self, path, default):
         if path is None:
@@ -1467,22 +1493,47 @@ class Factory(object):
 
 
     def __getattr__(self, name):
-        name = name.replace('_', '-')
-        if not name in Factory._command_line_options:
-            raise AttributeError("{} is not a supported option".format(name)) 
-        return object.__getattribute__(self, '_opts').get(name)
+        if name[0] == '_':
+            # For names that start with '_', immediately return the attribute.
+            # If the name does not start with '_' we assume is a factory option.
+            return object.__getattribute__(self, name)
+
+        if name in Factory._command_line_options:
+            try:
+                return object.__getattribute__(self, '_opts')[name]
+            except KeyError:
+                raise KeyError("{} is a valid factory attribute, but has not been set yet.".format(name))
+        else:
+            raise AttributeError("{} is not a supported option".format(name))
+
 
     def __setattr__(self, name, value):
-        opt_name = name.replace('_', '-')
-        if opt_name in Factory._command_line_options:
-            self._opts[opt_name] = value
-            self._write_config()
-        elif name[0] == '_':
-            # only allow underscored fields, so invalid options to
-            # work_queue_factory are a hard error
+        if name[0] == '_':
+            # For names that start with '_', immediately set the attribute.
+            # If the name does not start with '_' we assume is a factory option.
             object.__setattr__(self, name, value)
+        elif self._factory_proc:
+            # if factory is already running, only accept attributes that can
+            # changed dynamically
+            if name in Factory._config_file_options:
+                self._opts[name] = value
+                self._write_config()
+            elif name in Factory._command_line_options:
+                raise AttributeError('{} cannot be changed once the factory is running.'.format(name))
+            else:
+                raise AttributeError("{} is not a supported option".format(name))
         else:
-            raise AttributeError("{} is not a supported option".format(name)) 
+            if name in Factory._command_line_options:
+                self._opts[name] = value
+            else:
+                raise AttributeError("{} is not a supported option".format(name))
+
+    def _construct_command_line(self):
+        args  = [self._factory_binary]
+        args += ['--config-file', self._config_file]
+        args += ["--{}={}".format(opt,self._opts[opt]) for opt in self._opts.keys() if opt not in Factory._config_file_options]
+
+        return args
 
     def __enter__(self):
         if self._factory_proc is not None:
@@ -1494,16 +1545,14 @@ class Factory(object):
         self._write_config()
         logfd = open(self._log_file, 'a')
         devnull = open(os.devnull, 'w')
-        self._factory_proc = subprocess.Popen([self._factory_binary,
-            '--batch-type', self._batch_type,
-            '--worker-binary', self._worker_binary,
-            '--master-name', self._master_name,
-            '--config-file', self._config_file],
+        self._factory_proc = subprocess.Popen(
+            self._construct_command_line(),
             stdin=devnull,
             stdout=logfd,
             stderr=logfd)
         devnull.close()
         logfd.close()
+
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -1518,8 +1567,10 @@ class Factory(object):
     def _write_config(self):
         if self._config_file is None:
             return
+
+        opts_subset = dict( [ (opt, self._opts[opt]) for opt in self._opts.keys() if opt in Factory._config_file_options ] )
         with open(self._config_file, 'w') as f:
-            json.dump(self._opts, f, indent=4)
+            json.dump(opts_subset, f, indent=4)
 
 
 def rmsummary_snapshots(self):
