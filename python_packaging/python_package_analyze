@@ -1,49 +1,85 @@
 #!/usr/bin/env python3
+
 import os
 import re
+import ast
 import sys
 import json
+import glob
 import argparse
 import subprocess
-from stdlib_list import stdlib_list
+import email.parser
 
-libraries = stdlib_list(".".join(sys.version.split()[0].split(".")[:2]))
+def conda_packages(pkg):
+    # NOTE: a metapackage that uses different import names
+    # will not be detected.
+    out = {}
+    with open(os.path.join(os.environ['CONDA_PREFIX'], 'conda-meta', pkg['dist_name'] + '.json')) as f:
+        meta = json.load(f)
+    # only consider explicitly installed packages
+    if meta['requested_spec'] == 'None':
+        return out
+    for a in meta['files']:
+        m = re.match(r'lib(?:64)?/python[\d.]+/site-packages/([^/]+)/', a)
+        if m:
+            if m.group(1).startswith('.'):
+                continue
+            out[m.group(1)] = pkg['name']
+    return out
 
-def find_imports(source):
-    dependencies = []
-    for line in source.readlines():
-        words = line.split()
-        isList = False
-        isFrom = False
-        # Iterate through each word in the line
-        for i in range(0, len(words)):
-            # Signals that you are importing a module
-            if words[i] == "from" or words[i] == "import":
-                if words[i] == "from":
-                    isFrom = True
-                i += 1
-                name = words[i]
-                if name[-1] == ",":
-                    name = name[:-1]
-                    isList = True
-                if name not in libraries:
-                    dependencies.append(name)
-            # Iterate through multiple imports if multiple listed on one line
-            while isList:
-                i += 1
-                nane = words[i]
-                if name[-1] == ",":
-                    name = name[:-1]
-                else:
-                    isList = False
-                if name not in libraries:
-                    dependencies.append(name)
-            if isFrom:
-                break
-    return dependencies
+def pip_packages(pkg):
+    out = {}
+    parser = email.parser.BytesParser()
+    m = parser.parsebytes(subprocess.check_output(['pip', 'show', '-f', pkg['name']]))
+    files = [x.strip().split('/')[0] for x in m.get('Files').splitlines()]
+    for f in files:
+        if len(f) == 0:
+            continue
+        if f.startswith('.'):
+            continue
+        out[f] = pkg['name']
+    return out
 
-def export_env(source):
-    imports = set(find_imports(source) + ['python', 'pip'])
+def package_mappings():
+    out = {}
+    pkgs = json.loads(subprocess.check_output(['conda', 'list', '--json']))
+    conda_pkgs = [a for a in pkgs if a['channel'] != 'pypi']
+    for a in conda_pkgs:
+        out.update(conda_packages(a))
+    pip_pkgs = [a for a in pkgs if a['channel'] == 'pypi']
+    for a in pip_pkgs:
+        out.update(pip_packages(a))
+    return out
+
+def get_imports(stmt):
+    imports = []
+    if isinstance(stmt, ast.Import):
+        for a in stmt.names:
+            imports.append(a.name)
+    elif isinstance(stmt, ast.ImportFrom):
+        imports.append(stmt.module)
+    return imports
+
+def analyze_toplevel(module):
+    deps = []
+    for stmt in module.body:
+        deps += get_imports(stmt)
+    return deps
+
+def analyze_full(module):
+    deps = []
+    for stmt in ast.walk(module):
+        deps += get_imports(stmt)
+    return deps
+
+def analyze_function(module, func_name):
+    for stmt in ast.walk(module):
+        if isinstance(stmt, ast.FunctionDef) and stmt.name == func_name:
+            return analyze_full(stmt)
+
+def export_env(imports):
+    # Always capture base deps
+    imports = set(['python', 'pip'] + imports)
     env = json.loads(
         subprocess.check_output(['conda', 'env', 'export', '--json']))
     full_deps = env.pop('dependencies', [])
@@ -59,7 +95,6 @@ def export_env(source):
             for pkg in imports:
                 if a.startswith(pkg + '='):
                     deps.append(a)
-
     deps.sort()
     pip.sort()
     if pip:
@@ -68,21 +103,45 @@ def export_env(source):
         env['dependencies'] = deps
     return env
 
+def fix_imports(imports):
+    mapping = package_mappings()
+    for i in range(len(imports)):
+        if imports[i] in mapping:
+            imports[i] = mapping[imports[i]]
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Determine the environment required by Python code.')
+    actions = parser.add_mutually_exclusive_group()
     parser.add_argument('source',
         help='Analyze the given Python source code, or - for stdin.')
     parser.add_argument('out',
         help='Path to write the JSON description, or - for stdout.')
+    actions.add_argument('--toplevel', action='store_true',
+        help='Only include imports at the top level of the script.')
+    actions.add_argument('--function',
+        help='Only include imports in the given function.')
+
     args = parser.parse_args()
 
+    filename = '<stdin>'
     source = sys.stdin
     out = sys.stdout
     if args.source != '-':
         source = open(args.source, 'r')
+        filename = args.source
     if args.out != '-':
         out = open(args.out, 'w')
 
-    json.dump(export_env(source), out, indent=4, sort_keys=True)
+    code = ast.parse(source.read(), filename=filename)
+    if args.toplevel:
+        imports = analyze_toplevel(code)
+    elif args.function:
+        imports = analyze_function(code, args.function)
+    else:
+        imports = analyze_full(code)
+
+    fix_imports(imports)
+
+    json.dump(export_env(imports), out, indent=4, sort_keys=True)
     out.write('\n')
