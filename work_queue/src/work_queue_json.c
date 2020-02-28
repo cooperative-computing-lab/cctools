@@ -44,7 +44,7 @@ static const char *work_queue_task_properties[] = { "tag", "command_line", "work
 	"time_execute_cmd_finish", "total_transfer_time", "cmd_execution_time",
 	"total_cmd_execution_time", "total_cmd_exhausted_execute_time",
 	"total_time_until_worker_failure", "total_bytes_received", "total_bytes_sent",
-	"total_bytes_transferred", "time_app_delay"
+	"total_bytes_transferred", "time_app_delay", "cores", "memory", "disk"
 };
 
 
@@ -165,6 +165,7 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 static struct work_queue_task *create_task(const char *str)
 {
 
+    int cores, memory, disk;
 	char *command_line;
 	struct jx *input_files, *output_files;
 
@@ -190,8 +191,14 @@ static struct work_queue_task *create_task(const char *str)
 			input_files = value;
 		} else if(!strcmp(key, "output_files")) {
 			output_files = value;
+        } else if(!strcmp(key, "cores")) {
+            cores = value->u.integer_value;
+        } else if(!strcmp(key, "memory")) {
+            memory = value->u.integer_value;
+        } else if(!strcmp(key, "disk")) {
+            disk = value->u.integer_value;
 		} else {
-			printf("%s\n", value->u.string_value);
+			printf("%s\n", key);
 		}
 
 		key = jx_iterate_keys(json, &j);
@@ -215,6 +222,18 @@ static struct work_queue_task *create_task(const char *str)
 		if(output_files) {
 			specify_files(0, output_files, task);
 		}
+
+        if(cores) {
+            work_queue_task_specify_cores(task, cores);
+        }
+    
+        if(memory) {
+            work_queue_task_specify_memory(task, memory);
+        }
+
+        if(disk) {
+            work_queue_task_specify_disk(task, disk);
+        }
 
 		return task;
 
@@ -254,7 +273,7 @@ struct work_queue *work_queue_json_create(const char *str)
 		} else if(!strcmp(key, "priority")) {
 			priority = value->u.integer_value;
 		} else {
-			printf("Not necessary: %s\n", value->u.string_value);
+			printf("Not necessary: %s\n", key);
 		}
 
 		key = jx_iterate_keys(json, &j);
