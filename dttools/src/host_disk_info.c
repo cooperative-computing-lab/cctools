@@ -16,33 +16,8 @@ See the file COPYING for details.
 #include <sys/param.h>
 #include <sys/mount.h>
 
-#ifdef HAS_SYS_STATFS_H
-#include <sys/statfs.h>
-#endif
-
-#ifdef HAS_SYS_STATVFS_H
-#include <sys/statvfs.h>
-#endif
-
-#ifdef HAS_SYS_VFS_H
-#include <sys/vfs.h>
-#endif
-
 int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 {
-#ifdef CCTOOLS_OPSYS_SUNOS
-	int result;
-	struct statvfs s;
-
-	result = statvfs(path, &s);
-	if(result < 0)
-		return result;
-
-	*total = ((UINT64_T) s.f_bsize) * s.f_blocks;
-	*avail = ((UINT64_T) s.f_bsize) * s.f_bfree;
-
-	return 0;
-#else
 	int result;
 	struct statfs s;
 
@@ -54,7 +29,6 @@ int host_disk_info_get(const char *path, UINT64_T * avail, UINT64_T * total)
 	*avail = ((UINT64_T) s.f_bsize) * s.f_bavail;
 
 	return 0;
-#endif
 }
 
 int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_avail_threshold) {
@@ -77,7 +51,5 @@ int check_disk_space_for_filesize(char *path, int64_t file_size, uint64_t disk_a
 
 	return 1;
 }
-
-
 
 /* vim: set noexpandtab tabstop=4: */

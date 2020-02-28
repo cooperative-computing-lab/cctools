@@ -45,20 +45,14 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
-	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
+#ifdef CCTOOLS_OPSYS_DARWIN
+/* Darwin has 64-bit I/O by default */
 #	define stat64 stat
 #	define fstat64 fstat
 #	define ftruncate64 ftruncate
 #	define statfs64 statfs
 #	define fstatfs64 fstatfs
 #	define fstatat64 fstatat
-#elif defined(CCTOOLS_OPSYS_SUNOS)
-	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
-#	define statfs statvfs
-#	define fstatfs fstatvfs
-#	define statfs64 statvfs64
-#	define fstatfs64 fstatvfs64
 #endif
 
 #ifndef O_CLOEXEC
@@ -91,22 +85,7 @@ See the file COPYING for details.
 		cinfop->cst_ctime = linfop->st_ctime;\
 	} while (0)
 
-#ifdef CCTOOLS_OPSYS_SUNOS
-#	define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
-	do {\
-		struct chirp_statfs *cinfop = &(cinfo);\
-		struct statfs64 *linfop = &(linfo);\
-		memset(cinfop, 0, sizeof(struct chirp_statfs));\
-		cinfop->f_type = linfop->f_fsid;\
-		cinfop->f_bsize = linfop->f_frsize;\
-		cinfop->f_blocks = linfop->f_blocks;\
-		cinfop->f_bavail = linfop->f_bavail;\
-		cinfop->f_bfree = linfop->f_bfree;\
-		cinfop->f_files = linfop->f_files;\
-		cinfop->f_ffree = linfop->f_ffree;\
-	} while (0)
-#else
-#	define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
+#define COPY_STATFS_LOCAL_TO_CHIRP(cinfo,linfo) \
 	do {\
 		struct chirp_statfs *cinfop = &(cinfo);\
 		struct statfs64 *linfop = &(linfo);\
@@ -119,7 +98,6 @@ See the file COPYING for details.
 		cinfop->f_files = linfop->f_files;\
 		cinfop->f_ffree = linfop->f_ffree;\
 	} while (0)
-#endif
 
 static int rootfd = -1;
 

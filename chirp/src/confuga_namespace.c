@@ -32,7 +32,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 
-#if CCTOOLS_OPSYS_CYGWIN || CCTOOLS_OPSYS_DARWIN || CCTOOLS_OPSYS_FREEBSD || CCTOOLS_OPSYS_DRAGONFLY
+#ifdef CCTOOLS_OPSYS_DARWIN
 	/* Cygwin does not have 64-bit I/O, while FreeBSD/Darwin has it by default. */
 #	define stat64 stat
 #	define fstat64 fstat
@@ -40,12 +40,6 @@ See the file COPYING for details.
 #	define statfs64 statfs
 #	define fstatfs64 fstatfs
 #	define fstatat64 fstatat
-#elif defined(CCTOOLS_OPSYS_SUNOS)
-	/* Solaris has statfs, but it doesn't work! Use statvfs instead. */
-#	define statfs statvfs
-#	define fstatfs fstatvfs
-#	define statfs64 statvfs64
-#	define fstatfs64 fstatvfs64
 #endif
 
 #ifdef CCTOOLS_OPSYS_DARWIN

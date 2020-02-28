@@ -5,7 +5,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#if defined(HAS_KRB5) && !defined(CCTOOLS_OPSYS_FREEBSD)
+#if defined(HAS_KRB5)
 
 #include "krb5.h"
 

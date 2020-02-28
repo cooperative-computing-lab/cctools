@@ -9,11 +9,12 @@ c="./hostport.$PPID"
 
 ticket=my.ticket
 
-python=${CCTOOLS_PYTHON2}
+python=${CCTOOLS_PYTHON_TEST_EXEC}
+python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 
 check_needed()
 {
-	[ -f ../src/bindings/python/_CChirp.so ] || return 1
+	[ -n "${python}" ] || return 1
 }
 
 prepare()
@@ -34,7 +35,9 @@ run()
 
 	chirp -d all -a unix "$hostport" ticket_create -output "$ticket" -bits 1024 -duration 86400 -subject unix:`whoami` / write
 
-	PYTHONPATH=../src/bindings/python ${python} ../src/bindings/python/chirp_python_example.py $hostport $ticket
+	base=$(pwd)/../src/bindings/${python_dir}/
+	PYTHONPATH=${base} ${python} ${base}/chirp_python_example.py $hostport $ticket
+
 
 	return 0
 }

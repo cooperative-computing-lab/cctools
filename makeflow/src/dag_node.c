@@ -60,6 +60,10 @@ struct dag_node *dag_node_create(struct dag *d, int linenum)
 
 	n->resource_request = CATEGORY_ALLOCATION_FIRST;
 
+	// arguments for subworkflow nodes
+	n->workflow_args = NULL;
+	n->workflow_args_file = NULL;
+
 	return n;
 }
 
@@ -83,6 +87,10 @@ void dag_node_delete(struct dag_node *n)
 	if(n->resources_measured)
 		rmsummary_delete(n->resources_measured);
 
+
+	jx_delete(n->workflow_args);
+	free(n->workflow_args_file);
+
 	free(n);
 }
 
@@ -104,8 +112,16 @@ void dag_node_set_workflow(struct dag_node *n, const char *dag, struct jx * args
 
 	n->type = DAG_NODE_TYPE_WORKFLOW;
 	n->workflow_file = xxstrdup(dag);
-	n->workflow_args = jx_copy(args);
 	n->workflow_is_jx = is_jx;
+
+	n->workflow_args = jx_copy(args);
+	if(n->workflow_args) {
+		n->workflow_args_file = string_format("makeflow.jx.args.XXXXXX");
+		int fd = mkstemp(n->workflow_args_file);
+		FILE *argsfile = fdopen(fd,"w");
+		jx_print_stream(n->workflow_args,argsfile);
+		fclose(argsfile);
+	}
 
 	/* Record a placeholder in the command field */
 	/* A usable command will be created at submit time. */
@@ -389,6 +405,7 @@ struct jx * dag_node_env_create( struct dag *d, struct dag_node *n, int should_s
 		if(value) {
 			jx_insert(object,jx_string(key),jx_string(value));
 			debug(D_MAKEFLOW_RUN, "export %s=%s", key, value);
+			free(value);
 		}
 	}
 

@@ -4,8 +4,8 @@ include $(CCTOOLS_HOME)/rules.mk
 # Python always uses 'so' for its modules (even on Darwin)
 CCTOOLS_DYNAMIC_SUFFIX = so
 # SWIG produces code that causes a lot of warnings, so use -w to turn those off.
-LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON_CCFLAGS)
-LOCAL_LINKAGE = $(CCTOOLS_PYTHON_LDFLAGS)
+LOCAL_CCFLAGS = -fPIC -w $(CCTOOLS_PYTHON2_CCFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_PYTHON2_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = $(CCTOOLS_HOME)/dttools/src/libdttools.a
 RMPYTHONSO = _resource_monitor.$(CCTOOLS_DYNAMIC_SUFFIX)
@@ -30,9 +30,9 @@ clean:
 test:
 
 install: all
-	mkdir -p $(CCTOOLS_PYTHON_PATH)
+	mkdir -p $(CCTOOLS_PYTHON2_PATH)
 	chmod 755 resource_monitor.py
-	cp resource_monitor.py $(TARGETS) $(CCTOOLS_PYTHON_PATH)/
+	cp resource_monitor.py $(TARGETS) $(CCTOOLS_PYTHON2_PATH)/
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/doc
 
 

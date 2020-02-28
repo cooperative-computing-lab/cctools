@@ -4,28 +4,7 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#if defined(CCTOOLS_OPSYS_SUNOS)
-
-#include <sys/loadavg.h>
-#include <unistd.h>
-
-void load_average_get(double *avg)
-{
-	avg[0] = avg[1] = avg[2] = 0;
-	getloadavg(avg, 3);
-}
-
-int load_average_get_cpus()
-{
-	long n = sysconf(_SC_NPROCESSORS_ONLN);
-	if(n >= 1) {
-		return n;
-	} else {
-		return 1;
-	}
-}
-
-#elif defined(CCTOOLS_OPSYS_DARWIN)
+#if defined(CCTOOLS_OPSYS_DARWIN)
 
 #include <unistd.h>
 #include <stdlib.h>

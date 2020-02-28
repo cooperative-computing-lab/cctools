@@ -1,0 +1,26 @@
+
+MAKEFLOW_INPUTS=input/hello
+MAKEFLOW_OUTPUTS=mydir
+
+# Generate file A with contents A
+"A":
+	/bin/echo A > A
+
+# Generate file B with contents B
+'B':
+	/bin/echo B > B
+
+# Generate file C, D and E with contents C, D and E, respectively
+VAR_CD=C D
+$(VAR_CD) E:
+	/bin/echo C > C; /bin/echo D > D; /bin/echo E > E
+
+# Generate file "C D" with contents C D 'C D' "C D", and files F and G, with contents F and G respectively
+F "$(VAR_CD)" G:
+	/bin/echo "$(VAR_CD) \'$(VAR_CD)\' \\\"$(VAR_CD)\\\"" > "$(VAR_CD)"; /bin/echo F > F; /bin/echo G > G 
+
+# Generate files "H I" and "J K"
+VAR_HK="H I" "J K"
+$(VAR_HK):
+    /bin/echo H I > "H I"; /bin/echo J K > "J K"
+

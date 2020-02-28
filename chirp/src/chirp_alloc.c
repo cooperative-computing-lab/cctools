@@ -302,9 +302,6 @@ int chirp_alloc_init(INT64_T size)
 	} else if (cfs->lockf(-1, F_TEST, 0) == -1 && errno == ENOSYS) {
 		return -1;
 	}
-#ifdef CCTOOLS_OPSYS_CYGWIN
-	fatal("sorry, CYGWIN cannot employ space allocation because it does not support file locking.");
-#endif
 
 	alloc_enabled = 1;
 	recovery_in_progress = 1;

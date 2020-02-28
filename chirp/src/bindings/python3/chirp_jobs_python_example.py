@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-
-try:
-    import Chirp
-except ImportError:
-    print 'Could not find Chirp module. Please set PYTHONPATH accordingly.'
-    sys.exit(1)
+import Chirp
 
 def make_job(job_number):
     job = { 'executable' : './my_script',
@@ -24,7 +19,7 @@ def make_job(job_number):
 if __name__ == '__main__':
 
     if(len(sys.argv) != 3):
-        print "Usage: %s HOST:PORT executable" % sys.argv[0]
+        print("Usage: %s HOST:PORT executable" % sys.argv[0])
         sys.exit(1)
 
     hostport   = sys.argv[1]
@@ -35,11 +30,11 @@ if __name__ == '__main__':
                               authentication = ['unix'],
                               timeout = 15,
                               debug   = True)
-    except Chirp.AuthenticationFailure, e:
-         print "Could not authenticate using: %s" % ', '.join(e.value)
+    except Chirp.AuthenticationFailure as e:
+         print("Could not authenticate using: %s" % ', '.join(e.value))
          sys.exit(1)
 
-    print 'Chirp server sees me, ' + client.identity
+    print('Chirp server sees me, ' + client.identity)
 
     jobs = [ make_job(x) for x in range(1,10) ]
 
@@ -55,7 +50,7 @@ if __name__ == '__main__':
         job_states = client.job_wait(5)
 
         for state in job_states:
-            print 'job ' + str(state['id']) + ' is ' + state['status'] + "\n"
+            print('job ' + str(state['id']) + ' is ' + state['status'] + "\n")
 
             try:
                 if   state['status'] == 'FINISHED':
@@ -63,7 +58,7 @@ if __name__ == '__main__':
                 elif state['status'] == 'ERRORED':
                     client.job_kill( state['id'] )
             except Chirp.ChirpJobError:
-                print 'error trying to clean job ' + str(state['id'])
+                print('error trying to clean job ' + str(state['id']))
 
             jobs_running -= 1
 

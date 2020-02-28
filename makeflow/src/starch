@@ -194,7 +194,7 @@ def create_sfx(sfx_path, executables, libraries, data, environments, command):
         archive.addfile(lib_info, open(real_path, 'rb'))
 
     logging.debug('adding data...')
-    for data_path, real_path in map(lambda s: s.split(':'), data):
+    for data_path, real_path in [s.split(':') for s in data]:
         add_data_to_archive(archive, os.path.normpath(data_path), os.path.normpath(real_path))
 
     logging.debug('adding environment scripts...')
@@ -259,8 +259,6 @@ def find_files(files, env_var, default_paths = None):
                 break
         if not is_found:
             logging.error('could not find file: %s' % file)
-    raise StopIteration
-
 
 def find_executables(executables):
     exes = []
@@ -333,9 +331,9 @@ def autodetect_libraries_darwin(executable):
 # Configuration Parser
 
 class StarchConfigParser(ConfigParser):
-    def get(self, section, name, default = None):
+    def safe_get(self, section, name, default = None):
         try:
-            return ConfigParser.get(self, section, name)
+            return self.get(section, name)
         except (NoSectionError, NoOptionError):
             return default
 
@@ -385,12 +383,12 @@ def parse_command_line_options():
         config = StarchConfigParser()
         config.read(options.config)
 
-        options.executables.extend(config.get('starch', 'executables', '').split())
-        options.libraries.extend(config.get('starch', 'libraries', '').split())
-        options.data.extend(config.get('starch', 'data', '').split())
-        options.environments.extend(config.get('starch', 'environments', '').split())
+        options.executables.extend(config.safe_get('starch', 'executables', '').split())
+        options.libraries.extend(config.safe_get('starch', 'libraries', '').split())
+        options.data.extend(config.safe_get('starch', 'data', '').split())
+        options.environments.extend(config.safe_get('starch', 'environments', '').split())
         if not options.command:
-            options.command = config.get('starch', 'command', '')
+            options.command = config.safe_get('starch', 'command', '')
 
     if not options.executables:
         logging.error('no executables specified')

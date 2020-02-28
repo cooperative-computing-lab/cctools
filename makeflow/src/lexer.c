@@ -25,7 +25,7 @@
 #define CHAR_EOF 26		// ASCII for EOF
 
 #define LITERAL_LIMITS  "\\\"'$#\n\t \032"
-#define SYNTAX_LIMITS  LITERAL_LIMITS  ",.-(){},[]<>=+!?/"
+#define SYNTAX_LIMITS  LITERAL_LIMITS  ",.-(){},[]<>=+!?/:"
 #define FILENAME_LIMITS LITERAL_LIMITS  ":-"
 
 #define WHITE_SPACE          " \t"
@@ -435,11 +435,17 @@ int lexer_read_literal_quoted(struct lexer * lx)
 	if(c != '\'')
 		lexer_report_error(lx, "Missing opening quote.\n");
 
-	lexer_add_to_lexeme(lx, lexer_next_char(lx));	/* Add first ' */
+	lexer_next_char(lx); //skip opening '
+	if(lx->keep_quotes) {
+		lexer_add_to_lexeme(lx, '\'');	/* Add first if needed ' */
+	}
 
 	int count = lexer_read_escaped_until(lx, "'");
 
-	lexer_add_to_lexeme(lx, lexer_next_char(lx));	/* Add second ' */
+	lexer_next_char(lx); //skip closing '
+	if(lx->keep_quotes) {
+		lexer_add_to_lexeme(lx, '\'');	/* Add closing if needed ' */
+	}
 
 	return count;
 }
@@ -461,7 +467,7 @@ int lexer_read_literal(struct lexer * lx)
 
 struct token *lexer_read_literal_in_expandable_until(struct lexer *lx, char end_marker)
 {
-	const char end_markers[8] = { end_marker, '$', '\\', '"', '\'', '#', CHAR_EOF ,0};
+	const char end_markers[8] = { end_marker, '$', '\\', '"', '\'', '#', 0};
 
 	int count = 0;
 	do {
@@ -629,13 +635,21 @@ struct list *lexer_read_expandable_recursive(struct lexer *lx, char end_marker, 
 			lexer_read_literal(lx);
 			list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
 		} else if(c == '"' && opened == 0) {
-				lexer_add_to_lexeme(lx, lexer_next_char(lx));
-				list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));     // Add first "
+				lexer_next_char(lx); //skip first "
+				if(lx->keep_quotes) {
+					//if reading command, add opening quotes back
+					lexer_add_to_lexeme(lx, '"');
+					list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
+				}
 				tokens = list_splice(tokens, lexer_read_expandable_recursive(lx, '"', 1));
-				lexer_add_to_lexeme(lx, '"');
-				list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));     // Add closing "
-				if(end_marker == '"')
+				if(lx->keep_quotes) {
+					//if reading command, add closing quotes back
+					lexer_add_to_lexeme(lx, '"');
+					list_push_tail(tokens, lexer_pack_token(lx, TOKEN_LITERAL));
+				}
+				if(end_marker == '"') {
 					return tokens;
+				}
 		} else if(c == '#' && end_marker != '"') {
 			lexer_discard_comments(lx);
 		} else if(c == end_marker) {
@@ -766,10 +780,16 @@ struct token *lexer_read_file(struct lexer *lx)
 		return lexer_read_substitution(lx);
 		break;
 	case '\'':
-		lexer_add_to_lexeme(lx, '\'');
+		lx->keep_quotes = 0;
 		lexer_read_literal_quoted(lx);
-		lexer_add_to_lexeme(lx, '\'');
+		lx->keep_quotes = 1;
 		return lexer_pack_token(lx, TOKEN_LITERAL);
+		break;
+	case '"':
+		lx->keep_quotes = 0;
+		struct token *q = lexer_read_expandable(lx, '"');
+		lx->keep_quotes = 1;
+		return q;
 		break;
 	case '-':
 		if(lexer_peek_remote_rename_syntax(lx)) {
@@ -817,6 +837,12 @@ void lexer_concatenate_consecutive_literals(struct list *tokens)
 	while((t = list_pop_head(tokens))) {
 		if(t->type != TOKEN_LITERAL) {
 			list_push_tail(tmp, t);
+			continue;
+		}
+
+		//drop empty strings
+		if(t->lexeme[0] == '\0') {
+			lexer_free_token(t);
 			continue;
 		}
 
@@ -912,9 +938,7 @@ struct token *lexer_read_command_argument(struct lexer *lx)
 		return lexer_pack_token(lx, TOKEN_IO_REDIRECT);
 		break;
 	case '\'':
-		lexer_add_to_lexeme(lx, '\'');
 		lexer_read_literal(lx);
-		lexer_add_to_lexeme(lx, '\'');
 		return lexer_pack_token(lx, TOKEN_LITERAL);
 		break;
 	default:
@@ -1262,6 +1286,8 @@ struct lexer *lexer_create(int type, void *data, int line_number, int column_num
 	lx->eof = 0;
 
 	lx->depth = 0;
+
+	lx->keep_quotes = 1; // Keep " and ', unless expanding file specifications
 
 	lx->lexeme = calloc(BUFFER_CHUNK_SIZE, sizeof(char));
 	lx->lexeme_size = 0;

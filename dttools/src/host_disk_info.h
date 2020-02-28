@@ -8,6 +8,19 @@ See the file COPYING for details.
 #ifndef DISK_INFO_H
 #define DISK_INFO_H
 
+#ifdef HAS_SYS_STATFS_H
+#include <sys/statfs.h>
+#endif
+
+#ifdef HAS_SYS_STATVFS_H
+#include <sys/statvfs.h>
+#endif
+
+#ifdef HAS_SYS_VFS_H
+#include <sys/vfs.h>
+#endif
+
+
 #include "int_sizes.h"
 #include <time.h>
 

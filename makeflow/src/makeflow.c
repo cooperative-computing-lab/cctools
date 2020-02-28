@@ -96,13 +96,27 @@ an example.
 
 #define MAX_REMOTE_JOBS_DEFAULT 100
 
-extern int batch_job_verbose_jobnames;
+/*
+Flags to control the basic behavior of the Makeflow main loop. 
+*/
+enum job_submit_status {
+	JOB_SUBMISSION_HOOK_FAILURE = -1,
+	JOB_SUBMISSION_SKIPPED,
+	JOB_SUBMISSION_SUBMITTED,
+	JOB_SUBMISSION_ABORTED,
+	JOB_SUBMISSION_TIMEOUT
+};
 
 static sig_atomic_t makeflow_abort_flag = 0;
 static int makeflow_failed_flag = 1; // Makeflow fails by default. This is changed at dag start to indicate correct start.
-static int makeflow_submit_timeout = 3600;
+static int makeflow_submit_timeout = 32; // in seconds
 static int makeflow_retry_flag = 0;
 static int makeflow_retry_max = 5;
+
+/*
+Garbage Collection (GC) controls when and where intermediate
+files are cleaned up, so as to minimize disk space consumption.
+*/
 
 /* makeflow_gc_method indicates the type of garbage collection
  * indicated by the user. Refer to makeflow_gc.h for specifics */
@@ -116,37 +130,72 @@ static int makeflow_gc_barrier = 1;
 /* Determines next gc_barrier to make checks less frequent with large number of tasks */
 static double makeflow_gc_task_ratio = 0.05;
 
+/*
+Makeflow manages two queues of jobs.
+The remote_queue represents the cluster or distributed system
+in which jobs are run in parallel.  The local_queue represents
+local execution via Unix processes.
+*/
+
 static batch_queue_type_t batch_queue_type = BATCH_QUEUE_TYPE_LOCAL;
 static struct batch_queue *local_queue = 0;
 static struct batch_queue *remote_queue = 0;
 
-struct batch_queue * makeflow_get_remote_queue(){
-	return remote_queue;
-}
-
-struct batch_queue * makeflow_get_local_queue(){
-	return local_queue;
-}
-
-struct batch_queue * makeflow_get_queue(struct dag_node *n){
-	if(n->local_job && local_queue) {
-		return local_queue;
-	} else {
-		return remote_queue;
-	}
-}
+/*
+The local_resources describes the total CPU, RAM, DISK
+available to run local jobs, so that the machine is not
+over-subscribed.
+*/
 
 static struct rmsummary *local_resources = 0;
+
+/*
+local_jobs_max and remote_jobs_max describe manual limits
+set on the number of jobs, so that a million-node workflow
+doesn't instantly become a million jobs on the queue unless
+the user takes some positive steps to that effect.
+*/
 
 static int local_jobs_max = 1;
 static int remote_jobs_max = MAX_REMOTE_JOBS_DEFAULT;
 
+/*
+The project name and manual port number chosen for the 
+Work Queue configuration.  A port number of zero indicates
+any available port.
+*/
+
+
 static char *project = NULL;
 static int port = 0;
+
+/*
+Check the size of files after creation.
+This option doesn't seem to do much.
+*/
+
 static int output_len_check = 0;
+
+/*
+If enabled, do not check the filesystem for expected files
+before starting the dag, instead proceed under optimistic assumptions.
+*/
+
 static int skip_file_check = 0;
 
+/*
+Enable caching within the underlying batch system.
+In the case of Work Queue, this caches immutable files on the workers.
+*/
+
 static int cache_mode = 1;
+
+/*
+Hack: Enable batch job feature to pass detailed name to batch system.
+Would be better implemented as a batch system feature.
+*/
+
+extern int batch_job_verbose_jobnames;
 
 /*
 Wait upto this many seconds for an output file of a succesfull task
@@ -162,13 +211,49 @@ once weaver/pbui tools are updated.)
 */
 static int log_verbose_mode = 0;
 
+/*
+Send periodic reports of type "makeflow" to the catalog
+server, viewable by the makeflow_status command. 
+*/
+
 static int catalog_reporting_on = 0;
+
+/*
+Options related to the "mounting" of external data
+files at the DAG level.
+*/
 
 static char *mountfile = NULL;
 static char *mount_cache = NULL;
 static int use_mountfile = 0;
 
+/*
+If enabled, then all environment variables are sent
+from the submission site to the job execution site.
+*/
+
 static int should_send_all_local_environment = 0;
+
+struct batch_queue * makeflow_get_remote_queue(){
+	return remote_queue;
+}
+
+struct batch_queue * makeflow_get_local_queue(){
+	return local_queue;
+}
+
+/*
+Gives the queue associated with a job, taking into
+account the LOCAL flag in the node.
+*/
+
+struct batch_queue * makeflow_get_queue(struct dag_node *n){
+	if(n->local_job && local_queue) {
+		return local_queue;
+	} else {
+		return remote_queue;
+	}
+}
 
 /*
 Determines if this is a local job that will consume
@@ -185,7 +270,7 @@ Consider a node in the dag and convert it into a batch task ready to execute,
 with resources environments, and everything prior to calling hooks.
 */
 
-struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue, int full_env_list)
+struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue *queue )
 {
 	struct batch_task *task = batch_task_create(queue);
 	task->taskid = n->nodeid;
@@ -213,18 +298,12 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 		/* Generate the workflow arguments file */
 
 		if(n->workflow_args) {
-			char args[] = "makeflow.jx.args.XXXXXX";
-			int fd = mkstemp(args);
-			FILE *argsfile = fdopen(fd,"w");
-			jx_print_stream(n->workflow_args,argsfile);
-			fclose(argsfile);
-
 			oldcmd = cmd;
-			cmd = string_format("%s --jx-args %s",cmd,args);
+			cmd = string_format("%s --jx-args %s",cmd,n->workflow_args_file);
 			free(oldcmd);
 
 			/* Define this file as a temp so it is removed on completion. */
-			makeflow_hook_add_input_file(n->d,task,args,args,DAG_FILE_TYPE_TEMP);
+			makeflow_hook_add_input_file(n->d,task,n->workflow_args_file,n->workflow_args_file,DAG_FILE_TYPE_TEMP);
 		}
 
 		/* Add resource controls to the sub-workflow, if known. */
@@ -268,7 +347,10 @@ struct batch_task *makeflow_node_to_task(struct dag_node *n, struct batch_queue 
 	}
 
 	batch_task_set_resources(task, dag_node_dynamic_label(n));
-	batch_task_set_envlist(task, dag_node_env_create(n->d, n, full_env_list));
+
+	struct jx *env = dag_node_env_create(n->d, n, should_send_all_local_environment);
+	batch_task_set_envlist(task, env);
+	jx_delete(env);
 
 	return task;
 }
@@ -282,29 +364,9 @@ static void makeflow_abort_job( struct dag *d, struct dag_node *n, struct batch_
 	printf("aborting %s job %" PRIu64 "\n", name, jobid);
 
 	batch_job_remove(q, jobid);
-
 	makeflow_hook_node_abort(n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_ABORTED);
-
-	struct batch_file *bf;
-	struct dag_file *df;
-
-	/* Create generic task if one does not exist. This occurs in log recovery. */
-	if(!n->task){
-		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
-
-		/* Hooks are not applied. This should only happen in log recovery.
-		   If files were created in previous runs they are logged, orphaned, and cleaned. */
-	}
-
-	/* Clean all files associated with task, includes node and hook files. */
-	list_first_item(n->task->output_files);
-	while((bf = list_next_item(n->task->output_files))){
-		df = dag_file_lookup_or_create(d, bf->outer_name);
-		makeflow_clean_file(d, q, df);
-	}
-
-	makeflow_clean_node(d, q, n);
+	makeflow_clean_node(d,q,n);
 }
 
 /*
@@ -331,91 +393,21 @@ static void makeflow_abort_all(struct dag *d)
 
 /* A few forward prototypes to handle mutually-recursive definitions. */
 
-static void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n);
 static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct batch_queue *queue, struct batch_task *task);
-
-/*
-Decide whether to rerun a node based on batch and file system status. The silent
-option was added for to prevent confusing debug output when in clean mode. When
-clean_mode is not NONE we silence the node reseting output.
-*/
-
-void makeflow_node_decide_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n, int silent)
-{
-	struct dag_file *f;
-
-	if(itable_lookup(rerun_table, n->nodeid))
-		return;
-
-	// Below are a bunch of situations when a node has to be rerun.
-
-	// If a job was submitted to Condor, then just reconnect to it.
-	if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
-		// Reconnect the Condor jobs
-		if(!silent) fprintf(stderr, "rule still running: %s\n", n->command);
-		itable_insert(d->remote_job_table, n->jobid, n);
-
-		// Otherwise, we cannot reconnect to the job, so rerun it
-	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
-		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
-		goto rerun;
-	}
-	// Rerun if an input file has been updated since the last execution.
-	list_first_item(n->source_files);
-	while((f = list_next_item(n->source_files))) {
-		if(dag_file_should_exist(f)) {
-			continue;
-		} else {
-			if(!f->created_by) {
-				if(!silent) fprintf(stderr, "makeflow: input file %s does not exist and is not created by any rule.\n", f->filename);
-				exit(1);
-			} else {
-				/* If input file is missing, but node completed and file was garbage, then avoid rerunning. */
-				if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE) {
-					continue;
-				}
-				goto rerun;
-			}
-		}
-	}
-
-	// Rerun if an output file is missing.
-	list_first_item(n->target_files);
-	while((f = list_next_item(n->target_files))) {
-		if(dag_file_should_exist(f))
-			continue;
-		/* If output file is missing, but node completed and file was gc'ed, then avoid rerunning. */
-		if(n->state == DAG_NODE_STATE_COMPLETE && f->state == DAG_FILE_STATE_DELETE)
-			continue;
-		goto rerun;
-	}
-
-	// Do not rerun this node
-	return;
-
-	  rerun:
-	makeflow_node_force_rerun(rerun_table, d, n);
-}
+static void makeflow_node_reset_by_file( struct dag *d, struct dag_file *f );
 
 /*
 Reset all state to cause a node to be re-run.
 */
 
-void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct dag_node *n)
+void makeflow_node_reset( struct dag *d, struct dag_node *n )
 {
-	struct dag_node *p;
-	struct batch_file *bf;
-	struct dag_file *f1;
-	struct dag_file *f2;
-	int child_node_found;
+	/* Nothing to do if the node is still waiting. */
 
-	if(itable_lookup(rerun_table, n->nodeid))
-		return;
+	if(n->state==DAG_NODE_STATE_WAITING) return;
 
-	// Mark this node as having been rerun already
-	itable_insert(rerun_table, n->nodeid, n);
+	/* If the node is running, remove the corresponding job. */
 
-	// Remove running batch jobs
 	if(n->state == DAG_NODE_STATE_RUNNING) {
 		if(n->local_job && local_queue) {
 			batch_job_remove(local_queue, n->jobid);
@@ -426,55 +418,66 @@ void makeflow_node_force_rerun(struct itable *rerun_table, struct dag *d, struct
 		}
 	}
 
-	if(!n->task){
-		n->task = makeflow_node_to_task(n, makeflow_get_queue(n), should_send_all_local_environment);
+	/* Reset the state associated with the node */
 
-		/* Hooks may need to be applied for proper clean-up. Not currently
-		   done as most files will be regenerated. Global file may persist
-		   until the until the task is completed again if there were
-		   partial files. Wrapper expansion was removed. */
-	}
+	makeflow_clean_node(d,remote_queue,n);
 
-	// Clean up things associated with this node
-	list_first_item(n->task->output_files);
-	while((bf = list_next_item(n->task->output_files))) {
-		f1 = dag_file_lookup_or_create(d, bf->outer_name);
-		makeflow_clean_file(d, remote_queue, f1);
-	}
+	/* Put the node back to the waiting state. */
 
-	makeflow_clean_node(d, remote_queue, n);
 	makeflow_log_state_change(d, n, DAG_NODE_STATE_WAITING);
 
-	// For each parent node, rerun it if input file was garbage collected
-	list_first_item(n->source_files);
-	while((f1 = list_next_item(n->source_files))) {
-		if(dag_file_should_exist(f1))
-			continue;
+	/*
+	Reset each descendant of this node as well.
+	Note that the recursive behavior is self-limiting b/c each
+	reset node is put into the WAITING state, and WAITING
+	nodes are not reset.
+	*/
 
-		p = f1->created_by;
-		if(p) {
-			makeflow_node_force_rerun(rerun_table, d, p);
-			f1->reference_count += 1;
-		}
-	}
-
-	// For each child node, rerun it
+	/* For each of my output files... */
+	struct dag_file *f;
 	list_first_item(n->target_files);
-	while((f1 = list_next_item(n->target_files))) {
-		for(p = d->nodes; p; p = p->next) {
-			child_node_found = 0;
+	while((f = list_next_item(n->target_files))) {
+		/* Reset all nodes that consume that file. */
+		makeflow_node_reset_by_file(d,f);
+	}
+}
 
-			list_first_item(p->source_files);
-			while((f2 = list_next_item(n->source_files))) {
-				if(!strcmp(f1->filename, f2->filename)) {
-					child_node_found = 1;
-					break;
-				}
-			}
-			if(child_node_found) {
-				makeflow_node_force_rerun(rerun_table, d, p);
-			}
-		}
+/*
+Reset all nodes that consume file f.
+*/
+
+static void makeflow_node_reset_by_file( struct dag *d, struct dag_file *f )
+{
+	/* For each node that consumes the file... */
+	struct dag_node *n;
+	list_first_item(f->needed_by);
+	while((n = list_next_item(f->needed_by))) {
+		/* Reset that node and its descendants */
+		makeflow_node_reset(d,n);
+	}
+}
+
+
+/*
+Decide whether to reset a node based on batch and file system status. The silent
+option was added for to prevent confusing debug output when in clean mode. When
+clean_mode is not NONE we silence the node reseting output.
+*/
+
+void makeflow_node_decide_reset( struct dag *d, struct dag_node *n, int silent )
+{
+	if(n->state == DAG_NODE_STATE_WAITING) {
+		// The job hasn't run yet, nothing to do.	
+	} else if(n->state == DAG_NODE_STATE_RUNNING && !(n->local_job && local_queue) && batch_queue_type == BATCH_QUEUE_TYPE_CONDOR) {
+		// It's a Condor job and still out there in the batch system, so note that and keep going.
+		if(!silent) fprintf(stderr, "rule still running: %s\n", n->command);
+		itable_insert(d->remote_job_table, n->jobid, n);
+	} else if(n->state == DAG_NODE_STATE_RUNNING || n->state == DAG_NODE_STATE_FAILED || n->state == DAG_NODE_STATE_ABORTED) {
+		// Otherwise, we cannot reconnect to the job, so rerun it
+		if(!silent) fprintf(stderr, "will retry failed rule: %s\n", n->command);
+		makeflow_node_reset(d,n);
+	} else if(n->state==DAG_NODE_STATE_COMPLETE) {
+		// The job succeeded, so nothing more to do.
 	}
 }
 
@@ -483,7 +486,7 @@ Submit one fully formed job, retrying failures up to the makeflow_submit_timeout
 This is necessary because busy batch systems occasionally do not accept a job submission.
 */
 
-static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
+static enum job_submit_status makeflow_node_submit_retry( struct batch_queue *queue, struct batch_task *task)
 {
 	time_t stoptime = time(0) + makeflow_submit_timeout;
 	int waittime = 1;
@@ -499,26 +502,32 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 	 *  MAKEFLOW_HOOK_SUCCESS : Hook was successful and should submit */
 	int rc = makeflow_hook_batch_submit(task);
 	if(rc == MAKEFLOW_HOOK_SKIP){
-		return 0;
+		return JOB_SUBMISSION_SKIPPED;
 	} else if(rc != MAKEFLOW_HOOK_SUCCESS){
-		return -1;
+		return JOB_SUBMISSION_HOOK_FAILURE;
 	}
 
 	while(1) {
-		if(makeflow_abort_flag) break;
+		if(makeflow_abort_flag) {
+			break;
+		}
 
 		/* This will eventually be replaced by submit (queue, task )... */
+		char *input_files  = batch_files_to_string(queue, task->input_files);
+		char *output_files = batch_files_to_string(queue, task->output_files);
 		jobid = batch_job_submit(queue,
 								task->command,
-								batch_files_to_string(queue, task->input_files),
-								batch_files_to_string(queue, task->output_files),
+								input_files,
+								output_files,
 								task->envlist,
 								task->resources);
+		free(input_files);
+		free(output_files);
 
 		if(jobid > 0) {
 			printf("submitted job %"PRIbjid"\n", jobid);
 			task->jobid = jobid;
-			return 1;
+			return JOB_SUBMISSION_SUBMITTED;
 		} else if(jobid<0) {
 			fprintf(stderr, "couldn't submit batch job, still trying...\n");
 		} else if(jobid==0) {
@@ -526,19 +535,20 @@ static int makeflow_node_submit_retry( struct batch_queue *queue, struct batch_t
 				batch_queue_type_to_string(batch_queue_get_type(queue)));
 		}
 
-		if(makeflow_abort_flag) break;
-
-		if(time(0) > stoptime) {
-			fprintf(stderr, "unable to submit job after %d seconds!\n", makeflow_submit_timeout);
+		if(makeflow_abort_flag) {
 			break;
 		}
 
+		if(time(0) > stoptime) {
+			fprintf(stderr, "unable to submit job after %d seconds!\n", makeflow_submit_timeout);
+			return JOB_SUBMISSION_TIMEOUT;
+		}
+
 		sleep(waittime);
-		waittime *= 2;
-		if(waittime > 60) waittime = 60;
+		waittime = MIN(makeflow_submit_timeout, waittime * 2);
 	}
 
-	return 0;
+	return JOB_SUBMISSION_ABORTED;
 }
 
 
@@ -547,7 +557,7 @@ Submit a node to the appropriate batch system, after materializing
 the necessary list of input and output files, and applying all options.
 */
 
-static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
+static enum job_submit_status makeflow_node_submit(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
 {
 	struct batch_queue *queue = makeflow_get_queue(n);
 
@@ -568,48 +578,62 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 	}
 
 	/* Create task from node information */
-	struct batch_task *task = makeflow_node_to_task(n, queue, should_send_all_local_environment);
+	struct batch_task *task = makeflow_node_to_task(n, queue );
 	batch_queue_set_int_option(queue, "task-id", task->taskid);
 	n->task = task;
 
 	int hook_return = makeflow_hook_node_submit(n, task);
 	if (hook_return != MAKEFLOW_HOOK_SUCCESS){
 		makeflow_failed_flag = 1;
-		return;
+		return JOB_SUBMISSION_HOOK_FAILURE;
 	}
 
 	/* Logs the expectation of output files. */
 	makeflow_log_batch_file_list_state_change(d,task->output_files,DAG_FILE_STATE_EXPECT);
 
-	int submitted = makeflow_node_submit_retry(queue, task);
+	enum job_submit_status submitted = makeflow_node_submit_retry(queue, task);
 
 	/* Update all of the necessary data structures. */
-	if(submitted == 1) {
-		n->jobid = task->jobid;
-		/* Not sure if this is necessary/what it does. */
-		memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
+	switch(submitted) {
+		case JOB_SUBMISSION_HOOK_FAILURE:
+			debug(D_MAKEFLOW_RUN, "node %d could not be submitted because of a hook failure.", n->nodeid);
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
+			n->task = NULL;
+			batch_task_delete(task);
+			makeflow_failed_flag = 1;
+			break;
+		case JOB_SUBMISSION_SKIPPED:
+			debug(D_MAKEFLOW_RUN, "node %d was not submitted because it was already handled.", n->nodeid);
+			/* Exited Normally was updated and may have been handled elsewhere (e.g. Archive) */
+			if (task->info->exited_normally) {
+				makeflow_node_complete(d, n, queue, task);
+			}
+			break;
+		case JOB_SUBMISSION_SUBMITTED:
+			debug(D_MAKEFLOW_RUN, "node %d was successfully submitted.", n->nodeid);
+			n->jobid = task->jobid;
+			/* Not sure if this is necessary/what it does. */
+			memcpy(n->resources_allocated, task->resources, sizeof(struct rmsummary));
+			makeflow_log_state_change(d, n, DAG_NODE_STATE_RUNNING);
 
-		if(is_local_job(n)) {
-			makeflow_local_resources_subtract(local_resources,n);
-		}
+			if(is_local_job(n)) {
+				makeflow_local_resources_subtract(local_resources,n);
+			}
 
-		if(n->local_job && local_queue) {
-			itable_insert(d->local_job_table, n->jobid, n);
-		} else {
-			itable_insert(d->remote_job_table, n->jobid, n);
-		}
-	} else if (submitted == 0) {
-		/* Exited Normally was updated and may have been handled elsewhere (e.g. Archive) */
-		if (task->info->exited_normally) {
-			makeflow_node_complete(d, n, queue, task);
-		}
-	} else {
-		/* Negative submitted results from a failed submit */
-		makeflow_log_state_change(d, n, DAG_NODE_STATE_FAILED);
-		n->task = NULL;
-		batch_task_delete(task);
-		makeflow_failed_flag = 1;
+			if(n->local_job && local_queue) {
+				itable_insert(d->local_job_table, n->jobid, n);
+			} else {
+				itable_insert(d->remote_job_table, n->jobid, n);
+			}
+			break;
+		case JOB_SUBMISSION_ABORTED:
+			/* do nothing, as node was aborted before it was submitted. */
+			debug(D_MAKEFLOW_RUN, "node %d was not submitted because workflow was aborted.", n->nodeid);
+			break;
+		case JOB_SUBMISSION_TIMEOUT:
+			debug(D_MAKEFLOW_RUN, "node %d submission timed-out, retrying later.", n->nodeid);
+			/* do nothing, and let other rules to be waited/submitted. */
+			break;
 	}
 
 	/* Restore old batch job options. */
@@ -617,6 +641,8 @@ static void makeflow_node_submit(struct dag *d, struct dag_node *n, const struct
 		batch_queue_set_option(queue, "batch-options", previous_batch_options);
 		free(previous_batch_options);
 	}
+
+	return submitted;
 }
 
 static int makeflow_node_ready(struct dag *d, struct dag_node *n, const struct rmsummary *resources)
@@ -671,6 +697,18 @@ int makeflow_nodes_local_waiting_count(const struct dag *d) {
 	return count;
 }
 
+int makeflow_nodes_remote_waiting_count(const struct dag *d) {
+	int count = 0;
+
+	struct dag_node *n;
+	for(n = d->nodes; n; n = n->next) {
+		if(n->state == DAG_NODE_STATE_WAITING && !is_local_job(n))
+			count++;
+	}
+
+	return count;
+}
+
 /*
 Find all jobs ready to be run, then submit them.
 */
@@ -679,14 +717,34 @@ static void makeflow_dispatch_ready_jobs(struct dag *d)
 {
 	struct dag_node *n;
 
+	/* When submitting to an external queue if there are no resources
+	 * available, such as vms in amazon, then the submission fails with a
+	 * timeout. When this occurs, submission_timeout is set to 1, and only
+	 * local jobs are tried for submission. Batch jobs are tried again the next
+	 * time makeflow_dispatch_ready_jobs is called. This allows batch_job_wait
+	 * to be called in-between, which may free some batch resources and allow
+	 * job submissions that do not timeout.
+	 */
+	int submission_timeout = 0;
+
 	for(n = d->nodes; n; n = n->next) {
 		if(dag_remote_jobs_running(d) >= remote_jobs_max && dag_local_jobs_running(d) >= local_jobs_max) {
 			break;
 		}
 
 		const struct rmsummary *resources = dag_node_dynamic_label(n);
+
 		if(makeflow_node_ready(d, n, resources)) {
-			makeflow_node_submit(d, n, resources);
+			if(is_local_job(n) || !submission_timeout) {
+				enum job_submit_status status = makeflow_node_submit(d, n, resources);
+
+				if(status == JOB_SUBMISSION_ABORTED) {
+					break;
+				} else if(status == JOB_SUBMISSION_TIMEOUT) {
+					debug(D_MAKEFLOW_RUN, "batch submissions are timing-out. Only submitting local jobs for the rest of this cycle.");
+					submission_timeout = 1;
+				}
+			}
 		}
 	}
 }
@@ -859,40 +917,61 @@ static void makeflow_node_complete(struct dag *d, struct dag_node *n, struct bat
 }
 
 /*
-Check the dag for consistency, and emit errors if input dependencies, etc are missing.
+Check the dag for all files that should exist,
+whether provided by the user, or created by 
+a prior run that was logged.
 */
 
-static int makeflow_check(struct dag *d)
+static int makeflow_check_files(struct dag *d)
 {
 	struct stat buf;
-	struct dag_node *n;
 	struct dag_file *f;
-	int error = 0;
+	char *name;
+	int errors = 0;
+	int warnings = 0;
 
-	debug(D_MAKEFLOW_RUN, "checking rules for consistency...\n");
+	printf("checking files for unexpected changes...  (use --skip-file-check to skip this step)\n");
 
-	for(n = d->nodes; n; n = n->next) {
-		list_first_item(n->source_files);
-		while((f = list_next_item(n->source_files))) {
-			if(f->created_by) {
-				continue;
+	hash_table_firstkey(d->files);
+	while(hash_table_nextkey(d->files, &name, (void **) &f)) {
+
+		/* Skip special files that are not connected to the DAG nodes. */
+		if(!f->created_by && !list_size(f->needed_by)) continue;
+
+		/* Skip any file that should not exist yet. */
+		if(!dag_file_should_exist(f)) continue;
+
+		/* Check for the presence of the file. */
+		int result = batch_fs_stat(remote_queue, f->filename, &buf );
+
+		if(dag_file_is_source(f)) {
+			/* Source files must exist before running */
+			if(result<0) {
+				printf("error: %s does not exist, and is not created by any rule.\n", f->filename);
+				errors++;
 			}
-
-			if(skip_file_check || batch_fs_stat(remote_queue, f->filename, &buf) >= 0) {
-				continue;
+		} else {
+			/* Intermediate files can be re-created as needed. */
+			if(result<0) {
+				/* Recreate the file by running its parent. */
+				printf("warning: %s was previously created by makeflow, but someone else deleted it!\n", f->filename);
+				makeflow_log_file_state_change(d, f, DAG_FILE_STATE_UNKNOWN);
+				makeflow_node_reset(d,f->created_by);
+				warnings++;
+			} else if(!S_ISDIR(buf.st_mode) && difftime(buf.st_mtime, f->creation_logged) > 0) {
+				/* Recreate descendants by resetting all nodes that consume this file. */
+				printf("warning: %s was previously created by makeflow, but someone else modified it!\n",f->filename);
+				makeflow_node_reset_by_file(d,f);
+				warnings++;
 			}
-
-			if(f->source) {
-				continue;
-			}
-
-			fprintf(stderr, "makeflow: %s does not exist, and is not created by any rule.\n", f->filename);
-			error++;
 		}
 	}
 
-	if(error) {
-		fprintf(stderr, "makeflow: found %d errors during consistency check.\n", error);
+	if(errors>0 || warnings>0) {
+		printf("found %d errors and %d warnings during consistency check.\n", errors,warnings);
+	}
+
+	if(errors) {
 		return 0;
 	} else {
 		return 1;
@@ -964,8 +1043,10 @@ static void makeflow_run( struct dag *d )
  		*/
 		if(dag_local_jobs_running(d)==0 && 
 			dag_remote_jobs_running(d)==0 && 
-			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END))
+			(makeflow_hook_dag_loop(d) == MAKEFLOW_HOOK_END) &&
+			makeflow_nodes_remote_waiting_count(d) == 0) {
 			break;
+		}
 
 		if(dag_remote_jobs_running(d)) {
 			int tmp_timeout = 5;
@@ -2285,9 +2366,6 @@ int main(int argc, char *argv[])
 	}
 
 	printf("checking %s for consistency...\n",dagfile);
-	if(!makeflow_check(d)) {
-		goto EXIT_WITH_FAILURE;
-	}
 
 	if(!makeflow_check_batch_consistency(d) && clean_mode == MAKEFLOW_CLEAN_NONE) {
 		goto EXIT_WITH_FAILURE;
@@ -2309,8 +2387,16 @@ int main(int argc, char *argv[])
 	/* In case when the user uses --cache option to specify the mount cache dir and the log file also has
 	 * a cache dir logged, these two dirs must be the same. Otherwise exit.
 	 */
-	if(makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode, skip_file_check )) {
+	if(makeflow_log_recover(d, logfilename, log_verbose_mode, remote_queue, clean_mode )) {
 		goto EXIT_WITH_FAILURE;
+	}
+
+	if(skip_file_check) {
+		printf("skipping file checks.");
+	} else {
+		if(!makeflow_check_files(d)) {
+			goto EXIT_WITH_FAILURE;
+		}
 	}
 
 	/* This check must happen after makeflow_log_recover which may load the cache_dir info into d->cache_dir.
@@ -2352,6 +2438,7 @@ int main(int argc, char *argv[])
 
 		if(clean_mode == MAKEFLOW_CLEAN_ALL) {
 			unlink(logfilename);
+			unlink(batchlogfilename);
 		}
 
 		goto EXIT_WITH_SUCCESS;
@@ -2431,6 +2518,19 @@ EXIT_WITH_FAILURE:
 		makeflow_log_completed_event(d);
 		printf("nothing left to do.\n");
 		exit_value = EXIT_SUCCESS;
+	}
+
+	/* delete all jx args files. We do this here are some of these files may be created in clean mode. */
+	{
+		struct dag_node *n;
+		uint64_t key;
+		itable_firstkey(d->node_table);
+		while(itable_nextkey(d->node_table, &key, (void **) &n)) {
+			if(n->workflow_args_file) {
+				debug(D_MAKEFLOW_RUN, "deleting tmp file: %s\n", n->workflow_args_file);
+				unlink(n->workflow_args_file);
+			}
+		}
 	}
 
 	makeflow_hook_destroy(d);
