@@ -8,21 +8,70 @@ import json
 import glob
 import argparse
 import subprocess
+import importlib
 import email.parser
 
+HELPMSG = '''Determine the environment required by Python code.
+
+This script is assumed to be run from inside an active conda environment.
+Modules under $CONDA_PREFIX/lib/pythonX.Y/ are assumed to be part of the
+base Python installation, with the exception of the subdirectory
+site-packages/, which is assumed to contain extra packages installed via
+pip or conda. If a module is in site-packages/, but not known by either
+pip or conda, a warning is printed. This would indicate a strange packaging
+layout that we can't automatically detect, so the user should manually provide
+the package name with the --pkg-mapping option. Other modules under the prefix
+are assumed to be part of the Python package. It is also an error to import
+anything from outside the prefix.'''
+
+## AST-related stuff
+
+def get_stmt_imports(stmt):
+    imports = []
+    if isinstance(stmt, ast.Import):
+        for a in stmt.names:
+            imports.append(a.name)
+    elif isinstance(stmt, ast.ImportFrom):
+        # don't bother with relative imports
+        if stmt.level == 0:
+            imports.append(stmt.module)
+    return imports
+
+def analyze_toplevel(module):
+    deps = []
+    for stmt in module.body:
+        deps += get_stmt_imports(stmt)
+    return deps
+
+def analyze_full(module):
+    deps = []
+    for stmt in ast.walk(module):
+        deps += get_stmt_imports(stmt)
+    return deps
+
+def analyze_function(module, func_name):
+    for stmt in ast.walk(module):
+        if isinstance(stmt, ast.FunctionDef) and stmt.name == func_name:
+            return analyze_full(stmt)
+
+## Module search functions
+
+def builtin_module(pkg_name):
+    pkg = importlib.import_module(pkg_name)
+    pth = os.path.relpath(pkg.__file__, start=sys.prefix)
+    if pth.startswith('../'):
+        raise RuntimeError('Modules cannot be installed outside the conda environment')
+    m = re.match(r'lib(?:64)?/python[\d.]+/site-packages/', pth)
+    return not m
+
 def conda_packages(pkg):
-    # NOTE: a metapackage that uses different import names
-    # will not be detected.
     out = {}
-    with open(os.path.join(os.environ['CONDA_PREFIX'], 'conda-meta', pkg['dist_name'] + '.json')) as f:
+    with open(os.path.join(sys.prefix, 'conda-meta', pkg['dist_name'] + '.json')) as f:
         meta = json.load(f)
-    # only consider explicitly installed packages
-    if meta['requested_spec'] == 'None':
-        return out
     for a in meta['files']:
-        m = re.match(r'lib(?:64)?/python[\d.]+/site-packages/([^/]+)/', a)
+        m = re.match(r'lib(?:64)?/python[\d.]+/site-packages/([^/]+)(?:/|\.py)', a)
         if m:
-            if m.group(1).startswith('.'):
+            if '.' in m.group(1):
                 continue
             out[m.group(1)] = pkg['name']
     return out
@@ -35,7 +84,7 @@ def pip_packages(pkg):
     for f in files:
         if len(f) == 0:
             continue
-        if f.startswith('.'):
+        if '.' in f:
             continue
         out[f] = pkg['name']
     return out
@@ -51,67 +100,80 @@ def package_mappings():
         out.update(pip_packages(a))
     return out
 
-def get_imports(stmt):
-    imports = []
-    if isinstance(stmt, ast.Import):
-        for a in stmt.names:
-            imports.append(a.name)
-    elif isinstance(stmt, ast.ImportFrom):
-        imports.append(stmt.module)
-    return imports
+def choose_dep(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg):
+    # Don't try to pack up standard modules.
+    # This also throws exceptions for modules that can't be imported,
+    # or those outside the Conda prefix.
+    if builtin_module(pkg):
+        return
+    # Check if the user provided a package name
+    if pkg in overrides:
+        for a in conda_env:
+            if a.startswith(overrides[pkg] + '='):
+                conda_pkgs.add(a)
+                return
+        for a in pip_env:
+            if a.startswith(overrides[pkg] + '='):
+                pip_pkgs.add(a)
+                return
+    # Look for an installed package with the same name
+    for a in conda_env:
+        if a.startswith(pkg + '='):
+            conda_pkgs.add(a)
+            return
+    for a in pip_env:
+        if a.startswith(pkg + '='):
+            pip_pkgs.add(a)
+            return
+    # Try to find another package that provides the module
+    if pkg in pkg_mapping:
+        for a in conda_env:
+            if a.startswith(pkg_mapping[pkg] + '='):
+                conda_pkgs.add(a)
+                return
+        for a in pip_env:
+            if a.startswith(pkg_mapping[pkg] + '='):
+                pip_pkgs.add(a)
+                return
+    # Warn the user the package wasn't found
+    print("Warning: couldn't match {} to a conda/pip package!".format(pkg), file=sys.stderr)
+    print("You may need to use the --import flag.", file=sys.stderr)
 
-def analyze_toplevel(module):
-    deps = []
-    for stmt in module.body:
-        deps += get_imports(stmt)
-    return deps
+## Main code
 
-def analyze_full(module):
-    deps = []
-    for stmt in ast.walk(module):
-        deps += get_imports(stmt)
-    return deps
+def export_env(pkg_mapping, overrides, imports):
+    imports = set(imports)
+    env = json.loads(subprocess.check_output(['conda', 'env', 'export', '--json']))
+    conda_env = env.pop('dependencies', [])
+    pip_env = []
+    for i in range(len(conda_env)):
+        if isinstance(conda_env[i], dict):
+            pip_env = conda_env.pop(i)['pip']
 
-def analyze_function(module, func_name):
-    for stmt in ast.walk(module):
-        if isinstance(stmt, ast.FunctionDef) and stmt.name == func_name:
-            return analyze_full(stmt)
+    conda_pkgs = set()
+    pip_pkgs = set()
+    for pkg in imports:
+        choose_dep(pkg_mapping, overrides, conda_env, pip_env, conda_pkgs, pip_pkgs, pkg)
 
-def export_env(imports):
-    # Always capture base deps
-    imports = set(['python', 'pip'] + imports)
-    env = json.loads(
-        subprocess.check_output(['conda', 'env', 'export', '--json']))
-    full_deps = env.pop('dependencies', [])
-    deps = []
-    pip = []
-    for a in full_deps:
-        if isinstance(a, dict):
-            for b in a['pip']:
-                for pkg in imports:
-                    if b.startswith(pkg + '='):
-                        pip.append(b)
-        else:
-            for pkg in imports:
-                if a.startswith(pkg + '='):
-                    deps.append(a)
-    deps.sort()
-    pip.sort()
-    if pip:
-        deps.append({'pip': pip})
-    if deps:
-        env['dependencies'] = deps
+    # Always include python and pip
+    for a in conda_env:
+        if a.startswith('python='):
+            conda_pkgs.add(a)
+    for a in conda_env:
+        if a.startswith('pip='):
+            conda_pkgs.add(a)
+
+    conda_pkgs = sorted(list(conda_pkgs))
+    pip_pkgs = sorted(list(pip_pkgs))
+    if pip_pkgs:
+        conda_pkgs.append({'pip': pip_pkgs})
+    if conda_pkgs:
+        env['dependencies'] = conda_pkgs
     return env
-
-def fix_imports(imports):
-    mapping = package_mappings()
-    for i in range(len(imports)):
-        if imports[i] in mapping:
-            imports[i] = mapping[imports[i]]
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Determine the environment required by Python code.')
+        description=HELPMSG)
     actions = parser.add_mutually_exclusive_group()
     parser.add_argument('source',
         help='Analyze the given Python source code, or - for stdin.')
@@ -121,7 +183,8 @@ if __name__ == '__main__':
         help='Only include imports at the top level of the script.')
     actions.add_argument('--function',
         help='Only include imports in the given function.')
-
+    actions.add_argument('--pkg-mapping', action='append', metavar='IMPORT=NAME', default=[],
+        help='Specify that the module imported as IMPORT in the code is provided by the pip/conda package NAME.')
     args = parser.parse_args()
 
     filename = '<stdin>'
@@ -133,6 +196,11 @@ if __name__ == '__main__':
     if args.out != '-':
         out = open(args.out, 'w')
 
+    overrides = {}
+    for a in args.pkg_mapping:
+        (i, n) = a.split('=')
+        overrides[i] = n
+
     code = ast.parse(source.read(), filename=filename)
     if args.toplevel:
         imports = analyze_toplevel(code)
@@ -140,8 +208,7 @@ if __name__ == '__main__':
         imports = analyze_function(code, args.function)
     else:
         imports = analyze_full(code)
+    pkg_mapping = package_mappings()
 
-    fix_imports(imports)
-
-    json.dump(export_env(imports), out, indent=4, sort_keys=True)
+    json.dump(export_env(pkg_mapping, overrides, imports), out, indent=4, sort_keys=True)
     out.write('\n')
