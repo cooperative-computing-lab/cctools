@@ -1316,17 +1316,17 @@ optional_include syslog.h      HAS_SYSLOG_H
 cctools_doctargets=
 if check_path doxygen
 then
-	cctools_doctargets="${cctools_doctargets} apipages"
+	cctools_doctargets="apipages ${cctools_doctargets}"
 else
 	echo "*** not building API documentation"
 fi
 
 if check_path m4
 then
-	cctools_doctargets="${cctools_doctargets} htmlpages mdpages"
+	cctools_doctargets="htmlpages mdpages ${cctools_doctargets}"
 	if check_path nroff
 	then
-		cctools_doctargets="${cctools_doctargets} manpages"
+		cctools_doctargets="manpages ${cctools_doctargets}"
 	else
 		echo "*** not building man pages"
 	fi
