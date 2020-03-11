@@ -15,22 +15,22 @@ api/html/index.html:
 
 api/html/work_queue_perl.html:
 	mkdir -p api/html
-	pod2html ../work_queue/src/perl/Work_Queue.pm > $@
+	pod2html ../work_queue/src/bindings/perl/Work_Queue.pm > $@
 	@rm -f pod2htm*.tmp
 
 api/html/work_queue_task_perl.html:
 	mkdir -p api/html
-	pod2html ../work_queue/src/perl/Work_Queue/Task.pm > $@
+	pod2html ../work_queue/src/bindings/perl/Work_Queue/Task.pm > $@
 	@rm -f pod2htm*.tmp
 
 api/html/chirp_client_perl.html:
 	mkdir -p api/html
-	pod2html ../chirp/src/perl/Chirp/Client.pm > $@
+	pod2html ../chirp/src/bindings/perl/Chirp/Client.pm > $@
 	@rm -f pod2htm*.tmp
 
 api/html/chirp_stat_perl.html:
 	mkdir -p api/html
-	pod2html ../chirp/src/perl/Chirp/Stat.pm > $@
+	pod2html ../chirp/src/bindings/perl/Chirp/Stat.pm > $@
 	@rm -f pod2htm*.tmp
 
 
