@@ -143,6 +143,10 @@ class ResourceExhaustion(Exception):
 
         return 'Limits broken: {limits}'.format(limits=','.join(ls))
 
+class ResourceInternalError(Exception):
+    def __init__(self, *args, **kwargs):
+        super(ResourceInternalError, self).__init__(*args, **kwargs)
+
 def __measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
 
@@ -155,7 +159,7 @@ def __measure_update_to_peak(pid, old_summary = None):
 def __child_handler(child_finished, signum, frame):
     child_finished.set()
 
-def __wrap_function(results, fun, args, kwargs):
+def _wrap_function(results, fun, args, kwargs):
     def fun_wrapper():
         try:
             import os
@@ -186,7 +190,7 @@ def __read_pids_file(pids_file):
             else:
                 rmonitor_minimonitor(MINIMONITOR_REMOVE_PID, -pid)
 
-def __watchman(results_queue, limits, callback, interval, function, args, kwargs):
+def _watchman(results_queue, limits, callback, interval, function, args, kwargs):
     try:
         # child_finished is set when the process running function exits
         child_finished = threading.Event()
@@ -196,7 +200,7 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
         local_results = multiprocessing.Queue()
 
         # process that runs the original function
-        fun_proc = multiprocessing.Process(target=__wrap_function(local_results, function, args, kwargs))
+        fun_proc = multiprocessing.Process(target=_wrap_function(local_results, function, args, kwargs))
 
         # unique name for this function invocation
         fun_id = str(hash(json.dumps({'args': args, 'kwargs': kwargs}, sort_keys=True)))
@@ -253,7 +257,13 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
             results_queue.put({ 'result': None, 'resources': resources_max, 'resource_exhaustion': True})
         else:
             fun_proc.join()
-            (fun_result, resources_measured_end) = local_results.get(True, 5)
+            try:
+                (fun_result, resources_measured_end) = local_results.get(True, 5)
+            except Exception as e:
+                e = ResourceInternalError("No result generated.")
+                cctools_debug(D_RMON, "{}".format(e))
+                raise e
+
             if resources_measured_end is None:
                 raise fun_result
 
@@ -281,7 +291,7 @@ def _resources_to_dict(resources):
 def __monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
 
-    watchman_proc = multiprocessing.Process(target=__watchman, args=(result_queue, limits, callback, interval, function, args, kwargs))
+    watchman_proc = multiprocessing.Process(target=_watchman, args=(result_queue, limits, callback, interval, function, args, kwargs))
     watchman_proc.start()
     watchman_proc.join()
 
