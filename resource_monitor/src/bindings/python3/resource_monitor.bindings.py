@@ -155,7 +155,7 @@ def __measure_update_to_peak(pid, old_summary = None):
 def __child_handler(child_finished, signum, frame):
     child_finished.set()
 
-def __wrap_function(results, fun, args, kwargs):
+def _wrap_function(results, fun, args, kwargs):
     def fun_wrapper():
         try:
             import os
@@ -186,7 +186,7 @@ def __read_pids_file(pids_file):
             else:
                 rmonitor_minimonitor(MINIMONITOR_REMOVE_PID, -pid)
 
-def __watchman(results_queue, limits, callback, interval, function, args, kwargs):
+def _watchman(results_queue, limits, callback, interval, function, args, kwargs):
     try:
         # child_finished is set when the process running function exits
         child_finished = threading.Event()
@@ -196,7 +196,7 @@ def __watchman(results_queue, limits, callback, interval, function, args, kwargs
         local_results = multiprocessing.Queue()
 
         # process that runs the original function
-        fun_proc = multiprocessing.Process(target=__wrap_function(local_results, function, args, kwargs))
+        fun_proc = multiprocessing.Process(target=_wrap_function(local_results, function, args, kwargs))
 
         # unique name for this function invocation
         fun_id = str(hash(json.dumps({'args': args, 'kwargs': kwargs}, sort_keys=True)))
@@ -281,7 +281,7 @@ def _resources_to_dict(resources):
 def __monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
 
-    watchman_proc = multiprocessing.Process(target=__watchman, args=(result_queue, limits, callback, interval, function, args, kwargs))
+    watchman_proc = multiprocessing.Process(target=_watchman, args=(result_queue, limits, callback, interval, function, args, kwargs))
     watchman_proc.start()
     watchman_proc.join()
 
