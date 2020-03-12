@@ -27,19 +27,27 @@
     ~rmsummary() {
         rmsummary_delete($self);
     }
+
 %pythoncode %{
     def to_dict(self):
         d = {}
-        for k in rmsummary.__swig_setmethods__.keys():
-            if k in ['signal', 'exit_status', 'last_error', 'snapshots_count']:
-                continue
+        for k in ['category', 'command', 'taskid',
+                'start', 'end',
+                'exit_type', 'signal', 'exit_status', 'last_error',
+                'wall_time', 'total_processes', 'max_concurrent_processes', 'cpu_time',
+                'virtual_memory', 'memory', 'swap_memory',
+                'bytes_read', 'bytes_written', 'bytes_sent', 'bytes_received', 'bandwidth',
+                'total_files', 'disk',
+                'cores', 'cores_avg', 'gpus', 'machine_load', 'machine_cpus']:
             v = getattr(self, k)
             if v is None or (isinstance(v, int) and v < 0):
                 continue
-            if k in ['limits_exceeded', 'peak_times']:
-                d[k] = v.to_dict()
             else:
                 d[k] = v
+        for k in ['limits_exceeded', 'peak_times']:
+            v = getattr(self, k)
+            if v:
+                d[k] = v.to_dict()
         return d
 
     @classmethod
@@ -65,6 +73,7 @@
         self.__init__()
         rmsummary_merge_max(self, oth)
         setattr(self, 'limits_exceeded', rmsummary_copy(oth.limits_exceeded))
+        setattr(self, 'peak_times', rmsummary_copy(oth.limits_exceeded))
 %}
 }
 
