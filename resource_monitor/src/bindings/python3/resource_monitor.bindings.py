@@ -143,6 +143,10 @@ class ResourceExhaustion(Exception):
 
         return 'Limits broken: {limits}'.format(limits=','.join(ls))
 
+class ResourceInternalError(Exception):
+    def __init__(self, *args, **kwargs):
+        super(ResourceInternalError, self).__init__(*args, **kwargs)
+
 def __measure_update_to_peak(pid, old_summary = None):
     new_summary = rmonitor_measure_process(pid)
 
@@ -253,7 +257,13 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
             results_queue.put({ 'result': None, 'resources': resources_max, 'resource_exhaustion': True})
         else:
             fun_proc.join()
-            (fun_result, resources_measured_end) = local_results.get(True, 5)
+            try:
+                (fun_result, resources_measured_end) = local_results.get(True, 5)
+            except Exception as e:
+                e = ResourceInternalError("No result generated.")
+                cctools_debug(D_RMON, "{}".format(e))
+                raise e
+
             if resources_measured_end is None:
                 raise fun_result
 
