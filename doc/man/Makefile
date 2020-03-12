@@ -44,7 +44,7 @@ install: all
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/man
 	mkdir -p $(CCTOOLS_INSTALL_DIR)/share/man/man1
 	if [ -f man/chirp.1.gz ]; then cp man/*.1.gz $(CCTOOLS_INSTALL_DIR)/share/man/man1; fi
-	cp -r html $(CCTOOLS_INSTALL_DIR)/doc/man/
+	if [ -f html ]; then cp -r html $(CCTOOLS_INSTALL_DIR)/doc/man/; fi
 
 test:
 
