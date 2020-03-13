@@ -27,10 +27,8 @@ class WorkQueueServer:
         return response
 
     def connect(self, address, server_port, wq_port):
-        args = ['./work_queue_server', "%d" % server_port, "%d" % wq_port]#, '1>', '/dev/null', '2>&1']
+        args = ['./work_queue_master', "%d" % server_port, "%d" % wq_port]#, '1>', '/dev/null', '2>&1']
         self.server = Popen(args)
-
-        os.system("condor_submit_workers --cores 2 --memory 4000 --disk 10000 -M wq_bwa_json %d" % self.num_workers)
 
         i = 1
         while True:
@@ -107,8 +105,6 @@ class WorkQueueServer:
     def disconnect(self):
         self.socket.close()
         Popen.terminate(self.server)
-
-        os.system("condor_rm ccarball")
 
     def wq_empty(self):
         request = {
