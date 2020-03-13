@@ -128,10 +128,12 @@ sub split_query {
 		$line_count++;
 	}
 
+    $num_outputs++;
+
 	close(infile);
 
 	print localtime(). " Number of splits of $query_file is $num_outputs.\n";
-	return $num_outputs-1;
+	return $num_outputs;
 }
 
 sub partition_tasks {
