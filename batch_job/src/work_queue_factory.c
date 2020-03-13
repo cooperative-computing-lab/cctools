@@ -264,7 +264,7 @@ Count up the workers needed in a given list of masters, IGNORING how many
 workers are actually connected.
 */
 
-static int count_workers_needed( struct list *masters_list, int only_waiting )
+static int count_workers_needed( struct list *masters_list, int only_not_running )
 {
 	int needed_workers=0;
 	int masters=0;
@@ -286,14 +286,13 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 		const int tl =       jx_lookup_integer(j,"tasks_left");
 
 		int capacity = master_workers_capacity(j);
-		int tasks = tr+tw+tl;
 
 		// first assume one task per worker
 		int need;
-		if(only_waiting) {
-			need = tw;
+		if(only_not_running) {
+			need = tw + tl;
 		} else {
-			need = tasks;
+			need = tw + tl + tr;
 		}
 
 		// enforce many tasks per worker
@@ -309,7 +308,7 @@ static int count_workers_needed( struct list *masters_list, int only_waiting )
 			need = MIN(need, capacity);
 		}
 
-		debug(D_WQ,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tasks,capacity,need,tr);
+		debug(D_WQ,"%s %s:%d %s tasks: %d capacity: %d workers needed: %d tasks running: %d",project,host,port,owner,tw+tl+tr,capacity,need,tr);
 		needed_workers += need;
 		masters++;
 	}
@@ -859,25 +858,32 @@ static void mainloop( struct batch_queue *queue )
 		}
 	
 		debug(D_WQ,"evaluating master list...");
-		int workers_needed    = count_workers_needed(masters_list, 0);
 		int workers_connected = count_workers_connected(masters_list);
-
-		debug(D_WQ,"%d total workers needed across %d masters",
-				workers_needed,
-				masters_list ? list_size(masters_list) : 0);
+		int workers_needed = 0;
 
 		if(foremen_regex)
 		{
+			/* If there are foremen, we only look at tasks not running in the
+			 * masters' list. The rest of the tasks will be counted as waiting
+			 * or running on the foremen. */
+			workers_needed = count_workers_needed(masters_list, /* do not count running tasks */ 1);
 			debug(D_WQ,"evaluating foremen list...");
 			foremen_list    = work_queue_catalog_query(catalog_host,-1,foremen_regex);
 
 			/* add workers on foremen. Also, subtract foremen from workers
 			 * connected, as they were not deployed by the pool. */
-
-			workers_needed    += count_workers_needed(foremen_list, 1);
+			workers_needed    += count_workers_needed(foremen_list, 0);
 			workers_connected += MAX(count_workers_connected(foremen_list) - list_size(foremen_list), 0);
 
 			debug(D_WQ,"%d total workers needed across %d foremen",workers_needed,list_size(foremen_list));
+		} else {
+			/* If there are no foremen, workers needed are computed directly
+			 * from the tasks running, waiting, and left from the masters'
+			 * list. */
+			workers_needed = count_workers_needed(masters_list, 0);
+			debug(D_WQ,"%d total workers needed across %d masters",
+					workers_needed,
+					masters_list ? list_size(masters_list) : 0);
 		}
 
 		debug(D_WQ,"raw workers needed: %d", workers_needed);

@@ -1056,7 +1056,12 @@ then
 
 			if [ $BUILD_SYS = DARWIN ]
 			then
-				python2_ldflags="$python2_ldflags -undefined dynamic_lookup"
+				if [ "${CONDA_BUILD}" = 1 ]
+				then
+					python2_ldflags="-undefined dynamic_lookup"
+				else
+					python2_ldflags="$python2_ldflags -undefined dynamic_lookup"
+				fi
 			fi
 
 			if ! check_function Py_MATH_PI Python.h ${python2_ccflags} ${python2_ldflags}
@@ -1131,7 +1136,12 @@ then
 
 			if [ $BUILD_SYS = DARWIN ]
 			then
-				python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
+				if [ "${CONDA_BUILD}" = 1 ]
+				then
+					python3_ldflags="-undefined dynamic_lookup"
+				else
+					python3_ldflags="$python3_ldflags -undefined dynamic_lookup"
+				fi
 			fi
 
 			if ! check_function Py_MATH_PI Python.h ${python3_ccflags} ${python3_ldflags}
@@ -1316,17 +1326,17 @@ optional_include syslog.h      HAS_SYSLOG_H
 cctools_doctargets=
 if check_path doxygen
 then
-	cctools_doctargets="${cctools_doctargets} apipages"
+	cctools_doctargets="apipages ${cctools_doctargets}"
 else
 	echo "*** not building API documentation"
 fi
 
 if check_path m4
 then
-	cctools_doctargets="${cctools_doctargets} htmlpages mdpages"
+	cctools_doctargets="htmlpages mdpages ${cctools_doctargets}"
 	if check_path nroff
 	then
-		cctools_doctargets="${cctools_doctargets} manpages"
+		cctools_doctargets="manpages ${cctools_doctargets}"
 	else
 		echo "*** not building man pages"
 	fi
