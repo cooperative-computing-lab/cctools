@@ -4,10 +4,10 @@ include ../../rules.mk
 # -DSQLITE_DEFAULT_MMAP_SIZE=1073741824 - allow mmap of database.
 # -DSQLITE_TEMP_STORE=3 - only use memory for temporary files.
 # -DSQLITE_THREADSAFE=0 - we only use sqlite3 multi-process (i.e. no threads). This disables somewhat costly mutex locks.
-LOCAL_CCFLAGS = -DSQLITE_DEFAULT_MMAP_SIZE=1073741824 -DSQLITE_TEMP_STORE=3 -DSQLITE_THREADSAFE=0 -fstack-protector-all
+LOCAL_CCFLAGS = -DSQLITE_DEFAULT_MMAP_SIZE=1073741824 -DSQLITE_TEMP_STORE=3 -DSQLITE_THREADSAFE=0 -fstack-protector-all $(CCTOOLS_GLOBUS_CCFLAGS)
 
 # Globus is needed by all executables via libdttools.a/auth_globus.o
-LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS)
+LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS) $(CCTOOLS_READLINE_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a libconfuga.a
