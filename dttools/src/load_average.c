@@ -31,6 +31,10 @@ int load_average_get_cpus()
 #elif defined(CCTOOLS_OPSYS_LINUX)
 
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "stringtools.h"
+#include "string_set.h"
 
 void load_average_get(double *avg)
 {
@@ -45,20 +49,27 @@ void load_average_get(double *avg)
 
 int load_average_get_cpus()
 {
-	FILE *f;
+	struct string_set *cores;
+	cores = string_set_create(0, 0);
 
-	f = fopen("/proc/cpuinfo", "r");
-	if(f) {
+	for (int i = 0; ; i++) {
+		char *p = string_format("/sys/devices/system/cpu/cpu%u/topology/thread_siblings", i);
+		FILE *f = fopen(p, "r");
+		free(p);
+		if (!f) break;
+
 		char line[1024];
-		int ncpus = 0;
-		while(fgets(line, sizeof(line), f)) {
-			sscanf(line, "processor : %d", &ncpus);
-		}
+		int rc = fscanf(f, "%1023s", line);
 		fclose(f);
-		return ncpus + 1;
-	} else {
-		return 1;
+		if (rc != 1) break;
+
+		string_set_push(cores, line);
 	}
+
+	int cpus = string_set_size(cores);
+	string_set_delete(cores);
+	if (cpus < 1) cpus = 1;
+	return cpus;
 }
 
 #else
