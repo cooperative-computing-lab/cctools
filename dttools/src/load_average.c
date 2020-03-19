@@ -21,7 +21,7 @@ int load_average_get_cpus()
 {
 	int n;
 	size_t size = sizeof(n);
-	if(sysctlbyname("hw.ncpu", &n, &size, 0, 0) == 0) {
+	if(sysctlbyname("hw.physicalcpu", &n, &size, 0, 0) == 0) {
 		return n;
 	} else {
 		return 1;
