@@ -10,7 +10,7 @@ prepare()
 run()
 {
 	cd alloc
-	../../src/makeflow alloc.mf --storage-type 2 --storage-limit 5 
+	../../src/makeflow alloc.mf --local-cores 2 --storage-type 2 --storage-limit 5 
 	# This should fail as the output only tracking doesn't do an adequate job
 	if [ $? -eq 1 ]; then
 		exit 0
