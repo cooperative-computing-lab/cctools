@@ -68,7 +68,10 @@ int load_average_get_cpus()
 
 	int cpus = string_set_size(cores);
 	string_set_delete(cores);
-	if (cpus < 1) cpus = 1;
+	if (cpus < 1) {
+		cpus = 1;
+		fprintf(stderr, "Unable to detect CPUs, falling back to 1\n");
+	}
 	return cpus;
 }
 
