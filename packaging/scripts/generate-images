@@ -46,6 +46,7 @@ strace
 swig
 troff
 unzip
+valgrind
 vim
 wget
 which
@@ -174,6 +175,7 @@ strace                   => 'strace',
 swig                     => 'swig',
 troff                    => 'groff',
 unzip                    => 'unzip',
+valgrind                 => 'valgrind',
 vim                      => 'vim',
 wget                     => 'wget',
 which                    => 'which',
@@ -266,6 +268,7 @@ swig                     => 'swig',
 strace                   => 'strace',
 troff                    => 'groff',
 unzip                    => 'unzip',
+valgrind                 => 'valgrind',
 vim                      => 'vim',
 wget                     => 'wget',
 which                    => 'debianutils',
