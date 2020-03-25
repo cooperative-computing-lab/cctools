@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 			project_name = optarg;
 			break;
 		case 'Z':
-			port_file = strdup(optarg);
+			port_file = optarg;
 			port = 0;
 			break;
 		case 'v':
