@@ -238,8 +238,22 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 			struct batch_job_info *info;
 			int logcode, exitcode;
 
-			if(sscanf(line, "%d (%" SCNbjid ".%d.%d) %d/%d %d:%d:%d", &type, &jobid, &proc, &subproc, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 9) {
-				tm.tm_year = 2008 - 1900;
+			/* 
+				HTCondor job log lines come in one of two flavors:
+			
+					005 (312.000.000) 2020-03-28 23:01:04
+				or
+
+					005 (312.000.000) 03/28 23:01:02 
+			*/
+			tm.tm_year = 2020;
+
+			if((sscanf(line, "%d (%" SCNbjid ".%d.%d) %d/%d %d:%d:%d", 
+					&type, &jobid, &proc, &subproc, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 9) || 
+				(sscanf(line, "%d (%" SCNbjid ".%d.%d) %d-%d-%d %d:%d:%d", 
+					&type, &jobid, &proc, &subproc, &tm.tm_year, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 10)) {
+
+				tm.tm_year = tm.tm_year - 1900;
 				tm.tm_isdst = 0;
 
 				current = mktime(&tm);
