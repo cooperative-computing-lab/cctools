@@ -219,6 +219,18 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 		}
 	}
 
+	time_t current;
+	struct tm tm;
+
+	/* Obtain current year, in case HTCondor log lines do not provide a year.
+	   Note that this fallback may give the incorrect year for jobs that run
+	   when the year turns. However, we just need some value to give to a
+	   mktime below, and the current year is preferable than some fixed value.
+	   */
+	time(&current);
+	tm = *localtime(&current);
+	int current_year = tm.tm_year + 1900;
+
 	while(1) {
 		/*
 		   Note: clearerr is necessary to clear any cached end-of-file condition,
@@ -232,8 +244,6 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 		while(fgets(line, sizeof(line), logfile)) {
 			int type, proc, subproc;
 			batch_job_id_t jobid;
-			time_t current;
-			struct tm tm;
 
 			struct batch_job_info *info;
 			int logcode, exitcode;
@@ -246,7 +256,7 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 
 					005 (312.000.000) 03/28 23:01:02
 			*/
-			tm.tm_year = 2020;
+			tm.tm_year = current_year;
 
 			if((sscanf(line, "%d (%" SCNbjid ".%d.%d) %d/%d %d:%d:%d",
 					&type, &jobid, &proc, &subproc, &tm.tm_mon, &tm.tm_mday, &tm.tm_hour, &tm.tm_min, &tm.tm_sec) == 9) ||
