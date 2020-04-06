@@ -539,7 +539,7 @@ static int dispatch (confuga *C, chirp_jobid_t id, const char *tag)
 	sqlite3 *db = C->db;
 	sqlite3_stmt *stmt = NULL;
 	const char *current = SQL;
-	confuga_sid_t sid;
+	confuga_sid_t sid=-1;
 	struct job_stats stats;
 	memset(&stats, 0, sizeof(stats));
 
