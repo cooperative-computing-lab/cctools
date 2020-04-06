@@ -61,7 +61,7 @@ void deltadb_reduction_update( struct deltadb_reduction *r, double val )
 
 double deltadb_reduction_value( struct deltadb_reduction *r )
 {
-	double value;
+	double value = 0;
 	switch(r->type) {
 		case COUNT:
 			value = r->count;
