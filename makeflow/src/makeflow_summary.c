@@ -71,7 +71,7 @@ void makeflow_summary_create(struct dag *d, const char *filename, const char *em
 
 	struct dag_node *n;
 	struct dag_file *f;
-	const char *fn;
+	const char *fn = NULL;
 	dag_node_state_t state;
 	struct list *output_files;
 	output_files = list_create();

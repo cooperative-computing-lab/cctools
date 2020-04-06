@@ -216,7 +216,7 @@ struct list *find_dependencies_for(struct dependency *dep){
 		close(pipefd[1]);
 		char next;
 		char *buffer = (char *) malloc(sizeof(char));
-		char *original_name;
+		char *original_name = NULL;
 		int size = 0;
 		int depth = dep->depth  + 1;
 		struct list *new_deps = list_create();
