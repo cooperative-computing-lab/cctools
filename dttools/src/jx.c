@@ -540,7 +540,7 @@ struct jx_item * jx_item_copy( struct jx_item *i )
 struct jx  *jx_copy( struct jx *j )
 {
 	if(!j) return 0;
-	struct jx *c;
+	struct jx *c = 0;
 
 	switch(j->type) {
 		case JX_NULL:
@@ -575,7 +575,10 @@ struct jx  *jx_copy( struct jx *j )
 			break;
 	}
 
-	c->line = j->line;
+    if(c) {
+        c->line = j->line;
+    }
+
 	return c;
 }
 
