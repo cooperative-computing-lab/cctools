@@ -557,7 +557,9 @@ int pfs_table::resolve_name(int is_special_syscall, const char *cname, struct pf
 				} else {
 					pname->port = pname->service->get_default_port();
 				}
-				sprintf(pname->hostport,"%s:%d",pname->host,pname->port);
+				char *hostport=string_format("%s:%d", pname->host, pname->port);
+				strncpy(pname->hostport, hostport, sizeof(pname->hostport));
+				free(hostport);
 			}
 
 			if(!strcmp(pname->service_name,"multi")) {
