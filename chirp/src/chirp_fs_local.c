@@ -236,7 +236,7 @@ int chirp_fs_local_resolve (const char *path, int *dirfd, char basename[CHIRP_PA
 {
 	int i;
 	int rc;
-	int fd;
+	int fd=0;
 	char working[CHIRP_PATH_MAX] = "";
 	struct stat rootinfo;
 
