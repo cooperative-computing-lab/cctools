@@ -100,7 +100,7 @@ static int resolve (confuga *C, const char *path, int *dirfd, char basename[CONF
 {
 	int i;
 	int rc;
-	int fd;
+	int fd=-1;
 	char working[CONFUGA_PATH_MAX] = "";
 	struct stat rootinfo;
 

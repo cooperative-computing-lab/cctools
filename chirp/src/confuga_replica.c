@@ -199,9 +199,9 @@ CONFUGA_IAPI int confugaR_replicate (confuga *C, confuga_fid_t fid, confuga_sid_
 	struct confuga_host host_to;
 	char replica_open[CONFUGA_PATH_MAX];
 	char replica_closed[CONFUGA_PATH_MAX];
-	time_t start;
+	time_t start=0;
 	confuga_sid_t fsid = 0;
-	confuga_off_t size;
+	confuga_off_t size=0;
 
 	debug(D_DEBUG, "synchronously replicating " CONFUGA_FID_DEBFMT " to " CONFUGA_SID_DEBFMT, CONFUGA_FID_PRIARGS(fid), sid);
 
@@ -1112,7 +1112,7 @@ static int waitall (confuga *C, confuga_sid_t fsid, const char *fhostport)
 	for (i = 0; i < J->u.array.length; i++) {
 		json_value *job = J->u.array.values[i];
 		assert(jistype(job, json_object));
-		chirp_jobid_t id;
+		chirp_jobid_t id=-1;
 
 		json_value *cid = jsonA_getname(job, "id", json_integer);
 		CATCH(lookuptjid(C, fsid, cid->u.integer, &id));

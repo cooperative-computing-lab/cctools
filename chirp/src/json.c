@@ -100,6 +100,13 @@ static void * json_alloc (json_state * state, unsigned long size, int zero)
    return state->settings.mem_alloc (size, zero, state->settings.user_data);
 }
 
+#ifdef __GNUC__
+#if __GNUC__ >= 7
+/* Fix for strict-aliasing warning, noted inside function.*/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
+#endif
 static int new_value
    (json_state * state, json_value ** top, json_value ** root, json_value ** alloc, json_type type)
 {
@@ -137,6 +144,7 @@ static int new_value
                return 0;
             }
 
+            /* The following line gives a strict-aliasing warning with gcc. */
             value->_reserved.object_mem = (*(char **) &value->u.object.values) + values_size;
 
             value->u.object.length = 0;
@@ -178,6 +186,11 @@ static int new_value
 
    return 1;
 }
+#ifdef __GNUC__
+#if __GNUC__ >= 7
+#pragma GCC diagnostic pop
+#endif
+#endif
 
 #define e_off \
    ((int) (i - cur_line_begin))
@@ -189,6 +202,14 @@ static int new_value
 #define string_add(b)  \
    do { if (!state.first_pass) string [string_length] = b;  ++ string_length; } while (0);
 
+
+#ifdef __GNUC__
+#if __GNUC__ >= 7
+/* Fix for strict-aliasing warning, noted inside function.*/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif
+#endif
 static const long
    flag_next             = 1 << 0,
    flag_reproc           = 1 << 1,
@@ -364,8 +385,10 @@ json_value * json_parse_ex (json_settings * settings,
 
                   case json_object:
 
-                     if (state.first_pass)
+                     if (state.first_pass) {
+                        /* The following line gives a strict-aliasing warning with gcc. */
                         (*(json_char **) &top->u.object.values) += string_length + 1;
+                     }
                      else
                      {  
                         top->u.object.values [top->u.object.length].name
@@ -809,6 +832,11 @@ e_failed:
 
    return 0;
 }
+#ifdef __GNUC__
+#if __GNUC__ >= 7
+#pragma GCC diagnostic pop
+#endif
+#endif
 
 json_value * json_parse (const json_char * json, size_t length)
 {
