@@ -216,8 +216,8 @@ json_value * json_parse_ex (json_settings * settings,
    static const json_state _state;
    json_state state = _state;
    long flags;
-   long num_digits, num_e;
-   json_int_t num_fraction;
+   long num_digits=0, num_e=0;
+   json_int_t num_fraction=0;
 
    error[0] = '\0';
    end = (json + length);
