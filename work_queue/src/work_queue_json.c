@@ -230,7 +230,7 @@ struct work_queue *work_queue_json_create(const char *str)
 
 
 	int port = 0, priority = 0;
-	char *name;
+	char *name = NULL;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {
