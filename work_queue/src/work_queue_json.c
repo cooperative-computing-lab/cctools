@@ -166,8 +166,9 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 static struct work_queue_task *create_task(const char *str)
 {
 
-	char *command_line;
-	struct jx *input_files, *output_files;
+	char *command_line = NULL;
+	struct jx *input_files = NULL;
+    struct jx *output_files = NULL;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {
