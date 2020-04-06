@@ -729,7 +729,7 @@ static int dag_parse_make_export(struct lexer *bk)
 {
 	struct token *t, *vtoken, *vname;
 
-	const char *name;
+	const char *name = NULL;
 
 	int count = 0;
 	while((t = lexer_peek_next_token(bk)) && t->type != TOKEN_NEWLINE)
