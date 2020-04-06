@@ -96,7 +96,8 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 
 	while(arr != NULL) {
 
-		char *local, *remote;
+		char *local = NULL;
+        char *remote = NULL;
 		struct jx_pair *flag;
 		void *k = NULL;
 		void *v = NULL;
