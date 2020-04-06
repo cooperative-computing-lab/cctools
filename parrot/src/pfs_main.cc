@@ -1159,7 +1159,7 @@ int main( int argc, char *argv[] )
 
 	if(optind>=argc) show_help(argv[0]);
 
-	FILE *stats_out;
+	FILE *stats_out = NULL;
 	if (stats_file) {
 		stats_enable();
 		stats_out = fopen(stats_file, "w");
