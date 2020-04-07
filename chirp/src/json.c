@@ -102,8 +102,7 @@ static void * json_alloc (json_state * state, unsigned long size, int zero)
 
 #ifdef __GNUC__
 #if __GNUC__ >= 7
-/* Temporary fix for warning strict-aliasing.
- * This file should be replace with dttools/src/jx */
+/* Fix for strict-aliasing warning, noted inside function.*/
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
@@ -145,6 +144,7 @@ static int new_value
                return 0;
             }
 
+            /* The following line gives a strict-aliasing warning with gcc. */
             value->_reserved.object_mem = (*(char **) &value->u.object.values) + values_size;
 
             value->u.object.length = 0;
@@ -205,8 +205,7 @@ static int new_value
 
 #ifdef __GNUC__
 #if __GNUC__ >= 7
-/* Temporary fix for warning strict-aliasing.
- * This file should be replace with dttools/src/jx */
+/* Fix for strict-aliasing warning, noted inside function.*/
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif
@@ -387,6 +386,7 @@ json_value * json_parse_ex (json_settings * settings,
                   case json_object:
 
                      if (state.first_pass) {
+                        /* The following line gives a strict-aliasing warning with gcc. */
                         (*(json_char **) &top->u.object.values) += string_length + 1;
                      }
                      else
