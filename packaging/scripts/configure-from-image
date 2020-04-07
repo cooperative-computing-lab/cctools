@@ -46,7 +46,7 @@ then
 fi
 
 # compile everything
-./configure --strict $DEP_ARGS ${perl_option} "$@"
+./configure --debug --strict $DEP_ARGS ${perl_option} "$@"
 [[ -f config.mk ]] && make clean
 echo === Contents of config.mk ===
 cat config.mk
