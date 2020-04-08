@@ -1278,8 +1278,8 @@ class WorkQueue(object):
     def blacklist_clear(self, host=None):
         if host is None:
             return work_queue_blacklist_clear(self._work_queue)
-        else:
-            return work_queue_blacklist_remove(self._work_queue, host)
+
+        return work_queue_blacklist_remove(self._work_queue, host)
 
     ##
     # Delete file from workers's caches.
