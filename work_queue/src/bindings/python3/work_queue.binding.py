@@ -27,7 +27,7 @@ def specify_port_range(low_port, high_port):
     if low_port >= high_port:
         raise TypeError('low_port {} should be smaller than high_port {}'.format(low_port, high_port))
 
-    os.environ['TCP_LOW_PORT']  = str(low_port)
+    os.environ['TCP_LOW_PORT'] = str(low_port)
     os.environ['TCP_HIGH_PORT'] = str(high_port)
 
 cctools_debug_config('work_queue_python')
@@ -49,7 +49,7 @@ class Task(object):
         try:
             self._task = work_queue_task_create(command)
             if not self._task:
-                raise
+                raise Exception('Unable to create internal Task structure')
         except:
             raise Exception('Unable to create internal Task structure')
 
@@ -63,13 +63,13 @@ class Task(object):
         # asked explicitely.
 
         if flags is None:
-            flags = WORK_QUEUE_NOCACHE;
+            flags = WORK_QUEUE_NOCACHE
 
         if cache is not None:
             if cache:
-                flags = flags | WORK_QUEUE_CACHE;
+                flags = flags | WORK_QUEUE_CACHE
             else:
-                flags = flags & ~(WORK_QUEUE_CACHE);
+                flags = flags & ~(WORK_QUEUE_CACHE)
 
         return flags
 
@@ -276,7 +276,7 @@ class Task(object):
     #
     #   events:
     #   label        Name that identifies the snapshot. Only alphanumeric, -,
-    #                and _ characters are allowed. 
+    #                and _ characters are allowed.
     #   on-create    Take a snapshot every time the file is created. Default: false
     #   on-truncate  Take a snapshot when the file is truncated.    Default: false
     #   on-pattern   Take a snapshot when a line matches the regexp pattern.    Default: none
@@ -297,51 +297,51 @@ class Task(object):
     # default), the task is tried indefinitely. A task that did not succeed
     # after the given number of retries is returned with result
     # WORK_QUEUE_RESULT_MAX_RETRIES.
-    def specify_max_retries( self, max_retries ):
-        return work_queue_task_specify_max_retries(self._task,max_retries)
+    def specify_max_retries(self, max_retries):
+        return work_queue_task_specify_max_retries(self._task, max_retries)
 
     ##
     # Indicate the number of cores required by this task.
-    def specify_cores( self, cores ):
-        return work_queue_task_specify_cores(self._task,cores)
+    def specify_cores(self, cores):
+        return work_queue_task_specify_cores(self._task, cores)
 
     ##
     # Indicate the memory (in MB) required by this task.
-    def specify_memory( self, memory ):
-        return work_queue_task_specify_memory(self._task,memory)
+    def specify_memory(self, memory):
+        return work_queue_task_specify_memory(self._task, memory)
 
     ##
     # Indicate the disk space (in MB) required by this task.
-    def specify_disk( self, disk ):
-        return work_queue_task_specify_disk(self._task,disk)
+    def specify_disk(self, disk):
+        return work_queue_task_specify_disk(self._task, disk)
 
     ##
     # Indicate the the priority of this task (larger means better priority, default is 0).
-    def specify_priority( self, priority ):
-        return work_queue_task_specify_priority(self._task,priority)
+    def specify_priority(self, priority):
+        return work_queue_task_specify_priority(self._task, priority)
 
     # Indicate the maximum end time (absolute, in microseconds from the Epoch) of this task.
     # This is useful, for example, when the task uses certificates that expire.
     # If less than 1, or not specified, no limit is imposed.
-    def specify_end_time( self, useconds ):
-        return work_queue_task_specify_end_time(self._task,useconds)
+    def specify_end_time(self, useconds):
+        return work_queue_task_specify_end_time(self._task, useconds)
 
     # Indicate the maximum running time for a task in a worker (relative to
     # when the task starts to run).  If less than 1, or not specified, no limit
     # is imposed.
-    def specify_running_time( self, useconds ):
-        return work_queue_task_specify_running_time(self._task,useconds)
+    def specify_running_time(self, useconds):
+        return work_queue_task_specify_running_time(self._task, useconds)
 
     ##
     # Set this environment variable before running the task.
     # If value is None, then variable is unset.
-    def specify_environment_variable( self, name, value = None ):
-        return work_queue_task_specify_enviroment_variable(self._task,name,value)
+    def specify_environment_variable(self, name, value=None):
+        return work_queue_task_specify_enviroment_variable(self._task, name, value)
 
     ##
     # Set a name for the resource summary output directory from the monitor.
-    def specify_monitor_output( self, directory ):
-        return work_queue_task_specify_monitor_output(self._task,directory)
+    def specify_monitor_output(self, directory):
+        return work_queue_task_specify_monitor_output(self._task, directory)
 
     ##
     # Get the user-defined logical name for the task.
@@ -793,9 +793,9 @@ class WorkQueue(object):
     #
     # @see work_queue_create    - For more information about environmental variables that affect the behavior this method.
     def __init__(self, port=WORK_QUEUE_DEFAULT_PORT, name=None, shutdown=False, stats_log=None, transactions_log=None, debug_log=None):
-        self._shutdown   = shutdown
+        self._shutdown = shutdown
         self._work_queue = None
-        self._stats      = None
+        self._stats = None
         self._stats_hierarchy = None
         self._task_table = {}
 
@@ -814,7 +814,7 @@ class WorkQueue(object):
         try:
             if debug_log:
                 specify_debug_log(debug_log)
-            self._stats      = work_queue_stats()
+            self._stats = work_queue_stats()
             self._stats_hierarchy = work_queue_stats()
             self._work_queue = work_queue_create(port)
             if not self._work_queue:
@@ -973,7 +973,7 @@ class WorkQueue(object):
     # @param self 	Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring(self, dirname = None, watchdog = True):
+    def enable_monitoring(self, dirname=None, watchdog=True):
         return work_queue_enable_monitoring(self._work_queue, dirname, watchdog)
 
     ## As @ref enable_monitoring, but it also generates a time series and a debug file.
@@ -984,7 +984,7 @@ class WorkQueue(object):
     # @param self 	Reference to the current work queue object.
     # @param dirname    Directory name for the monitor output.
     # @param watchdog   If True (default), kill tasks that exhaust their declared resources.
-    def enable_monitoring_full(self, dirname = None, watchdog = True):
+    def enable_monitoring_full(self, dirname=None, watchdog=True):
         return work_queue_enable_monitoring_full(self._work_queue, dirname, watchdog)
 
     ##
@@ -1012,8 +1012,8 @@ class WorkQueue(object):
     # @param self       Reference to the current work queue object.
     # @param host       The hostname the host running the workers.
     # @param drain_mode If True, no new tasks are dispatched to workers at hostname, and empty workers are shutdown. Else, workers works as usual.
-    def specify_draining_by_hostname(self, hostname, drain_mode = True):
-        return work_queue_specify_draining_by_hostname (self._work_queue, hostname, drain_mode)
+    def specify_draining_by_hostname(self, hostname, drain_mode=True):
+        return work_queue_specify_draining_by_hostname(self._work_queue, hostname, drain_mode)
 
     ##
     # Determine whether there are any known tasks queued, running, or waiting to be collected.
@@ -1224,7 +1224,7 @@ class WorkQueue(object):
     # @param rm       Dictionary indicating maximum values. See @resources_measured for possible fields.
     # @param filename JSON file with resource summaries.
 
-    def initialize_categories(filename, rm):
+    def initialize_categories(self, filename, rm):
         return work_queue_initialize_categories(self._work_queue, rm, filename)
 
     ##
@@ -1278,8 +1278,8 @@ class WorkQueue(object):
     def blacklist_clear(self, host=None):
         if host is None:
             return work_queue_blacklist_clear(self._work_queue)
-        else:
-            return work_queue_blacklist_remove(self._work_queue, host)
+
+        return work_queue_blacklist_remove(self._work_queue, host)
 
     ##
     # Delete file from workers's caches.
@@ -1363,7 +1363,7 @@ class WorkQueue(object):
         task_pointer = work_queue_wait(self._work_queue, timeout)
         if task_pointer:
             task = self._task_table[int(task_pointer.taskid)]
-            del(self._task_table[task_pointer.taskid])
+            del self._task_table[task_pointer.taskid]
             return task
         return None
 
@@ -1373,7 +1373,7 @@ def rmsummary_snapshots(self):
 
     snapshots = []
     for i in range(0, self.snapshots_count):
-        snapshot = rmsummary_get_snapshot(self, i);
+        snapshot = rmsummary_get_snapshot(self, i)
         snapshots.append(snapshot)
     return snapshots
 

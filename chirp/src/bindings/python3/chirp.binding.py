@@ -10,12 +10,9 @@
 #
 # - @ref Chirp.Client
 # - @ref Chirp.Stat
-
 import os
 import time
 import json
-import binascii
-
 
 ##
 # Python Client object
@@ -32,7 +29,7 @@ class Client(object):
     # @param authentication    A list of prefered authentications. E.g., ['tickets', 'unix']
     # @param debug             Generate client debug output.
     def __init__(self, hostport, timeout=60, authentication=None, tickets=None, debug=False):
-        self.hostport    = hostport
+        self.hostport = hostport
         self.timeout = timeout
 
         if debug:
@@ -53,10 +50,10 @@ class Client(object):
 
         self.identity = self.whoami()
 
-        if self.identity is '':
+        if self.identity == '':
             raise AuthenticationFailure(authentication)
 
-    def __exit__(self):
+    def __exit__(self, exception_type, exception_value, traceback):
         chirp_reli_disconnect(self.hostport)
 
     def __del__(self):
@@ -154,7 +151,7 @@ class Client(object):
         result = chirp_wrap_resetacl(self.hostport, path, rights, self.__stoptime(absolute_stop_time, timeout))
 
         if result < 0:
-            raise GeneralFailure('resetacl', result, [path, subject, rights])
+            raise GeneralFailure('resetacl', result, [path, rights])
 
         return result
 
@@ -170,14 +167,14 @@ class Client(object):
     # @param timeout             If given, maximum number of seconds to
     #                            wait for a server response.
     def ls(self, path, absolute_stop_time=None, timeout=None):
-        dr    = chirp_reli_opendir(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
+        dr = chirp_reli_opendir(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
         files = []
 
         if dir is None:
             raise IOError(path)
 
         while True:
-            d =  chirp_reli_readdir(dr)
+            d = chirp_reli_readdir(dr)
             if d is None: break
             files.append(Stat(d.name, d.info))
 
@@ -219,7 +216,7 @@ class Client(object):
         result = chirp_reli_chmod(self.hostport, path, mode, self.__stoptime(absolute_stop_time, timeout))
 
         if result < 0:
-            raise GeneralFailure('chmod', result)
+            raise GeneralFailure('chmod', result, [path, mode])
 
         return result
 
@@ -242,7 +239,7 @@ class Client(object):
         result = chirp_recursive_put(self.hostport,
                                      source, destination,
                                      self.__stoptime(absolute_stop_time, timeout))
-        if(result > -1):
+        if result > -1:
             return result
 
         raise TransferFailure('put', result, source, destination)
@@ -268,7 +265,7 @@ class Client(object):
                                      source, destination,
                                      self.__stoptime(absolute_stop_time, timeout))
 
-        if(result > -1):
+        if result > -1:
             return result
 
         raise TransferFailure('get', result, source, destination)
@@ -355,12 +352,12 @@ class Client(object):
     # @endcode
     def job_create(self, job_description):
         job_json = json.dumps(job_description)
-        job_id   = chirp_wrap_job_create(self.hostport, job_json, self.__stoptime())
+        job_id = chirp_wrap_job_create(self.hostport, job_json, self.__stoptime())
 
         if job_id < 0:
             raise ChirpJobError('create', job_id, job_json)
 
-        return job_id;
+        return job_id
 
 
     ##
@@ -370,12 +367,12 @@ class Client(object):
     #
     def job_kill(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        result  = chirp_wrap_job_kill(self.hostport, ids_str, self.__stoptime())
+        result = chirp_wrap_job_kill(self.hostport, ids_str, self.__stoptime())
 
         if result < 0:
             raise ChirpJobError('kill', result, ids_str)
 
-        return result;
+        return result
 
 
 
@@ -386,12 +383,12 @@ class Client(object):
     #
     def job_commit(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        result  = chirp_wrap_job_commit(self.hostport, ids_str, self.__stoptime())
+        result = chirp_wrap_job_commit(self.hostport, ids_str, self.__stoptime())
 
         if result < 0:
             raise ChirpJobError('commit', result, ids_str)
 
-        return result;
+        return result
 
     ##
     # Reaps the jobs identified with the different job ids.
@@ -400,12 +397,12 @@ class Client(object):
     #
     def job_reap(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        result  = chirp_wrap_job_reap(self.hostport, ids_str, self.__stoptime())
+        result = chirp_wrap_job_reap(self.hostport, ids_str, self.__stoptime())
 
         if result < 0:
             raise ChirpJobError('reap', result, ids_str)
 
-        return result;
+        return result
 
     ##
     # Obtains the current status for each job id. The value returned is a
@@ -415,12 +412,12 @@ class Client(object):
     #
     def job_status(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        status  = chirp_wrap_job_status(self.hostport, ids_str, self.__stoptime())
+        status = chirp_wrap_job_status(self.hostport, ids_str, self.__stoptime())
 
         if status is None:
             raise ChirpJobError('status', None, ids_str)
 
-        return json.loads(status);
+        return json.loads(status)
 
     ##
     # Waits waiting_time seconds for the job_id to terminate. Return value is
@@ -429,13 +426,13 @@ class Client(object):
     #
     # @param waiting_time maximum number of seconds to wait for a job to finish.
     # @param job_id id of the job to wait.
-    def job_wait(self, waiting_time, job_id = 0):
-        status  = chirp_wrap_job_wait(self.hostport, job_id, waiting_time, self.__stoptime())
+    def job_wait(self, waiting_time, job_id=0):
+        status = chirp_wrap_job_wait(self.hostport, job_id, waiting_time, self.__stoptime())
 
         if status is None:
             raise ChirpJobError('status', None, job_id)
 
-        return json.loads(status);
+        return json.loads(status)
 
 
 ##
@@ -619,35 +616,34 @@ class Stat(object):
         return "%s uid:%d gid:%d size:%d" % (self.path, self.uid, self.gid, self.size)
 
 class AuthenticationFailure(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 class GeneralFailure(Exception):
     def __init__(self, action, status, value):
+        message = "Error with %s(%s) %s" % (action, status, value)
+        super(GeneralFailure, self).__init__(message)
+
         self.action = action
         self.status = status
-        self.value  = value
-    def __str__(self):
-        return "%s(%s) %s" % (self.action, self.status, self.value)
+        self.value = value
 
 class TransferFailure(Exception):
     def __init__(self, action, status, source, dest):
+        message = "Error with %s(%s) %s %s" % (action, status, source, dest)
+        super(TransferFailure, self).__init__(message)
+
         self.action = action
         self.status = status
         self.source = source
-        self.dest   = dest
-    def __str__(self):
-        return "Error with %s(%s) %s %s" % (self.action, self.status, self.source, self.dest)
+        self.dest = dest
 
 class ChirpJobError(Exception):
     def __init__(self, action, status, value):
+        message = "Error with %s(%s) %s" % (action, status, value)
+        super(ChirpJobError, self).__init__(message)
+
         self.action = action
         self.status = status
-        self.value  = value
-    def __str__(self):
-        return "%s(%s) %s" % (self.action, self.status, self.value)
-
+        self.value = value
 
 # @endcode
