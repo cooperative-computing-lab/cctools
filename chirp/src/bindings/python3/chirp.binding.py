@@ -53,7 +53,7 @@ class Client(object):
         if self.identity == '':
             raise AuthenticationFailure(authentication)
 
-    def __exit__(self):
+    def __exit__(self, exception_type, exception_value, traceback):
         chirp_reli_disconnect(self.hostport)
 
     def __del__(self):
