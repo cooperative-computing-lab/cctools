@@ -239,7 +239,7 @@ class Client(object):
         result = chirp_recursive_put(self.hostport,
                                      source, destination,
                                      self.__stoptime(absolute_stop_time, timeout))
-        if(result > -1):
+        if result > -1:
             return result
 
         raise TransferFailure('put', result, source, destination)
@@ -265,7 +265,7 @@ class Client(object):
                                      source, destination,
                                      self.__stoptime(absolute_stop_time, timeout))
 
-        if(result > -1):
+        if result > -1:
             return result
 
         raise TransferFailure('get', result, source, destination)
