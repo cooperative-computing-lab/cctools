@@ -148,9 +148,9 @@ def __measure_update_to_peak(pid, old_summary=None):
 
     if old_summary is None:
         return new_summary
-    else:
-        rmsummary_merge_max(old_summary, new_summary)
-        return old_summary
+
+    rmsummary_merge_max(old_summary, new_summary)
+    return old_summary
 
 def __child_handler(child_finished, signum, frame):
     child_finished.set()
@@ -294,8 +294,8 @@ def __monitor_function(limits, callback, interval, return_resources, function, *
 
     if not results['resources']:
         raise results['result']
-    else:
-        results['resources'] = _resources_to_dict(results['resources'])
+
+    results['resources'] = _resources_to_dict(results['resources'])
 
     if results['resource_exhaustion']:
         raise ResourceExhaustion(results['resources'], function, args, kwargs)
@@ -553,10 +553,9 @@ class Category:
 
         if mode == 'fixed':
             return self.maximum_seen()
-        else:
-            category_update_first_allocation(self._cat, None)
-            return resource_monitor.to_dict(self._cat.first_allocation)
+
+        category_update_first_allocation(self._cat, None)
+        return resource_monitor.to_dict(self._cat.first_allocation)
 
     def maximum_seen(self):
         return resource_monitor.to_dict(self._cat.max_resources_seen)
-
