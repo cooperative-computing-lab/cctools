@@ -29,7 +29,7 @@ class Client(object):
     # @param authentication    A list of prefered authentications. E.g., ['tickets', 'unix']
     # @param debug             Generate client debug output.
     def __init__(self, hostport, timeout=60, authentication=None, tickets=None, debug=False):
-        self.hostport    = hostport
+        self.hostport = hostport
         self.timeout = timeout
 
         if debug:
@@ -167,14 +167,14 @@ class Client(object):
     # @param timeout             If given, maximum number of seconds to
     #                            wait for a server response.
     def ls(self, path, absolute_stop_time=None, timeout=None):
-        dr    = chirp_reli_opendir(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
+        dr = chirp_reli_opendir(self.hostport, path, self.__stoptime(absolute_stop_time, timeout))
         files = []
 
         if dir is None:
             raise IOError(path)
 
         while True:
-            d =  chirp_reli_readdir(dr)
+            d = chirp_reli_readdir(dr)
             if d is None: break
             files.append(Stat(d.name, d.info))
 
@@ -352,7 +352,7 @@ class Client(object):
     # @endcode
     def job_create(self, job_description):
         job_json = json.dumps(job_description)
-        job_id   = chirp_wrap_job_create(self.hostport, job_json, self.__stoptime())
+        job_id = chirp_wrap_job_create(self.hostport, job_json, self.__stoptime())
 
         if job_id < 0:
             raise ChirpJobError('create', job_id, job_json)
@@ -367,7 +367,7 @@ class Client(object):
     #
     def job_kill(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        result  = chirp_wrap_job_kill(self.hostport, ids_str, self.__stoptime())
+        result = chirp_wrap_job_kill(self.hostport, ids_str, self.__stoptime())
 
         if result < 0:
             raise ChirpJobError('kill', result, ids_str)
@@ -383,7 +383,7 @@ class Client(object):
     #
     def job_commit(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        result  = chirp_wrap_job_commit(self.hostport, ids_str, self.__stoptime())
+        result = chirp_wrap_job_commit(self.hostport, ids_str, self.__stoptime())
 
         if result < 0:
             raise ChirpJobError('commit', result, ids_str)
@@ -397,7 +397,7 @@ class Client(object):
     #
     def job_reap(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        result  = chirp_wrap_job_reap(self.hostport, ids_str, self.__stoptime())
+        result = chirp_wrap_job_reap(self.hostport, ids_str, self.__stoptime())
 
         if result < 0:
             raise ChirpJobError('reap', result, ids_str)
@@ -412,7 +412,7 @@ class Client(object):
     #
     def job_status(self, *job_ids):
         ids_str = json.dumps(job_ids)
-        status  = chirp_wrap_job_status(self.hostport, ids_str, self.__stoptime())
+        status = chirp_wrap_job_status(self.hostport, ids_str, self.__stoptime())
 
         if status is None:
             raise ChirpJobError('status', None, ids_str)
@@ -426,8 +426,8 @@ class Client(object):
     #
     # @param waiting_time maximum number of seconds to wait for a job to finish.
     # @param job_id id of the job to wait.
-    def job_wait(self, waiting_time, job_id = 0):
-        status  = chirp_wrap_job_wait(self.hostport, job_id, waiting_time, self.__stoptime())
+    def job_wait(self, waiting_time, job_id=0):
+        status = chirp_wrap_job_wait(self.hostport, job_id, waiting_time, self.__stoptime())
 
         if status is None:
             raise ChirpJobError('status', None, job_id)
