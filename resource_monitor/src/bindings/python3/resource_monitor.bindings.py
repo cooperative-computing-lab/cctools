@@ -75,12 +75,12 @@ cctools_debug_config('resource_monitor')
 # >>> (result_a, resources) = my_sum_a([1,2,3])
 # >>> print(result, resources['memory'])
 # 6, 66
-# 
-# >>> result_b = my_sum_b([1,2,3]) 
+#
+# >>> result_b = my_sum_b([1,2,3])
 # memory used: 66
 #
 # >>> assert(result_a == result_b)
-# 
+#
 #
 # # Wrapping the already defined function 'sum', adding limits:
 # my_sum_monitored = monitored(limits = {'memory': 1024})(sum)
@@ -90,7 +90,7 @@ cctools_debug_config('resource_monitor')
 # except ResourceExhaustion as e:
 #   print(e)
 #   ...
-# 
+#
 # # Defining a function with a callback and a decorator.
 # # In this example, we record the time series of resources used:
 # import multiprocessing
@@ -104,7 +104,7 @@ cctools_debug_config('resource_monitor')
 #   ...
 #
 # result = my_function(...)
-# 
+#
 # # print the time series
 # while not results_series.empty():
 #     try:
@@ -113,7 +113,7 @@ cctools_debug_config('resource_monitor')
 #     except multiprocessing.Empty:
 #         pass
 # @endcode
-def monitored(limits = None, callback = None, interval = 1, return_resources = True):
+def monitored(limits=None, callback=None, interval=1, return_resources=True):
     def monitored_inner(function):
         return functools.partial(__monitor_function, limits, callback, interval, return_resources, function)
     return monitored_inner
@@ -145,7 +145,7 @@ class ResourceInternalError(Exception):
     def __init__(self, *args, **kwargs):
         super(ResourceInternalError, self).__init__(*args, **kwargs)
 
-def __measure_update_to_peak(pid, old_summary = None):
+def __measure_update_to_peak(pid, old_summary=None):
     new_summary = rmonitor_measure_process(pid)
 
     if old_summary is None:
@@ -211,12 +211,12 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
         pids_file = None
         try:
             # try python3 version first, which gets the 'buffering' keyword argument
-            pids_file=tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', buffering=0)
+            pids_file = tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', buffering=0)
         except TypeError:
             # on error try python2, which gets the 'bufsize' keyword argument
-            pids_file=tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', bufsize=0)
+            pids_file = tempfile.NamedTemporaryFile(mode='rb+', prefix='p_mon-', bufsize=0)
 
-        os.environ['CCTOOLS_RESOURCE_MONITOR_PIDS_FILE']=pids_file.name
+        os.environ['CCTOOLS_RESOURCE_MONITOR_PIDS_FILE'] = pids_file.name
 
         cctools_debug(D_RMON, "starting function process")
         fun_proc.start()
@@ -237,13 +237,13 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
                 resources_now = rmonitor_minimonitor(MINIMONITOR_MEASURE, 0)
                 rmsummary_merge_max(resources_max, resources_now)
 
-                rmsummary_check_limits(resources_max, limits);
+                rmsummary_check_limits(resources_max, limits)
                 if resources_max.limits_exceeded is not None:
                     child_finished.set()
                 else:
                     if callback:
                         callback(fun_id, function.__name__, step, _resources_to_dict(resources_now))
-                child_finished.wait(timeout = interval)
+                child_finished.wait(timeout=interval)
         except Exception as e:
             fun_proc.terminate()
             fun_proc.join()
@@ -252,7 +252,7 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
         if resources_max.limits_exceeded is not None:
             fun_proc.terminate()
             fun_proc.join()
-            results_queue.put({ 'result': None, 'resources': resources_max, 'resource_exhaustion': True})
+            results_queue.put({'result': None, 'resources': resources_max, 'resource_exhaustion': True})
         else:
             fun_proc.join()
             try:
@@ -266,7 +266,7 @@ def _watchman(results_queue, limits, callback, interval, function, args, kwargs)
                 raise fun_result
 
             rmsummary_merge_max(resources_max, resources_measured_end)
-            results_queue.put({ 'result': fun_result, 'resources': resources_max, 'resource_exhaustion': False})
+            results_queue.put({'result': fun_result, 'resources': resources_max, 'resource_exhaustion': False})
 
         if callback:
             callback(fun_id, function.__name__, -1, _resources_to_dict(resources_max))
@@ -282,9 +282,8 @@ def _resources_to_dict(resources):
         if d['wall_time'] > 0:
             d['cores_avg'] = float(d['cpu_time']) / float(d['wall_time'])
     except KeyError:
-            d['cores_avg'] = -1
+        d['cores_avg'] = -1
     return d
-
 
 def __monitor_function(limits, callback, interval, return_resources, function, *args, **kwargs):
     result_queue = multiprocessing.Queue()
@@ -323,8 +322,8 @@ class Categories:
     # Create an empty set of categories.
     # @param self                Reference to the current object.
     # @param all_categories_name Name of the general category that holds all of the summaries.
-    def __init__(self, all_categories_name = '(all)'):
-        self.categories          = {}
+    def __init__(self, all_categories_name='(all)'):
+        self.categories = {}
         self.all_categories_name = all_categories_name
         category_tune_bucket_size('category-steady-n-tasks', -1)
 
@@ -379,7 +378,7 @@ class Categories:
 
     ##
     # Add the summary (a dictionary) to the respective category.
-    # At least both the 'category' and 'wall_time' keys should be defined. 
+    # At least both the 'category' and 'wall_time' keys should be defined.
     #
     # @code
     # cs = Categories()
@@ -387,7 +386,7 @@ class Categories:
     # @endcode
     #
     def accumulate_summary(self, summary):
-        category      = summary['category']
+        category = summary['category']
         wall_time = summary['wall_time']
 
         if category == self.all_categories_name:
@@ -509,9 +508,9 @@ class Category:
     def usage(self, field):
         usage = 0
         for r in self.summaries:
-            resource  = r[field]
+            resource = r[field]
             wall_time = r['wall_time']
-            usage    += wall_time * resource
+            usage += wall_time * resource
         return usage
 
     def waste(self, field, allocation):
@@ -519,7 +518,7 @@ class Category:
 
         waste = 0
         for r in self.summaries:
-            resource  = r[field]
+            resource = r[field]
             wall_time = r['wall_time']
             if resource > allocation:
                 waste += wall_time * (allocation + maximum - resource)
@@ -537,17 +536,17 @@ class Category:
         maximum = self.maximum_seen()[field]
         maximum = float(maximum)
 
-        tasks      = 0
+        tasks = 0
         total_time = 0
         for r in self.summaries:
-            resource  = r[field]
+            resource = r[field]
             wall_time = r['wall_time']
 
             if resource > allocation:
-                tasks      += 1
+                tasks += 1
                 total_time += 2*wall_time
             else:
-                tasks      += maximum/allocation
+                tasks += maximum/allocation
                 total_time += wall_time
         return tasks/total_time
 
