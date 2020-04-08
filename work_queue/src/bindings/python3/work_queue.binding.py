@@ -1224,7 +1224,7 @@ class WorkQueue(object):
     # @param rm       Dictionary indicating maximum values. See @resources_measured for possible fields.
     # @param filename JSON file with resource summaries.
 
-    def initialize_categories(filename, rm):
+    def initialize_categories(self, filename, rm):
         return work_queue_initialize_categories(self._work_queue, rm, filename)
 
     ##
