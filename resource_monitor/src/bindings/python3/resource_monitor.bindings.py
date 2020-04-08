@@ -128,22 +128,20 @@ class ResourceExhaustion(Exception):
     # @param function            Function that caused the exhaustion.
     # @param args                List of positional arguments to function that caused the exhaustion.
     # @param kwargs              Dictionary of keyword arguments to function that caused the exhaustion.
-    def __init__(self, resources, function, args = None, kwargs = None):
-        self.resources = resources
-        self.function  = function
-        self.args      = args
-        self.kwargs    = kwargs
-
-    def __str__(self):
-        r = self.resources
-        l = r['limits_exceeded']
+    def __init__(self, resources, function, args=None, kwargs=None):
+        r = resources
+        l = resources['limits_exceeded']
         ls = ["{limit}: {value}".format(limit=k, value=l[k]) for k in list(l.keys()) if (l[k] > -1 and l[k] < r[k])]
+        message = 'Limits broken: {limits}'.format(limits=','.join(ls))
+        super(ResourceExhaustion, self).__init__(message)
 
-        return 'Limits broken: {limits}'.format(limits=','.join(ls))
+        self.resources = resources
+        self.function = function
+        self.args = args
+        self.kwargs = kwargs
 
 class ResourceInternalError(Exception):
-    def __init__(self, *args, **kwargs):
-        super(ResourceInternalError, self).__init__(*args, **kwargs)
+    pass
 
 def __measure_update_to_peak(pid, old_summary=None):
     new_summary = rmonitor_measure_process(pid)
