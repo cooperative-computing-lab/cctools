@@ -50,7 +50,7 @@ class Client(object):
 
         self.identity = self.whoami()
 
-        if self.identity is '':
+        if self.identity == '':
             raise AuthenticationFailure(authentication)
 
     def __exit__(self):
