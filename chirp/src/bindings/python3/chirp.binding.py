@@ -10,12 +10,9 @@
 #
 # - @ref Chirp.Client
 # - @ref Chirp.Stat
-
 import os
 import time
 import json
-import binascii
-
 
 ##
 # Python Client object
