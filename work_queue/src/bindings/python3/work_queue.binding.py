@@ -49,7 +49,7 @@ class Task(object):
         try:
             self._task = work_queue_task_create(command)
             if not self._task:
-                raise
+                raise Exception('Unable to create internal Task structure')
         except:
             raise Exception('Unable to create internal Task structure')
 
