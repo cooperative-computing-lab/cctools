@@ -151,7 +151,7 @@ class Client(object):
         result = chirp_wrap_resetacl(self.hostport, path, rights, self.__stoptime(absolute_stop_time, timeout))
 
         if result < 0:
-            raise GeneralFailure('resetacl', result, [path, subject, rights])
+            raise GeneralFailure('resetacl', result, [path, rights])
 
         return result
 
@@ -216,7 +216,7 @@ class Client(object):
         result = chirp_reli_chmod(self.hostport, path, mode, self.__stoptime(absolute_stop_time, timeout))
 
         if result < 0:
-            raise GeneralFailure('chmod', result)
+            raise GeneralFailure('chmod', result, [path, mode])
 
         return result
 
