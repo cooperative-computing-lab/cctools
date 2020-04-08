@@ -357,7 +357,7 @@ class Client(object):
         if job_id < 0:
             raise ChirpJobError('create', job_id, job_json)
 
-        return job_id;
+        return job_id
 
 
     ##
@@ -372,7 +372,7 @@ class Client(object):
         if result < 0:
             raise ChirpJobError('kill', result, ids_str)
 
-        return result;
+        return result
 
 
 
@@ -388,7 +388,7 @@ class Client(object):
         if result < 0:
             raise ChirpJobError('commit', result, ids_str)
 
-        return result;
+        return result
 
     ##
     # Reaps the jobs identified with the different job ids.
@@ -402,7 +402,7 @@ class Client(object):
         if result < 0:
             raise ChirpJobError('reap', result, ids_str)
 
-        return result;
+        return result
 
     ##
     # Obtains the current status for each job id. The value returned is a
@@ -417,7 +417,7 @@ class Client(object):
         if status is None:
             raise ChirpJobError('status', None, ids_str)
 
-        return json.loads(status);
+        return json.loads(status)
 
     ##
     # Waits waiting_time seconds for the job_id to terminate. Return value is
@@ -432,7 +432,7 @@ class Client(object):
         if status is None:
             raise ChirpJobError('status', None, job_id)
 
-        return json.loads(status);
+        return json.loads(status)
 
 
 ##
