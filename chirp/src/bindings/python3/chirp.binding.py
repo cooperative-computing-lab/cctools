@@ -616,35 +616,34 @@ class Stat(object):
         return "%s uid:%d gid:%d size:%d" % (self.path, self.uid, self.gid, self.size)
 
 class AuthenticationFailure(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
+    pass
 
 class GeneralFailure(Exception):
     def __init__(self, action, status, value):
+        message = "Error with %s(%s) %s" % (action, status, value)
+        super(GeneralFailure, self).__init__(message)
+
         self.action = action
         self.status = status
-        self.value  = value
-    def __str__(self):
-        return "%s(%s) %s" % (self.action, self.status, self.value)
+        self.value = value
 
 class TransferFailure(Exception):
     def __init__(self, action, status, source, dest):
+        message = "Error with %s(%s) %s %s" % (action, status, source, dest)
+        super(TransferFailure, self).__init__(message)
+
         self.action = action
         self.status = status
         self.source = source
-        self.dest   = dest
-    def __str__(self):
-        return "Error with %s(%s) %s %s" % (self.action, self.status, self.source, self.dest)
+        self.dest = dest
 
 class ChirpJobError(Exception):
     def __init__(self, action, status, value):
+        message = "Error with %s(%s) %s" % (action, status, value)
+        super(ChirpJobError, self).__init__(message)
+
         self.action = action
         self.status = status
-        self.value  = value
-    def __str__(self):
-        return "%s(%s) %s" % (self.action, self.status, self.value)
-
+        self.value = value
 
 # @endcode
