@@ -52,11 +52,8 @@ class Task(object):
     def __init__(self, command):
         self._task = None
 
-        try:
-            self._task = work_queue_task_create(command)
-            if not self._task:
-                raise Exception('Unable to create internal Task structure')
-        except:
+        self._task = work_queue_task_create(command)
+        if not self._task:
             raise Exception('Unable to create internal Task structure')
 
     def __del__(self):
