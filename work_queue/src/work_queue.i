@@ -4,6 +4,10 @@
 /* type is a go keyword. rename it to value_type */
 %rename(value_type) rmsummary_field::type;
 
+%begin %{
+	#define SWIG_PYTHON_2_UNICODE
+%}
+
 %{
 	#include "debug.h"
 	#include "int_sizes.h"

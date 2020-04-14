@@ -10,6 +10,11 @@
 /* silent const char leaking memory, as we do not leak memory */
 %warnfilter(451) chirp_searchstream::current;
 
+%begin %{
+	#define SWIG_PYTHON_2_UNICODE
+%}
+
+
 %{
 	#include <time.h>
 	#include "debug.h"
