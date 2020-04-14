@@ -6,6 +6,10 @@
 
 %module resource_monitor
 
+%begin %{
+	#define SWIG_PYTHON_2_UNICODE
+%}
+
 %{
 	#include "debug.h"
 	#include "int_sizes.h"
