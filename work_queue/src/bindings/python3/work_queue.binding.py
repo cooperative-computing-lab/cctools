@@ -1498,9 +1498,13 @@ class Factory(object):
             # If the name does not start with '_' we assume is a factory option.
             return object.__getattribute__(self, name)
 
-        if name in Factory._command_line_options:
+        # original command line options use - instead of _. _ is required by
+        # the naming conventions of python (otherwise - is taken as 'minus')
+        name_with_hyphens = name.replace('_', '-')
+
+        if name_with_hyphens in Factory._command_line_options:
             try:
-                return object.__getattribute__(self, '_opts')[name]
+                return object.__getattribute__(self, '_opts')[name_with_hyphens]
             except KeyError:
                 raise KeyError("{} is a valid factory attribute, but has not been set yet.".format(name))
         else:
@@ -1508,6 +1512,10 @@ class Factory(object):
 
 
     def __setattr__(self, name, value):
+        # original command line options use - instead of _. _ is required by
+        # the naming conventions of python (otherwise - is taken as 'minus')
+        name_with_hyphens = name.replace('_', '-')
+
         if name[0] == '_':
             # For names that start with '_', immediately set the attribute.
             # If the name does not start with '_' we assume is a factory option.
@@ -1515,16 +1523,16 @@ class Factory(object):
         elif self._factory_proc:
             # if factory is already running, only accept attributes that can
             # changed dynamically
-            if name in Factory._config_file_options:
-                self._opts[name] = value
+            if name_with_hyphens in Factory._config_file_options:
+                self._opts[name_with_hyphens] = value
                 self._write_config()
-            elif name in Factory._command_line_options:
+            elif name_with_hyphens in Factory._command_line_options:
                 raise AttributeError('{} cannot be changed once the factory is running.'.format(name))
             else:
                 raise AttributeError("{} is not a supported option".format(name))
         else:
-            if name in Factory._command_line_options:
-                self._opts[name] = value
+            if name_with_hyphens in Factory._command_line_options:
+                self._opts[name_with_hyphens] = value
             else:
                 raise AttributeError("{} is not a supported option".format(name))
 
