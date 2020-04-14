@@ -1467,8 +1467,8 @@ class Factory(object):
 
         self._opts = {}
 
-        self._opts['batch-type']    = batch_type
-        self._opts['master-name']   = master_name
+        self._opts['batch-type'] = batch_type
+        self._opts['master-name'] = master_name
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
 
         self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
@@ -1537,9 +1537,9 @@ class Factory(object):
                 raise AttributeError("{} is not a supported option".format(name))
 
     def _construct_command_line(self):
-        args  = [self._factory_binary]
+        args = [self._factory_binary]
         args += ['--config-file', self._config_file]
-        args += ["--{}={}".format(opt,self._opts[opt]) for opt in self._opts.keys() if opt not in Factory._config_file_options]
+        args += ["--{}={}".format(opt, self._opts[opt]) for opt in self._opts if opt not in Factory._config_file_options]
 
         return args
 
@@ -1576,7 +1576,7 @@ class Factory(object):
         if self._config_file is None:
             return
 
-        opts_subset = dict( [ (opt, self._opts[opt]) for opt in self._opts.keys() if opt in Factory._config_file_options ] )
+        opts_subset = dict([(opt, self._opts[opt]) for opt in self._opts if opt in Factory._config_file_options ])
         with open(self._config_file, 'w') as f:
             json.dump(opts_subset, f, indent=4)
 
