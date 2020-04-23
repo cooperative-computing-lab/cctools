@@ -1367,6 +1367,10 @@ int main( int argc, char *argv[] )
 				" - The program that launched Parrot used `PR_SET_DUMPABLE` to disable debugging\n   for this process.\n"
 				" - Your system's security framework (SELinux, Yama, etc.) disables ptrace.\n");
 		}
+
+		/* Manually kill first children as it is never added to the processes table if the attach operation fails. */
+		kill(pid, SIGKILL);
+
 		fatal("could not trace child");
 	}
 	kill(pid, SIGUSR1);
