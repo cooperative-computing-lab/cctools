@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+
+import ast
+import sys
+import argparse
+
+def list_functions(module):
+    for stmt in ast.walk(module):
+        if isinstance(stmt, ast.FunctionDef):
+            print(stmt.name)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='List the functions defined in some Python code.')
+    parser.add_argument('source',
+        help='Analyze the given Python source code, or - for stdin.')
+    args = parser.parse_args()
+
+    filename = '<stdin>'
+    source = sys.stdin
+    if args.source != '-':
+        source = open(args.source, 'r')
+        filename = args.source
+
+    code = ast.parse(source.read(), filename=filename)
+    list_functions(code)
