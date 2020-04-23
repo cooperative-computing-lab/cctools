@@ -61,7 +61,6 @@ environment document:
     ...
 }
 
-
 @return An integer taskid assigned to the submitted task.
 */
 int work_queue_json_submit(struct work_queue *q, const char *str);

@@ -101,9 +101,6 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 		struct jx_pair *flag;
 		void *k = NULL;
 		void *v = NULL;
-		int cache = 1;
-		int nocache = 0;
-		int watch = 16;
 		int flags = 0;
 
 		const char *key = jx_iterate_keys(arr, &k);
@@ -121,17 +118,13 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 				while(flag) {
 					char *flag_key = flag->key->u.string_value;
 					bool flag_value = flag->value->u.boolean_value;
-					if(!strcmp(flag_key, "WORK_QUEUE_NOCACHE")) {
+					if(!strcmp(flag_key, "cache")) {
 						if(flag_value) {
-							flags |= nocache;
+							flags |= WORK_QUEUE_CACHE;
 						}
-					} else if(!strcmp(flag_key, "WORK_QUEUE_CACHE")) {
+					} else if(!strcmp(flag_key, "watch")) {
 						if(flag_value) {
-							flags |= cache;
-						}
-					} else if(!strcmp(flag_key, "WORK_QUEUE_WATCH")) {
-						if(flag_value) {
-							flags |= watch;
+							flags |= WORK_QUEUE_WATCH;
 						}
 					} else {
 						printf("KEY ERROR: %s not valid", flag_key);
