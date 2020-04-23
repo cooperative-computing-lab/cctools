@@ -328,6 +328,10 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 
 	struct work_queue_task *t = work_queue_wait(q, timeout);
 
+    if(!t) {
+        return NULL;
+    }
+
 	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
 	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
 	return_status = jx_pair(jx_string("return_status"), jx_integer(t->return_status), taskid);
@@ -344,7 +348,6 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 	task = jx_print_string(j);
 
 	return task;
-
 }
 
 char *work_queue_json_remove(struct work_queue *q, int id)
