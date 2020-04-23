@@ -29,7 +29,7 @@ static const char *work_queue_properties[] = { "name", "port", "priority", "num_
 	"current_max_worker", "password", "bandwidth"
 };
 
-static const char *work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files",
+static const char *work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
 	"output_files", "env_list", "taskid", "return_status", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
@@ -156,6 +156,22 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 
 }
 
+static int specify_environment(struct jx *environment, struct work_queue_task *task) {
+	void *j = NULL;
+	void *i = NULL;
+	const char *key = jx_iterate_keys(environment, &j);
+	struct jx *value = jx_iterate_values(environment, &i);
+
+    while(key != NULL) {
+        work_queue_task_specify_enviroment_variable(task, key, value->u.string_value);
+        key = jx_iterate_keys(environment, &j);
+        value = jx_iterate_values(environment, &i);
+    }
+
+    return 0;
+}
+
+
 
 static struct work_queue_task *create_task(const char *str)
 {
@@ -163,6 +179,7 @@ static struct work_queue_task *create_task(const char *str)
 	char *command_line = NULL;
 	struct jx *input_files = NULL;
     struct jx *output_files = NULL;
+    struct jx *environment = NULL;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {
@@ -186,6 +203,8 @@ static struct work_queue_task *create_task(const char *str)
 			input_files = value;
 		} else if(!strcmp(key, "output_files")) {
 			output_files = value;
+		} else if(!strcmp(key, "environment")) {
+			environment = value;
 		} else {
 			printf("%s\n", value->u.string_value);
 		}
@@ -211,6 +230,10 @@ static struct work_queue_task *create_task(const char *str)
 		if(output_files) {
 			specify_files(0, output_files, task);
 		}
+
+        if(environment) {
+            specify_environment(environment, task);
+        }
 
 		return task;
 
