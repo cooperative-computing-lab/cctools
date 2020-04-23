@@ -59,10 +59,10 @@ int main(int argc, char *argv[])
 
 	while(!work_queue_empty(q)) {
 
-		t = work_queue_json_wait(q, 20);
-
-		printf("%s\n", t);
-
+		t = work_queue_json_wait(q, 5);
+        if(t) {
+            printf("%s\n", t);
+        }
 	}
 
 	printf("all tasks complete!\n");
