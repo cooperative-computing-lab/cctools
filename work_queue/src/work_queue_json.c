@@ -26,7 +26,7 @@ static const char *work_queue_properties[] = { "name", "port", "priority", "num_
 	"transactions_logfile", "keepalive_interval", "keepalive_timeout", "link_poll_end",
 	"master_preferred_connection", "monitor_mode", "monitor_file", "monitor_output_directory",
 	"monitor_summary_filename", "monitor_exe", "measured_local_resources",
-	"current_max_worker", "password", "bandwidth"
+	"current_max_worker", "password", "bandwidth", NULL
 };
 
 static const char *work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
@@ -44,7 +44,7 @@ static const char *work_queue_task_properties[] = { "tag", "command_line", "work
 	"time_execute_cmd_finish", "total_transfer_time", "cmd_execution_time",
 	"total_cmd_execution_time", "total_cmd_exhausted_execute_time",
 	"total_time_until_worker_failure", "total_bytes_received", "total_bytes_sent",
-	"total_bytes_transferred", "time_app_delay"
+	"total_bytes_transferred", "time_app_delay", NULL
 };
 
 
