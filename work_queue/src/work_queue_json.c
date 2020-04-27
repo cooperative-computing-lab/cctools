@@ -26,10 +26,10 @@ static const char *work_queue_properties[] = { "name", "port", "priority", "num_
 	"transactions_logfile", "keepalive_interval", "keepalive_timeout", "link_poll_end",
 	"master_preferred_connection", "monitor_mode", "monitor_file", "monitor_output_directory",
 	"monitor_summary_filename", "monitor_exe", "measured_local_resources",
-	"current_max_worker", "password", "bandwidth"
+	"current_max_worker", "password", "bandwidth", NULL
 };
 
-static const char *work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files",
+static const char *work_queue_task_properties[] = { "tag", "command_line", "worker_selection_algorithm", "output", "input_files", "environment",
 	"output_files", "env_list", "taskid", "return_status", "result", "host", "hostname",
 	"category", "resource_request", "priority", "max_retries", "try_count",
 	"exhausted_attempts", "time_when_submitted", "time_when_done",
@@ -44,7 +44,7 @@ static const char *work_queue_task_properties[] = { "tag", "command_line", "work
 	"time_execute_cmd_finish", "total_transfer_time", "cmd_execution_time",
 	"total_cmd_execution_time", "total_cmd_exhausted_execute_time",
 	"total_time_until_worker_failure", "total_bytes_received", "total_bytes_sent",
-	"total_bytes_transferred", "time_app_delay"
+	"total_bytes_transferred", "time_app_delay", NULL
 };
 
 
@@ -101,9 +101,6 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 		struct jx_pair *flag;
 		void *k = NULL;
 		void *v = NULL;
-		int cache = 1;
-		int nocache = 0;
-		int watch = 16;
 		int flags = 0;
 
 		const char *key = jx_iterate_keys(arr, &k);
@@ -121,17 +118,13 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 				while(flag) {
 					char *flag_key = flag->key->u.string_value;
 					bool flag_value = flag->value->u.boolean_value;
-					if(!strcmp(flag_key, "WORK_QUEUE_NOCACHE")) {
+					if(!strcmp(flag_key, "cache")) {
 						if(flag_value) {
-							flags |= nocache;
+							flags |= WORK_QUEUE_CACHE;
 						}
-					} else if(!strcmp(flag_key, "WORK_QUEUE_CACHE")) {
+					} else if(!strcmp(flag_key, "watch")) {
 						if(flag_value) {
-							flags |= cache;
-						}
-					} else if(!strcmp(flag_key, "WORK_QUEUE_WATCH")) {
-						if(flag_value) {
-							flags |= watch;
+							flags |= WORK_QUEUE_WATCH;
 						}
 					} else {
 						printf("KEY ERROR: %s not valid", flag_key);
@@ -163,6 +156,22 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 
 }
 
+static int specify_environment(struct jx *environment, struct work_queue_task *task) {
+	void *j = NULL;
+	void *i = NULL;
+	const char *key = jx_iterate_keys(environment, &j);
+	struct jx *value = jx_iterate_values(environment, &i);
+
+    while(key != NULL) {
+        work_queue_task_specify_enviroment_variable(task, key, value->u.string_value);
+        key = jx_iterate_keys(environment, &j);
+        value = jx_iterate_values(environment, &i);
+    }
+
+    return 0;
+}
+
+
 
 static struct work_queue_task *create_task(const char *str)
 {
@@ -170,6 +179,7 @@ static struct work_queue_task *create_task(const char *str)
 	char *command_line = NULL;
 	struct jx *input_files = NULL;
     struct jx *output_files = NULL;
+    struct jx *environment = NULL;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {
@@ -193,6 +203,8 @@ static struct work_queue_task *create_task(const char *str)
 			input_files = value;
 		} else if(!strcmp(key, "output_files")) {
 			output_files = value;
+		} else if(!strcmp(key, "environment")) {
+			environment = value;
 		} else {
 			printf("%s\n", value->u.string_value);
 		}
@@ -218,6 +230,10 @@ static struct work_queue_task *create_task(const char *str)
 		if(output_files) {
 			specify_files(0, output_files, task);
 		}
+
+        if(environment) {
+            specify_environment(environment, task);
+        }
 
 		return task;
 
@@ -312,6 +328,10 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 
 	struct work_queue_task *t = work_queue_wait(q, timeout);
 
+    if(!t) {
+        return NULL;
+    }
+
 	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
 	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
 	return_status = jx_pair(jx_string("return_status"), jx_integer(t->return_status), taskid);
@@ -328,7 +348,6 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 	task = jx_print_string(j);
 
 	return task;
-
 }
 
 char *work_queue_json_remove(struct work_queue *q, int id)
