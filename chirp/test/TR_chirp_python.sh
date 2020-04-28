@@ -15,6 +15,7 @@ python_dir=${CCTOOLS_PYTHON_TEST_DIR}
 check_needed()
 {
 	[ -n "${python}" ] || return 1
+	${python} -c 'import Chirp'
 }
 
 prepare()
