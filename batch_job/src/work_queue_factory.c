@@ -700,9 +700,11 @@ int read_config_file(const char *config_file) {
 
 	assign_new_value(new_condor_requirements, condor_requirements, condor-requirements, const char *, JX_STRING, string_value)
 
-	if(!new_project_regex || strlen(new_project_regex) == 0) {
-		debug(D_NOTICE, "%s: master name is missing.\n", config_file);
-		error_found = 1;
+	if(!master_host) {
+		if(!new_project_regex || strlen(new_project_regex) == 0) {
+			debug(D_NOTICE, "%s: master name is missing and no master host was given.\n", config_file);
+			error_found = 1;
+		}
 	}
 
 	if(new_workers_min > new_workers_max) {
@@ -1306,24 +1308,28 @@ int main(int argc, char *argv[])
 		config_file = xxstrdup(abs_path_name);
 	}
 
-	if(project_regex) {
-		using_catalog = 1;
-	} else if(config_file) {
-		using_catalog = 1;
+	if((argc - optind) == 2) {
+		master_host = argv[optind];
+		master_port = atoi(argv[optind+1]);
+	}
+
+	if(config_file) {
 		if(!read_config_file(config_file)) {
 			fprintf(stderr,"work_queue_factory: There were errors in the configuration file: %s\n", config_file);
 			return 1;
 		}
 	}
-	else if((argc - optind) == 2) {
-		using_catalog = 0;
-		master_host = argv[optind];
-		master_port = atoi(argv[optind+1]);
-	}
-	else {
+
+	if(!(master_host || config_file || project_regex)) {
 		fprintf(stderr,"work_queue_factory: You must either give a project name with the -M option or master-name option with a configuration file, or give the master's host and port.\n");
 		show_help(argv[0]);
 		exit(1);
+	}
+
+	if(master_host) {
+		using_catalog = 0;
+	} else {
+		using_catalog = 1;
 	}
 
 	cctools_version_debug(D_DEBUG, argv[0]);
