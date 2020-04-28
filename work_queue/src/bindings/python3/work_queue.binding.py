@@ -1453,26 +1453,47 @@ class Factory(object):
     ]
 
     def __init__(
-            self, batch_type, master_name,
+            self, batch_type,
+            master_name=None,
+            master_host_port=None,
             factory_binary=None, worker_binary=None,
             log_file=os.devnull):
-        """Create a factory with the given batch_type and master name.
-
+        """
+        Create a factory for the given batch_type and master name.
+        master_name or, master_host_port should be specified.
         If factory_binary or worker_binary is not
         specified, $PATH will be searched.
         """
+
         self._config_file = None
         self._factory_proc = None
         self._log_file = log_file
 
         self._opts = {}
 
+        self._set_master(master_name, master_host_port)
         self._opts['batch-type'] = batch_type
-        self._opts['master-name'] = master_name
         self._opts['worker-binary'] = self._find_exe(worker_binary, 'work_queue_worker')
-
         self._factory_binary = self._find_exe(factory_binary, 'work_queue_factory')
 
+    def _set_master(self, master_name, master_host_port):
+        if not (master_name or master_host_port):
+            raise ValueError('Either master_name or, master_host_port should be specified.')
+
+        if master_name and master_host_port:
+            raise ValueError('Master should be specified by a name, or by a host and port. Not both.')
+
+        if master_name:
+            self._opts['master-name'] = master_name
+            return
+
+        if master_host_port:
+            try:
+                (host, port) = [x for x in master_host_port.split(':') if x]
+                self._opts['master-host'] = host
+                self._opts['master-port'] = port
+            except (TypeError, ValueError):
+                raise ValueError('master_name is not of the form HOST:PORT')
 
     def _find_exe(self, path, default):
         if path is None:
@@ -1539,7 +1560,12 @@ class Factory(object):
     def _construct_command_line(self):
         args = [self._factory_binary]
         args += ['--config-file', self._config_file]
-        args += ["--{}={}".format(opt, self._opts[opt]) for opt in self._opts if opt not in Factory._config_file_options]
+        args += ["--{}={}".format(opt, self._opts[opt])
+                 for opt in self._opts
+                 if opt in Factory._command_line_options and opt not in Factory._config_file_options]
+
+        if 'master-host' in self._opts:
+            args += [self._opts['master-host'], self._opts['master-port']]
 
         return args
 
@@ -1560,6 +1586,10 @@ class Factory(object):
             stderr=logfd)
         devnull.close()
         logfd.close()
+
+        status = self._factory_proc.poll()
+        if status:
+            raise RuntimeError('Could not execute work_queue_factory. Exited with status: {}'.format(str(status)))
 
         return self
 
