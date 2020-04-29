@@ -1,17 +1,27 @@
 include ../config.mk
 include ../rules.mk
 
-PROGRAMS = python_package_analyze python_package_create python_package_run
+PHONY_TARGETS ?= src
+TARGETS ?= $(PHONY_TARGETS)
 
-all:
+all: $(TARGETS)
 
-clean:
+$(TARGETS):
+	@$(MAKE) -C $@
 
-test:
+CLEAN_TARGETS = $(TARGETS:%=clean-%)
+$(CLEAN_TARGETS):
+	@$(MAKE) -C $(@:clean-%=%) clean
+clean: $(CLEAN_TARGETS)
 
-install:
-	mkdir -p $(CCTOOLS_INSTALL_DIR)/bin
-	cp $(PROGRAMS) $(CCTOOLS_INSTALL_DIR)/bin/
+INSTALL_TARGETS = $(TARGETS:%=install-%)
+$(INSTALL_TARGETS):
+	@$(MAKE) -C $(@:install-%=%) install
+install: $(INSTALL_TARGETS)
 
+TEST_TARGETS = $(TARGETS:%=test-%)
+$(TEST_TARGETS):
+	@$(MAKE) -C $(@:test-%=%) test
+test: $(TEST_TARGETS)
 
-.PHONY: all clean install test
+.PHONY: $(PHONY_TARGETS) $(CLEAN_TARGETS) $(INSTALL_TARGETS) $(TEST_TARGETS) all clean install test
