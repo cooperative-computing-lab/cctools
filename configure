@@ -1413,7 +1413,7 @@ then
 fi
 
 
-potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc}"
+potential_packages="dttools batch_job ${include_package_grow} ${include_package_makeflow} work_queue ${include_package_apps} ${include_package_ftplite} ${include_package_parrot} ${include_package_resource_monitor} ${include_package_chirp} ${include_package_weaver} ${include_package_umbrella} ${include_package_deltadb} ${include_package_prune} ${include_package_doc} python_environments"
 
 echo "checking for all the things I know how to build..."
 for p in $potential_packages
