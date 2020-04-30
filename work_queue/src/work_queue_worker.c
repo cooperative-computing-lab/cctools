@@ -726,7 +726,7 @@ static int handle_tasks(struct link *master)
 }
 
 /**
- * Stream file/directory contents for the rget protocol.
+ * Stream file/directory contents for the recursive get/put protocol.
  * Format:
  * 		for a directory: a new line in the format of "dir $DIR_NAME 0"
  * 		for a file: a new line in the format of "file $FILE_NAME $FILE_LENGTH"
@@ -760,6 +760,7 @@ static int handle_tasks(struct link *master)
  * end
  *
  */
+
 static int stream_output_item(struct link *master, const char *filename, int recursive)
 {
 	DIR *dir;
@@ -988,23 +989,123 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 }
 
 /*
-Handle an incoming "put" message from the master,
-which places a file into the cache directory.
+Return false if name is invalid as a simple filename.
+For example, if it contains a slash, which would escape
+the current working directory.
 */
 
-static int do_put( struct link *master, char *filename, int64_t length, int mode )
+int is_valid_filename( const char *name )
 {
-	char cached_filename[WORK_QUEUE_LINE_MAX];
-	char *cur_pos;
+	if(strchr(name,'/')) return 0;
+	return 1;
+}
 
-	debug(D_WQ, "Putting file %s into workspace\n", filename);
+/*
+Handle an incoming file inside the rput protocol.
+Notice that we trust the caller to have created
+the necessary parent directories and checked the
+name for validity.
+*/
+
+static int do_put_file_internal( struct link *master, char *filename, int64_t length, int mode )
+{
 	if(!check_disk_space_for_filesize(".", length, disk_avail_threshold)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 
-
+	/* Ensure that worker can access the file! */
 	mode = mode | 0600;
+
+	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	if(fd<0) {
+		debug(D_WQ, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+
+	int64_t actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
+	close(fd);
+	if(actual!=length) {
+		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
+		return 0;
+	}
+
+	return 1;
+}
+
+/*
+Handle an incoming directory inside the recursive dir protocol.
+Notice that we have already checked the dirname for validity,
+and now we process "file" and "dir" commands within the list
+until "end" is reached.
+*/
+
+static int do_put_dir_internal( struct link *master, char *dirname )
+{
+	char line[WORK_QUEUE_LINE_MAX];
+	char name[WORK_QUEUE_LINE_MAX];
+	int64_t size;
+	int mode;
+
+	int result = mkdir(dirname,0777);
+	if(result<0) {
+		debug(D_WQ,"unable to create %s: %s",dirname,strerror(errno));
+		return 0;
+	}
+
+	while(1) {
+		if(!recv_master_message(master,line,sizeof(line),time(0)+active_timeout)) return 0;
+
+		if(sscanf(line,"file %s %" SCNd64 " %o",name,&size,&mode)==3) {
+
+			if(!is_valid_filename(name)) return 0;
+
+			char *subname = string_format("%s/%s",dirname,name);
+			do_put_file_internal(master,subname,size,mode);
+			free(subname);
+
+		} else if(sscanf(line,"dir %s",name)==1) {
+
+			if(!is_valid_filename(name)) return 0;
+
+			char *subname = string_format("%s/%s",dirname,name);
+			do_put_dir_internal(master,name);
+			free(subname);
+
+		} else if(!strcmp(line,"end")) {
+			break;
+		}
+	}
+
+	return 1;
+}
+
+static int do_put_dir( struct link *master, char *dirname )
+{
+	if(!is_valid_filename(dirname)) return 0;
+
+	char * cachename = string_format("cache/%s",dirname);
+	int result = do_put_dir_internal(master,cachename);
+	free(cachename);
+
+	return result;
+}
+
+/*
+This is the old method for sending a single file.
+It works, but it has the deficiency that the master
+expects the worker to create all parent directories
+for the file, which is horrifically expensive when
+sending a large directory tree.  The rput protocol
+(next) is preferred instead.
+*/
+
+static int do_put_single_file( struct link *master, char *filename, int64_t length, int mode )
+{
+	char cached_filename[WORK_QUEUE_LINE_MAX];
+	char *cur_pos;
+
+	debug(D_WQ, "Putting file %s into workspace\n", filename);
 
 	cur_pos = filename;
 
@@ -1024,20 +1125,7 @@ static int do_put( struct link *master, char *filename, int64_t length, int mode
 		*cur_pos = '/';
 	}
 
-	int fd = open(cached_filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
-	if(fd < 0) {
-		debug(D_WQ, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
-	int64_t actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
-	close(fd);
-	if(actual != length) {
-		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
-		return 0;
-	}
-
-	return 1;
+	return do_put_file_internal(master,cached_filename,length,mode);
 }
 
 static int file_from_url(const char *url, const char *filename) {
@@ -1434,7 +1522,7 @@ static int handle_master(struct link *master) {
 				free(g); //flags are not used anymore.
 				
 				if(path_within_dir(filename, workspace)) {
-					r = do_put(master, filename, length, mode);
+					r = do_put_single_file(master, filename, length, mode);
 					reset_idle_timer();
 				} else {
 					debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
@@ -1444,6 +1532,8 @@ static int handle_master(struct link *master) {
 				debug(D_WQ, "Malformed put message.");
 				r = 0;
 			}
+		} else if(sscanf(line, "dir %s", filename)==1) {
+			r = do_put_dir(master,filename);
 		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
 			r = do_url(master, filename, length, mode);
 			reset_idle_timer();
