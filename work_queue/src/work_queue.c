@@ -2856,9 +2856,12 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	return SUCCESS;
 }
 
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t * total_bytes, int flags );
+
 /*
 Send a directory and all of its contentss.
 */
+
 static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
 {
 	DIR *dir = opendir(dirname);
@@ -2869,8 +2872,8 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 	work_queue_result_code_t result = SUCCESS;
 
-	// When putting a file its parent directories are automatically
-	// created by the worker, so no need to manually create them.
+	send_worker_msg(q,w,"dir %s",remotedirname);
+
 	struct dirent *d;
 	while((d = readdir(dir))) {
 		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) continue;
@@ -2878,17 +2881,7 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 		char *localpath = string_format("%s/%s",dirname,d->d_name);
 		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
 
-		struct stat local_info;
-		if(lstat(localpath, &local_info)>=0) {
-			if(S_ISDIR(local_info.st_mode))  {
-				result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
-			} else {
-				result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
-			}
-		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", localpath, strerror(errno));
-			result = APP_FAILURE;
-		}
+		result = send_item( q, w, t, localpath, remotepath, total_bytes, flags );
 
 		free(localpath);
 		free(remotepath);
@@ -2896,7 +2889,28 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 		if(result != SUCCESS) break;
 	}
 
+	send_worker_msg(q,w,"end");
+
 	closedir(dir);
+	return result;
+}
+
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t * total_bytes, int flags )
+{
+	struct stat info;
+	int result = SUCCESS;
+
+	if(lstat(localpath, &info)>=0) {
+		if(S_ISDIR(info.st_mode))  {
+			result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
+		} else {
+			result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
+		}
+	} else {
+		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));
+		result = APP_FAILURE;
+	}
+
 	return result;
 }
 

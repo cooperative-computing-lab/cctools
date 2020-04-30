@@ -1036,8 +1036,10 @@ static int do_put_file_internal( struct link *master, char *filename, int64_t le
 /*
 Handle an incoming directory inside the recursive dir protocol.
 Notice that we have already checked the dirname for validity,
-and now we process "file" and "dir" commands within the list
-until "end" is reached.
+and now we process "put" and "dir" commands within the list
+until "end" is reached.  Note that "put" is used instead of
+"file" for historical reasons, to support recursive reuse
+of existing code.
 */
 
 static int do_put_dir_internal( struct link *master, char *dirname )
@@ -1056,7 +1058,7 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 	while(1) {
 		if(!recv_master_message(master,line,sizeof(line),time(0)+active_timeout)) return 0;
 
-		if(sscanf(line,"file %s %" SCNd64 " %o",name,&size,&mode)==3) {
+		if(sscanf(line,"put %s %" SCNd64 " %o",name,&size,&mode)==3) {
 
 			if(!is_valid_filename(name)) return 0;
 
