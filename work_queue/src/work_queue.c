@@ -2782,6 +2782,18 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
+/*
+Send a single file (or a piece of a file) to the remote worker.
+The transfer time is controlled by the size of the file.
+If the transfer takes too long, then abort.
+
+Problem: This is about the third time stat() has been called
+on the file.  Find a way to minimize stat calls.
+
+Problem: Symbolic links should be detected as a third type
+of object (like files and directories) and sent in a distinct way.
+*/
+
 static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, int64_t *total_bytes, int flags)
 {
 	struct stat local_info;
@@ -2845,8 +2857,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 
 	*total_bytes += actual;
 
-	if(actual != length)
-		return WORKER_FAILURE;
+	if(actual != length) return WORKER_FAILURE;
 
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
@@ -2856,10 +2867,14 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	return SUCCESS;
 }
 
+/* Need prototype here to address mutually recursive code. */
+
 static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t * total_bytes, int flags );
 
 /*
-Send a directory and all of its contentss.
+Send a directory and all of its contents using the new streaming protocol.
+Do this by sending a "dir" prefix, then all of the directory contents,
+and then an "end" marker.
 */
 
 static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
@@ -2895,6 +2910,14 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 	return result;
 }
 
+/*
+Send a single item, whether it is a directory or a file,
+and invoke the appropriate method.
+
+Problem: This does not account for symbolic links,
+which should be identified as a distinct third type of object.
+*/
+
 static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t * total_bytes, int flags )
 {
 	struct stat info;
@@ -2918,6 +2941,7 @@ static work_queue_result_code_t send_item( struct work_queue *q, struct work_que
 Send a file or directory to a remote worker, if it is not already cached.
 The local file name should already have been expanded by the caller.
 */
+
 static work_queue_result_code_t send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
@@ -2930,17 +2954,19 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 
 	work_queue_result_code_t result = SUCCESS;
 
-	// Look in the current files hash to see if the file is already on the worker.
+	/*
+	Look to see if this item is already cached there.
+	If it is in the worker, but a new version is available, warn and return.
+	We do not want to rewrite the file while some other task may be using it.
+	Otherwise, send it to the worker.
+	*/
+
 	remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
-	/* If it is in the worker, but a new version is available, warn and return.
-	   We do not want to rewrite the file while some other task may be using
-	   it. */
 	if(remote_info && (remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size)) {
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
-	}
-	else if(!remote_info) {
-		/* If not on the worker, send it. */
+	} else if(!remote_info) {
+
 		if(S_ISDIR(local_info.st_mode)) {
 			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		} else {
@@ -2948,16 +2974,13 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 		}
 
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
-			remote_info = malloc(sizeof(*remote_info));
+			remote_info = xxmalloc(sizeof(*remote_info));
 			if(remote_info) {
 				memcpy(remote_info, &local_info, sizeof(local_info));
 				hash_table_insert(w->current_files, tf->cached_name, remote_info);
-			} else {
-				debug(D_NOTICE, "Cannot allocate memory for cache entry for input file %s at %s (%s)", expanded_local_name, w->hostname, w->addrport);
 			}
 		}
-	}
-	else {
+	} else {
 		/* Up-to-date file on the worker, we do nothing. */
 	}
 
