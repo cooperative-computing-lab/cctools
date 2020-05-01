@@ -2872,7 +2872,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 
 /* Need prototype here to address mutually recursive code. */
 
-static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes );
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links );
 
 /*
 Send a directory and all of its contents using the new streaming protocol.
@@ -2901,7 +2901,7 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 		char *localpath = string_format("%s/%s",localname,d->d_name);
 
-		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes );
+		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, 0 );
 
 		free(localpath);
 
@@ -2916,17 +2916,30 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 /*
 Send a single item, whether it is a directory, symlink, or file.
-Note that we call lstat() here a single time, and then pass it
+
+Note 1: We call stat/lstat here a single time, and then pass it
 to the underlying object so as not to minimize syscall work.
+
+Note 2: This function is invoked at the top level with follow_links=1,
+since it is common for the user to to pass in a top-level symbolic
+link to a file or directory which they want transferred.
+However, in recursive calls, follow_links is set to zero,
+and internal links are not followed, they are sent natively.
 */
 
 
-static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes )
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
 {
 	struct stat info;
 	int result = SUCCESS;
 
-	if(lstat(localpath, &info)>=0) {
+	if(follow_links) {
+		result = stat(localpath,&info);
+	} else {
+		result = lstat(localpath,&info);
+	}
+
+	if(result>=0) {
 		if(S_ISDIR(info.st_mode))  {
 			result = send_directory( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISLNK(info.st_mode)) {
@@ -2974,7 +2987,7 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		}
 
 		work_queue_result_code_t result;
-		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes );
+		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
 
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = xxmalloc(sizeof(*remote_info));
