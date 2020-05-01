@@ -2783,15 +2783,35 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 }
 
 /*
+Send a symbolic link to the remote worker.
+Note that the target of the link is sent
+as sthe "body" of the link, following the
+message header.
+*/
+
+static int send_symlink( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, int64_t *total_bytes )
+{
+	char target[WORK_QUEUE_LINE_MAX];
+
+	int length = readlink(localname,target,sizeof(target));
+	if(length<0) return APP_FAILURE;
+
+	send_worker_msg(q,w,"symlink %s %d\n",remotename,length);
+
+	link_write(w->link,target,length,time(0)+q->long_timeout);
+
+	*total_bytes += length;
+
+	return SUCCESS;
+}
+
+/*
 Send a single file (or a piece of a file) to the remote worker.
 The transfer time is controlled by the size of the file.
 If the transfer takes too long, then abort.
 
 Problem: This is about the third time stat() has been called
 on the file.  Find a way to minimize stat calls.
-
-Problem: Symbolic links should be detected as a third type
-of object (like files and directories) and sent in a distinct way.
 */
 
 static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, int64_t *total_bytes, int flags)
@@ -2802,18 +2822,6 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	int64_t actual = 0;
 
 	if(stat(localname, &local_info) < 0) {
-		if(lstat(localname,&local_info)==0) {
-			/*
-			If stat fails but lstat succeeds, we are looking at
-			a broken symbolic link.  This could be user error but
-			is more frequently an editor lock file or similar indication.
-			In this case, emit a warning but continue without sending
-			the file.
-			*/
-			debug(D_WQ|D_NOTICE,"skipping broken symbolic link: %s",localname);
-			return SUCCESS;
-		}
-
 		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
@@ -2909,12 +2917,9 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 }
 
 /*
-Send a single item, whether it is a directory or a file,
-and invoke the appropriate method.
-
-Problem: This does not account for symbolic links,
-which should be identified as a distinct third type of object.
+Send a single item, whether it is a directory, symlink, or file.
 */
+
 
 static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t * total_bytes, int flags )
 {
@@ -2924,8 +2929,12 @@ static work_queue_result_code_t send_item( struct work_queue *q, struct work_que
 	if(lstat(localpath, &info)>=0) {
 		if(S_ISDIR(info.st_mode))  {
 			result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
-		} else {
+		} else if(S_ISLNK(info.st_mode)) {
+			result = send_symlink( q, w, t, localpath, remotepath, total_bytes );
+		} else if(S_ISREG(info.st_mode)) {
 			result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
+		} else {
+			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
 		}
 	} else {
 		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));

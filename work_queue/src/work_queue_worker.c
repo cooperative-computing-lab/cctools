@@ -1001,6 +1001,38 @@ int is_valid_filename( const char *name )
 }
 
 /*
+Handle an incoming symbolic link inside the rput protocol.
+The filename of the symlink was already given in the message,
+and the target of the symlink is given as the "body" which
+must be read off of the wire.
+*/
+
+static int do_put_symlink_internal( struct link *master, char *filename, int length )
+{
+	char *target = malloc(length);
+
+	int actual = link_read(master,target,length,time(0)+active_timeout);
+	if(actual!=length) {
+		free(target);
+		return 0;
+	}
+
+	/* XXX need to check that symlink target doesn't violate workspace */
+
+	int result = symlink(target,filename);
+	if(result<0) {
+		debug(D_WQ,"could not create symlink %s: %s",filename,strerror(errno));
+		free(target);
+		return 0;
+	}
+
+	free(target);
+
+	return 1;
+}
+
+
+/*
 Handle an incoming file inside the rput protocol.
 Notice that we trust the caller to have created
 the necessary parent directories and checked the
@@ -1058,12 +1090,22 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 	while(1) {
 		if(!recv_master_message(master,line,sizeof(line),time(0)+active_timeout)) return 0;
 
+		/* XXX need to check for success of each call. */
+
 		if(sscanf(line,"put %s %" SCNd64 " %o",name,&size,&mode)==3) {
 
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
 			do_put_file_internal(master,subname,size,mode);
+			free(subname);
+
+		} else if(sscanf(line,"symlink %s %" SCNd64,name,&size)==2) {
+
+			if(!is_valid_filename(name)) return 0;
+
+			char *subname = string_format("%s/%s",dirname,name);
+			do_put_symlink_internal(master,subname,size);
 			free(subname);
 
 		} else if(sscanf(line,"dir %s",name)==1) {
