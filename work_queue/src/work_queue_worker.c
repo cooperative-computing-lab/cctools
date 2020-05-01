@@ -1150,24 +1150,20 @@ protocol (above) is preferred instead.
 
 static int do_put_single_file( struct link *master, char *filename, int64_t length, int mode )
 {
-	char cached_filename[WORK_QUEUE_LINE_MAX];
-
 	if(!path_within_dir(filename, workspace)) {
 		debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 		return 0;
 	}
 
-	char *slash = strrchr(cached_filename, '/');
+	char * cached_filename = string_format("cache/%s",filename);
 
-	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", slash);
-
-	if(slash) {
-		*slash = '\0';
-		if(!create_dir(cached_filename, mode | 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)\n", cached_filename, strerror(errno));
+	if(strchr(filename,'/')) {
+		char dirname[WORK_QUEUE_LINE_MAX];
+		path_dirname(filename,dirname);
+		if(!create_dir(dirname,0777)) {
+			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
 			return 0;
 		}
-		*slash = '/';
 	}
 
 	return do_put_file_internal(master,cached_filename,length,mode);
