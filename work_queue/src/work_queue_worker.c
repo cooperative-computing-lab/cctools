@@ -1071,7 +1071,7 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
-			do_put_dir_internal(master,name);
+			do_put_dir_internal(master,subname);
 			free(subname);
 
 		} else if(!strcmp(line,"end")) {
