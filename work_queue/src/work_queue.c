@@ -2806,9 +2806,6 @@ static int send_symlink( struct work_queue *q, struct work_queue_worker *w, stru
 Send a single file (or a piece of a file) to the remote worker.
 The transfer time is controlled by the size of the file.
 If the transfer takes too long, then abort.
-
-Problem: This is about the third time stat() has been called
-on the file.  Find a way to minimize stat calls.
 */
 
 static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
