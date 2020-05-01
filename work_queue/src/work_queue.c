@@ -2939,11 +2939,11 @@ static work_queue_result_code_t send_item( struct work_queue *q, struct work_que
 }
 
 /*
-Send a file or directory to a remote worker, if it is not already cached.
+Send an item to a remote worker, if it is not already cached.
 The local file name should already have been expanded by the caller.
 */
 
-static work_queue_result_code_t send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
+static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
 	struct stat *remote_info;
@@ -2968,10 +2968,10 @@ static work_queue_result_code_t send_file_or_directory( struct work_queue *q, st
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
 	} else if(!remote_info) {
 
-		if(S_ISDIR(local_info.st_mode)) {
-			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
-		} else {
+		if(tf->offset!=0 || tf->piece_length!=0) {
 			result = send_file(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
+		} else {
+			result = send_item(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
 		}
 
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
@@ -3113,7 +3113,7 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
 			if(expanded_payload) {
-				result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
+				result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
 				free(expanded_payload);
 			} else {
 				result = APP_FAILURE; //signal app-level failure.
