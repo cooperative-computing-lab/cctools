@@ -1562,7 +1562,7 @@ static int handle_master(struct link *master) {
 	if(recv_master_message(master, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid,time(0)+active_timeout);
-		} else if(sscanf(line,"put %s %"SCNd64" %d",filename_encoded,&length,&mode)==3) {
+		} else if(sscanf(line,"put %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_single_file(master, filename, length, mode);
 			reset_idle_timer();
