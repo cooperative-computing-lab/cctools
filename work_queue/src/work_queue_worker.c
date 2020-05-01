@@ -798,7 +798,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_master_message(master, "file %s %"PRId64" 0%o\n", filename, length, info.st_mode);
+			send_master_message(master, "file %s %"PRId64"\n", filename, length );
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
