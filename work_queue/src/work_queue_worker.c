@@ -1144,33 +1144,30 @@ This is the old method for sending a single file.
 It works, but it has the deficiency that the master
 expects the worker to create all parent directories
 for the file, which is horrifically expensive when
-sending a large directory tree.  The rput protocol
-(next) is preferred instead.
+sending a large directory tree.  The direction put
+protocol (above) is preferred instead.
 */
 
 static int do_put_single_file( struct link *master, char *filename, int64_t length, int mode )
 {
 	char cached_filename[WORK_QUEUE_LINE_MAX];
-	char *cur_pos;
 
-	debug(D_WQ, "Putting file %s into workspace\n", filename);
-
-	cur_pos = filename;
-
-	while(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
+	if(!path_within_dir(filename, workspace)) {
+		debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+		return 0;
 	}
 
-	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
+	char *slash = strrchr(cached_filename, '/');
 
-	cur_pos = strrchr(cached_filename, '/');
-	if(cur_pos) {
-		*cur_pos = '\0';
+	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", slash);
+
+	if(slash) {
+		*slash = '\0';
 		if(!create_dir(cached_filename, mode | 0700)) {
 			debug(D_WQ, "Could not create directory - %s (%s)\n", cached_filename, strerror(errno));
 			return 0;
 		}
-		*cur_pos = '/';
+		*slash = '/';
 	}
 
 	return do_put_file_internal(master,cached_filename,length,mode);
@@ -1203,9 +1200,16 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 		return file_from_url(url, cache_name);
 }
 
-static int do_unlink(const char *path) {
+static int do_unlink(const char *path)
+{
 	char cached_path[WORK_QUEUE_LINE_MAX];
 	string_nformat(cached_path, sizeof(cached_path), "cache/%s", path);
+
+	if(!path_within_dir(cached_path, workspace)) {
+		debug(D_WQ, "%s is not within workspace %s",cached_path,workspace);
+		return 0;
+	}
+
 	//Use delete_dir() since it calls unlink() if path is a file.
 	if(delete_dir(cached_path) != 0) {
 		struct stat buf;
@@ -1564,13 +1568,8 @@ static int handle_master(struct link *master) {
 			r = do_task(master, taskid,time(0)+active_timeout);
 		} else if(sscanf(line,"put %s %"SCNd64" %d",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			if(path_within_dir(filename, workspace)) {
-				r = do_put_single_file(master, filename, length, mode);
-				reset_idle_timer();
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r = 0;
-			}
+			r = do_put_single_file(master, filename, length, mode);
+			reset_idle_timer();
 		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_dir(master,filename);
@@ -1580,12 +1579,7 @@ static int handle_master(struct link *master) {
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
-			if(path_within_dir(filename, workspace)) {
-				r = do_unlink(filename);
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r= 0;
-			}
+			r = do_unlink(filename);
 		} else if(sscanf(line, "get %s %d", filename_encoded, &mode) == 2) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_get(master, filename, mode);
