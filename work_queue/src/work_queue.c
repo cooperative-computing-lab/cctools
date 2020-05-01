@@ -2811,7 +2811,7 @@ Problem: This is about the third time stat() has been called
 on the file.  Find a way to minimize stat calls.
 */
 
-static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes, int flags)
+static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
 {
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
@@ -2855,7 +2855,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
 
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename_encoded, length, mode, flags);
+	send_worker_msg(q,w, "put %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -2873,7 +2873,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 
 /* Need prototype here to address mutually recursive code. */
 
-static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int flags );
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes );
 
 /*
 Send a directory and all of its contents using the new streaming protocol.
@@ -2881,7 +2881,7 @@ Do this by sending a "dir" prefix, then all of the directory contents,
 and then an "end" marker.
 */
 
-static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, int64_t * total_bytes, int flags )
+static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, int64_t * total_bytes )
 {
 	DIR *dir = opendir(localname);
 	if(!dir) {
@@ -2902,7 +2902,7 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 		char *localpath = string_format("%s/%s",localname,d->d_name);
 
-		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, flags );
+		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes );
 
 		free(localpath);
 
@@ -2922,18 +2922,18 @@ to the underlying object so as not to minimize syscall work.
 */
 
 
-static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int flags )
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes )
 {
 	struct stat info;
 	int result = SUCCESS;
 
 	if(lstat(localpath, &info)>=0) {
 		if(S_ISDIR(info.st_mode))  {
-			result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
+			result = send_directory( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISLNK(info.st_mode)) {
 			result = send_symlink( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISREG(info.st_mode)) {
-			result = send_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes, flags );
+			result = send_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes );
 		} else {
 			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
 		}
@@ -2969,7 +2969,7 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 	} else if(!remote_info) {
 
 		work_queue_result_code_t result;
-		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
+		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes );
 
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = xxmalloc(sizeof(*remote_info));
@@ -3071,7 +3071,7 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 	case WORK_QUEUE_BUFFER:
 		debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
-		send_worker_msg(q,w, "put %s %d %o %d\n",f->cached_name, f->length, 0777, f->flags);
+		send_worker_msg(q,w, "put %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
 			result = WORKER_FAILURE;

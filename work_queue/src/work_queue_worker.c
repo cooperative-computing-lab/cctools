@@ -1558,12 +1558,11 @@ static int handle_master(struct link *master) {
 	int64_t length;
 	int64_t taskid = 0;
 	int mode, r, n;
-	int flags;
 
 	if(recv_master_message(master, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid,time(0)+active_timeout);
-		} else if(sscanf(line,"put %s %"SCNd64" %d %d",filename_encoded,&length,&mode,&flags)==4) {
+		} else if(sscanf(line,"put %s %"SCNd64" %d",filename_encoded,&length,&mode)==3) {
 			url_decode(filename_encoded,filename,sizeof(filename));
 			if(path_within_dir(filename, workspace)) {
 				r = do_put_single_file(master, filename, length, mode);
