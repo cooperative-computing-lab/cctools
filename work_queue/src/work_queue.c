@@ -2871,7 +2871,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 
 /* Need prototype here to address mutually recursive code. */
 
-static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t * total_bytes, int flags );
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int flags );
 
 /*
 Send a directory and all of its contents using the new streaming protocol.
@@ -2897,7 +2897,7 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 		char *localpath = string_format("%s/%s",dirname,d->d_name);
 
-		result = send_item( q, w, t, localpath, d->d_name, total_bytes, flags );
+		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, flags );
 
 		free(localpath);
 
@@ -2915,7 +2915,7 @@ Send a single item, whether it is a directory, symlink, or file.
 */
 
 
-static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t * total_bytes, int flags )
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int flags )
 {
 	struct stat info;
 	int result = SUCCESS;
@@ -2926,7 +2926,7 @@ static work_queue_result_code_t send_item( struct work_queue *q, struct work_que
 		} else if(S_ISLNK(info.st_mode)) {
 			result = send_symlink( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISREG(info.st_mode)) {
-			result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
+			result = send_file( q, w, t, localpath, remotepath, offset, length, total_bytes, flags );
 		} else {
 			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
 		}
@@ -2968,11 +2968,7 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
 	} else if(!remote_info) {
 
-		if(tf->offset!=0 || tf->piece_length!=0) {
-			result = send_file(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
-		} else {
-			result = send_item(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
-		}
+		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
 			remote_info = xxmalloc(sizeof(*remote_info));
