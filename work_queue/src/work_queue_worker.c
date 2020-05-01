@@ -462,7 +462,7 @@ int link_recursive( const char *source, const char *target )
 {
 	struct stat info;
 
-	if(stat(source,&info)<0) return 0;
+	if(lstat(source,&info)<0) return 0;
 
 	if(S_ISDIR(info.st_mode)) {
 		DIR *dir = opendir(source);
