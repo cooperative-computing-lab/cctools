@@ -2887,24 +2887,22 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 	work_queue_result_code_t result = SUCCESS;
 
-	send_worker_msg(q,w,"dir %s",remotedirname);
+	send_worker_msg(q,w,"dir %s\n",remotedirname);
 
 	struct dirent *d;
 	while((d = readdir(dir))) {
 		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) continue;
 
 		char *localpath = string_format("%s/%s",dirname,d->d_name);
-		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
 
-		result = send_item( q, w, t, localpath, remotepath, total_bytes, flags );
+		result = send_item( q, w, t, localpath, d->d_name, total_bytes, flags );
 
 		free(localpath);
-		free(remotepath);
 
 		if(result != SUCCESS) break;
 	}
 
-	send_worker_msg(q,w,"end");
+	send_worker_msg(q,w,"end\n");
 
 	closedir(dir);
 	return result;
@@ -3306,7 +3304,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	// send_worker_msg returns the number of bytes sent, or a number less than
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
-	int result_msg = send_worker_msg(q,w, "end\n");
+	int result_msg = send_worker_msg(q,w,"end\n");
 
 	if(result_msg > -1)
 	{
