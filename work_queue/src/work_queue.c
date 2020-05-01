@@ -2808,35 +2808,30 @@ Problem: This is about the third time stat() has been called
 on the file.  Find a way to minimize stat calls.
 */
 
-static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, int64_t *total_bytes, int flags)
+static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes, int flags)
 {
-	struct stat local_info;
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
 	int64_t actual = 0;
 
-	if(stat(localname, &local_info) < 0) {
-		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno));
-		return APP_FAILURE;
-	}
-
 	/* normalize the mode so as not to set up invalid permissions */
-	local_info.st_mode |= 0600;
-	local_info.st_mode &= 0777;
+	int mode = ( info.st_mode | 0x600 ) & 0777;
 
 	if(!length) {
-		length = local_info.st_size;
+		length = info.st_size;
 	}
 
 	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
+
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
 
-	//We want to send bytes starting from 'offset'. So seek to it first.
-	if (offset >= 0 && (offset+length) <= local_info.st_size) {
+	/* If we are sending only a piece of the file, seek there first. */
+
+	if (offset >= 0 && (offset+length) <= info.st_size) {
 		if(lseek(fd, offset, SEEK_SET) == -1) {
 			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
 			close(fd);
@@ -2853,7 +2848,7 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	}
 
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename, length, local_info.st_mode, flags);
+	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename, length, mode, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -2912,6 +2907,8 @@ static work_queue_result_code_t send_directory( struct work_queue *q, struct wor
 
 /*
 Send a single item, whether it is a directory, symlink, or file.
+Note that we call lstat() here a single time, and then pass it
+to the underlying object so as not to minimize syscall work.
 */
 
 
@@ -2926,7 +2923,7 @@ static work_queue_result_code_t send_item( struct work_queue *q, struct work_que
 		} else if(S_ISLNK(info.st_mode)) {
 			result = send_symlink( q, w, t, localpath, remotepath, total_bytes );
 		} else if(S_ISREG(info.st_mode)) {
-			result = send_file( q, w, t, localpath, remotepath, offset, length, total_bytes, flags );
+			result = send_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes, flags );
 		} else {
 			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
 		}
