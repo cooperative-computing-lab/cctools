@@ -730,8 +730,6 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 		avg_transfer_rate = get_queue_transfer_rate(q, &data_source);
 	}
 
-	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
-
 	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
 
 	int timeout = length / tolerable_transfer_rate;
@@ -744,7 +742,13 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 		timeout = MAX(q->minimum_transfer_timeout,timeout);
 	}
 
-	debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+	/* Don't bother printing anything for transfers of less than 1MB, to avoid excessive output. */
+
+	if( length >= 1048576 ) {
+		debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
+
+		debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+	}
 
 	free(data_source);
 	return timeout;
@@ -2821,8 +2825,6 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 		length = info.st_size;
 	}
 
-	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
-
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
@@ -2964,6 +2966,12 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
 		return SUCCESS;
 	} else if(!remote_info) {
+
+		if(tf->offset==0 && tf->length==0) {
+			debug(D_WQ, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
+		} else {
+		  debug(D_WQ, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
+		}
 
 		work_queue_result_code_t result;
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes );
