@@ -2941,33 +2941,27 @@ static work_queue_result_code_t send_item( struct work_queue *q, struct work_que
 /*
 Send an item to a remote worker, if it is not already cached.
 The local file name should already have been expanded by the caller.
+If it is in the worker, but a new version is available, warn and return.
+We do not want to rewrite the file while some other task may be using it.
+Otherwise, send it to the worker.
 */
 
 static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
-	struct stat *remote_info;
-
 	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
 		return APP_FAILURE;
 	}
 
-	work_queue_result_code_t result = SUCCESS;
-
-	/*
-	Look to see if this item is already cached there.
-	If it is in the worker, but a new version is available, warn and return.
-	We do not want to rewrite the file while some other task may be using it.
-	Otherwise, send it to the worker.
-	*/
-
-	remote_info = hash_table_lookup(w->current_files, tf->cached_name);
+	struct stat *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
 	if(remote_info && (remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size)) {
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
+		return SUCCESS;
 	} else if(!remote_info) {
 
+		work_queue_result_code_t result;
 		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
 
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
@@ -2977,11 +2971,12 @@ static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, s
 				hash_table_insert(w->current_files, tf->cached_name, remote_info);
 			}
 		}
+
+		return result;
 	} else {
 		/* Up-to-date file on the worker, we do nothing. */
+		return SUCCESS;
 	}
-
-	return result;
 }
 
 /**
