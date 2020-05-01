@@ -4,12 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/*
-The following major problems must be fixed:
-- The capacity code assumes one task per worker.
-- The log specification need to be updated.
-*/
-
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
