@@ -1162,11 +1162,16 @@ static int do_put_single_file( struct link *master, char *filename, int64_t leng
 		path_dirname(filename,dirname);
 		if(!create_dir(dirname,0777)) {
 			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
+			free(cached_filename);
 			return 0;
 		}
 	}
 
-	return do_put_file_internal(master,cached_filename,length,mode);
+	int result = do_put_file_internal(master,cached_filename,length,mode);
+
+	free(cached_filename);
+
+	return result;
 }
 
 static int file_from_url(const char *url, const char *filename) {
