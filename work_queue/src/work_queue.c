@@ -2790,7 +2790,10 @@ static int send_symlink( struct work_queue *q, struct work_queue_worker *w, stru
 	int length = readlink(localname,target,sizeof(target));
 	if(length<0) return APP_FAILURE;
 
-	send_worker_msg(q,w,"symlink %s %d\n",remotename,length);
+	char remotename_encoded[WORK_QUEUE_LINE_MAX];
+	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
+
+	send_worker_msg(q,w,"symlink %s %d\n",remotename_encoded,length);
 
 	link_write(w->link,target,length,time(0)+q->long_timeout);
 
@@ -2847,8 +2850,12 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
 	}
 
+	/* filenames are url-encoded to avoid problems with spaces, etc */
+	char remotename_encoded[WORK_QUEUE_LINE_MAX];
+	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
+
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename, length, mode, flags);
+	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename_encoded, length, mode, flags);
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
@@ -2874,23 +2881,26 @@ Do this by sending a "dir" prefix, then all of the directory contents,
 and then an "end" marker.
 */
 
-static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
+static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, int64_t * total_bytes, int flags )
 {
-	DIR *dir = opendir(dirname);
+	DIR *dir = opendir(localname);
 	if(!dir) {
-		debug(D_NOTICE, "Cannot open dir %s: %s", dirname, strerror(errno));
+		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
 
 	work_queue_result_code_t result = SUCCESS;
 
-	send_worker_msg(q,w,"dir %s\n",remotedirname);
+	char remotename_encoded[WORK_QUEUE_LINE_MAX];
+	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
+
+	send_worker_msg(q,w,"dir %s\n",remotename_encoded);
 
 	struct dirent *d;
 	while((d = readdir(dir))) {
 		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) continue;
 
-		char *localpath = string_format("%s/%s",dirname,d->d_name);
+		char *localpath = string_format("%s/%s",localname,d->d_name);
 
 		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, flags );
 

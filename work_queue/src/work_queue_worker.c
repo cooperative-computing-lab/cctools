@@ -1004,7 +1004,8 @@ int is_valid_filename( const char *name )
 Handle an incoming symbolic link inside the rput protocol.
 The filename of the symlink was already given in the message,
 and the target of the symlink is given as the "body" which
-must be read off of the wire.
+must be read off of the wire.  The symlink target does not
+need to be url_decoded because it is sent in the body.
 */
 
 static int do_put_symlink_internal( struct link *master, char *filename, int length )
@@ -1017,8 +1018,6 @@ static int do_put_symlink_internal( struct link *master, char *filename, int len
 		return 0;
 	}
 
-	/* XXX need to check that symlink target doesn't violate workspace */
-
 	int result = symlink(target,filename);
 	if(result<0) {
 		debug(D_WQ,"could not create symlink %s: %s",filename,strerror(errno));
@@ -1030,7 +1029,6 @@ static int do_put_symlink_internal( struct link *master, char *filename, int len
 
 	return 1;
 }
-
 
 /*
 Handle an incoming file inside the rput protocol.
@@ -1077,6 +1075,7 @@ of existing code.
 static int do_put_dir_internal( struct link *master, char *dirname )
 {
 	char line[WORK_QUEUE_LINE_MAX];
+	char name_encoded[WORK_QUEUE_LINE_MAX];
 	char name[WORK_QUEUE_LINE_MAX];
 	int64_t size;
 	int mode;
@@ -1092,24 +1091,27 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 
 		int r = 0;
 
-		if(sscanf(line,"put %s %" SCNd64 " %o",name,&size,&mode)==3) {
+		if(sscanf(line,"put %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
 
+			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
 			r = do_put_file_internal(master,subname,size,mode);
 			free(subname);
 
-		} else if(sscanf(line,"symlink %s %" SCNd64,name,&size)==2) {
+		} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
 
+			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
 			r = do_put_symlink_internal(master,subname,size);
 			free(subname);
 
-		} else if(sscanf(line,"dir %s",name)==1) {
+		} else if(sscanf(line,"dir %s",name_encoded)==1) {
 
+			url_decode(name_encoded,name,sizeof(name));
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
@@ -1550,51 +1552,49 @@ static void disconnect_master(struct link *master) {
 
 static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
+	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
 	int mode, r, n;
+	int flags;
 
 	if(recv_master_message(master, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid,time(0)+active_timeout);
-		} else if(string_prefix_is(line, "put ")) {
-			char *f = NULL, *l = NULL, *m = NULL, *g = NULL;
-			if(pattern_match(line, "^put (.+) (%d+) ([0-7]+) (%d+)$", &f, &l, &m, &g) >= 0) {
-				strncpy(filename, f, WORK_QUEUE_LINE_MAX); free(f);
-				length = strtoll(l, 0, 10); free(l);
-				mode   = strtol(m, NULL, 8); free(m);
-				free(g); //flags are not used anymore.
-				
-				if(path_within_dir(filename, workspace)) {
-					r = do_put_single_file(master, filename, length, mode);
-					reset_idle_timer();
-				} else {
-					debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-					r = 0;
-				}
+		} else if(sscanf(line,"put %s %"SCNd64" %d %d",filename_encoded,&length,&mode,&flags)==4) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			if(path_within_dir(filename, workspace)) {
+				r = do_put_single_file(master, filename, length, mode);
+				reset_idle_timer();
 			} else {
-				debug(D_WQ, "Malformed put message.");
+				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r = 0;
 			}
-		} else if(sscanf(line, "dir %s", filename)==1) {
+		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_put_dir(master,filename);
+			reset_idle_timer();
 		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
 			r = do_url(master, filename, length, mode);
 			reset_idle_timer();
-		} else if(sscanf(line, "unlink %s", filename) == 1) {
+		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			if(path_within_dir(filename, workspace)) {
 				r = do_unlink(filename);
 			} else {
 				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
 				r= 0;
 			}
-		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
+		} else if(sscanf(line, "get %s %d", filename_encoded, &mode) == 2) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_get(master, filename, mode);
-		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename, path) == 3) {
+		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename_encoded, path) == 3) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_thirdget(mode, filename, path);
-		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
+		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename_encoded, path) == 3) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_thirdput(master, mode, filename, path);
 			reset_idle_timer();
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
@@ -1604,7 +1604,8 @@ static int handle_master(struct link *master) {
 				kill_all_tasks();
 				r = 1;
 			}
-		} else if(sscanf(line, "invalidate-file %s", filename) == 1) {
+		} else if(sscanf(line, "invalidate-file %s", filename_encoded) == 1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_invalidate_file(filename);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
