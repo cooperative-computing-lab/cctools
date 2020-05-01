@@ -1090,14 +1090,14 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 	while(1) {
 		if(!recv_master_message(master,line,sizeof(line),time(0)+active_timeout)) return 0;
 
-		/* XXX need to check for success of each call. */
+		int r = 0;
 
 		if(sscanf(line,"put %s %" SCNd64 " %o",name,&size,&mode)==3) {
 
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
-			do_put_file_internal(master,subname,size,mode);
+			r = do_put_file_internal(master,subname,size,mode);
 			free(subname);
 
 		} else if(sscanf(line,"symlink %s %" SCNd64,name,&size)==2) {
@@ -1105,7 +1105,7 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
-			do_put_symlink_internal(master,subname,size);
+			r = do_put_symlink_internal(master,subname,size);
 			free(subname);
 
 		} else if(sscanf(line,"dir %s",name)==1) {
@@ -1113,12 +1113,14 @@ static int do_put_dir_internal( struct link *master, char *dirname )
 			if(!is_valid_filename(name)) return 0;
 
 			char *subname = string_format("%s/%s",dirname,name);
-			do_put_dir_internal(master,subname);
+			r = do_put_dir_internal(master,subname);
 			free(subname);
 
 		} else if(!strcmp(line,"end")) {
 			break;
 		}
+
+		if(!r) return 0;
 	}
 
 	return 1;
