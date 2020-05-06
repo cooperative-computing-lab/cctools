@@ -4,6 +4,15 @@
 # This software is distributed under the GNU General Public License.
 # See the file COPYING for details.
 
+# Executes a command line inside a conda environment.
+# The conda environment can be supplied via a tar file or a directory.
+#
+# It is assumed that the conda environment can be used in the absence of a
+# local conda installation. This means it should include conda and conda-unpack
+# itself. This requirement can be fulfilled with the generic recipe shown with
+# the --help-env-creation option:
+#
+
 usage() {
     echo "Usage: python_package_run [options] -e <file> command and args ..."
     echo "where options are:"
@@ -12,10 +21,35 @@ usage() {
     echo "                            a temporary directory is used."
     echo " -w, --wait-for-lock <secs> Number of seconds to wait to get a writing lock"
     echo "                            on <dir>. Default is 300"
-    echo " -h, --help                 Show this help screen"
+    echo " --help-env-creation        Show instructions to create conda environments as tar files."
+    echo " -h, --help                 Show this help screen."
     echo "command and args            Command to execute inside the given environment."
     echo
     exit 1
+}
+
+function help_env_creation {
+cat << EOF
+
+Environments should include conda and conda-unpack so they can be used
+in the absence of a local conda installation. Environment creation follows
+the generic recipe:
+
+$ conda create --prefix ./my-conda-env python=X.XX conda
+$ source ./my-conda-env/bin/activate
+$ conda install -c conda-forge conda-pack
+... conda and pip install rest of packages ...
+$ python -c 'import conda_pack; conda_pack.pack(prefix="my-conda-env")
+
+The above generates my-conda-env.tar.gz ready to be used by this script as:
+
+$0 --environment my-conda-env.tar.gz -- python -c 'print(42)'
+
+The directory ./my-conda-env can be safely removed.
+
+EOF
+}
+
 }
 
 UNPACK_TO=
@@ -30,6 +64,10 @@ parse_arguments() {
 		case $1 in
 			-h | --help)
                 usage
+                ;;
+			--help-env*)
+                help_env_creation
+                exit 0
                 ;;
             -d | --unpack-to)
                 shift
