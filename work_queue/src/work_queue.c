@@ -1853,6 +1853,9 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	}
 
 	if(task_status == WORK_QUEUE_RESULT_FORSAKEN) {
+		// Delete any input files that are not to be cached.
+		delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 
