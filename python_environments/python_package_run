@@ -13,14 +13,18 @@
 # the --help-env-creation option:
 #
 
+start_time=$(date +'%s%N')
+
 usage() {
     echo "Usage: python_package_run [options] -e <file> command and args ..."
     echo "where options are:"
-    echo " -e, --environment <file>   Conda environment as a tar file. (Required.)"
-    echo " -d, --unpack-to <dir>      Directory to unpack the environment. If not given,"
-    echo "                            a temporary directory is used."
+    echo " -e, --environment <path>   Conda environment as a tar file or a directory. (Required.)"
+    echo " -u, --unpack-to <dir>      Directory to unpack the environment. If not given,"
+    echo "                            a temporary directory is used. If the argument to"
+    echo "                            --environment is a directory, --unpack-to is ignored."
     echo " -w, --wait-for-lock <secs> Number of seconds to wait to get a writing lock"
     echo "                            on <dir>. Default is 300"
+    echo " -d, --debug                Print debug messages."
     echo " --help-env-creation        Show instructions to create conda environments as tar files."
     echo " -h, --help                 Show this help screen."
     echo "command and args            Command to execute inside the given environment."
@@ -49,6 +53,18 @@ The directory ./my-conda-env can be safely removed.
 EOF
 }
 
+
+function logmsg {
+    if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
+    then
+        printf "%s python_package_run: " "$(date +'%Y-%m-%dT%T.%N')"
+        echo "$@"
+    fi
+}
+
+function errmsg {
+    local PYTHON_PACKAGE_RUN_DEBUG=yes
+    logmsg "$@"
 }
 
 UNPACK_TO=
@@ -69,9 +85,12 @@ parse_arguments() {
                 help_env_creation
                 exit 0
                 ;;
-            -d | --unpack-to)
+            -u | --unpack-to)
                 shift
                 UNPACK_TO="$1"
+                ;;
+            -d | --debug)
+                export PYTHON_PACKAGE_RUN_DEBUG=yes
                 ;;
             -e | --environment)
                 shift
@@ -88,16 +107,16 @@ parse_arguments() {
         shift
     done
 
-    if [ -z "${ENV_NAME}" ]
+    if [[ -z "${ENV_NAME}" ]]
     then
-        echo "An environment tarball should be specified with the --environment option."
+        errmsg "a tarball or directory should be specified with the --environment option."
         usage
         exit 1
     fi
 
-    if [ $# -lt 1 ]
+    if [[ $# -lt 1 ]]
     then
-        echo "No command line was specified."
+        errmsg "no command line was specified."
         usage
         exit 1
     fi
@@ -109,85 +128,117 @@ parse_arguments() {
 }
 
 function cleanup {
-    if [ "${UNPACK_IS_TMP}" = yes ]
+    if [[ "${UNPACK_IS_TMP}" = yes ]]
     then
         rm -rf "${UNPACK_TO}"
     fi
 
     rm -f "${UNTAR_SCRIPT}"
+
+    end_time=$(date +'%s%N')
+
+    ns=$((end_time-start_time))
+    s=$((ns/1000000000))
+    ns=$((ns-s))
+
+    logmsg total runtime: ${s}.${ns} seconds
 }
 trap cleanup EXIT
 
 parse_arguments "$@"
 
-
 #after shift, whatever is left is taken as the command line to execute.
 arg_counsumed=$?
 shift ${arg_counsumed}
 
+ENV_NAME_IS_DIR=no
 UNPACK_IS_TMP=no
 NEED_TO_UNPACK=yes
 
-if [ -z "${UNPACK_TO}" ]
+if [[ -d "${ENV_NAME}" ]]
+then
+    ENV_NAME_IS_DIR=yes
+
+    if [[ -n "${UNPACK_TO}" ]]
+    then
+        errmsg "ignoring --unpack-to argument as --environment is a directory." 
+    fi
+
+    UNPACK_TO="${ENV_NAME}"
+fi
+
+if [[ -z "${UNPACK_TO}" ]]
 then
     UNPACK_IS_TMP=yes
     UNPACK_TO="$(mktemp -d)"
 fi
 
 UNPACK_TO=$(realpath ${UNPACK_TO})
-echo Unpacking conda environment to ${UNPACK_TO}
+logmsg setting up conda environment at ${UNPACK_TO}
 
-if [ -f "${UNPACK_TO}" ]
+if [[ -f "${UNPACK_TO}" ]]
 then
-    echo "--unpack-to argument is an already existing file. It should be the name of a directory."
+    errmsg "--unpack-to argument is an already existing file. It should be the name of a directory."
     exit 1
 fi
 
+# unpacking environment if needed...
+LOCKFILE="${UNPACK_TO}/.unpacking_python_package_run_lock"
+mkdir -p "${UNPACK_TO}"
+
 UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
 cat > ${UNTAR_SCRIPT} << EOF
-if [ "\$(find ${UNPACK_TO} -mindepth 1 -maxdepth 1 | wc -l)" = 1 ]
+if [ "\$(find ${UNPACK_TO} -mindepth 1 -maxdepth 1 -not -name $(basename ${LOCKFILE}) | wc -l)" = 0 ]
 then
     # Directory is empty (the only file there is the lock). It is safe to untar.
     if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
     then
-        echo "Could not uncompress environment: ${ENV_NAME}"
+        echo "python_package_run: could not uncompress environment: ${ENV_NAME}"
         exit 1
     fi
 else
-    echo "Directory ${UNPACK_TO} is not empty. Not unpacking environment again."
+    if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
+    then
+        echo "python_package_run: directory ${UNPACK_TO} is not empty. Not expanding environment file again."
+    fi
 fi
 exit 0
 EOF
 
-# unpacking environment if needed.
-LOCKFILE="${UNPACK_TO}/.unpacking_python_package_run_lock"
-mkdir -p "${UNPACK_TO}"
-
-flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/sh ${UNTAR_SCRIPT}"
-if [ "$?" != 0 ]
+if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
-    echo -e "Could not untar environment: ${ENV_NAME}"
-    exit 1
+    logmsg expanding environment file
+    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/sh ${UNTAR_SCRIPT}"
+    if [ "$?" != 0 ]
+    then
+        errmsg "could not untar environment: ${ENV_NAME}"
+        exit 1
+    fi
 fi
 
 #activate and unpack the environment
+logmsg activating environment
 unset PYTHONPATH
 source "${UNPACK_TO}/bin/activate"
 if [ "$?" != 0 ]
 then
-    echo -e "Could not activate environment: ${ENV_NAME}"
+    errmsg "could not activate environment: ${ENV_NAME}"
     exit 1
 fi
 
+logmsg relocating paths
 flock -w ${LOCK_WAIT} ${LOCKFILE} conda-unpack
 if [ "$?" != 0 ]
 then
-    echo -e "Could not unpack environment: ${ENV_NAME}"
+    errmsg "could not unpack environment: ${ENV_NAME}"
     exit 1
 fi
 
 # Finally run the command line:
+logmsg executing command line: "${@}"
 "${@}"
 status=$?
+
+logmsg command line exit code: $status
 
 exit $status
