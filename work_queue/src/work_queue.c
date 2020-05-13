@@ -1579,7 +1579,7 @@ static void fetch_output_from_worker(struct work_queue *q, struct work_queue_wor
 	}
 
 	/* print warnings if the task ran for a very short time (1s) and exited with common non-zero status */
-	if(t->result == WORK_QUEUE_RESULT_WQ_SUCCESS && t->time_workers_execute_last < 1000000) {
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS && t->time_workers_execute_last < 1000000) {
 		switch(t->return_status) {
 			case(126):
 				warn(D_WQ, "Task %d ran for a very short time and exited with code %d.\n", t->taskid, t->return_status);
@@ -5607,7 +5607,7 @@ const char *task_result_str(work_queue_result_t result) {
 	const char *str;
 
 	switch(result) {
-		case WORK_QUEUE_RESULT_WQ_SUCCESS:
+		case WORK_QUEUE_RESULT_SUCCESS:
 			str = "WQ_SUCCESS";
 			break;
 		case WORK_QUEUE_RESULT_INPUT_MISSING:
@@ -5980,7 +5980,7 @@ struct work_queue_task *work_queue_wait_internal(struct work_queue *q, int timeo
 		if(t) {
 			change_task_state(q, t, WORK_QUEUE_TASK_DONE);
 
-			if( t->result != WORK_QUEUE_RESULT_WQ_SUCCESS )
+			if( t->result != WORK_QUEUE_RESULT_SUCCESS )
 			{
 				q->stats->tasks_failed++;
 			}
@@ -6889,7 +6889,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 
 	q->stats->tasks_done++;
 
-	if(t->result == WORK_QUEUE_RESULT_WQ_SUCCESS)
+	if(t->result == WORK_QUEUE_RESULT_SUCCESS)
 	{
 		q->stats->time_workers_execute_good += t->time_workers_execute_last;
 		q->stats->time_send_good            += t->time_when_commit_end - t->time_when_commit_end;
@@ -6915,7 +6915,7 @@ void work_queue_accumulate_task(struct work_queue *q, struct work_queue_task *t)
 
 	/* accumulate resource summary to category only if task result makes it meaningful. */
 	switch(t->result) {
-		case WORK_QUEUE_RESULT_WQ_SUCCESS:
+		case WORK_QUEUE_RESULT_SUCCESS:
 		case WORK_QUEUE_RESULT_SIGNAL:
 		case WORK_QUEUE_RESULT_RESOURCE_EXHAUSTION:
 		case WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME:
