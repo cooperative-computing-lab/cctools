@@ -5031,7 +5031,7 @@ struct work_queue *work_queue_create(int port)
 	q->asynchrony_multiplier = 1.0;
 	q->asynchrony_modifier = 0;
 
-	q->minimum_transfer_timeout = 10;
+	q->minimum_transfer_timeout = 60;
 	q->foreman_transfer_timeout = 3600;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;
