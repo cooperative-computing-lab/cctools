@@ -9,6 +9,7 @@ import re
 import os
 import getopt
 from subprocess import Popen, PIPE, check_output
+from functools import reduce
 
 gnuplot_cmd   = 'gnuplot'
 format        = 'svg'
