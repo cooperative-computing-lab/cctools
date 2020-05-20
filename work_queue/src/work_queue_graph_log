@@ -9,6 +9,7 @@ import re
 import os
 import getopt
 from subprocess import Popen, PIPE, check_output
+from functools import reduce
 
 gnuplot_cmd   = 'gnuplot'
 format        = 'svg'
@@ -44,7 +45,7 @@ def time_field_p(field):
 def read_log_entries(file, fields):
     log_entries = {}
     idxs  = range(0, len(fields))
-    pairs = zip(idxs, fields)
+    pairs = list(zip(idxs, fields))
     epoch = None
     count_lines = 0
     prev_line = None
@@ -124,8 +125,7 @@ def sort_time(log_entries):
     return times
 
 def pout(file, str):
-    file.write(str)
-    file.write('\n')
+    file.write("{}\n".format(str).encode('utf-8'))
 
 class WQPlot:
     def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range, stack = False):
