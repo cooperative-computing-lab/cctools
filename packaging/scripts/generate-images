@@ -136,6 +136,9 @@ $command_for{fedora} = 'dnf install -y';
 $versions_of{debian} = [ qw{ 9.9 } ];
 $command_for{debian} = 'apt-get install -y';
 
+$versions_of{ubuntu} = [ qw{ 16.04 } ];
+$command_for{ubuntu} = $command_for{debian};
+
 # e.g., $package_for{distro}{version}{dependency} == 'package'
 my %package_for;
 
@@ -294,6 +297,26 @@ $postinstall_for{debian}{default} = [
 	# do not compile with g++6:
 	# @{$xrootd}
 ];
+
+
+########## ubuntu ##########
+$package_for{ubuntu}{default} = $package_for{debian}{default};
+$preinstall_for{ubuntu}{default} = $preinstall_for{debian}{default};
+
+$extras_for{ubuntu}{default} = $extras_for{debian}{default};
+$postinstall_for{ubuntu}{default} = [
+	'echo en_US.UTF-8 UTF-8 >> /etc/locale.gen',
+	'/usr/sbin/locale-gen',
+	'apt-get clean',
+
+	@{$builder},
+	@{$musl},
+	@{$fuse},
+	# @{$cvmfs},
+	# do not compile with g++6:
+	# @{$xrootd}
+];
+
 
 ########## ALL ##########
 
