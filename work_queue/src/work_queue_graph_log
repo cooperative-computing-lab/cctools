@@ -8,7 +8,7 @@ import sys
 import re
 import os
 import getopt
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_output
 
 gnuplot_cmd   = 'gnuplot'
 format        = 'svg'
@@ -234,10 +234,8 @@ class WQPlotLog(WQPlot):
 
 def check_gnuplot_version(gnuplot_cmd):
         try:
-            gnuplot = Popen([gnuplot_cmd, '--version'], stdout = PIPE)
-            version = gnuplot.stdout.readline()
-            gnuplot.stdout.close()
-
+            version = check_output([gnuplot_cmd, '--version'])
+            version = version.decode("utf-8")
             result = re.match('gnuplot\s+(\d+\.\d+)\D', version)
 
             if not result:
