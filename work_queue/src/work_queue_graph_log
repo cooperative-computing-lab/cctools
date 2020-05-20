@@ -45,7 +45,7 @@ def time_field_p(field):
 def read_log_entries(file, fields):
     log_entries = {}
     idxs  = range(0, len(fields))
-    pairs = zip(idxs, fields)
+    pairs = list(zip(idxs, fields))
     epoch = None
     count_lines = 0
     prev_line = None
