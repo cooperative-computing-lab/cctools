@@ -125,8 +125,7 @@ def sort_time(log_entries):
     return times
 
 def pout(file, str):
-    file.write(str)
-    file.write('\n')
+    file.write("{}\n".format(str).encode('utf-8'))
 
 class WQPlot:
     def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range, stack = False):
