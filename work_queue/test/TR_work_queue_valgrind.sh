@@ -17,7 +17,7 @@ check_needed()
 
 	# valgrind dumps core when testing on ubuntu16.04 and statically linked
 	# workers on travis.
-	if [ "${xDOCKER_IMAGE}" = "cclnd/cctools-env:x86_64-ubuntu16.04" ]
+	if [ "${DOCKER_IMAGE}" = "cclnd/cctools-env:x86_64-ubuntu16.04" ]
 	then
 		exit 1
 	fi
