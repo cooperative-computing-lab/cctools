@@ -163,7 +163,7 @@ static int specify_environment(struct jx *environment, struct work_queue_task *t
 	struct jx *value = jx_iterate_values(environment, &i);
 
     while(key != NULL) {
-        work_queue_task_specify_enviroment_variable(task, key, value->u.string_value);
+        work_queue_task_specify_environment_variable(task, key, value->u.string_value);
         key = jx_iterate_keys(environment, &j);
         value = jx_iterate_values(environment, &i);
     }
