@@ -63,7 +63,7 @@ static void specify_envlist( struct work_queue_task *t, struct jx *envlist )
 	if(envlist) {
 		struct jx_pair *p;
 		for(p=envlist->u.pairs;p;p=p->next) {
-			work_queue_task_specify_enviroment_variable(t,p->key->u.string_value,p->value->u.string_value);
+			work_queue_task_specify_environment_variable(t,p->key->u.string_value,p->value->u.string_value);
 		}
 	}
 }

@@ -4248,7 +4248,7 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value )
+void work_queue_task_specify_environment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
 	if(value) {
 		list_push_tail(t->env_list,string_format("%s=%s",name,value));
@@ -4256,6 +4256,11 @@ void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, con
 		/* Specifications without = indicate variables to me unset. */
 		list_push_tail(t->env_list,string_format("%s",name));
 	}
+}
+
+/* same as above, but with a typo. can't remove as it is part of already published api. */
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value ) {
+	work_queue_task_specify_environment_variable(t, name, value);
 }
 
 void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max_retries ) {
