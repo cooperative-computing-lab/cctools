@@ -948,7 +948,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				work_queue_task_specify_enviroment_variable(task,env,value);
+				work_queue_task_specify_environment_variable(task,env,value);
 			}
 			free(env);
 		} else {

@@ -173,7 +173,7 @@ static void export_environment( struct work_queue_process *p )
 
 static void specify_integer_env_var( struct work_queue_process *p, const char *name, int64_t value) {
 	char *value_str = string_format("%" PRId64, value);
-	work_queue_task_specify_enviroment_variable(p->task, name, value_str);
+	work_queue_task_specify_environment_variable(p->task, name, value_str);
 	free(value_str);
 }
 

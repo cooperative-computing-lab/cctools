@@ -495,7 +495,7 @@ Specify an environment variable to be added to the task.
 @param name Name of the variable.
 @param value Value of the variable.
  */
-void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
+void work_queue_task_specify_environment_variable( struct work_queue_task *t, const char *name, const char *value );
 
 /** Select the scheduling algorithm for a single task.
 To change the scheduling algorithm for all tasks, use @ref work_queue_specify_algorithm instead.
@@ -1097,6 +1097,11 @@ int work_queue_task_specify_output_file_do_not_cache(struct work_queue_task *t, 
  @return The string corresponding to the filename.
 */
 char *work_queue_generate_disk_alloc_full_filename(char *pwd, int taskid);
+
+
+/** Same as work_queue_task_specify_environment_variable, but with a typo in environment
+ */
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value );
 
 //@}
 
