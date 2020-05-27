@@ -317,6 +317,9 @@ struct work_queue_stats {
 	int avg_capacity;               /**< @deprecated Use capacity_cores instead. */
 };
 
+/* Forward declare the queue's structure. This structure is opaque and defined in work_queue.c */
+struct work_queue;
+
 
 /** @name Functions - Tasks */
 
