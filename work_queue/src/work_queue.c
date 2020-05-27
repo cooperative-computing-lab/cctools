@@ -1180,7 +1180,7 @@ including a hash and a name where one is known, or another
 unique identifier where no name is available.
 */
 
-char *make_cached_name( const struct work_queue_task *t, const struct work_queue_file *f )
+char *make_cached_name( const struct work_queue_file *f )
 {
 	static unsigned int file_count = 0;
 	file_count++;
@@ -4383,7 +4383,7 @@ void work_queue_task_specify_feature(struct work_queue_task *t, const char *name
 	list_push_tail(t->features, xxstrdup(name));
 }
 
-struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
+struct work_queue_file *work_queue_file_create(const char *payload, const char *remote_name, work_queue_file_t type, work_queue_file_flags_t flags)
 {
 	struct work_queue_file *f;
 
@@ -4405,7 +4405,7 @@ struct work_queue_file *work_queue_file_create(const struct work_queue_task *t, 
 		f->length  = strlen(payload);
 	}
 
-	f->cached_name = make_cached_name(t, f);
+	f->cached_name = make_cached_name(f);
 
 	return f;
 }
@@ -4464,7 +4464,7 @@ int work_queue_task_specify_url(struct work_queue_task *t, const char *file_url,
 		}
 	}
 
-	tf = work_queue_file_create(t, file_url, remote_name, WORK_QUEUE_URL, flags);
+	tf = work_queue_file_create(file_url, remote_name, WORK_QUEUE_URL, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -4534,7 +4534,7 @@ int work_queue_task_specify_file(struct work_queue_task *t, const char *local_na
 		}
 	}
 
-	tf = work_queue_file_create(t, local_name, remote_name, WORK_QUEUE_FILE, flags);
+	tf = work_queue_file_create(local_name, remote_name, WORK_QUEUE_FILE, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -4576,7 +4576,7 @@ int work_queue_task_specify_directory(struct work_queue_task *t, const char *loc
 	//local name is null. This doesn't affect the behavior of the file transfers.
 	const char *payload = local_name ? local_name : remote_name;
 
-	tf = work_queue_file_create(t, payload, remote_name, WORK_QUEUE_DIRECTORY, flags);
+	tf = work_queue_file_create(payload, remote_name, WORK_QUEUE_DIRECTORY, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -4646,7 +4646,7 @@ int work_queue_task_specify_file_piece(struct work_queue_task *t, const char *lo
 		}
 	}
 
-	tf = work_queue_file_create(t, local_name, remote_name, WORK_QUEUE_FILE_PIECE, flags);
+	tf = work_queue_file_create(local_name, remote_name, WORK_QUEUE_FILE_PIECE, flags);
 	if(!tf) return 0;
 
 	tf->offset = start_byte;
@@ -4686,7 +4686,7 @@ int work_queue_task_specify_buffer(struct work_queue_task *t, const char *data, 
 		}
 	}
 
-	tf = work_queue_file_create(t, NULL, remote_name, WORK_QUEUE_BUFFER, flags);
+	tf = work_queue_file_create(NULL, remote_name, WORK_QUEUE_BUFFER, flags);
 	if(!tf) return 0;
 
 	tf->payload = malloc(length);
@@ -4760,7 +4760,7 @@ int work_queue_task_specify_file_command(struct work_queue_task *t, const char *
 		}
 	}
 
-	tf = work_queue_file_create(t, cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
+	tf = work_queue_file_create(cmd, remote_name, WORK_QUEUE_REMOTECMD, flags);
 	if(!tf) return 0;
 
 	list_push_tail(files, tf);
@@ -4813,7 +4813,7 @@ void work_queue_file_delete(struct work_queue_file *tf) {
 }
 
 void work_queue_invalidate_cached_file(struct work_queue *q, const char *local_name, work_queue_file_t type) {
-	struct work_queue_file *f = work_queue_file_create(NULL, local_name, local_name, type, WORK_QUEUE_CACHE);
+	struct work_queue_file *f = work_queue_file_create(local_name, local_name, type, WORK_QUEUE_CACHE);
 
 	work_queue_invalidate_cached_file_internal(q, f->cached_name);
 	work_queue_file_delete(f);
