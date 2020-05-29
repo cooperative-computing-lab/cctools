@@ -3323,6 +3323,11 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 		}
 	}
 
+	if(t->conda_environment) {
+		/* t->conda_environment is a cached name, thus we do not need to url_encode it again. */
+		send_worker_msg(q,w, "conda_env %s\n", t->conda_environment);
+	}
+
 	// send_worker_msg returns the number of bytes sent, or a number less than
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
@@ -4783,6 +4788,30 @@ void work_queue_task_specify_algorithm(struct work_queue_task *t, work_queue_sch
 {
 	t->worker_selection_algorithm = algorithm;
 }
+
+void work_queue_task_specify_conda_env(struct work_queue_task *t, const char *local_tarball) {
+	assert(t);
+	assert(local_tarball);
+
+	if(t->conda_environment) {
+		fatal("A conda environment for the task has been already specified.");
+	}
+
+	work_queue_task_specify_file(t, local_tarball, path_basename(local_tarball), WORK_QUEUE_INPUT, WORK_QUEUE_CACHE);
+
+	/* Search for the cached name given to the file. */
+	struct work_queue_file *tf;
+	list_first_item(t->input_files);
+	while((tf = (struct work_queue_file*)list_next_item(t->input_files))) {
+		if(!strcmp(local_tarball, tf->payload)) {
+			t->conda_environment = xxstrdup(tf->cached_name);
+			break;
+		}
+	}
+
+	assert(t->conda_environment);
+}
+
 
 void work_queue_task_specify_priority( struct work_queue_task *t, double priority )
 {

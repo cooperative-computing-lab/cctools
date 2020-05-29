@@ -78,6 +78,12 @@ typedef enum {
 	CONTAINER_MODE_UMBRELLA
 } container_mode_t;
 
+struct environment {
+	char *tarball;     /* Conda environemnt as produced by conda-pack. */
+	char *expansion;   /* Directory in cache/. Only set when environemnt has been expanded.*/
+	int error;         /* Whether the expansion had an error. 1 for yes, 0 for no. */
+};
+
 #define DOCKER_WORK_DIR "/home/worker"
 
 // In single shot mode, immediately quit when disconnected.
@@ -204,6 +210,9 @@ static struct itable *procs_complete = NULL;
 
 //User specified features this worker provides.
 static struct hash_table *features = NULL;
+
+//Conda environment records. cache/cached_name of tarball -> struct environment
+static struct hash_table *environments = NULL;
 
 static int results_to_be_sent_msg = 0;
 
@@ -522,6 +531,55 @@ int link_recursive( const char *source, const char *target )
 }
 
 /*
+Untar and unpack the conda environment. If this setup fails, then the task is
+inserted to the table of process running, but immediately marked with an error
+Returns 0 on success, of a pid that can be used to account for the task.
+*/
+static int setup_conda_environment(struct work_queue_process *p) {
+	if(!p->task->conda_environment) {
+		return 0;
+	}
+
+	struct environment *e = hash_table_lookup(environments, p->task->conda_environment);
+	if(!e->error && !e->expansion) {
+		e->expansion = string_format("cache/%s-expanded", p->task->conda_environment);
+
+		char *cmd = string_format(
+				"set -e\n"
+				"mkdir -p %s\n"
+				"/bin/tar -C %s -xf cache/%s\n"
+				"%s/bin/conda-unpack", e->expansion, e->expansion, p->task->conda_environment, e->expansion);
+		debug(D_WQ, cmd);
+		int status = system(cmd);
+		free(cmd);
+
+		if(!WIFEXITED(status) || WEXITSTATUS(status)) {
+			debug(D_WQ, "failed to expand environment %s", p->task->conda_environment);
+			e->error = 1;
+		}
+	}
+
+	if(e->error) {
+		/* get a fake pid to insert to table */
+		pid_t pid = fork();
+		if(pid < -1) {
+			fatal("could not fork to get a fake pid.");
+		} else if(pid == 0) {
+			fatal("could not fork to get a fake pid.");
+			exit(1);
+		}
+
+		return pid;
+	}
+
+	char *cmd_with_conda = string_format(". ../%s/bin/activate; %s", e->expansion, p->task->command_line);
+	free(p->task->command_line);
+	p->task->command_line = cmd_with_conda;
+
+	return 0;
+}
+
+/*
 Start executing the given process on the local host,
 accounting for the resources as necessary.
 */
@@ -531,12 +589,26 @@ static int start_process( struct work_queue_process *p )
 
 	pid_t pid;
 
-	if (container_mode == CONTAINER_MODE_DOCKER)
+	/* if fake_pid > 0, then there was an error setting up the environment.
+	 We use the fake_pid as the pid of the task as if it executed. The fake_pid
+	 was a valid pid, it is only fake in the sense that it is not correspond to
+	 the task executing.*/
+	int fake_pid = setup_conda_environment(p);
+
+	if (fake_pid > 0) {
+		pid = fake_pid;
+		p->pid = fake_pid;
+		p->task_status |= WORK_QUEUE_RESULT_ENV_SETUP_ERROR;
+	}
+	else if (container_mode == CONTAINER_MODE_DOCKER) {
 		pid = work_queue_process_execute(p, container_mode, img_name);
-	else if (container_mode == CONTAINER_MODE_DOCKER_PRESERVE)
+	}
+	else if (container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
 		pid = work_queue_process_execute(p, container_mode, container_name);
-	else
+	}
+	else {
 		pid = work_queue_process_execute(p, container_mode);
+	}
 
 	if(pid<0) fatal("unable to fork process for taskid %d!",p->task->taskid);
 
@@ -548,6 +620,7 @@ static int start_process( struct work_queue_process *p )
 	memory_allocated += t->resources_requested->memory;
 	disk_allocated += t->resources_requested->disk;
 	gpus_allocated += t->resources_requested->gpus;
+
 
 	return 1;
 }
@@ -952,6 +1025,16 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 				work_queue_task_specify_environment_variable(task,env,value);
 			}
 			free(env);
+		} else if(sscanf(line,"conda_env %s",filename)==1) {
+			/* Note we do not use work_queue_task_specify_conda_env here, as
+			 * the file has already been added above as an input file. */
+			task->conda_environment = xxstrdup(filename);
+			string_nformat(localname, sizeof(localname), "cache/%s", filename);
+			if(!hash_table_lookup(environments, filename)) {
+				struct environment *e = calloc(1, sizeof(*e));
+				e->tarball = xxstrdup(localname);
+				hash_table_insert(environments, filename, e);
+			}
 		} else {
 			debug(D_WQ|D_NOTICE,"invalid command from master: %s",line);
 			return 0;
@@ -2471,6 +2554,7 @@ int main(int argc, char *argv[])
 	char * catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
+	environments = hash_table_create(4, 0);
 
 	worker_start_time = time(0);
 

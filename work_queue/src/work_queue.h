@@ -68,7 +68,8 @@ typedef enum {
 	WORK_QUEUE_RESULT_MAX_RETRIES         = 6 << 3, /**< The task could not be completed successfully in the given number of retries. **/
 	WORK_QUEUE_RESULT_TASK_MAX_RUN_TIME   = 7 << 3, /**< The task ran for more than the specified time (relative since running in a worker). **/
 	WORK_QUEUE_RESULT_DISK_ALLOC_FULL     = 8 << 3, /**< The task filled its loop device allocation but needed more space. **/
-	WORK_QUEUE_RESULT_RMONITOR_ERROR      = 9 << 3  /**< The task failed because the monitor did not produce a summary report. **/
+	WORK_QUEUE_RESULT_RMONITOR_ERROR      = 9 << 3,  /**< The task failed because the monitor did not produce a summary report. **/
+	WORK_QUEUE_RESULT_ENV_SETUP_ERROR     = 10 << 3  /**< The task failed because setting up the environment failed. **/
 } work_queue_result_t;
 
 typedef enum {
@@ -109,6 +110,7 @@ struct work_queue_task {
 	struct list *input_files;                         /**< The files to transfer to the worker and place in the executing directory. */
 	struct list *output_files;                        /**< The output files (other than the standard output stream) created by the program to be retrieved from the task. */
 	struct list *env_list;                            /**< Environment variables applied to the task. */
+    char *conda_environment;                          /**< Local name of a tarball that contains a conda environment from conda-pack. */
 	int taskid;                                       /**< A unique task id number. */
 	int return_status;                                /**< The exit code of the command line. */
 	work_queue_result_t result;                       /**< The result of the task (see @ref work_queue_result_t */
@@ -507,6 +509,14 @@ To change the scheduling algorithm for all tasks, use @ref work_queue_specify_al
 */
 void work_queue_task_specify_algorithm(struct work_queue_task *t, work_queue_schedule_t algorithm);
 
+/** Specify a conda environment to run the task.
+ The environment should be contained in a tarball file created by conda-pack.
+ The environment will be unpacked only once per worker, and can be used unpacked by many tasks.
+@param t A task object.
+@param local_tarball The filename of the tarball that contains the conda environment.
+*/
+void work_queue_task_specify_conda_env(struct work_queue_task *t, const char *local_tarball);
+
 /** Specify a custom name for the monitoring summary. If @ref work_queue_enable_monitoring is also enabled, the summary is also written to that directory.
 @param t A task object.
 @param monitor_output Resource summary file.
@@ -572,7 +582,6 @@ For more information, consult the manual of the resource_monitor.
 */
 
 int work_queue_specify_snapshot_file(struct work_queue_task *t, const char *monitor_snapshot_file);
-
 
 //@}
 
