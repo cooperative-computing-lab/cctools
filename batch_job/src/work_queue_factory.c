@@ -1020,7 +1020,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s Specify the linking libraries for running mesos (for use with -T mesos).\n", "--mesos-preload");
 	printf(" %-30s Specify the container image for using Kubernetes (for use with -T k8s).\n", "--k8s-image");
 	printf(" %-30s Specify the container image that contains work_queue_worker availabe for using Kubernetes (for use with -T k8s).\n", "--k8s-worker-image");
-	printf(" %-30s Send debugging to this file (can also be :stderr, :stdout, :syslog, or :journal).\n", "-o,--debug-file=<file>");
+	printf(" %-30s Send debugging to this file (can also be :stderr, or :stdout).\n", "-o,--debug-file=<file>");
 	printf(" %-30s Specify the size of the debug file (must use with -o option).\n", "-O,--debug-file-size=<mb>");
 	printf(" %-30s Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.\n", "--worker-binary=<file>");
 	printf(" %-30s Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.\n","--runos=<img>");

@@ -1317,11 +1317,6 @@ optional_include stdint.h      HAS_STDINT_H HAVE_STDINT_H
 optional_include sys/statfs.h  HAS_SYS_STATFS_H
 optional_include sys/statvfs.h HAS_SYS_STATVFS_H
 optional_include sys/vfs.h     HAS_SYS_VFS_H
-optional_include syslog.h      HAS_SYSLOG_H
-
-#if optional_library_function systemd/sd-journal.h sd_journal_print systemd HAS_SYSTEMD_JOURNAL_H; then
-#	external_libraries="${external_libraries} -lsystemd"
-#fi
 
 cctools_doctargets=
 if check_path doxygen

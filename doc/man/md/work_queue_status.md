@@ -59,7 +59,7 @@ more detailed information about tasks and workers.
 - **-C --catalog <catalog>** Set catalog server to <catalog>. Format: HOSTNAME:PORT
 - **-d --debug <flag>** Enable debugging for the given subsystem. Try -d all as a start.
 - **-t --timeout <time>** RPC timeout (default=300s).
-- **-o --debug-file <file>** Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)
+- **-o --debug-file <file>** Send debugging to this file. (can also be :stderr, or :stdout)
 - **-O --debug-rotate-max <bytes>** Rotate debug file once it reaches this size.
 - **-v, --version** Show work_queue_status version.
 - **-h, --help** Show this help message.

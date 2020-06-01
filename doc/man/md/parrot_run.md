@@ -62,7 +62,7 @@ For complete details with examples, see the [Parrot User's Manual](http://ccl.cs
 - **-n --name-list <path>** Record all the file names.
 - **--no-set-foreground** Disable changing the foreground process group of the session.
 - **-N --hostname <name>** Pretend that this is my hostname.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-O --debug-rotate-max <bytes>** Rotate debug files of this size.
 - **-p --proxy <host:port>** Use this proxy server for HTTP requests.
 - **-Q** Inhibit catalog queries to list /chirp.
