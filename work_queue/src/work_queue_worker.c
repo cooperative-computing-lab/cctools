@@ -549,7 +549,6 @@ static int setup_conda_environment(struct work_queue_process *p) {
 				"mkdir -p %s\n"
 				"/bin/tar -C %s -xf cache/%s\n"
 				"%s/bin/conda-unpack", e->expansion, e->expansion, p->task->conda_environment, e->expansion);
-		debug(D_WQ, cmd);
 		int status = system(cmd);
 		free(cmd);
 
