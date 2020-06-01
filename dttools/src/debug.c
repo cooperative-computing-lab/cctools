@@ -37,10 +37,6 @@ static pid_t (*debug_getpid) (void) = getpid;
 static char debug_program_name[PATH_MAX];
 static int64_t debug_flags = D_NOTICE|D_ERROR|D_FATAL;
 
-static char *terminal_path = "/dev/tty";
-static FILE *terminal_f    = NULL;
-static int   terminal_available = 1;
-
 struct flag_info {
 	const char *name;
 	int64_t flag;
@@ -198,18 +194,8 @@ static void do_debug(int64_t flags, const char *fmt, va_list args)
 
 	debug_write(flags, buffer_tostring(&B));
 
-	if(terminal_available && (flags & (D_ERROR | D_NOTICE | D_FATAL))) {
-		if(debug_write != debug_stderr_write || !isatty(STDERR_FILENO)) {
-			if(!terminal_f) {
-				if((terminal_f = fopen(terminal_path, "a")) == NULL) {
-					/* print to wherever stderr is pointing that we could not open the terminal. */
-					terminal_available = 0;
-				}
-			}
-		}
-
-		if(terminal_f)
-			fprintf(terminal_f, "%s", buffer_tostring(&B));
+	if(debug_write != debug_stderr_write && (flags & (D_ERROR | D_NOTICE | D_FATAL))) {
+		debug_stderr_write(flags, buffer_tostring(&B));
 	}
 
 	buffer_free(&B);
