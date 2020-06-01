@@ -71,7 +71,7 @@ overwriting another service's record.
 - **-m --max-jobs <n>** Maximum number of child processes.  (default is 50)
 - **-M --server-size <size>** Maximum size of a server to be believed.  (default is any)
 - **-n --name <name>** Set the preferred hostname of this server.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-O --debug-rotate-max <bytes>** Rotate debug file once it reaches this size (default 10M, 0 disables).
 - **-p -- <port>** Port number to listen on (default is 9097)
 - **-S, --single** Single process mode; do not fork on queries.

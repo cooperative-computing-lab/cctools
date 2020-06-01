@@ -39,7 +39,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s Filter results by this expression.\n", "-w,--where=<expr>");
 	fprintf(stdout, " %-30s Query the catalog on this host.\n", "-c,--catalog=<host>");
 	fprintf(stdout, " %-30s Enable debugging for this sybsystem\n", "-d,--debug=<flag>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Rotate file once it reaches this size. (default 10M, 0 disables)\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Timeout.\n", "-t,--timeout=<time>");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");

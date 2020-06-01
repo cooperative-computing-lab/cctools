@@ -130,7 +130,7 @@ static void show_help(const char *progname)
 	fprintf(stdout, " %-30s Filter results by this expression.\n", "   --where=<expr>");
 	fprintf(stdout, " %-30s RPC timeout (default is %ds).\n", "-t,--timeout=<time>", work_queue_status_timeout);
 	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr,\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s :stdout, :syslog, or :journal)\n", "");
+	fprintf(stdout, " %-30s or :stdout)\n", "");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s Show work_queue_status version.\n", "-v,--version");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");

@@ -50,7 +50,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-34s The path of the namelist list.\n", "-n,--name-list=<listpath>");
 	fprintf(stdout, " %-34s The path of the package.\n", "-p,--package-path=<packagepath>");
 	fprintf(stdout, " %-34s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
-	fprintf(stdout, " %-34s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-34s Send debugging to this file. (can also be :stderr, or :stdout) (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-34s Show the help info.\n", "-h,--help");
 	return;
 }

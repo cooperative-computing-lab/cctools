@@ -50,7 +50,7 @@ then connect back to the master process and begin executing tasks.
 - **-v, --version** Show version string
 - **-d --debug <subsystem>** Enable debugging for this subsystem. (Try -d all to start.)
 - **-N --project-name <project>** Set the project name to <project>
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-p --port <port>** Port number for queue master to listen on.
 - **-P --priority <num>** Priority. Higher the value, higher the priority.
 - **-Z --port-file <file>** Select port at random and write it to this file.  (default is disabled)

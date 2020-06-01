@@ -42,7 +42,7 @@ For complete details with examples, see the [Confuga User's Manual](http://ccl.c
 
 - **-d --debug <flag>** Enable debugging for this sybsystem
 - **-h, --help** Give help information.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-v, --version** Show version info.
 
 

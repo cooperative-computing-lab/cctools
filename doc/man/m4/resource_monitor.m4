@@ -96,7 +96,7 @@ LONGCODE_END
 SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d,debug,subsystem)Enable debugging for this subsystem.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 OPTION_ITEM(`-v,--version')Show version string.
 OPTION_ITEM(`-h,--help')Show help text.
 OPTION_TRIPLET(-i,interval,n)Maximum interval between observations, in seconds (default=1).

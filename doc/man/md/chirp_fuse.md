@@ -57,7 +57,7 @@ For complete details with examples, see the
 - **-f, --foreground** Run in foreground for debugging.
 - **-i --tickets <files>** Comma-delimited list of tickets to use for authentication.
 - **-m --mount-options <option>** Pass mount option to FUSE. Can be specified multiple times.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-t --timeout <timeout>** Timeout for network operations. (default is 60s)
 - **-v, --version** Show program version.
 - **-h, --help** Give help information.
