@@ -32,11 +32,6 @@ extern int debug_file_path (const char *path);
 extern void debug_file_rename (const char *suffix);
 extern int debug_file_reopen (void);
 
-#ifdef HAS_SYSTEMD_JOURNAL_H
-extern void debug_journal_write (int64_t flags, const char *str);
-#endif
-
-
 static void (*debug_write) (int64_t flags, const char *str) = debug_stderr_write;
 static pid_t (*debug_getpid) (void) = getpid;
 static char debug_program_name[PATH_MAX];
@@ -299,13 +294,6 @@ int debug_config_file_e (const char *path)
 	} else if(strcmp(path, ":stdout") == 0) {
 		debug_write = debug_stdout_write;
 		return 0;
-	} else if (strcmp(path, ":journal") == 0) {
-#ifdef HAS_SYSTEMD_JOURNAL_H
-		debug_write = debug_journal_write;
-		return 0;
-#else
-		return errno = EINVAL, -1;
-#endif
 	} else {
 		debug_write = debug_file_write;
 		return debug_file_path(path);
