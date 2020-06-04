@@ -51,7 +51,7 @@ process and begin executing tasks.
 - **-p --port <port>** The port that the master will be listening on.
 - **-e --extra-args <args>** Extra arguments to pass to the comparison function.
 - **-f --input-file <file>** Extra input file needed by the comparison function. (may be given multiple times)
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-O ----output-file <file>** Write task output to this file (default to standard output)
 - **-t --estimated-time <seconds>** Estimated time to run one comparison. (default chosen at runtime)
 - **-x --width <item>** Width of one work unit, in items to compare. (default chosen at runtime)

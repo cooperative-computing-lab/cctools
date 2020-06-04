@@ -37,7 +37,7 @@ OPTION_ITEM(`-l, --verbose')Long output.
 OPTION_TRIPLET(-C, catalog, catalog)Set catalog server to <catalog>. Format: HOSTNAME:PORT
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for the given subsystem. Try -d all as a start.
 OPTION_TRIPLET(-t, timeout, time)RPC timeout (default=300s).
-OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)
+OPTION_TRIPLET(-o, debug-file, file)Send debugging to this file. (can also be :stderr, or :stdout)
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug file once it reaches this size.
 OPTION_ITEM(`-v, --version')Show work_queue_status version.
 OPTION_ITEM(`-h, --help')Show this help message.

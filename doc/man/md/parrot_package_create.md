@@ -40,7 +40,7 @@ After recording the accessed files and environment variables of one program with
 - **-n --name-list <path>** The path of the namelist list.
 - **-p --package-path <path>** The path of the package.
 - **-d --debug <flag>** Enable debugging for this sub-system.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-h, --help** Show the help info.
 
 

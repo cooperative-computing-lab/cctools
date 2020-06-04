@@ -108,7 +108,7 @@ static void help (const char *argv0)
 	fprintf(stdout, "use: %s [options] <Confuga root> <cmd> [...]\n", argv0);
 	fprintf(stdout, "The most common options are:\n");
 	fprintf(stdout, " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<name>");
-	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	fprintf(stdout, " %-30s Show version info.\n", "-v,--version");
 	fprintf(stdout, " %-30s This message.\n", "-h,--help");
 	fprintf(stdout, "\n");

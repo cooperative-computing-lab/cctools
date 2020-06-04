@@ -50,7 +50,7 @@ When using **chirp_status** with long form option (-l), it lists additional info
 - **-T, --totals** Totals output.
 - **-v, --version** Show program version.
 - **-d --debug <flag>** Enable debugging for this subsystem.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-O --debug-rotate-max <bytes>** Rotate file once it reaches this size.
 - **-h, --help** Show help text.
 

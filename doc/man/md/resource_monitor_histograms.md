@@ -73,7 +73,7 @@ wall_time
 ### Debugging Options
 
 - **-d --debug <subsystem>** Enable debugging for this subsystem.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **--verbose** Display runtime progress on stdout.
 
 

@@ -1552,7 +1552,7 @@ static void show_usage(const char *cmd)
 	fprintf(stdout, "\nUse: %s [options] output_directory [workflow_name]\n\n", cmd);
 	fprintf(stdout, "\nIf -L is specified, read the summary file list from standard input.\n\n");
 	fprintf(stdout, "%-20s Enable debugging for this subsystem.\n", "-d <subsystem>");
-	fprintf(stdout, "%-20s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o <file>");
+	fprintf(stdout, "%-20s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o <file>");
 	fprintf(stdout, "%-20s Read summaries filenames from file <list>.\n", "-L <list>");
 	fprintf(stdout, "%-20s Split on task categories.\n", "-s");
 	fprintf(stdout, "%-20s Use brute force to compute proposed resource allocations. (slow)\n", "-b");
