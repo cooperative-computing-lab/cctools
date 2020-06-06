@@ -12,9 +12,16 @@ Computing Lab at the University of Notre Dame, led by
 Prof. Douglas Thain.  The file CREDITS lists the many
 people that have contributed to the software over the years.
 
-For complete instructions on how to build, install, and use
-the software, see here:
-   http://ccl.cse.nd.edu/software/manuals
+For complete instructions on how to use the software, see here:
+   https://cctools.readthedocs.io/en/latest/
+
+CCTools can be installed via Conda with:
+
+    conda install -y -c conda-forge ndcctools
+
+You can also install via Spack or build from source.
+Full installation instructions are available here:
+   https://cctools.readthedocs.io/en/latest/install/
 
 If you are impatient, the following commands will build
 and install the software in your home directory:
