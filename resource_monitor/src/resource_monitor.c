@@ -2006,6 +2006,10 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 
         debug(D_RMON, "executing: %s\n", executable);
 
+		char *pid_s = string_format("%d", getpid());
+		setenv(RESOURCE_MONITOR_ROOT_PROCESS, pid_s, 1);
+		free(pid_s);
+
 		errno = 0;
         execvp(executable, argv);
         //We get here only if execlp fails.
