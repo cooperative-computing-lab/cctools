@@ -59,7 +59,6 @@ static uint64_t start_time = 0;
 static uint64_t end_time   = 0;
 
 static int stop_short_running = 0; /* Stop processes that run for less than RESOURCE_MONITOR_SHORT_TIME seconds. */
-static int root_process       = 0;  /* 1 for first process to be monitored. */
 
 #define declare_original_dlsym(name) __typeof__(name) *original_ ## name;
 #define define_original_dlsym(name) original_ ## name = dlsym(RTLD_NEXT, #name);
@@ -119,13 +118,6 @@ void rmonitor_helper_initialize() {
 		family_of_fd = itable_create(8);
 	}
 
-	if(getenv(RESOURCE_MONITOR_ROOT_PROCESS)) {
-		root_process = 1;
-		unsetenv(RESOURCE_MONITOR_ROOT_PROCESS);
-	} else {
-		root_process = 0;
-	}
-
 	if(getenv(RESOURCE_MONITOR_HELPER_STOP_SHORT)) {
 		stop_short_running = 1;
 	} else {
@@ -135,6 +127,10 @@ void rmonitor_helper_initialize() {
 	initializing_helper = 0;
 }
 
+int is_root_process() {
+	const char *pid_s = getenv(RESOURCE_MONITOR_ROOT_PROCESS);
+	return (pid_s && atoi(pid_s) == getpid());
+}
 
 pid_t fork()
 {
@@ -585,7 +581,7 @@ void exit_wrapper_preamble(int status)
 	sighandler_t old_handler = signal(SIGCONT, exit_signal_handler);
 
 	int short_process = 0;
-	if(root_process) {
+	if(is_root_process()) {
 		// root process is never considered a short running process
 		short_process = 0;
 	} else if(stop_short_running) {
