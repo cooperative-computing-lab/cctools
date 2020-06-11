@@ -20,7 +20,7 @@ SECTION(OPTIONS)
 OPTIONS_BEGIN
 OPTION_TRIPLET(-d, debug, flag)Enable debugging for this sybsystem
 OPTION_ITEM(`-h, --help')Give help information.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 OPTION_ITEM(`-v, --version')Show version info.
 OPTIONS_END
 

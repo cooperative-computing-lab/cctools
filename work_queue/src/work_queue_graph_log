@@ -8,7 +8,8 @@ import sys
 import re
 import os
 import getopt
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_output
+from functools import reduce
 
 gnuplot_cmd   = 'gnuplot'
 format        = 'svg'
@@ -44,7 +45,7 @@ def time_field_p(field):
 def read_log_entries(file, fields):
     log_entries = {}
     idxs  = range(0, len(fields))
-    pairs = zip(idxs, fields)
+    pairs = list(zip(idxs, fields))
     epoch = None
     count_lines = 0
     prev_line = None
@@ -124,8 +125,7 @@ def sort_time(log_entries):
     return times
 
 def pout(file, str):
-    file.write(str)
-    file.write('\n')
+    file.write("{}\n".format(str).encode('utf-8'))
 
 class WQPlot:
     def __init__(self, title, ylabel, fields, labels=None, x_units = x_units, y_units = x_units, range = x_range, stack = False):
@@ -234,10 +234,8 @@ class WQPlotLog(WQPlot):
 
 def check_gnuplot_version(gnuplot_cmd):
         try:
-            gnuplot = Popen([gnuplot_cmd, '--version'], stdout = PIPE)
-            version = gnuplot.stdout.readline()
-            gnuplot.stdout.close()
-
+            version = check_output([gnuplot_cmd, '--version'])
+            version = version.decode("utf-8")
             result = re.match('gnuplot\s+(\d+\.\d+)\D', version)
 
             if not result:
@@ -255,20 +253,29 @@ def check_gnuplot_version(gnuplot_cmd):
             exit(1)
 
 def show_usage():
-    print '\n%s [options] <work-queue-log>\n' % (os.path.basename(sys.argv[0],))
-    print '\t-h\t\t\tThis message.'
-    print '\t-c <gnuplot-path>\tSpecify the location of the gnuplot executable.'
-    print '\t\t\t\tDefault is gnuplot.'
-    print '\t-o <prefix-output>\tGenerate prefix-output.{workers,workers-accum,tasks,tasks-accum,time-master,time-workers,transfer,cores}.%s.' % (format,)
-    print '\t\t\t\tDefault is <work-queue-log>.\n'
-    print '\t-r <range>\t\tRange of time to plot, in time units (see -u) from'
-    print '\t\t\t\tthe start of execution. Of the form: min:max, min:, or :max.'
-    print '\t-s <seconds>\t\tSample log every <seconds> (default is %f).' % (resolution,)
-    print '\t-u <time-unit>\t\tTime scale to output. One of s,m,h or d, for seconds,'
-    print '\t\t\t\tminutes (default), hours or days.\n'
-    print '\t-T <output-format>\tSet output format. Default is %s.' % (format,)
-    print '\t\t\t\tIf \'text\', then the gnuplot scripts are written instead of the images.'
-    print '\t-g <width,height>\tSize of each plot. Default is %s.\n' % (geometry,)
+    usage_string = """
+{command} [options] <work-queue-log>
+        -h                  This message.
+        -c <gnuplot-path>   Specify the location of the gnuplot executable.
+                            Default is gnuplot.
+        -o <prefix-output>  Generate prefix-output.{{workers,workers-accum,
+                                                    tasks,tasks-accum,
+                                                    time-master,time-workers,
+                                                    transfer,cores}}.{format}
+                            Default is <work-queue-log>.
+        -r <range>          Range of time to plot, in time units (see -u) from
+                            the start of execution. Of the form: min:max,
+                            min:, or :max.
+        -s <seconds>        Sample log every <seconds> (default is {format}).
+        -u <time-unit>      Time scale to output. One of s,m,h or d, for seconds,
+                            minutes (default), hours or days.
+        -T <output-format>  Set output format. Default is {format}.
+                            If \'text\', then the gnuplot scripts are written
+                            instead of the images.
+        -g <width,height>   Size of each plot. Default is {geometry}.
+""".format(command=os.path.basename(sys.argv[0],), format=format, resolution=resolution, geometry=geometry)
+    print(usage_string)
+
 
 if __name__ == '__main__':
 

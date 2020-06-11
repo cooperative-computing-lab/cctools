@@ -257,9 +257,6 @@ int rmonitor_helper_init(char *lib_default_path, int *fd, int stop_short_running
 			setenv(RESOURCE_MONITOR_HELPER_STOP_SHORT, "1", 1);
 		}
 
-		/* First process will unset this variable. */
-		setenv(RESOURCE_MONITOR_ROOT_PROCESS, "1", 1);
-
 		/* Each process sets this variable to its start time after a fork,
 		 * except for the first process, which for which we set here. */
 		char *start_time = string_format("%" PRId64, timestamp_get());

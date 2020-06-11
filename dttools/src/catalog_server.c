@@ -580,7 +580,7 @@ static void show_help(const char *cmd)
 	fprintf(stdout, " %-30s (default is any)\n", "");
 	fprintf(stdout, " %-30s Preferred host name of this server.\n", "-n,--name=<name>");
 	fprintf(stdout, " %-30s Send debugging to this file. (can also\n", "-o,--debug-file=<file>");
-	fprintf(stdout, " %-30s be :stderr, :stdout, :syslog, or :journal)\n", "");
+	fprintf(stdout, " %-30s be :stderr, or :stdout)\n", "");
 	fprintf(stdout, " %-30s Rotate debug file once it reaches this size.\n", "-O,--debug-rotate-max=<bytes>");
 	fprintf(stdout, " %-30s (default 10M, 0 disables)\n", "");
 	fprintf(stdout, " %-30s Port number to listen on (default is %d)\n", "-p,--port=<port>", port);

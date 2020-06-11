@@ -60,7 +60,7 @@ For complete details with examples, see the [Chirp User's Manual](http://ccl.cse
 - **-I --interface <addr>** Listen only on this network interface.
 - **-M --max-clients <count>** Set the maximum number of clients to accept at once. (default unlimited)
 - **-n --catalog-name <name>** Use this name when reporting to the catalog.
-- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+- **-o --debug-file <file>** Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 - **-O --debug-rotate-max <bytes>** Rotate debug file once it reaches this size.
 - **-P --superuser <user>** Superuser for all directories. (default is none)
 - **-p --port <port>** Listen on this port (default is 9094, arbitrary is 0)

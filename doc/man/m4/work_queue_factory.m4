@@ -78,7 +78,7 @@ OPTION_PAIR(--mesos-path,filepath)Specify path to mesos python library (for use 
 OPTION_PAIR(--mesos-preload,library)Specify the linking libraries for running mesos (for use with -T mesos).
 OPTION_ITEM(--k8s-image)Specify the container image for using Kubernetes (for use with -T k8s).
 OPTION_ITEM(--k8s-worker-image)Specify the container image that contains work_queue_worker availabe for using Kubernetes (for use with -T k8s).
-OPTION_TRIPLET(-o,debug-file,file)Send debugging to this file (can also be :stderr, :stdout, :syslog, or :journal).
+OPTION_TRIPLET(-o,debug-file,file)Send debugging to this file (can also be :stderr, or :stdout).
 OPTION_TRIPLET(-O,debug-file-size,mb)Specify the size of the debug file (must use with -o option).
 OPTION_PAIR(--worker-binary,file)Specify the binary to use for the worker (relative or hard path). It should accept the same arguments as the default work_queue_worker.
 OPTION_PAIR(--runos,img)Will make a best attempt to ensure the worker will execute in the specified OS environment, regardless of the underlying OS.

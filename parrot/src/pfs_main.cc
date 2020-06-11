@@ -249,7 +249,7 @@ static void show_help( const char *cmd )
 	printf( " %-30s Maximum amount of time to retry failures.    (PARROT_TIMEOUT)\n", "-T,--timeout=<time>");
 	printf( " %-30s Enable debugging for this sub-system.    (PARROT_DEBUG_FLAGS)\n", "-d,--debug=<name>");
 	printf( " %-30s Send debugging to this file.              (PARROT_DEBUG_FILE)\n", "-o,--debug-file=<file>");
-	printf( " %-30s     (can also be :stderr, :stdout, :syslog, or :journal)\n", "");
+	printf( " %-30s     (can also be :stderr, or :stdout)\n", "");
 	printf( " %-30s Rotate debug files of this size.     (PARROT_DEBUG_FILE_SIZE)\n", "-O,--debug-rotate-max=<bytes>");
 	printf( " %-30s     (default 10M, 0 disables)\n","");
 	printf( " %-30s Display version number.\n", "-v,--version");

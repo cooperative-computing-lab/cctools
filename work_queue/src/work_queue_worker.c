@@ -462,7 +462,7 @@ int link_recursive( const char *source, const char *target )
 {
 	struct stat info;
 
-	if(stat(source,&info)<0) return 0;
+	if(lstat(source,&info)<0) return 0;
 
 	if(S_ISDIR(info.st_mode)) {
 		DIR *dir = opendir(source);
@@ -726,7 +726,7 @@ static int handle_tasks(struct link *master)
 }
 
 /**
- * Stream file/directory contents for the rget protocol.
+ * Stream file/directory contents for the recursive get/put protocol.
  * Format:
  * 		for a directory: a new line in the format of "dir $DIR_NAME 0"
  * 		for a file: a new line in the format of "file $FILE_NAME $FILE_LENGTH"
@@ -760,6 +760,7 @@ static int handle_tasks(struct link *master)
  * end
  *
  */
+
 static int stream_output_item(struct link *master, const char *filename, int recursive)
 {
 	DIR *dir;
@@ -797,7 +798,7 @@ static int stream_output_item(struct link *master, const char *filename, int rec
 		fd = open(cached_filename, O_RDONLY, 0);
 		if(fd >= 0) {
 			length = info.st_size;
-			send_master_message(master, "file %s %"PRId64"\n", filename, length);
+			send_master_message(master, "file %s %"PRId64"\n", filename, length );
 			actual = link_stream_from_fd(master, fd, length, time(0) + active_timeout);
 			close(fd);
 			if(actual != length) {
@@ -948,7 +949,7 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 			if(value) {
 				*value = 0;
 				value++;
-				work_queue_task_specify_enviroment_variable(task,env,value);
+				work_queue_task_specify_environment_variable(task,env,value);
 			}
 			free(env);
 		} else {
@@ -988,56 +989,189 @@ static int do_task( struct link *master, int taskid, time_t stoptime )
 }
 
 /*
-Handle an incoming "put" message from the master,
-which places a file into the cache directory.
+Return false if name is invalid as a simple filename.
+For example, if it contains a slash, which would escape
+the current working directory.
 */
 
-static int do_put( struct link *master, char *filename, int64_t length, int mode )
+int is_valid_filename( const char *name )
 {
-	char cached_filename[WORK_QUEUE_LINE_MAX];
-	char *cur_pos;
+	if(strchr(name,'/')) return 0;
+	return 1;
+}
 
-	debug(D_WQ, "Putting file %s into workspace\n", filename);
+/*
+Handle an incoming symbolic link inside the rput protocol.
+The filename of the symlink was already given in the message,
+and the target of the symlink is given as the "body" which
+must be read off of the wire.  The symlink target does not
+need to be url_decoded because it is sent in the body.
+*/
+
+static int do_put_symlink_internal( struct link *master, char *filename, int length )
+{
+	char *target = malloc(length);
+
+	int actual = link_read(master,target,length,time(0)+active_timeout);
+	if(actual!=length) {
+		free(target);
+		return 0;
+	}
+
+	int result = symlink(target,filename);
+	if(result<0) {
+		debug(D_WQ,"could not create symlink %s: %s",filename,strerror(errno));
+		free(target);
+		return 0;
+	}
+
+	free(target);
+
+	return 1;
+}
+
+/*
+Handle an incoming file inside the rput protocol.
+Notice that we trust the caller to have created
+the necessary parent directories and checked the
+name for validity.
+*/
+
+static int do_put_file_internal( struct link *master, char *filename, int64_t length, int mode )
+{
 	if(!check_disk_space_for_filesize(".", length, disk_avail_threshold)) {
 		debug(D_WQ, "Could not put file %s, not enough disk space (%"PRId64" bytes needed)\n", filename, length);
 		return 0;
 	}
 
-
+	/* Ensure that worker can access the file! */
 	mode = mode | 0600;
 
-	cur_pos = filename;
-
-	while(!strncmp(cur_pos, "./", 2)) {
-		cur_pos += 2;
-	}
-
-	string_nformat(cached_filename, sizeof(cached_filename), "cache/%s", cur_pos);
-
-	cur_pos = strrchr(cached_filename, '/');
-	if(cur_pos) {
-		*cur_pos = '\0';
-		if(!create_dir(cached_filename, mode | 0700)) {
-			debug(D_WQ, "Could not create directory - %s (%s)\n", cached_filename, strerror(errno));
-			return 0;
-		}
-		*cur_pos = '/';
-	}
-
-	int fd = open(cached_filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
-	if(fd < 0) {
+	int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, mode);
+	if(fd<0) {
 		debug(D_WQ, "Could not open %s for writing. (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
 	int64_t actual = link_stream_to_fd(master, fd, length, time(0) + active_timeout);
 	close(fd);
-	if(actual != length) {
+	if(actual!=length) {
 		debug(D_WQ, "Failed to put file - %s (%s)\n", filename, strerror(errno));
 		return 0;
 	}
 
 	return 1;
+}
+
+/*
+Handle an incoming directory inside the recursive dir protocol.
+Notice that we have already checked the dirname for validity,
+and now we process "put" and "dir" commands within the list
+until "end" is reached.  Note that "put" is used instead of
+"file" for historical reasons, to support recursive reuse
+of existing code.
+*/
+
+static int do_put_dir_internal( struct link *master, char *dirname )
+{
+	char line[WORK_QUEUE_LINE_MAX];
+	char name_encoded[WORK_QUEUE_LINE_MAX];
+	char name[WORK_QUEUE_LINE_MAX];
+	int64_t size;
+	int mode;
+
+	int result = mkdir(dirname,0777);
+	if(result<0) {
+		debug(D_WQ,"unable to create %s: %s",dirname,strerror(errno));
+		return 0;
+	}
+
+	while(1) {
+		if(!recv_master_message(master,line,sizeof(line),time(0)+active_timeout)) return 0;
+
+		int r = 0;
+
+		if(sscanf(line,"put %s %" SCNd64 " %o",name_encoded,&size,&mode)==3) {
+
+			url_decode(name_encoded,name,sizeof(name));
+			if(!is_valid_filename(name)) return 0;
+
+			char *subname = string_format("%s/%s",dirname,name);
+			r = do_put_file_internal(master,subname,size,mode);
+			free(subname);
+
+		} else if(sscanf(line,"symlink %s %" SCNd64,name_encoded,&size)==2) {
+
+			url_decode(name_encoded,name,sizeof(name));
+			if(!is_valid_filename(name)) return 0;
+
+			char *subname = string_format("%s/%s",dirname,name);
+			r = do_put_symlink_internal(master,subname,size);
+			free(subname);
+
+		} else if(sscanf(line,"dir %s",name_encoded)==1) {
+
+			url_decode(name_encoded,name,sizeof(name));
+			if(!is_valid_filename(name)) return 0;
+
+			char *subname = string_format("%s/%s",dirname,name);
+			r = do_put_dir_internal(master,subname);
+			free(subname);
+
+		} else if(!strcmp(line,"end")) {
+			break;
+		}
+
+		if(!r) return 0;
+	}
+
+	return 1;
+}
+
+static int do_put_dir( struct link *master, char *dirname )
+{
+	if(!is_valid_filename(dirname)) return 0;
+
+	char * cachename = string_format("cache/%s",dirname);
+	int result = do_put_dir_internal(master,cachename);
+	free(cachename);
+
+	return result;
+}
+
+/*
+This is the old method for sending a single file.
+It works, but it has the deficiency that the master
+expects the worker to create all parent directories
+for the file, which is horrifically expensive when
+sending a large directory tree.  The direction put
+protocol (above) is preferred instead.
+*/
+
+static int do_put_single_file( struct link *master, char *filename, int64_t length, int mode )
+{
+	if(!path_within_dir(filename, workspace)) {
+		debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
+		return 0;
+	}
+
+	char * cached_filename = string_format("cache/%s",filename);
+
+	if(strchr(filename,'/')) {
+		char dirname[WORK_QUEUE_LINE_MAX];
+		path_dirname(filename,dirname);
+		if(!create_dir(dirname,0777)) {
+			debug(D_WQ, "could not create directory %s: %s",dirname,strerror(errno));
+			free(cached_filename);
+			return 0;
+		}
+	}
+
+	int result = do_put_file_internal(master,cached_filename,length,mode);
+
+	free(cached_filename);
+
+	return result;
 }
 
 static int file_from_url(const char *url, const char *filename) {
@@ -1067,9 +1201,16 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 		return file_from_url(url, cache_name);
 }
 
-static int do_unlink(const char *path) {
+static int do_unlink(const char *path)
+{
 	char cached_path[WORK_QUEUE_LINE_MAX];
 	string_nformat(cached_path, sizeof(cached_path), "cache/%s", path);
+
+	if(!path_within_dir(cached_path, workspace)) {
+		debug(D_WQ, "%s is not within workspace %s",cached_path,workspace);
+		return 0;
+	}
+
 	//Use delete_dir() since it calls unlink() if path is a file.
 	if(delete_dir(cached_path) != 0) {
 		struct stat buf;
@@ -1416,6 +1557,7 @@ static void disconnect_master(struct link *master) {
 
 static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
+	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
 	int64_t length;
@@ -1425,40 +1567,28 @@ static int handle_master(struct link *master) {
 	if(recv_master_message(master, line, sizeof(line), idle_stoptime )) {
 		if(sscanf(line,"task %" SCNd64, &taskid)==1) {
 			r = do_task(master, taskid,time(0)+active_timeout);
-		} else if(string_prefix_is(line, "put ")) {
-			char *f = NULL, *l = NULL, *m = NULL, *g = NULL;
-			if(pattern_match(line, "^put (.+) (%d+) ([0-7]+) (%d+)$", &f, &l, &m, &g) >= 0) {
-				strncpy(filename, f, WORK_QUEUE_LINE_MAX); free(f);
-				length = strtoll(l, 0, 10); free(l);
-				mode   = strtol(m, NULL, 8); free(m);
-				free(g); //flags are not used anymore.
-				
-				if(path_within_dir(filename, workspace)) {
-					r = do_put(master, filename, length, mode);
-					reset_idle_timer();
-				} else {
-					debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-					r = 0;
-				}
-			} else {
-				debug(D_WQ, "Malformed put message.");
-				r = 0;
-			}
+		} else if(sscanf(line,"put %s %"SCNd64" %o",filename_encoded,&length,&mode)==3) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			r = do_put_single_file(master, filename, length, mode);
+			reset_idle_timer();
+		} else if(sscanf(line, "dir %s", filename_encoded)==1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			r = do_put_dir(master,filename);
+			reset_idle_timer();
 		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
 			r = do_url(master, filename, length, mode);
 			reset_idle_timer();
-		} else if(sscanf(line, "unlink %s", filename) == 1) {
-			if(path_within_dir(filename, workspace)) {
-				r = do_unlink(filename);
-			} else {
-				debug(D_WQ, "Path - %s is not within workspace %s.", filename, workspace);
-				r= 0;
-			}
-		} else if(sscanf(line, "get %s %d", filename, &mode) == 2) {
+		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
+			r = do_unlink(filename);
+		} else if(sscanf(line, "get %s %d", filename_encoded, &mode) == 2) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_get(master, filename, mode);
-		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename, path) == 3) {
+		} else if(sscanf(line, "thirdget %o %s %[^\n]", &mode, filename_encoded, path) == 3) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_thirdget(mode, filename, path);
-		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename, path) == 3) {
+		} else if(sscanf(line, "thirdput %o %s %[^\n]", &mode, filename_encoded, path) == 3) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_thirdput(master, mode, filename, path);
 			reset_idle_timer();
 		} else if(sscanf(line, "kill %" SCNd64, &taskid) == 1) {
@@ -1468,7 +1598,8 @@ static int handle_master(struct link *master) {
 				kill_all_tasks();
 				r = 1;
 			}
-		} else if(sscanf(line, "invalidate-file %s", filename) == 1) {
+		} else if(sscanf(line, "invalidate-file %s", filename_encoded) == 1) {
+			url_decode(filename_encoded,filename,sizeof(filename));
 			r = do_invalidate_file(filename);
 		} else if(!strncmp(line, "release", 8)) {
 			r = do_release();
@@ -2228,7 +2359,7 @@ static void show_help(const char *cmd)
 	printf( " %-30s Name of master (project) to contact.  May be a regular expression.\n", "-N,-M,--master-name=<name>");
 	printf( " %-30s Catalog server to query for masters.  (default: %s:%d) \n", "-C,--catalog=<host:port>",CATALOG_HOST,CATALOG_PORT);
 	printf( " %-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	printf( " %-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	printf( " %-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
 	printf( " %-30s Set the maximum size of the debug log (default 10M, 0 disables).\n", "--debug-rotate-max=<bytes>");
 	printf( " %-30s Set worker to run as a foreman.\n", "--foreman");
 	printf( " %-30s Run as a foreman, and advertise to the catalog server with <name>.\n", "-f,--foreman-name=<name>");

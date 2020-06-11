@@ -4,12 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-/*
-The following major problems must be fixed:
-- The capacity code assumes one task per worker.
-- The log specification need to be updated.
-*/
-
 #include "work_queue.h"
 #include "work_queue_protocol.h"
 #include "work_queue_internal.h"
@@ -736,8 +730,6 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 		avg_transfer_rate = get_queue_transfer_rate(q, &data_source);
 	}
 
-	debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
-
 	double tolerable_transfer_rate = avg_transfer_rate / q->transfer_outlier_factor; // bytes per second
 
 	int timeout = length / tolerable_transfer_rate;
@@ -750,7 +742,13 @@ static int get_transfer_wait_time(struct work_queue *q, struct work_queue_worker
 		timeout = MAX(q->minimum_transfer_timeout,timeout);
 	}
 
-	debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+	/* Don't bother printing anything for transfers of less than 1MB, to avoid excessive output. */
+
+	if( length >= 1048576 ) {
+		debug(D_WQ,"%s (%s) using %s average transfer rate of %.2lf MB/s\n", w->hostname, w->addrport, data_source, avg_transfer_rate/MEGABYTE);
+
+		debug(D_WQ, "%s (%s) will try up to %d seconds to transfer this %.2lf MB file.", w->hostname, w->addrport, timeout, length/1000000.0);
+	}
 
 	free(data_source);
 	return timeout;
@@ -1853,6 +1851,9 @@ static work_queue_result_code_t get_result(struct work_queue *q, struct work_que
 	}
 
 	if(task_status == WORK_QUEUE_RESULT_FORSAKEN) {
+		// Delete any input files that are not to be cached.
+		delete_worker_files(q, w, t->input_files, WORK_QUEUE_CACHE | WORK_QUEUE_PREEXIST);
+
 		/* task will be resubmitted, so we do not update any of the execution stats */
 		reap_task_from_worker(q, w, t, WORK_QUEUE_TASK_READY);
 
@@ -2782,47 +2783,60 @@ static int build_poll_table(struct work_queue *q, struct link *master)
 	return n;
 }
 
-static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, int64_t *total_bytes, int flags)
+/*
+Send a symbolic link to the remote worker.
+Note that the target of the link is sent
+as sthe "body" of the link, following the
+message header.
+*/
+
+static int send_symlink( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, int64_t *total_bytes )
 {
-	struct stat local_info;
+	char target[WORK_QUEUE_LINE_MAX];
+
+	int length = readlink(localname,target,sizeof(target));
+	if(length<0) return APP_FAILURE;
+
+	char remotename_encoded[WORK_QUEUE_LINE_MAX];
+	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
+
+	send_worker_msg(q,w,"symlink %s %d\n",remotename_encoded,length);
+
+	link_write(w->link,target,length,time(0)+q->long_timeout);
+
+	*total_bytes += length;
+
+	return SUCCESS;
+}
+
+/*
+Send a single file (or a piece of a file) to the remote worker.
+The transfer time is controlled by the size of the file.
+If the transfer takes too long, then abort.
+*/
+
+static int send_file( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, off_t offset, int64_t length, struct stat info, int64_t *total_bytes )
+{
 	time_t stoptime;
 	timestamp_t effective_stoptime = 0;
 	int64_t actual = 0;
 
-	if(stat(localname, &local_info) < 0) {
-		if(lstat(localname,&local_info)==0) {
-			/*
-			If stat fails but lstat succeeds, we are looking at
-			a broken symbolic link.  This could be user error but
-			is more frequently an editor lock file or similar indication.
-			In this case, emit a warning but continue without sending
-			the file.
-			*/
-			debug(D_WQ|D_NOTICE,"skipping broken symbolic link: %s",localname);
-			return SUCCESS;
-		}
-
-		debug(D_NOTICE, "Cannot stat file %s: %s", localname, strerror(errno));
-		return APP_FAILURE;
-	}
-
 	/* normalize the mode so as not to set up invalid permissions */
-	local_info.st_mode |= 0600;
-	local_info.st_mode &= 0777;
+	int mode = ( info.st_mode | 0x600 ) & 0777;
 
 	if(!length) {
-		length = local_info.st_size;
+		length = info.st_size;
 	}
 
-	debug(D_WQ, "%s (%s) needs file %s bytes %lld:%lld as '%s'", w->hostname, w->addrport, localname, (long long) offset, (long long) offset+length, remotename);
 	int fd = open(localname, O_RDONLY, 0);
 	if(fd < 0) {
 		debug(D_NOTICE, "Cannot open file %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
 
-	//We want to send bytes starting from 'offset'. So seek to it first.
-	if (offset >= 0 && (offset+length) <= local_info.st_size) {
+	/* If we are sending only a piece of the file, seek there first. */
+
+	if (offset >= 0 && (offset+length) <= info.st_size) {
 		if(lseek(fd, offset, SEEK_SET) == -1) {
 			debug(D_NOTICE, "Cannot seek file %s to offset %lld: %s", localname, (long long) offset, strerror(errno));
 			close(fd);
@@ -2838,15 +2852,18 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 		effective_stoptime = (length/q->bandwidth)*1000000 + timestamp_get();
 	}
 
+	/* filenames are url-encoded to avoid problems with spaces, etc */
+	char remotename_encoded[WORK_QUEUE_LINE_MAX];
+	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
+
 	stoptime = time(0) + get_transfer_wait_time(q, w, t, length);
-	send_worker_msg(q,w, "put %s %"PRId64" 0%o %d\n",remotename, length, local_info.st_mode, flags);
+	send_worker_msg(q,w, "put %s %"PRId64" 0%o\n",remotename_encoded, length, mode );
 	actual = link_stream_from_fd(w->link, fd, length, stoptime);
 	close(fd);
 
 	*total_bytes += actual;
 
-	if(actual != length)
-		return WORKER_FAILURE;
+	if(actual != length) return WORKER_FAILURE;
 
 	timestamp_t current_time = timestamp_get();
 	if(effective_stoptime && effective_stoptime > current_time) {
@@ -2856,98 +2873,138 @@ static int send_file( struct work_queue *q, struct work_queue_worker *w, struct 
 	return SUCCESS;
 }
 
+/* Need prototype here to address mutually recursive code. */
+
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *name, const char *remotename, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links );
+
 /*
-Send a directory and all of its contentss.
+Send a directory and all of its contents using the new streaming protocol.
+Do this by sending a "dir" prefix, then all of the directory contents,
+and then an "end" marker.
 */
-static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *dirname, const char *remotedirname, int64_t * total_bytes, int flags )
+
+static work_queue_result_code_t send_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localname, const char *remotename, int64_t * total_bytes )
 {
-	DIR *dir = opendir(dirname);
+	DIR *dir = opendir(localname);
 	if(!dir) {
-		debug(D_NOTICE, "Cannot open dir %s: %s", dirname, strerror(errno));
+		debug(D_NOTICE, "Cannot open dir %s: %s", localname, strerror(errno));
 		return APP_FAILURE;
 	}
 
 	work_queue_result_code_t result = SUCCESS;
 
-	// When putting a file its parent directories are automatically
-	// created by the worker, so no need to manually create them.
+	char remotename_encoded[WORK_QUEUE_LINE_MAX];
+	url_encode(remotename,remotename_encoded,sizeof(remotename_encoded));
+
+	send_worker_msg(q,w,"dir %s\n",remotename_encoded);
+
 	struct dirent *d;
 	while((d = readdir(dir))) {
 		if(!strcmp(d->d_name, ".") || !strcmp(d->d_name, "..")) continue;
 
-		char *localpath = string_format("%s/%s",dirname,d->d_name);
-		char *remotepath = string_format("%s/%s",remotedirname,d->d_name);
+		char *localpath = string_format("%s/%s",localname,d->d_name);
 
-		struct stat local_info;
-		if(lstat(localpath, &local_info)>=0) {
-			if(S_ISDIR(local_info.st_mode))  {
-				result = send_directory( q, w, t, localpath, remotepath, total_bytes, flags );
-			} else {
-				result = send_file( q, w, t, localpath, remotepath, 0, 0, total_bytes, flags );
-			}
-		} else {
-			debug(D_NOTICE, "Cannot stat file %s: %s", localpath, strerror(errno));
-			result = APP_FAILURE;
-		}
+		result = send_item( q, w, t, localpath, d->d_name, 0, 0, total_bytes, 0 );
 
 		free(localpath);
-		free(remotepath);
 
 		if(result != SUCCESS) break;
 	}
+
+	send_worker_msg(q,w,"end\n");
 
 	closedir(dir);
 	return result;
 }
 
 /*
-Send a file or directory to a remote worker, if it is not already cached.
-The local file name should already have been expanded by the caller.
+Send a single item, whether it is a directory, symlink, or file.
+
+Note 1: We call stat/lstat here a single time, and then pass it
+to the underlying object so as not to minimize syscall work.
+
+Note 2: This function is invoked at the top level with follow_links=1,
+since it is common for the user to to pass in a top-level symbolic
+link to a file or directory which they want transferred.
+However, in recursive calls, follow_links is set to zero,
+and internal links are not followed, they are sent natively.
 */
-static work_queue_result_code_t send_file_or_directory( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
+
+
+static work_queue_result_code_t send_item( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, const char *localpath, const char *remotepath, int64_t offset, int64_t length, int64_t * total_bytes, int follow_links )
+{
+	struct stat info;
+	int result = SUCCESS;
+
+	if(follow_links) {
+		result = stat(localpath,&info);
+	} else {
+		result = lstat(localpath,&info);
+	}
+
+	if(result>=0) {
+		if(S_ISDIR(info.st_mode))  {
+			result = send_directory( q, w, t, localpath, remotepath, total_bytes );
+		} else if(S_ISLNK(info.st_mode)) {
+			result = send_symlink( q, w, t, localpath, remotepath, total_bytes );
+		} else if(S_ISREG(info.st_mode)) {
+			result = send_file( q, w, t, localpath, remotepath, offset, length, info, total_bytes );
+		} else {
+			debug(D_NOTICE,"skipping unusual file: %s",strerror(errno));
+		}
+	} else {
+		debug(D_NOTICE, "cannot stat file %s: %s", localpath, strerror(errno));
+		result = APP_FAILURE;
+	}
+
+	return result;
+}
+
+/*
+Send an item to a remote worker, if it is not already cached.
+The local file name should already have been expanded by the caller.
+If it is in the worker, but a new version is available, warn and return.
+We do not want to rewrite the file while some other task may be using it.
+Otherwise, send it to the worker.
+*/
+
+static work_queue_result_code_t send_item_if_not_cached( struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, struct work_queue_file *tf, const char *expanded_local_name, int64_t * total_bytes)
 {
 	struct stat local_info;
-	struct stat *remote_info;
-
 	if(lstat(expanded_local_name, &local_info) < 0) {
 		debug(D_NOTICE, "Cannot stat file %s: %s", expanded_local_name, strerror(errno));
 		return APP_FAILURE;
 	}
 
-	work_queue_result_code_t result = SUCCESS;
+	struct stat *remote_info = hash_table_lookup(w->current_files, tf->cached_name);
 
-	// Look in the current files hash to see if the file is already on the worker.
-	remote_info = hash_table_lookup(w->current_files, tf->cached_name);
-
-	/* If it is in the worker, but a new version is available, warn and return.
-	   We do not want to rewrite the file while some other task may be using
-	   it. */
 	if(remote_info && (remote_info->st_mtime != local_info.st_mtime || remote_info->st_size != local_info.st_size)) {
 		debug(D_NOTICE|D_WQ, "File %s changed locally. Task %d will be executed with an older version.", expanded_local_name, t->taskid);
-	}
-	else if(!remote_info) {
-		/* If not on the worker, send it. */
-		if(S_ISDIR(local_info.st_mode)) {
-			result = send_directory(q, w, t, expanded_local_name, tf->cached_name, total_bytes, tf->flags);
+		return SUCCESS;
+	} else if(!remote_info) {
+
+		if(tf->offset==0 && tf->length==0) {
+			debug(D_WQ, "%s (%s) needs file %s as '%s'", w->hostname, w->addrport, expanded_local_name, tf->cached_name);
 		} else {
-			result = send_file(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, tf->flags);
+		  debug(D_WQ, "%s (%s) needs file %s (offset %lld length %lld) as '%s'", w->hostname, w->addrport, expanded_local_name, (long long) tf->offset, (long long) tf->length, tf->cached_name );
 		}
 
+		work_queue_result_code_t result;
+		result = send_item(q, w, t, expanded_local_name, tf->cached_name, tf->offset, tf->piece_length, total_bytes, 1 );
+
 		if(result == SUCCESS && tf->flags & WORK_QUEUE_CACHE) {
-			remote_info = malloc(sizeof(*remote_info));
+			remote_info = xxmalloc(sizeof(*remote_info));
 			if(remote_info) {
 				memcpy(remote_info, &local_info, sizeof(local_info));
 				hash_table_insert(w->current_files, tf->cached_name, remote_info);
-			} else {
-				debug(D_NOTICE, "Cannot allocate memory for cache entry for input file %s at %s (%s)", expanded_local_name, w->hostname, w->addrport);
 			}
 		}
-	}
-	else {
-		/* Up-to-date file on the worker, we do nothing. */
-	}
 
-	return result;
+		return result;
+	} else {
+		/* Up-to-date file on the worker, we do nothing. */
+		return SUCCESS;
+	}
 }
 
 /**
@@ -3035,7 +3092,7 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 	case WORK_QUEUE_BUFFER:
 		debug(D_WQ, "%s (%s) needs literal as %s", w->hostname, w->addrport, f->remote_name);
 		time_t stoptime = time(0) + get_transfer_wait_time(q, w, t, f->length);
-		send_worker_msg(q,w, "put %s %d %o %d\n",f->cached_name, f->length, 0777, f->flags);
+		send_worker_msg(q,w, "put %s %d %o\n",f->cached_name, f->length, 0777 );
 		actual = link_putlstring(w->link, f->payload, f->length, stoptime);
 		if(actual!=f->length) {
 			result = WORKER_FAILURE;
@@ -3075,7 +3132,7 @@ static work_queue_result_code_t send_input_file(struct work_queue *q, struct wor
 		} else {
 			char *expanded_payload = expand_envnames(w, f->payload);
 			if(expanded_payload) {
-				result = send_file_or_directory(q,w,t,f,expanded_payload,&total_bytes);
+				result = send_item_if_not_cached(q,w,t,f,expanded_payload,&total_bytes);
 				free(expanded_payload);
 			} else {
 				result = APP_FAILURE; //signal app-level failure.
@@ -3269,7 +3326,7 @@ static work_queue_result_code_t start_one_task(struct work_queue *q, struct work
 	// send_worker_msg returns the number of bytes sent, or a number less than
 	// zero to indicate errors. We are lazy here, we only check the last
 	// message we sent to the worker (other messages may have failed above).
-	int result_msg = send_worker_msg(q,w, "end\n");
+	int result_msg = send_worker_msg(q,w,"end\n");
 
 	if(result_msg > -1)
 	{
@@ -4191,7 +4248,7 @@ void work_queue_task_specify_command( struct work_queue_task *t, const char *cmd
 	t->command_line = xxstrdup(cmd);
 }
 
-void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value )
+void work_queue_task_specify_environment_variable( struct work_queue_task *t, const char *name, const char *value )
 {
 	if(value) {
 		list_push_tail(t->env_list,string_format("%s=%s",name,value));
@@ -4199,6 +4256,11 @@ void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, con
 		/* Specifications without = indicate variables to me unset. */
 		list_push_tail(t->env_list,string_format("%s",name));
 	}
+}
+
+/* same as above, but with a typo. can't remove as it is part of already published api. */
+void work_queue_task_specify_enviroment_variable( struct work_queue_task *t, const char *name, const char *value ) {
+	work_queue_task_specify_environment_variable(t, name, value);
 }
 
 void work_queue_task_specify_max_retries( struct work_queue_task *t, int64_t max_retries ) {
@@ -4974,7 +5036,7 @@ struct work_queue *work_queue_create(int port)
 	q->asynchrony_multiplier = 1.0;
 	q->asynchrony_modifier = 0;
 
-	q->minimum_transfer_timeout = 10;
+	q->minimum_transfer_timeout = 60;
 	q->foreman_transfer_timeout = 3600;
 	q->transfer_outlier_factor = 10;
 	q->default_transfer_rate = 1*MEGABYTE;

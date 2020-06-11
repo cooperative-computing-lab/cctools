@@ -40,7 +40,7 @@ OPTION_TRIPLET(-e, env-list, path)Record the environment variables.
 OPTION_TRIPLET(-n, name-list, path)Record all the file names.
 OPTION_ITEM(--no-set-foreground)Disable changing the foreground process group of the session.
 OPTION_TRIPLET(-N, hostname, name)Pretend that this is my hostname.
-OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs be sent to stdout (":stdout"), to the system syslog (":syslog"), or to the systemd journal (":journal").
+OPTION_TRIPLET(-o,debug-file,file)Write debugging output to this file. By default, debugging is sent to stderr (":stderr"). You may specify logs to be sent to stdout (":stdout") instead.
 OPTION_TRIPLET(-O, debug-rotate-max, bytes)Rotate debug files of this size.
 OPTION_TRIPLET(-p, proxy, host:port)Use this proxy server for HTTP requests.
 OPTION_ITEM(-Q, --no-chirp-catalog)Inhibit catalog queries to list /chirp.

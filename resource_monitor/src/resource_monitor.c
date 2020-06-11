@@ -2006,6 +2006,10 @@ struct rmonitor_process_info *spawn_first_process(const char *executable, char *
 
         debug(D_RMON, "executing: %s\n", executable);
 
+		char *pid_s = string_format("%d", getpid());
+		setenv(RESOURCE_MONITOR_ROOT_PROCESS, pid_s, 1);
+		free(pid_s);
+
 		errno = 0;
         execvp(executable, argv);
         //We get here only if execlp fails.
@@ -2024,7 +2028,7 @@ static void show_help(const char *cmd)
 {
     fprintf(stdout, "\nUse: %s [options] -- command-line-and-options\n\n", cmd);
     fprintf(stdout, "%-30s Enable debugging for this subsystem.\n", "-d,--debug=<subsystem>");
-	fprintf(stdout, "%-30s Send debugging to this file. (can also be :stderr, :stdout, :syslog, or :journal)\n", "-o,--debug-file=<file>");
+	fprintf(stdout, "%-30s Send debugging to this file. (can also be :stderr, or :stdout)\n", "-o,--debug-file=<file>");
     fprintf(stdout, "%-30s Show this message.\n", "-h,--help");
     fprintf(stdout, "%-30s Show version string.\n", "-v,--version");
     fprintf(stdout, "\n");
