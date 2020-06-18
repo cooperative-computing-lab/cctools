@@ -71,6 +71,7 @@ SOURCES = \
 	jx_export.c \
 	jx_eval.c \
 	jx_function.c \
+	jx_querytools.c \
 	link.c \
 	link_auth.c \
 	list.c \
@@ -144,6 +145,7 @@ HEADERS_PUBLIC = \
 	itable.h \
 	jx.h \
 	jx_match.h \
+	jx_querytools.h \
 	link.h \
 	list.h \
 	load_average.h \
@@ -179,7 +181,7 @@ PROGRAMS = $(MOST_PROGRAMS) catalog_query
 
 SCRIPTS = cctools_gpu_autodetect
 TARGETS = $(LIBRARIES) $(PRELOAD_LIBRARIES) $(PROGRAMS) $(TEST_PROGRAMS)
-TEST_PROGRAMS = auth_test disk_alloc_test jx_test microbench multirun jx_count_obj_test histogram_test category_test jx_binary_test
+TEST_PROGRAMS = auth_test disk_alloc_test jx_test jx_query microbench multirun jx_count_obj_test histogram_test category_test jx_binary_test
 
 all: $(TARGETS) catalog_query
 

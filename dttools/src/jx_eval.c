@@ -43,6 +43,9 @@ See the file COPYING for details.
 	)); \
 } while (false)
 
+//Stores select query before evaluation
+struct jx *select_expr = NULL;
+
 static struct jx *jx_check_errors(struct jx *j);
 
 static struct jx *jx_eval_null(struct jx_operator *op, struct jx *left, struct jx *right) {
@@ -203,7 +206,7 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 	} else if (!strcmp(func->u.symbol_name, "join")) {
 		return jx_function_join(args);
 	} else if (!strcmp(func->u.symbol_name, "ceil")) {
-		return jx_function_ceil(args);
+		return jx_function_ceil(args);	
 	} else if (!strcmp(func->u.symbol_name, "floor")) {
 		return jx_function_floor(args);
 	} else if (!strcmp(func->u.symbol_name, "basename")) {
@@ -214,11 +217,19 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 		return jx_function_listdir(args);
 	} else if (!strcmp(func->u.symbol_name, "escape")) {
 		return jx_function_escape(args);
-	} else if (!strcmp(func->u.symbol_name, "template")) {
+    } else if (!strcmp(func->u.symbol_name, "template")) {
 		return jx_function_template(args, ctx);
-	} else if (!strcmp(func->u.symbol_name, "len")) {
+    } else if (!strcmp(func->u.symbol_name, "len")) {
 		return jx_function_len(args);
-	} else {
+    } else if (!strcmp(func->u.symbol_name, "fetch")) {
+		return jx_function_fetch(args);
+    } else if (!strcmp(func->u.symbol_name, "select")) {
+		return jx_function_select(args, ctx);
+    } else if (!strcmp(func->u.symbol_name, "project")) {
+		return jx_function_project(args, ctx);
+    } else if (!strcmp(func->u.symbol_name, "schema")) {
+        return jx_function_schema(args, ctx);
+    } else {
 		return jx_error(jx_format(
 			"on line %d, unknown function: %s",
 			func->line,
@@ -333,21 +344,37 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	struct jx *right = NULL;
 	struct jx *result = NULL;
 
+    //Capture expression for select query before it gets evaluated
+    if(!strcmp("select", jx_print_string(o->left))) select_expr = jx_array_index(o->right, 0);
+
 	right = jx_eval(o->right,context);
 	if (jx_istype(right, JX_ERROR)) {
 		result = right;
 		right = NULL;
 		goto DONE;
-	}
+	} 
 
-	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, right, context);
+	if (o->type == JX_OP_CALL) {
+        //Pass in captured select query rather than evaluated value
+        /*
+         * By default: The evaluated select query will be set to the
+         * result of evaluating the query on the FIRST object in the
+         * list rather than evaluating the query separately FOR EACH
+         * object in the list.
+        */
+        if(!strcmp("select", jx_print_string(o->left))) {
+            jx_array_shift(right);
+            jx_array_insert(right, select_expr);
+        }        
+        return jx_eval_call(o->left, right, context);
+    }
 
 	left = jx_eval(o->left,context);
 	if (jx_istype(left, JX_ERROR)) {
 		result = left;
 		left = NULL;
 		goto DONE;
-	}
+	} 
 
 	if (o->type == JX_OP_SLICE) return jx_operator(JX_OP_SLICE, left, right);
 
