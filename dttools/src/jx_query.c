@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    FILE *json;
+    FILE *json = NULL;
     if(path || url) json = fopen(document, "r");
     if(!json) {
         fprintf(stderr, "Error opening JSON file: %s - %s\n", document, strerror(errno));
@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
             char *key = string_format("%u", hash_string(value));
             char *file = string_format("%s.json", key);
             FILE *f = fopen(file, "w");
-            fprintf(f, value);
+            fprintf(f, "%s", value);
             fclose(f);
             hash_table_insert(h, key, file);
             free(value);
