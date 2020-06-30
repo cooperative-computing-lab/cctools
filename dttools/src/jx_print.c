@@ -79,17 +79,17 @@ const char * jx_operator_string( jx_operator_t type )
 const char * jx_type_string( jx_type_t type )
 {
 	switch(type) {
-        case JX_NULL: return "null";
-        case JX_BOOLEAN: return "boolean";
-        case JX_INTEGER: return "integer";
-        case JX_DOUBLE: return "float";
-        case JX_STRING: return "string";
-        case JX_SYMBOL: return "symbol";
-        case JX_ARRAY: return "array";
-        case JX_OBJECT: return "object";
-        case JX_OPERATOR: return "operator";
-        case JX_ERROR: return "error";
-        default: return "???";
+		case JX_NULL: return "null";
+		case JX_BOOLEAN: return "boolean";
+		case JX_INTEGER: return "integer";
+		case JX_DOUBLE: return "float";
+		case JX_STRING: return "string";
+		case JX_SYMBOL: return "symbol";
+		case JX_ARRAY: return "array";
+		case JX_OBJECT: return "object";
+		case JX_OPERATOR: return "operator";
+		case JX_ERROR: return "error";
+		default: return "???";
 	}
 }
 

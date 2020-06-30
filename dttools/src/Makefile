@@ -93,7 +93,7 @@ SOURCES = \
 	rmonitor_poll.c \
 	rmsummary.c \
 	set.c \
-    semaphore.c \
+	semaphore.c \
 	sha1.c \
 	shell.c \
 	sh_popen.c\

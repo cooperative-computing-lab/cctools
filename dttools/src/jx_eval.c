@@ -354,7 +354,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		result = right;
 		right = NULL;
 		goto DONE;
-	} 
+	}
 
 	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, right, context);
 
@@ -363,7 +363,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		result = left;
 		left = NULL;
 		goto DONE;
-	} 
+	}
 
 	if (o->type == JX_OP_SLICE) return jx_operator(JX_OP_SLICE, left, right);
 
