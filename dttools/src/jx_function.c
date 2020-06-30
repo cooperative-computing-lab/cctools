@@ -694,16 +694,18 @@ struct jx *jx_function_select(struct jx *orig_args, struct jx *ctx) {
 	const char *funcname = "select";
 	const char *err = NULL;
 
+	//Get args and parse stringified query
+	//Stringify performed during initial eval
 	struct jx *args = jx_copy(orig_args);
-    struct jx *val = jx_array_shift(args);
+	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
 	struct jx *context = jx_array_shift(args);
 	assert(jx_istype(context, JX_ARRAY));
     struct jx *result = jx_array(0);
 
     struct jx *item;
     for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
-        struct jx *j = jx_eval(val, item);
-	    assert(jx_istype(j, JX_BOOLEAN));
+        struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
+		assert(jx_istype(j, JX_BOOLEAN));
         if(!j) {
             err = "error evaluating select expression";
             goto FAILURE;
@@ -734,7 +736,7 @@ struct jx *jx_function_project(struct jx *orig_args, struct jx *ctx) {
 
     struct jx *item;
     for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
-        struct jx *j = jx_eval(val, item);
+        struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
         if(!j) {
             err = "error evaluating project expression";
             goto FAILURE;
@@ -754,7 +756,7 @@ struct jx *jx_function_project(struct jx *orig_args, struct jx *ctx) {
 struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
     assert(orig_args);
 	assert(jx_istype(ctx, JX_OBJECT));
-	const char *funcname = "project";
+	const char *funcname = "schema";
 	const char *err = NULL;
 
 	struct jx *args = jx_copy(orig_args);
@@ -776,13 +778,12 @@ struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
         const char *key;
         struct jx *keys = jx_object(0);
         for(void *j = NULL; (key = jx_iterate_keys(item, &j));) {
-           struct jx *lookup = jx_lookup(item, key);
-           const char *type = jx_type_string(lookup->type);
-           struct jx *k = jx_string(key);
-           struct jx *v = jx_string(type);
-           struct jx_pair *p = jx_pair(k, v, 0);
-           keys = jx_merge(keys, jx_object(p), NULL);
-           //jx_array_append(keys, p);
+            struct jx *lookup = jx_lookup(item, key);
+			const char *type = jx_type_string(lookup->type);
+			struct jx *k = jx_string(key);
+			struct jx *v = jx_string(type);
+			struct jx_pair *p = jx_pair(k, v, 0);
+			keys = jx_merge(keys, jx_object(p), NULL);
         }
         jx_array_append(result, keys);
     }

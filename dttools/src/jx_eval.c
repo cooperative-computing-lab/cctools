@@ -6,6 +6,7 @@ See the file COPYING for details.
 
 #include "jx_eval.h"
 #include "debug.h"
+#include "jx_canonicalize.h"
 #include "jx_function.h"
 #include "jx_print.h"
 
@@ -42,9 +43,6 @@ See the file COPYING for details.
 		message \
 	)); \
 } while (false)
-
-//Stores select query before evaluation
-struct jx *select_expr = NULL;
 
 static struct jx *jx_check_errors(struct jx *j);
 
@@ -345,7 +343,13 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	struct jx *result = NULL;
 
     //Capture expression for select query before it gets evaluated
-    if(!strcmp("select", jx_print_string(o->left))) select_expr = jx_array_index(o->right, 0);
+	//Stringify it to prevent early evaluation
+    if(!strcmp("select", jx_print_string(o->left))) {
+		struct jx *r = jx_array_shift(o->right);
+		r = jx_string(jx_print_string((r)));
+		jx_array_insert(o->right, r);
+		fprintf(stderr, "inserting: %s\n", jx_print_string(o->right));
+	}
 
 	right = jx_eval(o->right,context);
 	if (jx_istype(right, JX_ERROR)) {
@@ -354,20 +358,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 		goto DONE;
 	} 
 
-	if (o->type == JX_OP_CALL) {
-        //Pass in captured select query rather than evaluated value
-        /*
-         * By default: The evaluated select query will be set to the
-         * result of evaluating the query on the FIRST object in the
-         * list rather than evaluating the query separately FOR EACH
-         * object in the list.
-        */
-        if(!strcmp("select", jx_print_string(o->left))) {
-            jx_array_shift(right);
-            jx_array_insert(right, select_expr);
-        }        
-        return jx_eval_call(o->left, right, context);
-    }
+	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, right, context);
 
 	left = jx_eval(o->left,context);
 	if (jx_istype(left, JX_ERROR)) {
