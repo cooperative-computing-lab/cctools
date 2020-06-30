@@ -15,10 +15,6 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 
-struct jx * jx_fetch_from_url ( const char *u ) {
-    return NULL;
-}
-
 const char * jx_parse_from_html ( const char *d ) {
     FILE *html = fopen(d, "r");
     char * line = NULL;
@@ -29,10 +25,6 @@ const char * jx_parse_from_html ( const char *d ) {
         if(string_match_regex(line, "<h1>Dumping raw contents of")) flag = 1;
     }
     return "";
-}
-
-struct jx * jx_query_project ( struct jx *c, struct jx *e ) {
-    return NULL;
 }
 
 struct jx * jx_query_select ( struct jx *c, struct jx *e ) {

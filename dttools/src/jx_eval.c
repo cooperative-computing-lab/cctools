@@ -6,7 +6,6 @@ See the file COPYING for details.
 
 #include "jx_eval.h"
 #include "debug.h"
-#include "jx_canonicalize.h"
 #include "jx_function.h"
 #include "jx_print.h"
 
@@ -215,19 +214,19 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 		return jx_function_listdir(args);
 	} else if (!strcmp(func->u.symbol_name, "escape")) {
 		return jx_function_escape(args);
-    } else if (!strcmp(func->u.symbol_name, "template")) {
+	} else if (!strcmp(func->u.symbol_name, "template")) {
 		return jx_function_template(args, ctx);
-    } else if (!strcmp(func->u.symbol_name, "len")) {
+	} else if (!strcmp(func->u.symbol_name, "len")) {
 		return jx_function_len(args);
-    } else if (!strcmp(func->u.symbol_name, "fetch")) {
+	} else if (!strcmp(func->u.symbol_name, "fetch")) {
 		return jx_function_fetch(args);
-    } else if (!strcmp(func->u.symbol_name, "select")) {
+	} else if (!strcmp(func->u.symbol_name, "select")) {
 		return jx_function_select(args, ctx);
-    } else if (!strcmp(func->u.symbol_name, "project")) {
+	} else if (!strcmp(func->u.symbol_name, "project")) {
 		return jx_function_project(args, ctx);
-    } else if (!strcmp(func->u.symbol_name, "schema")) {
-        return jx_function_schema(args, ctx);
-    } else {
+	} else if (!strcmp(func->u.symbol_name, "schema")) {
+		return jx_function_schema(args, ctx);
+	} else {
 		return jx_error(jx_format(
 			"on line %d, unknown function: %s",
 			func->line,
@@ -342,13 +341,12 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	struct jx *right = NULL;
 	struct jx *result = NULL;
 
-    //Capture expression for select query before it gets evaluated
+	//Capture expression for select query before it gets evaluated
 	//Stringify it to prevent early evaluation
-    if(!strcmp("select", jx_print_string(o->left))) {
+	if(!strcmp("select", jx_print_string(o->left))) {
 		struct jx *r = jx_array_shift(o->right);
 		r = jx_string(jx_print_string((r)));
 		jx_array_insert(o->right, r);
-		fprintf(stderr, "inserting: %s\n", jx_print_string(o->right));
 	}
 
 	right = jx_eval(o->right,context);
