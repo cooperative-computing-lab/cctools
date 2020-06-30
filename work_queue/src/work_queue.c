@@ -5608,7 +5608,7 @@ const char *task_result_str(work_queue_result_t result) {
 
 	switch(result) {
 		case WORK_QUEUE_RESULT_SUCCESS:
-			str = "WQ_SUCCESS";
+			str = "SUCCESS";
 			break;
 		case WORK_QUEUE_RESULT_INPUT_MISSING:
 			str = "INPUT_MISS";
@@ -6859,7 +6859,7 @@ int work_queue_specify_transactions_log(struct work_queue *q, const char *logfil
 		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING category-name {FIRST_RESOURCES|MAX_RESOURCES} resources-requested\n");
 		fprintf(q->transactions_logfile, "# time master-pid TASK taskid RUNNING worker-address {FIRST_RESOURCES|MAX_RESOURCES} resources-given\n");
 		fprintf(q->transactions_logfile, "# time master-pid TASK taskid WAITING_RETRIEVAL worker-address\n");
-		fprintf(q->transactions_logfile, "# time master-pid TASK taskid {RETRIEVED|DONE} {WQ_SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION} {exit-code} {limits-exceeded} {resources-measured}\n\n");
+		fprintf(q->transactions_logfile, "# time master-pid TASK taskid {RETRIEVED|DONE} {SUCCESS|SIGNAL|END_TIME|FORSAKEN|MAX_RETRIES|MAX_WALLTIME|UNKNOWN|RESOURCE_EXHAUSTION} {exit-code} {limits-exceeded} {resources-measured}\n\n");
 
 		write_transaction(q, "MASTER START");
 		return 1;
