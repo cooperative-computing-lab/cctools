@@ -609,7 +609,7 @@ struct jx *jx_function_len(struct jx *args){
 }
 
 struct jx *jx_function_fetch(struct jx *orig_args) {
-    assert(orig_args);
+	assert(orig_args);
 	const char *funcname = "fetch";
 	const char *err = NULL;
 
@@ -626,51 +626,34 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 		goto FAILURE;
 	}
 
-    const char *string_val = val->u.string_value;
+	const char *path = val->u.string_value;
+
 	switch (val->type) {
 		case JX_STRING:
-			if(string_match_regex(string_val, "http(s)?://")) {
+			if(string_match_regex(path, "http(s)?://")) {
 				//Assume an HTTP request is to a TLQ log server
-				char *fetch = string_format("curl %s -o tmp.json", string_val);
-				int f = system(fetch);
-				if(f == -1) {
+				char *cmd = string_format("curl %s", path);
+				FILE *stream = popen(cmd,"r");
+				free(cmd);
+				if(!stream) {
 					err = string_format("error encountered performing curl fetch - %s", strerror(errno));
 					goto FAILURE;
 				}
-				struct jx_parser *c = jx_parser_create(0);
-				const char *parsed = jx_parse_from_html("tmp.json");
-				jx_parser_read_string(c, parsed);
-				result = jx_parse(c);
-				jx_parser_delete(c);
-				unlink("tmp.json");
-				if(!result) {
-					err = "error parsing JSON document";
+				result = jx_parse_stream(stream);
+				pclose(stream);
+			} else {
+				FILE *stream = fopen(path, "r");
+				if(!stream) {
+					err = string_format("error opening JSON file: %s - %s\n", path, strerror(errno));
 					goto FAILURE;
 				}
-				if(jx_parser_errors(c)) {
-					err = "invalid JSON context";
-					goto FAILURE;
-				}
+				result = jx_parse_stream(stream);
+				fclose(stream);
 			}
-			else {
-				//Otherwise, attempt to open file locally
-				FILE *document = fopen(string_val, "r");
-				if(!document) {
-					err = string_format("error opening JSON file: %s - %s\n", string_val, strerror(errno));
-					goto FAILURE;
-				}
-				struct jx_parser *c = jx_parser_create(0);
-				jx_parser_read_stream(c, document);
-				result = jx_parse(c);
-				fclose(document);
-				if(!result) {
-					err = "error parsing JSON document";
-					goto FAILURE;
-				}
-				if(jx_parser_errors(c)) {
-					err = "invalid JSON context";
-					goto FAILURE;
-				}
+
+			if(!result) {
+				err = "error parsing JSON document";
+				goto FAILURE;
 			}
 			break;
 		default:
