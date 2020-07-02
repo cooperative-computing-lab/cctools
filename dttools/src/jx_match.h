@@ -88,7 +88,7 @@ See the file COPYING for details.
 #ifndef JX_MATCH_H
 #define JX_MATCH_H
 
-#include <jx.h>
+#include "jx.h"
 
 #ifndef JX_ANY
 #define JX_ANY -1

@@ -16,10 +16,14 @@ See the file COPYING for details.
 #include <dirent.h>
 #include <errno.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #include "jx.h"
+#include "jx_eval.h"
 #include "jx_match.h"
+#include "jx_parse.h"
 #include "jx_print.h"
+#include "jx_querytools.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -264,7 +268,7 @@ struct jx *jx_function_ceil(struct jx *orig_args) {
 		case JX_INTEGER:
 			result = jx_integer(ceil(val->u.integer_value));
 			break;
-		default: 
+		default:
 			err = "arg of invalid type";
 			goto FAILURE;
 	}	
@@ -304,7 +308,7 @@ struct jx *jx_function_floor(struct jx *orig_args) {
 		case JX_INTEGER:
 			result = jx_integer(floor(val->u.integer_value));
 			break;
-		default: 
+		default:
 			err = "arg of invalid type";
 			goto FAILURE;
 	}	
@@ -602,6 +606,196 @@ struct jx *jx_function_len(struct jx *args){
 
 	return jx_integer(length);
 
+}
+
+struct jx *jx_function_fetch(struct jx *orig_args) {
+    assert(orig_args);
+	const char *funcname = "fetch";
+	const char *err = NULL;
+
+	struct jx *args = jx_copy(orig_args);
+	struct jx *val = jx_array_shift(args);
+	struct jx *result = NULL;
+
+	int length = jx_array_length(orig_args);
+	if(length>1){
+		err = "must pass in one path or one URL";
+		goto FAILURE;
+	} else if(length<=0){
+		err = "must pass in a path or URL";
+		goto FAILURE;
+	}
+
+    const char *string_val = val->u.string_value;
+	switch (val->type) {
+		case JX_STRING:
+			if(string_match_regex(string_val, "http(s)?://")) {
+				//Assume an HTTP request is to a TLQ log server
+				char *fetch = string_format("curl %s -o tmp.json", string_val);
+				int f = system(fetch);
+				if(f == -1) {
+					err = string_format("error encountered performing curl fetch - %s", strerror(errno));
+					goto FAILURE;
+				}
+				struct jx_parser *c = jx_parser_create(0);
+				const char *parsed = jx_parse_from_html("tmp.json");
+				jx_parser_read_string(c, parsed);
+				result = jx_parse(c);
+				jx_parser_delete(c);
+				unlink("tmp.json");
+				if(!result) {
+					err = "error parsing JSON document";
+					goto FAILURE;
+				}
+				if(jx_parser_errors(c)) {
+					err = "invalid JSON context";
+					goto FAILURE;
+				}
+			}
+			else {
+				//Otherwise, attempt to open file locally
+				FILE *document = fopen(string_val, "r");
+				if(!document) {
+					err = string_format("error opening JSON file: %s - %s\n", string_val, strerror(errno));
+					goto FAILURE;
+				}
+				struct jx_parser *c = jx_parser_create(0);
+				jx_parser_read_stream(c, document);
+				result = jx_parse(c);
+				fclose(document);
+				if(!result) {
+					err = "error parsing JSON document";
+					goto FAILURE;
+				}
+				if(jx_parser_errors(c)) {
+					err = "invalid JSON context";
+					goto FAILURE;
+				}
+			}
+			break;
+		default:
+			err = "arg of invalid type";
+			goto FAILURE;
+	}
+
+	jx_delete(args);
+	jx_delete(val);
+	return result;
+	
+	FAILURE:
+	jx_delete(args);
+	jx_delete(val);
+	FAIL(funcname, orig_args, err);
+}
+
+struct jx *jx_function_select(struct jx *orig_args, struct jx *ctx) {
+	assert(orig_args);
+	assert(jx_istype(ctx, JX_OBJECT));
+	const char *funcname = "select";
+	const char *err = NULL;
+
+	//Get args and parse stringified query
+	//Stringify performed during initial eval
+	struct jx *args = jx_copy(orig_args);
+	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
+	struct jx *context = jx_array_shift(args);
+	assert(jx_istype(context, JX_ARRAY));
+	struct jx *result = jx_array(0);
+
+	struct jx *item;
+	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
+		struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
+		assert(jx_istype(j, JX_BOOLEAN));
+		if(!j) {
+			err = "error evaluating select expression";
+			goto FAILURE;
+		}
+		if(j->u.boolean_value) jx_array_append(result, item);
+	}
+	jx_delete(args);
+	jx_delete(val);
+	return result;
+
+	FAILURE:
+	jx_delete(args);
+	jx_delete(val);
+	
+	FAIL(funcname, orig_args, err);
+}
+
+struct jx *jx_function_project(struct jx *orig_args, struct jx *ctx) {
+	assert(orig_args);
+	assert(jx_istype(ctx, JX_OBJECT));
+	const char *funcname = "project";
+	const char *err = NULL;
+
+	struct jx *args = jx_copy(orig_args);
+	struct jx *val = jx_array_shift(args);
+	struct jx *context = jx_array_shift(args);
+	assert(jx_istype(context, JX_ARRAY));
+	struct jx *result = jx_array(0);
+
+	struct jx *item;
+	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
+		struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
+		if(!j) {
+			err = "error evaluating project expression";
+			goto FAILURE;
+		}
+		jx_array_append(result, j);
+	}
+	jx_delete(args);
+	jx_delete(val);
+	return result;
+
+	FAILURE:
+	jx_delete(args);
+	jx_delete(val);
+	FAIL(funcname, orig_args, err);
+}
+
+struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
+	assert(orig_args);
+	assert(jx_istype(ctx, JX_OBJECT));
+	const char *funcname = "schema";
+	const char *err = NULL;
+
+	struct jx *args = jx_copy(orig_args);
+	struct jx *context = jx_array_shift(args);
+	assert(jx_istype(context, JX_ARRAY));
+	struct jx *result = jx_array(0);
+
+	int length = jx_array_length(orig_args);
+	if(length>1){
+		err = "too many arguments";
+		goto FAILURE;
+	} else if(length<=0){
+		err = "too few arguments";
+		goto FAILURE;
+	}
+
+	struct jx *item;
+	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
+		const char *key;
+		struct jx *keys = jx_object(0);
+		for(void *j = NULL; (key = jx_iterate_keys(item, &j));) {
+			struct jx *lookup = jx_lookup(item, key);
+			const char *type = jx_type_string(lookup->type);
+			struct jx *k = jx_string(key);
+			struct jx *v = jx_string(type);
+			struct jx_pair *p = jx_pair(k, v, 0);
+			keys = jx_merge(keys, jx_object(p), NULL);
+		}
+		jx_array_append(result, keys);
+	}
+	jx_delete(args);
+	jx_delete(context);
+	return result;
+
+	FAILURE:
+	jx_delete(args);
+	jx_delete(context);
+	FAIL(funcname, orig_args, err);
 }
 
 /*vim: set noexpandtab tabstop=4: */

@@ -20,5 +20,9 @@ struct jx *jx_function_listdir(struct jx *args);
 struct jx *jx_function_escape(struct jx *args);
 struct jx *jx_function_template(struct jx *args, struct jx *ctx);
 struct jx *jx_function_len(struct jx *args);
+struct jx *jx_function_fetch(struct jx *args);
+struct jx *jx_function_select(struct jx *args, struct jx *ctx);
+struct jx *jx_function_project(struct jx *args, struct jx *ctx);
+struct jx *jx_function_schema(struct jx *args, struct jx *ctx);
 
 #endif
