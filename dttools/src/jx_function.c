@@ -636,7 +636,7 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 				FILE *stream = popen(cmd,"r");
 				free(cmd);
 				if(!stream) {
-					err = string_format("error encountered performing curl fetch - %s", strerror(errno));
+					err = string_format("error fetching %s: %s", path,strerror(errno));
 					goto FAILURE;
 				}
 				result = jx_parse_stream(stream);
@@ -644,7 +644,7 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 			} else {
 				FILE *stream = fopen(path, "r");
 				if(!stream) {
-					err = string_format("error opening JSON file: %s - %s\n", path, strerror(errno));
+					err = string_format("error reading %s: %s\n", path,strerror(errno));
 					goto FAILURE;
 				}
 				result = jx_parse_stream(stream);
@@ -652,12 +652,12 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 			}
 
 			if(!result) {
-				err = "error parsing JSON document";
+				err = string_format("error parsing JSON in %s",path);
 				goto FAILURE;
 			}
 			break;
 		default:
-			err = "arg of invalid type";
+			err = string_format("error fetch() expects a string argument");
 			goto FAILURE;
 	}
 
