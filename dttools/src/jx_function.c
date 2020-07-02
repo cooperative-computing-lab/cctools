@@ -632,7 +632,7 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 		case JX_STRING:
 			if(string_match_regex(path, "http(s)?://")) {
 				//Assume an HTTP request is to a TLQ log server
-				char *cmd = string_format("curl %s", path);
+				char *cmd = string_format("curl -s %s", path);
 				FILE *stream = popen(cmd,"r");
 				free(cmd);
 				if(!stream) {
