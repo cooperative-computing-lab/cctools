@@ -11,10 +11,11 @@ LOCAL_LINKAGE = $(CCTOOLS_GLOBUS_LDFLAGS)
 
 EXTERNAL_DEPENDENCIES = ../../dttools/src/libdttools.a
 LIBRARIES = libchirp.a libconfuga.a
-OBJECTS = chirp_tool.o chirp_fuse.o $(OBJECTS_CONFUGA) $(OBJECTS_LIBRARY) $(OBJECTS_SERVER)
+OBJECTS = chirp_tool.o chirp_fuse.o $(OBJECTS_CONFUGA) $(OBJECTS_LIBRARY) $(OBJECTS_SERVER) $(OBJECTS_PROGRAMS)
 OBJECTS_CONFUGA = $(SOURCES_CONFUGA:%.c=%.o)
 OBJECTS_LIBRARY = $(SOURCES_LIBRARY:%.c=%.o)
 OBJECTS_SERVER = $(SOURCES_SERVER:%.c=%.o)
+OBJECTS_PROGRAMS = $(PROGRAMS:%=%.o)
 PROGRAMS = $(PROGRAMS_CHIRP) $(PROGRAMS_CONFUGA)
 PROGRAMS_CHIRP = chirp chirp_get chirp_put chirp_server chirp_status chirp_benchmark chirp_stream_files chirp_fuse chirp_distribute
 PROGRAMS_CONFUGA = confuga_adm
