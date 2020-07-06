@@ -10,7 +10,7 @@ from subprocess import Popen
 
 class WorkQueueServer:
 
-    def __init__():
+    def __init__(self):
         self.socket = socket.socket()
         self.id = 1
         self.wq = None

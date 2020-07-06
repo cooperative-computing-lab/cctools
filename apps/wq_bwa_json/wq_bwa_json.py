@@ -88,10 +88,10 @@ def main():
     #generate tasks
     define_tasks(int(sys.argv[1]))
 
-    q = WorkQueueServer(int(sys.argv[2]))
+    q = WorkQueueServer()
 
     #connect to server
-    q.connect('127.0.0.1', 2345, 1234)
+    q.connect('127.0.0.1', 2345, 1234, "wq_bwa_json")
   
     #submit tasks
     for t in tasks:
