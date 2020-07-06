@@ -61,34 +61,11 @@ void reply(struct link *client, char *method, char *message, int id)
 
 }
 
-int main()
+void mainloop( struct work_queue *queue, struct link *client )
 {
 
 	char message[BUFSIZ];
 	char msg[BUFSIZ];
-
-	//create work queue
-	struct work_queue *q = work_queue_json_create(workqueue);
-
-	if(!q) {
-		printf("Could not create work_queue\n");
-		return 1;
-	}
-	//wait for client to connect
-	struct link *port = link_serve(SERVER_PORT);
-
-	if(!port) {
-		printf("Could not serve on port %d\n", SERVER_PORT);
-		return 1;
-	}
-
-	struct link *client = link_accept(port, time(NULL) + timeout);
-
-	if(!client) {
-		printf("Could not accept connection\n");
-	}
-
-	printf("Connected to client. Waiting for messages..\n");
 
 	while(true) {
 
@@ -171,7 +148,7 @@ int main()
 
 			char *task = val->u.string_value;
 
-			int taskid = work_queue_json_submit(q, task);
+			int taskid = work_queue_json_submit(queue, task);
 
 			if(taskid < 0) {
 				error = "Could not submit task";
@@ -184,7 +161,7 @@ int main()
 
 			int time_out = val->u.integer_value;
 
-			char *task = work_queue_json_wait(q, time_out);
+			char *task = work_queue_json_wait(queue, time_out);
 
 			if(!task) {
 				error = "timeout reached with no task returned";
@@ -196,7 +173,7 @@ int main()
 		} else if(!strcmp(method, "remove")) {
 			int taskid = val->u.integer_value;
 
-			char *task = work_queue_json_remove(q, taskid);
+			char *task = work_queue_json_remove(queue, taskid);
 			if(!task) {
 				error = "task not able to be removed from queue";
 				reply(client, "error", error, id);
@@ -208,7 +185,7 @@ int main()
 			reply(client, method, "Successfully disconnected.", id);
 			break;
 		} else if(!strcmp(method, "empty")) {
-			int empty = work_queue_empty(q);
+			int empty = work_queue_empty(queue);
 			if(empty) {
 				reply(client, method, "Empty", id);
 			} else {
@@ -224,9 +201,34 @@ int main()
 		jx_delete(jsonrpc);
 
 	}
+}
+
+
+int main( int argc, char *argv[] )
+{
+	struct work_queue *queue = work_queue_json_create(workqueue);
+	if(!queue) {
+		printf("Could not create work_queue\n");
+		return 1;
+	}
+
+	struct link *port = link_serve(SERVER_PORT);
+	if(!port) {
+		printf("Could not serve on port %d\n", SERVER_PORT);
+		return 1;
+	}
+
+	struct link *client = link_accept(port, time(NULL) + timeout);
+	if(!client) {
+		printf("Could not accept connection\n");
+	}
+
+	printf("Connected to client. Waiting for messages..\n");
+
+	mainloop(queue,client);
 
 	link_close(client);
 
 	return 0;
-
 }
+
