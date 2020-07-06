@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <time.h>
 #include <getopt.h>
+#include <errno.h>
 
 #include "link.h"
 #include "jx.h"
@@ -235,7 +236,7 @@ int main(int argc, char *argv[])
 	char *project_name = "wq_server";
 
 	int c;
-        while((c = getopt_long(argc, argv, "p:N:hv", long_options, 0))!=-1) {
+        while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
 
 		switch(c) {
 			case 'd':
@@ -266,23 +267,23 @@ int main(int argc, char *argv[])
 	}
 
 
-	char * config = string_format("{ \"project_name\":\"%s\", \"port\":%d }",project_name,port);
+	char * config = string_format("{ \"name\":\"%s\", \"port\":%d }",project_name,port);
 	
 	struct work_queue *queue = work_queue_json_create(config);
 	if(!queue) {
-		printf("Could not create work_queue\n");
+		printf("could not listen on port %d: %s\n",port,strerror(errno));
 		return 1;
 	}
 
 	struct link *server_link = link_serve(server_port);
 	if(!server_link) {
-		printf("Could not serve on port %d\n", server_port);
+		printf("could not serve on port %d: %s\n", server_port,strerror(errno));
 		return 1;
 	}
 
 	struct link *client = link_accept(server_link, time(NULL) + timeout);
 	if(!client) {
-		printf("Could not accept connection\n");
+		printf("could not accept connection: %s\n",strerror(errno));
 		return 1;
 	}
 
