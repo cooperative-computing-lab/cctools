@@ -14,223 +14,219 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <getopt.h>
 
 #define SERVER_PORT 2345
 #define WQ_PORT 1234
 
-char * workqueue = "{ \"name\" : \"server_wq\" , \"port\" : 1234 }";
+char *workqueue = "{ \"name\" : \"server_wq\" , \"port\" : 1234 }";
 int timeout = 25;
 
-void reply(struct link *client, char *method, char* message, int id){
+void reply(struct link *client, char *method, char *message, int id)
+{
 
-    struct jx_pair *result;
+	struct jx_pair *result;
 
-    char buffer[BUFSIZ];
-    memset(buffer, 0, BUFSIZ);
+	char buffer[BUFSIZ];
+	memset(buffer, 0, BUFSIZ);
 
-    struct jx_pair *idd = jx_pair(jx_string("id"), jx_integer(id), NULL);
+	struct jx_pair *idd = jx_pair(jx_string("id"), jx_integer(id), NULL);
 
-    if(!strcmp(method, "error")){
-        result = jx_pair(jx_string("error"), jx_string(message), idd);
-    }
-    else {
-        result = jx_pair(jx_string("result"), jx_string(message), idd);
-    }
-        
-    struct jx_pair *jsonrpc = jx_pair(jx_string("jsonrpc"), jx_string("2.0"), result);
+	if(!strcmp(method, "error")) {
+		result = jx_pair(jx_string("error"), jx_string(message), idd);
+	} else {
+		result = jx_pair(jx_string("result"), jx_string(message), idd);
+	}
 
-    struct jx *j = jx_object(jsonrpc);
+	struct jx_pair *jsonrpc = jx_pair(jx_string("jsonrpc"), jx_string("2.0"), result);
 
-    char *response = jx_print_string(j);
+	struct jx *j = jx_object(jsonrpc);
 
-    strcat(buffer, response);
+	char *response = jx_print_string(j);
 
-    int len = strlen(buffer);
+	strcat(buffer, response);
 
-    link_putfstring(client, "%d", time(NULL)+timeout, len);
+	int len = strlen(buffer);
 
-    int total_written = 0;
-    ssize_t written = 0;
-    while (total_written < len){
-        written = link_write(client, buffer, strlen(buffer), time(NULL)+timeout); 
-        total_written += written;
-    }
+	link_putfstring(client, "%d", time(NULL) + timeout, len);
 
-    jx_delete(j);
+	int total_written = 0;
+	ssize_t written = 0;
+	while(total_written < len) {
+		written = link_write(client, buffer, strlen(buffer), time(NULL) + timeout);
+		total_written += written;
+	}
+
+	jx_delete(j);
 
 }
 
-int main(){
+int main()
+{
 
-    char message[BUFSIZ];
-    char msg[BUFSIZ];
+	char message[BUFSIZ];
+	char msg[BUFSIZ];
 
-    //create work queue
-    struct work_queue* q = work_queue_json_create(workqueue);
+	//create work queue
+	struct work_queue *q = work_queue_json_create(workqueue);
 
-    if (!q){
-        printf("Could not create work_queue\n");
-        return 1;
-    }
-    
-    //wait for client to connect
-    struct link* port = link_serve(SERVER_PORT);
+	if(!q) {
+		printf("Could not create work_queue\n");
+		return 1;
+	}
+	//wait for client to connect
+	struct link *port = link_serve(SERVER_PORT);
 
-    if (!port){
-        printf("Could not serve on port %d\n", SERVER_PORT);
-        return 1;
-    }
- 
-    struct link* client = link_accept(port, time(NULL)+timeout);
+	if(!port) {
+		printf("Could not serve on port %d\n", SERVER_PORT);
+		return 1;
+	}
 
-    if (!client){
-        printf("Could not accept connection\n");
-    }
+	struct link *client = link_accept(port, time(NULL) + timeout);
 
-    printf("Connected to client. Waiting for messages..\n");
+	if(!client) {
+		printf("Could not accept connection\n");
+	}
 
-    while (true){
+	printf("Connected to client. Waiting for messages..\n");
 
-        //reset
-        char *error = NULL;
-        int id = -1;
+	while(true) {
 
-        //receive message
-        char l[5];
+		//reset
+		char *error = NULL;
+		int id = -1;
 
-        memset(l, 0, 5);
-        memset(message, 0, BUFSIZ);
-        memset(msg, 0, BUFSIZ);
+		//receive message
+		char l[5];
 
-        int i = 0;
-        ssize_t read = link_read(client, message, 1, time(NULL)+timeout);
-        while (message[0] != '{'){
+		memset(l, 0, 5);
+		memset(message, 0, BUFSIZ);
+		memset(msg, 0, BUFSIZ);
 
-            //printf("server number read: %c\n", message[0]);
+		int i = 0;
+		ssize_t read = link_read(client, message, 1, time(NULL) + timeout);
+		while(message[0] != '{') {
 
-            l[i] = message[0];
-            i++;
-            link_read(client, message, 1, time(NULL)+timeout);
-        }
+			//printf("server number read: %c\n", message[0]);
 
-        int length = atoi(l);
+			l[i] = message[0];
+			i++;
+			link_read(client, message, 1, time(NULL) + timeout);
+		}
 
-        read = link_read(client, msg, length-1, time(NULL)+timeout);
-        
-        //if server cannot read message from client, break connection
-        if (!read){
-            error = "Error reading from client";
-            reply(client, "error", error, id);
-            link_close(client);
-            break;
-        }
+		int length = atoi(l);
 
-        strcat(message, msg);
+		read = link_read(client, msg, length - 1, time(NULL) + timeout);
 
-        struct jx *jsonrpc = jx_parse_string(message);
+		//if server cannot read message from client, break connection
+		if(!read) {
+			error = "Error reading from client";
+			reply(client, "error", error, id);
+			link_close(client);
+			break;
+		}
 
-        //if server cannot parse JSON string, break connection
-        if (!jsonrpc){
-            error = "Could not parse JSON string";
-            reply(client, "error", error, id);
-            link_close(client);
-            break;
-        }
+		strcat(message, msg);
 
+		struct jx *jsonrpc = jx_parse_string(message);
 
-        //iterate over the object: get method and task description
-        void *k = NULL, *v = NULL;
-        const char *key = jx_iterate_keys(jsonrpc, &k);
-        struct jx *value = jx_iterate_values(jsonrpc, &v);
+		//if server cannot parse JSON string, break connection
+		if(!jsonrpc) {
+			error = "Could not parse JSON string";
+			reply(client, "error", error, id);
+			link_close(client);
+			break;
+		}
 
-        char *method;
-        struct jx *val;
+		//iterate over the object: get method and task description
+		void *k = NULL, *v = NULL;
+		const char *key = jx_iterate_keys(jsonrpc, &k);
+		struct jx *value = jx_iterate_values(jsonrpc, &v);
 
-        while (key){
-            
-            if (!strcmp(key, "method")){
-                method = value->u.string_value;
-            } else if (!strcmp(key, "params")){
-                val = value;
-            } else if (!strcmp(key, "id")){
-                id = value->u.integer_value;
-            } else if (strcmp(key, "jsonrpc")){
-                error = "unrecognized parameter";
-                reply(client, "error", error, id);
-                link_close(client);
-                break;
-            }
+		char *method;
+		struct jx *val;
 
-            key = jx_iterate_keys(jsonrpc, &k);
-            value = jx_iterate_values(jsonrpc, &v);
+		while(key) {
 
-        }
-    
-        //submit or wait
-        if (!strcmp(method, "submit")){
-            
-            char *task = val->u.string_value;
+			if(!strcmp(key, "method")) {
+				method = value->u.string_value;
+			} else if(!strcmp(key, "params")) {
+				val = value;
+			} else if(!strcmp(key, "id")) {
+				id = value->u.integer_value;
+			} else if(strcmp(key, "jsonrpc")) {
+				error = "unrecognized parameter";
+				reply(client, "error", error, id);
+				link_close(client);
+				break;
+			}
 
-            int taskid = work_queue_json_submit(q, task);
+			key = jx_iterate_keys(jsonrpc, &k);
+			value = jx_iterate_values(jsonrpc, &v);
 
-            if (taskid < 0){
-                error = "Could not submit task";
-                reply(client, "error", error, id);
-            } else {
-                reply(client, method, "Task submitted successfully.", id);
-            }
+		}
 
-        }
-        else if (!strcmp(method, "wait")){
+		//submit or wait
+		if(!strcmp(method, "submit")) {
 
-            int time_out = val->u.integer_value;
+			char *task = val->u.string_value;
 
-            char *task = work_queue_json_wait(q, time_out);
+			int taskid = work_queue_json_submit(q, task);
 
-            if (!task){
-                error = "timeout reached with no task returned";
-                reply(client, "error", error, id);
-            } else {
-                reply(client, method, task, id);
-            }
+			if(taskid < 0) {
+				error = "Could not submit task";
+				reply(client, "error", error, id);
+			} else {
+				reply(client, method, "Task submitted successfully.", id);
+			}
 
-        }
-        else if (!strcmp(method, "remove")){
-            int taskid = val->u.integer_value;
+		} else if(!strcmp(method, "wait")) {
 
-            char *task = work_queue_json_remove(q, taskid);
-            if (!task){
-                error = "task not able to be removed from queue";
-                reply(client, "error", error, id);
-            } else {
-                reply(client, method, "Task removed successfully.", id);
-            }
+			int time_out = val->u.integer_value;
 
-        }
-        else if (!strcmp(method, "disconnect")){
-            reply(client, method, "Successfully disconnected.", id);
-            break;
-        }
-        else if (!strcmp(method, "empty")){
-            int empty = work_queue_empty(q);
-            if (empty){
-                reply(client, method, "Empty", id);
-            } else {
-                reply(client, method, "Not Empty", id);
-            }
-        } else {
-            error = "Method not recognized";
-            reply(client, "error", error, id);
-        }
+			char *task = work_queue_json_wait(q, time_out);
 
-        //clean up
-        jx_delete(value);
-        jx_delete(jsonrpc);
+			if(!task) {
+				error = "timeout reached with no task returned";
+				reply(client, "error", error, id);
+			} else {
+				reply(client, method, task, id);
+			}
 
-    }
+		} else if(!strcmp(method, "remove")) {
+			int taskid = val->u.integer_value;
 
-    link_close(client);
+			char *task = work_queue_json_remove(q, taskid);
+			if(!task) {
+				error = "task not able to be removed from queue";
+				reply(client, "error", error, id);
+			} else {
+				reply(client, method, "Task removed successfully.", id);
+			}
 
-    return 0;
+		} else if(!strcmp(method, "disconnect")) {
+			reply(client, method, "Successfully disconnected.", id);
+			break;
+		} else if(!strcmp(method, "empty")) {
+			int empty = work_queue_empty(q);
+			if(empty) {
+				reply(client, method, "Empty", id);
+			} else {
+				reply(client, method, "Not Empty", id);
+			}
+		} else {
+			error = "Method not recognized";
+			reply(client, "error", error, id);
+		}
+
+		//clean up
+		jx_delete(value);
+		jx_delete(jsonrpc);
+
+	}
+
+	link_close(client);
+
+	return 0;
 
 }
