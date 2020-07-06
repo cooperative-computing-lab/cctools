@@ -22,8 +22,6 @@ See the file COPYING for details.
 
 #include "work_queue_json.h"
 
-#define SERVER_PORT 2345
-
 int timeout = 25;
 
 void reply(struct link *client, char *method, char *message, int id)
@@ -66,7 +64,6 @@ void reply(struct link *client, char *method, char *message, int id)
 
 void mainloop(struct work_queue *queue, struct link *client)
 {
-
 	char message[BUFSIZ];
 	char msg[BUFSIZ];
 
