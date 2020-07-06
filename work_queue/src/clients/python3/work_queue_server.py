@@ -13,7 +13,6 @@ class WorkQueueServer:
     def __init__():
         self.socket = socket.socket()
         self.id = 1
-        self.num_workers = workers
         self.wq = None
 
     def send_recv(self, request):
