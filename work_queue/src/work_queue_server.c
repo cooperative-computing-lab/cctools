@@ -22,13 +22,11 @@ See the file COPYING for details.
 #include "work_queue_json.h"
 
 #define SERVER_PORT 2345
-#define WQ_PORT 1234
 
 int timeout = 25;
 
 void reply(struct link *client, char *method, char *message, int id)
 {
-
 	struct jx_pair *result;
 
 	char buffer[BUFSIZ];
@@ -209,6 +207,7 @@ void mainloop(struct work_queue *queue, struct link *client)
 static const struct option long_options[] = 
 {
 	{"port", required_argument, 0, 'p'},
+	{"server-port", required_argument, 0, 's'},
 	{"project-name", required_argument, 0, 'N'},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
@@ -221,6 +220,7 @@ static void show_help( const char *cmd )
 	printf("use: %s [options]\n",cmd);
 	printf("where options are:\n");
 	printf("-p,--port=<port>          Port number to listen on.\n");
+	printf("-s,--server-port=<port>   Port number for server.\n");
 	printf("-N,--project-name=<name>  Set project name.\n");
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
@@ -231,6 +231,7 @@ static void show_help( const char *cmd )
 int main(int argc, char *argv[])
 {
 	int port = 0;
+	int server_port = 0;
 	char *project_name = "wq_server";
 
 	int c;
@@ -245,6 +246,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'p':
 				port = atoi(optarg);
+				break;
+			case 's':
+				server_port = atoi(optarg);
 				break;
 			case 'N':
 				project_name = strdup(optarg);
@@ -270,13 +274,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	struct link *server_port = link_serve(SERVER_PORT);
-	if(!server_port) {
-		printf("Could not serve on port %d\n", SERVER_PORT);
+	struct link *server_link = link_serve(server_port);
+	if(!server_link) {
+		printf("Could not serve on port %d\n", server_port);
 		return 1;
 	}
 
-	struct link *client = link_accept(server_port, time(NULL) + timeout);
+	struct link *client = link_accept(server_link, time(NULL) + timeout);
 	if(!client) {
 		printf("Could not accept connection\n");
 		return 1;

@@ -10,7 +10,7 @@ from subprocess import Popen
 
 class WorkQueueServer:
 
-    def __init__(self, workers):
+    def __init__():
         self.socket = socket.socket()
         self.id = 1
         self.num_workers = workers
@@ -26,8 +26,8 @@ class WorkQueueServer:
 
         return response
 
-    def connect(self, address, server_port, wq_port):
-        args = ['./work_queue_server', "%d" % server_port, "%d" % wq_port]#, '1>', '/dev/null', '2>&1']
+    def connect(self, address, server_port, worker_port, project_name):
+        args = ['./work_queue_server', '-s', "%d" % server_port, '-p', "%d" % worker_port, '-N', project_name ]
         self.server = Popen(args)
 
         i = 1
