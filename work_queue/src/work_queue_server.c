@@ -61,7 +61,7 @@ void reply(struct link *client, char *method, char *message, int id)
 
 }
 
-void mainloop( struct work_queue *queue, struct link *client )
+void mainloop(struct work_queue *queue, struct link *client)
 {
 
 	char message[BUFSIZ];
@@ -114,7 +114,6 @@ void mainloop( struct work_queue *queue, struct link *client )
 			link_close(client);
 			break;
 		}
-
 		//iterate over the object: get method and task description
 		void *k = NULL, *v = NULL;
 		const char *key = jx_iterate_keys(jsonrpc, &k);
@@ -204,7 +203,7 @@ void mainloop( struct work_queue *queue, struct link *client )
 }
 
 
-int main( int argc, char *argv[] )
+int main(int argc, char *argv[])
 {
 	struct work_queue *queue = work_queue_json_create(workqueue);
 	if(!queue) {
@@ -221,14 +220,14 @@ int main( int argc, char *argv[] )
 	struct link *client = link_accept(port, time(NULL) + timeout);
 	if(!client) {
 		printf("Could not accept connection\n");
+		return 1;
 	}
 
 	printf("Connected to client. Waiting for messages..\n");
 
-	mainloop(queue,client);
+	mainloop(queue, client);
 
 	link_close(client);
 
 	return 0;
 }
-
