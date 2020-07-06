@@ -7,7 +7,7 @@
 import os
 import sys
 import json
-from json_server import WorkQueueServer
+from work_queue_server import WorkQueueServer
 from time import time
 from create_splits import create_splits
 

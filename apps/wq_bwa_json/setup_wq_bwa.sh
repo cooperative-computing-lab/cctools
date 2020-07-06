@@ -4,6 +4,16 @@
 #This software is distributed under the GNU General Public License.
 #See the file COPYING for details.
 
+if [ ! -f work_queue_server ]
+then
+	ln -s ../../work_queue/src/work_queue_server .
+fi
+
+if [ ! -f work_queue_server.py ]
+then
+	ln -s ../../work_queue/src/clients/work_queue_server.py .
+fi
+
 ./fastq_generate.pl 100000 1000 > ref.fastq
 echo "done with ref.fastq"
 
