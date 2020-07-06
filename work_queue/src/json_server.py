@@ -27,7 +27,7 @@ class WorkQueueServer:
         return response
 
     def connect(self, address, server_port, wq_port):
-        args = ['./work_queue_master', "%d" % server_port, "%d" % wq_port]#, '1>', '/dev/null', '2>&1']
+        args = ['./work_queue_server', "%d" % server_port, "%d" % wq_port]#, '1>', '/dev/null', '2>&1']
         self.server = Popen(args)
 
         i = 1
