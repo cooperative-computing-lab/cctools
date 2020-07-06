@@ -744,7 +744,7 @@ then
 	if [ "${config_mpi_path}" = auto ] && search_file_executable mpicc
 	then
 		mpi_exe=${executable_search_result}
-	elif search_file_executable ${mpi_path}{,/bin/mpicc,/mpicc}
+	elif search_file_executable ${mpi_path} ${mpi_path}/bin/mpicc ${mpi_path}/mpicc
 	then
 		mpi_exe=${executable_search_result}
 	else
@@ -878,7 +878,7 @@ then
 	elif [ "${config_swig_path}" = auto ] && search_file_executable ${SWIG} swig
 	then
 		swig_exe="${executable_search_result}"
-	elif search_file_executable ${swig_path}{,/bin/swig,/swig}
+	elif search_file_executable ${swig_path} ${swig_path}/bin/swig ${swig_path}/swig
 	then
 		swig_exe="${executable_search_result}"
 	else
@@ -908,7 +908,7 @@ then
 	elif [ "${config_perl_path}" = auto ] && search_file_executable perl
 	then
 		perl_exe=${executable_search_result}
-	elif search_file_executable ${perl_path}{,/bin/perl}
+	elif search_file_executable ${perl_path} ${perl_path}/bin/perl
 	then
 		perl_exe=${executable_search_result}
 	else
@@ -976,10 +976,10 @@ then
 	python_path=${python_path:-${base_root}}
 	python_exe=""
 
-	if [ "${config_python_path}" = auto ] && search_file_executable python python3 python2 > /dev/null 2>&1
+	if [ "${config_python_path}" = auto ] && search_file_executable python3 python python2 > /dev/null 2>&1
 	then
 		python_exe=${executable_search_result}
-	elif search_file_executable ${python_path}{,/python,/python3,/python2} > /dev/null 2>&1
+	elif search_file_executable ${python_path} ${python_path}/python3 ${python_path}/python ${python_path}/python2 > /dev/null 2>&1
 	then
 		python_exe=${executable_search_result}
 	fi
@@ -1021,7 +1021,7 @@ then
 	elif [ "${config_python2_path}" = auto ] && search_file_executable python python2
 	then
 		python2_exe=${executable_search_result}
-	elif search_file_executable ${python2_path}{,/bin/python,/bin/python2,/python,/python2}
+	elif search_file_executable ${python2_path} ${python2_path}/bin/python ${python2_path}/bin/python2 ${python2_path}/python ${python2_path}/python2
 	then
 		python2_exe=${executable_search_result}
 	else
@@ -1049,10 +1049,11 @@ then
 
 	if [ "${python2_avail}" = yes ]
 	then
-		if check_file ${python2_exe}${python2_version}-config
+		python2_config_exe=$(dirname ${python2_exe})/python${python2_version}-config
+		if check_file ${python2_config_exe}
 		then
-			python2_ccflags=$(${python2_exe}${python2_version}-config --includes)
-			python2_ldflags=$(${python2_exe}${python2_version}-config --ldflags)
+			python2_ccflags=$(${python2_config_exe} --includes)
+			python2_ldflags=$(${python2_config_exe} --ldflags)
 
 			if [ $BUILD_SYS = DARWIN ]
 			then
@@ -1070,7 +1071,7 @@ then
 				python2_avail=no
 			fi
 		else
-			echo "*** could not find ${python2_exe}${python2_version}-config"
+			echo "*** could not find ${python2_config_exe}"
 			python2_avail=no
 		fi
 	fi
@@ -1102,10 +1103,10 @@ then
 	then
 		echo "*** swig version ${swig_version} is older than 2.0.4, disabling python3 support"
 		python3_avail=no
-	elif [ "${config_python3_path}" = auto ] && search_file_executable python python3
+	elif [ "${config_python3_path}" = auto ] && search_file_executable python3 python
 	then
 		python3_exe=${executable_search_result}
-	elif search_file_executable ${python3_path}{,/bin/python,/bin/python3,/python,/python3}
+	elif search_file_executable ${python3_path} ${python3_path}/bin/python3 ${python3_path}/bin/python ${python3_path}/python3 ${python3_path}/python
 	then
 		python3_exe=${executable_search_result}
 	else
@@ -1129,10 +1130,11 @@ then
 
 	if [ "${python3_avail}" = yes ]
 	then
-		if check_file ${python3_exe}${python3_version}-config
+		python3_config_exe=$(dirname ${python3_exe})/python${python3_version}-config
+		if check_file ${python3_config_exe}
 		then
-			python3_ccflags=$(${python3_exe}${python3_version}-config --includes)
-			python3_ldflags=$(${python3_exe}${python3_version}-config --ldflags)
+			python3_ccflags=$(${python3_config_exe} --includes)
+			python3_ldflags=$(${python3_config_exe} --ldflags)
 
 			if [ $BUILD_SYS = DARWIN ]
 			then
@@ -1150,7 +1152,7 @@ then
 				python3_avail=no
 			fi
 		else
-			echo "*** could not find ${python3_exe}${python3_version}-config"
+			echo "*** could not find ${python3_config_exe}"
 			python3_avail=no
 		fi
 	fi
@@ -1195,7 +1197,7 @@ then
 	elif [ "${config_golang_path}" = auto ] && search_file_executable go
 	then
 		golang_exe=${executable_search_result}
-	elif search_file_executable ${golang_path}{,/bin/go,go}
+	elif search_file_executable ${golang_path} ${golang_path}/bin/go ${golang_path}/go
 	then
 		golang_exe=${executable_search_result}
 	else
