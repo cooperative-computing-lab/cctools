@@ -4,11 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "work_queue_json.h"
-#include "link.h"
-#include "jx.h"
-#include "jx_print.h"
-#include "jx_parse.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,10 +11,19 @@ See the file COPYING for details.
 #include <time.h>
 #include <getopt.h>
 
+#include "link.h"
+#include "jx.h"
+#include "jx_print.h"
+#include "jx_parse.h"
+#include "debug.h"
+#include "stringtools.h"
+#include "cctools.h"
+
+#include "work_queue_json.h"
+
 #define SERVER_PORT 2345
 #define WQ_PORT 1234
 
-char *workqueue = "{ \"name\" : \"server_wq\" , \"port\" : 1234 }";
 int timeout = 25;
 
 void reply(struct link *client, char *method, char *message, int id)
@@ -202,22 +206,77 @@ void mainloop(struct work_queue *queue, struct link *client)
 	}
 }
 
+static const struct option long_options[] = 
+{
+	{"port", required_argument, 0, 'p'},
+	{"project-name", required_argument, 0, 'N'},
+	{"debug", required_argument, 0, 'd'},
+	{"debug-file", required_argument, 0, 'o'},
+	{"help", no_argument, 0, 'h' },
+	{"version", no_argument, 0, 'v' }
+};
+
+static void show_help( const char *cmd )
+{
+	printf("use: %s [options]\n",cmd);
+	printf("where options are:\n");
+	printf("-p,--port=<port>          Port number to listen on.\n");
+	printf("-N,--project-name=<name>  Set project name.\n");
+	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
+	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
+	printf("-h,--help                 Show this help string\n");
+	printf("-v,--version              Show version string\n");	
+}
 
 int main(int argc, char *argv[])
 {
-	struct work_queue *queue = work_queue_json_create(workqueue);
+	int port = 0;
+	char *project_name = "wq_server";
+
+	int c;
+        while((c = getopt_long(argc, argv, "p:N:hv", long_options, 0))!=-1) {
+
+		switch(c) {
+			case 'd':
+				debug_flags_set(optarg);
+				break;
+			case 'o':
+				debug_config_file(optarg);
+				break;
+			case 'p':
+				port = atoi(optarg);
+				break;
+			case 'N':
+				project_name = strdup(optarg);
+				break;
+			case 'v':
+	                        cctools_version_print(stdout, argv[0]);
+				return 0;
+				break;
+			default:
+			case 'h':
+				show_help(argv[0]);
+				return 0;
+				break;
+		}
+	}
+
+
+	char * config = string_format("{ \"project_name\":\"%s\", \"port\":%d }",project_name,port);
+	
+	struct work_queue *queue = work_queue_json_create(config);
 	if(!queue) {
 		printf("Could not create work_queue\n");
 		return 1;
 	}
 
-	struct link *port = link_serve(SERVER_PORT);
-	if(!port) {
+	struct link *server_port = link_serve(SERVER_PORT);
+	if(!server_port) {
 		printf("Could not serve on port %d\n", SERVER_PORT);
 		return 1;
 	}
 
-	struct link *client = link_accept(port, time(NULL) + timeout);
+	struct link *client = link_accept(server_port, time(NULL) + timeout);
 	if(!client) {
 		printf("Could not accept connection\n");
 		return 1;
