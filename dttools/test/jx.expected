@@ -711,3 +711,6 @@ value:      error("function template on line 289: undefined symbol in template")
 expression: template("bad {object}")
 value:      error("function template on line 290: cannot format expression in template")
 
+expression: schema([{"x":0,"y":"test","z":1}])
+value:      {"z":"float","y":"string","x":"integer"}
+

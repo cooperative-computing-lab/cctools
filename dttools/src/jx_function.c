@@ -23,7 +23,6 @@ See the file COPYING for details.
 #include "jx_match.h"
 #include "jx_parse.h"
 #include "jx_print.h"
-#include "jx_querytools.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
 
@@ -631,8 +630,8 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 	switch (val->type) {
 		case JX_STRING:
 			if(string_match_regex(path, "http(s)?://")) {
-				//Assume an HTTP request is to a TLQ log server
-				char *cmd = string_format("curl -s %s", path);
+				//Arbitrary 30 second timeout to perform curl
+				char *cmd = string_format("curl -m 30 -s %s", path);
 				FILE *stream = popen(cmd,"r");
 				free(cmd);
 				if(!stream) {
@@ -746,7 +745,7 @@ struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
 	struct jx *args = jx_copy(orig_args);
 	struct jx *context = jx_array_shift(args);
 	assert(jx_istype(context, JX_ARRAY));
-	struct jx *result = jx_array(0);
+	struct jx *result = jx_object(0);
 
 	int length = jx_array_length(orig_args);
 	if(length>1){
@@ -760,16 +759,15 @@ struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
 		const char *key;
-		struct jx *keys = jx_object(0);
 		for(void *j = NULL; (key = jx_iterate_keys(item, &j));) {
-			struct jx *lookup = jx_lookup(item, key);
-			const char *type = jx_type_string(lookup->type);
-			struct jx *k = jx_string(key);
-			struct jx *v = jx_string(type);
-			struct jx_pair *p = jx_pair(k, v, 0);
-			keys = jx_merge(keys, jx_object(p), NULL);
+			if(!jx_lookup(result, key)) {
+				struct jx *lookup = jx_lookup(item, key);
+				const char *type = jx_type_string(lookup->type);
+				struct jx *k = jx_string(key);
+				struct jx *v = jx_string(type);
+				jx_insert(result, k, v);
+			}
 		}
-		jx_array_append(result, keys);
 	}
 	jx_delete(args);
 	jx_delete(context);
