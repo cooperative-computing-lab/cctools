@@ -659,7 +659,6 @@ struct jx *jx_function_fetch(struct jx *orig_args) {
 			err = string_format("error fetch() expects a string argument");
 			goto FAILURE;
 	}
-
 	jx_delete(args);
 	jx_delete(val);
 	return result;
@@ -711,8 +710,10 @@ struct jx *jx_function_project(struct jx *orig_args, struct jx *ctx) {
 	const char *funcname = "project";
 	const char *err = NULL;
 
+	//Get args and parse stringified query
+	//Stringify performed during initial eval
 	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_array_shift(args);
+	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
 	struct jx *context = jx_array_shift(args);
 	assert(jx_istype(context, JX_ARRAY));
 	struct jx *result = jx_array(0);
