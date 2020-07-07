@@ -289,4 +289,6 @@ template("{f} {q}", {"q": "ok"});
 template("{q}", {"f": "ok"});
 template("bad {object}");
 
+schema([{"x": 0, "y": "test", "z": 1.0}]);
+
 #end
