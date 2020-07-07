@@ -17,12 +17,10 @@ ${BWA_VERSION}:
 	tar xvf ${BWA_VERSION}.tar
 
 ref.fastq: fastq_generate.pl
-	#./fastq_generate.pl 100000 1000 > ref.fastq
-	./fastq_generate.pl 1000 1000 > ref.fastq
+	./fastq_generate.pl 100000 1000 > ref.fastq
 
 query.fastq: fastq_generate.pl
-	#./fastq_generate.pl 10000000 10 > query.fastq      #5 splits
-	./fastq_generate.pl 10000 10 > query.fastq      #50 splits
+	./fastq_generate.pl 10000000 10 > query.fastq      #5 splits
 
 ref.fastq.ann: ref.fastq bwa
 	./bwa index ref.fastq
