@@ -103,7 +103,8 @@ class WorkQueueServer:
 
     def disconnect(self):
         self.socket.close()
-        Popen.terminate(self.server)
+	self.server.terminate()
+	self.server.wait()
 
     def empty(self):
         request = {
