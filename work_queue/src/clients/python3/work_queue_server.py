@@ -105,7 +105,7 @@ class WorkQueueServer:
         self.socket.close()
         Popen.terminate(self.server)
 
-    def wq_empty(self):
+    def empty(self):
         request = {
             "jsonrpc" : "2.0",
             "method" : "empty",

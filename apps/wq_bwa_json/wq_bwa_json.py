@@ -100,7 +100,7 @@ def main():
         print(response)
         
     #submit wait requests
-    while not q.wq_empty():
+    while not q.empty():
         response = q.wait(10)
         print(response)
 
