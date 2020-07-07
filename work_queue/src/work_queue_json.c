@@ -44,7 +44,7 @@ static const char *work_queue_task_properties[] = { "tag", "command_line", "work
 	"time_execute_cmd_finish", "total_transfer_time", "cmd_execution_time",
 	"total_cmd_execution_time", "total_cmd_exhausted_execute_time",
 	"total_time_until_worker_failure", "total_bytes_received", "total_bytes_sent",
-	"total_bytes_transferred", "time_app_delay", NULL
+	"total_bytes_transferred", "time_app_delay", "cores", "memory", "disk", NULL
 };
 
 
@@ -97,7 +97,7 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 	while(arr != NULL) {
 
 		char *local = NULL;
-        char *remote = NULL;
+		char *remote = NULL;
 		struct jx_pair *flag;
 		void *k = NULL;
 		void *v = NULL;
@@ -127,13 +127,13 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 							flags |= WORK_QUEUE_WATCH;
 						}
 					} else {
-						printf("KEY ERROR: %s not valid", flag_key);
+						printf("KEY ERROR: %s not valid\n", flag_key);
 						return 1;
 					}
 					flag = flag->next;
 				}
 			} else {
-				printf("KEY ERROR: %s not valid", key);
+				printf("KEY ERROR: %s not valid\n", key);
 				return 1;
 			}
 
@@ -156,19 +156,20 @@ static int specify_files(int input, struct jx *files, struct work_queue_task *ta
 
 }
 
-static int specify_environment(struct jx *environment, struct work_queue_task *task) {
+static int specify_environment(struct jx *environment, struct work_queue_task *task)
+{
 	void *j = NULL;
 	void *i = NULL;
 	const char *key = jx_iterate_keys(environment, &j);
 	struct jx *value = jx_iterate_values(environment, &i);
 
-    while(key != NULL) {
-        work_queue_task_specify_environment_variable(task, key, value->u.string_value);
-        key = jx_iterate_keys(environment, &j);
-        value = jx_iterate_values(environment, &i);
-    }
+	while(key != NULL) {
+		work_queue_task_specify_environment_variable(task, key, value->u.string_value);
+		key = jx_iterate_keys(environment, &j);
+		value = jx_iterate_values(environment, &i);
+	}
 
-    return 0;
+	return 0;
 }
 
 
@@ -178,8 +179,9 @@ static struct work_queue_task *create_task(const char *str)
 
 	char *command_line = NULL;
 	struct jx *input_files = NULL;
-    struct jx *output_files = NULL;
-    struct jx *environment = NULL;
+	struct jx *output_files = NULL;
+	struct jx *environment = NULL;
+	int cores, memory, disk;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {
@@ -205,8 +207,14 @@ static struct work_queue_task *create_task(const char *str)
 			output_files = value;
 		} else if(!strcmp(key, "environment")) {
 			environment = value;
+		} else if(!strcmp(key, "cores")) {
+			cores = value->u.integer_value;
+		} else if(!strcmp(key, "memory")) {
+			memory = value->u.integer_value;
+		} else if(!strcmp(key, "disk")) {
+			disk = value->u.integer_value;
 		} else {
-			printf("%s\n", value->u.string_value);
+			printf("%s\n", key);
 		}
 
 		key = jx_iterate_keys(json, &j);
@@ -231,10 +239,21 @@ static struct work_queue_task *create_task(const char *str)
 			specify_files(0, output_files, task);
 		}
 
-        if(environment) {
-            specify_environment(environment, task);
-        }
+		if(environment) {
+			specify_environment(environment, task);
+		}
 
+		if(cores) {
+			work_queue_task_specify_cores(task, cores);
+		}
+
+		if(memory) {
+			work_queue_task_specify_memory(task, memory);
+		}
+
+		if(disk) {
+			work_queue_task_specify_disk(task, disk);
+		}
 		return task;
 
 	}
@@ -273,7 +292,7 @@ struct work_queue *work_queue_json_create(const char *str)
 		} else if(!strcmp(key, "priority")) {
 			priority = value->u.integer_value;
 		} else {
-			printf("Not necessary: %s\n", value->u.string_value);
+			printf("Not necessary: %s\n", key);
 		}
 
 		key = jx_iterate_keys(json, &j);
@@ -328,9 +347,9 @@ char *work_queue_json_wait(struct work_queue *q, int timeout)
 
 	struct work_queue_task *t = work_queue_wait(q, timeout);
 
-    if(!t) {
-        return NULL;
-    }
+	if(!t) {
+		return NULL;
+	}
 
 	command_line = jx_pair(jx_string("command_line"), jx_string(t->command_line), NULL);
 	taskid = jx_pair(jx_string("taskid"), jx_integer(t->taskid), command_line);
