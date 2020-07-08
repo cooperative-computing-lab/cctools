@@ -714,3 +714,18 @@ value:      error("function template on line 290: cannot format expression in te
 expression: schema([{"x":0,"y":"test","z":1}])
 value:      {"z":"float","y":"string","x":"integer"}
 
+expression: select(x<10,[{"x":0,"y":"test","z":1}])
+value:      [{"x":0,"y":"test","z":1}]
+
+expression: select(x>10,[{"x":0,"y":"test","z":1}])
+value:      []
+
+expression: select(y=="test" and z!=0,[{"x":0,"y":"test","z":1}])
+value:      [{"x":0,"y":"test","z":1}]
+
+expression: project(x,[{"x":0,"y":"test","z":1}])
+value:      [0]
+
+expression: project({"z2":z*2},[{"x":0,"y":"test","z":1}])
+value:      [{"z2":2}]
+
