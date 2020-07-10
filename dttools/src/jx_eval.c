@@ -343,7 +343,8 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 
 	//Capture expression for select query before it gets evaluated
 	//Stringify it to prevent early evaluation
-	if(!strcmp("select", jx_print_string(o->left))) {
+	if(!strcmp("select", jx_print_string(o->left)) ||
+		!strcmp("project", jx_print_string(o->left))) {
 		struct jx *r = jx_array_shift(o->right);
 		r = jx_string(jx_print_string((r)));
 		jx_array_insert(o->right, r);
