@@ -2,15 +2,15 @@ include ../../config.mk
 include ../../rules.mk
 
 TARGETS=$(PROGRAMS)
-PROGRAMS=data_swarm_worker
+PROGRAMS=dataswarm_worker
 
-SOURCES=data_swarm_worker.c
+SOURCES=dataswarm_worker.c
 OBJECTS=$(SOURCES:%.c=%.o)
 LOCAL_LINKAGE = -L ../../dttools/src -ldttools
 
 all: $(TARGETS)
 
-data_swarm_worker: $(OBJECTS)
+dataswarm_worker: $(OBJECTS)
 
 clean:
 	rm -rf $(OBJECTS) $(PROGRAMS)
