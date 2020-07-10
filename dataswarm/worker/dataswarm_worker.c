@@ -24,6 +24,9 @@ See the file COPYING for details.
 // Give up and reconnect if no message received after this time.
 int idle_timeout = 300;
 
+// 
+int long_timeout = 3600;
+
 // Minimum time between connection attempts.
 int min_connect_retry = 1;
 
@@ -111,6 +114,8 @@ void worker_connect_loop( const char *manager_host, int manager_port )
 
 		struct link *manager_link = link_connect(manager_addr,manager_port,time(0)+sleeptime);
 		if(manager_link) {
+			const char *msg = "{\"type\":\"worker\"}";
+			send_string_message(manager_link,msg,strlen(msg),time(0)+long_timeout);
 			worker_main_loop(manager_link);
 			sleeptime = min_connect_retry;
 		} else {
