@@ -20,6 +20,67 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "domain_name.h"
 
+int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
+{
+	char lenstr[16];
+	sprintf(lenstr,"%d\n",length);
+	int lenstrlen = strlen(lenstr);
+	int result = link_write(l,lenstr,lenstrlen,stoptime);
+	if(result!=lenstrlen) return 0;
+	result = link_write(l,str,length,stoptime);
+	return result==length;
+}
+
+char * recv_string_message( struct link *l, time_t stoptime )
+{
+	char lenstr[16];
+	int result = link_readline(l,lenstr,sizeof(lenstr),stoptime);
+	if(!result) return 0;
+
+	int length = atoi(lenstr);
+	char *str = malloc(length);
+	result = link_read(l,str,length,stoptime);
+	if(result!=length) {
+		free(str);
+		return 0;
+	}
+	return str;
+}
+
+int send_json_message( struct link *l, struct jx *j, time_t stoptime )
+{
+	char *str = jx_print_string(j);
+	int result = send_string_message(l,str,strlen(str),stoptime);
+	free(str);
+	return result;
+}
+
+struct jx * recv_json_message( struct link *l, time_t stoptime )
+{
+	char *str = recv_string_message(l,stoptime);
+	if(!str) return 0;
+	struct jx *j = jx_parse_string(str);
+	free(str);
+	return j;
+}
+
+void process_json_message( struct link *manager_link, struct jx *msg )
+{
+}
+
+int worker_main_loop( struct link * manager_link )
+{
+	while(1) {
+		time_t stoptime = time(0) + 30;
+
+		struct jx *msg = recv_json_message(manager_link,stoptime);
+		if(!msg) return 0;
+
+		process_json_message(manager_link,msg);
+	}
+}
+
+
 static const struct option long_options[] = 
 {
 	{"manager-host", required_argument, 0, 'm'},
