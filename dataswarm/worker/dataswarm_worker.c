@@ -21,6 +21,14 @@ See the file COPYING for details.
 #include "domain_name.h"
 #include "macros.h"
 
+// Give up and reconnect if no message received after this time.
+int idle_timeout = 300;
+
+// Minimum time between connection attempts.
+int min_connect_retry = 1;
+
+// Maximum time between connection attempts.
+int max_connect_retry = 60;
 
 int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
 {
@@ -68,12 +76,20 @@ struct jx * recv_json_message( struct link *l, time_t stoptime )
 
 void process_json_message( struct link *manager_link, struct jx *msg )
 {
+	const char *action = jx_lookup_string(msg,"action");
+	if(!strcmp(action,"blob_create")) {
+		// blob_create(msg,...);
+	} else if(!strcmp(action,"task_create")) {
+		// task_create(msg,...);
+	} else {
+		debug(D_DEBUG,"unknown action: %s\n",action);
+	}
 }
 
 int worker_main_loop( struct link * manager_link )
 {
 	while(1) {
-		time_t stoptime = time(0) + 30;
+		time_t stoptime = time(0) + idle_timeout;
 
 		struct jx *msg = recv_json_message(manager_link,stoptime);
 		if(!msg) return 0;
@@ -81,9 +97,6 @@ int worker_main_loop( struct link * manager_link )
 		process_json_message(manager_link,msg);
 	}
 }
-
-int min_connect_retry = 1;
-int max_connect_retry = 60;
 
 void worker_connect_loop( const char *manager_host, int manager_port )
 {
