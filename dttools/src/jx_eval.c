@@ -341,12 +341,18 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	struct jx *right = NULL;
 	struct jx *result = NULL;
 
-	//Capture expression for select query before it gets evaluated
-	//Stringify it to prevent early evaluation
-	if(!strcmp("select", jx_print_string(o->left))) {
-		struct jx *r = jx_array_shift(o->right);
-		r = jx_string(jx_print_string((r)));
-		jx_array_insert(o->right, r);
+	/*
+	For function calls select and project, convert the first argument
+	to a string as a way of deferring evaluation of expressions.
+	*/
+
+	if(o->type==JX_OP_CALL && jx_istype(o->left,JX_SYMBOL)) {
+		const char *name = o->left->u.symbol_name;
+		if(!strcmp("select",name) || !strcmp("project",name)) {
+			struct jx *r = jx_array_shift(o->right);
+			r = jx_string(jx_print_string((r)));
+			jx_array_insert(o->right, r);
+		}
 	}
 
 	right = jx_eval(o->right,context);
