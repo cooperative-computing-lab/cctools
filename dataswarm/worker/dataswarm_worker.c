@@ -19,6 +19,8 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "cctools.h"
 #include "domain_name.h"
+#include "macros.h"
+
 
 int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
 {
@@ -80,6 +82,33 @@ int worker_main_loop( struct link * manager_link )
 	}
 }
 
+int min_connect_retry = 1;
+int max_connect_retry = 60;
+
+void worker_connect_loop( const char *manager_host, int manager_port )
+{
+	char manager_addr[LINK_ADDRESS_MAX];
+	int sleeptime = min_connect_retry;
+
+	while(1) {
+		if(!domain_name_lookup(manager_host,manager_addr)) {
+			printf("couldn't look up host name %s: %s\n",manager_host,strerror(errno));
+			break;
+		}
+
+		struct link *manager_link = link_connect(manager_addr,manager_port,time(0)+sleeptime);
+		if(manager_link) {
+			worker_main_loop(manager_link);
+			sleeptime = min_connect_retry;
+		} else {
+			printf("could not connect to %s:%d: %s\n",manager_host,manager_port,strerror(errno));
+			sleeptime = MIN(sleeptime*2,max_connect_retry);
+		}
+		sleep(sleeptime);
+	}
+
+	printf("worker shutting down.\n");
+}
 
 static const struct option long_options[] = 
 {
@@ -105,9 +134,8 @@ static void show_help( const char *cmd )
 
 int main(int argc, char *argv[])
 {
-	const char *manager_host;
+	const char *manager_host = 0;
 	int manager_port = 0;
-	int timeout = 30;
 
 	int c;
         while((c = getopt_long(argc, argv, "m:p:d:o:hv", long_options, 0))!=-1) {
@@ -137,20 +165,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	char manager_addr[LINK_ADDRESS_MAX];
-
-	if(!domain_name_lookup(manager_host,manager_addr)) {
-		printf("couldn't look up host name %s: %s\n",manager_host,strerror(errno));
-		return 1;
-	}
-
-	struct link *manager_link = link_connect(manager_addr,manager_port,time(0)+timeout);
-	if(!manager_link) {
-		printf("could not connect to %s:%d: %s\n",manager_host,manager_port,strerror(errno));
-		return 1;
-	}
-
-	printf("worker shutting down.\n");
+	worker_connect_loop(manager_host,manager_port);
 
 	return 0;
 }
