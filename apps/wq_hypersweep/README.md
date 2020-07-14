@@ -29,5 +29,5 @@ usage: resnet.py -b <batch size> -r <number of ResNet blocks> -d <dropout rate> 
 
 When the application completes, you will find the collated results of the collections (.csv) along with plots of each collection's results as a function of their hyperparameters (.png) as output files in the application's directory. A sample output is provided below.
 
-![Output](https://github.com/tjuedema/cctools/edit/master/apps/wq_hypersweep/output.png)
+![Output](https://github.com/tjuedema/cctools/blob/master/apps/wq_hypersweep/output.png)
 
