@@ -1,10 +1,11 @@
 The wq_hypersweep program trains multiple residual neural network (ResNet) instances with varied hyperparameter values over a collection of images provided by the [CIFAR-10 dataset](https://www.cs.toronto.edu/~kriz/cifar.html). ~~The program uses the Work Queueframework for distributed execution on available resources.~~
 
-To run:
+To run:  
 
-~~1. Install CCTools~~
-
+1. ~~Install CCTools~~  
+  
 2. Install Tensorflow, Keras, and plotting dependencies
+
 ```python
 pip install tensorflow numpy scipy scikit-learn pillow h5py
 pip install keras
@@ -12,6 +13,7 @@ pip install matplotlib numpy seaborn
 ```
 
 3. To allow the application to contact the dataset's host server, you may need to update your python security certificates:
+
 ```
 pip install --upgrade certifi
 ```
