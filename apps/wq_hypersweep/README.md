@@ -1,4 +1,4 @@
-The wq_hypersweep program trains multiple residual neural network (ResNet) instances with varied hyperparameter values over a collection of images provided by the [CIFAR-10 dataset](https://www.cs.toronto.edu/~kriz/cifar.html). ~~The program uses the Work Queueframework for distributed execution on available resources.~~
+The wq_hypersweep program trains multiple residual neural network (ResNet) instances with varied hyperparameter values over a collection of images provided by the [CIFAR-10 dataset](https://www.cs.toronto.edu/~kriz/cifar.html). ~~The program uses the Work Queue framework for distributed execution on available resources.~~
 
 To run:  
 
