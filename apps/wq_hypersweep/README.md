@@ -21,7 +21,7 @@ pip install --upgrade certifi
 4. Run './sweep.sh' to perform a pairwise hyperparameter optimization sweep over wq_hypersweep's default hyperparameter values.
 
 
-For listing the command-line options, do: ./wq_hypersweep -h
+For listing the command-line options, do: ~~./wq_hypersweep -h~~
 ```
 $ python resnet.py -h
 usage: resnet.py -b <batch size> -r <number of ResNet blocks> -d <dropout rate> -e <number of epochs> -s <steps per epoch> -v <validation steps>
