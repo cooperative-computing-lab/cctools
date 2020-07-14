@@ -18,10 +18,16 @@ pip install matplotlib numpy seaborn
 pip install --upgrade certifi
 ```
 
-4. Run 'python sweep.sh' to perform a pairwise hyperparameter optimization sweep over wq_hypersweep's default hyperparameter values
+4. Run './sweep.sh' to perform a pairwise hyperparameter optimization sweep over wq_hypersweep's default hyperparameter values.
 
 
 For listing the command-line options, do: ./wq_hypersweep -h
+```
+$ python resnet.py -h
+usage: resnet.py -b <batch size> -r <number of ResNet blocks> -d <dropout rate> -e <number of epochs> -s <steps per epoch> -v <validation steps>
+```
 
+When the application completes, you will find the collated results of the collections (.csv) along with plots of each collection's results as a function of their hyperparameters (.png) as output files in the application's directory. A sample output is provided below.
 
-When the application completes, you will find the collated results of the collections (.csv) along with plots of each collection's results as a function of their hyperparameters (.png) as output files in the application's directory.
+![Output](https://github.com/tjuedema/cctools/edit/master/apps/wq_hypersweep/output.png)
+
