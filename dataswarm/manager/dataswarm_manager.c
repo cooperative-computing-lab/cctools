@@ -91,8 +91,7 @@ struct jx * manager_status_jx()
 	username_get(owner);
 
 	struct jx * j = jx_object(0);
-	jx_insert_string(j,"type","ds_master");
-	jx_insert_string(j,"type","wq_master");
+	jx_insert_string(j,"type","dataswarm_manager");
 	if(project_name) jx_insert_string(j,"project",project_name);
 	jx_insert_integer(j,"starttime",(start_time/1000000)); 
 	jx_insert_string(j,"owner",owner);
