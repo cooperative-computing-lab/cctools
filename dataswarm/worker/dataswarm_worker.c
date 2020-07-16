@@ -22,6 +22,8 @@ See the file COPYING for details.
 #include "macros.h"
 #include "catalog_query.h"
 
+#include "dataswarm_message.h"
+
 // Give up and reconnect if no message received after this time.
 int idle_timeout = 300;
 
@@ -36,50 +38,6 @@ int max_connect_retry = 60;
 
 // Maximum time to wait for a catalog query
 int catalog_timeout = 60;
-
-int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
-{
-	char lenstr[16];
-	sprintf(lenstr,"%d\n",length);
-	int lenstrlen = strlen(lenstr);
-	int result = link_write(l,lenstr,lenstrlen,stoptime);
-	if(result!=lenstrlen) return 0;
-	result = link_write(l,str,length,stoptime);
-	return result==length;
-}
-
-char * recv_string_message( struct link *l, time_t stoptime )
-{
-	char lenstr[16];
-	int result = link_readline(l,lenstr,sizeof(lenstr),stoptime);
-	if(!result) return 0;
-
-	int length = atoi(lenstr);
-	char *str = malloc(length);
-	result = link_read(l,str,length,stoptime);
-	if(result!=length) {
-		free(str);
-		return 0;
-	}
-	return str;
-}
-
-int send_json_message( struct link *l, struct jx *j, time_t stoptime )
-{
-	char *str = jx_print_string(j);
-	int result = send_string_message(l,str,strlen(str),stoptime);
-	free(str);
-	return result;
-}
-
-struct jx * recv_json_message( struct link *l, time_t stoptime )
-{
-	char *str = recv_string_message(l,stoptime);
-	if(!str) return 0;
-	struct jx *j = jx_parse_string(str);
-	free(str);
-	return j;
-}
 
 void process_json_message( struct link *manager_link, struct jx *msg )
 {
@@ -98,7 +56,7 @@ int worker_main_loop( struct link * manager_link )
 	while(1) {
 		time_t stoptime = time(0) + idle_timeout;
 
-		struct jx *msg = recv_json_message(manager_link,stoptime);
+		struct jx *msg = dataswarm_json_recv(manager_link,stoptime);
 		if(!msg) return 0;
 
 		process_json_message(manager_link,msg);
@@ -120,7 +78,7 @@ void worker_connect_loop( const char *manager_host, int manager_port )
 		struct link *manager_link = link_connect(manager_addr,manager_port,time(0)+sleeptime);
 		if(manager_link) {
 			const char *msg = "{\"type\":\"worker\"}";
-			send_string_message(manager_link,msg,strlen(msg),time(0)+long_timeout);
+			dataswarm_message_send(manager_link,msg,strlen(msg),time(0)+long_timeout);
 			worker_main_loop(manager_link);
 			sleeptime = min_connect_retry;
 		} else {
