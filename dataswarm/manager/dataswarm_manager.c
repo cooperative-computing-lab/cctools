@@ -110,7 +110,10 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client *c, time_t stoptime )
 {
 	struct jx *msg = dataswarm_json_recv(c->link,stoptime);
-	if(!msg) return;
+	if(!msg) {
+		// handle disconnected client
+		return;
+	}
 
 	const char *action = jx_lookup_string(msg,"action");
 	if(!strcmp(action,"task_submit")) {
@@ -125,6 +128,11 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker *w, time_t stoptime )
 {
 	struct jx *msg = dataswarm_json_recv(w->link,stoptime);
+	if(!msg) {
+		// handle disconnected client
+		return;
+	}
+
 	const char *action = jx_lookup_string(msg,"action");
 	if(!strcmp(action,"task_change")) {
 		/* */
