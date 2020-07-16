@@ -215,6 +215,7 @@ void server_main_loop( struct dataswarm_manager *m )
 
 static const struct option long_options[] = 
 {
+	{"name", required_argument, 0, 'N'},
 	{"port", required_argument, 0, 'p'},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
@@ -226,6 +227,7 @@ static void show_help( const char *cmd )
 {
 	printf("use: %s [options]\n",cmd);
 	printf("where options are:\n");
+	printf("-N --name=<name>          Set project name for catalog update.\n");
 	printf("-p,--port=<port>          Port number to listen on.\n");
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
@@ -241,6 +243,9 @@ int main(int argc, char *argv[])
         while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
 
 		switch(c) {
+			case 'N':
+				m->project_name = optarg;
+				break;
 			case 'd':
 				debug_flags_set(optarg);
 				break;
