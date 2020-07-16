@@ -19,6 +19,8 @@ See the file COPYING for details.
 #include "stringtools.h"
 #include "cctools.h"
 #include "hash_table.h"
+#include "username.h"
+#include "catalog_query.h"
 
 #include "dataswarm_worker.h"
 #include "dataswarm_client.h"
@@ -29,6 +31,8 @@ struct link *manager_link = 0;
 
 int connect_timeout = 5;
 int stall_timeout = 30;
+int server_port = 0;
+
 
 int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
 {
@@ -72,6 +76,48 @@ struct jx * recv_json_message( struct link *l, time_t stoptime )
 	struct jx *j = jx_parse_string(str);
 	free(str);
 	return j;
+}
+
+int force_update = 0;
+time_t catalog_last_update_time = 0;
+int update_interval = 60;
+char * catalog_hosts;
+time_t start_time;
+const char *project_name = "dataswarm";
+
+struct jx * manager_status_jx()
+{
+	char owner[USERNAME_MAX];
+	username_get(owner);
+
+	struct jx * j = jx_object(0);
+	jx_insert_string(j,"type","ds_master");
+	jx_insert_string(j,"type","wq_master");
+	if(project_name) jx_insert_string(j,"project",project_name);
+	jx_insert_integer(j,"starttime",(start_time/1000000)); 
+	jx_insert_string(j,"owner",owner);
+	jx_insert_string(j,"version",CCTOOLS_VERSION);
+	jx_insert_integer(j,"port",server_port);
+
+	return j;
+}
+
+void update_catalog( int force_update )
+{
+	if(!force_update && (time(0) - catalog_last_update_time) < update_interval)
+		return;
+
+	if(!catalog_hosts) catalog_hosts = strdup(CATALOG_HOST);
+
+	struct jx *j = manager_status_jx();
+	char *str = jx_print_string(j);
+
+	debug(D_DATASWARM, "advertising to the catalog server(s) at %s ...", catalog_hosts);
+	catalog_query_send_update_conditional(catalog_hosts, str);
+
+	free(str);
+	jx_delete(j);
+	catalog_last_update_time = time(0);
 }
 
 void process_files()
@@ -206,6 +252,7 @@ int handle_messages( int msec )
 void server_main_loop()
 {
 	while(1) {
+		update_catalog(0);
 		handle_messages(100);
 		process_files();
 		process_tasks();
@@ -234,8 +281,6 @@ static void show_help( const char *cmd )
 
 int main(int argc, char *argv[])
 {
-	int port = 0;
-
 	int c;
         while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
 
@@ -247,7 +292,7 @@ int main(int argc, char *argv[])
 				debug_config_file(optarg);
 				break;
 			case 'p':
-				port = atoi(optarg);
+				server_port = atoi(optarg);
 				break;
 			case 'v':
 	                        cctools_version_print(stdout, argv[0]);
@@ -262,15 +307,15 @@ int main(int argc, char *argv[])
 	}
 
 
-	manager_link = link_serve(port);
+	manager_link = link_serve(server_port);
 	if(!manager_link) {
-		printf("could not serve on port %d: %s\n", port,strerror(errno));
+		printf("could not serve on port %d: %s\n", server_port,strerror(errno));
 		return 1;
 	}
 	
 	char addr[LINK_ADDRESS_MAX];
-	link_address_local(manager_link,addr,&port);
-	printf("listening on port %d...\n",port);
+	link_address_local(manager_link,addr,&server_port);
+	printf("listening on port %d...\n",server_port);
 
 	worker_table = hash_table_create(0,0);
 	client_table = hash_table_create(0,0);
