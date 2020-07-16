@@ -86,16 +86,16 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 		int port;
 		link_address_remote(l,addr,&port);
 
-		printf("new connection from %s:%d\n",addr,port);
+		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
 
 		const char *type = jx_lookup_string(msg,"type");
 
 		if(!strcmp(type,"worker")) {
-			printf("new worker from %s:%d\n",addr,port);	
+			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);	
 			struct dataswarm_worker *w = dataswarm_worker_create(l);
 			hash_table_insert(m->worker_table,key,w);
 		} else if(!strcmp(type,"client")) {
-			printf("new client from %s:%d\n",addr,port);	
+			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);	
 			struct dataswarm_client *c = dataswarm_client_create(l);
 			hash_table_insert(m->client_table,key,c);
 		} else {
@@ -262,11 +262,11 @@ int main(int argc, char *argv[])
 	
 	char addr[LINK_ADDRESS_MAX];
 	link_address_local(m->manager_link,addr,&m->server_port);
-	printf("listening on port %d...\n",m->server_port);
+	debug(D_DATASWARM,"listening on port %d...\n",m->server_port);
 
 	server_main_loop(m);
 
-	printf("server shutting down.\n");
+	debug(D_DATASWARM,"server shutting down.\n");
 
 	return 0;
 }
