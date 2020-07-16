@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include "cctools.h"
 #include "domain_name.h"
 #include "macros.h"
+#include "catalog_query.h"
 
 // Give up and reconnect if no message received after this time.
 int idle_timeout = 300;
@@ -32,6 +33,9 @@ int min_connect_retry = 1;
 
 // Maximum time between connection attempts.
 int max_connect_retry = 60;
+
+// Maximum time to wait for a catalog query
+int catalog_timeout = 60;
 
 int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
 {
@@ -107,6 +111,7 @@ void worker_connect_loop( const char *manager_host, int manager_port )
 	int sleeptime = min_connect_retry;
 
 	while(1) {
+
 		if(!domain_name_lookup(manager_host,manager_addr)) {
 			printf("couldn't look up host name %s: %s\n",manager_host,strerror(errno));
 			break;
@@ -128,8 +133,30 @@ void worker_connect_loop( const char *manager_host, int manager_port )
 	printf("worker shutting down.\n");
 }
 
+void worker_connect_by_name( const char *manager_name )
+{
+	char *expr = string_format("type==\"dataswarm_manager\" && project==\"%s\"",manager_name);
+
+	while(1) {
+		struct jx *jexpr = jx_parse_string(expr);
+		struct catalog_query *query = catalog_query_create(0,jexpr,time(0)+catalog_timeout);
+		if(query) {
+			struct jx *j = catalog_query_read(query,time(0)+catalog_timeout);
+			if(j) {
+				const char *host = jx_lookup_string(j,"name");
+				int port = jx_lookup_integer(j,"port");
+				worker_connect_loop(host,port);
+			}
+			catalog_query_delete(query);
+		}
+	}
+
+	free(expr);
+}
+
 static const struct option long_options[] = 
 {
+	{"manager-name", required_argument, 0, 'N'},
 	{"manager-host", required_argument, 0, 'm'},
 	{"manager-port", required_argument, 0, 'p'},
 	{"debug", required_argument, 0, 'd'},
@@ -142,7 +169,8 @@ static void show_help( const char *cmd )
 {
 	printf("use: %s [options]\n",cmd);
 	printf("where options are:\n");
-	printf("-m,--manager-host=<name>  Manager host or address.\n");
+	printf("-N,--manager-name=<name>  Manager project name.\n");
+	printf("-m,--manager-host=<host>  Manager host or address.\n");
 	printf("-p,--manager-port=<port>  Manager port number.\n");
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
@@ -152,13 +180,17 @@ static void show_help( const char *cmd )
 
 int main(int argc, char *argv[])
 {
+	const char *manager_name = 0;
 	const char *manager_host = 0;
 	int manager_port = 0;
 
 	int c;
-        while((c = getopt_long(argc, argv, "m:p:d:o:hv", long_options, 0))!=-1) {
+        while((c = getopt_long(argc, argv, "N:m:p:d:o:hv", long_options, 0))!=-1) {
 
 		switch(c) {
+			case 'N':
+				manager_name = optarg;
+				break;
 			case 'd':
 				debug_flags_set(optarg);
 				break;
@@ -183,7 +215,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	worker_connect_loop(manager_host,manager_port);
+	if(manager_name) {
+		worker_connect_by_name(manager_name);
+	} else if(manager_host && manager_port) {
+		worker_connect_loop(manager_host,manager_port);
+	} else {
+		fprintf(stderr,"%s: must specify manager name (-N) or host (-m) and port (-p)\n",argv[0]);
+	}
 
 	return 0;
 }
