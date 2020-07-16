@@ -22,53 +22,10 @@ See the file COPYING for details.
 #include "username.h"
 #include "catalog_query.h"
 
+#include "dataswarm_message.h"
 #include "dataswarm_worker.h"
 #include "dataswarm_client.h"
 #include "dataswarm_manager.h"
-
-int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
-{
-	char lenstr[16];
-	sprintf(lenstr,"%d\n",length);
-	int lenstrlen = strlen(lenstr);
-	int result = link_write(l,lenstr,lenstrlen,stoptime);
-	if(result!=lenstrlen) return 0;
-	result = link_write(l,str,length,stoptime);
-	return result==length;
-}
-
-char * recv_string_message( struct link *l, time_t stoptime )
-{
-	char lenstr[16];
-	int result = link_readline(l,lenstr,sizeof(lenstr),stoptime);
-	if(!result) return 0;
-
-	int length = atoi(lenstr);
-	char *str = malloc(length);
-	result = link_read(l,str,length,stoptime);
-	if(result!=length) {
-		free(str);
-		return 0;
-	}
-	return str;
-}
-
-int send_json_message( struct link *l, struct jx *j, time_t stoptime )
-{
-	char *str = jx_print_string(j);
-	int result = send_string_message(l,str,strlen(str),stoptime);
-	free(str);
-	return result;
-}
-
-struct jx * recv_json_message( struct link *l, time_t stoptime )
-{
-	char *str = recv_string_message(l,stoptime);
-	if(!str) return 0;
-	struct jx *j = jx_parse_string(str);
-	free(str);
-	return j;
-}
 
 struct jx * manager_status_jx( struct dataswarm_manager *m )
 {
@@ -117,7 +74,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 	struct link *l;
 
 	while((l = link_accept(m->manager_link,stoptime))) {
-		struct jx *msg = recv_json_message(l,stoptime);
+		struct jx *msg = dataswarm_json_recv(l,stoptime);
 		if(!msg) {
 			link_close(l);
 			break;
@@ -152,7 +109,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client *c, time_t stoptime )
 {
-	struct jx *msg = recv_json_message(c->link,stoptime);
+	struct jx *msg = dataswarm_json_recv(c->link,stoptime);
 	if(!msg) return;
 
 	const char *action = jx_lookup_string(msg,"action");
@@ -167,7 +124,7 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 
 void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker *w, time_t stoptime )
 {
-	struct jx *msg = recv_json_message(w->link,stoptime);
+	struct jx *msg = dataswarm_json_recv(w->link,stoptime);
 	const char *action = jx_lookup_string(msg,"action");
 	if(!strcmp(action,"task_change")) {
 		/* */
