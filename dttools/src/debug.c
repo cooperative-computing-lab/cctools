@@ -95,6 +95,7 @@ static struct flag_info table[] = {
 	{"ext", D_EXT},
 	{"rmonitor", D_RMON},
 	{"confuga", D_CONFUGA},
+	{"dataswarm", D_DATASWARM},
 	{"jx", D_JX},
 	{"all", D_ALL},
 	{"time", 0},		/* backwards compatibility */
