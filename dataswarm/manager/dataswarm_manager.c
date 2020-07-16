@@ -24,15 +24,7 @@ See the file COPYING for details.
 
 #include "dataswarm_worker.h"
 #include "dataswarm_client.h"
-
-struct hash_table *worker_table = 0;
-struct hash_table *client_table = 0;
-struct link *manager_link = 0;
-
-int connect_timeout = 5;
-int stall_timeout = 30;
-int server_port = 0;
-
+#include "dataswarm_manager.h"
 
 int send_string_message( struct link *l, const char *str, int length, time_t stoptime )
 {
@@ -78,71 +70,64 @@ struct jx * recv_json_message( struct link *l, time_t stoptime )
 	return j;
 }
 
-int force_update = 0;
-time_t catalog_last_update_time = 0;
-int update_interval = 60;
-char * catalog_hosts;
-time_t start_time;
-const char *project_name = "dataswarm";
-
-struct jx * manager_status_jx()
+struct jx * manager_status_jx( struct dataswarm_manager *m )
 {
 	char owner[USERNAME_MAX];
 	username_get(owner);
 
 	struct jx * j = jx_object(0);
 	jx_insert_string(j,"type","dataswarm_manager");
-	if(project_name) jx_insert_string(j,"project",project_name);
-	jx_insert_integer(j,"starttime",(start_time/1000000)); 
+	jx_insert_string(j,"project",m->project_name);
+	jx_insert_integer(j,"starttime",(m->start_time/1000000)); 
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
-	jx_insert_integer(j,"port",server_port);
+	jx_insert_integer(j,"port",m->server_port);
 
 	return j;
 }
 
-void update_catalog( int force_update )
+void update_catalog( struct dataswarm_manager *m, int force_update )
 {
-	if(!force_update && (time(0) - catalog_last_update_time) < update_interval)
+	if(!m->force_update && (time(0) - m->catalog_last_update_time) < m->update_interval)
 		return;
 
-	if(!catalog_hosts) catalog_hosts = strdup(CATALOG_HOST);
+	if(!m->catalog_hosts) m->catalog_hosts = strdup(CATALOG_HOST);
 
-	struct jx *j = manager_status_jx();
+	struct jx *j = manager_status_jx(m);
 	char *str = jx_print_string(j);
 
-	debug(D_DATASWARM, "advertising to the catalog server(s) at %s ...", catalog_hosts);
-	catalog_query_send_update_conditional(catalog_hosts, str);
+	debug(D_DATASWARM, "advertising to the catalog server(s) at %s ...", m->catalog_hosts);
+	catalog_query_send_update_conditional(m->catalog_hosts, str);
 
 	free(str);
 	jx_delete(j);
-	catalog_last_update_time = time(0);
+	m->catalog_last_update_time = time(0);
 }
 
-void process_files()
+void process_files( struct dataswarm_manager *m )
 {
 }
 
-void process_tasks()
+void process_tasks( struct dataswarm_manager *m )
 {
 }
 
-void handle_connect_message( struct link *manager_link, time_t stoptime )
+void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 {
 	struct link *l;
 
-	while((l = link_accept(manager_link,stoptime))) {
+	while((l = link_accept(m->manager_link,stoptime))) {
 		struct jx *msg = recv_json_message(l,stoptime);
 		if(!msg) {
 			link_close(l);
 			break;
 		}
 
+		char *key = string_format("%p",l);
+
 		char addr[LINK_ADDRESS_MAX];
 		int port;
-
 		link_address_remote(l,addr,&port);
-		char *key = string_format("%s:%d",addr,port);
 
 		printf("new connection from %s:%d\n",addr,port);
 
@@ -151,20 +136,21 @@ void handle_connect_message( struct link *manager_link, time_t stoptime )
 		if(!strcmp(type,"worker")) {
 			printf("new worker from %s:%d\n",addr,port);	
 			struct dataswarm_worker *w = dataswarm_worker_create(l);
-			hash_table_insert(worker_table,key,w);
+			hash_table_insert(m->worker_table,key,w);
 		} else if(!strcmp(type,"client")) {
 			printf("new client from %s:%d\n",addr,port);	
 			struct dataswarm_client *c = dataswarm_client_create(l);
-			hash_table_insert(client_table,key,c);
+			hash_table_insert(m->client_table,key,c);
 		} else {
 			/* invalid type? */
 		}
 
+		free(key);
 		jx_delete(msg);
 	}
 }
 
-void handle_client_message( struct dataswarm_client *c, time_t stoptime )
+void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client *c, time_t stoptime )
 {
 	struct jx *msg = recv_json_message(c->link,stoptime);
 	if(!msg) return;
@@ -179,7 +165,7 @@ void handle_client_message( struct dataswarm_client *c, time_t stoptime )
 	}	
 }
 
-void handle_worker_message( struct dataswarm_worker *w, time_t stoptime )
+void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker *w, time_t stoptime )
 {
 	struct jx *msg = recv_json_message(w->link,stoptime);
 	const char *action = jx_lookup_string(msg,"action");
@@ -194,13 +180,13 @@ void handle_worker_message( struct dataswarm_worker *w, time_t stoptime )
 	}
 }
 
-int handle_messages( int msec )
+int handle_messages( struct dataswarm_manager *m, int msec )
 {
-	int n = hash_table_size(client_table) + hash_table_size(worker_table) + 1;
+	int n = hash_table_size(m->client_table) + hash_table_size(m->worker_table) + 1;
 
 	struct link_info *table = malloc(sizeof(struct link_info)*(n+1));
 
-	table[0].link = manager_link;
+	table[0].link = m->manager_link;
 	table[0].events = LINK_READ;
 	table[0].revents = 0;
 
@@ -210,16 +196,16 @@ int handle_messages( int msec )
 
 	n = 1;
 
-	hash_table_firstkey(client_table);
-	while(hash_table_nextkey(client_table, &key, (void **) &c)) {
+	hash_table_firstkey(m->client_table);
+	while(hash_table_nextkey(m->client_table, &key, (void **) &c)) {
 		table[n].link = c->link;
 		table[n].events = LINK_READ;
 		table[n].revents = 0;
 		n++;
 	}
 
-	hash_table_firstkey(worker_table);
-	while(hash_table_nextkey(worker_table, &key, (void **) &w)) {
+	hash_table_firstkey(m->worker_table);
+	while(hash_table_nextkey(m->worker_table, &key, (void **) &w)) {
 		table[n].link = w->link;
 		table[n].events = LINK_READ;
 		table[n].revents = 0;
@@ -231,14 +217,18 @@ int handle_messages( int msec )
 	int i;
 	for(i=0;i<n;i++) {
 		if(table[i].revents&LINK_READ) {
-			struct link *l = table[i].link;
+
+			char *key = string_format("%p",table[i].link);
+
 			if(i==0) {
-				handle_connect_message(l,time(0)+connect_timeout);
-			} else if((c=hash_table_lookup(client_table,key))) {
-				handle_client_message(c,time(0)+stall_timeout);
-			} else if((w==hash_table_lookup(worker_table,key))) {
-				handle_worker_message(w,time(0)+stall_timeout);
+				handle_connect_message(m,time(0)+m->connect_timeout);
+			} else if((c=hash_table_lookup(m->client_table,key))) {
+				handle_client_message(m,c,time(0)+m->stall_timeout);
+			} else if((w==hash_table_lookup(m->worker_table,key))) {
+				handle_worker_message(m,w,time(0)+m->stall_timeout);
 			}
+
+			free(key);
 
 		}
 	}
@@ -248,13 +238,13 @@ int handle_messages( int msec )
 	return n;
 }
 
-void server_main_loop()
+void server_main_loop( struct dataswarm_manager *m )
 {
 	while(1) {
-		update_catalog(0);
-		handle_messages(100);
-		process_files();
-		process_tasks();
+		update_catalog(m,0);
+		handle_messages(m,100);
+		process_files(m);
+		process_tasks(m);
 	}
 }
 
@@ -280,6 +270,8 @@ static void show_help( const char *cmd )
 
 int main(int argc, char *argv[])
 {
+	struct dataswarm_manager * m = dataswarm_manager_create();
+
 	int c;
         while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
 
@@ -291,7 +283,7 @@ int main(int argc, char *argv[])
 				debug_config_file(optarg);
 				break;
 			case 'p':
-				server_port = atoi(optarg);
+				m->server_port = atoi(optarg);
 				break;
 			case 'v':
 	                        cctools_version_print(stdout, argv[0]);
@@ -305,24 +297,39 @@ int main(int argc, char *argv[])
 		}
 	}
 
-
-	manager_link = link_serve(server_port);
-	if(!manager_link) {
-		printf("could not serve on port %d: %s\n", server_port,strerror(errno));
+	m->manager_link = link_serve(m->server_port);
+	if(!m->manager_link) {
+		printf("could not serve on port %d: %s\n", m->server_port,strerror(errno));
 		return 1;
 	}
 	
 	char addr[LINK_ADDRESS_MAX];
-	link_address_local(manager_link,addr,&server_port);
-	printf("listening on port %d...\n",server_port);
+	link_address_local(m->manager_link,addr,&m->server_port);
+	printf("listening on port %d...\n",m->server_port);
 
-	worker_table = hash_table_create(0,0);
-	client_table = hash_table_create(0,0);
-
-	server_main_loop();
+	server_main_loop(m);
 
 	printf("server shutting down.\n");
 
 	return 0;
 }
+
+struct dataswarm_manager * dataswarm_manager_create()
+{
+	struct dataswarm_manager *m = malloc(sizeof(*m));
+
+	memset(m,0,sizeof(*m));
+
+	m->worker_table = hash_table_create(0,0);
+	m->client_table = hash_table_create(0,0);
+
+	m->connect_timeout = 5;
+	m->stall_timeout = 30;
+	m->update_interval = 60;
+
+	m->project_name = "dataswarm";
+
+	return m;
+}
+
 
