@@ -95,8 +95,11 @@ void worker_connect_loop( const char *manager_host, int manager_port )
 void worker_connect_by_name( const char *manager_name )
 {
 	char *expr = string_format("type==\"dataswarm_manager\" && project==\"%s\"",manager_name);
-
+	int sleeptime = min_connect_retry;
+	
 	while(1) {
+		int got_result = 0;
+
 		struct jx *jexpr = jx_parse_string(expr);
 		struct catalog_query *query = catalog_query_create(0,jexpr,time(0)+catalog_timeout);
 		if(query) {
@@ -105,9 +108,19 @@ void worker_connect_by_name( const char *manager_name )
 				const char *host = jx_lookup_string(j,"name");
 				int port = jx_lookup_integer(j,"port");
 				worker_connect_loop(host,port);
+				got_result = 1;
 			}
 			catalog_query_delete(query);
 		}
+
+		if(got_result) {
+			sleeptime = min_connect_retry;
+		} else {
+			debug(D_DATASWARM,"could not find %s\n",expr);
+			sleeptime = MIN(sleeptime*2,max_connect_retry);
+		}
+
+		sleep(sleeptime);
 	}
 
 	free(expr);
