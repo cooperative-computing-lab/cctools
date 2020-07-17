@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include "domain_name.h"
 #include "macros.h"
 #include "catalog_query.h"
+#include "create_dir.h"
 
 #include "dataswarm_message.h"
 
@@ -112,6 +113,20 @@ void worker_connect_by_name( const char *manager_name )
 	free(expr);
 }
 
+int workspace_init( const char *workspace )
+{
+	if(!create_dir(workspace,0777)) return 0;
+
+	chdir(workspace);
+	mkdir("task",0777);
+	mkdir("data",0777);
+	mkdir("data/deleting",0777);
+	mkdir("data/ro",0777);
+	mkdir("data/rw",0777);
+
+	return 1;
+}
+
 static const struct option long_options[] = 
 {
 	{"manager-name", required_argument, 0, 'N'},
@@ -141,11 +156,15 @@ int main(int argc, char *argv[])
 	const char *manager_name = 0;
 	const char *manager_host = 0;
 	int manager_port = 0;
+	const char *workspace_dir = "/tmp/dataswarm-worker";
 
 	int c;
-        while((c = getopt_long(argc, argv, "N:m:p:d:o:hv", long_options, 0))!=-1) {
+        while((c = getopt_long(argc, argv, "w:N:m:p:d:o:hv", long_options, 0))!=-1) {
 
 		switch(c) {
+			case 'w':
+				workspace_dir = optarg;
+				break;
 			case 'N':
 				manager_name = optarg;
 				break;
@@ -171,6 +190,11 @@ int main(int argc, char *argv[])
 				return 0;
 				break;
 		}
+	}
+
+	if(!workspace_init(workspace_dir)) {
+		fprintf(stderr,"%s: couldn't create workspace %s: %s\n",argv[0],workspace_dir,strerror(errno));
+		return 1;
 	}
 
 	if(manager_name) {
