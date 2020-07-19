@@ -48,7 +48,16 @@ Note that the helper is only activated in special cases (like time warp mode)
 so that not all programs will pay this performance penalty.
 */
 
-int gettimeofday( struct timeval *tv, struct timezone *tz )
+// Thanks, glibc...
+#if defined(__GLIBC__) && \
+		((__GLIBC__ << 16) + __GLIBC_MINOR__ <= (2 << 16) + 30) && \
+		(defined(_BSD_SOURCE) || defined(_DEFAULT_SOURCE))
+	typedef struct timezone * _cctools_timezone_ptr_t;
+#else
+	typedef void * _cctools_timezone_ptr_t;
+#endif
+
+int gettimeofday( struct timeval *tv, _cctools_timezone_ptr_t tz )
 {
 	return syscall(SYS_gettimeofday,tv,tz);
 }
