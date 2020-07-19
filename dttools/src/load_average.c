@@ -4,6 +4,8 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
+#include <assert.h>
+
 #if defined(CCTOOLS_OPSYS_DARWIN)
 
 #include <unistd.h>
@@ -42,7 +44,8 @@ void load_average_get(double *avg)
 	avg[0] = avg[1] = avg[2] = 0;
 	f = fopen("/proc/loadavg", "r");
 	if(f) {
-		fscanf(f, "%lf %lf %lf", &avg[0], &avg[1], &avg[2]);
+		int rc = fscanf(f, "%lf %lf %lf", &avg[0], &avg[1], &avg[2]);
+		assert(rc == 3);
 		fclose(f);
 	}
 }

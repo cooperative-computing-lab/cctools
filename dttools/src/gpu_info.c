@@ -16,7 +16,7 @@ See the file COPYING for details.
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include <assert.h>
 
 
 #define GPU_AUTODETECT "cctools_gpu_autodetect"
@@ -24,7 +24,8 @@ See the file COPYING for details.
 int gpu_info_get()
 {
 	int pipefd[2];
-	pipe(pipefd);
+	int rc = pipe(pipefd);
+	assert(rc == 0);
 
 	pid_t pid = fork();
 

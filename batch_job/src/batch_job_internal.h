@@ -11,6 +11,7 @@ See the file COPYING for details.
 
 #include <limits.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "batch_job.h"
 #include "copy_stream.h"
@@ -65,7 +66,7 @@ struct batch_queue {
 #define batch_queue_stub_option_update(name)  static void batch_queue_##name##_option_update (struct batch_queue *Q, const char *what, const char *value) { return; }
 
 #define batch_fs_stub_chdir(name)  static int batch_fs_##name##_chdir (struct batch_queue *Q, const char *path) { return chdir(path); }
-#define batch_fs_stub_getcwd(name)  static int batch_fs_##name##_getcwd (struct batch_queue *Q, char *buf, size_t size) { getcwd(buf, size); return 0; }
+#define batch_fs_stub_getcwd(name)  static int batch_fs_##name##_getcwd (struct batch_queue *Q, char *buf, size_t size) { char *rc = getcwd(buf, size); assert(rc != NULL); return 0; }
 #define batch_fs_stub_mkdir(name)  static int batch_fs_##name##_mkdir (struct batch_queue *Q, const char *path, mode_t mode, int recursive) { if (recursive) return create_dir(path, mode); else return mkdir(path, mode); }
 #define batch_fs_stub_putfile(name)  static int batch_fs_##name##_putfile (struct batch_queue *Q, const char *lpath, const char *rpath) { return copy_file_to_file(lpath, rpath); }
 #define batch_fs_stub_rename(name)  static int batch_fs_##name##_rename (struct batch_queue *Q, const char *lpath, const char *rpath) { return create_dir_parents(rpath, 0755) && !rename(lpath, rpath) ? 0 : -1; }

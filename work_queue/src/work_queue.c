@@ -1801,7 +1801,8 @@ static work_queue_result_code_t get_update( struct work_queue *q, struct work_qu
 
 	lseek(fd,offset,SEEK_SET);
 	link_stream_to_fd(w->link,fd,length,stoptime);
-	ftruncate(fd,offset+length);
+	int rc = ftruncate(fd,offset+length);
+	assert(rc == 0);
 	close(fd);
 
 	return WQ_SUCCESS;
@@ -4950,6 +4951,7 @@ struct work_queue *work_queue_create(int port)
 		return 0;
 	}
 	char *envstring;
+	char *rc;
 
 	random_init();
 
@@ -4979,7 +4981,8 @@ struct work_queue *work_queue_create(int port)
 		link_address_local(q->master_link, address, &q->port);
 	}
 
-	getcwd(q->workingdir,PATH_MAX);
+	rc = getcwd(q->workingdir,PATH_MAX);
+	assert(rc != NULL);
 
 	q->next_taskid = 1;
 

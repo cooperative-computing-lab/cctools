@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <pwd.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "hash_table.h"
 #include "xxmalloc.h"
@@ -355,7 +356,8 @@ void dag_to_dax_replica_catalog(const struct dag *d, FILE *output)
 	list_first_item(input_files);
 	while((f = (struct dag_file*)list_next_item(input_files)))
 	{
-		realpath(f->filename, fn);
+		char *rc = realpath(f->filename, fn);
+		assert(rc != NULL);
 		fprintf(output, "%s\tfile://%s\t%s\n", path_basename(f->filename), fn, "pool=\"local\"");
 	}
 }
@@ -383,7 +385,8 @@ void dag_to_dax_transform_catalog(const struct dag *d, FILE *output)
 	list_first_item(transforms);
 	while((fn = list_next_item(transforms))) {
 		if(path_lookup(getenv("PATH"), fn, pfn, PATH_MAX)){
-			realpath(fn, pfn);
+			char *rc = realpath(fn, pfn);
+			assert(rc != NULL);
 			type = "STAGEABLE";
 		} else {
 			type = "INSTALLED";

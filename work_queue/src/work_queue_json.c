@@ -13,6 +13,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 static const char *work_queue_properties[] = { "name", "port", "priority", "num_tasks_left", "next_taskid", "workingdir", "master_link",
 	"poll_table", "poll_table_size", "tasks", "task_state_map", "ready_list", "worker_table",
@@ -181,7 +182,9 @@ static struct work_queue_task *create_task(const char *str)
 	struct jx *input_files = NULL;
 	struct jx *output_files = NULL;
 	struct jx *environment = NULL;
-	int cores, memory, disk;
+	int cores = 0;
+	int memory = 0;
+	int disk = 0;
 
 	struct jx *json = jx_parse_string(str);
 	if(!json) {

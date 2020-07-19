@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <float.h>
+#include <assert.h>
 
 #define MAX_BUF_SIZE 4096
 
@@ -573,7 +574,8 @@ static batch_job_id_t batch_job_k8s_wait (struct batch_queue * q,
 			if(!cmd_fp) {
 				return -1;
 			}
-			fgets(log_tail_content, sizeof(log_tail_content)-1, cmd_fp);
+			char *rc = fgets(log_tail_content, sizeof(log_tail_content)-1, cmd_fp);
+			assert(rc != NULL);
 			int ret = pclose(cmd_fp);	
 			// If child process terminated abnormally, we will 
 			// retry it 5 times
@@ -679,7 +681,8 @@ static int batch_queue_k8s_free(struct batch_queue *q)
 {
 	char *cmd_rm_tmp_files = string_format("rm %s-*.json %s %s", 
 			mf_uuid->str, k8s_script_file_name, kubectl_failed_log);
-	system(cmd_rm_tmp_files);
+	int rc = system(cmd_rm_tmp_files);
+	assert(rc == 0);
 	return 0;
 	
 }

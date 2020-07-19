@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <assert.h>
 
 #define SEPCHARS " \n"
 #define SEPCHARS2 "/"
@@ -98,7 +99,8 @@ struct chirp_matrix *chirp_matrix_create(const char *host, const char *path, int
 	for(i = 0; (int) i < nhosts; i++) {
 		if(!fgets(line, sizeof(line), file)) {
 			rewind(file);
-			fgets(line, sizeof(line), file);
+			char *rc = fgets(line, sizeof(line), file);
+			assert(rc != NULL);
 		}
 		hosts[i] = strdup(line);
 		int len = strlen(hosts[i]);

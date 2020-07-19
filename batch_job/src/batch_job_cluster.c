@@ -20,6 +20,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <sys/stat.h>
 
@@ -68,7 +69,8 @@ static int setup_batch_wrapper(struct batch_queue *q, const char *sysname )
 	fchmod(fileno(file), 0755);
 
 	char path[PATH_MAX];
-	getcwd(path, PATH_MAX);
+	char *rc = getcwd(path, PATH_MAX);
+	assert(rc != NULL);
 
 	fprintf(file, "#!/bin/sh\n");
 	fprintf(file, "#$ -S /bin/sh\n");
@@ -338,7 +340,8 @@ static int batch_job_cluster_remove (struct batch_queue *q, batch_job_id_t jobid
 	info->exit_signal = 1;
 
 	char *command = string_format("%s %" PRIbjid, cluster_remove_cmd, jobid);
-	system(command);
+	int rc = system(command);
+	assert(rc == 0);
 	free(command);
 
 	return 1;

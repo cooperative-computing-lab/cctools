@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -34,7 +35,8 @@ int submit_tasks(struct work_queue *q, int input_size, int run_time, int output_
 
 	sprintf(input_file, "input.%d",ntasks);
 	sprintf(gen_input_cmd, "dd if=/dev/zero of=%s bs=1048576 count=%d",input_file,input_size);
-	system(gen_input_cmd);
+	int rc = system(gen_input_cmd);
+	assert(rc == 0);
 
 	/*
 	Note that bs=1m and similar are not portable across various

@@ -28,6 +28,7 @@ extern "C" {
 #include <stdlib.h>
 #include <utime.h>
 #include <time.h>
+#include <assert.h>
 
 extern struct file_cache *pfs_file_cache;
 extern int pfs_session_cache;
@@ -208,7 +209,10 @@ pfs_file * pfs_cache_open( pfs_name *name, int flags, mode_t mode )
 
 	fd = file_cache_open(pfs_file_cache,name->path,flags,txn,buf.st_size,0);
 	if(fd>=0) {
-		if(flags&O_TRUNC) ftruncate(fd,0);
+		if(flags&O_TRUNC) {
+			int rc = ftruncate(fd,0);
+			assert(rc == 0);
+		}
 		return new pfs_file_cached(name,fd,mode,buf.st_ctime,buf.st_ino);
 	} else {
 		debug(D_DEBUG, "file cache lookup failed: %s", strerror(errno));

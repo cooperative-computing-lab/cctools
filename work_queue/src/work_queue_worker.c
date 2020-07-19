@@ -2469,6 +2469,7 @@ int main(int argc, char *argv[])
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
 	char * catalog_hosts = CATALOG_HOST;
+	int rc;
 
 	features = hash_table_create(4, 0);
 
@@ -2784,7 +2785,8 @@ int main(int argc, char *argv[])
 	}
 
 	// change to workspace
-	chdir(workspace);
+	rc = chdir(workspace);
+	assert(rc == 0);
 
 	if(worker_mode == WORKER_MODE_FOREMAN) {
 		char foreman_string[WORK_QUEUE_LINE_MAX];
@@ -2827,14 +2829,16 @@ int main(int argc, char *argv[])
 	if(container_mode == CONTAINER_MODE_DOCKER && load_from_tar == 1) {
 		char load_cmd[1024];
 		string_nformat(load_cmd, sizeof(load_cmd), "docker load < %s", tar_fn);
-		system(load_cmd);
+		int rc = system(load_cmd);
+		assert(rc == 0);
 	}
 
 	if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
 		if (load_from_tar == 1) {
 			char load_cmd[1024];
 			string_nformat(load_cmd, sizeof(load_cmd), "docker load < %s", tar_fn);
-			system(load_cmd);
+			int rc = system(load_cmd);
+			assert(rc == 0);
 		}
 
 		string_nformat(container_name, sizeof(container_name), "worker-%d-%d", (int) getuid(), (int) getpid());
@@ -2842,7 +2846,8 @@ int main(int argc, char *argv[])
 		char start_container_cmd[1024];
 		string_nformat(container_mnt_point, sizeof(container_mnt_point), "%s:%s", workspace, DOCKER_WORK_DIR);
 		string_nformat(start_container_cmd, sizeof(start_container_cmd), "docker run -i -d --name=\"%s\" -v %s -w %s %s", container_name, container_mnt_point, DOCKER_WORK_DIR, img_name);
-		system(start_container_cmd);
+		int rc = system(start_container_cmd);
+		assert(rc == 0);
 	}
 
 	procs_running  = itable_create(0);
@@ -2933,10 +2938,13 @@ int main(int argc, char *argv[])
 		string_nformat(rm_container_cmd, sizeof(rm_container_cmd), "docker rm %s", container_name);
 
 		if(container_mode == CONTAINER_MODE_DOCKER_PRESERVE) {
+			int rc;
 			//1. stop the container
-			system(stop_container_cmd);
+			rc = system(stop_container_cmd);
+			assert(rc == 0);
 			//2. remove the container
-			system(rm_container_cmd);
+			rc = system(rm_container_cmd);
+			assert(rc == 0);
 		}
 
 	}

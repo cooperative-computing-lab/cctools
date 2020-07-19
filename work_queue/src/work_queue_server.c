@@ -119,8 +119,8 @@ void mainloop(struct work_queue *queue, struct link *client)
 		const char *key = jx_iterate_keys(jsonrpc, &k);
 		struct jx *value = jx_iterate_values(jsonrpc, &v);
 
-		char *method;
-		struct jx *val;
+		char *method = NULL;
+		struct jx *val = NULL;
 
 		while(key) {
 

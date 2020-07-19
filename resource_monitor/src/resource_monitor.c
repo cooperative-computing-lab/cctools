@@ -109,6 +109,7 @@ See the file COPYING for details.
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 
 #include <time.h>
 #include <unistd.h>
@@ -1684,7 +1685,8 @@ void write_helper_lib(void)
         return;
 
     n = sizeof(lib_helper_data);
-    write(flib, lib_helper_data, n);
+    ssize_t rc = write(flib, lib_helper_data, n);
+    assert(rc != -1);
     close(flib);
 
     chmod(lib_helper_name, 0777);

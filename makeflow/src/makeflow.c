@@ -1125,7 +1125,8 @@ static void handle_abort(int sig)
 	if (fd >= 0) {
 		char buf[256];
 		string_nformat(buf, sizeof(buf), "received signal %d (%s), cleaning up remote jobs and files...\n",sig,strsignal(sig));
-		write(fd, buf, strlen(buf));
+		ssize_t rc = write(fd, buf, strlen(buf));
+		assert(rc != -1);
 		close(fd);
 	}
 
@@ -2336,8 +2337,10 @@ int main(int argc, char *argv[])
 
 	makeflow_parse_input_outputs(d);
 
-	if (change_dir)
-		chdir(change_dir);
+	if (change_dir) {
+		int rc = chdir(change_dir);
+		assert(rc == 0);
+	}
 
 	if(!disable_afs_check && (batch_queue_type==BATCH_QUEUE_TYPE_CONDOR)) {
 		char *cwd = path_getcwd();

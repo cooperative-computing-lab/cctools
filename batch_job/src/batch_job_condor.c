@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include<assert.h>
 
 static int setup_condor_wrapper(const char *wrapperfile)
 {
@@ -299,7 +300,8 @@ static batch_job_id_t batch_job_condor_wait (struct batch_queue * q, struct batc
 
 					info->finished = current;
 
-					fgets(line, sizeof(line), logfile);
+					char *rc = fgets(line, sizeof(line), logfile);
+					assert(rc != NULL);
 					if(sscanf(line, " (%d) Normal termination (return value %d)", &logcode, &exitcode) == 2) {
 						debug(D_BATCH, "job %" PRIbjid " completed normally with status %d.", jobid, exitcode);
 						info->exited_normally = 1;

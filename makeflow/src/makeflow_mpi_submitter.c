@@ -16,6 +16,7 @@
 #include "list.h"
 #include "xxmalloc.h"
 #include <unistd.h>
+#include <assert.h>
 
 static const struct option long_options[] = {
     {"makeflow-arguments", required_argument, 0, 'm'},
@@ -482,7 +483,8 @@ int main(int argc, char** argv) {
             //submit job
             FILE* submitret = popen(tmp, "r");
             char outs[1024];
-            fgets(outs, 1024, submitret);
+            char *rc = fgets(outs, 1024, submitret);
+            assert(rc != NULL);
             int id = getnum(outs);
             int* idp = malloc(sizeof (int)*1);
             *idp = id;
@@ -515,7 +517,8 @@ int main(int argc, char** argv) {
                     tmp = string_format(" ");
                     break;
             }
-            system(tmp);
+            int rc = system(tmp);
+            assert(rc == 0);
             free(tmp);
         }
         

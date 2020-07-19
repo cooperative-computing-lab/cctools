@@ -38,6 +38,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include <math.h>
 #include <sys/stat.h>
@@ -124,7 +125,8 @@ invoke, so we construct a string and emit it with a low-level write.
 static void handle_abort( int sig )
 {
 	const char *msg = "received abort signal, shutting down workers...\n";
-	write(1,msg,strlen(msg));
+	ssize_t rc = write(1,msg,strlen(msg));
+	assert(rc != -1);
 	abort_flag = 1;
 }
 
@@ -1422,7 +1424,8 @@ int main(int argc, char *argv[])
 
 	if(password_file) {
 		cmd = string_format("cp %s %s/pwfile",password_file,scratch_dir);
-		system(cmd);
+		int rc = system(cmd);
+		assert(rc == 0);
 		free(cmd);
 	}
 

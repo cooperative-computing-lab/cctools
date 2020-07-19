@@ -16,7 +16,7 @@
 #include <sys/sendfile.h>
 #include <time.h>
 #include <limits.h>
-
+#include <assert.h>
 
 #include "copy_stream.h"
 #include "debug.h"
@@ -262,7 +262,8 @@ int prepare_work()
 		}
 		char mkdir_cmd[PATH_MAX * 2];
 		if(snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", packagepath) >= 0) {
-			system(mkdir_cmd);
+			int rc = system(mkdir_cmd);
+			assert(rc == 0);
 		}
 		if(access(packagepath, F_OK) != 0) {
 			fprintf(stderr, "mkdir(`%s`) fails: %s\n", packagepath, strerror(errno));
@@ -825,9 +826,9 @@ int main(int argc, char *argv[])
 	char special_filename_tmp[PATH_MAX];
 	string_nformat(special_filename_tmp, sizeof(special_filename_tmp), "%s%s", special_filename, ".tmp");
 	char sort_cmd[PATH_MAX * 2];
-	if(snprintf(sort_cmd, PATH_MAX * 2, "sort -u %s>>%s", special_filename, special_filename_tmp) >= 0)
-		system(sort_cmd);
-	else {
+	int rc = snprintf(sort_cmd, PATH_MAX * 2, "sort -u %s>>%s", special_filename, special_filename_tmp);
+	assert(rc >= 0);
+	if (system(sort_cmd) != 0) {
 		debug(D_DEBUG, "sort special_files fails.\n");
 		exit(EXIT_FAILURE);
 	}

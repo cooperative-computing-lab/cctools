@@ -19,6 +19,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 int open(const char *path, int flags, ...)
 {
@@ -61,6 +62,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
 
 	__typeof__(write) *original_write = dlsym(RTLD_NEXT, "write");
 
+	ssize_t rc;
 	int real_count;
 	int prev_errno = errno;
 	errno = 0;
@@ -70,13 +72,19 @@ ssize_t write(int fd, const void *buf, size_t count) {
 		int fd;
 		char *filename = getenv("CCTOOLS_DISK_ALLOC");
 		if(!filename) {
-			original_write(STDERR_FILENO, "WRITE ERROR: could not set flag to alert resource management system that loop device is full.\n", 94);
-			original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+			rc = original_write(STDERR_FILENO, "WRITE ERROR: could not set flag to alert resource management system that loop device is full.\n", 94);
+			assert(rc != -1);
+			rc = original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+			assert(rc != -1);
 			return real_count;
 		}
 		fd = open(filename, O_RDWR | O_CREAT);
-		if(fd < 0) { original_write(STDERR_FILENO, "WRITE ERROR: could not alert resource management system that loop device is full.\n", 77); }	
-		original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+		if(fd < 0) {
+			rc = original_write(STDERR_FILENO, "WRITE ERROR: could not alert resource management system that loop device is full.\n", 77);
+			assert(rc != -1);
+		}
+		rc = original_write(STDERR_FILENO, "WRITE ERROR: device capacity reached.\n", 39);
+		assert(rc != -1);
 		return real_count;
 	}
 
