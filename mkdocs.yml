@@ -25,6 +25,10 @@ nav:
     - Reference:
         - Man Pages: 'man_pages.md'
         - Network Configuration: 'network/index.md'
+        - JX Reference `jx/index.md`
+        - Chirp Reference `chirp/chirp_protocol.md`
+        - API Reference `http://ccl.cse.nd.edu/software/manuals/api/html/index.html`
+
 
 markdown_extensions:
     - toc:
