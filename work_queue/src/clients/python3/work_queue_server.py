@@ -5,7 +5,6 @@
 import os
 import socket
 import json
-import sys
 from time import sleep
 from subprocess import Popen, PIPE
 
@@ -27,7 +26,7 @@ class WorkQueueServer:
         return response
 
     def connect(self, address, server_port, worker_port, project_name):
-        args = ['./work_queue_server', '-s', "%d" % server_port, '-p', "%d" % worker_port, '-N', project_name, '-dall' ]
+        args = ['./work_queue_server', '-s', "%d" % server_port, '-p', "%d" % worker_port, '-N', project_name ]
         self.server = Popen(args, stdout=PIPE)
 
         server_port = self.server.stdout.readline()
