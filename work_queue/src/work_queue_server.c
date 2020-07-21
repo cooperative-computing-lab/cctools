@@ -84,8 +84,6 @@ void mainloop(struct work_queue *queue, struct link *client)
 		ssize_t read = link_read(client, message, 1, time(NULL) + timeout);
 		while(message[0] != '{') {
 
-			//printf("server number read: %c\n", message[0]);
-
 			l[i] = message[0];
 			i++;
 			link_read(client, message, 1, time(NULL) + timeout);
@@ -272,11 +270,25 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+    // what is the port chosen for the queue?
+    port = work_queue_port(queue);
+
 	struct link *server_link = link_serve(server_port);
 	if(!server_link) {
 		printf("could not serve on port %d: %s\n", server_port,strerror(errno));
 		return 1;
 	}
+
+    // what is the port chosen for the server?
+    char addr[LINK_ADDRESS_MAX];
+    int local = link_address_local(server_link, &addr, &server_port);
+    if(!local){
+        printf("could not get local address: %s\n", strerror(errno));
+        return 1;
+    }
+    
+	printf("server port: %d\n", server_port);
+    fflush(stdout);
 
 	struct link *client = link_accept(server_link, time(NULL) + timeout);
 	if(!client) {

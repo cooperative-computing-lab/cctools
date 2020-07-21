@@ -266,7 +266,7 @@ struct work_queue *work_queue_json_create(const char *str)
 {
 
 
-	int port = 0, priority = 0;
+	int port = -1, priority = 0;
 	char *name = NULL;
 
 	struct jx *json = jx_parse_string(str);
@@ -300,7 +300,7 @@ struct work_queue *work_queue_json_create(const char *str)
 
 	}
 
-	if(port) {
+	if(port >= 0) {
 
 		struct work_queue *workqueue = work_queue_create(port);
 
