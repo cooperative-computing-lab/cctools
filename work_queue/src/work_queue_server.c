@@ -280,8 +280,9 @@ int main(int argc, char *argv[])
 	}
 
     // what is the port chosen for the server?
-    char addr[LINK_ADDRESS_MAX];
-    int local = link_address_local(server_link, &addr, &server_port);
+    char *addr;
+    addr = (char *)malloc(LINK_ADDRESS_MAX);
+    int local = link_address_local(server_link, addr, &server_port);
     if(!local){
         printf("could not get local address: %s\n", strerror(errno));
         return 1;
