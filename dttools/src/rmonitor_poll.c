@@ -69,8 +69,8 @@ void rmonitor_poll_all_processes_once(struct itable *processes, struct rmonitor_
 			continue;
 
 		acc_mem_usage(&acc->mem, &p->mem);
-
 		acc_cpu_time_usage(&acc->cpu, &p->cpu);
+		acc_ctxsw_usage(&acc->ctx, &p->ctx);
 
 		acc_sys_io_usage(&acc->io, &p->io);
 		acc_map_io_usage(&acc->io, &p->io);
@@ -137,6 +137,7 @@ int rmonitor_poll_process_once(struct rmonitor_process_info *p)
 	debug(D_RMON, "monitoring process: %d\n", p->pid);
 
 	status |= rmonitor_get_cpu_time_usage(p->pid, &p->cpu);
+	status |= rmonitor_get_ctxsw_usage(p->pid, &p->ctx);
 	status |= rmonitor_get_mem_usage(p->pid, &p->mem);
 	status |= rmonitor_get_sys_io_usage(p->pid, &p->io);
 
@@ -360,6 +361,37 @@ int rmonitor_get_cpu_time_usage(pid_t pid, struct rmonitor_cpu_time_info *cpu)
 }
 
 void acc_cpu_time_usage(struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other)
+{
+	acc->delta += other->delta;
+}
+
+int rmonitor_get_ctxsw_usage(pid_t pid, struct rmonitor_ctxsw_info *switches)
+{
+	/* /proc/[pid]/stat */
+
+	int notfound;
+	uint64_t vol_switches = 0;
+	uint64_t nonvol_switches = 0;
+
+	FILE *fstat = open_proc_file(pid, "status");
+	if(!fstat) {
+		return 0;
+	}
+
+	notfound = 0;
+
+	notfound |= rmonitor_get_int_attribute(fstat, "voluntary_ctxt_switches:", &vol_switches, 1);
+	notfound |= rmonitor_get_int_attribute(fstat, "nonvoluntary_ctxt_switches:", &nonvol_switches, 0);
+
+	uint64_t accum = vol_switches + nonvol_switches;
+
+	switches->delta       = accum  - switches->accumulated;
+	switches->accumulated = accum;
+
+	return notfound;
+}
+
+void acc_ctxsw_usage(struct rmonitor_ctxsw_info *acc, struct rmonitor_ctxsw_info *other)
 {
 	acc->delta += other->delta;
 }
@@ -815,6 +847,7 @@ void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_in
 		tr->cores_avg = tmp_output;
 	}
 
+	tr->context_switches = p->ctx.accumulated;
 
 	tr->max_concurrent_processes = -1;
 	tr->total_processes          = -1;
