@@ -89,4 +89,10 @@ char *work_queue_json_wait(struct work_queue *q, int timeout);
 */
 char *work_queue_json_remove(struct work_queue *q, int id);
 
+/** Get the stats for a given work queue.
+@param q A work queue object.
+@return A JSON description of the stats of the given work queue object.
+*/
+char *work_queue_json_get_stats(struct work_queue *q);
+
 #endif
