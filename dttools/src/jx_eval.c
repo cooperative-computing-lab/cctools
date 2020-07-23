@@ -350,7 +350,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 
 	if(o->type==JX_OP_CALL && jx_istype(o->left,JX_SYMBOL)) {
 		const char *name = o->left->u.symbol_name;
-		if(!strcmp("select",name) || !strcmp("project",name) || !strcmp("like",name)) {
+		if(!strcmp("select",name) || !strcmp("project",name)) {
 			struct jx *r = jx_array_shift(o->right);
 			r = jx_string(jx_print_string((r)));
 			jx_array_insert(o->right, r);
