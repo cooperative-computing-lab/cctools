@@ -729,3 +729,12 @@ value:      [0]
 expression: project({"z2":z*2},[{"x":0,"y":"test","z":1}])
 value:      [{"z2":2}]
 
+expression: like(".es.*","test")
+value:      true
+
+expression: like("NULL","test")
+value:      false
+
+expression: select(like(".es.*",y),[{"x":0,"y":"test","z":1}])
+value:      [{"x":0,"y":"test","z":1}]
+

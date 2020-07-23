@@ -679,12 +679,12 @@ struct jx *jx_function_select(struct jx *orig_args, struct jx *ctx) {
 	//Stringify performed during initial eval
 	struct jx *args = jx_copy(orig_args);
 	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
-	struct jx *context = jx_array_shift(args);
-	assert(jx_istype(context, JX_ARRAY));
+	struct jx *objlist = jx_array_shift(args);
+	assert(jx_istype(objlist, JX_ARRAY));
 	struct jx *result = jx_array(0);
 
 	struct jx *item;
-	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
+	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
 		struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
 		assert(jx_istype(j, JX_BOOLEAN));
 		if(!j) {
@@ -714,12 +714,12 @@ struct jx *jx_function_project(struct jx *orig_args, struct jx *ctx) {
 	//Stringify performed during initial eval
 	struct jx *args = jx_copy(orig_args);
 	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
-	struct jx *context = jx_array_shift(args);
-	assert(jx_istype(context, JX_ARRAY));
+	struct jx *objlist = jx_array_shift(args);
+	assert(jx_istype(objlist, JX_ARRAY));
 	struct jx *result = jx_array(0);
 
 	struct jx *item;
-	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
+	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
 		struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
 		if(!j) {
 			err = "error evaluating project expression";
@@ -744,8 +744,8 @@ struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
 	const char *err = NULL;
 
 	struct jx *args = jx_copy(orig_args);
-	struct jx *context = jx_array_shift(args);
-	assert(jx_istype(context, JX_ARRAY));
+	struct jx *objlist = jx_array_shift(args);
+	assert(jx_istype(objlist, JX_ARRAY));
 	struct jx *result = jx_object(0);
 
 	int length = jx_array_length(orig_args);
@@ -758,7 +758,7 @@ struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
 	}
 
 	struct jx *item;
-	for(void *i = NULL; (item = jx_iterate_array(context, &i));) {
+	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
 		const char *key;
 		for(void *j = NULL; (key = jx_iterate_keys(item, &j));) {
 			if(!jx_lookup(result, key)) {
@@ -771,12 +771,43 @@ struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
 		}
 	}
 	jx_delete(args);
-	jx_delete(context);
+	jx_delete(objlist);
 	return result;
 
 	FAILURE:
 	jx_delete(args);
-	jx_delete(context);
+	jx_delete(objlist);
+	FAIL(funcname, orig_args, err);
+}
+
+struct jx *jx_function_like(struct jx *orig_args, struct jx *ctx) {
+	assert(orig_args);
+	assert(jx_istype(ctx, JX_OBJECT));
+	const char *funcname = "like";
+	const char *err = NULL;
+
+	//Get args and parse stringified query
+	//Stringify performed during initial eval
+	struct jx *args = jx_copy(orig_args);
+	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
+	struct jx *obj = jx_array_shift(args);
+	assert(jx_istype(val, JX_STRING));
+	assert(jx_istype(obj, JX_STRING));
+
+	int match = string_match_regex(obj->u.string_value, val->u.string_value);
+	struct jx *result = match ? jx_boolean(1) : jx_boolean(0);
+	if(!result) {
+		err = "error evaluating like expression";
+		goto FAILURE;
+	}
+	jx_delete(args);
+	jx_delete(val);
+	return result;
+
+	FAILURE:
+	jx_delete(args);
+	jx_delete(val);
+	
 	FAIL(funcname, orig_args, err);
 }
 
