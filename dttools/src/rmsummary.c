@@ -70,7 +70,7 @@ void initialize_units() {
 	rmsummary_add_conversion_field("bytes_written",            "B",       "MB",     "B",       MEGABYTE, 1,             1);
 	rmsummary_add_conversion_field("bytes_received",           "B",       "MB",     "B",       MEGABYTE, 1,             1);
 	rmsummary_add_conversion_field("bytes_sent",               "B",       "MB",     "B",       MEGABYTE, 1,             1);
-	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   "bps",     1000,     1,             1);
+	rmsummary_add_conversion_field("bandwidth",                "bps",     "Mbps",   "bps",     1000000,  1,             1);
 	rmsummary_add_conversion_field("cores",                    "cores",   "cores",  "cores",   1,        1,             0);
 	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1/1000.0,      1);
 	rmsummary_add_conversion_field("machine_cpus",             "cores",   "cores",  "cores",   1,        1,             0);
