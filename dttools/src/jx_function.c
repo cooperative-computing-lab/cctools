@@ -632,6 +632,7 @@ struct jx *jx_function_fetch(struct jx *args) {
 	const char *func = "fetch";
 
 	struct jx *result = NULL;
+	struct jx *val = NULL;
 
 	int length = jx_array_length(args);
 	if(length>1){
@@ -642,7 +643,7 @@ struct jx *jx_function_fetch(struct jx *args) {
 		goto FAILURE;
 	}
 
-	struct jx *val = jx_array_shift(args);
+	val = jx_array_shift(args);
 
 	if (!jx_istype(val, JX_STRING)) {
 		result = make_error(func, args, " string argument required");
