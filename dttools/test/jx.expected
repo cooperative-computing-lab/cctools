@@ -601,10 +601,10 @@ expression: dirname("..")
 value:      "."
 
 expression: listdir()
-value:      error("function listdir on line 0 takes one argument, 0 given")
+value:      error("function listdir on line 0: one argument required, 0 given")
 
 expression: listdir(7)
-value:      error("function listdir on line 0 takes a string path")
+value:      error("function listdir on line 0: string path required")
 
 expression: listdir("-")
 value:      error("function listdir on line 0: -, No such file or directory")

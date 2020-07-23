@@ -186,48 +186,43 @@ static struct jx *jx_eval_array(struct jx_operator *op, struct jx *left, struct 
 static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx) {
 	assert(func);
 	assert(args);
-	assert(args->type == JX_ARRAY);
-
-	if (!jx_istype(func, JX_SYMBOL)) {
-		jx_error(jx_format(
-			"on line %d, unknown function: %s",
-			func->line,
-			func->u.symbol_name
-		));
-	}
+	assert(jx_istype(args, JX_ARRAY));
+	assert(jx_istype(func, JX_SYMBOL)); //TODO
 
 	if (!strcmp(func->u.symbol_name, "range")) {
-		return jx_function_range(args);
+		return jx_function_range(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "format")) {
-		return jx_function_format(args);
+		return jx_function_format(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "join")) {
-		return jx_function_join(args);
+		return jx_function_join(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "ceil")) {
-		return jx_function_ceil(args);	
+		return jx_function_ceil(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "floor")) {
-		return jx_function_floor(args);
+		return jx_function_floor(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "basename")) {
-		return jx_function_basename(args);
+		return jx_function_basename(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "dirname")) {
-		return jx_function_dirname(args);
+		return jx_function_dirname(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "listdir")) {
-		return jx_function_listdir(args);
+		return jx_function_listdir(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "escape")) {
-		return jx_function_escape(args);
+		return jx_function_escape(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "template")) {
-		return jx_function_template(args, ctx);
+		return jx_function_template(jx_eval(args, ctx), ctx);
 	} else if (!strcmp(func->u.symbol_name, "len")) {
-		return jx_function_len(args);
+		return jx_function_len(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "fetch")) {
-		return jx_function_fetch(args);
+		return jx_function_fetch(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "select")) {
-		return jx_function_select(args, ctx);
+		// NB: deferred eval
+		return jx_function_select(jx_copy(args), ctx);
 	} else if (!strcmp(func->u.symbol_name, "project")) {
-		return jx_function_project(args, ctx);
+		// NB: deferred eval
+		return jx_function_project(jx_copy(args), ctx);
 	} else if (!strcmp(func->u.symbol_name, "schema")) {
-		return jx_function_schema(args, ctx);
+		return jx_function_schema(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "like")) {
-		return jx_function_like(args, ctx);
+		return jx_function_like(jx_eval(args, ctx));
 	} else {
 		return jx_error(jx_format(
 			"on line %d, unknown function: %s",
@@ -343,33 +338,18 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	struct jx *right = NULL;
 	struct jx *result = NULL;
 
-	/*
-	For function calls select, project, and like, convert the first argument
-	to a string as a way of deferring evaluation of expressions.
-	*/
-
-	if(o->type==JX_OP_CALL && jx_istype(o->left,JX_SYMBOL)) {
-		const char *name = o->left->u.symbol_name;
-		if(!strcmp("select",name) || !strcmp("project",name)) {
-			struct jx *r = jx_array_shift(o->right);
-			r = jx_string(jx_print_string((r)));
-			jx_array_insert(o->right, r);
-		}
-	}
-
-	right = jx_eval(o->right,context);
-	if (jx_istype(right, JX_ERROR)) {
-		result = right;
-		right = NULL;
-		goto DONE;
-	}
-
-	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, right, context);
+	if (o->type == JX_OP_CALL) return jx_eval_call(o->left, o->right, context);
 
 	left = jx_eval(o->left,context);
 	if (jx_istype(left, JX_ERROR)) {
 		result = left;
 		left = NULL;
+		goto DONE;
+	}
+	right = jx_eval(o->right,context);
+	if (jx_istype(right, JX_ERROR)) {
+		result = right;
+		right = NULL;
 		goto DONE;
 	}
 
