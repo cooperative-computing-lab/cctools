@@ -787,7 +787,7 @@ struct jx *jx_function_like(struct jx *orig_args, struct jx *ctx) {
 	const char *err = NULL;
 
 	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_eval(jx_array_shift(args), ctx);
+	struct jx *val = jx_array_shift(args);
 	struct jx *obj = jx_array_shift(args);
 	assert(jx_istype(val, JX_STRING));
 	assert(jx_istype(obj, JX_STRING));
