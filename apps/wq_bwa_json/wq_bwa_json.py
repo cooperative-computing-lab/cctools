@@ -93,7 +93,7 @@ def main():
     #connect to server
     q.connect('127.0.0.1', 0, 0, "wq_bwa_json")
 
-    response = q.stats()
+    response = q.status()
     print(response)
   
     #submit tasks

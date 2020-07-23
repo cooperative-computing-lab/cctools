@@ -393,9 +393,9 @@ char *work_queue_json_remove(struct work_queue *q, int id)
 
 }
 
-char *work_queue_json_get_stats(struct work_queue *q)
+char *work_queue_json_get_status(struct work_queue *q)
 {
-    char *stats;
+    char *status;
     struct work_queue_stats s;
 	struct jx *j;
 	struct jx_pair *workers_connected, *workers_idle, *workers_busy, *tasks_waiting, *tasks_on_workers, *tasks_running, *tasks_with_results, *tasks_submitted, *tasks_done, *tasks_failed, *bytes_sent, *bytes_received;
@@ -417,8 +417,8 @@ char *work_queue_json_get_stats(struct work_queue *q)
 
     j = jx_object(bytes_received);
 
-    stats = jx_print_string(j);
+    status = jx_print_string(j);
 
-    return stats;
+    return status;
 
 }

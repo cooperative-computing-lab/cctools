@@ -101,7 +101,7 @@ class WorkQueueServer:
 
         return self.send_recv(request)
 
-    def stats(self):
+    def status(self):
         request = {
             "jsonrpc" : "2.0",
             "method" : "stats",

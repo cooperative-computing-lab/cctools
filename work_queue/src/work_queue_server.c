@@ -180,9 +180,9 @@ void mainloop(struct work_queue *queue, struct link *client)
 			} else {
 				reply(client, method, "Not Empty", id);
 			}
-		} else if(!strcmp(method, "stats")) {
-            char *stats = work_queue_json_get_stats(queue);
-            reply(client, method, stats, id);
+		} else if(!strcmp(method, "status")) {
+            char *status = work_queue_json_get_status(queue);
+            reply(client, method, status, id);
         } else {
 			error = "Method not recognized";
 			reply(client, "error", error, id);
