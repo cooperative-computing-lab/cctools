@@ -477,6 +477,66 @@ len([1,2,3])
 = 3
 ```
 
+#### fetch
+
+>       fetch(A) -> Object
+>       where A = URL/path
+
+fetch() retrieves a JX document at the given URL or path.
+This document is then parsed into a JX object.
+
+```python
+fetch("example.json")
+= {"x": 0, "y": "test", "z": 1.0}
+```
+
+#### select
+
+>       select(A, [,B]) -> Array
+>       where A = Boolean and B = Object
+
+select() returns an array of objects for which the boolean expression evaluates to true for that object.
+
+```python
+select(x==1, [{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}])
+= [{"x": 1, "y": "example", "z": 0.0}]
+```
+
+#### project
+
+>       project(A, [,B]) -> Array
+>       where A = Expression and B = Object
+
+project() returns an array of objects resulting from evaluating the expression upon the array.
+
+```python
+project(x, [{"x": 0, "y": "test", "z": 1.0}, {"x": 1, "y": "example", "z": 0.0}])
+= [0, 1]
+```
+
+#### schema
+
+>       schema(A) -> Object
+>       where A = Object
+
+schema() returns the types of each key in the object.
+
+```python
+schema({"x": 0, "y": "test", "z": 1.0})
+= {"x": "integer", "y": "string", "z": "float"}
+```
+
+#### like
+
+>       like(A, B) -> Boolean
+>       where A = String and B = String
+
+like() returns a boolean value representing whether the given regex string matched to the given string.
+
+```python
+like(".es.*", "test")
+= true
+```
 
 ### Comprehensions
 
