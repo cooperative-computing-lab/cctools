@@ -108,6 +108,11 @@ expr for x in [1,2,3]
     dirname( path )
     escape( string )
     len( array )
+    fetch( URL/path )
+    select( boolean, array )
+    project( expression, array )
+    schema( object )
+    like( string, object )
 ```
 
 </td>

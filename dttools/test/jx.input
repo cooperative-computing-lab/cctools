@@ -298,4 +298,8 @@ select(y=="test"&&z!=0.0, [{"x": 0, "y": "test", "z": 1.0}]);
 project(x, [{"x": 0, "y": "test", "z": 1.0}]);
 project({"z2":z*2.0}, [{"x": 0, "y": "test", "z": 1.0}]);
 
+like(".es.*", "test");
+like("NULL", "test");
+select(like(".es.*", y), [{"x": 0, "y": "test", "z": 1.0}]);
+
 #end

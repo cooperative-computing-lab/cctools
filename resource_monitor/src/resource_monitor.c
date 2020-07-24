@@ -951,6 +951,7 @@ void rmonitor_collate_tree(struct rmsummary *tr, struct rmonitor_process_info *p
 
 	/* using .delta here because if we use .accumulated, then we lose information of processes that already terminated. */
 	tr->cpu_time  += p->cpu.delta;
+	tr->context_switches += p->ctx.delta;
 
 	tr->start = summary->start;
 	tr->end   = usecs_since_epoch();

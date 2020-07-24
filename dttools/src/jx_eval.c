@@ -226,6 +226,8 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 		return jx_function_project(args, ctx);
 	} else if (!strcmp(func->u.symbol_name, "schema")) {
 		return jx_function_schema(args, ctx);
+	} else if (!strcmp(func->u.symbol_name, "like")) {
+		return jx_function_like(args, ctx);
 	} else {
 		return jx_error(jx_format(
 			"on line %d, unknown function: %s",
@@ -342,7 +344,7 @@ static struct jx * jx_eval_operator( struct jx_operator *o, struct jx *context )
 	struct jx *result = NULL;
 
 	/*
-	For function calls select and project, convert the first argument
+	For function calls select, project, and like, convert the first argument
 	to a string as a way of deferring evaluation of expressions.
 	*/
 
