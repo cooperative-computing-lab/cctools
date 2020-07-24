@@ -58,6 +58,7 @@ struct rmsummary
 
 	int64_t  cores;                          /* peak usage in a small time window */
 	int64_t  cores_avg;
+	int64_t  context_switches;
 	int64_t  gpus;
     int64_t  machine_load;                   /* peak load of the host */
     int64_t  machine_cpus;                   /* number of cpus of the host */

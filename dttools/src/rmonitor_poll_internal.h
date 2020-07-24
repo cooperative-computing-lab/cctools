@@ -48,6 +48,7 @@ int rmonitor_poll_maps_once(   struct itable *processes, struct rmonitor_mem_inf
 void rmonitor_info_to_rmsummary(struct rmsummary *tr, struct rmonitor_process_info *p, struct rmonitor_wdir_info *d, struct rmonitor_filesys_info *f, uint64_t start_time);
 
 int rmonitor_get_cpu_time_usage(pid_t pid,        struct rmonitor_cpu_time_info *cpu);
+int rmonitor_get_ctxsw_usage(   pid_t pid,        struct rmonitor_ctxsw_info *ctx);
 int rmonitor_get_mem_usage(     pid_t pid,        struct rmonitor_mem_info *mem);
 int rmonitor_get_sys_io_usage(  pid_t pid,        struct rmonitor_io_info *io);
 int rmonitor_get_map_io_usage(  pid_t pid,        struct rmonitor_io_info *io);
@@ -58,6 +59,7 @@ int rmonitor_get_loadavg(struct rmonitor_load_info *load);
 int rmonitor_get_wd_usage(struct rmonitor_wdir_info *d, int max_time_for_measurement);
 
 void acc_cpu_time_usage( struct rmonitor_cpu_time_info *acc, struct rmonitor_cpu_time_info *other);
+void acc_ctxsw_usage(    struct rmonitor_ctxsw_info *acc,    struct rmonitor_ctxsw_info *other);
 void acc_mem_usage(      struct rmonitor_mem_info *acc,      struct rmonitor_mem_info *other);
 void acc_sys_io_usage(   struct rmonitor_io_info *acc,       struct rmonitor_io_info *other);
 void acc_map_io_usage(   struct rmonitor_io_info *acc,       struct rmonitor_io_info *other);

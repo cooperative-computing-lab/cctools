@@ -75,6 +75,7 @@ void initialize_units() {
 	rmsummary_add_conversion_field("cores_avg",                "mcores",  "cores",  "cores",   1000,     1/1000.0,      1);
 	rmsummary_add_conversion_field("machine_cpus",             "cores",   "cores",  "cores",   1,        1,             0);
 	rmsummary_add_conversion_field("machine_load",             "mprocs",  "procs",  "procs",   1000,     1/1000.0,      1);
+	rmsummary_add_conversion_field("context_switches",         "switches","switches","switches", 1,      1,             0);
 	rmsummary_add_conversion_field("max_concurrent_processes", "procs",   "procs",  "procs",   1,        1,             0);
 	rmsummary_add_conversion_field("total_processes",          "procs",   "procs",  "procs",   1,        1,             0);
 	rmsummary_add_conversion_field("total_files",              "files",   "files",  "files",   1,        1,             0);
@@ -339,6 +340,10 @@ int64_t rmsummary_get_int_field(struct rmsummary *s, const char *key) {
 		return s->cores_avg;
 	}
 
+	if(strcmp(key, "context_switches") == 0) {
+		return s->context_switches;
+	}
+
 	if(strcmp(key, "gpus") == 0) {
 		return s->gpus;
 	}
@@ -490,6 +495,11 @@ int rmsummary_assign_int_field(struct rmsummary *s, const char *key, int64_t val
 
 	if(strcmp(key, "cores_avg") == 0) {
 		s->cores_avg = value;
+		return 1;
+	}
+
+	if(strcmp(key, "context_switches") == 0) {
+		s->context_switches = value;
 		return 1;
 	}
 
@@ -645,6 +655,7 @@ struct jx *rmsummary_to_json(const struct rmsummary *s, int only_resources) {
 	field_to_json(output, s, wall_time);
 	field_to_json(output, s, cores);
 	field_to_json(output, s, cores_avg);
+	field_to_json(output, s, context_switches);
 	field_to_json(output, s, end);
 	field_to_json(output, s, start);
 
@@ -997,6 +1008,7 @@ void rmsummary_bin_op(struct rmsummary *dest, const struct rmsummary *src, rm_bi
 	rmsummary_apply_op(dest, src, fn, fs_nodes);
 	rmsummary_apply_op(dest, src, fn, cores);
 	rmsummary_apply_op(dest, src, fn, cores_avg);
+	rmsummary_apply_op(dest, src, fn, context_switches);
 	rmsummary_apply_op(dest, src, fn, machine_cpus);
 	rmsummary_apply_op(dest, src, fn, machine_load);
 
@@ -1093,6 +1105,7 @@ static void merge_limits(struct rmsummary *dest, const struct rmsummary *src)
 	merge_limit(dest, src, disk);
 	merge_limit(dest, src, cores);
 	merge_limit(dest, src, cores_avg);
+	merge_limit(dest, src, context_switches);
 	merge_limit(dest, src, machine_load);
 	merge_limit(dest, src, fs_nodes);
 
@@ -1172,6 +1185,7 @@ void rmsummary_merge_max_w_time(struct rmsummary *dest, const struct rmsummary *
 	max_op_w_time(dest, src, total_files);
 	max_op_w_time(dest, src, disk);
 	max_op_w_time(dest, src, cores);
+	max_op_w_time(dest, src, context_switches);
 	max_op_w_time(dest, src, machine_cpus);
 	max_op_w_time(dest, src, machine_load);
 	max_op_w_time(dest, src, fs_nodes);
@@ -1267,6 +1281,10 @@ size_t rmsummary_field_offset(const char *key) {
 
 	if(!strcmp(key, "cores_avg")) {
 		return offsetof(struct rmsummary, cores_avg);
+	}
+
+	if(!strcmp(key, "context_switches")) {
+		return offsetof(struct rmsummary, context_switches);
 	}
 
 	if(!strcmp(key, "disk")) {
