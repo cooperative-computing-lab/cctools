@@ -491,12 +491,12 @@ static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist)
 	/* Function arguments end with parens, but lists with brackets. */
 	jx_token_t delim_token = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
 
-	/* First check for an empty list. */
-	jx_token_t t = jx_scan(s);
-	if(t==delim_token) return 0;
-	jx_unscan(s,t);
-
 	while(1) {
+		/* Check for an empty list, or a close brace following a trailing comma. */
+		jx_token_t t = jx_scan(s);
+		if(t==delim_token) return head;
+		jx_unscan(s,t);
+
 		struct jx_item *i = jx_item(NULL, NULL);
 		i->line = s->line;
 
@@ -550,13 +550,12 @@ static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 	struct jx_pair *head = 0;
 	struct jx_pair **tail = 0;
 
-	/* First check for an empty list */
-
-	jx_token_t t = jx_scan(s);
-	if(t==JX_TOKEN_RBRACE) return 0;
-	jx_unscan(s,t);
-
 	while(1) {
+		/* Check for an empty list, or a close brace following a trailing comma. */
+		jx_token_t t = jx_scan(s);
+		if(t==JX_TOKEN_RBRACE) return head;
+		jx_unscan(s,t);
+
 		struct jx_pair *p = jx_pair(NULL, NULL, NULL);
 
 		/* Parse the key of the pair, which should be a string */
