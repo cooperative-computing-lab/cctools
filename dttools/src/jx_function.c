@@ -686,7 +686,6 @@ FAILURE:
 
 struct jx *jx_function_select(struct jx *args, struct jx *ctx) {
 	assert(args);
-	if (jx_istype(args, JX_ERROR)) return args;
 	assert(jx_istype(args, JX_ARRAY));
 	assert(jx_istype(ctx, JX_OBJECT));
 	const char *func = "select";
@@ -701,12 +700,21 @@ struct jx *jx_function_select(struct jx *args, struct jx *ctx) {
 		result = make_error(func, args, "2 arguments required");
 		goto FAILURE;
 	}
+
+	result = jx_eval(objlist, ctx);
+	assert(result);
+	if (jx_istype(result, JX_ERROR)) {
+		goto FAILURE;
+	}
+
+	jx_delete(objlist);
+	objlist = result;
+	result = jx_array(0);
+
 	if (!jx_istype(objlist, JX_ARRAY)) {
 		result = make_error(func, args, "list of objects required");
 		goto FAILURE;
 	}
-
-	result = jx_array(0);
 
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
@@ -746,7 +754,6 @@ FAILURE:
 
 struct jx *jx_function_project(struct jx *args, struct jx *ctx) {
 	assert(args);
-	if (jx_istype(args, JX_ERROR)) return args;
 	assert(jx_istype(args, JX_ARRAY));
 	assert(jx_istype(ctx, JX_OBJECT));
 
@@ -761,12 +768,21 @@ struct jx *jx_function_project(struct jx *args, struct jx *ctx) {
 		result = make_error(func, args, "2 arguments required");
 		goto FAILURE;
 	}
+
+	result = jx_eval(objlist, ctx);
+	assert(result);
+	if (jx_istype(result, JX_ERROR)) {
+		goto FAILURE;
+	}
+
+	jx_delete(objlist);
+	objlist = result;
+	result = jx_array(0);
+
 	if (!jx_istype(objlist, JX_ARRAY)) {
 		result = make_error(func, args, "list of objects required");
 		goto FAILURE;
 	}
-
-	result = jx_array(0);
 
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
