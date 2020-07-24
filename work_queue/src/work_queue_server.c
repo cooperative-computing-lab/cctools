@@ -144,34 +144,25 @@ void mainloop(struct work_queue *queue, struct link *client)
 
 		//submit or wait
 		if(!strcmp(method, "submit")) {
-
 			char *task = val->u.string_value;
-
 			int taskid = work_queue_json_submit(queue, task);
-
 			if(taskid < 0) {
 				error = "Could not submit task";
 				reply(client, "error", error, id);
 			} else {
 				reply(client, method, "Task submitted successfully.", id);
 			}
-
 		} else if(!strcmp(method, "wait")) {
-
 			int time_out = val->u.integer_value;
-
 			char *task = work_queue_json_wait(queue, time_out);
-
 			if(!task) {
 				error = "timeout reached with no task returned";
 				reply(client, "error", error, id);
 			} else {
 				reply(client, method, task, id);
 			}
-
 		} else if(!strcmp(method, "remove")) {
 			int taskid = val->u.integer_value;
-
 			char *task = work_queue_json_remove(queue, taskid);
 			if(!task) {
 				error = "task not able to be removed from queue";
@@ -179,7 +170,6 @@ void mainloop(struct work_queue *queue, struct link *client)
 			} else {
 				reply(client, method, "Task removed successfully.", id);
 			}
-
 		} else if(!strcmp(method, "disconnect")) {
 			reply(client, method, "Successfully disconnected.", id);
 			break;
@@ -190,7 +180,10 @@ void mainloop(struct work_queue *queue, struct link *client)
 			} else {
 				reply(client, method, "Not Empty", id);
 			}
-		} else {
+		} else if(!strcmp(method, "status")) {
+            char *status = work_queue_json_get_status(queue);
+            reply(client, method, status, id);
+        } else {
 			error = "Method not recognized";
 			reply(client, "error", error, id);
 		}

@@ -101,6 +101,17 @@ class WorkQueueServer:
 
         return self.send_recv(request)
 
+    def status(self):
+        request = {
+            "jsonrpc" : "2.0",
+            "method" : "stats",
+            "id" : self.id,
+            "params" : ""
+        }
+
+        return self.send_recv(request)
+
+
     def disconnect(self):
         self.socket.close()
 	self.server.terminate()
@@ -122,3 +133,5 @@ class WorkQueueServer:
             return False
         else:
             return True
+
+
