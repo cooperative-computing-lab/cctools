@@ -805,14 +805,15 @@ struct jx *jx_function_select(struct jx *args, struct jx *ctx) {
 		goto FAILURE;
 	}
 
-	jx_delete(objlist);
-	objlist = result;
-	result = jx_array(0);
-
-	if (!jx_istype(objlist, JX_ARRAY)) {
+	if (!jx_istype(result, JX_ARRAY)) {
+		jx_delete(result);
 		result = make_error(func, args, "list of objects required");
 		goto FAILURE;
 	}
+
+	jx_delete(objlist);
+	objlist = result;
+	result = jx_array(0);
 
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
@@ -873,14 +874,15 @@ struct jx *jx_function_project(struct jx *args, struct jx *ctx) {
 		goto FAILURE;
 	}
 
-	jx_delete(objlist);
-	objlist = result;
-	result = jx_array(0);
-
-	if (!jx_istype(objlist, JX_ARRAY)) {
+	if (!jx_istype(result, JX_ARRAY)) {
+		jx_delete(result);
 		result = make_error(func, args, "list of objects required");
 		goto FAILURE;
 	}
+
+	jx_delete(objlist);
+	objlist = result;
+	result = jx_array(0);
 
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
