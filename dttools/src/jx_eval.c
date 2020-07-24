@@ -450,6 +450,7 @@ static struct jx_item *jx_eval_comprehension(struct jx *body, struct jx_comprehe
 	struct jx *list = jx_eval(comp->elements, context);
 	if (jx_istype(list, JX_ERROR)) return jx_item(list, NULL);
 	if (!jx_istype(list, JX_ARRAY)) {
+		jx_delete(list);
 		return jx_item(jx_error(jx_format(
 			"on line %d: list comprehension takes an array",
 			comp->line

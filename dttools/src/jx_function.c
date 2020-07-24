@@ -176,7 +176,7 @@ struct jx *jx_function_range(struct jx *args) {
 
 	if (((stop - start) * step) < 0) {
 		// step is pointing the wrong way
-		return result;
+		goto FAILURE;
 	}
 
 	for (jx_int_t i = start; stop >= start ? i < stop : i > stop; i += step) {
@@ -827,6 +827,7 @@ struct jx *jx_function_select(struct jx *args, struct jx *ctx) {
 		if (jx_istype(j, JX_ERROR)) {
 			jx_delete(result);
 			result = j;
+			j = NULL;
 			goto FAILURE;
 		}
 		if (!jx_istype(j, JX_BOOLEAN)) {
@@ -897,6 +898,7 @@ struct jx *jx_function_project(struct jx *args, struct jx *ctx) {
 		if (jx_istype(j, JX_ERROR)) {
 			jx_delete(result);
 			result = j;
+			j = NULL;
 			goto FAILURE;
 		}
 
