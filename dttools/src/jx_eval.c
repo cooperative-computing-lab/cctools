@@ -213,16 +213,22 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 		return jx_function_len(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "fetch")) {
 		return jx_function_fetch(jx_eval(args, ctx));
-	} else if (!strcmp(func->u.symbol_name, "select")) {
-		// NB: deferred eval
-		return jx_function_select(jx_copy(args), ctx);
-	} else if (!strcmp(func->u.symbol_name, "project")) {
-		// NB: deferred eval
-		return jx_function_project(jx_copy(args), ctx);
 	} else if (!strcmp(func->u.symbol_name, "schema")) {
 		return jx_function_schema(jx_eval(args, ctx));
 	} else if (!strcmp(func->u.symbol_name, "like")) {
 		return jx_function_like(jx_eval(args, ctx));
+
+	/* select() and project() differ from the other functions in
+	 * that they need deferred eval for specific arguments.
+	 * We therefore just give them a copy of the args, and let
+	 * them do the eval themselves.
+	 *
+	 * When adding new functions, you probably don't want to do this
+	 */
+	} else if (!strcmp(func->u.symbol_name, "select")) {
+		return jx_function_select(jx_copy(args), ctx);
+	} else if (!strcmp(func->u.symbol_name, "project")) {
+		return jx_function_project(jx_copy(args), ctx);
 	} else {
 		return jx_error(jx_format(
 			"on line %d, unknown function: %s",
