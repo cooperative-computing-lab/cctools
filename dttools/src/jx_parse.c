@@ -483,49 +483,66 @@ FAILURE:
 	return NULL;
 }
 
-static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
-	jx_token_t rdelim = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
-	jx_token_t t = jx_scan(s);
-	if(t==rdelim) {
-		// empty list
-		return NULL;
-	}
+static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist)
+{
+	struct jx_item *head = 0;
+	struct jx_item **tail = 0;
 
+	/* Function arguments end with parens, but lists with brackets. */
+	jx_token_t delim_token = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
+
+	/* First check for an empty list. */
+	jx_token_t t = jx_scan(s);
+	if(t==delim_token) return 0;
 	jx_unscan(s,t);
 
-	struct jx_item *i = jx_item(NULL, NULL);
-	i->line = s->line;
+	while(1) {
+		struct jx_item *i = jx_item(NULL, NULL);
+		i->line = s->line;
 
-	i->value = jx_parse(s);
-	if(!i->value) {
-		// error set by deeper layer
-		jx_item_delete(i);
-		return NULL;
-	}
-	i->comp = jx_parse_comprehension(s);
-	if (jx_parser_errors(s)) {
-		// error set by deeper layer
-		jx_item_delete(i);
-		return NULL;
-	}
+		/* Parse the next value in the list */
 
-	t = jx_scan(s);
-	if(t==JX_TOKEN_COMMA) {
-		i->next = jx_parse_item_list(s, arglist);
+		i->value = jx_parse(s);
+		if(!i->value) {
+			// error set by deeper layer
+			jx_item_delete(i);
+			return head;
+		}
+
+		/* A value could be followed by a list comprehension */
+
+		i->comp = jx_parse_comprehension(s);
 		if (jx_parser_errors(s)) {
 			// error set by deeper layer
 			jx_item_delete(i);
-			return NULL;
+			return head;
 		}
-	} else if(t==rdelim) {
-		i->next = NULL;
-	} else {
-		jx_parse_error_c(s,"list of items missing a comma or closing delimiter");
-		jx_item_delete(i);
-		return NULL;
-	}
 
-	return i;
+		/* First item becomes the head, others added to the tail. */
+
+		if(!head) {
+			head = i;
+		} else {
+			*tail = i;
+		}			
+
+		/* Update the tail to the end of this pair. */
+
+		tail = &i->next;
+
+		/* Is this the end of the list or is there more? */
+
+		t = jx_scan(s);
+		if(t==JX_TOKEN_COMMA) {
+			/* keep going */
+		} else if(t==delim_token) {
+			/* end of list */
+			return head;
+		} else {
+			jx_parse_error_c(s,"list of items missing a comma or closing delimiter");
+			return head;
+		}
+	}
 }
 
 static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
