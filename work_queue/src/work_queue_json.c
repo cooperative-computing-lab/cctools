@@ -395,30 +395,30 @@ char *work_queue_json_remove(struct work_queue *q, int id)
 
 char *work_queue_json_get_status(struct work_queue *q)
 {
-    char *status;
-    struct work_queue_stats s;
+	char *status;
+	struct work_queue_stats s;
 	struct jx *j;
 	struct jx_pair *workers_connected, *workers_idle, *workers_busy, *tasks_waiting, *tasks_on_workers, *tasks_running, *tasks_with_results, *tasks_submitted, *tasks_done, *tasks_failed, *bytes_sent, *bytes_received;
 
-    work_queue_get_stats(q, &s);
+	work_queue_get_stats(q, &s);
 
-    workers_connected = jx_pair(jx_string("workers_connected"), jx_integer(s.workers_connected), NULL);
-    workers_idle = jx_pair(jx_string("workers_idle"), jx_integer(s.workers_idle), workers_connected);
-    workers_busy = jx_pair(jx_string("workers_busy"), jx_integer(s.workers_busy), workers_idle);
-    tasks_waiting = jx_pair(jx_string("tasks_waiting"), jx_integer(s.tasks_waiting), workers_busy);
-    tasks_on_workers = jx_pair(jx_string("tasks_on_workers"), jx_integer(s.tasks_on_workers), tasks_waiting);
-    tasks_running = jx_pair(jx_string("tasks_running"), jx_integer(s.tasks_running), tasks_on_workers);
-    tasks_with_results = jx_pair(jx_string("tasks_with_results"), jx_integer(s.tasks_with_results), tasks_running);
-    tasks_submitted = jx_pair(jx_string("tasks_submitted"), jx_integer(s.tasks_submitted), tasks_with_results);
-    tasks_done = jx_pair(jx_string("tasks_done"), jx_integer(s.tasks_done), tasks_submitted);
-    tasks_failed = jx_pair(jx_string("tasks_failed"), jx_integer(s.tasks_failed), tasks_done);
-    bytes_sent = jx_pair(jx_string("bytes_sent"), jx_integer(s.bytes_sent), tasks_failed);
-    bytes_received = jx_pair(jx_string("bytes_received"), jx_integer(s.bytes_received), bytes_sent);
+	workers_connected = jx_pair(jx_string("workers_connected"), jx_integer(s.workers_connected), NULL);
+	workers_idle = jx_pair(jx_string("workers_idle"), jx_integer(s.workers_idle), workers_connected);
+	workers_busy = jx_pair(jx_string("workers_busy"), jx_integer(s.workers_busy), workers_idle);
+	tasks_waiting = jx_pair(jx_string("tasks_waiting"), jx_integer(s.tasks_waiting), workers_busy);
+	tasks_on_workers = jx_pair(jx_string("tasks_on_workers"), jx_integer(s.tasks_on_workers), tasks_waiting);
+	tasks_running = jx_pair(jx_string("tasks_running"), jx_integer(s.tasks_running), tasks_on_workers);
+	tasks_with_results = jx_pair(jx_string("tasks_with_results"), jx_integer(s.tasks_with_results), tasks_running);
+	tasks_submitted = jx_pair(jx_string("tasks_submitted"), jx_integer(s.tasks_submitted), tasks_with_results);
+	tasks_done = jx_pair(jx_string("tasks_done"), jx_integer(s.tasks_done), tasks_submitted);
+	tasks_failed = jx_pair(jx_string("tasks_failed"), jx_integer(s.tasks_failed), tasks_done);
+	bytes_sent = jx_pair(jx_string("bytes_sent"), jx_integer(s.bytes_sent), tasks_failed);
+	bytes_received = jx_pair(jx_string("bytes_received"), jx_integer(s.bytes_received), bytes_sent);
 
-    j = jx_object(bytes_received);
+	j = jx_object(bytes_received);
 
-    status = jx_print_string(j);
+	status = jx_print_string(j);
 
-    return status;
+	return status;
 
 }
