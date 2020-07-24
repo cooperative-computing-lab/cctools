@@ -851,6 +851,11 @@ static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
 			return jx_parse_postfix_oper(s,j);
 		}
 		case JX_TOKEN_LPAREN: {
+			if (!jx_istype(a, JX_SYMBOL)) {
+					jx_parse_error_c(s, "function names must be symbols");
+					jx_delete(a);
+					return NULL;
+			}
 			unsigned line = s->line;
 			jx_unscan(s, t);
 

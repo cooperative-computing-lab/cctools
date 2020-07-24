@@ -187,7 +187,7 @@ static struct jx *jx_eval_call(struct jx *func, struct jx *args, struct jx *ctx)
 	assert(func);
 	assert(args);
 	assert(jx_istype(args, JX_ARRAY));
-	assert(jx_istype(func, JX_SYMBOL)); //TODO
+	assert(jx_istype(func, JX_SYMBOL));
 
 	if (!strcmp(func->u.symbol_name, "range")) {
 		return jx_function_range(jx_eval(args, ctx));
