@@ -753,3 +753,21 @@ value:      4
 expression: range(1,10)[2:5][2]
 value:      5
 
+expression: keys({})
+value:      []
+
+expression: values({})
+value:      []
+
+expression: items({})
+value:      []
+
+expression: keys({"a":1,"b":2})
+value:      ["b","a"]
+
+expression: values({"a":1,"b":2})
+value:      [2,1]
+
+expression: items({"a":1,"b":2})
+value:      [["b",2],["a",1]]
+

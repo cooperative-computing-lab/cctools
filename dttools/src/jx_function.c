@@ -625,6 +625,104 @@ FAILURE:
 
 }
 
+struct jx *jx_function_keys(struct jx *args){
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	assert(jx_istype(args, JX_ARRAY));
+
+	const char *func = "keys";
+	struct jx *out = NULL;
+
+	if (jx_array_length(args) != 1) {
+		out = make_error(func, args, "exactly 1 argument required");
+		goto FAILURE;
+	}
+
+	struct jx* item = jx_array_index(args, 0);
+	if (!jx_istype(item, JX_OBJECT)) {
+		out = make_error(func, args, "argument must be an object");
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	const char *key;
+	for (void *i = NULL; (key = jx_iterate_keys(item, &i));) {
+		jx_array_insert(out, jx_string(key));
+	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
+
+}
+
+struct jx *jx_function_values(struct jx *args){
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	assert(jx_istype(args, JX_ARRAY));
+
+	const char *func = "keys";
+	struct jx *out = NULL;
+
+	if (jx_array_length(args) != 1) {
+		out = make_error(func, args, "exactly 1 argument required");
+		goto FAILURE;
+	}
+
+	struct jx* item = jx_array_index(args, 0);
+	if (!jx_istype(item, JX_OBJECT)) {
+		out = make_error(func, args, "argument must be an object");
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	struct jx *value;
+	for (void *i = NULL; (value = jx_iterate_values(item, &i));) {
+		jx_array_insert(out, jx_copy(value));
+	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
+
+}
+
+struct jx *jx_function_items(struct jx *args){
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	assert(jx_istype(args, JX_ARRAY));
+
+	const char *func = "keys";
+	struct jx *out = NULL;
+
+	if (jx_array_length(args) != 1) {
+		out = make_error(func, args, "exactly 1 argument required");
+		goto FAILURE;
+	}
+
+	struct jx* item = jx_array_index(args, 0);
+	if (!jx_istype(item, JX_OBJECT)) {
+		out = make_error(func, args, "argument must be an object");
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	const char *key;
+	for (void *i = NULL; (key = jx_iterate_keys(item, &i));) {
+		struct jx *value = jx_get_value(&i);
+		struct jx *t = jx_array(NULL);
+		jx_array_insert(t, jx_copy(value));
+		jx_array_insert(t, jx_string(key));
+		jx_array_insert(out, t);
+	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
+
+}
+
+
 struct jx *jx_function_fetch(struct jx *args) {
 	assert(args);
 	if (jx_istype(args, JX_ERROR)) return args;
