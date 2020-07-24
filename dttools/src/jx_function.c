@@ -936,7 +936,7 @@ struct jx *jx_function_schema(struct jx *args) {
 		const char *key;
 		for(void *j = NULL; (key = jx_iterate_keys(item, &j));) {
 			if(!jx_lookup(result, key)) {
-				struct jx *lookup = jx_lookup(item, key);
+				struct jx *lookup = jx_get_value(&j);
 				jx_insert(result,
 					jx_string(key),
 					jx_string(jx_type_string(lookup->type)));
