@@ -49,7 +49,7 @@ void reply(struct link *client, char *method, char *message, int id)
 
 	int len = strlen(buffer);
 
-	link_putfstring(client, "%d", time(NULL) + timeout, len);
+	link_putfstring(client, "%d\n", time(NULL) + timeout, len);
 
 	int total_written = 0;
 	ssize_t written = 0;
@@ -74,24 +74,14 @@ void mainloop(struct work_queue *queue, struct link *client)
 		int id = -1;
 
 		//receive message
-		char l[5];
-
-		memset(l, 0, 5);
 		memset(message, 0, BUFSIZ);
 		memset(msg, 0, BUFSIZ);
 
-		int i = 0;
-		ssize_t read = link_read(client, message, 1, time(NULL) + timeout);
-		while(message[0] != '{') {
+		ssize_t read = link_readline(client, message, sizeof(message), time(NULL) + timeout);
 
-			l[i] = message[0];
-			i++;
-			link_read(client, message, 1, time(NULL) + timeout);
-		}
+		int length = atoi(message);
 
-		int length = atoi(l);
-
-		read = link_read(client, msg, length - 1, time(NULL) + timeout);
+		read = link_read(client, msg, length, time(NULL) + timeout);
 
 		//if server cannot read message from client, break connection
 		if(!read) {
@@ -101,9 +91,7 @@ void mainloop(struct work_queue *queue, struct link *client)
 			break;
 		}
 
-		strcat(message, msg);
-
-		struct jx *jsonrpc = jx_parse_string(message);
+		struct jx *jsonrpc = jx_parse_string(msg);
 
 		//if server cannot parse JSON string, break connection
 		if(!jsonrpc) {
@@ -194,26 +182,30 @@ void mainloop(struct work_queue *queue, struct link *client)
 		}
 
 		//clean up
-		jx_delete(value);
-		jx_delete(jsonrpc);
+		if(value) {
+			jx_delete(value);
+		}
+
+		if(jsonrpc) {
+			jx_delete(jsonrpc);
+		}
 
 	}
 }
 
-static const struct option long_options[] = 
-{
+static const struct option long_options[] = {
 	{"port", required_argument, 0, 'p'},
 	{"server-port", required_argument, 0, 's'},
 	{"project-name", required_argument, 0, 'N'},
 	{"debug", required_argument, 0, 'd'},
 	{"debug-file", required_argument, 0, 'o'},
-	{"help", no_argument, 0, 'h' },
-	{"version", no_argument, 0, 'v' }
+	{"help", no_argument, 0, 'h'},
+	{"version", no_argument, 0, 'v'}
 };
 
-static void show_help( const char *cmd )
+static void show_help(const char *cmd)
 {
-	printf("use: %s [options]\n",cmd);
+	printf("use: %s [options]\n", cmd);
 	printf("where options are:\n");
 	printf("-p,--port=<port>          Port number to listen on.\n");
 	printf("-s,--server-port=<port>   Port number for server.\n");
@@ -221,7 +213,7 @@ static void show_help( const char *cmd )
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
 	printf("-h,--help                 Show this help string\n");
-	printf("-v,--version              Show version string\n");	
+	printf("-v,--version              Show version string\n");
 }
 
 int main(int argc, char *argv[])
@@ -231,73 +223,71 @@ int main(int argc, char *argv[])
 	char *project_name = "wq_server";
 
 	int c;
-        while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0))!=-1) {
+	while((c = getopt_long(argc, argv, "p:N:s:d:o:hv", long_options, 0)) != -1) {
 
-		switch(c) {
-			case 'd':
-				debug_flags_set(optarg);
-				break;
-			case 'o':
-				debug_config_file(optarg);
-				break;
-			case 'p':
-				port = atoi(optarg);
-				break;
-			case 's':
-				server_port = atoi(optarg);
-				break;
-			case 'N':
-				project_name = strdup(optarg);
-				break;
-			case 'v':
-	                        cctools_version_print(stdout, argv[0]);
-				return 0;
-				break;
-			default:
-			case 'h':
-				show_help(argv[0]);
-				return 0;
-				break;
+		switch (c) {
+		case 'd':
+			debug_flags_set(optarg);
+			break;
+		case 'o':
+			debug_config_file(optarg);
+			break;
+		case 'p':
+			port = atoi(optarg);
+			break;
+		case 's':
+			server_port = atoi(optarg);
+			break;
+		case 'N':
+			project_name = strdup(optarg);
+			break;
+		case 'v':
+			cctools_version_print(stdout, argv[0]);
+			return 0;
+			break;
+		default:
+		case 'h':
+			show_help(argv[0]);
+			return 0;
+			break;
 		}
 	}
 
 
-	char * config = string_format("{ \"name\":\"%s\", \"port\":%d }",project_name,port);
-	
+	char *config = string_format("{ \"name\":\"%s\", \"port\":%d }", project_name, port);
+
 	struct work_queue *queue = work_queue_json_create(config);
 	if(!queue) {
-		printf("could not listen on port %d: %s\n",port,strerror(errno));
+		fprintf(stderr, "could not listen on port %d: %s\n", port, strerror(errno));
 		return 1;
 	}
-
-    // what is the port chosen for the queue?
-    port = work_queue_port(queue);
+	// what is the port chosen for the queue?
+	port = work_queue_port(queue);
 
 	struct link *server_link = link_serve(server_port);
 	if(!server_link) {
-		printf("could not serve on port %d: %s\n", server_port,strerror(errno));
+		fprintf(stderr, "could not serve on port %d: %s\n", server_port, strerror(errno));
+		return 1;
+	}
+	// what is the port chosen for the server?
+	char *addr;
+	addr = (char *) malloc(LINK_ADDRESS_MAX);
+	int local = link_address_local(server_link, addr, &server_port);
+	if(!local) {
+		fprintf(stderr, "could not get local address: %s\n", strerror(errno));
 		return 1;
 	}
 
-    // what is the port chosen for the server?
-    char *addr;
-    addr = (char *)malloc(LINK_ADDRESS_MAX);
-    int local = link_address_local(server_link, addr, &server_port);
-    if(!local){
-        printf("could not get local address: %s\n", strerror(errno));
-        return 1;
-    }
-    
 	printf("server port: %d\n", server_port);
-    fflush(stdout);
+	fflush(stdout);
 
 	struct link *client = link_accept(server_link, time(NULL) + timeout);
 	if(!client) {
-		printf("could not accept connection: %s\n",strerror(errno));
+		fprintf(stderr, "could not accept connection: %s\n", strerror(errno));
 		return 1;
 	}
 
-	printf("Connected to client. Waiting for messages..\n");
+	fprintf(stderr, "Connected to client. Waiting for messages..\n");
 
 	mainloop(queue, client);
 

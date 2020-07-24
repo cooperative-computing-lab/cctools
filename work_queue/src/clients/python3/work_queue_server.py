@@ -48,7 +48,7 @@ class WorkQueueServer:
         total = 0
         sent = 0
 
-        self.socket.send("%d" % length)
+        self.socket.send("%d\n" % length)
 
         while total < length:
             sent = self.socket.send(msg[sent:])
@@ -60,7 +60,7 @@ class WorkQueueServer:
         response = self.socket.recv(4096)
         length = ''
         for t in response:
-            if t != '{':
+            if t != '\n':
                 length += t
             else:
                 break
