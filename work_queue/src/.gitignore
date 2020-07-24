@@ -8,3 +8,5 @@ work_queue_test_watch
 work_queue_worker
 work_queue_workload_simulator
 work_queue_json_example
+work_queue_example_json
+work_queue_server
