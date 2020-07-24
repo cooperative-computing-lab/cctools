@@ -401,7 +401,7 @@ struct jx *jx_function_listdir(struct jx *args) {
 	int length = jx_array_length(args);
 	if (length != 1) {
 		out = make_error(func, args, "one argument required, %d given", length);
-		goto FAILURE2;
+		goto FAILURE;
 	}
 
 	struct jx *a = jx_array_index(args, 0);
@@ -409,7 +409,7 @@ struct jx *jx_function_listdir(struct jx *args) {
 
 	if (!jx_istype(a, JX_STRING)) {
 		out = make_error(func, args, "string path required");
-		goto FAILURE2;
+		goto FAILURE;
 	}
 
 	DIR *d = opendir(a->u.string_value);
@@ -417,7 +417,7 @@ struct jx *jx_function_listdir(struct jx *args) {
 		out = make_error(func, args, "%s, %s",
 			a->u.string_value,
 			strerror(errno));
-		goto FAILURE1;
+		goto FAILURE;
 	}
 
 	out = jx_array(NULL);
@@ -426,9 +426,8 @@ struct jx *jx_function_listdir(struct jx *args) {
 		if (!strcmp("..", e->d_name)) continue;
 		jx_array_append(out, jx_string(e->d_name));
 	}
-FAILURE1:
 	closedir(d);
-FAILURE2:
+FAILURE:
 	jx_delete(args);
 	return out;
 }
