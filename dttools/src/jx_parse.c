@@ -483,112 +483,142 @@ FAILURE:
 	return NULL;
 }
 
-static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist) {
-	jx_token_t rdelim = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
-	jx_token_t t = jx_scan(s);
-	if(t==rdelim) {
-		// empty list
-		return NULL;
-	}
+static struct jx_item *jx_parse_item_list(struct jx_parser *s, bool arglist)
+{
+	struct jx_item *head = 0;
+	struct jx_item **tail = 0;
 
-	jx_unscan(s,t);
+	/* Function arguments end with parens, but lists with brackets. */
+	jx_token_t delim_token = arglist ? JX_TOKEN_RPAREN : JX_TOKEN_RBRACKET;
 
-	struct jx_item *i = jx_item(NULL, NULL);
-	i->line = s->line;
+	while(1) {
+		/* Check for an empty list, or a close brace following a trailing comma. */
+		jx_token_t t = jx_scan(s);
+		if(t==delim_token) return head;
+		jx_unscan(s,t);
 
-	i->value = jx_parse(s);
-	if(!i->value) {
-		// error set by deeper layer
-		jx_item_delete(i);
-		return NULL;
-	}
-	i->comp = jx_parse_comprehension(s);
-	if (jx_parser_errors(s)) {
-		// error set by deeper layer
-		jx_item_delete(i);
-		return NULL;
-	}
+		struct jx_item *i = jx_item(NULL, NULL);
+		i->line = s->line;
 
-	t = jx_scan(s);
-	if(t==JX_TOKEN_COMMA) {
-		i->next = jx_parse_item_list(s, arglist);
+		/* Parse the next value in the list */
+
+		i->value = jx_parse(s);
+		if(!i->value) {
+			// error set by deeper layer
+			jx_item_delete(i);
+			return head;
+		}
+
+		/* A value could be followed by a list comprehension */
+
+		i->comp = jx_parse_comprehension(s);
 		if (jx_parser_errors(s)) {
 			// error set by deeper layer
 			jx_item_delete(i);
-			return NULL;
+			return head;
 		}
-	} else if(t==rdelim) {
-		i->next = NULL;
-	} else {
-		jx_parse_error_c(s,"list of items missing a comma or closing delimiter");
-		jx_item_delete(i);
-		return NULL;
-	}
 
-	return i;
+		/* First item becomes the head, others added to the tail. */
+
+		if(!head) {
+			head = i;
+		} else {
+			*tail = i;
+		}			
+
+		/* Update the tail to the end of this pair. */
+
+		tail = &i->next;
+
+		/* Is this the end of the list or is there more? */
+
+		t = jx_scan(s);
+		if(t==JX_TOKEN_COMMA) {
+			/* keep going */
+		} else if(t==delim_token) {
+			/* end of list */
+			return head;
+		} else {
+			jx_parse_error_c(s,"list of items missing a comma or closing delimiter");
+			return head;
+		}
+	}
 }
 
 static struct jx_pair * jx_parse_pair_list( struct jx_parser *s )
 {
-	jx_token_t t = jx_scan(s);
-	if(t==JX_TOKEN_RBRACE) {
-		// empty list
-		return NULL;
-	}
+	struct jx_pair *head = 0;
+	struct jx_pair **tail = 0;
 
-	jx_unscan(s,t);
+	while(1) {
+		/* Check for an empty list, or a close brace following a trailing comma. */
+		jx_token_t t = jx_scan(s);
+		if(t==JX_TOKEN_RBRACE) return head;
+		jx_unscan(s,t);
 
-	struct jx_pair *p = jx_pair(NULL, NULL, NULL);
+		struct jx_pair *p = jx_pair(NULL, NULL, NULL);
 
-	p->key = jx_parse(s);
-	if(!p->key) {
-		// error set by deeper layer
-		jx_pair_delete(p);
-		return NULL;
-	}
+		/* Parse the key of the pair, which should be a string */
 
-	if(s->strict_mode) {
-		if(p->key->type!=JX_STRING) {
-			jx_parse_error_c(s,"key-value pair must have a string as the key");
-			jx_pair_delete(p);
-			return NULL;
-		}
-	}
-
-	t = jx_scan(s);
-	if(t!=JX_TOKEN_COLON) {
-		char *pstr = jx_print_string(p->key);
-		jx_parse_error_a(s,string_format("key %s must be followed by a colon",pstr));
-		free(pstr);
-		jx_pair_delete(p);
-		return NULL;
-	}
-
-	p->line = s->line;
-	p->value = jx_parse(s);
-	if(!p->value) {
-		// error set by deeper layer
-		jx_pair_delete(p);
-		return NULL;
-	}
-
-	t = jx_scan(s);
-	if(t==JX_TOKEN_COMMA) {
-		p->next = jx_parse_pair_list(s);
-		if (jx_parser_errors(s)) {
+		p->key = jx_parse(s);
+		if(!p->key) {
 			// error set by deeper layer
 			jx_pair_delete(p);
-			return NULL;
+			return head;
 		}
-	} else if(t==JX_TOKEN_RBRACE) {
-		p->next = NULL;
-	} else {
-		jx_parse_error_c(s,"key-value pairs missing a comma or closing brace");
-		jx_pair_delete(p);
-		return NULL;
-	}
 
-	return p;
+		if(s->strict_mode) {
+			if(p->key->type!=JX_STRING) {
+				jx_parse_error_c(s,"key-value pair must have a string as the key");
+				jx_pair_delete(p);
+				return head;
+			}
+		}
+
+		/* Now look for a colon and value to complete the pair. */
+
+		t = jx_scan(s);
+		if(t!=JX_TOKEN_COLON) {
+			char *pstr = jx_print_string(p->key);
+			jx_parse_error_a(s,string_format("key %s must be followed by a colon",pstr));
+			free(pstr);
+			jx_pair_delete(p);
+			return head;
+		}
+
+		p->line = s->line;
+		p->value = jx_parse(s);
+		if(!p->value) {
+			// error set by deeper layer
+			jx_pair_delete(p);
+			return head;
+		}
+
+		/* First item becomes the head, others added to the tail. */
+
+		if(!head) {
+			head = p;
+		} else {
+			*tail = p;
+		}			
+
+		/* Update the tail to the end of this pair. */
+
+		tail = &p->next;
+
+		/* Is this the end of the list, or is there more? */
+
+		t = jx_scan(s);
+		if(t==JX_TOKEN_COMMA) {
+			/* keep going */
+		} else if(t==JX_TOKEN_RBRACE) {
+			/* end of list */
+			return head;
+		} else {
+			jx_parse_error_c(s,"key-value pairs missing a comma or closing brace");
+			return head;
+		}
+	}
 }
 
 static struct jx *jx_parse_atomic(struct jx_parser *s, bool arglist) {
