@@ -6,7 +6,7 @@ import os
 import socket
 import json
 from time import sleep
-from subprocess import Popen
+from subprocess import Popen, PIPE
 
 class WorkQueueServer:
 
@@ -27,7 +27,11 @@ class WorkQueueServer:
 
     def connect(self, address, server_port, worker_port, project_name):
         args = ['./work_queue_server', '-s', "%d" % server_port, '-p', "%d" % worker_port, '-N', project_name ]
-        self.server = Popen(args)
+        self.server = Popen(args, stdout=PIPE)
+
+        server_port = self.server.stdout.readline()
+        self.server.stdout.close()
+        server_port = int(server_port.split()[2])
 
         i = 1
         while True:
@@ -44,7 +48,7 @@ class WorkQueueServer:
         total = 0
         sent = 0
 
-        self.socket.send("%d" % length)
+        self.socket.send("%d\n" % length)
 
         while total < length:
             sent = self.socket.send(msg[sent:])
@@ -56,7 +60,7 @@ class WorkQueueServer:
         response = self.socket.recv(4096)
         length = ''
         for t in response:
-            if t != '{':
+            if t != '\n':
                 length += t
             else:
                 break
@@ -114,8 +118,8 @@ class WorkQueueServer:
 
     def disconnect(self):
         self.socket.close()
-	self.server.terminate()
-	self.server.wait()
+        self.server.terminate()
+        self.server.wait()
 
     def empty(self):
         request = {
