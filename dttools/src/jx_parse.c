@@ -764,7 +764,14 @@ static bool jx_operator_is_unary(jx_operator_t op) {
 	}
 }
 
-static struct jx *jx_parse_index(struct jx_parser *s) {
+/*
+An array index can consist of a plain expression,
+or a range of values separated by a colon, indicating
+a slice of the indexed array.
+*/
+
+static struct jx *jx_parse_array_index(struct jx_parser *s)
+{
 	struct jx *left = NULL;
 	struct jx *right = NULL;
 
@@ -804,21 +811,29 @@ FAIL:
 	return NULL;
 }
 
-static struct jx *jx_parse_postfix(struct jx_parser *s) {
-	struct jx *a = jx_parse_atomic(s, false);
-	if (!a) return NULL;
+/*
+jx_parse_postfix_oper looks for zero or more postfix operators
+(such as function arguments or array indexes) that follow an
+atomic expression a.  This function will return either the
+original expression a, or a postfix operator on the original
+expression a.  On error, the expression a is deleted.
+*/
 
+static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
+{
 	jx_token_t t = jx_scan(s);
 	switch (t) {
 		case JX_TOKEN_LBRACKET: {
 			unsigned line = s->line;
-			struct jx *b = jx_parse_index(s);
+
+			// Parse the index expression inside the bracket.
+			struct jx *b = jx_parse_array_index(s);
 			if (!b) {
 				jx_delete(a);
-				// parse error already set
-				return NULL;
+				return 0;
 			}
 
+			// Must be followed by a closing bracket.
 			t = jx_scan(s);
 			if (t != JX_TOKEN_RBRACKET) {
 				jx_parse_error_c(s, "missing closing bracket");
@@ -826,27 +841,61 @@ static struct jx *jx_parse_postfix(struct jx_parser *s) {
 				jx_delete(b);
 				return NULL;
 			}
+
+			// Create a new expression on the two values.
 			struct jx *j = jx_operator(JX_OP_LOOKUP, a, b);
 			j->line = line;
 			j->u.oper.line = line;
-			return j;
+
+			// Multiple postfix operations can be stacked
+			return jx_parse_postfix_oper(s,j);
 		}
 		case JX_TOKEN_LPAREN: {
 			unsigned line = s->line;
 			jx_unscan(s, t);
+
+			// The left side must be a function name.
+			if(!jx_istype(a,JX_SYMBOL)) {
+				jx_parse_error_c(s, "function arguments () must follow a function name");
+				jx_delete(a);
+				return 0;
+			}
+
+			// Get the function arguments, including both parens.
 			struct jx *args = jx_parse_atomic(s, true);
-			// error set by deeper level
-			if (!args) return NULL;
+			if (!args) {
+				jx_delete(a);
+				return NULL; 
+			}
+
+			// Create a new expression on the two values.
 			struct jx *j = jx_operator(JX_OP_CALL, a, args);
 			j->line = line;
 			j->u.oper.line = line;
-			return j;
+
+			// Multiple postfix operations can be stacked
+			return jx_parse_postfix_oper(s,j);
 		}
 		default: {
+			// No postfix operator, so return the atomic value.
 			jx_unscan(s, t);
 			return a;
 		}
 	}
+}
+
+/*
+jx_parse_postfix_expr looks for an atomic expression,
+followed by zero or more postfix operators, together
+making a postfix expression.
+*/
+
+static struct jx *jx_parse_postfix_expr(struct jx_parser *s)
+{
+	struct jx *a = jx_parse_atomic(s, false);
+	if(!a) return 0;
+
+	return jx_parse_postfix_oper(s,a);
 }
 
 static struct jx * jx_parse_unary( struct jx_parser *s )
@@ -858,7 +907,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_C_NOT:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s);
+			struct jx *j = jx_parse_unary(s);
 			if (!j) {
 				// error set by deeper level
 				return NULL;
@@ -892,7 +941,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 				return NULL;
 			}
 
-			struct jx *j = jx_parse_postfix(s);
+			struct jx *j = jx_parse_postfix_expr(s);
 			if (!j) {
 				// error set by deeper level
 				return NULL;
@@ -912,7 +961,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		}
 		default: {
 			jx_unscan(s,t);
-			return jx_parse_postfix(s);
+			return jx_parse_postfix_expr(s);
 		}
 	}
 }

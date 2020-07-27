@@ -738,3 +738,18 @@ value:      false
 expression: select(like(".es.*",y),[{"x":0,"y":"test","z":1}])
 value:      [{"x":0,"y":"test","z":1}]
 
+expression:  not  not true
+value:      true
+
+expression:  not  not false
+value:      false
+
+expression: [1,[2,3,4],5,6][1]
+value:      [2,3,4]
+
+expression: [1,[2,3,4],5,6][1][2]
+value:      4
+
+expression: range(1,10)[2:5][2]
+value:      5
+
