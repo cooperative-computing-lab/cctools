@@ -828,17 +828,12 @@ static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
 
 			// Parse the index expression inside the bracket.
 			struct jx *b = jx_parse_array_index(s);
-			if (!b) {
-				jx_delete(a);
-				// Parse error already set
-				return NULL;
-			}
+			if (!b) return 0;
 
 			// Must be followed by a closing bracket.
 			t = jx_scan(s);
 			if (t != JX_TOKEN_RBRACKET) {
 				jx_parse_error_c(s, "missing closing bracket");
-				jx_delete(a);
 				jx_delete(b);
 				return NULL;
 			}
@@ -883,13 +878,15 @@ followed by zero or more postfix operators, together
 making a postfix expression.
 */
 
-
 static struct jx *jx_parse_postfix_expr(struct jx_parser *s)
 {
 	struct jx *a = jx_parse_atomic(s, false);
 	if (!a) return NULL;
 
-	return jx_parse_postfix_oper(s,a);
+	struct jx *j = jx_parse_postfix_oper(s,a);
+	if(!j) jx_delete(a);
+
+	return j;
 }
 
 static struct jx * jx_parse_unary( struct jx_parser *s )
