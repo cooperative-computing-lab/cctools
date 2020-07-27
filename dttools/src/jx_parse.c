@@ -858,7 +858,7 @@ static struct jx * jx_parse_unary( struct jx_parser *s )
 		case JX_TOKEN_C_NOT:
 		case JX_TOKEN_NOT: {
 			unsigned line = s->line;
-			struct jx *j = jx_parse_postfix(s);
+			struct jx *j = jx_parse_unary(s);
 			if (!j) {
 				// error set by deeper level
 				return NULL;

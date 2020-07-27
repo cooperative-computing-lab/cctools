@@ -302,4 +302,6 @@ like(".es.*", "test");
 like("NULL", "test");
 select(like(".es.*", y), [{"x": 0, "y": "test", "z": 1.0}]);
 
+!!true;
+not not false;
 #end
