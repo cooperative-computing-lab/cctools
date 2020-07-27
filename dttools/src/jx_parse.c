@@ -816,7 +816,7 @@ jx_parse_postfix_oper looks for zero or more postfix operators
 (such as function arguments or array indexes) that follow an
 atomic expression a.  This function will return either the
 original expression a, or a postfix operator on the original
-expression a.
+expression a.  On error, the expression a is deleted.
 */
 
 static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
@@ -828,12 +828,16 @@ static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
 
 			// Parse the index expression inside the bracket.
 			struct jx *b = jx_parse_array_index(s);
-			if (!b) return 0;
+			if (!b) {
+				jx_delete(a);
+				return 0;
+			}
 
 			// Must be followed by a closing bracket.
 			t = jx_scan(s);
 			if (t != JX_TOKEN_RBRACKET) {
 				jx_parse_error_c(s, "missing closing bracket");
+				jx_delete(a);
 				jx_delete(b);
 				return NULL;
 			}
@@ -853,14 +857,16 @@ static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
 			// The left side must be a function name.
 			if(!jx_istype(a,JX_SYMBOL)) {
 				jx_parse_error_c(s, "function arguments () must follow a function name");
+				jx_delete(a);
 				return 0;
 			}
 
 			// Get the function arguments, including both parens.
 			struct jx *args = jx_parse_atomic(s, true);
-
-			// Error set by deeper level
-			if (!args) return NULL; 
+			if (!args) {
+				jx_delete(a);
+				return NULL; 
+			}
 
 			// Create a new expression on the two values.
 			struct jx *j = jx_operator(JX_OP_CALL, a, args);
@@ -889,10 +895,7 @@ static struct jx *jx_parse_postfix_expr(struct jx_parser *s)
 	struct jx *a = jx_parse_atomic(s, false);
 	if(!a) return 0;
 
-	struct jx *j = jx_parse_postfix_oper(s,a);
-	if(!j) jx_delete(a);
-
-	return j;
+	return jx_parse_postfix_oper(s,a);
 }
 
 static struct jx * jx_parse_unary( struct jx_parser *s )
