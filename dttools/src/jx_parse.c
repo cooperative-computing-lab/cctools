@@ -850,11 +850,17 @@ static struct jx *jx_parse_postfix_oper(struct jx_parser *s, struct jx *a )
 			unsigned line = s->line;
 			jx_unscan(s, t);
 
+			// The left side must be a function name.
+			if(!jx_istype(a,JX_SYMBOL)) {
+				jx_parse_error_c(s, "function arguments () must follow a function name");
+				return 0;
+			}
+
 			// Get the function arguments, including both parens.
 			struct jx *args = jx_parse_atomic(s, true);
 
 			// Error set by deeper level
-			if (!args) return NULL;
+			if (!args) return NULL; 
 
 			// Create a new expression on the two values.
 			struct jx *j = jx_operator(JX_OP_CALL, a, args);
@@ -881,7 +887,7 @@ making a postfix expression.
 static struct jx *jx_parse_postfix_expr(struct jx_parser *s)
 {
 	struct jx *a = jx_parse_atomic(s, false);
-	if (!a) return NULL;
+	if(!a) return 0;
 
 	struct jx *j = jx_parse_postfix_oper(s,a);
 	if(!j) jx_delete(a);
