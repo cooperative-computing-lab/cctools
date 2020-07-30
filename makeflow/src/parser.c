@@ -185,6 +185,11 @@ void rmsummary_set_resources_from_env(struct rmsummary *rs, struct dag_variable_
 		rs->gpus = atoll(val->value);
 	}
 
+	val = dag_variable_lookup(RESOURCES_MPI_PROCESSES, &s);
+	if(val) {
+		rs->max_concurrent_processes = atoll(val->value);
+	}
+
 	val = dag_variable_lookup(RESOURCES_WALL_TIME, &s);
 	if(val) {
 		rs->wall_time = atoll(val->value);
