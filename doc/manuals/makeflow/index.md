@@ -356,7 +356,7 @@ This will add the values for cores and memory. These values will be added onto
 `sbatch` in this format:  
 
 ```sh
--N 1 -n ${CORES} --mem=${MEMORY}M
+-N 1 -n 1 -c ${CORES} --mem=${MEMORY}M
 ```
 
 To remove resources specification at submission use Makeflow option `--safe-submit-mode`.
@@ -369,6 +369,31 @@ highly dependent on host site.
 Note: Some SLURM sites disallow specifying memory (example Stampede2). To
 avoid specification errors the Makeflow option `--ignore-memory-spec` removes
 memory from `sbatch`.
+
+
+#### SLURM and MPI jobs
+
+If your rules should run as an MPI jobs, you can set the environment variables
+"MPI_PROCESSES" and "CORES", or alternatively, use the makeflow directives
+".MAKEFLOW MPI_PROCESSES" and ".MAKEFLOW CORES". The value of MPI_PROCESSES
+sets the number of MPI processes the rule should spawn, and it should exactly
+divide the value of CORES. The value of sbatch used is something similar to:
+
+```sh
+-N 1 -n ${MPI_PROCESSES} ${CORES_divided_by_MPI_PROCESSES} --mem=${MEMORY}M
+```
+
+Further, the commands in your rules should be prepended with the `srun` command
+appropiate to your prefered MPI API, for example, here is a rule that uses 4
+MPI process, with 2 CORES each, using the `pmi2` API:
+
+```make
+.MAKEFLOW MPI_PROCESSES 4
+.MAKEFLOW CORES 8
+output: input
+srun --mpi=pmi2 -- ./my-mpi-job -i input -o output
+```
+
 
 ### Moab Scheduler
 
