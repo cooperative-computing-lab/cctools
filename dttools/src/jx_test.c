@@ -62,7 +62,7 @@ int main( int argc, char *argv[] )
 			return 1;
 		}
 	}
-	jx_parser_delete(p);
 	jx_delete(context);
+	jx_parser_delete(p);
 	return 0;
 }

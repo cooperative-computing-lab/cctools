@@ -601,10 +601,10 @@ expression: dirname("..")
 value:      "."
 
 expression: listdir()
-value:      error("function listdir on line 0 takes one argument, 0 given")
+value:      error("function listdir on line 0: one argument required, 0 given")
 
 expression: listdir(7)
-value:      error("function listdir on line 0 takes a string path")
+value:      error("function listdir on line 0: string path required")
 
 expression: listdir("-")
 value:      error("function listdir on line 0: -, No such file or directory")
@@ -752,4 +752,22 @@ value:      4
 
 expression: range(1,10)[2:5][2]
 value:      5
+
+expression: keys({})
+value:      []
+
+expression: values({})
+value:      []
+
+expression: items({})
+value:      []
+
+expression: keys({"a":1,"b":2})
+value:      ["b","a"]
+
+expression: values({"a":1,"b":2})
+value:      [2,1]
+
+expression: items({"a":1,"b":2})
+value:      [["b",2],["a",1]]
 

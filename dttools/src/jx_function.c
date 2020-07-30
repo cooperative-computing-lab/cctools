@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #include "jx.h"
 #include "jx_eval.h"
@@ -25,20 +26,27 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "stringtools.h"
 #include "xxmalloc.h"
+#include "buffer.h"
 
-// FAIL(const char *name, struct jx *args, const char *message)
-#define FAIL(name, args, message) \
-	do { \
-		assert(name); \
-		assert(args); \
-		assert(message); \
-		return jx_error(jx_format( \
-			"function %s on line %d: %s", \
-			name, \
-			args->line, \
-			message \
-		)); \
-	} while (false)
+static struct jx *make_error(const char *funcname, struct jx *args, const char *fmt, ...) {
+	assert(funcname);
+	assert(args);
+	assert(fmt);
+
+	va_list ap;
+	buffer_t buf;
+
+	buffer_init(&buf);
+	buffer_printf(&buf, "function %s on line %d: ", funcname, args->line);
+
+	va_start(ap, fmt);
+	buffer_vprintf(&buf, fmt, ap);
+	va_end(ap);
+
+	struct jx *err = jx_error(jx_string(buffer_tostring(&buf)));
+	buffer_free(&buf);
+	return err;
+}
 
 static char *jx_function_format_value(char spec, struct jx *args) {
 	if (spec == '%') return xxstrdup("%");
@@ -79,23 +87,23 @@ static char *jx_function_format_value(char spec, struct jx *args) {
 			if (jx_istype(j, JX_STRING))
 				result = xxstrdup(j->u.string_value);
 			break;
-		default: break;
+		default:
+			break;
 	}
 	jx_delete(j);
 	return result;
 }
 
-struct jx *jx_function_format(struct jx *orig_args) {
-	assert(orig_args);
-	const char *funcname = "format";
-	const char *err = NULL;
+struct jx *jx_function_format(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "format";
 	char *format = NULL;
 	char *result = xxstrdup("");
-	struct jx *args = jx_copy(orig_args);
 	struct jx *j = jx_array_shift(args);
 	if (!jx_match_string(j, &format)) {
 		jx_delete(j);
-		err = "invalid/missing format string";
+		j = make_error(func, args, "invalid/missing format string");
 		goto FAILURE;
 	}
 	jx_delete(j);
@@ -106,7 +114,7 @@ struct jx *jx_function_format(struct jx *orig_args) {
 			spec = false;
 			char *next = jx_function_format_value(*i, args);
 			if (!next) {
-				err = "mismatched format specifier";
+				j = make_error(func, args, "mismatched format specifier");
 				goto FAILURE;
 			}
 			result = string_combine(result, next);
@@ -121,29 +129,29 @@ struct jx *jx_function_format(struct jx *orig_args) {
 		++i;
 	}
 	if (spec) {
-		err = "truncated format specifier";
+		j = make_error(func, args, "truncated format specifier");
 		goto FAILURE;
 	}
 	if (jx_array_length(args) > 0) {
-		err = "too many arguments for format specifier";
+		j = make_error(func, args, "too many arguments for format specifier");
 		goto FAILURE;
 	}
-	jx_delete(args);
-	free(format);
+
 	j = jx_string(result);
-	free(result);
-	return j;
 FAILURE:
 	jx_delete(args);
 	free(result);
 	free(format);
-	FAIL(funcname, orig_args, err);
+	return j;
 }
 
 // see https://docs.python.org/2/library/functions.html#range
 struct jx *jx_function_range(struct jx *args) {
-	const char *funcname = "range";
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "range";
 	jx_int_t start, stop, step;
+	struct jx *result = NULL;
 
 	assert(args);
 	switch (jx_match_array(args, &start, JX_INTEGER, &stop, JX_INTEGER, &step, JX_INTEGER, NULL)) {
@@ -155,57 +163,62 @@ struct jx *jx_function_range(struct jx *args) {
 		case 2: step = 1; break;
 		case 3: break;
 		default:
-			FAIL(funcname, args, "invalid arguments");
+			result = make_error(func, args, "invalid arguments");
+			goto FAILURE;
 	}
 
-	if (step == 0)
-		FAIL(funcname, args, "step must be nonzero");
+	if (step == 0) {
+		result = make_error(func, args, "step must be nonzero");
+		goto FAILURE;
+	}
 
-	struct jx *result = jx_array(NULL);
+	result = jx_array(NULL);
 
 	if (((stop - start) * step) < 0) {
 		// step is pointing the wrong way
-		return result;
+		goto FAILURE;
 	}
 
 	for (jx_int_t i = start; stop >= start ? i < stop : i > stop; i += step) {
 		jx_array_append(result, jx_integer(i));
 	}
 
+FAILURE:
+	jx_delete(args);
 	return result;
 }
 
 
-struct jx *jx_function_join(struct jx *orig_args) {
-	assert(orig_args);
-	const char *funcname = "join";
-	const char *err = NULL;
+struct jx *jx_function_join(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "join";
 	char *result = NULL;
+	struct jx *j = NULL;
 
-	struct jx *args = jx_copy(orig_args);
 	struct jx *list = NULL;
 	struct jx *delimeter= NULL;	
 
 	int length = jx_array_length(args);
 	if(length>2){
-		err = "too many arguments to join";
+		j = make_error(func, args, "too many arguments to join");
 		goto FAILURE;
 	}
 	else if(length<=0){
-		err = "too few arguments to join";
+		j = make_error(func, args, "too few arguments to join");
 		goto FAILURE;
 	}
 	
 	list = jx_array_shift(args);
 	if (!jx_istype(list, JX_ARRAY)){
-		err = "A list must be the first argument in join";
+		j = make_error(func, args, "A list must be the first argument in join");
 		goto FAILURE;
 	}
 	
 	if (length==2){
 		delimeter  = jx_array_shift(args);
 		if(!jx_istype(delimeter, JX_STRING)){
-			err = "A delimeter must be defined as a string";
+			j = make_error(func, args, "A delimeter must be defined as a string");
 			goto FAILURE;
 		}
 	}
@@ -214,7 +227,7 @@ struct jx *jx_function_join(struct jx *orig_args) {
 	struct jx *value=NULL;
 	for (size_t location = 0; (value = jx_array_shift(list)); location++){
 		if (!jx_istype(value, JX_STRING)){
-			err = "All array values must be strings";
+			j = make_error(func, args, "All array values must be strings");
 			goto FAILURE;
 		}
 		if(location > 0){	
@@ -225,40 +238,32 @@ struct jx *jx_function_join(struct jx *orig_args) {
 		jx_delete(value);
 	}
 
+	j = jx_string(result);
+FAILURE:
+	free(result);
 	jx_delete(args);
 	jx_delete(list);
 	jx_delete(delimeter);
-	assert(result);
-	struct jx *j = jx_string(result);
-	free(result);
-	assert(j);
 	return j;
-	
-	FAILURE:
-	jx_delete(args);
-	jx_delete(list);
-	jx_delete(delimeter);
-	free(result);
-	FAIL(funcname, orig_args, err);
 }
 
-struct jx *jx_function_ceil(struct jx *orig_args) {
-	assert(orig_args);
-	const char *funcname = "ceil";
-	const char *err = NULL;
+struct jx *jx_function_ceil(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "ceil";
+	struct jx *result = NULL;
+	struct jx *val = NULL;
 
-	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_array_shift(args);
-	struct jx *result = NULL;	
-
-	int length = jx_array_length(orig_args);
+	int length = jx_array_length(args);
 	if(length>1){
-		err = "too many arguments";
+		result = make_error(func, args, "too many arguments");
 		goto FAILURE;
 	} else if(length<=0){
-		err = "too few arguments";
+		result = make_error(func, args, "too few arguments");
 		goto FAILURE;
 	}
+
+	val = jx_array_shift(args);
 
 	switch (val->type) {
 		case JX_DOUBLE:
@@ -268,37 +273,33 @@ struct jx *jx_function_ceil(struct jx *orig_args) {
 			result = jx_integer(ceil(val->u.integer_value));
 			break;
 		default:
-			err = "arg of invalid type";
+			result = make_error(func, args, "arg of invalid type");
 			goto FAILURE;
 	}	
 
+FAILURE:
 	jx_delete(args);
 	jx_delete(val);
 	return result;
-	
-	FAILURE:
-	jx_delete(args);
-	jx_delete(val);
-	FAIL(funcname, orig_args, err);
 }
 
-struct jx *jx_function_floor(struct jx *orig_args) {
-	assert(orig_args);
-	const char *funcname = "floor";
-	const char *err = NULL;
-
-	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_array_shift(args);
+struct jx *jx_function_floor(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "floor";
 	struct jx *result = NULL;	
+	struct jx *val = NULL;
 
-	int length = jx_array_length(orig_args);
+	int length = jx_array_length(args);
 	if(length>1){
-		err = "too many arguments";
+		result = make_error(func, args, "too many arguments");
 		goto FAILURE;
 	} else if(length<=0){
-		err = "too few arguments";
+		result = make_error(func, args, "too few arguments");
 		goto FAILURE;
 	}
+
+	val = jx_array_shift(args);
 
 	switch (val->type) {
 		case JX_DOUBLE:
@@ -308,35 +309,30 @@ struct jx *jx_function_floor(struct jx *orig_args) {
 			result = jx_integer(floor(val->u.integer_value));
 			break;
 		default:
-			err = "arg of invalid type";
+			result = make_error(func, args, "arg of invalid type");
 			goto FAILURE;
 	}	
 
+FAILURE:
 	jx_delete(args);
 	jx_delete(val);
 	return result;
-	
-	FAILURE:
-	jx_delete(args);
-	jx_delete(val);
-	FAIL(funcname, orig_args, err);
 }
 
 
 struct jx *jx_function_basename(struct jx *args) {
 	assert(args);
-	const char *funcname = "basename";
-	const char *err = NULL;
-
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "basename";
 	struct jx *result = NULL;
 
 	int length = jx_array_length(args);
 	if (length < 1){
-		err = "one argument is required";
+		result = make_error(func, args, "one argument is required");
 		goto FAILURE;
 	}
 	if (length > 2){
-		err = "only two arguments are allowed";
+		result = make_error(func, args, "only two arguments are allowed");
 		goto FAILURE;
 	}
 
@@ -345,11 +341,11 @@ struct jx *jx_function_basename(struct jx *args) {
 	struct jx *suffix = jx_array_index(args, 1);
 
 	if (!jx_istype(path, JX_STRING)) {
-		err = "path must be a string";
+		result = make_error(func, args, "path must be a string");
 		goto FAILURE;
 	}
 	if (suffix && !jx_istype(suffix, JX_STRING)) {
-		err = "suffix must be a string";
+		result = make_error(func, args, "suffix must be a string");
 		goto FAILURE;
 	}
 
@@ -363,22 +359,20 @@ struct jx *jx_function_basename(struct jx *args) {
 	}
 	free(tmp);
 
+FAILURE:
+	jx_delete(args);
 	return result;
-
-	FAILURE:
-	FAIL(funcname, args, err);
 }
 
 struct jx *jx_function_dirname(struct jx *args) {
 	assert(args);
-	const char *funcname = "dirname";
-	const char *err = NULL;
-
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "dirname";
 	struct jx *result = NULL;
 
 	int length = jx_array_length(args);
 	if (length != 1){
-		err = "dirname takes one argument";
+		result = make_error(func, args, "dirname takes one argument");
 		goto FAILURE;
 	}
 
@@ -386,65 +380,27 @@ struct jx *jx_function_dirname(struct jx *args) {
 	assert(a);
 
 	if (!jx_istype(a, JX_STRING)) {
-		err = "dirname takes a string";
+		result = make_error(func, args, "dirname takes a string");
 		goto FAILURE;
 	}
 	char *val = xxstrdup(a->u.string_value);
 	result = jx_string(dirname(val));
 	free(val);
 
+FAILURE:
+	jx_delete(args);
 	return result;
-
-	FAILURE:
-	FAIL(funcname, args, err);
 }
 
 struct jx *jx_function_listdir(struct jx *args) {
 	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "listdir";
+	struct jx *out = NULL;
 
 	int length = jx_array_length(args);
-	if (length != 1) return jx_error(jx_format(
-		"function listdir on line %d takes one argument, %d given",
-		args->line,
-		length
-	));
-
-	struct jx *a = jx_array_index(args, 0);
-	assert(a);
-
-	if (!jx_istype(a, JX_STRING)) return jx_error(jx_format(
-		"function listdir on line %d takes a string path",
-		args->line
-	));
-
-	DIR *d = opendir(a->u.string_value);
-	if (!d) return jx_error(jx_format(
-		"function listdir on line %d: %s, %s",
-		args->line,
-		a->u.string_value,
-		strerror(errno)
-	));
-
-	struct jx *out = jx_array(NULL);
-	for (struct dirent *e; (e = readdir(d));) {
-		if (!strcmp(".", e->d_name)) continue;
-		if (!strcmp("..", e->d_name)) continue;
-		jx_array_append(out, jx_string(e->d_name));
-	}
-	closedir(d);
-	return out;
-}
-
-struct jx *jx_function_escape(struct jx *args) {
-	assert(args);
-	const char *funcname = "escape";
-	const char *err = NULL;
-
-	struct jx *result = NULL;
-
-	int length = jx_array_length(args);
-	if (length != 1){
-		err = "escape takes one argument";
+	if (length != 1) {
+		out = make_error(func, args, "one argument required, %d given", length);
 		goto FAILURE;
 	}
 
@@ -452,29 +408,68 @@ struct jx *jx_function_escape(struct jx *args) {
 	assert(a);
 
 	if (!jx_istype(a, JX_STRING)) {
-		err = "escape takes a string";
+		out = make_error(func, args, "string path required");
 		goto FAILURE;
 	}
+
+	DIR *d = opendir(a->u.string_value);
+	if (!d) {
+		out = make_error(func, args, "%s, %s",
+			a->u.string_value,
+			strerror(errno));
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	for (struct dirent *e; (e = readdir(d));) {
+		if (!strcmp(".", e->d_name)) continue;
+		if (!strcmp("..", e->d_name)) continue;
+		jx_array_append(out, jx_string(e->d_name));
+	}
+	closedir(d);
+FAILURE:
+	jx_delete(args);
+	return out;
+}
+
+struct jx *jx_function_escape(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "escape";
+	struct jx *result = NULL;
+
+	int length = jx_array_length(args);
+	if (length != 1){
+		result = make_error(func, args, "escape takes one argument");
+		goto FAILURE;
+	}
+
+	struct jx *a = jx_array_index(args, 0);
+	assert(a);
+
+	if (!jx_istype(a, JX_STRING)) {
+		result = make_error(func, args, "escape takes a string");
+		goto FAILURE;
+	}
+
 	char *val = string_escape_shell(a->u.string_value);
 	result = jx_string(val);
 	free(val);
-
+FAILURE:
+	jx_delete(args);
 	return result;
-
-	FAILURE:
-	FAIL(funcname, args, err);
 }
 
 static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx *overrides) {
-	const char *funcname = "template";
+	const char *func = "template";
 
 	assert(template);
 	assert(jx_istype(template, JX_STRING));
 	assert(!ctx || jx_istype(ctx, JX_OBJECT));
 	assert(!overrides || jx_istype(overrides, JX_OBJECT));
 
-	const char *message = NULL;
 	char *s = template->u.string_value;
+	struct jx *out = NULL;
 
 	buffer_t buf;
 	buffer_t var;
@@ -503,19 +498,21 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 
 		// got to here, so must be an expression
 		if (*s != '{') {
-			message = "unmatched } in template";
-			goto FAIL;
+			out = make_error(func, template, "unmatched } in template");
+			goto FAILURE;
 		}
 		s++;
 		while (isspace(*s)) s++; // eat leading whitespace
 
 		if (*s == 0) {
-			message = "unterminated template expression";
-			goto FAIL;
+			out = make_error(func, template,
+				"unterminated template expression");
+			goto FAILURE;
 		}
 		if (!isalpha(*s) && *s != '_') {
-			message = "invalid template; each expression must be a single identifier";
-			goto FAIL;
+			out = make_error(func, template,
+				"invalid template; each expression must be a single identifier");
+			goto FAILURE;
 		}
 		buffer_putlstring(&var, s, 1); // copy identifier to buffer
 		s++;
@@ -526,12 +523,14 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 		while (isspace(*s)) s++; // eat trailing whitespace
 
 		if (*s == 0) {
-			message = "unterminated template expression";
-			goto FAIL;
+			out = make_error(func, template,
+				"unterminated template expression");
+			goto FAILURE;
 		}
 		if (*s != '}') {
-			message = "invalid template; each expression must be a single identifier";
-			goto FAIL;
+			out = make_error(func, template,
+				"invalid template; each expression must be a single identifier");
+			goto FAILURE;
 		}
 		s++;
 		struct jx *k = jx_lookup(overrides, buffer_tostring(&var));
@@ -539,8 +538,8 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 			k = jx_lookup(ctx, buffer_tostring(&var));
 		}
 		if (!k) {
-			message = "undefined symbol in template";
-			goto FAIL;
+			out = make_error(func, template, "undefined symbol in template");
+			goto FAILURE;
 		}
 		switch (k->type) {
 			case JX_INTEGER:
@@ -551,262 +550,441 @@ static struct jx *expand_template(struct jx *template, struct jx *ctx, struct jx
 				buffer_putstring(&buf, k->u.string_value);
 				break;
 			default:
-				message = "cannot format expression in template";
-				goto FAIL;
+				out = make_error(func, template,
+					"cannot format expression in template");
+				goto FAILURE;
 		}
 		buffer_rewind(&var, 0);
 	}
 
-FAIL:
+	out = jx_string(buffer_tostring(&buf));
+FAILURE:
 	buffer_free(&buf);
 	buffer_free(&var);
-	if (message) {
-		FAIL(funcname, template, message);
-	}
-	return jx_string(buffer_tostring(&buf));
+	return out;
 }
 
 struct jx *jx_function_template(struct jx *args, struct jx *ctx) {
 	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
 	assert(jx_istype(args, JX_ARRAY));
 	assert(!ctx || jx_istype(ctx, JX_OBJECT));
 
-	const char *funcname = "template";
+	const char *func = "template";
 	struct jx *template = jx_array_index(args, 0);
 	struct jx *overrides = jx_array_index(args, 1);
+	struct jx *out = NULL;
 
 	switch (jx_array_length(args)) {
 	case 0:
-		FAIL(funcname, args, "template string is required");
+		out = make_error(func, args, "template string is required");
+		goto FAILURE;
 	case 2:
 		if (!jx_istype(overrides, JX_OBJECT)) {
-			FAIL(funcname, args, "overrides must be an object");
+			out = make_error(func, args, "overrides must be an object");
+			goto FAILURE;
 		}
 		/* Else falls through. */
 	case 1:
 		if (!jx_istype(template, JX_STRING)) {
-			FAIL(funcname, args, "template must be a string");
+			out = make_error(func, args, "template must be a string");
+			goto FAILURE;
 		}
-		return expand_template(template, ctx, overrides);
+		out = expand_template(template, ctx, overrides);
+		break;
 	default:
-		FAIL(funcname, args, "at most two arguments are allowed");
+		out = make_error(func, args, "at most two arguments are allowed");
+		goto FAILURE;
 	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
 }
 
 struct jx *jx_function_len(struct jx *args){
-
 	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
 	assert(jx_istype(args, JX_ARRAY));
 
+	const char *func = "len";
+	struct jx *out = NULL;
+
 	struct jx* item = jx_array_index(args, 0);
-	assert(jx_istype(item, JX_ARRAY));
+	if (!jx_istype(item, JX_ARRAY)) {
+		out = make_error(func, args, "argument must be an array");
+		goto FAILURE;
+	}
 
 	int length = jx_array_length(item);
 
-	return jx_integer(length);
+	out = jx_integer(length);
+FAILURE:
+	jx_delete(args);
+	return out;
 
 }
 
-struct jx *jx_function_fetch(struct jx *orig_args) {
-	assert(orig_args);
-	const char *funcname = "fetch";
-	const char *err = NULL;
+struct jx *jx_function_keys(struct jx *args){
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	assert(jx_istype(args, JX_ARRAY));
 
-	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_array_shift(args);
+	const char *func = "keys";
+	struct jx *out = NULL;
+
+	if (jx_array_length(args) != 1) {
+		out = make_error(func, args, "exactly 1 argument required");
+		goto FAILURE;
+	}
+
+	struct jx* item = jx_array_index(args, 0);
+	if (!jx_istype(item, JX_OBJECT)) {
+		out = make_error(func, args, "argument must be an object");
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	const char *key;
+	for (void *i = NULL; (key = jx_iterate_keys(item, &i));) {
+		jx_array_insert(out, jx_string(key));
+	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
+
+}
+
+struct jx *jx_function_values(struct jx *args){
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	assert(jx_istype(args, JX_ARRAY));
+
+	const char *func = "keys";
+	struct jx *out = NULL;
+
+	if (jx_array_length(args) != 1) {
+		out = make_error(func, args, "exactly 1 argument required");
+		goto FAILURE;
+	}
+
+	struct jx* item = jx_array_index(args, 0);
+	if (!jx_istype(item, JX_OBJECT)) {
+		out = make_error(func, args, "argument must be an object");
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	struct jx *value;
+	for (void *i = NULL; (value = jx_iterate_values(item, &i));) {
+		jx_array_insert(out, jx_copy(value));
+	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
+
+}
+
+struct jx *jx_function_items(struct jx *args){
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	assert(jx_istype(args, JX_ARRAY));
+
+	const char *func = "keys";
+	struct jx *out = NULL;
+
+	if (jx_array_length(args) != 1) {
+		out = make_error(func, args, "exactly 1 argument required");
+		goto FAILURE;
+	}
+
+	struct jx* item = jx_array_index(args, 0);
+	if (!jx_istype(item, JX_OBJECT)) {
+		out = make_error(func, args, "argument must be an object");
+		goto FAILURE;
+	}
+
+	out = jx_array(NULL);
+	const char *key;
+	for (void *i = NULL; (key = jx_iterate_keys(item, &i));) {
+		struct jx *value = jx_get_value(&i);
+		struct jx *t = jx_array(NULL);
+		jx_array_insert(t, jx_copy(value));
+		jx_array_insert(t, jx_string(key));
+		jx_array_insert(out, t);
+	}
+
+FAILURE:
+	jx_delete(args);
+	return out;
+
+}
+
+
+struct jx *jx_function_fetch(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "fetch";
+
 	struct jx *result = NULL;
+	struct jx *val = NULL;
 
-	int length = jx_array_length(orig_args);
+	int length = jx_array_length(args);
 	if(length>1){
-		err = "must pass in one path or one URL";
+		result = make_error(func, args, "must pass in one path or one URL");
 		goto FAILURE;
 	} else if(length<=0){
-		err = "must pass in a path or URL";
+		result = make_error(func, args, "must pass in a path or URL");
+		goto FAILURE;
+	}
+
+	val = jx_array_shift(args);
+
+	if (!jx_istype(val, JX_STRING)) {
+		result = make_error(func, args, " string argument required");
 		goto FAILURE;
 	}
 
 	const char *path = val->u.string_value;
-
-	switch (val->type) {
-		case JX_STRING:
-			if(string_match_regex(path, "http(s)?://")) {
-				//Arbitrary 30 second timeout to perform curl
-				char *cmd = string_format("curl -m 30 -s %s", path);
-				FILE *stream = popen(cmd,"r");
-				free(cmd);
-				if(!stream) {
-					err = string_format("error fetching %s: %s", path,strerror(errno));
-					goto FAILURE;
-				}
-				result = jx_parse_stream(stream);
-				pclose(stream);
-			} else {
-				FILE *stream = fopen(path, "r");
-				if(!stream) {
-					err = string_format("error reading %s: %s\n", path,strerror(errno));
-					goto FAILURE;
-				}
-				result = jx_parse_stream(stream);
-				fclose(stream);
-			}
-
-			if(!result) {
-				err = string_format("error parsing JSON in %s",path);
-				goto FAILURE;
-			}
-			break;
-		default:
-			err = string_format("error fetch() expects a string argument");
+	if(string_match_regex(path, "http(s)?://")) {
+		//Arbitrary 30 second timeout to perform curl
+		char *cmd = string_format("curl -m 30 -s %s", path);
+		FILE *stream = popen(cmd,"r");
+		free(cmd);
+		if(!stream) {
+			result = make_error(func, args, "error fetching %s: %s",
+				path, strerror(errno));
 			goto FAILURE;
+		}
+		result = jx_parse_stream(stream);
+		pclose(stream);
+	} else {
+		FILE *stream = fopen(path, "r");
+		if(!stream) {
+			result = make_error(func, args, "error reading %s: %s\n",
+				path, strerror(errno));
+			goto FAILURE;
+		}
+		result = jx_parse_stream(stream);
+		fclose(stream);
 	}
+
+	if(!result) {
+		result = make_error(func, args, "error parsing JSON in %s", path);
+		goto FAILURE;
+	}
+
+FAILURE:
 	jx_delete(args);
 	jx_delete(val);
 	return result;
-	
-	FAILURE:
-	jx_delete(args);
-	jx_delete(val);
-	FAIL(funcname, orig_args, err);
 }
 
-struct jx *jx_function_select(struct jx *orig_args, struct jx *ctx) {
-	assert(orig_args);
+struct jx *jx_function_select(struct jx *args, struct jx *ctx) {
+	assert(args);
+	assert(jx_istype(args, JX_ARRAY));
 	assert(jx_istype(ctx, JX_OBJECT));
-	const char *funcname = "select";
-	const char *err = NULL;
+	const char *func = "select";
 
-	//Get args and parse stringified query
-	//Stringify performed during initial eval
-	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
+	struct jx *result = NULL;
+	struct jx *new_ctx = NULL;
+	struct jx *j = NULL;
+
+	struct jx *val = jx_array_shift(args);
 	struct jx *objlist = jx_array_shift(args);
-	assert(jx_istype(objlist, JX_ARRAY));
-	struct jx *result = jx_array(0);
-
-	struct jx *item;
-	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
-		struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
-		assert(jx_istype(j, JX_BOOLEAN));
-		if(!j) {
-			err = "error evaluating select expression";
-			goto FAILURE;
-		}
-		if(j->u.boolean_value) jx_array_append(result, item);
+	if (jx_array_length(args) != 0) {
+		result = make_error(func, args, "2 arguments required");
+		goto FAILURE;
 	}
-	jx_delete(args);
-	jx_delete(val);
-	return result;
 
-	FAILURE:
-	jx_delete(args);
-	jx_delete(val);
-	
-	FAIL(funcname, orig_args, err);
-}
+	result = jx_eval(objlist, ctx);
+	assert(result);
+	if (jx_istype(result, JX_ERROR)) {
+		goto FAILURE;
+	}
 
-struct jx *jx_function_project(struct jx *orig_args, struct jx *ctx) {
-	assert(orig_args);
-	assert(jx_istype(ctx, JX_OBJECT));
-	const char *funcname = "project";
-	const char *err = NULL;
+	if (!jx_istype(result, JX_ARRAY)) {
+		jx_delete(result);
+		result = make_error(func, args, "list of objects required");
+		goto FAILURE;
+	}
 
-	//Get args and parse stringified query
-	//Stringify performed during initial eval
-	struct jx *args = jx_copy(orig_args);
-	struct jx *val = jx_parse_string(jx_array_shift(args)->u.string_value);
-	struct jx *objlist = jx_array_shift(args);
-	assert(jx_istype(objlist, JX_ARRAY));
-	struct jx *result = jx_array(0);
+	jx_delete(objlist);
+	objlist = result;
+	result = jx_array(0);
 
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
-		struct jx *j = jx_eval(val, jx_merge(ctx, item, NULL));
-		if(!j) {
-			err = "error evaluating project expression";
+		if (!jx_istype(item, JX_OBJECT)) {
+			jx_delete(result);
+			result = make_error(func, args, "list of objects required");
 			goto FAILURE;
 		}
+		new_ctx = jx_merge(ctx, item, NULL);
+		j = jx_eval(val, new_ctx);
+		if (jx_istype(j, JX_ERROR)) {
+			jx_delete(result);
+			result = j;
+			j = NULL;
+			goto FAILURE;
+		}
+		if (!jx_istype(j, JX_BOOLEAN)) {
+			jx_delete(result);
+			result = make_error(func, args,
+				"select expression must use a boolean predicate");
+			goto FAILURE;
+		}
+		if(j->u.boolean_value) jx_array_append(result, jx_copy(item));
+		jx_delete(j);
+		jx_delete(new_ctx);
+		j = NULL;
+		new_ctx = NULL;
+	}
+
+FAILURE:
+	jx_delete(args);
+	jx_delete(val);
+	jx_delete(objlist);
+	jx_delete(new_ctx);
+	jx_delete(j);
+	return result;
+}
+
+struct jx *jx_function_project(struct jx *args, struct jx *ctx) {
+	assert(args);
+	assert(jx_istype(args, JX_ARRAY));
+	assert(jx_istype(ctx, JX_OBJECT));
+
+	const char *func = "project";
+	struct jx * result = NULL;
+	struct jx *j = NULL;
+	struct jx *new_ctx = NULL;
+
+	struct jx *val = jx_array_shift(args);
+	struct jx *objlist = jx_array_shift(args);
+	if (jx_array_length(args) != 0) {
+		result = make_error(func, args, "2 arguments required");
+		goto FAILURE;
+	}
+
+	result = jx_eval(objlist, ctx);
+	assert(result);
+	if (jx_istype(result, JX_ERROR)) {
+		goto FAILURE;
+	}
+
+	if (!jx_istype(result, JX_ARRAY)) {
+		jx_delete(result);
+		result = make_error(func, args, "list of objects required");
+		goto FAILURE;
+	}
+
+	jx_delete(objlist);
+	objlist = result;
+	result = jx_array(0);
+
+	struct jx *item;
+	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
+		if (!jx_istype(item, JX_OBJECT)) {
+			jx_delete(result);
+			result = make_error(func, args, "list of objects required");
+			goto FAILURE;
+		}
+		new_ctx = jx_merge(ctx, item, NULL);
+
+		j = jx_eval(val, new_ctx);
+		if (jx_istype(j, JX_ERROR)) {
+			jx_delete(result);
+			result = j;
+			j = NULL;
+			goto FAILURE;
+		}
+
 		jx_array_append(result, j);
+		jx_delete(new_ctx);
+		new_ctx = NULL;
+		j = NULL;
 	}
-	jx_delete(args);
-	jx_delete(val);
-	return result;
 
-	FAILURE:
+FAILURE:
 	jx_delete(args);
 	jx_delete(val);
-	FAIL(funcname, orig_args, err);
+	jx_delete(objlist);
+	jx_delete(j);
+	jx_delete(new_ctx);
+	return result;
 }
 
-struct jx *jx_function_schema(struct jx *orig_args, struct jx *ctx) {
-	assert(orig_args);
-	assert(jx_istype(ctx, JX_OBJECT));
-	const char *funcname = "schema";
-	const char *err = NULL;
+struct jx *jx_function_schema(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "schema";
+	struct jx *result = NULL;
 
-	struct jx *args = jx_copy(orig_args);
 	struct jx *objlist = jx_array_shift(args);
-	assert(jx_istype(objlist, JX_ARRAY));
-	struct jx *result = jx_object(0);
-
-	int length = jx_array_length(orig_args);
-	if(length>1){
-		err = "too many arguments";
-		goto FAILURE;
-	} else if(length<=0){
-		err = "too few arguments";
+	if (jx_array_length(args) != 0) {
+		result = make_error(func, args, "1 argument required");
 		goto FAILURE;
 	}
+	if (!jx_istype(objlist, JX_ARRAY)) {
+		result = make_error(func, args, "list of objects required");
+		goto FAILURE;
+	}
+
+	result = jx_object(0);
 
 	struct jx *item;
 	for(void *i = NULL; (item = jx_iterate_array(objlist, &i));) {
 		const char *key;
 		for(void *j = NULL; (key = jx_iterate_keys(item, &j));) {
 			if(!jx_lookup(result, key)) {
-				struct jx *lookup = jx_lookup(item, key);
-				const char *type = jx_type_string(lookup->type);
-				struct jx *k = jx_string(key);
-				struct jx *v = jx_string(type);
-				jx_insert(result, k, v);
+				struct jx *lookup = jx_get_value(&j);
+				jx_insert(result,
+					jx_string(key),
+					jx_string(jx_type_string(lookup->type)));
 			}
 		}
 	}
+
+FAILURE:
 	jx_delete(args);
 	jx_delete(objlist);
 	return result;
-
-	FAILURE:
-	jx_delete(args);
-	jx_delete(objlist);
-	FAIL(funcname, orig_args, err);
 }
 
-struct jx *jx_function_like(struct jx *orig_args, struct jx *ctx) {
-	assert(orig_args);
-	assert(jx_istype(ctx, JX_OBJECT));
-	const char *funcname = "like";
-	const char *err = NULL;
+struct jx *jx_function_like(struct jx *args) {
+	assert(args);
+	if (jx_istype(args, JX_ERROR)) return args;
+	const char *func = "like";
+	struct jx *result = NULL;
 
-	struct jx *args = jx_copy(orig_args);
 	struct jx *val = jx_array_shift(args);
 	struct jx *obj = jx_array_shift(args);
-	assert(jx_istype(val, JX_STRING));
-	assert(jx_istype(obj, JX_STRING));
+	if (!jx_istype(val, JX_STRING)) {
+		result = make_error(func, args, "1st argument must be a string");
+		goto FAILURE;
 
-	int match = string_match_regex(obj->u.string_value, val->u.string_value);
-	struct jx *result = match ? jx_boolean(1) : jx_boolean(0);
-	if(!result) {
-		err = "error evaluating like expression";
+	}
+	if (!jx_istype(obj, JX_STRING)) {
+		result = make_error(func, args, "2nd argument must be a string");
 		goto FAILURE;
 	}
-	jx_delete(args);
-	jx_delete(val);
-	return result;
+	if (jx_array_length(args) != 0) {
+		result = make_error(func, args, "2 arguments allowed");
+		goto FAILURE;
+	}
 
-	FAILURE:
+
+	int match = string_match_regex(obj->u.string_value, val->u.string_value);
+	result = jx_boolean(match);
+
+FAILURE:
 	jx_delete(args);
 	jx_delete(val);
-	
-	FAIL(funcname, orig_args, err);
+	jx_delete(obj);
+	return result;
 }
 
 /*vim: set noexpandtab tabstop=4: */

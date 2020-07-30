@@ -309,4 +309,12 @@ not not false;
 [1,[2,3,4],5,6][1][2];
 range(1,10)[2:5][2];
 
+keys({});
+values({});
+items({});
+
+keys({"a": 1, "b": 2});
+values({"a": 1, "b": 2});
+items({"a": 1, "b": 2});
+
 #end
