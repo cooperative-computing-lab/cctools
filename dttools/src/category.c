@@ -530,7 +530,7 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 	const struct rmsummary *max  = c->max_allocation;
 	const struct rmsummary *seen = c->max_resources_seen;
 
-	int new_maximum ;
+	int new_maximum;
 	if(rs
 			&& (max->cores  > 0 || rs->cores  <= seen->cores)
 			&& (max->memory > 0 || rs->memory <= seen->memory)
@@ -572,15 +572,10 @@ int category_accumulate_summary(struct category *c, const struct rmsummary *rs, 
 		c->completions_since_last_reset++;
 
         if(first_allocation_every_n_tasks > 0) {
-            if(new_maximum || c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
+            if(c->completions_since_last_reset % first_allocation_every_n_tasks == 0) {
                 update |= category_update_first_allocation(c, max_worker);
             }
         }
-
-		/* a task completed using a new maximum, so we consider that the new steady_state. */
-		if(new_maximum) {
-			c->steady_state = 1;
-		}
 
         c->total_tasks++;
 	}
@@ -697,8 +692,8 @@ const struct rmsummary *category_dynamic_task_max_resources(struct category *c, 
 	/* load max values */
 	rmsummary_merge_override(internal, max);
 
-	if(c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
-			&& request == CATEGORY_ALLOCATION_FIRST) {
+    if(category_in_steady_state(c) && c->allocation_mode != CATEGORY_ALLOCATION_MODE_FIXED
+            && request == CATEGORY_ALLOCATION_FIRST) {
 		rmsummary_merge_override(internal, first);
 	}
 
@@ -735,7 +730,7 @@ const struct rmsummary *category_dynamic_task_min_resources(struct category *c, 
 }
 
 int category_in_steady_state(struct category *c) {
-	return c->first_allocation != NULL;
+	return c->steady_state;
 }
 
 void category_tune_bucket_size(const char *resource, int64_t size) {
