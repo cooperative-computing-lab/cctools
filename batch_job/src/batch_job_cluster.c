@@ -126,8 +126,8 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 		/* The value of max_concurrent_processes is set by the .MAKEFLOW MPI_PROCESSES.
 		 * If set, the number of cores should be divisible by max_concurrent_processes. */
-		int procs = resources->max_concurrent_processes > 0 ? resources->max_concurrent_processes : 1;
-		int cores = resources->cores > 0 ? resources->cores : 1;
+		int64_t procs = resources->max_concurrent_processes > 0 ? resources->max_concurrent_processes : 1;
+		int64_t cores = resources->cores > 0 ? resources->cores : 1;
 
 		if(procs > 1) {
 			cores = cores / procs;
@@ -138,7 +138,7 @@ static char *cluster_set_resource_string(struct batch_queue *q, const struct rms
 		}
 		// Currently leaving out tmp as SLURM assumes a shared FS and tmp may be limiting
 		// char *disk = string_format(" --tmp=%" PRId64 "M", resources->disk);
-		cluster_resources = string_format(" -N 1 -n %d -c %" PRId64 "%s ",
+		cluster_resources = string_format(" -N 1 -n %" PRId64 " -c %" PRId64 "%s ",
 				procs, cores,
 				(resources->memory>0 && mem) ? mem : "") ;
 		free(mem);
