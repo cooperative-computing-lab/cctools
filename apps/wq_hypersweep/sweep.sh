@@ -6,6 +6,6 @@ do
 	do
 		python3 resnet.py -b 64 -r 10 -d ${i} -e ${j} -s 195
 	done
-done	
+done
 
 python3 plot.py
