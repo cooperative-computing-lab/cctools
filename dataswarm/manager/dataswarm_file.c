@@ -26,14 +26,16 @@ int dataswarm_declare_file(struct jx *json){
         if(!strcmp(key, "type")){
             type = value->u.string_value;
         } else if(!strcmp(key, "project")){
-            project = value->u.interger_value;
+            project = value->u.integer_value;
         } else if(!strcmp(key, "metadata")){
             metadata = value->u.string_value;
         }
 
     }
 
-    //TODO: assign a UUID to the file
+    // assign a UUID to the file
+    // TODO: create vv function
+    int uuid = dataswarm_assign_uuid();
     
     //return file UUID (for now just return 1 if successful)
     return 1;

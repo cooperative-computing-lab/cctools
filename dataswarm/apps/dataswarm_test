@@ -32,8 +32,14 @@ def main():
     ds.connect('127.0.0.1', 1234)
 
     # Here, we are declaring tasks in WQ style.
-    # Instead, we should declare and upload the shared input ile.
+    # Instead, we should declare and upload the shared input file.
     # Then, declare each output file and task.
+
+    #TODO: declare input file
+    input_file = { "type": "input", "url": "/usr/share/dict/words", "size": "4.8M" "metadata": {}, "project": None }
+    ds.file_submit(input_file)
+
+    #TODO: declare output files and tasks
 
     for i in range(ntasks):
         task = {}

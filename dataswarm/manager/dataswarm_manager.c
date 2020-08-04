@@ -26,6 +26,7 @@ See the file COPYING for details.
 #include "dataswarm_worker.h"
 #include "dataswarm_client.h"
 #include "dataswarm_manager.h"
+#include "dataswarm_file.h"
 
 struct jx * manager_status_jx( struct dataswarm_manager *m )
 {
@@ -119,7 +120,21 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	if(!strcmp(action,"task_submit")) {
 		/* */
 	} else if(!strcmp(action,"file_submit")) {
-		/* */
+        // read in json message
+        const char *params = jx_lookup_string(msg, "params");
+	   
+        // convert params argument to jx
+        struct jx *file = jx_parse_string(params);
+        
+        // declare_file()
+        int uuid = dataswarm_declare_file(file);
+
+        /* create jx of uuid response */
+        struct jx *response;
+
+        // return response
+        dataswarm_json_send(c->link, response, stoptime);
+
 	} else {
 		/* send back an invalid command response */
 	}	

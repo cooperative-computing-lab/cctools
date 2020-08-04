@@ -69,7 +69,6 @@ class DataSwarm:
 
     def submit(self, task):
         request = {
-            "jsonrpc" : "2.0",
             "method" : "submit",
             "id" : self.id,
             "params" : task
@@ -77,9 +76,17 @@ class DataSwarm:
 
         return self.send_recv(request)
 
+    def file_submit(self, f):
+        request = {
+            "method" : "file_submit",
+            "id" : self.id,
+            "params" : f
+        }
+
+        return self.send_recv(request)
+
     def wait(self, timeout):
         request = {
-            "jsonrpc" : "2.0",
             "method" : "wait",
             "id" : self.id,
             "params" : timeout
@@ -89,7 +96,6 @@ class DataSwarm:
 
     def remove(self, taskid):
         request = {
-            "jsonrpc" : "2.0",
             "method" : "remove",
             "id" : self.id,
             "params" : taskid
@@ -102,7 +108,6 @@ class DataSwarm:
 
     def empty(self):
         request = {
-            "jsonrpc" : "2.0",
             "method" : "empty",
             "id" : self.id,
             "params" : ""
