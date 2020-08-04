@@ -202,7 +202,8 @@ void makeflow_clean_node(struct dag *d, struct batch_queue *queue, struct dag_no
 		char *command = string_format("%s --clean",n->task->command);
 		printf("%s\n",command);
 		jx_export(n->task->envlist);
-		system(command);
+		int rc = system(command);
+		assert(rc == 0);
 		printf("done cleaning sub-workflow %s\n",n->workflow_file);
 		free(command);
 	}

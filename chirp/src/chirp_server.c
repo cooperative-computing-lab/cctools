@@ -1527,7 +1527,8 @@ static void chirp_handler(struct link *l, const char *addr, const char *subject)
 			result = 0;
 			// send this message to the parent for processing.
 			strcat(line, "\n");
-			write(config_pipe[1], line, strlen(line));
+			ssize_t rc = write(config_pipe[1], line, strlen(line));
+			assert(rc != -1);
 			debug_flags_set(chararg1);
 		} else if(sscanf(line, "search %s %s %" PRId64, chararg1, path, &flags) == 3) {
 			link_putliteral(l, "0\n", stalltime);
@@ -2132,7 +2133,8 @@ int main(int argc, char *argv[])
 		debug(D_CHIRP, "transient directory: `%s'", chirp_transient_path);
 	}
 
-	chdir("/"); /* no more relative path access from this point on */
+	int rc = chdir("/"); /* no more relative path access from this point on */
+	assert(rc == 0);
 
 	if(!create_dir(chirp_transient_path, S_IRWXU)) {
 		fatal("could not create transient data directory '%s': %s", chirp_transient_path, strerror(errno));

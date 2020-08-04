@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <sys/stat.h>
 
@@ -255,7 +256,8 @@ static int batch_job_cluster_remove (struct batch_queue *q, batch_job_id_t jobid
 	info->exit_signal = 1;
 
 	char *command = string_format("%s %" PRIbjid, cluster_remove_cmd, jobid);
-	system(command);
+	int rc = system(command);
+	assert(rc == 0);
 	free(command);
 
 	return 1;

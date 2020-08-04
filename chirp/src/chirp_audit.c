@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 static int audit_count = 0;
 
@@ -118,7 +119,8 @@ struct hash_table *chirp_audit(const char *path)
 	   anyone else.
 	 */
 
-	nice(10);
+	int rc = nice(10);
+	assert(rc != -1);
 
 	table = hash_table_create(0, 0);
 	if(!table)

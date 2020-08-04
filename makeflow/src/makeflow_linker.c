@@ -12,6 +12,7 @@ See the file COPYING for details.
 #include <limits.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 
 #include "buffer.h"
 #include "cctools.h"
@@ -115,7 +116,8 @@ file_type file_unix_file_known(const char *name){
 
 	FILE *unix_file_pipe = popen(file, "r");
 	char *unix_file_output = (char *) malloc(1024 * sizeof(char));
-	fgets(unix_file_output, 1024*sizeof(char), unix_file_pipe);
+	char *rc = fgets(unix_file_output, 1024*sizeof(char), unix_file_pipe);
+	assert(rc != NULL);
 	pclose(unix_file_pipe);
 	if(strstr(unix_file_output, "executable")) return EXE;
 
@@ -143,7 +145,8 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 	create_workspace();
 
 	char expanded_input[PATH_MAX];
-	realpath(input_file, expanded_input);
+	char *rc = realpath(input_file, expanded_input);
+	assert(rc != NULL);
 
 	struct dependency *initial_dependency = (struct dependency *) malloc(sizeof(struct dependency));
 	initial_dependency->original_name = xxstrdup(expanded_input);
@@ -158,7 +161,8 @@ void initialize( char *output_directory, char *input_file, struct list *d){
 struct list *find_dependencies_for(struct dependency *dep){
 	pid_t pid;
 	int pipefd[2];
-	pipe(pipefd);
+	int rc = pipe(pipefd);
+	assert(rc == 0);
 
 	if(dep->type == NAMED){
 		struct list *empty = list_create();
@@ -477,14 +481,16 @@ int main(int argc, char *argv[]){
 	initialize(output, input, dependencies);
 	char *tmp = output;
 	output = (char *) malloc(PATH_MAX * sizeof(char));
-	realpath(tmp, output);
+	char *rc = realpath(tmp, output);
+	assert(rc != NULL);
 	free(tmp);
 	if(!create_dir(output, 0777)) fatal("Could not create output directory.\n");
 	if(verbose) fprintf(stdout, "Using %s as output location.\n", output);
 
 	char input_wd[PATH_MAX];
 	path_dirname(input, input_wd);
-	chdir(input_wd);
+	int rc2 = chdir(input_wd);
+	assert(rc2 == 0);
 
 	find_drivers(dependencies);
 	find_dependencies(dependencies);

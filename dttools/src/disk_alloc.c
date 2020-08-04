@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <assert.h>
 
 #include "disk_alloc.h"
 #include "stringtools.h"
@@ -185,7 +186,8 @@ int disk_alloc_delete(char *loc) {
 	FILE *loop_find;
 	losetup_args = string_format("losetup -j %s", device_loc);
 	loop_find = popen(losetup_args, "r");
-	fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
+	int rc = fscanf(loop_find, "%s %s %s", loop_dev, loop_info, loop_mount);
+	assert(rc == 3);
 	pclose(loop_find);
 	int loop_dev_path_length = strlen(loop_mount);
 	loop_mount[loop_dev_path_length - 1] = '\0';

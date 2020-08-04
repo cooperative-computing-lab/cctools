@@ -102,7 +102,8 @@ pfs_table::pfs_table()
 	if(pfs_initial_working_directory) {
 		strcpy(working_dir,pfs_initial_working_directory);
 	} else {
-		::getcwd(working_dir,sizeof(working_dir));
+		char *rc = ::getcwd(working_dir,sizeof(working_dir));
+		assert(rc != NULL);
 	}
 	pointer_count = sysconf(_SC_OPEN_MAX);
 	pointers = new pfs_pointer* [pointer_count];

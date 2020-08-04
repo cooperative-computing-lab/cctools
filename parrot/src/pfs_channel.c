@@ -21,6 +21,7 @@ See the file COPYING for details.
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 struct entry {
 	char *name;
@@ -108,7 +109,8 @@ int pfs_channel_init( pfs_size_t size )
 	}
 
 	channel_size = size;
-	ftruncate(channel_fd,channel_size);
+	int rc = ftruncate(channel_fd,channel_size);
+	assert(rc == 0);
 
 	channel_base = (char*) mmap(0,channel_size,PROT_READ|PROT_WRITE,MAP_SHARED,channel_fd,0);
 	if(channel_base==MAP_FAILED) {
@@ -193,7 +195,8 @@ int pfs_channel_alloc( const char *name, pfs_size_t length, pfs_size_t *start )
 			debug(D_CHANNEL,"channel expanded to 0x%" PRIu64 " bytes at base 0x%" PRIdPTR, newsize, (uintptr_t) newbase);
 			return pfs_channel_alloc(name,length,start);
 		}
-		ftruncate64(channel_fd,channel_size);
+		int rc = ftruncate64(channel_fd,channel_size);
+		assert(rc == 0);
 	}
 
 	debug(D_CHANNEL|D_NOTICE,"out of channel space: %s",strerror(errno));

@@ -45,6 +45,7 @@ int host_memory_info_get(UINT64_T * avail, UINT64_T * total)
 #include <sys/resource.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <assert.h>
 
 int host_memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
 {
@@ -60,7 +61,8 @@ int host_memory_usage_get(UINT64_T * rssp, UINT64_T * totalp)
 	if(!file)
 		return 0;
 
-	fscanf(file, "%lu %lu %lu %lu %lu %lu %lu", &total, &rss, &shared, &text, &libs, &data, &dirty);
+	int rc = fscanf(file, "%lu %lu %lu %lu %lu %lu %lu", &total, &rss, &shared, &text, &libs, &data, &dirty);
+	assert(rc == 7);
 
 	fclose(file);
 

@@ -704,6 +704,7 @@ int main( int argc, char *argv[] )
 	const char *s;
 	char *key;
 	char *value = NULL;
+	int rc;
 
 	s = getenv("PARROT_BLOCK_SIZE");
 	if(s) pfs_service_set_block_size(string_metric_parse(s));
@@ -966,9 +967,9 @@ int main( int argc, char *argv[] )
 				return 1;
 			}
 			char cmd[PATH_MAX];
-			if(snprintf(cmd, sizeof(cmd), "find /lib*/ -name ld-linux*>>%s 2>/dev/null", optarg) >= 0)
-				system(cmd);
-			else {
+			rc = snprintf(cmd, sizeof(cmd), "find /lib*/ -name ld-linux*>>%s 2>/dev/null", optarg);
+			assert(rc >= 0);
+			if (system(cmd) != 0) {
 				debug(D_DEBUG, "writing ld-linux* into namelist file failed.");
 				return 1;
 			}
@@ -1210,7 +1211,8 @@ int main( int argc, char *argv[] )
 		for (int i = 0; environ[i]; i++)
 			fprintf(fp, "%s%c", environ[i], '\0');
 		char working_dir[PATH_MAX];
-		::getcwd(working_dir,sizeof(working_dir));
+		char *rc = ::getcwd(working_dir,sizeof(working_dir));
+		assert(rc != NULL);
 		if(working_dir == NULL)
 			fatal("Can not obtain the current working directory!");
 		fprintf(fp, "PWD=%s\n", working_dir);

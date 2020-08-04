@@ -181,8 +181,10 @@ static INT64_T do_lcd(int argc, char **argv)
 {
 	char full_path[CHIRP_PATH_MAX];
 	complete_local_path(argv[1], full_path);
+	char *rc;
 	if(chdir(full_path) == 0) {
-		getcwd(current_local_dir, CHIRP_PATH_MAX);
+		rc = getcwd(current_local_dir, CHIRP_PATH_MAX);
+		assert(rc != NULL);
 		return 0;
 	} else {
 		return -1;
@@ -997,10 +999,13 @@ static INT64_T do_xattr_get(int argc, char **argv)
 	complete_remote_path(argv[1], full_path);
 	char data[65536];
 	INT64_T size;
+	ssize_t rc;
 
 	if((size = chirp_reli_getxattr(current_host, full_path, argv[2], data, sizeof(data), stoptime)) > 0) {
-		write(STDOUT_FILENO, data, (size_t) size);
-		write(STDOUT_FILENO, "\n", 1);
+		rc = write(STDOUT_FILENO, data, (size_t) size);
+		assert(rc != -1);
+		rc = write(STDOUT_FILENO, "\n", 1);
+		assert(rc != -1);
 		return 0;
 	} else {
 		return -1;
@@ -1013,12 +1018,15 @@ static INT64_T do_xattr_list(int argc, char **argv)
 	complete_remote_path(argv[1], full_path);
 	char data[65536];
 	INT64_T size;
+	ssize_t rc;
 
 	if((size = chirp_reli_listxattr(current_host, full_path, data, sizeof(data), stoptime)) > 0) {
 		char *current;
 		for(current = data; *current; current = current + strlen(current) + 1) {
-			write(STDOUT_FILENO, current, strlen(current));
-			write(STDOUT_FILENO, "\n", 1);
+			rc = write(STDOUT_FILENO, current, strlen(current));
+			assert(rc != -1);
+			rc = write(STDOUT_FILENO, "\n", 1);
+			assert(rc != -1);
 		}
 		return 0;
 	} else {
@@ -1216,6 +1224,7 @@ int main(int argc, char *argv[])
 	char **user_argv = 0;
 	int user_argc;
 	int c;
+	char *rc;
 	INT64_T result = 0;
 
 	debug_config(argv[0]);
@@ -1280,7 +1289,8 @@ int main(int argc, char *argv[])
 		auth_ticket_load(NULL);
 	}
 
-	getcwd(current_local_dir, CHIRP_PATH_MAX);
+	rc = getcwd(current_local_dir, CHIRP_PATH_MAX);
+	assert(rc != NULL);
 
 	/* interactive mode if input is a TTY but we are not simply executing a
 	 * command from argv */

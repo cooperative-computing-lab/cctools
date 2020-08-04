@@ -11,6 +11,7 @@ See the file COPYING for details.
 #include <unistd.h>
 #include <sys/types.h>
 #include <string.h>
+#include <assert.h>
 
 int username_is_super()
 {
@@ -65,8 +66,11 @@ int username_set(const char *name)
 	if(result < 0)
 		return 0;
 
-	setuid(uid);
-	setgid(gid);
+	int rc;
+	rc = setuid(uid);
+	assert(rc == 0);
+	rc = setgid(gid);
+	assert(rc == 0);
 
 	return 1;
 }

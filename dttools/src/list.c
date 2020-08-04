@@ -42,7 +42,8 @@ struct list_cursor {
 
 static void oom(void) {
 	const char *message = "out of memory\n";
-	write(STDERR_FILENO, message, strlen(message));
+	ssize_t rc = write(STDERR_FILENO, message, strlen(message));
+	assert(rc >= 0);
 	abort();
 }
 

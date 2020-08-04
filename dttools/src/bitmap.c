@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "jpeglib.h"
 #endif /*  */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -201,17 +202,21 @@ struct bitmap *bitmap_load_raw(const char *path)
 	FILE *file;
 	int width, height;
 	struct bitmap *m;
+	size_t rc;
 	file = fopen(path, "rb");
 	if(!file)
 		return 0;
-	fread(&width, 1, sizeof(width), file);
-	fread(&height, 1, sizeof(height), file);
+	rc = fread(&width, 1, sizeof(width), file);
+	assert(rc == sizeof(width));
+	rc = fread(&height, 1, sizeof(height), file);
+	assert(rc == sizeof(height));
 	m = bitmap_create(width, height);
 	if(!m) {
 		fclose(file);
 		return 0;
 	}
-	fread(m->data, 1, width * height * sizeof(int), file);
+	rc = fread(m->data, 1, width * height * sizeof(int), file);
+	assert(rc == sizeof(width * height * sizeof(int)));
 	fclose(file);
 	return m;
 }
@@ -325,10 +330,12 @@ struct bitmap *bitmap_load_bmp(const char *path)
 	struct bitmap *m;
 	struct bmp_header header;
 	int i;
+	size_t rc;
 	file = fopen(path, "rb");
 	if(!file)
 		return 0;
-	fread(&header, 1, sizeof(header), file);
+	rc = fread(&header, 1, sizeof(header), file);
+	assert(rc == sizeof(header));
 	if(header.magic1 != 'B' || header.magic2 != 'M') {
 		printf("bitmap: %s is not a BMP file.\n", path);
 		fclose(file);
@@ -409,12 +416,14 @@ struct bitmap *bitmap_load_pcx(const char *path)
 	int *palette;
 	int palettesize;
 	int i, j, p;
+	size_t rc;
 	pcx_rle_repeat = 0;
 	pcx_rle_value = 0;
 	file = fopen(path, "rb");
 	if(!file)
 		return 0;
-	fread(&header, 1, sizeof(header), file);
+	rc = fread(&header, 1, sizeof(header), file);
+	assert(rc == sizeof(header));
 	if(header.manufacturer != 0x0a || header.encoding != 0x01) {
 		printf("bitmap: %s is not a PCX file.\n", path);
 		fclose(file);
@@ -523,10 +532,12 @@ struct bitmap *bitmap_load_sgi_rgb(const char *path)
 	int *length_table = 0;
 	int table_length = 0;
 	unsigned char *line = NULL;
+	size_t rc;
 	file = fopen(path, "rb");
 	if(!file)
 		return 0;
-	fread(&header, 1, sizeof(header), file);
+	rc = fread(&header, 1, sizeof(header), file);
+	assert(rc == sizeof(header));
 	if(header.magic == SGI_RGB_MAGIC_SWAPPED) {
 		doswap = 1;
 	}
@@ -583,7 +594,8 @@ struct bitmap *bitmap_load_sgi_rgb(const char *path)
 				int rle_length = length_table[y + header.ysize * z];
 				char *rle_data = malloc(rle_length);
 				fseek(file, rle_offset, SEEK_SET);
-				fread(rle_data, 1, rle_length, file);
+				rc = fread(rle_data, 1, rle_length, file);
+				assert((int) rc == rle_length);
 				while(r < rle_length) {
 					char count = rle_data[r] & 0x7f;
 					char marker = rle_data[r] & 0x80;
@@ -603,7 +615,8 @@ struct bitmap *bitmap_load_sgi_rgb(const char *path)
 				}
 				free(rle_data);
 			} else {
-				fread(line, 1, header.xsize, file);
+				rc = fread(line, 1, header.xsize, file);
+				assert(rc == header.xsize);
 			}
 			for(x = 0; x < header.xsize; x++) {
 				m->data[y * header.xsize + x] |= ((int) line[x]) << ((3 - z) * 8);

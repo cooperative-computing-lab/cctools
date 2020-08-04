@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 int memfdexe (const char *name, const char *extradir)
 {
@@ -65,7 +66,8 @@ int memfdexe (const char *name, const char *extradir)
 					continue;
 				}
 				munmap(addr, pagesize);
-				ftruncate(fd, 0);
+				int rc = ftruncate(fd, 0);
+				assert(rc == 0);
 				break;
 			} else {
 				debug(D_DEBUG, "could not create memfdexe: %s", strerror(errno));

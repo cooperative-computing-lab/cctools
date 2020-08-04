@@ -16,6 +16,7 @@ See the file COPYING for details.
 #include <fcntl.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "cctools.h"
 #include "catalog_query.h"
@@ -327,7 +328,8 @@ int main(int argc, char *argv[])
 		char expanded_path[PATH_MAX];
 
 		collect_input_files(d, bundle_directory, bundler_rename);
-		realpath(bundle_directory, expanded_path);
+		char *rc = realpath(bundle_directory, expanded_path);
+		assert(rc != NULL);
 
 		char output_makeflow[PATH_MAX];
 		string_nformat(output_makeflow, sizeof(output_makeflow), "%s/%s", expanded_path, path_basename(dagfile));

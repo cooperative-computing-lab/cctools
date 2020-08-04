@@ -17,6 +17,7 @@ See the file COPYING for details.
 #include <string.h>
 #include <errno.h>
 #include <time.h>
+#include <assert.h>
 
 static struct hash_table *stats_table = 0;
 
@@ -116,7 +117,8 @@ void chirp_stats_report(int pipefd, const char *addr, const char *subject, int i
 
 	if(time(0) - child_report_time > interval) {
 		snprintf(line, PIPE_BUF, "stats %s %s %" PRId64 " %" PRId64 " %" PRId64 "\n", addr, subject, child_ops, child_bytes_read, child_bytes_written);
-		write(pipefd, line, strlen(line));
+		ssize_t rc = write(pipefd, line, strlen(line));
+		assert(rc != -1);
 		debug(D_DEBUG, "sending stats: %s", line);
 		child_ops = child_bytes_read = child_bytes_written = 0;
 		child_report_time = time(0);

@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <assert.h>
 
 #include "stringtools.h"
 #include "xxmalloc.h"
@@ -229,8 +230,10 @@ int rmonitor_helper_init(char *lib_default_path, int *fd, int stop_short_running
 	char *helper_path = rmonitor_helper_locate(lib_default_path);
 	char helper_absolute[PATH_MAX + 1];
 	char *rmonitor_port;
+	char *rc;
 
-	realpath(helper_path, helper_absolute);
+	rc = realpath(helper_path, helper_absolute);
+	assert(rc != NULL);
 
 	if(access(helper_absolute,R_OK|X_OK)==0) {
 		debug(D_RMON, "found helper in %s\n", helper_absolute);
