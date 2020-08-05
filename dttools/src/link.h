@@ -58,6 +58,7 @@ link_close(link);
 
 /** Stoptime to give when you wish to wait forever */
 #define LINK_FOREVER ((time_t)INT_MAX)
+#define LINK_NOWAIT ((time_t)INT_MIN)
 
 /** Connect to a remote host.
 @param addr IP address of server in string form.

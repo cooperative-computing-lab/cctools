@@ -78,6 +78,7 @@ SOURCES = \
 	md5.c \
 	memfdexe.c \
 	mkdir_recursive.c \
+	mq.c \
 	twister.c \
 	nvpair.c \
 	nvpair_jx.c \
@@ -149,6 +150,7 @@ HEADERS_PUBLIC = \
 	load_average.h \
 	md5.h \
 	macros.h \
+	mq.h \
 	path.h \
 	rmonitor_poll.h \
 	rmsummary.h \

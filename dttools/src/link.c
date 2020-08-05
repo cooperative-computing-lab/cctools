@@ -241,6 +241,7 @@ int link_sleep(struct link *link, time_t stoptime, int reading, int writing)
 	}
 
 	return link_internal_sleep(link, tptr, NULL, reading, writing);
+
 }
 
 int link_usleep(struct link *link, int usec, int reading, int writing)
@@ -437,21 +438,28 @@ struct link *link_serve_address(const char *addr, int port)
 struct link *link_accept(struct link *master, time_t stoptime)
 {
 	struct link *link = 0;
+	int fd = -1;
 
 	if(master->type == LINK_TYPE_FILE) {
 		return NULL;
 	}
 
+	do {
+		fd = accept(master->fd, 0, 0);
+		if (fd >= 0) {
+			break;
+		} else if (stoptime == LINK_NOWAIT && errno_is_temporary(errno)) {
+				return NULL;
+		}
+		if(!link_sleep(master, stoptime, 1, 0)) {
+				goto failure;
+		}
+	} while(1);
+
 	link = link_create();
 	if(!link)
 		goto failure;
-
-	while(1) {
-		if(!link_sleep(master, stoptime, 1, 0))
-			goto failure;
-		link->fd = accept(master->fd, 0, 0);
-		break;
-	}
+	link->fd = fd;
 
 	if(!link_nonblocking(link, 1))
 		goto failure;
@@ -464,6 +472,7 @@ struct link *link_accept(struct link *master, time_t stoptime)
 	return link;
 
 	  failure:
+	close(fd);
 	if(link)
 		link_close(link);
 	return 0;
