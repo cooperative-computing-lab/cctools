@@ -30,3 +30,4 @@ struct dataswarm_worker * dataswarm_worker_create( struct link *l )
 	return w;
 }
 
+/* vim: set noexpandtab tabstop=4: */

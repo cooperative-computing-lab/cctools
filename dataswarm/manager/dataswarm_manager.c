@@ -140,7 +140,7 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	}
 
 	const char *method = jx_lookup_string(msg,"method");
-	const char *params = jx_lookup_string(msg,"params");
+	struct jx *params = jx_lookup(msg,"params");
 	if(!method || !params) {
 		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
 		/* should we disconnect the client on a message error? */

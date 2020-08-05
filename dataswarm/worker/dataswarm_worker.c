@@ -28,7 +28,7 @@ See the file COPYING for details.
 // Give up and reconnect if no message received after this time.
 int idle_timeout = 300;
 
-// 
+//
 int long_timeout = 3600;
 
 // Minimum time between connection attempts.
@@ -40,27 +40,70 @@ int max_connect_retry = 60;
 // Maximum time to wait for a catalog query
 int catalog_timeout = 60;
 
-void process_json_message( struct link *manager_link, struct jx *msg )
+
+void handle_manager_message( struct link *manager_link, struct jx *msg )
 {
-	const char *action = jx_lookup_string(msg,"action");
-	if(!strcmp(action,"blob_create")) {
-		// blob_create(msg,...);
-	} else if(!strcmp(action,"task_create")) {
-		// task_create(msg,...);
+	if(!msg) {
+		return;
+	}
+
+	const char *method = jx_lookup_string(msg,"method");
+	struct jx *params = jx_lookup(msg,"params");
+	if(!method || !params) {
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* should the worker add the manager to a banned list at least temporarily? */
+		/* disconnect from manager */
+		return;
+	}
+
+	if(!strcmp(method,"task-submit")) {
+		/* */
+	} else if(!strcmp(method,"task-retrieve")) {
+		/* */
+	} else if(!strcmp(method,"task-reap")) {
+		/* */
+	} else if(!strcmp(method,"task-cancel")) {
+		/* */
+	} else if(!strcmp(method,"status-request")) {
+		/* */
+	} else if(!strcmp(method,"blob-create")) {
+		/* */
+	} else if(!strcmp(method,"blob-put")) {
+		/* */
+	} else if(!strcmp(method,"blob-get")) {
+		/* */
+	} else if(!strcmp(method,"blob-delete")) {
+		/* */
+	} else if(!strcmp(method,"blob-commit")) {
+		/* */
+	} else if(!strcmp(method,"blob-copy")) {
+		/* */
 	} else {
-		debug(D_DEBUG,"unknown action: %s\n",action);
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
 }
 
-int worker_main_loop( struct link * manager_link )
+int worker_main_loop( struct link *manager_link )
 {
 	while(1) {
-		time_t stoptime = time(0) + idle_timeout;
+		time_t stoptime = time(0) + 5;  /* read messages for at most 5 seconds. remove with Tim's library. */
 
-		struct jx *msg = dataswarm_json_recv(manager_link,stoptime);
-		if(!msg) return 0;
+        while(1) {
+            struct jx *msg = dataswarm_json_recv(manager_link, stoptime);
+            handle_manager_message(manager_link, msg);
+            if(msg) {
+                jx_delete(msg);
+            } else {
+                break;
+            }
+        }
 
-		process_json_message(manager_link,msg);
+        //do not busy sleep more than stoptime
+        //this will probably go away with Tim's library
+        time_t sleeptime = stoptime - time(0);
+        if(sleeptime > 0) {
+            sleep(sleeptime);
+        }
 	}
 }
 
@@ -78,8 +121,16 @@ void worker_connect_loop( const char *manager_host, int manager_port )
 
 		struct link *manager_link = link_connect(manager_addr,manager_port,time(0)+sleeptime);
 		if(manager_link) {
-			const char *msg = "{\"type\":\"worker\"}";
-			dataswarm_message_send(manager_link,msg,strlen(msg),time(0)+long_timeout);
+            struct jx *msg = jx_object(NULL);
+            struct jx *params = jx_object(NULL);
+
+            jx_insert_string(msg, "method", "handshake");
+            jx_insert(msg, jx_string("params"), params);
+            jx_insert_string(params, "type", "worker");
+
+			dataswarm_json_send(manager_link, msg, time(0)+long_timeout);
+            jx_delete(msg);
+
 			worker_main_loop(manager_link);
 			sleeptime = min_connect_retry;
 		} else {
