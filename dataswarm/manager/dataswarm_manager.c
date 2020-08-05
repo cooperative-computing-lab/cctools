@@ -139,14 +139,37 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 		return;
 	}
 
-	const char *action = jx_lookup_string(msg,"action");
-	if(!strcmp(action,"task_submit")) {
+	const char *method = jx_lookup_string(msg,"method");
+	const char *params = jx_lookup_string(msg,"params");
+	if(!method || !params) {
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* should we disconnect the client on a message error? */
+		return;
+	}
+
+	if(!strcmp(method,"task-submit")) {
 		/* */
-	} else if(!strcmp(action,"file_submit")) {
+	} else if(!strcmp(method,"file-submit")) {
+		/* */
+	} else if(!strcmp(method,"status-report")) {
+		/* */
+	} else if(!strcmp(method,"status-request")) {
+		/* */
+	} else if(!strcmp(method,"task-retrieve")) {
+		/* */
+	} else if(!strcmp(method,"task-reap")) {
+		/* */
+	} else if(!strcmp(method,"task-cancel")) {
+		/* */
+	} else if(!strcmp(method,"blob-delete")) {
+		/* */
+	} else if(!strcmp(method,"blob-commit")) {
+		/* */
+	} else if(!strcmp(method,"blob-copy")) {
 		/* */
 	} else {
-		/* send back an invalid command response */
-	}	
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+	}
 }
 
 void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker *w, time_t stoptime )
