@@ -80,7 +80,31 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			break;
 		}
 
-		char *key = string_format("%p",l);
+		const char *method = jx_lookup_string(msg,"method");
+		struct jx *params = jx_lookup(msg,"params");
+
+		if(!method || !params) {
+			/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		if(strcmp(method, "handshake")) {
+			/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		jx_int_t id = jx_lookup_integer(msg, "id");
+		if(id < 1) {
+			/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_ID, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		char *manager_key = string_format("%p",l);
+		//const char *msg_key = jx_lookup_string(msg, "uuid");  /* todo: replace manager_key when msg_key not null */
+		const char *conn_type = jx_lookup_string(params, "type");
 
 		char addr[LINK_ADDRESS_MAX];
 		int port;
@@ -88,21 +112,21 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
 
-		const char *type = jx_lookup_string(msg,"type");
-
-		if(!strcmp(type,"worker")) {
-			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);	
+		if(!strcmp(conn_type,"worker")) {
+			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
 			struct dataswarm_worker *w = dataswarm_worker_create(l);
-			hash_table_insert(m->worker_table,key,w);
-		} else if(!strcmp(type,"client")) {
+			hash_table_insert(m->worker_table,manager_key,w);
+		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
 			struct dataswarm_client *c = dataswarm_client_create(l);
-			hash_table_insert(m->client_table,key,c);
+			hash_table_insert(m->client_table,manager_key,c);
 		} else {
-			/* invalid type? */
+			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
+			link_close(l);
+			break;
 		}
 
-		free(key);
+		free(manager_key);
 		jx_delete(msg);
 	}
 }
@@ -303,3 +327,4 @@ struct dataswarm_manager * dataswarm_manager_create()
 }
 
 
+/* vim: set noexpandtab tabstop=4: */
