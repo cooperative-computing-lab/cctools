@@ -35,7 +35,7 @@ struct jx * manager_status_jx( struct dataswarm_manager *m )
 	struct jx * j = jx_object(0);
 	jx_insert_string(j,"type","dataswarm_manager");
 	jx_insert_string(j,"project",m->project_name);
-	jx_insert_integer(j,"starttime",(m->start_time/1000000)); 
+	jx_insert_integer(j,"starttime",(m->start_time/1000000));
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_integer(j,"port",m->server_port);
@@ -95,7 +95,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			struct dataswarm_worker *w = dataswarm_worker_create(l);
 			hash_table_insert(m->worker_table,key,w);
 		} else if(!strcmp(type,"client")) {
-			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);	
+			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
 			struct dataswarm_client *c = dataswarm_client_create(l);
 			hash_table_insert(m->client_table,key,c);
 		} else {
@@ -213,7 +213,7 @@ void server_main_loop( struct dataswarm_manager *m )
 	}
 }
 
-static const struct option long_options[] = 
+static const struct option long_options[] =
 {
 	{"name", required_argument, 0, 'N'},
 	{"port", required_argument, 0, 'p'},
@@ -232,7 +232,7 @@ static void show_help( const char *cmd )
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
 	printf("-h,--help                 Show this help string\n");
-	printf("-v,--version              Show version string\n");	
+	printf("-v,--version              Show version string\n");
 }
 
 int main(int argc, char *argv[])
@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
 		printf("could not serve on port %d: %s\n", m->server_port,strerror(errno));
 		return 1;
 	}
-	
+
 	char addr[LINK_ADDRESS_MAX];
 	link_address_local(m->manager_link,addr,&m->server_port);
 	debug(D_DATASWARM,"listening on port %d...\n",m->server_port);
