@@ -179,17 +179,24 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 		// handle disconnected client
 		return;
 	}
+	const char *method = jx_lookup_string(msg,"method");
+	const char *params = jx_lookup_string(msg,"params");
+	if(!method || !params) {
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* disconnect worker */
+		return;
+	}
 
-	const char *action = jx_lookup_string(msg,"action");
-	if(!strcmp(action,"task_change")) {
+	if(!strcmp(method,"task-change")) {
 		/* */
-	} else if(!strcmp(action,"file_change")) {
+	} else if(!strcmp(method,"blob-change")) {
 		/* */
-	} else if(!strcmp(action,"status")) {
+	} else if(!strcmp(method,"status-report")) {
 		/* */
 	} else {
-		/* send back an invalid command response */
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
+
 }
 
 int handle_messages( struct dataswarm_manager *m, int msec )
