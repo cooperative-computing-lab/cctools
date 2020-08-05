@@ -11,10 +11,10 @@ def compose_task(i,j):
 
 	t = Task(command)
 
-	t.specify_file("env.tar.gz", "env.tar.gz", WORK_QUEUE_INPUT, cache=False)
+	t.specify_file("env.tar.gz", "env.tar.gz", WORK_QUEUE_INPUT, cache=True)
 	t.specify_file("datasets/cifar-10-batches-py", "datasets/cifar-10-batches-py", WORK_QUEUE_INPUT, cache=True)
-	t.specify_file("resnet.py", "resnet.py", WORK_QUEUE_INPUT, cache=False)
-	t.specify_file("script.sh", "script.sh", WORK_QUEUE_INPUT, cache=False)
+	t.specify_file("resnet.py", "resnet.py", WORK_QUEUE_INPUT, cache=True)
+	t.specify_file("script.sh", "script.sh", WORK_QUEUE_INPUT, cache=True)
 	t.specify_file(outfile, outfile, WORK_QUEUE_OUTPUT, cache=False)
 	return t
 

@@ -5,45 +5,69 @@ The wq_hypersweep program trains multiple residual neural network (ResNet) insta
 
 ## Build:
 
-1. Install [CCTools](https://cctools.readthedocs.io/en/latest/install/).
-
-2. Install Tensorflow, Keras, and plotting dependencies.
+1. Install [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/).
+2. Install [conda-pack](https://conda.github.io/conda-pack/). This can easily be done using `conda` directly with:
 ```bash
-pip install tensorflow numpy scipy scikit-learn pillow h5py
-pip install keras
-pip install matplotlib numpy seaborn
+conda install -c conda-forge conda-pack
+```
+Or, from PyPI using `pip`:
+```bash
+pip install conda-pack
+```
+3. Install [CCTools](https://cctools.readthedocs.io/en/latest/install/). This can easily be done using `conda` directly with:
+```bash
+conda install -y -c conda-forge ndcctools
 ```
 
-3. To allow the application to contact the dataset's host server, you may need to update your python security certificates:
-
+4. Install Tensorflow, Keras, and plotting dependencies. Using `conda`:
+```bash
+conda install numpy=1.18.1 tensorflow=1.15.0 certifi=2020.6.20 pandas=0.25.3 seaborn=0.10.1
+```
+Or, from PyPI using `pip`:
+```bash
+pip install tensorflow numpy scipy scikit-learn pillow h5py keras matplotlib numpy seaborn
+```
+Note: To allow the application to contact the dataset's host server, you may need to update your python security certificates:
 ```bash
 pip install --upgrade certifi
 ```
 
-4. Download the CIFAR-10 dataset  locally using the command line and extract it for use by the application.
+5. Download the CIFAR-10 dataset  locally using the command line and extract it for use by the application.
 ```bash
 curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz --create-dirs -o datasets/cifar-10-batches-py.tar.gz
 tar -xvf datasets/cifar-10-batches-py.tar.gz --directory datasets/
 ```
-<ul>The same tasks can be accomplished by running the resnet app locally:</ul>
-
+The same tasks can be accomplished by running the `resnet.py` locally:
 ```bash
 python resnet.py
 rm results.csv
 ```
 
-5. Create and pack an environment to allow wq_hypersweep to run when distributed with Work Queue using the packaging scripts provided by CCTools.
+6. Create and pack a `conda` environment to allow wq_hypersweep to run when distributed with Work Queue using the packaging scripts provided by CCTools.
 ```bash
 python_package_anaylze resnet.py env.yaml
 python_package_create env.yaml env.tar.gz
+rm env.yaml
 ```
-<ul>The same task can be accomplished using conda-pack directly:</ul>
-
+Or, using `conda-pack` directly:
 ```bash
-conda create -n res_env python=3.7 numpy=1.18.1 tensorflow=1.15.0  -o env.tar.gz
-conda pack -n res_env -o res_env.tar.gz
+conda create -n env python=3.7 numpy=1.18.1 tensorflow=1.15.0
+conda pack -n env -o env.tar.gz
 ```
 
+## Working Directory:
+At this point, your working directory should contain the following:
+```
+/datasets   - Directory holding CIFAR-10 dataset
+env.tar.gz  - Packed conda environment that hold all dependencies required by resnet.py for remote execution
+output.png  - Sample plot provided by distribution
+plot.py     - Python script used to convert application results into heatmaps
+README.md   - README provided by distribution
+resnet.py   - Python script to build/train/validate one ResNet model
+script.sh   - Pilot script used by test.py to unpack a conda environment at a remote worker and execute resnet.py
+sweep.sh    - Sample bash script that performs a local hyperparameter sweep
+test.py     - Work Queue master program used to distribute training tasks to remote workers  
+```
 
 ## Run:
 ### Local, Single Execution, Command line:

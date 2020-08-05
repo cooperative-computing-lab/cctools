@@ -146,8 +146,7 @@ def main():
 	x = layers.Conv2D(64, 3, activation='relu')(x)
 	x = layers.MaxPooling2D(3)(x)
 
-	num_res_net_blocks = RESNETBLOCKS
-	for i in range(num_res_net_blocks):
+	for i in range(RESNETBLOCKS):
 		x = res_net_block(x, 64, 3)
 
 	x = layers.Conv2D(64, 3, activation='relu')(x)
