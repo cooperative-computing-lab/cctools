@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "debug.h"
 #include "jx_print.h"
 #include "jx_parse.h"
 
@@ -15,6 +16,7 @@ int dataswarm_message_send( struct link *l, const char *str, int length, time_t 
 	int lenstrlen = strlen(lenstr);
 	int result = link_write(l,lenstr,lenstrlen,stoptime);
 	if(result!=lenstrlen) return 0;
+    debug(D_DATASWARM, "tx: %s", str);
 	result = link_write(l,str,length,stoptime);
 	return result==length;
 }
@@ -32,6 +34,7 @@ char * dataswarm_message_recv( struct link *l, time_t stoptime )
 		free(str);
 		return 0;
 	}
+    debug(D_DATASWARM, "rx: %s", str);
 	return str;
 }
 

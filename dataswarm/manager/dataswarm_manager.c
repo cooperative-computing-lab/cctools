@@ -80,6 +80,11 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			break;
 		}
 
+		char addr[LINK_ADDRESS_MAX];
+		int port;
+		link_address_remote(l,addr,&port);
+		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
+
 		const char *method = jx_lookup_string(msg,"method");
 		struct jx *params = jx_lookup(msg,"params");
 
@@ -105,12 +110,6 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 		char *manager_key = string_format("%p",l);
 		//const char *msg_key = jx_lookup_string(msg, "uuid");  /* todo: replace manager_key when msg_key not null */
 		const char *conn_type = jx_lookup_string(params, "type");
-
-		char addr[LINK_ADDRESS_MAX];
-		int port;
-		link_address_remote(l,addr,&port);
-
-		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
 
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
@@ -186,6 +185,12 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 		/* disconnect worker */
 		return;
 	}
+
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+	link_address_remote(w->link, addr, &port);
+	debug(D_DATASWARM, "worker %s:%d rx: %s", method);
+
 
 	if(!strcmp(method,"task-change")) {
 		/* */

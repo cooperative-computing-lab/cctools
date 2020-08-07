@@ -40,6 +40,9 @@ int max_connect_retry = 60;
 // Maximum time to wait for a catalog query
 int catalog_timeout = 60;
 
+// id msg counter
+int message_id = 1;
+
 
 void handle_manager_message( struct link *manager_link, struct jx *msg )
 {
@@ -83,20 +86,45 @@ void handle_manager_message( struct link *manager_link, struct jx *msg )
 	}
 }
 
+void send_status_report( struct link *manager_link, time_t stoptime ) {
+    struct jx *msg = jx_object(NULL);
+    struct jx *params = jx_object(NULL);
+
+    jx_insert_string(msg, "method", "status-report");
+    jx_insert(msg, jx_string("params"), params);
+    jx_insert_string(params, "hello", "manager");
+
+    debug(D_DATASWARM, "Sending status-report message");
+
+    dataswarm_json_send(manager_link, msg, stoptime);
+
+    jx_delete(msg);
+}
+
+
 int worker_main_loop( struct link *manager_link )
 {
 	while(1) {
 		time_t stoptime = time(0) + 5;  /* read messages for at most 5 seconds. remove with Tim's library. */
 
         while(1) {
-            struct jx *msg = dataswarm_json_recv(manager_link, stoptime);
-            handle_manager_message(manager_link, msg);
-            if(msg) {
-                jx_delete(msg);
+            if(link_sleep(manager_link, stoptime, stoptime, 0)) {
+                debug(D_DATASWARM, "reading new message...");
+                struct jx *msg = dataswarm_json_recv(manager_link, stoptime);
+                if(msg) {
+                    handle_manager_message(manager_link, msg);
+                    jx_delete(msg);
+                } else {
+                    /* handle manager disconnection */
+                    return;
+                }
             } else {
                 break;
             }
         }
+
+        /* testing: send status report every cycle for now */
+        send_status_report(manager_link, stoptime);
 
         //do not busy sleep more than stoptime
         //this will probably go away with Tim's library
@@ -127,11 +155,14 @@ void worker_connect_loop( const char *manager_host, int manager_port )
             jx_insert_string(msg, "method", "handshake");
             jx_insert(msg, jx_string("params"), params);
             jx_insert_string(params, "type", "worker");
+            jx_insert_integer(msg, "id", message_id++); /* need function to register msgs and their ids */
 
 			dataswarm_json_send(manager_link, msg, time(0)+long_timeout);
             jx_delete(msg);
 
 			worker_main_loop(manager_link);
+            link_close(manager_link);
+
 			sleeptime = min_connect_retry;
 		} else {
 			printf("could not connect to %s:%d: %s\n",manager_host,manager_port,strerror(errno));
@@ -147,7 +178,7 @@ void worker_connect_by_name( const char *manager_name )
 {
 	char *expr = string_format("type==\"dataswarm_manager\" && project==\"%s\"",manager_name);
 	int sleeptime = min_connect_retry;
-	
+
 	while(1) {
 		int got_result = 0;
 
