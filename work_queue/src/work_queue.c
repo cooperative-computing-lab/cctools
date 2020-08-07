@@ -38,6 +38,8 @@ See the file COPYING for details.
 #include "path.h"
 #include "md5.h"
 #include "url_encode.h"
+#include "jx_eval.h"
+#include "jx_parse.h"
 #include "jx_print.h"
 #include "shell.h"
 #include "pattern.h"
@@ -204,6 +206,9 @@ struct work_queue {
 
 	char *password;
 	double bandwidth;
+
+	char *debug_path;
+	char *tlq_home;
 };
 
 struct work_queue_worker {
@@ -245,6 +250,8 @@ struct work_queue_task_report {
 
 	struct rmsummary *resources;
 };
+
+char *master_tlq_url;
 
 static void handle_failure(struct work_queue *q, struct work_queue_worker *w, struct work_queue_task *t, work_queue_result_code_t fail_type);
 
@@ -562,6 +569,64 @@ work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worke
 	return MSG_PROCESSED;
 }
 
+work_queue_msg_code_t advertise_tlq_url(struct work_queue *q, struct work_queue_worker *w, char *line)
+{
+	char worker_url[WORK_QUEUE_LINE_MAX];
+	int n = sscanf(line, "tlq %s", worker_url);
+	if(n != 1) return MSG_FAILURE;
+
+	debug(D_TLQ, "received worker (%s) TLQ URL %s", w->addrport, worker_url);
+
+	//attempt to find local TLQ server to retrieve master URL
+	if(q->tlq_home && !master_tlq_url) {
+		debug(D_TLQ, "looking up master TLQ URL");
+		//sleep(3);
+		time_t stoptime = time(0) + 30;
+		struct jx *jexpr = jx_operator(
+			JX_OP_EQ,
+			jx_symbol("type"),
+			jx_string("tlq_server")
+		);
+		struct catalog_query *cq = catalog_query_create(q->catalog_hosts, jexpr, stoptime);
+		if(!cq) fatal("failed to query catalog server: %s\n", strerror(errno));
+
+		struct jx *j;
+		while((j = catalog_query_read(cq, stoptime))) {
+			struct jx *getlogs = jx_eval(jx_parse_string(string_format("project(logs, [%s])", jx_print_string(j))), jx_object(0));
+			assert(jx_istype(getlogs, JX_ARRAY));
+			struct jx *logs;
+			for(void *i = NULL; (logs = jx_iterate_array(getlogs, &i));) {
+				assert(jx_istype(logs, JX_ARRAY));
+				struct jx *log;
+				for(void *k = NULL; (log = jx_iterate_array(logs, &k));) {
+					char *select = string_format(
+						"project(url, select(home == \"%s\" and (type == \"work_queue_master\" or type == \"makeflow_and_work_queue_master\") and path == \"%s\", [%s]))",
+						q->tlq_home, q->debug_path, jx_print_string(log)
+					);
+					struct jx *selected = jx_eval(jx_parse_string(select), jx_object(0));
+					assert(jx_istype(selected, JX_ARRAY));
+					struct jx *url = jx_array_shift(selected);
+					if(url) {
+						master_tlq_url = string_trim_quotes(jx_print_string(url));
+						debug(D_TLQ, "set master TLQ URL: %s", master_tlq_url);
+						break;
+					}
+					jx_delete(url);
+					jx_delete(selected);
+				}
+			}
+			jx_delete(logs);
+			jx_delete(getlogs);
+		}
+		catalog_query_delete(cq);
+	}
+
+	//send master TLQ URL if there is one. otherwise send blank line
+	debug(D_TLQ, "sending master TLQ URL to worker (%s)", w->addrport);
+	send_worker_msg(q, w, "%s\n", master_tlq_url ? master_tlq_url : "");
+	return MSG_PROCESSED;
+}
+
 work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	char field[WORK_QUEUE_LINE_MAX];
@@ -654,6 +719,8 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
 		result = process_info(q, w, line);
+	} else if (string_prefix_is(line, "tlq")) {
+		result = advertise_tlq_url(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = MSG_NOT_PROCESSED;
@@ -5192,6 +5259,28 @@ void work_queue_specify_name(struct work_queue *q, const char *name)
 		setenv("WORK_QUEUE_NAME", q->name, 1);
 	} else {
 		q->name = 0;
+	}
+}
+
+void work_queue_specify_debug_path(struct work_queue *q, const char *path)
+{
+	if(q->debug_path) free(q->debug_path);
+	if(path) {
+		q->debug_path = xxstrdup(path);
+		setenv("WORK_QUEUE_DEBUG_PATH", q->debug_path, 1);
+	} else {
+		q->debug_path = 0;
+	}
+}
+
+void work_queue_specify_tlq_home(struct work_queue *q, const char *home)
+{
+	if(q->tlq_home) free(q->tlq_home);
+	if(home) {
+		q->tlq_home = xxstrdup(home);
+		setenv("WORK_QUEUE_TLQ_HOME", q->tlq_home, 1);
+	} else {
+		q->tlq_home = 0;
 	}
 }
 

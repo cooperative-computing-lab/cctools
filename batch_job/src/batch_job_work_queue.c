@@ -221,6 +221,12 @@ static void batch_queue_wq_option_update (struct batch_queue *q, const char *wha
 	} else if(strcmp(what, "name") == 0) {
 		if(value)
 			work_queue_specify_name(q->data, value);
+	} else if(strcmp(what, "debug") == 0) {
+		if(value)
+			work_queue_specify_debug_path(q->data, value);
+	} else if(strcmp(what, "tlq-home") == 0) {
+		if(value)
+			work_queue_specify_tlq_home(q->data, value);
 	} else if(strcmp(what, "priority") == 0) {
 		if(value)
 			work_queue_specify_priority(q->data, atoi(value));
