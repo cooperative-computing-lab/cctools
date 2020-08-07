@@ -26,7 +26,7 @@ int main (int argc, char *argv[])
 
 	struct mq *server = mq_serve("127.0.0.1", 65000);
 	assert(server);
-	struct mq *client = mq_connect("127.0.0.1", 65000, time(NULL) + 5);
+	struct mq *client = mq_connect("127.0.0.1", 65000);
 	assert(client);
 	struct mq *conn = mq_accept(server);
 	assert(conn);

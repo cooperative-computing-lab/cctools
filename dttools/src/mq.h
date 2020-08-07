@@ -127,7 +127,7 @@ See the file COPYING for details.
  * @returns A pointer to the new message queue.
  * @returns NULL on failure, with errno set appropriately.
  */
-struct mq *mq_connect(const char *addr, int port, time_t stoptime);
+struct mq *mq_connect(const char *addr, int port);
 
 /** Prepare to accept connections.
  *

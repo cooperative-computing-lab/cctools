@@ -235,8 +235,8 @@ struct mq *mq_serve(const char *addr, int port) {
 	return out;
 }
 
-struct mq *mq_connect(const char *addr, int port, time_t stoptime) {
-	struct link *link = link_connect(addr, port, stoptime);
+struct mq *mq_connect(const char *addr, int port) {
+	struct link *link = link_connect(addr, port, LINK_NOWAIT);
 	if (!link) return NULL;
 	struct mq *out = mq_create();
 	out->link = link;

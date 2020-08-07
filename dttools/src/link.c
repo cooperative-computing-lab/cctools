@@ -492,6 +492,11 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 	if(!link)
 		goto failure;
 
+	// in case we exit early for a non-blocking connect
+	link->rport = port;
+	strncpy(link->raddr, addr, sizeof(link->raddr));
+	link->raddr[sizeof(link->raddr) - 1] = 0;
+
 	link_squelch();
 
 	link->fd = socket(address.ss_family, SOCK_STREAM, 0);
@@ -521,6 +526,9 @@ struct link *link_connect(const char *addr, int port, time_t stoptime)
 
 		// Otherwise, a non-temporary errno should cause us to bail out.
 		if(result<0 && !errno_is_temporary(errno)) break;
+
+		// Let a non-blocking connect continue in the background
+		if (stoptime == LINK_NOWAIT) return link;
 
 		// If the remote address is valid, we are connected no matter what.
 		if(link_address_remote(link, link->raddr, &link->rport)) {
