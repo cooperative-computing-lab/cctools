@@ -27,6 +27,7 @@ int main (int argc, char *argv[]) {
 	int rc;
 	struct mq_msg *msg;
 	char *got_string;
+	size_t len;
 
 	struct mq *server = mq_serve("127.0.0.1", 65000);
 	assert(server);
@@ -67,8 +68,9 @@ int main (int argc, char *argv[]) {
 	msg = mq_recv(conn);
 	assert(msg);
 
-	got_string = mq_unwrap_buffer(msg);
+	got_string = mq_unwrap_buffer(msg, &len);
 	assert(got_string);
+	assert(len == MSG_SIZE);
 	assert(!memcmp(test1, got_string, MSG_SIZE));
 	free(got_string);
 
@@ -81,7 +83,7 @@ int main (int argc, char *argv[]) {
 	msg = mq_recv(conn);
 	assert(msg);
 
-	got_string = mq_unwrap_buffer(msg);
+	got_string = mq_unwrap_buffer(msg, NULL);
 	assert(got_string);
 	assert(!strcmp(test2, got_string));
 	free(got_string);

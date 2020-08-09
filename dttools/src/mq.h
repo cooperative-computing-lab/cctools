@@ -227,10 +227,11 @@ struct mq_msg *mq_wrap_buffer(const void *b, size_t size);
  * The caller is responsible for freeing the resulting buffer.
  * A successful unwrap also frees msg, so no need to delete it.
  * @param m The message to unwrap.
+ * @param len Location to store the length of the buffer. May be NULL.
  * @returns The string in m.
  * @returns NULL if m is not a string message.
  */
-void *mq_unwrap_buffer(struct mq_msg *msg);
+void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len);
 
 /** Put a filesystem blob into a message.
  *

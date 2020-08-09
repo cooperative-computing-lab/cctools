@@ -52,7 +52,7 @@ int main (int argc, char *argv[]) {
 	msg = mq_recv(conn);
 	assert(msg);
 
-	got_string = mq_unwrap_buffer(msg);
+	got_string = mq_unwrap_buffer(msg, NULL);
 	assert(got_string);
 	assert(!strcmp(test1, got_string));
 	free(got_string);
@@ -66,7 +66,7 @@ int main (int argc, char *argv[]) {
 	msg = mq_recv(conn);
 	assert(msg);
 
-	got_string = mq_unwrap_buffer(msg);
+	got_string = mq_unwrap_buffer(msg, NULL);
 	assert(got_string);
 	assert(!strcmp(test2, got_string));
 	free(got_string);

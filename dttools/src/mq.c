@@ -366,10 +366,13 @@ struct mq_msg *mq_wrap_buffer(const void *b, size_t size) {
 	return out;
 }
 
-void *mq_unwrap_buffer(struct mq_msg *msg) {
+void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
 	assert(msg);
 	if (msg->type != MQ_MSG_BUFFER) return NULL;
 	void *out = msg->buf;
+	if (len) {
+		*len = msg->len;
+	}
 	free(msg);
 	return out;
 }
