@@ -189,7 +189,7 @@ void mq_send(struct mq *mq, struct mq_msg *msg);
  * duration of this call.
  * @param mq The queue to wait on.
  * @param stoptime The time at which to stop waiting.
- * @returns 1 if a message is available.
+ * @returns 1 if a message/connection is available.
  * @returns 0 if interrupted by timeout/signal handling.
  * @returns -1 on closed socket or other error, with errno set appropriately.
  */
@@ -298,10 +298,10 @@ void mq_poll_delete(struct mq_poll *p);
 
 /** Add a message queue to a polling group.
  *
- * Adding the same message queue to a polling group more than once is safe
- * but has no effect. The tag value is returned from @ref mq_poll_readable
- * and friends. This could be a pointer to some client/worker struct that
- * knows its own channel, or you might just pass mq again.
+ * The tag value is returned from @ref mq_poll_readable and friends.
+ * This could be a pointer to some client/worker struct that
+ * knows its own channel, or NULL to just use mq. Note that a
+ * queue can only be added to a single polling group.
  * @param p The polling group to add to.
  * @param mq The queue to add.
  * @param tag A pointer to identify the queue. If tag is NULL, mq will
@@ -331,10 +331,9 @@ int mq_poll_rm(struct mq_poll *p, struct mq *mq);
  * Note that all signals are unblocked for the duration of this call.
  * @param p The polling group to wait on.
  * @param stoptime The time at which to stop waiting.
- * @returns The number of messages available (or zero if interrupted by
+ * @returns The number of events available (or zero if interrupted by
  * timeout/signal handling).
  * @returns -1 on error, with errno set appropriately.
-
  */
 int mq_poll_wait(struct mq_poll *p, time_t stoptime);
 
