@@ -25,12 +25,15 @@ See the file COPYING for details.
 #include "link.h"
 #include "xxmalloc.h"
 #include "debug.h"
+#include "jx_print.h"
+#include "jx_parse.h"
 
 #define HDR_SIZE sizeof(struct mq_msg_header)
 #define HDR_MAGIC "DSmsg"
 
 enum mq_msg_type {
 	MQ_MSG_BUFFER = 0,
+	MQ_MSG_JSON = 1,
 };
 
 enum mq_socket {
@@ -51,6 +54,7 @@ struct mq_msg {
 	enum mq_msg_type type;
 	size_t len;
 	void *buf;
+	struct jx *j;
 	struct mq_msg_header hdr;
 	bool parsed_header;
 	ptrdiff_t hdr_pos;
@@ -119,6 +123,7 @@ static void mq_die(struct mq *mq, int err) {
 static void delete_msg(struct mq_msg *msg) {
 	if (!msg) return;
 	free(msg->buf);
+	jx_delete(msg->j);
 	free(msg);
 }
 
@@ -246,7 +251,20 @@ static int flush_recv(struct mq *mq) {
 			}
 			rcv->buf_pos += r;
 		} else {
-			// parse JX, etc.
+			switch (rcv->type) {
+				case MQ_MSG_JSON:
+					rcv->j = jx_parse_string(rcv->buf);
+					if (!rcv->j) {
+						errno = EBADMSG;
+						return -1;
+					}
+					free(rcv->buf);
+					rcv->buf = NULL;
+					break;
+				case MQ_MSG_BUFFER:
+					// nothing more to do
+					break;
+			}
 			mq->recv = mq->recv_buf;
 			mq->recv_buf = NULL;
 		}
@@ -366,14 +384,34 @@ struct mq_msg *mq_wrap_buffer(const void *b, size_t size) {
 	return out;
 }
 
+struct mq_msg *mq_wrap_json(struct jx *j) {
+	assert(j);
+	struct mq_msg *out = msg_create();
+	out->type = MQ_MSG_JSON;
+	out->buf = jx_print_string(j);
+	assert(out->buf);
+	out->len = strlen(out->buf);
+	return out;
+}
+
 void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
 	assert(msg);
 	if (msg->type != MQ_MSG_BUFFER) return NULL;
 	void *out = msg->buf;
+	msg->buf = NULL;
 	if (len) {
 		*len = msg->len;
 	}
-	free(msg);
+	delete_msg(msg);
+	return out;
+}
+
+struct jx *mq_unwrap_json(struct mq_msg *msg) {
+	assert(msg);
+	if (msg->type != MQ_MSG_JSON) return NULL;
+	struct jx *out = msg->j;
+	msg->j = NULL;
+	delete_msg(msg);
 	return out;
 }
 
