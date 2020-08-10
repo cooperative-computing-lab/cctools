@@ -19,6 +19,7 @@ See the file COPYING for details.
 #include <arpa/inet.h>
 
 #include "mq.h"
+#include "buffer.h"
 #include "list.h"
 #include "itable.h"
 #include "set.h"
@@ -28,12 +29,12 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 
-#define HDR_SIZE sizeof(struct mq_msg_header)
-#define HDR_MAGIC "DSmsg"
+#define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
+#define HDR_MAGIC "MQmsg"
 
 enum mq_msg_type {
-	MQ_MSG_BUFFER = 0,
-	MQ_MSG_JSON = 1,
+	MQ_MSG_BUFFER = 1,
+	MQ_MSG_JSON = 2,
 };
 
 enum mq_socket {
@@ -43,22 +44,40 @@ enum mq_socket {
 	MQ_SOCKET_ERROR,
 };
 
-struct mq_msg_header {
-	char magic[5];
-	char pad[2]; // necessary for alignment
-	uint8_t type;
-	uint64_t length;
-};
-
 struct mq_msg {
-	enum mq_msg_type type;
 	size_t len;
-	void *buf;
-	struct jx *j;
-	struct mq_msg_header hdr;
 	bool parsed_header;
 	ptrdiff_t hdr_pos;
 	ptrdiff_t buf_pos;
+	buffer_t buf;
+	struct jx *j;
+
+	/* Here be dragons!
+	 *
+	 * Since we need to be able allow send/recv to be interrupted at any time
+	 * (even in the middle of an int), we can't rely on reading/writing
+	 * multi-byte header fields all in one go. The following fields are
+	 * arranged to match the wire format of the header. DO NOT add additional
+	 * struct fields below here! (If you do change the header format, be sure
+	 * to update the sanity check in msg_create.) First is some padding
+	 * (void pointer is self-aligned) so we don't need to worry too much
+	 * about the alignment of the earlier fields. Then the actual header
+	 * follows. Note that the length in the header needs to be in network
+	 * byte order, so that gets stored separately.
+	 *
+	 *  0 1 2 3 4 5 6 7
+	 * +-+-+-+-+-+-+-+-+
+	 * |  magic  |pad|*|    *type
+	 * +-+-+-+-+-+-+-+-+
+	 * |    length     |
+	 * +-+-+-+-+-+-+-+-+
+	 */
+	void *pad1;
+
+	char magic[5];
+	char pad2[2]; // necessary for alignment, should be 0
+	uint8_t type;
+	uint64_t hdr_len;
 };
 
 struct mq {
@@ -89,7 +108,13 @@ static bool errno_is_temporary(void) {
 }
 
 static struct mq_msg *msg_create (void) {
-	return xxcalloc(1, sizeof(struct mq_msg));
+	// sanity check
+	assert(HDR_SIZE == 16);
+	struct mq_msg *out = xxcalloc(1, sizeof(struct mq_msg));
+	buffer_init(&out->buf);
+	buffer_abortonfailure(&out->buf, true);
+	memcpy(out->magic, HDR_MAGIC, sizeof(out->magic));
+	return out;
 }
 
 static void mq_die(struct mq *mq, int err) {
@@ -122,16 +147,9 @@ static void mq_die(struct mq *mq, int err) {
 
 static void delete_msg(struct mq_msg *msg) {
 	if (!msg) return;
-	free(msg->buf);
+	buffer_free(&msg->buf);
 	jx_delete(msg->j);
 	free(msg);
-}
-
-static void write_header(struct mq_msg *msg) {
-	assert(msg);
-	memcpy(msg->hdr.magic, HDR_MAGIC, sizeof(msg->hdr.magic));
-	msg->hdr.type = msg->type;
-	msg->hdr.length = htobe64(msg->len);
 }
 
 static struct mq *mq_create(void) {
@@ -167,6 +185,22 @@ void mq_msg_delete(struct mq_msg *msg) {
 	delete_msg(msg);
 }
 
+static int validate_header(struct mq_msg *msg) {
+	assert(msg);
+	errno = EBADF;
+	if (memcmp(msg->magic, HDR_MAGIC, sizeof(msg->magic))) {
+		return -1;
+	}
+	switch (msg->type) {
+		case MQ_MSG_BUFFER:
+		case MQ_MSG_JSON:
+			break;
+		default:
+			return -1;
+	}
+	return 0;
+}
+
 static int flush_send(struct mq *mq) {
 	assert(mq);
 
@@ -176,7 +210,8 @@ static int flush_send(struct mq *mq) {
 		if (!mq->send_buf) {
 			mq->send_buf = list_pop_head(mq->send);
 			if (!mq->send_buf) return 0;
-			write_header(mq->send_buf);
+			buffer_tolstring(&mq->send_buf->buf, &mq->send_buf->len);
+			mq->send_buf->hdr_len = htobe64(mq->send_buf->len);
 		}
 		struct mq_msg *snd = mq->send_buf;
 
@@ -184,7 +219,7 @@ static int flush_send(struct mq *mq) {
 		assert(HDR_SIZE < PTRDIFF_MAX);
 		assert(snd->len < PTRDIFF_MAX);
 		if (snd->hdr_pos < (ptrdiff_t) HDR_SIZE) {
-			ssize_t s = send(socket, &snd->hdr + snd->hdr_pos,
+			ssize_t s = send(socket, &snd->magic + snd->hdr_pos,
 					HDR_SIZE - snd->hdr_pos, 0);
 			if (s == -1 && errno_is_temporary()) {
 				return 0;
@@ -193,7 +228,8 @@ static int flush_send(struct mq *mq) {
 			}
 			snd->hdr_pos += s;
 		} else if (snd->buf_pos < (ptrdiff_t) snd->len) {
-			ssize_t s = send(socket, snd->buf + snd->buf_pos,
+			ssize_t s = send(socket,
+					buffer_tostring(&snd->buf) + snd->buf_pos,
 					snd->len - snd->buf_pos, 0);
 			if (s == -1 && errno_is_temporary()) {
 				return 0;
@@ -223,7 +259,7 @@ static int flush_recv(struct mq *mq) {
 		assert(HDR_SIZE < PTRDIFF_MAX);
 		assert(rcv->len < PTRDIFF_MAX);
 		if (rcv->hdr_pos < (ptrdiff_t) HDR_SIZE) {
-			ssize_t r = recv(socket, &rcv->hdr + rcv->hdr_pos,
+			ssize_t r = recv(socket, &rcv->magic + rcv->hdr_pos,
 					HDR_SIZE - rcv->hdr_pos, 0);
 			if (r == -1 && errno_is_temporary()) {
 				return 0;
@@ -232,17 +268,13 @@ static int flush_recv(struct mq *mq) {
 			}
 			rcv->hdr_pos += r;
 		} else if (!rcv->parsed_header) {
-			if (memcmp(rcv->hdr.magic, HDR_MAGIC, sizeof(rcv->hdr.magic))) {
-				return -1;
-			}
-			rcv->type = rcv->hdr.type;
-			rcv->len = be64toh(rcv->hdr.length);
-			rcv->buf = xxmalloc(rcv->len + 1);
-			((char *) rcv->buf)[rcv->len] = 0;
-			//TODO validate
+			rcv->len = be64toh(rcv->hdr_len);
+			if (validate_header(rcv) == -1) return -1;
+			buffer_grow(&rcv->buf, rcv->len);
 			rcv->parsed_header = true;
 		} else if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
-			ssize_t r = recv(socket, rcv->buf + rcv->buf_pos,
+			ssize_t r = recv(socket,
+					(char *) buffer_tostring(&rcv->buf) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
 			if (r == -1 && errno_is_temporary()) {
 				return 0;
@@ -253,13 +285,11 @@ static int flush_recv(struct mq *mq) {
 		} else {
 			switch (rcv->type) {
 				case MQ_MSG_JSON:
-					rcv->j = jx_parse_string(rcv->buf);
+					rcv->j = jx_parse_string(buffer_tostring(&rcv->buf));
 					if (!rcv->j) {
 						errno = EBADMSG;
 						return -1;
 					}
-					free(rcv->buf);
-					rcv->buf = NULL;
 					break;
 				case MQ_MSG_BUFFER:
 					// nothing more to do
@@ -378,9 +408,7 @@ struct mq_msg *mq_wrap_buffer(const void *b, size_t size) {
 	assert(b);
 	struct mq_msg *out = msg_create();
 	out->type = MQ_MSG_BUFFER;
-	out->len = size;
-	out->buf = xxmalloc(size);
-	memcpy(out->buf, b, size);
+	buffer_putlstring(&out->buf, b, size);
 	return out;
 }
 
@@ -388,17 +416,15 @@ struct mq_msg *mq_wrap_json(struct jx *j) {
 	assert(j);
 	struct mq_msg *out = msg_create();
 	out->type = MQ_MSG_JSON;
-	out->buf = jx_print_string(j);
-	assert(out->buf);
-	out->len = strlen(out->buf);
+	jx_print_buffer(j, &out->buf);
 	return out;
 }
 
 void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
 	assert(msg);
 	if (msg->type != MQ_MSG_BUFFER) return NULL;
-	void *out = msg->buf;
-	msg->buf = NULL;
+	void *out = xxmalloc(msg->len);
+	memcpy(out, buffer_tostring(&msg->buf), msg->len);
 	if (len) {
 		*len = msg->len;
 	}
