@@ -1288,6 +1288,8 @@ else
 	cctools_dynamic_flag=-shared
 fi
 
+optional_function ppoll       poll.h     HAS_PPOLL
+
 # sqlite3 uses define "HAVE_*"
 optional_function gmtime_r    time.h     HAVE_GMTIME_R
 optional_function fdatasync   unistd.h   HAVE_FDATASYNC

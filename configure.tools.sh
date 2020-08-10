@@ -224,7 +224,7 @@ require_path ()
 
 require_function ()
 {
-	if check_function $1 $2
+	if check_function "$1" "$2" "-D_GNU_SOURCE"
 	then
 		return 0
 	else
@@ -383,10 +383,10 @@ optional_function()
 
 	multiarch_include=$(echo "${header}" | sed "s|include/|include/$HOST_MULTIARCH/|")
 
-	if check_function "$name" "$header"; then
+	if check_function "$name" "$header" "-D_GNU_SOURCE"; then
 		ccflags_append_define "$@"
 		return 0
-	elif [ -n "$HOST_MULTIARCH" ] && check_function "$name" "$multiarch_include"; then
+	elif [ -n "$HOST_MULTIARCH" ] && check_function "$name" "$multiarch_include" "-D_GNU_SOURCE"; then
 		ccflags_append_define "$@"
 		return 0
 	fi
