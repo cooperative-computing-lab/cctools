@@ -11,7 +11,6 @@ See the file COPYING for details.
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include <endian.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <poll.h>
@@ -28,6 +27,38 @@ See the file COPYING for details.
 #include "debug.h"
 #include "jx_print.h"
 #include "jx_parse.h"
+
+#ifndef htonll
+static uint64_t htonll(uint64_t hostlonglong) {
+	uint64_t out = 0;
+	uint8_t *d = (uint8_t *) &out;
+	d[7] = hostlonglong>>0;
+	d[6] = hostlonglong>>8;
+	d[5] = hostlonglong>>16;
+	d[4] = hostlonglong>>24;
+	d[3] = hostlonglong>>32;
+	d[2] = hostlonglong>>40;
+	d[1] = hostlonglong>>48;
+	d[0] = hostlonglong>>56;
+	return out;
+}
+#endif
+
+#ifndef ntohll
+static uint64_t ntohll(uint64_t netlonglong) {
+	uint64_t out = 0;
+	uint8_t *d = (uint8_t *) &netlonglong;
+	out |= (uint64_t) d[7]<<0;
+	out |= (uint64_t) d[6]<<8;
+	out |= (uint64_t) d[5]<<16;
+	out |= (uint64_t) d[4]<<24;
+	out |= (uint64_t) d[3]<<32;
+	out |= (uint64_t) d[2]<<40;
+	out |= (uint64_t) d[1]<<48;
+	out |= (uint64_t) d[0]<<56;
+	return out;
+}
+#endif
 
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
 #define HDR_MAGIC "MQmsg"
@@ -211,7 +242,7 @@ static int flush_send(struct mq *mq) {
 			mq->send_buf = list_pop_head(mq->send);
 			if (!mq->send_buf) return 0;
 			buffer_tolstring(&mq->send_buf->buf, &mq->send_buf->len);
-			mq->send_buf->hdr_len = htobe64(mq->send_buf->len);
+			mq->send_buf->hdr_len = htonll(mq->send_buf->len);
 		}
 		struct mq_msg *snd = mq->send_buf;
 
@@ -268,7 +299,7 @@ static int flush_recv(struct mq *mq) {
 			}
 			rcv->hdr_pos += r;
 		} else if (!rcv->parsed_header) {
-			rcv->len = be64toh(rcv->hdr_len);
+			rcv->len = ntohll(rcv->hdr_len);
 			if (validate_header(rcv) == -1) return -1;
 			buffer_grow(&rcv->buf, rcv->len);
 			rcv->parsed_header = true;
