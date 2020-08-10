@@ -34,7 +34,8 @@ int main (int argc, char *argv[]) {
 
 	msg = mq_wrap_json(test);
 	assert(msg);
-	mq_send(client, msg);
+	rc = mq_send(client, msg);
+	assert(rc != -1);
 
 	rc = mq_wait(server, time(NULL) + 1);
 	assert(rc != -1);

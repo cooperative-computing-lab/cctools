@@ -178,8 +178,11 @@ struct mq_msg *mq_recv(struct mq *mq);
  * be automatically deleted when the send is finished.
  * @param mq The message queue.
  * @param msg The message to send.
+ * @returns 0 on success. Note that this only indicates that the message was
+ *  successfully queued. It gives no indication about delivery.
+ * @returns -1 on failure.
  */
-void mq_send(struct mq *mq, struct mq_msg *msg);
+int mq_send(struct mq *mq, struct mq_msg *msg);
 
 /* Wait for a message or connection.
  *

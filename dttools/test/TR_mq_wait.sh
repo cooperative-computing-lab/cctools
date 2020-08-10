@@ -33,11 +33,13 @@ int main (int argc, char *argv[]) {
 
 	msg = mq_wrap_buffer(test1, strlen(test1));
 	assert(msg);
-	mq_send(client, msg);
+	rc = mq_send(client, msg);
+	assert(rc != -1);
 
 	msg = mq_wrap_buffer(test2, strlen(test2));
 	assert(msg);
-	mq_send(client, msg);
+	rc = mq_send(client, msg);
+	assert(rc != -1);
 
 	rc = mq_wait(server, time(NULL) + 1);
 	assert(rc != -1);

@@ -164,13 +164,14 @@ static bool errno_is_temporary(void) {
 	}
 }
 
-static struct mq_msg *msg_create (void) {
+static struct mq_msg *msg_create (enum mq_msg_type type) {
 	// sanity check
 	assert(HDR_SIZE == 16);
 	struct mq_msg *out = xxcalloc(1, sizeof(struct mq_msg));
 	buffer_init(&out->buf);
 	buffer_abortonfailure(&out->buf, true);
 	memcpy(out->magic, HDR_MAGIC, sizeof(out->magic));
+	out->type = type;
 	return out;
 }
 
@@ -209,9 +210,11 @@ static void delete_msg(struct mq_msg *msg) {
 	free(msg);
 }
 
-static struct mq *mq_create(void) {
+static struct mq *mq_create(enum mq_socket state, struct link *link) {
 	struct mq *out = xxcalloc(1, sizeof(*out));
 	out->send = list_create();
+	out->state = state;
+	out->link = link;
 	return out;
 }
 
@@ -293,24 +296,24 @@ static int flush_send(struct mq *mq) {
 		assert(HDR_SIZE < PTRDIFF_MAX);
 		assert(snd->len < PTRDIFF_MAX);
 		if (snd->hdr_pos < (ptrdiff_t) HDR_SIZE) {
-			ssize_t s = send(socket, &snd->magic + snd->hdr_pos,
+			ssize_t rc = send(socket, &snd->magic + snd->hdr_pos,
 					HDR_SIZE - snd->hdr_pos, 0);
-			if (s == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary()) {
 				return 0;
-			} else if (s <= 0) {
+			} else if (rc <= 0) {
 				return -1;
 			}
-			snd->hdr_pos += s;
+			snd->hdr_pos += rc;
 		} else if (snd->buf_pos < (ptrdiff_t) snd->len) {
-			ssize_t s = send(socket,
+			ssize_t rc = send(socket,
 					buffer_tostring(&snd->buf) + snd->buf_pos,
 					snd->len - snd->buf_pos, 0);
-			if (s == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary()) {
 				return 0;
-			} else if (s <= 0) {
+			} else if (rc <= 0) {
 				return -1;
 			}
-			snd->buf_pos += s;
+			snd->buf_pos += rc;
 		} else {
 			delete_msg(snd);
 			mq->send_buf = NULL;
@@ -325,7 +328,7 @@ static int flush_recv(struct mq *mq) {
 
 	while (!mq->recv) {
 		if (!mq->recv_buf) {
-			mq->recv_buf = msg_create();
+			mq->recv_buf = msg_create(0);
 		}
 		struct mq_msg *rcv = mq->recv_buf;
 
@@ -333,29 +336,29 @@ static int flush_recv(struct mq *mq) {
 		assert(HDR_SIZE < PTRDIFF_MAX);
 		assert(rcv->len < PTRDIFF_MAX);
 		if (rcv->hdr_pos < (ptrdiff_t) HDR_SIZE) {
-			ssize_t r = recv(socket, &rcv->magic + rcv->hdr_pos,
+			ssize_t rc = recv(socket, &rcv->magic + rcv->hdr_pos,
 					HDR_SIZE - rcv->hdr_pos, 0);
-			if (r == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary()) {
 				return 0;
-			} else if (r <= 0) {
+			} else if (rc <= 0) {
 				return -1;;
 			}
-			rcv->hdr_pos += r;
+			rcv->hdr_pos += rc;
 		} else if (!rcv->parsed_header) {
 			rcv->len = ntohll(rcv->hdr_len);
 			if (validate_header(rcv) == -1) return -1;
 			buffer_grow(&rcv->buf, rcv->len);
 			rcv->parsed_header = true;
 		} else if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
-			ssize_t r = recv(socket,
+			ssize_t rc = recv(socket,
 					(char *) buffer_tostring(&rcv->buf) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
-			if (r == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary()) {
 				return 0;
-			} else if (r <= 0) {
+			} else if (rc <= 0) {
 				return -1;;
 			}
-			rcv->buf_pos += r;
+			rcv->buf_pos += rc;
 		} else {
 			if (unpack_msg(rcv) == -1) return -1;
 			mq->recv = mq->recv_buf;
@@ -450,11 +453,9 @@ static int handle_revents(struct pollfd *pfd, struct mq *mq) {
 				// If the server socket polls readable,
 				// this should never block.
 				assert(link);
-				// Should only poll on writing if accept slot is free
+				// Should only poll on read if accept slot is free
 				assert(!mq->acc);
-				struct mq *out = mq_create();
-				out->link = link;
-				out->state = MQ_SOCKET_CONNECTED;
+				struct mq *out = mq_create(MQ_SOCKET_CONNECTED, link);
 				mq->acc = out;
 			}
 			break;
@@ -467,16 +468,14 @@ DONE:
 
 struct mq_msg *mq_wrap_buffer(const void *b, size_t size) {
 	assert(b);
-	struct mq_msg *out = msg_create();
-	out->type = MQ_MSG_BUFFER;
+	struct mq_msg *out = msg_create(MQ_MSG_BUFFER);
 	buffer_putlstring(&out->buf, b, size);
 	return out;
 }
 
 struct mq_msg *mq_wrap_json(struct jx *j) {
 	assert(j);
-	struct mq_msg *out = msg_create();
-	out->type = MQ_MSG_JSON;
+	struct mq_msg *out = msg_create(MQ_MSG_JSON);
 	jx_print_buffer(j, &out->buf);
 	return out;
 }
@@ -503,10 +502,13 @@ struct jx *mq_unwrap_json(struct mq_msg *msg) {
 	return out;
 }
 
-void mq_send(struct mq *mq, struct mq_msg *msg) {
+int mq_send(struct mq *mq, struct mq_msg *msg) {
 	assert(mq);
 	assert(msg);
+	errno = mq_geterror(mq);
+	if (errno != 0) return -1;
 	list_push_tail(mq->send, msg);
+	return 0;
 }
 
 struct mq_msg *mq_recv(struct mq *mq) {
@@ -522,18 +524,14 @@ struct mq_msg *mq_recv(struct mq *mq) {
 struct mq *mq_serve(const char *addr, int port) {
 	struct link *link = link_serve_address(addr, port);
 	if (!link) return NULL;
-	struct mq *out = mq_create();
-	out->link = link;
-	out->state = MQ_SOCKET_SERVER;
+	struct mq *out = mq_create(MQ_SOCKET_SERVER, link);
 	return out;
 }
 
 struct mq *mq_connect(const char *addr, int port) {
 	struct link *link = link_connect(addr, port, LINK_NOWAIT);
 	if (!link) return NULL;
-	struct mq *out = mq_create();
-	out->link = link;
-	out->state = MQ_SOCKET_INPROGRESS;
+	struct mq *out = mq_create(MQ_SOCKET_INPROGRESS, link);
 	return out;
 }
 

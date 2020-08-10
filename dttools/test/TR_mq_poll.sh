@@ -56,11 +56,13 @@ int main (int argc, char *argv[]) {
 
 	msg = mq_wrap_buffer(test1, MSG_SIZE);
 	assert(msg);
-	mq_send(client, msg);
+	rc = mq_send(client, msg);
+	assert(rc != -1);
 
 	msg = mq_wrap_buffer(test2, strlen(test2));
 	assert(msg);
-	mq_send(client, msg);
+	rc = mq_send(client, msg);
+	assert(rc != -1);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);
 	assert(rc == 1);
