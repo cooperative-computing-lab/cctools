@@ -258,6 +258,23 @@ static int validate_header(struct mq_msg *msg) {
 	return 0;
 }
 
+static int unpack_msg(struct mq_msg *msg) {
+	assert(msg);
+	switch (msg->type) {
+		case MQ_MSG_JSON:
+			msg->j = jx_parse_string(buffer_tostring(&msg->buf));
+			if (!msg->j) {
+				errno = EBADMSG;
+				return -1;
+			}
+			break;
+		case MQ_MSG_BUFFER:
+			// nothing more to do
+			break;
+	}
+	return 0;
+}
+
 static int flush_send(struct mq *mq) {
 	assert(mq);
 
@@ -340,23 +357,11 @@ static int flush_recv(struct mq *mq) {
 			}
 			rcv->buf_pos += r;
 		} else {
-			switch (rcv->type) {
-				case MQ_MSG_JSON:
-					rcv->j = jx_parse_string(buffer_tostring(&rcv->buf));
-					if (!rcv->j) {
-						errno = EBADMSG;
-						return -1;
-					}
-					break;
-				case MQ_MSG_BUFFER:
-					// nothing more to do
-					break;
-			}
+			if (unpack_msg(rcv) == -1) return -1;
 			mq->recv = mq->recv_buf;
 			mq->recv_buf = NULL;
 		}
 	}
-
 	return 0;
 }
 
@@ -382,7 +387,6 @@ static short poll_events(struct mq *mq) {
 		case MQ_SOCKET_ERROR:
 			break;
 	}
-
 	return out;
 }
 
@@ -552,12 +556,12 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 	pfd.revents = 0;
 
 	do {
-		pfd.events = poll_events(mq);
-
 		// NB: we're using revents from the *previous* iteration
 		if (handle_revents(&pfd, mq) == -1) {
 			return -1;
 		}
+		pfd.events = poll_events(mq);
+
 		if (mq->recv || mq->acc) {
 			return 1;
 		}
@@ -680,17 +684,19 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		uintptr_t ptr;
 		void *value;
 		itable_firstkey(p->members);
+		// This assumes that iterating over an itable does not
+		// change the order of the elements.
 		for (int i = 0; itable_nextkey(p->members, &key, &value); i++) {
 			ptr = key;
 			struct mq *mq = (struct mq *) ptr;
 			pfds[i].fd = link_fd(mq->link);
-			pfds[i].events = poll_events(mq);
 
 			// NB: we're using revents from the *previous* iteration
 			rc = handle_revents(&pfds[i], mq);
 			if (rc == -1) {
 				goto DONE;
 			}
+			pfds[i].events = poll_events(mq);
 		}
 
 		rc = 0;
