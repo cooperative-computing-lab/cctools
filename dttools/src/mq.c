@@ -28,37 +28,6 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 
-#ifndef htonll
-static uint64_t htonll(uint64_t hostlonglong) {
-	uint64_t out = 0;
-	uint8_t *d = (uint8_t *) &out;
-	d[7] = hostlonglong>>0;
-	d[6] = hostlonglong>>8;
-	d[5] = hostlonglong>>16;
-	d[4] = hostlonglong>>24;
-	d[3] = hostlonglong>>32;
-	d[2] = hostlonglong>>40;
-	d[1] = hostlonglong>>48;
-	d[0] = hostlonglong>>56;
-	return out;
-}
-#endif
-
-#ifndef ntohll
-static uint64_t ntohll(uint64_t netlonglong) {
-	uint64_t out = 0;
-	uint8_t *d = (uint8_t *) &netlonglong;
-	out |= (uint64_t) d[7]<<0;
-	out |= (uint64_t) d[6]<<8;
-	out |= (uint64_t) d[5]<<16;
-	out |= (uint64_t) d[4]<<24;
-	out |= (uint64_t) d[3]<<32;
-	out |= (uint64_t) d[2]<<40;
-	out |= (uint64_t) d[1]<<48;
-	out |= (uint64_t) d[0]<<56;
-	return out;
-}
-#endif
 
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
 #define HDR_MAGIC "MQmsg"
@@ -129,6 +98,63 @@ struct mq_poll {
 	struct set *readable;
 	struct set *error;
 };
+
+
+#ifndef htonll
+static uint64_t htonll(uint64_t hostlonglong) {
+	uint64_t out = 0;
+	uint8_t *d = (uint8_t *) &out;
+	d[7] = hostlonglong>>0;
+	d[6] = hostlonglong>>8;
+	d[5] = hostlonglong>>16;
+	d[4] = hostlonglong>>24;
+	d[3] = hostlonglong>>32;
+	d[2] = hostlonglong>>40;
+	d[1] = hostlonglong>>48;
+	d[0] = hostlonglong>>56;
+	return out;
+}
+#endif
+
+#ifndef ntohll
+static uint64_t ntohll(uint64_t netlonglong) {
+	uint64_t out = 0;
+	uint8_t *d = (uint8_t *) &netlonglong;
+	out |= (uint64_t) d[7]<<0;
+	out |= (uint64_t) d[6]<<8;
+	out |= (uint64_t) d[5]<<16;
+	out |= (uint64_t) d[4]<<24;
+	out |= (uint64_t) d[3]<<32;
+	out |= (uint64_t) d[2]<<40;
+	out |= (uint64_t) d[1]<<48;
+	out |= (uint64_t) d[0]<<56;
+	return out;
+}
+#endif
+
+static int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime) {
+	assert(fds);
+	sigset_t mask;
+	sigemptyset(&mask);
+	int timeout = stoptime - time(NULL);
+	if (timeout < 0) return 0;
+
+#ifdef HAS_PPOLL
+	struct timespec s;
+	s.tv_nsec = 0;
+	s.tv_sec = timeout;
+	return ppoll(fds, nfds, &s, &mask);
+#else
+	sigset_t origmask;
+	sigprocmask(SIG_SETMASK, &mask, &origmask);
+	int rc = poll(fds, nfds, timeout*1000);
+	int saved_errno = errno;
+	sigprocmask(SIG_SETMASK, &origmask, NULL);
+	errno = saved_errno;
+	return rc;
+#endif
+}
+
 
 static bool errno_is_temporary(void) {
 	if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN || errno == EINPROGRESS || errno == EALREADY || errno == EISCONN) {
@@ -522,8 +548,6 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 
 	int rc;
 	struct pollfd pfd;
-	struct timespec stop;
-	sigset_t mask;
 	pfd.fd = link_fd(mq->link);
 	pfd.revents = 0;
 
@@ -534,18 +558,10 @@ int mq_wait(struct mq *mq, time_t stoptime) {
 		if (handle_revents(&pfd, mq) == -1) {
 			return -1;
 		}
-
 		if (mq->recv || mq->acc) {
 			return 1;
 		}
-
-		stop.tv_nsec = 0;
-		stop.tv_sec = stoptime - time(NULL);
-		if (stop.tv_sec < 0) {
-			return 0;
-		}
-		sigemptyset(&mask);
-	} while ((rc = ppoll(&pfd, 1, &stop, &mask)) > 0);
+	} while ((rc = ppoll_compat(&pfd, 1, stoptime)) > 0);
 
 	if (rc == 0 || (rc == -1 && errno == EINTR)) {
 		return 0;
@@ -655,10 +671,7 @@ void *mq_poll_error(struct mq_poll *p) {
 int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 	assert(p);
 
-	struct timespec stop;
-	sigset_t mask;
 	int rc;
-
 	int count = itable_size(p->members);
 	struct pollfd *pfds = xxcalloc(count, sizeof(*pfds));
 
@@ -685,19 +698,10 @@ int mq_poll_wait(struct mq_poll *p, time_t stoptime) {
 		rc += set_size(p->readable);
 		rc += set_size(p->error);
 		if (rc > 0) goto DONE;
-
-		stop.tv_nsec = 0;
-		stop.tv_sec = stoptime - time(NULL);
-		if (stop.tv_sec < 0) {
-			rc = 0;
-			goto DONE;
-		}
-		sigemptyset(&mask);
-	} while ((rc = ppoll(pfds, count, &stop, &mask)) > 0);
+	} while ((rc = ppoll_compat(pfds, count, stoptime)) > 0);
 
 DONE:
 	free(pfds);
-
 	if (rc >= 0) {
 		return rc;
 	} else if (rc == -1 && errno == EINTR) {
