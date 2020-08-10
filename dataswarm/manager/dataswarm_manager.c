@@ -35,7 +35,7 @@ struct jx * manager_status_jx( struct dataswarm_manager *m )
 	struct jx * j = jx_object(0);
 	jx_insert_string(j,"type","dataswarm_manager");
 	jx_insert_string(j,"project",m->project_name);
-	jx_insert_integer(j,"starttime",(m->start_time/1000000)); 
+	jx_insert_integer(j,"starttime",(m->start_time/1000000));
 	jx_insert_string(j,"owner",owner);
 	jx_insert_string(j,"version",CCTOOLS_VERSION);
 	jx_insert_integer(j,"port",m->server_port);
@@ -80,29 +80,52 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 			break;
 		}
 
-		char *key = string_format("%p",l);
-
 		char addr[LINK_ADDRESS_MAX];
 		int port;
 		link_address_remote(l,addr,&port);
-
 		debug(D_DATASWARM,"new connection from %s:%d\n",addr,port);
 
-		const char *type = jx_lookup_string(msg,"type");
+		const char *method = jx_lookup_string(msg,"method");
+		struct jx *params = jx_lookup(msg,"params");
 
-		if(!strcmp(type,"worker")) {
-			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);	
-			struct dataswarm_worker *w = dataswarm_worker_create(l);
-			hash_table_insert(m->worker_table,key,w);
-		} else if(!strcmp(type,"client")) {
-			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);	
-			struct dataswarm_client *c = dataswarm_client_create(l);
-			hash_table_insert(m->client_table,key,c);
-		} else {
-			/* invalid type? */
+		if(!method || !params) {
+			/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+			link_close(l);
+			break;
 		}
 
-		free(key);
+		if(strcmp(method, "handshake")) {
+			/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		jx_int_t id = jx_lookup_integer(msg, "id");
+		if(id < 1) {
+			/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_ID, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		char *manager_key = string_format("%p",l);
+		//const char *msg_key = jx_lookup_string(msg, "uuid");  /* todo: replace manager_key when msg_key not null */
+		const char *conn_type = jx_lookup_string(params, "type");
+
+		if(!strcmp(conn_type,"worker")) {
+			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
+			struct dataswarm_worker *w = dataswarm_worker_create(l);
+			hash_table_insert(m->worker_table,manager_key,w);
+		} else if(!strcmp(conn_type,"client")) {
+			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
+			struct dataswarm_client *c = dataswarm_client_create(l);
+			hash_table_insert(m->client_table,manager_key,c);
+		} else {
+			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
+			link_close(l);
+			break;
+		}
+
+		free(manager_key);
 		jx_delete(msg);
 	}
 }
@@ -115,14 +138,37 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 		return;
 	}
 
-	const char *action = jx_lookup_string(msg,"action");
-	if(!strcmp(action,"task_submit")) {
+	const char *method = jx_lookup_string(msg,"method");
+	struct jx *params = jx_lookup(msg,"params");
+	if(!method || !params) {
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* should we disconnect the client on a message error? */
+		return;
+	}
+
+	if(!strcmp(method,"task-submit")) {
 		/* */
-	} else if(!strcmp(action,"file_submit")) {
+	} else if(!strcmp(method,"file-submit")) {
+		/* */
+	} else if(!strcmp(method,"status-report")) {
+		/* */
+	} else if(!strcmp(method,"status-request")) {
+		/* */
+	} else if(!strcmp(method,"task-retrieve")) {
+		/* */
+	} else if(!strcmp(method,"task-reap")) {
+		/* */
+	} else if(!strcmp(method,"task-cancel")) {
+		/* */
+	} else if(!strcmp(method,"blob-delete")) {
+		/* */
+	} else if(!strcmp(method,"blob-commit")) {
+		/* */
+	} else if(!strcmp(method,"blob-copy")) {
 		/* */
 	} else {
-		/* send back an invalid command response */
-	}	
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
+	}
 }
 
 void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker *w, time_t stoptime )
@@ -132,17 +178,30 @@ void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker
 		// handle disconnected client
 		return;
 	}
+	const char *method = jx_lookup_string(msg,"method");
+	const char *params = jx_lookup_string(msg,"params");
+	if(!method || !params) {
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_MALFORMED_MESSAGE, stoptime); */
+		/* disconnect worker */
+		return;
+	}
 
-	const char *action = jx_lookup_string(msg,"action");
-	if(!strcmp(action,"task_change")) {
+	char addr[LINK_ADDRESS_MAX];
+	int port;
+	link_address_remote(w->link, addr, &port);
+	debug(D_DATASWARM, "worker %s:%d rx: %s", method);
+
+
+	if(!strcmp(method,"task-change")) {
 		/* */
-	} else if(!strcmp(action,"file_change")) {
+	} else if(!strcmp(method,"blob-change")) {
 		/* */
-	} else if(!strcmp(action,"status")) {
+	} else if(!strcmp(method,"status-report")) {
 		/* */
 	} else {
-		/* send back an invalid command response */
+		/* dataswarm_json_send_error_result(l, msg, DS_MSG_UNEXPECTED_METHOD, stoptime); */
 	}
+
 }
 
 int handle_messages( struct dataswarm_manager *m, int msec )
@@ -213,7 +272,7 @@ void server_main_loop( struct dataswarm_manager *m )
 	}
 }
 
-static const struct option long_options[] = 
+static const struct option long_options[] =
 {
 	{"name", required_argument, 0, 'N'},
 	{"port", required_argument, 0, 'p'},
@@ -232,7 +291,7 @@ static void show_help( const char *cmd )
 	printf("-d,--debug=<subsys>       Enable debugging for this subsystem.\n");
 	printf("-o,--debug-file=<file>    Send debugging output to this file.\n");
 	printf("-h,--help                 Show this help string\n");
-	printf("-v,--version              Show version string\n");	
+	printf("-v,--version              Show version string\n");
 }
 
 int main(int argc, char *argv[])
@@ -272,7 +331,7 @@ int main(int argc, char *argv[])
 		printf("could not serve on port %d: %s\n", m->server_port,strerror(errno));
 		return 1;
 	}
-	
+
 	char addr[LINK_ADDRESS_MAX];
 	link_address_local(m->manager_link,addr,&m->server_port);
 	debug(D_DATASWARM,"listening on port %d...\n",m->server_port);
@@ -303,3 +362,4 @@ struct dataswarm_manager * dataswarm_manager_create()
 }
 
 
+/* vim: set noexpandtab tabstop=4: */
