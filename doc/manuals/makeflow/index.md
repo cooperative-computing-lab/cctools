@@ -380,7 +380,7 @@ sets the number of MPI processes the rule should spawn, and it should exactly
 divide the value of CORES. The value of sbatch used is something similar to:
 
 ```sh
--N 1 -n ${MPI_PROCESSES} ${CORES_divided_by_MPI_PROCESSES} --mem=${MEMORY}M
+-N 1 -n ${MPI_PROCESSES} -c ${CORES_divided_by_MPI_PROCESSES} --mem=${MEMORY}M
 ```
 
 Further, the commands in your rules should be prepended with the `srun` command
@@ -390,8 +390,23 @@ MPI process, with 2 CORES each, using the `pmi2` API:
 ```make
 .MAKEFLOW MPI_PROCESSES 4
 .MAKEFLOW CORES 8
+
 output: input
-srun --mpi=pmi2 -- ./my-mpi-job -i input -o output
+    srun --mpi=pmi2 -- ./my-mpi-job -i input -o output
+```
+
+Some installations may require a queue and time limit specifications. Since
+both `sbatch` (used internally by makeflow), and `srun` require these options,
+the environment variable can be used in the following way:
+
+```make
+# Setting queue and time limit needed as in xsede stampede2:
+BATCH_OPTIONS=-pnormal -t900
+.MAKEFLOW MPI_PROCESSES 4
+.MAKEFLOW CORES 8
+
+output: input
+    srun $(BATCH_OPTIONS) --mpi=pmi2 -- ./my-mpi-job -i input -o output
 ```
 
 
