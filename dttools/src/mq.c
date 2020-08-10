@@ -423,7 +423,8 @@ struct mq_msg *mq_wrap_json(struct jx *j) {
 void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
 	assert(msg);
 	if (msg->type != MQ_MSG_BUFFER) return NULL;
-	void *out = xxmalloc(msg->len);
+	char *out = xxmalloc(msg->len + 1);
+	out[msg->len] = 0;
 	memcpy(out, buffer_tostring(&msg->buf), msg->len);
 	if (len) {
 		*len = msg->len;
