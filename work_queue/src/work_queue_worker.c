@@ -454,6 +454,31 @@ static int send_tlq_config( struct link *master ) {
 	return 1;
 }
 
+static int get_task_tlq_url( struct work_queue_task *task ) {
+	if(tlq_port && debug_path) {
+		char home_host[WORK_QUEUE_LINE_MAX];
+		char tlq_workdir[WORK_QUEUE_LINE_MAX];
+		char log_path[WORK_QUEUE_LINE_MAX];
+		int home_port;
+		debug(D_TLQ, "looking up task %d TLQ URL", task->taskid);
+		if(sscanf(task->command_line,"sh log_define %s %d %s %s", home_host, &home_port, tlq_workdir, log_path) == 4) {
+			char *task_url = tlq_config_url(tlq_port, log_path);
+			if(!task_url) {
+				debug(D_TLQ, "error setting task %d TLQ URL - setting it to NONE", task->taskid);
+				return 0;
+			}
+			debug(D_TLQ, "set task %d TLQ URL: %s", task->taskid, task_url);
+			return 1;
+		}
+		else {
+			debug(D_TLQ, "could not find task %d debug log", task->taskid);
+			return 0;
+		}
+		return 1;
+	}
+	else return 0;
+}
+
 /*
 Send the initial "ready" message to the master with the version and so forth.
 The master will not start sending tasks until this message is recevied.
@@ -613,6 +638,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		total_tasks_executed++;
 	}
 
+	get_task_tlq_url(p->task);
 	send_stats_update(master);
 }
 

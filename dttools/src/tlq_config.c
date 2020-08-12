@@ -15,7 +15,10 @@ char *tlq_config_url( int port, const char *log_path ) {
 	struct link *server;
 	strcpy(buffer, log_path);
 	server = link_connect("127.0.0.1", port, time(0) + 10);
-	if(!server) debug(D_NOTICE, "error opening local INET socket: %d - %s", errno, strerror(errno));
+	if(!server) {
+		debug(D_NOTICE, "error opening local INET socket: %d - %s", errno, strerror(errno));
+		return NULL;
+	}
 	
 	ssize_t serv_write = link_write(server, buffer, sizeof(buffer), time(0) + 10);
 	if(serv_write < 0) debug(D_NOTICE, "error writing to local INET socket: %d - %s", errno, strerror(errno));
