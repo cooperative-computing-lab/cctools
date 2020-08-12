@@ -91,6 +91,7 @@ parse_arguments() {
                 ;;
             -d | --debug)
                 export PYTHON_PACKAGE_RUN_DEBUG=yes
+                logmsg parsing arguments...
                 ;;
             -e | --environment)
                 shift
