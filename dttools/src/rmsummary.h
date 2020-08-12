@@ -20,6 +20,7 @@ COPYING for details.
 #define RESOURCES_DISK      "DISK"
 #define RESOURCES_WALL_TIME "WALL_TIME"
 #define RESOURCES_GPUS      "GPUS"
+#define RESOURCES_MPI_PROCESSES "MPI_PROCESSES"
 
 // These fields are defined as signed integers, even though they
 // will only contain positive numbers. This is to conversion to
