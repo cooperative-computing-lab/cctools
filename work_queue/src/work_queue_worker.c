@@ -13,7 +13,6 @@ See the file COPYING for details.
 #include "work_queue_watcher.h"
 
 #include "cctools.h"
-#include "address.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
@@ -46,6 +45,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "pattern.h"
 #include "gpu_info.h"
+#include "tlq_config.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -217,9 +217,9 @@ static int total_tasks_executed = 0;
 static const char *project_regex = 0;
 static int released_by_master = 0;
 
-char *tlq_url;
-char *debug_path;
-char *catalog_hosts;
+static char *tlq_url = NULL;
+static char *debug_path = NULL;
+static char *catalog_hosts = NULL;
 static int tlq_port = 0;
 
 __attribute__ (( format(printf,2,3) ))
@@ -439,6 +439,21 @@ static int send_keepalive(struct link *master, int force_resources){
 	return 1;
 }
 
+static int send_tlq_config( struct link *master ) {
+	//attempt to find local TLQ server to retrieve master URL
+	if(tlq_port && debug_path && !tlq_url) {
+		debug(D_TLQ, "looking up worker TLQ URL");
+		tlq_url = tlq_config_url(tlq_port, debug_path);
+		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
+		else {
+			debug(D_TLQ, "error setting worker TLQ URL - setting it to NONE");
+			tlq_url = "NONE";
+		}
+	}
+	send_master_message(master, "tlq %s\n", tlq_url);
+	return 1;
+}
+
 /*
 Send the initial "ready" message to the master with the version and so forth.
 The master will not start sending tasks until this message is recevied.
@@ -451,30 +466,7 @@ static void report_worker_ready( struct link *master )
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_master_message(master, "info worker-id %s\n", worker_id);
 	send_features(master);
-
-	//attempt to find local TLQ server to retrieve master URL
-	if(tlq_port && debug_path && !tlq_url) {
-		debug(D_TLQ, "looking up worker TLQ URL");
-		tlq_url = address_get_tlq_url(tlq_port, debug_path);
-		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
-		else {
-			debug(D_TLQ, "error setting worker TLQ URL - setting it to NONE");
-			tlq_url = "NONE";
-		}
-	}
-
-	if(tlq_url) {
-		char line[WORK_QUEUE_LINE_MAX];
-		debug(D_TLQ, "retrieving master TLQ URL");
-		send_master_message(master, "tlq %s\n", tlq_url);
-		if(!recv_master_message(master,line,sizeof(line),idle_stoptime)) {
-			debug(D_TLQ, "no response from master while retrieving TLQ URL");
-			link_close(master);
-		}
-		else {
-			debug(D_TLQ, "setting master TLQ URL: %s", line);
-		}
-	}
+	send_tlq_config(master);
 	send_keepalive(master, 1);
 }
 
@@ -1234,6 +1226,11 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 		return file_from_url(url, cache_name);
 }
 
+static int do_tlq_url(const char *master_tlq_url) {
+	debug(D_TLQ, "set master TLQ URL: %s", master_tlq_url);
+	return 1;
+}
+
 static int do_unlink(const char *path)
 {
 	char cached_path[WORK_QUEUE_LINE_MAX];
@@ -1592,6 +1589,7 @@ static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
+	char master_tlq_url[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
@@ -1610,6 +1608,9 @@ static int handle_master(struct link *master) {
 			reset_idle_timer();
 		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
 			r = do_url(master, filename, length, mode);
+			reset_idle_timer();
+		} else if(sscanf(line, "tlq %s", master_tlq_url) == 1) {
+			r = do_tlq_url(master_tlq_url);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));

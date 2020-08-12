@@ -4,7 +4,6 @@ This software is distributed under the GNU General Public License.
 See the file COPYING for details.
 */
 
-#include "address.h"
 #include "auth_all.h"
 #include "auth_ticket.h"
 #include "batch_job.h"
@@ -34,6 +33,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "create_dir.h"
 #include "sha1.h"
+#include "tlq_config.h"
 
 #include "dag.h"
 #include "dag_node.h"
@@ -2484,7 +2484,7 @@ int main(int argc, char *argv[])
 
 	if(tlq_port && debug_file_name) {
 		debug(D_TLQ, "looking up makeflow TLQ URL");
-		char *local_tlq_url = address_get_tlq_url(tlq_port, debug_file_name);
+		char *local_tlq_url = tlq_config_url(tlq_port, debug_file_name);
 		if(!local_tlq_url) {
 			debug(D_TLQ, "error looking up makeflow TLQ URL - setting it to NONE");
 			local_tlq_url = "NONE";

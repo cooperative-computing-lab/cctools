@@ -157,27 +157,4 @@ int address_parse_hostport( const char *hostport, char *host, int *port, int def
 	}
 }
 
-char *address_get_tlq_url( int port, const char *log_path ) {
-	struct sockaddr_in serv_addr;
-	char buffer[256];
-	strcpy(buffer, log_path);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	serv_addr.sin_port = htons(port);
-	debug(D_NOTICE, "set server socket information");
-
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd < 0) debug(D_NOTICE, "error opening local INET socket: %d - %s", errno, strerror(errno));
-	if(connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) debug(D_NOTICE, "error connecting to local INET socket: %d - %s", errno, strerror(errno));
-	int serv_write = write(sockfd, buffer, strlen(buffer));
-	if(serv_write < 0) debug(D_NOTICE, "error writing to local INET socket: %d - %s", errno, strerror(errno));
-	bzero(buffer, 256);
-	int serv_read = read(sockfd, buffer, 255);
-	if(serv_read < 0) debug(D_NOTICE, "error reading from local INET socket: %d - %s", errno, strerror(errno));
-	close(sockfd);
-	char *url = xxstrdup(buffer);
-	if(!url) url = "NONE";
-	return xxstrdup(buffer);
-}
-
 /* vim: set noexpandtab tabstop=4: */
