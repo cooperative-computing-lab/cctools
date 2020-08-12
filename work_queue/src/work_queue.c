@@ -10,6 +10,7 @@ See the file COPYING for details.
 #include "work_queue_resources.h"
 
 #include "cctools.h"
+#include "address.h"
 #include "int_sizes.h"
 #include "link.h"
 #include "link_auth.h"
@@ -204,6 +205,10 @@ struct work_queue {
 
 	char *password;
 	double bandwidth;
+
+	char *debug_path;
+	int tlq_port;
+	char *tlq_url;
 };
 
 struct work_queue_worker {
@@ -562,6 +567,31 @@ work_queue_msg_code_t process_name(struct work_queue *q, struct work_queue_worke
 	return MSG_PROCESSED;
 }
 
+work_queue_msg_code_t advertise_tlq_url(struct work_queue *q, struct work_queue_worker *w, char *line)
+{
+	char worker_url[WORK_QUEUE_LINE_MAX];
+	int n = sscanf(line, "tlq %s", worker_url);
+	if(n != 1) debug(D_TLQ, "empty TLQ URL received from worker (%s)", w->addrport);
+	else debug(D_TLQ, "received worker (%s) TLQ URL %s", w->addrport, worker_url);
+
+	//attempt to find local TLQ server to retrieve master URL
+	if(q->tlq_port && q->debug_path && !q->tlq_url) {
+		debug(D_TLQ, "looking up master TLQ URL");
+		q->tlq_url = address_get_tlq_url(q->tlq_port, q->debug_path);
+		f(q->tlq_url) debug(D_TLQ, "set master TLQ URL: %s", q->tlq_url);
+		else {
+			debug(D_TLQ, "error setting master TLQ URL - setting it to NONE");
+			q->tlq_url = "NONE";
+		}
+	}
+	else if(q->tlq_port && !q->debug_path) debug(D_TLQ, "cannot get master TLQ URL: no debug log path set");
+
+	//send master TLQ URL if there is one. otherwise send NONE
+	debug(D_TLQ, "sending master TLQ URL to worker (%s)", w->addrport);
+	send_worker_msg(q, w, "%s\n", q->tlq_url ? q->tlq_url : "NONE");
+	return MSG_PROCESSED;
+}
+
 work_queue_msg_code_t process_info(struct work_queue *q, struct work_queue_worker *w, char *line)
 {
 	char field[WORK_QUEUE_LINE_MAX];
@@ -654,6 +684,8 @@ static work_queue_msg_code_t recv_worker_msg(struct work_queue *q, struct work_q
 		result = process_name(q, w, line);
 	} else if (string_prefix_is(line, "info")) {
 		result = process_info(q, w, line);
+	} else if (string_prefix_is(line, "tlq")) {
+		result = advertise_tlq_url(q, w, line);
 	} else {
 		// Message is not a status update: return it to the user.
 		result = MSG_NOT_PROCESSED;
@@ -2343,6 +2375,8 @@ static struct jx * queue_to_jx( struct work_queue *q, struct link *foreman_uplin
 	jx_insert_integer(j,"capacity_instantaneous",info.capacity_instantaneous);
 	jx_insert_integer(j,"capacity_weighted",info.capacity_weighted);
 	jx_insert_integer(j,"master_load",info.master_load);
+
+	if(q->tlq_url) jx_insert_string(j,"tlq_url",q->tlq_url);
 
 	// Add the resources computed from tributary workers.
 	struct work_queue_resources r;
@@ -5193,6 +5227,22 @@ void work_queue_specify_name(struct work_queue *q, const char *name)
 	} else {
 		q->name = 0;
 	}
+}
+
+void work_queue_specify_debug_path(struct work_queue *q, const char *path)
+{
+	if(q->debug_path) free(q->debug_path);
+	if(path) {
+		q->debug_path = xxstrdup(path);
+		setenv("WORK_QUEUE_DEBUG_PATH", q->debug_path, 1);
+	} else {
+		q->debug_path = 0;
+	}
+}
+
+void work_queue_specify_tlq_port(struct work_queue *q, int port)
+{
+	q->tlq_port = port;
 }
 
 const char *work_queue_name(struct work_queue *q)

@@ -20,5 +20,6 @@ int address_to_sockaddr( const char *addr, int port, struct sockaddr_storage *s,
 int address_from_sockaddr( char *str, struct sockaddr *saddr );
 int address_parse_hostport( const char *hostport, char *host, int *port, int default_port );
 int address_check_mode( struct addrinfo *info );
+char *address_get_tlq_url( int port, const char *log_path );
 
 #endif

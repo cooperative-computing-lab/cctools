@@ -13,10 +13,14 @@ See the file COPYING for details.
 #include "work_queue_watcher.h"
 
 #include "cctools.h"
+#include "address.h"
 #include "macros.h"
 #include "catalog_query.h"
 #include "domain_name_cache.h"
 #include "jx.h"
+#include "jx_eval.h"
+#include "jx_parse.h"
+#include "jx_print.h"
 #include "copy_stream.h"
 #include "host_memory_info.h"
 #include "host_disk_info.h"
@@ -212,6 +216,11 @@ static int total_tasks_executed = 0;
 
 static const char *project_regex = 0;
 static int released_by_master = 0;
+
+char *tlq_url;
+char *debug_path;
+char *catalog_hosts;
+static int tlq_port = 0;
 
 __attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
@@ -442,6 +451,30 @@ static void report_worker_ready( struct link *master )
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_master_message(master, "info worker-id %s\n", worker_id);
 	send_features(master);
+
+	//attempt to find local TLQ server to retrieve master URL
+	if(tlq_port && debug_path && !tlq_url) {
+		debug(D_TLQ, "looking up worker TLQ URL");
+		tlq_url = address_get_tlq_url(tlq_port, debug_path);
+		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
+		else {
+			debug(D_TLQ, "error setting worker TLQ URL - setting it to NONE");
+			tlq_url = "NONE";
+		}
+	}
+
+	if(tlq_url) {
+		char line[WORK_QUEUE_LINE_MAX];
+		debug(D_TLQ, "retrieving master TLQ URL");
+		send_master_message(master, "tlq %s\n", tlq_url);
+		if(!recv_master_message(master,line,sizeof(line),idle_stoptime)) {
+			debug(D_TLQ, "no response from master while retrieving TLQ URL");
+			link_close(master);
+		}
+		else {
+			debug(D_TLQ, "setting master TLQ URL: %s", line);
+		}
+	}
 	send_keepalive(master, 1);
 }
 
@@ -2402,6 +2435,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container based on this docker image.\n", "--docker-preserve=<image>");
 	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<tarball>");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
+	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2409,7 +2443,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
 	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2454,6 +2488,7 @@ static const struct option long_options[] = {
 	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
 	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
+	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{0,0,0,0}
 };
 
@@ -2468,7 +2503,7 @@ int main(int argc, char *argv[])
 	int enable_capacity = 1; // enabled by default
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
-	char * catalog_hosts = CATALOG_HOST;
+	catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
 
@@ -2541,6 +2576,7 @@ int main(int argc, char *argv[])
 			connect_timeout = string_time_parse(optarg);
 			break;
 		case 'o':
+			debug_path = xxstrdup(optarg);
 			debug_config_file(optarg);
 			break;
 		case LONG_OPT_FOREMAN:
@@ -2689,6 +2725,9 @@ int main(int argc, char *argv[])
 		}
 		case LONG_OPT_FEATURE:
 			hash_table_insert(features, optarg, (void **) 1);
+			break;
+		case LONG_OPT_TLQ:
+			tlq_port = atoi(optarg);
 			break;
 		default:
 			show_help(argv[0]);

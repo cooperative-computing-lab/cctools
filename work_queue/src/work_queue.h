@@ -853,6 +853,18 @@ const char *work_queue_name(struct work_queue *q);
 */
 void work_queue_specify_name(struct work_queue *q, const char *name);
 
+/** Change the debug log path for a given queue (used by TLQ).
+@param q A work queue object.
+@param name The debug log path.
+*/
+void work_queue_specify_debug_path(struct work_queue *q, const char *path);
+
+/** Change the home host and port for a given queue (used by TLQ).
+@param q A work queue object.
+@param flag Indicates whether master should look up its TLQ URL locally.
+*/
+void work_queue_specify_tlq_port(struct work_queue *q, int port);
+
 /** Change the priority for a given queue.
 @param q A work queue object.
 @param priority The new priority of the queue.  Higher priority masters will attract workers first.
