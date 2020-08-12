@@ -193,7 +193,7 @@ mkdir -p "${UNPACK_TO}"
 
 UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
 cat > ${UNTAR_SCRIPT} << EOF
-if [ "\$(find ${UNPACK_TO} -mindepth 1 -maxdepth 1 -not -name $(basename ${LOCKFILE}) | wc -l)" = 0 ]
+if [ ! -e "${UNPACK_TO}"/.python_package_run_expanded ]
 then
     # Directory is empty (the only file there is the lock). It is safe to untar.
     if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
@@ -201,6 +201,7 @@ then
         echo "python_package_run: could not uncompress environment: ${ENV_NAME}"
         exit 1
     fi
+    /bin/touch "${UNPACK_TO}"/.python_package_run_expanded
 else
     if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
     then
