@@ -142,11 +142,12 @@ function cleanup {
 
     end_time=$(date +'%s%N')
 
-    ns=$((end_time-start_time))
-    s=$((ns/1000000000))
-    ns=$((ns-s))
+    total_ns=$((end_time-start_time))
+    total_ms=$((total_ns/1000000))
+    ms=$((total_ms % 1000))
+    s=$((total_ms/1000))
 
-    logmsg total runtime: ${s}.${ns} seconds
+    logmsg total runtime: $(printf "%d.%0.3d seconds" ${s} ${ms})
 }
 trap cleanup EXIT
 
