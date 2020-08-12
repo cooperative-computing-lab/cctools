@@ -74,7 +74,7 @@ parse_arguments() {
 
     original_arg_count=$#
 
-	while [ $# -gt 0 ]
+	while [[ $# -gt 0 ]]
 	do
 		case $1 in
 			-h | --help)
@@ -91,6 +91,7 @@ parse_arguments() {
                 ;;
             -d | --debug)
                 export PYTHON_PACKAGE_RUN_DEBUG=yes
+                logmsg parsing arguments...
                 ;;
             -e | --environment)
                 shift
@@ -141,11 +142,12 @@ function cleanup {
 
     end_time=$(date +'%s%N')
 
-    ns=$((end_time-start_time))
-    s=$((ns/1000000000))
-    ns=$((ns-s))
+    total_ns=$((end_time-start_time))
+    total_ms=$((total_ns/1000000))
+    ms=$((total_ms % 1000))
+    s=$((total_ms/1000))
 
-    logmsg total runtime: ${s}.${ns} seconds
+    logmsg total runtime: $(printf "%d.%0.3d seconds" ${s} ${ms})
 }
 trap cleanup EXIT
 
@@ -192,7 +194,7 @@ mkdir -p "${UNPACK_TO}"
 
 UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
 cat > ${UNTAR_SCRIPT} << EOF
-if [ "\$(find ${UNPACK_TO} -mindepth 1 -maxdepth 1 -not -name $(basename ${LOCKFILE}) | wc -l)" = 0 ]
+if [[ ! -e "${UNPACK_TO}"/.python_package_run_expanded ]]
 then
     # Directory is empty (the only file there is the lock). It is safe to untar.
     if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
@@ -200,6 +202,13 @@ then
         echo "python_package_run: could not uncompress environment: ${ENV_NAME}"
         exit 1
     fi
+
+    if ! ${UNPACK_TO}/bin/conda-unpack
+    then
+        echo "python_package_run: could not relocate environment: ${ENV_NAME}"
+        exit 1
+    fi
+    /bin/touch "${UNPACK_TO}"/.python_package_run_expanded
 else
     if [[ "${PYTHON_PACKAGE_RUN_DEBUG}" = yes ]]
     then
@@ -212,7 +221,7 @@ EOF
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
     logmsg expanding environment file
-    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/sh ${UNTAR_SCRIPT}"
+    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/bash ${UNTAR_SCRIPT}"
     if [ "$?" != 0 ]
     then
         errmsg "could not untar environment: ${ENV_NAME}"
@@ -224,17 +233,9 @@ fi
 logmsg activating environment
 unset PYTHONPATH
 source "${UNPACK_TO}/bin/activate"
-if [ "$?" != 0 ]
+if [[ "$?" != 0 ]]
 then
     errmsg "could not activate environment: ${ENV_NAME}"
-    exit 1
-fi
-
-logmsg relocating paths
-flock -w ${LOCK_WAIT} ${LOCKFILE} conda-unpack
-if [ "$?" != 0 ]
-then
-    errmsg "could not unpack environment: ${ENV_NAME}"
     exit 1
 fi
 
