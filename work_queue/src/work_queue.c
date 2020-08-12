@@ -578,7 +578,7 @@ work_queue_msg_code_t advertise_tlq_url(struct work_queue *q, struct work_queue_
 	if(q->tlq_port && q->debug_path && !q->tlq_url) {
 		debug(D_TLQ, "looking up master TLQ URL");
 		q->tlq_url = address_get_tlq_url(q->tlq_port, q->debug_path);
-		f(q->tlq_url) debug(D_TLQ, "set master TLQ URL: %s", q->tlq_url);
+		if(q->tlq_url) debug(D_TLQ, "set master TLQ URL: %s", q->tlq_url);
 		else {
 			debug(D_TLQ, "error setting master TLQ URL - setting it to NONE");
 			q->tlq_url = "NONE";
