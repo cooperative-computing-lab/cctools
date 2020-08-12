@@ -74,7 +74,7 @@ parse_arguments() {
 
     original_arg_count=$#
 
-	while [ $# -gt 0 ]
+	while [[ $# -gt 0 ]]
 	do
 		case $1 in
 			-h | --help)
@@ -193,7 +193,7 @@ mkdir -p "${UNPACK_TO}"
 
 UNTAR_SCRIPT=$(mktemp python_package_run.XXXXXX)
 cat > ${UNTAR_SCRIPT} << EOF
-if [ ! -e "${UNPACK_TO}"/.python_package_run_expanded ]
+if [[ ! -e "${UNPACK_TO}"/.python_package_run_expanded ]]
 then
     # Directory is empty (the only file there is the lock). It is safe to untar.
     if ! tar -xf "${ENV_NAME}" -C "${UNPACK_TO}"
@@ -220,7 +220,7 @@ EOF
 if [[ "${ENV_NAME_IS_DIR}" = no ]]
 then
     logmsg expanding environment file
-    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/sh ${UNTAR_SCRIPT}"
+    flock -w ${LOCK_WAIT} ${LOCKFILE} -c "/bin/bash ${UNTAR_SCRIPT}"
     if [ "$?" != 0 ]
     then
         errmsg "could not untar environment: ${ENV_NAME}"
@@ -232,7 +232,7 @@ fi
 logmsg activating environment
 unset PYTHONPATH
 source "${UNPACK_TO}/bin/activate"
-if [ "$?" != 0 ]
+if [[ "$?" != 0 ]]
 then
     errmsg "could not activate environment: ${ENV_NAME}"
     exit 1
