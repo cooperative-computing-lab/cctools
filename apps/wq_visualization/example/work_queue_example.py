@@ -20,8 +20,8 @@ if __name__ == '__main__':
   port = WORK_QUEUE_DEFAULT_PORT
 
   if len(sys.argv) < 2:
-    print "work_queue_example <file1> [file2] [file3] ..."
-    print "Each file given on the command line will be compressed using a remote worker."
+    print("work_queue_example <file1> [file2] [file3] ...")
+    print("Each file given on the command line will be compressed using a remote worker.")
     sys.exit(1)
 
   # Usually, we can execute the gzip utility by simply typing its name at a
@@ -34,7 +34,7 @@ if __name__ == '__main__':
   if not os.path.exists(gzip_path):
     gzip_path = "/usr/bin/gzip"
     if not os.path.exists(gzip_path):
-      print "gzip was not found. Please modify the gzip_path variable accordingly. To determine the location of gzip, from the terminal type: which gzip (usual locations are /bin/gzip and /usr/bin/gzip)"
+      print("gzip was not found. Please modify the gzip_path variable accordingly. To determine the location of gzip, from the terminal type: which gzip (usual locations are /bin/gzip and /usr/bin/gzip)")
       sys.exit(1);
 
   # We create the tasks queue using the default port. If this port is already
@@ -43,7 +43,7 @@ if __name__ == '__main__':
   try:
       q = WorkQueue(port)
   except:
-      print "Instantiation of Work Queue failed!"
+      print("Instantiation of Work Queue failed!")
       sys.exit(1)
 
   # We create and dispatch a task for each filename given in the argument list

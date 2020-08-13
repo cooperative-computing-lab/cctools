@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 #Copyright (C) 2020- The University of Notre Dame
 #This software is distributed under the GNU General Public License.
@@ -115,7 +115,7 @@ def main():
     start = float(start)
     end = float(end)
 
-    print("time: {}".format(end-start-1))
+    print(("time: {}".format(end-start-1)))
 
     os.system("rm -f query.fastq.*.sam")
 

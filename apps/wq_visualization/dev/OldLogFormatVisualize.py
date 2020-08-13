@@ -170,7 +170,7 @@ def add_machine(draw, machine_type, ip, connections, workers, fileCount, legend=
 
 	else:
 		if "debug" in globals():
-			print "tried to add machine of unspecified type "+machine_type
+			print(("tried to add machine of unspecified type "+machine_type))
 		sys.exit()
 
 
@@ -211,7 +211,7 @@ class o_dict(object):
 		except:
 			#catch out of bounds errors, but don't do anything about them, just don't have them kill the program
 			if "debug" in globals():
-				print "Illegal swap attempt for o_dict"
+				print("Illegal swap attempt for o_dict")
 
 
 
@@ -235,14 +235,14 @@ class Task_Info(object):
 
 	def set_info(self, log, fileCount, ip, color_list, legend):
 		if "task_info_debug" in globals():
-			print "-------------------------------------------------\nIn set_info:\n"
+			print("-------------------------------------------------\nIn set_info:\n")
 
 		need_to_read = True
 		has_infile = False
 		while need_to_read:
 			recent_line = log.readline()
 			if "task_info_debug" in globals():
-				print "Read recent line: " + recent_line
+				print(("Read recent line: " + recent_line))
 
 			matched = re.search(": cmd ([0-9]+)(.*)", recent_line)
 			if(matched):
@@ -255,7 +255,7 @@ class Task_Info(object):
 					self.exe = self.command_string
 
 				if "task_info_debug" in globals():
-					print "\ncommand_info:\n\texe: " + self.exe + "\n\tcommand_string: " + self.command_string + "\n\tcommand_num: " + self.command_num + "\n"
+					print(("\ncommand_info:\n\texe: " + self.exe + "\n\tcommand_string: " + self.command_string + "\n\tcommand_num: " + self.command_num + "\n"))
 				continue
 
 			matched = re.search(": infile (.*)", recent_line)
@@ -270,7 +270,7 @@ class Task_Info(object):
 
 				legend.update(infile)
 				if "task_info_debug" in globals():
-					print "\ninfile: " + infile + "\n"
+					print(("\ninfile: " + infile + "\n"))
 				continue
 
 			matched = re.search(": outfile (.*)", recent_line)
@@ -284,7 +284,7 @@ class Task_Info(object):
 
 				legend.update(outfile)
 				if "task_info_debug" in globals():
-					print "\noutfile: " + outfile + "\n"
+					print(("\noutfile: " + outfile + "\n"))
 				continue
 
 			matched = re.search(": end", recent_line)
@@ -302,7 +302,7 @@ class Task_Info(object):
 			#re_read = log.readline()
 			#print "Unread recent line: " + re_read
 			#log.seek(-len(recent_line), 1)
-			print "Leaving set_info \n----------------------------------------------------------------------\n"
+			print("Leaving set_info \n----------------------------------------------------------------------\n")
 
 class File_Info(object):
 	def __init__(self, name=None, action=None):
@@ -347,48 +347,48 @@ class Machine_Task_Display(object):
 				min_tasks = len(row[1])
 
 		if "task_debug" in globals():
-			print ip + " adding task to " + str(adding_row)
+			print((ip + " adding task to " + str(adding_row)))
 
 		adding_row[1].append( (task_no, "running") )
 		if "task_debug" in globals():
-			print "The row is now " + str(adding_row)
-			print
+			print(("The row is now " + str(adding_row)))
+			print()
 
 		self.show_row(adding_row)
 
 	def finish_task(self, ip, task_no):
 		for row in self.task_rows:
 			if "task_debug" in globals():
-				print ip + " trying to finish task " + str(task_no) + " in " + str(row)
+				print((ip + " trying to finish task " + str(task_no) + " in " + str(row)))
 			i = 0
 			while i < len(row[1]):
 				if task_no == row[1][i][0]:
 					row[1][i] = (task_no, "finished")
 					self.show_row(row)
 					if "task_debug" in globals():
-						print "finished"
+						print("finished")
 					return
 
 		if "task_debug" in globals():
-			print ip + " failed to finish task " + str(task_no) + " in " + str(row)
+			print((ip + " failed to finish task " + str(task_no) + " in " + str(row)))
 
 	def remove_task(self, ip, task_no):
 		#max_tasks = len(self.task_rows[0][1])
 		#removing_row = self.task_rows[0]
 		for row in self.task_rows:
 			if "task_debug" in globals():
-				print ip + " trying to remove task " + str(task_no) + " from " + str(row)
+				print((ip + " trying to remove task " + str(task_no) + " from " + str(row)))
 			i = 0
 			while i < len(row[1]):
 				if task_no == row[1][i][0]:
 					row[1].pop(i)
 					self.show_row(row)
 					if "task_debug" in globals():
-						print "removed"
+						print("removed")
 					return
 
 		if "task_debug" in globals():
-			print ip + " failed to remove task " + str(task_no) + " from " + str(row)
+			print((ip + " failed to remove task " + str(task_no) + " from " + str(row)))
 
 		#	if(len(row[1]) > max_tasks):
 		#		removing_row = row
@@ -444,7 +444,7 @@ class Machine_File_Display(object):
 	def add_file(self, fname, color):
 		#add to the row with the fewest files showing in it
 		if "file_display_debug" in globals():
-			print "trying to add " + fname + " with color " + str(color)
+			print(("trying to add " + fname + " with color " + str(color)))
 		min_files = len(self.file_rows[0][1].dictionary)
 		adding_row = self.file_rows[0]
 		for row in self.file_rows:
@@ -456,7 +456,7 @@ class Machine_File_Display(object):
 				min_files = len(row[1].dictionary)
 		if "debug" in globals():
 			if min_files >= self.max_files_in_row:
-				print "Adding a color box that will not display on machine due to space considerations"
+				print("Adding a color box that will not display on machine due to space considerations")
 
 		adding_row[1].append(fname, color)
 		self.show_row(adding_row)
@@ -575,7 +575,7 @@ class Legend(object):
 			if new_count > self.lowest_file_refs:
 				#either lowest_file_refs is out of date, or we'll end up replacing a file
 				#no matter, lowest_file_refs will be updated
-				low_refs_index = self.file_slots.keys()[0]
+				low_refs_index = list(self.file_slots.keys())[0]
 				low_refs_name = self.file_slots[low_refs_index]
 				low_refs = self.fileCounter[low_refs_name].occur_count
 				for index in self.file_slots:
@@ -619,7 +619,7 @@ class Color_List(object):
 		except:
 			color = BLACK
 			if "debug" in globals():
-				print "Trying to pop empty color list"
+				print("Trying to pop empty color list")
 
 		return color
 
@@ -676,7 +676,7 @@ class Machine(object):
 				self.task_display.finish_task(self.ip, task_inf.num)
 				for outfile in task_inf.outfiles:
 					if "task_display_debug" in globals():
-						print "trying to add " + outfile + " to the display"
+						print(("trying to add " + outfile + " to the display"))
 					#if file is used in task, it will already be in fileCount
 					self.file_display.add_file(outfile, self.fileCount[outfile].color)
 					self.files.append(outfile)
@@ -860,7 +860,7 @@ class Machine(object):
 		regex_match = re.search("tcp: disconnected", line)
 		if(regex_match):
 			if "tcp_debug" in globals():
-				print "expect an invisible machine"
+				print("expect an invisible machine")
 			#coloring taken care of in main
 			self.is_visible = False
 			return True
@@ -868,12 +868,12 @@ class Machine(object):
 		return False
 
 	def display_attributes(self):
-		print self.name + "/" + self.ip
+		print((self.name + "/" + self.ip))
 		for task in self.tasks:
-			print "\tTask: "+ str(task)+" : " +self.tasks[task]
+			print(("\tTask: "+ str(task)+" : " +self.tasks[task]))
 		for f in self.files:
-			print "\tFile:" + f
-		print
+			print(("\tFile:" + f))
+		print()
 
 	def get_location(self):
 		return self.location
@@ -903,7 +903,7 @@ class Connections(object):
 			i = i + 1
 
 		if not added and "debug" in globals():
-			print "Out of space :("
+			print("Out of space :(")
 			return None
 		else:
 			return (grid_x, grid_y)
@@ -929,7 +929,7 @@ class Connection(object):
 
 	def add(self, draw):
 		if self.full() and ("debug" in globals()):
-			print "Can't add to this connection, overfull"
+			print("Can't add to this connection, overfull")
 		else:
 			#if this connection wire just got its first machine
 			if(self.slots_remaining == self.num_slots):
@@ -944,7 +944,7 @@ class Connection(object):
 				else:
 					i = i + 1
 			if not updated and ("debug" in globals()):
-				print "Failed to add to this connection, for some reason"
+				print("Failed to add to this connection, for some reason")
 				sys.exit()
 			else:
 				self.slots_remaining = self.slots_remaining - 1
@@ -962,23 +962,23 @@ class Connection(object):
 def main():
 
 	if(len(sys.argv) != 3):
-		print "Usage: "+sys.argv[0]+" <debugFileName> <outputFileName>"
+		print(("Usage: "+sys.argv[0]+" <debugFileName> <outputFileName>"))
 		sys.exit(0)
 	try:
 		logToRead = open(sys.argv[1], 'r')
 	except:
-		print "Could not open " + sys.argv[1] + " for reading: "
+		print(("Could not open " + sys.argv[1] + " for reading: "))
 		sys.exit(0)
 
 	if os.path.isfile(sys.argv[2]+".gif"):
-		print "Could not create " + sys.argv[2] + ".gif to write final movie to, file already exists"
+		print(("Could not create " + sys.argv[2] + ".gif to write final movie to, file already exists"))
 		sys.exit(0)
 
 	dirname = sys.argv[2]+"_frames"
 
 
 	if(os.system("mkdir "+dirname) != 0):
-		print "Could not create a temporary file storage directory " + dirname +"."
+		print(("Could not create a temporary file storage directory " + dirname +"."))
 		sys.exit()
 
 	numFrames = 0
@@ -1016,7 +1016,7 @@ def main():
 		ip = find_ip(line)
 		if "count_ips" in globals():
 			ips.add(ip)
-			print "Length of ips is: " + str(len(ips))
+			print(("Length of ips is: " + str(len(ips))))
 
 		if(ip not in workers and ip != None):
 			if(master.ip == ""):
@@ -1060,10 +1060,10 @@ def main():
 				currentImage.save(dirname+"/frame_"+padded_nframes+".gif", "GIF")
 				if (numFrames - last_appended_frame  >= append_threshold):
 					if "debug" in globals():
-						print "gifsicle --delay=" + str(FRAME_DELAY) + " --loop ./"+dirname+"/*.gif > tmp_"+padded_nframes+".gif"
+						print(("gifsicle --delay=" + str(FRAME_DELAY) + " --loop ./"+dirname+"/*.gif > tmp_"+padded_nframes+".gif"))
 					os.system("gifsicle --delay=" + str(FRAME_DELAY) +" --loop ./"+dirname+"/*.gif > tmp_"+padded_nframes+".gif")
 					if "debug" in globals():
-						print "gifsicle --batch "+sys.argv[2]+".gif --delay=" + str(FRAME_DELAY) +" --loop --append tmp_"+padded_nframes+".gif"
+						print(("gifsicle --batch "+sys.argv[2]+".gif --delay=" + str(FRAME_DELAY) +" --loop --append tmp_"+padded_nframes+".gif"))
 					os.system("gifsicle --batch "+sys.argv[2]+".gif --delay=" + str(FRAME_DELAY) + " --loop --append tmp_"+padded_nframes+".gif")
 					os.system("rm tmp_"+padded_nframes+".gif ./"+dirname+"/*")
 					last_appended_frame = numFrames
@@ -1073,20 +1073,20 @@ def main():
 					highlight_machine(draw, this_worker, BLACK)
 				else:
 					if "tcp_debug" in globals():
-						print "invisible worker in frame numFrames"
+						print("invisible worker in frame numFrames")
 					highlight_machine(draw, this_worker, WHITE)
 
 				color_connection(draw, master, this_worker, BLACK)
 
 				clear_text_box(draw)
 				if "debug" in globals():
-					print "len fileCount: " + str(len(fileCounter))
+					print(("len fileCount: " + str(len(fileCounter))))
 			else:
 				if "show_unused" in globals():
-					print line
+					print(line)
 		else:
 			if "show_unused" in globals():
-				print line
+				print(line)
 	os.system("gifsicle --delay=" + str(FRAME_DELAY) + " --loop ./"+dirname+"/*.gif > tmp.gif")
 	os.system("gifsicle --batch "+sys.argv[2]+".gif --append tmp.gif")
 	os.system("rm ./"+dirname+"/ -r")

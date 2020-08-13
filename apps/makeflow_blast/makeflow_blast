@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (C) 2011- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
@@ -15,7 +15,7 @@ class PassThroughParser(optparse.OptionParser):
 		while rargs:
 			try:
 				optparse.OptionParser._process_args(self,largs,rargs,values)
-			except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
+			except (optparse.BadOptionError,optparse.AmbiguousOptionError) as e:
 				largs.append(e.opt_str)
 
 #Parser initialization
@@ -67,7 +67,7 @@ def write_split_fasta(destination):
 	split_fasta = open(destination, "w")
 	try:
 		log.info("\tWriting Partitioning Script to : {0}".format(destination))
-		split_fasta.write('''#! /usr/bin/env python
+		split_fasta.write('''#! /usr/bin/env python3
 
 # Copyright (C) 2011- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
@@ -285,7 +285,7 @@ else:
 		dbpath = os.path.dirname(db)
 		for fn in os.listdir(dbpath):
 			oloc = "{0}/{1}\n".format(dbpath, fn)
-			print "{0}\n".format(oloc)
+			print("{0}\n".format(oloc))
 			if options.database in fn:
 				os.symlink(oloc, "{0}/{1}".format(options.database, fn))
 		log.info("Databse linked from : {0}/{1}".format(dbpath, options.database))

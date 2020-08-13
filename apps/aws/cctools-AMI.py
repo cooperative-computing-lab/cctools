@@ -22,13 +22,13 @@
 import boto.ec2
 import sys
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import datetime
 import time
 
 # Simple usage and file existence checks
 if len(sys.argv) != 5:
-	print "usage: "+sys.argv[0]+" <cctools-version-number|cctools-tar.gz> <AWS_Keyfile> <userdata_file> (public|private)"
+	print(("usage: "+sys.argv[0]+" <cctools-version-number|cctools-tar.gz> <AWS_Keyfile> <userdata_file> (public|private)"))
 	sys.exit()
 
 ### Check if it's a valid version of cctools ###################
@@ -38,12 +38,12 @@ source_string="source"
 tarballTransferred = False
 is_tarball = False
 try:
-	returned = urllib2.urlopen(urllib2.Request("http://ccl.cse.nd.edu/software/files/cctools-"+sys.argv[1]+"-"+source_string+".tar.gz"))
+	returned = urllib.request.urlopen(urllib.request.Request("http://ccl.cse.nd.edu/software/files/cctools-"+sys.argv[1]+"-"+source_string+".tar.gz"))
 	version_is_good = True
 except:
 	source_string="src"
 	try:
-		returned = urllib2.urlopen(urllib2.Request("http://ccl.cse.nd.edu/software/files/cctools-"+sys.argv[1]+"-"+source_string+".tar.gz"))
+		returned = urllib.request.urlopen(urllib.request.Request("http://ccl.cse.nd.edu/software/files/cctools-"+sys.argv[1]+"-"+source_string+".tar.gz"))
 		version_is_good = True
 	except:
 		version_is_good = False
@@ -53,7 +53,7 @@ if not version_is_good:
 		is_tarball = True
 	
 	if not is_tarball:
-		print sys.argv[1] + " is not a valid version of cctools and is not an accessible file that can contain cctools"
+		print((sys.argv[1] + " is not a valid version of cctools and is not an accessible file that can contain cctools"))
 		sys.exit()
 
 if sys.argv[4] == "public":
@@ -61,7 +61,7 @@ if sys.argv[4] == "public":
 elif sys.argv[4] == "private":
 	publicize = False
 else:
-	print "fourth argmuent must be either 'public' or 'private'"
+	print("fourth argmuent must be either 'public' or 'private'")
 	sys.exit()
 
 ### Valid version check complete ###############################
@@ -89,13 +89,13 @@ def publicize_amis(connection_amiID_pairs):
 		for (connection, ami_id) in connection_amiID_pairs:
 			try:
 				connection.modify_image_attribute(ami_id, attribute="launchPermission", operation="add", groups=["all"])
-				print "Image "+ ami_id  +" should be publicly available in "+connection.region.name
+				print(("Image "+ ami_id  +" should be publicly available in "+connection.region.name))
 				connection_amiID_pairs.remove((connection, ami_id))
 			except:
-				print "Image not ready for publicity in " + connection.region.name
+				print(("Image not ready for publicity in " + connection.region.name))
 		time.sleep(WAIT_LENGTH)
 
-	print "Image should be publicly available in all regions we copied it to."
+	print("Image should be publicly available in all regions we copied it to.")
 
 
 def move_tarball(key_pair, dns):
@@ -106,10 +106,10 @@ def move_tarball(key_pair, dns):
 		os.system("scp -i ./"+key_pair+".pem -oStrictHostKeyChecking=no ubuntu@"+dns+":/home/ubuntu/GOT_IT .")
 		if os.path.isfile("./GOT_IT"):
 			os.system("rm ./GOT_IT")
-			print "Tarball successfully scp'd"
+			print("Tarball successfully scp'd")
 			transfer_done = True
 		else:
-			print "Still transferring tarball"
+			print("Still transferring tarball")
 			time.sleep(WAIT_LENGTH)
 
 ### END DEFINE FUNCTION(S) #######################################
@@ -128,7 +128,7 @@ region_info = boto.ec2.get_region(default_region_name) #all_regions[0] #Do it in
 
 reg_connect = boto.ec2.connect_to_region(region_info.name, aws_access_key_id = access_key_id, aws_secret_access_key = secret_key)
 if not reg_connect:
-	print "connection failed"
+	print("connection failed")
 	sys.exit()
 ###Connection made################################################
 
@@ -153,9 +153,9 @@ sec_group.authorize("tcp", 22, 22, "0.0.0.0/0")
 try:
 	user_data = open(user_data_filename).read()
 except:
-	print
-	print user_data_filename + " could not be opened for reading, so the EC2 instance will not be able to run the installation commands."
-	print
+	print()
+	print((user_data_filename + " could not be opened for reading, so the EC2 instance will not be able to run the installation commands."))
+	print()
 	sys.exit()
 
 user_data = user_data.replace("VERSION_NUMBER", sys.argv[1])
@@ -181,7 +181,7 @@ while waiting_on_ec2instance:
 	#also, we are the only instance using this key pair, so len(instances)==1 should be true
 	dns_name = new_instance.public_dns_name
 
-	print "dns of just started instance is: "+dns_name
+	print(("dns of just started instance is: "+dns_name))
 	if len(dns_name) > 0:
 
 		if(is_tarball and not tarballTransferred):
@@ -192,10 +192,10 @@ while waiting_on_ec2instance:
 		if os.path.isfile("./IM_DONE"):
 			os.system("rm ./IM_DONE")
 			os.system("rm ./"+key_pair_name+".pem")
-			print "Initialization script is finished, waiting for flag to be deleted before snapshotting."
+			print("Initialization script is finished, waiting for flag to be deleted before snapshotting.")
 			waiting_on_ec2instance = False
 		else:
-			print "Initialization script on new instance is still running"
+			print("Initialization script on new instance is still running")
 ###EC2 Instance Created and user_data script finished##############
 
 ###Set up for and take the machine image##########################
@@ -205,11 +205,11 @@ while waiting_on_ec2instance:
 #the image could be taken when the script is running 
 for i in range(3):
 	time.sleep(WAIT_LENGTH)
-	print "Still waiting..."
+	print("Still waiting...")
 
 time.sleep(1)
 
-print "Attempting to take image"
+print("Attempting to take image")
 
 if(is_tarball):
 	AMI_name_string = sys.argv[1]+" Starter AMI "+timestamp
@@ -225,18 +225,18 @@ new_ami_id = new_instance.create_image(AMI_name_string, description="This AMI co
 if publicize:
 	publicize_amis([(reg_connect, new_ami_id)])
 else:
-	print "not publicizing"
+	print("not publicizing")
 ###ami is now public in the region we created the instance in#######################################
 
 ###Terminate the actual instance, we have the AMI#################
-print "Image taken. Trying to terminate instance"
+print("Image taken. Trying to terminate instance")
 terminated_instances = []
 terminated_instances = reg_connect.terminate_instances([new_instance.id])
 while(len(terminated_instances) <= 0):
 	time.sleep(WAIT_LENGTH)
 	terminated_instances = reg_connect.terminate_instances([new_instance.id])
 
-print "Instance terminated."
+print("Instance terminated.")
 ###Instance terminated ###########################################
 
 ###we need to copy this public ami to all other regions except the one we created it in#############
@@ -250,9 +250,9 @@ copy_dict = {}
 for region in regions_to_distribute_to:
 	new_connection = boto.ec2.connect_to_region(region.name, aws_access_key_id = access_key_id, aws_secret_access_key = secret_key)
 	if not new_connection:
-		print "UH OH! No new connection"
+		print("UH OH! No new connection")
 	else:
-		print "Connected to "+ region.name+"for image copying"
+		print(("Connected to "+ region.name+"for image copying"))
 		connections_list.append(new_connection)
 		copy_list.append(new_connection)
 		copy_dict[new_connection.region.name] = 0
@@ -262,21 +262,21 @@ while (len(copy_list) > 0):
 	for connection in copy_list:
 		try:
 			new_copied_ami_info = connection.copy_image(region_info.name, new_ami_id)
-			print "new_copied_ami_id = " + str(new_copied_ami_info.image_id) + " for region " + str(connection.region.name)
+			print(("new_copied_ami_id = " + str(new_copied_ami_info.image_id) + " for region " + str(connection.region.name)))
 			to_make_public.append((connection, new_copied_ami_info.image_id))
 			copy_list.remove(connection)
 		except:
 			attempts=copy_dict[connection.region.name]
 			copy_dict[connection.region.name] = attempts + 1
-			print "Failed to copy image to " + str(connection.region.name) + " on attempt " + str(attempts) +", connections left: " + str(copy_list)
+			print(("Failed to copy image to " + str(connection.region.name) + " on attempt " + str(attempts) +", connections left: " + str(copy_list)))
 			if attempts >= max_image_copy_attempts:
-				print "Region " + str(connection.region.name) + " is being uncooperative/does not want our public ami, so it won't get it"
+				print(("Region " + str(connection.region.name) + " is being uncooperative/does not want our public ami, so it won't get it"))
 				copy_list.remove(connection)
 		time.sleep(WAIT_LENGTH)
 
 if publicize:
 	publicize_amis(to_make_public)
 else:
-	print "not publicizing"
+	print("not publicizing")
 
 
