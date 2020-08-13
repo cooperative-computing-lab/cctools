@@ -17,6 +17,9 @@ See the file COPYING for details.
 #include "catalog_query.h"
 #include "domain_name_cache.h"
 #include "jx.h"
+#include "jx_eval.h"
+#include "jx_parse.h"
+#include "jx_print.h"
 #include "copy_stream.h"
 #include "host_memory_info.h"
 #include "host_disk_info.h"
@@ -42,6 +45,7 @@ See the file COPYING for details.
 #include "hash_table.h"
 #include "pattern.h"
 #include "gpu_info.h"
+#include "tlq_config.h"
 
 #include <unistd.h>
 #include <dirent.h>
@@ -212,6 +216,11 @@ static int total_tasks_executed = 0;
 
 static const char *project_regex = 0;
 static int released_by_master = 0;
+
+static char *tlq_url = NULL;
+static char *debug_path = NULL;
+static char *catalog_hosts = NULL;
+static int tlq_port = 0;
 
 __attribute__ (( format(printf,2,3) ))
 static void send_master_message( struct link *master, const char *fmt, ... )
@@ -430,6 +439,48 @@ static int send_keepalive(struct link *master, int force_resources){
 	return 1;
 }
 
+static int send_tlq_config( struct link *master ) {
+	//attempt to find local TLQ server to retrieve master URL
+	if(tlq_port && debug_path && !tlq_url) {
+		debug(D_TLQ, "looking up worker TLQ URL");
+		time_t config_stoptime = time(0) + 10;
+		tlq_url = tlq_config_url(tlq_port, debug_path, config_stoptime);
+		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
+		else debug(D_TLQ, "error setting worker TLQ URL");
+	}
+	else if(tlq_port && !debug_path && !tlq_url) debug(D_TLQ, "cannot get worker TLQ URL: no debug log path set");
+
+	if(tlq_url) send_master_message(master, "tlq %s\n", tlq_url);
+	return 1;
+}
+
+static int get_task_tlq_url( struct work_queue_task *task ) {
+	if(tlq_port && debug_path) {
+		char home_host[WORK_QUEUE_LINE_MAX];
+		char tlq_workdir[WORK_QUEUE_LINE_MAX];
+		char log_path[WORK_QUEUE_LINE_MAX];
+		int home_port;
+		debug(D_TLQ, "looking up task %d TLQ URL", task->taskid);
+		//Command is assumed to be wrapped by log_define script from TLQ
+		if(sscanf(task->command_line,"sh log_define %s %d %s %s", home_host, &home_port, tlq_workdir, log_path) == 4) {
+			time_t config_stoptime = time(0) + 10;
+			char *task_url = tlq_config_url(tlq_port, log_path, config_stoptime);
+			if(!task_url) {
+				debug(D_TLQ, "error setting task %d TLQ URL", task->taskid);
+				return 0;
+			}
+			debug(D_TLQ, "set task %d TLQ URL: %s", task->taskid, task_url);
+			return 1;
+		}
+		else {
+			debug(D_TLQ, "could not find task %d debug log", task->taskid);
+			return 0;
+		}
+		return 1;
+	}
+	else return 0;
+}
+
 /*
 Send the initial "ready" message to the master with the version and so forth.
 The master will not start sending tasks until this message is recevied.
@@ -442,6 +493,7 @@ static void report_worker_ready( struct link *master )
 	send_master_message(master,"workqueue %d %s %s %s %d.%d.%d\n",WORK_QUEUE_PROTOCOL_VERSION,hostname,os_name,arch_name,CCTOOLS_VERSION_MAJOR,CCTOOLS_VERSION_MINOR,CCTOOLS_VERSION_MICRO);
 	send_master_message(master, "info worker-id %s\n", worker_id);
 	send_features(master);
+	send_tlq_config(master);
 	send_keepalive(master, 1);
 }
 
@@ -588,6 +640,7 @@ static void report_task_complete( struct link *master, struct work_queue_process
 		total_tasks_executed++;
 	}
 
+	get_task_tlq_url(p->task);
 	send_stats_update(master);
 }
 
@@ -1201,6 +1254,11 @@ static int do_url(struct link* master, const char *filename, int length, int mod
 		return file_from_url(url, cache_name);
 }
 
+static int do_tlq_url(const char *master_tlq_url) {
+	debug(D_TLQ, "set master TLQ URL: %s", master_tlq_url);
+	return 1;
+}
+
 static int do_unlink(const char *path)
 {
 	char cached_path[WORK_QUEUE_LINE_MAX];
@@ -1559,6 +1617,7 @@ static int handle_master(struct link *master) {
 	char line[WORK_QUEUE_LINE_MAX];
 	char filename_encoded[WORK_QUEUE_LINE_MAX];
 	char filename[WORK_QUEUE_LINE_MAX];
+	char master_tlq_url[WORK_QUEUE_LINE_MAX];
 	char path[WORK_QUEUE_LINE_MAX];
 	int64_t length;
 	int64_t taskid = 0;
@@ -1577,6 +1636,9 @@ static int handle_master(struct link *master) {
 			reset_idle_timer();
 		} else if(sscanf(line, "url %s %" SCNd64 " %o", filename, &length, &mode) == 3) {
 			r = do_url(master, filename, length, mode);
+			reset_idle_timer();
+		} else if(sscanf(line, "tlq %s", master_tlq_url) == 1) {
+			r = do_tlq_url(master_tlq_url);
 			reset_idle_timer();
 		} else if(sscanf(line, "unlink %s", filename_encoded) == 1) {
 			url_decode(filename_encoded,filename,sizeof(filename));
@@ -2402,6 +2464,7 @@ static void show_help(const char *cmd)
 	printf(" %-30s docker-preserve mode -- tasks execute by a worker share a container based on this docker image.\n", "--docker-preserve=<image>");
 	printf(" %-30s docker-tar mode -- build docker image from tarball, this mode must be used with --docker or --docker-preserve.\n", "--docker-tar=<tarball>");
 	printf( " %-30s Set the percent chance per minute that the worker will shut down (simulates worker failures, for testing only).\n", "--volatility=<chance>");
+	printf( " %-30s Set the port used to lookup the worker's TLQ URL (-d and -o options also required).\n", "--tlq=<port>");
 }
 
 enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
@@ -2409,7 +2472,7 @@ enum {LONG_OPT_DEBUG_FILESIZE = 256, LONG_OPT_VOLATILITY, LONG_OPT_BANDWIDTH,
 	  LONG_OPT_DISK, LONG_OPT_GPUS, LONG_OPT_FOREMAN, LONG_OPT_FOREMAN_PORT, LONG_OPT_DISABLE_SYMLINKS,
 	  LONG_OPT_IDLE_TIMEOUT, LONG_OPT_CONNECT_TIMEOUT, LONG_OPT_RUN_DOCKER, LONG_OPT_RUN_DOCKER_PRESERVE,
 	  LONG_OPT_BUILD_FROM_TAR, LONG_OPT_SINGLE_SHOT, LONG_OPT_WALL_TIME, LONG_OPT_DISK_ALLOCATION,
-	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE};
+	  LONG_OPT_MEMORY_THRESHOLD, LONG_OPT_FEATURE, LONG_OPT_TLQ};
 
 static const struct option long_options[] = {
 	{"advertise",           no_argument,        0,  'a'},
@@ -2454,6 +2517,7 @@ static const struct option long_options[] = {
 	{"docker-preserve",     required_argument,  0,  LONG_OPT_RUN_DOCKER_PRESERVE},
 	{"docker-tar",          required_argument,  0,  LONG_OPT_BUILD_FROM_TAR},
 	{"feature",             required_argument,  0,  LONG_OPT_FEATURE},
+	{"tlq",					required_argument,	0,  LONG_OPT_TLQ},
 	{0,0,0,0}
 };
 
@@ -2468,7 +2532,7 @@ int main(int argc, char *argv[])
 	int enable_capacity = 1; // enabled by default
 	double fast_abort_multiplier = 0;
 	char *foreman_stats_filename = NULL;
-	char * catalog_hosts = CATALOG_HOST;
+	catalog_hosts = CATALOG_HOST;
 
 	features = hash_table_create(4, 0);
 
@@ -2541,6 +2605,7 @@ int main(int argc, char *argv[])
 			connect_timeout = string_time_parse(optarg);
 			break;
 		case 'o':
+			debug_path = xxstrdup(optarg);
 			debug_config_file(optarg);
 			break;
 		case LONG_OPT_FOREMAN:
@@ -2689,6 +2754,9 @@ int main(int argc, char *argv[])
 		}
 		case LONG_OPT_FEATURE:
 			hash_table_insert(features, optarg, (void **) 1);
+			break;
+		case LONG_OPT_TLQ:
+			tlq_port = atoi(optarg);
 			break;
 		default:
 			show_help(argv[0]);

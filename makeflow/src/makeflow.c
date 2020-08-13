@@ -33,6 +33,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "create_dir.h"
 #include "sha1.h"
+#include "tlq_config.h"
 
 #include "dag.h"
 #include "dag_node.h"
@@ -226,6 +227,11 @@ files at the DAG level.
 static char *mountfile = NULL;
 static char *mount_cache = NULL;
 static int use_mountfile = 0;
+
+/*
+Options related to TLQ debugging
+*/
+static int tlq_port = 0;
 
 /*
 If enabled, then all environment variables are sent
@@ -1263,6 +1269,10 @@ static void show_help_run(const char *cmd)
 	printf(" --monitor-with-opened-files    Enable monitoring of opened files.\n");
 	printf(" --monitor-log-fmt=<fmt>        Format for monitor logs.(def: resource-rule-%%)\n");
 	printf(" --allocation=<mode>            Specify allocation mode (see manual).\n");
+	        /********************************************************************************/
+	
+	printf("\nTLQ Options:\n");
+	printf(" --tlq=<port> Set the port for TLQ URL lookup (-d and -o required).\n");
 }
 
 int main(int argc, char *argv[])
@@ -1457,6 +1467,7 @@ int main(int argc, char *argv[])
 		LONG_OPT_VERBOSE_JOBNAMES,
 		LONG_OPT_MPI_CORES,
 		LONG_OPT_MPI_MEMORY,
+		LONG_OPT_TLQ,
 	};
 
 	static const struct option long_options_run[] = {
@@ -1575,6 +1586,7 @@ int main(int argc, char *argv[])
 		{"verbose-jobnames", no_argument, 0, LONG_OPT_VERBOSE_JOBNAMES},
 		{"mpi-cores", required_argument,0, LONG_OPT_MPI_CORES},
 		{"mpi-memory", required_argument,0, LONG_OPT_MPI_MEMORY},
+		{"tlq", required_argument, 0, LONG_OPT_TLQ},
 		{0, 0, 0, 0}
 	};
 
@@ -2103,6 +2115,9 @@ int main(int argc, char *argv[])
 			case LONG_OPT_MPI_MEMORY:
 				mpi_memory = atoi(optarg);
 				break;
+			case LONG_OPT_TLQ:
+				tlq_port = atoi(optarg);
+				break;
 			default:
 				show_help_run(argv[0]);
 				return 1;
@@ -2298,6 +2313,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "password", work_queue_password);
 	batch_queue_set_option(remote_queue, "master-mode", work_queue_master_mode);
 	batch_queue_set_option(remote_queue, "name", project);
+	batch_queue_set_option(remote_queue, "debug", debug_file_name);
 	batch_queue_set_option(remote_queue, "priority", priority);
 	batch_queue_set_option(remote_queue, "keepalive-interval", work_queue_keepalive_interval);
 	batch_queue_set_option(remote_queue, "keepalive-timeout", work_queue_keepalive_timeout);
@@ -2312,6 +2328,7 @@ int main(int argc, char *argv[])
 	batch_queue_set_option(remote_queue, "safe-submit-mode", safe_submit ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "ignore-mem-spec", ignore_mem_spec ? "yes" : "no");
 	batch_queue_set_option(remote_queue, "mem-type", batch_mem_type);
+	batch_queue_set_int_option(remote_queue, "tlq-port", tlq_port);
 
 	char *fa_multiplier = string_format("%f", wq_option_fast_abort_multiplier);
 	batch_queue_set_option(remote_queue, "fast-abort", fa_multiplier);
@@ -2464,6 +2481,15 @@ int main(int argc, char *argv[])
 	makeflow_log_started_event(d);
 
 	runtime = timestamp_get();
+
+	if(tlq_port && debug_file_name) {
+		debug(D_TLQ, "looking up makeflow TLQ URL");
+		time_t config_stoptime = time(0) + 10;
+		char *local_tlq_url = tlq_config_url(tlq_port, debug_file_name, config_stoptime);
+		if(!local_tlq_url) debug(D_TLQ, "error looking up makeflow TLQ URL");
+		else debug(D_TLQ, "set makeflow TLQ URL: %s", local_tlq_url);
+	}
+	else if(tlq_port && !debug_file_name) debug(D_TLQ, "cannot lookup makeflow TLQ URL: debug log not set");
 
 	makeflow_run(d);
 

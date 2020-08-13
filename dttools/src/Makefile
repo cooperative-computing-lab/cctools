@@ -107,6 +107,7 @@ SOURCES = \
 	text_list.c \
 	timer.c \
 	timestamp.c \
+	tlq_config.c \
 	unlink_recursive.c \
 	uptime.c \
 	url_encode.c \

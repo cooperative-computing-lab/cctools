@@ -1,10 +1,14 @@
 #include "address.h"
 #include "debug.h"
+#include "xxmalloc.h"
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 int address_check_mode( struct addrinfo *info ) {
 	assert(info);
@@ -153,4 +157,4 @@ int address_parse_hostport( const char *hostport, char *host, int *port, int def
 	}
 }
 
-
+/* vim: set noexpandtab tabstop=4: */
