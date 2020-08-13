@@ -571,24 +571,19 @@ work_queue_msg_code_t advertise_tlq_url(struct work_queue *q, struct work_queue_
 	//attempt to find local TLQ server to retrieve master URL
 	if(q->tlq_port && q->debug_path && !q->tlq_url) {
 		debug(D_TLQ, "looking up master TLQ URL");
-		q->tlq_url = tlq_config_url(q->tlq_port, q->debug_path);
+		time_t config_stoptime = time(0) + 10;
+		q->tlq_url = tlq_config_url(q->tlq_port, q->debug_path, config_stoptime);
 		if(q->tlq_url) debug(D_TLQ, "set master TLQ URL: %s", q->tlq_url);
-		else {
-			debug(D_TLQ, "error setting master TLQ URL - setting it to NONE");
-			q->tlq_url = "NONE";
-		}
+		else debug(D_TLQ, "error setting master TLQ URL");
 	}
-	else if(q->tlq_port && !q->debug_path && !q->tlq_url) {
-		debug(D_TLQ, "cannot get master TLQ URL: no debug log path set");
-		q->tlq_url = "NONE";
-	}
+	else if(q->tlq_port && !q->debug_path && !q->tlq_url) debug(D_TLQ, "cannot get master TLQ URL: no debug log path set");
 
 	char worker_url[WORK_QUEUE_LINE_MAX];
 	int n = sscanf(line, "tlq %s", worker_url);
 	if(n != 1) debug(D_TLQ, "empty TLQ URL received from worker (%s)", w->addrport);
 	else debug(D_TLQ, "received worker (%s) TLQ URL %s", w->addrport, worker_url);
 
-	//send master TLQ URL if there is one. otherwise send NONE
+	//send master TLQ URL if there is one
 	if(q->tlq_url) {
 		debug(D_TLQ, "sending master TLQ URL to worker (%s)", w->addrport);
 		send_worker_msg(q, w, "tlq %s\n", q->tlq_url);

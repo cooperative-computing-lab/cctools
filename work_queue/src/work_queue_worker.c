@@ -443,14 +443,14 @@ static int send_tlq_config( struct link *master ) {
 	//attempt to find local TLQ server to retrieve master URL
 	if(tlq_port && debug_path && !tlq_url) {
 		debug(D_TLQ, "looking up worker TLQ URL");
-		tlq_url = tlq_config_url(tlq_port, debug_path);
+		time_t config_stoptime = time(0) + 10;
+		tlq_url = tlq_config_url(tlq_port, debug_path, config_stoptime);
 		if(tlq_url) debug(D_TLQ, "set worker TLQ URL: %s", tlq_url);
-		else {
-			debug(D_TLQ, "error setting worker TLQ URL - setting it to NONE");
-			tlq_url = "NONE";
-		}
+		else debug(D_TLQ, "error setting worker TLQ URL");
 	}
-	send_master_message(master, "tlq %s\n", tlq_url);
+	else if(tlq_port && !debug_path && !tlq_url) debug(D_TLQ, "cannot get worker TLQ URL: no debug log path set");
+
+	if(tlq_url) send_master_message(master, "tlq %s\n", tlq_url);
 	return 1;
 }
 
@@ -461,10 +461,12 @@ static int get_task_tlq_url( struct work_queue_task *task ) {
 		char log_path[WORK_QUEUE_LINE_MAX];
 		int home_port;
 		debug(D_TLQ, "looking up task %d TLQ URL", task->taskid);
+		//Command is assumed to be wrapped by log_define script from TLQ
 		if(sscanf(task->command_line,"sh log_define %s %d %s %s", home_host, &home_port, tlq_workdir, log_path) == 4) {
-			char *task_url = tlq_config_url(tlq_port, log_path);
+			time_t config_stoptime = time(0) + 10;
+			char *task_url = tlq_config_url(tlq_port, log_path, config_stoptime);
 			if(!task_url) {
-				debug(D_TLQ, "error setting task %d TLQ URL - setting it to NONE", task->taskid);
+				debug(D_TLQ, "error setting task %d TLQ URL", task->taskid);
 				return 0;
 			}
 			debug(D_TLQ, "set task %d TLQ URL: %s", task->taskid, task_url);

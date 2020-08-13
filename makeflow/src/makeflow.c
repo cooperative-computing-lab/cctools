@@ -2484,14 +2484,12 @@ int main(int argc, char *argv[])
 
 	if(tlq_port && debug_file_name) {
 		debug(D_TLQ, "looking up makeflow TLQ URL");
-		char *local_tlq_url = tlq_config_url(tlq_port, debug_file_name);
-		if(!local_tlq_url) {
-			debug(D_TLQ, "error looking up makeflow TLQ URL - setting it to NONE");
-			local_tlq_url = "NONE";
-		}
-		debug(D_TLQ, "set makeflow TLQ URL: %s", local_tlq_url);
+		time_t config_stoptime = time(0) + 10;
+		char *local_tlq_url = tlq_config_url(tlq_port, debug_file_name, config_stoptime);
+		if(!local_tlq_url) debug(D_TLQ, "error looking up makeflow TLQ URL");
+		else debug(D_TLQ, "set makeflow TLQ URL: %s", local_tlq_url);
 	}
-	else if(tlq_port && !debug_file_name) debug(D_TLQ, "cannot lookup TLQ URL: debug log not set");
+	else if(tlq_port && !debug_file_name) debug(D_TLQ, "cannot lookup makeflow TLQ URL: debug log not set");
 
 	makeflow_run(d);
 
