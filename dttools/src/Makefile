@@ -17,6 +17,7 @@ SOURCES = \
 	catalog_query.c \
 	category.c \
 	cctools.c \
+	cctools_endian.c \
 	change_process_title.c \
 	chunk.c \
 	clean_dir.c \

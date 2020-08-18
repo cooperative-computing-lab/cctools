@@ -13,7 +13,6 @@ See the file COPYING for details.
 #include <string.h>
 #include <fcntl.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
 
 #include "mq.h"
 #include "buffer.h"
@@ -26,6 +25,7 @@ See the file COPYING for details.
 #include "jx_print.h"
 #include "jx_parse.h"
 #include "ppoll_compat.h"
+#include "cctools_endian.h"
 
 
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
@@ -97,39 +97,6 @@ struct mq_poll {
 	struct set *readable;
 	struct set *error;
 };
-
-
-#ifndef htonll
-static uint64_t htonll(uint64_t hostlonglong) {
-	uint64_t out = 0;
-	uint8_t *d = (uint8_t *) &out;
-	d[7] = hostlonglong>>0;
-	d[6] = hostlonglong>>8;
-	d[5] = hostlonglong>>16;
-	d[4] = hostlonglong>>24;
-	d[3] = hostlonglong>>32;
-	d[2] = hostlonglong>>40;
-	d[1] = hostlonglong>>48;
-	d[0] = hostlonglong>>56;
-	return out;
-}
-#endif
-
-#ifndef ntohll
-static uint64_t ntohll(uint64_t netlonglong) {
-	uint64_t out = 0;
-	uint8_t *d = (uint8_t *) &netlonglong;
-	out |= (uint64_t) d[7]<<0;
-	out |= (uint64_t) d[6]<<8;
-	out |= (uint64_t) d[5]<<16;
-	out |= (uint64_t) d[4]<<24;
-	out |= (uint64_t) d[3]<<32;
-	out |= (uint64_t) d[2]<<40;
-	out |= (uint64_t) d[1]<<48;
-	out |= (uint64_t) d[0]<<56;
-	return out;
-}
-#endif
 
 static bool errno_is_temporary(void) {
 	if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN || errno == EINPROGRESS || errno == EALREADY || errno == EISCONN) {
