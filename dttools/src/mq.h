@@ -8,6 +8,7 @@ See the file COPYING for details.
 #define MQ_H
 
 #include <stddef.h>
+#include <time.h>
 
 #include "jx.h"
 

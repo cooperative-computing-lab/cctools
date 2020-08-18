@@ -86,6 +86,7 @@ SOURCES = \
 	path.c \
 	path_disk_size_info.c \
 	pattern.c \
+	ppoll_compat.c \
 	preadwrite.c \
 	process.c \
 	random.c \

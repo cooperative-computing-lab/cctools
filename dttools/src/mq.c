@@ -12,8 +12,6 @@ See the file COPYING for details.
 #include <stdbool.h>
 #include <string.h>
 #include <fcntl.h>
-#include <signal.h>
-#include <poll.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -27,6 +25,7 @@ See the file COPYING for details.
 #include "debug.h"
 #include "jx_print.h"
 #include "jx_parse.h"
+#include "ppoll_compat.h"
 
 
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
@@ -131,30 +130,6 @@ static uint64_t ntohll(uint64_t netlonglong) {
 	return out;
 }
 #endif
-
-static int ppoll_compat(struct pollfd fds[], nfds_t nfds, int stoptime) {
-	assert(fds);
-	sigset_t mask;
-	sigemptyset(&mask);
-	int timeout = stoptime - time(NULL);
-	if (timeout < 0) return 0;
-
-#ifdef HAS_PPOLL
-	struct timespec s;
-	s.tv_nsec = 0;
-	s.tv_sec = timeout;
-	return ppoll(fds, nfds, &s, &mask);
-#else
-	sigset_t origmask;
-	sigprocmask(SIG_SETMASK, &mask, &origmask);
-	int rc = poll(fds, nfds, timeout*1000);
-	int saved_errno = errno;
-	sigprocmask(SIG_SETMASK, &origmask, NULL);
-	errno = saved_errno;
-	return rc;
-#endif
-}
-
 
 static bool errno_is_temporary(void) {
 	if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN || errno == EINPROGRESS || errno == EALREADY || errno == EISCONN) {
