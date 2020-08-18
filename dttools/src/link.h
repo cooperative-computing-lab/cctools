@@ -347,4 +347,6 @@ Wait for a activity on a an array of links.
 
 int link_poll(struct link_info *array, int nlinks, int msec);
 
+int errno_is_temporary(int e);
+
 #endif

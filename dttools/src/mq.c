@@ -98,14 +98,6 @@ struct mq_poll {
 	struct set *error;
 };
 
-static bool errno_is_temporary(void) {
-	if (errno == EINTR || errno == EWOULDBLOCK || errno == EAGAIN || errno == EINPROGRESS || errno == EALREADY || errno == EISCONN) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
 static struct mq_msg *msg_create (enum mq_msg_type type) {
 	// sanity check
 	assert(HDR_SIZE == 16);
@@ -240,7 +232,7 @@ static int flush_send(struct mq *mq) {
 		if (snd->hdr_pos < (ptrdiff_t) HDR_SIZE) {
 			ssize_t rc = send(socket, &snd->magic + snd->hdr_pos,
 					HDR_SIZE - snd->hdr_pos, 0);
-			if (rc == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
 				return -1;
@@ -250,7 +242,7 @@ static int flush_send(struct mq *mq) {
 			ssize_t rc = send(socket,
 					buffer_tostring(&snd->buf) + snd->buf_pos,
 					snd->len - snd->buf_pos, 0);
-			if (rc == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
 				return -1;
@@ -280,7 +272,7 @@ static int flush_recv(struct mq *mq) {
 		if (rcv->hdr_pos < (ptrdiff_t) HDR_SIZE) {
 			ssize_t rc = recv(socket, &rcv->magic + rcv->hdr_pos,
 					HDR_SIZE - rcv->hdr_pos, 0);
-			if (rc == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
 				return -1;;
@@ -295,7 +287,7 @@ static int flush_recv(struct mq *mq) {
 			ssize_t rc = recv(socket,
 					(char *) buffer_tostring(&rcv->buf) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
-			if (rc == -1 && errno_is_temporary()) {
+			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
 			} else if (rc <= 0) {
 				return -1;;
