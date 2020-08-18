@@ -156,6 +156,7 @@ check_function()
 	echon "checking for $name in $header..."
 
 cat > .configure.tmp.c << EOF
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <${header}>
 int main(int argc, char **argv) {
@@ -224,7 +225,7 @@ require_path ()
 
 require_function ()
 {
-	if check_function "$1" "$2" "-D_GNU_SOURCE"
+	if check_function "$1" "$2"
 	then
 		return 0
 	else
@@ -383,10 +384,10 @@ optional_function()
 
 	multiarch_include=$(echo "${header}" | sed "s|include/|include/$HOST_MULTIARCH/|")
 
-	if check_function "$name" "$header" "-D_GNU_SOURCE"; then
+	if check_function "$name" "$header"; then
 		ccflags_append_define "$@"
 		return 0
-	elif [ -n "$HOST_MULTIARCH" ] && check_function "$name" "$multiarch_include" "-D_GNU_SOURCE"; then
+	elif [ -n "$HOST_MULTIARCH" ] && check_function "$name" "$multiarch_include"; then
 		ccflags_append_define "$@"
 		return 0
 	fi
