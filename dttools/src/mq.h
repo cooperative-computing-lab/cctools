@@ -10,8 +10,6 @@ See the file COPYING for details.
 #include <stddef.h>
 #include <time.h>
 
-#include "jx.h"
-
 /** @file mq.h Non-blocking message-oriented queue for network communication.
  *
  * This module provides ordered, message-oriented semantics and
@@ -53,7 +51,7 @@ See the file COPYING for details.
  * Example Client:
  *
  *	struct mq *mq = mq_connect("127.0.0.1", 1234);
- *	struct mq_msg *msg = mq_wrap_json(hello);
+ *	struct mq_msg *msg = mq_wrap_buffer(buf);
  *	mq_send(mq, msg);
  *	while (true) {
  *		switch (mq_wait(mq, time() + 30)) {
@@ -198,23 +196,6 @@ int mq_send(struct mq *mq, struct mq_msg *msg);
  * @returns -1 on closed socket or other error, with errno set appropriately.
  */
 int mq_wait(struct mq *mq, time_t stoptime);
-
-/** Put a JSON document into a message.
- *
- * @param j The JSON document to put in a message.
- * @returns A @ref mq_msg containing j.
- */
-struct mq_msg *mq_wrap_json(struct jx *j);
-
-/** Pull a JSON document from a message.
- *
- * The caller is responsible for deleting the resulting JSON.
- * A successful unwrap also frees msg, so no need to delete it.
- * @param m The message to unwrap.
- * @returns The JSON object in m.
- * @returns NULL if m is not a JSON message.
- */
-struct jx *mq_unwrap_json(struct mq_msg *msg);
 
 /** Put a binary buffer into a message.
  *

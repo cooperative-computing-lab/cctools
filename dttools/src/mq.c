@@ -22,8 +22,6 @@ See the file COPYING for details.
 #include "link.h"
 #include "xxmalloc.h"
 #include "debug.h"
-#include "jx_print.h"
-#include "jx_parse.h"
 #include "ppoll_compat.h"
 #include "cctools_endian.h"
 
@@ -33,7 +31,6 @@ See the file COPYING for details.
 
 enum mq_msg_type {
 	MQ_MSG_BUFFER = 1,
-	MQ_MSG_JSON = 2,
 };
 
 enum mq_socket {
@@ -49,7 +46,6 @@ struct mq_msg {
 	ptrdiff_t hdr_pos;
 	ptrdiff_t buf_pos;
 	buffer_t buf;
-	struct jx *j;
 
 	/* Here be dragons!
 	 *
@@ -64,12 +60,12 @@ struct mq_msg {
 	 * follows. Note that the length in the header needs to be in network
 	 * byte order, so that gets stored separately.
 	 *
-	 *  0 1 2 3 4 5 6 7
-	 * +-+-+-+-+-+-+-+-+
-	 * |  magic  |pad|*|    *type
-	 * +-+-+-+-+-+-+-+-+
-	 * |    length     |
-	 * +-+-+-+-+-+-+-+-+
+	 *  0    1    2    3    4    5    6    7
+	 * +----+----+----+----+----+----+----+----+
+	 * |           magic        |   pad   |type|
+	 * +----+----+----+----+----+----+----+----+
+	 * |                 length                |
+	 * +----+----+----+----+----+----+----+----+
 	 */
 	void *pad1;
 
@@ -140,7 +136,6 @@ static void mq_die(struct mq *mq, int err) {
 static void delete_msg(struct mq_msg *msg) {
 	if (!msg) return;
 	buffer_free(&msg->buf);
-	jx_delete(msg->j);
 	free(msg);
 }
 
@@ -187,27 +182,9 @@ static int validate_header(struct mq_msg *msg) {
 	}
 	switch (msg->type) {
 		case MQ_MSG_BUFFER:
-		case MQ_MSG_JSON:
 			break;
 		default:
 			return -1;
-	}
-	return 0;
-}
-
-static int unpack_msg(struct mq_msg *msg) {
-	assert(msg);
-	switch (msg->type) {
-		case MQ_MSG_JSON:
-			msg->j = jx_parse_string(buffer_tostring(&msg->buf));
-			if (!msg->j) {
-				errno = EBADMSG;
-				return -1;
-			}
-			break;
-		case MQ_MSG_BUFFER:
-			// nothing more to do
-			break;
 	}
 	return 0;
 }
@@ -294,7 +271,6 @@ static int flush_recv(struct mq *mq) {
 			}
 			rcv->buf_pos += rc;
 		} else {
-			if (unpack_msg(rcv) == -1) return -1;
 			mq->recv = mq->recv_buf;
 			mq->recv_buf = NULL;
 		}
@@ -407,13 +383,6 @@ struct mq_msg *mq_wrap_buffer(const void *b, size_t size) {
 	return out;
 }
 
-struct mq_msg *mq_wrap_json(struct jx *j) {
-	assert(j);
-	struct mq_msg *out = msg_create(MQ_MSG_JSON);
-	jx_print_buffer(j, &out->buf);
-	return out;
-}
-
 void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
 	assert(msg);
 	if (msg->type != MQ_MSG_BUFFER) return NULL;
@@ -423,15 +392,6 @@ void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
 	if (len) {
 		*len = msg->len;
 	}
-	delete_msg(msg);
-	return out;
-}
-
-struct jx *mq_unwrap_json(struct mq_msg *msg) {
-	assert(msg);
-	if (msg->type != MQ_MSG_JSON) return NULL;
-	struct jx *out = msg->j;
-	msg->j = NULL;
 	delete_msg(msg);
 	return out;
 }
