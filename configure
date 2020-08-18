@@ -958,6 +958,7 @@ then
 		if [ "${CONDA_BUILD}" = 1 ]
 		then
 			perl_install_dir="site_perl"
+			perl_ccflags="${perl_ccflags} -I${BUILD_PREFIX}/${BUILD}/sysroot/usr/include"
 		else
 			perl_install_dir="perl5/site_perl"
 		fi
