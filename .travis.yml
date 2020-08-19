@@ -33,7 +33,7 @@ matrix:
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-debian9.9
   - os: linux
     compiler: gcc
-    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-fedora30
+    env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-fedora32
   - os: linux
     compiler: gcc
     env: DOCKER_IMAGE=cclnd/cctools-env:x86_64-ubuntu16.04

@@ -135,7 +135,7 @@ my %postinstall_for;
 $versions_of{centos} = [ qw{ 7 6 } ];
 $command_for{centos} = 'yum install -y';
 
-$versions_of{fedora} = [ qw{ 30  } ];
+$versions_of{fedora} = [ qw{ 32  } ];
 $command_for{fedora} = 'dnf install -y';
 
 $versions_of{debian} = [ qw{ 9.9 } ];
