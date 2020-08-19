@@ -28,7 +28,7 @@ import time
 
 # Simple usage and file existence checks
 if len(sys.argv) != 5:
-	print(("usage: "+sys.argv[0]+" <cctools-version-number|cctools-tar.gz> <AWS_Keyfile> <userdata_file> (public|private)"))
+	print("usage: "+sys.argv[0]+" <cctools-version-number|cctools-tar.gz> <AWS_Keyfile> <userdata_file> (public|private)")
 	sys.exit()
 
 ### Check if it's a valid version of cctools ###################
@@ -53,7 +53,7 @@ if not version_is_good:
 		is_tarball = True
 	
 	if not is_tarball:
-		print((sys.argv[1] + " is not a valid version of cctools and is not an accessible file that can contain cctools"))
+		print(sys.argv[1] + " is not a valid version of cctools and is not an accessible file that can contain cctools")
 		sys.exit()
 
 if sys.argv[4] == "public":
@@ -89,10 +89,10 @@ def publicize_amis(connection_amiID_pairs):
 		for (connection, ami_id) in connection_amiID_pairs:
 			try:
 				connection.modify_image_attribute(ami_id, attribute="launchPermission", operation="add", groups=["all"])
-				print(("Image "+ ami_id  +" should be publicly available in "+connection.region.name))
+				print("Image "+ ami_id  +" should be publicly available in "+connection.region.name)
 				connection_amiID_pairs.remove((connection, ami_id))
 			except:
-				print(("Image not ready for publicity in " + connection.region.name))
+				print("Image not ready for publicity in " + connection.region.name)
 		time.sleep(WAIT_LENGTH)
 
 	print("Image should be publicly available in all regions we copied it to.")
@@ -153,9 +153,7 @@ sec_group.authorize("tcp", 22, 22, "0.0.0.0/0")
 try:
 	user_data = open(user_data_filename).read()
 except:
-	print()
-	print((user_data_filename + " could not be opened for reading, so the EC2 instance will not be able to run the installation commands."))
-	print()
+	print("\nfile {} could not be opened for reading, so the EC2 instance will not be able to run the installation commands.\n".format(user_data_filename))
 	sys.exit()
 
 user_data = user_data.replace("VERSION_NUMBER", sys.argv[1])
@@ -181,9 +179,8 @@ while waiting_on_ec2instance:
 	#also, we are the only instance using this key pair, so len(instances)==1 should be true
 	dns_name = new_instance.public_dns_name
 
-	print(("dns of just started instance is: "+dns_name))
+	print("dns of just started instance is: " + dns_name)
 	if len(dns_name) > 0:
-
 		if(is_tarball and not tarballTransferred):
 			move_tarball(key_pair_name, dns_name)
 			tarballTransferred = True
@@ -252,7 +249,7 @@ for region in regions_to_distribute_to:
 	if not new_connection:
 		print("UH OH! No new connection")
 	else:
-		print(("Connected to "+ region.name+"for image copying"))
+		print("Connected to " + region.name + " for image copying")
 		connections_list.append(new_connection)
 		copy_list.append(new_connection)
 		copy_dict[new_connection.region.name] = 0
@@ -262,15 +259,15 @@ while (len(copy_list) > 0):
 	for connection in copy_list:
 		try:
 			new_copied_ami_info = connection.copy_image(region_info.name, new_ami_id)
-			print(("new_copied_ami_id = " + str(new_copied_ami_info.image_id) + " for region " + str(connection.region.name)))
+			print("new_copied_ami_id = " + str(new_copied_ami_info.image_id) + " for region " + str(connection.region.name))
 			to_make_public.append((connection, new_copied_ami_info.image_id))
 			copy_list.remove(connection)
 		except:
 			attempts=copy_dict[connection.region.name]
 			copy_dict[connection.region.name] = attempts + 1
-			print(("Failed to copy image to " + str(connection.region.name) + " on attempt " + str(attempts) +", connections left: " + str(copy_list)))
+			print("Failed to copy image to " + str(connection.region.name) + " on attempt " + str(attempts) +", connections left: " + str(copy_list))
 			if attempts >= max_image_copy_attempts:
-				print(("Region " + str(connection.region.name) + " is being uncooperative/does not want our public ami, so it won't get it"))
+				print("Region " + str(connection.region.name) + " is being uncooperative/does not want our public ami, so it won't get it")
 				copy_list.remove(connection)
 		time.sleep(WAIT_LENGTH)
 

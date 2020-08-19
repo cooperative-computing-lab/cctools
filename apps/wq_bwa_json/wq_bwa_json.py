@@ -115,7 +115,7 @@ def main():
     start = float(start)
     end = float(end)
 
-    print(("time: {}".format(end-start-1)))
+    print("time: {}".format(end-start-1))
 
     os.system("rm -f query.fastq.*.sam")
 

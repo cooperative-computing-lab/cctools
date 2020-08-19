@@ -149,7 +149,7 @@ def add_machine(draw, machine_type, ip, connections, workers, fileCount, legend=
 
 	else:
 		if "debug" in globals():
-			print(("tried to add machine of unspecified type "+machine_type))
+			print("tried to add machine of unspecified type "+machine_type)
 		sys.exit()
 
 
@@ -225,7 +225,7 @@ def read_resource_report(line, log):
 	tag_regex = ": resource tag (-?[0-9]*)"
 	end_regex = ": info end_of_resource_update 0"
 	if "debug" in globals():
-		print(("First line in read_resource_report is " + line))
+		print("First line in read_resource_report is " + line)
 
 	matched = re.search(general_resource_regex, line)
 	if(matched):
@@ -246,7 +246,7 @@ def read_resource_report(line, log):
 	while need_to_read:
 		recent_line = log.readline()
 		if "debug" in globals():
-			print(("In read_resource_report, read: " + recent_line))
+			print("In read_resource_report, read: " + recent_line)
 		matched = re.search(general_resource_regex, recent_line)
 		if matched:
 			isResourceObject = True
@@ -329,7 +329,7 @@ class Task_Info(object):
 		while need_to_read:
 			recent_line = log.readline()
 			if "task_info_debug" in globals():
-				print(("Read recent line: " + recent_line))
+				print("Read recent line: " + recent_line)
 
 			matched = re.search(": cmd ([0-9]+)(.*)", recent_line)
 			if(matched):
@@ -342,7 +342,7 @@ class Task_Info(object):
 					self.exe = self.command_string
 
 				if "task_info_debug" in globals():
-					print(("\ncommand_info:\n\texe: " + self.exe + "\n\tcommand_string: " + self.command_string + "\n\tcommand_num: " + self.command_num + "\n"))
+					print("\ncommand_info:\n\texe: " + self.exe + "\n\tcommand_string: " + self.command_string + "\n\tcommand_num: " + self.command_num + "\n")
 				continue
 
 			matched = re.search(": infile (.*)", recent_line)
@@ -357,7 +357,7 @@ class Task_Info(object):
 
 				legend.update(infile)
 				if "task_info_debug" in globals():
-					print(("\ninfile: " + infile + "\n"))
+					print("\ninfile: " + infile + "\n")
 				continue
 
 			matched = re.search(": outfile (.*)", recent_line)
@@ -371,7 +371,7 @@ class Task_Info(object):
 
 				legend.update(outfile)
 				if "task_info_debug" in globals():
-					print(("\noutfile: " + outfile + "\n"))
+					print("\noutfile: " + outfile + "\n")
 				continue
 
 			matched = re.search(": tag (-?[0-9]*)", recent_line)
@@ -382,13 +382,13 @@ class Task_Info(object):
 			matched = re.search(": tx .*: (cores|gpus|memory|disk|unlabeled) (-?[0-9]*)", recent_line)
 			if(matched):
 				if "task_info_debug" in globals():
-					print(("matched on set info for task resources, resource=" + matched.group(1)))
+					print("matched on set info for task resources, resource=" + matched.group(1))
 
 				self.resources.set_resource( matched.group(1), int(matched.group(2)) )
 
 
 				if "task_info_debug" in globals():
-					print(("task " + str(self.num) + " requires " + str(matched.group(1)) + " to be: " + str(matched.group(2))))
+					print("task " + str(self.num) + " requires " + str(matched.group(1)) + " to be: " + str(matched.group(2)))
 
 				continue
 
@@ -433,7 +433,7 @@ class Machine_Task_Display(object):
 		self.top_corner_adjusted = (top_left_corner[0] + from_corner_to_interior, top_left_corner[1] + from_corner_to_interior+ y_offset)
 		self.row_height = RESOURCE_ROW_HEIGHT
 		if "debug" in globals():
-			print(("top_y_pixel tasks= " + str(self.top_corner_adjusted[1])))
+			print("top_y_pixel tasks= " + str(self.top_corner_adjusted[1]))
 
 		i = 0
 		while i < self.total_cores:
@@ -451,7 +451,7 @@ class Machine_Task_Display(object):
 		self.tasks_to_status[task_info.num] = "running"
 		needed_cores = max(1, task_info.resources.cores)
 		if "debug" in globals():
-			print(("need a machine with " + str(needed_cores) + " cores to run task " + str(task_info.num)))
+			print("need a machine with " + str(needed_cores) + " cores to run task " + str(task_info.num))
 
 		cores_to_use = []
 		i = 0
@@ -466,7 +466,7 @@ class Machine_Task_Display(object):
 			#fulfilled the request
 			self.tasks_to_cores[task_info.num] = cores_to_use
 			if "debug" in globals():
-				print(("added task " + str(task_info.num) + " to cores " + str(cores_to_use)))
+				print("added task " + str(task_info.num) + " to cores " + str(cores_to_use))
 		else:
 			if "debug" in globals():
 				print("Tried to add task to a core that already has a task running.")
@@ -479,7 +479,7 @@ class Machine_Task_Display(object):
 		#should be as easy as saying the task is finished
 		if "task_debug" in globals():
 			try:
-				print((ip + " trying to finish task " + str(task_no) + " on cores " + str(self.tasks_to_cores[task_no])))
+				print(ip + " trying to finish task " + str(task_no) + " on cores " + str(self.tasks_to_cores[task_no]))
 			except:
 				pass
 
@@ -490,13 +490,13 @@ class Machine_Task_Display(object):
 				return
 		else:
 			if "task_debug" in globals():
-				print((ip + " failed to finish task " + str(task_no) + " in " + str(row)))
+				print(ip + " failed to finish task " + str(task_no) + " in " + str(row))
 		self.show_task(task_no)
 
 	def remove_task(self, ip, task_no):
 		if "task_debug" in globals():
 			try:
-				print((ip + " trying to remove task " + str(task_no) + " from cores " + str(self.tasks_to_cores[task_no])))
+				print(ip + " trying to remove task " + str(task_no) + " from cores " + str(self.tasks_to_cores[task_no]))
 			except:
 				pass
 
@@ -513,7 +513,7 @@ class Machine_Task_Display(object):
 				print("removed")
 		else:
 			if "task_debug" in globals():
-				print((ip + " failed to remove task " + str(task_no)))
+				print(ip + " failed to remove task " + str(task_no))
 
 	def clear_core(self, core_number):
 		x1 = self.top_corner_adjusted[0]
@@ -523,11 +523,11 @@ class Machine_Task_Display(object):
 		#Draw the top core separator
 		self.draw.line( [x1, y1, x1+self.in_machine_space, y1], fill=BLACK, width = 1)
 		if "task_info_debug" in globals():
-			print(("clearing core " + str(core_number) + " with edges at y = " + str(y1) + " and y = " + str(y1 + self.row_height-1)))
+			print("clearing core " + str(core_number) + " with edges at y = " + str(y1) + " and y = " + str(y1 + self.row_height-1))
 
 	def show_task(self, task_no):
 		if "task_info_debug" in globals():
-			print(("in show_task for task_no " + str(task_no)))
+			print("in show_task for task_no " + str(task_no))
 		try:
 			cores_used = self.tasks_to_cores[task_no]
 			status = self.tasks_to_status[task_no]
@@ -564,7 +564,7 @@ class Machine_Task_Display(object):
 		#Draw the top core separator
 		self.draw.line( [x1, y1, x1+self.in_machine_space, y1], fill=BLACK, width = 1)
 		if "task_debug" in globals():
-			print(("filling core " + str(core_number) + " " + str(color) + " with edges at y = " + str(y1) + " and y = " + str(y1 + self.row_height)))
+			print("filling core " + str(core_number) + " " + str(color) + " with edges at y = " + str(y1) + " and y = " + str(y1 + self.row_height))
 
 		self.draw.text( (x1+2*MACHINE_BORDER_WIDTH, y1), self.tasks_to_exes[task_no], font=font, fill=WHITE)
 
@@ -583,13 +583,13 @@ class Machine_File_Display(object):
 		self.row_height = RESOURCE_ROW_HEIGHT
 		self.top_corner_adjusted = (top_left_corner[0] + from_corner_to_interior, top_left_corner[1] + from_corner_to_interior)
 		if "task_debug" in globals():
-			print(("top_y_pixel_files = " + str(self.top_corner_adjusted[1])))
-			print(("bottom_y_pixel_files = " + str( self.top_corner_adjusted[1] + len(self.file_rows)*self.row_height - 1)))
+			print("top_y_pixel_files = " + str(self.top_corner_adjusted[1]))
+			print("bottom_y_pixel_files = " + str( self.top_corner_adjusted[1] + len(self.file_rows)*self.row_height - 1))
 
 	def add_file(self, fname, color):
 		#add to the row with the fewest files showing in it
 		if "file_display_debug" in globals():
-			print(("trying to add " + fname + " with color " + str(color)))
+			print("trying to add " + fname + " with color " + str(color))
 		min_files = len(self.file_rows[0][1].dictionary)
 		adding_row = self.file_rows[0]
 		for row in self.file_rows:
@@ -811,7 +811,7 @@ class Machine(object):
 				self.task_display.finish_task(self.ip, task_inf.num)
 				for outfile in task_inf.outfiles:
 					if "task_display_debug" in globals():
-						print(("trying to add " + outfile + " to the display"))
+						print("trying to add " + outfile + " to the display")
 					#if file is used in task, it will already be in fileCount
 					self.file_display.add_file(outfile, self.fileCount[outfile].color)
 					self.files.append(outfile)
@@ -950,12 +950,11 @@ class Machine(object):
 		return False
 
 	def display_attributes(self):
-		print((self.name + "/" + self.ip))
+		print(self.name + "/" + self.ip)
 		for task in self.tasks:
-			print(("\tTask: "+ str(task)+" : " + str(self.tasks[task])))
+            print("\tTask: {}:{}\n".format(task, self.tasks[task]))
 		for f in self.files:
-			print(("\tFile:" + str(f)))
-		print()
+			print("\tFile: {}\n".format(f))
 
 	def get_location(self):
 		return self.location
@@ -999,7 +998,7 @@ class Connection(object):
 		self.bottom_y_pixel = GIF_HEIGHT - (TEXT_HEIGHT) #all added workers will have a length in pixel and then a buffer space below them
 		self.free_pixels_list = [(self.top_y_pixel, self.bottom_y_pixel)]
 		if "tcp_debug" in globals():
-			print(("On connection __init__: Free pixels list = " + str(self.free_pixels_list)))
+			print("On connection __init__: Free pixels list = " + str(self.free_pixels_list))
 
 	def find_minimum_fragmentation(self, machine_height):
 		#find the best fit hole in the list and return the fragmentation in pixels
@@ -1056,7 +1055,7 @@ class Connection(object):
 
 	def add(self, draw, machine_height):
 		if "tcp_debug" in globals():
-			print(("On entering connection add(): Free pixels list = " + str(self.free_pixels_list)))
+			print("On entering connection add(): Free pixels list = " + str(self.free_pixels_list))
 		if not self.can_add_machine(machine_height) and ("tcp_debug" in globals()):
 			print("Can't add to this connection, overfull")
 			return None
@@ -1069,10 +1068,10 @@ class Connection(object):
 
 			insert_machine_hole_index = self.find_minimum_fragmentation_location(machine_height)
 			if "tcp_debug" in globals():
-				print(("insert_machine_hole_index is: " + str(insert_machine_hole_index)))
+				print("insert_machine_hole_index is: " + str(insert_machine_hole_index))
 			old_pixels_hole = self.free_pixels_list[insert_machine_hole_index]
 			if "tcp_debug" in globals():
-				print(("old_pixels_hole is: " + str(old_pixels_hole)))
+				print("old_pixels_hole is: " + str(old_pixels_hole))
 			new_machine_top_y_pixel = old_pixels_hole[0]
 			new_machine_left_x_pixel = self.x_pixel - (MACHINE_WIDTH + BUFFER_SPACE)
 
@@ -1082,15 +1081,15 @@ class Connection(object):
 					print("perfect fit! pop the hole")
 				self.free_pixels_list.pop(insert_machine_hole_index)
 				if "tcp_debug" in globals():
-					print(("Connection added: Free pixels list = " + str(self.free_pixels_list)))
+					print("Connection added: Free pixels list = " + str(self.free_pixels_list))
 			else:
 				#insert at the top of the hole
 				new_pixels_hole = ( (old_pixels_hole[0] + space_needed), old_pixels_hole[1] )
 				if "tcp_debug" in globals():
-					print(("new_pixels_hole is: " + str(new_pixels_hole)))
+					print("new_pixels_hole is: " + str(new_pixels_hole))
 				self.free_pixels_list[insert_machine_hole_index] = new_pixels_hole
 				if "tcp_debug" in globals():
-					print(("Connection added: Free pixels list = " + str(self.free_pixels_list)))
+					print("Connection added: Free pixels list = " + str(self.free_pixels_list))
 
 			self.total_connections = self.total_connections + 1
 			return  (new_machine_left_x_pixel, new_machine_top_y_pixel)  #the slot location
@@ -1109,23 +1108,23 @@ class Connection(object):
 def main():
 
 	if(len(sys.argv) != 3):
-		print(("Usage: "+sys.argv[0]+" <debugFileName> <outputFileName>"))
+		print("Usage: "+sys.argv[0]+" <debugFileName> <outputFileName>")
 		sys.exit(0)
 	try:
 		logToRead = open(sys.argv[1], 'r')
 	except:
-		print(("Could not open " + sys.argv[1] + " for reading: "))
+		print("Could not open " + sys.argv[1] + " for reading: ")
 		sys.exit(0)
 
 	if os.path.isfile(sys.argv[2]+".gif"):
-		print(("Could not create " + sys.argv[2] + ".gif to write final movie to, file already exists"))
+		print("Could not create " + sys.argv[2] + ".gif to write final movie to, file already exists")
 		sys.exit(0)
 
 	dirname = sys.argv[2]+"_frames"
 
 
 	if(os.system("mkdir "+dirname) != 0):
-		print(("Could not create a temporary file storage directory " + dirname +"."))
+		print("Could not create a temporary file storage directory " + dirname +".")
 		sys.exit()
 
 	numFrames = 0
@@ -1164,7 +1163,7 @@ def main():
 		ip = find_ip(line)
 		if "count_ips" in globals():
 			ips.add(ip)
-			print(("Length of ips is: " + str(len(ips))))
+			print("Length of ips is: " + str(len(ips)))
 
 		if(master.ip == "" and not ip):
 			result = re.search("dns: ([^ ]*) is ([0-9\.]*)", line)
@@ -1175,8 +1174,8 @@ def main():
 		if(ip not in workers and ip != None):
 			if ip in workers_needing_resource_reports:
 				if "debug" in globals():
-					print(("about to read resource report,   ip: " + str(ip)))
-					print(("about to read resource report, line: " + line))
+					print("about to read resource report,   ip: " + str(ip))
+					print("about to read resource report, line: " + line)
 				resources = read_resource_report(line, logToRead)
 				if "debug" in globals():
 					print("read resource report")
@@ -1224,10 +1223,10 @@ def main():
 				currentImage.save(dirname+"/frame_"+padded_nframes+".gif", "GIF")
 				if (numFrames - last_appended_frame  >= append_threshold):
 					if "gif_debug" in globals():
-						print(("gifsicle --delay=" + str(FRAME_DELAY) + " --loop ./"+dirname+"/*.gif > tmp_"+padded_nframes+".gif"))
+						print("gifsicle --delay=" + str(FRAME_DELAY) + " --loop ./"+dirname+"/*.gif > tmp_"+padded_nframes+".gif")
 					os.system("gifsicle --delay=" + str(FRAME_DELAY) +" --loop ./"+dirname+"/*.gif > tmp_"+padded_nframes+".gif")
 					if "gif_debug" in globals():
-						print(("gifsicle --batch "+sys.argv[2]+".gif --delay=" + str(FRAME_DELAY) +" --loop --append tmp_"+padded_nframes+".gif"))
+						print("gifsicle --batch "+sys.argv[2]+".gif --delay=" + str(FRAME_DELAY) +" --loop --append tmp_"+padded_nframes+".gif")
 					os.system("gifsicle --batch "+sys.argv[2]+".gif --delay=" + str(FRAME_DELAY) + " --loop --append tmp_"+padded_nframes+".gif")
 					os.system("rm tmp_"+padded_nframes+".gif ./"+dirname+"/*")
 					last_appended_frame = numFrames

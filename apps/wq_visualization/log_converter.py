@@ -5,15 +5,15 @@ import sys
 import re
 
 if len(sys.argv) != 3:
-	print(("Usage: " + str(sys.argv[0]) + " file_to_converted converted_file_name"))
+	print("Usage: " + str(sys.argv[0]) + " file_to_converted converted_file_name")
 	sys.exit()
 
 f = open(sys.argv[1], 'r')
 f_new = open(sys.argv[2], 'w')
 if not f:
-	print(("Could not open " + sys.argv[1] + " for reading"))
+	print("Could not open " + sys.argv[1] + " for reading")
 if not f_new:
-	print(("Could not open " + sys.argv[2] + " for writing"))
+	print("Could not open " + sys.argv[2] + " for writing")
 
 resources_lines_dict = dict()
 workers_lines = set()
@@ -66,7 +66,7 @@ for line in f:
 		#grab date/time/process/machine info
 		starting_match = starting_re.search(l)
 
-		print((starting_match.group(1) + starting_match.group(2)))
+		print(starting_match.group(1) + starting_match.group(2))
 		f_new.write(starting_match.group(1) + starting_match.group(2) + "info end_of_resource_update 0\n")
 
 	line_no += 1
