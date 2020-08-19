@@ -5,14 +5,22 @@
 #include <string.h>
 
 #include "mq.h"
+#include "buffer.h"
+#include "xxmalloc.h"
 
 int main (int argc, char *argv[]) {
-	const char *test1 = "test message";
-	const char *test2 = "another one";
+	const char *string1 = "test message";
+	const char *string2 = "another one";
+
+	buffer_t *test1 = xxmalloc(sizeof(*test1));
+	buffer_t *test2 = xxmalloc(sizeof(*test2));
+	buffer_init(test1);
+	buffer_init(test2);
+	buffer_putstring(test1, string1);
+	buffer_putstring(test2, string2);
 
 	int rc;
-	struct mq_msg *msg;
-	char *got_string;
+	buffer_t *got_string;
 
 	struct mq *server = mq_serve("127.0.0.1", 65000);
 	assert(server);
@@ -21,14 +29,10 @@ int main (int argc, char *argv[]) {
 	struct mq *conn = mq_accept(server);
 	assert(!conn);
 
-	msg = mq_wrap_buffer(test1, strlen(test1));
-	assert(msg);
-	rc = mq_send(client, msg);
+	rc = mq_send_buffer(client, test1);
 	assert(rc != -1);
 
-	msg = mq_wrap_buffer(test2, strlen(test2));
-	assert(msg);
-	rc = mq_send(client, msg);
+	rc = mq_send_buffer(client, test2);
 	assert(rc != -1);
 
 	rc = mq_wait(server, time(NULL) + 1);
@@ -41,26 +45,24 @@ int main (int argc, char *argv[]) {
 	rc = mq_wait(conn, time(NULL) + 1);
 	assert(rc != -1);
 
-	msg = mq_recv(conn);
-	assert(msg);
+	rc = mq_recv(conn, &got_string);
+	assert(rc == MQ_MSG_NEWBUFFER);
 
-	got_string = mq_unwrap_buffer(msg, NULL);
-	assert(got_string);
-	assert(!strcmp(test1, got_string));
+	assert(!strcmp(string1, buffer_tostring(got_string)));
+	buffer_free(got_string);
 	free(got_string);
 
-	msg = mq_recv(conn);
-	assert(!msg);
+	rc = mq_recv(conn, &got_string);
+	assert(rc == MQ_MSG_NONE);
 
 	rc = mq_wait(conn, time(NULL) + 1);
 	assert(rc != -1);
 
-	msg = mq_recv(conn);
-	assert(msg);
+	rc = mq_recv(conn, &got_string);
+	assert(rc == MQ_MSG_NEWBUFFER);
 
-	got_string = mq_unwrap_buffer(msg, NULL);
-	assert(got_string);
-	assert(!strcmp(test2, got_string));
+	assert(!strcmp(string2, buffer_tostring(got_string)));
+	buffer_free(got_string);
 	free(got_string);
 
 	mq_close(client);

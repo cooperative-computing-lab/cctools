@@ -5,20 +5,26 @@
 #include <string.h>
 
 #include "mq.h"
+#include "xxmalloc.h"
+#include "buffer.h"
 
 // 10 MiB (should be bigger than any send/recv buffers)
 #define MSG_SIZE 10485760
 
 int main (int argc, char *argv[]) {
-	char *test1 = malloc(MSG_SIZE);
-	const char *test2 = "test message";
-	assert(test1);
-	memset(test1, 'a', MSG_SIZE);
+	char *string1 = xxmalloc(MSG_SIZE);
+	const char *string2 = "test message";
+	memset(string1, 'a', MSG_SIZE);
+
+	buffer_t *test1 = xxmalloc(sizeof(*test1));
+	buffer_t *test2 = xxmalloc(sizeof(*test2));
+	buffer_init(test1);
+	buffer_init(test2);
+	buffer_putstring(test1, string1);
+	buffer_putstring(test2, string2);
 
 	int rc;
-	struct mq_msg *msg;
-	char *got_string;
-	size_t len;
+	buffer_t *got_string;
 
 	struct mq *server = mq_serve("127.0.0.1", 65000);
 	assert(server);
@@ -45,40 +51,34 @@ int main (int argc, char *argv[]) {
 	rc = mq_poll_add(p, conn, NULL);
 	assert(rc == 0);
 
-	msg = mq_wrap_buffer(test1, MSG_SIZE);
-	assert(msg);
-	rc = mq_send(client, msg);
+	rc = mq_send_buffer(client, test1);
 	assert(rc != -1);
 
-	msg = mq_wrap_buffer(test2, strlen(test2));
-	assert(msg);
-	rc = mq_send(client, msg);
+	rc = mq_send_buffer(client, test2);
 	assert(rc != -1);
 
 	rc = mq_poll_wait(p, time(NULL) + 5);
 	assert(rc == 1);
 
-	msg = mq_recv(conn);
-	assert(msg);
+	rc = mq_recv(conn, &got_string);
+	assert(rc == MQ_MSG_NEWBUFFER);
 
-	got_string = mq_unwrap_buffer(msg, &len);
-	assert(got_string);
-	assert(len == MSG_SIZE);
-	assert(!memcmp(test1, got_string, MSG_SIZE));
+	assert(buffer_pos(got_string) == MSG_SIZE);
+	assert(!memcmp(string1, buffer_tostring(got_string), MSG_SIZE));
+	buffer_free(got_string);
 	free(got_string);
 
-	msg = mq_recv(conn);
-	assert(!msg);
+	rc = mq_recv(conn, &got_string);
+	assert(rc == MQ_MSG_NONE);
 
 	rc = mq_poll_wait(p, time(NULL) + 1);
 	assert(rc == 1);
 
-	msg = mq_recv(conn);
-	assert(msg);
+	rc = mq_recv(conn, &got_string);
+	assert(rc == MQ_MSG_NEWBUFFER);
 
-	got_string = mq_unwrap_buffer(msg, NULL);
-	assert(got_string);
-	assert(!strcmp(test2, got_string));
+	assert(!strcmp(string2, buffer_tostring(got_string)));
+	buffer_free(got_string);
 	free(got_string);
 
 	mq_close(client);

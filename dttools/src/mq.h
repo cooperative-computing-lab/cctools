@@ -10,6 +10,8 @@ See the file COPYING for details.
 #include <stddef.h>
 #include <time.h>
 
+#include "buffer.h"
+
 /** @file mq.h Non-blocking message-oriented queue for network communication.
  *
  * This module provides ordered, message-oriented semantics and
@@ -51,7 +53,6 @@ See the file COPYING for details.
  * Example Client:
  *
  *	struct mq *mq = mq_connect("127.0.0.1", 1234);
- *	struct mq_msg *msg = mq_wrap_buffer(buf);
  *	mq_send(mq, msg);
  *	while (true) {
  *		switch (mq_wait(mq, time() + 30)) {
@@ -61,8 +62,9 @@ See the file COPYING for details.
  *			// error or closed socket, mq should be deleted
  *			default:
  *			// got some messages!
- *			process_response(mq_recv(mq));
- *			// make sure some message breaks out of the loop!
+ *			mq_recv(mq, &buf);
+ *			// process the result
+ *			// make sure something breaks out of the loop!
  *		}
  *	}
  *	mq_close(mq);
@@ -115,7 +117,17 @@ See the file COPYING for details.
  *	mq_close(server);
  */
 
-//------------Basic API-------------------//
+
+typedef enum {
+	MQ_MSG_NONE = 0,
+	MQ_MSG_NEWBUFFER,
+	MQ_MSG_BUFFER,
+	//MQ_MSG_FILE,
+	//MQ_MSG_PROCESS,
+} mq_msg_t;
+
+
+//---------Basic Functions----------------//
 
 /** Connect to a remote host.
  *
@@ -157,32 +169,6 @@ void mq_close(struct mq *mq);
  */
 struct mq *mq_accept(struct mq *server);
 
-/** Pop a message from the receive queue.
- *
- * This is a non-blocking operation, and will return immediately if no
- * messages are available. The caller is responsible for deleting all
- * received messages.
- * @param mq The message queue.
- * @returns An available message.
- * @returns NULL if no messages are available.
- */
-struct mq_msg *mq_recv(struct mq *mq);
-
-/** Push a message onto the send queue.
- *
- * This is a non-blocking operations, and will return immediately.
- * Messages are delivered in the order they were sent. Note that the queue
- * takes ownership of the message (and any data contained in it), so callers
- * MUST NOT delete the message after pushing it on the send queue. It will
- * be automatically deleted when the send is finished.
- * @param mq The message queue.
- * @param msg The message to send.
- * @returns 0 on success. Note that this only indicates that the message was
- *  successfully queued. It gives no indication about delivery.
- * @returns -1 on failure.
- */
-int mq_send(struct mq *mq, struct mq_msg *msg);
-
 /* Wait for a message or connection.
  *
  * Blocks the current thread until a message/connection is received
@@ -196,70 +182,6 @@ int mq_send(struct mq *mq, struct mq_msg *msg);
  * @returns -1 on closed socket or other error, with errno set appropriately.
  */
 int mq_wait(struct mq *mq, time_t stoptime);
-
-/** Put a binary buffer into a message.
- *
- * @param b The buffer to put in a message.
- * @param size The length of b.
- * @returns A @ref mq_msg containing s.
- */
-struct mq_msg *mq_wrap_buffer(const void *b, size_t size);
-
-/** Pull a binary buffer from a message.
- *
- * An additional NULL byte will follow the buffer, so it is safe to
- * use C string functions on a received buffer.
- * The caller is responsible for freeing the resulting buffer.
- * A successful unwrap also frees msg, so no need to delete it.
- * @param m The message to unwrap.
- * @param len Location to store the length of the buffer. May be NULL.
- * @returns The string in m.
- * @returns NULL if m is not a string message.
- */
-void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len);
-
-/** Put a filesystem blob into a message.
- *
- * It is undefined behavior to modify path before the message is actually
- * sent (in practice, path should be immutable).
- * @param j The filesystem blob to put in a message.
- * @returns A @ref mq_msg containing path.
- */
-struct mq_msg *mq_wrap_blob(const char *path);
-
-/** Pull a filesystem blob from a message.
- *
- * The blob is stored under a temporary name in the channel's temp dir
- * (see @ref mq_set_tmpdir to change this). The caller is responsible for
- * freeing the returned path string. After unwrapping a blob, the caller
- * takes ownership of the blob in the filesystem, and can rename, modify,
- * delete, etc. as needed. A successful unwrap also frees msg, so no
- * need to delete it.
- * @param m The message to unwrap.
- * @returns The path to the filesystem blob in m.
- * @returns NULL if m is not a blob message.
- */
-char *mq_unwrap_blob(struct mq_msg *msg);
-
-/** Delete a message without unwrapping the value.
- *
- * Note that in the case of blob messages, this will delete the received
- * blob from the filesystem.
- * @param msg The message to delete.
- */
-void mq_msg_delete(struct mq_msg *msg);
-
-/** Set the directory where blobs should be received.
- *
- * Note that partially-received blobs will also be stored in path, so it
- * is undefined behavior to inspect any file/directory named .mq-blob.*
- * under path, except those returned from @ref mq_unwrap_blob.
- * @param mq The queue to configure.
- * @param path The path to the directory where blobs should be received.
- * @returns 0 on success.
- * @returns -1 on failure, with errno set appropriately.
- */
-int mq_set_tmpdir(struct mq *mq, const char *path);
 
 
 //------------Polling API-----------------//
@@ -360,5 +282,67 @@ void *mq_poll_acceptable(struct mq_poll *p);
  * @returns NULL if no queues in the polling group are in error.
  */
 void *mq_poll_error(struct mq_poll *p);
+
+
+//------------Send/Recv-------------------//
+
+/** Push a message onto the send queue.
+ *
+ * This is a non-blocking operation, and will return immediately.
+ * Messages are delivered in the order they were sent. Note that the queue
+ * takes ownership of the passed-in buffer, so callers MUST NOT use/delete
+ * the buffer after pushing it onto the send queue. It will
+ * be automatically deleted when the send is finished. In particular,
+ * passing in a stack-allocated buffer_t WILL result in memory corruption.
+ * Only use heap-allocated buffers here.
+ * @param mq The message queue.
+ * @param buf The message to send.
+ * @returns 0 on success. Note that this only indicates that the message was
+ *  successfully queued. It gives no indication about delivery.
+ * @returns -1 on failure.
+ */
+int mq_send_buffer(struct mq *mq, buffer_t *buf);
+
+/** Pop a message from the receive queue.
+ *
+ * This is a non-blocking operation, and will return immediately if no
+ * messages are available. This function supports two modes of operation:
+ * allocating storage or using provided storage.
+ * If no storage is provided, each message will be written to a newly-allocated
+ * buffer, with a pointer stored in @ref out. The caller takes ownership of any such
+ * buffers, and is responsible for deleting them. If a storage location was provided
+ * (via mq_store_*), the return code will indicate that a complete message was
+ * written there. @ref out will be ignored.
+ * @param mq The message queue.
+ * @param out The location of a buffer_t pointer containing the message.
+ * @returns MQ_MSG_NONE if no message is available.
+ * @returns MQ_MSG_NEWBUFFER if a message was stored in a newly-allocated
+ *  buffer (pointed to by out).
+ * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided buffer.
+ * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided file.
+ * @returns MQ_MSG_BUFFER if a message has been written to a previously-provided process.
+ */
+mq_msg_t mq_recv(struct mq *mq, buffer_t **out);
+
+/** Store the next message in the given buffer.
+ *
+ * This function allows the caller to provide the storage space for the next
+ * message to be received. This may be useful in avoiding heap allocations.
+ * @ref buf must already be initialized. Any existing contents will be overwritten.
+ * It is undefined behavior to inspect/modify @ref buf before getting MQ_MSG_BUFFER
+ * from @ref mq_recv (the notable exception is deleting the buffer and *not*
+ * calling *_wait() again). It is undefined behavior to call this if a message has
+ * already been partially received. It is therefore only safe to call this before
+ * calling *_wait() for the first time or immediately after receiving a message
+ * from @ref mq_recv().
+ * @param mq The message queue.
+ * @param buf The buffer to use to store the next message.
+ * @returns 0 on success.
+ * @returns -1 on failure, with errno set appropriately.
+ */
+int mq_store_buffer(struct mq *mq, buffer_t *buf);
+
+//int mq_store_file(struct mq *mq, ...);
+//int mq_store_process(struct mq *mq, ...);
 
 #endif

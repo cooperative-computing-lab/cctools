@@ -29,9 +29,7 @@ See the file COPYING for details.
 #define HDR_SIZE (sizeof(struct mq_msg) - offsetof(struct mq_msg, magic))
 #define HDR_MAGIC "MQmsg"
 
-enum mq_msg_type {
-	MQ_MSG_BUFFER = 1,
-};
+#define HDR_MSG_SINGLE 3
 
 enum mq_socket {
 	MQ_SOCKET_SERVER,
@@ -45,7 +43,8 @@ struct mq_msg {
 	bool parsed_header;
 	ptrdiff_t hdr_pos;
 	ptrdiff_t buf_pos;
-	buffer_t buf;
+	mq_msg_t storage;
+	buffer_t *buffer;
 
 	/* Here be dragons!
 	 *
@@ -82,8 +81,8 @@ struct mq {
 	struct list *send;
 	int err;
 	struct mq_msg *recv;
-	struct mq_msg *send_buf;
-	struct mq_msg *recv_buf;
+	struct mq_msg *sending;
+	struct mq_msg *recving;
 	struct mq_poll *poll_group;
 };
 
@@ -94,15 +93,32 @@ struct mq_poll {
 	struct set *error;
 };
 
-static struct mq_msg *msg_create (enum mq_msg_type type) {
+static struct mq_msg *msg_create (void) {
 	// sanity check
 	assert(HDR_SIZE == 16);
 	struct mq_msg *out = xxcalloc(1, sizeof(struct mq_msg));
-	buffer_init(&out->buf);
-	buffer_abortonfailure(&out->buf, true);
 	memcpy(out->magic, HDR_MAGIC, sizeof(out->magic));
-	out->type = type;
+	out->type = HDR_MSG_SINGLE;
 	return out;
+}
+
+static void delete_msg(struct mq_msg *msg) {
+	if (!msg) return;
+	switch (msg->storage) {
+		case MQ_MSG_NONE:
+		case MQ_MSG_BUFFER:
+			break;
+		case MQ_MSG_NEWBUFFER:
+			buffer_free(msg->buffer);
+			break;
+	}
+	free(msg);
+}
+
+static void mq_msg_delete(struct mq_msg *msg) {
+	if (!msg) return;
+	// once blobs are implemented, check for on-disk stuff to delete
+	delete_msg(msg);
 }
 
 static void mq_die(struct mq *mq, int err) {
@@ -111,8 +127,8 @@ static void mq_die(struct mq *mq, int err) {
 	mq->err = err;
 
 	mq_close(mq->acc);
-	mq_msg_delete(mq->send_buf);
-	mq_msg_delete(mq->recv_buf);
+	mq_msg_delete(mq->sending);
+	mq_msg_delete(mq->recving);
 	mq_msg_delete(mq->recv);
 
 	struct list_cursor *cur = list_cursor_create(mq->send);
@@ -131,12 +147,6 @@ static void mq_die(struct mq *mq, int err) {
 			set_insert(mq->poll_group->error, mq);
 		}
 	}
-}
-
-static void delete_msg(struct mq_msg *msg) {
-	if (!msg) return;
-	buffer_free(&msg->buf);
-	free(msg);
 }
 
 static struct mq *mq_create(enum mq_socket state, struct link *link) {
@@ -168,12 +178,6 @@ int mq_geterror(struct mq *mq) {
 	}
 }
 
-void mq_msg_delete(struct mq_msg *msg) {
-	if (!msg) return;
-	// once blobs are implemented, check for on-disk stuff to delete
-	delete_msg(msg);
-}
-
 static int validate_header(struct mq_msg *msg) {
 	assert(msg);
 	errno = EBADF;
@@ -181,7 +185,7 @@ static int validate_header(struct mq_msg *msg) {
 		return -1;
 	}
 	switch (msg->type) {
-		case MQ_MSG_BUFFER:
+		case HDR_MSG_SINGLE:
 			break;
 		default:
 			return -1;
@@ -195,13 +199,11 @@ static int flush_send(struct mq *mq) {
 	int socket = link_fd(mq->link);
 
 	while (true) {
-		if (!mq->send_buf) {
-			mq->send_buf = list_pop_head(mq->send);
-			if (!mq->send_buf) return 0;
-			buffer_tolstring(&mq->send_buf->buf, &mq->send_buf->len);
-			mq->send_buf->hdr_len = htonll(mq->send_buf->len);
+		if (!mq->sending) {
+			mq->sending = list_pop_head(mq->send);
 		}
-		struct mq_msg *snd = mq->send_buf;
+		struct mq_msg *snd = mq->sending;
+		if (!snd) return 0;
 
 		// make sure the cast below won't overflow
 		assert(HDR_SIZE < PTRDIFF_MAX);
@@ -217,7 +219,7 @@ static int flush_send(struct mq *mq) {
 			snd->hdr_pos += rc;
 		} else if (snd->buf_pos < (ptrdiff_t) snd->len) {
 			ssize_t rc = send(socket,
-					buffer_tostring(&snd->buf) + snd->buf_pos,
+					buffer_tostring(snd->buffer) + snd->buf_pos,
 					snd->len - snd->buf_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
@@ -227,7 +229,7 @@ static int flush_send(struct mq *mq) {
 			snd->buf_pos += rc;
 		} else {
 			delete_msg(snd);
-			mq->send_buf = NULL;
+			mq->sending = NULL;
 		}
 	}
 }
@@ -238,10 +240,14 @@ static int flush_recv(struct mq *mq) {
 	int socket = link_fd(mq->link);
 
 	while (!mq->recv) {
-		if (!mq->recv_buf) {
-			mq->recv_buf = msg_create(0);
+		if (!mq->recving) {
+			mq->recving = msg_create();
+			mq->recving->buffer = xxcalloc(1, sizeof(*mq->recving->buffer));
+			buffer_init(mq->recving->buffer);
+			buffer_abortonfailure(mq->recving->buffer, true);
+			mq->recving->storage = MQ_MSG_NEWBUFFER;
 		}
-		struct mq_msg *rcv = mq->recv_buf;
+		struct mq_msg *rcv = mq->recving;
 
 		// make sure the cast below won't overflow
 		assert(HDR_SIZE < PTRDIFF_MAX);
@@ -258,11 +264,12 @@ static int flush_recv(struct mq *mq) {
 		} else if (!rcv->parsed_header) {
 			rcv->len = ntohll(rcv->hdr_len);
 			if (validate_header(rcv) == -1) return -1;
-			buffer_grow(&rcv->buf, rcv->len);
+			buffer_grow(rcv->buffer, rcv->len + 1);
+			rcv->buffer->buf[rcv->len] = 0;
 			rcv->parsed_header = true;
 		} else if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
 			ssize_t rc = recv(socket,
-					(char *) buffer_tostring(&rcv->buf) + rcv->buf_pos,
+					(char *) buffer_tostring(rcv->buffer) + rcv->buf_pos,
 					rcv->len - rcv->buf_pos, 0);
 			if (rc == -1 && errno_is_temporary(errno)) {
 				return 0;
@@ -271,8 +278,9 @@ static int flush_recv(struct mq *mq) {
 			}
 			rcv->buf_pos += rc;
 		} else {
-			mq->recv = mq->recv_buf;
-			mq->recv_buf = NULL;
+			rcv->buffer->end = rcv->buffer->buf + rcv->len;
+			mq->recv = rcv;
+			mq->recving = NULL;
 		}
 	}
 	return 0;
@@ -288,7 +296,7 @@ static short poll_events(struct mq *mq) {
 			out |= POLLOUT;
 			break;
 		case MQ_SOCKET_CONNECTED:
-			if (mq->send_buf || list_length(mq->send)) {
+			if (mq->sending || list_length(mq->send)) {
 				out |= POLLOUT;
 			}
 			// falls through
@@ -374,45 +382,6 @@ static int handle_revents(struct pollfd *pfd, struct mq *mq) {
 DONE:
 	update_poll_group(mq);
 	return rc;
-}
-
-struct mq_msg *mq_wrap_buffer(const void *b, size_t size) {
-	assert(b);
-	struct mq_msg *out = msg_create(MQ_MSG_BUFFER);
-	buffer_putlstring(&out->buf, b, size);
-	return out;
-}
-
-void *mq_unwrap_buffer(struct mq_msg *msg, size_t *len) {
-	assert(msg);
-	if (msg->type != MQ_MSG_BUFFER) return NULL;
-	char *out = xxmalloc(msg->len + 1);
-	out[msg->len] = 0;
-	memcpy(out, buffer_tostring(&msg->buf), msg->len);
-	if (len) {
-		*len = msg->len;
-	}
-	delete_msg(msg);
-	return out;
-}
-
-int mq_send(struct mq *mq, struct mq_msg *msg) {
-	assert(mq);
-	assert(msg);
-	errno = mq_geterror(mq);
-	if (errno != 0) return -1;
-	list_push_tail(mq->send, msg);
-	return 0;
-}
-
-struct mq_msg *mq_recv(struct mq *mq) {
-	assert(mq);
-	struct mq_msg *out = mq->recv;
-	mq->recv = NULL;
-	if (mq->poll_group) {
-		set_remove(mq->poll_group->readable, mq);
-	}
-	return out;
 }
 
 struct mq *mq_serve(const char *addr, int port) {
@@ -607,4 +576,48 @@ DONE:
 	} else {
 		return -1;
 	}
+}
+
+int mq_send_buffer(struct mq *mq, buffer_t *buf) {
+	assert(mq);
+	assert(buf);
+
+	errno = mq_geterror(mq);
+	if (errno != 0) return -1;
+
+	struct mq_msg *msg = msg_create();
+	msg->storage = MQ_MSG_NEWBUFFER;
+	msg->buffer = buf;
+	buffer_tolstring(buf, &msg->len);
+	msg->hdr_len = htonll(msg->len);
+	list_push_tail(mq->send, msg);
+
+	return 0;
+}
+
+mq_msg_t mq_recv(struct mq *mq, buffer_t **out) {
+	assert(mq);
+
+	if (!mq->recv) return MQ_MSG_NONE;
+	struct mq_msg *msg = mq->recv;
+	mq->recv = NULL;
+	mq_msg_t storage = msg->storage;
+	if (mq->poll_group) {
+		set_remove(mq->poll_group->readable, mq);
+	}
+
+	switch (storage) {
+		case MQ_MSG_NEWBUFFER:
+			assert(out);
+			*out = msg->buffer;
+			msg->buffer = NULL;
+			msg->storage = MQ_MSG_NONE;
+		case MQ_MSG_BUFFER:
+			break;
+		case MQ_MSG_NONE:
+			abort();
+	}
+
+	delete_msg(msg);
+	return storage;
 }
