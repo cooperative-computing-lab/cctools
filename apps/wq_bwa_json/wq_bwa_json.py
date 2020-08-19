@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 #Copyright (C) 2020- The University of Notre Dame
 #This software is distributed under the GNU General Public License.
