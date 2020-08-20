@@ -20,6 +20,7 @@ COPYING for details.
 #define RESOURCES_DISK      "DISK"
 #define RESOURCES_WALL_TIME "WALL_TIME"
 #define RESOURCES_GPUS      "GPUS"
+#define RESOURCES_MPI_PROCESSES "MPI_PROCESSES"
 
 // These fields are defined as signed integers, even though they
 // will only contain positive numbers. This is to conversion to
@@ -58,6 +59,7 @@ struct rmsummary
 
 	int64_t  cores;                          /* peak usage in a small time window */
 	int64_t  cores_avg;
+	int64_t  context_switches;
 	int64_t  gpus;
     int64_t  machine_load;                   /* peak load of the host */
     int64_t  machine_cpus;                   /* number of cpus of the host */

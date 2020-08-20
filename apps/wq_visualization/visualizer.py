@@ -15,7 +15,7 @@ import math
 try:
 	from PIL import Image, ImageDraw, ImageFont
 except:
-	print sys.argv[0] + " requires the Python Imaging Library to run"
+	print(sys.argv[0] + " requires the Python Imaging Library to run")
 
 #variables in pixels
 MACHINE_WIDTH = 40
@@ -702,7 +702,7 @@ class Legend(object):
 				#no matter, lowest_file_refs will be updated
 
 				#find the lowest referenced file in the legend, assuming the index 0 is the least referenced
-				low_refs_index = self.file_slots.keys()[0]
+				low_refs_index = list(self.file_slots.keys())[0]
 				low_refs_name = self.file_slots[low_refs_index]
 				low_refs = self.fileCounter[low_refs_name].occur_count
 				for index in self.file_slots:
@@ -949,12 +949,11 @@ class Machine(object):
 
 	def display_attributes(self):
 		#debug info
-		print self.name + "/" + self.ip
+		print(self.name + "/" + self.ip)
 		for task in self.tasks:
-			print "\tTask: "+ str(task)+" : " + str(self.tasks[task])
+            print("\tTask: {}:{}\n".format(task, self.tasks[task]))
 		for f in self.files:
-			print "\tFile:" + str(f)
-		print
+			print("\tFile: {}\n".format(f))
 
 	def get_location(self):
 		return self.location
@@ -1099,29 +1098,29 @@ class Connection(object):
 def main():
 
 	if(len(sys.argv) != 3):
-		print "Usage: "+sys.argv[0]+" <debugFileName> <outputFileName>"
+		print("Usage: "+sys.argv[0]+" <debugFileName> <outputFileName>")
 		sys.exit(0)
 	try:
 		logToRead = open(sys.argv[1], 'r')
 	except:
-		print "Could not open " + sys.argv[1] + " for reading: "
+		print("Could not open " + sys.argv[1] + " for reading: ")
 		sys.exit(0)
 
 	if os.path.isfile(sys.argv[2]+".gif"):
-		print "Could not create " + sys.argv[2] + ".gif to write final movie to, file already exists"
+		print("Could not create " + sys.argv[2] + ".gif to write final movie to, file already exists")
 		sys.exit(0)
 
 	dirname = sys.argv[2]+"_frames"
 
 
 	if(os.system("mkdir "+dirname) != 0):
-		print "Could not create a temporary file storage directory " + dirname +"."
+		print("Could not create a temporary file storage directory " + dirname +".")
 		sys.exit()
 
 	try:
 		subprocess.check_output(["gifsicle", "--version"])
 	except:
-		print "gifsicle is a tool required by this visualization tool. Please install it before use."
+		print("gifsicle is a tool required by this visualization tool. Please install it before use.")
 		os.system("rmdir " + dirname)
 		sys.exit()
 

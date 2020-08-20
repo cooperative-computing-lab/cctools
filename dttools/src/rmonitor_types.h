@@ -44,6 +44,12 @@ struct rmonitor_cpu_time_info
 	uint64_t delta;
 };
 
+struct rmonitor_ctxsw_info
+{
+	uint64_t accumulated;
+	uint64_t delta;
+};
+
 struct rmonitor_mem_info
 {
 	uint64_t virtual;
@@ -133,6 +139,7 @@ struct rmonitor_process_info
 
 	struct rmonitor_mem_info      mem;
 	struct rmonitor_cpu_time_info cpu;
+	struct rmonitor_ctxsw_info    ctx;
 	struct rmonitor_io_info       io;
 	struct rmonitor_load_info     load;
 	struct rmonitor_wdir_info    *wd;

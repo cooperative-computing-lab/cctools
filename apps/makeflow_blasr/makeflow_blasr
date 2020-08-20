@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (C) 2014- The University of Notre Dame
 # This software is distributed under the GNU General Public License.
@@ -19,7 +19,7 @@ class PassThroughParser(optparse.OptionParser):
     while rargs:
          try:
              optparse.OptionParser._process_args(self,largs,rargs,values)
-         except (optparse.BadOptionError,optparse.AmbiguousOptionError), e:
+         except (optparse.BadOptionError,optparse.AmbiguousOptionError) as e:
              largs.append(e.opt_str)
 
 def parse_blasr_options(parser):

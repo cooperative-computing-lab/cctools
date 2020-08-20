@@ -48,7 +48,50 @@ Note that the helper is only activated in special cases (like time warp mode)
 so that not all programs will pay this performance penalty.
 */
 
-int gettimeofday( struct timeval *tv, struct timezone *tz )
+#if defined(__GLIBC__) && \
+		((__GLIBC__ << 16) + __GLIBC_MINOR__ <= (2 << 16) + 30) && \
+		(defined(_BSD_SOURCE) || defined(_DEFAULT_SOURCE))
+	typedef struct timezone * _cctools_timezone_ptr_t;
+#else
+	typedef void * _cctools_timezone_ptr_t;
+#endif
+/*
+The `gettimeofday()` function (and especially the second argument) seem
+to have been deprecated for a while. In v2.31 glibc recently changed
+the way it's defined in sys/time.h. Previously, the choice of feature
+macros would result in `tz` being decalred as either a `struct timezone *`
+or a `void *`. The `struct timezone *` form appears to be an older (possibly
+BSD or SysV derived?) feature, while Linux declares a `void *` expects `NULL`.
+Apparently glibc finally dropped support for the former mode. Unfortunately,
+this a problem for Parrot. Just from the distros we build for (and a bleeding
+edge one like Arch or the Nix environment from #2327), I saw several
+different behaviors:
++ `__USE_BSD` switches to the `struct timezone *` form. This is an internal
+  macro, turned on via `_BSD_SOURCE`. `_BSD_SOURCE` and `_SVID_SOURCE` are
+  deprecated aliases for `_DEFAULT_SOURCE`.
++ `__USE_MISC` instead. This is turned on by either `_BSD_SOURCE` or
+  `_SVID_SOURCE` (`_DEFAULT_SOURCE` on newer versions).
++ No feature macros at all. Current/future glibc versions only allow
+  the `void *` form.
+
+To complicate things, defining `_GNU_SOURCE` (and possibly `-std=`) can imply
+features. Thus depending on glibc version our default `CFLAGS` resulted in the
+`struct timezone *` form on some platforms, and `void *` on others.
+
+We detect this glibc quirk here, and while ugly this is the only way I could
+find to fix this that doesn't have the chance to introduce weird type
+mismatches. Trying to work around the glibc headers by compiling with
+different features defined or by avoiding certain headers might get things
+to compile in the short term, but risks creating a mismatch if a feature macro
+changes the typedefs e.g. `off_t` can vary in width depending on which
+features are defined. A mismatch between header typedefs would be terrible
+to debug, as we'd see either stack corruption or silent changes
+to function arguments.
+
+Thanks, glibc....
+*/
+
+int gettimeofday( struct timeval *tv, _cctools_timezone_ptr_t tz )
 {
 	return syscall(SYS_gettimeofday,tv,tz);
 }

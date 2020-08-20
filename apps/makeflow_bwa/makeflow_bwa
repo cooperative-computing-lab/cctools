@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 #Copyright (C) 2013- The University of Notre Dame
 #This software is distributed under the GNU General Public License.
@@ -33,7 +33,7 @@ class PassThroughParser(optparse.OptionParser):
 		while rargs:
 			try:
 				optparse.OptionParser._process_args(self,largs,rargs,values)
-			except (optparse.AmbiguousOptionError, optparse.BadOptionError), e:
+			except (optparse.AmbiguousOptionError, optparse.BadOptionError) as e:
 				bwa_args[current_algo].append(e.opt_str)
 				if "--" not in rargs[0]:
 					bwa_args[current_algo].append(rargs[0])

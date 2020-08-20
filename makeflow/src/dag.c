@@ -58,6 +58,7 @@ struct dag *dag_create()
 	string_set_insert(d->special_vars, RESOURCES_MEMORY);
 	string_set_insert(d->special_vars, RESOURCES_DISK);
 	string_set_insert(d->special_vars, RESOURCES_GPUS);
+	string_set_insert(d->special_vars, RESOURCES_MPI_PROCESSES);
 	string_set_insert(d->special_vars, RESOURCES_WALL_TIME);
 
 	/* export all variables related to resources */
@@ -66,6 +67,7 @@ struct dag *dag_create()
 	string_set_insert(d->export_vars, RESOURCES_MEMORY);
 	string_set_insert(d->export_vars, RESOURCES_DISK);
 	string_set_insert(d->export_vars, RESOURCES_GPUS);
+	string_set_insert(d->export_vars, RESOURCES_MPI_PROCESSES);
 	string_set_insert(d->export_vars, RESOURCES_WALL_TIME);
 
 	memset(d->node_states, 0, sizeof(int) * DAG_NODE_STATE_MAX);
