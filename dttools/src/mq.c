@@ -110,6 +110,7 @@ static void delete_msg(struct mq_msg *msg) {
 			break;
 		case MQ_MSG_NEWBUFFER:
 			buffer_free(msg->buffer);
+			free(msg->buffer);
 			break;
 	}
 	free(msg);
