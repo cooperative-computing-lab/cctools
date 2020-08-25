@@ -264,7 +264,9 @@ static int flush_recv(struct mq *mq) {
 		} else if (!rcv->parsed_header) {
 			rcv->len = ntohll(rcv->hdr_len);
 			if (validate_header(rcv) == -1) return -1;
-			buffer_grow(rcv->buffer, rcv->len + 1);
+			if (buffer_grow(rcv->buffer, rcv->len + 1) == -1) {
+				fatal("failed to allocate memory for mq recv buffer");
+			}
 			rcv->buffer->buf[rcv->len] = 0;
 			rcv->parsed_header = true;
 		} else if (rcv->buf_pos < (ptrdiff_t) rcv->len) {
@@ -620,4 +622,17 @@ mq_msg_t mq_recv(struct mq *mq, buffer_t **out) {
 
 	delete_msg(msg);
 	return storage;
+}
+
+int mq_store_buffer(struct mq *mq, buffer_t *buf) {
+	assert(mq);
+	assert(buf);
+
+	assert(!mq->recving);
+	buffer_rewind(buf, 0);
+	mq->recving = msg_create();
+	mq->recving->buffer = buf;
+	mq->recving->storage = MQ_MSG_BUFFER;
+
+	return 0;
 }
