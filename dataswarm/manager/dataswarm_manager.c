@@ -23,8 +23,8 @@ See the file COPYING for details.
 #include "catalog_query.h"
 
 #include "dataswarm_message.h"
-#include "dataswarm_worker.h"
-#include "dataswarm_client.h"
+#include "dataswarm_worker_rep.h"
+#include "dataswarm_client_rep.h"
 #include "dataswarm_manager.h"
 
 struct jx * manager_status_jx( struct dataswarm_manager *m )
@@ -113,11 +113,11 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 
 		if(!strcmp(conn_type,"worker")) {
 			debug(D_DATASWARM,"new worker from %s:%d\n",addr,port);
-			struct dataswarm_worker *w = dataswarm_worker_create(l);
+			struct dataswarm_worker_rep *w = dataswarm_worker_rep_create(l);
 			hash_table_insert(m->worker_table,manager_key,w);
 		} else if(!strcmp(conn_type,"client")) {
 			debug(D_DATASWARM,"new client from %s:%d\n",addr,port);
-			struct dataswarm_client *c = dataswarm_client_create(l);
+			struct dataswarm_client_rep *c = dataswarm_client_rep_create(l);
 			hash_table_insert(m->client_table,manager_key,c);
 		} else {
 			/* dataswarm_json_send_error_result(l, {"result": ["params.type"] }, DS_MSG_MALFORMED_PARAMETERS, stoptime); */
@@ -130,7 +130,7 @@ void handle_connect_message( struct dataswarm_manager *m, time_t stoptime )
 	}
 }
 
-void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client *c, time_t stoptime )
+void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client_rep *c, time_t stoptime )
 {
 	struct jx *msg = dataswarm_json_recv(c->link,stoptime);
 	if(!msg) {
@@ -171,7 +171,7 @@ void handle_client_message( struct dataswarm_manager *m, struct dataswarm_client
 	}
 }
 
-void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker *w, time_t stoptime )
+void handle_worker_message( struct dataswarm_manager *m, struct dataswarm_worker_rep *w, time_t stoptime )
 {
 	struct jx *msg = dataswarm_json_recv(w->link,stoptime);
 	if(!msg) {
@@ -215,8 +215,8 @@ int handle_messages( struct dataswarm_manager *m, int msec )
 	table[0].revents = 0;
 
 	char *key;
-	struct dataswarm_worker *w;
-	struct dataswarm_client *c;
+	struct dataswarm_worker_rep *w;
+	struct dataswarm_client_rep *c;
 
 	n = 1;
 

@@ -19,13 +19,12 @@
 #include "catalog_query.h"
 
 #include "dataswarm_message.h"
-#include "dataswarm_worker.h"
-#include "dataswarm_client.h"
+#include "dataswarm_worker_rep.h"
 #include "dataswarm_manager.h"
 
-struct dataswarm_worker * dataswarm_worker_create( struct link *l )
+struct dataswarm_worker_rep * dataswarm_worker_rep_create( struct link *l )
 {
-	struct dataswarm_worker *w = malloc(sizeof(*w));
+	struct dataswarm_worker_rep *w = malloc(sizeof(*w));
 	w->link = l;
 	return w;
 }
